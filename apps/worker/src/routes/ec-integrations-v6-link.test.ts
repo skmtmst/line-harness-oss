@@ -212,7 +212,7 @@ describe('EC receipt links one normalized event to V6', () => {
       occurredAt: '2026-08-27T16:00:00.000Z',
       friendId: 'friend-1',
       eventData: expect.objectContaining({ orderNumber: 'NEN-1001', orderTotal: 2860 }),
-    }, 'account-token', 'account-a', undefined, undefined);
+    }, 'account-token', 'account-a', expect.objectContaining({sourceEventId:expect.any(String)}), undefined);
     const [, , payload] = mocks.fireEvent.mock.calls[0] as unknown as [unknown, unknown, Record<string, unknown>];
     expect(payload).not.toHaveProperty('event_id');
     expect(payload.eventData).not.toHaveProperty('order.items');
@@ -236,7 +236,7 @@ describe('EC receipt links one normalized event to V6', () => {
     expect(mocks.pushMessage).not.toHaveBeenCalled();
     expect(mocks.fireEvent).toHaveBeenCalledTimes(1);
     expect(mocks.fireEvent).toHaveBeenCalledWith(
-      db, 'ec.order.confirmed', expect.objectContaining({ sourceEventId: 'event-12345678' }), 'account-token', 'account-a', undefined, undefined,
+      db, 'ec.order.confirmed', expect.objectContaining({ sourceEventId: 'event-12345678' }), 'account-token', 'account-a', expect.objectContaining({sourceEventId:expect.any(String)}), undefined,
     );
   });
 
@@ -259,7 +259,7 @@ describe('EC receipt links one normalized event to V6', () => {
     expect(await retried.json()).toMatchObject({ success: true, status: 'processed' });
     expect(mocks.fireEvent).toHaveBeenCalledTimes(1);
     expect(mocks.fireEvent).toHaveBeenCalledWith(
-      db, 'ec.order.confirmed', expect.objectContaining({ sourceEventId: 'event-12345678' }), 'account-token', 'account-a', undefined, undefined,
+      db, 'ec.order.confirmed', expect.objectContaining({ sourceEventId: 'event-12345678' }), 'account-token', 'account-a', expect.objectContaining({sourceEventId:expect.any(String)}), undefined,
     );
   });
 
@@ -370,7 +370,13 @@ describe('EC receipt links one normalized event to V6', () => {
     expect(mocks.fireEvent).toHaveBeenCalledWith(
       db, 'ec.customer.profile_updated', expect.objectContaining({
         sourceEventId: 'event-abcdef12', sourceKind: 'eccube', friendId: 'friend-1',
-      }), 'account-token', 'account-a', undefined, undefined,
+      }), 'account-token', 'account-a', expect.objectContaining({sourceEventId:expect.any(String)}), undefined,
     );
   });
+});
+
+vi.mock('../services/workflow-execution.js',async()=>{
+ const {unitWorkflow}=await import('../test-utils/workflow-unit.js');
+ return {acquireWorkflow:async(db:D1Database,ref:any)=>unitWorkflow(db,ref),
+  runWorkflowStep:async(_db:any,_ref:any,work:Function,options:any)=>work({input_json:JSON.stringify(options.input),retry_key:options.retryKey,attempt_count:1,first_attempt_at:Date.now()})};
 });

@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import ts from 'typescript'
 import { ListPage, ListPageBody } from './index'
 
 afterEach(cleanup)
@@ -105,16 +106,38 @@ describe('左の列を持つ一覧は、畳んだときの行き先も持つ', (
   }
   walk(join(SRC, 'v8'))
   walk(join(SRC, 'app'))
-  const LIST_USERS = /<(ListPage|ListPageBody|AffiliateFrame|MileageFrame)\b/
+  const folderLists = (source: string) => {
+    const ast = ts.createSourceFile('screen.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const lists: Array<{ component: string; fallback: boolean }> = []
+    const visit = (node: ts.Node) => {
+      if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+        const component = node.tagName.getText(ast)
+        if (['ListPage', 'ListPageBody', 'AffiliateFrame', 'MileageFrame'].includes(component)) {
+          const attrs = node.attributes.properties.filter(ts.isJsxAttribute)
+          if (attrs.some((attr) => attr.name.getText(ast) === 'folders')) {
+            const fallback = attrs.some((attr) => ['collapsedFolders', 'folderNav'].includes(attr.name.getText(ast)) && attr.initializer?.getText(ast) !== '{undefined}')
+            lists.push({ component, fallback })
+          }
+        }
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(ast)
+    return lists
+  }
   const listFiles = files.filter((file) => {
     const source = readFileSync(file, 'utf8')
-    return LIST_USERS.test(source) && /\bfolders=\{/.test(source)
+    return folderLists(source).length > 0
+  })
+  it('情報欄編集の folders を一覧の左列と混同せず、本物の左列は見張る', () => {
+    expect(folderLists('<ListPage><FieldEditor folders={rows} /></ListPage>')).toEqual([])
+    expect(folderLists('<ListPageBody folders={rows} />')).toEqual([{ component: 'ListPageBody', fallback: false }])
   })
   it('一覧の型を使う画面を拾えている（見張りが空振りしない）', () => {
     expect(listFiles.length).toBeGreaterThan(20)
   })
   it.each(listFiles.map((file) => [relative(SRC, file), file]))('%s は collapsedFolders か folderNav を渡す', (_name, file) => {
     const source = readFileSync(file, 'utf8')
-    expect(/\b(collapsedFolders=\{(?!undefined\})|folderNav=\{)/.test(source)).toBe(true)
+    expect(folderLists(source).every((list) => list.fallback)).toBe(true)
   })
 })

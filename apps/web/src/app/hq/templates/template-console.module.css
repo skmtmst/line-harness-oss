@@ -6,7 +6,7 @@
 .tabs { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 4px; background: var(--color-canvas-sunken); padding: 4px; border-radius: var(--radius-control); margin-bottom: 20px; }
 .tabs a { padding: 10px; text-align: center; border-radius: var(--radius-control); font-size: 12px; }
 .tabs a[aria-current] { background: var(--color-canvas); color: var(--color-accent-deep); font-weight: 600; }
-.panel { border: 1px solid var(--color-hairline); background: var(--color-canvas); border-radius: var(--radius-card); padding: 20px; min-width: 0; }
+.panel { border: 1px solid var(--card-edge); background: var(--color-canvas); border-radius: var(--radius-card); padding: 20px; min-width: 0; box-shadow: var(--card-shadow); }
 .panel h2 { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
 .toolbar { display: flex; gap: 16px; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; }
 .input { border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas-sunken); padding: 10px 12px; width: 100%; min-width: 0; color: var(--color-ink); }

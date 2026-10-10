@@ -1,13 +1,21 @@
 'use client'
 
+import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+
 /*
  * ★V8 Googleビジネス パフォーマンス（`SrmVs`）。
  * 数4（共通の KpiCard）→ 飲食店向け指標 → 注。期間は 7／28／90 日（今の画面と同じ口・既定28日）。
- * 表示数の推移（今の画面の棒グラフ）は、数のマスの「…」→「表示数の推移を見る」で下に開く。
+ * 表示数の推移（今の画面の棒グラフ）は、帯の下の「表示数の推移を見る」で開閉する。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Eye, MapPin, MousePointerClick, Phone } from 'lucide-react'
+import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import SectionHeader from '@/components/shared/section-header'
+import KpiBand from '@/components/shared/kpi-band'
+import SegmentedControl from '@/components/shared/segmented'
 import { RowMenu } from '@/components/shared/row-actions'
+import PeriodPicker from '@/components/shared/period-picker'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -19,6 +27,8 @@ import {
 } from '@/lib/restaurant-google-api'
 import { errorMessage } from './format'
 import styles from './google.module.css'
+import { formatDate as polishFormatDate, formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 const DAYS: GooglePerformanceDays[] = [7, 28, 90]
 
@@ -55,8 +65,7 @@ export function bucketDaily(daily: Array<{ date: string; impressions: number | n
 const BUCKET_LABELS: Record<GooglePerformanceDays, string> = { 7: '1日ごと', 28: '2日ごと', 90: '7日ごと' }
 
 function shortDate(isoDate: string): string {
-  const [, month, day] = isoDate.split('-')
-  return `${Number.parseInt(month, 10)}/${day}`
+  return polishFormatDate(isoDate, { style: 'list-day', fallback: '—' })
 }
 
 function ImpressionsChart({ data }: { data: GooglePerformanceData }) {
@@ -65,28 +74,7 @@ function ImpressionsChart({ data }: { data: GooglePerformanceData }) {
   if (!buckets.some((bucket) => bucket.total !== null)) {
     return <ListState kind="empty" title="表示数のデータがまだありません" description="夜間の自動取得のあとに表示されます。" />
   }
-  const summary = buckets.filter((b) => b.total !== null).map((b) => `${shortDate(b.startDate)}〜 ${b.total}回`).join('、')
-  return (
-    <svg className={styles.chart} viewBox={`0 0 ${buckets.length * 10} 100`} preserveAspectRatio="none" role="img" aria-label={`プロフィール表示の推移（${BUCKET_LABELS[data.days]}の合計）: ${summary}`}>
-      {buckets.map((bucket, index) => {
-        const height = ((bucket.total ?? 0) / max) * 100
-        return (
-          <rect key={bucket.startDate} className={styles.chartBar} x={index * 10 + 1.5} width={7} y={100 - height} height={height}>
-            <title>{`${shortDate(bucket.startDate)}〜: ${bucket.total ?? '—'}`}</title>
-          </rect>
-        )
-      })}
-    </svg>
-  )
-}
-
-function MetricMenu({ title, onShowTrend }: { title: string; onShowTrend: () => void }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <span className={styles.menuBox}>
-      <RowMenu className={styles.metricMenu} label={`${title}の操作`} open={open} onOpenChange={setOpen} items={[{ id: 'trend', label: '表示数の推移を見る', onSelect: () => { setOpen(false); onShowTrend() } }]} />
-    </span>
-  )
+  return <ValueBarChart label={`プロフィール表示の推移（${BUCKET_LABELS[data.days]}の合計）`} unit="回" items={buckets.map(bucket=>({key:bucket.startDate,label:bucket.startDate,value:bucket.total}))} />
 }
 
 export default function PerformanceBoard({ accountId }: { accountId: string }) {
@@ -117,51 +105,47 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
     <>
       <div className={styles.toolbar}>
         <p className={styles.toolbarText} title={range ? `集計期間 ${range}（日本時間）` : undefined}>Google の検索・地図でどれだけ見られたか</p>
-        <div className={styles.seg} role="radiogroup" aria-label="集計期間">
-          {DAYS.map((d) => (
-            <button key={d} type="button" role="radio" aria-checked={days === d} className={styles.segButton} onClick={() => setDays(d)}>{`直近${d}日`}</button>
-          ))}
-        </div>
+        <PeriodPicker days={days} onChange={(value) => setDays(value as GooglePerformanceDays)} supportedDays={DAYS} />
       </div>
       {loading && !data ? <div className={styles.stateBox}><ListState kind="loading" title="パフォーマンスを読み込んでいます" /></div> : null}
       {loadError ? <ListState kind="error" title="パフォーマンスを表示できませんでした" description={loadError} onRetry={() => void load()} /> : null}
       {data ? (
         <>
           {data.lastMetricsSyncedAt === null ? <Notice tone="info">パフォーマンスの自動取得はまだ実行されていません。毎晩の取得のあとに数値が表示されます。</Notice> : null}
-          <div className={styles.metrics}>
+          <KpiBand presentation="band" gridClassName="">
             {METRICS.map(({ key, title, icon: Icon }) => (
               <KpiCard
                 key={key}
-                className={styles.metric}
+                presentation="band"
                 title={title}
                 icon={<Icon aria-hidden className={styles.icon13} />}
-                menu={<MetricMenu title={title} onShowTrend={() => setShowTrend(true)} />}
                 value={data.totals[key]}
                 unit="回"
                 detail={compareText(data.days, data.totals[key], data.previousTotals[key])}
                 help={key === 'callClicks' ? '電話ボタンが押された数です。通話が成立した数ではありません。' : undefined}
               />
             ))}
-          </div>
-          <section className={styles.card}>
-            <h2 className={styles.cardTitle}>飲食店向け指標</h2>
+          </KpiBand>
+          <Button onClick={() => setShowTrend((current) => !current)} aria-expanded={showTrend}>表示数の推移を見る</Button>
+          <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
+            <SectionHeader size="small" title={<>飲食店向け指標</>} />
             <dl className={styles.facts}>
-              <div className={styles.factRow}><dt className={styles.factKey}>予約ボタンのクリック</dt><dd className={styles.factValue}>{data.food.bookings === null ? '—（連携サービス未対応）' : `${data.food.bookings.toLocaleString('ja-JP')} 回`}</dd></div>
-              <div className={styles.factRow}><dt className={styles.factKey}>メニューの閲覧</dt><dd className={styles.factValue}>{data.food.menuClicks === null ? '—（対象機能を使っている店舗のみ）' : `${data.food.menuClicks.toLocaleString('ja-JP')} 回`}</dd></div>
-              <div className={styles.factRow}><dt className={styles.factKey}>料理の注文</dt><dd className={styles.factValue}>{data.food.foodOrders === null ? '—（連携サービス未対応）' : `${data.food.foodOrders.toLocaleString('ja-JP')} 回`}</dd></div>
+              <div className={styles.factRow}><dt className={styles.factKey}>予約ボタンのクリック</dt><dd className={styles.factValue}>{data.food.bookings === null ? '—（連携サービス未対応）' : `${polishFormatNumber(data.food.bookings)} 回`}</dd></div>
+              <div className={styles.factRow}><dt className={styles.factKey}>メニューの閲覧</dt><dd className={styles.factValue}>{data.food.menuClicks === null ? '—（対象機能を使っている店舗のみ）' : `${polishFormatNumber(data.food.menuClicks)} 回`}</dd></div>
+              <div className={styles.factRow}><dt className={styles.factKey}>料理の写真の閲覧</dt><dd className={styles.factValue}>—（未取得）</dd></div>
             </dl>
             <p className={styles.grayNote}>数字は Google ビジネス プロフィールの集計です（前日までの分。2〜3日遅れることがあります）。</p>
-          </section>
+          </Card>
           {showTrend ? (
-            <section className={styles.card} aria-label="プロフィール表示の推移">
+            <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-label="プロフィール表示の推移">
               <div className={styles.cardHead}>
-                <h2 className={styles.cardTitle}>プロフィール表示の推移</h2>
+                <SectionHeader size="small" title={<>プロフィール表示の推移</>} />
                 <span className={styles.spacer} aria-hidden="true" />
                 <span className={styles.muted}>{`■ 表示数 / ${BUCKET_LABELS[data.days]}の合計・${range}`}</span>
-                <button type="button" className={styles.textButton} onClick={() => setShowTrend(false)}>閉じる</button>
+                <Button variant="text" onClick={() => setShowTrend(false)}>閉じる</Button>
               </div>
               <ImpressionsChart data={data} />
-            </section>
+            </Card>
           ) : null}
         </>
       ) : null}

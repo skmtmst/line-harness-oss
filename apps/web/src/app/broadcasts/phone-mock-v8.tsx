@@ -1,4 +1,4 @@
-import { BatteryFull, ChevronDown, ChevronLeft, Menu, Phone, Search, Signal, Wifi } from 'lucide-react'
+import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import BroadcastMessagePreview from '@/components/broadcasts/broadcast-message-preview'
 import type { BroadcastBubble, BroadcastMessageButton } from '@/lib/api'
 import styles from './phone-mock-v8.module.css'
@@ -28,46 +28,15 @@ export default function BroadcastPhoneMock({
 }) {
   const senderInitial = accountName.trim().charAt(0) || '然'
   return (
-    <div className={styles.phone} aria-label="届いたときの見え方の見本">
-      <div className={styles.screen}>
-        <div className={styles.statusBar}>
-          <span>9:41</span>
-          <span className={styles.island} aria-hidden="true" />
-          <span className={styles.statusIcons} aria-hidden="true">
-            <Signal size={13} />
-            <Wifi size={13} />
-            <BatteryFull size={15} />
-          </span>
-        </div>
-        <div className={styles.chatHeader}>
-          <ChevronLeft size={18} aria-hidden="true" />
-          <span className={styles.chatName}>{accountName}</span>
-          <span className={styles.chatHeaderIcons} aria-hidden="true">
-            <Search size={15} />
-            <Phone size={15} />
-            <Menu size={15} />
-          </span>
-        </div>
-        <div className={styles.chatBody}>
-          {chip ? <span className={styles.dateChip}>{chip}</span> : null}
-          <div className={styles.sender}>
-            <span className={styles.senderAvatar} aria-hidden="true">{senderInitial}</span>
-            <span className={styles.senderName}>{accountName}</span>
-          </div>
-          <div className={styles.bubbles}>
+    <LinePreview title={null} accountName={accountName} caption={chip}>
+      <LinePreviewMessage accountName={accountName} avatar={senderInitial} time="">
             <BroadcastMessagePreview
               bubbles={broadcast.messageBubbles}
               messageType={broadcast.messageType}
               messageContent={broadcast.messageContent}
               buttons={broadcast.messageOptions?.buttons}
             />
-          </div>
-        </div>
-        <div className={styles.chatFooter}>
-          <span>メニュー <ChevronDown size={10} style={{ display: 'inline', verticalAlign: '-1px' }} aria-hidden="true" /></span>
-          <span className={styles.homeIndicator} aria-hidden="true" />
-        </div>
-      </div>
-    </div>
+      </LinePreviewMessage>
+    </LinePreview>
   )
 }

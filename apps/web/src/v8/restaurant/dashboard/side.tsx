@@ -5,7 +5,7 @@
  *
  * 媒体のリンク（店舗ページ・管理画面）は「予約サイト・グルメ媒体」の設定（/settings/booking-media）で保存した URL。
  * 保存してある行だけにリンクが出る。見出しの右の「設定」から、その設定の画面へ。
- * Instagram はまだつなげないので「つなぐ」への案内だけ（SNS 連携の画面へ）。
+ * Instagram は投稿の同時公開まで対応（設定 › SNS 連携）。DM・コメントを受け取る口はまだ無いので案内だけ。
  */
 import { CornerUpLeft } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -15,6 +15,7 @@ import TextLink from '@/components/shared/text-link'
 import type { GoogleConnectionData, GoogleReview } from '@/lib/restaurant-google-api'
 import type { StoreMedium } from './use-store-today'
 import styles from './dashboard.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 function stars(rating: number): string {
   const n = Math.max(0, Math.min(5, Math.round(rating)))
@@ -54,9 +55,9 @@ export function SidePanel({ media, google, latestReview, canWrite, now }: {
           {media.map((m) => (
             <li key={m.code} className={styles.medium}>
               <span className={styles.mediumMark} aria-hidden="true">{m.name.slice(0, 1)}</span>
-              <span className={styles.mediumName} title={m.name}>{m.name}</span>
-              {m.storePageUrl ? <a className={styles.mediumLink} href={m.storePageUrl} target="_blank" rel="noopener noreferrer">店舗ページ ↗</a> : null}
-              {m.adminUrl ? <a className={styles.mediumLink} href={m.adminUrl} target="_blank" rel="noopener noreferrer">管理画面 ↗</a> : null}
+              <span className={styles.mediumName} ><TruncatedText value={String(m.name ?? '')} /></span>
+              {m.storePageUrl ? <TextLink external className={styles.mediumLink} href={m.storePageUrl}  >店舗ページ</TextLink> : null}
+              {m.adminUrl ? <TextLink external className={styles.mediumLink} href={m.adminUrl}  >管理画面</TextLink> : null}
             </li>
           ))}
         </ul>
@@ -97,11 +98,11 @@ export function SidePanel({ media, google, latestReview, canWrite, now }: {
 
       <SectionHeader
         title="Instagram の新着"
-        help="Instagram をつなぐと、DM とコメントの新着がここに出て、受信箱で LINE と同じように返せます。"
+        help="いまの Instagram 連携は、Googleビジネスの投稿を Instagram にも同時に出すところまでです。DM とコメントの新着は、受け取る口ができてからここに出します。"
         helpLabel="Instagram の新着の説明"
       />
       <div className={styles.sideCard}>
-        <p className={styles.sideText}>Instagram はまだつないでいません。つなぐと DM・コメントの新着がここに出ます。</p>
+        <p className={styles.sideText}>DM・コメントの新着はまだここに出せません。Instagram のつなぎ方は SNS 連携の画面で見られます。</p>
         <TextLink href="/settings/sns">SNS 連携を見る</TextLink>
       </div>
     </div>

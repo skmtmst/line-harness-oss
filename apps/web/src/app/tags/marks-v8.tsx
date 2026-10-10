@@ -31,6 +31,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { TagRowsSkeleton } from './tag-rows-skeleton'
 import styles from './list-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -317,7 +318,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
         {kpis.map((kpi) => (
           <div key={kpi.title} className={styles.kpi}>
             <span className={styles.kpiLabel}><kpi.icon size={13} aria-hidden="true" />{kpi.title}</span>
-            <p className={styles.kpiValue}>{kpi.value ?? '—'}<span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span></p>
+            <p className={styles.kpiValue}>{kpi.value ?? emptyValue('unknown')}<span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span></p>
             <p className={styles.kpiDetail}>{kpi.detail}</p>
           </div>
         ))}
@@ -331,8 +332,8 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
         <div className={styles.toolbar}>
           <div className={styles.searchWrap}>
             <SearchField
-              aria-label="マーク名で検索"
-              placeholder="マーク名で検索"
+              aria-label="マーク名で探す"
+              placeholder="マーク名で探す"
               value={query}
               onChange={setQuery}
               onClear={() => setQuery('')}
@@ -457,7 +458,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
                           </ContextMenu>
                         </td>
                         <td className={styles.cellText} style={{ fontVariantNumeric: 'tabular-nums' }}>{mark.friendCount}人</td>
-                        <td className={styles.cellText}>{mark.isDefault ? '新着時の初期値' : '—'}</td>
+                        <td className={styles.cellText}>{mark.isDefault ? '新着時の初期値' : emptyValue('unknown')}</td>
                         <td className={styles.cellMuted}><span className={styles.cellTruncate} title={autoRuleLabel(mark)}>{autoRuleLabel(mark)}</span></td>
                         <td className={styles.cellMuted}><span className={styles.cellTruncate} title={usageLabel(mark)}>{usageLabel(mark)}</span></td>
                         <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
@@ -574,7 +575,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
             </div>
             <div>
               <dt className={styles.cellMuted}>初期値</dt>
-              <dd className={styles.cellText}>{activeMark.isDefault ? '新着時の初期値' : '—'}</dd>
+              <dd className={styles.cellText}>{activeMark.isDefault ? '新着時の初期値' : emptyValue('unknown')}</dd>
             </div>
             <div>
               <dt className={styles.cellMuted}>自動変更</dt>

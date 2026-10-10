@@ -1,5 +1,6 @@
+import { liffActionFromUrl } from '@line-crm/shared';
 import { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import LoadingView from './components/LoadingView.js';
 
 // 画面ごとに束を分ける。開いた画面のぶんだけ読む。
@@ -11,10 +12,12 @@ const EventDone = lazy(() => import('./pages/EventDone.js'));
 const EventBookings = lazy(() => import('./pages/EventBookings.js'));
 const Affiliate = lazy(() => import('./pages/Affiliate.js'));
 const Webinar = lazy(() => import('./pages/Webinar.js'));
+const Research = lazy(() => import('./pages/Research.js'));
 const Form = lazy(() => import('./pages/Form.js'));
 const EventWaitlistOffer = lazy(() => import('./pages/EventWaitlistOffer.js'));
 const VisitStamps = lazy(() => import('./pages/VisitStamps.js'));
 const SeatReserve = lazy(() => import('./pages/seat/SeatReserve.js'));
+const EntryRouteCoupon = lazy(() => import('./pages/EntryRouteCoupon.js'));
 const NotFound = lazy(() => import('./pages/NotFound.js'));
 
 function Loading() {
@@ -23,6 +26,8 @@ function Loading() {
 
 export default function App() {
   const [search] = useSearchParams();
+  const location = useLocation();
+  if (search.get('couponRef')) return <Suspense fallback={<Loading />}><EntryRouteCoupon /></Suspense>;
   const waitlistToken = search.get('eventWaitlistToken');
   if (waitlistToken) {
     return (
@@ -30,6 +35,22 @@ export default function App() {
         <EventWaitlistOffer token={waitlistToken} />
       </Suspense>
     );
+  }
+
+  if (location.pathname === '/' && search.get('page') === 'webinar' && search.get('slug')) {
+    return <Navigate to={{ pathname: `/webinar/${encodeURIComponent(search.get('slug')!)}`, search: location.search }} replace />;
+  }
+
+  if (location.pathname === '/' && search.get('page') === 'research' && search.get('researchId')) {
+    return <Navigate to={{ pathname: `/research/${encodeURIComponent(search.get('researchId')!)}`, search: location.search }} replace />;
+  }
+
+  const action = liffActionFromUrl(`https://liff.line.me/entry/${location.search}`);
+  if (location.pathname === '/' && action) {
+    const pathname = action.kind === 'visit_stamp' ? '/visit-stamps'
+      : action.kind === 'form' ? `/forms/${encodeURIComponent(action.formId)}`
+      : action.kind === 'booking_history' ? '/booking/history' : '/booking';
+    return <Navigate to={{ pathname, search: location.search }} replace />;
   }
 
   return (
@@ -44,9 +65,10 @@ export default function App() {
         <Route path="/affiliate" element={<Affiliate />} />
         <Route path="/visit-stamps" element={<VisitStamps />} />
         <Route path="/webinar/:slug" element={<Webinar />} />
+        <Route path="/research/:id" element={<Research />} />
         <Route path="/forms/:id" element={<Form />} />
         <Route path="/restaurant/reserve/:token" element={<SeatReserve />} />
-        <Route path="/" element={<Navigate to="/booking" replace />} />
+        <Route path="/" element={<Navigate to={{ pathname: '/booking', search: location.search }} replace />} />
         {/* どの住所にも当たらないとき（板 aLU3r）。 */}
         <Route path="*" element={<NotFound />} />
       </Routes>

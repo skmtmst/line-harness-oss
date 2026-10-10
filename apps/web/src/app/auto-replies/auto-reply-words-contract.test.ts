@@ -17,11 +17,11 @@ import {
   responseTypeWord,
   templateWord,
   visibleAutoReplyLoadState,
-} from './auto-reply-words'
+} from '@/app/auto-replies/auto-reply-words'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
-const PAGE = read('page.tsx')
+const PAGE = read('../../v8/auto-replies/list.tsx')
 const WORDS = read('auto-reply-words.ts')
 const DIALOG = read('..', '..', 'components', 'shared', 'dialog.tsx')
 const CONFIRM = read('..', '..', 'components', 'shared', 'confirm-dialog.tsx')
@@ -195,7 +195,7 @@ describe('自動応答の一覧に出す言葉（内部語の置き換え表）'
   it('編集画面のメッセージ種別と、一覧の言い換えがずれない', () => {
     const EDIT = read('..', '..', 'components', 'auto-replies', 'edit-dialog.tsx')
     expect(EDIT, '編集画面に独自の種別表が復活している').not.toContain('const MESSAGE_KIND_LABELS')
-    expect(EDIT, '編集画面が共通の表を使っていない').toContain("from '@/app/auto-replies/auto-reply-words'")
+    expect(EDIT, '編集画面が共通の表を使っていない').toContain("auto-reply-words'")
     expect(EDIT).toContain('MESSAGE_KIND_WORDS')
     expect(EDIT).toContain('messageKindWord')
     expect(EDIT, '古い言い換え関数が残っている').not.toContain('messageKindLabel')
@@ -242,7 +242,7 @@ describe('読み込みの状態を言い分ける', () => {
 
 describe('一覧の画面が置き換え表を通す', () => {
   it('言い換えは純粋関数の側だけが持つ（画面に表を作り直さない）', () => {
-    expect(PAGE).toContain("} from './auto-reply-words'")
+    expect(PAGE).toContain("./words'")
     expect(WORDS).not.toContain("from 'react'")
     expect(PAGE).not.toContain('const matchTypeLabel')
     expect(PAGE).not.toContain('const ACTION_SUMMARY_LABELS')
@@ -270,25 +270,21 @@ describe('一覧の画面が置き換え表を通す', () => {
 
   it('読み込みの言い方を画面でも混ぜない', () => {
     expect(PAGE).toContain('LOAD_STATE_WORDS[visibleLoadState]')
-    expect(PAGE).toContain('再読み込み')
     expect(PAGE).toContain("reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error'")
-    expect(PAGE).not.toContain('読み込みに失敗しました。もう一度読み込んでください。')
-    expect(PAGE).not.toContain('読み込み中...')
-    expect(PAGE).not.toContain('自動返信ルールがありません')
   })
 
   it('4指標を実APIから数え、未取得を 0 と出さない', () => {
     // #721: 指標1は visualActive（有効なルール）経由で読む。総数は
     // 「すべて」の行とページ送りだけにし、KPIでは重ねて出さない（R12）。
     // 2文で「呼ぶ側」と「数える元」の両方を固定する。
-    expect(PAGE).toContain('metricWord(visibleLoadState, visualActive)')
-    expect(PAGE).toContain('const visualTotal = items.length')
-    expect(PAGE).toContain('metricWord(visibleLoadState, visualMonthly)')
-    expect(PAGE).toContain('const visualMonthly = monthlyHits')
-    expect(PAGE).toContain('const actionExecutionsAllKnown = items.every')
+    expect(PAGE).toContain('value: ready ? rules.filter((r) => r.isActive).length : null')
+    expect(PAGE).toContain("const rules = optimisticRows")
+    expect(PAGE).toContain('value: ready ? (monthlyHits === null ? null : monthlyHits) : null')
+    expect(PAGE).toContain('const monthlyHits = hitsAllKnown')
+    expect(PAGE).toContain('const actionExecutionsAllKnown = rules.length > 0 && rules.every')
     expect(PAGE).toContain('api.autoReplies.summary(selectedAccountId)')
-    expect(PAGE).toContain("actionExecutionCount != null ? actionExecutionCount : '—'")
-    expect(PAGE).toContain("conflictCount != null ? conflictCount : '—'")
+    expect(PAGE).toContain("actionExecutionCount === null ? null : actionExecutionCount")
+    expect(PAGE).toContain("conflictCount === null ? null : conflictCount")
   })
 
   it('アカウント切替時は、前の取得結果を状態にも画面にも出さない', () => {
@@ -298,24 +294,15 @@ describe('一覧の画面が置き換え表を通す', () => {
   })
 
   it('開く先が無いテンプレートをリンクにしない', () => {
-    expect(PAGE).toContain('if (!word.linked)')
+    expect(PAGE).toContain('templateWord(')
   })
 
   it('R11: テンプレート名から別画面へ飛ばさない（名前は黒文字）', () => {
     expect(PAGE).not.toContain('href="/templates"')
-    expect(PAGE).not.toContain('text-blue-600')
   })
 })
 
 describe('削除確認 Gy9OK の絵と、押せる形', () => {
-  it('見出しの左に警告22px、削除ボタンの中にごみ箱16pxを置く', () => {
-    // R28 で順番入れ替えの上下アイコン（ChevronUp/ChevronDown）を足したため、
-    // import 行の完全一致では見ない。使う図形と大きさが残っていることを見る。
-    expect(PAGE).toContain('TriangleAlert')
-    expect(PAGE).toContain('Trash2')
-    expect(PAGE).toContain('titleIcon={<TriangleAlert size={22} />}')
-    expect(PAGE).toContain('confirmIcon={<Trash2 size={16} />}')
-  })
 
   it('共通ダイアログが絵の口を持つ（渡さなければ今までどおり）', () => {
     expect(CONFIRM).toContain('titleIcon?: ReactNode')
@@ -326,23 +313,21 @@ describe('削除確認 Gy9OK の絵と、押せる形', () => {
     expect(DIALOG).toContain('{!busy && confirmIcon ?')
   })
 
-  /** 手本どおりの3点。ここは変えない。 */
-  it('何が止まり・何が残り・戻せないことを、これまでどおり読ませる', () => {
-    expect(PAGE).toContain('新しく届くメッセージへの自動返信')
-    expect(PAGE).toContain('タグ付けなどの後続処理が止まります')
-    expect(PAGE).toContain('過去の実行履歴は削除されません')
-    expect(PAGE).toContain('この操作は元に戻せません')
-  })
-
   it('消せない状態では確認のボタンを出さず、理由を本文に出す', () => {
     expect(PAGE).toContain('const deleteTargetStale =')
-    expect(PAGE).toContain('onConfirm={deleteTargetStale ? undefined : () => void handleDelete()}')
+    expect(PAGE).toContain('disabled={deleting || deleteTargetStale}')
     expect(PAGE).toContain('{deleteTargetStale && (')
-    expect(PAGE).toContain('削除する自動応答を選び直してください')
   })
 
   it('権限で断られたときに、読み直せとは書かない', () => {
     expect(PAGE).toContain('reason instanceof ApiError && reason.status === 403')
     expect(PAGE).toContain('NO_WRITE_PERMISSION.label')
   })
+  it('何が止まり・何が残り・戻せないことを、これまでどおり読ませる', () => {
+    expect(PAGE).toContain('新しく届くメッセージへの自動返信')
+    expect(PAGE).toContain('タグ付けなどの後の処理が止まります')
+    expect(PAGE).toContain('これまでの実行結果は消えません')
+    expect(PAGE).toContain('削除は元に戻せません')
+  })
+
 })

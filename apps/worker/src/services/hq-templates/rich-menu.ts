@@ -1,4 +1,5 @@
-import { RICH_MENU_ACTION_TYPE_BY_INTENT } from '@line-crm/shared';
+import { resolveHqLiffActions } from './liff-actions.js';
+import { RICH_MENU_ACTION_TYPE_BY_INTENT, isLiffActionKind, liffActionUrl, liffActionFromUrl, type LiffAction } from '@line-crm/shared';
 import { resolveSwitcherActions, validateRichMenuGroupForPublish, type AreaInput } from '../../lib/rich-menu-publisher.js';
 import { buildTapPostbackData } from '../../lib/rich-menu-tap.js';
 import {
@@ -15,7 +16,7 @@ type RefKind = 'tag' | 'form' | 'scenario' | 'template';
 interface Area {
   id: string; bounds: { x: number; y: number; width: number; height: number };
   actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch';
-  actionData: Record<string, string>; intent?: 'url' | 'text' | 'form' | 'template' | 'switch'; label?: string;
+  actionData: Record<string, string>; intent?: 'url' | 'text' | 'form' | 'booking' | 'booking_history' | 'visit_stamp' | 'template' | 'switch'; label?: string;
   tagIds?: string[]; formId?: string; templateId?: string; scenarioId?: string;
 }
 interface Page { id: string; name: string; imageR2Key: string; areas: Area[] }
@@ -110,15 +111,16 @@ export function parseRichMenuTemplateDefinition(input: HqTemplateAdapterInput, t
       if (!(Number(b.width) > 0 && Number(b.height) > 0 && Number(b.x) + Number(b.width) <= 2500 && Number(b.y) + Number(b.height) <= (g.size === 'large' ? 1686 : 843))) fail('INVALID_BOUNDS');
       if (!['uri', 'message', 'postback', 'richmenuswitch'].includes(String(a.actionType))) fail('INVALID_ACTION');
       if (a.intent !== undefined) {
-        if (!['url', 'text', 'form', 'template', 'switch'].includes(String(a.intent))) fail('INVALID_ACTION');
+        if (!['url', 'text', 'form', 'booking', 'booking_history', 'visit_stamp', 'template', 'switch'].includes(String(a.intent))) fail('INVALID_ACTION');
         const expected = RICH_MENU_ACTION_TYPE_BY_INTENT[a.intent as keyof typeof RICH_MENU_ACTION_TYPE_BY_INTENT];
         if (a.actionType !== expected) fail('INVALID_ACTION');
       }
       // Opaque postback payloads may hide source account IDs. Only structured references are accepted.
-      const allowed = a.intent === 'form' ? [] : a.actionType === 'richmenuswitch' ? ['targetPageId'] : a.actionType === 'uri' ? ['uri'] : a.actionType === 'message' ? ['text'] : [];
+      const allowed = a.intent === 'booking' ? ['menuId'] : a.intent === 'visit_stamp' ? ['cardId'] : isLiffActionKind(a.intent) ? [] : a.actionType === 'richmenuswitch' ? ['targetPageId'] : a.actionType === 'uri' ? ['uri'] : a.actionType === 'message' ? ['text'] : [];
       keys(a.actionData, allowed);
+      for (const key of ['menuId', 'cardId']) if (a.actionData[key] !== undefined) ident(a.actionData[key]);
       for (const v of Object.values(a.actionData)) text(v, 2000);
-      if (a.actionType === 'uri' && a.intent !== 'form') assertPublicUri(a.actionData.uri);
+      if (a.actionType === 'uri' && !isLiffActionKind(a.intent)) assertPublicUri(a.actionData.uri);
       if (a.actionType === 'message' && !a.actionData.text) fail('INVALID_ACTION');
       if (a.actionType === 'richmenuswitch') ident(a.actionData.targetPageId);
       if (a.actionType === 'postback' && a.intent !== 'template') fail('OPAQUE_REFERENCE_UNSUPPORTED');
@@ -143,7 +145,7 @@ export function parseRichMenuTemplateDefinition(input: HqTemplateAdapterInput, t
   // account's actual LIFF URL remains a prerequisite of the later publish flow.
   const pages = definition.richMenu.pages.map((p, orderIndex) => ({ ...p, orderIndex, imageContentType: null, lineRichMenuId: null, areas: p.areas as AreaInput[] }));
   try {
-    validateRichMenuGroupForPublish({ id: definition.richMenu.id, size: definition.richMenu.size, chatBarText: definition.richMenu.chatBarText, isDefaultForAll: false, formBaseUrl: 'https://example.invalid/', pages: resolveSwitcherActions(pages, definition.richMenu.id) });
+    validateRichMenuGroupForPublish({ id: definition.richMenu.id, size: definition.richMenu.size, chatBarText: definition.richMenu.chatBarText, isDefaultForAll: false, formBaseUrl: 'https://liff.line.me/fixture-hq', pages: resolveSwitcherActions(pages, definition.richMenu.id) });
   } catch { fail('INVALID_ACTION'); }
   return definition;
 }
@@ -189,6 +191,13 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
   async function capture(accountId: string) {
     ident(accountId);
     const matched = await targetRefs(accountId);
+    const actions = new Map<string, LiffAction>();
+    for (const p of g.pages) for (const a of p.areas) {
+      if (!isLiffActionKind(a.intent)) continue;
+      actions.set(`area:${a.id}`, a.intent === 'booking' ? { kind: 'booking', ...(a.actionData.menuId ? { menuId: a.actionData.menuId } : {}) }
+        : a.intent === 'visit_stamp' ? { kind: 'visit_stamp', ...(a.actionData.cardId ? { cardId: a.actionData.cardId } : {}) }
+        : { kind: 'booking_history' }); // フォームは既存の参照計画で配り先IDを解決する。
+    }
     const parts = [jsonRows(['id', 'tenant_id', 'revision', 'is_active', 'archived_at'], 'line_accounts', 'id = ? AND tenant_id = ? AND is_active = 1 AND archived_at IS NULL')];
     const bindings: (string | number | null)[] = [accountId, authority.tenantId];
     parts.push(jsonRows(['id', 'definition_json'], 'hq_template_versions', "id=? AND tenant_id=? AND EXISTS (SELECT 1 FROM hq_templates t WHERE t.id=hq_template_versions.template_id AND t.tenant_id=hq_template_versions.tenant_id AND t.template_type='rich_menu' AND t.archived_at IS NULL)"));
@@ -213,13 +222,14 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
     const values = JSON.parse(row.snapshot) as unknown[][][];
     if (values[0].length !== 1 || values[1].length !== 1 || values[1][0][1] !== input.definitionJson) fail('SOURCE_OR_TARGET_SCOPE_MISMATCH');
     if (values.slice(5).some((v, index) => v.length !== (matched[index].operation === 'reuse' ? 1 : 0))) fail('REFERENCE_SCOPE_MISMATCH');
+    const liff = await resolveHqLiffActions(db, authority, accountId, actions);
     const media = await Promise.all(g.pages.map(async p => {
       const obj = await bucket.head(p.imageR2Key);
       if (!obj || obj.size < 1 || obj.size > 1024 * 1024 || !['image/png', 'image/jpeg'].includes(obj.httpMetadata?.contentType ?? '')) fail('INVALID_IMAGE');
       return { key: p.imageR2Key, etag: obj.etag, size: obj.size, contentType: obj.httpMetadata!.contentType! };
     }));
-    const token = await createHqTemplateSnapshotToken({ schemaVersion: 1, rootHash: await digest(row.snapshot), referenceHash: await digest(JSON.stringify(matched)), childHash: await digest(input.definitionJson), mediaKeyHash: await digest(JSON.stringify(media)) }, digest);
-    return { sql, bindings, raw: row.snapshot, token, matched, media };
+    const token = await createHqTemplateSnapshotToken({ schemaVersion: 1, rootHash: await digest(row.snapshot), referenceHash: await digest(JSON.stringify([matched, liff.snapshot])), childHash: await digest(input.definitionJson), mediaKeyHash: await digest(JSON.stringify(media)) }, digest);
+    return { sql, bindings, raw: row.snapshot, token, matched, media, liff };
   }
   return {
     type: 'rich_menu',
@@ -278,7 +288,7 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
         const bytes = new Uint8Array(await obj.arrayBuffer()); if (bytes.length !== s.media[i].size) fail('IMAGE_CHANGED');
         return { key: `rich-menus/${c.targetAccountId}/hq/${ownerToken}/${resolve(p.id)}`, ownerToken, bytes, contentType: s.media[i].contentType };
       }));
-      const dbCommit: HqTemplateStatement[] = [{ sql: `SELECT json(CASE WHEN (${s.sql}) = ? THEN '{}' ELSE 'VERSION_CONFLICT' END)`, bindings: [...s.bindings, s.raw] }];
+      const dbCommit: HqTemplateStatement[] = [{ sql: `SELECT json(CASE WHEN (${s.sql}) = ? THEN '{}' ELSE 'VERSION_CONFLICT' END)`, bindings: [...s.bindings, s.raw] }, ...s.liff.statements];
       const add = (sql: string, ...bindings: (string | number | null)[]) => dbCommit.push({ sql, bindings });
       if (c.mode === 'overwrite') {
         // Explicit child deletion also works with the application's current FK-off test fixture.
@@ -294,6 +304,18 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
         for (const a of p.areas) {
           const ref = (kind: RefKind, id?: string) => id ? ident(idMap[`${kind}:${id}`]) : null;
           const data: Record<string, string | null> = { ...a.actionData, ...(a.scenarioId ? { scenarioId: ref('scenario', a.scenarioId) } : {}) };
+          if (isLiffActionKind(a.intent)) {
+            const uri = s.liff.targets[`area:${a.id}`];
+            if (a.intent === 'form') {
+              const liffId = new URL(uri).pathname.replace(/\//g, '');
+              data.uri = liffActionUrl({ liffId, kind: 'form', formId: ref('form', a.formId)! });
+            } else {
+              data.uri = uri;
+              const selected = liffActionFromUrl(uri);
+              if (selected?.kind === 'booking' && selected.menuId) data.menuId = selected.menuId;
+              if (selected?.kind === 'visit_stamp' && selected.cardId) data.cardId = selected.cardId;
+            }
+          }
           if (a.actionType === 'richmenuswitch') data.targetPageId = resolve(a.actionData.targetPageId);
           add('INSERT INTO rich_menu_areas (id,page_id,bounds_x,bounds_y,bounds_width,bounds_height,action_type,action_data,intent,label,tag_ids,form_id,template_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)', resolve(a.id), resolve(p.id), a.bounds.x, a.bounds.y, a.bounds.width, a.bounds.height, a.actionType, JSON.stringify(data), a.intent ?? null, a.label ?? null, JSON.stringify((a.tagIds ?? []).map(id => ref('tag', id))), ref('form', a.formId), ref('template', a.templateId));
         }

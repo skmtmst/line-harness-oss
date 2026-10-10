@@ -11,6 +11,8 @@
  * データの口・保存の口・権限・失敗の扱いは app/friend-add-settings/list-v8.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import SharedStatusPill from '@/components/shared/status-pill'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -48,6 +50,8 @@ import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
+import { FOLDER_SELECT_COLORS, type FriendAddRuleFolder } from '@line-crm/shared'
 import FolderPanel from '@/components/shared/folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import Select from '@/components/shared/select'
@@ -65,6 +69,10 @@ import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { describeFriendAddFailure } from './failure'
 import { useCursorStack } from './use-cursor-stack'
 import styles from './list.module.css'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
+import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const KIND_LABELS: Record<FriendAddRuleKind, string> = {
   first_time: 'はじめて友だち追加した人',
@@ -86,7 +94,7 @@ const STATUS_CHIPS: Array<{ key: FriendAddRuleStatus; label: string; icon: typeo
 ]
 
 function countText(value: number | null | undefined, unit: string) {
-  return value === null || value === undefined ? '—' : `${formatNumber(value)}${unit}`
+  return value === null || value === undefined ? emptyValue('unknown') : `${formatNumber(value)}${unit}`
 }
 
 function successRate(delivered: number | null, failed: number | null) {
@@ -123,7 +131,7 @@ export function actionLine(rule: FriendAddRule) {
     parts.push(`＋シナリオ「${rule.scenarioName}」`)
   }
   for (const action of rule.definition.actions) {
-    if (action.type === 'start_scenario' && rule.scenarioName) continue
+    if (action.type === 'start_scenario' && rule.scenarioName && action.targetId === rule.definition.scenarioId) continue
     if (action.label) parts.push(`＋${actionName(action.label)}`)
   }
   return parts.join(' ')
@@ -146,10 +154,7 @@ function statusTone(rule: FriendAddRule) {
 
 function StatusPill({ rule }: { rule: FriendAddRule }) {
   return (
-    <span className={styles.pill} data-tone={statusTone(rule)}>
-      <span className={styles.pillDot} aria-hidden="true" />
-      {statusLabel(rule)}
-    </span>
+    <SharedStatusPill tone={statusTone(rule) === 'active' ? 'success' : statusTone(rule) === 'always' ? 'info' : 'neutral'}>{statusLabel(rule)}</SharedStatusPill>
   )
 }
 
@@ -195,14 +200,17 @@ function FriendAddList() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [appliedSearch, setAppliedSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<FriendAddRuleStatus | ''>('')
-  const [folder, setFolder] = useState<string | null>(null)
-  const [perPage, setPerPage] = useState(20)
+  const [statusFilter, setStatusFilter] = useListUrlValue<FriendAddRuleStatus | ''>('statusFilter', '')
+  const [folder, setFolder] = useListUrlValue<string | null>('folder', null)
+  const [perPage, setPerPage] = useListUrlValue('perPage', 20)
   const { cursor, canPrev, reset: resetCursor, goPrev, goNext } = useCursorStack()
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
+  const [folderColor, setFolderColor] = useState<string | null>(FOLDER_SELECT_COLORS[0].value)
+  const [editingFolder, setEditingFolder] = useState<FriendAddRuleFolder | null>(null)
+  const [folderError, setFolderError] = useState('')
   const [folderBusy, setFolderBusy] = useState(false)
   const folderKey = useRef(crypto.randomUUID())
   const requestSequence = useRef(0)
@@ -268,7 +276,7 @@ function FriendAddList() {
     const timer = setTimeout(() => {
       setAppliedSearch(search)
       resetCursor()
-    }, 300)
+    }, 0)
     return () => clearTimeout(timer)
   }, [search, resetCursor])
 
@@ -302,9 +310,9 @@ function FriendAddList() {
   const folders = useMemo(() => {
     const counts = new Map<string | null, number>()
     for (const entry of data?.folderCounts ?? []) counts.set(entry.name, entry.count)
-    const rows: Array<{ key: string; name: string; count: number; color?: string | null }> = []
+    const rows: Array<{ id?: string; key: string; name: string; count: number; color?: string | null }> = []
     for (const option of data?.options.folders ?? []) {
-      rows.push({ key: option.name, name: option.name, color: option.color, count: counts.get(option.name) ?? 0 })
+      rows.push({ id: option.id, key: option.name, name: option.name, color: option.color, count: counts.get(option.name) ?? 0 })
     }
     const uncategorized = counts.get(null) ?? 0
     if (uncategorized > 0 || !rows.some((row) => row.name === '未分類')) {
@@ -318,21 +326,23 @@ function FriendAddList() {
     const name = folderName.trim()
     if (!name) return
     setFolderBusy(true)
-    setActionError('')
+    setFolderError('')
     try {
-      const response = await api.friendAddRules.createFolder(selectedAccountId, name, folderKey.current)
+      const response = editingFolder
+        ? await api.friendAddRules.updateFolder(selectedAccountId, editingFolder.id, { name, color: folderColor })
+        : await api.friendAddRules.createFolder(selectedAccountId, name, folderKey.current, folderColor)
       if (!response.success) {
-        setActionError(response.error)
-        setFolderDialogOpen(false)
+        setFolderError(response.error)
         return
       }
+      if (editingFolder && folder === editingFolder.name) setFolder(name)
+      setEditingFolder(null)
       folderKey.current = crypto.randomUUID()
       setFolderName('')
       setFolderDialogOpen(false)
       await load()
     } catch (caught) {
-      setActionError(describeFriendAddFailure(caught, 'フォルダ', 'create').message)
-      setFolderDialogOpen(false)
+      setFolderError(describeFriendAddFailure(caught, 'フォルダ', 'create').message)
     } finally {
       setFolderBusy(false)
     }
@@ -506,7 +516,7 @@ function FriendAddList() {
   const kpis = [
     {
       key: 'rules', icon: MessageSquareMore, title: '初回案内', value: error ? null : summary?.rules ?? null, unit: '件',
-      detail: summary ? `有効 ${formatNumber(summary.active)}件` : '—',
+      detail: summary ? `有効 ${formatNumber(summary.active)}件` : emptyValue('unknown'),
       help: 'いまある初回案内の設定数です。右の3つ（直近7日）とは期間がちがいます。',
     },
     {
@@ -532,7 +542,8 @@ function FriendAddList() {
   /* 閲覧のみの人には、作る・追加・編集・削除の操作を置かない（押せない形でも出さない。オーナー 2026-10-06）。 */
   const folderRows = [
     { kind: 'all' as const, id: '', label: 'すべて', count: data?.total ?? items.length },
-    ...folders.map((entry) => ({ kind: entry.key === UNFILED ? 'unfiled' as const : 'folder' as const, id: entry.key, label: entry.name, color: entry.color, count: entry.count })),
+    ...folders.map((entry) => ({ kind: entry.key === UNFILED ? 'unfiled' as const : 'folder' as const, id: entry.key, label: entry.name, color: entry.color, count: entry.count,
+      onEdit: canEdit && entry.id && entry.key !== UNFILED ? () => { setFolderName(entry.name); setFolderColor(folderDisplayColor(entry)); setEditingFolder({ id: entry.id!, name: entry.name, color: entry.color }); setFolderError(''); setFolderDialogOpen(true) } : undefined })),
   ]
   const createButton = canEdit ? (
     <Button variant="primary" href="/friend-add-settings?view=new" className={styles.createButton}>
@@ -587,7 +598,7 @@ function FriendAddList() {
   const errorBand = actionError ? (
     <p className={styles.errorBand} role="alert">
       {actionError}
-      <Button onClick={() => void load()}>読み直す</Button>
+      <Button onClick={() => void load()}>もう一度読み込む</Button>
     </p>
   ) : null
   /* 1152 の板（P20kYU）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「状態の札」。 */
@@ -679,7 +690,7 @@ function FriendAddList() {
         <p className={styles.stateDesc}>
           {errorStatus === 403 ? error : '数の帯は「—」、道具はそのまま使えます。条件を変えてから試し直せます。'}
         </p>
-        <Button onClick={() => void load()}>もう一度試す</Button>
+        <Button onClick={() => void load()}>もう一度読み込む</Button>
       </div>
     )
   } else if (items.length === 0) {
@@ -736,13 +747,13 @@ function FriendAddList() {
                         onMove={(direction) => keyboardMove(rule.id, direction)}
                       >
                         <span aria-hidden="true" className={styles.grip}>⠿</span>
-                      </ReorderHandle> : <span aria-hidden="true" className={`${styles.grip} ${styles.gripSpace}`}>⠿</span>}
-                      <span className={styles.orderNum}>{index + 1}</span>
+                      </ReorderHandle> : <span aria-hidden="true" className={`${styles.grip} ${styles.gripSpace}`} />}
+                      <span className={styles.orderNum}>{rule.priority}</span>
                     </span>
                   </Td>
                   <Td className={styles.colName}>
                     <FolderDotName folder={folderDotOf(rule.folderName)}>
-                      <Link href={editHref(rule.id)} title={rule.name} className={styles.name}>{rule.name}</Link>
+                      <Link href={editHref(rule.id)}  className={styles.name}><TruncatedText value={String(rule.name ?? '')} /></Link>
                     </FolderDotName>
                     <span className={`${styles.sub} ${styles.nameSub}`} title={rule.routeNames.join('、') || '未選択'}>
                       <Link2 size={12} aria-hidden="true" />
@@ -752,7 +763,7 @@ function FriendAddList() {
                   {sendCell(rule)}
                   <Td className={styles.colStatus}><StatusPill rule={rule} /></Td>
                   <Td className={styles.colRecent}>
-                    <span className={styles.num}>{rule.status === 'draft' ? '—' : countText(rule.matchedLast7Days, '人')}</span>
+                    <span className={styles.num}>{rule.status === 'draft' ? emptyValue('unknown') : countText(rule.matchedLast7Days, '人')}</span>
                   </Td>
                   {menuCell(rule)}
                 </Tr>
@@ -766,7 +777,7 @@ function FriendAddList() {
                   </Td>
                   <Td className={styles.colName}>
                     <FolderDotName folder={folderDotOf(sinkRule.folderName)}>
-                      <Link href={editHref(sinkRule.id)} title={sinkRule.name} className={styles.name}>{sinkRule.name}</Link>
+                      <Link href={editHref(sinkRule.id)}  className={styles.name}><TruncatedText value={String(sinkRule.name ?? '')} /></Link>
                     </FolderDotName>
                     <span className={`${styles.sub} ${styles.nameSub}`} title={SINK_NOTE}>
                       <CircleHelp size={12} aria-hidden="true" />
@@ -782,14 +793,13 @@ function FriendAddList() {
             </tbody>
           </DataTable>
         </div>
-        <p className={styles.footNote}>{ORDER_NOTE}</p>
       </>
     )
   }
 
   const pager = data && (canPrev || data.nextCursor) ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{formatNumber(data.total ?? items.length)}件</span>
+      <span className={styles.pagerCount}>{formatNumber(data.total ?? items.length)} 件</span>
       <span className={styles.pagerButtons} aria-label="ページ送り">
         <Button disabled={!canPrev || loading} onClick={() => goPrev()}>前へ</Button>
         <Button disabled={!data.nextCursor || loading} onClick={() => data.nextCursor && goNext(data.nextCursor)}>次へ</Button>
@@ -799,10 +809,11 @@ function FriendAddList() {
 
   return (
     <ListPage
+      help={<>{"友だち追加されたときに、来た経路（流入リンク）ごとに初回の案内を送り、タグ付けやシナリオを始めます。"}{ORDER_NOTE}</>}
       boardId={canEdit ? 'MRhef' : 'LEwkJ'}
       headingSize="regular"
       title="友だち追加時の配信"
-      description="友だち追加されたときに、来た経路（流入リンク）ごとに初回の案内を送り、タグ付けやシナリオを始めます。"
+
       actions={
         <Button href="/friend-add-settings/runs">
           <Activity size={15} aria-hidden="true" />実行結果を見る
@@ -813,7 +824,7 @@ function FriendAddList() {
         {role !== null && !canEdit ? (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
           </div>
         ) : null}
         <div className={styles.kindTabs} data-design="KindTabs">
@@ -854,7 +865,7 @@ function FriendAddList() {
         <FolderPanel
           activeId={folder ?? ''}
           onSelect={(id) => selectFolder(id || null)}
-          onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
+          onAddFolder={canEdit ? () => { setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setEditingFolder(null); setFolderError(''); setFolderDialogOpen(true) } : undefined}
           addFolderLabel="フォルダを追加"
           addFolderDisabled={folderBusy}
           rows={folderRows}
@@ -870,6 +881,12 @@ function FriendAddList() {
         <ConfirmDialog
           open={fallbackStop}
           designNode="cFo2p"
+          designLayout="stacked"
+          designWidth={600}
+          designTop={280}
+          footerAlign="start"
+          designFooterGap={84}
+          confirmFirst
           titleIcon={false}
           title="「経路が分からなかった人」は止められません"
           description="いちばん最後の受け皿なので、止めると誰にも案内が届かなくなります。届く中身を変えたいときは、この設定を編集してください。止めたいときは、先に別の受け皿を有効にしてください。"
@@ -880,10 +897,7 @@ function FriendAddList() {
           }}
           onCancel={() => setFallbackStop(false)}
         >
-          <p className={styles.warnNote}>
-            <AlertCircle size={14} aria-hidden="true" />
-            <span>直近7日では {formatNumber(sinkRule?.matchedLast7Days ?? 0)}人 がこの設定で案内を受け取っています。</span>
-          </p>
+          <Notice tone="warn" appearance="soft" message={`直近7日では ${countText(sinkRule?.matchedLast7Days, '人')} がこの設定で案内を受け取っています。`} />
         </ConfirmDialog>
         {/* 通常の設定の一時停止の確かめ。 */}
         <ConfirmDialog
@@ -893,7 +907,7 @@ function FriendAddList() {
           confirmLabel="止める"
           busy={stopBusy}
           error={stopError}
-          onConfirm={() => void runStop()}
+          onConfirm={() => runStop()}
           onCancel={() => {
             if (stopBusy) return
             setStopTarget(null)
@@ -910,33 +924,15 @@ function FriendAddList() {
           destructive
           busy={deleteBusy}
           error={deleteError}
-          onConfirm={() => void runDelete()}
+          onConfirm={() => runDelete()}
           onCancel={closeDelete}
         />
-        {/* フォルダを追加する窓（v7 と同じ文）。 */}
-        <ConfirmDialog
-          open={folderDialogOpen}
-          title="流入の束を追加"
-          description="設定を整理するフォルダ名を入力してください。"
-          confirmLabel="追加する"
-          busy={folderBusy}
-          onCancel={() => {
-            setFolderDialogOpen(false)
-            setFolderName('')
-          }}
-          onConfirm={folderName.trim() ? () => void createFolder() : undefined}
-        >
-          <label className={styles.folderDialogBody}>
-            <span className={styles.folderDialogLabel}>フォルダ名</span>
-            <input
-              autoFocus
-              className={styles.folderDialogInput}
-              value={folderName}
-              onChange={(event) => setFolderName(event.target.value)}
-              maxLength={50}
-            />
-          </label>
-        </ConfirmDialog>
+        <FolderEditorDialog open={folderDialogOpen} title={editingFolder ? 'フォルダを直す' : 'フォルダを追加'}
+          description="設定を分けてしまう箱です。"
+          name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor} maxLength={50}
+          confirmLabel={editingFolder ? '保存する' : '追加する'} busy={folderBusy} error={folderError || undefined}
+          onCancel={() => { if (!folderBusy) { setFolderDialogOpen(false); setFolderName(''); setEditingFolder(null) } }}
+          onConfirm={() => createFolder()} />
       </>}
     >
       {listBody}

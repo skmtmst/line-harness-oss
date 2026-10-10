@@ -1,5 +1,7 @@
 'use client'
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import { CircleDot, Download, Star } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsAuditRow } from '@/lib/api'
@@ -14,6 +16,10 @@ import Pagination from '@/components/shared/pagination'
 import { OpsHead } from './shell'
 import parts from './parts.module.css'
 import styles from './audit.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /**
  * 運営の監査ログ V8（絵 `e7ljE`）。
@@ -50,20 +56,16 @@ function actionWord(action: string): string {
 
 /** 短い日時（10/1 15:20 の形）。 */
 function shortDateTime(value: string | null | undefined): string {
-  if (!value) return '—'
-  const full = formatDateTime(value)
-  const m = full.match(/^(\d+)-(\d+)-(\d+) (\d+:\d+)$/)
-  if (!m) return full
-  return `${Number(m[2])}/${Number(m[3])} ${m[4]}`
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 export default function OpsAuditV8() {
   const [rows, setRows] = useState<OpsAuditRow[]>([])
   const [total, setTotal] = useState(0)
-  const [filter, setFilter] = useState('')
+  const [filter, setFilter] = useListUrlValue('filter', '')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [exporting, setExporting] = useState(false)
@@ -105,7 +107,7 @@ export default function OpsAuditV8() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `musubo-audit-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = csvFileName("運営の操作履歴")
     a.click()
     URL.revokeObjectURL(url)
     setExportNote(truncated
@@ -124,7 +126,7 @@ export default function OpsAuditV8() {
         environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
         actions={(
           <Button onClick={() => void exportCsv()} disabled={exporting || total === 0} busy={exporting} busyLabel="書き出しています…">
-            <Download aria-hidden="true" />CSV で書き出す
+            <Download aria-hidden="true" />CSVで書き出す
           </Button>
         )}
       />
@@ -151,14 +153,14 @@ export default function OpsAuditV8() {
         {error && rows.length > 0 ? <p role="alert" className={parts.alert}>{error}</p> : null}
 
         {loading && rows.length === 0 ? (
-          <ListState kind="loading" title="記録を読み込んでいます" />
+          <ListState permissionScope="hq" kind="loading" title="記録を読み込んでいます" />
         ) : error && rows.length === 0 ? (
           <div className={parts.panel}>
-            <ListState kind="error" title="記録を表示できませんでした" description={error} onRetry={() => void load()} />
+            <ListState permissionScope="hq" kind="error" title="記録を表示できませんでした" description={error} onRetry={() => void load()} />
           </div>
         ) : rows.length === 0 ? (
           <div className={parts.panel}>
-            <ListState kind="empty" title="記録がありません" description="運営が操作を行うと、ここに残ります。" />
+            <ListState permissionScope="hq" kind="empty" title="記録がありません" description="運営が操作を行うと、ここに残ります。" />
           </div>
         ) : (
           <div className={parts.mini} role="table" aria-label="監査ログ">
@@ -172,10 +174,10 @@ export default function OpsAuditV8() {
             {rows.map((row) => (
               <div key={row.id} className={parts.miniRow} role="row">
                 <span className={`${parts.fixed} ${styles.colAt}`} role="cell" title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</span>
-                <span className={`${parts.fixed} ${styles.colWho}`} role="cell" title={row.staff_name}>{row.staff_name}</span>
+                <span className={`${parts.fixed} ${styles.colWho}`} role="cell" ><TruncatedText value={String(row.staff_name ?? '')} /></span>
                 <span className={`${parts.fixed} ${styles.colWhat}`} role="cell">{actionWord(row.action)}</span>
-                <span className={`${parts.fixed} ${styles.colTenant}`} role="cell" title={row.tenant_name ?? ''}>{row.tenant_name ?? '—'}</span>
-                <span className={parts.grow} role="cell" title={row.reason ?? ''}>{row.reason ?? '—'}</span>
+                <span className={`${parts.fixed} ${styles.colTenant}`} role="cell" title={row.tenant_name ?? ''}>{row.tenant_name ?? emptyValue('unknown')}</span>
+                <span className={parts.grow} role="cell" title={row.reason ?? ''}>{row.reason ?? emptyValue('unknown')}</span>
               </div>
             ))}
           </div>

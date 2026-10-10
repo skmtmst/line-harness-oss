@@ -35,3 +35,13 @@ describe('足したときの質問文', () => {
     expect(labelOf('textarea')).toBe('')
   })
 })
+
+
+describe('足したときの参考の文字', () => {
+  it('メールと電話だけに初期の見本を入れる', () => {
+    for (const [key, expected] of [['contact', '例：sample@example.com'], ['tel', '例：090-1234-5678'], ['address', ''], ['text', ''], ['textarea', ''], ['date', ''], ['time', '']]) {
+      const block = card(key).make(0)
+      expect(block.kind === 'input' ? block.placeholder ?? '' : null).toBe(expected)
+    }
+  })
+})

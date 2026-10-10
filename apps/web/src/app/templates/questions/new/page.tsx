@@ -250,7 +250,7 @@ function QuestionTemplatePageInner() {
 
       <div className="grid min-w-0 gap-4 2xl:grid-cols-4">
         <div className="min-w-0 space-y-4 2xl:col-span-3">
-          <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 lg:grid-cols-3">
+          <section className="bg-canvas border-hairline rounded-card shadow-card-surface grid gap-4 border p-4 lg:grid-cols-3">
             {/* 入力欄は共通部品。#976 U086: 必須の印は Field の required（
                 「必須」札）にそろえ、独自の赤字テキストは置かない。 */}
             <div className="min-w-0 lg:col-span-2">
@@ -285,7 +285,7 @@ function QuestionTemplatePageInner() {
             </Field>
           </section>
 
-          <section className="bg-canvas border-hairline rounded-card shadow-card border p-4">
+          <section className="bg-canvas border-hairline rounded-card shadow-card-surface border p-4">
             <QuestionEditor value={question} onChange={setQuestion} choiceColumns />
           </section>
         </div>
@@ -320,7 +320,7 @@ function QuestionTemplatePageInner() {
             )}
           </section>
 
-          <section className="bg-canvas border-hairline rounded-card shadow-card border p-4 text-label">
+          <section className="bg-canvas border-hairline rounded-card shadow-card-surface border p-4 text-label">
             <h2 className="font-bold text-ink">この質問を使う場所</h2>
             <p className="text-ink-secondary text-label mt-2">
               {id ? `使用先 ${usageCount}か所` : '保存後にシナリオから選べます'}

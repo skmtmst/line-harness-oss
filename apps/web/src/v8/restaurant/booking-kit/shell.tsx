@@ -8,6 +8,7 @@
  * データの口は今の画面（app/restaurant-test/v8/shell.tsx）と同じ
  * restaurantTestApi.snapshot。src/v8 は古い画面を import できないので写した。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
@@ -18,12 +19,16 @@ import {
   type RestaurantStore,
 } from '@/lib/restaurant-test-api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import HelpTip from '@/components/shared/help-tip'
+import KpiBand from '@/components/shared/kpi-band'
+import Card, { CardHeader } from '@/components/shared/card'
+import Notice from '@/components/shared/notice'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import StoreTabs, { type StoreTabKey } from '../store-tabs/store-tabs'
 import styles from './shell.module.css'
+import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 
 export interface RestaurantV8Context {
   data: RestaurantSnapshot
@@ -43,9 +48,9 @@ export interface RestaurantV8Context {
 export class QuietError extends Error {}
 
 const statusLabel: Record<string, string> = {
-  connected: '正常', active: '有効', invited: '招待中', suspended: '停止中', archived: '保管済', approved: '承認済', completed: '完了', visited: '来店済',
+  connected: '正常', active: '有効', invited: '招待中', suspended: '停止中', archived: 'アーカイブ', approved: '承認済', completed: '完了', visited: '来店済',
   confirmed: '予約確定', warning: '要確認', pending: '承認待ち', draft: '下書き', scheduled: '予約済', paused: '停止中',
-  unreplied: '未返信', unconfigured: '未設定', disabled: '無効', error: 'エラー', returned: '差戻し',
+  unreplied: '未返信', unconfigured: '未設定', disabled: '停止中', error: 'エラー', returned: '差戻し',
   seated: '来店中', cancelled: '取消', no_show: '無断キャンセル', preview_only: 'プレビューのみ',
 }
 
@@ -72,30 +77,9 @@ export function BoundaryBanner() {
   )
 }
 
-/** 数のカード。並べるときは StatRow で包む。 */
-export function Stat({ label, value, note, warning = false, help }: {
-  label: string
-  value: ReactNode
-  note: string
-  /** 注意を促す数（要承認・未配席など）は琥珀色で出す。 */
-  warning?: boolean
-  help?: ReactNode
-}) {
-  return (
-    <div className={styles.stat}>
-      <p className={styles.statLabel}>
-        {label}
-        {help ? <HelpTip label={`${label}の説明`}>{help}</HelpTip> : null}
-      </p>
-      <p className={`${styles.statValue} ${warning ? styles.statValueWarning : ''} ${typeof value === 'string' && /[^\x20-\x7e]/.test(value) ? styles.statValueJp : ''}`}>{value}</p>
-      <p className={styles.statNote}>{note}</p>
-    </div>
-  )
-}
-
-/** 数の並び。compact は予約台帳の今日（内側14・数字20）。 */
+/** 数の並び。compact は予約台帳の今日（小さい帯・数字20）。 */
 export function StatRow({ children, compact = false }: { children: ReactNode; compact?: boolean }) {
-  return <div className={`${styles.stats} ${compact ? styles.statsCompact : ''}`}>{children}</div>
+  return <KpiBand density={compact ? 'compact' : undefined}>{children}</KpiBand>
 }
 
 /** 白い枠。題・説明・右端の操作を持つ。 */
@@ -108,16 +92,10 @@ export function Panel({ title, description, aside, flush = false, children }: {
   children: ReactNode
 }) {
   return (
-    <section className={styles.panel}>
-      <div className={styles.panelHead}>
-        <div className={styles.panelHeadText}>
-          <h2 className={styles.panelTitle}>{title}</h2>
-          {description ? <p className={styles.panelDescription}>{description}</p> : null}
-        </div>
-        {aside}
-      </div>
+    <Card layout="vertical" surface="inset" overflow="hidden">
+      <CardHeader size="panel" title={title} meta={description} action={aside} />
       {flush ? children : <div className={styles.panelBody}>{children}</div>}
-    </section>
+    </Card>
   )
 }
 
@@ -131,7 +109,7 @@ function EmptySetup() {
   )
 }
 
-export default function RestaurantShell({ boardId, title, description, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, children }: {
+export default function RestaurantShell({ boardId, title, description, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, templateHeading = false, children }: {
   /** Pencil の板 ID。外枠へ付ける。 */
   boardId: string
   title: string
@@ -158,6 +136,7 @@ export default function RestaurantShell({ boardId, title, description, query, he
    */
   boundary?: boolean
   /** 板の頭の大きさ。compact は E 系の板（題 20・説明の行 20）。 */
+  templateHeading?: boolean
   headSize?: 'compact'
   children: (ctx: RestaurantV8Context) => ReactNode
 }) {
@@ -200,7 +179,7 @@ export default function RestaurantShell({ boardId, title, description, query, he
     try {
       await action()
       await load()
-      setNotice({ tone: 'success', text: success })
+      notifySaved(success)
       return true
     } catch (error) {
       if (error instanceof QuietError) { setNotice(null); return false }
@@ -232,10 +211,10 @@ export default function RestaurantShell({ boardId, title, description, query, he
     children(ctx)
   )
   const storePicker = snapshot && snapshot.stores.length > 0 ? (
-    <span className={`${styles.storePicker} ${layout === 'standard' ? '' : styles.storeLedger}`}>
-      <Select
-        aria-label="店舗を選ぶ"
-        size="full"
+    <span>
+      <StoreFilterTabs
+
+
         value={selectedStoreId}
         onChange={setSelectedStoreId}
         options={snapshot.stores.map((item) => ({ value: item.id, label: `店舗：${item.name}` }))}
@@ -243,9 +222,7 @@ export default function RestaurantShell({ boardId, title, description, query, he
     </span>
   ) : null
   const noticeBand = notice ? (
-    <div role="status" className={`${styles.notice} ${notice.tone === 'success' ? styles.noticeSuccess : styles.noticeError}`}>
-      {notice.text}
-    </div>
+    <Notice role="status" tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />
   ) : null
 
   if (bare) {
@@ -257,15 +234,22 @@ export default function RestaurantShell({ boardId, title, description, query, he
     )
   }
 
-  return (
+  const page = (
     <div data-design-node={boardId} className={styles.page}>
+      {templateHeading ? <PageHeading
+        inset="none"
+        title={title}
+        help={typeof description === 'function' ? description(ctx) : description}
+        actions={headAfter ? headAfter(ctx, storePicker) : storePicker}
+      /> : (
       <div className={`${styles.head} ${layout === 'standard' ? '' : styles.headLedger}`}>
         <div className={styles.headText}>
-          <h1 className={`${styles.headTitle} ${headSize === 'compact' ? styles.headTitleCompact : ''}`}>{title}</h1>
-          <p className={`${styles.headDescription} ${headSize === 'compact' ? styles.headDescriptionCompact : ''}`}>{typeof description === 'function' ? description(ctx) : description}</p>
+          <PageHeading title={title} help={<> {typeof description === 'function' ? description(ctx) : description}</>} />
+
         </div>
         {headAfter ? headAfter(ctx, storePicker) : storePicker}
       </div>
+      )}
       {storeTab ? <div className={styles.storeTabs}><StoreTabs current={storeTab} flush /></div> : null}
       <div className={`${styles.body} ${layout === 'ledgerTight' ? styles.bodyTight : ''} ${storeTab ? styles.bodyAfterTabs : ''} ${boundary ? '' : styles.bodyFlush}`}>
         {boundary ? <BoundaryBanner /> : null}
@@ -274,4 +258,5 @@ export default function RestaurantShell({ boardId, title, description, query, he
       </div>
     </div>
   )
+  return templateHeading ? <PageFrame kind="restaurant" standalone>{page}</PageFrame> : page
 }

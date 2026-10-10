@@ -164,12 +164,13 @@ export async function getSupportMarks(
 export async function getSupportMarksWithUsage(
   db: D1Database,
   scope: SupportMarkScope,
+  includeArchived = false,
 ): Promise<SupportMarkWithUsage[]> {
   await ensureDefaultSupportMarks(db, scope);
   const result = await db.prepare(
     `WITH visible_marks AS (
        ${MARK_SELECT}
-        WHERE sm.archived_at IS NULL
+        WHERE ${includeArchived ? '1 = 1' : 'sm.archived_at IS NULL'}
           AND COALESCE(sms.tenant_id, ?) = ?
           AND (sms.line_account_id = ? OR sms.line_account_id IS NULL)
      )

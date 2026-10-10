@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 /**
  * #838 第2段: Google Sheets への直接書き出し（OAuth + Sheets API）。
  *
@@ -75,8 +76,9 @@ function fail(
   status: 400 | 401 | 403 | 404 | 409 | 500 | 502 | 503,
   error: string,
   extra: Record<string, unknown> = {},
+  fieldKeys: readonly string[] = [],
 ) {
-  return c.json({ success: false, error, ...extra }, status);
+  return inputError(c, { success: false, error, ...extra }, status, fieldKeys);
 }
 
 function staffTenantId(c: Context<Env>): string {
@@ -264,12 +266,12 @@ googleSheets.get('/api/integrations/google-sheets/runs', requireRole('owner', 'a
 
 // ---------- OAuth ----------
 
-googleSheets.post('/api/integrations/google-sheets/connect/start', requireIntegrationManager, async (c) => {
+googleSheets.post('/api/integrations/google-sheets/connect/start', requireIntegrationManager, inputJsonBoundary({"accountId":["string"]}), async (c) => {
   const client = oauthClientFor(c);
   if (!client) return fail(c, 503, 'Google接続の設定（OAuthクライアント）がこの環境にありません', { code: 'oauth_not_configured' });
   const body = await c.req.json<{ accountId?: string }>().catch(() => ({}) as { accountId?: string });
   const selected = body.accountId?.trim() || accountId(c);
-  if (!selected) return fail(c, 400, 'LINEアカウントを指定してください');
+  if (!selected) return fail(c, 400, 'LINEアカウントを指定してください', {}, ["accountId"]);
   const scope = await getVisibleLineAccountScope(dbFor(c.env), c.get('staff'));
   if (!scope.ids.includes(selected)) return fail(c, 404, 'Not found');
   const existing = await integrationFor(c, selected);
@@ -435,11 +437,11 @@ googleSheets.get('/api/integrations/google-sheets/oauth/callback', requireIntegr
   }
 });
 
-googleSheets.post('/api/integrations/google-sheets/disconnect', requireIntegrationManager, async (c) => {
+googleSheets.post('/api/integrations/google-sheets/disconnect', requireIntegrationManager, inputJsonBoundary({"accountId":["string"],"confirmed":["boolean"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string; confirmed?: boolean }>().catch(() => ({}) as { accountId?: string; confirmed?: boolean });
-  if (body.confirmed !== true) return fail(c, 400, '確認が必要です', { code: 'confirmation_required' });
+  if (body.confirmed !== true) return fail(c, 400, '確認が必要です', { code: 'confirmation_required' }, ["confirmed"]);
   const selected = body.accountId?.trim() || accountId(c);
-  if (!selected) return fail(c, 400, 'LINEアカウントを指定してください');
+  if (!selected) return fail(c, 400, 'LINEアカウントを指定してください', {}, ["accountId"]);
   const integration = await integrationFor(c, selected);
   if (!integration) return fail(c, 409, '接続されていません', { code: 'not_connected' });
   let revoked = false;
@@ -469,13 +471,13 @@ googleSheets.post('/api/integrations/google-sheets/disconnect', requireIntegrati
 
 // ---------- 出力先 ----------
 
-googleSheets.put('/api/integrations/google-sheets/target', requireIntegrationManager, async (c) => {
+googleSheets.put('/api/integrations/google-sheets/target', requireIntegrationManager, inputJsonBoundary({"accountId":["string"],"spreadsheet":["string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string; spreadsheet?: string }>().catch(() => ({}) as { accountId?: string; spreadsheet?: string });
   const selected = body.accountId?.trim() || accountId(c);
-  if (!selected) return fail(c, 400, 'LINEアカウントを指定してください');
+  if (!selected) return fail(c, 400, 'LINEアカウントを指定してください', {}, ["accountId"]);
   const spreadsheetId = parseSpreadsheetId(body.spreadsheet ?? '');
   if (!spreadsheetId) {
-    return fail(c, 400, 'スプレッドシートのURLまたはIDの形が違います', { code: 'invalid_spreadsheet' });
+    return fail(c, 400, 'スプレッドシートのURLまたはIDの形が違います', { code: 'invalid_spreadsheet' }, ["spreadsheet"]);
   }
   const integration = await integrationFor(c, selected);
   if (!integration || integration.status === 'expired') {
@@ -505,10 +507,10 @@ googleSheets.put('/api/integrations/google-sheets/target', requireIntegrationMan
 
 // ---------- 同期 ----------
 
-googleSheets.post('/api/integrations/google-sheets/sync', requireIntegrationManager, async (c) => {
+googleSheets.post('/api/integrations/google-sheets/sync', requireIntegrationManager, inputJsonBoundary({"accountId":["string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string }>().catch(() => ({}) as { accountId?: string });
   const selected = body.accountId?.trim() || accountId(c);
-  if (!selected) return fail(c, 400, 'LINEアカウントを指定してください');
+  if (!selected) return fail(c, 400, 'LINEアカウントを指定してください', {}, ["accountId"]);
   const integration = await integrationFor(c, selected);
   if (!integration || !integration.spreadsheet_id) {
     return fail(c, 409, 'Googleアカウントまたは出力先が設定されていません', { code: 'not_ready' });

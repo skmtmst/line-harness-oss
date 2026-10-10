@@ -20,12 +20,17 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   usePathname: () => '/hq/banners',
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageChrome: () => ({ title: null, fullWidth: false, crumbs: null }) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {},  usePageTitle: vi.fn(), usePageChrome: () => ({ title: null, fullWidth: false, crumbs: null }) }))
 vi.mock('@/components/hq/banners/projects-section', () => ({ default: () => null }))
 vi.mock('@/components/hq/banners/library-section', () => ({ default: () => null }))
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (original) => ({
+  ...await original<typeof import('@/lib/api')>(),
   api: {
-    hqBanners: { presets: apiMocks.presets, stats: apiMocks.stats },
+    hqBanners: {
+      presets: apiMocks.presets, stats: apiMocks.stats,
+      projects: { list: vi.fn(async () => ({ success: true, data: [] })) },
+      images: { list: vi.fn(async () => ({ success: true, data: [] })) },
+    },
     lineAccounts: { list: apiMocks.listAccounts },
   },
 }))
@@ -64,6 +69,9 @@ describe('hq/banners の形違い応答', () => {
     apiMocks.stats.mockResolvedValue({ success: true, data: { projects: { active: 2, archived: 1 }, deliveredImages: 18, deliveredAccounts: 3 } })
     render(<Page />)
     await flush()
-    expect(await screen.findByText('アーカイブ 1')).toBeTruthy()
+    // 数の帯と、上の絞り込みの札（見る：アーカイブ）の両方に出る（B-136）。
+    expect((await screen.findAllByText('アーカイブ 1')).length).toBeGreaterThan(0)
   })
 })
+
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))

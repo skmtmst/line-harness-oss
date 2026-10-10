@@ -41,7 +41,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/hq/members',
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {},
   usePageTitle: vi.fn(),
   usePageChrome: () => ({ title: null, fullWidth: false, crumbs: null }),
 }))

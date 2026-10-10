@@ -1,0 +1,11 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/* フォルダの列の下の注（テンプレート一覧と同じ小さな薄い字）。字の途中で折ってよい（狭い列で3行にしない）。 */
+.note {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-tl-note-lh);
+  word-break: normal;
+}
+}

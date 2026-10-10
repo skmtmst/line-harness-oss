@@ -156,7 +156,7 @@
   border: 1.2px solid var(--color-ink-faint);
   border-radius: var(--radius-pill);
   background: var(--color-canvas);
-  font-size: var(--text-nano);
+  font-size: var(--text-micro);
   font-weight: 600;
   line-height: 1;
 }
@@ -209,7 +209,7 @@
 /* 正本 f6zwfs：影なし、枠なし、上下6、行間18。 */
 [data-theme='v8'] .tip {
   display: flex; align-items: flex-start; gap: 0; padding: 6px 10px;
-  border: 0; border-radius: 8px; box-shadow: none;
+  border: 0; border-radius: var(--polish-radius-small); box-shadow: none;
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
   font-size: 12px; line-height: 18px; font-weight: 400;
 }
@@ -223,12 +223,12 @@
   border: 0;
   outline: 1.2px solid var(--color-ink-faint);
   outline-offset: -0.6px;
-  border-radius: 999px;
+  border-radius: var(--polish-radius-pill);
   background: transparent;
   color: var(--color-ink-faint);
   font-family: var(--font-noto-sans-jp), system-ui, sans-serif;
-  font-size: 10px;
-  line-height: 10px;
+  font-size: var(--text-micro);
+  line-height: 11px;
 }
 }
 

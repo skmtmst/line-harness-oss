@@ -9,17 +9,20 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import ChatsPage from './page'
 
 const fixture = vi.hoisted(() => ({
   accountId: 'acc-1' as string,
+  twoChats: false,
   params: new URLSearchParams(),
 }))
 
 const net = vi.hoisted(() => ({
   calls: [] as string[],
 }))
+
+vi.mock('@/components/chats/template-picker', () => ({ default: ({ open, onPickPack }: { open: boolean; onPickPack: (texts: string[]) => void }) => open ? <button onClick={() => onPickPack(['一通目', '二通目'])}>パック見本</button> : null }))
 
 vi.mock('next/link', () => ({ default: () => null }))
 
@@ -69,9 +72,11 @@ function installFetch() {
     if (path.startsWith('/api/chats/stats')) {
       body = { success: true, data: { total: 1, unread: 1, inProgress: 0, onHold: 0, resolved: 0, oldestUnansweredMinutes: null, assigneeUnread: [] } }
     } else if (path.startsWith('/api/chats?')) {
-      body = { success: true, data: [chatRow()] }
+      body = { success: true, data: fixture.twoChats ? [chatRow(), { ...chatRow(), id: 'chat-2', friendId: 'fr-2', friendName: '利用者2' }] : [chatRow()] }
     } else if (path === '/api/chats/chat-1' || path.startsWith('/api/chats/chat-1?')) {
       body = { success: true, data: chatDetail() }
+    } else if (path === '/api/chats/chat-2' || path.startsWith('/api/chats/chat-2?')) {
+      body = { success: true, data: { ...chatDetail(), id: 'chat-2', friendId: 'fr-2', friendName: '利用者2' } }
     } else if (path === '/api/chats/chat-1/read') {
       body = { success: true, data: { isUnread: false } }
     } else if (path.startsWith('/api/inbox/saved-views')) {
@@ -100,6 +105,8 @@ let root: Root
 
 beforeEach(() => {
   net.calls.length = 0
+  fixture.accountId = 'acc-1'
+  fixture.twoChats = false
   const store = new Map<string, string>()
   vi.stubGlobal('localStorage', {
     getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
@@ -159,4 +166,45 @@ describe('画像＋本文の結合送信', () => {
     })
     expect(net.calls.filter((c) => c === 'POST /api/chats/chat-1/send')).toHaveLength(0)
   })
+})
+
+it('パック確認中にアカウントを切り替えたら確認を閉じる（WEB283）', async () => {
+  await act(async()=>root.render(<ChatsPage />))
+  fireEvent.click(await screen.findByRole('button',{ name:/利用者1/ }))
+  await screen.findByLabelText('メッセージを入力')
+  fireEvent.click(screen.getByRole('button',{ name:'テンプレートを選択' }))
+  fireEvent.click(await screen.findByText('パック見本'))
+  await screen.findByRole('button',{ name:'まとめて送る（2通）' })
+  fixture.accountId='acc-2';await act(async()=>root.render(<ChatsPage />))
+  expect(screen.queryByRole('button',{ name:'まとめて送る（2通）' })).toBeNull()
+})
+it('添付画像の確認はEscで閉じて元のボタンへ焦点を戻す（WEB284）', async () => {
+  await act(async()=>root.render(<ChatsPage />))
+  fireEvent.click(await screen.findByRole('button',{ name:/利用者1/ }))
+  await screen.findByLabelText('メッセージを入力')
+  const input=host.querySelector('input[type="file"]')!
+  const file=new File(['x'.repeat(100)],'o.jpg',{ type:'image/jpeg' })
+  Object.defineProperty(file,'arrayBuffer',{ value:async()=>new TextEncoder().encode('x'.repeat(100)).buffer })
+  await act(async()=>fireEvent.change(input,{ target:{ files:[file] } }))
+  const trigger=await screen.findByRole('button',{ name:'添付した画像を大きく見る' });trigger.focus();fireEvent.click(trigger)
+  const dialog=await screen.findByRole('dialog',{ name:'添付した画像の確認' })
+  await waitFor(()=>expect(dialog.contains(document.activeElement)).toBe(true))
+  fireEvent.keyDown(document.activeElement!,{ key:'Escape' })
+  await waitFor(()=>expect(screen.queryByRole('dialog',{ name:'添付した画像の確認' })).toBeNull())
+  expect(document.activeElement).toBe(trigger)
+})
+
+
+it('パック確認後に別の会話へ移ったとき、前のパックを別の相手へ送れない（WEB283）', async () => {
+  fixture.twoChats = true
+  await act(async () => root.render(<ChatsPage />))
+  fireEvent.click(await screen.findByRole('button', { name: /利用者1/ }))
+  await screen.findByLabelText('メッセージを入力')
+  fireEvent.click(screen.getByRole('button', { name: 'テンプレートを選択' }))
+  fireEvent.click(await screen.findByText('パック見本'))
+  await screen.findByRole('button', { name: 'まとめて送る（2通）' })
+  fireEvent.click(screen.getByRole('button', { name: /利用者2/ }))
+  await screen.findByLabelText('メッセージを入力')
+  expect(screen.queryByRole('button', { name: 'まとめて送る（2通）' })).toBeNull()
+  expect(net.calls.filter(call => call.startsWith('POST /api/chats/chat-2/send'))).toHaveLength(0)
 })

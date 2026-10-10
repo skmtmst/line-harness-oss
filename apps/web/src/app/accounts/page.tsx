@@ -274,7 +274,7 @@ function AccountsPageV7() {
       ) : status === 'error' ? (
         <ListState
           kind="error"
-          action={<Button type="button" onClick={() => void load(false)}>再読み込み</Button>}
+          onRetry={() => void load(false)}
         />
       ) : shown.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline border">

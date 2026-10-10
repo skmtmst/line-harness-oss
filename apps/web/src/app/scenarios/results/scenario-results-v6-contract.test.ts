@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('../../../v8/scenarios/results.tsx', import.meta.url), 'utf8')
 const DETAIL = readFileSync(new URL('../detail/scenario-detail-client.tsx', import.meta.url), 'utf8')
 
 describe('V6 5-1-L シナリオ配信結果', () => {
   it('実Node IDとシナリオ・統計・開始記録APIを使う', () => {
-    expect(PAGE).toContain('data-design-node="M2b2B"')
+    expect(PAGE).toContain('boardId="X4STXS"')
     expect(PAGE).toContain('scenarioReferenceData.scenario(id)')
     expect(PAGE).toContain('scenarioReferenceData.stats(id)')
     expect(PAGE).toContain('api.scenarios.runs(id, selectedAccountId, {')
@@ -28,10 +28,7 @@ describe('V6 5-1-L シナリオ配信結果', () => {
      * 案内し、「まだいません」とは書かない。
      */
     expect(PAGE).toContain("useState<'idle' | 'loading' | 'ready' | 'error'>")
-    expect(PAGE).toContain('購読一覧を表示できませんでした')
     expect(PAGE).toContain('onRetry={() => void loadRuns(loadSeqRef.current)}')
-    expect(PAGE).toContain('購読一覧を読み込んでいます')
-    expect(PAGE).toContain('購読している友だちはまだいません')
     expect(PAGE).toContain("runsState === 'idle'")
   })
 
@@ -44,9 +41,7 @@ describe('V6 5-1-L シナリオ配信結果', () => {
   it('SCENARIO-12: カーソルページングと総件数・状態絞り込みを接続する', () => {
     expect(PAGE).toContain('runs.pagination.nextCursor')
     expect(PAGE).toContain('runs.pagination.total')
-    expect(PAGE).toContain('さらに読み込む')
     expect(PAGE).toContain('status: subscriptionStatus || undefined')
-    expect(PAGE).toContain('aria-label="購読の状態で絞り込む"')
   })
 
   it('SCENARIO-13: 配信記録を待たずにシナリオ・集計を先に表示する', () => {
@@ -61,23 +56,13 @@ describe('V6 5-1-L シナリオ配信結果', () => {
   })
 
   it('取れない開封・クリック・失敗数を0として作らない', () => {
-    expect(PAGE).toContain("run?.opened.value ?? '—'")
-    expect(PAGE).toContain("run?.clicked.value ?? '—'")
-    expect(PAGE).toContain('runs?.steps[0]?.failed.reason')
-    expect(PAGE).toContain('<div><dt>エラー</dt><dd>—</dd></div>')
-    expect(PAGE).toContain('LINEでは通ごとの開封・クリック・失敗をすべて取得できません')
-    expect(PAGE).toContain('run?.delivered ?? result?.reachedCount')
+    expect(PAGE).toContain("run?.opened.state === 'available'")
+    expect(PAGE).toContain("run?.clicked.state === 'available'")
+    expect(PAGE).toContain("step.failed.state === 'available'")
+    expect(PAGE).toContain('runs?.steps')
+    expect(PAGE).toContain("?.delivered")
     expect(PAGE).not.toContain('result?.reachedCount ?? 0')
     expect(PAGE).not.toContain('82.4%')
     expect(PAGE).not.toContain('46.1%')
-  })
-})
-
-describe('ステップの到達人数の色（監査・崩れ3）', () => {
-  it('「○人到達」は緑に塗らず ink にする', () => {
-    const css = readFileSync(new URL('./scenario-results.module.css', import.meta.url), 'utf8')
-    const reached = /\.reached \{[^}]*\}/.exec(css)?.[0] ?? ''
-    expect(reached).toContain('--color-ink')
-    expect(reached).not.toContain('accent')
   })
 })

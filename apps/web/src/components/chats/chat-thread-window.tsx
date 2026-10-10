@@ -161,7 +161,7 @@ export default function ChatThreadWindow<M extends ThreadMessage>({
         aria-posinset={before + i + 1}
         aria-setsize={setSize}
         /* 吹き出しへは1か所だけ Tab で入る（いちばん新しい吹き出し）。中は矢印で動く。 */
-        tabIndex={i === messages.length - 1 ? 0 : -1}
+        tabIndex={i === win.end - 1 ? 0 : -1}
         /* 行の間 8px は行の中に持つ（外の余白だと測った高さに入らない）。 */
         style={{ display: 'flow-root', paddingTop: i === 0 ? 0 : rowGap }}
         className="rounded-mini focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"

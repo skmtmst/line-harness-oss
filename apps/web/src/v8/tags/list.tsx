@@ -29,6 +29,7 @@ import MarksTab from './marks-tab'
 import SearchesTab from './searches-tab'
 import FieldsTab from './fields-tab'
 import styles from './list.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const TABS = [
   ['tags', 'タグ'],
@@ -98,7 +99,7 @@ export default function TagsList({
     canEdit ? (
       <Button href="/tags/marks/new" variant="primary"><Plus size={15} aria-hidden="true" />マークを作る</Button>
     ) : null
-  ) : tab === 'searches' ? (
+  ) : tab === 'searches' && canEdit ? (
     <Button href="/friends" variant="primary"><Plus size={15} aria-hidden="true" />友だち一覧で条件を作る</Button>
   ) : null
 
@@ -107,7 +108,7 @@ export default function TagsList({
       <PageHeading
         headingSize="regular"
         title="タグ"
-        description="友だちに付ける印（タグ）・入力してもらう項目・対応の印・保存した条件をまとめて管理します。"
+        help="友だちに付ける印（タグ）・入力してもらう項目・対応の印・保存した条件をまとめて管理します。"
         actions={actions}
       />
 
@@ -115,8 +116,7 @@ export default function TagsList({
         <div className={styles.readonlyRow}>
           <p className={styles.readonlyBand}>
             <Eye className={styles.readonlyIcon} aria-hidden="true" />
-            閲覧のみで見ています。変える操作は管理者に頼んでください。
-          </p>
+            閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
         </div>
       ) : null}
 

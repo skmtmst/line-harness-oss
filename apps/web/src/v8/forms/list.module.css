@@ -146,9 +146,7 @@
 }
 
 /* 数の帯：上の線は見出しの段と重ねない。 */
-:global([data-theme='v8']) .kpiStrip.kpiStrip {
-  border-top: 0;
-}
+
 
 /* 表。見出しと行の区切り線だけ。外側の枠は作らない。 */
 .tableWrap {

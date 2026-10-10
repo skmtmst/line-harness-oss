@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
@@ -60,7 +60,7 @@ describe('NEN配信のテスト送信先', () => {
     // 1件の失敗で画面全体をエラーにしない(点検 #512 の中3)。
     // ★V7 `x63W5x`：失敗はそのタブの一覧の場所の1枚で示す（帯は出さない）。
     expect(page).toContain('tabErrors');
-    expect(page).not.toContain('tone="danger"');
+    expect(page).toContain('tabError');
     expect(overview).toContain('tabError');
     expect(overview).toContain('onRetryTab');
     expect(page).not.toContain('loadError');

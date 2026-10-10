@@ -58,7 +58,7 @@ describe('受信箱A-2 右パネルでその場で直す', () => {
 
   it('右パネルは340幅、狭い幅では畳んで頭のボタンで出す', () => {
     expect(PAGE).toContain('w-[340px]')
-    expect(PAGE).toContain('customer-info-toggle')
+    expect(PAGE).toContain('panel={{ open: showFriendInfo, onToggle: () => setShowFriendInfo((current) => !current) }}')
   })
 
   it('前払いのみの印は顔の下（友だち詳細と同じ置き場所）', () => {

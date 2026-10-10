@@ -18,7 +18,7 @@ export async function validateAutoReplyOperatorAction(db:D1Database,action:AutoR
  return null;
 }
 export async function runAutoReplyAction(db:D1Database,action:AutoReplyExecutionAction,friendId:string,input:{lineAccountId:string|null;sourceEventId:string;env?:Env['Bindings']}):Promise<RunActionsResult> {
- if(action.action_type!=='notify_staff')return runActionRows(db,[action as ScenarioActionRow],friendId);
+ if(action.action_type!=='notify_staff')return runActionRows(db,[action as ScenarioActionRow],friendId,{accountId:input.lineAccountId,sourceEventId:input.sourceEventId,executorDependencies:{credentialEncryptionKey:input.env?.LINE_CREDENTIAL_ENCRYPTION_KEY,operatorMailEnv:input.env}});
  if(!input.lineAccountId||await validateAutoReplyOperatorAction(db,action,input.lineAccountId,true))throw new Error('notification_action_invalid');
  const config=JSON.parse(action.config_json) as {notificationRuleId:string;message:string};
  const rule=await getNotificationRuleById(db,config.notificationRuleId,input.lineAccountId);

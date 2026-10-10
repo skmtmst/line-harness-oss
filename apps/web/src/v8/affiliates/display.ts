@@ -9,6 +9,8 @@
  */
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import { formatDay, formatNumber } from '@/lib/format'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 export interface AffiliateItem {
   id: string
@@ -113,30 +115,17 @@ export function formatYenNullable(n: number | null | undefined): string {
 }
 
 export function formatDate(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '—'
-  return formatDay(date)
+  return polishFormatDate(iso, { style: 'day', fallback: '—' })
 }
 
 /** 「9/30 14:12」（日本時間）。 */
 export function formatMonthDayTime(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const ms = new Date(iso).getTime()
-  if (!Number.isFinite(ms)) return '—'
-  const jst = new Date(ms + 9 * 3600_000)
-  const hh = String(jst.getUTCHours()).padStart(2, '0')
-  const mm = String(jst.getUTCMinutes()).padStart(2, '0')
-  return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${hh}:${mm}`
+  return polishFormatDate(iso, { style: 'list', fallback: '—' })
 }
 
 /** 「10/31」（日本時間）。 */
 export function formatMonthDay(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const ms = new Date(iso).getTime()
-  if (!Number.isFinite(ms)) return '—'
-  const jst = new Date(ms + 9 * 3600_000)
-  return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()}`
+  return polishFormatDate(iso, { style: 'list-day' })
 }
 
 /*

@@ -1,5 +1,36 @@
 import { jstNow } from './utils.js';
 
+/** フォルダだけを消し、同じアカウントの設定は未分類へ戻す。公開版・実行履歴は残す。 */
+export async function deleteFriendAddRuleFolder(
+  db: D1Database,
+  input: { lineAccountId: string; folderId: string },
+): Promise<'deleted' | 'not_found' | 'conflict'> {
+  const folder = await db.prepare(`SELECT name, color, updated_at FROM friend_add_rule_folders
+    WHERE id = ? AND line_account_id = ?`)
+    .bind(input.folderId, input.lineAccountId)
+    .first<{ name: string; color: string | null; updated_at: string }>();
+  if (!folder) return 'not_found';
+  try {
+    await db.batch([
+      // 改名・色変更・削除が読み取り後に入った場合は、まとめ書き全体を戻す。
+      db.prepare(`SELECT json(CASE WHEN EXISTS (
+        SELECT 1 FROM friend_add_rule_folders
+        WHERE id = ? AND line_account_id = ? AND name = ? AND color IS ? AND updated_at = ?
+      ) THEN '{}' ELSE 'FRIEND_ADD_FOLDER_CONFLICT' END)`)
+        .bind(input.folderId, input.lineAccountId, folder.name, folder.color, folder.updated_at),
+      db.prepare(`UPDATE friend_add_rules SET folder_name = NULL, lock_version = lock_version + 1, updated_at = ?
+        WHERE line_account_id = ? AND folder_name = ?`)
+        .bind(jstNow(), input.lineAccountId, folder.name),
+      db.prepare('DELETE FROM friend_add_rule_folders WHERE id = ? AND line_account_id = ?')
+        .bind(input.folderId, input.lineAccountId),
+    ]);
+  } catch (error) {
+    if (/malformed JSON|FRIEND_ADD_FOLDER_CONFLICT/i.test(String(error))) return 'conflict';
+    throw error;
+  }
+  return 'deleted';
+}
+
 export type FriendAddRuleKind = 'first_time' | 'returning';
 export type FriendAddRuleStatus = 'draft' | 'published' | 'stopped' | 'archived';
 export type FriendAddRuleVersionStatus = 'draft' | 'published' | 'retired';

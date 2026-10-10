@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 /*
  * 行の操作は「主な1つ（編集）＋…メニュー」。削除は行に直に置かず、
  * 停止・再開と並んでメニューの中の危ない操作にあることを実マウントで確かめる。
@@ -43,7 +44,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [{ id: 'account-a', name: '本店' }], loading: false }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {},
   usePageTitle: () => {},
 }))
 
@@ -106,38 +107,37 @@ describe('自動応答一覧の行操作', () => {
     await act(async () => { root.render(<AutoRepliesPage />) })
     await flush()
 
-    const edit = [...host.querySelectorAll('button')]
-      .find((el) => el.textContent?.trim() === '編集')
+    const edit = host.querySelector('a[href="/auto-replies/edit?id=ar-1"]')
     expect(edit, '枠つき「編集」ボタンが見つかりません').toBeTruthy()
 
     // 削除は行に直に置かない。
     expect(host.querySelector('button[aria-label="自動応答「旧キーワードルール」を削除する"]')).toBeNull()
 
-    const more = host.querySelector('button[aria-label="自動応答「旧キーワードルール」のその他操作"]') as HTMLButtonElement
+    const more = host.querySelector('button[aria-label="自動応答「旧キーワードルール」の操作"]') as HTMLButtonElement
     expect(more, 'その他ボタンが見つかりません').toBeTruthy()
     act(() => { more.click() })
     // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
     const menu = document.querySelector('[role="menu"]')
     expect(menu, 'メニューが開きません').toBeTruthy()
-    expect(menu!.textContent).toContain('停止する')
-    expect(menu!.textContent).toContain('削除する')
+    expect(menu!.textContent).toContain('止める')
+    expect(menu!.textContent).toContain('削除')
   })
 
-  it('下書き行の「その他」には削除だけが入る（公開の前段なので動かせない）', async () => {
+  it('下書き行の「その他」には閲覧・複製・移動・削除は使え、停止・再開は出ない', async () => {
     listReplies.mockImplementation(async () => ({
       success: true,
       data: [{ ...rule, isActive: false, lifecycleStatus: 'draft' }],
     }))
     await act(async () => { root.render(<AutoRepliesPage />) })
     await flush()
-    const more = host.querySelector('button[aria-label="自動応答「旧キーワードルール」のその他操作"]') as HTMLButtonElement
+    const more = host.querySelector('button[aria-label="自動応答「旧キーワードルール」の操作"]') as HTMLButtonElement
     expect(more, '下書き行にもその他ボタンがある').toBeTruthy()
     act(() => { more.click() })
     // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
     const menu = document.querySelector('[role="menu"]')
     expect(menu, 'メニューが開きません').toBeTruthy()
-    expect(menu!.textContent).toContain('削除する')
-    expect(menu!.textContent).not.toContain('停止する')
+    expect(menu!.textContent).toContain('削除')
+    expect(menu!.textContent).not.toContain('止める')
     expect(menu!.textContent).not.toContain('再開する')
   })
 })

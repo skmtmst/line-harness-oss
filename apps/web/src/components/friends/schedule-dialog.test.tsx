@@ -62,7 +62,9 @@ describe('予約して送る（MyJP7）', () => {
     await click(byText('予約して送る'))
     expect(document.body.querySelector('[role="dialog"] h2')?.textContent).toBe('ソラさんに予約して送る')
     await click(byText('テンプレートを選択'))
-    await click(Array.from(document.body.querySelectorAll('[role="menuitem"]')).find((b) => b.textContent === '前日のご案内'))
+    // 共通の選ぶ窓（dJZ7Q）で選び、［この文を入れる］で本文へ入れる。
+    await click(document.body.querySelector('input[type="radio"][aria-label="前日のご案内"]'))
+    await click(byText('この文を入れる'))
     await click(byText('月曜 10:00'))
     expect(byText('月曜 10:00')?.getAttribute('aria-pressed')).toBe('true')
     const reserve = Array.from(document.body.querySelectorAll('button')).find((b) => /に予約$/.test(b.textContent ?? ''))

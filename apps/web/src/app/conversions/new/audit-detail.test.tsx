@@ -164,6 +164,7 @@ describe('DETAIL-17 集計対象は画面上部のアカウントに固定', () 
     const el = host.querySelector('#cv-account')
     expect(el?.tagName).not.toBe('SELECT')
     expect(el?.textContent).toBe('A店')
+    await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label="集計対象アカウントの説明"]')!.click() })
     expect(host.textContent).toContain('画面上部で選んでいるLINEアカウントに固定されます')
     // 「すべて」は保存側がアカウント必須のため、選べる選択肢にはしない。
     expect(host.querySelector('select#cv-account')).toBeNull()

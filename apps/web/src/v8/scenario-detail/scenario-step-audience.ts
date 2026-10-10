@@ -74,7 +74,7 @@ export function describeStepAudience(
 
   const rules = condition.rules.length
   const groups = (condition.groups ?? []).filter((g) => g.rules.length > 0).length
-  return groups === 0 ? `詳細条件 ${rules}件` : `詳細条件 ${rules}件 ＋ or条件 ${groups}組`
+  return groups === 0 ? `詳細条件 ${rules} 件` : `詳細条件 ${rules} 件 ＋ or条件 ${groups}組`
 }
 
 /**

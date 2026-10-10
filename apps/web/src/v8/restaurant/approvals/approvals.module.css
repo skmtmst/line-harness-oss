@@ -29,10 +29,11 @@
   gap: var(--tpl-rt-card-gap);
   padding: var(--tpl-rt-card-pad);
   border-radius: var(--tpl-rt-card-radius);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
   min-width: 0;
+  box-shadow: var(--card-shadow);
 }
 
 /* 閲覧のみで承認待ちのカード：枠を緑（1.5）にして目立たせる。 */
@@ -184,8 +185,9 @@
 .emptyBox {
   padding: var(--tpl-rt-state-pad);
   border-radius: var(--tpl-rt-card-radius);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
+  box-shadow: var(--card-shadow);
 }
 
 /* 公開境界：余白20・段の間4。 */
@@ -195,8 +197,9 @@
   gap: var(--tpl-rt-note-gap);
   padding: var(--tpl-rt-card-pad);
   border-radius: var(--tpl-rt-card-radius);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
+  box-shadow: var(--card-shadow);
 }
 
 .boundaryTitle {

@@ -94,7 +94,7 @@ describe('手順（型の共通部品 Steps）', () => {
 
   it('見た目：丸22・数11・名13・線24×1.5・間8・丸と名6。折り返さず、狭いときは今の段以外の名を隠す', () => {
     expect(globals).toMatch(/--tpl-steps-dot:\s*22px/)
-    expect(globals).toMatch(/--tpl-steps-text-size:\s*13px/)
+    expect(globals).toMatch(/--tpl-steps-text-size:\s*var\(--polish-text-body\);/)
     expect(globals).toMatch(/--tpl-steps-num-size:\s*11px/)
     expect(globals).toMatch(/--tpl-steps-line-w:\s*24px/)
     expect(globals).toMatch(/--tpl-steps-line-h:\s*1\.5px/)

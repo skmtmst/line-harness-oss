@@ -91,8 +91,8 @@ describe('V8 通知', () => {
   test('EC連携の通知を押すと既読にして EC連携へ移る', async () => {
     render(<NotificationsV8 />)
     const title = await screen.findByText('EC連携の取り込みが失敗')
-    fireEvent.click(title.closest('button')!)
-    expect(push).toHaveBeenCalledWith('/ec-commerce')
+    fireEvent.click(title.closest('a')!)
+    expect(title.closest('a')?.getAttribute('href')).toBe('/ec-commerce')
     await waitFor(() => expect(markRead).toHaveBeenCalledWith('n-ec', 'account-a'))
   })
 

@@ -4,7 +4,7 @@
  *
  * - R537: 各GETの通信断から復旧後に画面内で再取得でき、失敗中に
  *   未登録扱いの空状態（「先にスタッフを登録してください」）を出さない。
- *   403は権限案内のみで再試行の口を出さない。429は再試行できる。
+ *   403は権限案内のみで再読み込みの口を出す。429は再試行できる。
  * - R538: 閲覧のみの担当者は割当を読めても、チェック・数値・保存の入口に
  *   進めない。編集権限を持つ担当者だけが変えられる。
  */
@@ -109,14 +109,14 @@ describe('R537 取得失敗は空状態と分け、画面内で取り直せる',
     expect(screen.queryByText('表示できませんでした')).toBeNull()
   })
 
-  test('403は権限案内のみで、再試行の口は出さない', async () => {
+  test('403は権限案内のみで、再読み込みの口を出す', async () => {
     fixture.listMenus = async () => {
       throw Object.assign(new MockApiError('forbidden'), { status: 403 })
     }
     render(<MenuStaffMatrix />)
 
     await screen.findByText('担当スタッフの割り当てを見る権限がありません')
-    expect(screen.queryByRole('button', { name: 'もう一度読み込む' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
     expect(screen.queryByText('先にスタッフを登録してください')).toBeNull()
   })
 

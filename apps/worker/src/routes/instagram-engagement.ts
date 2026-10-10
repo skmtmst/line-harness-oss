@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { applyMileageRulesForEvent } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -10,7 +11,7 @@ const ALLOWED_EVENTS = new Set([
 
 const instagramEngagement = new Hono<Env>();
 
-instagramEngagement.post('/api/integrations/ig-harness/engagement', async (c) => {
+instagramEngagement.post('/api/integrations/ig-harness/engagement', inputJsonBoundary(), async (c) => {
   let body: {
     friendId?: unknown;
     eventType?: unknown;
@@ -21,7 +22,7 @@ instagramEngagement.post('/api/integrations/ig-harness/engagement', async (c) =>
   try {
     body = await c.req.json();
   } catch {
-    return c.json({ success: false, error: 'invalid_json' }, 400);
+    return inputError(c, { success: false, error: 'invalid_json' }, 400, []);
   }
 
   const friendId = typeof body.friendId === 'string' ? body.friendId.trim() : '';
@@ -33,10 +34,10 @@ instagramEngagement.post('/api/integrations/ig-harness/engagement', async (c) =>
     : {};
 
   if (!friendId || friendId.length > 128 || !sourceEventId || sourceEventId.length > 256) {
-    return c.json({ success: false, error: 'invalid_identity' }, 422);
+    return inputError(c, { success: false, error: 'invalid_identity' }, 422, ["friendId","sourceEventId"]);
   }
   if (!ALLOWED_EVENTS.has(eventType)) {
-    return c.json({ success: false, error: 'invalid_event_type' }, 422);
+    return inputError(c, { success: false, error: 'invalid_event_type' }, 422, ["eventType"]);
   }
   if (JSON.stringify(metadata).length > 4096) {
     return c.json({ success: false, error: 'metadata_too_large' }, 413);

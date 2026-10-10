@@ -39,6 +39,8 @@ export interface EmptyListProps {
   onClearFilters?: () => void
   /** 絞り込みで0件のときの説明。既定は「絞り込みや検索を外すと、すべて出ます」。 */
   filteredDescription?: string
+  /** 絞り込んだ対象の名前を含む題。省略すると共通の文言。 */
+  filteredTitle?: string
   /** 作るボタンの代わりに置く操作（見本から作るなど、作り方が別のとき）。 */
   action?: ReactNode
   'data-design-node'?: string
@@ -56,6 +58,7 @@ export default function EmptyList({
   filtered = false,
   onClearFilters,
   filteredDescription,
+  filteredTitle,
   action,
   'data-design-node': designNode,
 }: EmptyListProps) {
@@ -63,7 +66,7 @@ export default function EmptyList({
     return (
       <div className={styles.root} data-empty-list="filtered" data-design-node={designNode ?? 'gIaJZ'} role="status">
         <span className={styles.mark} aria-hidden="true"><SearchX /></span>
-        <p className={styles.title}>{EMPTY_LIST_FILTERED_TITLE}</p>
+        <p className={styles.title}>{filteredTitle ?? EMPTY_LIST_FILTERED_TITLE}</p>
         <p className={styles.description}>{filteredDescription ?? EMPTY_LIST_FILTERED_DESCRIPTION}</p>
         {onClearFilters ? (
           <div className={styles.action}>

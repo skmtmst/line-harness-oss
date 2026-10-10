@@ -55,9 +55,10 @@
   flex-direction: column;
   gap: 10px;
   padding: 16px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .sideTitle {
@@ -71,9 +72,10 @@
   flex-direction: column; /* layout: vertical */
   gap: 8px; /* gap: 8 */
   padding: 20px; /* padding: 20 */
-  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border: 1px solid var(--card-edge); /* stroke: $hairline */
   border-radius: var(--radius-card); /* cornerRadius: $radius-md */
-  background: var(--color-canvas); /* fill: $canvas */
+  background: var(--color-canvas); /* fill: $canvas */;
+  box-shadow: var(--card-shadow);
 }
 
 .blockTitle {

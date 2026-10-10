@@ -19,11 +19,11 @@ describe('V6 予約スタッフ・受付時間の一覧状態', () => {
     it(`${name}は失敗時に再読み込みできる`, () => {
       expect(source).toContain('kind="error"')
       if (name === '受付時間') {
-        expect(source).toContain('onClick={() => setReloadKey((value) => value + 1)}')
+        expect(source).toContain('onRetry={() => setReloadKey((value) => value + 1)}')
       } else {
         expect(source).toContain('onClick={() => void load()}')
       }
-      expect(source).toContain('再読み込み</Button>')
+      expect(source).toContain(name === '受付時間' ? 'onRetry=' : '再読み込み</Button>')
     })
 
     it(`${name}はアカウント切替前の遅い応答を採用しない`, () => {

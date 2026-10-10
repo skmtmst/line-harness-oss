@@ -71,6 +71,7 @@ describe('ログインユーザーV8（nku0f・A35Gh）', () => {
   it('管理者はnku0f・役割でできることを出す', async () => {
     await render()
     expect(host.querySelector('[data-design-node~="nku0f"]')).not.toBeNull()
+    await act(async () => { host.querySelector<HTMLButtonElement>('[data-template-region=heading] button[aria-expanded]')!.click() })
     expect(host.textContent).toContain('管理画面に入る人と、その人ができることを決めます')
     expect(host.textContent).toContain('役割でできること')
     expect(host.textContent).not.toContain('閲覧のみで見ています')

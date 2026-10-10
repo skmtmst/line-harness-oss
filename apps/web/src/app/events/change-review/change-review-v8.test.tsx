@@ -5,7 +5,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -179,8 +179,9 @@ describe('V8-B 変更の確認（hmr2P）', () => {
   it('V8 の決まり（layer・色直書きなし・準備中なし）を守る', () => {
     expect(v8css.split('\n')[0]).toContain('@layer properties, theme, base, components, utilities;')
     expect(v8css).not.toMatch(/#[0-9a-fA-F]{3,8}/)
-    expect(v8css).not.toMatch(/box-shadow\s*:/)
-    expect(v8tsx).toContain('data-design-node="hmr2P"')
+    // 影は共通のカードの影だけ（2026-10-09 オーナー採用 B-137）。ほかの影は直書きしない。
+    expect(v8css.replace(/box-shadow:\s*var\(--card-shadow\)/g, '')).not.toMatch(/box-shadow\s*:/)
+    expect(v8tsx).toMatch(/(?:data-design-node|boardId)="hmr2P"/)
     expect(v8tsx).not.toContain('準備中')
   })
 })

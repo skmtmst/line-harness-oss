@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { getLineAccountById, jstNow, nextVersionToken, recordConversionSourceEvent } from '@line-crm/db';
 import {
@@ -75,7 +76,7 @@ async function getTestRecipient(c: Context<Env>, accountId: string, friendId: st
 
 async function requireAccount(c: Context<Env>): Promise<string | Response> {
   const accountId = c.req.query('lineAccountId');
-  if (!accountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
   }
@@ -84,12 +85,12 @@ async function requireAccount(c: Context<Env>): Promise<string | Response> {
 
 function metricsError(c: Context<Env>, error: unknown): Response {
   if (error instanceof NenCampaignMetricsError) {
-    return c.json({
+    return inputError(c, {
       success: false,
       code: error.code,
       error: error.message,
       ...(error.field ? { field: error.field } : {}),
-    }, error.status);
+    }, error.status, []);
   }
   console.error(JSON.stringify({
     event: 'nen_campaign_metrics_failed',
@@ -101,7 +102,7 @@ function metricsError(c: Context<Env>, error: unknown): Response {
 
 function columnOperationError(c: Context<Env>, error: unknown): Response {
   if (error instanceof NenColumnOperationError) {
-    return c.json({ success: false, code: error.code, error: error.message }, error.status);
+    return inputError(c, { success: false, code: error.code, error: error.message }, error.status, []);
   }
   console.error('NEN column operation failed:', error);
   return c.json({ success: false, error: 'NENコラムを操作できませんでした' }, 500);
@@ -243,15 +244,15 @@ function readCampaignSettingUpdatedAt(raw: string | null, fallback: string): str
   }
 }
 
-nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner', 'admin'), async (c) => {
+nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const key = c.req.param('campaignKey');
-  if (!CAMPAIGN_KEYS.has(key)) return c.json({ success: false, error: 'Invalid campaign' }, 400);
+  if (!CAMPAIGN_KEYS.has(key)) return inputError(c, { success: false, error: 'Invalid campaign' }, 400, []);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   if (!body || typeof body.isEnabled !== 'boolean' || typeof body.title !== 'string'
       || typeof body.bodyText !== 'string' || typeof body.deliveryTime !== 'string') {
-    return c.json({ success: false, error: 'Invalid body' }, 400);
+    return inputError(c, { success: false, error: 'Invalid body' }, 400, ["isEnabled","title","bodyText","deliveryTime"]);
   }
   const delayDays = Number(body.delayDays);
   const buttonLabel = typeof body.buttonLabel === 'string' ? body.buttonLabel.trim() : '';
@@ -260,22 +261,22 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner'
   const afterActions = body.afterActions === undefined ? [] : parseNenCampaignAfterActions(body.afterActions);
   if (body.afterActions !== undefined
       && (!Array.isArray(body.afterActions) || afterActions.length !== body.afterActions.length)) {
-    return c.json({ success: false, error: 'Invalid campaign actions' }, 400);
+    return inputError(c, { success: false, error: 'Invalid campaign actions' }, 400, ["afterActions"]);
   }
   // 本文の上限は画面と同じ採用上限（NEN_CAMPAIGN_BODY_MAX_LENGTH）。数え方も
   // 画面の残数表示と同じ関数で測り、超過時は字数を添えて理由を返す。
   const bodyCheck = checkNenCampaignBodyLength(body.bodyText);
   if (!bodyCheck.fits) {
-    return c.json({
+    return inputError(c, {
       success: false,
       error: `本文は${NEN_CAMPAIGN_BODY_MAX_LENGTH.toLocaleString('ja-JP')}字以内で入力してください（現在${bodyCheck.length.toLocaleString('ja-JP')}字）`,
-    }, 400);
+    }, 400, ["bodyText"]);
   }
   if (!body.title.trim() || body.title.trim().length > 120
       || !Number.isInteger(delayDays) || delayDays < 0 || delayDays > 365
       || !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.deliveryTime)
       || buttonLabel.length > 20 || !isUrl(buttonUrl) || !isUrl(imageUrl)) {
-    return c.json({ success: false, error: 'Invalid campaign values' }, 400);
+    return inputError(c, { success: false, error: 'Invalid campaign values' }, 400, ["title","delayDays","deliveryTime","buttonLabel","buttonUrl","imageUrl"]);
   }
   const current = await getNenCampaign(c.env.DB, key, accountId);
   if (!current) return c.json({ success: false, error: 'Campaign not found' }, 404);
@@ -287,7 +288,7 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner'
     : body.excludeFormRespondents;
   if (!Number.isInteger(dedupWindowDays) || dedupWindowDays < 0 || dedupWindowDays > 365
       || typeof excludeFormRespondents !== 'boolean') {
-    return c.json({ success: false, error: 'Invalid delivery safeguards' }, 400);
+    return inputError(c, { success: false, error: 'Invalid delivery safeguards' }, 400, ["dedupWindowDays","excludeFormRespondents"]);
   }
   /*
    * NEN-07 (#1078): 「回答フォームを開く」設定はつなぐフォームが今も使える
@@ -310,20 +311,20 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner'
   };
   const buttonFormId = campaignButtonFormId(proposed);
   if (buttonFormId !== null && buttonFormId !== formAction?.formId) {
-    return c.json({
+    return inputError(c, {
       success: false,
       error: 'ボタンのURLは回答フォームを指していますが、「押されたあとにすること」でフォームが選ばれていません。先にフォームを選んでください',
-    }, 400);
+    }, 400, ["afterActions","excludeFormRespondents","buttonUrl"]);
   }
   if (excludeFormRespondents && !formAction) {
-    return c.json({
+    return inputError(c, {
       success: false,
       error: '「すでに口コミを書いた人には送らない」には回答フォームの選択が必要です',
-    }, 400);
+    }, 400, ["excludeFormRespondents","afterActions"]);
   }
   const formIssue = await nenCampaignFormIssue(c.env.DB, proposed, accountId);
   if (formIssue) {
-    return c.json({ success: false, error: NEN_CAMPAIGN_FORM_ISSUE_LABELS[formIssue] }, 400);
+    return inputError(c, { success: false, error: NEN_CAMPAIGN_FORM_ISSUE_LABELS[formIssue] }, 400, ["afterActions","excludeFormRespondents","buttonUrl"]);
   }
   /*
    * M507: 配信設定の同時保存は後勝ちで先の変更が黙って消えていた。
@@ -407,14 +408,14 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner'
 // いる場合に停止すらできなくなる（#659差し戻し2点目）。停止は本文の長さに
 // 関わらず必ず実行できる必要があるため、is_enabled以外は今の値のまま
 // 変えず、本文の長さ検査も行わない。
-nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey/enabled', requireRole('owner', 'admin'), async (c) => {
+nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey/enabled', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const key = c.req.param('campaignKey');
-  if (!CAMPAIGN_KEYS.has(key)) return c.json({ success: false, error: 'Invalid campaign' }, 400);
+  if (!CAMPAIGN_KEYS.has(key)) return inputError(c, { success: false, error: 'Invalid campaign' }, 400, []);
   const body = await c.req.json<{ isEnabled?: unknown }>().catch(() => null);
   if (!body || typeof body.isEnabled !== 'boolean') {
-    return c.json({ success: false, error: 'isEnabled is required' }, 400);
+    return inputError(c, { success: false, error: 'isEnabled is required' }, 400, ["isEnabled"]);
   }
   const current = await getNenCampaign(c.env.DB, key, accountId);
   if (!current) return c.json({ success: false, error: 'Campaign not found' }, 404);
@@ -467,10 +468,10 @@ function applyCampaignDraft(campaign: CampaignRow, draft: NenCampaignDraft | und
   return { ...campaign, title, body_text: bodyText, button_label: buttonLabel, button_url: buttonUrl, image_url: imageUrl };
 }
 
-nenCampaigns.post('/api/nen-campaigns/test-send', requireRole('owner', 'admin'), async (c) => {
+nenCampaigns.post('/api/nen-campaigns/test-send', requireRole('owner', 'admin'), inputJsonBoundary({"campaignKey":["string"],"accountId":["string"],"friendId":["string"],"draft":["object"]}), async (c) => {
   const body = await c.req.json<{ campaignKey?: string; accountId?: string; friendId?: string; draft?: NenCampaignDraft }>().catch(() => null);
   if (!body?.campaignKey || !CAMPAIGN_KEYS.has(body.campaignKey) || !body.accountId || !body.friendId) {
-    return c.json({ success: false, error: 'campaignKey, accountId and friendId are required' }, 400);
+    return inputError(c, { success: false, error: 'campaignKey, accountId and friendId are required' }, 400, ["campaignKey","accountId","friendId"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
@@ -485,7 +486,7 @@ nenCampaigns.post('/api/nen-campaigns/test-send', requireRole('owner', 'admin'),
   if (!friend) return c.json({ success: false, code: 'test_recipient_unavailable', error: 'テスト送信先が登録されていないか、友だち追加されていません' }, 404);
   if (!savedCampaign || !account) return c.json({ success: false, error: 'Test target not found' }, 404);
   const campaign = applyCampaignDraft(savedCampaign, body.draft);
-  if ('error' in campaign) return c.json({ success: false, error: campaign.error }, 400);
+  if ('error' in campaign) return inputError(c, { success: false, error: campaign.error }, 400, ["draft"]);
   const sample = {
     event: {
       event_id: `test-${crypto.randomUUID()}`, event_type: 'ec.order.shipped', occurred_at: new Date().toISOString(),
@@ -600,10 +601,10 @@ nenCampaigns.get('/api/nen-campaigns/deliveries/:id', requireRole('owner', 'admi
   }
 });
 
-nenCampaigns.post('/api/nen-campaigns/deliveries/:id/retry', requireRole('owner', 'admin'), async (c) => {
+nenCampaigns.post('/api/nen-campaigns/deliveries/:id/retry', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   const accountId = typeof body?.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
-  if (!accountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
   }
@@ -665,27 +666,27 @@ nenCampaigns.get('/api/nen-campaigns/columns-preview', requireRole('owner', 'adm
   }
 });
 
-nenCampaigns.post('/api/nen-campaigns/columns', requireRole('owner', 'admin'), async (c) => {
+nenCampaigns.post('/api/nen-campaigns/columns', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
 
   const parsed = await readBoundedJsonObject(c.req.raw);
-  if (!parsed.ok) return c.json({ success: false, error: parsed.error }, parsed.status);
+  if (!parsed.ok) return inputError(c, { success: false, error: parsed.error }, parsed.status, []);
   const validated = validateNenColumnCreateBody(parsed.value);
-  if (!validated.ok) return c.json({ success: false, error: validated.error }, 400);
+  if (!validated.ok) return inputError(c, { success: false, error: validated.error }, 400, ["conditions"]);
 
   const input = validated.value;
   for (const tagId of new Set([input.targetTagId, input.completionTagId].filter((value): value is string => Boolean(value)))) {
     const tag = await c.env.DB.prepare(
       `SELECT id FROM tags WHERE id = ? AND line_account_id = ?`,
     ).bind(tagId, accountId).first<{ id: string }>();
-    if (!tag) return c.json({ success: false, error: 'target_invalid' }, 400);
+    if (!tag) return inputError(c, { success: false, error: 'target_invalid' }, 400, ["targetTagId"]);
   }
   if (input.sourceColumnId) {
     const source = await c.env.DB.prepare(
       `SELECT id FROM nen_columns WHERE id = ? AND line_account_id = ?`,
     ).bind(input.sourceColumnId, accountId).first<{ id: string }>();
-    if (!source) return c.json({ success: false, error: 'target_invalid' }, 400);
+    if (!source) return inputError(c, { success: false, error: 'target_invalid' }, 400, ["sourceColumnId"]);
   }
   const existing = await c.env.DB.prepare(
     `SELECT id FROM nen_columns WHERE slug = ?`,
@@ -726,7 +727,7 @@ nenCampaigns.post('/api/nen-campaigns/columns', requireRole('owner', 'admin'), a
   return c.json({ success: true, data: { id, queued: 0 } }, 201);
 });
 
-nenCampaigns.post('/api/nen-campaigns/columns/:id/duplicate', requireRole('owner', 'admin'), async (c) => {
+nenCampaigns.post('/api/nen-campaigns/columns/:id/duplicate', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string }>().catch(() => null);
   if (!body?.accountId || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
@@ -737,7 +738,7 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/duplicate', requireRole('owner
    */
   const idempotencyKey = c.req.header('Idempotency-Key')?.trim() || null;
   if (idempotencyKey && !isValidIdempotencyKey(idempotencyKey)) {
-    return c.json({ success: false, error: 'Idempotency-Key はUUIDで送ってください' }, 400);
+    return inputError(c, { success: false, error: 'Idempotency-Key はUUIDで送ってください' }, 400, []);
   }
   const sourceId = c.req.param('id');
   const findDuplicate = () => c.env.DB.prepare(
@@ -772,10 +773,10 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/duplicate', requireRole('owner
   }
 });
 
-nenCampaigns.post('/api/nen-campaigns/columns/:id/test-send', requireRole('owner', 'admin'), async (c) => {
+nenCampaigns.post('/api/nen-campaigns/columns/:id/test-send', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"friendId":["string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string; friendId?: string }>().catch(() => null);
   if (!body?.accountId || !body.friendId) {
-    return c.json({ success: false, error: 'accountId and friendId are required' }, 400);
+    return inputError(c, { success: false, error: 'accountId and friendId are required' }, 400, ["accountId","friendId"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
@@ -809,11 +810,11 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/test-send', requireRole('owner
 nenCampaigns.post(
   '/api/nen-campaigns/columns/:id/read-events',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     if (!body || typeof body.lineAccountId !== 'string' || typeof body.friendId !== 'string'
       || (body.eventKind !== 'opened' && body.eventKind !== 'completed') || typeof body.idempotencyKey !== 'string') {
-      return c.json({ success: false, error: 'Invalid body' }, 400);
+      return inputError(c, { success: false, error: 'Invalid body' }, 400, []);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
       return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
@@ -831,7 +832,7 @@ nenCampaigns.post(
   },
 );
 
-nenCampaigns.post('/api/nen-campaigns/deliveries/pending-now', requireRole('owner', 'admin'), async (c) => {
+nenCampaigns.post('/api/nen-campaigns/deliveries/pending-now', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"expectedCount":["number"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string; expectedCount?: number }>().catch(() => null);
   if (!body?.accountId || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
@@ -847,9 +848,9 @@ nenCampaigns.post('/api/nen-campaigns/deliveries/pending-now', requireRole('owne
   }
 });
 
-nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireRole('owner', 'admin'), async (c) => {
+nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"scheduledAt":["string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string; scheduledAt?: string }>().catch(() => null);
-  if (!body?.accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  if (!body?.accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
   }
@@ -862,10 +863,10 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireRole('owner',
   if (body.scheduledAt) {
     const parsed = Date.parse(body.scheduledAt);
     if (!Number.isFinite(parsed)) {
-      return c.json({ success: false, error: 'scheduled_at_invalid' }, 400);
+      return inputError(c, { success: false, error: 'scheduled_at_invalid' }, 400, ["scheduledAt"]);
     }
     if (parsed <= Date.now()) {
-      return c.json({ success: false, error: 'past_datetime' }, 400);
+      return inputError(c, { success: false, error: 'past_datetime' }, 400, ["scheduledAt"]);
     }
     when = new Date(parsed).toISOString().slice(0, 19).replace('T', ' ');
   } else {
@@ -875,13 +876,13 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireRole('owner',
   return c.json({ success: true, data: { queued } });
 });
 
-nenCampaigns.put('/api/nen-campaigns/columns/:id/message', requireRole('owner', 'admin'), async (c) => {
+nenCampaigns.put('/api/nen-campaigns/columns/:id/message', requireRole('owner', 'admin'), inputJsonBoundary({"introText":["string"],"expectedUpdatedAt":["string"]}), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const body = await c.req.json<{ introText?: string; expectedUpdatedAt?: string }>().catch(() => null);
   const introText = body?.introText?.trim() || '';
   if (!introText || introText.length > 1500) {
-    return c.json({ success: false, error: 'introText is required and must be 1500 characters or fewer' }, 400);
+    return inputError(c, { success: false, error: 'introText is required and must be 1500 characters or fewer' }, 400, ["introText"]);
   }
   /*
    * M507: 紹介文の同時保存は後勝ちで先の変更が黙って消えていた。
@@ -953,7 +954,7 @@ nenCampaigns.get('/api/nen-campaigns/pets', requireRole('owner', 'admin', 'staff
 // 誕生日の形（YYYY-MM-DD か MM-DD）の判定は lib/nen-pet-birthday.ts の1本。
 
 function petWriteBody(body: Record<string, unknown> | null):
-  { error: string } | {
+  { error: string; field?: string } | {
     name: string; animalType: string; gender: string; birthday: string | null;
     breed: string | null; weightKg: number | null;
   } {
@@ -997,7 +998,7 @@ function petWriteBody(body: Record<string, unknown> | null):
  * 検証はDBを読む前に済ませるため、ここは入力だけを見る（無効入力でDBを叩かない）。
  */
 function petPatchBody(body: Record<string, unknown> | null):
-  { error: string } | {
+  { error: string; field?: string } | {
     name?: string; animalType?: string; gender?: string; birthday?: string | null;
     breed?: string | null; weightKg?: number | null;
   } {
@@ -1007,16 +1008,16 @@ function petPatchBody(body: Record<string, unknown> | null):
   } = {};
   if (!body) return patch;
   if (body.name !== undefined) {
-    if (typeof body.name !== 'string' || !body.name.trim()) return { error: 'name is required' };
+    if (typeof body.name !== 'string' || !body.name.trim()) return { error: 'name is required', field: 'name' };
     if (countNenCampaignBodyLength(body.name.trim()) > NEN_PET_NAME_MAX_LENGTH) {
-      return { error: `ペットのお名前は${NEN_PET_NAME_MAX_LENGTH}字以内で入力してください` };
+      return { error: `ペットのお名前は${NEN_PET_NAME_MAX_LENGTH}字以内で入力してください`, field: 'name' };
     }
     patch.name = body.name.trim();
   }
   if (body.animalType !== undefined) {
     // DEEP-24: 範囲外の種別を犬へ黙って倒さずエラーにする。
     if (!['dog', 'cat', 'other'].includes(String(body.animalType))) {
-      return { error: '種別は 犬・猫・その他 から選んでください' };
+      return { error: '種別は 犬・猫・その他 から選んでください', field: 'animalType' };
     }
     patch.animalType = String(body.animalType);
   }
@@ -1025,7 +1026,7 @@ function petPatchBody(body: Record<string, unknown> | null):
   }
   if (body.birthday !== undefined) {
     const birthday = normalizeNenPetBirthday(body.birthday);
-    if (birthday === 'invalid') return { error: '誕生日は YYYY-MM-DD か MM-DD で入力してください' };
+    if (birthday === 'invalid') return { error: '誕生日は YYYY-MM-DD か MM-DD で入力してください', field: 'birthday' };
     patch.birthday = birthday;
   }
   if (body.breed !== undefined) {
@@ -1034,7 +1035,7 @@ function petPatchBody(body: Record<string, unknown> | null):
   if (body.weightKg !== undefined) {
     const weightKg = body.weightKg === null || body.weightKg === '' ? null : Number(body.weightKg);
     if (weightKg !== null && (!Number.isFinite(weightKg) || weightKg < 0.1 || weightKg > 200)) {
-      return { error: '体重は 0.1〜200kg で入力してください' };
+      return { error: '体重は 0.1〜200kg で入力してください', field: 'weightKg' };
     }
     patch.weightKg = weightKg;
   }
@@ -1076,15 +1077,15 @@ async function findPetById(db: D1Database, id: string) {
   }>();
 }
 
-nenCampaigns.post('/api/nen-campaigns/pets', requireRole('owner', 'admin'), async (c) => {
+nenCampaigns.post('/api/nen-campaigns/pets', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   if (!body || typeof body.friendId !== 'string') {
-    return c.json({ success: false, error: 'friendId and name are required' }, 400);
+    return inputError(c, { success: false, error: 'friendId and name are required' }, 400, ["friendId"]);
   }
   const input = petWriteBody(body);
-  if ('error' in input) return c.json({ success: false, error: input.error }, 400);
+  if ('error' in input) return inputError(c, { success: false, error: input.error }, 400, ["name","birthday","weightKg","animalType","gender","breed"]);
   const friend = await c.env.DB.prepare(`SELECT id, line_account_id FROM friends WHERE id = ?`)
     .bind(body.friendId).first<{ id: string; line_account_id: string | null }>();
   if (!friend || friend.line_account_id !== accountId) {
@@ -1093,7 +1094,7 @@ nenCampaigns.post('/api/nen-campaigns/pets', requireRole('owner', 'admin'), asyn
   const customerId = typeof body.customerId === 'string' ? body.customerId : null;
   const rawKey = c.req.header('Idempotency-Key')?.trim() || null;
   if (rawKey !== null && !isValidIdempotencyKey(rawKey)) {
-    return c.json({ success: false, error: '再実行キーの形式が正しくありません' }, 400);
+    return inputError(c, { success: false, error: '再実行キーの形式が正しくありません' }, 400, []);
   }
   if (rawKey) {
     const existing = await findPetById(c.env.DB, rawKey);
@@ -1132,13 +1133,13 @@ nenCampaigns.post('/api/nen-campaigns/pets', requireRole('owner', 'admin'), asyn
   return c.json({ success: true, data: { id } }, 201);
 });
 
-nenCampaigns.put('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), async (c) => {
+nenCampaigns.put('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), inputJsonBoundary({"expectedUpdatedAt":["string"]}), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const body = await c.req.json<Record<string, unknown> & { expectedUpdatedAt?: string }>().catch(() => null);
   // 入力検証はDBを読む前に済ませる。無効な入力ではDBへ一切行かない。
   const patch = petPatchBody(body ?? {});
-  if ('error' in patch) return c.json({ success: false, error: patch.error }, 400);
+  if ('error' in patch) return inputError(c, { success: false, error: patch.error, field: patch.field }, 400, []);
   const pet = await c.env.DB.prepare(
     `SELECT p.friend_id, p.name, p.animal_type, p.gender, p.birthday, p.breed, p.weight_kg, p.updated_at, f.line_account_id
      FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id WHERE p.id = ?`,
@@ -1241,7 +1242,7 @@ nenCampaigns.get('/api/nen-campaigns/birthday-coupon', async (c) => {
   } });
 });
 
-nenCampaigns.put('/api/nen-campaigns/birthday-coupon', requireRole('owner', 'admin'), async (c) => {
+nenCampaigns.put('/api/nen-campaigns/birthday-coupon', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
@@ -1251,14 +1252,14 @@ nenCampaigns.put('/api/nen-campaigns/birthday-coupon', requireRole('owner', 'adm
       || !/^[A-Z0-9-]{3,10}$/.test(body.codePrefix) || typeof body.benefitLabel !== 'string'
       || !body.benefitLabel.trim() || !Number.isInteger(amount) || amount < 1 || amount > 100000
       || !Number.isInteger(days) || days < 1 || days > 365) {
-    return c.json({ success: false, error: 'Invalid coupon settings' }, 400);
+    return inputError(c, { success: false, error: 'Invalid coupon settings' }, 400, ["isEnabled","codePrefix","benefitLabel","discountAmount","validityDays"]);
   }
   // 419: 2月29日生まれの扱い。送られてきたら検証し、省略なら既存値を守る
   // （旧クライアントからの保存で 'skip' 扱いの設定を無断で変えない）。
   let leapYearPolicy: 'feb28' | 'mar1' | 'skip' | undefined;
   if (body.leapYearPolicy !== undefined) {
     if (!['feb28', 'mar1', 'skip'].includes(body.leapYearPolicy as string)) {
-      return c.json({ success: false, error: 'Invalid leapYearPolicy' }, 400);
+      return inputError(c, { success: false, error: 'Invalid leapYearPolicy' }, 400, ["leapYearPolicy"]);
     }
     leapYearPolicy = body.leapYearPolicy as 'feb28' | 'mar1' | 'skip';
   } else {
@@ -1296,7 +1297,7 @@ async function resolveSoleActiveAccountId(db: D1Database): Promise<string | null
  * ★V6 37-6-A「ECのコラムを取り込む」。EC で保存されたコラムは Webhook で自動的に届くが、
  * 宛先が決められなかった分（アカウントが複数ある・古いコラム）がここに残る。
  */
-nenCampaigns.post('/api/nen-campaigns/columns/import', requireRole('owner', 'admin'), async (c) => {
+nenCampaigns.post('/api/nen-campaigns/columns/import', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const account = await getLineAccountById(c.env.DB, accountId);
@@ -1309,7 +1310,7 @@ nenCampaigns.post('/api/nen-campaigns/columns/import', requireRole('owner', 'adm
   return c.json({ success: true, data: { imported } });
 });
 
-nenCampaigns.post('/api/integrations/eccube/columns', async (c) => {
+nenCampaigns.post('/api/integrations/eccube/columns', inputJsonBoundary(), async (c) => {
   const secret = c.env.ECCUBE_WEBHOOK_SECRET;
   if (!secret || secret.length < 32) return c.json({ success: false, error: 'Integration is not configured' }, 503);
   const raw = await c.req.text();
@@ -1322,12 +1323,12 @@ nenCampaigns.post('/api/integrations/eccube/columns', async (c) => {
   try {
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
-    return c.json({ success: false, error: 'Invalid JSON' }, 400);
+    return inputError(c, { success: false, error: 'Invalid JSON' }, 400, []);
   }
   if (typeof body.slug !== 'string' || typeof body.title !== 'string' || typeof body.article_url !== 'string'
       || !body.slug || !body.title || !isUrl(body.article_url)
       || (body.image_url && (typeof body.image_url !== 'string' || !isUrl(body.image_url)))) {
-    return c.json({ success: false, error: 'Invalid column' }, 400);
+    return inputError(c, { success: false, error: 'Invalid column' }, 400, ["slug","title","article_url","image_url"]);
   }
   // 120: 管理画面経路（validateNenColumnCreateBody）と同じ値に揃えた。送信元の
   // EC-Cube側フォームも独立に120字で制約している（JournalController.php の
@@ -1341,7 +1342,7 @@ nenCampaigns.post('/api/integrations/eccube/columns', async (c) => {
       titleLength: body.title.length,
       maxLength: 120,
     }));
-    return c.json({ success: false, error: 'title_invalid' }, 400);
+    return inputError(c, { success: false, error: 'title_invalid' }, 400, ["title"]);
   }
   const requestedLineAccountId = typeof body.line_account_id === 'string' ? body.line_account_id : null;
   if (requestedLineAccountId && !await getLineAccountById(c.env.DB, requestedLineAccountId)) {
@@ -1397,7 +1398,7 @@ nenCampaigns.post('/api/integrations/eccube/columns', async (c) => {
  * （冪等）。利用=注文なので成果計測にもつなげるが、計測の失敗で
  * 記録自体は止めない。
  */
-nenCampaigns.post('/api/integrations/eccube/coupon-usages', async (c) => {
+nenCampaigns.post('/api/integrations/eccube/coupon-usages', inputJsonBoundary(), async (c) => {
   const secret = c.env.ECCUBE_WEBHOOK_SECRET;
   if (!secret || secret.length < 32) return c.json({ success: false, error: 'Integration is not configured' }, 503);
   const raw = await c.req.text();
@@ -1410,7 +1411,7 @@ nenCampaigns.post('/api/integrations/eccube/coupon-usages', async (c) => {
   try {
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
-    return c.json({ success: false, error: 'Invalid JSON' }, 400);
+    return inputError(c, { success: false, error: 'Invalid JSON' }, 400, []);
   }
   const code = typeof body.code === 'string' ? body.code.trim().slice(0, 64) : '';
   const usedAt = body.used_at === undefined || body.used_at === null || body.used_at === ''
@@ -1424,7 +1425,7 @@ nenCampaigns.post('/api/integrations/eccube/coupon-usages', async (c) => {
   const eventId = typeof body.event_id === 'string' && body.event_id.trim()
     ? body.event_id.trim().slice(0, 255) : null;
   if (!code || usedAt === 'invalid') {
-    return c.json({ success: false, error: 'Invalid coupon usage' }, 400);
+    return inputError(c, { success: false, error: 'Invalid coupon usage' }, 400, ["code","used_at"]);
   }
   const when = usedAt ?? jstNow();
   // 二重報告で最初の利用日時を上書きしない（used_at IS NULL の行だけ更新）。

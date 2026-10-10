@@ -7,16 +7,18 @@
  * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左のフォルダの列（型のフォルダの列＋共通 FolderPanel。2026-10-08 タグ→フォルダ・API-17）・
  * 数のカード4枚・探す欄と状態の札・カード／表の切り替え・並び・件数・アカウントのカード・件数と注。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { CircleDot, Inbox, LogIn, Plus, RotateCcw, Settings, Star, MessageCircle } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ListPage } from '@/components/templates'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
-import { FolderDotName } from '@/components/shared/folder-dot'
+import { FolderDot, FolderDotName } from '@/components/shared/folder-dot'
 import { brandInitial } from '@/components/layout/brand-initial'
 import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import ListState from '@/components/shared/list-state'
@@ -40,6 +42,11 @@ import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8, accountHandle } from './account-dialogs'
 import { connectionReasonLine } from './connection-reasons'
 import styles from './home.module.css'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/folder-colors'
+import StatusPill from '@/components/shared/status-pill'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 type View = 'cards' | 'table'
@@ -109,13 +116,13 @@ export default function HqHomeV8() {
   const [connectionProgress, setConnectionProgress] = useState('')
   const [connectionResult, setConnectionResult] = useState('')
 
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [folder, setFolder] = useState<string>(ALL)
-  const [view, setView] = useState<View>('cards')
-  const [sort, setSort] = useState('friends')
+  const [view, setView] = useListUrlValue<View>('view', 'cards')
+  const [sort, setSort] = useListUrlValue('sort', 'friends')
   const [size, setSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [folders, setFolders] = useState<(Folder & { itemCount?: number })[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   /* フォルダの追加・名前と色を変える窓（同じ窓。editing があれば変える）。 */
@@ -203,10 +210,10 @@ export default function HqHomeV8() {
     try {
       await Promise.all([load(), refreshAccounts()])
       setConnectionResult(failed === 0
-        ? `${succeeded}件のLINE IDと接続状態を更新しました。`
-        : `${succeeded}件を更新し、${failed}件は更新できませんでした。`)
+        ? `${succeeded} 件のLINE IDと接続状態を更新しました。`
+        : `${succeeded} 件を更新し、${failed} 件は更新できませんでした。`)
     } catch {
-      setConnectionResult(`${succeeded}件を確認しましたが、一覧を再読み込みできませんでした。`)
+      setConnectionResult(`${succeeded} 件を確認しましたが、一覧を再読み込みできませんでした。`)
     } finally {
       setConnectionProgress('')
       setCheckingConnections(false)
@@ -270,7 +277,7 @@ export default function HqHomeV8() {
 
   const openFolderDialog = (editing: Folder | null) => {
     setFolderName(editing?.name ?? '')
-    setFolderColor(editing?.color ?? null)
+    setFolderColor(editing ? folderDisplayColor(editing) : DEFAULT_TAG_FOLDER_COLOR)
     setFolderError('')
     setFolderDialog({ editing })
   }
@@ -341,6 +348,7 @@ export default function HqHomeV8() {
       label: f.name,
       count: typeof f.itemCount === 'number' ? f.itemCount : (folderCounts.get(f.id) ?? 0),
       color: f.color,
+      icon: <FolderDot folder={{ name: f.name, color: f.color }} />,
       onEdit: canManage ? () => openFolderDialog(f) : undefined,
       onMoveUp: canManage && index > 0 ? () => void moveFolder(index, -1) : undefined,
       onMoveDown: canManage && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
@@ -391,7 +399,7 @@ export default function HqHomeV8() {
     return (
       <div className={styles.cardButtons}>
         <Button className={styles.grow} onClick={() => login(account.id)} aria-label={`${account.displayName || account.name} へ入る`}>
-          <LogIn aria-hidden="true" className={styles.buttonIcon} />このアカウントへ入る
+          <LogIn aria-hidden="true" className={styles.buttonIcon} />入る
         </Button>
         {canManage ? (
           <Button onClick={() => setSettingsAccount(account)} aria-label={`${account.displayName || account.name} の設定`}>
@@ -416,13 +424,13 @@ export default function HqHomeV8() {
   const body = loadError ? (
     <Notice
       tone="danger"
-      message={loadFailureNotice(loadError, '統括のアカウント情報')}
+      message={loadFailureNotice(loadError, '統括のアカウント情報', 'hq')}
       action={classifyApiFailure(loadError) === 'forbidden' ? undefined : (
-        <Button type="button" onClick={() => { setLoading(true); setReloadKey((key) => key + 1) }}>再読み込み</Button>
+        <Button type="button" onClick={() => { setLoading(true); setReloadKey((key) => key + 1) }}>もう一度読み込む</Button>
       )}
     />
   ) : loading ? (
-    <ListState kind="loading" title="アカウントを読み込んでいます" />
+    <ListState permissionScope="hq" kind="loading" loadingShape={view === 'cards' ? 'cards' : 'list'} title="アカウントを読み込んでいます" />
   ) : accounts.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
     <EmptyList
@@ -434,12 +442,12 @@ export default function HqHomeV8() {
     />
   ) : (
     <>
-      <div className={styles.cards} data-design="KPIs">
-        <StatCard label="アカウント" value={formatNumber(accounts.length)} unit="件" />
-        <StatCard label="友だち合計" value={formatNumber(totals.friends)} unit="人" title="全アカウントの合計" />
-        <StatCard label="今月の配信" value={formatNumber(totals.messages)} unit="通" />
-        <StatCard label="接続に問題" value={formatNumber(totals.warnings)} unit="件" warn />
-      </div>
+      <KpiBand data-design="KPIs">
+        <KpiCard title="アカウント" value={accounts.length} unit="件" detail={null} />
+        <KpiCard title="友だち合計" value={totals.friends} unit="人" detail={null} help="全アカウントの合計" />
+        <KpiCard title="今月の配信" value={totals.messages} unit="通" detail={null} />
+        <KpiCard title="接続に問題" value={totals.warnings} unit="件" detail={null} valueTone="warning" />
+      </KpiBand>
 
       <div className={styles.tools}>
         <div className={styles.searchBox}>
@@ -472,7 +480,7 @@ export default function HqHomeV8() {
             value={String(size)}
             width={110}
             onChange={(value) => { setSize(Number(value)); resetPage() }}
-            options={PAGE_SIZES.map((value) => ({ value: String(value), label: `${value}件表示` }))}
+            options={PAGE_SIZES.map((value) => ({ value: String(value), label: `${value} 件表示` }))}
           />
         </div>
       </div>
@@ -483,7 +491,7 @@ export default function HqHomeV8() {
         <Notice
           tone="warn"
           message="保存はできましたが、一覧を読み直せませんでした。"
-          action={<Button type="button" onClick={() => void reloadAfterSave()}>読み直す</Button>}
+          action={<Button type="button" onClick={() => void reloadAfterSave()}>もう一度読み込む</Button>}
         />
       ) : null}
 
@@ -514,31 +522,27 @@ export default function HqHomeV8() {
                     {/* B-31：名前の下は1行で省略し、全文は title。 */}
                     <p className={styles.meta} title={metaOf(account)}>{metaOf(account)}</p>
                   </div>
-                  <span className={state.tone === 'ok' ? `${styles.pill} ${styles.pill_ok}` : state.tone === 'warn' ? `${styles.pill} ${styles.pill_warn}` : `${styles.pill} ${styles.pill_idle}`}><span className={styles.dot} aria-hidden="true" />{state.label}</span>
+                  <StatusPill tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusPill>
                 </div>
                 <dl className={styles.stats}>
                   <div className={styles.stat}>
                     <dt>友だち</dt>
-                    <dd>{isArchived(account) && !account.stats?.friendCount ? '—' : formatNumber(account.stats?.friendCount ?? 0)}</dd>
+                    <dd>{isArchived(account) && !account.stats?.friendCount ? emptyValue('unknown') : formatNumber(account.stats?.friendCount ?? 0)}</dd>
                   </div>
                   <div className={styles.stat}>
                     <dt>今月の配信</dt>
                     <dd>{`${formatNumber(account.stats?.messagesThisMonth ?? 0)} 通`}</dd>
                   </div>
                 </dl>
+                <div className={styles.reasonSlot}>
+                  {warned ? (() => {
+                    const reason = connectionReasonLine(account)
+                    return <Notice tone="warn" compact title={reason.title} message={reason.text}
+                      action={canManage ? <button type="button" onClick={() => void refreshConnectionInfo()} disabled={checkingConnections} className={styles.linkButton}>更新する</button> : undefined}
+                    />
+                  })() : null}
+                </div>
                 {cardActions(account)}
-                {warned ? (() => {
-                  /* 要確認の理由を、引っかかった確認ごとの言葉で1行に。長ければ省略し title で全文。 */
-                  const reason = connectionReasonLine(account)
-                  return (
-                    <p className={styles.warnLine}>
-                      <span className={styles.warnText} title={reason.title}>{reason.text}</span>
-                      {canManage ? (
-                        <button type="button" onClick={() => void refreshConnectionInfo()} disabled={checkingConnections} className={styles.linkButton}>更新する</button>
-                      ) : null}
-                    </p>
-                  )
-                })() : null}
               </article>
             )
           })}
@@ -560,11 +564,11 @@ export default function HqHomeV8() {
                 <span role="cell" className={styles.rowName}>
                   <span className={styles.logo} aria-hidden="true">{brandInitial(tenantName || name)}</span>
                   <span className={styles.cardName}>
-                    <span className={styles.name} title={name}>{name}</span>
+                    <span className={styles.name} ><TruncatedText value={String(name ?? '')} /></span>
                     <span className={styles.meta}>{metaOf(account)}</span>
                   </span>
                 </span>
-                <span role="cell"><span className={state.tone === 'ok' ? `${styles.pill} ${styles.pill_ok}` : state.tone === 'warn' ? `${styles.pill} ${styles.pill_warn}` : `${styles.pill} ${styles.pill_idle}`}><span className={styles.dot} aria-hidden="true" />{state.label}</span></span>
+                <span role="cell"><StatusPill tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusPill></span>
                 <span role="cell" className={styles.num}>{formatNumber(account.stats?.friendCount ?? 0)}</span>
                 <span role="cell" className={styles.num}>{formatNumber(account.stats?.messagesThisMonth ?? 0)}</span>
                 <span role="cell">{cardActions(account)}</span>
@@ -576,9 +580,9 @@ export default function HqHomeV8() {
 
       <div className={styles.footer}>
         <span className={styles.range}>
-          {filtered.length === 0 ? '0件' : `${formatNumber(filtered.length)}件中 ${formatNumber((current - 1) * size + 1)}〜${formatNumber((current - 1) * size + shown.length)}件`}
+          {filtered.length === 0 ? '0件' : `${formatNumber(filtered.length)} 件中 ${formatNumber((current - 1) * size + 1)}〜${formatNumber((current - 1) * size + shown.length)} 件`}
         </span>
-        <p className={styles.footNote}>カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「詳細」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。</p>
+
         {pageCount > 1 ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="アカウントのページ送り" /> : null}
       </div>
     </>
@@ -588,7 +592,8 @@ export default function HqHomeV8() {
     <ListPage
       boardId="JKjsE"
       title="統括のアカウント"
-      description={`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}
+      help={<>{`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}{"カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「詳細」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。"}</>}
+
       folders={folderColumn}
       folderInset
       folderWidth={200}
@@ -644,12 +649,12 @@ export default function HqHomeV8() {
         title={folderDialog?.editing ? 'フォルダの名前と色を変える' : 'フォルダを追加'}
         description="アカウントは1つのフォルダに入ります。フォルダを消しても、アカウントは消えません。"
         name={folderName} onNameChange={setFolderName} nameId="hq-account-folder-name" nameLabel="フォルダの名前"
-        color={folderColor} onColorChange={setFolderColor} colors={FOLDER_SELECT_COLORS} allowClear
-        placeholder="例: 渋谷エリア" maxLength={100}
+        color={folderColor} onColorChange={setFolderColor} colors={FOLDER_SELECT_COLORS}
+        placeholder="例：渋谷エリア" maxLength={100}
         onCancel={() => { if (!folderSaving) setFolderDialog(null) }}
         designNode="JKjsE" busy={folderSaving} error={folderError || undefined}
         confirmLabel={folderDialog?.editing ? '保存する' : '追加する'} cancelLabel="やめる"
-        onConfirm={() => void saveFolder()}
+        onConfirm={() => saveFolder()}
       />
 
       {deleteFolder ? (
@@ -662,23 +667,10 @@ export default function HqHomeV8() {
           destructive
           busy={folderSaving}
           error={folderError || undefined}
-          onConfirm={() => void removeFolder(deleteFolder)}
+          onConfirm={() => removeFolder(deleteFolder)}
           onCancel={() => { if (!folderSaving) setDeleteFolder(null) }}
         />
       ) : null}
     </ListPage>
-  )
-}
-
-/** 数のカード（統括は角丸のカード4枚。題と、数の横に単位の2段。B-33）。 */
-function StatCard({ label, value, unit, title, warn = false }: { label: string; value: string; unit: string; title?: string; warn?: boolean }) {
-  return (
-    <div className={styles.stat4} title={title}>
-      <span className={styles.statLabel}>{label}</span>
-      <span className={styles.statLine}>
-        <span className={warn ? `${styles.statValue} ${styles.statWarn}` : styles.statValue}>{value}</span>
-        <span className={styles.statSub}>{unit}</span>
-      </span>
-    </div>
   )
 }

@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import { getFriendById, getLineAccountById, recordRichMenuAssignment } from '@line-crm/db';
@@ -28,7 +29,7 @@ async function resolveLineClient(c: Context<Env>): Promise<LineClient> {
 function richMenuError(c: Context<Env>, prefix: string, err: unknown) {
   const message = err instanceof Error ? err.message : String(err);
   if (err instanceof LineAccountRequiredError) {
-    return c.json({ success: false, error: message }, 400);
+    return inputError(c, { success: false, error: message }, 400, []);
   }
   console.error(`${prefix}:`, message);
   return c.json({ success: false, error: `${prefix}: ${message}` }, 500);
@@ -46,7 +47,7 @@ richMenus.get('/api/rich-menus', async (c) => {
 });
 
 // POST /api/rich-menus — create a rich menu via LINE API
-richMenus.post('/api/rich-menus', requireRole('owner', 'admin'), async (c) => {
+richMenus.post('/api/rich-menus', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json();
     const lineClient = await resolveLineClient(c);
@@ -70,7 +71,7 @@ richMenus.delete('/api/rich-menus/:id', requireRole('owner', 'admin'), async (c)
 });
 
 // POST /api/rich-menus/:id/default — set rich menu as default for all users
-richMenus.post('/api/rich-menus/:id/default', requireRole('owner', 'admin'), async (c) => {
+richMenus.post('/api/rich-menus/:id/default', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const richMenuId = c.req.param('id');
     const lineClient = await resolveLineClient(c);
@@ -82,13 +83,13 @@ richMenus.post('/api/rich-menus/:id/default', requireRole('owner', 'admin'), asy
 });
 
 // POST /api/friends/:friendId/rich-menu — link rich menu to a specific friend
-richMenus.post('/api/friends/:friendId/rich-menu', requireRole('owner', 'admin'), async (c) => {
+richMenus.post('/api/friends/:friendId/rich-menu', requireRole('owner', 'admin'), inputJsonBoundary({"richMenuId":["string"]}), async (c) => {
   try {
     const friendId = c.req.param('friendId');
     const body = await c.req.json<{ richMenuId: string }>();
 
     if (!body.richMenuId) {
-      return c.json({ success: false, error: 'richMenuId is required' }, 400);
+      return inputError(c, { success: false, error: 'richMenuId is required' }, 400, ["richMenuId"]);
     }
 
     const db = c.env.DB;
@@ -270,7 +271,7 @@ richMenus.get('/api/friends/:friendId/rich-menu', async (c) => {
 export { richMenus };
 
 // POST /api/rich-menus/:id/image — upload rich menu image (accepts base64 body or binary)
-richMenus.post('/api/rich-menus/:id/image', requireRole('owner', 'admin'), async (c) => {
+richMenus.post('/api/rich-menus/:id/image', requireRole('owner', 'admin'), inputJsonBoundary({"image":["string"],"imageData":["string"],"contentType":["string"]}), async (c) => {
   try {
     const richMenuId = c.req.param('id');
     const contentType = c.req.header('content-type') ?? '';
@@ -283,7 +284,7 @@ richMenus.post('/api/rich-menus/:id/image', requireRole('owner', 'admin'), async
       const body = await c.req.json<{ image?: string; imageData?: string; contentType?: string }>();
       const imageBase64 = body.image ?? body.imageData;
       if (!imageBase64) {
-        return c.json({ success: false, error: 'image (base64) is required' }, 400);
+        return inputError(c, { success: false, error: 'image (base64) is required' }, 400, ["image","imageData"]);
       }
       // Strip data URI prefix if present
       const base64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
@@ -299,7 +300,7 @@ richMenus.post('/api/rich-menus/:id/image', requireRole('owner', 'admin'), async
       imageData = await c.req.arrayBuffer();
       imageContentType = contentType.includes('jpeg') || contentType.includes('jpg') ? 'image/jpeg' : 'image/png';
     } else {
-      return c.json({ success: false, error: 'Content-Type must be application/json (with base64) or image/png or image/jpeg' }, 400);
+      return inputError(c, { success: false, error: 'Content-Type must be application/json (with base64) or image/png or image/jpeg' }, 400, []);
     }
 
     const lineClient = await resolveLineClient(c);

@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import PostalMime from 'postal-mime';
 import type { Env } from '../index.js';
@@ -52,7 +53,7 @@ export function extractContactFormReceipt(text: string | undefined): {
   };
 }
 
-supportInbox.post('/webhooks/xserver/support-email', async (c) => {
+supportInbox.post('/webhooks/xserver/support-email', inputJsonBoundary(), async (c) => {
   const secret = c.env.XSERVER_RELAY_SECRET;
   if (!secret) return c.json({ success: false, error: 'Relay not configured' }, 503);
   const rawBody = await c.req.text();
@@ -68,10 +69,10 @@ supportInbox.post('/webhooks/xserver/support-email', async (c) => {
   try {
     payload = JSON.parse(rawBody) as { raw?: string };
   } catch {
-    return c.json({ success: false, error: 'Invalid JSON' }, 400);
+    return inputError(c, { success: false, error: 'Invalid JSON' }, 400, []);
   }
   if (!payload.raw || payload.raw.length > 14 * 1024 * 1024) {
-    return c.json({ success: false, error: 'Invalid email payload' }, 400);
+    return inputError(c, { success: false, error: 'Invalid email payload' }, 400, ["raw"]);
   }
   const binary = atob(payload.raw);
   const raw = Uint8Array.from(binary, (character) => character.charCodeAt(0));
@@ -97,7 +98,7 @@ supportInbox.post('/webhooks/xserver/support-email', async (c) => {
     : replyAddress?.address
       ? replyAddress
       : parsed.from;
-  if (!sender?.address) return c.json({ success: false, error: 'Missing sender' }, 400);
+  if (!sender?.address) return inputError(c, { success: false, error: 'Missing sender' }, 400, ["raw"]);
   const result = await storeSupportEmail(c.env, {
     customerEmail: formData.customerEmail || sender.address,
     customerName: isContactFormReceipt
@@ -461,7 +462,7 @@ supportInbox.get('/api/support/email/threads/:id', async (c) => {
 supportInbox.post(
   '/api/support/email/threads/:id/read',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const id = c.req.param('id');
     const thread = await c.env.DB
       .prepare(`SELECT last_incoming_at FROM support_email_threads WHERE id = ?`)
@@ -483,7 +484,7 @@ supportInbox.post(
 supportInbox.post(
   '/api/support/email/read-all',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const now = new Date().toISOString();
     await c.env.DB
       .prepare(
@@ -502,13 +503,13 @@ supportInbox.post(
   },
 );
 
-supportInbox.patch('/api/support/email/threads/:id/status', requireRole('owner', 'admin', 'staff'), async (c) => {
+supportInbox.patch('/api/support/email/threads/:id/status', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   const id = c.req.param('id');
   const body: { status?: string; revision?: number; reason?: string } = await c.req
     .json<{ status?: string; revision?: number; reason?: string }>()
     .catch(() => ({}));
   if (!isInboxStatus(body.status)) {
-    return c.json({ success: false, error: '対応状態が正しくありません' }, 400);
+    return inputError(c, { success: false, error: '対応状態が正しくありません' }, 400, ["status"]);
   }
   const staff = c.get('staff');
   const now = new Date().toISOString();
@@ -567,7 +568,7 @@ supportInbox.patch('/api/support/email/threads/:id/status', requireRole('owner',
 supportInbox.patch(
   '/api/support/email/threads/:id/assignee',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const id = c.req.param('id');
     const body: { staffId?: string | null; revision?: number; reason?: string } = await c.req
       .json<{ staffId?: string | null; revision?: number; reason?: string }>()
@@ -579,7 +580,7 @@ supportInbox.patch(
       const exists = await c.env.DB.prepare(`SELECT 1 FROM staff_members WHERE id = ? AND is_active = 1`)
         .bind(staffId)
         .first();
-      if (!exists) return c.json({ success: false, error: '担当者が見つかりません' }, 400);
+      if (!exists) return inputError(c, { success: false, error: '担当者が見つかりません' }, 400, ["staffId"]);
     }
 
     const current = await c.env.DB.prepare(
@@ -624,14 +625,14 @@ supportInbox.patch(
 supportInbox.patch(
   '/api/support/email/threads/:id/notes',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const id = c.req.param('id');
     const body: { notes?: string; revision?: number; reason?: string } = await c.req
       .json<{ notes?: string; revision?: number; reason?: string }>()
       .catch(() => ({}));
     const notes = (body.notes ?? '').trim();
     if (notes.length > 10_000) {
-      return c.json({ success: false, error: '内部メモは10,000文字以内で入力してください' }, 400);
+      return inputError(c, { success: false, error: '内部メモは10,000文字以内で入力してください' }, 400, ["notes"]);
     }
     const current = await c.env.DB.prepare(
       `SELECT notes, revision FROM support_email_threads WHERE id = ?`,
@@ -708,18 +709,18 @@ supportInbox.get(
   },
 );
 
-supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', 'admin', 'staff'), async (c) => {
+supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   const id = c.req.param('id');
   const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
   if (!isValidIdempotencyKey(idempotencyKey)) {
-    return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+    return inputError(c, { success: false, error: '有効なIdempotency-Keyが必要です' }, 400, []);
   }
   const body: { body?: string; revision?: number } = await c.req
     .json<{ body?: string; revision?: number }>()
     .catch(() => ({}));
   const content = body.body?.trim() || '';
   if (!content || content.length > 50_000) {
-    return c.json({ success: false, error: '本文は1〜50,000文字で入力してください' }, 400);
+    return inputError(c, { success: false, error: '本文は1〜50,000文字で入力してください' }, 400, ["body"]);
   }
   let leaseAcquired = false;
   try {

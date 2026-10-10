@@ -276,3 +276,12 @@ describe('日時の欄の時刻の部分も同じ部品', () => {
     expect(screen.getByTestId('value').textContent).toBe('2026-10-01T14:30')
   })
 })
+
+
+describe('終了時刻の24時', () => {
+  it('終了欄だけ24:00を受け付け、24:30と通常欄の24:00を拒む', () => {
+    expect(normalizeTimeInput('24:00', 30, true)).toMatchObject({ kind: 'ok', time: { hours: 24, minutes: 0 } })
+    expect(normalizeTimeInput('24:30', 30, true).kind).toBe('error')
+    expect(normalizeTimeInput('24:00', 30).kind).toBe('error')
+  })
+})

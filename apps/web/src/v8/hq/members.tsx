@@ -13,6 +13,8 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import { ListPage } from '@/components/templates'
 import StepUpPrompt from '@/components/step-up-prompt'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -23,6 +25,9 @@ import { canResendInvite, lastLoginShort, memberKpis, memberStatus, sortMembersB
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import MemberDialogV8, { MemberChangeConfirmV8, type MemberDialogValue } from './member-dialog'
 import styles from './members.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -50,7 +55,7 @@ const STATUS_TONES: Record<MemberStatus, StatusBadgeTone> = {
   inactive: 'neutral',
 }
 
-const VIEWER_NOTE = '閲覧のみで見ています。権限者の招待・変更はオーナーか管理者に頼んでください。'
+const VIEWER_NOTE = '閲覧のみで見ています。権限者の招待・変更は統括の管理者に頼んでください。'
 
 export default function HqMembersV8() {
   return (
@@ -164,7 +169,7 @@ function MembersInner() {
       }
       // M026：原文のまま出さず、共通の状態別案内へ渡す（本人確認の分岐は先に残す）。
       setDialogError(japaneseDetailOf(caught) || describeApiFailure(caught, '保存', {
-        forbidden: '権限者の招待・変更はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。',
+        scope: 'hq',
       }))
     } finally {
       setDialogBusy(false)
@@ -182,7 +187,7 @@ function MembersInner() {
     } catch (caught) {
       // M026：再試行の言葉がない代替文にしない。共通の状態別案内へ渡す。
       setActionError(japaneseDetailOf(caught) || describeApiFailure(caught, '招待メールの再送', {
-        forbidden: '招待メールの再送はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。',
+        scope: 'hq',
       }))
     } finally {
       setResendingId(null)
@@ -197,7 +202,7 @@ function MembersInner() {
     <ListPage
       boardId="r4ARpV"
       title="メンバー"
-      description="統括の画面に入れる人です。役割と、見られるアカウント（担当範囲）を決めます。"
+      help="統括の画面に入れる人です。役割と、見られるアカウント（担当範囲）を決めます。"
       actions={ready && canManage ? (
         <Button variant="primary" onClick={openInvite}>
           <Plus aria-hidden="true" className={styles.buttonIcon} />
@@ -212,21 +217,21 @@ function MembersInner() {
         {actionError ? <p className={styles.error} role="alert">{actionError}</p> : null}
 
         {status === 'loading' ? (
-          <ListState kind="loading" title="権限者を読み込んでいます" />
+          <ListState permissionScope="hq" kind="loading" title="権限者を読み込んでいます" />
         ) : status === 'forbidden' ? (
-          <ListState kind="forbidden" />
+          <ListState permissionScope="hq" kind="forbidden" />
         ) : status === 'error' ? (
-          <ListState kind="error" title="権限者を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
+          <ListState permissionScope="hq" kind="error" title="権限者を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
         ) : restricted ? (
-          <ListState kind="forbidden" title="全アカウントの担当者だけが権限者を管理できます" description="担当アカウントが限定されているため、権限者の一覧と変更はできません。" />
+          <ListState permissionScope="hq" kind="forbidden" title="全アカウントの担当者だけが権限者を管理できます" permissionReason="担当アカウントが限定されているため、権限者の一覧と変更はできません。" />
         ) : (
           <>
-            <div className={styles.cards} aria-label="権限者の数">
-              <StatCard label="権限者" value={kpis.total} unit="人" sub={`有効 ${kpis.active}人`} />
-              <StatCard label="招待中" value={kpis.invited} unit="人" sub="まだ承諾していない招待" />
-              <StatCard label="閲覧のみ" value={kpis.viewers} unit="人" sub="編集できない権限者" />
-              <StatCard label="担当アカウント" value={kpis.scopedAccounts} unit="アカウント" sub={`全アカウントを担当 ${kpis.allScope}人`} />
-            </div>
+            <KpiBand aria-label="権限者の数">
+              <KpiCard title="権限者" value={kpis.total} unit="人" detail={`有効 ${kpis.active}人`} />
+              <KpiCard title="招待中" value={kpis.invited} unit="人" detail="まだ承諾していない招待" />
+              <KpiCard title="閲覧のみ" value={kpis.viewers} unit="人" detail="編集できない権限者" />
+              <KpiCard title="担当アカウント" value={kpis.scopedAccounts} unit="アカウント" detail={`全アカウントを担当 ${kpis.allScope}人`} />
+            </KpiBand>
 
             <div className={styles.table} role="table" aria-label="権限者の一覧" data-design="Table">
               <div className={styles.head} role="row">
@@ -247,7 +252,7 @@ function MembersInner() {
                 return (
                   <div key={member.id} className={styles.row} role="row">
                     <span role="cell" className={styles.cell} title={member.name}>{member.name}{isSelf ? '（あなた）' : ''}</span>
-                    <span role="cell" className={styles.cell} title={member.email ?? ''}>{member.email ?? '—'}</span>
+                    <span role="cell" className={styles.cell} title={member.email ?? ''}>{member.email ?? emptyValue('unknown')}</span>
                     <span role="cell" className={styles.cell}>{ROLE_WORDS[member.role] ?? member.role}</span>
                     <span role="cell" className={styles.cell} title={scope}>{scope}</span>
                     <span role="cell"><StatusBadge tone={STATUS_TONES[state]}>{STATUS_WORDS[state]}</StatusBadge></span>
@@ -306,7 +311,7 @@ function MembersInner() {
           onConfirm={() => {
             const pending = confirmChange
             setConfirmChange(null)
-            void submitDialog(pending.value)
+            return submitDialog(pending.value)
           }}
         />
       ) : null}
@@ -318,19 +323,5 @@ function MembersInner() {
         />
       ) : null}
     </ListPage>
-  )
-}
-
-/** 数のカード（絵 `r4ARpV` の数の帯。統括では角丸のカード4枚）。 */
-function StatCard({ label, value, unit, sub }: { label: string; value: number; unit: string; sub: string }) {
-  return (
-    <div className={styles.card}>
-      <span className={styles.cardLabel}>{label}</span>
-      <span className={styles.cardValueRow}>
-        <span className={styles.cardValue}>{value.toLocaleString('ja-JP')}</span>
-        <span className={styles.cardUnit}>{unit}</span>
-      </span>
-      <span className={styles.cardSub}>{sub}</span>
-    </div>
   )
 }

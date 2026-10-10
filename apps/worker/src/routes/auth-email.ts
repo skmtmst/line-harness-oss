@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { Env } from '../index.js';
@@ -176,18 +177,18 @@ function readToken(c: Context<Env>, body?: Body): string {
  *
  * 返事はいつも同じ「送りました」。登録済みのメールには本人向けの案内メールを送る。
  */
-authEmail.post('/api/auth/register/request', async (c) => {
+authEmail.post('/api/auth/register/request', inputJsonBoundary(), async (c) => {
   const base = adminBase(c);
   if (!base) return c.json({ success: false, error: '管理画面の URL が設定されていません' }, 500);
 
   const body = await readBody(c);
   const email = normalizeEmail(body.email);
-  if (!email) return c.json({ success: false, error: 'メールアドレスの形式が正しくありません' }, 400);
-  if (body.agreed !== true) return c.json({ success: false, error: '利用規約とプライバシーポリシーに同意してください' }, 400);
+  if (!email) return inputError(c, { success: false, error: 'メールアドレスの形式が正しくありません' }, 400, ["email"]);
+  if (body.agreed !== true) return inputError(c, { success: false, error: '利用規約とプライバシーポリシーに同意してください' }, 400, ["agreed"]);
 
   const turnstile = await verifyTurnstile(c.env, body.turnstileToken as string | undefined, clientIp(c));
   if (!turnstile.ok) {
-    return c.json({ success: false, error: turnstileErrorMessage(turnstile.reason) }, turnstile.reason === 'not_configured' ? 503 : 400);
+    return inputError(c, { success: false, error: turnstileErrorMessage(turnstile.reason) }, turnstile.reason === 'not_configured' ? 503 : 400, []);
   }
 
   const markers = deviceMarkerOf(c, body);
@@ -233,7 +234,7 @@ authEmail.get('/api/auth/register/check', async (c) => {
   const token = readToken(c);
   const row = token ? await getAuthEmailToken(c.env.DB, 'signup', await sha256Hex(token)) : null;
   const state = tokenState(row);
-  if (state !== 'valid') return c.json({ success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410);
+  if (state !== 'valid') return inputError(c, { success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410, []);
   return c.json({ success: true, data: { email: row!.email, trialDays: TRIAL_DAYS } });
 });
 
@@ -243,7 +244,7 @@ authEmail.get('/api/auth/register/check', async (c) => {
  *
  * 統括（トライアル）とオーナー権限者を作り、そのままログインした状態にする。
  */
-authEmail.post('/api/auth/register/complete', async (c) => {
+authEmail.post('/api/auth/register/complete', inputJsonBoundary(), async (c) => {
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) return c.json({ success: false, error: config.misconfigured }, 500);
 
@@ -251,7 +252,7 @@ authEmail.post('/api/auth/register/complete', async (c) => {
   const token = readToken(c, body);
   const row = token ? await getAuthEmailToken(c.env.DB, 'signup', await sha256Hex(token)) : null;
   const state = tokenState(row);
-  if (state !== 'valid') return c.json({ success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410);
+  if (state !== 'valid') return inputError(c, { success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410, []);
 
   const tenantName = text(body.tenantName, NAME_MAX);
   const name = text(body.name, NAME_MAX);
@@ -263,7 +264,7 @@ authEmail.post('/api/auth/register/complete', async (c) => {
   else if (name.length > NAME_MAX) errors.name = `お名前は${NAME_MAX}文字以内で入力してください`;
   const passwordError = validatePasswordPolicy(password);
   if (passwordError) errors.password = passwordError;
-  if (Object.keys(errors).length) return c.json({ success: false, error: Object.values(errors)[0], errors }, 400);
+  if (Object.keys(errors).length) return inputError(c, { success: false, error: Object.values(errors)[0], errors }, 400, []);
 
   const markers = deviceMarkerOf(c, body);
   for (const marker of markers) {
@@ -319,7 +320,7 @@ authEmail.post('/api/auth/register/complete', async (c) => {
 // ---------------------------------------------------------------------------
 
 /** POST /api/auth/password/login { email, password, remember? } */
-authEmail.post('/api/auth/password/login', async (c) => {
+authEmail.post('/api/auth/password/login', inputJsonBoundary(), async (c) => {
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) return c.json({ success: false, error: config.misconfigured }, 500);
 
@@ -327,7 +328,7 @@ authEmail.post('/api/auth/password/login', async (c) => {
   const email = normalizeEmail(body.email);
   const password = typeof body.password === 'string' ? body.password : '';
   const remember = body.remember === true;
-  if (!email || !password) return c.json({ success: false, error: 'メールアドレスとパスワードを入力してください' }, 400);
+  if (!email || !password) return inputError(c, { success: false, error: 'メールアドレスとパスワードを入力してください' }, 400, ["email","password"]);
 
   const throttleKey = `login:${await sha256Hex(`${email}|${clientIp(c) ?? 'unknown'}`)}`;
   if ((await readAuthThrottle(c.env.DB, throttleKey, LOGIN_FAIL_WINDOW_MS)) >= LOGIN_FAIL_MAX) {
@@ -393,17 +394,17 @@ authEmail.post('/api/auth/password/login', async (c) => {
  * そのメールの有効な権限者がちょうど 1 人のときだけ送る（LINE だけの人が
  * あとからパスワードを持てる道）。
  */
-authEmail.post('/api/auth/password/forgot', async (c) => {
+authEmail.post('/api/auth/password/forgot', inputJsonBoundary(), async (c) => {
   const base = adminBase(c);
   if (!base) return c.json({ success: false, error: '管理画面の URL が設定されていません' }, 500);
 
   const body = await readBody(c);
   const email = normalizeEmail(body.email);
-  if (!email) return c.json({ success: false, error: 'メールアドレスの形式が正しくありません' }, 400);
+  if (!email) return inputError(c, { success: false, error: 'メールアドレスの形式が正しくありません' }, 400, ["email"]);
 
   const turnstile = await verifyTurnstile(c.env, body.turnstileToken as string | undefined, clientIp(c));
   if (!turnstile.ok) {
-    return c.json({ success: false, error: turnstileErrorMessage(turnstile.reason) }, turnstile.reason === 'not_configured' ? 503 : 400);
+    return inputError(c, { success: false, error: turnstileErrorMessage(turnstile.reason) }, turnstile.reason === 'not_configured' ? 503 : 400, []);
   }
 
   const ipHash = await ipHashOf(c);
@@ -447,7 +448,7 @@ authEmail.get('/api/auth/password/reset/check', async (c) => {
   const token = readToken(c);
   const row = token ? await getAuthEmailToken(c.env.DB, 'password_reset', await sha256Hex(token)) : null;
   const state = tokenState(row);
-  if (state !== 'valid') return c.json({ success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410);
+  if (state !== 'valid') return inputError(c, { success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410, []);
   return c.json({ success: true, data: { email: row!.email } });
 });
 
@@ -459,16 +460,16 @@ authEmail.get('/api/auth/password/reset/check', async (c) => {
  * パスワードでログイン → TOTPの再設定（必須）」の順で必ず復帰でき、
  * ロックアウトで詰まない。TOTPを外した記録はログイン記録へ残す。
  */
-authEmail.post('/api/auth/password/reset', async (c) => {
+authEmail.post('/api/auth/password/reset', inputJsonBoundary(), async (c) => {
   const body = await readBody(c);
   const token = readToken(c, body);
   const row = token ? await getAuthEmailToken(c.env.DB, 'password_reset', await sha256Hex(token)) : null;
   const state = tokenState(row);
-  if (state !== 'valid') return c.json({ success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410);
+  if (state !== 'valid') return inputError(c, { success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410, []);
 
   const password = typeof body.password === 'string' ? body.password : '';
   const passwordError = validatePasswordPolicy(password);
-  if (passwordError) return c.json({ success: false, error: passwordError, errors: { password: passwordError } }, 400);
+  if (passwordError) return inputError(c, { success: false, error: passwordError, errors: { password: passwordError } }, 400, ["password"]);
 
   const staff = row!.staff_id ? await getStaffById(c.env.DB, row!.staff_id) : null;
   if (!staff || !staff.is_active) return c.json({ success: false, error: TOKEN_STATE_MESSAGE.invalid, code: 'invalid' }, 404);

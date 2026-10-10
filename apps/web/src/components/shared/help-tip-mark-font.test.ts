@@ -19,8 +19,8 @@ describe('「?」の印の字', () => {
     expect(globals).toMatch(/\[data-theme="v8"\] \{[^}]*--tpl-ux5-help-mark-font: var\(--font-inter\), Inter, sans-serif;/)
   })
 
-  it('円は 16px・字は 10px のまま', () => {
+  it('円は 16px・字は 11px のまま', () => {
     expect(css).toMatch(/\[data-theme='v8'\] \.mark \{[^}]*width: 16px;[^}]*height: 16px;/)
-    expect(css).toMatch(/font-size: 10px;\s*line-height: 10px;/)
+    expect(css).toMatch(/font-size: var\(--text-micro\);\s*line-height: 11px;/)
   })
 })

@@ -133,7 +133,9 @@ function stubBrowser(theme: string | undefined, measured: unknown) {
   const calls: string[] = []
   let initFn: ((arg: unknown) => void) | null = null
   let initArg: unknown = null
+  let fixedAt: Date | null = null
   const page = {
+    clock: { setFixedTime: async (at: Date) => { fixedAt = at } },
     goto: async () => ({ status: () => 200 }),
     waitForTimeout: async () => {},
     evaluate: async (fnOrString: unknown) => {
@@ -166,6 +168,7 @@ function stubBrowser(theme: string | undefined, measured: unknown) {
   }
   return {
     calls,
+    fixedTime: () => fixedAt,
     runInit(store: Record<string, string>) {
       if (!initFn) throw new Error('合言葉が置かれていない')
       const g = globalThis as Record<string, unknown>
@@ -212,6 +215,14 @@ describe('撮る前に V8 テーマ＋偽ログインを置く', () => {
     const store: Record<string, string> = {}
     stub.runInit(store)
     expect(store).toMatchObject(PARITY_INIT)
+  })
+
+  it('ROOT-14 予約とリマインダは見本サーバーと同じ時計で撮る', async () => {
+    for (const route of ['/restaurant-test/reservations', '/reminders/edit?id=reminder-new']) {
+      const stub = stubBrowser('v8', { keys: [] })
+      await shootUrl(stub.browser, 'http://localhost:3101', route, 1440)
+      expect(stub.fixedTime()?.toISOString()).toBe('2026-10-01T03:00:00.000Z')
+    }
   })
 
   it('V8 でなければ比べずに落とす', async () => {

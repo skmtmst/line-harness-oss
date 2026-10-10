@@ -29,7 +29,7 @@ import LinePreview from '@/components/shared/line-preview'
 import { InsertText } from '@/components/shared/insert-text-field'
 import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor'
 import TargetMissing from '@/components/shared/target-missing'
-import FlexPreviewComponent from '@/components/flex-preview'
+import { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
 import {
   buildUsageRows,
   insertionNames,
@@ -44,6 +44,12 @@ import {
   type UsageRow,
 } from './model'
 import styles from './detail.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 /** 表にまず見せる行数。残りは「ほか N か所を見る」で開く。 */
 const USAGE_VISIBLE = 4
@@ -277,7 +283,7 @@ export default function TemplateDetailV8() {
     return (
       <div className={styles.page} data-design-node="UTbi1">
         <div className={styles.loadingHead}>{backLink}</div>
-        <p className={styles.loading} role="status">読み込み中…</p>
+        <DetailLoading />
       </div>
     )
   }
@@ -306,12 +312,12 @@ export default function TemplateDetailV8() {
     <div key={row.key} className={styles.usageRow}>
       <span className={styles.usageKind}>{row.kind}</span>
       {row.href
-        ? <Link href={row.href} className={styles.usageName} title={row.name}>{row.name}</Link>
-        : <span className={styles.usageNameQuiet} title={row.name}>{row.name}</span>}
+        ? <Link href={row.href} className={styles.usageName} ><TruncatedText value={String(row.name ?? '')} /></Link>
+        : <span className={styles.usageNameQuiet} ><TruncatedText value={String(row.name ?? '')} /></span>}
       <span className={row.fixed ? styles.usageVersionFixed : styles.usageVersion} title={row.version}>{row.version}</span>
-      <span className={styles.usageState}>{row.status ?? '—'}</span>
+      <span className={styles.usageState}>{row.status ?? emptyValue('unknown')}</span>
       {row.href
-        ? <Link href={row.href} className={styles.ghostButton}><ExternalLink size={14} aria-hidden="true" />開く</Link>
+        ? <TextLink external href={row.href} className={styles.ghostButton}>開く</TextLink>
         : <span className={styles.ghostSpacer} aria-hidden="true" />}
     </div>
   )
@@ -319,7 +325,7 @@ export default function TemplateDetailV8() {
   const compareBox = compareTarget !== null && compareBefore !== null && compareAfter !== null ? (
     <ChangeBox
       title={compareTarget === 'draft'
-        ? `変わるところ（版${inUseVersion?.versionNumber ?? '—'} → 下書き）`
+        ? `変わるところ（版${inUseVersion?.versionNumber ?? emptyValue('unknown')} → 下書き）`
         : `比べる（版${compareTarget} → いま使っている版${inUseVersion?.versionNumber ?? ''}）`}
       before={compareBefore}
       after={compareAfter}
@@ -349,7 +355,7 @@ export default function TemplateDetailV8() {
         <dl className={styles.aboutList}>
           <div className={styles.aboutRow}><dt>種類</dt><dd>{messageTypeText(template.messageType)}</dd></div>
           <div className={styles.aboutRow}><dt>フォルダ</dt><dd>{folderLabel}</dd></div>
-          <div className={styles.aboutRow}><dt>今月送った数</dt><dd>{monthlySends === undefined ? '読み込み中…' : monthlySends === null ? '—' : `${monthlySends.toLocaleString('ja-JP')}通`}</dd></div>
+          <div className={styles.aboutRow}><dt>今月送った数</dt><dd>{monthlySends === undefined ? '読み込み中…' : monthlySends === null ? '—' : `${polishFormatNumber(monthlySends)} 通`}</dd></div>
           <div className={styles.aboutRow}><dt>差し込み</dt><dd title={insertions.join('・')}>{insertions.length > 0 ? insertions.join('・') : 'なし'}</dd></div>
         </dl>
       </section>
@@ -388,7 +394,7 @@ export default function TemplateDetailV8() {
         description={[messageTypeText(template.messageType), folderLabel, `更新 ${shortStamp(template.updatedAt)}`].join('・')}
         preview={side}
       >
-        {canMutate ? null : <p className={styles.roBand} role="note">閲覧のみで見ています。編集・公開・削除は管理者に頼んでください。</p>}
+        {canMutate ? null : <p className={styles.roBand} role="note">閲覧のみで見ています。編集・公開・削除はオーナーか管理者に頼んでください。</p>}
         {template.hasDraft ? (
           <div className={styles.draftBand} role="status">
             <CircleAlert size={18} aria-hidden="true" className={styles.draftIcon} />
@@ -456,7 +462,7 @@ export default function TemplateDetailV8() {
             <h2 className={styles.cardTitle}>版の履歴</h2>
             <p className={styles.cardNote}>戻すと、その版を下書きとして作り直します。公開するまで使っている所は変わりません。</p>
           </div>
-          {versions === null && !versionsError ? <p className={styles.empty} role="status">読み込み中…</p> : versionsError ? (
+          {versions === null && !versionsError ? <DetailLoading /> : versionsError ? (
             <div className={styles.versionError}>
               <p className={styles.errorText}>{versionsError}</p>
               <Button variant="secondary" onClick={() => void loadVersions()}>もう一度読み込む</Button>
@@ -536,7 +542,7 @@ export default function TemplateDetailV8() {
               {usageRows.slice(0, PUBLISH_VISIBLE).map((row) => (
                 <div key={row.key} className={styles.dialogRow}>
                   <span className={styles.usageKind}>{row.kind}</span>
-                  <span className={styles.dialogName} title={row.name}>{row.name}</span>
+                  <span className={styles.dialogName} ><TruncatedText value={String(row.name ?? '')} /></span>
                   <span className={styles.dialogState}>{publishRowState(row)}</span>
                 </div>
               ))}
@@ -569,9 +575,9 @@ export default function TemplateDetailV8() {
           {usageRows.slice(0, BLOCKED_VISIBLE).map((row) => (
             <div key={row.key} className={styles.blockedRow}>
               <span className={styles.usageKind}>{row.kind}</span>
-              <span className={styles.dialogName} title={row.name}>{row.name}</span>
+              <span className={styles.dialogName} ><TruncatedText value={String(row.name ?? '')} /></span>
               {row.href
-                ? <Link href={row.href} className={styles.ghostButton}><ExternalLink size={14} aria-hidden="true" />開いて差し替える</Link>
+                ? <TextLink external href={row.href} className={styles.ghostButton}>開いて差し替える</TextLink>
                 : <span className={styles.dialogState}>開ける画面がありません</span>}
             </div>
           ))}
@@ -588,7 +594,7 @@ export default function TemplateDetailV8() {
         destructive
         busy={deleting}
         error={deleteError}
-        onConfirm={() => void remove()}
+        onConfirm={() => remove()}
         onCancel={() => {
           if (deleting) return
           setDeleteOpen(false)
@@ -600,11 +606,11 @@ export default function TemplateDetailV8() {
       <ConfirmDialog
         open={revertTarget !== null}
         title={`版${revertTarget}の内容で下書きを作り直しますか？`}
-        description="過去の版は変わりません。その中身で新しい下書きを作ります。予約済み・送信中の配信は、いま使っている版のままです。"
+        description="過去の版は変わりません。その中身で新しい下書きを作ります。予約中・送信中の配信は、いま使っている版のままです。"
         confirmLabel="この版に戻す"
         busy={reverting}
         error={revertError}
-        onConfirm={() => void doRevert()}
+        onConfirm={() => doRevert()}
         onCancel={() => {
           if (reverting) return
           setRevertTarget(null)
@@ -639,7 +645,7 @@ export function DetailFrame({ title, identity, description, preview, children }:
 }) {
   return (
     <PageFrame kind="create">
-      <PageHeading title={title} identity={identity} description={description} />
+      <PageHeading title={title} identity={identity} help={description} />
       <div className={styles.split}>
         <div className={styles.content}>{children}</div>
         <aside className={styles.aside}>{preview}</aside>

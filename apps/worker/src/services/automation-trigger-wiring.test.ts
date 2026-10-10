@@ -15,9 +15,9 @@ describe('V6オートメーションの発生元配線', () => {
   });
 
   it('リンククリックは保存済みクリックIDを一意な発生元IDにする', () => {
-    const text = source('routes/tracked-links.ts');
-    expect(text).toContain(`eventType: 'link_clicked'`);
-    expect(text).toContain(`sourceEventId: click.id`);
+    const text = source('services/tracked-click-steps.ts');
+    expect(text).toContain(`eventType:'link_clicked'`);
+    expect(text).toContain(`sourceEventId:clickId`);
   });
 
   it('予約は確定経路だけが予約IDで発火する', () => {

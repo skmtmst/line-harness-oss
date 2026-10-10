@@ -21,3 +21,8 @@ it('分類の作成と更新で色を送り、色を消すNULLも送れる',asyn
  await hqBroadcastsApi.createFolder('毎月','#ef4444');expect(request).toHaveBeenLastCalledWith('/api/hq/broadcasts/folders',{method:'POST',body:JSON.stringify({name:'毎月',color:'#ef4444'})});
  await hqBroadcastsApi.updateFolder('f/1','改名',3,null);expect(request).toHaveBeenLastCalledWith('/api/hq/broadcasts/folders/f%2F1',{method:'PATCH',body:JSON.stringify({name:'改名',expectedVersion:3,color:null})});
 });
+
+it('フォルダ交換は双方の版をまとめて送り、IDをescapeする',async()=>{
+ await hqBroadcastsApi.swapFolderOrder('f/1','f/2',3,4);
+ expect(request).toHaveBeenLastCalledWith('/api/hq/broadcasts/folders/f%2F1/swap-order',{method:'POST',body:JSON.stringify({withId:'f/2',expectedVersion:3,withExpectedVersion:4})});
+});

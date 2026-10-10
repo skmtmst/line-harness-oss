@@ -7,6 +7,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -83,11 +84,88 @@ describe('作りかけの下書きを ?id= で開き直す', () => {
     window.history.replaceState(null, '', '/')
   })
 
+  it('店でも案Aの形を選ぶと、A・Bに対応する2面の座標を作成APIへ送る', async () => {
+    window.history.replaceState(null, '', '/rich-menus/new')
+    type CreatedInput = { pages: Array<{ areas: Array<{ boundsY: number; boundsHeight: number }> }> }
+    let input: CreatedInput | null = null
+    const original = fetch
+    vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
+      const path = new URL(String(url), 'http://localhost').pathname
+      if (path === '/api/rich-menu-groups' && init?.method === 'POST') {
+        input = JSON.parse(String(init.body))
+        return { ok: true, status: 200, json: async () => ({ success: true, data: { id: 'rmg-x', pages: [{ id: 'p-top' }] } }) }
+      }
+      if (path === '/api/rich-menu-groups/rmg-x' && input) {
+        const created: CreatedInput = input
+        return { ok: true, status: 200, json: async () => ({ success: true, data: { ...GROUP, pages: [{ ...GROUP.pages[0], areas: created.pages[0].areas.map((area: object, index: number) => ({ ...area, id: `area-${index}` })) }] } }) }
+      }
+      return original(url as RequestInfo, init)
+    }))
+    await act(async () => { root.render(<RichMenuCreateV8 />) })
+    await settle()
+    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: '1面（面 A）' })) })
+    await act(async () => { fireEvent.keyDown(screen.getByRole('radio', { name: '1面（面 A）' }), { key: 'ArrowRight' }) })
+    expect((screen.getByRole('radio', { name: '上下2面（面 A・B）' }) as HTMLInputElement).checked).toBe(true)
+    await act(async () => { fireEvent.change(screen.getByLabelText('メニュー名（友だちには見えません）'), { target: { value: '店の2面メニュー' } }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き' })) })
+    await settle()
+    expect(input).not.toBeNull()
+    const created = input as unknown as CreatedInput
+    expect(created.pages[0].areas.map((area) => [area.boundsY, area.boundsHeight])).toEqual([[0, 843], [843, 843]])
+    expect(screen.getAllByRole('button', { name: /^面 [AB]、動きは/ })).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: /^面 C、/ })).toBeNull()
+  })
+
+  it('店：①でタブを2つにすると名前の欄と画像の枠がタブの数だけ出て、作った後に各ページへ画像を上げる', async () => {
+    window.history.replaceState(null, '', '/rich-menus/new')
+    type CreatedInput = { pages: Array<{ name: string }> }
+    let input: CreatedInput | null = null
+    const uploads: string[] = []
+    const original = fetch
+    vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
+      const path = new URL(String(url), 'http://localhost').pathname
+      if (path === '/api/rich-menu-groups' && init?.method === 'POST') {
+        input = JSON.parse(String(init.body))
+        return { ok: true, status: 200, json: async () => ({ success: true, data: { id: 'rmg-x', pages: [{ id: 'p-top' }, { id: 'p-tab' }] } }) }
+      }
+      if (/\/pages\/[^/]+\/image$/.test(path)) {
+        uploads.push(path)
+        return { ok: true, status: 200, json: async () => ({ success: true, data: { imageR2Key: `k-${uploads.length}`, imageContentType: 'image/png' } }) }
+      }
+      if (path === '/api/rich-menu-groups/rmg-x' && input) {
+        return { ok: true, status: 200, json: async () => ({ success: true, data: GROUP }) }
+      }
+      return original(url as RequestInfo, init)
+    }))
+    await act(async () => { root.render(<RichMenuCreateV8 />) })
+    await settle()
+    expect(screen.queryByLabelText('タブ1の名前（トーク画面のタブに出ます）')).toBeNull()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '2つ' })) })
+    expect(screen.getByRole('heading', { name: '画像（タブごとに1枚）' })).toBeTruthy()
+    await act(async () => { fireEvent.change(screen.getByLabelText('タブ1の名前（トーク画面のタブに出ます）'), { target: { value: '予約' } }) })
+    await act(async () => { fireEvent.change(screen.getByLabelText('タブ2の名前（トーク画面のタブに出ます）'), { target: { value: '会員' } }) })
+    const URLs = globalThis.URL as unknown as { createObjectURL?: unknown; revokeObjectURL?: unknown }
+    URLs.createObjectURL = () => 'blob:local'
+    URLs.revokeObjectURL = () => {}
+    for (const index of [1, 2]) {
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(`タブ${index}の画像を追加（ファイル）`), { target: { files: [new File(['png'], `t${index}.png`, { type: 'image/png' })] } })
+      })
+    }
+    expect(screen.getByRole('group', { name: 'タブ2の画像を追加' }).querySelector('img')).not.toBeNull()
+    await act(async () => { fireEvent.change(screen.getByLabelText('メニュー名（友だちには見えません）'), { target: { value: 'タブのメニュー' } }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き' })) })
+    await settle()
+    expect((input as unknown as CreatedInput).pages.map((page) => page.name)).toEqual(['予約', '会員'])
+    expect(uploads).toEqual(['/api/rich-menu-groups/rmg-x/pages/p-top/image', '/api/rich-menu-groups/rmg-x/pages/p-tab/image'])
+  })
+
   it('手順②に下書きのページと面を出し、①だけ済みにする', async () => {
     await act(async () => { root.render(<RichMenuCreateV8 />) })
     await settle()
     const text = host.textContent ?? ''
-    expect(text).toContain('切替タブ（ページ）')
+    expect(text).toContain('直すタブ')
+    expect(text).not.toContain('ページを足す')
     expect(text).toContain('タブA：予約')
     const rows = Array.from(host.querySelectorAll('button[aria-pressed]')).map((b) => b.textContent ?? '')
     expect(rows.some((t) => t.includes('予約する') && t.includes('URLを開く'))).toBe(true)
@@ -103,4 +181,22 @@ describe('作りかけの下書きを ?id= で開き直す', () => {
     await settle()
     expect(host.textContent).toContain('作りかけの下書きを開けませんでした')
   })
+  it('WEB287：保存待ち中は名前と文言を編集できない', async () => {
+    window.history.replaceState(null, '', '/rich-menus/new?id=rmg-x&step=shape')
+    const original = vi.mocked(fetch).getMockImplementation()!
+    let release!: (v: unknown) => void
+    vi.mocked(fetch).mockImplementation((input, init) => init?.method === 'PATCH' ? new Promise(resolve => { release = resolve as never }) : original(input, init))
+    await act(async () => root.render(<RichMenuCreateV8 />)); await settle()
+    const name = host.querySelector('#rm-name') as HTMLInputElement
+    expect(name).toBeTruthy()
+    await act(async () => fireEvent.change(name, { target: { value: '直した名前' } }))
+    const save = [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === '下書きを保存')!
+    await act(async () => fireEvent.click(save)); await settle()
+    expect(typeof release).toBe('function')
+    expect(name.closest('fieldset[disabled]')).not.toBeNull()
+    await act(async () => release({ ok: false, status: 500, json: async () => ({ success: false, error: 'down' }) }))
+    await settle(); expect(name.closest('fieldset[disabled]')).toBeNull()
+    expect(name.value).toBe('直した名前')
+  })
+
 })

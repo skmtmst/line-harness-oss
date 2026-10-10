@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(new URL('../../v8/broadcasts/list.tsx', import.meta.url), 'utf8')
 const FIXTURES = readFileSync(
   join(HERE, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'fixtures.mjs'),
   'utf8',
@@ -22,7 +22,7 @@ const FIXTURES = readFileSync(
 describe('一斉配信の保存検索と対象プレビュー（点検 #490 中5・中6）', () => {
   it('旧形式の保存検索（statuses）を新形式に読み替える', () => {
     expect(PAGE).toContain('legacyStatuses')
-    expect(PAGE).toContain("legacyStatuses.includes('scheduled')")
+    expect(PAGE).toContain("legacyStatuses.includes(chip.key)")
   })
 
   it('fixtureの保存検索は保存側と同じ形にする', () => {

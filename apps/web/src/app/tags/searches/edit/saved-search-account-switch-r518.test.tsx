@@ -49,6 +49,7 @@ class MockApiError extends Error {
 vi.mock('@/lib/api', () => ({
   ApiError: MockApiError,
   api: {
+    staff: { me: async () => ({ success: true, data: { role: 'owner' } }) },
     savedSearches: {
       detail: (id: string, accountId: string) => {
         if (accountId === 'a1') return Promise.resolve({ success: true, data: detailFor('a1', 'Aの検索') })

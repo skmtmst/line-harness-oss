@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -243,14 +244,14 @@ hqBilling.get('/api/hq/billing/preview', requireRole('owner'), async (c) => {
 
 // ================================================================ checkout
 
-hqBilling.post('/api/hq/billing/checkout', requireRole('owner'), async (c) => {
+hqBilling.post('/api/hq/billing/checkout', requireRole('owner'), inputJsonBoundary({ planKey: ['string'], interval: ['string'] }), async (c) => {
   try {
     const tenantId = tenantOf(c);
     const body = await c.req.json<{ planKey?: string; interval?: unknown } | null>().catch(() => null);
     const plan = findPlan(body?.planKey);
-    if (!plan) return c.json({ success: false, error: 'プランを選んでください' }, 400);
+    if (!plan) return inputError(c, { success: false, error: 'プランを選んでください' }, 400, ["planKey"]);
     const interval = body?.interval === undefined ? 'month' : body.interval;
-    if (interval !== 'month' && interval !== 'year') return c.json({ success: false, error: '月払いまたは年払いを選んでください' }, 400);
+    if (interval !== 'month' && interval !== 'year') return inputError(c, { success: false, error: '月払いまたは年払いを選んでください' }, 400, ["interval"]);
     if (!stripeReady(c)) return c.json({ success: false, error: '決済の接続設定がまだありません。運営にお問い合わせください' }, 503);
     const priceId = priceIdForPlan(c.env, plan.key, interval);
     if (!priceId) return c.json({ success: false, error: 'このプランの価格がまだ設定されていません。運営にお問い合わせください' }, 503);
@@ -297,7 +298,7 @@ hqBilling.post('/api/hq/billing/checkout', requireRole('owner'), async (c) => {
 
 // ================================================================ portal
 
-hqBilling.post('/api/hq/billing/portal', requireRole('owner', 'admin'), async (c) => {
+hqBilling.post('/api/hq/billing/portal', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const billing = await getTenantBilling(c.env.DB, tenantOf(c));
     if (!billing?.stripe_customer_id || !stripeReady(c)) {

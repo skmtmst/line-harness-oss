@@ -61,7 +61,7 @@ describe('予約管理のアカウント境界(#963)', () => {
     // V6R-S3-c: ページまたぎは fetchAllPages に任せ、「まだ要るか」にアカウント一致を渡す。
     expect(PAGE).toContain("bookingApi.listRequests(requestedAccountId, 'all', { limit: 100, offset, ...range })")
     expect(PAGE).toContain('() => alive && listAccountRef.current === requestedAccountId,')
-    expect(PAGE).toContain('if (alive && listAccountRef.current === requestedAccountId) setCalendarItems(collected)')
+    expect(PAGE).toMatch(/if \(alive && listAccountRef\.current === requestedAccountId\) \{\s*setCalendarItems\(collected\)/)
   })
 
   it('確定操作の結果表示は操作時のアカウントと一致するときだけ触る', () => {

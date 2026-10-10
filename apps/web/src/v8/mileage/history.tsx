@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDateOffset, jstDate } from '@/lib/jst-datetime'
+
 /*
  * ★V8 マイル「履歴」（板 `oRbJi`、状態は見本帳 `zaqP9`）。
  *
@@ -9,6 +11,7 @@
  * ほかは「友だちを見る」）＋「…」。行を押すとその友だちのマイルの詳細。
  * 種類・方法・期間の絞り込みは「よく使う絞り込み」の見方として残す。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CalendarRange, CircleDot, Download, History, Plus, TrendingDown, TrendingUp, Undo2 } from 'lucide-react'
@@ -43,6 +46,9 @@ import {
 import { MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './mileage.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function viewName(item: MileageAdminHistoryItem) {
   return item.displayName || '名前未取得'
@@ -63,14 +69,11 @@ const PRESETS: Array<{ value: string; label: string }> = [
 ]
 
 function monthStart(): string {
-  const date = new Date()
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`
+  return jstDate().slice(0, 7) + '-01'
 }
 
 function daysAgo(days: number) {
-  const date = new Date()
-  date.setDate(date.getDate() - days)
-  return date.toISOString().slice(0, 10)
+  return jstDateOffset(-days)
 }
 
 export default function HistoryTab() {
@@ -79,19 +82,20 @@ export default function HistoryTab() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const requestRef = useRef(0)
   const [result, setResult] = useState<MileageAdminHistory | null>(null)
+  const [periodResult, setPeriodResult] = useState<MileageAdminHistory | null>(null)
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [exportError, setExportError] = useState('')
   const [pendingAction, setPendingAction] = useState<{ kind: 'confirm' | 'void'; item: MileageAdminHistoryItem } | null>(null)
   const [pendingReason, setPendingReason] = useState('')
   const [pendingBusy, setPendingBusy] = useState(false)
   const [pendingError, setPendingError] = useState('')
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [grantedOnly, setGrantedOnly] = useState(false)
-  const [spentOnly, setSpentOnly] = useState(false)
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [grantedOnly, setGrantedOnly] = useListUrlValue('grantedOnly', false)
+  const [spentOnly, setSpentOnly] = useListUrlValue('spentOnly', false)
   const [preset, setPreset] = useState('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [menuId, setMenuId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -116,7 +120,7 @@ export default function HistoryTab() {
     setError(false)
     setExportError('')
     try {
-      const response = await api.mileage.history({
+      const [response, period] = await Promise.all([api.mileage.history({
         accountId: selectedAccountId ?? '',
         search: search || undefined,
         entryType: entryTypeFilter,
@@ -124,18 +128,19 @@ export default function HistoryTab() {
         from,
         limit: pageSize,
         offset: (page - 1) * pageSize,
-      })
+      }), api.mileage.history({ accountId: selectedAccountId ?? '', from: daysAgo(29), to: daysAgo(0), limit: 1, offset: 0 }).catch(() => null)])
       if (request !== requestRef.current) return
       if (!response.success) throw new Error(response.error)
       /* 「使った・取り消しのみ」は口に種類の絞り込みが無いので、付けた分を手元で除く。 */
       if (spentOnly) {
         response.data.items = response.data.items.filter((item) => !isGranted(item))
       }
+      setPeriodResult(period?.success ? period.data : null)
       setResult(response.data)
       setLoadedAccountId(selectedAccountId)
     } catch (caught) {
       if (request !== requestRef.current) return
-      setResult(null)
+      setResult(null); setPeriodResult(null)
       if (!(caught instanceof ApiError && caught.status === 400)) setError(true)
     } finally {
       if (request === requestRef.current) setLoading(false)
@@ -151,14 +156,14 @@ export default function HistoryTab() {
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearch(searchInput.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
   const items = useMemo(() => result?.items ?? [], [result])
   const total = mileagePaginationTotal(result)
   const pageCount = Math.max(1, Math.ceil((total ?? 0) / pageSize))
-  const byType = result?.summary.byType ?? []
+  const byType = periodResult?.summary.byType ?? []
   const countOf = (entryType: MileageHistoryItem['entryType']) =>
     byType.find((item) => item.entryType === entryType)?.count ?? 0
   const amountOf = (entryType: MileageHistoryItem['entryType']) =>
@@ -186,7 +191,7 @@ export default function HistoryTab() {
       const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-history-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("マイル履歴")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {
@@ -234,24 +239,24 @@ export default function HistoryTab() {
     setPage(1)
   }
 
-  const ready = !loading && !error
+  const ready = !loading && !error && periodResult !== null
 
   const stats = (
     <KpiBand>
       <KpiCard
         presentation="band"
-        title="今月の動き"
+        title="直近30日の動き"
         icon={<History size={14} aria-hidden="true" />}
-        value={ready ? total : null}
+        value={ready ? mileagePaginationTotal(periodResult) : null}
         unit="件"
-        detail={ready ? `付けた ${formatNumber(grantedCount)}・使った ${formatNumber(countOf('spend'))}・取り消し ${formatNumber(reversalCount)}` : '—'}
+        detail={ready ? `付けた ${formatNumber(grantedCount)}・使った ${formatNumber(countOf('spend'))}・取り消し ${formatNumber(reversalCount)}` : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
         title="付けた"
         icon={<TrendingUp size={14} aria-hidden="true" />}
         value={ready ? amountOf('grant') : null}
-        unit=""
+        unit="マイル"
         detail=""
       />
       <KpiCard
@@ -259,8 +264,8 @@ export default function HistoryTab() {
         title="使った"
         icon={<TrendingDown size={14} aria-hidden="true" />}
         value={ready ? Math.abs(amountOf('spend')) : null}
-        unit=""
-        detail={`交換 ${formatNumber(countOf('spend'))}件`}
+        unit="マイル"
+        detail={`交換 ${formatNumber(countOf('spend'))} 件`}
       />
       <KpiCard
         presentation="band"
@@ -349,10 +354,10 @@ export default function HistoryTab() {
                 onClick={(event) => {
                   if ((event.target as HTMLElement).closest('a, button, [role="menu"]')) return
                   router.push(friendHref)
-                }}
+                }} data-row-id={item.id}
               >
                 <Td className={styles.colName}>
-                  <span className={styles.rowNameInk} title={viewName(item)}>{viewName(item)}</span>
+                  <span className={styles.rowName} title={viewName(item)}>{viewName(item)}</span>
                   <span className={styles.rowSub}>
                     {`${formatMileageShortDateTime(item.occurredAt)}${item.lineAccountName ? `・${item.lineAccountName}` : ''}`}
                   </span>
@@ -368,7 +373,7 @@ export default function HistoryTab() {
                   <span className={styles.cellSub}>{`${mileageEntryTypeLabel(item.entryType)}・${mileageStatusLabel(item.status)}`}</span>
                 </Td>
                 <Td className={`${styles.colAfter} ${styles.num}`}>
-                  <span className={styles.cellMain}>{item.balanceAfter === null ? '—' : formatNumber(item.balanceAfter)}</span>
+                  <span className={styles.cellMain}>{item.balanceAfter === null ? emptyValue('unknown') : formatNumber(item.balanceAfter)}</span>
                 </Td>
                 <Td className={styles.colWho}>
                   <span className={styles.cellMain}>
@@ -391,7 +396,7 @@ export default function HistoryTab() {
                         onOpenChange={(next) => setMenuId(next ? item.id : null)}
                         items={[
                           ...(pending ? [{ id: 'void', label: '取り消す', onSelect: () => openPending('void', item) }] : []),
-                          { id: 'friend', label: '友だちを見る', external: true, onSelect: () => router.push(friendHref) },
+                          { id: 'friend', label: '友だちを見る', external: true, href: friendHref, onSelect: () => router.push(friendHref) },
                         ]}
                       />
                     </div>
@@ -430,20 +435,20 @@ export default function HistoryTab() {
       <div className={styles.pagerRow}>
         <span className={styles.pagerCount}>
           {spentOnly
-            ? `${formatNumber(total ?? 0)}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total ?? 0)}件のうち、使った・取り消し ${formatNumber(items.length)}件`
-            : `${formatNumber(total ?? 0)}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total ?? 0)}件`}
+            ? `${formatNumber(total ?? 0)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total ?? 0)} 件のうち、使った・取り消し ${formatNumber(items.length)} 件`
+            : `${formatNumber(total ?? 0)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total ?? 0)} 件`}
         </span>
         {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading} /> : null}
       </div>
-      <p className={styles.footNoteFlush}>行を押すと、その友だちのマイルの詳細を開きます。「増やす・減らす」は理由を書いて明細を足します（オーナー・管理者だけ）。</p>
     </>
   ) : undefined
 
   return (
     <MileageFrame
+      help="行を押すと、その友だちのマイルの詳細を開きます。「増やす・減らす」は理由を書いて明細を足します（オーナー・管理者だけ）。"
       actions={<div className={styles.headActions}>
         <Button onClick={exportCsv} disabled={!canExport}>
-          <Download size={15} aria-hidden="true" /> CSV で書き出す
+          <Download size={15} aria-hidden="true" /> CSVで書き出す
         </Button>
         {/* 閲覧のみの人には出さない。 */}
         {!readonly ? (
@@ -467,18 +472,15 @@ export default function HistoryTab() {
           busy={pendingBusy}
           error={pendingError || undefined}
           onCancel={() => { if (!pendingBusy) setPendingAction(null) }}
-          onConfirm={() => void runPendingAction()}
+          onConfirm={() => runPendingAction()}
         >
-          <label className={styles.fieldLabel}>
-            理由（必須）
-            <textarea
+          <Field label="理由" required><textarea
               className={styles.textarea}
               value={pendingReason}
               onChange={(event) => setPendingReason(event.target.value)}
               placeholder={pendingAction?.kind === 'confirm' ? '例：入金を確認しました' : '例：予約がキャンセルされました'}
               rows={3}
-            />
-          </label>
+            /></Field>
         </Dialog>
       }
     >

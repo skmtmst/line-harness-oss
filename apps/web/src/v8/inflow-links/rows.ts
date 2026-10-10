@@ -4,6 +4,8 @@
  * src/v8 からは @/app を import できないので、元を直したらここも直す。
  */
 import type { EntryRoute, Scenario, Tag } from '@line-crm/shared'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 export interface RefRouteStats {
   refCode: string
@@ -211,17 +213,5 @@ export function routeStatus(row: RouteRow): 'measured' | 'unregistered' | 'stopp
 
 /** 最新追加の日時（絵の「9/30 14:12」の形）。読めなければ「—」。 */
 export function formatLatest(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+  return polishFormatDate(iso, { style: 'list', fallback: '—' })
 }

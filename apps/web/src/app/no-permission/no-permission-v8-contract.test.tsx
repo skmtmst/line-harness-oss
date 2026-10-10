@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -61,11 +61,12 @@ describe('V8 権限なし（O5tUeE）の板', () => {
     })
     expect(host?.querySelector('[data-design-node="O5tUeE"]')).not.toBeNull()
     expect(host?.textContent).toContain('シナリオ配信')
+    await act(async () => { (host?.querySelector('button[aria-label="シナリオ配信の説明"]') as HTMLButtonElement).click() })
     expect(host?.textContent).toContain('この機能は、あなたの役割では開けません。')
     expect(host?.textContent).toContain('シナリオ配信を開く権限がありません')
     expect(host?.textContent).toContain('いまの役割は「受付」です。')
     expect(host?.textContent).toContain('シナリオ配信は「運用」以上の役割で使えます。')
-    expect(host?.textContent).toContain('必要なら、管理者に役割の変更を頼んでください。')
+    expect(host?.textContent).toContain('オーナーか管理者に頼んでください。')
     expect(host?.textContent).toContain('管理者：Kenta Kawano')
     expect(host?.textContent).toContain('役割でできることを見る')
     expect(host?.textContent).toContain('ダッシュボードへ戻る')
@@ -100,7 +101,8 @@ describe('V8 権限なし（O5tUeE）の受け口', () => {
     expect(BOARD).not.toContain('取得できません')
     // 役割の仕組みは作らない。表示名を受け取るだけ。
     expect(BOARD).toContain('roleLabel?: string | null')
-    expect(VARS_V8).toContain('<NoPermissionV8')
-    expect(VARS_V8).toContain('featureName="共通情報"')
+    expect(VARS_V8).toContain('isForbidden(listFailure) ? (')
+    expect(VARS_V8).toContain('共通情報を見る権限がありません')
+    expect(VARS_V8).toContain('オーナーか管理者に、共通情報を見られるよう頼んでください。')
   })
 })

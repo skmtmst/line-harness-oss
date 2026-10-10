@@ -5,6 +5,7 @@
  * AとBを選んで保存し、配列で送られることを確かめる。
  */
 import React from 'react'
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin', canManageRole: () => true }))
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
@@ -53,14 +54,8 @@ afterEach(() => {
 })
 
 async function chooseType(label: string) {
-  const trigger = screen.getByRole('button', { name: '友だち情報欄の種類' })
-  await act(async () => {
-    fireEvent.click(trigger)
-  })
-  const option = await screen.findByRole('button', { name: label })
-  await act(async () => {
-    fireEvent.click(option)
-  })
+  const word = label === '複数選択' ? 'いくつでも選ぶ' : label === '複数行テキスト' ? '文章' : label
+  fireEvent.click(screen.getByRole('radio', { name: new RegExp(word) }))
 }
 
 describe('R139 複数選択の既定値', () => {
@@ -73,13 +68,13 @@ describe('R139 複数選択の既定値', () => {
       fireEvent.change(screen.getByLabelText(/項目名/), { target: { value: '好きなもの' } })
     })
     await act(async () => {
-      fireEvent.change(screen.getByLabelText(/差し込み名/), { target: { value: 'favorites' } })
+      fireEvent.change(screen.getByLabelText(/差し込みの名前/), { target: { value: 'favorites' } })
     })
     await chooseType('複数選択')
 
-    const options = screen.getByLabelText(/選択肢/)
+    const options = screen.getByLabelText('選択肢 1')
     await act(async () => {
-      fireEvent.change(options, { target: { value: 'A\nB' } })
+      fireEvent.change(options, { target: { value: 'A' } }); fireEvent.change(screen.getByLabelText('選択肢 2'), { target: { value: 'B' } })
     })
 
     // 既定値でAとBを選ぶ。
@@ -107,11 +102,11 @@ describe('R139 複数選択の既定値', () => {
       fireEvent.change(screen.getByLabelText(/項目名/), { target: { value: '好きなもの' } })
     })
     await act(async () => {
-      fireEvent.change(screen.getByLabelText(/差し込み名/), { target: { value: 'favorites' } })
+      fireEvent.change(screen.getByLabelText(/差し込みの名前/), { target: { value: 'favorites' } })
     })
     await chooseType('複数選択')
     await act(async () => {
-      fireEvent.change(screen.getByLabelText(/選択肢/), { target: { value: 'A\nB' } })
+      fireEvent.change(screen.getByLabelText('選択肢 1'), { target: { value: 'A' } }); fireEvent.change(screen.getByLabelText('選択肢 2'), { target: { value: 'B' } })
     })
 
     await act(async () => {

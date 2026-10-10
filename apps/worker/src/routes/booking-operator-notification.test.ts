@@ -268,7 +268,7 @@ describe('N-327 #663 予約の受付から運用者通知を自動発火する',
     await second.settle();
 
     expect(response.status).toBe(422);
-    await expect(response.json()).resolves.toEqual({ error: 'slot_not_available' });
+    await expect(response.json()).resolves.toMatchObject({ code: 'slot_not_available' , fields: expect.any(Object), error: expect.any(String) });
     expect(bookingRows()).toHaveLength(1);
     expect(dispatchOperatorEvent).not.toHaveBeenCalled();
   });

@@ -12,7 +12,11 @@ const legacy = bootstrap.replace(/CREATE TABLE (?:"tags"|tags) \([\s\S]*?\);/, t
   table.replace(/name\s+TEXT(?: UNIQUE)? NOT NULL/, 'name TEXT UNIQUE NOT NULL'))
   .replace(/CREATE UNIQUE INDEX idx_tags_legacy_name[^;]+;/, '')
   .replace(/CREATE UNIQUE INDEX idx_tags_legacy_normalized_name[^;]+;/, '')
-  .replace(/CREATE UNIQUE INDEX idx_tags_account_exact_name[^;]+;/, '');
+  .replace(/CREATE UNIQUE INDEX idx_tags_account_exact_name[^;]+;/, '')
+  // 617 の分類先の追加は 382 より後。382 の時点の表の形で番兵を試す。
+  .replace(/CREATE TABLE affiliate_offers [\s\S]*?;/, table => table.replace(/, folder_id TEXT REFERENCES folders\(id\) ON DELETE SET NULL/, ''))
+  .replace(/CREATE INDEX idx_affiliate_offers_folder[^;]+;/, '')
+  .replace(/CREATE TRIGGER affiliate_offers_folder_(?:insert|update)[\s\S]*?END;/g, '');
 const referenceColumns = [
   ['affiliate_offers', 'tag_id', 'NO ACTION'],
   ['broadcasts', 'target_tag_id', 'SET NULL'],

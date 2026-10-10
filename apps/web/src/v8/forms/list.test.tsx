@@ -169,7 +169,7 @@ describe('V8 回答フォーム一覧', () => {
   it('変えられない人には閲覧のみの帯が出て、「フォルダを追加」は出さない（押せない飾りを置かない）', async () => {
     role.value = 'staff'
     await mount()
-    expect(screen.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeTruthy()
+    expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /フォルダを追加/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /フォームを作る/ })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '「来店アンケート」のその他の操作' }))
@@ -190,13 +190,13 @@ describe('V8 回答フォーム一覧', () => {
     window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/form-submissions']))
     await mount()
     expect(screen.getAllByRole('button', { name: /フォームを作る/ }).length).toBeGreaterThan(0)
-    expect(screen.queryByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeNull()
+    expect(screen.queryByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeNull()
     expect(screen.queryByRole('button', { name: /フォルダを追加/ })).toBeNull()
   })
 
   it('管理できる人には帯を出さず、「フォルダを追加」を押せる', async () => {
     await mount()
-    expect(screen.queryByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeNull()
+    expect(screen.queryByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeNull()
     const add = screen.getByRole('button', { name: /フォルダを追加/ }) as HTMLButtonElement
     expect(add.disabled).toBe(false)
   })
@@ -216,7 +216,7 @@ describe('V8 回答フォーム一覧', () => {
 
   it('1ページに収まるときは件数だけ（N件）', async () => {
     await mount()
-    expect(screen.getByText('1件')).toBeTruthy()
+    expect(screen.getByText('1 件')).toBeTruthy()
   })
 
   it('一覧の口へ件数 20・最新の回答順で頼む', async () => {

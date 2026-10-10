@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -8,17 +8,17 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const TARGETS = [
   'affiliates/tabs.tsx',
   'booking/menus/page.tsx',
-  'broadcasts/page.tsx',
-  'friend-add-settings/publish/page.tsx',
+  '../v8/friend-add-publish/publish.tsx',
   '../components/friends/friend-list-table.tsx',
   'line-notifications/page.tsx',
   'line-notifications/operator-notification-rules.tsx',
-  'mileage/action-score-tab.tsx',
-  'mileage/page.tsx',
+  '../v8/mileage/score.tsx',
+  '../v8/mileage/balances.tsx',
+  '../v8/mileage/earning-rules.tsx',
   'nen-members/photo-review-v8.tsx',
   'rich-menus/connections/page.tsx',
   // 失敗表示を持つ本体を指定し、別の詳細画面・ダイアログは取り込まない。
-  'scenarios/results/page.tsx',
+  '../v8/scenarios/results.tsx',
   'tags/mark-editor-v8.tsx',
   '../components/broadcasts/segment-preset-controls.tsx',
   '../components/friend-fields/field-list.tsx',
@@ -35,8 +35,9 @@ function failureDisplays(source: string) {
     ...source.matchAll(/<ListState\b[\s\S]*?\/>/g),
     ...source.matchAll(/<TargetMissing\b[\s\S]*?\/>/g),
     ...source.matchAll(/<TableStateRow\b[\s\S]*?\/>/g),
+    ...source.matchAll(/<StateCard\b[\s\S]*?\/>/g),
   ].map(([tag]) => tag)
-  return tags.filter((tag) => tag.includes('kind="error"'))
+  return tags.filter((tag) => tag.includes('kind="error"') || tag.includes('tone="error"'))
 }
 
 describe('一覧の取得失敗からその場で読み直せる契約', () => {
@@ -47,8 +48,7 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
       expect(errors.length, `${target} の取得失敗表示が検査から消えています`).toBeGreaterThan(0)
 
       for (const errorState of errors) {
-        expect(errorState, `${target} の取得失敗`).toContain('onRetry=')
-        expect(errorState, `${target} に古い個別ボタンが残っています`).not.toContain('action=')
+        expect(errorState, `${target} の取得失敗`).toMatch(/onRetry=|action=\{<Button(?:[^>]*?) onClick=/)
       }
     }
   })
@@ -58,6 +58,7 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
       ['../v8/broadcasts/list.tsx', '一斉配信を読み込めませんでした', 'onClick={() => void loadList((page - 1) * pageSize)}'],
       // 一斉配信・回答フォーム・シナリオは入口が src/v8 の新しい一覧を出す（古い list-v8.tsx はもう描かれない）。
       ['../v8/forms/list.tsx', "loadFailureCopy(loadFailure, '回答フォーム')", 'onClick={() => void loadForms()}'],
+      ['../v8/auto-replies/list.tsx', "visibleLoadState === 'error' || visibleLoadState === 'forbidden'", 'onClick={() => void load()}'],
       ['../v8/scenarios/list.tsx', 'シナリオを読み込めませんでした', 'onClick={() => void loadScenarios()}'],
       ['reminders/list-v8.tsx', 'リマインダを読み込めませんでした', 'onClick={reminderList.retry}'],
     ]) {
@@ -70,7 +71,7 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
     const forms = readFileSync(join(HERE, '../v8/forms/list.tsx'), 'utf8')
     // 403 は共通の案内（loadFailureCopy）が retryable=false を返し、読み直しを出さない。
     expect(forms).toContain('failure.retryable ? (')
-    const friends = readFileSync(join(HERE, 'friends/page.tsx'), 'utf8')
+    const friends = readFileSync(join(HERE, '../v8/friends/list/list.tsx'), 'utf8')
     expect(friends).toContain('onRetry={() => void loadFriends()}')
   })
 

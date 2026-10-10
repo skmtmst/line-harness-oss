@@ -10,6 +10,8 @@ test('571 preserves existing templates and versions and exposes the logical scen
   sql.exec("INSERT INTO hq_templates(id,tenant_id,template_type,name) VALUES ('old','t','template','既存'); INSERT INTO hq_template_versions(id,tenant_id,template_id,version,definition_json,content_hash) VALUES ('v','t','old',1,'{}','fixture')");
   sql.exec(readFileSync(new URL('../migrations/571_hq_scenario_templates.sql',import.meta.url),'utf8'));
   sql.exec(readFileSync(new URL('../migrations/612_hq_friend_attribute_templates.sql',import.meta.url),'utf8'));
+  // 現在のDBヘルパーが読む列を追加してから、571で保った型と履歴を確認する。
+  sql.exec(readFileSync(new URL('../migrations/622_hq_delivery_templates.sql',import.meta.url),'utf8'));
   const db=asD1(sql);
   expect((await createHqTemplate(db,{id:'new',tenantId:'t',type:'scenario',name:'案内'})).template_type).toBe('scenario');
   expect((await getHqTemplate(db,'t','old'))?.template_type).toBe('template');

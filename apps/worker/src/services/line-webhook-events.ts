@@ -1,8 +1,9 @@
+import { acquireWorkflow, type WorkflowExecution } from './workflow-execution.js';
 import type { WebhookEvent } from '@line-crm/line-sdk';
 import {
   markLineWebhookEventFailed,
   markLineWebhookEventSucceeded,
-  reserveLineWebhookEvent,
+  reserveLineWebhookEvent, getLineWebhookEvent, getWorkflowStep, ensureWorkflowStep,
 } from '@line-crm/db';
 import type { LineWebhookErrorClassification } from '@line-crm/db';
 
@@ -14,7 +15,7 @@ type SafeWebhookLog = {
   reason?: LineWebhookErrorClassification;
 };
 
-export type WebhookEventHandler = (event: WebhookEvent) => Promise<void>;
+export type WebhookEventHandler = (event: WebhookEvent, execution: WorkflowExecution) => Promise<void>;
 
 /**
  * 例外の本文は保存もログ出力もせず、運用に必要な短い分類だけへ変換する。
@@ -78,47 +79,37 @@ export async function processLineWebhookEvents(input: {
       lineAccountId: input.lineAccountId,
       eventType: webhookEvent.type,
     };
-    let acquired: boolean | null = null;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        acquired = await reserveLineWebhookEvent(input.db, reservation);
-        break;
-      } catch {
-        safeLog('error', { ...logBase, event: 'line_webhook_ledger_reserve_failed', reason: 'db_error' });
-      }
-    }
-
-    if (!acquired) {
-      if (acquired === null) {
-        // 台帳が使えず重複防止が効かないが、イベントを失わないため本処理を優先する。
-        safeLog('warn', {
-          ...logBase,
-          event: 'line_webhook_ledger_unavailable_processed',
-          reason: 'db_error',
-        });
-      } else {
-        safeLog('log', { ...logBase, event: 'line_webhook_duplicate_skipped' });
-        continue;
-      }
-    }
-
+    const ref={scopeId:`line:${input.lineAccountId ?? 'default'}`,processKind:'line_event',subjectId:webhookEvent.webhookEventId};
     try {
-      await input.handle(webhookEvent);
-      if (acquired === null) continue;
-      await markLineWebhookEventSucceeded(input.db, webhookEvent.webhookEventId);
-    } catch (error) {
-      const reason = classifyLineWebhookError(error);
-      if (acquired === null) {
-        safeLog('error', { ...logBase, event: 'line_webhook_event_failed', reason });
+      const prior=await getLineWebhookEvent(input.db,webhookEvent.webhookEventId);
+      const checkpoint=await getWorkflowStep(input.db,{...ref,stepKey:'__run'});
+      if(prior && !checkpoint) {
+        if(prior.status!=='succeeded') await ensureWorkflowStep(input.db,{...ref,stepKey:'__run'},
+          {status:'unknown',input:{eventType:webhookEvent.type}});
+        safeLog('log',{...logBase,event:'line_webhook_duplicate_skipped'});
         continue;
       }
+      const execution=await acquireWorkflow(input.db,ref,{input:{eventType:webhookEvent.type}});
+      if(!execution) {safeLog('log',{...logBase,event:'line_webhook_duplicate_skipped'});continue;}
       try {
-        await markLineWebhookEventFailed(input.db, webhookEvent.webhookEventId, reason);
-      } catch {
-        safeLog('error', { ...logBase, event: 'line_webhook_ledger_update_failed', reason: 'db_error' });
-        continue;
+        let reserved=false;
+        for(let attempt=0;attempt<2;attempt++){
+          try{await reserveLineWebhookEvent(execution.db,reservation);reserved=true;break}
+          catch(error){if(attempt===1)throw error}
+        }
+        if(!reserved)throw new Error('line_event_reservation_failed');
+        await input.handle(webhookEvent,execution);
+        await markLineWebhookEventSucceeded(execution.db,webhookEvent.webhookEventId);
+        await execution.complete();
+      }catch(error){
+        const reason=classifyLineWebhookError(error);
+        await markLineWebhookEventFailed(execution.db,webhookEvent.webhookEventId,reason).catch(()=>undefined);
+        await execution.fail();
+        safeLog('error',{...logBase,event:'line_webhook_event_failed',reason});
       }
-      safeLog('error', { ...logBase, event: 'line_webhook_event_failed', reason });
+    }catch {
+      // A missing checkpoint store must never enable duplicate external sends.
+      safeLog('error',{...logBase,event:'line_webhook_ledger_reserve_failed',reason:'db_error'});
     }
   }
 }

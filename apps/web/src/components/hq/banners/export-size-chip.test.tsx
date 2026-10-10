@@ -58,14 +58,7 @@ describe('書き出す大きさの札', () => {
 })
 
 describe('札の置き場所', () => {
-  const v7 = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'app/hq/banners/project/page.tsx'), 'utf8')
   const v8 = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'v8/hq-banners/project.tsx'), 'utf8')
-
-  it('v7 は下部追従バーの `info`（中ほど）に札を渡す', () => {
-    expect(v7).toContain('ExportSizeChip')
-    // 帯の `info` に渡す。パネルの中には置かない。
-    expect(v7).toMatch(/info=\{[\s\S]{0,200}ExportSizeChip/)
-  })
 
   /*
    * 2026-10-07 の2度目の差し戻し: 札の見た目は合っていたが、v8 だけ
@@ -87,10 +80,9 @@ describe('札の置き場所', () => {
     expect(v8).toMatch(/>生成をやめる</)
   })
 
-  it('v7・v8 とも寸法の文は `exportSizeText` から組む（決め打ちしない）', () => {
-    expect(v7).toMatch(/text=\{exportSizeText\(presets, input\.presetKey\)\}/)
+  it('v8 の寸法の文は `exportSizeText` から組む（決め打ちしない）', () => {
     expect(v8).toMatch(/text=\{exportSizeText\(presets, input\.presetKey\)\}/)
-    for (const source of [v7, v8]) {
+    for (const source of [v8]) {
       expect(source).not.toMatch(/'1040 × 1040 で書き出します'/)
     }
   })

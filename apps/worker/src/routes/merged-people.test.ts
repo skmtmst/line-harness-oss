@@ -134,11 +134,11 @@ describe('merged person HTTP contract', () => {
     );
   });
 
-  it('returns 422 for malformed JSON and 409 for a stale revision', async () => {
+  it('returns 400 for malformed JSON and 409 for a stale revision', async () => {
     const malformed = await harness().request('/api/friends/people/user-a', {
       method: 'PATCH', headers: { 'content-type': 'application/json' }, body: '{',
     });
-    expect(malformed.status).toBe(422);
+    expect(malformed.status).toBe(400);
     expect(await malformed.json()).toMatchObject({ success: false, code: 'INVALID_JSON' });
 
     personMocks.updateMergedPerson.mockRejectedValue(

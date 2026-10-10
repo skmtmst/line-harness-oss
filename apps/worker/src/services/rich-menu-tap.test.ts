@@ -85,3 +85,16 @@ test('PKG47: 同じWebhookのタップ再送は加点せず、次のタップは
   expect(f.raw.prepare("SELECT score FROM friends WHERE id='friend'").get()).toEqual({ score: 20 });
   expect(f.raw.prepare('SELECT COUNT(*) n, SUM(score_change) total FROM friend_scores').get()).toEqual({ n: 2, total: 20 });
 });
+
+test.each([
+  ['imagemap', { baseUrl: 'https://example.com/map', baseSize: { width: 1040, height: 520 }, altText: '地図', actions: [{ type: 'message', text: '案内', area: { x: 0, y: 0, width: 1040, height: 520 } }] }, 'imagemap'],
+  ['rich_message', { assetName: '案内', baseUrl: 'https://example.com/map', baseSize: { width: 1040, height: 520 }, imageUrl: 'https://example.com/map.png', tapAreas: [{ actionType: 'message', text: '案内', x: 0, y: 0, width: 100, height: 100 }] }, 'imagemap'],
+  ['coupon', { assetId: 'coupon-1', description: '500円引き', startsAt: '2026-10-01T00:00', endsAt: '2026-11-01T00:00' }, 'flex'],
+] as const)('テンプレート %s はJSON本文でなく対応するLINE形式で届く', async (kind, payload, expectedType) => {
+  const f = fixture();
+  f.raw.prepare(`INSERT INTO templates(id,name,message_type,message_content,line_account_id) VALUES ('tpl','案内',?,?,'account')`).run(kind, JSON.stringify(payload));
+  f.raw.exec(`UPDATE rich_menu_areas SET intent='template',template_id='tpl',action_data='{}' WHERE id='area'`);
+  const pushMessage = vi.fn(async () => undefined);
+  await handleRichMenuTap(f.db, { pushMessage } as unknown as LineClient, { id: 'friend', line_user_id: 'U1' }, 'area', { lineAccountId: 'account' });
+  expect(pushMessage).toHaveBeenCalledWith('U1', [expect.objectContaining({ type: expectedType })]);
+});

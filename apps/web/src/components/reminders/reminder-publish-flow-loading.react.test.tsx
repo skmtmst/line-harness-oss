@@ -90,7 +90,7 @@ describe('対象フローの読み込み失敗表示', () => {
     render(<ReminderPublishFlow reminderId="rem-1" stage="target" />)
     await waitFor(() => expect(screen.getByText('下書きを表示できませんでした')).toBeTruthy())
     expect(screen.queryByText('下書きを読み込んでいます')).toBeNull()
-    expect(screen.getByRole('button', { name: '再読み込み' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
   })
 
   it('読み込み失敗は共通の失敗表示になり、再読み込みで直る', async () => {
@@ -100,7 +100,7 @@ describe('対象フローの読み込み失敗表示', () => {
     render(<ReminderPublishFlow reminderId="rem-1" stage="target" />)
     await waitFor(() => expect(screen.getByText('下書きを表示できませんでした')).toBeTruthy())
     expect(screen.queryByText('下書きを読み込んでいます')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '再読み込み' }))
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
     await waitFor(() => expect(screen.getByText('対象者の条件')).toBeTruthy())
     expect(fixture.getDraft).toHaveBeenCalledTimes(2)
   })

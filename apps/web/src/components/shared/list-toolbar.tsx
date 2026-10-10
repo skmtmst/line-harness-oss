@@ -1,7 +1,8 @@
 'use client'
 import type React from 'react'
 
-import type { ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import Select, { type SelectProps } from './select'
 import SearchField from './search-field'
 import styles from './list-toolbar.module.css'
 
@@ -20,8 +21,6 @@ export type ListToolbarSearch = {
   width?: number
   /** 検索中。渡すと虫眼鏡の代わりに回る印が出る。 */
   loading?: boolean
-  /** 箱の右端の近道の印（例 '⌘K'）。渡すと探す欄へ飛べる。v8 だけ。 */
-  shortcut?: string
 }
 
 /**
@@ -44,9 +43,11 @@ export default function ListToolbar({
   actions,
   filters,
   trailing,
+  sort,
   layout = 'band',
 }: {
   search: ListToolbarSearch
+  sort?: ListToolbarSortProps
   /** 1行目。検索の右に置く、動くものだけ（保存した検索・この条件を保存）。 */
   actions?: ReactNode
   /** 2行目・左。札・日付などの絞り込み。 */
@@ -62,8 +63,8 @@ export default function ListToolbar({
 }) {
   const label = search.label ?? search.placeholder
   return (
-    <div className={styles.toolbar} data-toolbar-layout={layout} style={search.width ? ({ '--list-search-width': `${search.width}px` } as React.CSSProperties) : undefined}>
-      <div className={styles.row1}>
+    <div className={styles.toolbar} data-list-toolbar data-toolbar-layout={layout} style={search.width ? ({ '--list-search-width': `${search.width}px` } as React.CSSProperties) : undefined}>
+      <div className={styles.row1} data-toolbar-tools>
         <SearchField
           placeholder={search.placeholder}
           aria-label={label}
@@ -72,17 +73,53 @@ export default function ListToolbar({
           onClear={() => search.onChange('')}
           maxLength={search.maxLength}
           loading={search.loading}
-          shortcut={search.shortcut}
           className={styles.search}
         />
         {actions}
       </div>
-      {filters || trailing ? (
+      {filters || trailing || sort ? (
         <div className={styles.row2}>
-          {filters ? <div className={styles.filters}>{filters}</div> : null}
-          {trailing ? <div className={styles.trailing}>{trailing}</div> : null}
+          {filters ? <div className={styles.filters} data-toolbar-tools>{filters}</div> : null}
+          {trailing || sort ? <div className={styles.trailing} data-toolbar-tools>{sort ? <ListToolbarSort {...sort} /> : null}{trailing}</div> : null}
         </div>
       ) : null}
     </div>
   )
+}
+
+/** 優先度の低い道具。帯に入らないときだけ「…」から同じ操作へ到達する。 */
+export function ListToolbarOptional({ children, label = 'ほかの絞り込み', compact = false }: { children: ReactNode; label?: string; compact?: boolean }) {
+  const ref = useRef<HTMLDetailsElement>(null)
+  const expandedWidthRef = useRef(0)
+  const [collapsed, setCollapsed] = useState(compact)
+  useLayoutEffect(() => {
+    const item = ref.current, toolbar = item?.closest<HTMLElement>('[data-list-toolbar]')
+    if (!item || !toolbar || !window.ResizeObserver || compact) return
+    const measure = () => {
+      if (document.documentElement.dataset.theme !== 'v8') return
+      const content = item.querySelector<HTMLElement>('[data-toolbar-optional-content]')!
+      if (!item.hasAttribute('data-collapsed')) expandedWidthRef.current = content.getBoundingClientRect().width
+      const tools = [...toolbar.querySelectorAll<HTMLElement>('[data-toolbar-tools]')].flatMap((group) => [...group.children] as HTMLElement[])
+      const gap = parseFloat(getComputedStyle(toolbar).columnGap) || 0
+      const required = tools.reduce((width, tool) => width + (tool === item ? expandedWidthRef.current : tool.getBoundingClientRect().width), 0) + gap * Math.max(0, tools.length - 1)
+      setCollapsed(required > toolbar.clientWidth)
+    }
+    const observer = new ResizeObserver(measure)
+    observer.observe(toolbar)
+    for (const group of toolbar.querySelectorAll('[data-toolbar-tools]')) for (const tool of group.children) observer.observe(tool)
+    measure()
+    return () => observer.disconnect()
+  }, [children, compact])
+  return <details ref={ref} className={styles.optional} data-toolbar-tool data-toolbar-optional data-collapsed={collapsed || undefined} open={collapsed ? undefined : true}
+    onKeyDown={(event) => { if (event.key === 'Escape' && collapsed) { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus() } }}
+    onBlur={(event) => { if (collapsed && !event.currentTarget.contains(event.relatedTarget as Node | null)) event.currentTarget.open = false }}>
+    <summary aria-label={label} title={label}>…</summary>
+    <div data-toolbar-optional-content>{children}</div>
+  </details>
+}
+
+export type ListToolbarSortProps = Omit<SelectProps, 'aria-label' | 'label'> & { label?: string; 'aria-label'?: string }
+/** 並びの名前と選ぶ操作はこの欄にそろえる。 */
+export function ListToolbarSort(props: ListToolbarSortProps) {
+  return <span data-list-sort><Select {...props} label="並び" aria-label="並び" /></span>
 }

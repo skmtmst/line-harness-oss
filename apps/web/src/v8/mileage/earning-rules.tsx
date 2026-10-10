@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDateOffset } from '@/lib/jst-datetime'
+
 /*
  * ★V8 マイル「たまる決めごと」（板 `OC0gy`・1152 `ZJIyl`・閲覧のみ `E2Any`、
  * 状態は見本帳 `zaqP9`）。
@@ -11,9 +13,11 @@
  * フォルダの列に割り当てる API は無いので、きっかけの種類で分けた
  * 見え方の切り替えとして持つ（保存はしない）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowDown, ArrowUp, Bookmark, CircleDot, Clock3, Coins, Download, Gift, ListOrdered, Plus, TriangleAlert, Wallet } from 'lucide-react'
+import { ArrowDown, ArrowUp, Bookmark, CircleDot, Clock3, Coins, Download, Gift, ListOrdered, Plus, Wallet } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { adminSessionHeaders } from '@/lib/admin-session'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -31,7 +35,7 @@ import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel from '@/components/shared/folder-panel'
+import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -43,7 +47,6 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { FolderDotName } from '@/components/shared/folder-dot'
-import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import { ListPagePagination } from '@/components/templates'
 import {
   describeMileageCsvExportFailure,
@@ -56,6 +59,9 @@ import {
 import { CreateButton, MileageFrame, useMileageShell } from './frame'
 import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const EVENT_LABELS: Record<string, string> = {
   friend_added: '友だち追加',
@@ -105,22 +111,17 @@ function folderOf(rule: MileageEarningRuleV6): Exclude<FolderKey, 'all'> {
   return 'other'
 }
 
-/* 色は行の名前の前の丸と左のフォルダの列で同じものを使う（絵 OC0gy：購入は青・配信の反応は緑・紹介は橙・未分類は色の無い輪）。 */
-const FOLDERS: Array<{ key: FolderKey; label: string; color?: string }> = [
-  { key: 'all', label: 'すべて' },
-  { key: 'purchase', label: '購入', color: FOLDER_COLORS[0] },
-  { key: 'reaction', label: '配信の反応', color: FOLDER_COLORS[1] },
-  { key: 'referral', label: '紹介', color: FOLDER_COLORS[2] },
-  { key: 'other', label: '未分類' },
+/*
+ * きっかけの分け方（購入・配信の反応・紹介・そのほか）。決めごとの種類から決まる固定の分け方で、
+ * 作ったフォルダではないので、左のフォルダの列ではなく上の絞り込みに置く（B-136 2026-10-09）。
+ */
+const FOLDERS: Array<{ key: FolderKey; label: string }> = [
+  { key: 'all', label: 'きっかけ：すべて' },
+  { key: 'purchase', label: '購入' },
+  { key: 'reaction', label: '配信の反応' },
+  { key: 'referral', label: '紹介' },
+  { key: 'other', label: 'そのほか' },
 ]
-
-/** 行の名前の前の丸に渡すフォルダ。未分類は null（色の無い輪）。 */
-function folderDotOf(rule: MileageEarningRuleV6): { name: string; color?: string } | null {
-  const key = folderOf(rule)
-  if (key === 'other') return null
-  const item = FOLDERS.find((f) => f.key === key)
-  return item ? { name: item.label, color: item.color } : null
-}
 
 function isOverview(value: unknown): value is MileageEarningRulesV6Overview {
   if (!value || typeof value !== 'object') return false
@@ -132,9 +133,7 @@ function isOverview(value: unknown): value is MileageEarningRulesV6Overview {
 }
 
 function dateOnlyDaysAgo(days: number) {
-  const date = new Date()
-  date.setDate(date.getDate() - days)
-  return date.toISOString().slice(0, 10)
+  return jstDateOffset(-days)
 }
 
 function grantedMiles30d(rule: MileageEarningRuleV6) {
@@ -161,7 +160,7 @@ const PRESETS: Array<{ value: string; label: string; active: boolean; pending: b
   { value: 'pending', label: '確定待ちありのみ', active: false, pending: true, stopped: false, sort: 'order' },
 ]
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((size) => ({ value: String(size), label: `${size}件表示` }))
+const PAGE_SIZE_OPTIONS = [10, 20, 50].map((size) => ({ value: String(size), label: `${size} 件表示` }))
 
 export default function EarningRulesTab() {
   const router = useRouter()
@@ -181,15 +180,15 @@ export default function EarningRulesTab() {
   const [friendTotal, setFriendTotal] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [folder, setFolder] = useState<FolderKey>('all')
-  const [activeOnly, setActiveOnly] = useState(false)
-  const [pendingOnly, setPendingOnly] = useState(false)
-  const [stoppedOnly, setStoppedOnly] = useState(false)
-  const [sort, setSort] = useState<SortKey>('order')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [folder, setFolder] = useListUrlValue<FolderKey>('folder', 'all')
+  const [activeOnly, setActiveOnly] = useListUrlValue('activeOnly', false)
+  const [pendingOnly, setPendingOnly] = useListUrlValue('pendingOnly', false)
+  const [stoppedOnly, setStoppedOnly] = useListUrlValue('stoppedOnly', false)
+  const [sort, setSort] = useListUrlValue<SortKey>('sort', 'order')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [menuId, setMenuId] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
@@ -278,7 +277,7 @@ export default function EarningRulesTab() {
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearch(searchInput.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
@@ -311,7 +310,7 @@ export default function EarningRulesTab() {
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-earning-rules-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("マイルの獲得ルール")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {
@@ -520,7 +519,7 @@ export default function EarningRulesTab() {
   }
 
   const ready = !loading && !loadError
-  const dash = (text: string) => (ready ? text : '—')
+  const dash = (text: string) => (ready ? text : emptyValue('unknown'))
 
   /* ===== 数の帯（4マス） ===== */
   const stats = (
@@ -535,19 +534,19 @@ export default function EarningRulesTab() {
       />
       <KpiCard
         presentation="band"
-        title="今月 付けたマイル"
+        title="直近30日 付けたマイル"
         icon={<Coins size={14} aria-hidden="true" />}
         value={ready ? grantedMiles ?? 0 : null}
         unit=""
-        detail={dash(`${formatMileageNumber(grantedCount ?? 0)}人に`)}
+        detail={dash(`${formatMileageNumber(grantedCount ?? 0)} 件`)}
       />
       <KpiCard
         presentation="band"
-        title="今月 使われたマイル"
+        title="直近30日 使われたマイル"
         icon={<Gift size={14} aria-hidden="true" />}
         value={ready ? spentMiles ?? 0 : null}
         unit=""
-        detail={dash(`交換 ${formatMileageNumber(spentCount ?? 0)}件`)}
+        detail={dash(`交換 ${formatMileageNumber(spentCount ?? 0)} 件`)}
       />
       <KpiCard
         presentation="band"
@@ -555,7 +554,7 @@ export default function EarningRulesTab() {
         icon={<Wallet size={14} aria-hidden="true" />}
         value={ready ? balanceTotal ?? 0 : null}
         unit=""
-        detail={dash(`友だち ${formatMileageNumber(friendTotal ?? 0)}人`)}
+        detail={dash(`友だち ${formatMileageNumber(friendTotal ?? 0)} 人`)}
       />
     </KpiBand>
   )
@@ -566,22 +565,30 @@ export default function EarningRulesTab() {
     </CreateButton>
   )
 
+  /*
+   * 左のフォルダの列は共通の ManagedFolderPanel。決めごとをフォルダへ入れる受け口（folder_id）がまだ無いので
+   * 「すべて」だけを出す。受け口ができたら kind="mileage_rule" を渡すだけで、追加・「…」・未分類が出る。
+   */
   const folderPanel = (
-    <FolderPanel
-      heading="フォルダ"
-      rows={FOLDERS.map((item) => ({ kind: item.label === 'すべて' ? 'all' as const : item.label === '未分類' ? 'unfiled' as const : 'folder' as const, id: item.key, label: item.label, count: folderCounts.get(item.key) ?? 0, color: item.color }))}
-      activeId={folder}
-      onSelect={(id) => resetPage(() => setFolder(id as FolderKey))}
-      addFolderNote="フォルダを消しても、中の経路は未分類に残ります"
+    <ManagedFolderPanel
+      kind={null}
+      folders={[]}
+      onChanged={() => undefined}
+      canManage={!readonly}
+      itemLabel="決めごと"
+      activeId="all"
+      onSelect={() => undefined}
+      allCount={folderCounts.get('all') ?? null}
     />
   )
 
+  /* きっかけで絞る（固定の分け方）。件数も添える。 */
   const folderSelect = (
     <div className={styles.narrowFolder}>
       <Select
-        aria-label="フォルダ"
+        aria-label="きっかけ"
         value={folder}
-        options={FOLDERS.map((item) => ({ value: item.key, label: `フォルダ：${item.label}` }))}
+        options={FOLDERS.map((item) => ({ value: item.key, label: item.key === 'all' ? item.label : `${item.label} ${formatMileageNumber(folderCounts.get(item.key) ?? 0)}` }))}
         onChange={(value) => resetPage(() => setFolder(value as FolderKey))}
       />
     </div>
@@ -712,7 +719,7 @@ export default function EarningRulesTab() {
             if (!value) { setSearch(''); setPage(1) }
           },
         }}
-        filters={filterChips}
+        filters={<>{folderSelect}{filterChips}</>}
         trailing={<>{savedBox}{perPageBox}</>}
       />
     </>
@@ -733,7 +740,7 @@ export default function EarningRulesTab() {
                 id: 'edit',
                 label: '編集',
                 external: true,
-                onSelect: () => router.push(`/mileage/earning-rules/edit?id=${encodeURIComponent(rule.id)}`),
+                href: `/mileage/earning-rules/edit?id=${encodeURIComponent(rule.id)}`, onSelect: () => router.push(`/mileage/earning-rules/edit?id=${encodeURIComponent(rule.id)}`),
               },
               {
                 id: 'test',
@@ -804,11 +811,11 @@ export default function EarningRulesTab() {
             const active = rule.published.status === 'published'
             const orderIndex = ruleOrder.indexOf(rule.id)
             return (
-              <Tr key={rule.id} className={styles.row} data-table-layout="columns">
+              <Tr key={rule.id} className={styles.row} data-table-layout="columns" data-row-id={rule.id}>
                 <Td className={styles.colName}>
                   <div className={styles.rowNameLine}>
-                    <FolderDotName folder={folderDotOf(rule)}>
-                      <span className={styles.rowName} title={rule.draft.name}>{rule.draft.name}</span>
+                    <FolderDotName folder={null}>
+                      <span className={styles.rowName} ><TruncatedText value={String(rule.draft.name ?? '')} /></span>
                     </FolderDotName>
                   </div>
                   <span className={narrow ? styles.rowSub : `${styles.rowSub} ${styles.dotIndent}`}>
@@ -823,7 +830,7 @@ export default function EarningRulesTab() {
                 <Td className={styles.colValidity}><span className={styles.cellMain}>{validityText(rule)}</span></Td>
                 <Td className={`${styles.colRecent} ${styles.num}`}>
                   <span className={styles.cellMain}>{formatMileageNumber(grantedMiles30d(rule))}</span>
-                  <span className={styles.cellSub}>{`対象外 ${formatMileageNumber(rule.metrics30d.excluded)}回`}</span>
+                  <span className={styles.cellSub}>{`対象外 ${formatMileageNumber(rule.metrics30d.excluded)} 回`}</span>
                 </Td>
                 <Td className={styles.colState}>
                   <span className={styles.pill} data-tone={active ? 'active' : 'neutral'}>
@@ -865,12 +872,11 @@ export default function EarningRulesTab() {
   const body = loading ? (
     <ListState kind="loading" title="たまる決めごとを読み込んでいます" />
   ) : loadError ? (
-    <div className={styles.stateCard} role="alert">
-      <span className={`${styles.stateIcon} ${styles.stateIconError}`}><TriangleAlert size={16} aria-hidden="true" /></span>
-      <p className={styles.stateTitle}>たまる決めごとを読み込めませんでした</p>
-      <p className={styles.stateDesc}>数の帯は「—」にしています。道具はそのまま使えます。</p>
-      <Button type="button" onClick={() => void load()}>もう一度試す</Button>
-    </div>
+    <ListState kind="error"
+      title="たまる決めごとを読み込めませんでした"
+      description="数の帯は「—」にしています。道具はそのまま使えます。"
+      onRetry={() => void load()}
+    />
   ) : visible.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
     <EmptyList
@@ -886,14 +892,13 @@ export default function EarningRulesTab() {
   ) : (
     <>
       {table}
-      <p className={styles.footNote}>行の「…」から 編集・止める・複製・この決めごとの履歴を見る。</p>
     </>
   )
 
   const pager = ready && visible.length > 0 && pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {`${shown.length}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, shown.length)}件`}
+        {`${shown.length} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, shown.length)} 件`}
       </span>
       <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
     </ListPagePagination>
@@ -901,14 +906,15 @@ export default function EarningRulesTab() {
 
   return (
     <MileageFrame
+      help="行の「…」から 編集・止める・複製・この決めごとの履歴を見る。"
       actions={
         <Button onClick={() => void exportCsv()} disabled={exporting || rules.length === 0}>
-          <Download size={15} aria-hidden="true" /> CSV で書き出す
+          <Download size={15} aria-hidden="true" /> CSVで書き出す
         </Button>
       }
       stats={stats}
       folders={<>{createButton(true)}{folderPanel}</>}
-      folderNav={narrow ? undefined : { rows: FOLDERS.map((item) => ({ id: item.key, label: item.label })), activeId: folder, onSelect: (id) => resetPage(() => setFolder(id as FolderKey)), createAction: readonly ? undefined : createButton(false) }}
+      folderNav={narrow ? undefined : { rows: [{ id: 'all', label: 'すべて' }], activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>
@@ -947,8 +953,8 @@ export default function EarningRulesTab() {
             <Notice tone="danger" message={testError} />
           ) : testResult ? (
             <dl className={styles.testList}>
-              <div><dt>条件に合う行動</dt><dd>{formatMileageNumber(testResult.matchedEvents)}回</dd></div>
-              <div><dt>対象になる友だち</dt><dd>{formatMileageNumber(testResult.matchedFriends)}人</dd></div>
+              <div><dt>条件に合う行動</dt><dd>{formatMileageNumber(testResult.matchedEvents)} 回</dd></div>
+              <div><dt>対象になる友だち</dt><dd>{formatMileageNumber(testResult.matchedFriends)} 人</dd></div>
               <div><dt>付与見込みの合計</dt><dd>{formatMileageNumber(testResult.estimatedTotalMiles)} マイル</dd></div>
               <div><dt>1人あたり最大</dt><dd>{formatMileageNumber(testResult.maxPerFriend)} マイル</dd></div>
               <div><dt>付いた直後の状態</dt><dd>{testResult.initialStatus === 'pending' ? '確定待ち' : 'すぐ使える'}</dd></div>

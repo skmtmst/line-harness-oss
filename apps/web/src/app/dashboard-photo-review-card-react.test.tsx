@@ -113,12 +113,12 @@ async function render() {
 
 /** 「写真審査」カードの中身。見出しを含む一番内側の箱を返す。 */
 function photoCard(): HTMLElement {
-  const heading = Array.from(host.querySelectorAll('h3')).find(
+  const heading = Array.from(host.querySelectorAll('[data-kpi-presentation] p[title]')).find(
     (node) => node.textContent?.trim() === '写真審査',
   )
   if (!heading) throw new Error(`写真審査のカードが見つかりません: ${host.textContent?.slice(0, 400)}`)
   /* 見出しは「見出し＋リンク」の行に入っている。その1つ外がカード本体。 */
-  const card = heading.parentElement?.parentElement
+  const card = heading.closest('[data-kpi-presentation]')
   if (!card) throw new Error('写真審査のカードの外枠が見つかりません')
   return card as HTMLElement
 }
@@ -145,7 +145,7 @@ describe('ダッシュボードの写真審査カード(#666)', () => {
     })
     await render()
     const text = photoCard().textContent ?? ''
-    expect(text).toContain('写真を見る権限がありません')
+    expect(text).toContain('この操作の権限がありません')
     expect(text).not.toContain('読み込み中')
   })
 

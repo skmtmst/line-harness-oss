@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type Next } from 'hono';
 import {
   closeAffiliateAccountSettlement,
@@ -168,7 +169,7 @@ affiliatePayouts.post(
   '/api/affiliate-settlements',
   requireRole('owner', 'admin', 'staff'),
   affiliatePermission('affiliate.settlement.close'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     auditLog(c, 'affiliate.settlement.close', { kind: 'affiliate-settlement' });
     const key = idempotencyKey(c);
     type CloseBody = {
@@ -178,7 +179,7 @@ affiliatePayouts.post(
     if (!key || typeof body.lineAccountId !== 'string' || !validIso(body.periodFrom)
       || !validIso(body.periodTo) || Date.parse(body.periodFrom) > Date.parse(body.periodTo)
       || typeof body.expectedPreviewVersion !== 'string' || !/^[a-f0-9]{64}$/.test(body.expectedPreviewVersion)) {
-      return c.json({ success: false, error: '締め期間、版、再実行キーを確認してください' }, 400);
+      return inputError(c, { success: false, error: '締め期間、版、再実行キーを確認してください' }, 400, ["lineAccountId","periodFrom","periodTo","expectedPreviewVersion"]);
     }
     if (!await accountVisible(c, body.lineAccountId)) {
       return c.json({ success: false, error: '締め対象が見つかりません' }, 404);
@@ -209,7 +210,7 @@ affiliatePayouts.post(
   '/api/affiliate-payout-batches',
   requireRole('owner', 'admin', 'staff'),
   affiliatePermission('affiliate.payout.export'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     auditLog(c, 'affiliate.payout.create', { kind: 'affiliate-payout-batch' });
     const key = idempotencyKey(c);
     type BatchBody = {
@@ -219,7 +220,7 @@ affiliatePayouts.post(
     const version = positiveVersion(body.expectedVersion);
     if (!key || typeof body.lineAccountId !== 'string' || typeof body.settlementId !== 'string'
       || !version || body.bankFormat !== 'zengin_csv') {
-      return c.json({ success: false, error: '支払対象、版、銀行形式、再実行キーを確認してください' }, 400);
+      return inputError(c, { success: false, error: '支払対象、版、銀行形式、再実行キーを確認してください' }, 400, ["lineAccountId","settlementId","expectedVersion","bankFormat"]);
     }
     if (!await accountVisible(c, body.lineAccountId)) {
       return c.json({ success: false, error: '支払対象が見つかりません' }, 404);
@@ -249,14 +250,14 @@ affiliatePayouts.post(
   '/api/affiliate-payout-batches/:id/export',
   requireRole('owner', 'admin', 'staff'),
   affiliatePermission('affiliate.payout.export'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     auditLog(c, 'affiliate.payout.export', { kind: 'affiliate-payout-batch', id: c.req.param('id') });
     const key = idempotencyKey(c);
     type ExportBody = { lineAccountId?: unknown; expectedVersion?: unknown };
     const body = await c.req.json<ExportBody>().catch((): ExportBody => ({}));
     const version = positiveVersion(body.expectedVersion);
     if (!key || typeof body.lineAccountId !== 'string' || !version) {
-      return c.json({ success: false, error: '支払バッチ、版、再実行キーを確認してください' }, 400);
+      return inputError(c, { success: false, error: '支払バッチ、版、再実行キーを確認してください' }, 400, ["lineAccountId","expectedVersion"]);
     }
     const lineAccountId = body.lineAccountId;
     const batchId = c.req.param('id');
@@ -354,7 +355,7 @@ affiliatePayouts.post(
   '/api/affiliate-statements',
   requireRole('owner', 'admin', 'staff'),
   affiliatePermission('affiliate.settlement.close'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     auditLog(c, 'affiliate.statement.generate', { kind: 'affiliate-statement' });
     const key = idempotencyKey(c);
     type StatementBody = {
@@ -364,7 +365,7 @@ affiliatePayouts.post(
     const version = positiveVersion(body.expectedVersion);
     if (!key || typeof body.lineAccountId !== 'string' || typeof body.settlementId !== 'string'
       || typeof body.affiliateId !== 'string' || !version) {
-      return c.json({ success: false, error: '締め、紹介者、版、再実行キーを確認してください' }, 400);
+      return inputError(c, { success: false, error: '締め、紹介者、版、再実行キーを確認してください' }, 400, ["lineAccountId","settlementId","affiliateId","expectedVersion"]);
     }
     if (!await accountVisible(c, body.lineAccountId)) {
       return c.json({ success: false, error: '明細対象が見つかりません' }, 404);

@@ -13,7 +13,6 @@ import FriendAddRunDetailPage from './page'
  * ★V8 友だち追加時の配信の実行の詳細（板 `N43uVX`）の契約。
  * `<html data-theme="v8">` の下でだけ新しい詳細に切り替わり、
  * 失敗の帯・行ったこと・右の「この追加について」が出ることを
- * 実DOMで固定する。v7 では従来の詳細が出ることも固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
@@ -137,13 +136,4 @@ test('v8 の実行の詳細は板 N43uVX・失敗の帯・行ったこと・右�
   expect(host.textContent).toContain('この追加について')
   expect(host.textContent).toContain('トークを開く')
   expect(host.textContent).toContain('設定を開く')
-})
-
-test('v7 の下では従来の詳細が出る（N43uVXには切り替わらない）', async () => {
-  await act(async () => root.render(<FriendAddRunDetailPage />))
-  await settle()
-  await eventually(() => {
-    expect(host.textContent).toContain('あわせて実行した処理')
-  })
-  expect(host.querySelector('[data-design-node="N43uVX"]')).toBeNull()
 })

@@ -103,14 +103,14 @@ describe('R511 権限のない担当者に作成を案内しない', () => {
   it('一覧の403では作成ボタンを出さず、理由だけ出す', async () => {
     fixture.marksList.mockRejectedValueOnce({ status: 403 })
     render(<SupportMarkEditor />)
-    await screen.findByText('対応マークを作る権限がありません。オーナーか管理者に確認してください。')
+    await screen.findByText('この操作の権限がありません。オーナーか管理者に頼んでください。')
     expect(screen.queryByRole('button', { name: '対応マークを作る' })).toBeNull()
   })
 
   it('役割がstaffと分かっているときも作成を案内しない', async () => {
     window.localStorage.setItem('lh_staff_role', 'staff')
     render(<SupportMarkEditor />)
-    await screen.findByText('対応マークを作る権限がありません。オーナーか管理者に確認してください。')
+    await screen.findByText('この操作の権限がありません。オーナーか管理者に頼んでください。')
     expect(screen.queryByRole('button', { name: '対応マークを作る' })).toBeNull()
     expect(fixture.marksCreate).not.toHaveBeenCalled()
   })

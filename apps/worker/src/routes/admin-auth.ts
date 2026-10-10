@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { Env } from '../index.js';
@@ -311,13 +312,13 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
   }
 });
 
-adminAuth.post('/api/auth/two-factor/verify', async (c) => {
+adminAuth.post('/api/auth/two-factor/verify', inputJsonBoundary({"challengeToken":["string"],"code":["string"]}), async (c) => {
   const body = await c.req.json<{ challengeToken?: string; code?: string }>()
     .catch(() => ({} as { challengeToken?: string; code?: string }));
   const challengeToken = body.challengeToken?.trim() ?? '';
   const code = body.code?.trim() ?? '';
   if (!challengeToken || !/^\d{6}$/.test(code)) {
-    return c.json({ success: false, error: '6桁の認証コードを入力してください' }, 400);
+    return inputError(c, { success: false, error: '6桁の認証コードを入力してください' }, 400, ["challengeToken","code"]);
   }
 
   const tokenHash = await sha256Hex(challengeToken);
@@ -345,7 +346,7 @@ adminAuth.post('/api/auth/two-factor/verify', async (c) => {
   );
   if (!verified.valid || verified.step === null) {
     await incrementTwoFactorChallengeAttempts(c.env.DB, tokenHash);
-    return c.json({ success: false, error: '認証コードが正しくありません' }, 400);
+    return inputError(c, { success: false, error: '認証コードが正しくありません' }, 400, ["challengeToken","code"]);
   }
 
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
@@ -379,12 +380,12 @@ adminAuth.post('/api/auth/two-factor/verify', async (c) => {
  * setup 用途の合言葉だけで開ける。登録用の秘密をその場で発行して
  * provisioning URI を返す。
  */
-adminAuth.post('/api/auth/two-factor/setup', async (c) => {
+adminAuth.post('/api/auth/two-factor/setup', inputJsonBoundary({"challengeToken":["string"]}), async (c) => {
   const body = await c.req.json<{ challengeToken?: string }>()
     .catch(() => ({} as { challengeToken?: string }));
   const challengeToken = body.challengeToken?.trim() ?? '';
   if (!challengeToken) {
-    return c.json({ success: false, error: '設定の合言葉がありません。ログインからやり直してください' }, 400);
+    return inputError(c, { success: false, error: '設定の合言葉がありません。ログインからやり直してください' }, 400, ["challengeToken"]);
   }
 
   const tokenHash = await sha256Hex(challengeToken);
@@ -455,13 +456,13 @@ async function readPendingTotpSecret(
  * 認証アプリの6桁が合えばTOTPを有効にし、そのまま通常セッションを発行する。
  * 試行は合言葉ごとに5回まで。
  */
-adminAuth.post('/api/auth/two-factor/setup/confirm', async (c) => {
+adminAuth.post('/api/auth/two-factor/setup/confirm', inputJsonBoundary({"challengeToken":["string"],"code":["string"]}), async (c) => {
   const body = await c.req.json<{ challengeToken?: string; code?: string }>()
     .catch(() => ({} as { challengeToken?: string; code?: string }));
   const challengeToken = body.challengeToken?.trim() ?? '';
   const code = body.code?.trim() ?? '';
   if (!challengeToken || !/^\d{6}$/.test(code)) {
-    return c.json({ success: false, error: '6桁の認証コードを入力してください' }, 400);
+    return inputError(c, { success: false, error: '6桁の認証コードを入力してください' }, 400, ["challengeToken","code"]);
   }
 
   const tokenHash = await sha256Hex(challengeToken);
@@ -487,7 +488,7 @@ adminAuth.post('/api/auth/two-factor/setup/confirm', async (c) => {
   );
   if (!verified.valid || verified.step === null) {
     await incrementTwoFactorChallengeAttempts(c.env.DB, tokenHash);
-    return c.json({ success: false, error: '認証コードが正しくありません' }, 400);
+    return inputError(c, { success: false, error: '認証コードが正しくありません' }, 400, ["challengeToken","code"]);
   }
 
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
@@ -520,7 +521,7 @@ adminAuth.post('/api/auth/two-factor/setup/confirm', async (c) => {
 });
 
 /** 高危険操作の直前だけ使える、5分・1回限りの再認証grantを発行する。 */
-adminAuth.post('/api/auth/step-up', async (c) => {
+adminAuth.post('/api/auth/step-up', inputJsonBoundary({"code":["string"],"password":["string"],"purpose":["string"]}), async (c) => {
   const staffContext = c.get('staff');
   /*
    * 再認証フロー専用の401。管理画面の共通401処理は code の無い
@@ -532,7 +533,7 @@ adminAuth.post('/api/auth/step-up', async (c) => {
   const body = await c.req.json<{ code?: string; password?: string; purpose?: string }>()
     .catch(() => ({} as { code?: string; password?: string; purpose?: string }));
   if (!isStepUpPurpose(body.purpose)) {
-    return c.json({ success: false, error: '確認する操作を指定してください' }, 400);
+    return inputError(c, { success: false, error: '確認する操作を指定してください' }, 400, ["purpose"]);
   }
   const purpose = body.purpose;
   const staff = await getStaffById(c.env.DB, staffContext.id);
@@ -550,10 +551,10 @@ adminAuth.post('/api/auth/step-up', async (c) => {
   const code = body.code?.trim() ?? '';
   const password = body.password ?? '';
   if (useTotp && !/^\d{6}$/.test(code)) {
-    return c.json({ success: false, error: '6桁の認証コードを入力してください' }, 400);
+    return inputError(c, { success: false, error: '6桁の認証コードを入力してください' }, 400, ["code"]);
   }
   if (!useTotp && staff.password_hash && !password) {
-    return c.json({ success: false, error: 'パスワードを入力してください' }, 400);
+    return inputError(c, { success: false, error: 'パスワードを入力してください' }, 400, ["password"]);
   }
   if (!useTotp && !staff.password_hash) {
     return c.json({ success: false, error: '重要操作には二段階認証またはパスワードの設定が必要です' }, 403);
@@ -574,7 +575,7 @@ adminAuth.post('/api/auth/step-up', async (c) => {
       if (attempt.attempts >= attempt.maxAttempts) {
         return stepUpRateLimitResponse(c, staff.id);
       }
-      return c.json({ success: false, error: '認証コードが正しくありません' }, 400);
+      return inputError(c, { success: false, error: '認証コードが正しくありません' }, 400, ["code"]);
     }
     totpStep = verified.step;
   } else {
@@ -582,7 +583,7 @@ adminAuth.post('/api/auth/step-up', async (c) => {
       if (attempt.attempts >= attempt.maxAttempts) {
         return stepUpRateLimitResponse(c, staff.id);
       }
-      return c.json({ success: false, error: 'パスワードが正しくありません' }, 400);
+      return inputError(c, { success: false, error: 'パスワードが正しくありません' }, 400, ["password"]);
     }
   }
   /*
@@ -630,7 +631,7 @@ adminAuth.post('/api/auth/step-up', async (c) => {
  * turning the silent "login breaks after deploy" failure into an actionable
  * configuration error.
  */
-adminAuth.post('/api/auth/login', async (c) => {
+adminAuth.post('/api/auth/login', inputJsonBoundary(), async (c) => {
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) {
     console.error('[admin-auth] refused login — misconfigured topology:', config.misconfigured);
@@ -681,7 +682,7 @@ adminAuth.post('/api/auth/login', async (c) => {
  * own session is not a meaningful CSRF target, and this keeps logout resilient
  * even if the CSRF token was lost client-side.
  */
-adminAuth.post('/api/auth/logout', async (c) => {
+adminAuth.post('/api/auth/logout', inputJsonBoundary(), async (c) => {
   // 誰がログアウトしたかは、この時点では staff から取れる場合と
   // 取れない場合がある。取れなければ null で残す。記録が無いより
   // 「誰かがログアウトした」の方が手がかりになる。
@@ -831,7 +832,7 @@ adminAuth.delete('/api/auth/sessions/:tokenHash', async (c) => {
 });
 
 /** POST /api/auth/sessions/revoke-others — 今のセッション以外をまとめて失効する。 */
-adminAuth.post('/api/auth/sessions/revoke-others', async (c) => {
+adminAuth.post('/api/auth/sessions/revoke-others', inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   if (!staff) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const currentToken = currentSessionToken(c);

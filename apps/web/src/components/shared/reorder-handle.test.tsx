@@ -42,14 +42,19 @@ describe('ReorderHandle', () => {
     expect(view.container.querySelector('[data-reorder-disabled]')).toBeNull()
   })
 
-  it('旧 DragHandle は名前をそのまま読み上げと title に使い、渡したキー操作も動く', () => {
+  it('DragHandle はマウスで動かせるときに名前とキー操作を保つ', () => {
     const onKeyDown = vi.fn()
-    render(<DragHandle label="「質問」を並べ替える" onKeyDown={onKeyDown} />)
+    render(<DragHandle label="「質問」を並べ替える" draggable onDragStart={() => {}} onKeyDown={onKeyDown} />)
     const handle = screen.getByRole('button', { name: '「質問」を並べ替える' })
     expect(handle.getAttribute('title')).toBe('「質問」を並べ替える')
     fireEvent.keyDown(handle, { key: 'ArrowDown' })
     expect(onKeyDown).toHaveBeenCalledTimes(1)
   })
+})
+
+it('WEB-019：マウスで動かせないつまみは出さない', () => {
+  const view = render(<DragHandle onMove={() => {}} />)
+  expect(view.container.querySelector('[data-reorder-handle]')).toBeNull()
 })
 
 describe('moveIdTo', () => {

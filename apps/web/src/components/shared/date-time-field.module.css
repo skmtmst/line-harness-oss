@@ -106,3 +106,5 @@
   font-weight: 600;
 }
 }
+
+.compactField { height: var(--tpl-chip-h); }

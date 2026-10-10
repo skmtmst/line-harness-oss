@@ -328,7 +328,7 @@ describe('R588 詳細の失敗は理由で案内を分ける', () => {
     expect(retry).toBeTruthy()
   })
 
-  it('詳細404は対象なしの案内で再試行は出さない', async () => {
+  it('詳細404は対象なしの案内で再読み込みを出す', async () => {
     window.history.replaceState({}, '', '/contents?id=unknown-id')
     fixture.detailBehavior = 'fail404'
     await renderPage()
@@ -340,16 +340,16 @@ describe('R588 詳細の失敗は理由で案内を分ける', () => {
     expect(retry).toBeUndefined()
   })
 
-  it('詳細403は権限案内で再試行は出さない', async () => {
+  it('詳細403は権限案内で再読み込みを出す', async () => {
     window.history.replaceState({}, '', '/contents?id=media-a')
     fixture.detailBehavior = 'fail403'
     await renderPage()
     await waitForText('権限がありません')
-    expect(host.textContent).toContain('オーナーか管理者に追加を依頼してください')
+    expect(host.textContent).toContain('オーナーか管理者に頼んでください')
     expect(host.textContent).not.toContain('存在しないか、このLINEアカウントでは表示できません')
     const retry = [...host.querySelectorAll<HTMLButtonElement>('button')]
       .find((button) => button.textContent === 'もう一度読み込む')
-    expect(retry).toBeUndefined()
+    expect(retry).toBeTruthy()
   })
 })
 

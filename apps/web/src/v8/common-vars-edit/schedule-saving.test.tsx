@@ -31,3 +31,30 @@ it('共通情報の予定登録中は×・キャンセル・Escを止める', as
   expect(screen.getByRole('dialog')).toBeTruthy()
   await act(async () => resolve({ success: true, data: {} }))
 })
+
+it('B-139：名前を消して保存すると、口を呼ばず名前の欄が赤くなり、真下に理由が出て、そこへ移る', async () => {
+  const { api } = await import('@/lib/api')
+  const update = vi.spyOn(api.commonVars, 'update')
+  render(<Editor />)
+  const name = await screen.findByLabelText('名前') as HTMLInputElement
+  fireEvent.change(name, { target: { value: '' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+  await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+  expect(update).not.toHaveBeenCalled()
+  expect(name.getAttribute('aria-invalid')).toBe('true')
+  expect(document.getElementById('cv-name-error')?.textContent).toBe('共通情報名を入力してください')
+  expect(document.activeElement).toBe(name)
+})
+
+it('B-139：予定の開始日が空なら登録せず、開始日の欄に理由を出す', async () => {
+  add.mockReset()
+  render(<Editor />)
+  fireEvent.click(await screen.findByRole('button', { name: '予定を足す' }))
+  // 開始日を空にする（×で消す）
+  fireEvent.click(screen.getByRole('button', { name: '日付を消す' }))
+  fireEvent.click(screen.getByRole('button', { name: '登録する' }))
+  await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+  expect(add).not.toHaveBeenCalled()
+  expect(screen.getByText('開始日を入れてください')).toBeTruthy()
+  expect(document.activeElement).toBe(document.getElementById('sc-date'))
+})

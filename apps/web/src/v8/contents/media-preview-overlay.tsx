@@ -2,7 +2,8 @@
 
 /* ★V8 写し：src/app/contents/media-preview-overlay.tsx から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
 
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Dialog from '@/components/shared/dialog'
+import TextLink from '@/components/shared/text-link'
 
 /*
  * メディアのプレビュー。全面の暗い幕の上に中身だけを出す。
@@ -23,28 +24,7 @@ export default function MediaPreviewOverlay({
   src: string
   onClose: () => void
 }) {
-  const overlayRef = useOverlayFocus(true, onClose)
-  return (
-    <div
-      ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      style={{ background: 'color-mix(in srgb, var(--color-ink) 60%, transparent)' }}
-      role="dialog"
-      aria-modal="true"
-      aria-label={`${filename}のプレビュー`}
-      tabIndex={-1}
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="プレビューを閉じる"
-        className="text-on-accent absolute top-4 right-6 text-2xl leading-none"
-      >
-        ×
-      </button>
+  return <Dialog open title={`${filename}のプレビュー`} onCancel={onClose} size="wide">
       {kind === 'image' ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt={filename} className="max-h-full max-w-full object-contain" />
@@ -55,11 +35,10 @@ export default function MediaPreviewOverlay({
       ) : (
         <div className="rounded-card bg-canvas p-6 text-center text-sm">
           <p className="text-ink font-medium">{filename}</p>
-          <a href={src} target="_blank" rel="noreferrer" className="text-info mt-2 inline-block hover:underline">
+          <TextLink external href={src}   className="text-info mt-2 inline-block hover:underline">
             別のタブで開く
-          </a>
+          </TextLink>
         </div>
       )}
-    </div>
-  )
+  </Dialog>
 }

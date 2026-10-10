@@ -48,6 +48,9 @@ import {
 import { LineCard } from '../../line-preview'
 import { formatNumber } from '@/lib/format'
 import styles from './column-new-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 export default function ColumnNewV8() {
   const router = useRouter()
@@ -131,8 +134,8 @@ export default function ColumnNewV8() {
         <nav className={styles.crumb} aria-label="パンくず">
           <Link href="/nen-campaigns">← NEN配信へ</Link>
         </nav>
-        <h1 className={styles.headTitle}>コラムを書く</h1>
-        <p className={styles.headDesc}>外部サイトの記事へつなぐ下書きを作ります。記事本文は外部サイトで管理します。</p>
+        <PageHeading title="コラムを書く" help={<> 外部サイトの記事へつなぐ下書きを作ります。記事本文は外部サイトで管理します。</>} />
+
       </div>
 
       {failure ? (
@@ -144,38 +147,20 @@ export default function ColumnNewV8() {
         <div className={styles.main}>
           <section className={styles.card} aria-label="題名と分類" data-nen-part="title">
             <h2 className={styles.cardTitle}>題名と分類</h2>
-            <label className={styles.fieldLabel}>
-              題名
-              <TextField aria-label="題名" value={draft.title} maxLength={120} onChange={(event) => set({ title: event.target.value })} />
-            </label>
+            <Field label="題名"><TextField aria-label="題名" value={draft.title} maxLength={120} onChange={(event) => set({ title: event.target.value })} /></Field>
             {touched && errorFor('title') ? <p className={styles.fieldError}>{errorFor('title')}</p> : <p className={styles.note}>{titleNotice(draft.title) ?? `題名はLINEの通知に${TITLE_NOTICE_LENGTH}文字まで出ます。`}</p>}
-            <div className={styles.row2}>
-              <label className={styles.fieldLabel}>
-                分類
-                <TextField aria-label="分類" value={draft.category} maxLength={CATEGORY_MAX} placeholder="例: 季節のこと" onChange={(event) => set({ category: event.target.value })} />
-              </label>
-              <div className={styles.fieldLabel}>
+            <div className={styles.row2}><Field label="分類"><TextField aria-label="分類" value={draft.category} maxLength={CATEGORY_MAX} placeholder="例：季節のこと" onChange={(event) => set({ category: event.target.value })} /><div className={styles.fieldLabel}>
                 前のコラムを下敷きにする
                 <Link href="/nen-campaigns?tab=columns" className={styles.linkAction}>一覧で元のコラムを選びます →</Link>
-              </div>
-            </div>
-            <label className={styles.fieldLabel}>
-              概要（LINE のカードに出る短い紹介文）
-              <TextField aria-label="概要" value={draft.excerpt} maxLength={EXCERPT_MAX} onChange={(event) => set({ excerpt: event.target.value })} />
-            </label>
+              </div></Field></div>
+            <Field label="概要（LINE のカードに出る短い紹介文）"><TextField aria-label="概要" value={draft.excerpt} maxLength={EXCERPT_MAX} onChange={(event) => set({ excerpt: event.target.value })} /></Field>
           </section>
 
           <section className={styles.card} aria-label="記事のリンク" data-nen-part="article">
             <h2 className={styles.cardTitle}>記事のリンク</h2>
-            <label className={styles.fieldLabel}>
-              記事の URL
-              <TextField aria-label="記事の URL" value={draft.articleUrl} placeholder="https://example.com/columns/..." onChange={(event) => set({ articleUrl: event.target.value })} />
-            </label>
+            <Field label="記事の URL"><TextField aria-label="記事の URL" value={draft.articleUrl} placeholder="https://example.com/columns/..." onChange={(event) => set({ articleUrl: event.target.value })} /></Field>
             {touched && errorFor('articleUrl') ? <p className={styles.fieldError}>{errorFor('articleUrl')}</p> : null}
-            <label className={styles.fieldLabel}>
-              画像の URL
-              <TextField aria-label="画像の URL" value={draft.imageUrl} placeholder="https://cdn.example.com/..." onChange={(event) => set({ imageUrl: event.target.value })} />
-            </label>
+            <Field label="画像の URL"><TextField aria-label="画像の URL" value={draft.imageUrl} placeholder="https://cdn.example.com/..." onChange={(event) => set({ imageUrl: event.target.value })} /></Field>
           </section>
 
           <section className={styles.card} aria-label="届く形">
@@ -192,13 +177,8 @@ export default function ColumnNewV8() {
             <h2 className={styles.cardTitle}>いつ・だれに出しますか</h2>
             <p className={styles.note}>この日時は下書きに記録されます。実際の配信は、一覧で「この内容で予約する」を押したときだけ始まります。</p>
             <div className={styles.row2}>
-              <div className={styles.fieldLabel}>
-                <label htmlFor="nen-schedule-v8">配信日時（日本時間）</label>
-                <DateTimeField id="nen-schedule-v8" aria-label="配信日時（日本時間）" value={draft.scheduledAt} invalid={Boolean(touched && errorFor('scheduledAt'))} onChange={(v) => set({ scheduledAt: v })} />
-              </div>
-              <label className={styles.fieldLabel}>
-                配信対象
-                <Select
+              <div className={styles.fieldLabel}><Field label="配信日時（日本時間）" htmlFor="nen-schedule-v8"><DateTimeField id="nen-schedule-v8" aria-label="配信日時（日本時間）" value={draft.scheduledAt} invalid={Boolean(touched && errorFor('scheduledAt'))} onChange={(v) => set({ scheduledAt: v })} /></Field></div>
+              <Field label="配信対象"><Select
                   aria-label="配信対象"
                   value={draft.targetMode}
                   options={[
@@ -206,13 +186,10 @@ export default function ColumnNewV8() {
                     { value: 'tag', label: 'タグで絞る' },
                   ]}
                   onChange={(value) => set({ targetMode: value as 'all' | 'tag' })}
-                />
-              </label>
+                /></Field>
             </div>
             {draft.targetMode === 'tag' ? (
-              <label className={styles.fieldLabel}>
-                対象タグ
-                <Select
+              <Field label="対象タグ"><Select
                   aria-label="対象タグ"
                   value={draft.targetTagId}
                   options={[
@@ -220,15 +197,11 @@ export default function ColumnNewV8() {
                     ...accountTags.map((tag) => ({ value: tag.id, label: tag.name })),
                   ]}
                   onChange={(value) => set({ targetTagId: value })}
-                />
-              </label>
+                /></Field>
             ) : null}
-            <p className={styles.note}>この条件では {audienceCount == null ? '—' : formatNumber(audienceCount)}人に届きます。</p>
+            <p className={styles.note}>この条件では {audienceCount == null ? emptyValue('unknown') : formatNumber(audienceCount)}人に届きます。</p>
             <Disclosure title="公開日時も記録する（任意）" size="compact">
-            <div className={styles.fieldLabel}>
-              <label htmlFor="nen-publish-v8">公開日時（日本時間）</label>
-              <DateTimeField id="nen-publish-v8" aria-label="公開日時（日本時間）" value={draft.publishedAt} invalid={Boolean(touched && errorFor('publishedAt'))} onChange={(v) => set({ publishedAt: v })} />
-            </div>
+            <div className={styles.fieldLabel}><Field label="公開日時（日本時間）" htmlFor="nen-publish-v8"><DateTimeField id="nen-publish-v8" aria-label="公開日時（日本時間）" value={draft.publishedAt} invalid={Boolean(touched && errorFor('publishedAt'))} onChange={(v) => set({ publishedAt: v })} /></Field></div>
             <p className={styles.note}>空のままなら公開日時は入りません。日本時間で保存します。</p>
             </Disclosure>
           </section>
@@ -236,13 +209,8 @@ export default function ColumnNewV8() {
           <section className={styles.card} aria-label="読んだ人にすること">
             <h2 className={styles.cardTitle}>読んだ人にすること</h2>
             <div className={styles.row2}>
-              <label className={styles.fieldLabel}>
-                読了イベント名
-                <TextField aria-label="読了イベント名" value={draft.completionEventName} placeholder="例: 秋の食事コラムを読了" onChange={(event) => set({ completionEventName: event.target.value })} />
-              </label>
-              <label className={styles.fieldLabel}>
-                読了後に付けるタグ
-                <Select
+              <Field label="読了イベント名"><TextField aria-label="読了イベント名" value={draft.completionEventName} placeholder="例：秋の食事コラムを読了" onChange={(event) => set({ completionEventName: event.target.value })} /></Field>
+              <Field label="読了後に付けるタグ"><Select
                   aria-label="読了後に付けるタグ"
                   value={draft.completionTagId}
                   options={[
@@ -250,8 +218,7 @@ export default function ColumnNewV8() {
                     ...accountTags.map((tag) => ({ value: tag.id, label: tag.name })),
                   ]}
                   onChange={(value) => set({ completionTagId: value })}
-                />
-              </label>
+                /></Field>
             </div>
           </section>
         </div>

@@ -469,3 +469,5 @@
   color: var(--color-status-warn-deep);
   font-size: var(--tpl-bm-13);
 }
+
+.staffRow[aria-invalid='true'] { outline: var(--tpl-bm-2) solid var(--color-danger); }

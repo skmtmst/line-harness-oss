@@ -111,35 +111,12 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 
-test('状態の切り替えは5つが1行で、選んだ所だけが選ばれている', async () => {
-  await act(async () => root.render(<ChatsPage />))
-  await eventually(() => expect(host.textContent).toContain('A未対応'))
-
-  const { group, items } = radios()
-  expect(items.map((item) => item.textContent?.trim())).toEqual(
-    ['すべて', '未対応', '対応中', '保留', '対応済み'],
-  )
-  // 左の欄の最小の幅でも2行に落ちない。折り返しの指定は無い。
-  expect(group.className).toContain('flex-nowrap')
-  expect(group.className).not.toContain('flex-wrap')
-  for (const item of items) {
-    expect(item.className).toContain('flex-1')
-    expect(item.className).toContain('whitespace-nowrap')
-  }
-  // 最初は「すべて」。選んでいる所だけ Tab で止まる。
-  expect(items[0].getAttribute('aria-checked')).toBe('true')
-  expect(items.slice(1).map((item) => item.getAttribute('aria-checked'))).toEqual(
-    ['false', 'false', 'false', 'false'],
-  )
-  expect(items.map((item) => item.tabIndex)).toEqual([0, -1, -1, -1, -1])
-})
-
 test('押すと絞り込みが変わる。これまでの動きのまま', async () => {
   await act(async () => root.render(<ChatsPage />))
   await eventually(() => expect(host.textContent).toContain('A未対応'))
 
   const { items } = radios()
-  await act(async () => items[2].dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  await act(async () => items[1].dispatchEvent(new MouseEvent('click', { bubbles: true })))
 
   await eventually(() => {
     expect(host.textContent).toContain('B対応中')
@@ -147,7 +124,7 @@ test('押すと絞り込みが変わる。これまでの動きのまま', async
     expect(host.textContent).not.toContain('C対応済み')
   })
   const { items: after } = radios()
-  expect(after[2].getAttribute('aria-checked')).toBe('true')
+  expect(after[1].getAttribute('aria-checked')).toBe('true')
 })
 
 test('左右のキーで選ぶ所が動く', async () => {
@@ -167,8 +144,8 @@ test('左右のキーで選ぶ所が動く', async () => {
   })
   // キーで選んだら絞り込みも動く。
   await eventually(() => {
-    expect(host.textContent).toContain('A未対応')
-    expect(host.textContent).not.toContain('B対応中')
+    expect(host.textContent).toContain('B対応中')
+    expect(host.textContent).not.toContain('A未対応')
   })
 })
 

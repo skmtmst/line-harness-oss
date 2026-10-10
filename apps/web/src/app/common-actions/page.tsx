@@ -251,7 +251,7 @@ function CommonActionsPageV7() {
           { label: '共通アクション' },
         ]}
         title="共通アクション"
-        description=""
+        help=""
         actions={(
           <>
             {manualHref ? <Button href={manualHref}>マニュアル</Button> : null}

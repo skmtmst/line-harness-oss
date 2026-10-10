@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { ApiError } from '@/lib/api'
 import { BILLING_UNREACHABLE, billingFailureMessage } from './failure-message'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('../../../v8/hq/billing.tsx', import.meta.url), 'utf8')
 
 /**
  * M023：Stripe への輸送失敗は内部文を出さず、決済サービスの案内にする。
@@ -17,7 +17,7 @@ describe('M023/M024 課金の失敗表示', () => {
 
   it('403 は権限の案内になる', () => {
     expect(billingFailureMessage(new ApiError(403, 'API error: 403'), '支払い方法の管理画面の表示', 'forbidden-text'))
-      .toBe('forbidden-text')
+      .toBe('この操作の権限がありません。統括の管理者に頼んでください。')
   })
 
   it('通信断は再試行の言葉つきの案内になる', () => {

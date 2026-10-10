@@ -112,7 +112,7 @@ function button(label: string, occurrence = 0): HTMLButtonElement {
 }
 
 function mutableSwitch(): HTMLButtonElement {
-  const found = [...host.querySelectorAll<HTMLButtonElement>('[role="switch"]')].find((item) => !item.disabled)
+  const found = [...host.querySelectorAll<HTMLButtonElement>('[type="checkbox"]')].find((item) => !item.disabled)
   if (!found) throw new Error('切替可能な機能がありません')
   return found
 }
@@ -132,16 +132,16 @@ describe('N-446 機能設定を保存済み状態へ戻す', () => {
   it('変更を取り消すは保存失敗後も、最後に取得したaccount別snapshotへ戻し、APIは呼ばない', async () => {
     await render()
     const toggle = mutableSwitch()
-    const savedChecked = toggle.getAttribute('aria-checked')
+    const savedChecked = String((toggle as HTMLInputElement).checked)
     await act(async () => { toggle.click() })
-    expect(toggle.getAttribute('aria-checked')).not.toBe(savedChecked)
+    expect(String((toggle as HTMLInputElement).checked)).not.toBe(savedChecked)
 
     await fillReason()
     network.saveFails = true
     await act(async () => { button('機能設定を保存').click(); await settle() })
     expect(network.puts).toBe(1)
     await act(async () => { button('キャンセル').click() })
-    expect(toggle.getAttribute('aria-checked')).toBe(savedChecked)
+    expect(String((toggle as HTMLInputElement).checked)).toBe(savedChecked)
     expect(network.puts).toBe(1)
     expect(document.body.textContent).toContain('保存済みの機能設定に戻しました。')
   })
@@ -149,10 +149,10 @@ describe('N-446 機能設定を保存済み状態へ戻す', () => {
   it('初期値は確認後だけ下書きへ入り、二重操作しても保存前にサーバーを変更しない', async () => {
     await render()
     const toggle = mutableSwitch()
-    const savedChecked = toggle.getAttribute('aria-checked')
+    const savedChecked = String((toggle as HTMLInputElement).checked)
     await act(async () => { button('初期値に戻す').click(); button('初期値に戻す').click() })
     expect(document.body.textContent).toContain('初期値に戻しますか？')
-    expect(toggle.getAttribute('aria-checked')).toBe(savedChecked)
+    expect(String((toggle as HTMLInputElement).checked)).toBe(savedChecked)
     expect(network.puts).toBe(0)
     await act(async () => { button('初期値を下書きに入れる').click(); button('初期値を下書きに入れる').click() })
     expect(network.puts).toBe(0)
@@ -169,7 +169,7 @@ describe('N-446 機能設定を保存済み状態へ戻す', () => {
     await render()
     await settle()
     expect(document.body.textContent).not.toContain('初期値に戻しますか？')
-    expect(mutableSwitch().getAttribute('aria-checked')).toBe('true')
+    expect(String((mutableSwitch() as HTMLInputElement).checked)).toBe('true')
 
     // Aへ戻る読込を遅らせたあとBへ戻す。遅延A応答が最後に届いても、Bの
     // snapshot/表示を上書きできない。
@@ -184,7 +184,7 @@ describe('N-446 機能設定を保存済み状態へ戻す', () => {
       network.resolveAccountA?.(response(settingsResponse('account-a')))
       await settle()
     })
-    expect(mutableSwitch().getAttribute('aria-checked')).toBe('true')
+    expect(String((mutableSwitch() as HTMLInputElement).checked)).toBe('true')
     expect(button('キャンセル').disabled).toBe(true)
   })
 })

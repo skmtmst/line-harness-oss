@@ -24,7 +24,7 @@ export default function ConnectionHeading({ group, v8 }: { group: { name: string
         { label: group.name },
       ]}
       title="切替メニューのつながり"
-      description={`${group.name} の切替先と戻り道を確認します。`}
+      help={`${group.name} の切替先と戻り道を確認します。`}
     />
   )
 }

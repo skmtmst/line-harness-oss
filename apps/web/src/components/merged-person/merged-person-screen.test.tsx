@@ -19,7 +19,7 @@ vi.mock('@/components/shared/select', () => ({
     options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
   ),
 }))
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { MergedPersonDetail } from '@line-crm/shared'

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
 // 描画は page.tsx、読み込みの入口（loadInitial）は use-manual-links.ts にある。

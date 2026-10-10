@@ -42,7 +42,8 @@ binding = "AI"
 
 # バナー生成の用途寸法への整形（Cloudflare Images・R120）。
 # R2 の `IMAGES` と名前が重なるため `CF_IMAGES` にしている。
-# 注意: Images の有効化が必要か・変換回ごとの料金を、配備の前にオーナーへ確認する。
+# 2026-10-08 利用者承認: staging の既存プラン範囲で Images 画像変換を使用する。
+# 購入・プラン変更・本番環境への有効化はこの承認の対象外。
 [images]
 binding = "CF_IMAGES"
 
@@ -72,6 +73,8 @@ WORKER_URL = "https://stg-api.musubo.jp"
 # 同じ検証Workerに届く別の入口。LINE の Webhook がこちらで登録されていても「この環境」と判定する。
 WORKER_ALIAS_URLS = "https://nen-line-stg.skmtmst.workers.dev"
 ADMIN_PUBLIC_URL = "https://stg-admin.musubo.jp"
+META_GRAPH_API_VERSION = "v24.0"
+META_REDIRECT_URI = "https://stg-api.musubo.jp/api/instagram/oauth/callback"
 ADMIN_ORIGIN = "https://stg-admin.musubo.jp,https://nen-line-stg-admin.pages.dev"
 ADMIN_ALLOW_CROSS_SITE = "true"
 LIFF_PUBLIC_URL = "https://stg-api.musubo.jp"

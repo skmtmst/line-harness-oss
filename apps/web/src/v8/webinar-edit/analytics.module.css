@@ -20,8 +20,10 @@
   min-width: 0;
   padding: var(--tpl-wc-an-card-pad);
   border-radius: var(--tpl-wc-card-radius);
-  box-shadow: var(--tpl-an-ring);
+
   background: var(--color-canvas);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 .card[data-gap='wide'] { gap: var(--tpl-wc-an-gap); }
 .cardTitle {

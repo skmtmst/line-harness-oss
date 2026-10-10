@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -14,7 +14,7 @@ const read = (relative: string) => readFileSync(join(HERE, relative), 'utf8')
 describe('V8 オートメーション3板の印', () => {
   it('一覧の外枠に LWQXd を付ける', () => {
     const list = read('list-v8.tsx')
-    expect(list, '一覧の板が無い').toContain('data-design-node="LWQXd"')
+    expect(list, '一覧の板が無い').toMatch(/narrow \? 'En14p' : viewerOnly \? 'nH9L8' : 'LWQXd'/)
   })
 
   it('一覧の行の操作に「1人で試す」を置く（F-14 担当へ知らせるの動作確認口）', () => {
@@ -34,7 +34,7 @@ describe('V8 オートメーション3板の印', () => {
 
   it('見本の外枠に c7dxp を付ける', () => {
     const templates = read('templates-v8.tsx')
-    expect(templates, '見本の板が無い').toContain('data-design-node="c7dxp"')
+    expect(templates, '見本の板が無い').toMatch(/(?:data-design-node|boardId)="c7dxp"/)
   })
 
   it('見本は口の実データから12件出す（F-16）。絵の数は書かない', () => {

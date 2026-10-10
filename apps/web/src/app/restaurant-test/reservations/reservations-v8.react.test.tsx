@@ -12,8 +12,7 @@ import ReservationsPage from './page'
 
 /*
  * ★V8-B 予約台帳（板 `Z3FoM` 一覧・`l9NlC0` 今日・`rm92Y` 電話の予約）。
- * `<html data-theme="v8">` の下でだけ新しい台帳に切り替わり、
- * 見方が変わること・v7 では従来の台帳が出ることを実DOMで固定する。
+ * テーマにかかわらず V8 を描き、見方・電話予約・古い応答の破棄を守る。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
@@ -100,6 +99,7 @@ test('v8 では今日（時間×卓）が出て、表の列と操作は出ない
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   expect(text()).toContain('予約台帳')
+  await act(async () => { (host.querySelector('button[aria-label="予約台帳の説明"]') as HTMLButtonElement).click() })
   expect(text()).toContain('時間と卓で確認します')
   expect(host.querySelector('[aria-label$="時間×卓"]')).not.toBeNull()
   expect(text()).toContain('電話の予約を入れる')
@@ -126,13 +126,6 @@ test('v8 の電話の予約は rm92Y の手順と主ボタンが出る', async (
   expect(text()).toContain('いつ・何人・どの卓')
   expect(text()).toContain('台帳に入れる')
   expect(host.querySelector('[data-design-node="rm92Y"]')).not.toBeNull()
-})
-
-test('v7 では従来の台帳が出て V8 の板は出ない', async () => {
-  await renderPage()
-  expect(text()).toContain('今後の予約')
-  expect(host.querySelector('[data-design-node="l9NlC0"]')).toBeNull()
-  expect(host.querySelector('[data-design-node="Z3FoM"]')).toBeNull()
 })
 
 test('V8の枠だけ押さえる操作は有効で、期限を入力できる', async () => {

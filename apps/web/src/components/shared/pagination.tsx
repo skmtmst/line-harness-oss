@@ -15,6 +15,8 @@ export type PaginationProps = {
    * 表示があるので、この中身は v8 のときだけ出る。
    */
   summary?: React.ReactNode
+  /** 予約台帳の枠内で、絵の広めの件数帯を描く。 */
+  spacing?: 'roomy'
 }
 
 /** Pencil の5枠に収め、先頭・現在地・末尾を常に辿れる並びを返す。 */
@@ -73,6 +75,7 @@ export default function Pagination({
   disabled = false,
   className,
   summary,
+  spacing,
 }: PaginationProps) {
   const total = safePage(pageCount, 1)
   const current = Math.min(total, safePage(page, 1))
@@ -82,7 +85,7 @@ export default function Pagination({
   if (total <= 1) return null
 
   return (
-    <nav aria-label={ariaLabel} className={classes}>
+    <nav aria-label={ariaLabel} className={classes} data-spacing={spacing}>
       {summary ? <span className={styles.summary}>{summary}</span> : null}
       <button
         type="button"

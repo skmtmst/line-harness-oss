@@ -39,6 +39,7 @@ const baseDetail = () => ({
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
   api: {
+    staff: { me: async () => ({ success: true, data: { role: 'owner' } }) },
     savedSearches: {
       detail: () => Promise.resolve({ success: true, data: baseDetail() }),
       list: () => Promise.resolve({

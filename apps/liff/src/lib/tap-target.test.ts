@@ -16,7 +16,7 @@ describe('押せる所の大きさ', () => {
     expect(css).toContain('.liff-hit:not(.absolute):not(.fixed):not(.sticky)');
   });
 
-  it('測って小さかったボタンに付いている', () => {
+  it('小さい操作も共通 Button の44pxの段を使う', () => {
     const cases: Array<[string, string]> = [
       ['../components/ui/LiffHeader.tsx', 'aria-label="閉じる"'],
       ['../components/DateTimePicker.tsx', 'aria-label="前の週"'],
@@ -31,7 +31,8 @@ describe('押せる所の大きさ', () => {
       expect(at, `${file} ${marker}`).toBeGreaterThan(-1);
       // 印の近く（同じ要素の className）に liff-hit がある
       const around = src.slice(Math.max(0, at - 400), at + 400);
-      expect(around, `${file} ${marker}`).toContain('liff-hit');
+      expect(around, `${file} ${marker}`).toMatch(/<Button variant="(?:icon|arrow|chip)"/);
+      expect(read('../components/ui/Button.tsx')).toMatch(/(?:icon|arrow|chip): `?'liff-hit/);
     }
   });
 

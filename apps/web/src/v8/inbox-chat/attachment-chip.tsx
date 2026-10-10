@@ -8,6 +8,7 @@
 import { FileText, Film, RotateCw, X } from 'lucide-react'
 import { formatSize } from './attachments'
 import styles from './inbox-chat.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 export type PendingAttachmentView = {
   kind: 'video' | 'file'
@@ -46,7 +47,7 @@ export default function AttachmentChip({
     >
       <Icon aria-hidden className={styles.attachChipIcon} />
       <span className={styles.attachChipText}>
-        <span className={styles.attachChipName} title={item.name}>{item.name}</span>
+        <span className={styles.attachChipName} ><TruncatedText value={String(item.name ?? '')} /></span>
         <span className={item.status === 'failed' ? styles.attachChipError : styles.attachChipSub} role={item.status === 'failed' ? 'alert' : undefined} title={sub}>
           {sub}
         </span>

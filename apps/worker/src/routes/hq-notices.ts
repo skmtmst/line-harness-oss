@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { issueStaffLineLinkCode, listUnreadScreenNotices, markScreenNoticeRead } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -17,7 +18,7 @@ hqNotices.get('/api/hq/notices', async (c) => {
   return c.json({ success: true, data: notices });
 });
 
-hqNotices.post('/api/hq/notices/:id/read', requireRole('owner', 'admin', 'staff'), async (c) => {
+hqNotices.post('/api/hq/notices/:id/read', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const ok = await markScreenNoticeRead(c.env.DB, c.req.param('id'), staff.id);
   return c.json({ success: true, data: { read: ok } });

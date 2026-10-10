@@ -1,3 +1,5 @@
+import { formDocuments } from './routes/form-documents.js';
+import { purgeExpiredFormDocuments } from './services/form-documents.js';
 import { autoReplyUnmatched } from './routes/auto-reply-unmatched.js';
 import { instagram } from './routes/instagram.js';
 import { purgeInstagramTransientData } from './services/instagram.js';
@@ -9,6 +11,7 @@ import { broadcastMediaDirect } from './routes/broadcast-media-direct.js';
 import { hqBroadcasts } from './routes/hq-broadcasts.js';
 import { visitStamps } from './routes/visit-stamps.js';
 import { processVisitStampQueue } from './services/visit-stamps.js';
+import { processVisitStampReminders } from './services/visit-stamp-reminders.js';
 import { Hono, type Context } from 'hono';
 import { noindexHeaderMiddleware, robotsTxtHandler } from './lib/robots.js';
 import { cors } from 'hono/cors';
@@ -146,6 +149,7 @@ import dedupPreview from './routes/dedup-preview.js';
 import { profileRefresh } from './routes/profile-refresh.js';
 import { richMenuGroups } from './routes/rich-menu-groups.js';
 import { lineProxy } from './routes/line-proxy.js';
+import { research } from './routes/research.js';
 import { webinarRoutes } from './routes/webinars.js';
 import { instagramEngagement } from './routes/instagram-engagement.js';
 import adminVersion from './routes/admin-version.js';
@@ -244,6 +248,9 @@ import {
 export type Env = {
   Bindings: {
     DB: D1Database;
+    BUILD_GIT_COMMIT?: string;
+    BUILD_VERSION?: string;
+    BUILD_RELEASED_AT?: string;
     IMAGES: R2Bucket;
     /** 飲食店向けの受信メール原本。本番 wrangler.toml には束縛が無いので任意 */
     RAW_MAIL?: R2Bucket;
@@ -570,6 +577,7 @@ app.route('/', commonActions);
 app.route('/', richMenus);
 app.route('/', trackedLinks);
 app.route('/', entryRoutes);
+app.route('/', formDocuments);
 app.route('/', forms);
 app.route('/', postalCode);
 app.route('/', adPlatforms);
@@ -598,6 +606,7 @@ app.route('/', dedupPreview);
 app.route('/', profileRefresh);
 app.route('/', richMenuGroups);
 app.route('/', webinarRoutes);
+app.route('/', research);
 app.route('/', instagramEngagement);
 app.route('/', instagram);
 // LINE Messaging API 互換プロキシ — 外部エージェントの直接送信を messages_log に残す
@@ -738,14 +747,21 @@ app.get('/r/:ref', async (c) => {
       return c.html(ENTRY_ROUTE_STOPPED_HTML, 410);
     }
   }
+  // クーポンの所属アカウントを固定する。main poolへ落とすと別の店へ着地する。
+  const couponRoute = route?.coupon_enabled === 1 && Boolean(route.coupon_asset_id);
+  if (couponRoute) {
+    const account = route?.line_account_id ? await getLineAccountById(c.env.DB, route.line_account_id) : null;
+    if (!account?.liff_id) return c.html('<!doctype html><html lang="ja"><meta charset="utf-8"><title>このリンクは現在利用できません</title><p>お店へお問い合わせください。</p></html>', 503);
+    liffUrl = `https://liff.line.me/${account.liff_id}`;
+  }
   // 転送先が設定された経路はそちらへ送る（#514 重大4）。保存はするのに
   // 読まないままだった。危険な形式は safe-redirect が弾き、そのときは
   // 従来どおり友だち追加の着地画面へ進む。
-  if (route?.redirect_url) {
+  if (!couponRoute && route?.redirect_url) {
     const target = safeRedirectTarget(route.redirect_url);
     if (target) return c.redirect(target, 302);
   }
-  if (route?.pool_id) {
+  if (!couponRoute && route?.pool_id) {
     const candidate = await getTrafficPoolById(c.env.DB, route.pool_id);
     if (candidate?.is_active) pool = candidate;
   }
@@ -783,7 +799,7 @@ app.get('/r/:ref', async (c) => {
   // 2 / 3. fallback to URL query or 'main'. Skipped for affiliate refs, whose
   // account is already resolved above; falling through to the 'main' pool would
   // override the affiliate's chosen account.
-  if (!pool && !affiliateResolved) {
+  if (!pool && !affiliateResolved && !couponRoute) {
     const poolSlug = c.req.query('pool') || 'main';
     pool = await getTrafficPoolBySlug(c.env.DB, poolSlug);
   }
@@ -805,6 +821,7 @@ app.get('/r/:ref', async (c) => {
   const liffParams = new URLSearchParams();
   if (liffIdMatch) liffParams.set('liffId', liffIdMatch[1]);
   if (ref) liffParams.set('ref', ref);
+  if (couponRoute) liffParams.set('couponRef', ref);
   if (formId) liffParams.set('form', formId);
   const gate = c.req.query('gate');
   if (gate) liffParams.set('gate', gate);
@@ -822,13 +839,23 @@ app.get('/r/:ref', async (c) => {
   // friend-add gate (initSalonBooking, initEventBooking); page=book/form
   // would bypass that gate and bypass ref-based attribution, so they are
   // intentionally excluded until those initializers are unified.
-  const PAGE_PASSTHROUGH_ALLOWED = new Set(['salon-book', 'event', 'event-me', 'webinar']);
+  const PAGE_PASSTHROUGH_ALLOWED = new Set(['salon-book', 'event', 'event-me', 'webinar', 'research', 'visit-stamps']);
   const page = c.req.query('page');
   if (page && PAGE_PASSTHROUGH_ALLOWED.has(page)) liffParams.set('page', page);
+  if (page === 'research' && c.req.query('researchId')) liffParams.set('researchId', c.req.query('researchId')!);
   const id = c.req.query('id');
   if (id) liffParams.set('id', id);
   const slug = c.req.query('slug');
   if (slug) liffParams.set('slug', slug);
+  if (page === 'salon-book') {
+    const menuId = c.req.query('menu_id');
+    if (menuId && /^[A-Za-z0-9_-]{1,128}$/.test(menuId)) liffParams.set('menu_id', menuId);
+    if (c.req.query('view') === 'history') liffParams.set('view', 'history');
+  }
+  if (page === 'visit-stamps') {
+    const card = c.req.query('card');
+    if (card && /^[A-Za-z0-9_-]{1,128}$/.test(card)) liffParams.set('card', card);
+  }
 
   // Ad click IDs + UTM passthrough. /auth/line forwards its full query string
   // to /r/:ref, but rebuilding liffParams here without these keys silently
@@ -1116,7 +1143,7 @@ ${longPressBlock}
 // attribution を汚染する、という 2 つの問題があるため別ルートに分けている。
 // 仕様:
 // - クエリ: liffId (必須, `<digits>-<id>` 形式) / page / id
-// - page は `/r/:ref` と同じ allowlist (salon-book / event / event-me)
+// - page は `/r/:ref` と同じ allowlist (salon-book / event / event-me / webinar / visit-stamps)
 // - mobile UA は「LINEで開く」ボタン、desktop は QR を返す (`/r/:ref` 同等)
 app.get('/o', async (c) => {
   if (isLinkPreviewBot(c.req.header('user-agent') || '')) {
@@ -1130,13 +1157,22 @@ app.get('/o', async (c) => {
 
   const liffParams = new URLSearchParams();
   liffParams.set('liffId', liffId);
-  const PAGE_PASSTHROUGH_ALLOWED = new Set(['salon-book', 'event', 'event-me', 'webinar']);
+  const PAGE_PASSTHROUGH_ALLOWED = new Set(['salon-book', 'event', 'event-me', 'webinar', 'research', 'visit-stamps']);
   const page = c.req.query('page');
   if (page && PAGE_PASSTHROUGH_ALLOWED.has(page)) liffParams.set('page', page);
+  if (page === 'research' && c.req.query('researchId')) liffParams.set('researchId', c.req.query('researchId')!);
   const id = c.req.query('id');
   if (id) liffParams.set('id', id);
   const slug = c.req.query('slug');
   if (slug) liffParams.set('slug', slug);
+  if (page === 'salon-book') {
+    const menuId = c.req.query('menu_id');
+    if (menuId && /^[A-Za-z0-9_-]{1,128}$/.test(menuId)) liffParams.set('menu_id', menuId);
+  }
+  if (page === 'visit-stamps') {
+    const card = c.req.query('card');
+    if (card && /^[A-Za-z0-9_-]{1,128}$/.test(card)) liffParams.set('card', card);
+  }
   // N-396: 管理画面が発行する「予約履歴URL」は salon-book の view=history を
   // 指す。任意の view を通すと未定義画面へ誘導できてしまうので、履歴だけを通す。
   const view = c.req.query('view');
@@ -1414,6 +1450,12 @@ async function runFrequentHeavyJobs(
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
+    {name:'durable tracked click continuation',run:async()=>{const {processDueTrackedClicks}=await import('./services/tracked-click-steps.js');await processDueTrackedClicks(env);}},
+    {name:'durable banner generation',run:async()=>{const {processDueBannerGenerations}=await import('./services/banner-jobs.js');await processDueBannerGenerations(env);}},
+    {
+      name: 'form document retention',
+      run: async () => { await purgeExpiredFormDocuments(env.DB, env.IMAGES, new Date(event.scheduledTime)); },
+    },
     {name:'API draft and integration retention',run:async()=>{const now=new Date(event.scheduledTime);await purgeExpiredScenarioDrafts(env.DB,now);await purgeInstagramTransientData(env.DB,now);}},
     {name:'booking waitlist expiry and promotion',run:async()=>{const {processBookingWaitlists}=await import('./services/waitlist-tick.js');await processBookingWaitlists(env);}},
     {
@@ -2235,6 +2277,17 @@ async function scheduled(
     console.error('event-waitlist error:', e);
   }
 
+  // 来店スタンプの期限通知。配信の見張り（observeDispatch）の対応表には未登録なので、
+  // event-waitlist と同じく直接呼ぶ（対応表への追加は Codex の担当で別に行う）。
+  try {
+    await processVisitStampReminders(dbFor(env), {
+      now: new Date(event.scheduledTime), proxyBaseUrl: env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
+      proxyDispatch: request => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+    });
+  } catch {
+    console.error(JSON.stringify({ event: 'visit_stamp_reminders_pending' }));
+  }
+
   // 外部Google Calendarで確定したMeet個別相談。前日・1時間前のLINE通知を
   // D1で管理し、送信は必ずLINE Harness Proxyを通す。
   try {
@@ -2736,7 +2789,7 @@ async function scheduled(
   const jobs: Promise<unknown>[] = [];
   jobs.push(
     observeDispatch('scenario deliveries',
-      () => processStepDeliveries(env.DB, defaultLineClient, env.WORKER_URL)),
+      () => processStepDeliveries(env.DB, defaultLineClient, env.WORKER_URL, env.LINE_CREDENTIAL_ENCRYPTION_KEY)),
     observeDispatch('broadcast deliveries', async () => {
       await Promise.all([
         processScheduledBroadcasts(env.DB, defaultLineClient, env.WORKER_URL),

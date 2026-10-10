@@ -1,8 +1,10 @@
 'use client'
 
+import { createPortal } from 'react-dom'
 import React, { useCallback, useEffect, useId, useRef, type ReactNode } from 'react'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import styles from './detail-panel.module.css'
+import { DETAIL_PANEL_WIDTH } from './panel-sizes'
 import { isImeComposing } from './ime'
 
 export type DetailPanelProps = {
@@ -77,7 +79,7 @@ export default function DetailPanel({
   useEffect(() => {
     if (!open) return
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    panelRef.current?.focus()
+    panelRef.current?.focus({ preventScroll: true })
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' && event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
       // ほかの部品（「…」のメニュー・選ぶ箱など）が先に処理したキー・日本語の変換中のキーは触らない。
@@ -102,15 +104,15 @@ export default function DetailPanel({
     document.addEventListener('keydown', onKeyDown)
     return () => {
       document.removeEventListener('keydown', onKeyDown)
-      previous?.focus()
+      previous?.focus({ preventScroll: true })
     }
   }, [open ])
 
   if (!open) return null
-  return (
+  const panel = (
     <aside
       ref={panelRef}
-      className={styles.panel}
+      className={styles.panel} style={{ width: DETAIL_PANEL_WIDTH }}
       role="dialog"
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
@@ -139,6 +141,7 @@ export default function DetailPanel({
       {footer ? <footer className={styles.footer}>{footer}</footer> : null}
     </aside>
   )
+  return typeof document === 'undefined' ? null : createPortal(panel, document.body)
 }
 
 /**

@@ -30,6 +30,8 @@ import { csvExportLine } from '../list/csv-export'
 import { ExecuteConfirmDialog, MigrationItemDialog, RollbackConfirmDialog, runStatusView } from './uid-dialogs'
 import { classLabel, decisionLabel, formatMappingBytes, ITEM_PAGE_SIZE, MIGRATION_STEPS, useUidMigration, type ItemClassification } from './use-uid-migration'
 import styles from './migrations.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const PRE_EXECUTE = ['dry_run', 'review', 'ready']
 
@@ -84,7 +86,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `uid-migration-${active.id}.csv`
+    anchor.download = csvFileName("UID移行")
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -120,7 +122,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
       </div>
       <FileDropzone title="対応表のCSVをここに置く" hint="old_uid・new_uid 列のCSVを選びます" accept=".csv,text/csv" chooseLabel="CSVをアップロード" onFiles={(files) => void m.onUidFile(files)} />
       {m.file ? (
-        <AttachmentRow name={m.file.name} meta={`${formatNumber(m.mappings.length)}行・${formatMappingBytes(m.file.size)}`} onRemove={() => { m.setFile(null); m.setMappings([]); m.setMessage(null) }} />
+        <AttachmentRow name={m.file.name} meta={`${formatNumber(m.mappings.length)} 行・${formatMappingBytes(m.file.size)}`} onRemove={() => { m.setFile(null); m.setMappings([]); m.setMessage(null) }} />
       ) : <p className={styles.small}>ファイルは未選択です</p>}
       <div className={styles.cardFoot}>
         {canDecideItems ? (
@@ -186,7 +188,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                     </button>
                   ))}
                   <button type="button" aria-pressed={m.pendingOnly} className={m.pendingOnly ? `${styles.chip} ${styles.chipOn}` : styles.chip} onClick={() => m.onFilterChange(active.id, m.classification, !m.pendingOnly)}>
-                    {`未判断 ${m.unresolved == null ? '—' : formatNumber(m.unresolved)}`}
+                    {`未判断 ${m.unresolved == null ? emptyValue('unknown') : formatNumber(m.unresolved)}`}
                   </button>
                 </div>
                 <span className={styles.spacer} />
@@ -217,14 +219,14 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                   </thead>
                   <tbody>
                     {active.items?.map((item) => (
-                      <Tr key={item.id} className={`${styles.row} ${styles.rowTall}`}>
+                      <Tr key={item.id} className={`${styles.row} ${styles.rowTall}`} data-row-id={item.id}>
                         <Td className={styles.td}>
-                          <button type="button" className={`${styles.mono} ${styles.uidButton}`} title={`${item.oldUid}（詳細を見る）`} onClick={() => { m.setDetailError(null); m.setDetailItem(item) }}>
+                          <button type="button" className={`${styles.mono} ${styles.uidButton}`} title={`${item.oldUid}（詳細を見る）`}  onClick={() => { m.setDetailError(null); m.setDetailItem(item) }}>
                             {shortUid(item.oldUid)}
                           </button>
                         </Td>
                         <Td className={styles.td}>
-                          <span className={styles.mono} title={[item.newUid, item.candidateName, item.conflictReason].filter(Boolean).join(' ／ ') || undefined}>{item.newUid ? shortUid(item.newUid) : '—'}</span>
+                          <span className={styles.mono} title={[item.newUid, item.candidateName, item.conflictReason].filter(Boolean).join(' ／ ') || undefined}>{item.newUid ? shortUid(item.newUid) : emptyValue('unknown')}</span>
                         </Td>
                         <Td className={styles.td}>
                           <span className={`${styles.pill} ${item.classification === 'auto' ? styles.pillOk : item.classification === 'conflict' ? styles.pillDanger : item.classification === 'unmatched' ? styles.pillMuted : styles.pillWarn}`}>
@@ -256,7 +258,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
               )}
               {pageCount > 1 ? (
                 <div className={styles.pagerRow}>
-                  <span className={styles.small}>{`${formatNumber(total)}件中 ${formatNumber(m.page * ITEM_PAGE_SIZE + 1)}〜${formatNumber(Math.min((m.page + 1) * ITEM_PAGE_SIZE, total))}件`}</span>
+                  <span className={styles.small}>{`${formatNumber(total)} 件中 ${formatNumber(m.page * ITEM_PAGE_SIZE + 1)}〜${formatNumber(Math.min((m.page + 1) * ITEM_PAGE_SIZE, total))} 件`}</span>
                   <Pagination page={m.page + 1} pageCount={pageCount} onPageChange={(next) => m.onPageChange(active.id, next - 1)} disabled={m.busy || m.detailBusy} />
                 </div>
               ) : null}
@@ -272,7 +274,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                 <span className={styles.bandTitle}>{active.status === 'completed' ? '本移行と照合が終わりました' : statusView?.badgeLabel}</span>
                 <span className={styles.bandText}>
                   {active.status === 'completed'
-                    ? `${formatNumber(active.counts.applied)}人を引き継ぎました。必要ならこの履歴から切り戻せます。`
+                    ? `${formatNumber(active.counts.applied)} 人を引き継ぎました。必要ならこの履歴から切り戻せます。`
                     : statusView?.description}
                 </span>
               </span>
@@ -280,10 +282,10 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
             <section className={styles.card} aria-labelledby="uid-result">
               <h3 id="uid-result" className={styles.cardTitle}>照合の結果</h3>
               <ul className={styles.lines}>
-                <li className={styles.line}><span>引き継いだ</span><span className={styles.lineGood}>{`${formatNumber(active.counts.applied)}人`}</span></li>
-                <li className={styles.line}><span>一致先なし（CSVで書き出す・取り込むで作る）</span><span className={styles.lineValue}>{`${formatNumber(active.counts.unmatched)}人`}</span></li>
-                <li className={styles.line}><span>除いた</span><span className={styles.lineValue}>{`${formatNumber(active.decisionCounts?.exclude ?? 0)}人`}</span></li>
-                <li className={styles.line}><span>失敗</span><span className={styles.lineValue}>{`${formatNumber(active.counts.failed)}人`}</span></li>
+                <li className={styles.line}><span>引き継いだ</span><span className={styles.lineGood}>{`${formatNumber(active.counts.applied)} 人`}</span></li>
+                <li className={styles.line}><span>一致先なし（CSVで書き出す・取り込むで作る）</span><span className={styles.lineValue}>{`${formatNumber(active.counts.unmatched)} 人`}</span></li>
+                <li className={styles.line}><span>除いた</span><span className={styles.lineValue}>{`${formatNumber(active.decisionCounts?.exclude ?? 0)} 人`}</span></li>
+                <li className={styles.line}><span>失敗</span><span className={styles.lineValue}>{`${formatNumber(active.counts.failed)} 人`}</span></li>
               </ul>
             </section>
           </>
@@ -321,10 +323,10 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                 {m.runs.map((run) => {
                   const badge = historyBadge(run)
                   return (
-                    <Tr key={run.id} className={`${styles.row} ${styles.rowRun}`} selected={active?.id === run.id || undefined}>
+                    <Tr key={run.id} className={`${styles.row} ${styles.rowRun}`} selected={active?.id === run.id || undefined} data-row-id={run.id}>
                       <Td className={styles.td}>{slashDateTime(run.createdAt)}</Td>
                       <Td className={styles.td}>
-                        <button type="button" className={styles.runButton} aria-current={active?.id === run.id ? 'true' : undefined} title={`${run.purpose} ・ ${formatNumber(run.counts.total)}件`} onClick={() => m.selectRun(run.id)}>
+                        <button type="button" className={styles.runButton} aria-current={active?.id === run.id ? 'true' : undefined} title={`${run.purpose} ・ ${formatNumber(run.counts.total)}件`}  onClick={() => m.selectRun(run.id)}>
                           {`${accountName(run.fromAccountId)} → ${accountName(run.toAccountId)}`}
                         </button>
                       </Td>
@@ -337,7 +339,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                           </button>
                         ) : run.rollbackable === true ? (
                           <span className={styles.small} title={rollbackBlockedReason ?? undefined}>ownerのみ</span>
-                        ) : <span className={styles.faint}>—</span>}
+                        ) : <span className={styles.faint}>{emptyValue('unknown')}</span>}
                       </Td>
                     </Tr>
                   )
@@ -392,15 +394,15 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
       <div className={styles.body}>{body}</div>
 
       <MigrationItemDialog detailItem={m.detailItem} active={active} me={m.me} busy={m.busy} detailError={m.detailError} onClose={() => { m.setDetailItem(null); m.setDetailError(null) }} decide={(item, decision) => void m.decide(item, decision)} />
-      <ExecuteConfirmDialog active={active} accounts={m.accounts} me={m.me} busy={m.busy} open={m.confirmExecute} error={m.executeError} canRun={m.canRunExecute} onConfirm={() => void m.execute()} onCancel={() => { if (!m.busy) m.setConfirmExecute(false) }} />
-      <RollbackConfirmDialog active={active} me={m.me} busy={m.busy} open={m.confirmRollback} error={m.rollbackError} conflicts={m.rollbackConflicts} canRun={m.canRunRollback} onConfirm={() => void m.rollback()} onCancel={() => { if (!m.busy) { m.setConfirmRollback(false); m.setRollbackConflicts([]) } }} />
+      <ExecuteConfirmDialog active={active} accounts={m.accounts} me={m.me} busy={m.busy} open={m.confirmExecute} error={m.executeError} canRun={m.canRunExecute} onConfirm={() => m.execute()} onCancel={() => { if (!m.busy) m.setConfirmExecute(false) }} />
+      <RollbackConfirmDialog active={active} me={m.me} busy={m.busy} open={m.confirmRollback} error={m.rollbackError} conflicts={m.rollbackConflicts} canRun={m.canRunRollback} onConfirm={() => m.rollback()} onCancel={() => { if (!m.busy) { m.setConfirmRollback(false); m.setRollbackConflicts([]) } }} />
       <ConfirmDialog
         open={bulkOpen}
         title="要確認をまとめて結び付けます"
         description={`このページの要確認・未判断で移行先のある ${formatNumber(bulkTargets.length)} 行を「結び付ける」にします。1行ずつ保存します。本移行まで実データは変わりません。`}
         confirmLabel="結び付ける"
         busy={m.busy}
-        onConfirm={() => void runBulkLink()}
+        onConfirm={() => runBulkLink()}
         onCancel={() => { if (!m.busy) setBulkOpen(false) }}
       />
     </PageFrame>

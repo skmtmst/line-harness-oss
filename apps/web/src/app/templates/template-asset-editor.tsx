@@ -408,14 +408,14 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
 
       <div className="flex min-w-0 flex-col gap-4 xl:flex-row">
         <div className="min-w-0 flex-1 space-y-4">
-          <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 md:grid-cols-3">
+          <section className="bg-canvas border-hairline rounded-card shadow-card-surface grid gap-4 border p-4 md:grid-cols-3">
             <div className="md:col-span-2"><Field label={`${meta.title}名`} required><TextField className="mt-2" value={name} onChange={(event) => setName(event.target.value)} /></Field></div>
             <Field label="フォルダ"><TextField className="mt-2" value={folder} onChange={(event) => setFolder(event.target.value)} /></Field>
           </section>
 
           {kind === 'rich_message' ? (
             <>
-              <section className="bg-canvas border-hairline rounded-card shadow-card border p-4">
+              <section className="bg-canvas border-hairline rounded-card shadow-card-surface border p-4">
                 <h2 className="font-bold text-ink">面の分け方</h2>
                 <p className="text-caption mt-1 text-ink-faint">選んだ形に合わせて、下の設定が増えます</p>
                 <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-6">
@@ -426,7 +426,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                   ))}
                 </div>
               </section>
-              <section className="bg-canvas border-hairline rounded-card shadow-card border p-4">
+              <section className="bg-canvas border-hairline rounded-card shadow-card-surface border p-4">
                 <Field label="画像" required note="1040 × 1040px 推奨。上下に分けるときは 1040 × 520px も選べます。">
                   <div className="border-hairline rounded-control mt-2 border border-dashed p-5 text-center">
                     <Button type="button" onClick={() => setPickerFor('rich_message')}>登録メディアから選ぶ</Button>
@@ -435,7 +435,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                   </div>
                 </Field>
               </section>
-              <section className="bg-canvas border-hairline rounded-card shadow-card border p-4">
+              <section className="bg-canvas border-hairline rounded-card shadow-card-surface border p-4">
                 <h2 className="font-bold text-ink">押した面ごとの動き</h2>
                 <p className="text-caption mt-1 text-ink-faint">面ごとに「URLを開く」か「動きを実行する」を選べます</p>
                 <div className="mt-3 grid gap-2 md:grid-cols-3">
@@ -491,7 +491,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
             </>
           ) : kind === 'coupon' ? (
             <>
-              <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 md:grid-cols-2">
+              <section className="bg-canvas border-hairline rounded-card shadow-card-surface grid gap-4 border p-4 md:grid-cols-2">
                 <Field label="画像">
                   <Button type="button" className="mt-2 w-full" onClick={() => setPickerFor('coupon')}>登録メディアから選ぶ</Button>
                   {pickedMedia ? <span className="text-success mt-1 block text-xs">選択中: {pickedMedia.filename}</span> : null}
@@ -516,7 +516,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                   </Field>
                 </div>
               </section>
-              <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 md:grid-cols-3">
+              <section className="bg-canvas border-hairline rounded-card shadow-card-surface grid gap-4 border p-4 md:grid-cols-3">
                 <Field label="抽選にする">
                   <Select aria-label="抽選にする" value={lottery} onChange={(value) => setLottery(value as 'on' | 'off')} options={[{ value: 'on', label: 'する' }, { value: 'off', label: 'しない' }]} size="full" />
                 </Field>
@@ -539,7 +539,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                   <p className="text-caption self-end pb-2 font-normal text-ink-faint">抽選なしで配ります。当たる確率・当選人数の上限は保存されません。</p>
                 )}
               </section>
-              <section className="bg-canvas border-hairline rounded-card shadow-card border p-4">
+              <section className="bg-canvas border-hairline rounded-card shadow-card-surface border p-4">
                 <h2 className="font-bold">クーポンが使われたときに実行すること</h2>
                 <div className="mt-3">
                   <InlineActionList
@@ -556,7 +556,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
             </>
           ) : (
             <>
-              <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 md:grid-cols-3">
+              <section className="bg-canvas border-hairline rounded-card shadow-card-surface grid gap-4 border p-4 md:grid-cols-3">
                 <div className="text-label block font-semibold text-ink-secondary">
                   <span>受付の開始</span>
                   <DateTimeField aria-label="受付の開始" value={researchStartsAt} onChange={setResearchStartsAt} className="mt-2" />
@@ -579,7 +579,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                   <Field label="説明（お客さまに見えます）"><textarea className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none" rows={2} value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
                 </div>
               </section>
-              <section className="bg-canvas border-hairline rounded-card shadow-card border p-4">
+              <section className="bg-canvas border-hairline rounded-card shadow-card-surface border p-4">
                 <div className="flex items-center justify-between">
                   <div><h2 className="font-semibold">質問（上から順に出ます）</h2><p className="text-caption mt-1 text-ink-faint">{questions.length} / {MAX_QUESTIONS} 問</p></div>
                   <Button type="button" disabled={questions.length >= MAX_QUESTIONS} title={questions.length >= MAX_QUESTIONS ? `質問は${MAX_QUESTIONS}問までです` : undefined} onClick={addQuestion}>
@@ -600,7 +600,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                 </div>
               </section>
               {previewQuestion ? (
-                <section className="bg-canvas border-hairline rounded-card shadow-card border p-4">
+                <section className="bg-canvas border-hairline rounded-card shadow-card-surface border p-4">
                   <h2 className="font-bold">質問 {previewQuestionIndex + 1} の中身</h2>
                   <Field label="質問文" required>
                     <textarea aria-label="質問文" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none" rows={3} value={previewQuestion.text} onChange={(event) => updateQuestion(previewQuestionIndex, { text: event.target.value })} />
@@ -651,7 +651,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                   )}
                 </section>
               ) : null}
-              <section className="bg-canvas border-hairline rounded-card shadow-card border p-4">
+              <section className="bg-canvas border-hairline rounded-card shadow-card-surface border p-4">
                 <h2 className="font-bold">答え終わったときに実行すること</h2>
                 <div className="mt-3">
                   <InlineActionList
@@ -714,7 +714,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
           </LinePreview>
           <Button type="button" className="mt-4 w-full" disabled title={TEST_SEND_UNAVAILABLE_NOTE}>自分に送って確かめる</Button>
           <p className="text-ink-faint mt-2 text-xs leading-relaxed">{TEST_SEND_UNAVAILABLE_NOTE}</p>
-          <section className="bg-canvas border-hairline rounded-card shadow-card border p-4 text-sm">
+          <section className="bg-canvas border-hairline rounded-card shadow-card-surface border p-4 text-sm">
             <h2 className="font-bold">{kind === 'rich_message' ? 'リッチメニューとの違い' : kind === 'coupon' ? '公開したあとに見られる数' : '回答フォームとの使い分け'}</h2>
             <p className="mt-2 leading-relaxed text-ink-secondary">{kind === 'rich_message' ? 'リッチメッセージはトークに1回流れて、過去のやり取りに残ります。リッチメニューは画面の下に常に出ます。' : kind === 'coupon' ? '配った数 ／ 開いた数 ／ 使われた数 ／ 当選した数。使われた数は成果とアフィリエイトにも送れます。' : 'リサーチはLINEの中で完結する短い質問向けです。住所や画像も聞く場合は回答フォームを使います。'}</p>
           </section>

@@ -51,6 +51,11 @@ import { nenRanksApi, type NenFeedingData, type NenFeedingKind } from '@/lib/nen
 import { birthdayDraft, normalizeBirthdayInput } from './pet-editor'
 import type { PetTab } from './page'
 import styles from './pets-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -111,8 +116,8 @@ export default function PetsPageV8({
     <div data-design-node={BOARD_NODE[tab]} className={styles.board}>
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>マイペット</h1>
-          <p className={styles.headDesc}>お客さまがマイページで登録したペットです。体重と主食から、1日のごはんの目安を出します。</p>
+          <PageHeading title="マイペット" help={<> お客さまがマイページで登録したペットです。体重と主食から、1日のごはんの目安を出します。</>} />
+
         </div>
       </div>
       <div data-design="Tabs" data-design-node="pets-tabs-v8">
@@ -169,7 +174,7 @@ function PetsKpiBand({
         <span className={styles.kpiLabel}>{label}</span>
         <button type="button" className={styles.kpiHelp} title={help} aria-label={`${label}：${help}`}>…</button>
       </div>
-      <p className={styles.kpiValue}>{value === null ? '—' : <>{formatNumber(value)}<span className={styles.kpiUnit}>匹</span></>}</p>
+      <p className={styles.kpiValue}>{value === null ? emptyValue('unknown') : <>{formatNumber(value)}<span className={styles.kpiUnit}>匹</span></>}</p>
       <p className={styles.kpiSub}>{sub}</p>
     </li>
   )
@@ -247,7 +252,7 @@ function PetsListV8({
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `nen-pets-${new Date().toISOString().slice(0, 10)}.csv`
+      a.download = csvFileName("ペット")
       a.click()
       URL.revokeObjectURL(url)
     } catch {
@@ -305,7 +310,7 @@ function PetsListV8({
           ]}
         />
         <span className={styles.toolsTail}>
-          <span className={styles.rangeLabel}>{data ? headCountLabel(data.total, data.page, data.pageSize) : '—'}</span>
+          <span className={styles.rangeLabel}>{data ? headCountLabel(data.total, data.page, data.pageSize) : emptyValue('unknown')}</span>
           <PageSizeSelect
             value={pageSize}
             options={[10, 20, 50]}
@@ -422,7 +427,7 @@ function PetRowV8({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; 
         <span className={styles.petSub}>{pet.owner.customerId ? `EC会員 ${pet.owner.customerId}` : 'EC未連携'}</span>
       </Td>
       <Td className={styles.colAge}><span className="text-label text-ink-secondary">{pet.ageLabel}</span></Td>
-      <Td align="right"><span className="text-label tabular-nums text-ink">{pet.weightKg == null ? '—' : `${pet.weightKg}kg`}</span></Td>
+      <Td align="right"><span className="text-label tabular-nums text-ink">{pet.weightKg == null ? emptyValue('unknown') : `${pet.weightKg}kg`}</span></Td>
       <Td>
         {pet.feeding?.dailyGrams != null ? (
           <>
@@ -431,12 +436,12 @@ function PetRowV8({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; 
           </>
         ) : pet.feeding ? (
           <>
-            <span className="block text-label text-ink-secondary">—</span>
+            <span className="block text-label text-ink-secondary">{emptyValue('unknown')}</span>
             <span className="block text-micro text-ink-faint">{`約${pet.feeding.dailyKcal}kcal・主食が未設定`}</span>
           </>
         ) : (
           <>
-            <span className="block text-label text-ink-secondary">—</span>
+            <span className="block text-label text-ink-secondary">{emptyValue('unknown')}</span>
             {/* #999 DEEP-24: 犬・猫以外はNRC/FEDIAFの計算対象外。犬の式で出した数値を見せない。 */}
             <span className="block text-micro text-ink-faint">{pet.animalType === 'other' ? '犬・猫以外は目安の計算対象外' : pet.weightKg == null ? '体重が未登録' : '誕生日が未登録'}</span>
           </>
@@ -583,7 +588,7 @@ function FeedingV8({ accountId }: { accountId: string }) {
         : '主食を保存しました。')
     } catch (caught) {
       setError(describeApiFailure(caught, '主食の保存', {
-        forbidden: '主食を保存する権限がありません。権限を確認してください。',
+        scope: 'store',
       }))
     } finally {
       setBusy(false)
@@ -636,15 +641,7 @@ function FeedingV8({ accountId }: { accountId: string }) {
               onAdd={() => add('nen')}
               disabledAdd={drafts.length >= MAX_PRODUCTS}
             />
-            <div className={styles.treatRow}>
-              <label className={styles.fieldLabel}>
-                おやつの上限（%）
-                <span className={styles.treatInput}>
-                  <TextField aria-label="おやつの上限（%）" inputMode="numeric" value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); setDirty(true); setNotice('') }} />
-                </span>
-              </label>
-              <p className={styles.treatNote}>1日の必要カロリーのうち、おやつに回す割合</p>
-            </div>
+            <div className={styles.treatRow}><Field note={<>1日の必要カロリーのうち、おやつに回す割合</>} label="おやつの上限"><NumberInput unit="%" aria-label="おやつの上限（%）" inputMode="numeric" numericText value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); setDirty(true); setNotice('') }} /></Field></div>
           </section>
         </div>
 
@@ -778,7 +775,7 @@ function FeedingTableV8({
 
 /**
  * ペットの情報を直す（eLjeQ）。真ん中の小窓。
- * 誕生日を変えると、予約済みの誕生日クーポン配信は新しい誕生日で組み直される。
+ * 誕生日を変えると、予約中の誕生日クーポン配信は新しい誕生日で組み直される。
  * 版つき保存：ほかの人が先に直していたら止めて、入力は残したまま保存し直せる。
  */
 function PetEditorV8({ accountId, pet, onClose, onSaved }: {
@@ -867,7 +864,7 @@ function PetEditorV8({ accountId, pet, onClose, onSaved }: {
         <div className={styles.dialogHead}>
           <div>
             <h2 className={styles.dialogTitle}>ペットの情報を直す</h2>
-            <p className={styles.dialogDesc}>間違っている項目を直して保存します。誕生日を変えると、予約済みの誕生日クーポン配信は新しい誕生日で組み直されます。</p>
+            <p className={styles.dialogDesc}>間違っている項目を直して保存します。誕生日を変えると、予約中の誕生日クーポン配信は新しい誕生日で組み直されます。</p>
           </div>
           <button type="button" className={styles.dialogClose} onClick={onClose} aria-label="閉じる">✕</button>
         </div>
@@ -885,14 +882,8 @@ function PetEditorV8({ accountId, pet, onClose, onSaved }: {
           {pill('種別', 'other', 'その他', animalType, (next) => setAnimalType(next as typeof animalType))}
         </fieldset>
         <div className={styles.fieldGrid}>
-          <label className={styles.fieldLabel}>
-            ペットの名前
-            <TextField aria-label="ペットの名前" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} />
-          </label>
-          <label className={styles.fieldLabel}>
-            品種
-            <TextField aria-label="品種" value={breed} maxLength={80} onChange={(event) => setBreed(event.target.value)} />
-          </label>
+          <Field label="ペットの名前"><TextField aria-label="ペットの名前" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} /></Field>
+          <Field label="品種"><TextField aria-label="品種" value={breed} maxLength={80} onChange={(event) => setBreed(event.target.value)} /></Field>
         </div>
         <fieldset className={styles.pillGroup}>
           <legend className={styles.fieldLabel}>性別</legend>
@@ -901,14 +892,8 @@ function PetEditorV8({ accountId, pet, onClose, onSaved }: {
           {pill('性別', 'unknown', 'わからない', gender, (next) => setGender(next as typeof gender))}
         </fieldset>
         <div className={styles.fieldGrid}>
-          <label className={styles.fieldLabel}>
-            誕生日
-            <TextField aria-label="誕生日" placeholder="2022-04-03" value={birthday} onChange={(event) => setBirthday(event.target.value)} />
-          </label>
-          <label className={styles.fieldLabel}>
-            体重
-            <TextField aria-label="体重" inputMode="decimal" placeholder="9.2 kg" value={weight} onChange={(event) => setWeight(event.target.value)} />
-          </label>
+          <Field label="誕生日"><TextField aria-label="誕生日" placeholder="2022-04-03" value={birthday} onChange={(event) => setBirthday(event.target.value)} /></Field>
+          <Field label="体重"><TextField aria-label="体重" inputMode="decimal" placeholder="9.2 kg" value={weight} onChange={(event) => setWeight(event.target.value)} /></Field>
         </div>
         <p className={styles.fieldHint}>生まれた年が分からないときは「03-15」のように月日だけを入れます。空欄は未登録です。</p>
         {error ? <p className={styles.errorText} role="alert">{error}</p> : null}

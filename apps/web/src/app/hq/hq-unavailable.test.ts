@@ -36,16 +36,13 @@ describe('統括の「まだ使えません」画面の整理', () => {
     }
   })
 
-  it('直接開いたときは案内のまま「アカウントを選ぶ」へ誘導する', () => {
-    expect(sharedTemplatePage).toContain('TargetMissing')
-    expect(sharedTemplatePage).toContain('まだ使えません')
-    expect(sharedTemplatePage).toContain('hqOpenHref(target)')
-    expect(sharedTemplatePage).toContain('アカウントを選ぶ')
+  it('直接URLはV8のひな形画面へ通す', () => {
+    expect(sharedTemplatePage).toContain('<TemplateConsole type={type}')
+    expect(sharedTemplatePage).not.toContain('TargetMissing')
   })
-
-  it('4画面とも共通の案内ページを使い回す', () => {
-    expect(formSubmissions).toContain('HqTemplatePage')
-    expect(friendAttributes).toContain('HqTemplatePage')
-    expect(richMenus).toContain('HqTemplatePage')
+  it('各入口はV8の機能画面を使う', () => {
+    expect(formSubmissions).toContain('HqTemplatesV8')
+    expect(friendAttributes).toContain('HqTemplatesV8')
+    expect(richMenus).toContain('HqTemplatesV8')
   })
 })

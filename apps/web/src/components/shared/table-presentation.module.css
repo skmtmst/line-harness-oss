@@ -1,0 +1,126 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/* 予約一覧と時間×卓。既定の表の見た目は変えない。 */
+[data-theme='v8'] .calendar {
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+[data-theme='v8'] .calendar :global(table) {
+  width: auto;
+}
+
+[data-theme='v8'] .calendar :global(thead tr) {
+  height: var(--tpl-rs-rsv-cal-head-h);
+  border: 0;
+  background: var(--color-surface-pearl);
+}
+
+[data-theme='v8'] .calendar :global(thead th) {
+  width: var(--tpl-rs-rsv-cal-col-w);
+  height: auto;
+  padding: var(--tpl-rs-rsv-cal-head-pad);
+  border: 0;
+  box-shadow: var(--tpl-rs-line-left-bottom);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-rs-lh-11);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-theme='v8'] .calendar :global(thead th:first-child) {
+  width: var(--tpl-rs-rsv-cal-time-w);
+  box-shadow: var(--tpl-rs-line-bottom);
+}
+
+[data-theme='v8'] .calendar :global(tbody tr) {
+  height: var(--tpl-rs-rsv-cal-row-h);
+  background: var(--color-canvas);
+}
+
+[data-theme='v8'] .calendar :global(tbody th) {
+  position: relative;
+  height: var(--tpl-rs-rsv-cal-row-h);
+  padding: var(--tpl-rs-rsv-cal-time-pad);
+  border: 0;
+  box-shadow: var(--tpl-rs-line-top);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 400;
+  line-height: var(--tpl-rs-lh-11);
+  text-align: left;
+  vertical-align: top;
+}
+
+[data-theme='v8'] .calendar :global(tbody tr:first-child th) {
+  box-shadow: none;
+}
+
+[data-theme='v8'] .calendar :global(tbody td) {
+  position: relative;
+  padding: 0;
+  border: 0;
+  box-shadow: var(--tpl-rs-line-left-top);
+  vertical-align: top;
+}
+
+
+[data-theme='v8'] .ledger {
+  border: 0;
+  border-radius: var(--tpl-rs-radius-none);
+}
+
+[data-theme='v8'] .ledger :global(thead tr) {
+  height: auto;
+  border: 0;
+  background: var(--color-surface-pearl);
+}
+
+[data-theme='v8'] .ledger.ledger :global(thead th[class]) {
+  height: auto;
+  padding: var(--tpl-rs-th-pad-block) var(--tpl-rs-inv-col-gap) var(--tpl-rs-th-pad-block) 0;
+  border: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-rs-lh-11);
+}
+
+[data-theme='v8'] .ledger.ledger :global(thead th[class]:first-child),
+[data-theme='v8'] .ledger :global(tbody td:first-child) {
+  padding-left: var(--tpl-rs-cell-side);
+}
+
+[data-theme='v8'] .ledger.ledger :global(thead th[class]:nth-child(4)),
+[data-theme='v8'] .ledger :global(tbody td:nth-child(4)) {
+  padding-right: var(--tpl-rs-rsv-col-pad-num);
+}
+
+[data-theme='v8'] .ledger.ledger :global(thead th[class]:last-child),
+[data-theme='v8'] .ledger :global(tbody td:last-child) {
+  padding-right: var(--tpl-rs-cell-side);
+}
+
+[data-theme='v8'] .ledger :global(tbody tr) {
+  height: var(--tpl-rs-row-h);
+}
+
+[data-theme='v8'] .ledger :global(tbody td) {
+  padding: 0 var(--tpl-rs-inv-col-gap) 0 0;
+  border-top: 0;
+  box-shadow: var(--tpl-rs-line-top);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rs-lh-12);
+  white-space: nowrap;
+}
+
+
+[data-theme='v8'] .calendar :global(td:hover button[data-booking-add]) { opacity: 1; }
+}

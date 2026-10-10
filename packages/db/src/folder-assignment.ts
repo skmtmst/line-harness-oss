@@ -5,7 +5,7 @@ export class FolderAssignmentError extends Error {
 }
 
 export async function readFolderAssignment(
-  db: D1Database, kind: 'automation' | 'common_action' | 'webhook' | 'conversion',
+  db: D1Database, kind: 'automation' | 'common_action' | 'webhook' | 'conversion' | 'affiliate' | 'affiliate_offer' | 'mileage_reward' | 'friend_add_rule',
   accountId: string | null, value: unknown,
 ): Promise<string | null | undefined> {
   if (value === undefined || value === null) return value;

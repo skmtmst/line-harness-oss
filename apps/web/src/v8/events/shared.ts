@@ -1,3 +1,5 @@
+
+import { datetimeLocalJstToUtcIso, jstDate } from '@/lib/jst-datetime'
 /*
  * ★V8 イベント予約で使う決まりごと。src/v8 は古い画面（src/app）と共通部品の外の
  * 処理を import しない決まりなので、今の作り（components/events/event-draft-shared.ts・jst.ts）と
@@ -49,14 +51,12 @@ export const ENTRY_CUTOFF_OPTIONS = [
 
 /** 日本時間の日付（YYYY-MM-DD）と時刻（HH:MM）→ UTC の ISO。 */
 export function jstToUtcIso(date: string, hhmm: string): string {
-  const [h, m] = hhmm.split(':').map(Number)
-  const [y, mo, d] = date.split('-').map(Number)
-  return new Date(Date.UTC(y, mo - 1, d) + (h * 60 + m - 9 * 60) * 60_000).toISOString()
+  return datetimeLocalJstToUtcIso(`${date}T${hhmm}`)
 }
 
 /** 今日（日本時間）の YYYY-MM-DD。 */
 export function todayJst(): string {
-  return new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10)
+  return jstDate()
 }
 
 const WEEK = ['日', '月', '火', '水', '木', '金', '土']

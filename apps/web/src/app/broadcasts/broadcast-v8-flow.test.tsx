@@ -29,7 +29,7 @@ function scheduledRow(id: string, title: string) {
   return {
     ...draftRow(id, title),
     status: 'scheduled', scheduledAt: '2026-10-10T10:00:00+09:00',
-    displayStatus: 'scheduled', displayStatusLabel: '予約済み',
+    displayStatus: 'scheduled', displayStatusLabel: '予約中',
   }
 }
 
@@ -244,6 +244,6 @@ describe('V8 一斉配信の通し', () => {
     await waitFor(() => expect(mocks.cancelReservation).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.queryByText('「予約ずみ配信」の予約を取り消しますか？')).toBeNull())
     await screen.findByText('下書き')
-    expect(screen.queryByText('予約済み')).toBeNull()
+    expect(screen.queryByText('予約中')).toBeNull()
   })
 })

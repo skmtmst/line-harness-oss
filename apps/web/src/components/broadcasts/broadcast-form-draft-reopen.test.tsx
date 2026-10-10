@@ -33,6 +33,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         preflight: async () => ({ success: true, data: { audienceCount: 10 } }),
         previewCount: async () => ({ success: true, data: { count: 10 } }),
       },
+      staff: { me: async () => ({ success: true, data: { role: 'owner' } }) },
+      featureSettings: { visibility: async () => ({ success: true, data: {} }) },
       folders: { list: emptyList },
       scenarios: { list: emptyList },
       commonVars: { list: emptyList },
@@ -185,4 +187,14 @@ describe('下書きの開き直しと再編集（BROADCAST-17）', () => {
       unmount()
     }
   })
+})
+
+it('WEB258: 明示的な分散0分を開き直しても30分へ変えない', async () => {
+  getApi.mockResolvedValue({ success: true, data: draftRow({ draftPayload: { stealthSpreadMinutes: 0 } }) })
+  updateApi.mockResolvedValue({ success: true, data: { id: 'draft-1', version: 8 } })
+  await renderForm()
+  try {
+    await act(async () => saveButton()!.click()); await flush()
+    expect(updateApi.mock.calls[0][1].stealthSpreadMinutes).toBe(0)
+  } finally { unmount() }
 })

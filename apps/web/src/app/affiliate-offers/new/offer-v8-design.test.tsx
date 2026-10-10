@@ -6,7 +6,7 @@
  * - 保存して公開には ✓ が付く
  */
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -70,6 +70,7 @@ describe('Td4TN 作る画面の絵合わせ', () => {
     await waitFor(() => {
       expect(screen.getByText('案件を作る')).toBeTruthy()
     })
+    fireEvent.click(screen.getByRole('button', { name: '案件を作るの説明' }))
     expect(screen.getByText(/何を紹介すると/)).toBeTruthy()
     expect(screen.getAllByText(/アフィリエイターの画面に出ます/).length).toBeGreaterThanOrEqual(2)
     expect(screen.getByText('アフィリエイターの画面での見え方')).toBeTruthy()

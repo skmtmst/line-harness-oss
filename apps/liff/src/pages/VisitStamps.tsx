@@ -1,4 +1,7 @@
+import { TextInput } from '../components/forms/controls.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { VISIT_STAMP_DEFAULT_COLOR, visitStampDarkInk } from '@line-crm/shared';
+import stampStyles from './VisitStamps.module.css';
 import type { VisitStampCard, VisitStampPaperRequest, VisitStampRedemption, VisitStampReward, VisitStampWallet } from '@line-crm/shared';
 import { api, visitStampsApi } from '../lib/api.js';
 import { SUBMIT_FAILED_MESSAGE, logFailure } from '../lib/user-message.js';
@@ -11,6 +14,7 @@ import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
 import Badge from '../components/ui/Badge.js';
 import Icon from '../components/ui/Icon.js';
+import { LiffInput } from '../components/forms/controls.js'
 
 /**
  * ★V8 来店スタンプ（お客さまの LIFF・提案 E-8）。マイルとは別のスタンプカード。
@@ -23,6 +27,20 @@ import Icon from '../components/ui/Icon.js';
 
 type View = 'card' | 'show' | 'used' | 'paper' | 'pending';
 type Entry = { card: VisitStampCard; wallet: VisitStampWallet };
+
+/** 使用後にページを開き直しても、受け取った次のカードを表示する。 */
+export function currentStampCard(entries: Entry[], wanted: string | null): Entry | null {
+  let entry = entries.find(x => x.card.id === wanted) ?? entries[0] ?? null;
+  const seen = new Set<string>();
+  while (entry && !seen.has(entry.card.id)) {
+    seen.add(entry.card.id);
+    if (entry.card.settings.completion !== 'next_card') break;
+    const next = entries.find(x => x.card.id === entry!.card.settings.nextCardId);
+    if (!next) break;
+    entry = next;
+  }
+  return entry;
+}
 
 const sorted = (rewards: VisitStampReward[]) => [...rewards].sort((a, b) => a.stamps - b.stamps);
 /** マスの数。カードの設定（slotCount）を使い、無い古いカードはいちばん大きい特典の個数。 */
@@ -69,12 +87,12 @@ function Slots({ card, balance }: { card: VisitStampCard; balance: number }) {
             key={n}
             role="listitem"
             aria-label={done ? `${n}個目 済み` : reward ? `${n}個目 ${reward.name}` : `${n}個目`}
-            className={`flex h-13 w-13 flex-col items-center justify-center rounded-full ${done ? 'bg-liff-primary text-(--liff-on-primary)' : 'bg-canvas text-liff-sub'} ${reward ? 'outline-[1.5px] outline-liff-primary' : 'outline outline-liff-line'}`}
+            className={`${stampStyles.slot} ${done ? stampStyles.done : ''}`}
           >
             {done ? <Icon name="check" className="h-6 w-6" /> : reward ? (
               <>
-                <Icon name="gift" className="h-4 w-4 text-liff-primary" />
-                <span className="text-[9px] leading-[14px] font-semibold text-liff-primary">{`${n}個`}</span>
+                <Icon name="gift" className="h-4 w-4" />
+                <span className="text-[9px] leading-[14px] font-semibold">{`${n}個`}</span>
               </>
             ) : <span className="liff-num text-[13px] leading-5">{n}</span>}
           </span>
@@ -99,10 +117,10 @@ function InfoRows({ rows }: { rows: Array<[string, string]> }) {
 
 function TextButton({ icon, children, onClick }: { icon?: 'camera'; children: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="liff-press mx-auto flex h-9 items-center justify-center gap-1.5 px-3.5 text-[13px] font-semibold text-liff-sub focus-visible:outline-2 focus-visible:outline-ink">
+    <Button variant="text" className="mx-auto" type="button" onClick={onClick}>
       {icon ? <Icon name={icon} className="h-4 w-4" /> : null}
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -128,7 +146,7 @@ export default function VisitStamps() {
       setAccountId(account); setShopName(config.data.accountName ?? '');
       const list = await visitStampsApi.cards(account);
       const wanted = new URLSearchParams(window.location.search).get('card');
-      const found = list.data.find((x) => x.card.id === wanted) ?? list.data[0] ?? null;
+      const found = currentStampCard(list.data, wanted);
       setEntry(found);
       setState(found ? 'ready' : 'empty');
     } catch (e) {
@@ -184,7 +202,7 @@ export default function VisitStamps() {
         onUse={async (pin) => {
           const result = await visitStampsApi.useReward(accountId, redemption.id, pin);
           offerRequest.current = requestId();
-          const fresh = await visitStampsApi.card(accountId, card.id).catch(() => null);
+          const fresh = await visitStampsApi.card(accountId, result.data.nextCardId ?? card.id).catch(() => null);
           const balance = fresh?.data.wallet.balance ?? Math.max(0, wallet.balance - redemption.stamps);
           if (fresh) setEntry({ card: fresh.data.card, wallet: fresh.data.wallet });
           setUsed({ at: new Date(), balance, staffName: result.data.staffName });
@@ -235,17 +253,21 @@ export default function VisitStamps() {
     <LiffLookScope className="min-h-screen bg-canvas" designNode="jQRsr">
       <LiffHeader title="来店スタンプ" />
       <div className="mx-auto flex w-full max-w-md flex-col gap-4 p-5 pb-44">
-        <section className="flex flex-col gap-3 rounded-2xl bg-liff-off-bg p-4 outline outline-liff-line" aria-label={card.name}>
-          <div className="flex items-center">
-            <h1 className="min-w-0 flex-1 truncate text-sm leading-[21px] font-semibold text-ink">{card.name}</h1>
-            <span className="liff-num text-sm leading-[21px] font-bold text-liff-primary">{`${Math.min(wallet.balance, count)} / ${count}`}</span>
+        <section className={stampStyles.card} aria-label={card.name} style={{ backgroundColor: card.settings.backgroundColor ?? VISIT_STAMP_DEFAULT_COLOR, color: visitStampDarkInk(card.settings.backgroundColor ?? VISIT_STAMP_DEFAULT_COLOR) ? 'var(--color-ink)' : 'var(--color-canvas)' }}>
+          {card.settings.backgroundImageUrl ? <img className={stampStyles.background} src={card.settings.backgroundImageUrl} alt="" /> : null}
+          <div className={stampStyles.content}>
+          <div className={stampStyles.title} style={card.settings.backgroundImageUrl ? { backgroundColor: card.settings.backgroundColor ?? VISIT_STAMP_DEFAULT_COLOR } : undefined}>
+            <h1 className="min-w-0 flex-1 truncate text-sm leading-[21px] font-semibold">{card.name}</h1>
+            <span className="liff-num text-sm leading-[21px] font-bold">{`${Math.min(wallet.balance, count)} / ${count}`}</span>
           </div>
           <Slots card={card} balance={wallet.balance} />
-          <p className="text-xs leading-[18px] text-liff-sub">
+          {card.settings.instructions ? <p className={stampStyles.instructions} style={card.settings.backgroundImageUrl ? { backgroundColor: card.settings.backgroundColor ?? VISIT_STAMP_DEFAULT_COLOR } : undefined}>{card.settings.instructions}</p> : null}
+          <p className={stampStyles.expiry} style={card.settings.backgroundImageUrl ? { backgroundColor: card.settings.backgroundColor ?? VISIT_STAMP_DEFAULT_COLOR } : undefined}>
             {wallet.expiresAt
-              ? `期限：${jpDate(wallet.expiresAt)}${card.settings.expiryMonths ? `（最後の来店から ${card.settings.expiryMonths}か月）` : ''}`
-              : card.settings.expiryMonths ? `期限：最後の来店から ${card.settings.expiryMonths}か月` : '期限はありません'}
+              ? `期限：${jpDate(wallet.expiresAt)}${card.settings.expiryMonths ? `（${card.settings.expiryBasis === 'first_visit' ? '最初' : '最後'}の来店から ${card.settings.expiryMonths}か月）` : ''}`
+              : card.settings.expiryBasis !== 'none' && card.settings.expiryMonths ? `期限：${card.settings.expiryBasis === 'first_visit' ? '最初' : '最後'}の来店から ${card.settings.expiryMonths}か月` : '期限はありません'}
           </p>
+          </div>
         </section>
 
         {info.best ? (
@@ -264,17 +286,16 @@ export default function VisitStamps() {
             const selected = chosen?.id === r.id;
             return (
               <li key={r.id}>
-                <button
+                <Button variant="option" selected={selected}
                   type="button"
                   disabled={!ok}
                   onClick={() => setPicked(r.id)}
                   aria-pressed={ok ? selected : undefined}
-                  className={`flex w-full items-center gap-2.5 text-left disabled:cursor-default ${selected && info.usable.length > 1 ? 'font-semibold' : ''}`}
                 >
                   <span className="w-10 shrink-0 text-[13px] leading-5 font-semibold text-ink">{`${r.stamps}個`}</span>
                   <span className="min-w-0 flex-1 truncate text-sm leading-[21px] text-ink">{r.name}</span>
                   <span className="text-[13px] leading-5 text-liff-sub">{ok ? '使えます' : `あと ${r.stamps - wallet.balance}個`}</span>
-                </button>
+                </Button>
               </li>
             );
           })}
@@ -342,7 +363,7 @@ function ShowReward({ redemption, shopName, onBack, onUse }: {
                 </span>
               ))}
             </span>
-            <input
+            <TextInput appearance="pin"
               ref={input}
               aria-label="店員の暗証番号（4桁）"
               inputMode="numeric"
@@ -351,7 +372,6 @@ function ShowReward({ redemption, shopName, onBack, onUse }: {
               maxLength={4}
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              className="absolute inset-x-0 bottom-0 h-12 w-full cursor-text opacity-0"
             />
           </label>
           <p className="text-xs leading-[18px] text-liff-sub">お客さまご自身では使用済みにできません</p>
@@ -450,19 +470,19 @@ function PaperCard({ accountId, cardId, requests, onSent, onBack }: { accountId:
               </>
             )}
           </div>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" className="sr-only" aria-label="紙のカードの写真"
+          <TextInput appearance="hidden" ref={fileRef} type="file" accept="image/*" capture="environment" aria-label="紙のカードの写真"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) { if (photo) URL.revokeObjectURL(photo.url); setPhoto({ file: f, url: URL.createObjectURL(f) }); setError(''); } e.target.value = ''; }} />
           {/* 絵の「撮り直す」は高さ36の枠のボタン（副ボタン 44 より低い）。 */}
-          <button type="button" onClick={() => fileRef.current?.click()} className="liff-press flex h-9 w-full items-center justify-center gap-1.5 rounded-(--liff-radius) border border-liff-line-strong bg-canvas px-3.5 text-[13px] font-semibold text-ink focus-visible:outline-2 focus-visible:outline-ink active:bg-liff-off-bg">
+          <Button variant="secondary" type="button" onClick={() => fileRef.current?.click()}>
             <Icon name="camera" className="h-4 w-4" />{photo ? '撮り直す' : '写真を撮る'}
-          </button>
+          </Button>
         </div>
         <div className="flex flex-col gap-2">
           <h2 className="text-sm leading-[21px] font-semibold text-ink">② 押してある数</h2>
           <div className="flex items-center gap-3">
-            <button type="button" aria-label="1個へらす" disabled={stamps <= 1} onClick={() => setStamps((n) => Math.max(1, n - 1))} className="liff-press flex h-9 w-9 items-center justify-center rounded-(--liff-radius) bg-canvas outline outline-liff-line disabled:opacity-40"><Icon name="minus" className="h-4 w-4" /></button>
+            <Button variant="icon" type="button" aria-label="1個へらす" disabled={stamps <= 1} onClick={() => setStamps((n) => Math.max(1, n - 1))}><Icon name="minus" className="h-4 w-4" /></Button>
             <span className="liff-num text-xl leading-[30px] font-bold text-ink" aria-live="polite">{`${stamps} 個`}</span>
-            <button type="button" aria-label="1個ふやす" disabled={stamps >= 100} onClick={() => setStamps((n) => Math.min(100, n + 1))} className="liff-press flex h-9 w-9 items-center justify-center rounded-(--liff-radius) bg-canvas outline outline-liff-line disabled:opacity-40"><Icon name="plus" className="h-4 w-4" /></button>
+            <Button variant="icon" type="button" aria-label="1個ふやす" disabled={stamps >= 100} onClick={() => setStamps((n) => Math.min(100, n + 1))}><Icon name="plus" className="h-4 w-4" /></Button>
           </div>
         </div>
         {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}

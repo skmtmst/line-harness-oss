@@ -345,10 +345,10 @@ export function describeSavedCondition(
   if (condition.kind === 'calendar_booking') return NEGATED_OPS.has(condition.op) ? 'カレンダー予約がない' : 'カレンダー予約がある'
   if (condition.kind === 'reminder') return NEGATED_OPS.has(condition.op) ? 'リマインダがない' : 'リマインダがある'
   if (condition.kind === 'memo') {
-    if (condition.op === 'exists' || condition.op === 'has') return '個別メモがある'
-    if (condition.op === 'not_exists' || condition.op === 'not_has') return '個別メモがない'
-    if (condition.op === 'eq' || condition.op === 'equals') return `個別メモが「${value || '未指定'}」`
-    return `個別メモに「${value || '未指定'}」を含む`
+    if (condition.op === 'exists' || condition.op === 'has') return 'メモがある'
+    if (condition.op === 'not_exists' || condition.op === 'not_has') return 'メモがない'
+    if (condition.op === 'eq' || condition.op === 'equals') return `メモが「${value || '未指定'}」`
+    return `メモに「${value || '未指定'}」を含む`
   }
   if (condition.kind === 'common_event') return NEGATED_OPS.has(condition.op) ? `その他のイベント「${value || '未指定'}」がない` : `その他のイベント「${value || '未指定'}」がある`
   /*

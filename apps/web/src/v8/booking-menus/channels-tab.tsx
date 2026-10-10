@@ -1,5 +1,6 @@
 'use client'
 
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchApi } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -9,6 +10,7 @@ import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Toggle from '@/components/shared/toggle'
 import { notifyToast } from '@/components/shared/toast'
 import { describeApiFailure } from '@/components/shared/api-error-message'
@@ -22,6 +24,8 @@ import {
 import type { BookingStaff } from '@/lib/api'
 import styles from './settings.module.css'
 import ch from './channels.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -34,24 +38,16 @@ const CHANNEL_LABEL: Record<string, { name: string; sub: string; how: string }> 
 }
 
 function formatReadAt(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getMonth() + 1}/${date.getDate()} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return polishFormatDate(value, { style: 'list' })
 }
 
 function formatConflictRange(conflict: BookingConflict): string {
-  const starts = new Date(conflict.startsAt)
-  if (Number.isNaN(starts.getTime())) return ''
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short' }).formatToParts(starts)
-  const part = (kind: Intl.DateTimeFormatPartTypes) => parts.find((value) => value.type === kind)?.value ?? ''
-  return `${conflict.staffName}さんの ${part('month')}/${part('day')}（${part('weekday')}） ${formatConflictTime(conflict.startsAt)}`
+  const day = polishFormatDate(conflict.startsAt, { style: 'day', fallback: '' })
+  return day ? `${conflict.staffName}さんの ${day} ${formatConflictTime(conflict.startsAt)}` : ''
 }
 
 function formatConflictTime(value: string): string {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date)
+  return polishFormatDate(value, { style: 'time' })
 }
 
 function StaffStatusChip({ status }: { status: BookingChannelStaff['status'] }) {
@@ -69,7 +65,7 @@ function ChannelStatusChip({ channel }: { channel: BookingChannel }) {
 
 /** 1行で収め、はみ出す分は「…」にして title で全文を見せる。 */
 function OneLine({ text, tone }: { text: string; tone?: 'name' | 'sub' }) {
-  return <span className={tone === 'name' ? `${ch.oneLine} ${ch.name}` : tone === 'sub' ? `${ch.oneLine} ${ch.sub}` : ch.oneLine} title={text}>{text}</span>
+  return <span className={tone === 'name' ? `${ch.oneLine} ${ch.name}` : tone === 'sub' ? `${ch.oneLine} ${ch.sub}` : ch.oneLine} ><TruncatedText value={String(text ?? '')} /></span>
 }
 
 /** つながっているカレンダーの中身（「予定を見る」）。つなぎ直す口もここに置く。 */
@@ -96,9 +92,9 @@ function CalendarDetailDialog({
       onCancel={onClose}
     >
       <dl className={ch.detail}>
-        <div className={ch.detailRow}><dt className={ch.detailKey}>カレンダー</dt><dd className={ch.detailValue}>{calendarId || '—'}</dd></div>
+        <div className={ch.detailRow}><dt className={ch.detailKey}>カレンダー</dt><dd className={ch.detailValue}>{calendarId || emptyValue('unknown')}</dd></div>
         <div className={ch.detailRow}><dt className={ch.detailKey}>状態</dt><dd className={ch.detailValue}><StaffStatusChip status={staff.status} /></dd></div>
-        <div className={ch.detailRow}><dt className={ch.detailKey}>外の予定（今週）</dt><dd className={ch.detailValue}>{staff.externalEventsThisWeek == null ? '—' : `${staff.externalEventsThisWeek}件`}</dd></div>
+        <div className={ch.detailRow}><dt className={ch.detailKey}>外の予定（今週）</dt><dd className={ch.detailValue}>{staff.externalEventsThisWeek == null ? emptyValue('unknown') : `${staff.externalEventsThisWeek}件`}</dd></div>
         <div className={ch.detailRow}><dt className={ch.detailKey}>最後に読んだ</dt><dd className={ch.detailValue}>{formatReadAt(staff.lastReadAt)}</dd></div>
         {staff.readError ? <div className={ch.detailRow}><dt className={ch.detailKey}>読めなかった理由</dt><dd className={ch.detailValue}>{staff.readError}</dd></div> : null}
       </dl>
@@ -148,7 +144,7 @@ function ConnectDialog({
       cancelLabel="やめる"
       busy={busy}
       error={error || undefined}
-      onConfirm={() => void save()}
+      onConfirm={() => save()}
       onCancel={onClose}
     >
       <TextField aria-label="カレンダーの ID" value={calendarId} onChange={(e) => setCalendarId(e.target.value)} placeholder="例：shop@example.com" />
@@ -158,12 +154,14 @@ function ConnectDialog({
 
 /** 予約が重なったときの知らせ（DFl3Q）。移す先を選び、移して知らせる。 */
 export function ConflictDialog({
+  canEdit = true,
   accountId,
   conflict,
   staff,
   onClose,
   onDone,
 }: {
+  canEdit?: boolean
   accountId: string
   conflict: BookingConflict
   staff: BookingChannelStaff[]
@@ -177,6 +175,7 @@ export function ConflictDialog({
   const [error, setError] = useState('')
   const targetName = targets.find((t) => t.staffId === targetId)?.displayName ?? ''
   const move = async () => {
+    if (!canEdit || busy) return
     if (!targetId) {
       setError('移す先のスタッフを選んでください。')
       return
@@ -205,7 +204,7 @@ export function ConflictDialog({
         cancelLabel="あとで"
         busy={busy}
         error={error || undefined}
-        onConfirm={() => void move()}
+        onConfirm={canEdit ? () => move() : undefined}
         onCancel={onClose}
       >
         {conflict.bookings?.length ? (
@@ -218,6 +217,7 @@ export function ConflictDialog({
           </div>
         ) : null}
         {conflict.reason ? <p className={ch.conflictReason}>{conflict.reason}</p> : null}
+        {canEdit ? <>
         <p className={ch.conflictLabel}>①の予約を移す先のスタッフ</p>
         <Select
           aria-label="移す先のスタッフ"
@@ -231,9 +231,10 @@ export function ConflictDialog({
           ]}
         />
         <div className={ch.detailRow}>
-          <Toggle label="移したことを、お客さまに知らせる" checked={notify} disabled={busy} onChange={setNotify} />
+          <SettingCheckbox label="移したことを、お客さまに知らせる" checked={notify} disabled={busy} onChange={setNotify} />
           <span className={ch.conflictReason}>移したことを、お客さまに知らせる（LINE の友だちなら LINE、そうでなければ電話の案内を出す）</span>
         </div>
+        </> : null}
         {conflict.guidance ? <NoteBar tone="warn">{conflict.guidance}</NoteBar> : null}
       </Dialog>
     </div>
@@ -334,7 +335,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
 
   if (status === 'loading') return <ListState kind="loading" />
   if (status === 'error' || !data) {
-    return <ListState kind="error" title="予約経路を読み込めませんでした" description={error} action={<Button onClick={() => void load()}>もう一度読む</Button>} />
+    return <ListState kind="error" title="予約経路を読み込めませんでした" description={error} onRetry={() => void load()} />
   }
 
   return (
@@ -347,7 +348,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
         <NoteBar tone="warn">
           予約が {conflicts.length} 件重なっています。
           {/* WEB059：閲覧のみには、付け替え（書き込み）へ進む口を置かない。重なりの知らせは出す。 */}
-          {canEdit ? <Button size="compact" onClick={() => setConflictOpen(true)}>重なりを解消する</Button> : null}
+          <Button size="compact" onClick={() => setConflictOpen(true)}>{canEdit ? '重なりを解消する' : '重なりを見る'}</Button>
         </NoteBar>
       ) : null}
 
@@ -372,9 +373,9 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
                   <OneLine text={person.displayName} tone="name" />
                   {role ? <OneLine text={role} tone="sub" /> : null}
                 </span>
-                <span className={ch.cell} role="cell"><OneLine text={calendarId || '—'} /></span>
+                <span className={ch.cell} role="cell"><OneLine text={calendarId || emptyValue('unknown')} /></span>
                 <span className={ch.cell} role="cell"><StaffStatusChip status={person.status} /></span>
-                <span className={`${ch.cell} ${ch.right}`} role="cell">{person.externalEventsThisWeek == null ? '—' : `${person.externalEventsThisWeek}件`}</span>
+                <span className={`${ch.cell} ${ch.right}`} role="cell">{person.externalEventsThisWeek == null ? emptyValue('unknown') : `${person.externalEventsThisWeek}件`}</span>
                 <span className={ch.cell} role="cell">{formatReadAt(person.lastReadAt)}</span>
                 <span className={ch.cell} role="cell">
                   {person.status === 'connected' ? (
@@ -411,10 +412,10 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
                   <OneLine text={label.name} tone="name" />
                   {label.sub ? <OneLine text={label.sub} tone="sub" /> : null}
                 </span>
-                <span className={`${ch.cell} ${ch.wrap}`} role="cell">{label.how || '—'}</span>
+                <span className={`${ch.cell} ${ch.wrap}`} role="cell">{label.how || emptyValue('unknown')}</span>
                 <span className={ch.cell} role="cell"><ChannelStatusChip channel={channel} /></span>
-                <span className={`${ch.cell} ${ch.right}`} role="cell">{channel.todayCount == null ? '—' : `${channel.todayCount}件`}</span>
-                <span className={ch.cell} role="cell">—</span>
+                <span className={`${ch.cell} ${ch.right}`} role="cell">{channel.todayCount == null ? emptyValue('unknown') : `${channel.todayCount}件`}</span>
+                <span className={ch.cell} role="cell">{emptyValue('unknown')}</span>
                 <span className={ch.cell} role="cell">
                   {channel.status === 'active' && (channel.key === 'line' || channel.key === 'manual') ? (
                     <Button href="/booking/bookings">予約管理へ</Button>
@@ -460,8 +461,8 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
       {connectTarget ? (
         <ConnectDialog accountId={accountId} staff={connectTarget} onClose={() => setConnectTarget(null)} onDone={() => { setConnectTarget(null); void load() }} />
       ) : null}
-      {canEdit && conflictOpen && firstConflict ? (
-        <ConflictDialog accountId={accountId} conflict={firstConflict} staff={data.staff} onClose={() => setConflictOpen(false)} onDone={() => { setConflictOpen(false); void load() }} />
+      {conflictOpen && firstConflict ? (
+        <ConflictDialog canEdit={canEdit} accountId={accountId} conflict={firstConflict} staff={data.staff} onClose={() => setConflictOpen(false)} onDone={() => { setConflictOpen(false); void load() }} />
       ) : null}
     </div>
   )

@@ -45,7 +45,7 @@ export function startChecklist(scenario: ScenarioForCheck): StartCheckItem[] {
         steps === undefined
           ? '—（未取得）通数を確認できませんでした'
           : steps > 0
-            ? `—（未取得）${steps}通ありますが、各通の配信タイミングはこの一覧から確認できません`
+            ? `—（未取得）${steps} 通ありますが、各通の配信タイミングはこの一覧から確認できません`
             : '通が1つもありません。1通以上入れてください',
     },
     {

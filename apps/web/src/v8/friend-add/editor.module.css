@@ -3,12 +3,6 @@
  * 枠・頭・手順の輪・右の列・下の帯は型（CreatePage）が持つ。ここは左の段（カード）の中身だけ。
  */
 
-.backLink {
-  display: inline-flex;
-  align-items: center;
-  font-size: var(--text-label);
-}
-
 /* 段（カード）：枠1・角12・余白20・中の間14。 */
 .card {
   gap: var(--tpl-section-gap);
@@ -138,8 +132,9 @@
   gap: var(--tpl-rule-row-gap);
   padding: var(--tpl-fa-ed-sub-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
+  box-shadow: var(--card-shadow);
 }
 .subTitle {
   margin: 0;
@@ -422,6 +417,7 @@
   justify-content: flex-end;
   width: 100%;
 }
+.previewButton { width: 100%; }
 /* スマホの中の「友だち追加しました」の札。 */
 .talkChip {
   display: flex;

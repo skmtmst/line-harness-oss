@@ -2,17 +2,18 @@
 
 /* ② 受付枠（yRPxl）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Search } from 'lucide-react'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import DateField from '@/components/shared/date-field'
 import HelpTip from '@/components/shared/help-tip'
 import { TimeField } from '@/components/shared/date-time-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { RowMenu } from '@/components/shared/row-actions'
 import { notifyToast } from '@/components/shared/toast'
 import { ApiError, bookingApi, type BookingMenu, type BookingResource, type BookingSettings, type BookingSlotCheckResult, type BookingStaff } from '@/lib/api'
@@ -29,6 +30,9 @@ import {
   type LoadStatus,
 } from './shared'
 import styles from '../settings.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import NumberInput from '@/components/shared/number-field'
 
 export function HoursTabV8({ accountId, settings, settingsStatus, settingsError, resources, resourcesStatus, resourcesError, canEdit, menus, onSaved, onReload, onResourceSaved, onResourceCreated, onResourceDeleted, onResourcesRetry }: {
   accountId: string
@@ -50,6 +54,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
   const [draft, setDraft] = useState<BusinessHoursDay[] | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [badHours, setBadHours] = useState<{ weekday: number; index: number; parts: Array<'start' | 'end' | 'capacity'> } | null>(null)
   const [addingResource, setAddingResource] = useState(false)
   const inFlightRef = useRef(false)
 
@@ -75,15 +80,32 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
       ? { ...day, intervals: update(day.intervals) }
       : day) ?? current)
     setSaveError(null)
+    setBadHours(null)
   }
+
+  const isBad = (weekday: number, index: number, part: 'start' | 'end' | 'capacity') => Boolean(badHours && badHours.weekday === weekday && badHours.index === index && badHours.parts.includes(part))
 
   async function submit() {
     if (!settings || !draft || inFlightRef.current) return
     const validationError = validateBusinessHours(draft)
     if (validationError) {
-      setSaveError(validationError)
+      setSaveError(validationError.message)
+      /* 落ちた区間の欄を赤くして移る（B-139）。理由の文は表の下に出す。 */
+      setBadHours(validationError.at ?? null)
+      const at = validationError.at
+      const dayLabel = at ? DAYS.find((day) => day.weekday === at.weekday)?.label : undefined
+      if (at && dayLabel) {
+        const part = at.parts[at.parts.length - 1]
+        const target = `${dayLabel}の${part === 'start' ? '開始時刻' : part === 'end' ? '終了時刻' : '同時受付数'}（${at.index + 1}区間目）`
+        requestAnimationFrame(() => {
+          const el = Array.from(document.querySelectorAll<HTMLElement>('[aria-label]')).find((node) => node.getAttribute('aria-label') === target)
+          el?.scrollIntoView?.({ block: 'center' })
+          el?.focus({ preventScroll: true })
+        })
+      }
       return
     }
+    setBadHours(null)
     inFlightRef.current = true
     setSaving(true)
     setSaveError(null)
@@ -103,7 +125,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
         businessHours: draft,
       })
       if (!response.success) throw new Error('booking_business_hours_save_failed')
-      notifyToast('受付時間を保存しました。')
+      notifySaved('受付時間を保存しました。')
       onSaved(response.data)
     } catch (error) {
       setSaveError(businessHoursSaveError(error))
@@ -120,7 +142,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
         icon={<AccountIcon />}
         title="受付枠を読み込めませんでした"
         description={settingsError ?? '通信状態を確認して、もう一度お試しください。'}
-        action={<Button onClick={onReload}>読み直す</Button>}
+        action={<Button onClick={onReload}>もう一度読み込む</Button>}
       />
     )
   }
@@ -169,7 +191,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
             return (
               <div key={weekday} className={styles.dayRow}>
                 <div className={styles.dayName}>
-                  <Toggle
+                  <SettingCheckbox
                     label={`${label}を${isOpen ? '休みにする' : '開ける'}`}
                     checked={isOpen}
                     onChange={(next) => updateDay(weekday, () => next ? [{ start: '09:00', end: '18:00', capacity: 1 }] : [])}
@@ -183,6 +205,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                   {intervals.map((interval, index) => (
                   <div key={index} className={styles.intervalLine}>
                     <TimeField
+                      invalid={isBad(weekday, index, 'start')}
                       aria-label={`${label}の開始時刻（${index + 1}区間目）`}
                       value={interval.start}
                       onChange={(value) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, start: value } : entry))}
@@ -191,6 +214,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                     />
                     <span className={styles.intervalTilde}>〜</span>
                     <TimeField
+                      invalid={isBad(weekday, index, 'end')}
                       aria-label={`${label}の終了時刻（${index + 1}区間目）`}
                       value={interval.end}
                       onChange={(value) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, end: value } : entry))}
@@ -198,8 +222,9 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       size="compact"
                     />
                     <span className={styles.sameTimeLabel}>同時</span>
-                    <input
+                    <NumberInput
                       aria-label={`${label}の同時受付数（${index + 1}区間目）`}
+                      aria-invalid={isBad(weekday, index, 'capacity') || undefined}
                       type="number"
                       min={1}
                       max={1000}
@@ -249,7 +274,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
             icon={<AccountIcon />}
             title="設備を読み込めませんでした"
             description={resourcesError ?? 'もう一度お試しください。'}
-            action={<Button onClick={onResourcesRetry}>読み直す</Button>}
+            action={<Button onClick={onResourcesRetry}>もう一度読み込む</Button>}
           />
         ) : null}
         {resourcesStatus === 'ready' && resources ? (
@@ -395,7 +420,7 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
         busy={busy}
         error={error ?? undefined}
         onCancel={() => { if (!busy) setConfirmDelete(false) }}
-        onConfirm={() => void remove()}
+        onConfirm={() => remove()}
       />
     </div>
   )
@@ -466,15 +491,9 @@ export function ResourceDialog({ open, onClose, accountId, resource, onSaved }: 
       busy={saving}
     >
       <div className="grid gap-3">
-        <label className={styles.fieldLabel}>設備名
-          <input aria-label="設備名" value={name} onChange={(event) => setName(event.target.value)} disabled={saving} maxLength={100} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" />
-        </label>
-        <label className={styles.fieldLabel}>種類
-          <input aria-label="種類" value={type} onChange={(event) => setType(event.target.value)} disabled={saving} maxLength={50} placeholder="例: 部屋・席・機器" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" />
-        </label>
-        <label className={styles.fieldLabel}>受付上限
-          <input aria-label="受付上限" type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2" />
-        </label>
+        <Field label="設備名"><input aria-label="設備名" value={name} onChange={(event) => setName(event.target.value)} disabled={saving} maxLength={100} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></Field>
+        <Field label="種類"><input aria-label="種類" value={type} onChange={(event) => setType(event.target.value)} disabled={saving} maxLength={50} placeholder="例：部屋・席・機器" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></Field>
+        <Field label="受付上限"><NumberInput aria-label="受付上限" type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2" /></Field>
         {error ? <p className="text-danger text-xs" role="alert">{error}</p> : null}
         <div className="flex justify-end gap-2">
           <Button onClick={() => { if (!saving) onClose() }} disabled={saving}>キャンセル</Button>
@@ -492,6 +511,7 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
   const [time, setTime] = useState('')
   const [staffId, setStaffId] = useState('')
   const [staffOptions, setStaffOptions] = useState<BookingStaff[]>([])
+  const staffRows = useMemo(() => staffOptions.map((person) => ({ id: person.id, name: person.display_name })), [staffOptions])
   const [checking, setChecking] = useState(false)
   const [checkError, setCheckError] = useState<string | null>(null)
   const [result, setResult] = useState<BookingSlotCheckResult | null>(null)
@@ -538,7 +558,7 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
       if (requestId !== requestRef.current) return
       setResult(null)
       setCheckError(error instanceof ApiError && error.status === 403
-        ? 'このアカウントの予約を確かめる権限がありません。'
+        ? permissionDeniedMessage('store')
         : '空き状況を確かめられませんでした。もう一度お試しください。')
     } finally {
       if (requestId === requestRef.current) setChecking(false)
@@ -555,31 +575,26 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
         <HelpTip label="空きを確かめるの説明">お客さまの画面と同じ条件で、その日時に受けられるか確かめます。確かめても予約は作られません。</HelpTip>
       </div>
       <div className={styles.checkGrid}>
-        <Select size="full"
-          aria-label="確かめるメニュー"
+        <EntityKindField
+          kind="booking_menu"
+          label="確かめるメニュー"
+          options={activeMenus}
           value={menuId}
           onChange={(value) => { setMenuId(value); changeCriteria() }}
-          options={[
-            ...(activeMenus.length === 0 ? [{ value: '', label: '受付中のメニューがありません' }] : []),
-            ...activeMenus.map((menu) => ({ value: menu.id, label: menu.name })),
-          ]}
+          placeholder={activeMenus.length === 0 ? '（受付中のメニューがありません）' : '（メニューを選ぶ）'}
+          meta={() => undefined}
         />
-        <label className={styles.fieldLabel}>
-          日付
-          <DateField aria-label="確かめる日付" value={date} onChange={(value) => { setDate(value); changeCriteria() }} className="mt-1" />
-        </label>
-        <label className={styles.fieldLabel}>
-          開始時刻
-          <TimeField aria-label="確かめる開始時刻" size="field" value={time} onChange={(value) => { setTime(value); changeCriteria() }} className="mt-1" />
-        </label>
-        <Select size="full"
-          aria-label="確かめる担当"
+        <Field label="日付"><DateField aria-label="確かめる日付" value={date} onChange={(value) => { setDate(value); changeCriteria() }} className="mt-1" /></Field>
+        <Field label="開始時刻"><TimeField aria-label="確かめる開始時刻" size="field" value={time} onChange={(value) => { setTime(value); changeCriteria() }} className="mt-1" /></Field>
+        <EntityKindField
+          kind="staff"
+          label="確かめる担当"
+          options={staffRows}
           value={staffId}
           onChange={(value) => { setStaffId(value); changeCriteria() }}
-          options={[
-            { value: '', label: '担当：指名なし' },
-            ...staffOptions.map((person) => ({ value: person.id, label: `担当：${person.display_name}` })),
-          ]}
+          clearable
+          placeholder="（担当：指名なし）"
+          meta={() => undefined}
         />
       </div>
       <div className={styles.checkAction}>
@@ -614,23 +629,27 @@ function initialBusinessHours(settings: BookingSettings): BusinessHoursDay[] {
 }
 
 // v7 /booking/staff/shifts の BusinessHoursEditor と同じ検査。
-function validateBusinessHours(days: BusinessHoursDay[]): string | null {
+/** 営業時間の誤りと、その欄（曜日・何区間目・どの欄）。欄が無い誤りは場所なし（B-139）。 */
+type HoursProblem = { message: string; at?: { weekday: number; index: number; parts: Array<'start' | 'end' | 'capacity'> } }
+
+function validateBusinessHours(days: BusinessHoursDay[]): HoursProblem | null {
   const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/
   for (const day of days) {
-    if (day.intervals.length > 8) return '1曜日の営業時間は8区間までです。'
+    if (day.intervals.length > 8) return { message: '1曜日の営業時間は8区間までです。' }
     const sorted = [...day.intervals].sort((a, b) => a.start.localeCompare(b.start))
+    const at = (interval: (typeof sorted)[number], parts: Array<'start' | 'end' | 'capacity'>) => ({ weekday: day.weekday, index: day.intervals.indexOf(interval), parts })
     for (const interval of sorted) {
       if (!timePattern.test(interval.start) || !timePattern.test(interval.end) || interval.start >= interval.end) {
-        return '営業時間は日ごとに分けて入力してください。終了は同じ日の開始より後にし、24:00は使えません。'
+        return { message: '営業時間は日ごとに分けて入力してください。終了は同じ日の開始より後にし、24:00は使えません。', at: at(interval, ['start', 'end']) }
       }
       const capacity = Number(interval.capacity)
       if (!Number.isInteger(capacity) || capacity < 1 || capacity > 1000) {
-        return '同時に受け付ける数は1〜1000件で入力してください。'
+        return { message: '同時に受け付ける数は1〜1000件で入力してください。', at: at(interval, ['capacity']) }
       }
     }
     for (let index = 1; index < sorted.length; index += 1) {
       if (sorted[index - 1].end > sorted[index].start) {
-        return '同じ曜日の営業時間は重ならないように入力してください。'
+        return { message: '同じ曜日の営業時間は重ならないように入力してください。', at: at(sorted[index], ['start']) }
       }
     }
   }
@@ -650,7 +669,7 @@ function resourceSaveError(error: unknown): string {
     return 'ほかの担当者が先にこの設備を変更しました。読み直してからもう一度お試しください。'
   }
   if (error instanceof ApiError && error.status === 403) {
-    return '設備を変更する権限がありません。'
+    return permissionDeniedMessage('store')
   }
   return '設備を保存できませんでした。入力内容を確かめて、もう一度お試しください。'
 }

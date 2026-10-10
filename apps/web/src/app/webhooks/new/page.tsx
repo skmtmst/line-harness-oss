@@ -168,7 +168,7 @@ function NewWebhookForm() {
   return (
     <CreatePage
       title="Webhookを追加する"
-      description="このツールのできごとを外部へ知らせます（送り出す向きのみ）。"
+      help="このツールのできごとを外部へ知らせます（送り出す向きのみ）。"
       showHeader={false}
       parent={['外部連携', '/webhooks']}
       variant="v6"

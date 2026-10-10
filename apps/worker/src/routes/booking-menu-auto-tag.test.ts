@@ -200,14 +200,14 @@ describe('E-03 #657 予約メニューの自動タグ: 保存時と実行時の 
     test('整理済み(archived)タグは 400 tag_not_found で、メニュー自体を作らない', async () => {
       const res = await createMenu({ auto_tag_id: 'tag-archived' });
       expect(res.status).toBe(400);
-      await expect(res.json()).resolves.toEqual({ error: 'tag_not_found' });
+      await expect(res.json()).resolves.toMatchObject({ code: 'tag_not_found' , fields: expect.any(Object), error: expect.any(String) });
       expect(menuRows()).toEqual([]);
     });
 
     test('別アカウントの有効タグは 400 tag_not_found で、メニュー自体を作らない', async () => {
       const res = await createMenu({ auto_tag_id: 'tag-other-account' });
       expect(res.status).toBe(400);
-      await expect(res.json()).resolves.toEqual({ error: 'tag_not_found' });
+      await expect(res.json()).resolves.toMatchObject({ code: 'tag_not_found' , fields: expect.any(Object), error: expect.any(String) });
       expect(menuRows()).toEqual([]);
     });
 
@@ -225,7 +225,7 @@ describe('E-03 #657 予約メニューの自動タグ: 保存時と実行時の 
     ])('文字列以外(%s)の auto_tag_id は 400 invalid_auto_tag_id で、500 にしない', async (_label, value) => {
       const res = await createMenu({ auto_tag_id: value });
       expect(res.status).toBe(400);
-      await expect(res.json()).resolves.toEqual({ error: 'invalid_auto_tag_id' });
+      await expect(res.json()).resolves.toMatchObject({ code: 'invalid_auto_tag_id' , fields: expect.any(Object), error: expect.any(String) });
       expect(menuRows()).toEqual([]);
     });
   });
@@ -247,21 +247,21 @@ describe('E-03 #657 予約メニューの自動タグ: 保存時と実行時の 
     test('整理済みタグへの付け替えは 400 で、いま入っている設定を壊さない', async () => {
       const res = await updateMenu('menu-a', { auto_tag_id: 'tag-archived' });
       expect(res.status).toBe(400);
-      await expect(res.json()).resolves.toEqual({ error: 'tag_not_found' });
+      await expect(res.json()).resolves.toMatchObject({ code: 'tag_not_found' , fields: expect.any(Object), error: expect.any(String) });
       expect(storedAutoTag()).toBe('tag-active');
     });
 
     test('別アカウントのタグへの付け替えは 400 で、いま入っている設定を壊さない', async () => {
       const res = await updateMenu('menu-a', { auto_tag_id: 'tag-other-account' });
       expect(res.status).toBe(400);
-      await expect(res.json()).resolves.toEqual({ error: 'tag_not_found' });
+      await expect(res.json()).resolves.toMatchObject({ code: 'tag_not_found' , fields: expect.any(Object), error: expect.any(String) });
       expect(storedAutoTag()).toBe('tag-active');
     });
 
     test('文字列以外の auto_tag_id は 400 invalid_auto_tag_id で、設定を壊さない', async () => {
       const res = await updateMenu('menu-a', { auto_tag_id: 42 });
       expect(res.status).toBe(400);
-      await expect(res.json()).resolves.toEqual({ error: 'invalid_auto_tag_id' });
+      await expect(res.json()).resolves.toMatchObject({ code: 'invalid_auto_tag_id' , fields: expect.any(Object), error: expect.any(String) });
       expect(storedAutoTag()).toBe('tag-active');
     });
 

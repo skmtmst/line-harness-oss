@@ -14,6 +14,7 @@ import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import { jstToUtcIso } from './shared'
 import styles from './create.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 export default function ApplicationPreview({ accountId, draft, date, startTime, endTime, capacity }: {
   accountId: string
@@ -57,7 +58,7 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
       <button type="button" className={styles.linkButton} onClick={() => void load()}>プレビューを開く →</button>
       <Dialog open={open} title="お客さまの申込ページの見本" onCancel={close} footer={<Button onClick={close}>閉じる</Button>}>
         {busy ? <ListState kind="loading" /> : error ? (
-          <ListState kind="error" description={error} action={<Button onClick={() => void load()}>もう一度試す</Button>} />
+          <ListState kind="error" description={error} onRetry={() => void load()} />
         ) : data ? (
           <div className={styles.previewBody}>
             <p className={styles.phoneName}>{data.name}</p>
@@ -67,10 +68,7 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
             {data.description ? <p className={styles.previewText}>{data.description}</p> : null}
             <p>残り {data.capacity} 席</p>
             {data.questions.map((question) => (
-              <label key={question.id} className={styles.previewQuestion}>
-                {question.label}{question.required ? '（必須）' : ''}
-                <input className={styles.input} disabled aria-label={question.label} />
-              </label>
+              <Field key={question.id} label={question.label} required={question.required}><input className={styles.input} disabled aria-label={question.label} /></Field>
             ))}
             <Button disabled>{data.requiresApproval ? '申し込む（承認後に確定）' : '申し込む'}</Button>
             <p className={styles.cardNote}>見本です。申し込みや公開は行いません。</p>

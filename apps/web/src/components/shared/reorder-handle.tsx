@@ -2,14 +2,18 @@
 
 import {
   useState,
+  useLayoutEffect,
+  useRef,
   type ButtonHTMLAttributes,
   type DragEvent,
   type KeyboardEvent,
   type ReactNode,
+  type RefObject,
 } from 'react'
 import { GripVertical } from 'lucide-react'
 import type { ActionMenuItem } from './action-menu'
 import { useLiveReorder } from '@/lib/use-live-reorder'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import styles from './row-actions.module.css'
 
 /*
@@ -87,8 +91,19 @@ export default function ReorderHandle({
   ...rest
 }: ReorderHandleProps) {
   const glyph = children ?? (look === 'icon' ? SIX_DOTS : <GripVertical size={16} aria-hidden="true" />)
-  if (disabledReason || locked) {
-    if (disabledLook === 'dim') {
+  // V8 ではマウスの移動が接続されたものだけつまみを出す（WEB-019）。
+  const slotRef = useRef<HTMLButtonElement | HTMLSpanElement>(null)
+  const [parentDraggable, setParentDraggable] = useState(false)
+  // 既存の表では親の箱に dragstart を接続している。そこからの操作も残す。
+  useLayoutEffect(() => {
+    const connected = Boolean(slotRef.current?.parentElement?.closest('[draggable="true"]'))
+    setParentDraggable(previous => previous === connected ? previous : connected)
+  })
+  const mouseConnected = parentDraggable || rest.onPointerDown || rest.onMouseDown || (rest.draggable && rest.onDragStart)
+  const v8 = useAdminTheme() === 'v8'
+  const noMouse = v8 && !mouseConnected
+  if (disabledReason || locked || rest.disabled || noMouse) {
+    if (disabledLook === 'dim' && !v8) {
       return (
         <span
           className="inline-flex cursor-not-allowed items-center justify-center text-ink-faint"
@@ -106,6 +121,7 @@ export default function ReorderHandle({
         style={look === 'icon' ? { cursor: 'default', background: 'none' } : undefined}
         title={disabledReason ?? undefined}
         data-reorder-disabled=""
+        ref={slotRef}
       >
         <span aria-hidden="true" style={{ visibility: 'hidden', display: 'inline-flex' }}>{glyph}</span>
         <span className="sr-only">{`${label}は並び替えできません。${disabledReason ?? ''}`}</span>
@@ -127,6 +143,7 @@ export default function ReorderHandle({
     <button
       type="button"
       {...rest}
+      ref={slotRef as RefObject<HTMLButtonElement | null>}
       onKeyDown={handleKeyDown}
       // 一覧の行の矢印移動（row-roving）に ↑↓ を取られないようにする。←→ は行の中の移動に使う。
       data-roving-own="vertical"

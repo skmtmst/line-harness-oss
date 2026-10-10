@@ -16,7 +16,7 @@
 [data-theme='v8'] .input:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; box-shadow: inset 0 0 0 5px var(--color-accent-deep); }
 [data-theme='v8'] .input:not(:checked):focus-visible { box-shadow: none; }
 [data-theme='v8'] .label { font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif; -webkit-font-smoothing: auto; }
-[data-theme='v8'] .input { gap: 0; border-radius: 999px; }
+[data-theme='v8'] .input { gap: 0; border-radius: var(--polish-radius-pill); }
 /*
  * 小さい字（★BG-B `z14gEG` 人物2択）。文 12/17。
  * 丸 18・間隔 8・選択中の 5px は行内ラジオと同じまま。

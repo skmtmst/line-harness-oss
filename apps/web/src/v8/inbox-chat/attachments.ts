@@ -9,6 +9,7 @@
  * - ファイル：PDF・Word・Excel・PowerPoint・ZIP・10MB まで。LINE にはファイルのメッセージが
  *   無いので、期限30日のダウンロードのリンクとして届く（API-15）
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import {
   CHAT_FILE_MAX_BYTES,
   CHAT_FILE_TYPES,
@@ -138,11 +139,8 @@ export function parseSentAttachment(messageType: string, content: string): SentA
 
 /** ダウンロードの期限（日本時間 10月8日 まで）。 */
 export function formatExpiry(iso: string | null): string | null {
-  if (!iso) return null
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return null
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).format(d)
-  return `${parts}まで`
+  const day = polishFormatDate(iso, { style: 'day', fallback: '' })
+  return day ? `${day}まで` : null
 }
 
 /**

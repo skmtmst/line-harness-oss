@@ -28,6 +28,7 @@ export default function TemplateFolderSelect({
 }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const optionsRef = useRef<HTMLUListElement>(null)
   const selected = options.find((option) => option.value === value) ?? options[0]
   const statusLabel = status === 'loading'
     ? 'フォルダを読み込み中'
@@ -46,7 +47,7 @@ export default function TemplateFolderSelect({
       className="relative"
       data-template-folder-select
       onBlur={(event) => {
-        if (!rootRef.current?.contains(event.relatedTarget)) setOpen(false)
+        if (!rootRef.current?.contains(event.relatedTarget) && !optionsRef.current?.contains(event.relatedTarget)) setOpen(false)
       }}
     >
       <div className={`rounded-control ${open ? 'ring-2 ring-accent/20' : ''}`}>
@@ -77,6 +78,7 @@ export default function TemplateFolderSelect({
           onClose={() => setOpen(false)}
         >
         <ul
+          ref={optionsRef}
           role="listbox"
           aria-label="テンプレートのフォルダ"
           className="max-h-72 min-w-64 overflow-y-auto rounded-control border border-hairline bg-canvas p-1.5 shadow-float"

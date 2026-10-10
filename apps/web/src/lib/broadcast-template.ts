@@ -1,3 +1,4 @@
+import { tapActionDef, tapActionFromUri } from './tap-actions'
 import type {
   BroadcastBubble,
   BroadcastBubbleType,
@@ -9,9 +10,11 @@ import {
   convertBroadcastAsset,
   isBroadcastAssetKind,
   type BroadcastAssetKind,
+  type TapExtras,
 } from '@line-crm/shared'
 import {
   serializeMessageKind,
+  emptyMessageKindState,
   type MessageKind,
   type MessageKindState,
 } from '@/components/scenarios/message-kind-fields'
@@ -26,6 +29,9 @@ export interface BroadcastTemplateOption {
   folderId?: string | null
   /** 持ち主のLINEアカウント。アカウント切替で持ち主を追跡するために残す。 */
   accountId?: string | null
+  carouselTapLimitMode?: string
+  carouselTapLimitText?: string | null
+  carouselActions?: unknown | null
   usageCount?: number
   updatedAt?: string
 }
@@ -66,12 +72,30 @@ export function messageTemplateToBubble(template: BroadcastTemplateOption): Broa
   }
 
 
+  if (template.messageType === 'carousel') {
+    try {
+      const columns = JSON.parse(template.messageContent)
+      if (!Array.isArray(columns) || !columns.length) return null
+      return { id: bubbleId(), type: 'carousel', content: { columnsJson: template.messageContent, templateId: template.id, templateName: template.name, carouselActions: template.carouselActions, tapLimitMode: template.carouselTapLimitMode ?? 'none', tapLimitText: template.carouselTapLimitText ?? '' } }
+    } catch { return null }
+  }
+  if (['audio', 'sticker', 'location'].includes(template.messageType)) {
+    try {
+      const content = JSON.parse(template.messageContent)
+      const state = emptyMessageKindState()
+      if (template.messageType === 'audio') state.audio = { originalContentUrl: String(content.originalContentUrl ?? ''), duration: String(Number(content.duration) / 1000) }
+      if (template.messageType === 'sticker') state.sticker = { packageId: String(content.packageId ?? ''), stickerId: String(content.stickerId ?? '') }
+      if (template.messageType === 'location') state.location = { title: String(content.title ?? ''), address: String(content.address ?? ''), latitude: String(content.latitude ?? ''), longitude: String(content.longitude ?? '') }
+      return { id: bubbleId(), type: template.messageType as BroadcastBubbleType, content: { state, templateId: template.id, templateName: template.name } }
+    } catch { return null }
+  }
+
   if (template.messageType === 'imagemap') {
     try {
       const parsed = JSON.parse(template.messageContent)
       if (parsed.video) return { id: bubbleId(), type: 'rich_video', content: { ...parsed, templateId: template.id, templateName: template.name } }
-      const p = parsed as {baseUrl:string;baseSize:{width:number;height:number};altText?:string;actions:Array<{type:string;area:Record<string,number>;linkUri?:string;text?:string}>}
-      return {id:bubbleId(),type:'rich_message',content:{assetId:template.id,assetName:template.name,imageUrl:`${p.baseUrl}/1040`,baseUrl:p.baseUrl,baseSize:p.baseSize,description:p.altText,coordinateUnit:'px',tapAreas:p.actions.map(a=>({...a.area,actionType:a.type,uri:a.linkUri,text:a.text}))}}
+      const p = parsed as {baseUrl:string;baseSize:{width:number;height:number};altText?:string;actions:Array<{type:string;area:Record<string,number>;linkUri?:string;text?:string;tapExtras?:TapExtras}>}
+      return {id:bubbleId(),type:'rich_message',content:{assetId:template.id,assetName:template.name,imageUrl:`${p.baseUrl}/1040`,baseUrl:p.baseUrl,baseSize:p.baseSize,description:p.altText,coordinateUnit:'px',tapAreas:p.actions.map(a=>({...a.area,actionType:a.type,uri:a.linkUri,text:a.text,...(a.tapExtras?{tapExtras:a.tapExtras}:{})}))}}
     } catch { return null }
   }
 
@@ -96,10 +120,12 @@ export function messageTemplateToBubble(template: BroadcastTemplateOption): Broa
 }
 
 export function contentTemplateToBubble(asset: BroadcastMessageAsset): BroadcastBubble {
+  // 質問の押下は公開版へ固定する。下書きの選択肢と公開版の番号を混ぜない。
+  const payload = asset.kind === 'research' ? asset.publishedPayload ?? asset.payload : asset.payload
   return {
     id: bubbleId(),
     type: asset.kind,
-    content: { assetId: asset.id, assetName: asset.name, ...asset.payload },
+    content: { ...payload, assetId: asset.id, assetName: asset.name, ...(asset.kind === 'research' ? { assetVersion: asset.publishedVersion, ...(asset.publishedVersion === 0 ? { assetId: '' } : {}) } : {}) },
   }
 }
 
@@ -190,11 +216,16 @@ const KIND_FIELD_TYPES = new Set<BroadcastBubbleType>(['location', 'audio', 'sti
  * 作成5段の帯が同じ関数を見る（監査 R206）。Worker 側の検査と文言を
  * そろえているので、画面で通ったものが保存で断られない。
  */
-export function messageButtonsError(buttons: BroadcastMessageButton[]): string {
+export function messageButtonsError(buttons: BroadcastMessageButton[], opts: { hasLiff?: boolean } = {}): string {
   if (buttons.length > 4) return 'ボタンは4つまでです'
   for (const [index, button] of buttons.entries()) {
     const number = index + 1
     if (!button.label.trim()) return `ボタン${number}の名前を入力してください`
+    /* 予約・回答フォーム・予約履歴・来店スタンプ（LIFF のページ）は、アカウントに LIFF が無いと開けない。 */
+    if (opts.hasLiff === false && button.type === 'url' && tapActionFromUri(button.value).kind !== 'uri') {
+      return `ボタン${number}：このアカウントに LIFF が設定されていないため、「${tapActionDef(tapActionFromUri(button.value).kind)?.label}」は開けません`
+    }
+    if (button.type === 'url' && tapActionFromUri(button.value).kind === 'form' && !tapActionFromUri(button.value).refId) return `ボタン${number}の回答フォームを選んでください`
     if (!button.value.trim()) return `ボタン${number}のURLを入力してください`
     if (!/^https:\/\//i.test(button.value.trim())) return `ボタン${number}のURLは https:// から始めてください`
   }

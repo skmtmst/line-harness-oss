@@ -5,6 +5,7 @@
  * V8 のテーマで出す・選んだ値が保存に乗る・閲覧のみの人には押せない保存を置かない・
  * コラムは配信対象を1つの欄で選び、足りないと保存せずに理由を出す。
  */
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
@@ -77,7 +78,7 @@ const REVIEW = {
 let host: HTMLDivElement
 let root: Root
 
-beforeEach(() => {
+beforeEach(() => { clearToastsForTest();
   document.documentElement.dataset.theme = 'v8'
   role.value = 'owner'
   for (const fn of Object.values(calls)) fn.mockReset()
@@ -111,16 +112,35 @@ async function pick(label: string, option: string) {
   await act(async () => { fireEvent.click(item!.querySelector('button') ?? item!) })
 }
 
+describe('狭い板の配信プレビュー', () => {
+  it.each(['配信を直す', 'コラムを書く'])('%s でも畳んだ見え方を開き、閉じられる', async (screen) => {
+    await act(async () => { root.render(screen === '配信を直す' ? <CampaignEdit campaignKey="review_request" /> : <ColumnNew />) })
+    await flush()
+    await act(async () => { fireEvent.click(button('プレビューを見る')!) })
+    await flush()
+    const drawer = document.querySelector('[role="dialog"]')!
+    expect(drawer.textContent).toContain('配信のプレビュー')
+    expect(drawer.textContent).toContain('LINEでの見え方')
+    expect(host.querySelector('[data-template-region="preview"]')).toBeNull()
+    await act(async () => { fireEvent.click(drawer.querySelector('button[aria-label="閉じる"]')!) })
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 250)) })
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(calls.updateSetting).not.toHaveBeenCalled()
+    expect(calls.createColumn).not.toHaveBeenCalled()
+  })
+})
+
 describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
   it('V8 のテーマで節が並び、選んだ日数・時刻・マイルが保存に乗る', async () => {
-    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) })
+    await act(async () => { root.render(<><CampaignEdit campaignKey="review_request" /><ToastHost /></>) })
     await flush()
     expect(document.documentElement.dataset.theme).toBe('v8')
     expect(host.querySelector('[data-design-node="w5pwG"]')).not.toBeNull()
     for (const heading of ['配信フロー', 'いつ送りますか', '送るもの', '押されたあとにすること']) expect(host.textContent).toContain(heading)
     expect(host.textContent).toContain('200 マイル')
     await pick('きっかけからの日数', '注文が届いた日から 14 日後')
-    await pick('送る時刻', '19:00')
+    const time = host.querySelector('input[aria-label="送る時刻"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(time, { target: { value: '19:00' } }); fireEvent.blur(time) })
     await pick('回答後にマイルを付ける', '500 マイル')
     await act(async () => { fireEvent.click(button('配信内容を保存する')!) })
     await flush()
@@ -133,9 +153,22 @@ describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
     expect(host.textContent).toContain('配信内容を保存しました')
   })
 
+  it('B-139：本文が空のまま保存すると、口を呼ばず本文の欄が赤くなり、真下に理由が出て、本文へ移る', async () => {
+    calls.settings.mockResolvedValue({ success: true, data: [{ ...REVIEW, bodyText: '' }] })
+    await act(async () => { root.render(<><CampaignEdit campaignKey="review_request" /><ToastHost /></>) })
+    await flush()
+    await act(async () => { fireEvent.click(button('配信内容を保存する')!) })
+    await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(calls.updateSetting).not.toHaveBeenCalled()
+    const body = document.getElementById('nen-edit-body')!
+    expect(body.getAttribute('aria-invalid')).toBe('true')
+    expect(document.getElementById('nen-edit-body-error')?.textContent).toBe('本文を入力してください')
+    expect(body.contains(document.activeElement) || document.activeElement === body).toBe(true)
+  })
+
   it('閲覧のみの人には帯を出し、保存・テスト送信・押せない選ぶ欄を置かない', async () => {
     role.value = 'staff'
-    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) })
+    await act(async () => { root.render(<><CampaignEdit campaignKey="review_request" /><ToastHost /></>) })
     await flush()
     expect(host.textContent).toContain('閲覧のみで見ています')
     expect(button('配信内容を保存する')).toBeUndefined()
@@ -154,13 +187,18 @@ describe('V8 NEN配信「コラムを書く」（yRDwW）', () => {
     const input = (label: string) => host.querySelector(`input[aria-label="${label}"]`) as HTMLInputElement
     await act(async () => { fireEvent.change(input('題名'), { target: { value: '秋の食事、量はどれくらい？' } }) })
     await act(async () => { fireEvent.change(input('記事の URL'), { target: { value: 'https://nen.example.jp/columns/autumn-food' } }) })
-    await pick('配信対象', 'タグで絞る：ペット登録あり')
+    // 配信対象は選ぶ窓の1つの欄。空＝友だち全員、タグを選ぶとそのタグで絞る。
+    await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="配信対象：選ぶ"]')!.click() })
     await flush()
-    expect(host.textContent).toContain('1,240人に届きます')
+    const picker = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!
+    await act(async () => { picker.querySelector<HTMLInputElement>('input[type="checkbox"][aria-label="ペット登録あり"]')!.click() })
+    await act(async () => { [...picker.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '選ぶ（1件）')!.click() })
+    await flush()
+    expect(host.textContent).toContain('1,240 人に届きます')
     await act(async () => { fireEvent.click(button('下書きを保存')!) })
     await flush()
     expect(calls.createColumn).toHaveBeenCalledWith('account-a', expect.objectContaining({ title: '秋の食事、量はどれくらい？', targetMode: 'tag', targetTagId: 'tag-pet' }))
-    expect(calls.push).toHaveBeenCalledWith('/nen-campaigns?tab=columns')
+    expect(calls.push).toHaveBeenCalledWith('/nen-campaigns?tab=columns&highlight=c-new')
   })
 
   it('題名と記事の URL が無いまま押すと、保存せずに理由を出す', async () => {
@@ -170,6 +208,17 @@ describe('V8 NEN配信「コラムを書く」（yRDwW）', () => {
     await flush()
     expect(calls.createColumn).not.toHaveBeenCalled()
     expect(host.textContent).toContain('HTTPSの記事URLを入力してください。')
+    const title = host.querySelector('input[aria-label="題名"]') as HTMLInputElement
+    const article = host.querySelector('input[aria-label="記事の URL"]') as HTMLInputElement
+    expect(title.getAttribute('aria-invalid')).toBe('true')
+    expect(article.getAttribute('aria-invalid')).toBe('true')
+    expect(host.querySelectorAll('#nen-col-title')).toHaveLength(1)
+    expect(host.querySelectorAll('[data-design-part="notice"][role="alert"]')).toHaveLength(0)
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 40)) })
+    expect(document.activeElement).toBe(title)
+    await act(async () => { fireEvent.change(title, { target: { value: '秋の食事' } }) })
+    expect(title.getAttribute('aria-invalid')).not.toBe('true')
+    expect(host.querySelector('#nen-col-title-error')).toBeNull()
   })
 
   it('閲覧のみの人には書く欄も保存も置かず、帯と戻る道だけ出す', async () => {
@@ -181,4 +230,26 @@ describe('V8 NEN配信「コラムを書く」（yRDwW）', () => {
     expect(host.querySelector('input[aria-label="題名"]')).toBeNull()
     expect([...document.querySelectorAll('button[disabled]')].map((b) => b.textContent)).toEqual([])
   })
+})
+
+it('保存のぶつかりでは入力を残し、比較では変えず、読み直すときだけ最新を入れる', async () => {
+  const { ApiError } = await import('@/lib/api')
+  await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) })
+  await flush()
+  const input = document.getElementById('nen-edit-body') as HTMLElement
+  await act(async () => { input.textContent = '自分の入力'; fireEvent.input(input) })
+  calls.updateSetting.mockRejectedValueOnce(new ApiError(409, '競合', 'VERSION_CONFLICT'))
+  calls.settings.mockResolvedValue({ success: true, data: [{ ...REVIEW, bodyText: 'ほかの担当者の入力', updatedAt: '2026-10-09T08:00:00Z' }] })
+  await act(async () => { fireEvent.click(button('配信内容を保存する')!) })
+  await flush()
+  expect(input.textContent).toBe('自分の入力')
+  expect(button('違いを比べる')).toBeTruthy()
+  await act(async () => { fireEvent.click(button('違いを比べる')!) })
+  await flush()
+  expect(input.textContent).toBe('自分の入力')
+  expect(document.body.textContent).toContain('ほかの担当者の入力')
+  const reload = [...document.querySelectorAll('button')].find((item) => item.textContent?.includes('最新を読み込んで続ける'))!
+  await act(async () => { fireEvent.click(reload) })
+  await flush()
+  expect((document.getElementById('nen-edit-body') as HTMLElement).textContent).toBe('ほかの担当者の入力')
 })

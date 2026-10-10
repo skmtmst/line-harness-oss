@@ -317,13 +317,13 @@ function setInputValue(input: HTMLInputElement, value: string) {
 }
 
 describe('検索で探す(#931 N-308)', () => {
-  it('語を入れて「探す」と q= 付きで一覧を取り直し、URLにも語が残る', async () => {
+  it('語を入れて300ms待つと自動で一覧を取り直し、URLにも語が残る', async () => {
     net.handler = detailCapableHandler(MIXED)
     await renderAt('/nen-members?tab=photos')
     const input = host.querySelector('input[placeholder*="探す"]') as HTMLInputElement
     expect(input).toBeTruthy()
     await act(async () => { setInputValue(input, 'モモ') })
-    await act(async () => { input.closest('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
     await act(async () => { await Promise.resolve() })
     expect(net.calls.some((path) => path.startsWith('/api/nen-members/photos?') && path.includes('q='))).toBe(true)
     expect(decodeURIComponent(window.location.search)).toContain('q=モモ')

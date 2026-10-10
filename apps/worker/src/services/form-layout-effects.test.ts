@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   enrollFriendInReminder: vi.fn(),
   enrollFriendInScenario: vi.fn(),
   getFriendFieldById: vi.fn(),
+  getFixedFriendField: vi.fn(),
   getMessageTemplateById: vi.fn(),
   removeTagFromFriend: vi.fn(),
   setFriendFieldValue: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock('@line-crm/db', async (importOriginal) => {
     enrollFriendInReminder: mocks.enrollFriendInReminder,
     enrollFriendInScenario: mocks.enrollFriendInScenario,
     getFriendFieldById: mocks.getFriendFieldById,
+    getFixedFriendField: mocks.getFixedFriendField,
     getMessageTemplateById: mocks.getMessageTemplateById,
     removeTagFromFriend: mocks.removeTagFromFriend,
     setFriendFieldValue: mocks.setFriendFieldValue,
@@ -87,6 +89,7 @@ beforeEach(() => {
     type: 'text',
     options_json: null,
   });
+  mocks.getFixedFriendField.mockResolvedValue({ id: 'fixed-name', type: 'text', ec_is_master: 0 });
   mocks.setFriendFieldValue.mockResolvedValue(undefined);
 });
 
@@ -269,7 +272,7 @@ describe('回答を配る', () => {
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
   });
 
-  test('本名・システム表示名・個別メモは friends の列に書く', async () => {
+  test('本名・表示名は友だち、メモは受信箱へ書く', async () => {
     const layout = layoutWith([
       input({
         name: 'full_name',
@@ -286,11 +289,13 @@ describe('回答を配る', () => {
       answers: { full_name: '山田太郎' },
     });
 
-    expect(calls).toHaveLength(1);
-    expect(calls[0].sql).toContain('real_name = ?');
-    expect(calls[0].sql).toContain('system_display_name = ?');
-    expect(calls[0].sql).toContain('private_memo = ?');
-    expect(calls[0].binds.slice(0, 3)).toEqual(['山田太郎', '山田太郎', '山田太郎']);
+    expect(calls).toHaveLength(2);
+    expect(calls[0].sql).toContain('INSERT INTO chats');
+    expect(calls[0].binds[2]).toBe('山田太郎');
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(db, expect.objectContaining({ fieldId: 'fixed-name', value: '山田太郎', updatedBy: 'form' }));
+    expect(calls[1].sql).toContain('system_display_name = ?');
+    expect(calls[1].sql).not.toContain('private_memo = ?');
+    expect(calls[1].binds[0]).toBe('山田太郎');
   });
 
   test('選んだ選択肢のタグだけを付ける', async () => {
@@ -1079,4 +1084,21 @@ test('飛ばしたセクションの値が送られても定員・登録先・�
   expect(mocks.countChoiceUsage).not.toHaveBeenCalled();
   expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
   expect(mocks.attachTag).not.toHaveBeenCalled();
+});
+
+describe('住所・予約の登録先は読める文字で保存する', () => {
+  test.each([
+    ['address', { postalCode: '1234567', prefecture: '東京都', city: '新宿区', addressLine1: '1-2', addressLine2: 'A' }, '〒123-4567 東京都新宿区1-2A'],
+    ['booking', { menuId: 'm', staffId: 's', startsAt: '2026-10-10T01:30:00Z' }, '10/10 10:30'],
+  ] as const)('%s を情報欄・本名・表示名・メモへ保存する', async (type, value, expected) => {
+    const { db, calls } = fakeDb();
+    await applyFormLayoutEffects({ db, friendId: 'friend-1', answers: { answer: value },
+      layout: layoutWith([input({ name: 'answer', type, destinations: { friendFieldIds: ['ff-1'], realName: true, displayName: true, note: true } })]),
+    });
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ value: expected }));
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ fieldId: 'fixed-name', value: expected }));
+    expect(calls.find((c) => c.sql.includes('INSERT INTO chats'))?.binds[2]).toBe(expected);
+    expect(calls.find((c) => c.sql.startsWith('UPDATE friends'))?.binds[0]).toBe(expected);
+    expect(calls.find((c) => c.sql.startsWith('UPDATE friends'))?.sql).not.toContain('private_memo');
+  });
 });

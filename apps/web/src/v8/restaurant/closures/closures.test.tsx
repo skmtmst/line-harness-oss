@@ -74,20 +74,21 @@ describe('UVnvR 休業日・貸切', () => {
       return found as HTMLElement
     })
     const board = document.querySelector('[data-design-node="UVnvR"]')!
-    expect(board.textContent).toContain('渋谷店 ・ 1つの時間帯の総数 20席（稼働中の卓 5）')
+    fireEvent.click(screen.getByRole('button', { name: '予約枠・在庫の説明' }))
+    expect(screen.getByText('渋谷店 ・ 1つの時間帯の総数 20席（有効の卓 5）')).toBeTruthy()
     expect(board.textContent).not.toContain('検証環境専用')
     expect(screen.getByRole('tab', { name: '休業日・貸切' }).getAttribute('aria-selected')).toBe('true')
     expect(card.textContent).toContain('終日・全卓')
     expect(card.textContent).toContain('他サイト 未対応 2')
     /* 連絡済みは contact-status の数（休業を作った後に担当者が LINE で送った予約）。 */
-    await waitFor(() => expect(card.textContent).toContain('予約 2件 ・ 連絡済み 1件 ・ 他サイト 未対応 2'))
+    await waitFor(() => expect(card.textContent).toContain('予約 2 件 ・ 連絡済み 1 件 ・ 他サイト 未対応 2'))
     expect(fixture.closureContactStatus).toHaveBeenCalledWith('account-1', 'cl-1')
     expect(document.querySelector('[data-closure-card="cl-2"]')!.textContent).toContain('18:00〜22:00 ・ 個室A・T1')
     expect(screen.getAllByText('定休').length).toBeGreaterThan(1)
     const band = document.querySelector('[data-closure-band]') as HTMLElement
-    expect(band.textContent).toContain('他の予約サイトの枠を閉じてください（未対応 2件）')
+    expect(band.textContent).toContain('他の予約サイトの枠を閉じてください（未対応 2 件）')
     expect(band.textContent).toContain('ホットペッパー・食べログの')
-    expect(within(band).getByRole('link', { name: 'ホットペッパーの管理画面を開く ↗' }).getAttribute('href')).toBe('https://cms.example.jp/')
+    expect(within(band).getByRole('link', { name: 'ホットペッパーの管理画面を開く' }).getAttribute('href')).toBe('https://cms.example.jp/')
     fireEvent.click(within(band).getByRole('button', { name: 'ホットペッパーの枠を閉じた' }))
     await waitFor(() => expect(fixture.completeChannelCloseTask).toHaveBeenCalledWith('account-1', 'k1'))
   })
@@ -100,7 +101,7 @@ describe('UVnvR 休業日・貸切', () => {
       if (!found) throw new Error('まだ')
       return found as HTMLElement
     })
-    await within(dialog).findByText(/予約が 2件あります（保存しても取り消しません）/)
+    await within(dialog).findByText(/予約が 2 件あります（保存しても取り消しません）/)
     expect(fixture.previewClosure).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', allDay: true, kind: 'temporary_closed', tableIds: [] }))
     expect(within(dialog).getByRole('link', { name: 'LINE で連絡する' }).getAttribute('href')).toBe('/chats?friend=friend-9')
     expect(dialog.textContent).toContain('ホットペッパー・食べログに「閉じる知らせ」を出す')
@@ -116,7 +117,7 @@ describe('UVnvR 休業日・貸切', () => {
     render(<InventoryPage />)
     fireEvent.click(await screen.findByRole('button', { name: /臨時休業・貸切を足す/ }))
     const dialog = await waitFor(() => document.querySelector('[data-design-node="nVvXy"]') as HTMLElement)
-    await within(dialog).findByText(/予約が 2件あります/)
+    await within(dialog).findByText(/予約が 2 件あります/)
     fireEvent.click(within(dialog).getByRole('button', { name: 'この日を閉じる' }))
     await waitFor(() => expect(google.proposeClosureHours).toHaveBeenCalledWith('account-1', 'cl-new', 1, false))
 
@@ -125,7 +126,7 @@ describe('UVnvR 休業日・貸切', () => {
     }))
     fireEvent.click(await screen.findByRole('button', { name: /臨時休業・貸切を足す/ }))
     const again = await waitFor(() => document.querySelector('[data-design-node="nVvXy"]') as HTMLElement)
-    await within(again).findByText(/予約が 2件あります/)
+    await within(again).findByText(/予約が 2 件あります/)
     fireEvent.click(within(again).getByRole('button', { name: 'この日を閉じる' }))
     /* 409 の data から相手の名前と日付を出す。 */
     expect(await within(again).findByText(/の貸切「会社の宴会」と重なっています。日付か卓を変えてください。/)).not.toBeNull()
@@ -143,7 +144,7 @@ describe('UVnvR 休業日・貸切', () => {
     fireEvent.click(within(card).getByRole('button', { name: /の操作$/ }))
     fireEvent.click(await screen.findByRole('menuitem', { name: '変える' }))
     const dialog = await waitFor(() => document.querySelector('[data-design-node="nVvXy"]') as HTMLElement)
-    await within(dialog).findByText(/予約が 2件あります（保存しても取り消しません・連絡済み 1件）/)
+    await within(dialog).findByText(/予約が 2 件あります（保存しても取り消しません・連絡済み 1 件）/)
     expect(fixture.previewClosure).toHaveBeenCalledWith('account-1', expect.objectContaining({ excludeId: 'cl-1' }))
     expect(within(dialog).getByRole('link', { name: /電話で連絡（03-1234-5678）/ })).not.toBeNull()
     expect(within(dialog).getByRole('link', { name: '連絡済み（会話を見る）' }).getAttribute('href')).toBe('/chats?friend=friend-9')
@@ -203,17 +204,17 @@ describe('休業日・貸切の数え方', () => {
 
   it('他サイトの状態：未対応があれば未対応、全部閉じたら n/m。件数が分からなければ予約は書かない', () => {
     const t = (status: string) => ({ reason: 'closure', closureId: 'x', status }) as never
-    expect(statusLine(2, tasksFor({ id: 'x' }, [t('close'), t('done')]))).toBe('予約 2件 ・ 他サイト 未対応 1')
-    expect(statusLine(0, tasksFor({ id: 'x' }, [t('done'), t('done')]))).toBe('予約 0件 ・ 他サイト 閉じた 2/2')
+    expect(statusLine(2, tasksFor({ id: 'x' }, [t('close'), t('done')]))).toBe('予約 2 件 ・ 他サイト 未対応 1')
+    expect(statusLine(0, tasksFor({ id: 'x' }, [t('done'), t('done')]))).toBe('予約 0 件 ・ 他サイト 閉じた 2/2')
     expect(statusLine(null, tasksFor({ id: 'x' }, []))).toBe('')
-    expect(statusLine(2, tasksFor({ id: 'x' }, []), 1)).toBe('予約 2件 ・ 連絡済み 1件')
-    expect(statusLine(0, tasksFor({ id: 'x' }, []), 0)).toBe('予約 0件')
+    expect(statusLine(2, tasksFor({ id: 'x' }, []), 1)).toBe('予約 2 件 ・ 連絡済み 1 件')
+    expect(statusLine(0, tasksFor({ id: 'x' }, []), 0)).toBe('予約 0 件')
   })
 
   it('重なりの文：相手の種類・名前・日付・時刻。相手が分からなければ一般の文', () => {
     const c = { name: '会社の宴会', kind: 'private_event' as const, startDate: '2026-10-24', endDate: '2026-10-24', allDay: false, startTime: '18:00', endTime: '22:00' }
     expect(overlapMessage([c])).toBe('10月24日（土） 18:00〜22:00の貸切「会社の宴会」と重なっています。日付か卓を変えてください。')
-    expect(overlapMessage([{ ...c, name: '臨時休業', kind: 'temporary_closed', allDay: true }, c])).toBe('10月24日（土）の臨時休業（ほか 1件）と重なっています。日付か卓を変えてください。')
+    expect(overlapMessage([{ ...c, name: '臨時休業', kind: 'temporary_closed', allDay: true }, c])).toBe('10月24日（土）の臨時休業（ほか 1 件）と重なっています。日付か卓を変えてください。')
     expect(overlapMessage([])).toBe('同じ日・同じ卓に、ほかの休業・貸切があります。日付か卓を変えてください。')
   })
 

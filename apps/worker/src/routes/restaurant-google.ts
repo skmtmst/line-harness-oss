@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 /**
  * 飲食店向け「Googleビジネス」第1段：設定（Google接続）と口コミ。
  *
@@ -190,8 +191,8 @@ export function nowIso(): string {
   return new Date().toISOString();
 }
 
-export function fail(c: Context<Env>, status: 400 | 401 | 403 | 404 | 409 | 500 | 502 | 503 | 504, error: string, extra: Record<string, unknown> = {}) {
-  return c.json({ success: false, error, ...extra }, status);
+export function fail(c: Context<Env>, status: 400 | 401 | 403 | 404 | 409 | 500 | 502 | 503 | 504, error: string, extra: Record<string, unknown> = {}, fieldKeys: readonly string[] = []) {
+  return inputError(c, { success: false, error, ...extra }, status, fieldKeys);
 }
 
 function readCookie(header: string | undefined, name: string): string | null {
@@ -571,7 +572,7 @@ restaurantGoogle.get('/api/restaurant-test/google/connection', async (c) => {
   });
 });
 
-restaurantGoogle.post('/api/restaurant-test/google/connect/start', requireConnectionManager, async (c) => {
+restaurantGoogle.post('/api/restaurant-test/google/connect/start', requireConnectionManager, inputJsonBoundary(), async (c) => {
   const client = oauthClient(c);
   if (!client) return fail(c, 503, 'Google接続の設定（OAuthクライアント）がこの環境にありません', { code: 'oauth_not_configured' });
   const store = await ensureStoreForGoogle(c);
@@ -789,7 +790,7 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
   }
 });
 
-restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', requireConnectionManager, async (c) => {
+restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', requireConnectionManager, inputJsonBoundary(), async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const connection = await connectionFor(c, store.id);
@@ -798,21 +799,21 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
     .json<{ locationName?: string; confirmSwitch?: boolean }>()
     .catch(() => ({}) as { locationName?: string; confirmSwitch?: boolean });
   const locationName = body.locationName?.trim();
-  if (!locationName) return fail(c, 400, 'locationName が必要です');
+  if (!locationName) return fail(c, 400, 'locationName が必要です', {}, ["locationName"]);
   // 以前つないでいた店舗が残っている状態で別の店舗を選ぶのは「店舗の切り替え」。
   // 取得済みの口コミ・プロフィール・投稿・数値は前の店舗のものなので、
   // 本人の確認なしには切り替えない（確認したら下で消す）。
   const previousName = connection.location_name;
   const switching = Boolean(previousName) && previousName !== locationName;
   if (switching && body.confirmSwitch !== true) {
-    return fail(c, 400, '店舗を切り替えるには確認が必要です', { code: 'switch_confirmation_required' });
+    return fail(c, 400, '店舗を切り替えるには確認が必要です', { code: 'switch_confirmation_required' }, ["locationName","confirmSwitch"]);
   }
   const db = dbFor(c.env, store.id);
   const candidate = await db
     .prepare('SELECT location_name, location_title FROM rt_google_location_candidates WHERE store_id = ? AND location_name = ? LIMIT 1')
     .bind(store.id, locationName)
     .first<{ location_name: string; location_title: string }>();
-  if (!candidate) return fail(c, 400, '選べる店舗ではありません');
+  if (!candidate) return fail(c, 400, '選べる店舗ではありません', {}, ["locationName"]);
   let selectedLocation: GoogleLocation | undefined;
   try {
     const accessToken = await accessTokenFor(c, connection);
@@ -857,11 +858,11 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
   return c.json({ success: true, connection: publicConnection(await connectionFor(c, store.id)) });
 });
 
-restaurantGoogle.post('/api/restaurant-test/google/disconnect', requireConnectionManager, async (c) => {
+restaurantGoogle.post('/api/restaurant-test/google/disconnect', requireConnectionManager, inputJsonBoundary({"confirmed":["boolean"]}), async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const body = await c.req.json<{ confirmed?: boolean }>().catch(() => ({}) as { confirmed?: boolean });
-  if (body.confirmed !== true) return fail(c, 400, '確認が必要です', { code: 'confirmation_required' });
+  if (body.confirmed !== true) return fail(c, 400, '確認が必要です', { code: 'confirmation_required' }, ["confirmed"]);
   const connection = await connectionFor(c, store.id);
   if (!connection || connection.status === 'disconnected') return fail(c, 409, '接続されていません');
   let revoked = false;
@@ -963,7 +964,7 @@ export async function recordReviewSyncResult(
     .run();
 }
 
-restaurantGoogle.post('/api/restaurant-test/google/reviews/sync', async (c) => {
+restaurantGoogle.post('/api/restaurant-test/google/reviews/sync', inputJsonBoundary(), async (c) => {
   const ctx = await requireConnectedStore(c);
   if (ctx instanceof Response) return ctx;
   const { store, connection } = ctx;
@@ -1073,7 +1074,7 @@ export async function runGoogleAi(c: Context<Env>, prompt: { system: string; use
   }
 }
 
-restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', async (c) => {
+restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', inputJsonBoundary({"mode":["string"],"baseText":["string"]}), async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const row = await reviewFor(c, store.id, c.req.param('id'));
@@ -1087,7 +1088,7 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', 
   // 「短くする」「丁寧にする」は、保存前に画面で直した文章を元にする。
   // 画面から送られてこなかったときだけ、保存済みの下書きを使う。
   const base = (typeof body.baseText === 'string' ? body.baseText.slice(0, 4096) : (row.reply_draft ?? '')).trim();
-  if (mode !== 'new' && !base) return fail(c, 400, '先に下書きを作るか、返信文を入力してください', { code: 'draft_required' });
+  if (mode !== 'new' && !base) return fail(c, 400, '先に下書きを作るか、返信文を入力してください', { code: 'draft_required' }, ["mode","baseText"]);
   const connection = await connectionFor(c, store.id);
   const storeTitle = connection?.location_title ?? store.name;
   const generateOnce = async (strict: boolean) => {
@@ -1135,7 +1136,7 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', 
   return c.json({ success: true, draft: validated.text, aiGenerated: true, generatedAt, mode });
 });
 
-restaurantGoogle.put('/api/restaurant-test/google/reviews/:id/draft', async (c) => {
+restaurantGoogle.put('/api/restaurant-test/google/reviews/:id/draft', inputJsonBoundary({"replyDraft":["string"]}), async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const row = await reviewFor(c, store.id, c.req.param('id'));
@@ -1145,7 +1146,7 @@ restaurantGoogle.put('/api/restaurant-test/google/reviews/:id/draft', async (c) 
   }
   const body = await c.req.json<{ replyDraft?: string }>().catch(() => ({}) as { replyDraft?: string });
   const validated = validateReplyText(body.replyDraft ?? '');
-  if (!validated.ok) return fail(c, 400, validated.reason === 'too_long' ? '返信文が長すぎます' : '返信文を入力してください', { code: validated.reason });
+  if (!validated.ok) return fail(c, 400, validated.reason === 'too_long' ? '返信文が長すぎます' : '返信文を入力してください', { code: validated.reason }, ["replyDraft"]);
   await dbFor(c.env, store.id)
     .prepare(`UPDATE rt_google_reviews SET reply_draft = ?, reply_draft_ai_generated = 0, reply_status = 'draft', updated_at = ? WHERE id = ?`)
     .bind(validated.text, nowIso(), row.id)
@@ -1153,17 +1154,17 @@ restaurantGoogle.put('/api/restaurant-test/google/reviews/:id/draft', async (c) 
   return c.json({ success: true, review: publicReview((await reviewFor(c, store.id, row.id))!) });
 });
 
-restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/reply', requireRole('owner', 'admin'), async (c) => {
+restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/reply', requireRole('owner', 'admin'), inputJsonBoundary({"confirmed":["boolean"],"comment":["string"]}), async (c) => {
   const ctx = await requireConnectedStore(c);
   if (ctx instanceof Response) return ctx;
   const { store, connection } = ctx;
   const row = await reviewFor(c, store.id, c.req.param('id'));
   if (!row) return fail(c, 404, '口コミが見つかりません');
   const body = await c.req.json<{ confirmed?: boolean; comment?: string }>().catch(() => ({}) as { confirmed?: boolean; comment?: string });
-  if (body.confirmed !== true) return fail(c, 400, '返信先・内容・個人情報の有無の確認が必要です', { code: 'confirmation_required' });
+  if (body.confirmed !== true) return fail(c, 400, '返信先・内容・個人情報の有無の確認が必要です', { code: 'confirmation_required' }, ["confirmed"]);
   if (!writeEnabled(c.env)) return fail(c, 403, 'この環境ではGoogleへ公開できません', { code: 'write_disabled' });
   const validated = validateReplyText(body.comment ?? row.reply_draft ?? '');
-  if (!validated.ok) return fail(c, 400, validated.reason === 'too_long' ? '返信文が長すぎます' : '返信文を入力してください', { code: validated.reason });
+  if (!validated.ok) return fail(c, 400, validated.reason === 'too_long' ? '返信文が長すぎます' : '返信文を入力してください', { code: validated.reason }, ["comment","store"]);
   if (row.reply_status === 'published' || row.reply_status === 'replied') {
     return fail(c, 409, 'この口コミにはすでに返信があります', { code: 'already_replied', existingReply: row.reply_comment });
   }

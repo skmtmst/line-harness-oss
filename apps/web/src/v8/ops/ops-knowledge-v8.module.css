@@ -65,9 +65,12 @@
   flex-direction: column;
   gap: var(--tpl-op-row-gap);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
+
+
   padding: var(--tpl-op-ann-form-pad);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 
 .field {

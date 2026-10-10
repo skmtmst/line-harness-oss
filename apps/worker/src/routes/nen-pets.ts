@@ -1,3 +1,4 @@
+import { inputError } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import type { Env } from '../index.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
@@ -33,7 +34,7 @@ function accountIdFrom(c: Context<Env>): string {
 }
 
 async function requireAccount(c: Context<Env>, accountId: string): Promise<Response | null> {
-  if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }

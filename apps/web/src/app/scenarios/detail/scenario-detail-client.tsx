@@ -1872,7 +1872,7 @@ export default function ScenarioDetailClient({
               </Button>
               {/* 保存するものは、いま開いている編集の内容。カードの「編集」
                   「変更」を押していないときは、保存するものが無い。 */}
-              <Button variant="primary" className="px-4 py-2 font-bold border-0 h-auto whitespace-normal" onClick={handleSaveScenario} disabled={!editing || saving} title={editing ? undefined : '「編集」か「変更」を押すと、ここで保存できます'}>
+              <Button variant="primary" className="px-4 py-2 font-bold border-0 h-auto whitespace-normal" onClick={handleSaveScenario} disabled={!editing || saving} title={editing ? undefined : '「編集」か「変更」を押すと、ここで保存できます'} >
                 {saving ? '保存中…' : '保存する'}
               </Button>
               </div>

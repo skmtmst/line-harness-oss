@@ -1,14 +1,20 @@
 'use client'
 
+import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
 import React, { useEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import MenuPortal from './menu-portal'
+import { useV8Leave } from './overlay-utils'
 import styles from './action-menu.module.css'
 
 export type ActionMenuItem = {
   id: string
   label: string
   icon?: ReactNode
+  /** 自分で結果を表示する共通操作（コピーなど）。 */
+  content?: ReactNode
+  /** 先頭の主な操作を太字で示す。既存の項目の見た目は変えない。 */
+  emphasis?: boolean
   /**
    * 補足（★V7）。渡すと項目が2行・高さ52pxになる。
    * 例：「テンプレートを送る」＋「受信箱で選んで送ります」。
@@ -20,6 +26,7 @@ export type ActionMenuItem = {
    * 同じ画面の中の操作（モーダル・タブ切替）には付けない。
    */
   external?: boolean
+  href?: string
   disabled?: boolean
   /**
    * #985 LAY-18: 押せない理由（使用中・公開中など）。無効な項目の下に
@@ -58,6 +65,7 @@ export type ActionMenuProps = {
 
 /** Pencil ★V8 `hnuY9`「その他操作メニュー」を正本にした小型操作メニュー。 */
 export default function ActionMenu({ open, items, note, onClose, ariaLabel = '操作', inline = false, anchorRef }: ActionMenuProps) {
+  const leaving = useV8Leave(open, 80)
   const menuRef = useRef<HTMLDivElement>(null)
   const anchorMarkRef = useRef<HTMLSpanElement>(null)
 
@@ -137,7 +145,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
     }
   }, [inline, open])
 
-  if (!open) return null
+  if (!open && !leaving) return null
 
   const moveFocus = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Tab') {
@@ -159,6 +167,9 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
     <div
       ref={menuRef}
       role="menu"
+      aria-hidden={leaving || undefined}
+      inert={leaving || undefined}
+      data-closing={leaving || undefined}
       aria-label={ariaLabel}
       className={`${styles.menu} ${inline ? styles.inline : styles.menuPortal}`}
       onKeyDown={moveFocus}
@@ -171,7 +182,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
       data-design-part="action-menu"
       data-design-node="xifuV"
     >
-      {items.map((item) => (
+      {items.map((item) => item.content ?? (
         <div key={item.id}>
           {item.dividerBefore ? <hr className={styles.divider} /> : null}
           {item.sectionBefore ? (
@@ -179,7 +190,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
               {item.sectionBefore}
             </p>
           ) : null}
-          <button
+          <MenuCommand href={item.href} external={item.external}
             type="button"
             role="menuitem"
             className={`${styles.item} ${item.description || (item.disabled && item.disabledReason) ? styles.itemTall : ''} ${item.tone === 'danger' ? styles.danger : ''}`}
@@ -191,13 +202,13 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
               // 先に開いたボタンへ戻しておく。項目が窓を開くと、窓はこのボタンを
               // 「開く前の場所」として覚え、閉じた後にここへ戻す（消えた項目へは戻れない）。
               if (!inline) getFocusTarget()?.focus({ preventScroll: true })
-              item.onSelect()
+              if (!item.href) item.onSelect()
               onClose()
             }}
           >
             {item.icon ? <span className={styles.icon} aria-hidden="true">{item.icon}</span> : null}
             <span className={styles.itemBody}>
-              <span className={styles.label}>{item.label}</span>
+              <span className={styles.label}>{item.emphasis ? <strong>{item.label}</strong> : item.label}</span>
               {item.description ? (
                 <span className={styles.description}>{item.description}</span>
               ) : null}
@@ -208,7 +219,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
             {item.external ? (
               <ArrowUpRight size={14} aria-hidden="true" className={styles.externalIcon} />
             ) : null}
-          </button>
+          </MenuCommand>
         </div>
       ))}
       {note ? <p className={styles.note}>{note}</p> : null}
@@ -221,10 +232,15 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
   if (inline) return menu
   return (
     <>
-      <span ref={anchorMarkRef} aria-hidden="true" className={styles.anchor} />
-      <MenuPortal open={open} getAnchor={getAnchor} onClose={onClose}>
+      {anchorRef ? null : <span ref={anchorMarkRef} aria-hidden="true" className={styles.anchor} />}
+      <MenuPortal open={open} exitDuration={80} getAnchor={getAnchor} onClose={onClose}>
         {menu}
       </MenuPortal>
     </>
   )
+}
+
+function MenuCommand({ href, external, disabled, children, type, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { href?: string; external?: boolean }) {
+  if (href && !disabled) return <Link href={href} role={props.role} className={props.className} title={props.title} target={external ? '_blank' : undefined} rel={external ? 'noopener noreferrer' : undefined} onClick={props.onClick as unknown as React.MouseEventHandler<HTMLAnchorElement>}>{children}</Link>
+  return <button {...props} type={type} disabled={disabled}>{children}</button>
 }

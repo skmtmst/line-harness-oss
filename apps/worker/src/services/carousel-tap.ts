@@ -62,7 +62,7 @@ export async function handleCarouselTap(
   lineClient: LineClient,
   friend: { id: string; line_user_id: string },
   tap: CarouselTapPostback,
-  options: { lineAccountId?: string | null; replyToken?: string },
+  options: { lineAccountId?: string | null; replyToken?: string; sourceEventId?: string },
 ): Promise<CarouselTapResult> {
   const template = await getTemplateById(db, tap.templateId);
   if (!template) return { kind: 'not_found' };
@@ -131,7 +131,7 @@ export async function handleCarouselTap(
   if (rows.length === 0) return { kind: 'ran', executed: 0 };
 
   try {
-    const result = await runActionRows(db, rows, friend.id);
+    const result = await runActionRows(db, rows, friend.id, {accountId:lineAccountId,sourceEventId:options.sourceEventId,executorDependencies:{resolveLineAccessToken:async()=> 'existing-client',createLineClient:()=>lineClient}});
     return { kind: 'ran', executed: result.executed };
   } catch (err) {
     console.error('[carouselTap] failed to run actions', err);

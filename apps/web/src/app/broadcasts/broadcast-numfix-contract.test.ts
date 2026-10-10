@@ -32,9 +32,9 @@ describe('一斉配信の数字合わせ', () => {
     expect(CSS).toMatch(/\.table th:last-child,\s*\.table td:last-child \{ padding-right: var\(--tpl-bc-edge-pad\)/)
   })
 
-  it('題は13px・500', () => {
+  it('題は12px・500', () => {
     expect(CSS).toMatch(/\.cellTitle \{[^}]*font-size: var\(--text-label\)/)
-    expect(token('--text-label')).toBe('13px')
+    expect(token('--text-label')).toBe('12px')
     expect(CSS).toMatch(/\.cellTitle \{[^}]*font-weight: 500/)
   })
 })

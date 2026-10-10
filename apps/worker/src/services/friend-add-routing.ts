@@ -1580,6 +1580,8 @@ export interface FriendAddRoutingResult {
   ruleVersionId: string | null;
   /** 実行台帳上で失敗した処理数。配信結果とは分けて親台帳を確定する。 */
   actionFailureCount?: number;
+  /** 公開ルールのテキスト本文。送信権を持つWebhookが送る。 */
+  messageText?: string;
 }
 
 function ruleActions(value: unknown[]): FriendAddAction[] {
@@ -1898,6 +1900,17 @@ export async function applyFriendAddRouting(
 
   const timing = routing.firstTime.timing;
   const classifiedKind = matchedRule ? kind : classifyFriend(friend, routing.criteria.firstTime);
+
+  if (matchedRule?.definition.messageType === 'text' &&
+      !(classifiedKind === 'returning' && routing.returning.mode === 'none')) {
+    const actionResult = await runActions(db, friend.id, ruleActions(matchedRule.definition.actions), push, routingContext?.fence,
+      routingContext?.eventId ? { eventId: routingContext.eventId, ruleVersionId: matchedRule.versionId, lineAccountId: accountId } : undefined);
+    const messageText = matchedRule.definition.messageText;
+    return { routed: true, kind: classifiedKind, enrollments: [], timing,
+      suppressed: !messageText.trim(), suppressReason: messageText.trim() ? null : 'delivery_disabled',
+      ruleId: matchedRule.ruleId, ruleVersionId: matchedRule.versionId,
+      actionFailureCount: actionResult.failed, messageText };
+  }
 
   // ② で「配信しない」を選んでいる
   if (classifiedKind === 'returning' && routing.returning.mode === 'none') {

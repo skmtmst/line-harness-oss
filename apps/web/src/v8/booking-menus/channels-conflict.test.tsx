@@ -6,7 +6,7 @@ import type { BookingConflict } from '@line-crm/shared'
 
 const net = vi.hoisted(() => ({ reassign: vi.fn() }))
 vi.mock('./lib/booking-channels', () => ({ bookingChannelsApi: net }))
-vi.mock('@/components/shared/toast', () => ({ notifyToast: vi.fn() }))
+vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
 import { ConflictDialog } from './channels-tab'
 
 const conflict: BookingConflict = {
@@ -29,7 +29,7 @@ afterEach(() => { cleanup(); vi.resetAllMocks() })
 
 it('2件の名前・メニュー・受付経路と日本時間を返事どおりに表示する', () => {
   render(<ConflictDialog accountId="a" conflict={conflict} staff={staff} onClose={() => {}} onDone={() => {}} />)
-  expect(screen.getByRole('heading').textContent).toContain('10/3（土） 13:00')
+  expect(screen.getByRole('heading').textContent).toContain('10月3日（土） 13:00')
   expect(screen.getByText(/① LINE（musubo）・山田さん・トリミング・13:00〜14:00/)).toBeTruthy()
   expect(screen.getByText(/② 外部取り込み・鈴木さん・シャンプー・13:00〜13:45/)).toBeTruthy()
   expect(screen.getByText(conflict.guidance!)).toBeTruthy()
@@ -49,4 +49,13 @@ it('連携済みなら未連携の案内を出さず、失敗した移動は同�
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '移して知らせる' })) })
   expect(net.reassign).toHaveBeenLastCalledWith('a', 'b1', { staffId: 's2', notifyCustomer: true })
   expect(done).toHaveBeenCalledTimes(1)
+})
+it('WEB-059: 閲覧のみも重なった予約を読めるが移動操作と入力を隠す', () => {
+  render(<ConflictDialog accountId="a" conflict={conflict} staff={staff} canEdit={false} onClose={() => {}} onDone={() => {}} />)
+  expect(screen.getByText(/① LINE（musubo）・山田さん/)).toBeTruthy()
+  expect(screen.getByText(conflict.reason!)).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '移して知らせる' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '移す先のスタッフ' })).toBeNull()
+  expect(screen.queryByRole('switch')).toBeNull()
+  expect(net.reassign).not.toHaveBeenCalled()
 })

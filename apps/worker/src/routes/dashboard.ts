@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   DASHBOARD_CARD_GROUPS as SHARED_DASHBOARD_CARD_GROUPS,
@@ -405,14 +406,14 @@ dashboard.get('/api/dashboard/preferences', async (c) => {
   }
 });
 
-dashboard.put('/api/dashboard/preferences', async (c) => {
+dashboard.put('/api/dashboard/preferences', inputJsonBoundary(), async (c) => {
   try {
     const access = await requireVisibleAccount(c);
     if ('response' in access) return access.response;
     const body = await c.req.json<{ version?: unknown; cards?: unknown }>();
     const cards = readDashboardCards(body.cards);
     if (!Number.isInteger(body.version) || Number(body.version) < 0 || !cards) {
-      return c.json({ success: false as const, error: '配置または版の指定が正しくありません' }, 400);
+      return inputError(c, { success: false as const, error: '配置または版の指定が正しくありません' }, 400, ["version","cards"]);
     }
     const saved = await saveDashboardPreference(c.env.DB, {
       staffId: c.get('staff').id,
@@ -444,13 +445,13 @@ dashboard.delete('/api/dashboard/preferences', async (c) => {
   }
 });
 
-dashboard.put('/api/dashboard/preferences/default', requireRole('owner'), async (c) => {
+dashboard.put('/api/dashboard/preferences/default', requireRole('owner'), inputJsonBoundary(), async (c) => {
   try {
     const access = await requireVisibleAccount(c);
     if ('response' in access) return access.response;
     const body = await c.req.json<{ cards?: unknown }>();
     const cards = readDashboardCards(body.cards);
-    if (!cards) return c.json({ success: false as const, error: '配置の指定が正しくありません' }, 400);
+    if (!cards) return inputError(c, { success: false as const, error: '配置の指定が正しくありません' }, 400, ["cards"]);
     const saved = await saveDashboardDefaultPreference(c.env.DB, {
       lineAccountId: access.accountId,
       staffId: c.get('staff').id,

@@ -78,6 +78,32 @@ describe('回答フォームの応答契約（Worker の形）', () => {
     expect(await api.webinarAudience('w1')).toEqual({ viewerCount: 2, lecturerName: null });
     expect(unwrapSuccessData({ success: true, data: 0 }, '/x')).toBe(0);
   });
+
+  test('liffConfig・郵便番号・繰上げ案内は包みごと返す', async () => {
+    const config = { success: true, data: { accountId: 'a1', accountName: '店', botBasicId: '@test' } };
+    stubFetch(config);
+    expect(await api.liffConfig()).toEqual(config);
+    const postal = { success: true, data: { query: '100-0001', normalized: '1000001', status: 'not_found', candidates: [] } };
+    stubFetch(postal);
+    expect(await api.postalCodeSearch('100-0001')).toEqual(postal);
+    const offer = { success: true, data: { eventId: 'e1' } };
+    stubFetch(offer);
+    expect(await api.eventWaitlistOffer('offer')).toEqual(offer);
+  });
+
+  test.each([null, {}, { answers: [] }, { answers: '名前' }])('前回回答の不正な中身を受け付けない (%j)', async (data) => {
+    // null は正規の「前回回答なし」。ほかの不正な中身は例外にする。
+    stubFetch({ success: true, data });
+    if (data === null) expect(await api.getMyLatestFormAnswer('f1')).toBeNull();
+    else await expect(api.getMyLatestFormAnswer('f1')).rejects.toThrow(/応答の形/);
+  });
+
+  test('送信の 409 と本文はそのまま判定側へ渡す', async () => {
+    const body = { success: false, error: 'conflict', code: 'FORM_DUPLICATE' };
+    stubFetch(body, 409);
+    expect(await api.submitForm('f1', { data: {} }, '00000000-0000-4000-8000-000000000001'))
+      .toEqual({ status: 409, body });
+  });
 });
 
 describe('撮影用の偽 API も同じ契約で読める', () => {

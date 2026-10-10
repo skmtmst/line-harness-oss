@@ -130,7 +130,7 @@ function EditWebhookPageInner() {
   return (
     <CreatePage
       title="送り先を直す"
-      description="送り先の設定を直します。合言葉はこの画面では変わりません。"
+      help="送り先の設定を直します。合言葉はこの画面では変わりません。"
       parent={['外部連携', '/webhooks']}
       saveLabel="保存する"
       successHref={() => '/webhooks'}

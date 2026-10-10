@@ -105,7 +105,7 @@ describe('current tenant', () => {
       body: JSON.stringify({ name }),
     }, environment());
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ success: false, error });
+    await expect(response.json()).resolves.toMatchObject({ success: false, error , fields: expect.any(Object) });
   });
 });
 

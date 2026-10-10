@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { getTenantCompanyContact, saveTenantCompanyContact } from '@line-crm/db';
 import { parseTenantCompanyContact } from '@line-crm/shared';
@@ -66,15 +67,15 @@ tenants.get('/api/tenants/me/company-contact', requireRole('owner', 'admin'), as
     : c.json({ success: false, error: '統括が見つかりません' }, 404);
 });
 
-tenants.patch('/api/tenants/me/company-contact', requireRole('owner', 'admin'), async c => {
+tenants.patch('/api/tenants/me/company-contact', requireRole('owner', 'admin'), inputJsonBoundary(), async c => {
   const staff = c.get('staff')!;
   if (staff.readOnly) return c.json({ success: false, error: '閲覧のみの権限では保存できません' }, 403);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   const parsed = parseTenantCompanyContact(body);
-  if (parsed.error) return c.json({ success: false, error: parsed.error }, 400);
+  if (parsed.error) return inputError(c, { success: false, error: parsed.error }, 400, ["name"]);
   const revision = body?.expectedRevision;
   if (typeof revision !== 'number' || !Number.isSafeInteger(revision) || revision < 0) {
-    return c.json({ success: false, error: '最新版を読み込んでから保存してください' }, 400);
+    return inputError(c, { success: false, error: '最新版を読み込んでから保存してください' }, 400, ["expectedRevision"]);
   }
   const db = dbFor(c.env), tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
   if (!await getTenantCompanyContact(db, tenantId)) return c.json({ success: false, error: '統括が見つかりません' }, 404);
@@ -84,7 +85,7 @@ tenants.patch('/api/tenants/me/company-contact', requireRole('owner', 'admin'), 
   return c.json({ success: true, data });
 });
 
-tenants.post('/api/tenants', async (c) => {
+tenants.post('/api/tenants', inputJsonBoundary(), async (c) => {
   if (!(await canManageTenants(c))) return forbidden(c);
 
   const body = await c.req.json<{
@@ -95,23 +96,23 @@ tenants.post('/api/tenants', async (c) => {
   }>().catch(() => null);
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
   if (!name || name.length > 100) {
-    return c.json({ success: false, error: '統括名は1〜100文字で入力してください' }, 400);
+    return inputError(c, { success: false, error: '統括名は1〜100文字で入力してください' }, 400, ["name"]);
   }
   // The current tenants schema has nowhere to persist these fields. Rejecting
   // them avoids pretending that supplied business data was saved.
   if (body?.prefecture !== undefined || body?.representativeName !== undefined) {
-    return c.json({ success: false, error: '未対応の項目が含まれています' }, 400);
+    return inputError(c, { success: false, error: '未対応の項目が含まれています' }, 400, ["prefecture","representativeName"]);
   }
   const featurePacks = parseFeaturePacks(body?.featurePacks);
   if (!featurePacks) {
-    return c.json({ success: false, error: '利用できない機能パックが含まれています' }, 400);
+    return inputError(c, { success: false, error: '利用できない機能パックが含まれています' }, 400, ["featurePacks"]);
   }
 
   const db = dbFor(c.env);
   const duplicate = await db.prepare('SELECT id FROM tenants WHERE name = ? LIMIT 1')
     .bind(name)
     .first<{ id: string }>();
-  if (duplicate) return c.json({ success: false, error: '同じ名前の統括が存在します' }, 400);
+  if (duplicate) return inputError(c, { success: false, error: '同じ名前の統括が存在します' }, 400, ["name"]);
 
   const tenantId = crypto.randomUUID();
   try {
@@ -146,12 +147,12 @@ tenants.get('/api/tenants', async (c) => {
   });
 });
 
-tenants.patch('/api/tenants/:id/status', async (c) => {
+tenants.patch('/api/tenants/:id/status', inputJsonBoundary(), async (c) => {
   if (!(await canManageTenants(c))) return forbidden(c);
   const body = await c.req.json<{ status?: unknown }>().catch(() => null);
   const status = body?.status;
   if (typeof status !== 'string' || !ALLOWED_TENANT_STATUSES.has(status as TenantStatus)) {
-    return c.json({ success: false, error: '利用できない状態です' }, 400);
+    return inputError(c, { success: false, error: '利用できない状態です' }, 400, ["status"]);
   }
 
   // This only records the tenant state. Enforcing it for login and delivery is
@@ -165,12 +166,12 @@ tenants.patch('/api/tenants/:id/status', async (c) => {
   return c.json({ success: true, data: { status: status as TenantStatus } });
 });
 
-tenants.patch('/api/tenants/:id/feature-packs', async (c) => {
+tenants.patch('/api/tenants/:id/feature-packs', inputJsonBoundary(), async (c) => {
   if (!(await canManageTenants(c))) return forbidden(c);
   const body = await c.req.json<{ featurePacks?: unknown }>().catch(() => null);
   const featurePacks = parseFeaturePacks(body?.featurePacks);
   if (!featurePacks) {
-    return c.json({ success: false, error: '利用できない機能パックが含まれています' }, 400);
+    return inputError(c, { success: false, error: '利用できない機能パックが含まれています' }, 400, ["featurePacks"]);
   }
   const result = await dbFor(c.env).prepare(`UPDATE tenants
     SET feature_packs = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
@@ -193,11 +194,11 @@ tenants.get('/api/tenants/me', async (c) => {
 });
 
 /** 認証スタッフ自身が所属する統括の表示名だけを更新する。 */
-tenants.patch('/api/tenants/me', requireRole('owner', 'admin'), async (c) => {
+tenants.patch('/api/tenants/me', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const body = await c.req.json<{ name?: unknown }>().catch(() => null);
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
-  if (!name) return c.json({ success: false, error: '統括名を入力してください' }, 400);
-  if (name.length > 100) return c.json({ success: false, error: '統括名は100文字以内で入力してください' }, 400);
+  if (!name) return inputError(c, { success: false, error: '統括名を入力してください' }, 400, ["name"]);
+  if (name.length > 100) return inputError(c, { success: false, error: '統括名は100文字以内で入力してください' }, 400, ["name"]);
 
   const db = dbFor(c.env);
   const staffTenantId = c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;

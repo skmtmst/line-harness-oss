@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -57,7 +58,7 @@ function readToken(c: Context<Env>, body?: Record<string, unknown>): string {
 opsInvite.get('/api/auth/ops-invite/check', async (c) => {
   const { state, staff } = await loadInvite(c, readToken(c));
   if (state !== 'valid' || !staff) {
-    return c.json({ success: false, error: STATE_MESSAGE[state as Exclude<InviteState, 'valid'>], code: state }, state === 'invalid' ? 404 : 410);
+    return inputError(c, { success: false, error: STATE_MESSAGE[state as Exclude<InviteState, 'valid'>], code: state }, state === 'invalid' ? 404 : 410, []);
   }
   return c.json({
     success: true,
@@ -70,13 +71,13 @@ opsInvite.get('/api/auth/ops-invite/check', async (c) => {
   });
 });
 
-opsInvite.post('/api/auth/ops-invite/accept', async (c) => {
+opsInvite.post('/api/auth/ops-invite/accept', inputJsonBoundary(), async (c) => {
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) return c.json({ success: false, error: config.misconfigured }, 500);
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
   const { state, invite, staff } = await loadInvite(c, readToken(c, body));
   if (state !== 'valid' || !staff || !invite) {
-    return c.json({ success: false, error: STATE_MESSAGE[state as Exclude<InviteState, 'valid'>], code: state }, state === 'invalid' ? 404 : 410);
+    return inputError(c, { success: false, error: STATE_MESSAGE[state as Exclude<InviteState, 'valid'>], code: state }, state === 'invalid' ? 404 : 410, []);
   }
 
   const now = new Date();
@@ -95,7 +96,7 @@ opsInvite.post('/api/auth/ops-invite/accept', async (c) => {
     else if (name.length > NAME_MAX) errors.name = `お名前は${NAME_MAX}文字以内で入力してください`;
     const passwordError = validatePasswordPolicy(password);
     if (passwordError) errors.password = passwordError;
-    if (Object.keys(errors).length) return c.json({ success: false, error: Object.values(errors)[0], errors }, 400);
+    if (Object.keys(errors).length) return inputError(c, { success: false, error: Object.values(errors)[0], errors }, 400, []);
     updates.name = name;
     updates.password_hash = await hashPassword(password);
     updates.password_updated_at = toJstString(now);

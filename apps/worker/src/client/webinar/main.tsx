@@ -1,14 +1,13 @@
 // main.tsx — Auto-webinar (疑似ライブ) LIFF entry. Loaded via dynamic import
 // from apps/worker/src/client/main.ts (?page=webinar&slug=<slug>).
-// apps/liff/src/pages/Webinar.tsx と同一ロジックの legacy-client 移植版
-// (本番 LIFF は worker 内蔵クライアントのため。apps/liff は未デプロイ)。
+// Worker の入口と apps/liff の入口が共用する、申込・視聴・回答の本体。
 //
 // 時刻の権威はサーバー:
 //   期待位置 = offsetSeconds + (performance.now() - t0) / 1000
 // 動画側がバッファ等で 5 秒以上ズレたら期待位置へ強制シーク。
 // シークバー・一時停止 UI は出さない (controls なし)。
 
-import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
+import { StrictMode, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import {
   buildFormSubmitHeaders,
@@ -18,6 +17,15 @@ import {
 } from '@line-crm/shared';
 import { buildMeetingDateOptions } from './date-options.js';
 import './styles.css';
+import '../../../../liff/src/index.css';
+import LiffHeader from '../../../../liff/src/components/ui/LiffHeader.js';
+import LoadingView from '../../../../liff/src/components/LoadingView.js';
+import LoadErrorView from '../../../../liff/src/components/LoadErrorView.js';
+import Icon from '../../../../liff/src/components/ui/Icon.js';
+import StatusView from '../../../../liff/src/components/ui/StatusView.js';
+import Button from '../../../../liff/src/components/ui/Button.js';
+import { TextInput, FieldCount } from '../../../../liff/src/components/forms/controls.js';
+import { setLiffContext } from '../../../../liff/src/lib/liff-auth.js';
 
 // LIFF SDK は index.html の script タグでグローバル注入される
 declare const liff: {
@@ -31,6 +39,7 @@ export interface WebinarContext {
   liffId: string;
   lineUserId: string;
   idToken: string;
+  apiBase?: string;
 }
 
 const DRIFT_TOLERANCE = 5;
@@ -131,6 +140,7 @@ interface ChatItem {
   authorName: string;
   body: string;
   mine?: boolean;
+  failed?: boolean;
   ctaCard?: WebinarCtaCard;
 }
 
@@ -139,7 +149,7 @@ function buildAuthHeaders(ctx: WebinarContext, extra: Record<string, string> = {
 }
 
 async function apiGet<T>(path: string, ctx: WebinarContext): Promise<T> {
-  const url = new URL(path, window.location.origin);
+  const url = new URL(path, ctx.apiBase || window.location.origin);
   url.searchParams.set('liffId', ctx.liffId);
   const r = await fetch(url.toString(), { headers: buildAuthHeaders(ctx) });
   if (!r.ok) {
@@ -151,7 +161,7 @@ async function apiGet<T>(path: string, ctx: WebinarContext): Promise<T> {
 }
 
 async function apiPost<T>(path: string, body: unknown, ctx: WebinarContext): Promise<T> {
-  const url = new URL(path, window.location.origin);
+  const url = new URL(path, ctx.apiBase || window.location.origin);
   url.searchParams.set('liffId', ctx.liffId);
   const r = await fetch(url.toString(), {
     method: 'POST',
@@ -172,12 +182,17 @@ function formatJp(epoch: number): string {
   });
 }
 
-function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
+export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
   const [state, setState] = useState<WebinarState | null>(null);
+  const loadingRef = useRef(false);
+  const commentInFlight = useRef(false);
+  const [commentBusy, setCommentBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ended, setEnded] = useState(false);
   const [needsTap, setNeedsTap] = useState(false);
   const [countdown, setCountdown] = useState('');
+  const [remainSec, setRemainSec] = useState(0);
+  const [unplayable, setUnplayable] = useState(false);
   // ライブ参加ゲート: 予約した回だけ再生する。未予約なら開始直後でも予約画面。
   const [joined, setJoined] = useState(false);
   const joinedRef = useRef(false);
@@ -232,12 +247,16 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
   );
 
   const load = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    setError(null);
     try {
       const admissionSession = new URLSearchParams(window.location.search).get('sessionStartAt');
       const path = `/api/liff/webinars/${encodeURIComponent(slug)}` +
         (admissionSession ? `?sessionStartAt=${encodeURIComponent(admissionSession)}` : '');
       const s = await apiGet<WebinarState>(path, ctx);
       if (s.live) {
+        s.playlistUrl = new URL(s.playlistUrl, ctx.apiBase || window.location.origin).toString();
         t0Ref.current = performance.now();
         baseOffsetRef.current = s.offsetSeconds;
         commentIdxRef.current = 0;
@@ -263,6 +282,8 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
       else if (status === 404) setError('この配信は見つかりませんでした。');
       else setError('読み込みに失敗しました。開き直してください。');
       console.error(err);
+    } finally {
+      loadingRef.current = false;
     }
   }, [slug, ctx]);
 
@@ -280,7 +301,7 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
 
   // 待機画面: カウントダウン + 開始時刻到達で自動リロード
   useEffect(() => {
-    if (!state || state.live) return;
+    if (!state || state.live || error) return;
     if (state.nextSessionAt === null) return;
     const timer = setInterval(() => {
       const remain = state.nextSessionAt! - Math.floor(Date.now() / 1000);
@@ -292,12 +313,13 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
       const h = Math.floor(remain / 3600);
       const m = Math.floor((remain % 3600) / 60);
       const s = remain % 60;
+      setRemainSec(Math.max(0, remain));
       setCountdown(
         h > 0 ? `${h}時間${String(m).padStart(2, '0')}分` : `${m}分${String(s).padStart(2, '0')}秒`,
       );
     }, 1000);
     return () => clearInterval(timer);
-  }, [state, load]);
+  }, [state, load, error]);
 
   // ライブ画面: プレーヤー初期化
   useEffect(() => {
@@ -322,7 +344,7 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
         const { default: Hls } = await import('hls.js');
         if (cancelled) return;
         if (!Hls.isSupported()) {
-          setError('この端末では再生できません。');
+          setUnplayable(true);
           return;
         }
         const instance = new Hls();
@@ -523,8 +545,8 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
     return () => clearInterval(timer);
   }, [state, joined, slug, ctx, expectedPosition, ended]);
 
-  const sendComment = async () => {
-    if (!state) return;
+  const sendComment = async (retry?: ChatItem) => {
+    if (!state || commentInFlight.current) return;
     // ライブ中は現在位置、待機ルーム中は次回セッション帰属の負の位置で投稿する
     let sessionStartAt: number;
     let atSeconds: number;
@@ -537,13 +559,14 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
     } else {
       return;
     }
-    const text = input.trim();
+    const text = retry?.body ?? input.trim();
     if (!text) return;
-    setInput('');
-    setChat((prev) => [
-      ...prev,
-      { key: `u-${Date.now()}`, authorName: 'あなた', body: text, mine: true },
-    ]);
+    const key = retry?.key ?? `u-${crypto.randomUUID()}`;
+    commentInFlight.current = true;
+    setCommentBusy(true);
+    if (!retry || input.trim() === text) setInput('');
+    setChat(prev => retry ? prev.map(item => item.key === key ? { ...item, failed: false } : item)
+      : [...prev, { key, authorName: 'あなた', body: text, mine: true }]);
     try {
       await apiPost(`/api/liff/webinars/${encodeURIComponent(slug)}/comments`, {
         sessionStartAt,
@@ -552,6 +575,11 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
       }, ctx);
     } catch (err) {
       console.warn('comment post failed:', err);
+      setChat(prev => prev.map(item => item.key === key ? { ...item, failed: true } : item));
+      setInput(current => current === '' ? text : current);
+    } finally {
+      commentInFlight.current = false;
+      setCommentBusy(false);
     }
   };
 
@@ -578,13 +606,13 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
       // 開封記録 (フォーム機能側のファネル計測に乗せる)
       if (!IS_PREVIEW) {
         // 帰属は Authorization の LINE ID トークンで判定される (body の ID は無視)
-        void fetch(`/api/forms/${encodeURIComponent(card.formId)}/opened`, {
+        void fetch(new URL(`/api/forms/${encodeURIComponent(card.formId)}/opened`, ctx.apiBase || window.location.origin).toString(), {
           method: 'POST',
           headers: buildAuthHeaders(ctx, { 'Content-Type': 'application/json' }),
           body: JSON.stringify({}),
         }).catch(() => undefined);
       }
-      void fetch(`/api/forms/${encodeURIComponent(card.formId)}`)
+      void fetch(new URL(`/api/forms/${encodeURIComponent(card.formId)}`, ctx.apiBase || window.location.origin).toString())
         .then(async (r) => {
           const json = (await r.json()) as { success: boolean; data?: FormDef };
           if (!r.ok || !json.success || !json.data) throw new Error('form fetch failed');
@@ -650,18 +678,26 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
     }
   };
 
+  const header = <LiffHeader title={state?.title || 'ウェビナー'} />;
+  const shell = (content: ReactNode) => (
+    <div className="min-h-screen bg-canvas text-ink" data-design-node="RpW2h">
+      {header}<div className="mx-auto w-full max-w-md px-4 pt-4 pb-12">{content}</div>
+    </div>
+  );
   if (error) {
-    return <div className="p-8 text-center text-gray-300">{error}</div>;
+    if (error.includes('友だち追加')) return shell(<StatusView icon="user-plus" title="友だち追加すると見られます" body={error} />);
+    return shell(<LoadErrorView message={error} onRetry={() => void load()} />);
   }
-  if (!state) {
-    return <div className="p-8 text-center text-gray-500">読み込み中...</div>;
-  }
+  if (unplayable) return shell(<StatusView icon="info" title="この端末では再生できません" body="別の端末かブラウザで開いてください。" />);
+  if (!state) return shell(<LoadingView />);
+  if (ended && !IS_PREVIEW) return shell(<StatusView icon="circle-check" title="ご視聴ありがとうございました" body="配信は終了しました" />);
 
   // ---- 待機ルーム (開始10分前〜): カウントダウン + 開始前チャット ----
   if (!state.live && state.waiting) {
     return (
-      <div className="flex h-dvh justify-center bg-gray-900 text-white">
+      <div className="flex h-dvh justify-center bg-night-deep text-night-body" data-design-node="RpW2h">
         <div className="flex h-full w-full max-w-md flex-col">
+          {header}
           <div className="relative flex aspect-video w-full shrink-0 flex-col items-center justify-center bg-gray-800 px-4">
             <span className="absolute left-2 top-2 rounded bg-gray-600 px-2 py-0.5 text-xs font-bold">
               まもなく開始
@@ -671,35 +707,38 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
             <p className="mt-1 text-sm text-gray-400">で配信が始まります</p>
           </div>
 
-          <div ref={chatBoxRef} className="flex-1 overflow-y-auto p-3 text-sm">
+          <div ref={chatBoxRef} className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-4 py-2 text-[13px]">
             {chat.map((item) => (
               <div key={item.key} className="mb-2">
-                <span className={item.mine ? 'font-medium text-[#06C755]' : 'font-medium text-gray-400'}>
+                <span className={item.mine ? 'font-medium text-night-mine' : 'font-medium text-gray-400'}>
                   {item.authorName}
                 </span>{' '}
-                <span className="text-gray-100">{item.body}</span>
+                <span className="text-night-body">{`\u3000${item.body}`}</span>{item.failed && <><span>（送れませんでした）</span><Button variant="nightText" type="button" disabled={commentBusy} onClick={() => void sendComment(item)}>再送する</Button></>}
               </div>
             ))}
           </div>
 
-          <div className="flex gap-2 border-t border-gray-700 p-2">
-            <input
+          <div className="flex items-center gap-2 px-4 pt-2.5">
+            <TextInput appearance="night"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') void sendComment();
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229) void sendComment();
               }}
-              placeholder="コメントを入力..."
+              aria-label="コメントを書く"
+            placeholder="コメントを書く"
               maxLength={500}
-              className="flex-1 rounded-full bg-gray-800 px-4 py-2 text-base text-white placeholder-gray-500"
+              className="flex-1"
             />
-            <button
-              onClick={() => void sendComment()}
-              className="rounded-full bg-[#06C755] px-4 py-2 text-sm font-bold active:opacity-80"
+            <Button variant="nightSend" aria-label="送信する"
+              disabled={commentBusy || !input.trim()}
+            onClick={() => void sendComment()}
+
             >
-              送信
-            </button>
+              送信する
+            </Button>
           </div>
+          <FieldCount value={input} max={500} night />
         </div>
       </div>
     );
@@ -711,50 +750,48 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
     const visibleUpcoming = upcoming.slice(0, visibleSessionCount);
     const registered = state.registeredSessionAt ?? null;
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center bg-gray-900 p-6 text-white">
-        <p className="mb-2 text-sm text-gray-400">ライブ配信</p>
+      <div className="flex min-h-dvh flex-col bg-canvas text-ink">
+        {header}
+        <div className="flex w-full flex-col items-center p-6">
+        <p className="mb-2 text-sm text-liff-sub">ライブ配信</p>
         <h1 className="mb-1 text-center text-xl font-bold">{state.title}</h1>
         {registered !== null ? (
-          <div className="mt-5 w-full max-w-sm rounded-2xl bg-gray-800 p-5 text-center">
-            <p className="text-sm text-[#06C755]">✅ 予約済み</p>
+          <div className="mt-5 w-full max-w-sm rounded-2xl bg-liff-chip p-5 text-center">
+            <p className="text-sm text-liff-primary">✅ 予約済み</p>
             <p className="mt-2 text-lg font-bold">{formatJp(registered)} の回</p>
-            <p className="mt-3 text-xs leading-relaxed text-gray-400">
+            <p className="mt-3 text-xs leading-relaxed text-liff-sub">
               開始前にLINEで視聴リンクをお送りします。
               <br />
               時間になったらこのページも自動で配信に切り替わります
             </p>
-            <p className="mt-4 text-xs text-gray-500">別の回に変更する場合はもう一度選んでください</p>
+            <p className="mt-4 text-xs text-liff-sub">別の回に変更する場合はもう一度選んでください</p>
           </div>
         ) : (
-          <p className="mt-2 text-sm text-gray-400">参加する回を選んでください</p>
+          <p className="mt-2 text-sm text-liff-sub">参加する回を選んでください</p>
         )}
         <div className="mt-5 flex w-full max-w-sm flex-col gap-2">
           {visibleUpcoming.map((t) => (
-            <button
+            <Button variant="optionRow" selected={registered === t}
               key={t}
               disabled={registering}
               onClick={() => void registerSession(t)}
-              className={`rounded-full py-3 text-center font-bold active:opacity-80 disabled:opacity-50 ${
-                registered === t
-                  ? 'bg-[#06C755] text-white'
-                  : 'bg-gray-800 text-gray-100'
-              }`}
             >
               {t <= Math.floor(Date.now() / 1000)
                 ? `${formatJp(t)} の回（今すぐ途中参加）`
                 : `${formatJp(t)} の回`}
               {registered === t ? ' ✅' : ''}
-            </button>
+            </Button>
           ))}
           {visibleUpcoming.length < upcoming.length && (
             <button
               type="button"
               onClick={() => setVisibleSessionCount((count) => Math.min(count + 6, upcoming.length))}
-              className="mt-1 rounded-full border border-gray-700 py-3 text-sm font-bold text-gray-300 active:opacity-80"
+              className="mt-1 rounded-full border border-gray-700 py-3 text-sm font-bold text-liff-sub active:opacity-80"
             >
               もっと先の時間を見る
             </button>
           )}
+        </div>
         </div>
       </div>
     );
@@ -763,18 +800,23 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
   // ---- 待機画面 (スケジュール未設定・開催予定なし) ----
   if (!state.live) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center bg-gray-900 p-6 text-white">
-        <p className="mb-2 text-sm text-gray-400">次回のライブ配信</p>
+      <div className="flex min-h-dvh flex-col bg-canvas text-ink">
+        {header}
+        <div className="flex w-full flex-col items-center p-6">
+        <p className="mb-2 text-sm text-liff-sub">次回のライブ配信</p>
         <h1 className="mb-6 text-center text-xl font-bold">{state.title}</h1>
         {state.nextSessionAt !== null ? (
           <>
             <p className="text-lg">{formatJp(state.nextSessionAt)} 開始</p>
-            <p className="mt-4 font-mono text-3xl font-bold">{countdown}</p>
-            <p className="mt-6 text-sm text-gray-400">開始時刻になると自動的に始まります</p>
+            <div className="mt-4 flex gap-2" role="timer" aria-label={`開始まであと${remainSec}秒`}>
+              {[{ value: Math.floor(remainSec / 60), unit: '分' }, { value: remainSec % 60, unit: '秒' }].map(box => <div key={box.unit} className="flex min-w-20 flex-col items-center rounded-xl bg-liff-chip px-4 py-3"><span className="text-3xl font-bold tabular-nums">{String(box.value).padStart(2, '0')}</span><span>{box.unit}</span></div>)}
+            </div>
+            <p className="mt-6 text-sm text-liff-sub">開始時刻になると自動的に始まります</p>
           </>
         ) : (
-          <p className="text-gray-400">次回の開催は未定です</p>
+          <p className="text-liff-sub">次回の開催は未定です</p>
         )}
+        </div>
       </div>
     );
   }
@@ -786,12 +828,14 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
     const visibleUpcoming = upcoming.slice(0, visibleSessionCount);
     const registered = state.registeredSessionAt ?? null;
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center bg-gray-900 p-6 text-white">
+      <div className="flex min-h-dvh flex-col bg-canvas text-ink">
+        {header}
+        <div className="flex w-full flex-col items-center p-6">
         <span className="rounded bg-red-600 px-2 py-0.5 text-xs font-bold">● LIVE</span>
         <h1 className="mt-3 text-center text-xl font-bold">{state.title}</h1>
-        <div className="mt-5 w-full max-w-sm rounded-2xl bg-gray-800/60 p-5 text-center">
-          <p className="text-sm font-bold text-gray-400">🔴 いま配信中です（{elapsedMin}分経過）</p>
-          <p className="mt-2 text-xs leading-relaxed text-gray-500">
+        <div className="mt-5 w-full max-w-sm rounded-2xl bg-liff-chip p-5 text-center">
+          <p className="text-sm font-bold text-liff-sub">🔴 いま配信中です（{elapsedMin}分経過）</p>
+          <p className="mt-2 text-xs leading-relaxed text-liff-sub">
             この回への途中からの参加はできません。
             <br />
             次の回のスタートからご参加ください
@@ -799,67 +843,67 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
         </div>
         {upcoming.length > 0 && (
           <>
-            <p className="mt-6 text-sm text-gray-300">
+            <p className="mt-6 text-sm text-liff-sub">
               {registered !== null
                 ? `✅ ${formatJp(registered)} の回を予約済み`
                 : '次の回を最初から予約する'}
             </p>
             <div className="mt-3 flex w-full max-w-sm flex-col gap-2">
               {visibleUpcoming.map((t) => (
-                <button
+                <Button variant="optionRow" selected={registered === t}
                   key={t}
                   disabled={registering}
                   onClick={() => void registerSession(t)}
-                  className={`rounded-full py-3 text-center font-bold active:opacity-80 disabled:opacity-50 ${
-                    registered === t ? 'bg-[#06C755] text-white' : 'bg-gray-800 text-gray-100'
-                  }`}
                 >
                   {formatJp(t)} の回{registered === t ? ' ✅' : ''}
-                </button>
+                </Button>
               ))}
               {visibleUpcoming.length < upcoming.length && (
                 <button
                   type="button"
                   onClick={() => setVisibleSessionCount((count) => Math.min(count + 6, upcoming.length))}
-                  className="mt-1 rounded-full border border-gray-700 py-3 text-sm font-bold text-gray-300 active:opacity-80"
+                  className="mt-1 rounded-full border border-gray-700 py-3 text-sm font-bold text-liff-sub active:opacity-80"
                 >
                   もっと先の時間を見る
                 </button>
               )}
             </div>
             {registered !== null && (
-              <p className="mt-3 text-xs text-gray-500">
+              <p className="mt-3 text-xs text-liff-sub">
                 開始5分前にLINEでお知らせします。このページは閉じてOKです
               </p>
             )}
           </>
         )}
+        </div>
       </div>
     );
   }
 
-  // ---- ライブ / 終了画面 ----
+  // ---- ライブ中 (★V8 RpW2h) / 終了画面 ----
   // PC の横長ウィンドウで video (w-full) が画面高を食い尽くしてチャット欄が
   // 潰れないよう、全体をスマホ幅カラム (max-w-md) に閉じ込めて中央寄せする。
   // スマホでは max-w-md は効かないので挙動不変。
   return (
-    <div className="flex h-dvh justify-center bg-gray-900 text-white">
+    <div className="flex h-dvh justify-center bg-night-deep text-night-body" data-design-node="RpW2h">
       <div className="flex h-full w-full max-w-md flex-col">
-      <div className="relative shrink-0">
-        <video ref={videoRef} className="w-full" playsInline />
+          {header}
+      <div className="relative aspect-video w-full shrink-0 bg-night-panel">
+        <video ref={videoRef} className="aspect-video w-full" playsInline />
         {!ended && (
           <span className={`absolute left-2 top-2 rounded px-2 py-0.5 text-xs font-bold ${IS_PREVIEW || state.replay ? 'bg-gray-600' : 'bg-red-600'}`}>
             {IS_PREVIEW ? 'PREVIEW' : state.replay ? 'REPLAY' : '● LIVE'}
           </span>
         )}
         {!ended && (
-          <button
-            className="absolute right-2 top-2 rounded-full bg-black/60 px-3 py-1.5 text-lg leading-none"
+          <Button variant="nightSound"
+            className="absolute right-2 top-2"
             onClick={toggleMute}
-            aria-label={muted ? '音声をONにする' : '音声をOFFにする'}
+            aria-label={muted ? '音声をオンにする' : '音声をオフにする'}
           >
-            {muted ? '🔇' : '🔊'}
-          </button>
+            <Icon name="volume-x" className="h-3.5 w-3.5" />
+            {muted ? '音声をオンにする' : '音声をオフにする'}
+          </Button>
         )}
         {needsTap && muted && !ended && (
           <button
@@ -875,7 +919,7 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
             }}
           >
             <span className="rounded-full bg-white px-6 py-3 font-bold text-gray-900">
-              タップして音声をON
+              タップして音声をオンにする
             </span>
           </button>
         )}
@@ -885,6 +929,11 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
             <p className="mt-2 text-sm text-gray-300">ご視聴ありがとうございました</p>
           </div>
         )}
+      </div>
+
+      <div className="flex flex-col gap-1 px-4 py-3">
+        <h1 className="truncate text-base font-bold text-white" title={state.title}>{state.title}</h1>
+        <p className="liff-num text-xs text-night-sub">{new Date(state.sessionStartAt * 1000).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })}〜{new Date((state.sessionStartAt + state.durationSeconds) * 1000).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })}</p>
       </div>
 
       {IS_PREVIEW && (
@@ -906,7 +955,7 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
         </div>
       )}
 
-      <div ref={chatBoxRef} className="flex-1 overflow-y-auto p-3 text-sm">
+      <div ref={chatBoxRef} className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-4 py-2 text-[13px]">
         {chat.map((item) =>
           item.ctaCard ? (
             <div
@@ -917,61 +966,64 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
               {item.ctaCard.body && (
                 <p className="mt-1 text-sm leading-relaxed text-gray-600">{item.ctaCard.body}</p>
               )}
-              <button
+              <Button variant="nightAction"
                 onClick={() => openCta(item.ctaCard!)}
-                className="mt-3 w-full rounded-full bg-[#06C755] py-3 text-center text-base font-bold text-white active:opacity-80"
+                className="mt-3"
               >
                 {item.ctaCard.buttonLabel}
-              </button>
+              </Button>
             </div>
           ) : (
             <div key={item.key} className="mb-2">
-              <span className={item.mine ? 'font-medium text-[#06C755]' : 'font-medium text-gray-400'}>
+              <span className={item.mine ? 'font-medium text-night-mine' : 'font-medium text-gray-400'}>
                 {item.authorName}
               </span>{' '}
-              <span className="text-gray-100">{item.body}</span>
+              <span className="text-night-body">{`\u3000${item.body}`}</span>{item.failed && <><span>（送れませんでした）</span><Button variant="nightText" type="button" disabled={commentBusy} onClick={() => void sendComment(item)}>再送する</Button></>}
             </div>
           ),
         )}
       </div>
 
       {activeCta ? (
-        <button
+        <Button variant="nightAction"
           onClick={() => openCta(activeCta)}
-          className="mx-3 mb-2 rounded-full bg-[#06C755] py-3 text-center font-bold text-white active:opacity-80"
+          className="mx-4 mb-2"
         >
           {activeCta.buttonLabel}
-        </button>
+        </Button>
       ) : ctaVisible && state.cta ? (
-        <button
+        <Button variant="nightAction"
           onClick={clickCta}
-          className="mx-3 mb-2 rounded-full bg-[#06C755] py-3 text-center font-bold text-white active:opacity-80"
+          className="mx-4 mb-2"
         >
           {state.cta.label}
-        </button>
+        </Button>
       ) : null}
 
       {!ended && !state.replay && (
-        <div className="flex gap-2 border-t border-gray-700 p-2">
-          <input
+        <div className="flex items-center gap-2 px-4 pt-2.5">
+          <TextInput appearance="night"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') void sendComment();
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229) void sendComment();
             }}
-            placeholder="コメントを入力..."
+            aria-label="コメントを書く"
+            placeholder="コメントを書く"
             maxLength={500}
-            className="flex-1 rounded-full bg-gray-800 px-4 py-2 text-base text-white placeholder-gray-500"
+            className="flex-1"
           />
-          <button
+          <Button variant="nightSend" aria-label="送信する"
+            disabled={commentBusy || !input.trim()}
             onClick={() => void sendComment()}
-            className="rounded-full bg-[#06C755] px-4 py-2 text-sm font-bold active:opacity-80"
+
           >
-            送信
-          </button>
+            送信する
+          </Button>
         </div>
       )}
 
+      {!ended && !state.replay && <FieldCount value={input} max={500} night />}
       {formSheet && (
         <FormSheet
           sheet={formSheet}
@@ -1076,7 +1128,7 @@ export function FormSheet({
     const idemKey = idemKeyRef.current.key;
     // #729: ヘッダ組立は共有部品へ寄せる。認証の取得(ctx)・URL・再送はここに残す。
     const postOnce = async (key: FormIdempotencyKey) => {
-      const r = await fetch(`/api/forms/${encodeURIComponent(def.id)}/submit`, {
+      const r = await fetch(new URL(`/api/forms/${encodeURIComponent(def.id)}/submit`, ctx.apiBase || window.location.origin).toString(), {
         method: 'POST',
         headers: buildAuthHeaders(ctx, buildFormSubmitHeaders(key)),
         body: JSON.stringify({ data: values }),
@@ -1408,6 +1460,7 @@ export function FormSheet({
 }
 
 export function mountWebinar(container: HTMLElement, ctx: WebinarContext, slug: string): void {
+  setLiffContext(ctx);
   document.body.classList.add('wb-active');
   container.innerHTML = '';
   _root?.unmount();

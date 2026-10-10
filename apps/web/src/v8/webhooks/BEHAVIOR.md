@@ -26,7 +26,7 @@ API 接続のタブ（`ralAc`）も `src/v8/webhooks/api-tokens.tsx`（今まで
 - 受け取り口：`api.webhooks.incoming.list / detail / update（name・isActive・secret）/ delete / create / unmatched / resolveUnmatched / test`
 - やり取り：`api.webhooks.interactions.list（periodDays・direction・status・search・page・limit）/ retry / retryFailed`
 - Google Sheets：`api.webhooks.googleSheets.connection / runs / connectStart / setTarget / sync / disconnect`
-- フォルダの箱：`api.folders.list('webhook', accountId)`・追加は共通の `FolderAddDialog`（kind=`webhook`）
+- フォルダの箱：`api.folders.list('webhook', accountId)`・列は共通の `ManagedFolderPanel`（kind=`webhook`。追加・「…」の名前・色・並べ替え・消す）
 - 帯の数：送り先の一覧・受け取り口の一覧・やり取りの集計（この30日・`limit: 1`）を1回ずつ読む（どのタブも同じ）
 
 ## 権限（今と同じ R32）
@@ -34,7 +34,7 @@ API 接続のタブ（`ralAc`）も `src/v8/webhooks/api-tokens.tsx`（今まで
 - 閲覧のみ（統括でない人）には、押せない作る・設定・フォルダを追加・この見本で作る・まとめてやり直すを**置かず**、場所だけ空ける（2026-10-06 オーナー決定）。タブの下・数の帯の上に「閲覧のみで見ています」の帯。
 
 ## 今の V8 と違うところ
-- 送る一覧：左にフォルダの列（箱は `kind=webhook`）。**送り先をフォルダへ入れる口がまだ無い**（送り先の表に folder_id が無い）ので、全件が未分類。フォルダを選ぶと0件。箱の件数は口が返さないので出さない。
+- 送る一覧：左にフォルダの列（箱は `kind=webhook`）。送り先の一覧は `folderId` を返すので、フォルダ・未分類で絞り、件数は読み込んだ送り先から数える。行の名前の前にフォルダの色の丸（B-136）。
 - 送る一覧：並びの部品は絵に無いので、既定を名前順にし、送った回数順は「よく使う絞り込み」から選ぶ。
 - 送る一覧：行の右は「中身を見る（失敗があれば やり直す）」と「設定」（押すと操作の一覧。右クリックでも同じ一覧）。操作の名前は「鍵を作り直す」。
 - 送る一覧：動いているのに一度も送っていない行は「まだ送っていません」。
@@ -62,3 +62,10 @@ API 接続のタブ（`ralAc`）も `src/v8/webhooks/api-tokens.tsx`（今まで
 - 狭い幅（共通の useNarrowViewport）では4列：送り先（名前＋「送るタイミング → URL のホスト」）・今月送った（回数＋最後に送った日時／失敗の数）・状態・操作。
 - 操作は「…」だけ。中に 中身を見る・（失敗があり変えられる人なら）失敗をやり直す・直す・止める／動かす・鍵を作り直す・試しに送る・削除する。
 - 広い幅（ZSbFY）は今までどおり6列・「中身を見る／やり直す」と「設定」。
+
+## 2026-10-09 whook の共通化と入力の誤り
+- 頭と数の帯は型を維持し、短いタブ・カード・入力欄・状態の札・一覧と小さな表を共通部品で描く。画面側の表の内部・カード・入力欄の見た目の上書きを外した。共通部品の追加指定を省いた場合の表示は変えない。
+- 送り先・受け取り口・API 接続の鍵を作るときの入力不足は、欄の赤い枠と理由で知らせる。最初の誤りへ focus と中央へのスクロールを行い、上の失敗の帯と重ねない。通信・権限・競合などの失敗は従来の場所で知らせる。
+- Google Sheets の解除は、連携設定・同期の記録・Google 側の許可が消えることと、シートの中身が残ることを1つの警告にまとめる。解除の処理と本人確認は変えない。
+- 型・動きの試験は残す。画面独自の CSS を要求していた寸法の試験2件だけ、共有 Card・TextField の同じ寸法を確かめる形へ更新した。
+- 測定・左右の比較・再現できない板・正本の食い違いは `SCREEN-REPORT.md` を参照。

@@ -99,6 +99,29 @@ async function setInput(selector: string, value: string) {
 }
 
 describe('V8-B プールを作る（D0AOyx）', () => {
+  it('入力の誤りは該当欄に一度だけ示し、そこへ移動して保存を止める', async () => {
+    await renderV8()
+    const save = document.querySelector('button[form="pool-create-form"]') as HTMLButtonElement
+    await act(async () => save.click())
+    await flush()
+    const name = document.querySelector('#pl-name') as HTMLInputElement
+    expect(document.activeElement).toBe(name)
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect([...document.querySelectorAll('[role="alert"]')].filter(node => node.textContent === '名前を入力してください')).toHaveLength(1)
+    expect(poolsCreate).not.toHaveBeenCalled()
+
+    await setInput('#pl-name', '渋谷')
+    expect(name.getAttribute('aria-invalid')).not.toBe('true')
+    await setInput('#pl-slug', '日本語')
+    await act(async () => save.click())
+    await flush()
+    const slug = document.querySelector('#pl-slug') as HTMLInputElement
+    expect(document.activeElement).toBe(slug)
+    expect(slug.getAttribute('aria-invalid')).toBe('true')
+    expect(poolsCreate).not.toHaveBeenCalled()
+    expect(routerPush).not.toHaveBeenCalled()
+  })
+
   it('番号つきの節とプレビューが出る', async () => {
     await renderV8()
     expect(document.querySelector('[data-design-node="D0AOyx"]'), '板IDの枠がある').toBeTruthy()

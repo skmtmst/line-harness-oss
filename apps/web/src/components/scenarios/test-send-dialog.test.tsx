@@ -280,3 +280,15 @@ describe('NEXT-04: 確認は選択した通・実本文・差込値から組み�
     expect(document.body.textContent).toContain('画像（登録済みの内容をそのまま送ります）')
   })
 })
+
+it('WEB269: 実本文の取得が失敗したらチェックを入れても送信できない', async () => {
+  preview.mockRejectedValue(new Error('offline'))
+  render(<TestSendDialog scenarioId="sc-1" lineAccountId="acc-1" stepId="step-3" stepLabel="3通目" steps={[STEP3]} onClose={() => {}} />)
+  fireEvent.click(await screen.findByText(FRIEND.displayName))
+  fireEvent.click(screen.getByText('内容を確認'))
+  await act(async () => {})
+  for (const check of checkboxes()) fireEvent.click(check)
+  expect(sendButton().disabled).toBe(true)
+  fireEvent.click(sendButton())
+  expect(send).not.toHaveBeenCalled()
+})

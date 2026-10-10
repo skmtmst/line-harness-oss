@@ -31,6 +31,8 @@ import {
   splitFeatureGroups,
 } from './feature-settings-view'
 import { formatDay, formatNumber } from '@/lib/format'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 export type UsageCategory = AnalyticsUsageOverview['data']['categories'][number]
 export type FeatureUsage = AnalyticsUsageOverview['data']['features'][number]
@@ -79,7 +81,7 @@ const USAGE_ITEM_IDS_BY_KEY: Record<string, string[]> = {
 
 /** 最終利用の日付だけを短く出す。時刻はバッジに入らないのでタイトルへ残す。 */
 export function shortUsageDate(value: string): string {
-  return formatDay(value)
+  return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }
 
 export function groupSummary(group: FeatureGroup, features: Record<string, boolean>) {
@@ -594,7 +596,7 @@ export function useFeatureSettings() {
   }
 
   const impactSummary = (group: FeatureImpactGroup) => group.items
-    .map((item) => `${item.targetType} ${formatNumber(item.count)}件`)
+    .map((item) => `${item.targetType} ${formatNumber(item.count)} 件`)
     .join('、')
 
   return {

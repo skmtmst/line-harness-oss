@@ -39,7 +39,7 @@ it('閲覧のみには帯を出し、差戻し・承認するのボタンを置�
   fixture.role = 'staff'
   render(<ApprovalsV8 />)
   expect(await screen.findByText('価格改定')).toBeTruthy()
-  expect(screen.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeTruthy()
+  expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
   expect(screen.queryByRole('button', { name: '承認する' })).toBeNull()
   expect(screen.queryByRole('button', { name: '差戻し' })).toBeNull()
   expect(fixture.decideApproval).not.toHaveBeenCalled()

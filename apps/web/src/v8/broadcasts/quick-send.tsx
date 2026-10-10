@@ -15,7 +15,9 @@ import type { Tag } from '@line-crm/shared'
 import { api, type BroadcastApprovalCandidate } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import DateTimeField from '@/components/shared/date-time-field'
 import { formatNumber } from '@/lib/format'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
@@ -23,6 +25,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './quick-send.module.css'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import { Field } from '@/components/shared/form-controls'
 
 /** 承認を頼む境目（絵の文どおり）。 */
 /** 「名前」を押して入る文字。送るときに友だちの名前へ置き換わる形（{{name}}）。 */
@@ -35,8 +38,8 @@ type Estimate = { count: number; blocked: number; remaining: number | null }
 
 /** 見込みの1文。今月の残りが読めたときだけ足す。 */
 export function estimateText(estimate: Estimate): string {
-  const base = `${formatNumber(estimate.count)}人に届く見込み（ブロック中 ${formatNumber(estimate.blocked)}人を除く）`
-  return estimate.remaining === null ? base : `${base}・今月あと ${formatNumber(estimate.remaining)}通 送れます`
+  const base = `${formatNumber(estimate.count)} 人に届く見込み（ブロック中 ${formatNumber(estimate.blocked)} 人を除く）`
+  return estimate.remaining === null ? base : `${base}・今月あと ${formatNumber(estimate.remaining)} 通 送れます`
 }
 
 export default function QuickSendV8({
@@ -61,6 +64,8 @@ export default function QuickSendV8({
   const [estimating, setEstimating] = useState(false)
   const [candidates, setCandidates] = useState<BroadcastApprovalCandidate[]>([])
   const [approverId, setApproverId] = useState('')
+  const [approvalConfig, setApprovalConfig] = useState<{threshold: number; singleOperator: boolean} | null>(null)
+  const [countInput, setCountInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const estimateTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -72,7 +77,12 @@ export default function QuickSendV8({
 
   // 開いたら入力を空に戻し、タグと承認する人の候補を読む。
   useEffect(() => {
+    let cancelled = false
     if (!open) return
+    setApprovalConfig(null)
+    setCountInput('')
+    setTags([])
+    setCandidates([])
     pendingRef.current = null
     sendingRef.current = false
     setPending(false)
@@ -87,17 +97,20 @@ export default function QuickSendV8({
     setError(null)
     if (!accountId) return
     void api.tags.list({ accountId }).then((res) => {
-      if (res.success) setTags(res.data)
+      if (!cancelled && res.success) setTags(res.data)
     }).catch(() => undefined)
     void api.broadcasts.approval.candidates(accountId).then((res) => {
-      if (res.success) setCandidates(res.data)
+      if (!cancelled && res.success) setCandidates(res.data)
     }).catch(() => undefined)
+    void api.broadcasts.approval.config(accountId).then((res) => { if (cancelled) return; if (res.success) setApprovalConfig(res.data); else setError('承認の設定を読み込めませんでした。開き直してください。') }).catch(() => { if (!cancelled) setError('承認の設定を読み込めませんでした。開き直してください。') })
+    return () => { cancelled = true }
   }, [open, accountId])
 
   // 本文・相手が変わったら人数を見積もる（少し待ってから1回だけ）。
   useEffect(() => {
     let cancelled = false
     setEstimate(null)
+    setCountInput('')
     setEstimating(false)
     if (!open || !accountId) return
     if (estimateTimer.current) clearTimeout(estimateTimer.current)
@@ -132,13 +145,18 @@ export default function QuickSendV8({
     }
   }, [open, accountId, text, target, tagId])
 
-  const needsApproval = (estimate?.count ?? 0) >= APPROVAL_THRESHOLD
+  const needsCountConfirmation = estimate !== null && approvalConfig !== null && estimate.count >= approvalConfig.threshold && approvalConfig.singleOperator
+  const needsApproval = estimate !== null && approvalConfig !== null && estimate.count >= approvalConfig.threshold && !approvalConfig.singleOperator
+  const countMatched = countInput.trim() !== '' && Number(countInput) === estimate?.count
   const scheduledAt = when === 'scheduled' && scheduledValue ? datetimeLocalJstToUtcIso(scheduledValue) : null
   const canSend = text.trim().length > 0
     && text.length <= TEXT_LIMIT
     && (target === 'all' || tagId !== '')
     && (when === 'now' || scheduledValue !== '')
     && (!needsApproval || approverId !== '')
+    && approvalConfig !== null
+    && estimate !== null
+    && (!needsCountConfirmation || countMatched)
     && !busy
 
   /** 差し込む：今のカーソルの位置に {{name}} を入れる（送るときに名前へ置き換わる形。{名前} は置き換わらずに届いていた）。 */
@@ -158,22 +176,7 @@ export default function QuickSendV8({
     setError(null)
     try {
       let attempt = pendingRef.current
-      if (!attempt) {
-        const created = await api.broadcasts.create({
-          title: text.trim().slice(0, 20) || 'かんたん送信',
-          messageType: 'text',
-          messageContent: text,
-          targetType: target === 'tag' ? 'tag' : 'all',
-          targetTagId: target === 'tag' ? tagId : null,
-          scheduledAt,
-          status: scheduledAt ? 'scheduled' : 'draft',
-          lineAccountId: accountId,
-        })
-        if (!created.success) throw new Error(created.error ?? '作れませんでした')
-        attempt = { id: created.data.id, scheduledAt, needsApproval }
-        pendingRef.current = attempt
-        setPending(true)
-      } else {
+      if (attempt) {
         // 応答だけを失った場合は実物を読み、既に始まった送信・承認依頼を繰り返さない。
         const current = await api.broadcasts.get(attempt.id)
         if (!current.success) throw new Error(current.error ?? '配信の状態を確認できませんでした')
@@ -185,12 +188,45 @@ export default function QuickSendV8({
           return
         }
       }
+      if (needsCountConfirmation) {
+        const current = await api.broadcasts.preflight({
+          targetType: target === 'tag' ? 'tag' : 'all',
+          targetTagId: target === 'tag' ? tagId : null,
+          lineAccountId: accountId,
+          messageContent: text,
+          messageCount: 1,
+        })
+        if (!current.success) throw new Error(current.error || '現在の人数を確認できませんでした')
+        if (current.data.audienceCount !== Number(countInput)) {
+          setEstimate({ count: current.data.audienceCount, blocked: current.data.hiddenExcluded, remaining: current.data.quota?.remaining ?? null })
+          setCountInput('')
+          setError('対象人数が変わりました。現在の人数を確認して、もう一度入力してください。')
+          return
+        }
+      }
+      if (!attempt) {
+        const created = await api.broadcasts.create({
+          title: text.trim().slice(0, 20) || 'かんたん送信',
+          messageType: 'text',
+          messageContent: text,
+          targetType: target === 'tag' ? 'tag' : 'all',
+          targetTagId: target === 'tag' ? tagId : null,
+          scheduledAt,
+          status: scheduledAt ? 'scheduled' : 'draft',
+          lineAccountId: accountId,
+          ...(needsCountConfirmation ? { confirmedRecipientCount: Number(countInput) } : {}),
+        })
+        if (!created.success) throw new Error(created.error ?? '作れませんでした')
+        attempt = { id: created.data.id, scheduledAt, needsApproval }
+        pendingRef.current = attempt
+        setPending(true)
+      }
       const id = attempt.id
       if (attempt.needsApproval) {
         const requested = await api.broadcasts.approval.request(id, { approverStaffId: approverId })
         if (!requested.success) throw new Error(requested.error)
       } else if (!attempt.scheduledAt) {
-        const sent = await api.broadcasts.send(id)
+        const sent = await api.broadcasts.send(id, needsCountConfirmation ? { confirmedRecipientCount: Number(countInput) } : undefined)
         if (!sent.success) throw new Error(sent.error)
       }
       guard.disarm()
@@ -234,9 +270,7 @@ export default function QuickSendV8({
         </div>
       )}
     >
-      <div className={styles.body}>
-        <label className={styles.label} htmlFor="quick-send-v8-text">本文</label>
-        <InsertTextField
+      <div className={styles.body}><Field label="本文" htmlFor="quick-send-v8-text"><InsertTextField
           id="quick-send-v8-text"
           ref={textRef}
           className={styles.textarea}
@@ -245,15 +279,14 @@ export default function QuickSendV8({
           disabled={busy || pending}
           onValueChange={(next) => setText(next)}
         />
-        <div className={styles.metaRow}>
+<div className={styles.metaRow}>
           <span className={styles.meta}>差し込む：</span>
           <button type="button" className={styles.insert} disabled={busy || pending} onClick={insertName}>名前</button>
           <span className={styles.spacer} aria-hidden="true" />
           <span className={styles.meta}>{`${formatNumber(text.length)} / ${formatNumber(TEXT_LIMIT)}`}</span>
         </div>
-
-        <p className={styles.label} id="quick-send-v8-target">送る相手</p>
-        <div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-target">
+<p className={styles.label} id="quick-send-v8-target">送る相手</p>
+<div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-target">
           {([['all', '友だち全員'], ['tag', 'タグで絞る']] as const).map(([value, label]) => (
             <button key={value} type="button" role="radio" disabled={busy || pending} aria-checked={target === value} className={styles.chip} onClick={() => setTarget(value)}>
               {label}
@@ -261,19 +294,12 @@ export default function QuickSendV8({
           ))}
           {target === 'tag' ? (
             <div className={styles.tagPick}>
-              <Select
-                aria-label="タグ"
-                disabled={busy || pending}
-                value={tagId}
-                onChange={setTagId}
-                options={[{ value: '', label: 'タグを選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]}
-              />
+              <EntityKindField kind="tag" label="タグ" disabled={busy || pending} value={tagId} onChange={setTagId} options={tags} />
             </div>
           ) : null}
         </div>
-
-        <p className={styles.label} id="quick-send-v8-when">いつ</p>
-        <div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-when">
+<p className={styles.label} id="quick-send-v8-when">いつ</p>
+<div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-when">
           {([['now', '今すぐ'], ['scheduled', '日時を決める']] as const).map(([value, label]) => (
             <button key={value} type="button" role="radio" disabled={busy || pending} aria-checked={when === value} className={styles.chip} onClick={() => setWhen(value)}>
               {label}
@@ -285,17 +311,17 @@ export default function QuickSendV8({
             </div>
           ) : null}
         </div>
-
-        <div className={styles.estimateBox}>
+<div className={styles.estimateBox}>
           <div className={styles.estimate} aria-live="polite">
             <Users size={16} aria-hidden="true" className={styles.estimateIcon} />
             <span>
               {estimating ? '人数を数えています…' : estimate ? estimateText(estimate) : '本文を書くと、届く人数の見込みが出ます'}
             </span>
           </div>
+          {needsCountConfirmation && estimate ? <SingleOperatorFields recipientCount={estimate.count} value={countInput} onChange={setCountInput} /> : null}
           {needsApproval ? (
             <div className={styles.approval}>
-              <p className={styles.approvalTitle}>{`${formatNumber(APPROVAL_THRESHOLD)}人以上に送るときは承認が要ります。承認する人を選んで頼んでください。`}</p>
+              <p className={styles.approvalTitle}>{`${formatNumber(approvalConfig?.threshold ?? APPROVAL_THRESHOLD)} 人以上に送るときは承認が要ります。承認する人を選んで頼んでください。`}</p>
               <Select
                 aria-label="承認する人"
                 size="full"
@@ -306,8 +332,7 @@ export default function QuickSendV8({
               <p className={styles.approvalNote}>1人で運用しているときは、人数を確かめるチェックだけで送れます。</p>
             </div>
           ) : null}
-        </div>
-      </div>
+        </div></Field></div>
     </Dialog>
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     </>

@@ -7,12 +7,12 @@
  * 「版のこと」「つながる先」「気をつけること」。下の帯はキャンセル・下書きを保存を真ん中に。
  * データの口・保存（下書き＋要求キー）・選択肢の読み込みと失敗の扱いは今の V8（app/common-actions/common-action-new-v8.tsx）と同じ。
  * 見せ方を絵に合わせた：処理は番号つきの1行（何を・どれを）で並べ、行を押すとその処理の設定を開く。
- * 並べ替えは開いた設定の ↑↓。「失敗したとき」は全部の処理の「失敗したとき」をまとめて決める（行ごとに変えることもできる）。
+ * 並べ替え・削除は閉じた行の右端から行う。「失敗したとき」は全部の処理の「失敗したとき」をまとめて決める（行ごとに変えることもできる）。
  */
-import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowDown, ArrowUp, Save } from 'lucide-react'
+import { ArrowDown, ArrowUp, Save, Trash2 } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { api, describeSaveFailure, type CommonActionResources, type CommonActionStep } from '@/lib/api'
 import CommonActionEditor, { newCommonActionStep, newStepId } from '@/components/automations/common-action-editor'
@@ -24,11 +24,14 @@ import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import { Field, OptionalBadge } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import BranchEditors, { newBranchStep, updateBranchStep, type BranchPatch } from './branch-editor'
 import { stepNumbers } from './action-order'
 import { ACTION_LABELS } from './version-diff'
 import styles from './common-action-new.module.css'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 const EMPTY_RESOURCES: CommonActionResources = {
   tags: [], scenarios: [], templates: [], webhooks: [], richMenus: [], commonActions: [],
@@ -91,6 +94,7 @@ export function CommonActionNew() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [actions, setActions] = useState<CommonActionStep[]>([newCommonActionStep()])
+  const initialActions = useRef(JSON.stringify(actions))
   const [openId, setOpenId] = useState<string | null>(null)
   const [resources, setResources] = useState<CommonActionResources>(EMPTY_RESOURCES)
   const [resourcesLoading, setResourcesLoading] = useState(true)
@@ -99,9 +103,17 @@ export function CommonActionNew() {
   const [resourcesReloadKey, setResourcesReloadKey] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [inputError, setInputError] = useState<{ target: string; message: string } | null>(null)
   const [exampleOpen, setExampleOpen] = useState(false)
   const [exampleId, setExampleId] = useState('')
   const [requestKey] = useState(() => newStepId())
+
+  useEffect(() => {
+    if (!inputError) return
+    const control = document.getElementById(inputError.target)
+    control?.focus()
+    control?.scrollIntoView?.({ block: 'center' })
+  }, [inputError])
 
   useEffect(() => {
     if (accountLoading || canManage !== true || !selectedAccountId) {
@@ -141,9 +153,12 @@ export function CommonActionNew() {
   }, [accountLoading, canManage, selectedAccountId, resourcesReloadKey])
 
   const save = async () => {
+    if (saving) return
     if (!selectedAccountId) return setError('LINE公式アカウントを選んでください')
-    if (!name.trim()) return setError('共通アクション名を入力してください')
-    if (actions.length === 0) return setError('処理を1つ以上追加してください')
+    setError('')
+    if (!name.trim()) return setInputError({ target: 'ca-name', message: '共通アクション名を入力してください' })
+    if (actions.length === 0) return setInputError({ target: 'ca-add-step', message: '処理を1つ以上追加してください' })
+    setInputError(null)
     setSaving(true)
     setError('')
     try {
@@ -154,9 +169,9 @@ export function CommonActionNew() {
         clientRequestKey: requestKey,
       })
       if (!response.success) throw new Error(response.error)
-      router.push(`/common-actions/versions?id=${encodeURIComponent(response.data.id)}`)
+      router.push(createPageReturnHref('/common-actions', response.data.id))
     } catch (caught) {
-      setError(describeSaveFailure(caught))
+      setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
     } finally {
       setSaving(false)
     }
@@ -166,6 +181,7 @@ export function CommonActionNew() {
   /* 足した行は閉じたまま（2行目の「〇〇を選ぶ」で何を決めるかが分かる）。押すと設定を開く。 */
   const addStep = (step: CommonActionStep) => {
     setActions((current) => [...current, step])
+    if (inputError?.target === 'ca-add-step') setInputError(null)
   }
   const addExample = (id: string) => {
     if (!id) return
@@ -213,7 +229,6 @@ export function CommonActionNew() {
     )
   }
 
-  const back = <Link href="/common-actions" className={styles.backLink}>← 共通アクションへ</Link>
   const aside = (
     <div className={styles.aside}>
       <section className={styles.sideCard}>
@@ -239,10 +254,11 @@ export function CommonActionNew() {
 
   return (
     <CreatePage
+      dirty={Boolean(name || description || JSON.stringify(actions) !== initialActions.current)}
+      busy={saving}
       boardId="j2hfkS"
       title="共通アクションを作る"
-      description="いくつもの所から呼び出せる「処理のまとまり」を作ります。ここでは下書きを保存し、公開は版の画面から行います。使う所はいまの版のまま。使う所ごとに新しい版へ更新します。"
-      identity={back}
+      help="いくつもの所から呼び出せる「処理のまとまり」を作ります。ここでは下書きを保存し、公開は版の画面から行います。使う所はいまの版のまま。使う所ごとに新しい版へ更新します。"
       preview={aside}
       footerActions={<>
         <Button href="/common-actions">キャンセル</Button>
@@ -262,14 +278,10 @@ export function CommonActionNew() {
 
       <section className={styles.card} aria-labelledby="ca-what">
         <div className={styles.cardHead}><h2 className={styles.cardTitle} id="ca-what">どんなアクションか</h2></div>
-        <label className={styles.field}>
-          <span className={styles.label}>名前</span>
-          <input className={styles.input} value={name} maxLength={120} placeholder="例：購入のお礼" onChange={(event) => setName(event.target.value)} />
-        </label>
-        <label className={styles.field}>
-          <span className={styles.label}>説明<span className={styles.optional}>任意</span></span>
-          <input className={styles.input} value={description} maxLength={200} placeholder="使う場面や目的を書きます" onChange={(event) => setDescription(event.target.value)} />
-        </label>
+        <Field label="名前" htmlFor="ca-name" error={inputError?.target === 'ca-name' ? inputError.message : undefined}>
+          <TextField id="ca-name" value={name} maxLength={120} placeholder="例：購入のお礼" onChange={(event) => { setName(event.target.value); if (inputError?.target === 'ca-name') setInputError(null) }} />
+        </Field>
+        <Field label="説明"><TextField value={description} maxLength={200} placeholder="使う場面や目的を書きます" onChange={(event) => setDescription(event.target.value)} /></Field>
       </section>
 
       <section className={styles.card} aria-labelledby="ca-steps">
@@ -289,19 +301,22 @@ export function CommonActionNew() {
           const number = numbers[step.id] ?? index + 1
           return (
             <div key={step.id} className={styles.stepBox} data-open={open || undefined}>
-              <button type="button" className={styles.stepRow} aria-expanded={open} onClick={() => setOpenId(open ? null : step.id)}>
-                <span className={styles.stepNo}>{number}</span>
-                <span className={styles.stepText}>
-                  <span className={styles.stepTitle}>{ACTION_LABELS[step.type] ?? '処理'}</span>
-                  <span className={styles.stepSub}>{stepSummary(step, resources)}</span>
-                </span>
-              </button>
+              <div className={styles.stepLine}>
+                <button type="button" className={styles.stepRow} aria-expanded={open} onClick={() => setOpenId(open ? null : step.id)}>
+                  <span className={styles.stepNo}>{number}</span>
+                  <span className={styles.stepText}>
+                    <span className={styles.stepTitle}>{ACTION_LABELS[step.type] ?? '処理'}</span>
+                    <span className={styles.stepSub}>{stepSummary(step, resources)}</span>
+                  </span>
+                </button>
+                <div className={styles.stepMoves}>
+                  <IconButton onClick={() => move(step.id, -1)} disabled={index === 0} aria-label={`${number}番目の処理を上へ`}><ArrowUp size={16} aria-hidden="true" /></IconButton>
+                  <IconButton onClick={() => move(step.id, 1)} disabled={index === actions.length - 1} aria-label={`${number}番目の処理を下へ`}><ArrowDown size={16} aria-hidden="true" /></IconButton>
+                  <IconButton onClick={() => replaceStep(step.id, [])} aria-label={`${number}番目の処理を削除`}><Trash2 size={16} aria-hidden="true" /></IconButton>
+                </div>
+              </div>
               {open ? (
                 <div className={styles.stepEditor}>
-                  <div className={styles.stepMoves}>
-                    <IconButton onClick={() => move(step.id, -1)} disabled={index === 0} aria-label={`${number}番目の処理を上へ`}><ArrowUp size={16} aria-hidden="true" /></IconButton>
-                    <IconButton onClick={() => move(step.id, 1)} disabled={index === actions.length - 1} aria-label={`${number}番目の処理を下へ`}><ArrowDown size={16} aria-hidden="true" /></IconButton>
-                  </div>
                   {step.type === 'branch' ? (
                     <BranchEditors
                       steps={[step]}
@@ -324,7 +339,7 @@ export function CommonActionNew() {
           )
         })}
         <div className={styles.addLinks}>
-          <button type="button" className={styles.addLink} onClick={() => addStep(newCommonActionStep())}>＋ 処理を足す</button>
+          <button id="ca-add-step" type="button" className={styles.addLink} onClick={() => addStep(newCommonActionStep())}>＋ 処理を足す</button>
           <button type="button" className={styles.addLink} onClick={() => addStep(newCommonActionStep('wait'))}>待ち時間を入れる</button>
           <button type="button" className={styles.addLink} onClick={() => addStep(newBranchStep())}>条件で分ける</button>
           {resources.commonActions.length > 0 ? (
@@ -335,6 +350,7 @@ export function CommonActionNew() {
             ) : <button type="button" className={styles.addLink} onClick={() => setExampleOpen(true)}>見本から受け渡す</button>
           ) : null}
         </div>
+        {inputError?.target === 'ca-add-step' ? <p className={styles.inputError} role="alert">{inputError.message}</p> : null}
       </section>
 
       <section className={styles.card} aria-labelledby="ca-failure">

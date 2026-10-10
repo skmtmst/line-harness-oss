@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -54,7 +54,7 @@ describe('V8 写真審査の一枚表示と掲載管理', () => {
   })
 
   it('does not turn an unavailable view count into zero', () => {
-    expect(publications).toContain("value == null ? '—'")
+    expect(publications).toContain("value == null ? emptyValue('unknown')")
     expect(publications).toContain('view_count_30_days')
     expect(publications).toContain('withdrawPhotoPublication')
     expect(publications).toContain('updatePhotoPublicationPlacements')

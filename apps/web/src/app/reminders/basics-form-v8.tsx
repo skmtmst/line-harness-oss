@@ -14,6 +14,7 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import Card from '@/components/shared/card'
 import { ChoiceCardV8 } from './wizard-v8-ui'
 import styles from './wizard-v8.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 /*
  * ★V8 リマインダ手順1「基本設定」の入力部分（板 VE1u5）。
@@ -87,7 +88,7 @@ export function basicsBaseSummary(value: BasicsValue, fields: FriendField[], eve
 /*
  * #996 DEEP-06/07: ひな形。選んだときだけ用途に合う基準日・タイミング・
  * 本文をまとめて入れる。fieldNameMatch は friend_field 起点のとき、
- * 候補の名前に含まれていればその情報欄を自動で選ぶ目印（例: 「誕生日」）。
+ * 候補の名前に含まれていればその情報欄を自動で選ぶ目印（例：「誕生日」）。
  */
 export interface ReminderTemplateV8 {
   id: string
@@ -258,16 +259,13 @@ export function ReminderBasicsFormV8({
           <p className={styles.cardNote}>一覧に出る名前です。友だちには見えません。</p>
         </div>
         <div className={styles.fieldGrid}>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="v8-reminder-name">リマインダ名（60文字まで）</label>
-            <TextField
+          <div className={styles.field}><Field label="リマインダ名（60文字まで）" htmlFor="v8-reminder-name"><TextField
               id="v8-reminder-name"
               value={value.name}
               maxLength={60}
               placeholder="例：予約前日のご案内"
               onChange={(event) => patch({ name: event.target.value })}
-            />
-          </div>
+            /></Field></div>
           <div className={styles.field}>
             <span className={styles.label}>フォルダ</span>
             <div className={styles.testRow}>
@@ -289,18 +287,13 @@ export function ReminderBasicsFormV8({
               ) : null}
             </div>
           </div>
-          <div className={`${styles.field} ${styles.span2}`}>
-            <label className={styles.label} htmlFor="v8-reminder-memo">
-              社内メモ <span className={styles.labelOptional}>任意</span>
-            </label>
-            {value.description.includes('\n') ? (
+          <div className={`${styles.field} ${styles.span2}`}><Field label="社内メモ" htmlFor="v8-reminder-memo">{value.description.includes('\n') ? (
               <TextArea id="v8-reminder-memo" rows={3} value={value.description}
                 placeholder="運用の目的や注意点" onChange={(event) => patch({ description: event.target.value })} />
             ) : (
               <TextField id="v8-reminder-memo" value={value.description}
                 placeholder="運用の目的や注意点" onChange={(event) => patch({ description: event.target.value })} />
-            )}
-          </div>
+            )}</Field></div>
         </div>
       </Card>
 

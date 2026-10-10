@@ -27,6 +27,8 @@ import { createResponseGate } from '@/lib/latest-request'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import { formatDateTime } from '@/lib/format'
 import styles from './field-migrate-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const TYPES = Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]
 
@@ -134,7 +136,7 @@ export default function FieldMigrateV8() {
         // ATTR-11: 失敗は loadError へ。項目未発見（!source）と混ぜない。
         if (!active) return
         if (reason instanceof ApiError && reason.status === 403) {
-          setLoadError('友だち情報欄を見る権限がありません。オーナーか管理者に確認してください。')
+          setLoadError(permissionDeniedMessage('store'))
           setLoadForbidden(true)
         } else {
           setLoadError('項目を読み込めませんでした')
@@ -544,7 +546,7 @@ export default function FieldMigrateV8() {
         <h2 className={styles.sectionTitle}>切り替わる使用先</h2>
         {preview ? preview.usageTargets.length > 0 ? (
           <div className={`${styles.usageGrid} mt-3`}>
-            {preview.usageTargets.map((usage) => <p key={`${usage.kind}:${usage.id}`} className={styles.usageTile}><span className={styles.usageName} title={usage.name}>{usage.name}</span><span className={styles.usageMeta}>{usage.kind} ／ {usage.switchable ? '移行時に切り替え' : '手動確認が必要'}</span></p>)}
+            {preview.usageTargets.map((usage) => <p key={`${usage.kind}:${usage.id}`} className={styles.usageTile}><span className={styles.usageName} ><TruncatedText value={String(usage.name ?? '')} /></span><span className={styles.usageMeta}>{usage.kind} ／ {usage.switchable ? '移行時に切り替え' : '手動確認が必要'}</span></p>)}
           </div>
         ) : <Notice tone="success" className="mt-3">切り替えが必要な使用先はありません。</Notice>
           : <p className={`${styles.noteText} mt-3`}>事前確認すると、回答フォームや自動処理などの使用先を表示します。</p>}

@@ -7,6 +7,7 @@
  * 違いは1つだけ：保存の 409（ほかの人が先に保存した）を「競合」として返す
  * （絵 NCbYn の帯を出すため。今の画面は文だけを出していた）。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { validateFlexContent, type CommonVar, type FriendField } from '@line-crm/shared'
 
@@ -171,7 +172,7 @@ export function templateUsageEntries(usedBy: TemplateUsedBy): Array<{ key: strin
     ...usedBy.scenarioSteps.map((usage) => ({
       key: `scenario-${usage.stepId}`,
       href: `/scenarios/detail?id=${usage.scenarioId}`,
-      label: `シナリオ「${usage.scenarioName}」${usage.stepOrder}通目`,
+      label: `シナリオ「${usage.scenarioName}」${usage.stepOrder} 通目`,
     })),
     ...usedBy.autoReplies.map((usage) => ({
       key: `auto-reply-${usage.id}`,
@@ -267,8 +268,5 @@ export function describeTemplateDiff(mine: TemplateDraft, incoming: TemplateDraf
 
 /** 競合の帯の時刻（日本時間の 時:分）。読めなければ空。 */
 export function conflictTime(iso: string | null | undefined): string {
-  if (!iso) return ''
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ''
-  return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', hour12: false }).format(date)
+  return polishFormatDate(iso, { style: 'time', fallback: '' })
 }

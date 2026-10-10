@@ -76,7 +76,8 @@ describe('SCENARIO-22: URIだけの挙動に届かない設定をさせない', 
       addTagIds: ['t1'],
       field: { fieldId: 'f1', value: 'x' },
     })
-    expect(dead).toEqual(['選択時の返信', '追加するタグ', '友だち情報欄'])
+    expect(dead).toEqual(['選択時の返信', '友だち情報欄'])
+    expect(deadAnswerSettings({label:'電話',behavior:'tel',addTagIds:['t1'],scoreChange:10})).toEqual(['追加するタグ','足すスコア'])
   })
 
   it('未設定なら何も挙げない', () => {

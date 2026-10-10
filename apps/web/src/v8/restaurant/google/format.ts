@@ -2,6 +2,7 @@
  * ★V8 Googleビジネスの表示の道具（今の画面 app/restaurant-test/google/google-format.ts から写した）。
  * src/v8 からは @/app を読めないので、使う分だけ写す。日時は店舗の時刻（日本時間）で出す。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import type { GoogleHoursPeriod, GoogleWeekday } from '@/lib/restaurant-google-api'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
@@ -9,38 +10,26 @@ export const STORE_TIME_ZONE = 'Asia/Tokyo'
 export const WEEKDAYS: GoogleWeekday[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
 export const WEEKDAY_JA: Record<GoogleWeekday, string> = { MONDAY: '月', TUESDAY: '火', WEDNESDAY: '水', THURSDAY: '木', FRIDAY: '金', SATURDAY: '土', SUNDAY: '日' }
 
-function parts(value: string | null | undefined, timeZone = STORE_TIME_ZONE) {
-  if (!value) return null
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return null
-  const map = Object.fromEntries(new Intl.DateTimeFormat('ja-JP', {
-    timeZone, year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).formatToParts(date).map((p) => [p.type, p.value]))
-  return { y: map.year, m: Number(map.month), d: Number(map.day), hh: map.hour.padStart(2, '0'), mm: map.minute.padStart(2, '0') }
-}
+
 
 /** 「9/30 21:40」（口コミの受信・投稿の公開）。 */
 export function formatShortStamp(value: string | null | undefined): string {
-  const p = parts(value)
-  return p ? `${p.m}/${p.d} ${p.hh}:${p.mm}` : '—'
+  return polishFormatDate(value, { style: 'list' })
 }
 
 /** 「9/30」。 */
 export function formatShortDay(value: string | null | undefined): string {
-  const p = parts(value)
-  return p ? `${p.m}/${p.d}` : '—'
+  return polishFormatDate(value, { style: 'list-day' })
 }
 
 /** 「2026/09/12」。 */
 export function formatYmd(value: string | null | undefined): string {
-  const p = parts(value)
-  return p ? `${p.y}/${String(p.m).padStart(2, '0')}/${String(p.d).padStart(2, '0')}` : '—'
+  return polishFormatDate(value, { style: 'list-day' })
 }
 
 /** 「2026/09/12 10:20」。 */
 export function formatStampFull(value: string | null | undefined): string {
-  const p = parts(value)
-  return p ? `${p.y}/${String(p.m).padStart(2, '0')}/${String(p.d).padStart(2, '0')} ${p.hh}:${p.mm}` : '—'
+  return polishFormatDate(value, { style: 'detail' })
 }
 
 /**
@@ -71,8 +60,7 @@ export function weekdayOf(date: string): GoogleWeekday {
 
 /** "2026-10-02" → "10/2（金）" */
 export function formatYmdShort(date: string): string {
-  const [, m, d] = date.split('-').map((x) => Number.parseInt(x, 10))
-  return `${m}/${d}（${WEEKDAY_JA[weekdayOf(date)]}）`
+  return polishFormatDate(date, { style: 'list-day-weekday' })
 }
 
 /** 営業時間「17:00〜23:00」。 */

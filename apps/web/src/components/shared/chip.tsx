@@ -11,12 +11,14 @@ export type ChipTone = 'neutral' | 'info' | 'ok' | 'warn' | 'danger'
  */
 export default function Chip({
   tone = 'neutral',
+  kind,
   className,
   children,
 }: {
   tone?: ChipTone
+  kind?: 'channel'
   className?: string
   children: ReactNode
 }) {
-  return <span className={[styles.chip, styles[tone], className].filter(Boolean).join(' ')}>{children}</span>
+  return <span className={[styles.chip, styles[tone], className].filter(Boolean).join(' ')} data-kind={kind}>{children}</span>
 }

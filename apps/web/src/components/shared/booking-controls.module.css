@@ -1,0 +1,105 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/* 時間×卓の予約・空き枠・卓の選択。既定の Button の見た目に影響しない。 */
+.block {
+  position: absolute;
+  inset: var(--tpl-rs-rsv-block-inset);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-rs-panel-head-text-gap);
+  height: auto;
+  min-height: 0;
+  padding: var(--tpl-rs-rsv-block-pad);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-segment);
+  text-align: left;
+  cursor: pointer;
+}
+
+.blockLine {
+  background: var(--color-accent-soft);
+  box-shadow: var(--tpl-rs-bar-line);
+}
+
+.blockMedia {
+  background: var(--tpl-rs-occupied-bg);
+  box-shadow: var(--tpl-rs-bar-media);
+}
+
+.blockPhone {
+  background: var(--tpl-rs-rsv-phone-bg);
+  box-shadow: var(--tpl-rs-bar-phone);
+}
+
+.blockPending {
+  background: var(--color-status-warn-soft);
+  outline: var(--tpl-rs-inv-cell-line) solid var(--color-warning);
+  outline-offset: calc(var(--tpl-rs-inv-cell-line) * -1);
+}
+
+.blockHold {
+  background: var(--tpl-rs-rsv-hold-bg);
+  outline: 1px solid var(--tpl-rs-rsv-hold-line);
+  outline-offset: -1px;
+}
+
+.slotAdd {
+  position: absolute;
+  top: var(--tpl-rs-rsv-add-top);
+  left: var(--tpl-rs-rsv-add-side);
+  right: var(--tpl-rs-rsv-add-side);
+  height: var(--tpl-rs-rsv-add-h);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  color: var(--color-action);
+  font-size: var(--text-nano);
+  font-weight: 600;
+  line-height: var(--tpl-rs-lh-10);
+  opacity: 0;
+  cursor: pointer;
+}
+
+.phoneTable {
+  flex: 1 1 var(--tpl-rs-rsv-phone-table-basis);
+  height: var(--tpl-rs-rsv-phone-table-h);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-segment);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: var(--tpl-rs-lh-12);
+  cursor: pointer;
+}
+
+.phoneTableTaken {
+  background: var(--tpl-rs-occupied-bg);
+  outline-color: var(--tpl-rs-occupied-line);
+  cursor: not-allowed;
+}
+
+.phoneTableChosen {
+  background: var(--color-accent-soft);
+  outline: var(--tpl-rs-table-card-line) solid var(--color-accent-deep);
+  outline-offset: calc(var(--tpl-rs-table-card-line) * -1);
+  color: var(--color-accent-deep);
+}
+
+.slotAdd:focus-visible {
+  opacity: 1;
+}
+
+.block:focus-visible, .slotAdd:focus-visible, .phoneTable:focus-visible { outline: 2px solid var(--color-action); outline-offset: 1px; }
+}

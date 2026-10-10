@@ -98,10 +98,10 @@ describe('画面名は上部バーだけが持つ', () => {
       'templates/detail/page.tsx',
       'scenarios/detail/scenario-detail-client.tsx',
       'events/edit/page.tsx',
-      'events/new/page.tsx',
+      // events/new/page.tsx は V8（v8/events/create.tsx が usePageTitle('イベントを作る') を持つ）を出すだけになった（2026-10-09 V7 削除）。
       'form-submissions/edit/page.tsx',
       'pools/page.tsx',
-      'hq/settings/page.tsx',
+      // hq/settings/page.tsx は V8（v8/hq/settings.tsx が usePageTitle を持つ）を出すだけになった（2026-10-09 V7 削除）。
       'rich-menus/edit/page.tsx',
       'rich-menus/new/page.tsx',
       'search-console/page.tsx',

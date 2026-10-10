@@ -34,6 +34,10 @@ export const FOLDER_KINDS = [
   'common_action',
   'webhook',
   'conversion',
+  'affiliate',
+  'affiliate_offer',
+  'mileage_reward',
+  'friend_add_rule',
 ] as const;
 
 export type FolderKind = (typeof FOLDER_KINDS)[number];
@@ -50,6 +54,7 @@ export interface Folder {
   color: string | null;
   created_at: string;
   updated_at: string;
+  revision: number;
 }
 
 export function isFolderKind(value: unknown): value is FolderKind {
@@ -67,7 +72,7 @@ export async function getFolders(
     // the unassigned policy; other existing folder kinds keep their old list.
     const ids = accountId ? scope.allowedAccountIds.filter((id) => id === accountId) : scope.allowedAccountIds;
     const own = ids.length ? `account_id IN (${ids.map(() => "?").join(",")})` : "0";
-    const legacy = scope.canSeeUnassigned ? "account_id IS NULL" : "(account_id IS NULL AND kind NOT IN ('tag', 'webinar', 'template', 'automation', 'common_action', 'webhook', 'conversion'))";
+    const legacy = scope.canSeeUnassigned ? "account_id IS NULL" : "(account_id IS NULL AND kind NOT IN ('tag', 'webinar', 'template', 'automation', 'common_action', 'webhook', 'conversion', 'affiliate', 'affiliate_offer', 'mileage_reward', 'friend_add_rule'))";
     const result = await db.prepare(`SELECT * FROM folders WHERE (${own} OR ${legacy})${kind ? " AND kind = ?" : ""}
       ORDER BY kind ASC, display_order ASC, name ASC`).bind(...ids, ...(kind ? [kind] : [])).all<Folder>();
     return result.results;
@@ -115,7 +120,7 @@ export async function createFolder(
 ): Promise<Folder> {
   const id = crypto.randomUUID();
   const now = jstNow();
-  await db
+  try { await db
     .prepare(
       `INSERT INTO folders (id, kind, name, parent_id, display_order, color, account_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -131,15 +136,22 @@ export async function createFolder(
       now,
       now,
     )
-    .run();
+    .run(); } catch (error) {
+      if (/UNIQUE/.test(String(error))) throw new FolderConflictError();
+      throw error;
+    }
   return (await getFolderById(db, id))!;
 }
 
 export async function updateFolder(
   db: D1Database,
   id: string,
-  input: { name?: string; parentId?: string | null; displayOrder?: number; color?: string | null },
+  input: { name?: string; parentId?: string | null; displayOrder?: number; color?: string | null; expectedRevision?: number },
 ): Promise<Folder | null> {
+  const current = await getFolderById(db, id);
+  if (!current) return null;
+  const revision = input.expectedRevision ?? current.revision;
+  if (revision !== current.revision) throw new FolderConflictError();
   const sets: string[] = [];
   const values: unknown[] = [];
   if (input.color !== undefined) {
@@ -159,12 +171,10 @@ export async function updateFolder(
     values.push(input.displayOrder);
   }
   if (sets.length > 0) {
-    sets.push('updated_at = ?');
+    sets.push('updated_at = ?', 'revision = revision + 1');
     values.push(jstNow(), id);
-    await db
-      .prepare(`UPDATE folders SET ${sets.join(', ')} WHERE id = ?`)
-      .bind(...values)
-      .run();
+    await folderBatch(db, [folderRevisionGuard(db, id, revision),
+      db.prepare(`UPDATE folders SET ${sets.join(', ')} WHERE id = ?`).bind(...values)]);
   }
   return getFolderById(db, id);
 }
@@ -188,9 +198,9 @@ export async function swapFolderOrder(db: D1Database, a: Folder, b: Folder): Pro
     bOrder = aIsFirst ? b.display_order : b.display_order + 1;
   }
   const now = jstNow();
-  await db.batch([
-    db.prepare('UPDATE folders SET display_order = ?, updated_at = ? WHERE id = ?').bind(aOrder, now, a.id),
-    db.prepare('UPDATE folders SET display_order = ?, updated_at = ? WHERE id = ?').bind(bOrder, now, b.id),
+  await folderBatch(db, [folderRevisionGuard(db,a.id,a.revision),folderRevisionGuard(db,b.id,b.revision),
+    db.prepare('UPDATE folders SET display_order = ?, updated_at = ?, revision = revision + 1 WHERE id = ?').bind(aOrder, now, a.id),
+    db.prepare('UPDATE folders SET display_order = ?, updated_at = ?, revision = revision + 1 WHERE id = ?').bind(bOrder, now, b.id),
   ]);
 }
 
@@ -204,9 +214,13 @@ export async function swapFolderOrder(db: D1Database, a: Folder, b: Folder): Pro
  * 子フォルダだけは ON DELETE CASCADE で一緒に消える。空の入れ物が
  * 親を失って一覧の最上位に湧いてくる方が分かりにくいため。
  */
-export async function deleteFolder(db: D1Database, id: string): Promise<boolean> {
+export async function deleteFolder(db: D1Database, id: string, expectedRevision?: number): Promise<boolean> {
+  const current = await getFolderById(db,id);
+  if (!current) return false;
+  const revision = expectedRevision ?? current.revision;
+  if (revision !== current.revision) throw new FolderConflictError();
   // Older data may have a foreign-account descendant. Never cascade across it.
-  const result = await db.prepare(`WITH RECURSIVE children(id, account_id, kind) AS (
+  const result = await folderBatch(db, [folderRevisionGuard(db,id,revision), db.prepare(`WITH RECURSIVE children(id, account_id, kind) AS (
     SELECT id, account_id, kind FROM folders WHERE parent_id = ?
     UNION SELECT f.id, f.account_id, f.kind FROM folders f JOIN children c ON f.parent_id = c.id
   ) DELETE FROM folders WHERE id = ? AND NOT EXISTS (
@@ -214,8 +228,8 @@ export async function deleteFolder(db: D1Database, id: string): Promise<boolean>
   ) AND (kind <> 'tag' OR NOT EXISTS (
     SELECT 1 FROM tags t WHERE (t.folder_id = folders.id OR t.folder_id IN (SELECT id FROM children))
       AND t.line_account_id IS NOT folders.account_id
-  ))`).bind(id, id).run();
-  return Number(result.meta?.changes ?? 0) > 0;
+  ))`).bind(id, id)]);
+  return Number(result[1].meta?.changes ?? 0) > 0;
 }
 
 /** kind ごとの件数。画面のタブに数字を出すため。 */
@@ -264,6 +278,10 @@ export const FOLDER_ITEM_COUNT_TABLES: Partial<Record<FolderKind, {
   listFilter?: string;
 }>> = {
   // 一覧は deleted_at IS NULL で絞る(apps/worker/src/routes/reminders.ts:425)。
+  affiliate: { table: 'affiliates', accountColumn: 'line_account_id' },
+  affiliate_offer: { table: 'affiliate_offers', accountColumn: 'line_account_id' },
+  mileage_reward: { table: 'mileage_rewards', accountColumn: 'line_account_id', listFilter: "status <> 'archived'" },
+  friend_add_rule: { table: 'friend_add_rules', accountColumn: 'line_account_id', listFilter: 'archived_at IS NULL' },
   reminder: { table: 'reminders', accountColumn: 'line_account_id', listFilter: 'deleted_at IS NULL' },
   scenario: { table: 'scenarios', accountColumn: 'line_account_id' },
   tag: { table: 'tags', accountColumn: 'line_account_id' },
@@ -340,6 +358,9 @@ export async function getFolderItemCounts(
       unfiled: Number(results.find(row => row.folder_id === null)?.item_count ?? 0),
     };
   }
+  if (['affiliate', 'affiliate_offer', 'mileage_reward', 'friend_add_rule'].includes(kind)) {
+    scope = { ...scope, canSeeUnassigned: false };
+  }
   const target = FOLDER_ITEM_COUNT_TABLES[kind];
   if (!target) return undefined;
   const { table, accountColumn, listFilter } = target;
@@ -377,4 +398,13 @@ export async function getFolderItemCounts(
     (byFolderResult.results ?? []).map((row) => [row.folder_id, Number(row.item_count)]),
   );
   return { byFolderId, unfiled: Number(unfiledResult?.unfiled_count ?? 0) };
+}
+
+export class FolderConflictError extends Error { constructor() { super('FOLDER_CONFLICT'); } }
+export function folderRevisionGuard(db: D1Database, id: string, revision: number) {
+  return db.prepare("SELECT json(CASE WHEN EXISTS(SELECT 1 FROM folders WHERE id=? AND revision=?) THEN '{}' ELSE 'FOLDER_CONFLICT' END)").bind(id,revision);
+}
+export async function folderBatch(db: D1Database, statements: D1PreparedStatement[]) {
+  try { return await db.batch(statements); }
+  catch (error) { if (/malformed JSON|FOLDER_CONFLICT|UNIQUE/i.test(String(error))) throw new FolderConflictError(); throw error; }
 }

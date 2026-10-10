@@ -17,7 +17,7 @@ vi.mock('@/lib/api', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return { ...actual }
 })
-vi.mock('@/components/shared/toast', () => ({ notifyToast: vi.fn() }))
+vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
 vi.mock('next/navigation', async importOriginal => ({
   ...await importOriginal<typeof import('next/navigation')>(),
   useRouter: () => ({ push: () => {} }),

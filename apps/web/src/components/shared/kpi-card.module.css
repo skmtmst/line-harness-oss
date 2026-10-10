@@ -6,11 +6,11 @@
   flex-direction: column;
   justify-content: space-between;
   min-height: 100px;
-  padding: 14px 16px;
+  padding: 16px 24px;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
+  border-radius: 0;
   background: var(--color-canvas);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--card-shadow);
 }
 
 .card[hidden] {
@@ -68,8 +68,8 @@
 
 .label {
   color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  font-weight: 600;
+  font-size: var(--text-body);
+  font-weight: 500;
 }
 
 .labelV6 {
@@ -79,7 +79,7 @@
 
 .labelBroadcast {
   color: var(--color-ink-faint);
-  font-size: var(--text-label);
+  font-size: var(--text-body);
 }
 
 .labelSkeleton {
@@ -92,11 +92,11 @@
 
 .badge {
   flex-shrink: 0;
-  padding: 3px 8px;
-  border-radius: var(--radius-card);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
-  font-size: var(--text-nano);
+  padding: 2px 8px;
+  border-radius: var(--radius-mini);
+  background: var(--color-notice-success-bg);
+  color: var(--color-kpi-positive);
+  font-size: var(--text-caption);
   font-weight: 600;
 }
 
@@ -150,8 +150,8 @@
 }
 
 .detail {
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
   /* 補足の行の高さは1行ぶんにそろえる。空でも潰さない。 */
   min-height: 1lh;
 }
@@ -186,9 +186,9 @@
 .unit, .labelText, .number { display: contents; }
 [data-theme='v8'] .card {
   justify-content: flex-start; min-width: 0; min-height: 0;
-  gap: var(--tpl-band-cell-gap); padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side); border: 0; border-radius: 12px;
-  outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
-  background: var(--color-canvas); box-shadow: none;
+  gap: var(--tpl-band-cell-gap); padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side); border: 0; border-radius: var(--radius-card);
+  outline: 1px solid var(--card-edge); outline-offset: -0.5px;
+  background: var(--color-canvas); box-shadow: var(--card-shadow);
 }
 /* 包みを使わない組み方（画面が strip＋KpiCard を直に並べる所）も、
    数の大きさ・マスの余白は帯と同じ変数で絵どおりにする。 */
@@ -238,7 +238,7 @@
 [data-theme='v8'] .detailText { min-width: 0; flex: 1; }
 [data-theme='v8'] .link { font-size: 12px; font-weight: 500; line-height: 18px; }
 [data-theme='v8'] .card[data-kpi-presentation='band'] {
-  border-radius: 0; outline-color: transparent;
+  border-radius: 0; outline-color: transparent; box-shadow: none;
 }
 [data-theme='v8'] .card[data-kpi-density='compact'] {
   padding: 10px 16px; gap: 4px;
@@ -269,7 +269,7 @@
   grid-template-columns: none;
   gap: var(--tpl-band-gap);
   /* 絵どおり上下の線だけ（左右の枠なし）。 */
-  border-block: 1px solid var(--color-hairline);
+  border-block: 1px solid var(--tpl-band-line);
   border-radius: var(--radius-none);
   background: var(--color-canvas);
 }
@@ -278,9 +278,10 @@
   border: 0;
   border-radius: var(--radius-none);
   outline-color: transparent;
+  box-shadow: none;
 }
-[data-theme='v8'] .strip[data-kpi-presentation='band'] > * + * {
-  border-left: 1px solid var(--color-hairline);
+[data-theme='v8'] .strip[data-kpi-presentation='band'] > *:not(:last-child) {
+  border-right: 1px solid var(--tpl-band-line);
 }
 [data-theme='v8'] .strip[data-kpi-presentation='band'] .number {
   font-size: var(--tpl-band-number-size);
@@ -291,9 +292,9 @@
     grid-auto-flow: row;
     grid-template-columns: minmax(0, 1fr);
   }
-  [data-theme='v8'] .strip[data-kpi-presentation='band'] > * + * {
-    border-left: 0;
-    border-top: 1px solid var(--color-hairline);
+  [data-theme='v8'] .strip[data-kpi-presentation='band'] > *:not(:last-child) {
+    border-right: 0;
+    border-bottom: 1px solid var(--tpl-band-line);
   }
 }
 [data-theme='v8'] .card[data-kpi-presentation='cell'] { border-radius: 0; }
@@ -309,3 +310,16 @@
  */
 [data-theme='v8'] .skeleton { height: 32px; }
 [data-theme='v8'] .card[data-kpi-presentation='band'] .skeleton { height: var(--tpl-band-number-lh); }
+
+[data-theme='v8'] .valueRow[data-unit-spacing='tight'] .value { gap: var(--tpl-kpi-unit-gap-tight); }
+/* hQQlt：箱の中の小さな件数。通常のカード・数の帯は変えない。 */
+[data-theme='v8'] .card[data-kpi-presentation='inline'] { min-height: 0; justify-content: flex-start; display: flex; flex-direction: column; gap: 4px; padding: 0; border: 0; outline-color: transparent; border-radius: var(--radius-none); background: none; box-shadow: none; }
+[data-theme='v8'] .card[data-kpi-presentation='inline'] .head { order: 2; min-height: 0; }
+[data-theme='v8'] .card[data-kpi-presentation='inline'] .label { color: var(--color-ink-secondary); font-size: 11px; font-weight: 400; line-height: 16px; }
+[data-theme='v8'] .card[data-kpi-presentation='inline'] .number, [data-theme='v8'] .card[data-kpi-presentation='inline'] .unit { font-size: 12px; font-weight: 700; line-height: 18px; }
+[data-theme='v8'] .card[data-kpi-presentation='inline'] .value { gap: 0; }
+[data-theme='v8'] .card[data-kpi-presentation='inline'] .detail { display: none; }
+[data-theme='v8'] .valueDanger { color: var(--color-danger); }
+[data-theme='v8'] .strip[data-kpi-presentation='band'][data-kpi-border='inset-top'] {
+  border-block-width: 0; box-shadow: var(--shadow-wh-kpi-top);
+}

@@ -6,3 +6,14 @@
 }
 [data-theme='v8'] .row [data-skeleton] { display: block; background-color: var(--color-shell-gray); border-radius: 4px; }
 [data-theme='v8'] .row .face { border-radius: 50%; }
+
+/* B-152・仕上げ8 */
+.list { width: 100%; min-width: 0; }
+.listRow { display: flex; align-items: center; gap: var(--polish-space-section); height: var(--polish-table-row); padding: 0 var(--polish-space-section); box-shadow: var(--shadow-row-line); }
+.listRow:last-child { box-shadow: none; }
+.listRow [data-skeleton] { display: block; height: var(--polish-skeleton-height); background: var(--polish-skeleton-bg); border-radius: var(--polish-skeleton-radius); }
+.nameBone { flex: 2 1 0; max-width: 40%; }
+.numberBone { flex: 1 1 0; max-width: 12%; }
+.dateBone { flex: 1 1 0; max-width: 24%; }
+[data-theme='v8'] .row { height: var(--polish-table-row); padding-block: 0; }
+[data-theme='v8'] .row [data-skeleton] { background: var(--polish-skeleton-bg); border-radius: var(--polish-skeleton-radius); }

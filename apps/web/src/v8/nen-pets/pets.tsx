@@ -8,11 +8,12 @@
  * データの口（pets・feeding・saveFeeding・updatePet・CSV）は今の画面と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useListUrlJsonValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import { useEffect, useState } from 'react'
 import { Calculator, Download, Eye, History, PawPrint, Sparkles } from 'lucide-react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
-import { RowMenu } from '@/components/shared/row-actions'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -25,6 +26,7 @@ import PetsListV8 from './list'
 import FeedingV8 from './feeding'
 import { EMPTY_QUERY, downloadCsv, petsToCsv, type PetTab, type PetsQuery } from './parts'
 import styles from './pets.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 export type { PetTab } from './parts'
 
@@ -48,7 +50,7 @@ export default function PetsV8({
   const [kpis, setKpis] = useState<NenPetKpis | null>(null)
   const [kpisFailed, setKpisFailed] = useState(false)
   /** 一覧の絞り込み。CSV も同じ条件で書き出す（今の画面と同じ）。 */
-  const [query, setQuery] = useState<PetsQuery>(EMPTY_QUERY)
+  const [query, setQuery] = useListUrlJsonValue<PetsQuery>('query', EMPTY_QUERY)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState(false)
 
@@ -80,7 +82,7 @@ export default function PetsV8({
     try {
       const res = await nenPetsApi.pets(accountId, { ...query, pageSize: 'all' })
       if (!res.success) throw new Error(res.error)
-      downloadCsv(petsToCsv(res.data.items), `nen-pets-${new Date().toISOString().slice(0, 10)}.csv`)
+      downloadCsv(petsToCsv(res.data.items), csvFileName("ペット"))
     } catch {
       setExportError(true)
     } finally {
@@ -102,20 +104,16 @@ export default function PetsV8({
 
   const pending = kpis === null
   const missing = kpisFailed ? '読み込めませんでした' : '読み込んでいます'
-  const menu = (title: string) => <KpiMenu title={title} busy={exporting || !accountId} onExport={() => void exportCsv()} />
   const stats = accountId ? (
     <>
       {readonly ? (
-        <div className={styles.viewerBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。ペットの情報や主食を変える操作は管理者に頼んでください。</span>
-        </div>
+        <div className={styles.viewerBand}><Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。ペットの情報や主食を変える操作は管理者に頼んでください。" /></div>
       ) : null}
-      <KpiBand data-design="KPIs" className={styles.band} aria-label="ペットの数の帯">
-        <KpiCard presentation="band" title="登録ペット" icon={<History size={13} aria-hidden="true" />} menu={menu('登録ペット')} value={pending ? null : kpis.total} unit="匹" loading={pending && !kpisFailed} detail={pending ? missing : `犬 ${kpis.dogs}・猫 ${kpis.cats}・その他 ${Math.max(0, kpis.total - kpis.dogs - kpis.cats)}`} />
-        <KpiCard presentation="band" title="今月の新規" icon={<Sparkles size={13} aria-hidden="true" />} menu={menu('今月の新規')} value={pending ? null : kpis.newThisMonth} unit="匹" loading={pending && !kpisFailed} detail="1日から今日まで" />
-        <KpiCard presentation="band" title="目安を出せる" icon={<Calculator size={13} aria-hidden="true" />} menu={menu('目安を出せる')} value={pending ? null : kpis.computable} unit="匹" loading={pending && !kpisFailed} detail="犬・猫で体重と主食がそろっている" />
-        <KpiCard presentation="band" title="体重が古い" icon={<PawPrint size={13} aria-hidden="true" />} menu={menu('体重が古い')} value={pending ? null : kpis.staleWeight} unit="匹" loading={pending && !kpisFailed} detail="90日 更新なし" />
+      <KpiBand data-design="KPIs" aria-label="ペットの数の帯">
+        <KpiCard presentation="band" title="登録ペット" icon={<History size={13} aria-hidden="true" />} value={pending ? null : kpis.total} unit="匹" loading={pending && !kpisFailed} detail={pending ? missing : `犬 ${kpis.dogs}・猫 ${kpis.cats}・その他 ${Math.max(0, kpis.total - kpis.dogs - kpis.cats)}`} />
+        <KpiCard presentation="band" title="今月の新規" icon={<Sparkles size={13} aria-hidden="true" />} value={pending ? null : kpis.newThisMonth} unit="匹" loading={pending && !kpisFailed} detail="1日から今日まで" />
+        <KpiCard presentation="band" title="目安を出せる" icon={<Calculator size={13} aria-hidden="true" />} value={pending ? null : kpis.computable} unit="匹" loading={pending && !kpisFailed} detail="犬・猫で体重と主食がそろっている" />
+        <KpiCard presentation="band" title="体重が古い" icon={<PawPrint size={13} aria-hidden="true" />} value={pending ? null : kpis.staleWeight} unit="匹" loading={pending && !kpisFailed} detail="90日 更新なし" />
       </KpiBand>
     </>
   ) : undefined
@@ -125,10 +123,10 @@ export default function PetsV8({
       boardId={BOARD[tab]}
       headingSize="regular"
       title="マイペット"
-      description="お客さまがマイページで登録したペットです。体重と主食から、1日のごはんの目安を出します。"
+      help="お客さまがマイページで登録したペットです。体重と主食から、1日のごはんの目安を出します。"
       actions={accountId ? (
         <Button type="button" onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
-          <Download size={15} aria-hidden="true" />CSV で書き出す
+          <Download size={15} aria-hidden="true" />CSVで書き出す
         </Button>
       ) : null}
       tabs={tabs}
@@ -147,15 +145,5 @@ export default function PetsV8({
         <PetsListV8 key={accountId} accountId={accountId} canEdit={canEdit} query={query} onQueryChange={setQuery} onKpis={setKpis} />
       )}
     </ListPage>
-  )
-}
-
-/** 数の帯の「…」。この画面で使える操作（いまの絞り込みで CSV を書き出す）。 */
-function KpiMenu({ title, busy, onExport }: { title: string; busy: boolean; onExport: () => void }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <span className={styles.kpiMenu}>
-      <RowMenu className={styles.kpiMenuButton} label={`${title}のメニュー`} open={open} onOpenChange={setOpen} items={[{ id: 'csv', label: 'CSV で書き出す', disabled: busy, onSelect: () => { setOpen(false); onExport() } }]} />
-    </span>
   )
 }

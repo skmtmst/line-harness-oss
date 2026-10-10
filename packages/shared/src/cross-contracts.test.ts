@@ -18,7 +18,7 @@ describe("横断契約の正本", () => {
     });
     // O(#822): LINE が後から足した2つの動き。DB の action_type は4つのまま。
     expect(RICH_MENU_ACTION_TYPE_BY_INTENT).toEqual({
-      url: "uri", tel: "uri", form: "uri", text: "message",
+      url: "uri", tel: "uri", form: "uri", booking: "uri", booking_history: "uri", visit_stamp: "uri", text: "message",
       template: "postback", switch: "richmenuswitch", postback: "postback",
       datetime: "datetimepicker", clipboard: "clipboard",
     });

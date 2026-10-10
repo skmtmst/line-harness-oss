@@ -1,3 +1,4 @@
+import { TextInput, TextArea, ChoiceInput, FieldLabel, FieldCount, FormChoiceRow } from '../components/forms/controls.js';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, type EventDetail, type EventSlot } from '../lib/api.js';
@@ -11,6 +12,7 @@ import BottomBar from '../components/ui/BottomBar.js';
 import PrivacyNote from '../components/ui/PrivacyNote.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
 import LiffLookScope from '../components/LiffLookScope.js';
+import { LiffInput, LiffTextArea } from '../components/forms/controls.js'
 
 function nanoid(): string {
   return crypto.randomUUID();
@@ -202,45 +204,37 @@ export default function EventConfirm() {
               const value = answers[q.id];
               return (
                 <div key={q.id}>
-                  <span className="mb-1 block text-sm text-ink" id={`eq-label-${q.id}`}>
+                  <FieldLabel id={`eq-label-${q.id}`} htmlFor={q.type === 'text' || q.type === 'textarea' ? `eq-${q.id}` : undefined} required={q.required}>
                     {q.label}
-                    {q.required ? (
-                      <span className="ml-1 text-danger" aria-label="必須">*</span>
-                    ) : (
-                      <span className="ml-1 text-xs text-ink-faint">任意</span>
-                    )}
-                  </span>
+                  </FieldLabel>
                   {q.type === 'text' && (
-                    <input
-                      type="text"
+                    <TextInput
+                      id={`eq-${q.id}`} type="text"
                       aria-labelledby={`eq-label-${q.id}`}
                       value={typeof value === 'string' ? value : ''}
                       onChange={(e) => setAnswers((cur) => ({ ...cur, [q.id]: e.target.value }))}
-                      className="w-full rounded-lg border border-hairline bg-canvas p-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-ink"
                     />
                   )}
                   {q.type === 'textarea' && (
-                    <textarea
-                      aria-labelledby={`eq-label-${q.id}`}
+                    <TextArea
+                      id={`eq-${q.id}`} aria-labelledby={`eq-label-${q.id}`}
                       value={typeof value === 'string' ? value : ''}
                       onChange={(e) => setAnswers((cur) => ({ ...cur, [q.id]: e.target.value }))}
                       rows={3}
-                      className="w-full rounded-lg border border-hairline bg-canvas p-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-ink"
                     />
                   )}
                   {q.type === 'radio' && (
                     <div className="space-y-1" role="radiogroup" aria-labelledby={`eq-label-${q.id}`}>
                       {(q.options ?? []).map((opt) => (
-                        <label key={opt} className="flex min-h-11 items-center gap-2 text-sm text-ink">
-                          <input
+                        <FormChoiceRow key={opt} selected={value === opt}>
+                          <ChoiceInput
                             type="radio"
                             name={`eq-${q.id}`}
                             checked={value === opt}
                             onChange={() => setAnswers((cur) => ({ ...cur, [q.id]: opt }))}
-                            className="h-4 w-4 accent-liff-primary"
                           />
                           {opt}
-                        </label>
+                        </FormChoiceRow>
                       ))}
                     </div>
                   )}
@@ -250,8 +244,8 @@ export default function EventConfirm() {
                         const chosen = Array.isArray(value) ? value : [];
                         const checked = chosen.includes(opt);
                         return (
-                          <label key={opt} className="flex min-h-11 items-center gap-2 text-sm text-ink">
-                            <input
+                          <FormChoiceRow key={opt} selected={checked}>
+                            <ChoiceInput
                               type="checkbox"
                               checked={checked}
                               onChange={() =>
@@ -260,10 +254,9 @@ export default function EventConfirm() {
                                   [q.id]: checked ? chosen.filter((x) => x !== opt) : [...chosen, opt],
                                 }))
                               }
-                              className="h-4 w-4 accent-liff-primary"
                             />
                             {opt}
-                          </label>
+                          </FormChoiceRow>
                         );
                       })}
                     </div>
@@ -274,17 +267,17 @@ export default function EventConfirm() {
           </div>
         )}
 
-        <label className="block">
-          <span className="block text-sm font-bold text-ink">備考</span>
-          <textarea
-            value={note}
+        <div className="space-y-2">
+          <FieldLabel htmlFor="event-note">備考</FieldLabel>
+          <TextArea
+            id="event-note" value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
             maxLength={5000}
             placeholder="質問や伝えたいことがあれば"
-            className="mt-2 block h-20 w-full resize-none rounded-(--liff-radius) bg-canvas px-3.5 py-3 text-sm text-ink outline outline-1 -outline-offset-1 outline-liff-line-strong placeholder:text-liff-idle focus-visible:outline-2 focus-visible:outline-ink"
           />
-        </label>
+          <FieldCount value={note} max={5000} />
+        </div>
 
         {submitError && (
           <p role="alert" className="text-sm leading-6 text-danger">
@@ -301,13 +294,12 @@ export default function EventConfirm() {
         <Button variant="primary" onClick={submit} disabled={submitting}>
           {submitting ? '送信中...' : '申し込む'}
         </Button>
-        <button
+        <Button variant="text"
           type="button"
           onClick={back}
-          className="liff-hit self-center px-4 py-1 text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
         >
           ← 戻る
-        </button>
+        </Button>
       </BottomBar>
     </LiffLookScope>
   );

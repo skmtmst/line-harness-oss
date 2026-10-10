@@ -62,13 +62,12 @@ describe('統括の友だち属性の上のタブ', () => {
     expect(document.body.textContent).toContain('VIP')
   })
 
-  it('友だち情報欄を押すと ?tab=fields に替え（履歴を積まない）、いまどこで作るかの1行と入る口を出す', async () => {
+  it('友だち情報欄を押すと ?tab=fields に替え、履歴を積まない', async () => {
     await render()
     await act(async () => { tabButton('友だち情報欄')?.click() })
     expect(replace).toHaveBeenCalledWith('/hq/friend-attributes?tab=fields', { scroll: false })
-    expect(document.body.textContent).toContain('友だち情報欄は、いまは各アカウントの友だち属性で作ります')
-    expect(document.body.textContent).not.toContain('準備中')
-    expect(document.querySelector('a[href="/hq/open?target=tags"]')).toBeTruthy()
+    expect(tabButton('友だち情報欄')?.getAttribute('aria-selected')).toBe('true')
+    expect(window.location.search).toBe('?tab=fields')
     expect(document.body.textContent).not.toContain('VIP')
   })
 
@@ -76,7 +75,7 @@ describe('統括の友だち属性の上のタブ', () => {
     window.history.replaceState(null, '', '/hq/friend-attributes?tab=marks')
     await render()
     expect(tabButton('対応マーク')?.getAttribute('aria-selected')).toBe('true')
-    expect(document.body.textContent).toContain('対応マークは、いまは各アカウントの友だち属性で作ります')
+    expect(window.location.search).toBe('?tab=marks')
   })
 
   it('テンプレートなどほかの種類には友だち属性のタブを出さない', async () => {

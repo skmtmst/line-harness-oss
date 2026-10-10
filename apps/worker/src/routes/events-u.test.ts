@@ -203,7 +203,7 @@ describe('U 状態の切替口', () => {
       to: 'paused',
     });
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ error: 'lifecycle_reason_required' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'lifecycle_reason_required' , fields: expect.any(Object), error: expect.any(String) });
   });
 
   test('一時停止は公開フラグを落とす', async () => {
@@ -307,7 +307,7 @@ describe('U 変更確認の口', () => {
       slot_changes: [{ slot_id: 's1', capacity: 3 }],
     });
     expect(noReason.status).toBe(422);
-    await expect(noReason.json()).resolves.toEqual({ error: 'change_reason_required' });
+    await expect(noReason.json()).resolves.toMatchObject({ code: 'change_reason_required' , fields: expect.any(Object), error: expect.any(String) });
 
     const applied = await postJson(app, path, {
       expected_version: 1,
@@ -350,7 +350,7 @@ describe('U 待ちの手動操作の口', () => {
     const path = '/api/events/admin/occurrences/s1/waitlist/reorder?account_id=la1';
     const noReason = await postJson(app, path, { ordered_ids: ['w2', 'w1'] });
     expect(noReason.status).toBe(422);
-    await expect(noReason.json()).resolves.toEqual({ error: 'waitlist_reason_required' });
+    await expect(noReason.json()).resolves.toMatchObject({ code: 'waitlist_reason_required' , fields: expect.any(Object), error: expect.any(String) });
 
     const res = await postJson(app, path, {
       ordered_ids: ['w2', 'w1'],
@@ -397,7 +397,7 @@ describe('U 待ちの手動操作の口', () => {
       { expectedVersion: 1 },
     );
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ error: 'waitlist_reason_required' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'waitlist_reason_required' , fields: expect.any(Object), error: expect.any(String) });
   });
 });
 

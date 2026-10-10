@@ -8,6 +8,7 @@ import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 export type BulkRouteAction = 'pause' | 'resume' | 'move'
 
@@ -73,7 +74,7 @@ export default function BulkRoutesDialog({
         failed.push({
           route,
           error: cause instanceof ApiError && cause.status === 403
-            ? 'この操作を行う権限がありません'
+            ? permissionDeniedMessage('store')
             : '通信できませんでした',
         })
       }
@@ -104,7 +105,7 @@ export default function BulkRoutesDialog({
           </Button>
           {action && affected.length > 0 ? (
             <Button type="button" variant="primary" disabled={busy} onClick={() => { void run() }} busy={busy} busyLabel="実行中…">
-              {`${formatNumber(affected.length)}件に実行する`}
+              {`${formatNumber(affected.length)} 件に実行する`}
             </Button>
           ) : null}
         </div>
@@ -113,12 +114,12 @@ export default function BulkRoutesDialog({
       {result ? (
         <div className="space-y-3">
           <p className="text-ink text-sm">
-            {formatNumber(result.succeeded.length)}件に反映しました。
+            {formatNumber(result.succeeded.length)} 件に反映しました。
           </p>
           {result.failed.length > 0 ? (
             <div className="space-y-2">
               <p className="text-danger text-sm font-semibold">
-                {formatNumber(result.failed.length)}件は実行できませんでした。
+                {formatNumber(result.failed.length)} 件は実行できませんでした。
               </p>
               <ul className="divide-hairline divide-y rounded-control border border-hairline text-sm">
                 {result.failed.map(({ route, error }) => (
@@ -149,11 +150,11 @@ export default function BulkRoutesDialog({
         <div className="space-y-4">
           <div>
             <p className="text-ink text-sm font-semibold">
-              対象 {formatNumber(remaining.length)}件
+              対象 {formatNumber(remaining.length)} 件
             </p>
             <p className="text-ink-faint mt-1 text-xs leading-5">
               {remaining.slice(0, 8).map((route) => route.name).join('、')}
-              {remaining.length > 8 ? ` ほか${formatNumber((remaining.length - 8))}件` : ''}
+              {remaining.length > 8 ? ` ほか${formatNumber((remaining.length - 8))} 件` : ''}
             </p>
           </div>
           <RadioCardGroup legend="どの操作をしますか？">
@@ -161,19 +162,19 @@ export default function BulkRoutesDialog({
               {
                 value: 'pause' as const,
                 label: 'まとめて停止する',
-                note: `選んだ中の受付中 ${formatNumber(pauseTargets.length)}件が対象です。`,
+                note: `選んだ中の受付中 ${formatNumber(pauseTargets.length)} 件が対象です。`,
                 count: pauseTargets.length,
               },
               {
                 value: 'resume' as const,
                 label: 'まとめて再開する',
-                note: `選んだ中の停止中 ${formatNumber(resumeTargets.length)}件が対象です。`,
+                note: `選んだ中の停止中 ${formatNumber(resumeTargets.length)} 件が対象です。`,
                 count: resumeTargets.length,
               },
               {
                 value: 'move' as const,
                 label: 'フォルダをまとめて移動する',
-                note: `選んだ中の ${formatNumber(moveTargets.length)}件が変わります。`,
+                note: `選んだ中の ${formatNumber(moveTargets.length)} 件が変わります。`,
                 count: -1,
               },
             ]).map((option) => {

@@ -371,7 +371,7 @@ function NewInflowLinkPageV7() {
       </div>
 
       {pruneNotice ? <Notice tone="warn" message={pruneNotice} onClose={() => setPruneNotice(null)} /> : null}
-      {saveError ? <Notice tone="error" message={saveError} onClose={() => setSaveError(null)} /> : null}
+      {saveError ? <Notice tone="danger" message={saveError} onClose={() => setSaveError(null)} /> : null}
       {conflict ? (
         <section className={styles.conflictBand} data-design-node="vWJEm" aria-label="文字が重複しています">
           <div className={styles.conflictText}>

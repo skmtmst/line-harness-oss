@@ -63,6 +63,12 @@ beforeEach(() => {
     if (url.pathname === '/api/reminders' || url.pathname === '/api/reminders/') {
       return response({ success: true, data: { items: listItems, total: listItems.length, limit: 20 } })
     }
+    if (url.pathname.startsWith('/api/reminders/') && init?.method === 'PUT') {
+      const id = url.pathname.split('/').at(-1)
+      const changes = JSON.parse(String(init.body))
+      listItems = listItems.map(row => row.id === id ? { ...row, ...changes, lifecycleStatus: changes.isActive ? 'published' : 'stopped' } : row)
+      return response({ success: true, data: listItems.find(row => row.id === id) })
+    }
     if (url.pathname === '/api/folders') return response({ success: true, data: [], unfiledCount: 0 })
     if (url.pathname === '/api/list-stats') return response({ success: false, error: 'not needed' })
     if (url.pathname === '/api/staff/me') return response({ success: true, data: { role: 'owner' } })
@@ -97,7 +103,7 @@ function renderPage() {
   })
 }
 
-test('再開は押した瞬間に有効の札になり、元に戻すで送らずに戻る', async () => {
+test('再開は確認を挟まず有効へ変わり、保存を1回送り、元に戻すを出さない', async () => {
   renderPage()
   await eventually(() => {
     if (!host.textContent?.includes('止まっている方')) throw new Error('no rows yet')
@@ -112,15 +118,9 @@ test('再開は押した瞬間に有効の札になり、元に戻すで送ら�
     const pills = [...host.querySelectorAll('span')].filter((s) => s.textContent === '有効')
     if (pills.length < 2) throw new Error('not yet optimistic')
   })
-  const undo = [...host.querySelectorAll('button')].find((b) => b.textContent === '元に戻す') as HTMLElement
-  expect(undo).toBeTruthy()
-  await act(async () => { undo.click() })
-  await act(async () => { await Promise.resolve(); await Promise.resolve() })
-  expect(calls.some((c) => c.path.startsWith('/api/reminders/') && c.method !== 'GET')).toBe(false)
-  await eventually(() => {
-    const stopped = [...host.querySelectorAll('span')].filter((s) => s.textContent === '停止中')
-    if (stopped.length < 1) throw new Error('not yet reverted')
-  })
+  expect([...host.querySelectorAll('button')].some(button => button.textContent === '元に戻す')).toBe(false)
+  expect(calls.filter(call => call.path === '/api/reminders/r1' && call.method === 'PUT')).toHaveLength(1)
+  expect(document.querySelector('[role="alertdialog"]')).toBeNull()
 })
 
 test('読み込み中は出来上がりと同じ形の骨組みを出す', async () => {

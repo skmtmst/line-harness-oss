@@ -272,7 +272,7 @@ describe('N-025 引用返信と送信予約', () => {
       document.querySelector<HTMLElement>('[data-inbox-v6="schedule-toggle"]')!.click()
     })
     await eventually(() => {
-      expect(document.querySelector('[data-inbox-v6="schedule-panel"]')).toBeTruthy()
+      expect(document.querySelector('[role="dialog"]')).toBeTruthy()
     })
 
     // 日時の選択（★V7）で 2027-09-17 09:00 を選ぶ。値は今までどおり日本時間の文字列。
@@ -298,7 +298,7 @@ describe('N-025 引用返信と送信予約', () => {
     })
 
     const scheduleButton = Array.from(document.querySelectorAll('button'))
-      .find((b) => b.textContent === 'この日時で予約する')!
+      .find((b) => /に予約$/.test(b.textContent ?? ''))!
     await act(async () => { scheduleButton.click() })
     await eventually(() => {
       expect(fixture.scheduled).toHaveLength(1)
@@ -413,7 +413,7 @@ describe('★V8 書く欄：予約は窓・送るキーの切り替え・添付'
    * 画像・動画／ファイルを選ぶ。ファイルは先に準備（アップロード）し、札を出してから本文と一緒に送る。
    */
   const pickFile = async (file: File) => {
-    const input = document.querySelector('[data-inbox-v8="attach-file-input"]') as HTMLInputElement
+    const input = document.querySelector('input[type=file][aria-label="ファイルを添付（ファイル）"]') as HTMLInputElement
     expect(input.accept).toContain('application/pdf')
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
     await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })) })
@@ -446,7 +446,7 @@ describe('★V8 書く欄：予約は窓・送るキーの切り替え・添付'
     await act(async () => { root.render(<ChatsPage />) })
     await eventually(() => { expect(host.textContent).toContain('値段はいくらですか？') })
     await pickFile(new File(['a,b'], '名簿.csv', { type: 'text/csv' }))
-    await eventually(() => { expect(host.textContent).toContain('「名簿.csv」は送れない形式です') })
+    await eventually(() => { expect(host.textContent).toMatch(/のファイルを選んでください/) })
     const big = new File(['x'], '大きい.pdf', { type: 'application/pdf' })
     Object.defineProperty(big, 'size', { value: 10 * 1024 * 1024 + 1 })
     await pickFile(big)

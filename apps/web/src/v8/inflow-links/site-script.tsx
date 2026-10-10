@@ -13,10 +13,11 @@
  * - 「貼りかたが分からないときは」は窓で開く（今は右の列のいちばん下の段）
  * - 閲覧のみ（owner・admin 以外）には、サイトを追加する・「…」・操作の行を出さない
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CircleHelp, Copy, Eye, Mail, MoreHorizontal, Pause, Play, Plus, RefreshCw } from 'lucide-react'
-import { api, type MeasurementSite } from '@/lib/api'
+import { ApiError, api, type MeasurementSite } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
 import { useResponseGate } from '@/lib/use-response-gate'
@@ -30,7 +31,13 @@ import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextArea, TextField } from '@/components/shared/text-field'
+import { DetailPage } from '@/components/templates'
+import { focusField } from './focus-field'
 import styles from './site-script.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type PageRow = { host: string | null; path: string; views: number; visitors: number }
 type TrackingSummary = {
@@ -48,14 +55,7 @@ type SiteDialogState =
 
 /** 「10/1 21:14」の形（日本時間）。読めない値は出さない。 */
 function formatShort(value: string | null | undefined): string | null {
-  if (!value) return null
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return null
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo',
-  }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+  return polishFormatDate(value, { style: 'list', fallback: '' }) || null
 }
 
 const parseDomains = (text: string) => text.split(/[\s,]+/).map((d) => d.trim()).filter(Boolean)
@@ -170,8 +170,17 @@ export default function SiteScriptV8() {
     }
   }, [selectedAccountId, keyAttempt])
 
+  const [siteFieldErrors, setSiteFieldErrors] = useState<Record<string, string>>({})
+  const [stopReasonError, setStopReasonError] = useState('')
+
   const saveSite = async () => {
     if (!siteDialog) return
+    const errors: Record<string, string> = {}
+    if (!siteDialog.label.trim()) errors['site-name'] = 'サイトの名前を入力してください'
+    if (!parseDomains(siteDialog.domainsText).length) errors['site-domains'] = '計測を許可するドメインを入力してください'
+    setSiteFieldErrors(errors)
+    setSiteDialog({ ...siteDialog, error: null })
+    if (Object.keys(errors).length) { focusField(Object.keys(errors)[0]); return }
     const accountAtStart = selectedAccountId
     const moved = () => accountRef.current !== accountAtStart
     setSiteBusy(true)
@@ -189,7 +198,17 @@ export default function SiteScriptV8() {
       await load()
     } catch (err) {
       if (moved()) return
-      setSiteDialog({ ...siteDialog, error: err instanceof Error ? err.message : '保存できませんでした' })
+      const message = err instanceof Error ? err.message : '保存できませんでした'
+      const field = err instanceof ApiError && err.status === 400
+        ? message.includes('ドメイン') ? 'site-domains' : message.includes('サイトの名前') ? 'site-name' : null
+        : null
+      if (field) {
+        setSiteFieldErrors({ [field]: message })
+        setSiteDialog({ ...siteDialog, error: null })
+        focusField(field)
+      } else {
+        setSiteDialog({ ...siteDialog, error: message })
+      }
     } finally {
       setSiteBusy(false)
     }
@@ -201,7 +220,9 @@ export default function SiteScriptV8() {
     const moved = () => accountRef.current !== accountAtStart
     const reason = stopDialog.reason.trim()
     if (!reason) {
-      setStopDialog({ ...stopDialog, error: '止める理由を入れてください' })
+      setStopDialog({ ...stopDialog, error: null })
+      setStopReasonError('止める理由を入れてください')
+      focusField('site-stop-reason')
       return
     }
     setSiteBusy(true)
@@ -241,31 +262,10 @@ export default function SiteScriptV8() {
     }
   }
 
-  const copy = async () => {
-    if (!snippet) return
-    try {
-      await navigator.clipboard.writeText(snippet)
-      setCopied(true)
-      setCopyFailed(false)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      setCopyFailed(true)
-    }
-  }
+
 
   /** 制作会社へ送る文（コードつき）をコピーする。 */
-  const copyMessage = async () => {
-    if (!snippet) return
-    const message = `ホームページの</head>の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。\n${snippet}`
-    try {
-      await navigator.clipboard.writeText(message)
-      setMessageCopied(true)
-      setCopyFailed(false)
-      setTimeout(() => setMessageCopied(false), 2000)
-    } catch {
-      setCopyFailed(true)
-    }
-  }
+
 
   const receiving = summary?.lastEventAt != null
   const lastSeen = formatShort(summary?.lastEventAt)
@@ -297,15 +297,15 @@ export default function SiteScriptV8() {
         return (
           <div key={site.id} className={styles.siteRow} role="row" data-selected={selectedSiteId === site.id || undefined}>
             <span className={styles.colSite} role="cell"><span className={styles.siteName} title={site.label}>{site.label}</span></span>
-            <span className={styles.colDomain} role="cell"><span className={styles.cellText} title={site.domains.join('\n')}>{site.domains.join('、') || '—'}</span></span>
+            <span className={styles.colDomain} role="cell"><span className={styles.cellText} title={site.domains.join('\n')}>{site.domains.join('、') || emptyValue('unknown')}</span></span>
             <span className={styles.colState} role="cell">
               {stopped ? (
-                <StatusBadge tone="neutral" size="compact">止めている</StatusBadge>
+                <StatusBadge tone="neutral" size="compact">停止中</StatusBadge>
               ) : (
                 <StatusBadge tone="success" size="compact">{site.lastReceivedAt ? '届いている' : '受信待ち'}</StatusBadge>
               )}
             </span>
-            <span className={styles.colLast} role="cell"><span className={styles.cellText}>{last ?? '—'}</span></span>
+            <span className={styles.colLast} role="cell"><span className={styles.cellText}>{last ?? emptyValue('unknown')}</span></span>
             <span className={styles.colMenu} role="cell">
               {manage ? (
                 <IconButton
@@ -328,11 +328,11 @@ export default function SiteScriptV8() {
           <span className={styles.rowActionsLabel}>{selectedSite ? `「${selectedSite.label}」の操作：` : '「…」を開いたとき：'}</span>
           <Button
             disabled={!selectedSite}
-            onClick={() => selectedSite && setSiteDialog({ mode: 'edit', site: selectedSite, label: selectedSite.label, domainsText: selectedSite.domains.join('\n'), error: null })}
+            onClick={() => { if (selectedSite) { setSiteFieldErrors({}); setSiteDialog({ mode: 'edit', site: selectedSite, label: selectedSite.label, domainsText: selectedSite.domains.join('\n'), error: null }) } }}
           >
             編集
           </Button>
-          <Button disabled={!selectedSite || selectedStopped} onClick={() => selectedSite && setStopDialog({ site: selectedSite, reason: '', error: null })}>
+          <Button disabled={!selectedSite || selectedStopped} onClick={() => { if (selectedSite) { setStopReasonError(''); setStopDialog({ site: selectedSite, reason: '', error: null }) } }}>
             <Pause size={15} aria-hidden="true" />止める
           </Button>
           <Button disabled={!selectedSite || !selectedStopped} onClick={() => selectedSite && setResumeTarget(selectedSite)}>
@@ -344,18 +344,12 @@ export default function SiteScriptV8() {
   )
 
   return (
-    <div className={styles.board} data-design-node="XjOte">
-      <header className={styles.head}>
-        <div className={styles.headText}>
-          <h1 className={styles.title}>サイトスクリプト</h1>
-          <p className={styles.description}>ホームページに1行貼ると、サイトを見た人と LINE の友だちを結びつけ、成果も数えられます。</p>
-        </div>
-        <Button onClick={() => setHelpOpen(true)}><CircleHelp size={15} aria-hidden="true" />貼りかたが分からないときは</Button>
-      </header>
-
+    <DetailPage boardId="XjOte" title="サイトスクリプト" help="ホームページに1行貼ると、サイトを見た人と LINE の友だちを結びつけ、成果も数えられます。"
+      contentPadding="var(--tpl-detail-head-pad-bottom) var(--tpl-head-pad-side)"
+      actions={<Button onClick={() => setHelpOpen(true)}><CircleHelp size={15} aria-hidden="true" />貼りかたが分からないときは</Button>}>
       <div className={styles.body}>
         {readonly ? (
-          <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作は管理者に頼んでください。</p>
+          <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
         ) : null}
 
         {loading && summary == null && !failed ? (
@@ -365,7 +359,7 @@ export default function SiteScriptV8() {
             kind="error"
             title="サイトの計測を読み込めませんでした"
             description={`${lastSeen ? `最後に受け取ったのは ${lastSeen} です。` : ''}タグが外れていないか、サイトの公開先が変わっていないかを確かめてください。`}
-            action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+            onRetry={() => void load()}
           />
         ) : <>
           <section className={styles.card} aria-labelledby="ss-sites">
@@ -373,7 +367,7 @@ export default function SiteScriptV8() {
             <div className={styles.sitesLead}>
               <p className={styles.lead}>サイトごとにコードを分けます。止めたサイトの成果は数えません。</p>
               {manage ? (
-                <Button onClick={() => setSiteDialog({ mode: 'create', label: '', domainsText: '', error: null })}>
+                <Button onClick={() => { setSiteFieldErrors({}); setSiteDialog({ mode: 'create', label: '', domainsText: '', error: null }) }}>
                   <Plus size={15} aria-hidden="true" />サイトを追加する
                 </Button>
               ) : null}
@@ -393,8 +387,8 @@ export default function SiteScriptV8() {
                     <div className={styles.codeBox}><code className={styles.code}>{snippet}</code></div>
                     {copyFailed ? <p className={styles.small} role="alert">コピーできませんでした。上のコードを選んでコピーしてください。</p> : null}
                     <div className={styles.buttons}>
-                      <Button variant="primary" onClick={() => void copy()}><Copy size={15} aria-hidden="true" />{copied ? 'コピーしました' : 'コードをコピー'}</Button>
-                      <Button onClick={() => void copyMessage()}><Mail size={15} aria-hidden="true" />{messageCopied ? 'コピーしました' : '制作会社へ送る文をコピー'}</Button>
+                      <CopyTextButton value={snippet ?? ""} label="コードをコピー" aria-label="コードをコピー"  />
+                      <CopyTextButton value={`ホームページの</head>の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。\n${snippet}`} label="制作会社へ送る文をコピー" aria-label="制作会社へ送る文をコピー"  />
                     </div>
                   </>
                 ) : (
@@ -435,7 +429,7 @@ export default function SiteScriptV8() {
                   {receiving ? (
                     <>
                       <span><StatusBadge tone="success" size="compact">届いている</StatusBadge></span>
-                      <p className={styles.faint}>{`最後に届いたのは ${lastSeen ?? '—'}`}</p>
+                      <p className={styles.faint}>{`最後に届いたのは ${lastSeen ?? emptyValue('unknown')}`}</p>
                     </>
                   ) : (
                     <>
@@ -461,8 +455,8 @@ export default function SiteScriptV8() {
                   {pages.length === 0 ? (
                     <div className={styles.pageRow} role="row">
                       <span className={styles.pageCol} role="cell">同意なし</span>
-                      <span className={styles.numCol} role="cell">—</span>
-                      <span className={styles.numColNarrow} role="cell">—</span>
+                      <span className={styles.numCol} role="cell">{emptyValue('unknown')}</span>
+                      <span className={styles.numColNarrow} role="cell">{emptyValue('unknown')}</span>
                     </div>
                   ) : null}
                 </div>
@@ -499,24 +493,21 @@ export default function SiteScriptV8() {
 
       <Dialog
         open={siteDialog !== null}
+        initialFocusId={Object.entries(siteFieldErrors).find(([, error]) => Boolean(error))?.[0]}
         title={siteDialog?.mode === 'edit' ? '計測サイトを直す' : '計測サイトを追加'}
-        description="このサイトから届いた成果だけを数えます。ドメインは1行に1つずつ書きます（例: shop.example.com）。www の有無は同じサイトとして扱います。"
+        description="このサイトから届いた成果だけを数えます。ドメインは1行に1つずつ書きます（例：shop.example.com）。www の有無は同じサイトとして扱います。"
         busy={siteBusy}
         error={siteDialog?.error ?? undefined}
         confirmLabel={siteDialog?.mode === 'edit' ? '保存する' : '追加する'}
-        onConfirm={() => void saveSite()}
+        onConfirm={() => saveSite()}
         onCancel={() => setSiteDialog(null)}
       >
         {siteDialog ? (
           <div className={styles.dialogFields}>
-            <label className={styles.dialogField}>
-              <span className={styles.dialogLabel}>サイトの名前</span>
-              <TextField value={siteDialog.label} maxLength={100} placeholder="例: 公式ショップ" onChange={(e) => setSiteDialog({ ...siteDialog, label: e.target.value })} />
-            </label>
-            <label className={styles.dialogField}>
-              <span className={styles.dialogLabel}>計測を許可するドメイン</span>
-              <TextArea rows={4} value={siteDialog.domainsText} placeholder={'example.com\nshop.example.com'} onChange={(e) => setSiteDialog({ ...siteDialog, domainsText: e.target.value })} />
-            </label>
+            <Field label="サイトの名前"><TextField id="site-name" aria-invalid={Boolean(siteFieldErrors['site-name'])} aria-describedby={siteFieldErrors['site-name'] ? 'site-name-error' : undefined} value={siteDialog.label} maxLength={100} placeholder="例：公式ショップ" onChange={(e) => { setSiteDialog({ ...siteDialog, label: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-name': '' })) }} />
+{siteFieldErrors['site-name'] ? <span id="site-name-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-name']}</span> : null}</Field>
+            <Field label="計測を許可するドメイン"><TextArea id="site-domains" aria-invalid={Boolean(siteFieldErrors['site-domains'])} aria-describedby={siteFieldErrors['site-domains'] ? 'site-domains-error' : undefined} rows={4} value={siteDialog.domainsText} placeholder={'example.com\nshop.example.com'} onChange={(e) => { setSiteDialog({ ...siteDialog, domainsText: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-domains': '' })) }} />
+{siteFieldErrors['site-domains'] ? <span id="site-domains-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-domains']}</span> : null}</Field>
           </div>
         ) : null}
       </Dialog>
@@ -528,16 +519,14 @@ export default function SiteScriptV8() {
         busy={siteBusy}
         error={stopDialog?.error ?? undefined}
         confirmLabel="計測を止める"
-        onConfirm={() => void stopSite()}
+        onConfirm={() => stopSite()}
         onCancel={() => { if (!siteBusy) setStopDialog(null) }}
       >
         {stopDialog ? (
           <div className={styles.dialogFields}>
             <p className={styles.small}>{`対象: ${stopDialog.site.label}`}</p>
-            <label className={styles.dialogField}>
-              <span className={styles.dialogLabel}>止める理由（必須）</span>
-              <TextField value={stopDialog.reason} maxLength={200} placeholder="例: サイトを閉じたため" onChange={(e) => setStopDialog({ ...stopDialog, reason: e.target.value })} />
-            </label>
+            <Field label="止める理由" required><TextField id="site-stop-reason" aria-invalid={Boolean(stopReasonError)} aria-describedby={stopReasonError ? 'site-stop-reason-error' : undefined} value={stopDialog.reason} maxLength={200} placeholder="例：サイトを閉じたため" onChange={(e) => { setStopDialog({ ...stopDialog, reason: e.target.value }); setStopReasonError('') }} />
+{stopReasonError ? <span id="site-stop-reason-error" className={styles.fieldError} role="alert">{stopReasonError}</span> : null}</Field>
           </div>
         ) : null}
       </Dialog>
@@ -548,9 +537,9 @@ export default function SiteScriptV8() {
         description={resumeTarget ? `「${resumeTarget.label}」から届く分をまた数え始めます。止めていた間の分は数えていません。` : ''}
         confirmLabel="再開する"
         busy={siteBusy}
-        onConfirm={() => void resumeSite()}
+        onConfirm={() => resumeSite()}
         onCancel={() => { if (!siteBusy) setResumeTarget(null) }}
       />
-    </div>
+    </DetailPage>
   )
 }

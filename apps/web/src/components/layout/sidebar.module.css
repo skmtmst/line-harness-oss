@@ -12,9 +12,9 @@
 
 .sectionHeading {
   display: flex;
-  height: 34px;
+  height: 30px;
   align-items: flex-end;
-  padding: 12px 12px 5px;
+  padding: 10px 10px 3px;
   color: var(--color-ink-faint);
   font-size: var(--text-caption);
   font-weight: 600;
@@ -23,13 +23,13 @@
 .item {
   position: relative;
   display: flex;
-  height: 40px;
+  height: 36px;
   align-items: center;
-  gap: 11px;
-  border-radius: var(--radius-card);
-  padding: 0 12px;
+  gap: 10px;
+  border-radius: var(--radius-segment);
+  padding: 0 10px;
   color: var(--color-ink);
-  font-size: 14px;
+  font-size: var(--text-callout);
   font-weight: 600;
   transition: color var(--motion-fast) var(--motion-ease-out), background-color var(--motion-fast) var(--motion-ease-out);
 }
@@ -44,8 +44,8 @@
 }
 
 .active {
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
+  background: var(--color-notice-success-bg);
+  color: var(--color-success);
   font-weight: 500;
 }
 
@@ -399,7 +399,7 @@
 }
 
 /* zUg8S / Yw24X の実寸。v7 は既存値を保持。 */
-[data-theme="v8"] .item { gap: 10px; padding-inline: 10px; border-radius: 8px; color: var(--color-ink-secondary); }
+[data-theme="v8"] .item { gap: 10px; padding-inline: 10px; border-radius: var(--radius-button-primary); color: var(--color-ink-secondary); }
 [data-theme="v8"] .active { color: var(--color-ink); }
 [data-theme="v8"] .section { gap: 1px; }
 [data-theme="v8"] .sectionHeading,

@@ -30,6 +30,7 @@ import { IdentityStateBlock } from '@/components/identity/identity-state'
 import { useIdentityReview } from '@/components/identity/identity-review'
 import { confidenceText } from '@/components/identity/identity-view'
 import styles from '@/app/friends/friends-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function FriendIdentityCandidatesV8Inner() {
   usePageTitle('重複候補の確認')
@@ -154,13 +155,13 @@ function FriendIdentityCandidatesV8Inner() {
                       return (
                         <tr key={field.fieldKey}>
                           <td style={{ color: 'var(--color-ink)', fontWeight: 600 }}>{field.fieldLabel}</td>
-                          <td>{left?.valuePreview ?? '—'}</td>
-                          <td>{right?.valuePreview ?? '—'}</td>
+                          <td>{left?.valuePreview ?? emptyValue('unknown')}</td>
+                          <td>{right?.valuePreview ?? emptyValue('unknown')}</td>
                           <td>
                             {same
                               ? '同じ'
                               : field.options[0]
-                                ? `${field.options[0].sourceLabel}：${field.options[0].valuePreview ?? '未登録'}`
+                                ? `${field.options[0].sourceLabel}：${field.options[0].valuePreview ?? emptyValue('unconfigured')}`
                                 : '判定時に選択'}
                           </td>
                         </tr>

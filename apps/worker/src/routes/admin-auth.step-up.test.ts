@@ -178,7 +178,7 @@ describe('POST /api/auth/step-up のパスワード経路（V）', () => {
       body: JSON.stringify({ password: 'wrong-pass1', purpose: 'operations.control' }),
     }, bindings());
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ success: false, error: 'パスワードが正しくありません' });
+    await expect(res.json()).resolves.toMatchObject({ success: false, error: 'パスワードが正しくありません' , fields: expect.any(Object) });
     expect(testDb.raw.prepare(
       'SELECT attempts FROM auth_step_up_attempts WHERE staff_id = ?',
     ).get('staff-1')).toEqual({ attempts: 1 });
@@ -224,7 +224,7 @@ describe('POST /api/auth/step-up の優先順位（V）', () => {
     // beforeEach で TOTP 設定済み。パスワードを送っても TOTP 経路の形式検査に掛かる。
     const res = await requestStepUp('not-a-code');
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ success: false, error: '6桁の認証コードを入力してください' });
+    await expect(res.json()).resolves.toMatchObject({ success: false, error: '6桁の認証コードを入力してください', fields: { code: '6桁の認証コードを入力してください' } });
   });
 });
 

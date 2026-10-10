@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 CSV で書き出す・取り込む（Pencil `T9gblG`、状態 `SXCb3`）。
+ * ★V8 CSVで書き出す・取り込む（Pencil `T9gblG`、状態 `SXCb3`）。
  *
  * 手順と API は v7 と同じ `useFriendMigrations`。違いは見せ方——
  * 「← 友だち一覧 › データ管理 › CSVで書き出す・取り込む」と
@@ -27,6 +27,8 @@ import {
   useFriendMigrations,
 } from './use-friend-migrations'
 import styles from '@/app/friends/friends-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 export default function FriendMigrationsV8() {
   usePageTitle('CSVで書き出す・取り込む')
@@ -35,7 +37,7 @@ export default function FriendMigrationsV8() {
 
   if (m.status === 'loading') return <ListState kind="loading" title="書き出し・取り込みを読み込んでいます" />
   if (m.status === 'forbidden') return <ListState kind="forbidden" title="書き出し・取り込みを見る権限がありません" description="見るには権限が要ります。オーナーか管理者の方に確認してください。" />
-  if (m.status === 'error') return <ListState kind="error" title="書き出し・取り込みを表示できませんでした" description="履歴は消えていません。" action={<Button onClick={() => void m.load()}>もう一度試す</Button>} />
+  if (m.status === 'error') return <ListState kind="error" title="書き出し・取り込みを表示できませんでした" description="履歴は消えていません。" onRetry={() => void m.load()} />
 
   const reflectable = m.summary ? m.summary.add + m.summary.update : 0
 
@@ -68,10 +70,7 @@ export default function FriendMigrationsV8() {
       <div className={styles.duoCards}>
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>CSVで書き出す</h3>
-          <div className={styles.fieldStack}>
-            <label className={styles.fieldLabel}>
-              アカウント
-              <Select
+          <div className={styles.fieldStack}><Field label="アカウント" help={<>基本はLINEユーザーID・LINE表示名・本名・システム表示名・登録日の5列です。この5列はそのまま取り込めます。</>}><Select
                 aria-label="書き出すLINEアカウント"
                 size="full"
                 value={m.accountId}
@@ -80,9 +79,7 @@ export default function FriendMigrationsV8() {
                   { value: '', label: 'アカウントを選択' },
                   ...m.accounts.map((account) => ({ value: account.id, label: account.name })),
                 ]}
-              />
-            </label>
-            <fieldset className={styles.fieldStack} style={{ gap: 8 }}>
+              /><fieldset className={styles.fieldStack} style={{ gap: 8 }}>
               <legend className={styles.fieldLabel}>
                 書き出す項目
                 <HelpTip label="書き出す項目の説明">基本はLINEユーザーID・LINE表示名・本名・システム表示名・登録日の5列です。この5列はそのまま取り込めます。</HelpTip>
@@ -103,10 +100,9 @@ export default function FriendMigrationsV8() {
                 </Checkbox>
               ))}
             </fieldset>
-            <p className={styles.sectionDesc} style={{ margin: 0 }}>
+<p className={styles.sectionDesc} style={{ margin: 0 }}>
               文字コード：UTF-8（Shift_JISの書き出しはまだ使えません）
-            </p>
-          </div>
+            </p></Field></div>
           <div className={styles.cardCenter}>
             <Button
               variant="primary"
@@ -123,7 +119,7 @@ export default function FriendMigrationsV8() {
                 className={styles.linkAction}
                 href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}${m.exportResult.downloadUrl}`}
               >
-                CSVをダウンロード（{m.exportResult.rowCount ?? '—'}件）
+                CSVをダウンロード（{m.exportResult.rowCount ?? emptyValue('unknown')}件）
               </a>
             </p>
           ) : null}
@@ -240,7 +236,7 @@ export default function FriendMigrationsV8() {
                   <tr key={`${job.kind}-${job.id}`}>
                     <td>{formatDateTime(job.created_at)}</td>
                     <td>{job.kind === 'export' ? '書き出し' : '取り込み'}</td>
-                    <td className="num">{job.row_count ?? job.total_count ?? '—'}</td>
+                    <td className="num">{job.row_count ?? job.total_count ?? emptyValue('unknown')}</td>
                     <td>{job.created_by_name}</td>
                     <td>
                       <StatusBadge tone={job.status === 'completed' ? 'success' : 'neutral'}>

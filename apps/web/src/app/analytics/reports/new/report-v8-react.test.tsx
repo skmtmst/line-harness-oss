@@ -178,6 +178,7 @@ describe('V8 レポート作成（H5UoIu）', () => {
     const framed = container.querySelector('[data-design-node="H5UoIu"]')
     expect(framed).toBeTruthy()
     expect(container.textContent).toContain('レポートを作る')
+    await act(async () => { container.querySelector<HTMLButtonElement>('[data-template-region=heading] button[aria-expanded]')!.click() })
     expect(container.textContent).toContain('見たい数をまとめて')
     // 配信先・頻度は必須
     expect(container.textContent).toContain('必須')
@@ -208,7 +209,7 @@ describe('V8 レポート作成（H5UoIu）', () => {
   it('名前が空のまま押すと欄の下に文が出る', async () => {
     await mount()
     await settle()
-    const nameField = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement | null
+    const nameField = container.querySelector("input[placeholder=\"例：週次まとめ\"]") as HTMLInputElement | null
     if (!nameField) throw new Error('名前の入力が見つかりません')
     await act(async () => { fireEvent.change(nameField, { target: { value: '' } }) })
     // 宛先を選んで保存できる形にする
@@ -219,7 +220,28 @@ describe('V8 レポート作成（H5UoIu）', () => {
     await act(async () => { fireEvent.click(person) })
     await click(buttonByText('つくって動かす'))
     await settle()
+    expect(container.querySelectorAll('[role="alert"]')).toHaveLength(1)
+    expect(nameField.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(nameField)
     expect(container.textContent).toContain('レポートの名前を入力してください')
+  })
+
+  it('知らせる条件の空欄は0として保存せず、その欄へ移る', async () => {
+    fixture.editId = 'report-1'
+    await mount()
+    await settle()
+    const toggle = [...container.querySelectorAll('input[type="checkbox"]')].find((item) => item.closest('label')?.textContent?.includes('大きな変化を知らせる')) as HTMLInputElement
+    await act(async () => { fireEvent.click(toggle) })
+    const condition = container.querySelector('input[aria-label="友だち減少の条件を使う"]') as HTMLInputElement
+    await act(async () => { fireEvent.click(condition) })
+    const threshold = container.querySelector('#report-alert-friend_adds-threshold') as HTMLInputElement
+    await act(async () => { fireEvent.change(threshold, { target: { value: '' } }) })
+    await click(buttonByText('変更を保存する'))
+    await settle()
+    expect(document.activeElement).toBe(threshold)
+    expect(threshold.getAttribute('aria-invalid')).toBe('true')
+    expect(container.querySelectorAll('[role="alert"]')).toHaveLength(1)
+    expect(net.puts).toHaveLength(0)
   })
 })
 
@@ -228,7 +250,7 @@ describe('V8 作成時の競合小窓（G83vi）', () => {
     fixture.editId = 'report-1'
     await mount()
     await settle()
-    const nameField = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement
+    const nameField = container.querySelector("input[placeholder=\"例：週次まとめ\"]") as HTMLInputElement
     await act(async () => { fireEvent.change(nameField, { target: { value: '保存する名前' } }) })
     const beforeSave = new Event('beforeunload', { cancelable: true })
     window.dispatchEvent(beforeSave)
@@ -253,7 +275,7 @@ describe('V8 作成時の競合小窓（G83vi）', () => {
     net.putMode = 'failure'
     await mount()
     await settle()
-    const nameField = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement
+    const nameField = container.querySelector("input[placeholder=\"例：週次まとめ\"]") as HTMLInputElement
     await act(async () => { fireEvent.change(nameField, { target: { value: '残す名前' } }) })
     await click(buttonByText('変更を保存する'))
     await settle()
@@ -280,7 +302,7 @@ describe('V8 作成時の競合小窓（G83vi）', () => {
     net.putMode = 'conflict-then-ok'
     await mount()
     await settle()
-    const nameField = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement
+    const nameField = container.querySelector("input[placeholder=\"例：週次まとめ\"]") as HTMLInputElement
     await act(async () => { fireEvent.change(nameField, { target: { value: '比較して残す名前' } }) })
     await click(buttonByText('変更を保存する'))
     await settle()
@@ -319,7 +341,7 @@ describe('V8 作成時の競合小窓（G83vi）', () => {
     expect(buttonByText('変更を保存する')).toBeTruthy()
 
     // 入力中の名前を変えてから保存する（取り直した最新と食い違う）。
-    const nameField = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement | null
+    const nameField = container.querySelector("input[placeholder=\"例：週次まとめ\"]") as HTMLInputElement | null
     if (!nameField) throw new Error('名前の入力が見つかりません')
     await act(async () => { fireEvent.change(nameField, { target: { value: 'わたしの入力' } }) })
 
@@ -330,7 +352,7 @@ describe('V8 作成時の競合小窓（G83vi）', () => {
     expect(container.querySelector('[data-design-node="G83vi"]')).toBeTruthy()
     expect(container.textContent).toMatch(/ほかの人が.*このレポートを.*保存しました/)
     expect(container.textContent).toContain('このまま保存すると、相手の変更が消えます。入力は残っています。')
-    expect((container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement).value).toBe('わたしの入力')
+    expect((container.querySelector("input[placeholder=\"例：週次まとめ\"]") as HTMLInputElement).value).toBe('わたしの入力')
     // 下の帯の主ボタンは比べる向きになる
     expect(buttonByText('比べてから保存')).toBeTruthy()
 
@@ -361,7 +383,7 @@ describe('V8 作成時の競合小窓（G83vi）', () => {
     await click(buttonByText('最新を読み込んで続ける'))
     await settle()
     expect(container.querySelector('[data-design-node="H5UoIu"]')).toBeTruthy()
-    expect((container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement).value).toBe('ほかの人が変えた名前')
+    expect((container.querySelector("input[placeholder=\"例：週次まとめ\"]") as HTMLInputElement).value).toBe('ほかの人が変えた名前')
     expect(buttonByText('変更を保存する')).toBeTruthy()
   })
 
@@ -390,7 +412,7 @@ describe('V8 作成時の競合小窓（G83vi）', () => {
     net.putMode = 'conflict-then-ok'
     await mount()
     await settle()
-    const nameField = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement
+    const nameField = container.querySelector("input[placeholder=\"例：週次まとめ\"]") as HTMLInputElement
     await act(async () => { fireEvent.change(nameField, { target: { value: '残したい入力' } }) })
     await click(buttonByText('変更を保存する'))
     await settle()
@@ -427,7 +449,7 @@ describe('V8 作成時の競合小窓（G83vi）', () => {
       await act(async () => { root.render(<><AnalyticsReportNewPage /><ToastHost /></>) })
       await settle()
     }
-    const nameField = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement
+    const nameField = container.querySelector("input[placeholder=\"例：週次まとめ\"]") as HTMLInputElement
     await act(async () => { fireEvent.change(nameField, { target: { value: '新しい入力' } }) })
     await act(async () => { net.getDeferred.splice(0).forEach((resolve) => resolve(new Response(JSON.stringify({ success: true, data: { items: [SCHEDULE], options: OPTIONS } }), { status: 200 }))) })
     await settle()

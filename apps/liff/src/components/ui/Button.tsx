@@ -10,25 +10,64 @@ export default function Button({
   variant = 'primary',
   children,
   className = '',
+  selected: selectedProp,
+  unavailable = false,
+  waitlisted = false,
+  full = false,
+  href,
+  external = false,
   ref,
   ...rest
 }: {
-  variant?: 'primary' | 'secondary' | 'danger';
-  children: ReactNode;
+  variant?: 'choice' | 'backdrop' | 'calendar' | 'weekday' | 'row' | 'night-cta' | 'night-text' | 'sound' | 'send' | 'slot-row' | 'reward-row' | 'overlay-bell' | 'segment' | 'primary' | 'secondary' | 'danger' | 'text' | 'icon' | 'arrow' | 'notify' | 'chip' | 'tab' | 'option' | 'optionRow' | 'day' | 'time' | 'calendarDay' | 'overlay' | 'nightAction' | 'nightText' | 'nightSound' | 'nightSend';
+  selected?: boolean;
+  unavailable?: boolean;
+  waitlisted?: boolean;
+  full?: boolean;
+  /** 回答フォームに置く外部リンクも同じボタンの形にする。 */
+  href?: string;
+  external?: boolean;
+  children?: ReactNode;
   className?: string;
   /** 確認窓が開いたときのフォーカス移動用 (React 19 の ref-as-prop)。 */
   ref?: Ref<HTMLButtonElement>;
 } & ButtonHTMLAttributes<HTMLButtonElement>) {
-  const base =
-    'liff-press flex w-full items-center justify-center gap-2 rounded-(--liff-radius) px-4 font-bold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50';
-  const tone =
-    variant === 'primary'
-      ? 'min-h-12 bg-liff-primary text-[15px] text-(--liff-on-primary) focus-visible:outline-liff-primary active:opacity-90'
-      : variant === 'danger'
-        ? 'min-h-12 bg-danger text-[15px] text-white focus-visible:outline-danger active:opacity-90'
-        : 'min-h-11 border border-liff-line-strong bg-canvas text-sm font-semibold text-ink focus-visible:outline-ink active:bg-liff-off-bg';
+  const selected = selectedProp ?? (rest['aria-pressed'] === true || rest['aria-pressed'] === 'true' || rest['aria-checked'] === true || rest['aria-checked'] === 'true');
+  const aliases = {'choice': 'time', 'backdrop': 'overlay', 'calendar': 'calendarDay', 'weekday': 'day', 'row': 'option', 'night-cta': 'nightAction', 'night-text': 'nightText', 'sound': 'nightSound', 'send': 'nightSend', 'slot-row': 'optionRow', 'reward-row': 'option', 'overlay-bell': 'notify', 'segment': 'tab'} as const;
+  const tone = variant in aliases ? aliases[variant as keyof typeof aliases] : variant as Exclude<typeof variant, keyof typeof aliases>;
+  const base = 'liff-press focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-50';
+  const action = 'flex w-full items-center justify-center gap-2 rounded-(--liff-radius) px-4 font-bold';
+  const choice = selected
+    ? 'bg-liff-soft outline-2 -outline-offset-1 outline-liff-primary'
+    : unavailable
+      ? 'bg-liff-off-bg outline-1 -outline-offset-1 outline-liff-line'
+      : 'bg-canvas outline-1 -outline-offset-1 outline-liff-line';
+  const tones = {
+    primary: `${action} min-h-12 bg-liff-primary text-[15px] text-(--liff-on-primary) focus-visible:outline-liff-primary active:opacity-90`,
+    danger: `${action} min-h-12 bg-danger text-[15px] text-white focus-visible:outline-danger active:opacity-90`,
+    secondary: `${action} min-h-11 border border-liff-line-strong bg-canvas text-sm font-semibold text-ink active:bg-liff-off-bg`,
+    text: 'liff-hit inline-flex items-center justify-center gap-1 px-2 text-xs text-liff-sub',
+    icon: 'liff-hit inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-ink disabled:text-liff-off-ink',
+    arrow: 'liff-hit flex h-10 w-[18px] shrink-0 items-center justify-center text-ink disabled:text-liff-off-ink',
+    notify: 'liff-hit flex h-6 w-6 items-center justify-center rounded-full bg-canvas text-liff-primary shadow outline-1 -outline-offset-1 outline-liff-line-strong',
+    chip: `liff-hit inline-flex shrink-0 items-center justify-center rounded-full px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap ${selected ? 'bg-ink text-canvas' : 'bg-liff-chip text-ink'}`,
+    tab: `liff-hit flex min-h-11 flex-1 items-center justify-center rounded-lg px-1 text-xs ${selected ? 'bg-canvas font-bold text-ink' : 'font-semibold text-liff-sub'}`,
+    option: `liff-hit flex w-full items-center gap-3 rounded-(--liff-radius-lg) p-3.5 text-left text-sm text-ink ${choice}`,
+    optionRow: `liff-hit flex min-h-11 w-full items-center justify-between gap-3 rounded-(--liff-radius) border px-4 py-2.5 text-left disabled:cursor-not-allowed ${unavailable ? 'border-hairline bg-liff-off-bg' : selected && waitlisted ? 'border-liff-wait-ink bg-liff-wait-bg' : selected ? 'border-liff-primary bg-liff-primary' : 'border-hairline bg-canvas'}`,
+    day: `liff-hit flex min-w-0 flex-col items-center gap-0.5 rounded-(--liff-radius) py-2 disabled:opacity-100 ${choice}`,
+    time: `liff-hit liff-num min-h-11 w-full rounded-(--liff-radius) px-1 text-[15px] disabled:opacity-100 ${selected ? 'bg-liff-primary font-bold text-(--liff-on-primary)' : unavailable ? 'bg-liff-off-bg font-medium text-liff-off-ink' : 'bg-canvas font-medium text-ink outline -outline-offset-1 outline-liff-line-strong'}`,
+    calendarDay: `liff-hit flex h-11 flex-col items-center justify-center gap-0.5 rounded-(--liff-radius) font-semibold disabled:opacity-100 ${selected ? 'bg-liff-primary text-(--liff-on-primary)' : full ? 'text-liff-full' : unavailable ? 'text-liff-off-ink' : 'text-ink'}`,
+    overlay: 'absolute inset-0 bg-ink/40',
+    nightAction: `${action} min-h-12 bg-night-cta text-[15px] text-white`,
+    nightText: 'liff-hit inline-flex items-center text-xs text-night-mine',
+    nightSound: 'liff-hit pointer-events-auto inline-flex items-center gap-1 rounded-full bg-night-panel px-2.5 py-1 text-xs font-semibold text-white',
+    nightSend: 'liff-hit flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-liff-primary text-white',
+  };
+  if (href !== undefined) {
+    return <a href={href} target={external ? '_blank' : undefined} rel={external ? 'noreferrer' : undefined} className={`${base} ${tones[tone]} ${className}`} style={rest.style}>{children}</a>;
+  }
   return (
-    <button type="button" ref={ref} className={`${base} ${tone} ${className}`} {...rest}>
+    <button type="button" ref={ref} data-selected={selected || undefined} className={`${base} ${tones[tone]} ${className}`} {...rest}>
       {children}
     </button>
   );

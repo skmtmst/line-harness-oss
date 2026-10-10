@@ -13,7 +13,6 @@ import {
   Check,
   ChevronRight,
   CircleAlert,
-  GripVertical,
   Play,
   Power,
   X,
@@ -66,10 +65,11 @@ import { describeAutoReplyDiff } from './auto-reply-conflict-diff'
 import { SaveConflictBand, SaveConflictCompareDialog } from '@/components/shared/save-conflict'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
-import LinePreview from '@/components/shared/line-preview'
+import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import TargetMissing from '@/components/shared/target-missing'
 import ListState from '@/components/shared/list-state'
 import { notifyToast } from '@/components/shared/toast'
@@ -99,13 +99,16 @@ import {
 import {
   MESSAGE_KIND_WORDS,
   matchTypeWord,
-  responseTypeWord,
 } from '@/app/auto-replies/auto-reply-words'
 import { inEvaluationOrder, PRIORITY_MAX, PRIORITY_MIN, type OrderedRule } from '@/app/auto-replies/auto-reply-order'
-import { canPublish, conflictTone, publishGates } from '@/app/auto-replies/publish/publish-flow'
+import { canPublish, publishGates } from '@/app/auto-replies/publish/publish-flow'
 import AutoReplyInsertChips, { insertedLabels } from './insert-chips'
 import styles from './wizard-v8.module.css'
 import InsertTextField from '@/components/shared/insert-text-field'
+import { FieldError } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
 
 /*
  * ★V8 自動応答の作成・編集・有効化。
@@ -139,6 +142,7 @@ const DONE_DESIGN_NODE = 'V4LjH'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'not-found' | 'published-only'
 type ResponseMode = 'silent' | 'template' | 'inline-text' | 'inline-flex' | 'inline-image'
+type InputIssue = { error: string; field?: string; step?: WizardStep }
 
 function detectMode(d: {
   responseType: string
@@ -219,7 +223,7 @@ const EMPTY_FORM: WizardForm = {
   keywordMatchMode: 'any',
   matchType: 'exact',
   messageKinds: [],
-  weekdays: [],
+  weekdays: [0, 1, 2, 3, 4, 5, 6],
   holidayRule: 'ignore',
   timeMode: 'always',
   activeFrom: '',
@@ -256,7 +260,7 @@ function formFromSettings(s: AutoReplyDraftInput): WizardForm {
     keywordMatchMode: s.keywordMatchMode ?? 'any',
     matchType: initialMatchType({ keyword: s.keyword, matchType: s.matchType, keywords: s.keywords }),
     messageKinds: s.messageKinds ?? [],
-    weekdays: s.responseWeekdays ?? [],
+    weekdays: s.responseWeekdays?.length ? s.responseWeekdays : [0, 1, 2, 3, 4, 5, 6],
     holidayRule: (s.responseHolidayRule as HolidayRuleValue) ?? 'ignore',
     timeMode: s.activeFrom || s.activeUntil ? 'custom' : 'always',
     activeFrom: s.activeFrom ?? '',
@@ -312,6 +316,7 @@ export const STARTER_TEMPLATES: Array<{
     apply: (form) => ({
       ...form,
       ruleName: '予約変更の受付',
+      respondToAll: false, timeMode: 'always', activeFrom: '', activeUntil: '',
       actions: [{key:newActionKey(),actionType:'notify_staff',config:{notificationRuleId:'',notificationRuleVersion:0,message:'予約変更のお問い合わせがありました。受信箱を確認してください。'},onFailure:'continue'}, {key:newActionKey(),actionType:'tag',config:{op:'add',tagIds:[]},onFailure:'continue'}],
       keywordRules: [
         { keyword: '予約変更', matchType: 'contains', minLength: '', caseSensitive: true },
@@ -329,6 +334,7 @@ export const STARTER_TEMPLATES: Array<{
     apply: (form) => ({
       ...form,
       ruleName: 'よくある質問への回答',
+      respondToAll: false, timeMode: 'always', activeFrom: '', activeUntil: '',
       actions: [{key:newActionKey(),actionType:'tag',config:{op:'add',tagIds:[]},onFailure:'continue'}],
       keywordRules: [
         { keyword: '営業時間', matchType: 'contains', minLength: '', caseSensitive: true },
@@ -429,6 +435,8 @@ function AutoReplyWizardV8Inner() {
 
   const initialId = params.get('id')
   const [autoReplyId, setAutoReplyId] = useState<string | null>(initialId)
+  const ruleIdRef = useRef(autoReplyId)
+  ruleIdRef.current = autoReplyId
   const step = readStep(params.get('step'))
   const [published, setPublished] = useState<{ name: string } | null>(null)
   const stage: WizardStep | 'done' = published ? 'done' : step
@@ -441,6 +449,7 @@ function AutoReplyWizardV8Inner() {
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [loadError, setLoadError] = useState<unknown>(null)
   const [versionNumber, setVersionNumber] = useState<number | null>(null)
+  const savedVersionRef = useRef<number | null>(null)
   const [isActive, setIsActive] = useState(false)
   const [lifecycleStatus, setLifecycleStatus] = useState('draft')
   const [matchedLast28Days, setMatchedLast28Days] = useState<number | null>(null)
@@ -448,6 +457,8 @@ function AutoReplyWizardV8Inner() {
   const [matchedAccountId, setMatchedAccountId] = useState<string | null>(null)
 
   const [form, setForm] = useState<WizardForm>(EMPTY_FORM)
+  const formFingerprintRef = useRef(JSON.stringify(form))
+  formFingerprintRef.current = JSON.stringify(form)
   /** 最後に読み込み・保存した形。差分が dirty。 */
   const savedSnapshotRef = useRef(JSON.stringify(EMPTY_FORM))
   // 編集の競合（`UGrd2`：409）。入力は捨てず、比べる・読み込むを選んでもらう。
@@ -458,7 +469,7 @@ function AutoReplyWizardV8Inner() {
   const [compareError, setCompareError] = useState('')
   // 作る②の1152（`Z2LIUx`）。折り畳みはCSSが担い、ここでは板IDだけを切り替える。
   const narrow = useNarrowViewport()
-  const [templates, setTemplates] = useState<Array<{ id: string; name: string; messageType: string; messageContent: string }>>([])
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string; messageType: string; messageContent: string; folderId?: string | null; updatedAt?: string }>>([])
   const [folders, setFolders] = useState<Array<{ id: string; name: string; color?: string | null }>>([])
   const [rules, setRules] = useState<RuleRow[]>([])
   const [conflicts, setConflicts] = useState<AutoReplyConflict[]>([])
@@ -480,6 +491,7 @@ function AutoReplyWizardV8Inner() {
   /** 保存が通った直後の「✓保存しました」（共通 Button の done、1.2秒）。 */
   const [saveDone, setSaveDone] = useState(false)
   const [error, setError] = useState('')
+  const [inputIssue, setInputIssue] = useState<InputIssue | null>(null)
   const [weekdayNotice, setWeekdayNotice] = useState('')
   const [showMoreKinds, setShowMoreKinds] = useState(false)
   const actionOptions = useActionOptions()
@@ -487,7 +499,34 @@ function AutoReplyWizardV8Inner() {
   const createKeyRef = useRef(crypto.randomUUID())
   const publishKeyRef = useRef(crypto.randomUUID())
 
-  const patch = (part: Partial<WizardForm>) => setForm((current) => ({ ...current, ...part }))
+  const patch = (part: Partial<WizardForm>) => {
+    setInputIssue(null)
+    setForm((current) => ({ ...current, ...part }))
+  }
+  useEffect(() => {
+    if (!inputIssue?.field || inputIssue.step !== step || loadState !== 'ready') return
+    const target = document.getElementById(inputIssue.field)
+    const control = target?.matches('input, textarea, button, [contenteditable="true"]')
+      ? target
+      : target?.querySelector<HTMLElement>('input, textarea, button, [tabindex="0"]')
+    control?.focus()
+    control?.scrollIntoView?.({ block: 'center' })
+  }, [inputIssue, step, loadState])
+  const fieldError = (field: string) => inputIssue?.field === field ? inputIssue.error : undefined
+  const showInputIssue = useCallback((issue: InputIssue) => {
+    setError('')
+    if (!issue.field || !issue.step) {
+      setError(issue.error)
+      return
+    }
+    setInputIssue(issue)
+    if (issue.step !== step) {
+      const query = new URLSearchParams()
+      if (autoReplyId) query.set('id', autoReplyId)
+      query.set('step', issue.step)
+      router.replace(`/auto-replies/edit?${query.toString()}`)
+    }
+  }, [autoReplyId, router, step])
   const dirty = JSON.stringify(form) !== savedSnapshotRef.current
 
   useEffect(() => {
@@ -508,9 +547,11 @@ function AutoReplyWizardV8Inner() {
   })
 
   /* ===== 読み込み ===== */
+  const creationAccountId = autoReplyId ? null : selectedAccountId ?? accounts[0]?.id ?? null
   const load = useCallback(async () => {
     setLoadState('loading')
     setLoadError(null)
+    setInputIssue(null)
     try {
       const [draftRes, liveRes, folderRes] = await Promise.all([
         autoReplyId ? api.autoReplies.getDraft(autoReplyId) : Promise.resolve(null),
@@ -531,6 +572,7 @@ function AutoReplyWizardV8Inner() {
         const nextForm = formFromSettings(version.settings)
         setForm(nextForm)
         savedSnapshotRef.current = JSON.stringify(nextForm)
+        savedVersionRef.current = version.versionNumber
         setVersionNumber(version.versionNumber)
         setWasPublished(version.status === 'published')
         setMatchedLast28Days(version.matchedLast28Days ?? null)
@@ -540,7 +582,7 @@ function AutoReplyWizardV8Inner() {
         )
         // 公開済みで下書きの無いものはそのまま編集に入る。保存で新しい下書きが作られる。
       } else {
-        accountId = selectedAccountId ?? accounts[0]?.id ?? null
+        accountId = creationAccountId
         savedSnapshotRef.current = JSON.stringify(EMPTY_FORM)
         setForm(EMPTY_FORM)
       }
@@ -554,6 +596,8 @@ function AutoReplyWizardV8Inner() {
             name: t.name,
             messageType: t.messageType,
             messageContent: t.messageContent,
+            folderId: t.folderId,
+            updatedAt: t.updatedAt,
           })),
         )
       }
@@ -562,7 +606,7 @@ function AutoReplyWizardV8Inner() {
       setLoadError(caught)
       setLoadState(caught instanceof ApiError && caught.status === 404 ? 'not-found' : 'error')
     }
-  }, [autoReplyId, selectedAccountId, accounts])
+  }, [autoReplyId, creationAccountId])
 
   useEffect(() => {
     void load()
@@ -654,15 +698,17 @@ function AutoReplyWizardV8Inner() {
 
   /* ===== 手順5で読むもの（公開前チェック） ===== */
   const loadValidation = useCallback(async (ruleId: string) => {
+    const subject = assessmentSubjectRef.current
     setConfirmState('loading')
     try {
       const res = await api.autoReplies.validateDraft(ruleId)
+      if (subject !== assessmentSubjectRef.current) return
       if (!res.success || !res.data) throw new Error('validate failed')
       setValidation(res.data)
       setConflicts(res.data.conflicts ?? [])
       setConfirmState('ready')
     } catch {
-      setConfirmState('error')
+      if (subject === assessmentSubjectRef.current) setConfirmState('error')
     }
   }, [])
 
@@ -672,58 +718,45 @@ function AutoReplyWizardV8Inner() {
    * サーバーの下書きに無いので、未保存のまま飛んだときは保存してから読む
    * ——goNext と同じ約束を直接遷移にも持たせる。
    */
-  useEffect(() => {
-    if (loadState !== 'ready' || !autoReplyId) return
-    if (step !== 'priority' && step !== 'confirm') return
-    if (stepDataRequested.current.has(`${step}:${autoReplyId}`)) return
-    stepDataRequested.current.add(`${step}:${autoReplyId}`)
-    const accountId = matchedAccountId ?? selectedAccountId ?? null
-    if (step === 'priority') {
-      void loadPriorityData(autoReplyId, accountId)
-    } else {
-      void loadValidation(autoReplyId)
-      void loadOrder(autoReplyId, accountId).catch(() => setPriorityState('error'))
-    }
-  }, [loadState, autoReplyId, step, matchedAccountId, selectedAccountId, loadPriorityData, loadValidation, loadOrder])
 
   /* ===== 保存 ===== */
-  const buildInput = useCallback((): AutoReplyDraftInput | { error: string } => {
+  const buildInput = useCallback((): AutoReplyDraftInput | InputIssue => {
     const effectiveRules = form.keywordRules.filter((rule) => rule.keyword.trim() !== '')
     const firstKeyword = effectiveRules[0]?.keyword.trim() ?? ''
     if (!form.respondToAll && !firstKeyword) {
-      return { error: '反応する言葉を入れてください' }
+      return { error: '反応する言葉を入れてください', field: 'wiz-keywords', step: 'trigger' }
+    }
+    const mismatchNotice = exactAllMismatchNotice(effectiveRules, form.keywordMatchMode)
+    if (mismatchNotice) return { error: mismatchNotice, field: 'wiz-keywords', step: 'trigger' }
+    const conditionIssue = findConditionDraftIssue(
+      form.friendTarget === 'filtered' ? form.friendConditions : null,
+    )
+    if (conditionIssue) return { error: conditionIssue, field: 'wiz-conditions', step: 'trigger' }
+
+    if (form.mode === 'template' && !form.templateId) {
+      return { error: '返すテンプレートを選んでください', field: 'wiz-template', step: 'response' }
+    }
+    if (form.mode === 'inline-text' && !form.responseContent.trim()) {
+      return { error: '返す内容を入力してください', field: 'wiz-content', step: 'response' }
+    }
+    if (form.mode === 'inline-flex') {
+      if (!form.responseContent.trim()) return { error: 'カードの内容を入力してください', field: 'wiz-flex', step: 'response' }
+      const flexError = validateFlexContent('flex', form.responseContent)
+      if (flexError) return { error: flexError, field: 'wiz-flex', step: 'response' }
+    }
+    if (form.mode === 'inline-image' && !readLineImageContent(form.responseContent)) {
+      return { error: '返信する画像を選んでください', field: 'wiz-image', step: 'response' }
     }
     if (form.cooldownOn) {
       const cooldownValue = Number(form.cooldownMinutes)
       if (!Number.isInteger(cooldownValue) || cooldownValue <= 0 || cooldownValue > 10080) {
-        return { error: '「同じ人へ続けて返さない」の時間は1〜10080の整数（分）で入れてください' }
+        return { error: '「同じ人へ続けて返さない」の時間は1〜10080の整数（分）で入れてください', field: 'wiz-cooldown', step: 'response' }
       }
     }
-    if (form.mode === 'template' && !form.templateId) {
-      return { error: '返すテンプレートを選んでください' }
-    }
-    if (form.mode === 'inline-text' && !form.responseContent.trim()) {
-      return { error: '返す内容を入力してください' }
-    }
-    if (form.mode === 'inline-flex') {
-      if (!form.responseContent.trim()) return { error: 'カードの内容を入力してください' }
-      const flexError = validateFlexContent('flex', form.responseContent)
-      if (flexError) return { error: flexError }
-    }
-    if (form.mode === 'inline-image' && !readLineImageContent(form.responseContent)) {
-      return { error: '返信する画像を選んでください' }
-    }
-    const conditionIssue = findConditionDraftIssue(
-      form.friendTarget === 'filtered' ? form.friendConditions : null,
-    )
-    if (conditionIssue) return { error: conditionIssue }
     const accountId = matchedAccountId ?? selectedAccountId ?? accounts[0]?.id ?? null
     if (!accountId) {
       return { error: 'LINEアカウントを選んでから作ってください' }
     }
-    const mismatchNotice = exactAllMismatchNotice(effectiveRules, form.keywordMatchMode)
-    if (mismatchNotice) return { error: mismatchNotice }
-
     const body: AutoReplyDraftInput = {
       keyword: firstKeyword || form.keywordRules[0]?.keyword.trim() || 'すべてのメッセージ',
       matchType: effectiveRules[0]?.matchType ?? form.matchType,
@@ -784,11 +817,13 @@ function AutoReplyWizardV8Inner() {
    * 返り値は保存したルールの id。失敗したら理由を出して null。
    */
   const saveDraftNow = useCallback(async (): Promise<{ id: string; accountId: string | null } | null> => {
+    if (form.weekdays.length === 0) { setWeekdayNotice('反応する曜日を1つ以上選んでください。'); return null }
     const body = buildInput()
     if ('error' in body) {
-      setError(body.error)
+      showInputIssue(body)
       return null
     }
+    setInputIssue(null)
     setSaving(true)
     setError('')
     setSaveNotice('')
@@ -803,12 +838,14 @@ function AutoReplyWizardV8Inner() {
           expectedVersion: versionNumber,
         })
         if (!res.success) throw new Error(res.error || 'save failed')
+        savedVersionRef.current = res.data.versionNumber
         setVersionNumber(res.data.versionNumber)
       } else {
         const res = await api.autoReplies.createDraft(body, createKeyRef.current)
         if (!res.success) throw new Error(res.error || 'create failed')
         savedId = res.data.autoReplyId
         setAutoReplyId(res.data.autoReplyId)
+        savedVersionRef.current = res.data.versionNumber
         setVersionNumber(res.data.versionNumber)
         setMatchedAccountId(res.data.settings.lineAccountId || null)
         setLifecycleStatus('draft')
@@ -839,9 +876,38 @@ function AutoReplyWizardV8Inner() {
     } finally {
       setSaving(false)
     }
-  }, [buildInput, autoReplyId, versionNumber, form, step, router])
+  }, [buildInput, autoReplyId, versionNumber, form, step, router, showInputIssue])
 
   // `UGrd2`「最新を読み込んで続ける」。入力中の内容は最新の版で置き換わる。
+  const inputFingerprint = JSON.stringify(form)
+  const assessmentSubjectRef = useRef('')
+  assessmentSubjectRef.current = `${autoReplyId}:${versionNumber}:${inputFingerprint}`
+  useEffect(() => {
+    setValidation(null); setDryRun(null); setAcknowledged(new Set())
+    setConfirmState('idle')
+  }, [inputFingerprint])
+  useEffect(() => {
+    if (loadState !== 'ready' || !autoReplyId || (step !== 'priority' && step !== 'confirm')) return
+    const key = `${step}:${assessmentSubjectRef.current}`
+    if (stepDataRequested.current.has(key)) return
+    stepDataRequested.current.add(key)
+    const subject = assessmentSubjectRef.current
+    void (async () => {
+      let ruleId = autoReplyId
+      let accountId = matchedAccountId ?? selectedAccountId ?? null
+      if (dirty) {
+        const saved = await saveDraftNow()
+        if (!saved) { stepDataRequested.current.delete(key); return }
+        ruleId = saved.id; accountId = saved.accountId
+        // 保存で版が上がったあとのeffectに一本化する。
+        return
+      }
+      if (subject !== assessmentSubjectRef.current) return
+      if (step === 'priority') await loadPriorityData(ruleId, accountId)
+      else { await loadValidation(ruleId); await loadOrder(ruleId, accountId).catch(() => setPriorityState('error')) }
+    })()
+  }, [loadState, autoReplyId, step, versionNumber, inputFingerprint, dirty, matchedAccountId, selectedAccountId, saveDraftNow, loadPriorityData, loadValidation, loadOrder])
+
   const reloadAfterConflict = useCallback(async () => {
     setSaveConflict(false)
     setCompareTarget(null)
@@ -890,29 +956,28 @@ function AutoReplyWizardV8Inner() {
     const nextIndex = STEP_ORDER.indexOf(step) + 1
     if (nextIndex >= STEP_ORDER.length) return
     const next = STEP_ORDER[nextIndex]
+    if (step === 'trigger') {
+      const input = buildInput()
+      if ('error' in input && input.step === 'trigger') {
+        showInputIssue(input)
+        return
+      }
+    }
     if (next === 'priority' || next === 'confirm') {
       // 確かめる対象はサーバーの下書き。未保存のままでは確かめられないので、
       // 変更があればここで必ず保存する。
       let ruleId = autoReplyId
-      let accountId = matchedAccountId ?? selectedAccountId ?? null
       if (dirty || !autoReplyId) {
         const saved = await saveDraftNow()
         if (!saved) return
         ruleId = saved.id
-        accountId = saved.accountId
       }
       if (!ruleId) return
-      if (next === 'priority') {
-        void loadPriorityData(ruleId, accountId)
-      } else {
-        void loadValidation(ruleId)
-        void loadOrder(ruleId, accountId).catch(() => setPriorityState('error'))
-      }
       goToStep(next, ruleId ?? undefined)
     } else {
       goToStep(next)
     }
-  }, [step, dirty, autoReplyId, saveDraftNow, matchedAccountId, selectedAccountId, loadPriorityData, loadValidation, loadOrder, goToStep])
+  }, [step, dirty, autoReplyId, saveDraftNow, matchedAccountId, selectedAccountId, loadPriorityData, loadValidation, loadOrder, goToStep, buildInput, showInputIssue])
 
   /* ===== 手順4：順番 ===== */
   /**
@@ -983,6 +1048,8 @@ function AutoReplyWizardV8Inner() {
   /* ===== 手順4：試しに送る ===== */
   const runTest = useCallback(async () => {
     if (!autoReplyId || !selectedFriendId || !testMessage.trim()) return
+    const testedInput = formFingerprintRef.current
+    setInputIssue(null)
     setSaving(true)
     setError('')
     try {
@@ -994,10 +1061,12 @@ function AutoReplyWizardV8Inner() {
         ruleId = saved.id
       }
       if (!ruleId) return
+      const testedVersion = savedVersionRef.current
       const res = await api.autoReplies.testDraft(ruleId, {
         friendId: selectedFriendId,
         incomingText: testMessage.trim(),
       })
+      if (ruleIdRef.current !== ruleId || savedVersionRef.current !== testedVersion || formFingerprintRef.current !== testedInput) return
       if (!res.success) throw new Error(res.error || 'test failed')
       if (res.data.staleTest) {
         setDryRun(null)
@@ -1018,10 +1087,11 @@ function AutoReplyWizardV8Inner() {
     () => publishGates(validation, dryRun, acknowledged),
     [validation, dryRun, acknowledged],
   )
-  const publishReady = canPublish(gates)
+  const publishReady = !dirty && canPublish(gates)
 
   const publish = useCallback(async () => {
     if (!autoReplyId || !publishReady || saving) return
+    setInputIssue(null)
     setSaving(true)
     setError('')
     try {
@@ -1119,6 +1189,7 @@ function AutoReplyWizardV8Inner() {
     return rows
   })()
 
+  const previewAccountName = accounts?.find((account) => account.id === matchedAccountId)?.name ?? '公式アカウント'
   const thisRuleName = form.ruleName.trim() || effectiveKeywords[0]?.keyword.trim() || '名前なしのルール'
   const myPositionLabel = myIndex >= 0 ? `${myIndex + 1}番目` : 'いちばん下'
 
@@ -1167,12 +1238,12 @@ function AutoReplyWizardV8Inner() {
     const doneSteps: StepperStep[] = STEP_ORDER.map((key) => ({ key, label: STEP_LABELS_V8[key], state: 'done' }))
     const doneKeywords = form.respondToAll
       ? 'すべてのメッセージ'
-      : effectiveKeywords.map((r) => r.keyword.trim()).filter(Boolean).join('・') || '—'
+      : effectiveKeywords.map((r) => r.keyword.trim()).filter(Boolean).join('・') || emptyValue('unknown')
     return (
       <PageFrame kind="create" boardId={DONE_DESIGN_NODE}>
         <PageHeading
           title="ルールを作る"
-          description={`ルール名：${published!.name}`}
+          help={`ルール名：${published!.name}`}
           identity={<Link href="/auto-replies" className={styles.backLink}>
             <ArrowLeft size={14} aria-hidden="true" />
             自動応答へ
@@ -1184,10 +1255,10 @@ function AutoReplyWizardV8Inner() {
             <span className={styles.doneIcon} aria-hidden="true">
               <Check size={24} />
             </span>
-            <h1 id="auto-reply-done-title" className={styles.doneTitle}>{`「${published!.name}」を有効にしました`}</h1>
-            <p className={styles.doneNote}>
+            <PageHeading title={`「${published!.name}」を有効にしました`} titleId="auto-reply-done-title" help={<>
               これから届くメッセージで動き始めます。止めているあいだに届いた分には、さかのぼって返しません。止めたいときは、一覧の「…」から止められます。
-            </p>
+            </>} />
+
             <dl className={styles.doneRows}>
               <div className={styles.doneRow}>
                 <dt>動く順番</dt>
@@ -1251,7 +1322,7 @@ function AutoReplyWizardV8Inner() {
                 <h2 className={styles.sideTitle}>保存したあとに、過去28日で当たった数が出ます</h2>
                 {/* 絵 A0pDt：数（— 件）→ 説明 → 試しの文2つ（いまの言葉で当たるか）。 */}
                 <p className={styles.countRow} aria-label="当たった受信（過去28日）">
-                  <span className={styles.countNum}>{matchedLast28Days == null ? '—' : formatNumber(matchedLast28Days)}</span>
+                  <span className={styles.countNum}>{matchedLast28Days == null ? emptyValue('unknown') : formatNumber(matchedLast28Days)}</span>
                   <span className={styles.countUnit}>件</span>
                 </p>
                 <p className={styles.sideHint}>
@@ -1266,12 +1337,11 @@ function AutoReplyWizardV8Inner() {
                   ))}
                 </dl>
               </Card>
-              {withPhone ? <LinePreview accountName="公式アカウント">
+              {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>
-                  <p className={styles.bubbleReply}>
+                  <LinePreviewMessage direction="outgoing" accountName={previewAccountName} avatar={null} time="">
                     {triggerSamples[0].text}
-                  </p>
-                  <p className={styles.bubbleMeta}>届いた側の見え方</p>
+                  </LinePreviewMessage>
                 </div>
               </LinePreview> : null}
             </>
@@ -1298,7 +1368,7 @@ function AutoReplyWizardV8Inner() {
                   </div>
                   <div className={styles.kvRow}>
                     <dt className="text-ink-faint text-xs">後の処理</dt>
-                    <dd className={styles.kvVal}>{form.actions.length > 0 ? `${form.actions.length}つ` : 'なし'}</dd>
+                    <dd className={styles.kvVal}>{form.actions.length > 0 ? `${form.actions.length}つ` : emptyValue('none')}</dd>
                   </div>
                   {(() => {
                     const used = insertedLabels(form.responseContent)
@@ -1312,8 +1382,9 @@ function AutoReplyWizardV8Inner() {
                   })()}
                 </dl>
               </Card>
-              {withPhone ? <LinePreview accountName="公式アカウント">
+              {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>
+                  <LinePreviewMessage direction="outgoing" accountName={previewAccountName} avatar={null} time="">{triggerSamples[0].text}</LinePreviewMessage>
                   {form.mode === 'inline-image' && imageContent ? (
                     <img
                       src={imageContent.previewImageUrl}
@@ -1322,9 +1393,8 @@ function AutoReplyWizardV8Inner() {
                       style={{ padding: 0, overflow: 'hidden' }}
                     />
                   ) : (
-                    <p className={styles.bubbleReply}>{replyPreviewText}</p>
+                    <LinePreviewMessage density="compact" accountName={previewAccountName} avatar={previewAccountName.slice(0, 1)} time="">{replyPreviewText}</LinePreviewMessage>
                   )}
-                  <p className={styles.bubbleMeta}>返す側の見え方</p>
                 </div>
               </LinePreview> : null}
             </>
@@ -1374,17 +1444,17 @@ function AutoReplyWizardV8Inner() {
               <CreateSummaryCard
                 title="重なりの確認"
                 rows={[
-                  { label: '同時に当たるルール', value: conflicts.length > 0 ? `${conflicts.length}つ` : 'なし' },
-                  { label: '当たる受信（過去28日）', value: matchedLast28Days == null ? '—' : `${formatNumber(matchedLast28Days)}件` },
+                  { label: '同時に当たるルール', value: conflicts.length > 0 ? `${conflicts.length}つ` : emptyValue('none') },
+                  { label: '当たる受信（過去28日）', value: matchedLast28Days == null ? emptyValue('unknown') : `${formatNumber(matchedLast28Days)}件` },
                   { label: '試した結果', value: dryRun ? (dryRun.draftWon ? 'このルールが返す' : '見送り') : 'まだ試していません' },
                 ]}
               />
-              {withPhone ? <LinePreview accountName="公式アカウント">
+              {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>
                   {testMessage.trim() ? <p className={styles.bubbleIn}>{testMessage.trim()}</p> : null}
-                  <p className={styles.bubbleReply}>
+                  <LinePreviewMessage density="compact" accountName={previewAccountName} avatar={previewAccountName.slice(0, 1)} time="">
                     {dryRun?.winner?.responseContent || replyPreviewText}
-                  </p>
+                  </LinePreviewMessage>
                   {dryRun?.winner && dryRun.winner.autoReplyId !== autoReplyId ? (
                     <p className={styles.bubbleMeta}>「{dryRun.winner.name}」が返します</p>
                   ) : (
@@ -1413,15 +1483,15 @@ function AutoReplyWizardV8Inner() {
                   <div className={styles.kvRow}>
                     <dt className="text-ink-faint text-xs">同時に当たるルール</dt>
                     <dd className={styles.kvVal}>
-                      {conflicts.length > 0 ? `${conflicts.length}つ` : 'なし'}
+                      {conflicts.length > 0 ? `${conflicts.length}つ` : emptyValue('none')}
                     </dd>
                   </div>
                 </dl>
               </Card>
-              {withPhone ? <LinePreview accountName="公式アカウント">
+              {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>
-                  <p className={styles.bubbleReply}>{replyPreviewText}</p>
-                  <p className={styles.bubbleMeta}>返す側の見え方</p>
+                  <LinePreviewMessage direction="outgoing" accountName={previewAccountName} avatar={null} time="">{triggerSamples[0].text}</LinePreviewMessage>
+                  <LinePreviewMessage density="compact" accountName={previewAccountName} avatar={previewAccountName.slice(0, 1)} time="">{replyPreviewText}</LinePreviewMessage>
                 </div>
               </LinePreview> : null}
             </>
@@ -1430,25 +1500,12 @@ function AutoReplyWizardV8Inner() {
   )
 
   return (
-    <CreatePage boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={<>{autoReplyId && lifecycleStatus !== 'draft' ? 'ルールを編集' : 'ルールを作る'}</>} description={<>
+    <CreatePage boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={autoReplyId && lifecycleStatus !== 'draft' ? 'ルールを編集' : 'ルールを作る'} help={<>
           {step === 'basic' ? (
             'いまは停止中として作ります。最後の「確認」で有効にします。'
           ) : (
             `ルール名：${thisRuleName}・${statusBadge}として作っています`
           )}
-          {/* 編集の競合（UGrd2）：頭の下に横いっぱいの帯。入力は捨てず、比べる・読み込むを選んでもらう。 */}
-          {saveConflict ? (
-            /* 帯は共通部品（save-conflict）に寄せた。文はこの画面の絵のまま。 */
-            <div className={styles.conflictBandSlot}>
-              <SaveConflictBand
-                title={`ほかの人がルール「${thisRuleName}」を先に保存しました`}
-                designNode="UGrd2"
-                compareBusy={compareBusy}
-                onCompare={() => void openCompare()}
-                onReload={() => void reloadAfterConflict()}
-              />
-            </div>
-          ) : null}
         </>} identity={<Link href="/auto-replies" className={styles.backLink}>
           <ArrowLeft size={14} aria-hidden="true" />
           自動応答へ
@@ -1508,7 +1565,15 @@ function AutoReplyWizardV8Inner() {
               </Button>
             )}
           </>
-        } status={dirty ? '下書きに未保存の変更があります' : undefined}>
+        } noticeSpacing="band" notice={saveConflict ? (
+          <SaveConflictBand
+            title={`ほかの人がルール「${thisRuleName}」を先に保存しました`}
+            designNode="UGrd2"
+            compareBusy={compareBusy}
+            onCompare={() => void openCompare()}
+            onReload={() => void reloadAfterConflict()}
+          />
+        ) : undefined} status={dirty ? '下書きに未保存の変更があります' : undefined}>
 
 
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
@@ -1530,22 +1595,13 @@ function AutoReplyWizardV8Inner() {
                   <p className={styles.cardNote}>一覧に出る名前です。友だちには見えません。</p>
                 </div>
                 <div className={styles.fieldPair}>
-                  <div className={styles.field}>
-                    <label htmlFor="wiz-name" className={styles.label}>
-                      ルール名
-                    </label>
-                    <TextField
+                  <div className={styles.field}><Field label="ルール名" htmlFor="wiz-name"><TextField
                       id="wiz-name"
                       value={form.ruleName}
                       onChange={(e) => patch({ ruleName: e.target.value })}
                       placeholder="例：予約の日程変更"
-                    />
-                  </div>
-                  <div className={styles.field}>
-                    <label htmlFor="wiz-folder" className={styles.label}>
-                      フォルダ
-                    </label>
-                    <FolderSelect
+                    /></Field></div>
+                  <div className={styles.field}><Field label="フォルダ" htmlFor="wiz-folder"><FolderSelect
                       id="wiz-folder"
                       aria-label="フォルダ"
                       value={form.folderId}
@@ -1556,27 +1612,21 @@ function AutoReplyWizardV8Inner() {
                       onCreate={canManage
                         ? folderCreator((name, color) => api.folders.create({ kind: 'auto_reply', name, color }), folderById, (created) => setFolders((current) => [...current, { id: created.id, name: created.name, color: created.color }]))
                         : undefined}
-                    />
-                  </div>
+                    /></Field></div>
                 </div>
-                <div className={styles.field}>
-                  <label htmlFor="wiz-memo" className={styles.label}>
-                    社内メモ<span className={styles.labelOptional}>任意</span>
-                  </label>
-                  <TextField
+                <div className={styles.field}><Field label="社内メモ" htmlFor="wiz-memo"><TextField
                     id="wiz-memo"
                     value={form.internalMemo}
                     onChange={(e) => patch({ internalMemo: e.target.value })}
                     placeholder="例：キャンペーン中だけ使う"
-                  />
-                </div>
+                  /></Field></div>
               </Card>
 
               <Notice tone="info">
                 新しく作るルールは、一覧のいちばん下（最後に見る順番）に足されます。順番は手順4「優先順位」で確かめます。
               </Notice>
 
-              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
+              <Card padding="roomy" layout="vertical" className={`${styles.cardContent} ${styles.starterSection}`}>
                 <div className={styles.cardHeading}>
                   <h2 className={styles.cardTitle}>ひな形から作る（任意）</h2>
                   <p className={styles.cardNote}>選ぶと、条件と返信がまとめて入ります。あとから全部変えられます。</p>
@@ -1649,6 +1699,7 @@ function AutoReplyWizardV8Inner() {
                         ))}
                         <span className={styles.kwSpacer} />
                         <KeywordInput
+                          error={fieldError('wiz-keywords')}
                           onAdd={(word) => {
                             const trimmed = word.trim()
                             if (!trimmed) return
@@ -1662,6 +1713,7 @@ function AutoReplyWizardV8Inner() {
                           }}
                         />
                       </div>
+                      {fieldError('wiz-keywords') ? <FieldError id="wiz-keywords-error">{fieldError('wiz-keywords')}</FieldError> : null}
                     </div>
                     <div className={styles.pairRow}>
                     <div className={styles.field}>
@@ -1722,7 +1774,7 @@ function AutoReplyWizardV8Inner() {
                   </>
                 )}
 
-                <div className={styles.field}>
+                <div className={`${styles.field} ${!narrow ? styles.kindField : ''}`}>
                   <div className={styles.labelRow}>
                     <span className={styles.label}>反応するメッセージの種類</span>
                     {/* 1152 の板（Z2LIUx）は札の行に余地が無いので、題の行の右に置く。 */}
@@ -1800,7 +1852,7 @@ function AutoReplyWizardV8Inner() {
                 <div className={styles.field}>
                   <span className={styles.label}>曜日</span>
                   <div className={styles.weekdayRow}>
-                  <div className={styles.weekdays} role="group" aria-label="反応する曜日">
+                  <div className={styles.weekdays} role="group" aria-label="反応する曜日" aria-describedby={weekdayNotice ? 'wiz-weekday-error' : undefined} aria-invalid={Boolean(weekdayNotice)}>
                     {/* 絵 A0pDt は月曜はじまり。保存する値（0=日〜6=土）は変えない。 */}
                     {[1, 2, 3, 4, 5, 6, 0].map((index) => {
                       const label = WEEKDAY_LABELS[index]
@@ -1816,7 +1868,8 @@ function AutoReplyWizardV8Inner() {
                               ? form.weekdays.filter((d) => d !== index)
                               : [...form.weekdays, index].sort()
                             if (next.length === 0) {
-                              setWeekdayNotice('全部の曜日を外すと、このルールはどの曜日にも反応しなくなります。')
+                              setWeekdayNotice('反応する曜日を1つ以上選んでください。')
+                              return
                             } else {
                               setWeekdayNotice('')
                             }
@@ -1848,7 +1901,7 @@ function AutoReplyWizardV8Inner() {
                     </span>
                   </div>
                   </div>
-                  {weekdayNotice ? <p className={styles.hint}>{weekdayNotice}</p> : null}
+                  {weekdayNotice ? <FieldError id="wiz-weekday-error">{weekdayNotice}</FieldError> : null}
                 </div>
                 <div className={styles.field}>
                   <span className={styles.label}>時間帯</span>
@@ -1881,15 +1934,12 @@ function AutoReplyWizardV8Inner() {
                     </button>
                   </div>
                   {/* 祝日の扱いは機能として残す（絵は説明の1行だけ）。場所を取らないよう時間帯の横に小さく。 */}
-                  <label className={styles.inlineSelect}>
-                    祝日
-                    <Select
+                  <Field label="祝日"><Select
                       aria-label="祝日の扱い"
                       value={form.holidayRule}
                       onChange={(v) => patch({ holidayRule: v as HolidayRuleValue })}
                       options={HOLIDAY_RULE_LABELS.map((o) => ({ value: o.value, label: o.label }))}
-                    />
-                  </label>
+                    /></Field>
                   </div>
                   {form.timeMode === 'custom' && (
                     <div className={styles.chips}>
@@ -1932,11 +1982,14 @@ function AutoReplyWizardV8Inner() {
                   />
                 </RadioCardGroup>
                 {form.friendTarget === 'filtered' ? (
+                  <div id="wiz-conditions" role="group" aria-label="反応する友だちの条件" aria-describedby={fieldError('wiz-conditions') ? 'wiz-conditions-error' : undefined} data-invalid={!!fieldError('wiz-conditions') || undefined} className={styles.compositeField}>
                   <ConditionBuilder
                     value={form.friendConditions}
                     onChange={(next) => patch({ friendConditions: next })}
                     label="反応する友だちの条件"
                   />
+                  {fieldError('wiz-conditions') ? <FieldError id="wiz-conditions-error">{fieldError('wiz-conditions')}</FieldError> : null}
+                  </div>
                 ) : (
                   <p className={styles.hint}>条件を入れないと、全員に反応します。</p>
                 )}
@@ -1972,16 +2025,17 @@ function AutoReplyWizardV8Inner() {
                 </div>
 
                 {form.mode === 'inline-text' && (
-                  <div className={styles.bodyBox}>
+                  <div className={styles.bodyBox} data-invalid={!!fieldError('wiz-content') || undefined}>
                     <InsertTextField
                       id="wiz-content"
+                      aria-invalid={!!fieldError('wiz-content') || undefined}
+                      aria-describedby={fieldError('wiz-content') ? 'wiz-content-error' : undefined}
                       aria-label="返す文"
                       className={styles.bodyText}
                       value={form.responseContent}
                       onValueChange={(next) => patch({ responseContent: next })}
                       placeholder="例：予約の変更を承りました。担当者が確認次第ご連絡します。"
                       maxLength={5000}
-                      rows={2}
                     />
                     <div className={styles.insertChips}>
                       <span className={styles.insertLabel}>差し込む</span>
@@ -1993,49 +2047,48 @@ function AutoReplyWizardV8Inner() {
                         {formatNumber(form.responseContent.length)} / 5,000
                       </span>
                     </div>
+                    {fieldError('wiz-content') ? <FieldError id="wiz-content-error">{fieldError('wiz-content')}</FieldError> : null}
                   </div>
                 )}
 
                 {form.mode === 'template' && (
                   <div className={styles.field}>
-                    <label htmlFor="wiz-template" className={styles.label}>
+                    <span className={styles.label}>
                       テンプレート
-                    </label>
-                    <Select
+                    </span>
+                    <EntityKindField
+                      kind="template"
                       id="wiz-template"
-                      aria-label="テンプレート"
+                      label="テンプレート"
+                      options={templates}
+                      accountId={matchedAccountId}
+                      invalid={!!fieldError('wiz-template')}
                       value={form.templateId ?? ''}
                       onChange={(v) => patch({ templateId: v || null })}
-                      options={[
-                        { value: '', label: '選んでください' },
-                        ...templates.map((t) => ({
-                          value: t.id,
-                          label: `${t.name}（${responseTypeWord(t.messageType).label}）`,
-                        })),
-                      ]}
                     />
+                    {fieldError('wiz-template') ? <FieldError id="wiz-template-error">{fieldError('wiz-template')}</FieldError> : null}
                     <p className={styles.hint}>テンプレートの管理は「ひな形を管理」からできます。</p>
                   </div>
                 )}
 
                 {form.mode === 'inline-flex' && (
-                  <div className={styles.field}>
-                    <label htmlFor="wiz-flex" className={styles.label}>
-                      カードの内容（JSON）
-                    </label>
-                    <TextArea
+                  <div className={styles.field}><Field label="カードの内容（JSON）" htmlFor="wiz-flex"><TextArea
                       id="wiz-flex"
+                      invalid={!!fieldError('wiz-flex')}
+                      aria-describedby={fieldError('wiz-flex') ? 'wiz-flex-error' : undefined}
                       value={form.responseContent}
                       onChange={(e) => patch({ responseContent: e.target.value })}
                       placeholder='{"type":"bubble", ...}'
                     />
-                  </div>
+{fieldError('wiz-flex') ? <FieldError id="wiz-flex-error">{fieldError('wiz-flex')}</FieldError> : null}</Field></div>
                 )}
 
                 {form.mode === 'inline-image' && (
+                  <div id="wiz-image" role="group" aria-label="返信する画像" aria-describedby={fieldError('wiz-image') ? 'wiz-image-error' : undefined} data-invalid={!!fieldError('wiz-image') || undefined} className={styles.compositeField}>
                   <ImageUploader
                     mode="line-image"
                     label="返信する画像"
+                    title="返信する画像を追加"
                     value={
                       imageContent
                         ? { mode: 'line-image', ...imageContent }
@@ -2050,6 +2103,8 @@ function AutoReplyWizardV8Inner() {
                       })
                     }
                   />
+                  {fieldError('wiz-image') ? <FieldError id="wiz-image-error">{fieldError('wiz-image')}</FieldError> : null}
+                  </div>
                 )}
 
                 {form.mode === 'silent' && (
@@ -2091,8 +2146,12 @@ function AutoReplyWizardV8Inner() {
                   </div>
                   <div className={styles.toggleExtra}>
                     {form.cooldownOn ? (
+                      <>
                       <span className={styles.toggleUnit}>
-                        <input
+                        <NumberInput
+                          id="wiz-cooldown"
+                          aria-invalid={!!fieldError('wiz-cooldown') || undefined}
+                          aria-describedby={fieldError('wiz-cooldown') ? 'wiz-cooldown-error' : undefined}
                           type="number"
                           className={styles.toggleNum}
                           aria-label="あける時間（分）"
@@ -2103,21 +2162,23 @@ function AutoReplyWizardV8Inner() {
                         />{' '}
                         分あける
                       </span>
+                      </>
                     ) : (
                       <span className={styles.toggleNote}>何度でも返す</span>
                     )}
-                    <Toggle
+                    <SettingCheckbox
                       label="同じ人へ続けて返さない"
                       checked={form.cooldownOn}
                       onChange={(on) => patch({ cooldownOn: on })}
                     />
                   </div>
                 </div>
+                {fieldError('wiz-cooldown') ? <FieldError id="wiz-cooldown-error">{fieldError('wiz-cooldown')}</FieldError> : null}
                 <div className={styles.toggleRow}>
                   <div className={styles.toggleText}>
                     <p className={styles.toggleTitle}>担当者が対応中のトークには返さない</p>
                   </div>
-                  <Toggle
+                  <SettingCheckbox
                     label="担当者が対応中のトークには返さない"
                     checked={form.skipWhenOperatorActive}
                     onChange={(on) => patch({ skipWhenOperatorActive: on })}
@@ -2130,7 +2191,7 @@ function AutoReplyWizardV8Inner() {
                       オフのときは、同じ人が何度送っても返します（上の「続けて返さない」の時間は守ります）
                     </p>
                   </div>
-                  <Toggle
+                  <SettingCheckbox
                     label="1人につき1回だけ返す"
                     checked={form.oncePerFriend}
                     onChange={(on) => patch({ oncePerFriend: on })}
@@ -2200,7 +2261,7 @@ function AutoReplyWizardV8Inner() {
                             certain && aboveSelf ? styles.orderRowConflict : '',
                           ].join(' ')}
                         >
-                          <GripVertical size={14} aria-hidden="true" className={styles.orderGrip} />
+                          <span aria-hidden="true" className={styles.orderGrip} />
                           <span className={styles.orderNum}>{index + 1}</span>
                           <div className={styles.orderBody}>
                             <p className={styles.orderName}>
@@ -2353,7 +2414,7 @@ function AutoReplyWizardV8Inner() {
                       ? 'すべてのメッセージ'
                       : effectiveKeywords.length > 0
                         ? `${effectiveKeywords.map((r) => `「${r.keyword.trim()}」`).join('')}（${matchTypeWord(form.matchType)}）`
-                        : '未入力'}
+                        : emptyValue('unconfigured')}
                   </SummaryRow>
                   <SummaryRow label="いつ" onEdit={() => goToStep('trigger')}>
                     {[
@@ -2383,7 +2444,7 @@ function AutoReplyWizardV8Inner() {
                   <SummaryRow label="返したあと" onEdit={() => goToStep('response')}>
                     {form.actions.length > 0
                       ? form.actions.map((a, i) => `${i + 1} ${actionRowTitle(a, actionOptions)}`).join(' → ')
-                      : 'なし'}
+                      : emptyValue('none')}
                   </SummaryRow>
                   <SummaryRow label="細かい決まり" onEdit={() => goToStep('response')}>
                     {[
@@ -2426,7 +2487,7 @@ function AutoReplyWizardV8Inner() {
                           className={`${styles.checkIcon} ${gate.state === 'ok' ? styles.checkIconOk : gate.state === 'blocked' ? styles.checkIconWarn : ''}`}
                           aria-hidden="true"
                         >
-                          {gate.state === 'ok' ? <Check size={14} /> : gate.state === 'blocked' ? <CircleAlert size={14} /> : '—'}
+                          {gate.state === 'ok' ? <Check size={14} /> : gate.state === 'blocked' ? <CircleAlert size={14} /> : emptyValue('unknown')}
                         </span>
                         <div className={styles.checkBody}>
                           <p className={styles.checkTitle}>{gate.label}</p>
@@ -2499,7 +2560,7 @@ function SummaryRow({
 }
 
 /** 反応する言葉の追加入力。Enter・カンマ・離れると確定する。 */
-function KeywordInput({ onAdd }: { onAdd: (word: string) => void }) {
+function KeywordInput({ onAdd, error }: { onAdd: (word: string) => void; error?: string }) {
   const [value, setValue] = useState('')
   const commit = () => {
     if (value.trim()) {
@@ -2508,9 +2569,10 @@ function KeywordInput({ onAdd }: { onAdd: (word: string) => void }) {
     }
   }
   return (
-    <label className={styles.kwInput}>
-      <Search size={14} aria-hidden="true" />
-      <input
+    <Field label={<><Search size={14} aria-hidden="true" /></>}><input
+        id="wiz-keywords"
+        aria-invalid={!!error || undefined}
+        aria-describedby={error ? 'wiz-keywords-error' : undefined}
         value={value}
         placeholder="言葉を入れて Enter"
         aria-label="反応する言葉を足す"
@@ -2522,8 +2584,7 @@ function KeywordInput({ onAdd }: { onAdd: (word: string) => void }) {
           }
         }}
         onBlur={commit}
-      />
-    </label>
+      /></Field>
   )
 }
 

@@ -1,5 +1,7 @@
 'use client'
 
+import { useUrlTab } from '@/lib/use-url-tab'
+
 /*
  * ★V8 他のサイトの枠を閉じる知らせ（提案 E-5 `YMVFD`。ダッシュボードの「すべて見る」から）。
  *
@@ -7,17 +9,19 @@
  * ［閉じた］は媒体ごと（まだ閉じていない先頭の媒体。ほかの媒体は「…」から）。
  * 席が空いた枠は「もう開けてよい」。読む口・書く口は channel-close-tasks（今ある口）だけ。動きは BEHAVIOR.md。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check } from 'lucide-react'
 import type { RestaurantChannelCloseTask } from '@line-crm/shared'
 import { ListPage } from '@/components/templates/list-page'
+import Chip from '@/components/shared/chip'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
-import { RowActions } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { notifyToast } from '@/components/shared/toast'
@@ -28,6 +32,7 @@ import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { type CloseGroup, canWriteRole, groupCloseTasks, openItems, reasonText, slotTitle } from '../dashboard/summarize'
 import { type StoreMedium, loadStoreMedia } from '../dashboard/use-store-today'
 import styles from './close-tasks.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Tab = 'open' | 'done'
 
@@ -52,8 +57,8 @@ export default function CloseTasksPage() {
   const [tasks, setTasks] = useState<RestaurantChannelCloseTask[] | null>(null)
   const [media, setMedia] = useState<StoreMedium[]>([])
   const [error, setError] = useState<unknown>(null)
-  const [tab, setTab] = useState<Tab>('open')
-  const [query, setQuery] = useState('')
+  const [tab, setTab] = useUrlTab(['open', 'done'] as const, 'open')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [medium, setMedium] = useState('all')
   const [busyId, setBusyId] = useState('')
 
@@ -119,11 +124,11 @@ export default function CloseTasksPage() {
   } else {
     content = (
       <div className={styles.tableWrap}>
-      <DataTable className={styles.table} data-design="restaurant-close-tasks">
+      <DataTable presentation="columns" data-design="restaurant-close-tasks">
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
+          <TableHeadRow data-table-layout="columns">
             <Th className={styles.colSlot}>枠の日時</Th>
-            <Th className={styles.colRoute}>入った経路</Th>
+            <Th className={styles.colRoute} collapseAt="narrow">入った経路</Th>
             <Th className={styles.colMedia}>閉じる媒体</Th>
             <Th className={styles.colState}>状態</Th>
             <Th className={styles.colActions}>操作</Th>
@@ -136,19 +141,19 @@ export default function CloseTasksPage() {
             const targetMedium = target ? media.find((m) => m.code === target.channel) ?? null : null
             const badge = STATE_BADGE[group.state]
             return (
-              <Tr key={group.slotId} className={styles.row} data-table-layout="columns">
+              <Tr key={group.slotId} data-table-layout="columns">
                 <Td className={styles.colSlot}>
                   <span className={styles.slot}>{slotTitle(group.startsAt)}</span>
                   <span className={styles.reason}>{reasonText(group)}</span>
                 </Td>
                 {/* 予約と知らせの結び付け（どの経路で入った予約か）は口がまだ無い（Codex 担当）。来たらここに経路の札。 */}
-                <Td className={styles.colRoute}><span className={styles.none} title="どの経路の予約で出た知らせかは、まだ出せません">—</span></Td>
+                <Td className={styles.colRoute} collapseAt="narrow"><span className={styles.none} title="どの経路の予約で出た知らせかは、まだ出せません">{emptyValue('unknown')}</span></Td>
                 <Td className={styles.colMedia}>
                   <span className={styles.chips} title={group.items.map((item) => `${item.name}${item.status === 'done' ? '（閉じた）' : ''}`).join('・')}>
                     {group.items.map((item) => (
-                      <span key={item.id} className={`${styles.chip} ${item.status === 'done' ? styles.chipDone : ''}`}>
+                      <Chip key={item.id}>
                         {item.name}{item.status === 'done' ? <Check size={12} aria-label="閉じた" /> : null}
-                      </span>
+                      </Chip>
                     ))}
                   </span>
                 </Td>
@@ -158,19 +163,19 @@ export default function CloseTasksPage() {
                 <Td className={styles.colActions}>
                   <span className={styles.actions}>
                     {targetMedium?.adminUrl ? (
-                      <Button size="compact" href={targetMedium.adminUrl} target="_blank" rel="noopener noreferrer">管理画面を開く ↗</Button>
+                      <Button external size="compact" href={targetMedium.adminUrl}  >管理画面を開く</Button>
                     ) : null}
                     {canWrite && target ? (
-                      <Button size="compact" onClick={() => void close(target.id, target.name)} disabled={busyId === target.id} aria-label={`${target.name}の枠を閉じた`} title={`${target.name}の枠を閉じた`}>
+                      <Button size="compact" onClick={() => void close(target.id, target.name)} disabled={busyId === target.id} aria-label={`${target.name}の枠を閉じた`} title={`${target.name}の枠を閉じた`} busy={Boolean(busyId === target.id)} busyLabel="処理中…">
                         <Check size={15} aria-hidden="true" />閉じた
                       </Button>
                     ) : null}
-                    <RowActions
-                      className={styles.more}
-                      subjectName={slotTitle(group.startsAt)}
-                      menuItems={[
+                    <RowMenu
+                      appearance="box"
+                      label={`${slotTitle(group.startsAt)}の操作`}
+                      items={[
                         ...(canWrite ? remaining.slice(1).map((item) => ({ id: item.id, label: `${item.name}を閉じた`, onSelect: () => void close(item.id, item.name) })) : []),
-                        { id: 'ledger', label: '予約台帳でこの日を見る', external: true, onSelect: () => { router.push(`/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}`) } },
+                        { id: 'ledger', label: '予約台帳でこの日を見る', external: true, href: `/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}`, onSelect: () => { router.push(`/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}`) } },
                       ]}
                     />
                   </span>

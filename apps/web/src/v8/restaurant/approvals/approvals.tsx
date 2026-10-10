@@ -9,6 +9,7 @@
  * 承認待ちのカードは閲覧のみのとき枠を緑にして目立たせる（n4DT7）。動きは BEHAVIOR.md。
  */
 import { useState } from 'react'
+import KpiCard from '@/components/shared/kpi-card'
 import { Check, Eye, Undo2 } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -24,8 +25,11 @@ import {
   type RestaurantStore,
 } from '@/lib/restaurant-test-api'
 import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
-import { formatStamp, Stat, StatRow, Status } from '../common-a/parts'
+import { formatStamp, StatRow, Status } from '../common-a/parts'
 import styles from './approvals.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const kindLabel: Record<RestaurantApproval['kind'], string> = {
   gbp_post: 'Google投稿',
@@ -45,7 +49,7 @@ function approvalSummary(item: RestaurantApproval): string {
   const payload = approvalPayload(item)
   const before = typeof payload.before === 'string' ? payload.before : null
   const after = typeof payload.after === 'string' ? payload.after : null
-  if (before || after) return `${before || '—'} → ${after || '—'}`
+  if (before || after) return `${before || emptyValue('unknown')} → ${after || emptyValue('unknown')}`
   return item.title
 }
 
@@ -87,9 +91,9 @@ function ApprovalContent({ item, data }: { item: RestaurantApproval; data: Resta
     return (
       <p className={styles.payloadDiff}>
         <span className={styles.diffKey}>変更前：</span>
-        <span className={styles.diffBefore}>{before || '—'}</span>
+        <span className={styles.diffBefore}>{before || emptyValue('unknown')}</span>
         <span className={styles.diffKey}>→</span>
-        <span className={styles.diffAfter}>{after || '—'}</span>
+        <span className={styles.diffAfter}>{after || emptyValue('unknown')}</span>
       </p>
     )
   }
@@ -124,7 +128,7 @@ function ApprovalCard({ item, data, store, busy, readOnly, onApprove, onReturn }
         ) : null}
       </div>
       <h3 className={styles.cardTitle}>{item.title}</h3>
-      <p className={styles.requested}>{`申請：${item.requested_by || '—'} ・ ${formatStamp(item.created_at)}`}</p>
+      <p className={styles.requested}>{`申請：${item.requested_by || emptyValue('unknown')} ・ ${formatStamp(item.created_at)}`}</p>
       <div className={styles.payload}>
         <p className={styles.payloadLabel}>変更内容</p>
         <ApprovalContent item={item} data={data} />
@@ -160,21 +164,18 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
         <div className={styles.dialogBody}>
           <div className={styles.dialogSummary}>
             <p className={styles.dialogSummaryMeta}>
-              {`${kindLabel[item.kind]}・${store?.name || '全店舗'}・申請 ${item.requested_by || '—'}（${formatStamp(item.created_at)}）`}
+              {`${kindLabel[item.kind]}・${store?.name || '全店舗'}・申請 ${item.requested_by || emptyValue('unknown')}（${formatStamp(item.created_at)}）`}
             </p>
             <p className={styles.dialogSummaryMain}>{approvalSummary(item)}</p>
           </div>
-          <label className={styles.dialogField}>
-            <span className={styles.dialogFieldLabel}>差し戻す理由（必須・申請者に届きます）</span>
-            <TextArea
+          <Field note={<>差し戻すと、申請は「差戻し」になり、直して出し直すまで公開されません。</>} label="差し戻す理由（・申請者に届きます）" required><TextArea
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder="例：原価の根拠（仕入れ値の表）を添えてください"
               rows={3}
               disabled={busy}
-            />
-          </label>
-          <p className={styles.dialogNote}>差し戻すと、申請は「差戻し」になり、直して出し直すまで公開されません。</p>
+            /></Field>
+
         </div>
       ) : null}
     </Dialog>
@@ -206,13 +207,13 @@ function ApprovalsBoard({ ctx }: { ctx: RestaurantContext }) {
   return (
     <>
       {readOnly ? (
-        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.readOnlyIcon} /><span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span></div>
+        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.readOnlyIcon} /><span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span></div>
       ) : null}
       <StatRow>
-        <Stat label="承認待ち" value={`${pending.length}`} note="対応が必要" warning={pending.length > 0} />
-        <Stat label="Google投稿" value={`${rows.filter((a) => a.kind === 'gbp_post').length}`} note="投稿下書き" />
-        <Stat label="LINE配信" value={`${rows.filter((a) => a.kind === 'line_message').length}`} note="配信下書き" />
-        <Stat label="メニュー改定" value={`${rows.filter((a) => a.kind === 'menu_change').length}`} note="価格・内容変更" />
+        <KpiCard title="承認待ち" valueText={`${pending.length}`} detail="対応が必要" valueTone={pending.length > 0 ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="Google投稿" valueText={`${rows.filter((a) => a.kind === 'gbp_post').length}`} detail="投稿下書き" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="LINE配信" valueText={`${rows.filter((a) => a.kind === 'line_message').length}`} detail="配信下書き" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="メニュー改定" valueText={`${rows.filter((a) => a.kind === 'menu_change').length}`} detail="価格・内容変更" icon={null} presentation="band" value={null} unit="" />
       </StatRow>
       {rows.length === 0 ? (
         <div className={styles.emptyBox}><ListState kind="empty" title="承認待ちはありません" /></div>

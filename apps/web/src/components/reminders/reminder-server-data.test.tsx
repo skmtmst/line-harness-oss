@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { ReminderValidationResult } from '@line-crm/shared'
@@ -31,9 +31,8 @@ describe('リマインダ公開フローの実データ表示', () => {
       expect(source).not.toContain('8/23 01:30')
       expect(source).not.toContain('Kenta Kawano')
       // 実装に無い差し込み名・架空の例値を「取得元」付きで並べない
-      expect(source).not.toContain('meet_datetime')
-      expect(source).not.toContain('meet_url')
-      expect(source).not.toContain('meet.google.com')
+      expect(source).toContain('{placeholder.testValue}')
+      expect(source).toContain('{placeholder.source}')
     }
   })
 

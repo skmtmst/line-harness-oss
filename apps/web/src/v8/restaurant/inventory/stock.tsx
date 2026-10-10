@@ -9,19 +9,24 @@
  * 比べてから保存するか、最新を読み込んで続ける。
  * データの口・送る形は今の画面（app/restaurant-test/v8/inventory.tsx）と同じ。動きは BEHAVIOR.md。
  */
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
-import { ArrowLeftRight, BookOpen, Check, CircleAlert, Info, RefreshCw, Trash2 } from 'lucide-react'
+import { ArrowLeftRight, Armchair, BookOpen, Check, TriangleAlert, RefreshCw, Trash2 } from 'lucide-react'
 import type { RestaurantOpeningDay } from '@line-crm/shared'
+import Card, { CardHeader } from '@/components/shared/card'
+import Notice from '@/components/shared/notice'
+import SeatTile from '@/components/shared/seat-tile'
+import CheckCard from '@/components/shared/check-card'
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
-import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import DateField from '@/components/shared/date-field'
+import { DetailColumns } from '@/components/templates/detail-columns'
+import TimeField from '@/components/shared/time-field-v8'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { useAccount } from '@/contexts/account-context'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -32,6 +37,9 @@ import { DialogNote, RsDialog } from '../booking-kit/parts'
 import { dayLabel, formatTime, joinTableCodes, sanName, slotTimeLabel, tableOrder, WEEK_ORDER, WEEKDAY_LABEL } from './format'
 import type { RestaurantChannel } from './channels'
 import styles from './inventory.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 type Alloc = { ota: number; line: number; walkin: number }
 type Hours = RestaurantOpeningDay[]
@@ -61,25 +69,19 @@ const emptyWeek = (): Hours => Array.from({ length: 7 }, (_, weekday) => ({ week
 const periodsText = (day: RestaurantOpeningDay | undefined) =>
   day && day.periods.length > 0 ? day.periods.map((period) => `${period.opensAt}〜${period.closesAt}`).join('・') : '休み'
 
-/** 開ける時間の選び肢（30分ごと）。保存済みの値が刻みに無いときも、その値を残す。 */
-const HALF_HOURS = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`)
-function timeOptions(current: string) {
-  const list = HALF_HOURS.includes(current) || !current ? HALF_HOURS : [...HALF_HOURS, current].sort()
-  return list.map((value) => ({ value, label: value }))
-}
-
 function storeToday(timezone: string | undefined): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: timezone || 'Asia/Tokyo' }).format(new Date())
 }
 
-function NumberField({ label, value, onChange, dim = false }: { label: string; value: number; onChange: (value: number) => void; dim?: boolean }) {
+function NumberField({ label, value, onChange, canEdit, invalid = false }: { label: string; value: number; onChange: (value: number) => void; canEdit: boolean; invalid?: boolean }) {
   return (
-    <TextField
+    <NumberInput
       type="number"
       min={0}
       aria-label={label}
       value={String(value)}
-      className={dim ? styles.inputDim : undefined}
+      readOnly={!canEdit}
+      invalid={invalid}
       onChange={(event) => onChange(Number(event.target.value))}
     />
   )
@@ -93,6 +95,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
     () => (store ? data.tables.filter((item) => item.store_id === store.id) : data.tables),
     [data.tables, store],
   )
+  const [asideExpanded, setAsideExpanded] = useState(false)
   const [date, setDate] = useState(() => storeToday(store?.timezone))
   const [dayRows, setDayRows] = useState<RestaurantInventory[] | null>(null)
   const [loadError, setLoadError] = useState('')
@@ -173,7 +176,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
     const occupied = [...occupiedOf(row)].map((id) => tableById.get(id)).filter((item): item is RestaurantTable => Boolean(item))
     const seats = row.occupied_seats ?? overlapping.reduce((sum, item) => sum + item.guest_count, 0)
     const free = row.freeSeats ?? Math.max(0, totalSeats - seats)
-    return { row, time: slotTimeLabel(row.starts_at), seats, tables: occupied, free, ratio: totalSeats > 0 ? seats / totalSeats : 0 }
+    return { row, time: slotTimeLabel(row.starts_at, store?.timezone), seats, tables: occupied, free, ratio: totalSeats > 0 ? seats / totalSeats : 0 }
   })
 
   const [selectedId, setSelectedId] = useState('')
@@ -253,7 +256,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
       ...(changedDays.length > 0 ? [`${changedDays.map((weekday) => `${WEEKDAY_LABEL[weekday]}曜`).join('・')}の開ける時間`] : []),
       ...(allocChanged ? ['配分'] : []),
     ].join('と') || '保存した内容'
-    setConflict({ who: sanName(who), at: formatTime(at), scope, attemptedAlloc, attemptedHours })
+    setConflict({ who: sanName(who), at: formatTime(at, store?.timezone), scope, attemptedAlloc, attemptedHours })
   }
 
   /* 下の帯の保存：配分（全部の時間帯）→ 開ける時間。どちらかで 409 なら競合の帯。 */
@@ -326,242 +329,26 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
   return (
     <>
       {loadError ? (
-        <div className={styles.warnBand} role="alert">
-          <CircleAlert size={16} aria-hidden="true" />
-          <p className={styles.warnText}>{loadError}</p>
-          <Button onClick={() => setRefresh((n) => n + 1)}>再読込</Button>
-        </div>
+        <Notice tone="warn" message={loadError} action={<Button onClick={() => setRefresh((n) => n + 1)}>もう一度読み込む</Button>} />
       ) : null}
       {conflict ? (
-        <div className={styles.conflict} role="alert">
-          <CircleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
-          <div className={styles.conflictBody}>
-            <p className={styles.conflictTitle}>{`${conflict.who}が${conflict.at ? ` ${conflict.at} に` : ''}予約枠・在庫を保存しました`}</p>
-            <p className={styles.conflictText}>{`このまま保存すると、${conflict.who}の変更（${conflict.scope}）が消えます`}</p>
-          </div>
-          <Button onClick={() => setDiffOpen(true)}><ArrowLeftRight size={15} aria-hidden="true" />違いを比べる</Button>
-          <Button onClick={reloadLatest}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
-        </div>
+        <SaveConflictBand
+          title={`${conflict.who}が${conflict.at ? ` ${conflict.at} に` : ''}予約枠・在庫を保存しました`}
+          description={`このまま保存すると、${conflict.who}の変更（${conflict.scope}）が消えます`}
+          onCompare={() => setDiffOpen(true)} onReload={reloadLatest} />
       ) : null}
-      <p className={styles.infoBand}>
-        <Info size={16} aria-hidden="true" className={styles.infoIcon} />
-        <span>ここは「席（卓）」に対して受ける予約の枠です。担当スタッフなど「人」に対して受ける予約は、予約設定（メニュー・受付枠・担当スタッフ）で決めます。</span>
-      </p>
-      <div className={styles.columns}>
-        <div className={styles.mainColumn}>
-          <section className={styles.section} aria-labelledby="rs-alloc-title">
-            <div className={styles.sectionHead}>
-              <h2 id="rs-alloc-title" className={styles.sectionTitle}>席と枠の配分（卓とつながる）</h2>
-              <p className={styles.sectionDescription}>総数は「座席・卓管理」の稼働中の卓から自動で決まります。ここで入れた配分を全部の時間帯に入れ、時間帯ごとに直すときは下の表の行を押します。</p>
-            </div>
-            <div className={styles.totalLine}>
-              <BookOpen size={16} aria-hidden="true" className={styles.totalIcon} />
-              <div className={styles.totalText}>
-                <p className={styles.totalValue}>{`1つの時間帯の総数 ${totalSeats}席`}</p>
-                <p className={styles.totalSub}>{`稼働中の卓 ${activeTables.length} つ${stoppedTables.length > 0 ? `（${stoppedTables.map((item) => item.code).join('・')} は停止中のため除く）` : ''}`}</p>
-              </div>
-              <Link href="/restaurant-test/tables" className={styles.link}>座席・卓管理で変える →</Link>
-            </div>
-            <div className={styles.allocGrid}>
-              <label className={styles.allocField}><span className={styles.allocLabel}>OTA（予約媒体）</span>
-                <NumberField label="OTA（予約媒体）" value={alloc.ota} onChange={(ota) => updateAlloc({ ...alloc, ota })} />
-              </label>
-              <label className={styles.allocField}><span className={styles.allocLabel}>LINE 専用</span>
-                <NumberField label="LINE 専用" value={alloc.line} onChange={(line) => updateAlloc({ ...alloc, line })} />
-              </label>
-              <label className={styles.allocField}><span className={styles.allocLabel}>当日（ウォークイン）</span>
-                <NumberField label="当日（ウォークイン）" value={alloc.walkin} onChange={(walkin) => updateAlloc({ ...alloc, walkin })} />
-              </label>
-              <div className={styles.allocField}><span className={styles.allocLabel}>店頭・電話</span>
-                <span className={styles.remainder}>{`${remainder}（残り）`}</span>
-              </div>
-            </div>
-            <p className={`${styles.note} ${allocInvalid ? styles.noteInvalid : ''}`}>OTA・LINE・当日の合計が総数を超えると保存できません。予約媒体へは書き戻しません（検証中）</p>
-          </section>
-          <section className={styles.section} aria-labelledby="rs-stock-title">
-            <div className={styles.sectionHeadRow}>
-              <div className={styles.sectionHead}>
-                <h2 id="rs-stock-title" className={styles.sectionTitle}>{`時間帯ごとの在庫（${dayLabel(date)}）`}</h2>
-                <p className={styles.sectionDescription}>予約台帳の予約から、埋まっている卓と空きを出します。行を押すと右に卓の埋まりぐあいが出ます</p>
-              </div>
-              <input type="date" aria-label="在庫の日付" className={styles.dateInput} value={date} disabled={busy} onChange={(event) => changeDate(event.target.value)} />
-            </div>
-            {dayRows === null ? (
-              <div className={styles.stateBox}><ListState kind="loading" /></div>
-            ) : slots.length === 0 ? (
-              <div className={styles.stateBox}>
-                <ListState
-                  kind="empty"
-                  title="この日の時間帯がありません"
-                  description="開ける時間から、30分ごとの枠を作れます。今ある枠は残します。"
-                  action={canEdit ? (
-                    <Button
-                      variant="primary"
-                      disabled={busy || !hoursVersion || allocInvalid}
-                      onClick={() => {
-                        if (!selectedAccountId || !store) return
-                        void mutate(() => restaurantTestApi.generateInventory(selectedAccountId, { storeId: store.id, date, expectedHoursVersion: hoursVersion, otaCapacity: alloc.ota, lineCapacity: alloc.line, walkInCapacity: alloc.walkin }), '30分ごとの枠を作りました。').then((ok) => { if (ok) setRefresh((n) => n + 1) })
-                      }}
-                    >この日の枠を作る</Button>
-                  ) : undefined}
-                />
-              </div>
-            ) : (
-              <DataTable className={styles.stockTable}>
-                <thead>
-                  <TableHeadRow className={styles.headRow}>
-                    <Th className={`${styles.th} ${styles.colTime}`}>時間</Th>
-                    <Th className={`${styles.th} ${styles.colUse}`}>利用状況</Th>
-                    <Th className={`${styles.th} ${styles.colSeats}`} align="right">席数</Th>
-                    <Th className={`${styles.th} ${styles.colTables}`}>埋まっている卓</Th>
-                    <Th className={`${styles.th} ${styles.colFree}`} align="right">空き</Th>
-                  </TableHeadRow>
-                </thead>
-                <tbody>
-                  {slots.map((slot) => (
-                    <Tr
-                      key={slot.row.id}
-                      className={styles.stockRow}
-                      selected={selected?.row.id === slot.row.id}
-                      interactive
-                      onClick={() => { setSelectedId(slot.row.id); setSlotAlloc(null); setSlotVersion(undefined) }}
-                    >
-                      <Td className={styles.td}>
-                        <button type="button" className={styles.timeButton} aria-pressed={selected?.row.id === slot.row.id} onClick={(event) => { event.stopPropagation(); setSelectedId(slot.row.id); setSlotAlloc(null); setSlotVersion(undefined) }}>{slot.time}</button>
-                      </Td>
-                      <Td className={styles.td}>
-                        <svg className={styles.useBar} role="img" aria-label={`利用率 ${Math.round(slot.ratio * 100)}％`} viewBox="0 0 120 8" preserveAspectRatio="none">
-                          <rect className={styles.useTrack} x="0" y="0" width="120" height="8" rx="4" />
-                          <rect
-                            className={slot.ratio >= 0.7 ? styles.useFillBusy : styles.useFill}
-                            x="0"
-                            y="0"
-                            width={Math.max(4, Math.min(120, Math.round(slot.ratio * 120)))}
-                            height="8"
-                            rx="4"
-                          />
-                        </svg>
-                      </Td>
-                      <Td className={`${styles.td} ${styles.colSeats} ${styles.strong}`} align="right">{`${slot.seats}席`}</Td>
-                      <Td className={`${styles.td} ${styles.tablesCell}`}><span title={joinTableCodes(slot.tables)}>{joinTableCodes(slot.tables) || '—'}</span></Td>
-                      <Td className={`${styles.td} ${styles.colFree} ${styles.bold}`} align="right"><span className={lowSlot(slot) ? styles.freeLow : undefined}>{`${slot.free}席`}</span></Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </DataTable>
-            )}
-          </section>
-          <section className={styles.section} aria-labelledby="rs-hours-title">
-            {selected && !conflict ? (
-              <div className={styles.slotBox} aria-label={`${selected.time} の配分だけ直す`}>
-                <h3 className={styles.sectionTitle}>{`行を押したとき：${selected.time} の配分だけ直す`}</h3>
-                <div className={styles.slotGrid}>
-                  <label className={styles.slotField}><span className={styles.slotLabel}>OTA（予約媒体）</span>
-                    <NumberField dim label={`${selected.time}のOTA`} value={currentSlotAlloc.ota} onChange={(ota) => updateSlot({ ...currentSlotAlloc, ota })} />
-                  </label>
-                  <label className={styles.slotField}><span className={styles.slotLabel}>LINE 専用</span>
-                    <NumberField dim label={`${selected.time}のLINE`} value={currentSlotAlloc.line} onChange={(line) => updateSlot({ ...currentSlotAlloc, line })} />
-                  </label>
-                  <label className={styles.slotField}><span className={styles.slotLabel}>当日（ウォークイン）</span>
-                    <NumberField dim label={`${selected.time}の当日`} value={currentSlotAlloc.walkin} onChange={(walkin) => updateSlot({ ...currentSlotAlloc, walkin })} />
-                  </label>
-                </div>
-                <div className={styles.slotActions}>
-                  <span className={styles.slotBase}>{`全部の時間帯の配分：OTA ${alloc.ota}・LINE ${alloc.line}・当日 ${alloc.walkin}（上で入れた数）`}</span>
-                  {canEdit ? (
-                    <>
-                      <Button onClick={() => updateSlot({ ...alloc })}>全体の配分に戻す</Button>
-                      <Button variant="primary" disabled={busy || slotInvalid} onClick={saveSlot}>この時間帯だけ保存</Button>
-                    </>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-            <div className={styles.sectionHead}>
-              <h2 id="rs-hours-title" className={styles.sectionTitle}>開ける時間</h2>
-              <p className={styles.sectionDescription}>曜日ごとに予約を受ける時間を決めます（予約設定の受付枠と同じ決め方。違うのは、受けられる数が「人」ではなく「席」で決まること）</p>
-            </div>
-            {hoursError ? <p className={styles.hoursError} role="alert">{hoursError}</p> : null}
-            {hoursDraft ? WEEK_ORDER.map((weekday) => {
-              const day = hoursDraft.find((item) => item.weekday === weekday) ?? { weekday, periods: [] }
-              const open = day.periods.length > 0
-              const name = WEEKDAY_LABEL[weekday]
-              return (
-                <div key={weekday} className={styles.dayRow}>
-                  <div className={styles.dayHead}>
-                    {/* 閲覧のみ：つまみ・時刻を選ぶ部品は置かず、いまの時間を文字で見せる（2026-10-06 オーナー決定）。 */}
-                    {canEdit ? (
-                      <Toggle
-                        checked={open}
-                        label={`${name}曜日に予約を受ける`}
-                        onChange={(next) => setDay(weekday, next ? [{ opensAt: '17:00', closesAt: '22:00' }] : [])}
-                      />
-                    ) : null}
-                    <span className={styles.dayName}>{name}</span>
-                  </div>
-                  {open ? (
-                    <div className={styles.dayPeriods}>
-                      {day.periods.map((period, index) => (
-                        <div key={index} className={styles.period}>
-                          {canEdit ? <>
-                            <span className={styles.timeInput}>
-                              <Select
-                                aria-label={`${name}曜日 ${index + 1}つ目の開始`}
-                                size="full"
-                                value={period.opensAt}
-                                options={timeOptions(period.opensAt)}
-                                onChange={(value) => setDay(weekday, day.periods.map((p, i) => (i === index ? { ...p, opensAt: value } : p)))}
-                              />
-                            </span>
-                            <span className={styles.tilde}>〜</span>
-                            <span className={styles.timeInput}>
-                              <Select
-                                aria-label={`${name}曜日 ${index + 1}つ目の終了`}
-                                size="full"
-                                value={period.closesAt}
-                                options={timeOptions(period.closesAt)}
-                                onChange={(value) => setDay(weekday, day.periods.map((p, i) => (i === index ? { ...p, closesAt: value } : p)))}
-                              />
-                            </span>
-                          </> : (
-                            <span aria-label={`${name}曜日 ${index + 1}つ目の時間帯`}>{`${period.opensAt}〜${period.closesAt}`}</span>
-                          )}
-                          {canEdit ? (
-                            <IconButton aria-label={`${name}曜日の${index + 1}つ目の時間帯を外す`} className={styles.iconButton} onClick={() => setDay(weekday, day.periods.filter((_, i) => i !== index))}>
-                              <Trash2 size={16} aria-hidden="true" />
-                            </IconButton>
-                          ) : null}
-                        </div>
-                      ))}
-                      {canEdit ? (
-                        <button type="button" className={styles.addPeriod} onClick={() => setDay(weekday, [...day.periods, { opensAt: '17:00', closesAt: '22:00' }])}>＋ 時間帯を足す</button>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <p className={styles.dayClosed}>休み（定休日）・お客さまの画面に出ません</p>
-                  )}
-                </div>
-              )
-            }) : hoursError ? null : <ListState kind="loading" />}
-          </section>
-        </div>
-        <aside className={styles.sideColumn}>
-          <section className={styles.section} aria-labelledby="rs-tables-title">
-            <div className={styles.sectionHead}>
-              <h2 id="rs-tables-title" className={styles.sectionTitle}>{selected ? `${selected.time} の卓` : '卓の埋まりぐあい'}</h2>
-              <p className={styles.sectionDescription}>赤＝埋まっている・白＝空き・灰＝停止中</p>
-            </div>
+      <Notice tone="info" icon={<Armchair size={16} />} message="ここは「席（卓）」に対して受ける予約の枠です。担当スタッフなど「人」に対して受ける予約は、予約設定（メニュー・受付枠・担当スタッフ）で決めます。" />
+      <DetailColumns variant="restaurant-inventory" asideLabel="この時間帯の卓を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={(
+        <div className={styles.sideColumn}>
+          <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-tables-title">
+            <CardHeader size="stacked" titleId="rs-tables-title" title={selected ? `${selected.time} の卓` : '卓の埋まりぐあい'} meta="赤＝埋まっている・白＝空き・灰＝停止中" />
             <ul className={styles.tablesGrid}>
               {gridTables.map((item) => {
                 const occupied = occupiedIds.has(item.id)
                 return (
-                  <li
-                    key={item.id}
-                    className={`${styles.tableCell} ${!item.is_active ? styles.tableCellStopped : occupied ? styles.tableCellOccupied : ''}`}
-                    aria-label={`${item.code} ${item.max_capacity}名${!item.is_active ? '（停止中）' : occupied ? '（埋まっている）' : '（空き）'}`}
-                  >
-                    <span className={styles.tableCellName}>{item.code}</span>
-                    <span className={styles.tableCellSeats}>{`${item.max_capacity}名`}</span>
+                  <li key={item.id}>
+                    <SeatTile presentation="occupancy" code={item.code} capacity={`${item.max_capacity}名`} stopped={!item.is_active} occupied={Boolean(item.is_active) && occupied}
+                      aria-label={`${item.code} ${item.max_capacity}名${!item.is_active ? '（停止中）' : occupied ? '（埋まっている）' : '（空き）'}`} />
                   </li>
                 )
               })}
@@ -584,9 +371,186 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
                 ) : null}
               </div>
             ) : null}
-          </section>
-        </aside>
-      </div>
+          </Card>
+        </div>
+      )}>
+        <div className={styles.mainColumn}>
+          <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-alloc-title">
+            <CardHeader size="stacked" titleId="rs-alloc-title" title="席と枠の配分（卓とつながる）" meta="総数は「座席・卓管理」の有効の卓から自動で決まります。ここで入れた配分を全部の時間帯に入れ、時間帯ごとに直すときは下の表の行を押します。" />
+            <div className={styles.totalLine}>
+              <Armchair size={16} aria-hidden="true" className={styles.totalIcon} />
+              <div className={styles.totalText}>
+                <p className={styles.totalValue}>{`1つの時間帯の総数 ${totalSeats}席`}</p>
+                <p className={styles.totalSub}>{`有効の卓 ${activeTables.length} つ${stoppedTables.length > 0 ? `（${stoppedTables.map((item) => item.code).join('・')} は停止中のため除く）` : ''}`}</p>
+              </div>
+              <Button variant="text" size="inline" href="/restaurant-test/tables">座席・卓管理で変える →</Button>
+            </div>
+            <div className={styles.allocGrid}>
+              <Field label={<><span className={styles.allocLabel}>OTA（予約媒体）</span></>}><NumberField canEdit={canEdit} invalid={allocInvalid} label="OTA（予約媒体）" value={alloc.ota} onChange={(ota) => updateAlloc({ ...alloc, ota })} /></Field>
+              <Field label={<><span className={styles.allocLabel}>LINE 専用</span></>}><NumberField canEdit={canEdit} invalid={allocInvalid} label="LINE 専用" value={alloc.line} onChange={(line) => updateAlloc({ ...alloc, line })} /></Field>
+              <Field label={<><span className={styles.allocLabel}>当日（ウォークイン）</span></>}><NumberField canEdit={canEdit} invalid={allocInvalid} label="当日（ウォークイン）" value={alloc.walkin} onChange={(walkin) => updateAlloc({ ...alloc, walkin })} /></Field>
+              <div className={styles.allocField}><span className={styles.allocLabel}>店頭・電話</span>
+                <span className={styles.remainder}>{`${remainder}（残り）`}</span>
+              </div>
+            </div>
+            <p className={`${styles.note} ${allocInvalid ? styles.noteInvalid : ''}`}>OTA・LINE・当日の合計が総数を超えると保存できません。予約媒体へは書き戻しません（検証中）</p>
+          </Card>
+          <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-stock-title">
+            <div className={styles.sectionHeadRow}>
+              <CardHeader size="stacked" titleId="rs-stock-title" title={`時間帯ごとの在庫（${dayLabel(date)}）`} meta="予約台帳の予約から、埋まっている卓と空きを出します。行を押すと右に卓の埋まりぐあいが出ます" />
+              <span className={styles.datePicker}><DateField aria-label="在庫の日付" value={date} disabled={busy} onChange={changeDate} /></span>
+            </div>
+            {dayRows === null ? (
+              <div className={styles.stateBox}><ListState kind="loading" /></div>
+            ) : slots.length === 0 ? (
+              <div className={styles.stateBox}>
+                <ListState
+                  kind="empty"
+                  title="この日の時間帯がありません"
+                  description="開ける時間から、30分ごとの枠を作れます。今ある枠は残します。"
+                  action={canEdit ? (
+                    <Button
+                      variant="primary"
+                      disabled={busy || !hoursVersion || allocInvalid}
+                      onClick={() => {
+                        if (!selectedAccountId || !store) return
+                        void mutate(() => restaurantTestApi.generateInventory(selectedAccountId, { storeId: store.id, date, expectedHoursVersion: hoursVersion, otaCapacity: alloc.ota, lineCapacity: alloc.line, walkInCapacity: alloc.walkin }), '30分ごとの枠を作りました。').then((ok) => { if (ok) setRefresh((n) => n + 1) })
+                      }}
+                    >この日の枠を作る</Button>
+                  ) : undefined}
+                />
+              </div>
+            ) : (
+              <DataTable presentation="inventory">
+                <thead>
+                  <TableHeadRow>
+                    <Th className={styles.colTime}>時間</Th>
+                    <Th className={styles.colUse}>利用状況</Th>
+                    <Th className={styles.colSeats} align="right">席数</Th>
+                    <Th className={styles.colTables}>埋まっている卓</Th>
+                    <Th className={styles.colFree} align="right">空き</Th>
+                  </TableHeadRow>
+                </thead>
+                <tbody>
+                  {slots.map((slot) => (
+                    <Tr
+                      key={slot.row.id}
+                      selected={selected?.row.id === slot.row.id}
+                      interactive
+                      onClick={() => { setSelectedId(slot.row.id); setSlotAlloc(null); setSlotVersion(undefined) }}
+                    >
+                      <Td>
+                        <Button variant="text" size="inline" textTone="ink" aria-pressed={selected?.row.id === slot.row.id} onClick={(event) => { event.stopPropagation(); setSelectedId(slot.row.id); setSlotAlloc(null); setSlotVersion(undefined) }}>{slot.time}</Button>
+                      </Td>
+                      <Td>
+                        <svg className={styles.useBar} role="img" aria-label={`利用率 ${Math.round(slot.ratio * 100)}％`} viewBox="0 0 120 8" preserveAspectRatio="none">
+                          <rect className={styles.useTrack} x="0" y="0" width="120" height="8" rx="4" />
+                          <rect
+                            className={slot.ratio >= 0.7 ? styles.useFillBusy : styles.useFill}
+                            x="0"
+                            y="0"
+                            width={Math.max(4, Math.min(120, Math.round(slot.ratio * 120)))}
+                            height="8"
+                            rx="4"
+                          />
+                        </svg>
+                      </Td>
+                      <Td className={`${styles.colSeats} ${styles.strong}`} align="right">{`${slot.seats}席`}</Td>
+                      <Td className={styles.tablesCell}><span title={joinTableCodes(slot.tables)}>{joinTableCodes(slot.tables) || emptyValue('unknown')}</span></Td>
+                      <Td className={`${styles.colFree} ${styles.bold}`} align="right"><span className={lowSlot(slot) ? styles.freeLow : undefined}>{`${slot.free}席`}</span></Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </DataTable>
+            )}
+          </Card>
+          <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-hours-title">
+            {selected && !conflict ? (
+              <Card layout="vertical" padding="default" gap="tight" surface="inset" aria-label={`${selected.time} の配分だけ直す`}>
+                <h3 className={styles.sectionTitle}>{`行を押したとき：${selected.time} の配分だけ直す`}</h3>
+                <div className={styles.slotGrid}>
+                  <Field label={<><span className={styles.slotLabel}>OTA（予約媒体）</span></>}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}のOTA`} value={currentSlotAlloc.ota} onChange={(ota) => updateSlot({ ...currentSlotAlloc, ota })} /></Field>
+                  <Field label={<><span className={styles.slotLabel}>LINE 専用</span></>}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}のLINE`} value={currentSlotAlloc.line} onChange={(line) => updateSlot({ ...currentSlotAlloc, line })} /></Field>
+                  <Field label={<><span className={styles.slotLabel}>当日（ウォークイン）</span></>}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}の当日`} value={currentSlotAlloc.walkin} onChange={(walkin) => updateSlot({ ...currentSlotAlloc, walkin })} /></Field>
+                </div>
+                <div className={styles.slotActions}>
+                  <span className={styles.slotBase}>{`全部の時間帯の配分：OTA ${alloc.ota}・LINE ${alloc.line}・当日 ${alloc.walkin}（上で入れた数）`}</span>
+                  {canEdit ? (
+                    <>
+                      <Button onClick={() => updateSlot({ ...alloc })}>全体の配分に戻す</Button>
+                      <Button variant="primary" disabled={busy || slotInvalid} onClick={saveSlot}>この時間帯だけ保存</Button>
+                    </>
+                  ) : null}
+                </div>
+              </Card>
+            ) : null}
+            <CardHeader size="stacked" titleId="rs-hours-title" title="開ける時間" meta="曜日ごとに予約を受ける時間を決めます（予約設定の受付枠と同じ決め方。違うのは、受けられる数が「人」ではなく「席」で決まること）" />
+            {hoursError ? <p className={styles.hoursError} role="alert">{hoursError}</p> : null}
+            {hoursDraft ? WEEK_ORDER.map((weekday) => {
+              const day = hoursDraft.find((item) => item.weekday === weekday) ?? { weekday, periods: [] }
+              const open = day.periods.length > 0
+              const name = WEEKDAY_LABEL[weekday]
+              return (
+                <div key={weekday} className={styles.dayRow}>
+                  <div className={styles.dayHead}>
+                    {/* 閲覧のみ：つまみ・時刻を選ぶ部品は置かず、いまの時間を文字で見せる（2026-10-06 オーナー決定）。 */}
+                    {canEdit ? (
+                      <SettingCheckbox
+                        checked={open}
+                        label={`${name}曜日に予約を受ける`}
+                        onChange={(next) => setDay(weekday, next ? [{ opensAt: '17:00', closesAt: '22:00' }] : [])}
+                      />
+                    ) : null}
+                    <span className={styles.dayName}>{name}</span>
+                  </div>
+                  {open ? (
+                    <div className={styles.dayPeriods}>
+                      {day.periods.map((period, index) => (
+                        <div key={index} className={styles.period}>
+                          {canEdit ? <>
+                            <span className={styles.timeInput}>
+                              <TimeField
+                                aria-label={`${name}曜日 ${index + 1}つ目の開始`}
+                                minuteStep={30}
+                                size="default"
+                                value={period.opensAt}
+                                onChange={(value) => setDay(weekday, day.periods.map((p, i) => (i === index ? { ...p, opensAt: value } : p)))}
+                              />
+                            </span>
+                            <span className={styles.tilde}>〜</span>
+                            <span className={styles.timeInput}>
+                              <TimeField
+                                allowEndOfDay
+                                aria-label={`${name}曜日 ${index + 1}つ目の終了`}
+                                minuteStep={30}
+                                size="default"
+                                value={period.closesAt}
+                                onChange={(value) => setDay(weekday, day.periods.map((p, i) => (i === index ? { ...p, closesAt: value } : p)))}
+                              />
+                            </span>
+                          </> : (
+                            <span aria-label={`${name}曜日 ${index + 1}つ目の時間帯`}>{`${period.opensAt}〜${period.closesAt}`}</span>
+                          )}
+                          {canEdit ? (
+                            <IconButton aria-label={`${name}曜日の${index + 1}つ目の時間帯を外す`} onClick={() => setDay(weekday, day.periods.filter((_, i) => i !== index))}>
+                              <Trash2 size={16} aria-hidden="true" />
+                            </IconButton>
+                          ) : null}
+                        </div>
+                      ))}
+                      {canEdit ? (
+                        <Button variant="text" size="inline" onClick={() => setDay(weekday, [...day.periods, { opensAt: '17:00', closesAt: '22:00' }])}>＋ 時間帯を足す</Button>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className={styles.dayClosed}>休み（定休日）・お客さまの画面に出ません</p>
+                  )}
+                </div>
+              )
+            }) : hoursError ? null : <ListState kind="loading" />}
+          </Card>
+        </div>
+      </DetailColumns>
       {canEdit ? (
         <StickyBar
           className={styles.stickyBar}
@@ -629,14 +593,13 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
         ) : (
           <div className={styles.checkList}>
             {closingChannels.map((channel) => (
-              <Checkbox
+              <CheckCard
+                size="row"
                 key={channel.id}
-                className={styles.checkRow}
                 checked={closedChannels.includes(channel.id)}
-                onCheckedChange={(checked) => setClosedChannels((current) => (checked ? [...current, channel.id] : current.filter((item) => item !== channel.id)))}
-              >
-                {`${channel.name} の ${dayLabel(date).split('・')[0]} ${selected?.time ?? ''} を閉じた`}
-              </Checkbox>
+                onChange={(checked) => setClosedChannels((current) => (checked ? [...current, channel.id] : current.filter((item) => item !== channel.id)))}
+                title={`${channel.name} の ${dayLabel(date).split('・')[0]} ${selected?.time ?? ''} を閉じた`}
+              />
             ))}
           </div>
         )}

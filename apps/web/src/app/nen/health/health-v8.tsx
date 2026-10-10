@@ -49,6 +49,8 @@ import { WeightBars } from './health-tab'
 import { SummarySheet, SKIN_LABELS, TEAR_LABELS, countText, md } from './summary-drawer'
 import type { HealthTabKey } from './page'
 import styles from './health-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -109,8 +111,8 @@ export default function HealthPageV8({
     <div data-design-node={BOARD_NODE[tab]} className={styles.board}>
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>健康日記</h1>
-          <p className={styles.headDesc}>お客さまがマイページで付けたペットの記録（体重・食事・うんち・元気）を見ます。気になる変化を見つけて声をかけられます。</p>
+          <PageHeading title="健康日記" help={<> お客さまがマイページで付けたペットの記録（体重・食事・うんち・元気）を見ます。気になる変化を見つけて声をかけられます。</>} />
+
         </div>
         <Button type="button" variant="secondary" onClick={() => window.print()} disabled={!canPrint} title={canPrint ? undefined : '一覧の「30日のまとめ」を開くと書き出せます'}>獣医師向け PDF を書き出す</Button>
       </div>
@@ -185,7 +187,7 @@ function HealthKpiBand({
         <span className={styles.kpiLabel}>{label}</span>
         <button type="button" className={styles.kpiHelp} title={help} aria-label={`${label}：${help}`}>…</button>
       </div>
-      <p className={styles.kpiValue}>{value === null ? '—' : <>{formatNumber(value)}<span className={styles.kpiUnit}>{unit}</span></>}</p>
+      <p className={styles.kpiValue}>{value === null ? emptyValue('unknown') : <>{formatNumber(value)}<span className={styles.kpiUnit}>{unit}</span></>}</p>
       <p className={styles.kpiSub}>{sub}</p>
     </li>
   )
@@ -296,7 +298,7 @@ function HealthListV8({
               { value: 'none', label: '変化なし' },
             ]}
           />
-          <span className={styles.rangeLabel}>{data ? headCountLabel(data.total, data.page, data.pageSize) : '—'}</span>
+          <span className={styles.rangeLabel}>{data ? headCountLabel(data.total, data.page, data.pageSize) : emptyValue('unknown')}</span>
           <Select
             aria-label="並び順"
             value={sort}
@@ -412,7 +414,7 @@ function HealthRowV8({ row, onOpenSummary }: { row: NenHealthRow; onOpenSummary:
       <Td><span className="text-label text-ink-secondary">{row.lastLoggedLabel}</span></Td>
       <Td align="right"><span className="text-label tabular-nums text-ink">{row.count30d}日</span></Td>
       <Td><WeightBars series={row.weightSeries} warn={weightWarn} /></Td>
-      <Td><span className="text-label text-ink-secondary">{row.latestStool && row.latestAppetite ? `${row.latestStool}・${row.latestAppetite}` : '—'}</span></Td>
+      <Td><span className="text-label text-ink-secondary">{row.latestStool && row.latestAppetite ? `${row.latestStool}・${row.latestAppetite}` : emptyValue('unknown')}</span></Td>
       <Td>
         {row.changes.length === 0 ? (
           row.count30d > 0 ? <Chip tone="ok">いつもどおり</Chip> : <Chip tone="neutral">記録なし</Chip>
@@ -536,15 +538,15 @@ function SummaryDrawerV8({
               </div>
               <div className={styles.statBox}>
                 <dt className={styles.statLabel}>体重</dt>
-                <dd className={styles.statValue}>{s.weight ? `${s.weight.first} → ${s.weight.last} kg` : '—'}</dd>
+                <dd className={styles.statValue}>{s.weight ? `${s.weight.first} → ${s.weight.last} kg` : emptyValue('unknown')}</dd>
               </div>
               <div className={styles.statBox}>
                 <dt className={styles.statLabel}>呼吸数（平均）</dt>
-                <dd className={styles.statValue}>{s.respiratoryRateAvg == null ? '—' : `${s.respiratoryRateAvg}回／分`}</dd>
+                <dd className={styles.statValue}>{s.respiratoryRateAvg == null ? emptyValue('unknown') : `${s.respiratoryRateAvg}回／分`}</dd>
               </div>
               <div className={styles.statBox}>
                 <dt className={styles.statLabel}>心拍数（平均）</dt>
-                <dd className={styles.statValue}>{s.heartRateAvg == null ? '—' : `${s.heartRateAvg}回／分`}</dd>
+                <dd className={styles.statValue}>{s.heartRateAvg == null ? emptyValue('unknown') : `${s.heartRateAvg}回／分`}</dd>
               </div>
             </dl>
             <section aria-label="体重の30日の推移">
@@ -574,12 +576,12 @@ function SummaryDrawerV8({
                     {s.logs.map((log) => (
                       <Tr key={log.loggedOn}>
                         <Td><span className="text-label tabular-nums text-ink">{md(log.loggedOn)}</span></Td>
-                        <Td align="right"><span className="text-label tabular-nums text-ink">{log.weightKg == null ? '—' : `${log.weightKg}kg`}</span></Td>
+                        <Td align="right"><span className="text-label tabular-nums text-ink">{log.weightKg == null ? emptyValue('unknown') : `${log.weightKg}kg`}</span></Td>
                         <Td><span className="text-label text-ink-secondary">{summary.labels.stool[log.stool] ?? log.stool}</span></Td>
                         <Td><span className="text-label text-ink-secondary">{summary.labels.appetite[log.appetite] ?? log.appetite}</span></Td>
-                        <Td><span className="text-label text-ink-secondary">{log.skin ? SKIN_LABELS[log.skin] ?? log.skin : '—'}</span></Td>
-                        <Td><span className="text-label text-ink-secondary">{log.tearStain ? TEAR_LABELS[log.tearStain] ?? log.tearStain : '—'}</span></Td>
-                        <Td><span className="block truncate text-label text-ink-secondary" title={s.notes.find((n) => n.loggedOn === log.loggedOn)?.note ?? ''}>{s.notes.find((n) => n.loggedOn === log.loggedOn)?.note ?? '—'}</span></Td>
+                        <Td><span className="text-label text-ink-secondary">{log.skin ? SKIN_LABELS[log.skin] ?? log.skin : emptyValue('unknown')}</span></Td>
+                        <Td><span className="text-label text-ink-secondary">{log.tearStain ? TEAR_LABELS[log.tearStain] ?? log.tearStain : emptyValue('unknown')}</span></Td>
+                        <Td><span className="block truncate text-label text-ink-secondary" title={s.notes.find((n) => n.loggedOn === log.loggedOn)?.note ?? ''}>{s.notes.find((n) => n.loggedOn === log.loggedOn)?.note ?? emptyValue('unknown')}</span></Td>
                       </Tr>
                     ))}
                   </tbody>

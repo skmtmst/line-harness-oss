@@ -111,26 +111,7 @@
   padding: 0;
 }
 
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-ms-key-pill-gap);
-  padding: var(--tpl-ms-key-pill-pad);
-  border-radius: var(--radius-pill);
-  background: var(--color-success-bg);
-  color: var(--color-success);
-  font-size: var(--tpl-ms-key-token-size);
-  font-weight: 600;
-  line-height: var(--tpl-ms-key-pill-lh);
-  white-space: nowrap;
-}
 
-.pillDot {
-  width: var(--tpl-badge-dot);
-  height: var(--tpl-badge-dot);
-  border-radius: var(--radius-pill);
-  background: currentColor;
-}
 
 .srOnly {
   position: absolute;
@@ -166,16 +147,6 @@
   line-height: var(--tpl-ms-key-info-lh);
 }
 
-.input {
-  width: 100%;
-  height: var(--tpl-ms-key-btn-h);
-  padding: var(--tpl-ms-key-input-pad);
-  border: 1px solid var(--color-control-border);
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-label);
-}
 
 .fieldError {
   margin: 0;

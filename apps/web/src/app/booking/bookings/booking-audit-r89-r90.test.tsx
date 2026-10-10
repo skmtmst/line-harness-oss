@@ -6,7 +6,7 @@
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { BookingRequest } from '@/lib/api'
 
 const fixture = vi.hoisted(() => ({
@@ -35,6 +35,7 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 vi.mock('@/lib/api', () => ({
+  ApiError: class extends Error { constructor(public status: number) { super('API error') } },
   api: {
     staff: { me: fixture.staffMe },
   },
@@ -145,7 +146,7 @@ describe('タブの数は期間の有効な予約だけ（取消・拒否・期�
   })
 })
 
-describe('監査 R89: 承認の後は集計・カレンダーも更新する', () => {
+describe('監査 R89: 状態変更の後は集計・カレンダーも更新する', () => {
   it('状態の確定で一覧・集計・カレンダーの取得が走り直す', async () => {
     // 日の表示のまま。カレンダーのマス→詳細→完了の順に押す。
     render(<BookingsPage />)
@@ -153,12 +154,12 @@ describe('監査 R89: 承認の後は集計・カレンダーも更新する', (
     const listBefore = fixture.listRequests.mock.calls.length
     const summaryBefore = fixture.requestsSummary.mock.calls.length
     fireEvent.click(card)
-    const complete = await screen.findByRole('button', { name: '来ていただきました にする' })
+    const complete = await screen.findByRole('button', { name: '取り消す' })
     fireEvent.click(complete)
-    const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: '完了' }))
+    const dialog = await screen.findByRole('alertdialog', {name: 'この予約を「キャンセル」にしますか？'})
+    fireEvent.click(within(dialog).getAllByRole('button', { name: 'キャンセル' }).find((button) => button.getAttribute('data-dialog-action') === 'danger')!)
     await waitFor(() => {
-      expect(fixture.decideRequest).toHaveBeenCalledWith('account-a', 'b-req', 'complete')
+      expect(fixture.decideRequest).toHaveBeenCalledWith('account-a', 'b-req', 'cancel')
     })
     // 一覧・集計・カレンダー（'all'＋期間の取得）の取り直しが走る。
     await waitFor(() => {
@@ -172,3 +173,33 @@ describe('監査 R89: 承認の後は集計・カレンダーも更新する', (
     })
   })
 })
+
+ describe('WEB295〜297：カレンダー取得の状態と再試行', () => {
+   it('WEB295：期間の予約を取得中は予約数を確定しない', async () => {
+     fixture.listRequests.mockImplementation(async (_a: string, _s: string, params: Record<string, unknown>) => {
+       if (params?.from) return new Promise(() => {})
+       return { requests: [], total: 0 }
+     })
+     render(<BookingsPage />)
+     await screen.findAllByRole('button', { name: /今日/ })
+     expect(screen.getAllByText('読み込んでいます').length).toBeGreaterThan(0)
+   })
+   it('WEB296：期間の取得失敗から再試行したら、その期間を読み直す', async () => {
+     let rangeCalls = 0
+     fixture.listRequests.mockImplementation(async (_a: string, _s: string, params: Record<string, unknown>) => {
+       if (params?.from && ++rangeCalls === 1) throw new Error('network')
+       return { requests: [], total: 0 }
+     })
+     render(<BookingsPage />)
+     await screen.findByText('予約を読み込めませんでした')
+     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /もう一度読み込む/ })) })
+     await waitFor(() => expect(rangeCalls).toBe(2))
+   })
+   it('WEB297：一括空き枠の500ではメニュー別要求を増やさない', async () => {
+     fixture.availabilityBatch.mockRejectedValueOnce(new Error('network'))
+     fixture.availability.mockResolvedValue({ by_staff: [] })
+     render(<BookingsPage />)
+     await screen.findAllByText(/空き枠を読み込めませんでした/)
+     expect(fixture.availability).not.toHaveBeenCalled()
+   })
+ })

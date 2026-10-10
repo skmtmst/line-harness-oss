@@ -134,7 +134,7 @@ describe('リマインダ一覧の行操作', () => {
     await act(async () => { item.click() })
     await flush()
     // 削除の確認が出る（確認の窓は body 直下の portal）。行の詳細遷移（router.push）は動かない。
-    expect(document.body.textContent).toContain('「予約前のお知らせ」を削除する')
+    expect(document.body.textContent).toContain('「予約前のお知らせ」を削除しますか？')
     expect(routerPush).not.toHaveBeenCalled()
   })
 

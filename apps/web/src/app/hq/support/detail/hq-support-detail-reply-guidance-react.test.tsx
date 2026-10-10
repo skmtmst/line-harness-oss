@@ -6,8 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import HqSupportDetailPage from './page'
 
 vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: { children: React.ReactNode; href: string } & Record<string, unknown>) => <a href={href} {...rest}>{children}</a> }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(window.location.search),  useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {},  usePageTitle: () => {} }))
 
 /**
  * R609: メール未設定でも返信がそのメールへ届くと案内していた再発防止。
@@ -81,9 +81,9 @@ describe('返信先の案内（R609）', () => {
     await act(async () => { root.render(<HqSupportDetailPage />) })
     await flush()
     const text = host.textContent ?? ''
-    expect(text).toContain('運営からの返信はここと登録メールアドレスに届きます')
-    expect(text).toContain('返信はこのメールアドレスに届きます')
-    expect(text).toContain('送ると運営の対応は「対応中」に戻ります。控えが登録メールアドレスにも届きます')
+    expect(text).toContain('運営から返事が届いています。登録メールにも同じ内容が届きます')
+    expect(text).toContain('yamada@example.com')
+    expect(text).toContain('送ると運営の対応は「対応中」に戻ります')
     await typeBody('直りました。ありがとうございます。')
     const send = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('送る'))!
     await act(async () => { send.click() })
@@ -101,9 +101,9 @@ describe('返信先の案内（R609）', () => {
     expect(text).toContain('メール')
     expect(text).not.toContain('登録メールアドレス')
     expect(text).not.toContain('このメールアドレスに届きます')
-    expect(text).toContain('運営からの返信はここに届きます')
-    expect(text).toContain('返信はこの画面のやり取りに届きます')
-    expect(text).toContain('送ると運営の対応は「対応中」に戻ります。返信はこの画面で確認できます')
+    expect(text).toContain('運営から返事が届いています')
+    expect(host.querySelector('textarea')).not.toBeNull()
+    expect(text).toContain('送ると運営の対応は「対応中」に戻ります')
     await typeBody('追加の情報です。')
     const send = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('送る'))!
     await act(async () => { send.click() })

@@ -44,19 +44,5 @@ describe('m22c 行き先リンクの見た目', () => {
     expect(source).not.toContain('font-semibold text-action')
   })
 
-  it('タグ系の見出し行の戻りはボタン枠ではなく共通の行き先リンク', () => {
-    for (const rel of [
-      'app/tags/fields/new/page.tsx',
-      'app/tags/fields/edit/page.tsx',
-      'app/tags/fields/migrate/page.tsx',
-      'components/friend-fields/support-mark-editor.tsx',
-    ]) {
-      const source = read(rel)
-      expect(source, `${rel} に共通の行き先リンクが無い`).toContain('text-status-info shrink-0 text-label font-semibold hover:underline')
-    }
-    expect(read('app/tags/fields/new/page.tsx')).not.toContain('>友だち情報欄へ</Button>')
-    expect(read('app/tags/fields/edit/page.tsx')).not.toContain('>友だち情報欄へ</Button>')
-    expect(read('app/tags/fields/migrate/page.tsx')).not.toContain('>友だち情報欄へ</Button>')
-    expect(read('components/friend-fields/support-mark-editor.tsx')).not.toContain('>対応マークへ</Button>')
-  })
+  // V7の本文の戻るリンクは廃止。V8の経路はbreadcrumb-r177で守る。
 })

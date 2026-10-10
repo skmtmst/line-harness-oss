@@ -276,7 +276,7 @@ function CommonActionVersionsInner() {
           { label: '版と使われている場所' },
         ]}
         title="版と使われている場所"
-        description={`「${detail.name}」の公開履歴と、版を固定している利用先を確認します。`}
+        help={`「${detail.name}」の公開履歴と、版を固定している利用先を確認します。`}
         actions={(
           <>
             {canManage && draft ? (

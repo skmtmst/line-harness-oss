@@ -39,7 +39,7 @@ describe('条件の足し口（m22c）', () => {
     // 候補つき入力が「すべて」「or条件」の2か所に1つずつあるだけ。
     expect(screen.getAllByRole('combobox', { name: '追加する条件を選ぶ' })).toHaveLength(1)
     // 札ボタンに戻っていたら赤：15種の名前がボタンとして並ぶ。
-    for (const label of ['個別メモ', 'ステータスメッセージ', '友だち登録日', '対応マーク', '行動スコア']) {
+    for (const label of ['メモ', 'ステータスメッセージ', '友だち登録日', '対応マーク', '行動スコア']) {
       expect(screen.queryByRole('button', { name: label })).toBeNull()
     }
   })

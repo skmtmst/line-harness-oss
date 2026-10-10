@@ -49,6 +49,7 @@ const scenario = vi.hoisted(() => ({
   ],
 }))
 
+vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ status: 'ready', enabled: () => true }) }))
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {
     status: number
@@ -84,6 +85,12 @@ vi.mock('@/components/scenarios/scenario-reference-data', () => ({
     })),
     templates: vi.fn(async () => ({ success: true, data: [] })),
     tags: vi.fn(async () => ({ success: true, data: [] })),
+    friendFields: vi.fn(async () => ({ success: true, data: [] })),
+    supportMarks: vi.fn(async () => ({ success: true, data: [] })),
+    scenarios: vi.fn(async () => ({ success: true, data: [] })),
+    commonVars: vi.fn(async () => ({ success: true, data: [] })),
+    reminders: vi.fn(async () => ({ success: true, data: [] })),
+    events: vi.fn(async () => ({ success: true, data: [] })),
     invalidateScenario: vi.fn(),
   },
 }))
@@ -143,7 +150,7 @@ async function render() {
       await Promise.resolve()
     })
   }
-  await screen.findByRole('heading', { level: 1, name: '新規登録7日間フォロー' })
+  await screen.findByRole('heading', { level: 2, name: '新規登録7日間フォロー' })
 }
 
 beforeEach(() => {
@@ -171,7 +178,7 @@ describe('V8 シナリオ配信の編集', () => {
     for (const name of ['配信結果を見る', 'まとめて下見', 'まとめてテストを送る', '設定を変える', '一時停止する', 'このシナリオを削除する', 'キャンセル', '複製する', '保存する']) {
       expect(screen.getAllByRole(name === '配信結果を見る' ? 'link' : 'button', { name }).length, name).toBeGreaterThan(0)
     }
-    expect(screen.getByText('保存済み 10月1日 14:02')).toBeTruthy()
+    expect(screen.getByText('保存済み 10月1日（木）14:02')).toBeTruthy()
     expect(screen.getByText('友だち追加のとき')).toBeTruthy()
     expect(screen.getByText('送っています')).toBeTruthy()
     expect(screen.getByText('何もしない（一時停止）')).toBeTruthy()
@@ -183,10 +190,23 @@ describe('V8 シナリオ配信の編集', () => {
     expect(screen.getAllByText('ご登録ありがとうございます。').length).toBeGreaterThan(1)
   })
 
+  it('B-139：新しい通の本文が空のまま追加すると、本文の欄が赤くなり真下に理由が出て、その欄へ移る', async () => {
+    await render()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'メッセージを追加する' })) })
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '追加する' })) })
+    for (let i = 0; i < 2; i += 1) await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    const reason = document.getElementById('step-content-error')
+    expect(reason?.textContent).toBe('メッセージ内容を入力してください')
+    const body = screen.getByPlaceholderText('メッセージ内容を入力...')
+    expect(body.getAttribute('aria-invalid')).toBe('true')
+    expect(body.contains(document.activeElement) || document.activeElement === body).toBe(true)
+  })
+
   it('閲覧のみ：帯が出て、変える操作のボタンを置かない（押せないボタンも残さない）', async () => {
     role.value = 'staff'
     await render()
-    expect(screen.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeTruthy()
+    expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     for (const name of ['まとめてテストを送る', '設定を変える', '一時停止する', '変える', 'このシナリオを削除する', '複製する', '保存する', 'メッセージを追加する', 'テンプレートを追加する', '＋ ここに挿入', '名前・説明・置き場を変える', 'このシナリオのその他操作', '1通目を上へ']) {
       expect(screen.queryByRole('button', { name }), name).toBeNull()
     }

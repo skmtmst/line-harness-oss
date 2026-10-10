@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -107,7 +107,7 @@ describe('いま出せる行', () => {
       lastError: null, version: 2,
     })
     expect(row).toMatchObject({ screenId: '2-1', taskId: null, status: 'ok' })
-    expect(checkedLabel(row.checkedAt)).toBe('8月28日（金）4:00')
+    expect(checkedLabel(row.checkedAt)).toBe('8月28日（金）04:00')
   })
 
   it('手元にあるのは作業ID 4件だけで、どれも未設定', () => {

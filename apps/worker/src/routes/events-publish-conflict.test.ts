@@ -252,7 +252,7 @@ describe('m26g R577 枠の並行編集は一方だけ確定する', () => {
       expected_version: 1,
     });
     expect(stale.status).toBe(409);
-    expect(((await stale.json()) as { error: string }).error).toBe('version_conflict');
+    expect(((await stale.json()) as { error: string; code: string }).error).toBe('version_conflict');
     // 読み直した版では通る。
     const retried = await putJson(app, '/api/events/admin/events/e1/slots/s1?account_id=la1', {
       is_active: 1,
@@ -273,6 +273,6 @@ describe('m26g R577 枠の並行編集は一方だけ確定する', () => {
     const app = setupApp();
     const res = await putJson(app, '/api/events/admin/events/e1/slots/s1?account_id=la1', { capacity: 9 });
     expect(res.status).toBe(422);
-    expect(((await res.json()) as { error: string }).error).toBe('expected_version_required');
+    expect(((await res.json()) as { error: string; code: string }).code).toBe('expected_version_required');
   });
 });

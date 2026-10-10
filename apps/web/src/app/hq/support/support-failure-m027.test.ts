@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('../../../v8/hq/support.tsx', import.meta.url), 'utf8')
 
 /**
  * M027：履歴の読込失敗に再試行口なし・送信失敗は原文表示。
@@ -17,7 +17,7 @@ describe('M027 お問い合わせの失敗表示', () => {
 
   it('送信の失敗は原文のまま出さない', () => {
     expect(PAGE).toContain("describeApiFailure(caught, '送信'")
-    expect(PAGE).toContain('お問い合わせの送信はオーナー・管理者・担当者だけができます')
+    expect(PAGE).toContain("scope: 'hq'")
     expect(PAGE).not.toContain("caught.message : '送信できませんでした。もう一度お試しください。'")
   })
 

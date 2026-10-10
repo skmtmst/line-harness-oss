@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest'
  */
 
 const PAGE = readFileSync(join(__dirname, 'page.tsx'), 'utf8')
+  + readFileSync(new URL('../../v8/inbox-chat/schedule-dialog.tsx', import.meta.url), 'utf8')
 
 describe('受信箱の応答対象照合(#962)', () => {
   it('「前のメッセージ」の応答は要求時の会話・アカウントと一致するときだけ履歴へ足す', () => {

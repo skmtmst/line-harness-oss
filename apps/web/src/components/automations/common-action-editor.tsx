@@ -5,6 +5,7 @@ import type { CommonActionResources, CommonActionStep } from '@/lib/api'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import Select from '@/components/shared/select'
+import { EntityKindField, type EntityKind } from '@/components/shared/entity-picker-sources'
 import { TextArea, TextField } from '@/components/shared/text-field'
 
 const ACTION_OPTIONS: Array<{ value: CommonActionStep['type']; label: string }> = [
@@ -156,33 +157,31 @@ export default function CommonActionEditor({
   )
 }
 
+/** 作ってあるものを選ぶ欄（共通の選ぶ窓・dJZ7Q）。保存する値は今と同じ ID。 */
 function ResourceSelect({
   label,
+  kind,
   value,
   options,
   onChange,
   resourcesFailed = false,
+  clearable = false,
 }: {
   label: string
+  kind: EntityKind
   value: string
   options: Array<{ id: string; name: string }>
   onChange: (value: string) => void
   /** 監査 R585: 取得失敗時は真の0件と分け、空の案内を出さない。 */
   resourcesFailed?: boolean
+  clearable?: boolean
 }) {
   return (
-    <label className="text-ink-secondary block text-sm">
-      {label}
-      <Select
-        aria-label={label}
-        size="full"
-        value={value}
-        onChange={(value) => onChange(value)}
-        className="mt-1 w-full"
-        options={[{ value: '', label: `${label}を選ぶ` }, ...options.map((option) => ({ value: option.id, label: option.name }))]}
-      />
+    <div className="text-ink-secondary block text-sm">
+      <span className="mb-1 block">{label}</span>
+      <EntityKindField kind={kind} label={label} options={options} value={value} onChange={onChange} clearable={clearable} />
       {options.length === 0 && !resourcesFailed ? <span className="text-warning mt-1 block text-xs">選べる{label}がありません</span> : null}
-    </label>
+    </div>
   )
 }
 
@@ -198,23 +197,23 @@ function ActionParams({
   onChange: (params: Record<string, unknown>) => void
 }) {
   if (step.type === 'add_tag' || step.type === 'remove_tag') {
-    return <ResourceSelect label="タグ" value={String(step.params.tagId ?? '')} options={resources.tags} resourcesFailed={resourcesFailed} onChange={(tagId) => onChange({ tagId })} />
+    return <ResourceSelect label="タグ" kind="tag" value={String(step.params.tagId ?? '')} options={resources.tags} resourcesFailed={resourcesFailed} onChange={(tagId) => onChange({ tagId })} />
   }
   if (step.type === 'start_scenario' || step.type === 'stop_scenario' || step.type === 'resume_scenario') {
-    return <ResourceSelect label="シナリオ" value={String(step.params.scenarioId ?? '')} options={resources.scenarios} resourcesFailed={resourcesFailed} onChange={(scenarioId) => onChange({ scenarioId })} />
+    return <ResourceSelect label="シナリオ" kind="scenario" value={String(step.params.scenarioId ?? '')} options={resources.scenarios} resourcesFailed={resourcesFailed} onChange={(scenarioId) => onChange({ scenarioId })} />
   }
   if (step.type === 'send_webhook') {
-    return <ResourceSelect label="送信先" value={String(step.params.webhookId ?? '')} options={resources.webhooks} resourcesFailed={resourcesFailed} onChange={(webhookId) => onChange({ webhookId })} />
+    return <ResourceSelect label="送信先" kind="webhook" value={String(step.params.webhookId ?? '')} options={resources.webhooks} resourcesFailed={resourcesFailed} onChange={(webhookId) => onChange({ webhookId })} />
   }
   if (step.type === 'switch_rich_menu') {
-    return <ResourceSelect label="リッチメニュー" value={String(step.params.richMenuPageId ?? '')} options={resources.richMenus} resourcesFailed={resourcesFailed} onChange={(richMenuPageId) => onChange({ richMenuPageId })} />
+    return <ResourceSelect label="リッチメニュー" kind="rich_menu" value={String(step.params.richMenuPageId ?? '')} options={resources.richMenus} resourcesFailed={resourcesFailed} onChange={(richMenuPageId) => onChange({ richMenuPageId })} />
   }
   if (step.type === 'common_action') {
     const commonActionId = String(step.params.commonActionId ?? '')
     const selected = resources.commonActions.find((item) => item.id === commonActionId)
     return (
       <div>
-        <ResourceSelect label="共通アクション" value={commonActionId} options={resources.commonActions} resourcesFailed={resourcesFailed} onChange={(nextId) => onChange({ commonActionId: nextId })} />
+        <ResourceSelect label="共通アクション" kind="common_action" value={commonActionId} options={resources.commonActions} resourcesFailed={resourcesFailed} onChange={(nextId) => onChange({ commonActionId: nextId })} />
         {selected ? <p className="text-ink-secondary mt-2 text-xs">共通アクション「{selected.name}」 v{selected.version}</p> : null}
       </div>
     )
@@ -232,7 +231,7 @@ function ActionParams({
     const selected = resources.templates.find((item) => item.id === templateId)
     return (
       <div className="space-y-3">
-        <ResourceSelect label="テンプレート" value={templateId} options={resources.templates} resourcesFailed={resourcesFailed} onChange={(next) => onChange(next ? { templateId: next } : { content: '' })} />
+        <ResourceSelect label="テンプレート" kind="template" clearable value={templateId} options={resources.templates} resourcesFailed={resourcesFailed} onChange={(next) => onChange(next ? { templateId: next } : { content: '' })} />
         {selected ? (
           <p className="text-ink-secondary text-xs">
             テンプレート「{selected.name}」　版: —（未取得。テンプレートの版を返す口が接続されると表示します）

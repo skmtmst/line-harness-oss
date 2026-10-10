@@ -95,18 +95,10 @@ describe('表の外側の余白の洗い出し', () => {
     expect(body).toContain('<Th align="right" className="w-56">操作</Th>')
   })
 
-  it('/friends/migrations：外側は px-5、状態の札は固定幅', () => {
-    const body = code(read('app', 'friends', 'migrations', 'page.tsx'))
-    expect(body).toContain('<Th className="pl-5">日時</Th>')
-    expect(body).toContain('<Th className="w-28 pr-5">状態</Th>')
-  })
-
-  it('/reminders/new：外側は16pxにそろえ、操作は右へ寄せる', () => {
-    const body = code(read('app', 'reminders', 'new', 'page.tsx'))
-    expect(body).toContain('<Th className="pl-4">ひな形</Th>')
-    expect(body).toContain('<Th align="right" className="pr-4">操作</Th>')
-    expect(body).toContain('py-2 pr-2 pl-4')
-    expect(body).toContain('py-2 pr-4 pl-2 text-right')
+  it('/friends/migrations：V8の表は左右のセル余白を設計値で保つ', () => {
+    const css = read('v8', 'friends', 'migrations', 'migrations.module.css')
+    expect(css).toMatch(/\.table thead th\.th:first-child[^{]*\{[^}]*padding-left: var\(--tpl-fr-cell-inset\)/)
+    expect(css).toMatch(/\.table td\.td:last-child[^{]*\{[^}]*padding-right: var\(--tpl-fr-cell-inset\)/)
   })
 
   it('/duplicates：外側は見出しの余白にそろえ、操作は右へ寄せる', () => {
@@ -139,12 +131,10 @@ describe('表の外側の余白の洗い出し', () => {
     expect(body).toContain('cursor-grab')
   })
 
-  it('/friends/identity-candidates：外側は20px、採用する値は固定幅', () => {
-    const body = code(read('app', 'friends', 'identity-candidates', 'page.tsx'))
-    expect(body).toContain('<Th className="pl-5">項目</Th>')
-    expect(body).toContain('<Th className="w-36 pr-5">採用する値</Th>')
-    expect(body).toContain('<Td className="pl-5">')
-    expect(body).toContain('<Td className="pr-5">')
+  it('/friends/identity-candidates：V8の表は左右のセル余白を設計値で保つ', () => {
+    const css = read('v8', 'friends', 'compare', 'compare.module.css')
+    expect(css).toMatch(/\.table thead th\.th:first-child[^{]*\{[^}]*padding-left: var\(--tpl-fr-cell-inset\)/)
+    expect(css).toMatch(/\.table td\.td:last-child[^{]*\{[^}]*padding-right: var\(--tpl-fr-cell-inset\)/)
   })
 
   it('/ops/members：自分自身の行にも「—」を置き、右端を空にしない', () => {

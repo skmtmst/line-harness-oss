@@ -34,6 +34,7 @@ type Draft = {
   priority: string
   manualProtectionMinutes: string
   isActive: boolean
+  condition?: SupportMarkAutomationRule['condition']
 }
 
 const EMPTY_DRAFT: Draft = {
@@ -46,6 +47,7 @@ const draftOf = (rule: SupportMarkAutomationRule): Draft => ({
   priority: String(rule.priority),
   manualProtectionMinutes: String(rule.manualProtectionMinutes),
   isActive: rule.isActive,
+  condition: rule.condition,
 })
 
 /**
@@ -274,7 +276,7 @@ export default function SupportMarkRulesPanel({
           kind="error"
           title={LIST_ERROR.title}
           description={LIST_ERROR.description}
-          action={<Button onClick={() => void load()}>自動変更ルールを読み直す</Button>}
+          onRetry={() => void load()}
         />
       ) : rules.length === 0 && editingId === null ? (
         <ListState kind="empty" title={LIST_EMPTY.title} description={LIST_EMPTY.description} />

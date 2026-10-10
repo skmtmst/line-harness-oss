@@ -13,6 +13,7 @@ export const hqBroadcastsApi={
  send:(id:string,expectedVersion:number,confirmedRecipientCount?:number)=>send<HqBroadcastRun>(`/${encodeURIComponent(id)}/send`,{expectedVersion,confirmedRecipientCount},true),
  stop:(id:string,expectedVersion:number)=>send<HqBroadcastRun>(`/${encodeURIComponent(id)}/stop`,{expectedVersion}),
  cancel:(id:string,expectedVersion:number)=>send<HqBroadcastRun>(`/${encodeURIComponent(id)}/cancel`,{expectedVersion}),
+ swapFolderOrder:(id:string,withId:string,expectedVersion:number,withExpectedVersion:number)=>send<{swapped:[string,string]}>(`/folders/${encodeURIComponent(id)}/swap-order`,{withId,expectedVersion,withExpectedVersion}),
  folders:()=>fetchApi<Response<Array<import('@line-crm/shared').HqBroadcastFolder & {item_count:number}>>>(path('/folders')),
  createFolder:(name:string,color?:string|null)=>send<import('@line-crm/shared').HqBroadcastFolder>('/folders',{name,color}),
  updateFolder:(id:string,name:string,expectedVersion:number,color?:string|null)=>send<import('@line-crm/shared').HqBroadcastFolder>(`/folders/${encodeURIComponent(id)}`,{name,expectedVersion,color},false,'PATCH'),

@@ -40,6 +40,7 @@ import { currentAffiliateSettlementPeriod } from './payment-tab'
 import { KpiStrip, KpiCell, NoticeBar, EmptyState, ZeroResultState, LoadingRows, LoadError, BulkBar } from './v8-shared'
 import AffiliateDrawerV8 from './v8-drawer'
 import './list-v8.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 const PAGE_SIZES = [20, 50, 100]
 
@@ -270,7 +271,7 @@ export default function AffiliatesTabV8({
   }, [loadList, loadApprovals, loadMonthly])
   useEffect(() => { void loadPayment() }, [loadPayment])
 
-  // ── 板の頭の操作（CSV で書き出す） ──────────────────────────────────────────
+  // ── 板の頭の操作（CSVで書き出す） ──────────────────────────────────────────
   const shownRows = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('ja-JP')
     return rows
@@ -300,7 +301,7 @@ export default function AffiliatesTabV8({
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `affiliates-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("アフィリエイター")
     anchor.click()
     URL.revokeObjectURL(url)
   }, [shownRows])
@@ -313,7 +314,7 @@ export default function AffiliatesTabV8({
         onClick={exportCsv}
         disabled={shownRows.length === 0}
       >
-        <Download size={15} aria-hidden="true" /> CSV で書き出す
+        <Download size={15} aria-hidden="true" /> CSVで書き出す
       </Button>,
     )
     return () => registerHeaderActions(null)
@@ -578,7 +579,7 @@ export default function AffiliatesTabV8({
                     </td>
                     <td>
                       <div className="af-list-personCell">
-                        <button type="button" className="af-list-personName" title={row.name} onClick={() => openDrawer(row.id, false)}>
+                        <button type="button" className="af-list-personName" title={row.name}  onClick={() => openDrawer(row.id, false)}>
                           {row.name}
                         </button>
                         <span className="af-list-personCode" title={row.code}>{row.code}</span>

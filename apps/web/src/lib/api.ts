@@ -1,3 +1,7 @@
+import type { ApiFieldErrors } from '@line-crm/shared'
+import { csvFileName } from './csv-file-name'
+import { getFeatureDisabledContext } from './feature-disabled-context'
+import type {QuestionAnswerRecovery,ResumeQuestionAnswerRequest,ResumeQuestionAnswerResponse} from '@line-crm/shared';
 import type { AutomationTabCounts, MediaTabCounts, ConversionApprovalCounts } from '@line-crm/shared';
 import type { BookingMenuReorderRequest, BookingMenuReorderResponse, MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary, ReminderRunReadOptions, ReminderScheduleMetrics, WebhookCreateState, EcIdentityDuplicateSignal, CustomerNotificationFailureCounts, BannerGenerationCreateOptions, RichMenuGroupListOptions } from '@line-crm/shared'
 import { CHAT_FILE_TYPES } from '@line-crm/shared';
@@ -1219,6 +1223,7 @@ export type SaveSupportMarkAutomationRule = Omit<
 /** Affiliate offer (案件) as returned by the worker. */
 export type AffiliateOffer = {
   id: string
+  folderId?: string | null
   name: string
   description: string | null
   rewardAmount: number | null
@@ -1961,6 +1966,8 @@ export type { BroadcastBubbleType, BroadcastBubble } from '@line-crm/shared';
 import type { BroadcastBubble } from '@line-crm/shared';
 export type BroadcastAssetKind = 'rich_message' | 'card_message' | 'coupon' | 'research';
 export type BroadcastMessageAsset = {
+  publishedPayload?: Record<string, unknown>;
+  publishedVersion?: number;
   id: string;
   lineAccountId: string | null;
   kind: BroadcastAssetKind;
@@ -1999,7 +2006,7 @@ export type CommonActionSummary = {
 export type AutomationListItem = Automation & {
   folderId?: string | null
   triggerConfig: Record<string, unknown>;
-  status: 'draft' | 'active' | 'stopped';
+  status: 'draft' | 'active' | 'stopped' | 'archived';
   versionId: string;
   version: number;
   executionCount30d: number;
@@ -2490,6 +2497,7 @@ export type ApiAccountEventDetail = {
   /** 呼び出した時点の対象。未指定・複数店舗のときは null。 */
   accountId: string | null
   accountIds?: string[]
+  featureContext?: import('./feature-disabled-context').FeatureDisabledContext
 }
 export type FeatureDisabledEventDetail = Partial<ApiAccountEventDetail> & {
   featureId?: string
@@ -2525,6 +2533,8 @@ const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
  * the string.
  */
 export class ApiError extends Error {
+  /** useFormErrors のサーバー側の検証結果として渡す欄ごとの理由。 */
+  readonly fields: ApiFieldErrors
   readonly status: number
   readonly code: string | undefined
   /** 409などで画面を最新状態へ描き直すための機械データ。利用者へ直接表示しない。 */
@@ -2540,9 +2550,10 @@ export class ApiError extends Error {
    */
   readonly retryAfterSeconds: number | undefined
 
-  constructor(status: number, message?: string, code?: string, data?: unknown, trackingId?: string, retryAfterSeconds?: number) {
+  constructor(status: number, message?: string, code?: string, data?: unknown, trackingId?: string, retryAfterSeconds?: number, fields: ApiFieldErrors = {}) {
     super(message || `API error: ${status}`)
     this.name = 'ApiError'
+    this.fields = fields
     this.status = status
     this.code = code
     this.data = data
@@ -2683,6 +2694,27 @@ export function extractApiErrorMessage(raw: string, status: number): string {
   return ''
 }
 
+/** 400/422 の欄ごとの理由だけを取り出す。古い error のみの応答も受けられる。 */
+export function extractApiFieldErrors(raw: string, status: number): ApiFieldErrors {
+  if (status !== 400 && status !== 422) return {}
+  try {
+    const payload: unknown = JSON.parse(raw)
+    if (!payload || typeof payload !== 'object' || !('fields' in payload)) return {}
+    const fields = payload.fields
+    if (!fields || typeof fields !== 'object' || Array.isArray(fields)) return {}
+    return Object.fromEntries(Object.entries(fields).flatMap(([key, reason]) => {
+      const message = safeOperatorMessage(reason)
+      return key.length > 0 && message ? [[key, message]] : []
+    }))
+  } catch { return {} }
+}
+
+/** 保存の catch からフォームへ渡す。ネットワークエラーなどには欄の理由はない。 */
+export function getApiFieldErrors(error: unknown): ApiFieldErrors {
+  return error instanceof ApiError ? error.fields : {}
+}
+
+
 /**
  * 画面分岐にだけ使う、Worker由来の機械コードを取り出す。
  *
@@ -2724,6 +2756,11 @@ export function shouldAnnounceFeatureDisabled(status: number, code: string | und
 
 /** 応答待ちの間に画面が切り替わっても、呼出元のアカウントを保持する。 */
 function apiAccountContext(path: string, options?: FetchApiOptions): ApiAccountEventDetail {
+  const featureContext = getFeatureDisabledContext()
+  return { ...resolveApiAccountContext(path, options), ...(featureContext ? { featureContext } : {}) }
+}
+
+function resolveApiAccountContext(path: string, options?: FetchApiOptions): ApiAccountEventDetail {
   const accountKeys = ['account_id', 'accountId', 'line_account_id', 'lineAccountId']
   const valid = (value: unknown): value is string => typeof value === 'string'
     && value.trim().length > 0 && value.length <= 256
@@ -2917,6 +2954,7 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
       extractApiErrorTrackingId(raw),
       // m23m: 429の待ち秒数（Retry-After）。画面は待つ案内に使う。
       parseRetryAfterSeconds(res.headers.get('Retry-After')),
+      extractApiFieldErrors(raw, res.status),
     )
   }
   if (res.status === 204) return undefined as T
@@ -2954,6 +2992,7 @@ export async function refreshCachedList<T>(path: string): Promise<T> {
       undefined,
       extractApiErrorTrackingId(raw),
       parseRetryAfterSeconds(res.headers.get('Retry-After')),
+      extractApiFieldErrors(raw, res.status),
     )
   }
   const body = (await res.json()) as T
@@ -2961,12 +3000,13 @@ export async function refreshCachedList<T>(path: string): Promise<T> {
   return body
 }
 
-export async function fetchApiBlob(path: string, init?: { method?: string; accountId?: string | null }): Promise<Blob> {
+export async function fetchApiBlob(path: string, init?: { method?: string; accountId?: string | null; body?: string }): Promise<Blob> {
   const context = apiAccountContext(path, init)
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     method: init?.method ?? 'GET',
     credentials: 'include',
-    headers: adminSessionHeaders(),
+    headers: { ...adminSessionHeaders(), ...(init?.body ? { 'Content-Type': 'application/json' } : {}) },
+    body: init?.body,
   })
   if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) {
@@ -2984,6 +3024,7 @@ export async function fetchApiBlob(path: string, init?: { method?: string; accou
       undefined,
       extractApiErrorTrackingId(raw),
       parseRetryAfterSeconds(res.headers.get('Retry-After')),
+      extractApiFieldErrors(raw, res.status),
     )
   }
   return res.blob()
@@ -3030,6 +3071,7 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
       undefined,
       extractApiErrorTrackingId(raw),
       parseRetryAfterSeconds(res.headers.get('Retry-After')),
+      extractApiFieldErrors(raw, res.status),
     )
   }
   const disposition = res.headers.get('Content-Disposition') ?? ''
@@ -3049,7 +3091,7 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
   try {
     const anchor = document.createElement('a')
     anchor.href = href
-    anchor.download = named ? decodeURIComponent(named) : fallbackFilename
+    anchor.download = /\.csv$/i.test(fallbackFilename) ? csvFileName(fallbackFilename) : named ? decodeURIComponent(named) : fallbackFilename
     anchor.click()
   } finally {
     URL.revokeObjectURL(href)
@@ -3182,6 +3224,8 @@ export type FriendFormSubmission = {
   createdAt: string
 }
 export type FriendDetail = FriendWithTags & {
+  realName?: string | null
+  systemDisplayName?: string | null
   formSubmissions: FriendFormSubmission[]
   /** フォーム回答の総数。submissions=0 の軽い応答でも返る（PERF-13）。 */
   formSubmissionTotal?: number | null
@@ -3880,6 +3924,7 @@ export type ListStats = {
     clickRate: number | null
   }
   scenarios: {
+
     total: number
     active: number
     subscribers: number
@@ -4055,6 +4100,7 @@ export type TemplateQuestion = {
     reply?: string
     repeatReply?: string
     addTagIds?: string[]
+    scoreChange?: number | null
     removeTagIds?: string[]
     field?: { fieldId: string; value: string }
   }>
@@ -6583,7 +6629,7 @@ export const api = {
       body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
     }),
     // 色は受け取らない。印の色はフォルダ（tagGroups）に付く。
-    create: (data: { name: string; groupId?: string | null }) =>
+    create: (data: { name: string; groupId?: string | null; lineAccountId?: string }) =>
       fetchApi<ApiResponse<Tag>>('/api/tags', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -6637,6 +6683,10 @@ export const api = {
       ),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/tags/${id}`, { method: 'DELETE' }),
+    restore: (id: string, accountId: string, expectedVersion: number) =>
+      fetchApi<ApiResponse<{ restored: true; version: number }>>(`/api/tags/${encodeURIComponent(id)}/restore?lineAccountId=${encodeURIComponent(accountId)}`, {
+        method: 'POST', body: JSON.stringify({ expectedVersion }),
+      }),
     archive: (id: string, accountId: string, data: {
       expectedVersion: number
       impactRevision: string
@@ -6795,11 +6845,15 @@ export const api = {
   },
   /** 対応マーク。友だちの対応状況を運用側の言葉で持つ。 */
   supportMarks: {
-    list: (accountId: string, options?: FetchApiOptions) =>
+    list: (accountId: string, options?: FetchApiOptions & { includeArchived?: boolean }) =>
       fetchApi<ApiResponse<SupportMarkListItem[]>>(
-        `/api/support-marks?lineAccountId=${encodeURIComponent(accountId)}`,
+        `/api/support-marks?lineAccountId=${encodeURIComponent(accountId)}${options?.includeArchived ? '&includeArchived=1' : ''}`,
         options,
       ),
+    restore: (id: string, accountId: string, expectedVersion: number) =>
+      fetchApi<ApiResponse<{ restored: true; version: number }>>(`/api/support-marks/${encodeURIComponent(id)}/restore?lineAccountId=${encodeURIComponent(accountId)}`, {
+        method: 'POST', body: JSON.stringify({ expectedVersion }),
+      }),
     /**
      * R512: 応答だけ失った再試行で二重に作らないため、要求キーを付ける。
      * 同じ作成のやり直しは同じキーを送り、内容を変えたら新しいキーにする。
@@ -8077,22 +8131,24 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { name?: string; parentId?: string | null; displayOrder?: number }, accountId?: string) =>
+    update: (id: string, data: { name?: string; parentId?: string | null; displayOrder?: number; color?: string | null; expectedRevision?: number }, accountId?: string) =>
       fetchApi<ApiResponse<Folder>>(`/api/folders/${id}${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
     /** 中身は消えず未分類に戻る。子フォルダは一緒に消える。 */
-    delete: (id: string, accountId?: string) =>
-      fetchApi<ApiResponse<null>>(`/api/folders/${id}${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`, { method: 'DELETE' }),
+    delete: (id: string, accountId?: string, expectedRevision?: number) => {
+      const q=new URLSearchParams();if(accountId)q.set('account_id',accountId);if(expectedRevision!==undefined)q.set('expectedRevision',String(expectedRevision));
+      return fetchApi<ApiResponse<null>>(`/api/folders/${encodeURIComponent(id)}${q.size?'?'+q:''}`, { method: 'DELETE' })
+    },
     /**
      * 隣り合う2つのフォルダの並びを1回で入れ替える（V6R-S2-c）。
      * 以前の「PATCH を2回」は、1回目だけ成功すると同じ番号が2つ残った。
      */
-    swapOrder: (id: string, withId: string, accountId?: string) =>
+    swapOrder: (id: string, withId: string, accountId?: string, expectedRevision?: number, withExpectedRevision?: number) =>
       fetchApi<ApiResponse<{ swapped: [string, string] }>>(`/api/folders/${encodeURIComponent(id)}/swap-order`, {
         method: 'POST',
-        body: JSON.stringify({ withId, ...(accountId ? { accountId } : {}) }),
+        body: JSON.stringify({ withId, ...(accountId ? { accountId } : {}), ...(expectedRevision === undefined ? {} : {expectedRevision}), ...(withExpectedRevision === undefined ? {} : {withExpectedRevision}) }),
       }),
   },
   tagGroups: {
@@ -8118,6 +8174,11 @@ export const api = {
       ),
   },
   scenarios: {
+    questionAnswers: {
+      list: (scenarioId:string)=>fetchApi<ApiResponse<QuestionAnswerRecovery[]>>(`/api/scenarios/${encodeURIComponent(scenarioId)}/question-answers`),
+      resume: (scenarioId:string,executionId:string,input:ResumeQuestionAnswerRequest)=>fetchApi<ApiResponse<ResumeQuestionAnswerResponse>>(
+        `/api/scenarios/${encodeURIComponent(scenarioId)}/question-answers/${encodeURIComponent(executionId)}/resume`,{method:'POST',body:JSON.stringify(input)}),
+    },
     listPage: (params?: {
       accountId?: string
       page?: number
@@ -9108,19 +9169,27 @@ export const api = {
    * 形は `apps/worker/src/routes/hq-banners.ts`、説明は `docs/hq-banner-generation.md`。
    */
   hqBanners: {
+    folders: {
+      list: (kind: import('@line-crm/shared').HqBannerFolderKind) => fetchApi<ApiResponse<import('@line-crm/shared').HqBannerFolder[]>>(`/api/hq/banners/folders?kind=${kind}`),
+      create: (input: {kind: import('@line-crm/shared').HqBannerFolderKind; name: string; color?: string | null}) => fetchApi<ApiResponse<import('@line-crm/shared').HqBannerFolder>>('/api/hq/banners/folders',{method:'POST',body:JSON.stringify(input)}),
+      update: (id:string,input:{kind:import('@line-crm/shared').HqBannerFolderKind; name?:string; color?:string|null; expectedRevision:number}) => fetchApi<ApiResponse<import('@line-crm/shared').HqBannerFolder>>(`/api/hq/banners/folders/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify(input)}),
+      swapOrder: (id:string,withId:string,kind:import('@line-crm/shared').HqBannerFolderKind,expectedRevision:number,withExpectedRevision:number) => fetchApi<ApiResponse<{swapped:[string,string]}>>(`/api/hq/banners/folders/${encodeURIComponent(id)}/swap-order`,{method:'POST',body:JSON.stringify({kind,withId,expectedRevision,withExpectedRevision})}),
+      delete: (id:string,kind:import('@line-crm/shared').HqBannerFolderKind,expectedRevision:number) => fetchApi<ApiResponse<{id:string;archived:boolean}>>(`/api/hq/banners/folders/${encodeURIComponent(id)}`,{method:'DELETE',body:JSON.stringify({kind,expectedRevision})}),
+    },
     presets: () => fetchApi<ApiResponse<BannerPresetsResponse>>('/api/hq/banners/presets'),
     usage: () => fetchApi<ApiResponse<BannerUsage>>('/api/hq/banners/usage'),
     /** 数値カード帯の数（プロジェクト数・店舗へ渡した画像と店舗の数）。 */
     stats: () => fetchApi<ApiResponse<BannerStats>>('/api/hq/banners/stats'),
     projects: {
-      list: (params?: { archived?: boolean; q?: string }) => {
+      list: (params?: { archived?: boolean; q?: string; folderId?: string | null }) => {
         const q = new URLSearchParams()
+        if (params?.folderId !== undefined) q.set('folderId',params.folderId ?? '__none__')
         if (params?.archived) q.set('archived', '1')
         if (params?.q) q.set('q', params.q)
         const query = q.toString()
         return fetchApi<ApiResponse<BannerProject[]>>(`/api/hq/banners/projects${query ? `?${query}` : ''}`)
       },
-      create: (input: { name: string; description?: string | null }) =>
+      create: (input: { name: string; description?: string | null; folderId?: string | null }) =>
         fetchApi<ApiResponse<BannerProject>>('/api/hq/banners/projects', {
           method: 'POST',
           body: JSON.stringify(input),
@@ -9129,7 +9198,7 @@ export const api = {
         fetchApi<ApiResponse<BannerProjectDetail>>(`/api/hq/banners/projects/${encodeURIComponent(id)}`),
       update: (
         id: string,
-        input: { name?: string; description?: string | null; isFavorite?: boolean; archived?: boolean },
+        input: { name?: string; description?: string | null; isFavorite?: boolean; archived?: boolean; folderId?: string | null },
       ) =>
         fetchApi<ApiResponse<BannerProject>>(`/api/hq/banners/projects/${encodeURIComponent(id)}`, {
           method: 'PATCH',
@@ -9172,6 +9241,7 @@ export const api = {
     images: {
       list: (params?: import("@line-crm/shared").HqBannerImageQuery) => {
         const q = new URLSearchParams()
+        if (params?.folderId !== undefined) q.set('folderId',params.folderId ?? '__none__')
         if (params?.projectId) q.set('projectId', params.projectId)
         if (params?.favorite) q.set('favorite', '1')
         if (params?.delivered !== undefined) q.set('delivered', params.delivered ? '1' : '0')
@@ -9187,7 +9257,7 @@ export const api = {
         )
       },
       get: (id: string) => fetchApi<ApiResponse<BannerImage>>(`/api/hq/banners/images/${encodeURIComponent(id)}`),
-      update: (id: string, input: { isFavorite?: boolean; projectId?: string }) =>
+      update: (id: string, input: { isFavorite?: boolean; projectId?: string; folderId?: string | null }) =>
         fetchApi<ApiResponse<BannerImage>>(`/api/hq/banners/images/${encodeURIComponent(id)}`, {
           method: 'PATCH',
           body: JSON.stringify(input),
@@ -9865,6 +9935,7 @@ export const api = {
     // includes an issued `link` (refCode + url) unless issueInitialLink=false.
     // The legacy explicit `code` form still works for OSS back-compat.
     create: (data: {
+      folderId?: string | null
       name?: string
       code?: string
       rewardMode?: 'none' | 'fixed' | 'rate'
@@ -9889,6 +9960,7 @@ export const api = {
       data: Partial<
         Pick<
           Affiliate,
+          | 'folderId'
           | 'name'
           | 'rewardMode'
           | 'commissionRate'
@@ -10653,13 +10725,14 @@ export const api = {
   automations: {
     counts: (accountId: string) => fetchApi<ApiResponse<AutomationTabCounts>>(
       `/api/automations/counts?account_id=${encodeURIComponent(accountId)}`),
-    list: (params?: { accountId?: string; limit?: number; offset?: number }) => {
+    list: <IncludeArchived extends boolean = false>(params?: { accountId?: string; limit?: number; offset?: number; includeArchived?: IncludeArchived }) => {
       const query = new URLSearchParams()
+      if (params?.includeArchived) query.set('includeArchived', '1')
       if (params?.accountId) query.set('lineAccountId', params.accountId)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       if (params?.offset !== undefined) query.set('offset', String(params.offset))
       const suffix = query.size ? `?${query}` : ''
-      return fetchApi<ApiResponse<AutomationListItem[]> & {
+      return fetchApi<ApiResponse<Array<IncludeArchived extends true ? AutomationListItem : AutomationListItem & { status: Exclude<AutomationListItem['status'], 'archived'> }>> & {
         summary?: { active: number; stopped: number; executionCount30d: number; failureCount30d: number }
         freshness?: 'available'
         pagination?: { total: number; limit: number | null; offset: number }
@@ -10763,7 +10836,9 @@ export const api = {
         `/api/automations/${encodeURIComponent(id)}/duplicate`,
         { method: 'POST', body: '{}' },
       ),
-    // #942 N-352: 稼働切替と「保管」。保管は一方通行。実行記録は残る。
+    restore: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<{ id: string; status: 'draft' | 'active' | 'stopped' }>>(`/api/automations/${encodeURIComponent(id)}/restore?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'POST', body: '{}' }),
+    // 稼働切替と「保管」。実行記録は残る。
     setStatus: (id: string, status: 'active' | 'stopped' | 'archived') =>
       fetchApi<ApiResponse<{ id: string; status: 'active' | 'stopped' | 'archived' }>>(
         `/api/automations/${encodeURIComponent(id)}/status`,
@@ -11237,6 +11312,10 @@ export const api = {
       fetchApi<ApiResponse<import('@line-crm/shared').FriendAddRuleFolder>>(`/api/friend-add-rules/folders/${encodeURIComponent(id)}`, {
         method: 'PATCH', body: JSON.stringify({ accountId, ...input }),
       }),
+    deleteFolder: (accountId: string, id: string) =>
+      fetchApi<ApiResponse<import('@line-crm/shared').FriendAddRuleFolderDeleteResult>>(`/api/friend-add-rules/folders/${encodeURIComponent(id)}?account_id=${encodeURIComponent(accountId)}`, {
+        method: 'DELETE',
+      }),
     runs: (accountId: string, params?: {
       period?: 'all' | 'last28days' | 'today' | 'this_month' | 'last_month'
       from?: string
@@ -11694,14 +11773,12 @@ export const api = {
     }),
     friendOverview: (friendId: string) => fetchApi<ApiResponse<NenFriendOverview>>(`/api/nen-members/friends/${encodeURIComponent(friendId)}`),
     ranks: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/ranks'),
-    consultations: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/consultations'),
     installRichMenu: (accountId: string) => fetchApi<ApiResponse<{ richMenuId: string; liffId: string }>>('/api/nen-members/rich-menu/install', { method: 'POST', body: JSON.stringify({ accountId }) }),
   },
   instagram: {
     connection: (accountId:string)=>fetchApi<ApiResponse<import('@line-crm/shared').InstagramConnectionStatus>>(`/api/instagram/connection?${new URLSearchParams({lineAccountId:accountId})}`),
     start: (accountId:string)=>fetchApi<ApiResponse<{url:string;expiresAt:string}>>(`/api/instagram/oauth/start?${new URLSearchParams({lineAccountId:accountId})}`,{method:'POST',body:'{}'}),
-    callback: (state:string,code:string)=>fetchApi<ApiResponse<{state:string;lineAccountId:string;pages:import('@line-crm/shared').InstagramOAuthPage[]}>>(`/api/instagram/oauth/callback?${new URLSearchParams({state,code})}`),
-    connect: (accountId:string,body:{state:string;pageId:string;expectedVersion:number})=>fetchApi<ApiResponse<{connected:true;version:number}>>(`/api/instagram/oauth/connect?${new URLSearchParams({lineAccountId:accountId})}`,{method:'POST',body:JSON.stringify(body)}),
+    // 折り返しはブラウザがそのまま踏む（/settings/sns?instagram=... へ戻る）ので、画面から叩く口は持たない。
     refresh: (accountId:string)=>fetchApi<ApiResponse<{expiresAt:string;dataAccessExpiresAt:string|null;version:number}>>(`/api/instagram/refresh?${new URLSearchParams({lineAccountId:accountId})}`,{method:'POST',body:'{}'}),
     disconnect: (accountId:string,expectedVersion:number)=>fetchApi<ApiResponse<{disconnected:true}>>(`/api/instagram/connection?${new URLSearchParams({lineAccountId:accountId})}`,{method:'DELETE',body:JSON.stringify({expectedVersion})}),
     profile: (accountId:string)=>fetchApi<ApiResponse<{state:string;value:import('@line-crm/shared').InstagramProfile|null;syncedAt?:string|null}>>(`/api/instagram/profile?${new URLSearchParams({lineAccountId:accountId})}`),
@@ -13434,8 +13511,10 @@ export const api = {
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/entry-routes/${id}`, { method: 'DELETE' }),
     /** M (止めた経路のQR): 印刷用PDFをサーバーで作る。止めた経路は409。 */
-    qrPdf: (id: string): Promise<Blob> =>
-      fetchApiBlob(`/api/entry-routes/${encodeURIComponent(id)}/qr-pdf`, { method: 'POST' }),
+    qrPdf: (id: string, paper: 'A4' | 'A5' = 'A4'): Promise<Blob> =>
+      fetchApiBlob(`/api/entry-routes/${encodeURIComponent(id)}/qr-pdf`, { method: 'POST', body: JSON.stringify({ paper }) }),
+    qrImage: (id: string, format: 'png' | 'svg', size: 'small' | 'medium' | 'large'): Promise<Blob> =>
+      fetchApiBlob(`/api/entry-routes/${encodeURIComponent(id)}/qr-image`, { method: 'POST', body: JSON.stringify({ format, size }) }),
     funnel: (id: string) =>
       fetchApi<ApiResponse<EntryRouteFunnel>>(`/api/entry-routes/${id}/funnel`),
     /** クリックがどこから来ているか。utm_source > 参照元のホスト > 直接アクセス */
@@ -13536,6 +13615,7 @@ export const api = {
     get: (id: string) =>
       fetchApi<{ success: boolean; data: AffiliateOffer }>(`/api/affiliate-offers/${id}`),
     create: (data: {
+      folderId?: string | null
       name: string
       description?: string | null
       rewardAmount?: number
@@ -13558,6 +13638,7 @@ export const api = {
         body: JSON.stringify(data),
       }),
     update: (id: string, data: Partial<{
+      folderId: string | null
       name: string
       description: string | null
       rewardAmount: number

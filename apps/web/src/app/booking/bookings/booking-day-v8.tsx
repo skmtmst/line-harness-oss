@@ -9,6 +9,7 @@ import type {
   BookingTodayRow,
   BookingVisitMark,
 } from '@/lib/api'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /**
  * 予約管理の「日」（時刻順）（Pencil B-1 `AlwZz` 人・`V8TfD` 席）。
@@ -211,11 +212,11 @@ export default function BookingDayTimeline({
   return (
     <div className={`${styles.root}`}>
       <div className={`${styles.tiles}`} role="status" aria-label="今日の数">
-        <div className={`${styles.tile}`}><span className={`${styles.tileTitle}`}>予約</span><span className={`${styles.tileNum}`}>{loading ? '—' : counts.total}</span></div>
-        <div className={`${styles.tile}`}><span className={`${styles.tileTitle}`}>来店した</span><span className={`${styles.tileNum}`}>{loading ? '—' : counts.visited}</span></div>
-        <div className={`${styles.tile}`}><span className={`${styles.tileTitle}`}>遅れる</span><span className={`${styles.tileNum}`}>{loading ? '—' : counts.late}</span></div>
-        <div className={`${styles.tile}`}><span className={`${styles.tileTitle}`}>来なかった</span><span className={`${styles.tileNum}`}>{loading ? '—' : counts.noShow}</span></div>
-        <div className={`${styles.tile}`}><span className={`${styles.tileTitle}`}>{waitlistTitle}</span><span className={`${styles.tileNum}`}>{loading ? '—' : waitlist.length}</span></div>
+        <div className={`${styles.tile}`}><span className={`${styles.tileTitle}`}>予約</span><span className={`${styles.tileNum}`}>{loading ? emptyValue('unknown') : counts.total}</span></div>
+        <div className={`${styles.tile}`}><span className={`${styles.tileTitle}`}>来店した</span><span className={`${styles.tileNum}`}>{loading ? emptyValue('unknown') : counts.visited}</span></div>
+        <div className={`${styles.tile}`}><span className={`${styles.tileTitle}`}>遅れる</span><span className={`${styles.tileNum}`}>{loading ? emptyValue('unknown') : counts.late}</span></div>
+        <div className={`${styles.tile}`}><span className={`${styles.tileTitle}`}>来なかった</span><span className={`${styles.tileNum}`}>{loading ? emptyValue('unknown') : counts.noShow}</span></div>
+        <div className={`${styles.tile}`}><span className={`${styles.tileTitle}`}>{waitlistTitle}</span><span className={`${styles.tileNum}`}>{loading ? emptyValue('unknown') : waitlist.length}</span></div>
       </div>
       <div className={`${styles.cols}`}>
         <ol className={`${styles.timeline}`} aria-label="時刻順の予約">

@@ -15,6 +15,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AlertCircle, Eye, Info, Loader2, MoreHorizontal, TriangleAlert, X } from 'lucide-react'
 import Button from '@/components/shared/button'
 import './list-v8.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 数の帯
@@ -86,7 +87,7 @@ export function KpiCell({
         <KpiInfo text={info} label={label} />
       </div>
       <div className="af-list-kpiValue">
-        {value == null ? '—' : value}
+        {value == null ? emptyValue('unknown') : value}
         {value != null && unit ? <span className="af-list-kpiUnit">{unit}</span> : null}
       </div>
       {sub ? <p className="af-list-kpiSub">{sub}</p> : null}

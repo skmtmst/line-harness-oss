@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   addTagToFriend,
@@ -93,7 +94,7 @@ publicApi.get('/api/public/v1/tags', async (c) => {
  * FEATURE_DISABLED で止まり、タグは増えない。読み取り（GET tags）は
  * 棚卸しのため止めない。どちらが止まるかは OpenAPI の説明にも書いてある。
  */
-publicApi.post('/api/public/v1/friends/:friendId/tags', async (c) => {
+publicApi.post('/api/public/v1/friends/:friendId/tags', inputJsonBoundary(), async (c) => {
   try {
     const auth = await requireToken(c, 'tags:write');
     if ('error' in auth) return auth.error;
@@ -115,7 +116,7 @@ publicApi.post('/api/public/v1/friends/:friendId/tags', async (c) => {
     }
     const body = await c.req.json<{ tagId?: unknown }>().catch(() => null);
     const tagId = typeof body?.tagId === 'string' ? body.tagId.trim() : '';
-    if (!tagId) return c.json({ success: false, error: 'tagId is required' }, 400);
+    if (!tagId) return inputError(c, { success: false, error: 'tagId is required' }, 400, ["tagId"]);
 
     const db = c.env.DB;
     const friendId = c.req.param('friendId');

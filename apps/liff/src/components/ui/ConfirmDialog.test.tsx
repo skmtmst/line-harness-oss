@@ -16,7 +16,7 @@ const TITLE = '「豆まき大会」の予約をキャンセルしますか？';
 const DESCRIPTION = '2/3 10:00・広場の予約を取り消します。';
 
 function cancelButton(): HTMLElement {
-  return screen.getByRole('button', { name: 'やめる' });
+  return screen.getByRole('button', { name: '閉じる' });
 }
 
 describe('Esc で閉じる', () => {
@@ -45,7 +45,7 @@ describe('Esc で閉じる', () => {
 });
 
 describe('フォーカス', () => {
-  it('開いたら安全な方 (「やめる」) へ移る', () => {
+  it('開いたら安全な方 (「閉じる」) へ移る', () => {
     render(
       <>
         <button type="button">外のボタン</button>

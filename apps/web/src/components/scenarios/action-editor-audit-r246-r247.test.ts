@@ -114,12 +114,13 @@ describe('R248 実行されない設定を消すが効く', () => {
   }
 
   it('消去を部分マージにかけても3項目の警告が残らない', () => {
-    expect(deadAnswerSettings(filled)).toHaveLength(6)
+    expect(deadAnswerSettings(filled)).toHaveLength(5)
     /* ボタンの動き：setChoice と同じ mergeChoice にかける */
     const cleared = mergeChoice(filled, clearDeadAnswerSettings(filled))
     expect(deadAnswerSettings(cleared)).toEqual([])
     expect(cleared.reply).toBeUndefined()
     expect(cleared.field).toBeUndefined()
+    expect(cleared.addTagIds).toEqual(['tag-1'])
   })
 
   it('消去後もラベル・挙動・URL・鍵は残る', () => {

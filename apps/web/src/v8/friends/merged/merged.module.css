@@ -30,7 +30,8 @@
   gap: var(--tpl-fr-stack-gap);
   padding: var(--tpl-fr-panel-pad);
   border-radius: var(--radius-card);
-  box-shadow: var(--tpl-fr-shadow-outline);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 
 .panelHead { display: flex; flex-direction: column; gap: var(--tpl-compact-gap); }

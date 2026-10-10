@@ -235,7 +235,7 @@ describe('使い道の絵合わせ（板 `S35pO`）', () => {
     expect(container.textContent ?? '').toContain('この内容で交換できます。残高・在庫は動いていません。')
   })
 
-  it('頭に CSV で書き出すが出て、表の中身が入る', async () => {
+  it('頭に CSVで書き出すが出て、表の中身が入る', async () => {
     await renderTab()
     await waitForRows()
     expect(headerNode).not.toBeNull()
@@ -252,7 +252,7 @@ describe('使い道の絵合わせ（板 `S35pO`）', () => {
       const headerRoot = createRoot(host)
       await act(async () => { headerRoot.render(<>{headerNode}</>) })
       const button = [...host.querySelectorAll('button')].find(
-        (element) => (element.textContent ?? '').includes('CSV で書き出す'),
+        (element) => (element.textContent ?? '').includes('CSVで書き出す'),
       )
       if (!(button instanceof HTMLButtonElement)) throw new Error('CSV のボタンがありません')
       expect(button.disabled).toBe(false)

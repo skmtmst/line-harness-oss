@@ -478,7 +478,7 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
     expect(view.container.textContent).toContain('視聴開始直後')
     expect(view.container.textContent).toContain('未視聴')
     expect(view.container.textContent).toContain('下書き')
-    expect(view.container.textContent).not.toContain('稼働中')
+    expect(view.container.textContent).not.toContain('有効')
 
     apiMocks.get.mockResolvedValue({ data: { ...webinar, id: 'webinar-active', status: 'active' } })
     navigationMocks.query = 'id=webinar-active&pane=participants'

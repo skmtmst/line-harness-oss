@@ -21,7 +21,7 @@ export interface SqliteD1 {
 }
 
 function isSelect(sql: string): boolean {
-  return /^\s*(SELECT|WITH|PRAGMA)/i.test(sql)
+  return /^\s*(SELECT|WITH|PRAGMA)/i.test(sql) || /\bRETURNING\b/i.test(sql)
 }
 
 /*
@@ -39,6 +39,10 @@ function rewriteNumbered(sql: string, args: unknown[]): { sql: string; args: unk
   return { sql: rewritten, args: order.map((n) => args[n - 1]) }
 }
 
+/** Public methods stay promises; batch executes native statements without yielding between SQL writes. */
+function promiseMethod<T>(sync:()=>T):(()=>Promise<T>) & {sync:()=>T} {
+  return Object.assign(async()=>sync(),{sync});
+}
 function wrap(raw: Database.Database, sql: string, args: unknown[]) {
   const rewritten = rewriteNumbered(sql, args)
   sql = rewritten.sql
@@ -49,18 +53,22 @@ function wrap(raw: Database.Database, sql: string, args: unknown[]) {
     return a as never
   })
   return {
-    first: async <T = unknown>(): Promise<T | null> => {
+    first: promiseMethod(<T = unknown>(): T | null => {
       const row = raw.prepare(sql).get(...normalized)
       return (row as T) ?? null
-    },
-    all: async <T = unknown>(): Promise<{ results: T[] }> => {
+    }),
+    all: promiseMethod(<T = unknown>(): { results: T[]; meta?: { changes:number; last_row_id:number } } => {
       const rows = raw.prepare(sql).all(...normalized)
+      if (/\bRETURNING\b/i.test(sql) && !/^\s*(SELECT|PRAGMA)/i.test(sql)) {
+        const meta=raw.prepare('SELECT changes() AS changes,last_insert_rowid() AS last_row_id').get() as {changes:number;last_row_id:number};
+        return {results:rows as T[],meta};
+      }
       return { results: rows as T[] }
-    },
-    run: async () => {
+    }),
+    run: promiseMethod(() => {
       const info = raw.prepare(sql).run(...normalized)
       return { meta: { changes: info.changes, last_row_id: Number(info.lastInsertRowid) } }
-    },
+    }),
   }
 }
 
@@ -104,6 +112,7 @@ export function createTestD1(
   // その種の回帰テストは { foreignKeys: true } で作り、実 D1 と同じ制約で確かめる。
   raw.pragma(`foreign_keys = ${options?.foreignKeys ? 'ON' : 'OFF'}`)
 
+  let batchTail:Promise<unknown>=Promise.resolve();
   const db = {
     prepare: (sql: string) => ({
       // batch が SELECT へ .all() を振り分けられるよう、元の SQL を残しておく。
@@ -111,7 +120,8 @@ export function createTestD1(
       sql,
       ...(isSelect(sql) ? wrap(raw, sql, []) : wrap(raw, sql, [])),
     }),
-    batch: async (statements: D1PreparedStatement[]) => {
+    batch: (statements: D1PreparedStatement[]) => {
+      const run=async()=>{
       raw.exec('BEGIN IMMEDIATE')
       try {
         const results = []
@@ -122,16 +132,21 @@ export function createTestD1(
            * 呼び出し側（使用先のまとめ集計など）が黙って壊れる。
            */
           const sql = (statement as unknown as { sql?: string }).sql ?? '';
+          const invoke=(method:'run'|'all')=>{
+            const callback=statement[method] as unknown as (()=>unknown) & {sync?:()=>unknown};
+            return callback.sync ? callback.sync() : callback.call(statement);
+          };
           if (!isSelect(sql)) {
-            results.push(await statement.run());
+            const result=invoke('run');results.push(result && typeof (result as Promise<unknown>).then==='function'?await result:result);
             continue;
           }
           try {
-            results.push(await statement.all());
-          } catch {
+            const result=invoke('all');results.push(result && typeof (result as Promise<unknown>).then==='function'?await result:result);
+          } catch (error) {
+            if(!String((error as {message?:unknown})?.message).includes('does not return data'))throw error;
             // WITH x AS (...) INSERT ... のように WITH で始まる書き込みもある。
             // returnsData が無い文に .all() すると実行前に失敗するので .run() へ倒す。
-            results.push(await statement.run());
+            const result=invoke('run');results.push(result && typeof (result as Promise<unknown>).then==='function'?await result:result);
           }
         }
         raw.exec('COMMIT')
@@ -140,6 +155,8 @@ export function createTestD1(
         raw.exec('ROLLBACK')
         throw error
       }
+      };
+      const result=batchTail.then(run);batchTail=result.catch(()=>undefined);return result;
     },
   } as unknown as D1Database
 

@@ -1034,7 +1034,6 @@ function EditMenuModal({
   const resourceSubmitRef = useRef(false)
   const resourceLoadGenerationRef = useRef(0)
   /** 破棄確認の表示。×・Esc・背景・キャンセルは dirty のときだけここへ寄せる。 */
-  const [showDiscard, setShowDiscard] = useState(false)
   /*
    * R305: 未保存の変更があるか。フォームと設備の割当を開いた直後と比べ、
    * 変わっていれば閉じる前に破棄確認を挟む。保存の成否自体は submit 側の
@@ -1054,14 +1053,6 @@ function EditMenuModal({
     resources: [...resourceAssignments.entries()]
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
   }) !== initialSnapshot.current
-  /** 閉じる操作は共通 Dialog（×・Esc・背景）から全部ここへ集まる。 */
-  function requestClose() {
-    if (dirty && !saving) {
-      setShowDiscard(true)
-      return
-    }
-    onClose()
-  }
 
   useEffect(() => {
     const generation = ++resourceLoadGenerationRef.current
@@ -1210,11 +1201,12 @@ function EditMenuModal({
       <Dialog
         open
         title="メニュー編集"
-        onCancel={requestClose}
+        dirty={dirty}
+        onCancel={onClose}
         busy={saving}
         footer={
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button type="button" onClick={requestClose} disabled={saving}>
+            <Button type="button" onClick={onClose} disabled={saving}>
               キャンセル
             </Button>
             <Button
@@ -1471,16 +1463,7 @@ function EditMenuModal({
           )}
         </div>
       </Dialog>
-      <ConfirmDialog
-        open={showDiscard}
-        title="変更を破棄しますか？"
-        description="保存していない変更は消えます。閉じてよければ破棄を選んでください。"
-        confirmLabel="破棄する"
-        cancelLabel="編集に戻る"
-        primaryAction="cancel"
-        onConfirm={onClose}
-        onCancel={() => setShowDiscard(false)}
-      />
+
     </>
   )
 }

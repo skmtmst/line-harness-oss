@@ -91,14 +91,19 @@ function summarize(content: string): { panels: number; firstTitle: string } {
 export default function CarouselPicker({ value, onChange, accountId }: CarouselPickerProps) {
   const [items, setItems] = useState<CarouselTemplate[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [retry, setRetry] = useState(0)
   const generationRef = useRef(createLoadGeneration())
 
   useEffect(() => {
     // 独立審査(指摘4): 持ち主の公開版だけを候補にし、古い応答は世代で捨てる。
     const generation = generationRef.current.next()
     setLoading(true)
+    setItems([])
+    setError(false)
     void scenarioReferenceData.templates(accountId ?? undefined).then((res) => {
       if (!generationRef.current.isCurrent(generation)) return
+      if (!res.success) { setError(true); return }
       if (res.success) {
         setItems(
           filterSendableTemplates(res.data, accountId)
@@ -111,13 +116,15 @@ export default function CarouselPicker({ value, onChange, accountId }: CarouselP
             })),
         )
       }
-      setLoading(false)
-    })
-  }, [accountId])
+    }).catch(() => { if (generationRef.current.isCurrent(generation)) setError(true) }).finally(() => { if (generationRef.current.isCurrent(generation)) setLoading(false) })
+    return () => { generationRef.current.next() }
+  }, [accountId, retry])
 
   if (loading) {
     return <p className="text-ink-faint py-6 text-center text-sm">読み込み中…</p>
   }
+
+  if (error) return <div role="alert">カルーセルを読み込めませんでした。<Button onClick={() => setRetry(value => value + 1)}>もう一度読み込む</Button></div>
 
   if (items.length === 0) {
     return (

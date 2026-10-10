@@ -135,6 +135,10 @@ describe('席の予約の流れ', () => {
     expect(screen.getByText('・15分を過ぎてご連絡がない場合は、取り消しになることがあります')).toBeTruthy();
     fireEvent.change(screen.getByLabelText(/ご要望/), { target: { value: '記念日です' } });
     fireEvent.change(screen.getByLabelText('電話'), { target: { value: '090ー1111ー2222' } });
+    expect(screen.getAllByText('任意')).toHaveLength(2);
+    expect(screen.queryByText('ご要望（任意）')).toBeNull();
+    expect(screen.getByText('5/200文字')).toBeTruthy();
+    expect(screen.getByText('13/50文字')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
     await screen.findByText('ご予約を受け付けました');
     expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: '記念日です', customerPhone: '090-1111-2222' });

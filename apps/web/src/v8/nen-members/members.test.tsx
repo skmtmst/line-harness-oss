@@ -14,6 +14,9 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+const notifySaved = vi.hoisted(() => vi.fn())
+vi.mock('@/components/shared/toast', () => ({ notifySaved, default: () => null }))
+
 const fetchApi = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const push = vi.hoisted(() => vi.fn())
@@ -94,6 +97,7 @@ describe('V8 会員（src/v8/nen-members）', () => {
     document.documentElement.dataset.theme = 'v8'
     role.value = 'owner'
     fetchApi.mockReset()
+    notifySaved.mockReset()
     push.mockReset()
     fetchApi.mockImplementation(async (path: string) => {
       if (path.startsWith('/api/nen/rank-settings?')) return { success: true, data: SETTINGS }
@@ -119,7 +123,7 @@ describe('V8 会員（src/v8/nen-members）', () => {
     expect(host.textContent).toContain('¥0〜（固定）')
     expect(host.textContent).toContain('ゴールド以上')
     expect(host.textContent).toContain('今年の購入 ¥50,000 以上')
-    expect(host.textContent).toContain('最後に送った日時 9/30 10:12')
+    expect(host.textContent).toContain('最後に送った日時 09/30 10:12')
   })
 
   it('「…」→ランクを削除する：移す先はひとつ下を先に選び、版つきで消す', async () => {
@@ -127,10 +131,10 @@ describe('V8 会員（src/v8/nen-members）', () => {
     await render('ranks', onRetry)
     await click(byLabel('ランク「シルバー」のその他操作'))
     await click(byText('ランクを削除する'))
-    expect(document.body.textContent).toContain('ランク「シルバー」を消しますか？')
+    expect(document.body.textContent).toContain('「シルバー」を削除しますか？')
     expect(document.body.textContent).toContain('このランクには会員が 2 人います。')
     fetchApi.mockImplementationOnce(async () => ({ success: true, data: { id: 'r-sv', replacementRankId: 'r-bz', movedMembers: 2, version: 4, operationId: 'op', ecSync: 'synced' } }))
-    await click(byText('2 人を移して消す'))
+    await click(byText('削除する'))
     const call = fetchApi.mock.calls.find(([path, options]) => String(path).startsWith('/api/nen/rank-settings/r-sv') && options?.method === 'DELETE')
     expect(call).toBeTruthy()
     expect(JSON.parse(call![1].body)).toEqual({ accountId: 'acc-1', replacementRankId: 'r-bz', expectedVersion: 3 })
@@ -146,7 +150,7 @@ describe('V8 会員（src/v8/nen-members）', () => {
       if (path.startsWith('/api/nen/rank-settings?')) return { success: true, data: { ...SETTINGS, rules: { ...SETTINGS.rules!, version: 4, updatedAt: '2026-10-01T14:02:00+09:00' } } }
       return { success: true, data: {} }
     })
-    await click(byText('2 人を移して消す'))
+    await click(byText('削除する'))
     expect(host.textContent).toContain('ほかの人が 14:02 にランク設定を保存しました')
     expect(byText('違いを比べる')).toBeTruthy()
     expect(byText('最新を読み込んで続ける')).toBeTruthy()
@@ -177,6 +181,36 @@ describe('V8 会員（src/v8/nen-members）', () => {
     const call = fetchApi.mock.calls.find(([path, options]) => path === '/api/nen/lifetime-milestones' && options?.method === 'PUT')
     expect(call).toBeTruthy()
     expect(JSON.parse(call![1].body).milestones[0]).toEqual({ id: 'm1', thresholdYen: 50000, title: 'はじめまして', notifyOnReach: true })
+    expect(notifySaved).toHaveBeenCalledOnce()
+    expect(notifySaved).toHaveBeenCalledWith('節目を保存しました。')
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('ECへの同期は失敗')
+    expect(host.querySelector('[role="status"]')?.textContent ?? '').not.toContain('節目を保存しました。')
+  })
+
+  it('B-139 ランク：名前を消して保存すると、口を呼ばずその行の名前の欄が赤くなり、そこへ移る', async () => {
+    await render('ranks')
+    const name = host.querySelector('input[aria-label="ランク名 1"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(name, { target: { value: '' } }) })
+    fetchApi.mockClear()
+    await click(buttons().find((b) => b.textContent?.includes('保存して EC へ同期')))
+    await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(fetchApi.mock.calls.some(([, options]) => options?.method === 'PUT')).toBe(false)
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(document.getElementById('rank-name-0-error')?.textContent).toBe('ランク名を入れるか、行を消してください。')
+    expect(document.activeElement).toBe(name)
+  })
+
+  it('B-139 ライフタイム：称号を消して決めると、窓は閉じず称号の欄が赤くなり、そこへ移る', async () => {
+    await render('lifetime')
+    await click(byLabel('節目「なかよし」のその他操作'))
+    await click(byText('編集する'))
+    const title = document.getElementById('milestone-title') as HTMLInputElement
+    await act(async () => { fireEvent.change(title, { target: { value: '' } }) })
+    await click(byText('決める'))
+    await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(document.getElementById('milestone-title-error')?.textContent).toBe('称号を入れてください。')
+    expect(title.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(title)
   })
 
   it('閲覧のみ：帯を出し、変える・足す・消す・保存のボタンを置かない（CSV は使える）', async () => {
@@ -186,7 +220,7 @@ describe('V8 会員（src/v8/nen-members）', () => {
     for (const text of ['ランクを足す', 'もう一度同期', 'キャンセル', '保存して EC へ同期']) {
       expect(buttons().some((b) => b.textContent?.includes(text))).toBe(false)
     }
-    expect(buttons().some((b) => b.textContent?.includes('CSV で書き出す'))).toBe(true)
+    expect(buttons().some((b) => b.textContent?.includes('CSVで書き出す'))).toBe(true)
     // 欄は読み取りだけ（押せない形ではなく、値は読める）。2026-10-06 オーナー決定。
     const inputs = Array.from(host.querySelectorAll('input'))
     expect(inputs.length).toBeGreaterThan(0)

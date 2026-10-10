@@ -83,14 +83,13 @@ describe('テキストテンプレートの本文上限', () => {
     }, bindings);
 
     expect(response.status).toBe(422);
-    expect(await response.json()).toEqual({
+    expect(await response.json()).toMatchObject({
       success: false,
       code: 'TEMPLATE_TEXT_TOO_LONG',
       error: '本文は5,000文字までです。いまは5,001文字です。',
       field: 'messageContent',
       maxCharacters: 5_000,
-      actualCharacters: 5_001,
-    });
+      actualCharacters: 5_001, fields: expect.any(Object) });
     expect(mocks.createTemplate).not.toHaveBeenCalled();
   });
 

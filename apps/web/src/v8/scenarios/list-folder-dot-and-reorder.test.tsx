@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 /*
- * 並び替えのつまみ（オーナー点検 2026-10-08）：絞り込み中・2ページ以上のときは、
+ * 並び替えのつまみ（オーナー点検 2026-10-08）：絞り込み中は、
  * つまみを出さず理由を言う（一部の行だけで番号を振り直さない）。
  */
 import React from 'react'
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
 const scenario = (id: string, name: string, folderId: string | null) => ({
@@ -27,10 +27,18 @@ const scenario = (id: string, name: string, folderId: string | null) => ({
 })
 
 const total = vi.hoisted(() => ({ value: null as number | null }))
+const reorder = vi.hoisted(() => vi.fn(async () => ({ success: true })))
 const items = [
   scenario('s-filed', '新規登録7日間フォロー', 'sf-onboarding'),
   scenario('s-unfiled', '会員更新リマインド', null),
 ]
+
+vi.mock('@/lib/undoable', () => ({
+  runUndoable: (options: { commit: () => Promise<unknown>; onCommitted?: () => void; undo: () => void }) => {
+    void options.commit().then(() => options.onCommitted?.()).catch(() => options.undo())
+  },
+  notifyToast: () => {},
+}))
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
@@ -62,7 +70,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       ...api,
       scenarios: {
         ...api.scenarios,
-        listPage: () => Promise.resolve({ success: true, data: { items, total: total.value ?? items.length, limit: 20, sort: [] } }),
+        listPage: (input: { limit?: number } = {}) => Promise.resolve({ success: true, data: { items: total.value && input.limit === 100 ? [...items, ...Array.from({ length: total.value - 2 }, (_, i) => scenario(`s-extra-${i}`, `ページ外${i}`, null))] : items, total: total.value ?? items.length, limit: input.limit ?? 20, sort: [] } }),
+        reorder,
       },
       folders: {
         ...api.folders,
@@ -91,13 +100,15 @@ describe('V8 シナリオ一覧の並び替えのつまみ', () => {
     await waitFor(() => expect(view.container.querySelectorAll('button[data-reorder-handle]')).toHaveLength(2))
   })
 
-  test('2ページ以上あるときは、つまみを出さず理由を言う', async () => {
+  test('WEB-016：ページ外も含めた全順位を送り、ページ外の位置を保つ', async () => {
     total.value = 30
+    reorder.mockClear()
     const view = render(<ScenariosListV8 />)
     await view.findByText('新規登録7日間フォロー')
-    await waitFor(() => expect(view.container.querySelector('[data-reorder-disabled]')?.getAttribute('title')).toBe('全件が1ページに収まる表示件数にすると動かせます'))
-    expect(view.container.querySelector('button[data-reorder-handle]')).toBeNull()
-    expect(view.container.querySelector('td[draggable="true"]')).toBeNull()
+    const handle = view.container.querySelector('button[data-reorder-handle]')!
+    expect(handle).not.toBeNull()
+    fireEvent.keyDown(handle, { key: 'ArrowDown' })
+    await waitFor(() => expect(reorder).toHaveBeenCalledWith(['s-unfiled', 's-filed', ...Array.from({ length: 28 }, (_, i) => `s-extra-${i}`)]))
     total.value = null
   })
 })

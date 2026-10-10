@@ -584,7 +584,6 @@ function EcCommercePageV8() {
   return (
     <EcCommerceScreen
       tab={tab}
-      renderSubscriptions={(accountId) => <SubscriptionsPanel accountId={accountId} />}
     />
   )
 }

@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { getChatById, getFriendById, jstNow } from '@line-crm/db';
 import { CHAT_FILE_TTL_MS, CHAT_IMAGE_MAX_BYTES, type ChatAttachment } from '@line-crm/shared';
@@ -46,14 +47,14 @@ async function readBounded(body: ReadableStream<Uint8Array>, max: number): Promi
   return bytes;
 }
 
-chatAttachments.post('/api/chats/:id/attachments/upload', ...guards, async c => {
+chatAttachments.post('/api/chats/:id/attachments/upload', ...guards, inputJsonBoundary(), async c => {
   const owner = await target(c);
   if (!owner) return c.notFound();
   try {
     const mimeType = (c.req.header('Content-Type') ?? '').split(';')[0];
     const filename = decodeURIComponent(c.req.header('X-Filename') ?? '');
     const declaredSize = c.req.header('Content-Length');
-    if (mimeType === 'video/mp4') return c.json({ success: false, error: '動画は直接アップロードの口を使ってください' }, 400);
+    if (mimeType === 'video/mp4') return inputError(c, { success: false, error: '動画は直接アップロードの口を使ってください' }, 400, []);
     if (declaredSize && Number(declaredSize) > CHAT_IMAGE_MAX_BYTES) throw new ChatAttachmentError('ファイルは10MB以下にしてください');
     if (!c.req.raw.body) throw new ChatAttachmentError('ファイルを選んでください');
     const bytes = await readBounded(c.req.raw.body, CHAT_IMAGE_MAX_BYTES);
@@ -65,7 +66,7 @@ chatAttachments.post('/api/chats/:id/attachments/upload', ...guards, async c => 
     });
     return c.json({ success: true, data: attachment }, 201);
   } catch (error) {
-    if (error instanceof ChatAttachmentError || error instanceof URIError) return c.json({ success: false, error: error.message }, 400);
+    if (error instanceof ChatAttachmentError || error instanceof URIError) return inputError(c, { success: false, error: error.message }, 400, []);
     return c.json({ success: false, error: '添付を保存できませんでした。もう一度選び直してください' }, 502);
   }
 });
@@ -76,7 +77,7 @@ interface Session {
   expires_at: string; completed_at: string | null;
 }
 // API-6と同じ署名URL・既存のアップロード予約表・ETag照合・完了のCASを使う。
-chatAttachments.post('/api/chats/:id/attachments/upload-sessions', ...guards, async c => {
+chatAttachments.post('/api/chats/:id/attachments/upload-sessions', ...guards, inputJsonBoundary(), async c => {
   const owner = await target(c);
   if (!owner) return c.notFound();
   let body: { filename: string; mimeType: string; sizeBytes: number };
@@ -84,7 +85,7 @@ chatAttachments.post('/api/chats/:id/attachments/upload-sessions', ...guards, as
     body = await c.req.json();
     if (!body || typeof body.filename !== 'string' || body.mimeType !== 'video/mp4'
       || uploadKind(body.mimeType, body.filename, body.sizeBytes) !== 'video') throw new ChatAttachmentError('MP4動画を選んでください');
-  } catch (error) { return c.json({ success: false, error: error instanceof ChatAttachmentError ? error.message : '形式を確認してください' }, 400); }
+  } catch (error) { return inputError(c, { success: false, error: error instanceof ChatAttachmentError ? error.message : '形式を確認してください' }, 400, []); }
   if (!c.env.CF_ACCOUNT_ID || !c.env.MEDIA_R2_ACCESS_KEY_ID || !c.env.MEDIA_R2_SECRET_ACCESS_KEY || !c.env.MEDIA_R2_BUCKET_NAME) {
     return c.json({ success: false, error: '直接アップロードが未設定です。管理者に確認してください' }, 503);
   }
@@ -100,7 +101,7 @@ chatAttachments.post('/api/chats/:id/attachments/upload-sessions', ...guards, as
   return c.json({ success: true, data: { id, uploadUrl: signed.url, requiredHeaders: signed.headers, expiresAt: signed.expiresAt } }, 201);
 });
 
-chatAttachments.post('/api/chats/:id/attachments/upload-sessions/:sessionId/complete', ...guards, async c => {
+chatAttachments.post('/api/chats/:id/attachments/upload-sessions/:sessionId/complete', ...guards, inputJsonBoundary(), async c => {
   const owner = await target(c);
   if (!owner) return c.notFound();
   const id = c.req.param('sessionId');
@@ -115,7 +116,7 @@ chatAttachments.post('/api/chats/:id/attachments/upload-sessions/:sessionId/comp
   if (session.completed_at && session.public_key) return c.json({ success: true, data: await replay(session.public_key) });
   if (Date.parse(session.expires_at) <= Date.now()) return c.json({ success: false, error: 'アップロード期限が切れました' }, 409);
   let body: { etag?: string };
-  try { body = await c.req.json(); } catch { return c.json({ success: false, error: 'ETagを確認してください' }, 400); }
+  try { body = await c.req.json(); } catch { return inputError(c, { success: false, error: 'ETagを確認してください' }, 400, []); }
   const object = await c.env.IMAGES.head(session.r2_key);
   if (!object || object.size !== session.expected_size || object.httpMetadata?.contentType !== session.mime_type
     || typeof body?.etag !== 'string' || object.etag !== body.etag.replace(/^"|"$/g, '')
@@ -126,7 +127,7 @@ chatAttachments.post('/api/chats/:id/attachments/upload-sessions/:sessionId/comp
   const prefix = await c.env.IMAGES.get(session.r2_key, { range: { offset: 0, length: 256 * 1024 }, onlyIf: { etagMatches: object.etag } });
   if (!prefix || !('body' in prefix)) return c.json({ success: false, error: 'ファイルが変更されました' }, 409);
   try { validateChatUpload(new Uint8Array(await prefix.arrayBuffer()), session.mime_type, session.filename, session.expected_size); }
-  catch (error) { return c.json({ success: false, error: error instanceof Error ? error.message : '形式を確認してください' }, 422); }
+  catch (error) { return inputError(c, { success: false, error: error instanceof Error ? error.message : '形式を確認してください' }, 422, []); }
   const source = await c.env.IMAGES.get(session.r2_key, { onlyIf: { etagMatches: object.etag } });
   if (!source || !('body' in source)) return c.json({ success: false, error: 'ファイルが変更されました' }, 409);
   const attachment = newAttachment(c, session.filename, session.mime_type, session.expected_size);

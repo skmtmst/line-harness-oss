@@ -843,7 +843,7 @@ function InflowLinksPageInner({
       <PageHeader
         breadcrumb={[{ label: '成果と分析' }, { label: '流入と計測' }]}
         title="流入と計測"
-        description="QRコード・URLごとに、どこから友だちになったかを数えます。友だちになったときに、タグ・メッセージ・シナリオを自動で動かせます。"
+        help="QRコード・URLごとに、どこから友だちになったかを数えます。友だちになったときに、タグ・メッセージ・シナリオを自動で動かせます。"
         actions={<>
           <Button variant="secondary" href="/inflow-links?tab=connections">広告とのつなぎ</Button>
           {/*

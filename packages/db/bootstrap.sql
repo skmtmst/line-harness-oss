@@ -26,6 +26,75 @@ CREATE TABLE _556_folders_backup_templates (id TEXT PRIMARY KEY, folder_id TEXT)
 
 CREATE TABLE _556_folders_backup_webinars (id TEXT PRIMARY KEY, folder_id TEXT);
 
+CREATE TABLE _617_backup_auto_replies (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _617_backup_automation_definitions (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _617_backup_broadcasts (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _617_backup_common_actions (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _617_backup_common_vars (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _617_backup_conversion_points (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _617_backup_folder_parents (id TEXT PRIMARY KEY, parent_id TEXT);
+
+CREATE TABLE _617_backup_folders(
+  id TEXT,
+  kind TEXT,
+  name TEXT,
+  parent_id TEXT,
+  display_order INT,
+  created_at TEXT,
+  updated_at TEXT,
+  color TEXT,
+  account_id TEXT
+);
+
+CREATE TABLE _617_backup_forms (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _617_backup_friend_fields (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _617_backup_incoming_webhooks (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _617_backup_media (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _617_backup_media_upload_sessions (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _617_backup_mileage_rewards(
+  id TEXT,
+  line_account_id TEXT,
+  program_id TEXT,
+  name TEXT,
+  description TEXT,
+  image_url TEXT,
+  reward_kind TEXT,
+  status TEXT,
+  sort_order INT,
+  current_draft_version_id TEXT,
+  current_published_version_id TEXT,
+  created_by TEXT,
+  created_at TEXT,
+  updated_at TEXT,
+  archived_at TEXT,
+  folder_id TEXT
+);
+
+CREATE TABLE _617_backup_outgoing_webhooks (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _617_backup_reminders (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _617_backup_rich_menu_groups (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _617_backup_scenarios (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _617_backup_tags (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _617_backup_templates (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _617_backup_webinars (id TEXT PRIMARY KEY, folder_id TEXT);
+
 CREATE TABLE account_handover_decisions (
   id              TEXT PRIMARY KEY,
   handover_id     TEXT NOT NULL REFERENCES account_handovers(id) ON DELETE CASCADE,
@@ -440,7 +509,7 @@ CREATE TABLE affiliate_offers (
   scenario_id     TEXT REFERENCES scenarios (id),
   is_active       INTEGER NOT NULL DEFAULT 1,
   created_at      TEXT NOT NULL
-, operation_id TEXT);
+, operation_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
 CREATE TABLE affiliate_payout_batch_lines (
   id TEXT PRIMARY KEY,
@@ -583,7 +652,7 @@ CREATE TABLE affiliates (
   friend_id       TEXT REFERENCES friends (id),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , email TEXT, hold_days INTEGER, payout_cycle TEXT, notify_on_conversion INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id), lifecycle_status TEXT NOT NULL DEFAULT 'active'
-  CHECK (lifecycle_status IN ('active', 'paused', 'archived')), archived_at TEXT, operation_id TEXT, reward_mode TEXT CHECK (reward_mode IN ('none', 'fixed', 'rate')));
+  CHECK (lifecycle_status IN ('active', 'paused', 'archived')), archived_at TEXT, operation_id TEXT, reward_mode TEXT CHECK (reward_mode IN ('none', 'fixed', 'rate')), folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
 CREATE TABLE ai_loop_slack_reports (
   work_key        TEXT PRIMARY KEY,
@@ -1290,7 +1359,8 @@ CREATE TABLE banner_generations (
   started_at       TEXT,
   finished_at      TEXT
 , reference_image_id TEXT REFERENCES banner_images(id), reference_mode TEXT
-  CHECK (reference_mode IS NULL OR reference_mode IN ('edit', 'inspire')), base_color TEXT, accent_color TEXT, reference_images TEXT, emphasis_lines TEXT);
+  CHECK (reference_mode IS NULL OR reference_mode IN ('edit', 'inspire')), base_color TEXT, accent_color TEXT, reference_images TEXT, emphasis_lines TEXT, crop_gravity TEXT NOT NULL DEFAULT 'center'
+  CHECK (crop_gravity IN ('center','top','bottom')), stop_requested_at TEXT);
 
 CREATE TABLE banner_image_deliveries (
   id               TEXT PRIMARY KEY,
@@ -1316,7 +1386,7 @@ CREATE TABLE banner_images (
   deleted_at       TEXT,
   created_by       TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, folder_id TEXT REFERENCES hq_banner_folders(id) ON DELETE SET NULL);
 
 CREATE TABLE banner_projects (
   id           TEXT PRIMARY KEY,
@@ -1328,7 +1398,7 @@ CREATE TABLE banner_projects (
   created_by   TEXT,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, folder_id TEXT REFERENCES hq_banner_folders(id) ON DELETE SET NULL);
 
 CREATE TABLE banner_usage_ledger (
   id             TEXT PRIMARY KEY,
@@ -2228,7 +2298,7 @@ CREATE TABLE coupon_redemptions (
   used_at TEXT NOT NULL,
   use_number INTEGER NOT NULL,
   payload_snapshot TEXT NOT NULL
-);
+, entry_route_coupon_receipt_id TEXT REFERENCES entry_route_coupon_receipts(id));
 
 CREATE TABLE customer_notification_definitions (
   id                    TEXT PRIMARY KEY,
@@ -2467,6 +2537,20 @@ CREATE TABLE engagement_events (
   UNIQUE (program_id, idempotency_key)
 );
 
+CREATE TABLE entry_route_coupon_receipts (
+  id TEXT PRIMARY KEY,
+  entry_route_id TEXT NOT NULL REFERENCES entry_routes(id),
+  asset_id TEXT NOT NULL,
+  friend_id TEXT NOT NULL REFERENCES friends(id),
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'received', 'sent', 'failed', 'unknown')),
+  asset_name TEXT NOT NULL,
+  payload_snapshot TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  received_at TEXT,
+  UNIQUE (entry_route_id, friend_id)
+);
+
 CREATE TABLE entry_route_genres (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
@@ -2496,7 +2580,7 @@ CREATE TABLE entry_routes (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-, pool_id TEXT REFERENCES traffic_pools (id) ON DELETE SET NULL, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, run_account_friend_add_scenarios INTEGER NOT NULL DEFAULT 1, genre TEXT, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, stopped_at TEXT, stopped_reason TEXT);
+, pool_id TEXT REFERENCES traffic_pools (id) ON DELETE SET NULL, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, run_account_friend_add_scenarios INTEGER NOT NULL DEFAULT 1, genre TEXT, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, stopped_at TEXT, stopped_reason TEXT, coupon_asset_id TEXT REFERENCES broadcast_message_assets(id) ON DELETE SET NULL, coupon_enabled INTEGER NOT NULL DEFAULT 0 CHECK (coupon_enabled IN (0, 1)), coupon_audience TEXT NOT NULL DEFAULT 'new_friends' CHECK (coupon_audience IN ('new_friends', 'all_friends')));
 
 CREATE TABLE error_messages (
   -- エラーコード。code が無い現行 route は error 文字列そのものを鍵にする（§9-1）。
@@ -2776,14 +2860,15 @@ CREATE TABLE "folders" (
                   'tag','template','scenario','reminder','auto_reply',
                   'rich_menu','webinar','form','media','common_var',
                   'mileage_rule','automation','event','entry_route','broadcast',
-                  'friend_field','common_action','webhook','conversion')),
+                  'friend_field','common_action','webhook','conversion','affiliate','affiliate_offer','mileage_reward','friend_add_rule')),
   name          TEXT NOT NULL,
   parent_id     TEXT REFERENCES folders(id) ON DELETE CASCADE,
   display_order INTEGER NOT NULL DEFAULT 0,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   color         TEXT,
-  account_id    TEXT REFERENCES line_accounts(id) ON DELETE CASCADE
+  account_id    TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
+  revision INTEGER NOT NULL DEFAULT 1 CHECK (revision > 0)
 );
 
 CREATE TABLE form_accounts (
@@ -2809,6 +2894,27 @@ CREATE TABLE form_opens (
   opened_at TEXT NOT NULL DEFAULT (datetime('now'))
 , is_test INTEGER NOT NULL DEFAULT 0
   CHECK (is_test IN (0, 1)));
+
+CREATE TABLE form_submission_files (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  form_id TEXT NOT NULL REFERENCES forms(id),
+  form_version_id TEXT,
+  block_id TEXT NOT NULL,
+  friend_id TEXT NOT NULL REFERENCES friends(id),
+  submission_id TEXT REFERENCES form_submissions(id),
+  file_kind TEXT NOT NULL CHECK (file_kind IN ('image', 'pdf', 'identity')),
+  side TEXT NOT NULL CHECK (side IN ('single', 'front', 'back')),
+  r2_key TEXT NOT NULL UNIQUE,
+  filename TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  size_bytes INTEGER NOT NULL CHECK (size_bytes > 0 AND size_bytes <= 10485760),
+  scan_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  expires_at TEXT,
+  deleted_at TEXT,
+  deletion_reason TEXT
+);
 
 CREATE TABLE form_submissions (
   id TEXT PRIMARY KEY,
@@ -3038,7 +3144,7 @@ CREATE TABLE friend_add_rules (
   created_at                 TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at                 TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , lock_version INTEGER NOT NULL DEFAULT 1
-  CHECK (lock_version > 0), stop_idempotency_key TEXT, stopped_at TEXT, stopped_by_staff_id TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id));
+  CHECK (lock_version > 0), stop_idempotency_key TEXT, stopped_at TEXT, stopped_by_staff_id TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
 CREATE TABLE friend_add_send_claims (
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -3225,6 +3331,11 @@ CREATE TABLE friend_fields (
     'select','multi_select','checkbox','image','pdf'
   )), type_v8 TEXT
   CHECK (type_v8 IS NULL OR type_v8 = 'time'));
+
+CREATE TABLE friend_fixed_fields (
+  fixed_key TEXT PRIMARY KEY CHECK (fixed_key IN ('name','kana','birthday','age','email','tel','address')),
+  field_id TEXT NOT NULL UNIQUE REFERENCES friend_fields(id) ON DELETE RESTRICT
+);
 
 CREATE TABLE friend_identity_links (
   id TEXT PRIMARY KEY,
@@ -3441,6 +3552,13 @@ CREATE TABLE google_sheets_sync_runs (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 , run_date TEXT, spreadsheet_id TEXT);
 
+CREATE TABLE hq_banner_folders (
+ id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id),
+ kind TEXT NOT NULL CHECK(kind IN ('project','image')), name TEXT NOT NULL CHECK(length(name) BETWEEN 1 AND 100),
+ color TEXT CHECK(color IS NULL OR (typeof(color)='text' AND length(color)=7 AND color GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')), display_order INTEGER NOT NULL DEFAULT 0, revision INTEGER NOT NULL DEFAULT 1 CHECK(revision>0),
+ archived_at TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE hq_broadcast_audit (
  id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES hq_broadcast_runs(id), line_account_id TEXT NOT NULL,
  actor_id TEXT NOT NULL, action TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT(datetime('now'))
@@ -3451,7 +3569,7 @@ CREATE TABLE hq_broadcast_folders (
  revision INTEGER NOT NULL DEFAULT 1, archived_at TEXT,
  created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 , color TEXT
-  CHECK (color IS NULL OR (typeof(color) = 'text' AND length(color) = 7 AND color GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')));
+  CHECK (color IS NULL OR (typeof(color) = 'text' AND length(color) = 7 AND color GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')), display_order INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE hq_broadcast_runs (
  id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id), request_id TEXT NOT NULL, actor_id TEXT NOT NULL,
@@ -3568,7 +3686,7 @@ CREATE TABLE hq_template_folders (
   archived_at TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), color TEXT
-  CHECK (color IS NULL OR (typeof(color) = 'text' AND length(color) = 7 AND color GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')),
+  CHECK (color IS NULL OR (typeof(color) = 'text' AND length(color) = 7 AND color GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')), display_order INTEGER NOT NULL DEFAULT 0,
   UNIQUE(id, tenant_id)
 );
 
@@ -3669,7 +3787,8 @@ CREATE TABLE hq_templates (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   archived_at TEXT, folder_id TEXT, extended_type TEXT CHECK (extended_type IS NULL OR extended_type='scenario'), friend_attribute_type TEXT
-  CHECK (friend_attribute_type IS NULL OR friend_attribute_type IN ('friend_field','mark')),
+  CHECK (friend_attribute_type IS NULL OR friend_attribute_type IN ('friend_field','mark')), delivery_type TEXT
+  CHECK (delivery_type IS NULL OR delivery_type IN ('auto_reply','friend_add_rule','reminder')),
   PRIMARY KEY (id, tenant_id),
   FOREIGN KEY (current_version_id, id, tenant_id)
     REFERENCES hq_template_versions(id, template_id, tenant_id)
@@ -3882,7 +4001,7 @@ CREATE TABLE instagram_connections (
  expires_at TEXT NOT NULL, data_access_expires_at TEXT, profile_json TEXT, posts_json TEXT,
  refreshed_at TEXT NOT NULL, synced_at TEXT, connected_by TEXT NOT NULL,
  version INTEGER NOT NULL DEFAULT 1
-);
+, scopes TEXT NOT NULL DEFAULT '');
 
 CREATE TABLE instagram_messages (
  id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
@@ -4552,7 +4671,7 @@ CREATE TABLE mileage_reward_versions (
   UNIQUE (reward_id, version_number)
 );
 
-CREATE TABLE mileage_rewards (
+CREATE TABLE "mileage_rewards" (
   id                           TEXT PRIMARY KEY,
   line_account_id              TEXT NOT NULL REFERENCES line_accounts(id),
   program_id                   TEXT NOT NULL DEFAULT 'default' REFERENCES mileage_programs(id),
@@ -4575,7 +4694,7 @@ CREATE TABLE mileage_rewards (
   created_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   archived_at                  TEXT
-, folder_id TEXT REFERENCES mileage_reward_folders(id));
+, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
 CREATE TABLE mileage_rules (
   id             TEXT PRIMARY KEY,
@@ -6463,7 +6582,7 @@ CREATE TABLE rt_google_posts (
   checked_at TEXT,
   deleted_at TEXT,
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, instagram_enabled INTEGER NOT NULL DEFAULT 0 CHECK(instagram_enabled IN (0,1)), instagram_caption TEXT, instagram_status TEXT NOT NULL DEFAULT 'none' CHECK(instagram_status IN ('none','pending','published','failed','skipped')), instagram_media_id TEXT, instagram_permalink TEXT, instagram_error TEXT, instagram_published_at TEXT);
 
 CREATE TABLE rt_google_profiles (
   store_id TEXT PRIMARY KEY REFERENCES rt_stores(id) ON DELETE CASCADE,
@@ -8057,6 +8176,30 @@ CREATE TABLE webinars (
   updated_at TEXT NOT NULL
 , folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, publication_starts_at TEXT, publication_ends_at TEXT, video_asset_id TEXT REFERENCES webinar_video_assets(id) ON DELETE SET NULL, cta_version INTEGER NOT NULL DEFAULT 0, cta_updated_by TEXT, cta_updated_at TEXT, cta_write_token TEXT);
 
+CREATE TABLE workflow_steps (
+  scope_id TEXT NOT NULL,
+  process_kind TEXT NOT NULL,
+  subject_id TEXT NOT NULL,
+  step_key TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending','running','succeeded','failed','exhausted','unknown','canceled')),
+  lease_owner TEXT,
+  lease_expires_at INTEGER,
+  attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  max_attempts INTEGER NOT NULL DEFAULT 5 CHECK (max_attempts > 0),
+  next_attempt_at INTEGER,
+  retry_key TEXT NOT NULL,
+  input_json TEXT,
+  result_json TEXT,
+  error_code TEXT,
+  first_attempt_at INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (scope_id, process_kind, subject_id, step_key),
+  CHECK ((status = 'running' AND NOT (lease_owner IS NULL) AND NOT (lease_expires_at IS NULL))
+      OR (status <> 'running' AND lease_owner IS NULL AND lease_expires_at IS NULL))
+);
+
 CREATE INDEX booking_sync_notices_account ON booking_sync_notices(line_account_id,status,target_date);
 
 CREATE INDEX broadcasts_hq_run ON broadcasts(hq_run_id);
@@ -8162,6 +8305,8 @@ CREATE UNIQUE INDEX idx_affiliate_links_operation_id
 CREATE INDEX idx_affiliate_offer_versions_offer
   ON affiliate_offer_versions (offer_id, version_number DESC);
 
+CREATE INDEX idx_affiliate_offers_folder ON affiliate_offers(line_account_id,folder_id);
+
 CREATE UNIQUE INDEX idx_affiliate_offers_operation_id
   ON affiliate_offers(line_account_id, operation_id)
   WHERE operation_id IS NOT NULL;
@@ -8188,6 +8333,8 @@ CREATE INDEX idx_affiliate_settlements_scope_created
 CREATE UNIQUE INDEX idx_affiliate_statements_idempotency
   ON affiliate_statements(organization_id, line_account_id, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
+
+CREATE INDEX idx_affiliates_folder ON affiliates(line_account_id,folder_id);
 
 CREATE UNIQUE INDEX idx_affiliates_friend ON affiliates (friend_id) WHERE friend_id IS NOT NULL;
 
@@ -8381,11 +8528,15 @@ CREATE INDEX idx_banner_generations_reference
 CREATE INDEX idx_banner_generations_tenant_status
   ON banner_generations(tenant_id, status);
 
+CREATE INDEX idx_banner_images_folder ON banner_images(tenant_id,folder_id,deleted_at);
+
 CREATE INDEX idx_banner_images_project
   ON banner_images(project_id, deleted_at, created_at DESC);
 
 CREATE INDEX idx_banner_images_tenant
   ON banner_images(tenant_id, deleted_at, created_at DESC);
+
+CREATE INDEX idx_banner_projects_folder ON banner_projects(tenant_id,folder_id,archived_at);
 
 CREATE INDEX idx_banner_projects_tenant
   ON banner_projects(tenant_id, archived_at, updated_at DESC);
@@ -8635,6 +8786,8 @@ CREATE INDEX idx_conversion_points_tenant ON conversion_points(tenant_id);
 
 CREATE INDEX idx_coupon_redemptions_friend ON coupon_redemptions(asset_id, friend_id);
 
+CREATE INDEX idx_coupon_redemptions_receipt ON coupon_redemptions(entry_route_coupon_receipt_id);
+
 CREATE INDEX idx_customer_notification_definitions_account
   ON customer_notification_definitions(line_account_id, status, category, name, id);
 
@@ -8691,6 +8844,8 @@ CREATE INDEX idx_engagement_events_actor_user
 
 CREATE INDEX idx_engagement_events_source
   ON engagement_events(source, source_event_id);
+
+CREATE INDEX idx_entry_coupon_receipts_asset_friend ON entry_route_coupon_receipts(asset_id, friend_id, received_at);
 
 CREATE INDEX idx_entry_route_genres_created
   ON entry_route_genres (created_at ASC);
@@ -8782,6 +8937,8 @@ CREATE UNIQUE INDEX idx_field_migration_runs_idempotency
 CREATE INDEX idx_field_migration_runs_scope
   ON field_migration_runs(tenant_id, line_account_id, created_at DESC);
 
+CREATE UNIQUE INDEX idx_folders_friend_add_name ON folders(account_id,name) WHERE kind='friend_add_rule';
+
 CREATE INDEX idx_folders_kind_order_556 ON folders(kind, display_order);
 
 CREATE INDEX idx_folders_webinar_account_order_556
@@ -8800,6 +8957,12 @@ CREATE INDEX idx_form_opens_form ON form_opens (form_id, opened_at);
 
 CREATE INDEX idx_form_opens_test_month
   ON form_opens(form_id, is_test, opened_at);
+
+CREATE INDEX idx_form_submission_files_expiry ON form_submission_files(expires_at) WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_form_submission_files_owner ON form_submission_files(line_account_id, form_id, friend_id, block_id);
+
+CREATE INDEX idx_form_submission_files_submission ON form_submission_files(submission_id);
 
 CREATE INDEX idx_form_submissions_form ON form_submissions (form_id);
 
@@ -8885,6 +9048,8 @@ CREATE INDEX idx_friend_add_rules_account_kind_priority
 CREATE UNIQUE INDEX idx_friend_add_rules_create_idempotency
   ON friend_add_rules (line_account_id, create_idempotency_key)
   WHERE create_idempotency_key IS NOT NULL;
+
+CREATE INDEX idx_friend_add_rules_folder ON friend_add_rules(line_account_id,folder_id);
 
 CREATE UNIQUE INDEX idx_friend_add_rules_stop_idempotency
   ON friend_add_rules(line_account_id, stop_idempotency_key)
@@ -9008,7 +9173,11 @@ CREATE INDEX idx_handover_decisions_handover
 
 CREATE INDEX idx_health_logs_account ON account_health_logs (line_account_id);
 
+CREATE UNIQUE INDEX idx_hq_banner_folder_name ON hq_banner_folders(tenant_id,kind,name) WHERE archived_at IS NULL;
+
 CREATE UNIQUE INDEX idx_hq_broadcast_folder_name ON hq_broadcast_folders(tenant_id,name) WHERE archived_at IS NULL;
+
+CREATE INDEX idx_hq_broadcast_folders_order ON hq_broadcast_folders(tenant_id,archived_at,display_order,name,id);
 
 CREATE UNIQUE INDEX idx_hq_folder_name ON hq_template_folders(tenant_id, name) WHERE archived_at IS NULL;
 
@@ -9023,6 +9192,8 @@ CREATE INDEX idx_hq_support_requests_tenant
 
 CREATE UNIQUE INDEX idx_hq_support_requests_ticket_no
   ON hq_support_requests(ticket_no) WHERE ticket_no IS NOT NULL;
+
+CREATE INDEX idx_hq_template_folders_order ON hq_template_folders(tenant_id,archived_at,display_order,name,id);
 
 CREATE INDEX idx_hq_template_owned_r2_reconcile
   ON hq_template_owned_r2_keys(tenant_id, state, updated_at);
@@ -10160,6 +10331,16 @@ CREATE UNIQUE INDEX visit_stamp_one_paper ON visit_stamp_paper_requests(card_id,
 
 CREATE UNIQUE INDEX visit_stamp_one_visit ON visit_stamp_entries(card_id,friend_id,visit_key) WHERE kind='visit';
 
+CREATE INDEX workflow_steps_due ON workflow_steps(process_kind, status, next_attempt_at, lease_expires_at);
+
+CREATE TRIGGER affiliate_offers_folder_insert BEFORE INSERT ON affiliate_offers WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='affiliate_offer' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
+
+CREATE TRIGGER affiliate_offers_folder_update BEFORE UPDATE OF folder_id,line_account_id ON affiliate_offers WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='affiliate_offer' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
+
+CREATE TRIGGER affiliates_folder_insert BEFORE INSERT ON affiliates WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='affiliate' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
+
+CREATE TRIGGER affiliates_folder_update BEFORE UPDATE OF folder_id,line_account_id ON affiliates WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='affiliate' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
+
 CREATE TRIGGER analytics_projection_friend_stage_count
 AFTER INSERT ON analytics_projection_friend_stage
 BEGIN UPDATE analytics_projection_metric_stage SET unique_friend_count = unique_friend_count + 1 WHERE line_account_id = NEW.line_account_id AND cycle_id = NEW.cycle_id AND metric_date = NEW.metric_date AND event_type = NEW.event_type; END;
@@ -10176,6 +10357,14 @@ CREATE TRIGGER automation_definitions_folder_update BEFORE UPDATE OF folder_id, 
 WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
   SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'automation' AND account_id = NEW.line_account_id
 ) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER banner_images_folder_insert BEFORE INSERT ON banner_images WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM hq_banner_folders WHERE id=NEW.folder_id AND tenant_id=NEW.tenant_id AND kind='image' AND archived_at IS NULL) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
+
+CREATE TRIGGER banner_images_folder_update BEFORE UPDATE OF folder_id,tenant_id ON banner_images WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM hq_banner_folders WHERE id=NEW.folder_id AND tenant_id=NEW.tenant_id AND kind='image' AND archived_at IS NULL) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
+
+CREATE TRIGGER banner_projects_folder_insert BEFORE INSERT ON banner_projects WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM hq_banner_folders WHERE id=NEW.folder_id AND tenant_id=NEW.tenant_id AND kind='project' AND archived_at IS NULL) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
+
+CREATE TRIGGER banner_projects_folder_update BEFORE UPDATE OF folder_id,tenant_id ON banner_projects WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM hq_banner_folders WHERE id=NEW.folder_id AND tenant_id=NEW.tenant_id AND kind='project' AND archived_at IS NULL) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
 
 CREATE TRIGGER booking_auto_assign_sync_rules_insert AFTER INSERT ON account_settings WHEN NEW.key='booking_auto_assign' BEGIN UPDATE booking_sync_rules SET auto_assign=CASE WHEN NEW.value='true' THEN 1 ELSE 0 END,version=version+1,updated_at=datetime('now') WHERE line_account_id=NEW.line_account_id AND auto_assign<>CASE WHEN NEW.value='true' THEN 1 ELSE 0 END; END;
 
@@ -10260,6 +10449,79 @@ WHEN EXISTS (
 )
 BEGIN SELECT RAISE(ABORT, 'conversion point with events or usages cannot be deleted'); END;
 
+CREATE TRIGGER fixed_friend_field_definition_guard BEFORE UPDATE ON friend_fields
+WHEN EXISTS (SELECT 1 FROM friend_fixed_fields WHERE field_id = OLD.id)
+  AND (NEW.name IS NOT OLD.name OR NEW.field_key IS NOT OLD.field_key
+    OR NEW.type IS NOT OLD.type OR NEW.type_v6 IS NOT OLD.type_v6 OR NEW.type_v8 IS NOT OLD.type_v8
+    OR NEW.folder_id IS NOT NULL OR NEW.is_personal <> 1 OR NEW.ec_is_master <> 0 OR NEW.status <> 'active')
+BEGIN SELECT RAISE(ABORT, 'FIXED_FRIEND_FIELD_IMMUTABLE'); END;
+
+CREATE TRIGGER fixed_name_friend_insert AFTER INSERT ON friends
+WHEN NEW.real_name IS NOT NULL AND TRIM(NEW.real_name) <> ''
+BEGIN   INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at)
+  VALUES (NEW.id, 'fixed-name', NEW.real_name, 'manual', NEW.updated_at); END;
+
+CREATE TRIGGER fixed_name_friend_update AFTER UPDATE OF real_name ON friends
+WHEN OLD.real_name IS NOT NEW.real_name
+BEGIN   DELETE FROM friend_field_values WHERE friend_id = NEW.id AND field_id = 'fixed-name'
+    AND (NEW.real_name IS NULL OR TRIM(NEW.real_name) = '');   INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at, source_type, source_id)
+  SELECT NEW.id, 'fixed-name', NEW.real_name, 'manual', NEW.updated_at, NULL, NULL
+  WHERE NEW.real_name IS NOT NULL AND TRIM(NEW.real_name) <> ''
+  ON CONFLICT(friend_id, field_id) DO UPDATE SET value = excluded.value,
+    updated_by = excluded.updated_by, updated_at = excluded.updated_at, source_type = NULL, source_id = NULL
+  WHERE friend_field_values.value IS NOT excluded.value; END;
+
+CREATE TRIGGER fixed_name_value_delete AFTER DELETE ON friend_field_values
+WHEN OLD.field_id = 'fixed-name'
+BEGIN   UPDATE friends SET real_name = NULL WHERE id = OLD.friend_id AND real_name IS NOT NULL; END;
+
+CREATE TRIGGER fixed_name_value_insert AFTER INSERT ON friend_field_values
+WHEN NEW.field_id = 'fixed-name'
+BEGIN   UPDATE friends SET real_name = NEW.value, updated_at = NEW.updated_at
+  WHERE id = NEW.friend_id AND real_name IS NOT NEW.value; END;
+
+CREATE TRIGGER fixed_name_value_update AFTER UPDATE OF value ON friend_field_values
+WHEN NEW.field_id = 'fixed-name'
+BEGIN   UPDATE friends SET real_name = NEW.value, updated_at = NEW.updated_at
+  WHERE id = NEW.friend_id AND real_name IS NOT NEW.value; END;
+
+CREATE TRIGGER folders_friend_add_rename AFTER UPDATE OF name ON folders WHEN NEW.kind='friend_add_rule' AND NEW.name IS NOT OLD.name BEGIN UPDATE friend_add_rules SET folder_name=NEW.name,lock_version=lock_version+1,updated_at=NEW.updated_at WHERE folder_id=NEW.id AND line_account_id=NEW.account_id; END;
+
+CREATE TRIGGER folders_friend_add_rule_legacy_delete AFTER DELETE ON folders WHEN OLD.kind='friend_add_rule' BEGIN DELETE FROM friend_add_rule_folders WHERE id=OLD.id AND line_account_id=OLD.account_id; END;
+
+CREATE TRIGGER folders_friend_add_rule_legacy_insert AFTER INSERT ON folders WHEN NEW.kind='friend_add_rule' BEGIN INSERT OR IGNORE INTO friend_add_rule_folders(id,line_account_id,name,color,created_at,updated_at,create_idempotency_key,created_by_staff_id) VALUES(NEW.id,NEW.account_id,NEW.name,NEW.color,NEW.created_at,NEW.updated_at,'common-'||NEW.id,'folder-api'); END;
+
+CREATE TRIGGER folders_friend_add_rule_legacy_update AFTER UPDATE ON folders WHEN NEW.kind='friend_add_rule' BEGIN UPDATE friend_add_rule_folders SET name=NEW.name,color=NEW.color,updated_at=NEW.updated_at WHERE id=NEW.id AND line_account_id=NEW.account_id AND (name IS NOT NEW.name OR color IS NOT NEW.color); END;
+
+CREATE TRIGGER folders_mileage_reward_legacy_delete AFTER DELETE ON folders WHEN OLD.kind='mileage_reward' BEGIN DELETE FROM mileage_reward_folders WHERE id=OLD.id AND line_account_id=OLD.account_id; END;
+
+CREATE TRIGGER folders_mileage_reward_legacy_insert AFTER INSERT ON folders WHEN NEW.kind='mileage_reward' BEGIN INSERT OR IGNORE INTO mileage_reward_folders(id,line_account_id,name,display_order,created_at,updated_at) VALUES(NEW.id,NEW.account_id,NEW.name,NEW.display_order,NEW.created_at,NEW.updated_at); END;
+
+CREATE TRIGGER folders_mileage_reward_legacy_update AFTER UPDATE ON folders WHEN NEW.kind='mileage_reward' BEGIN UPDATE mileage_reward_folders SET name=NEW.name,display_order=NEW.display_order,updated_at=NEW.updated_at WHERE id=NEW.id AND line_account_id=NEW.account_id AND (name IS NOT NEW.name OR display_order IS NOT NEW.display_order); END;
+
+CREATE TRIGGER friend_add_rule_folders_common_delete AFTER DELETE ON friend_add_rule_folders BEGIN DELETE FROM folders WHERE id=OLD.id AND kind='friend_add_rule' AND account_id=OLD.line_account_id; END;
+
+CREATE TRIGGER friend_add_rule_folders_common_insert AFTER INSERT ON friend_add_rule_folders WHEN NOT EXISTS(SELECT 1 FROM folders WHERE id=NEW.id) BEGIN INSERT INTO folders(id,kind,account_id,name,color,created_at,updated_at) VALUES(NEW.id,'friend_add_rule',NEW.line_account_id,NEW.name,NEW.color,NEW.created_at,NEW.updated_at); END;
+
+CREATE TRIGGER friend_add_rule_folders_common_update AFTER UPDATE ON friend_add_rule_folders WHEN EXISTS(SELECT 1 FROM folders WHERE id=NEW.id AND (name IS NOT NEW.name OR color IS NOT NEW.color)) BEGIN UPDATE folders SET name=NEW.name,color=NEW.color,revision=revision+1,updated_at=NEW.updated_at WHERE id=NEW.id AND kind='friend_add_rule' AND account_id=NEW.line_account_id; END;
+
+CREATE TRIGGER friend_add_rules_folder_id_insert AFTER INSERT ON friend_add_rules WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE friend_add_rules SET folder_name=(SELECT name FROM folders WHERE id=NEW.folder_id) WHERE id=NEW.id AND folder_name IS NOT (SELECT name FROM folders WHERE id=NEW.folder_id); END;
+
+CREATE TRIGGER friend_add_rules_folder_id_update AFTER UPDATE OF folder_id ON friend_add_rules WHEN NEW.folder_id IS NOT OLD.folder_id BEGIN UPDATE friend_add_rules SET folder_name=(SELECT name FROM folders WHERE id=NEW.folder_id),lock_version=lock_version+1 WHERE id=NEW.id AND folder_name IS NOT (SELECT name FROM folders WHERE id=NEW.folder_id); END;
+
+CREATE TRIGGER friend_add_rules_folder_insert BEFORE INSERT ON friend_add_rules WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='friend_add_rule' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
+
+CREATE TRIGGER friend_add_rules_folder_name_insert AFTER INSERT ON friend_add_rules WHEN NEW.folder_name IS NOT NULL AND NEW.folder_id IS NULL BEGIN INSERT OR IGNORE INTO folders(id,kind,account_id,name) SELECT 'friend-add-name-'||hex(NEW.line_account_id)||'-'||hex(NEW.folder_name)||'-'||lower(hex(randomblob(8))),'friend_add_rule',NEW.line_account_id,NEW.folder_name WHERE NOT EXISTS(SELECT 1 FROM folders WHERE kind='friend_add_rule' AND account_id=NEW.line_account_id AND name=NEW.folder_name); UPDATE friend_add_rules SET folder_id=(SELECT id FROM folders WHERE kind='friend_add_rule' AND account_id=NEW.line_account_id AND name=NEW.folder_name) WHERE id=NEW.id; END;
+
+CREATE TRIGGER friend_add_rules_folder_name_update AFTER UPDATE OF folder_name ON friend_add_rules WHEN NEW.folder_name IS NOT OLD.folder_name BEGIN INSERT INTO folders(id,kind,account_id,name) SELECT 'friend-add-name-'||hex(NEW.line_account_id)||'-'||hex(NEW.folder_name)||'-'||lower(hex(randomblob(8))),'friend_add_rule',NEW.line_account_id,NEW.folder_name WHERE NEW.folder_name IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE kind='friend_add_rule' AND account_id=NEW.line_account_id AND name=NEW.folder_name); UPDATE friend_add_rules SET folder_id=(SELECT id FROM folders WHERE kind='friend_add_rule' AND account_id=NEW.line_account_id AND name=NEW.folder_name) WHERE id=NEW.id; END;
+
+CREATE TRIGGER friend_add_rules_folder_update BEFORE UPDATE OF folder_id,line_account_id ON friend_add_rules WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='friend_add_rule' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
+
+CREATE TRIGGER friend_field_value_source_clear AFTER UPDATE OF value, updated_by, updated_at ON friend_field_values
+WHEN NEW.updated_by IS NOT 'form' AND NEW.source_type = 'form'
+BEGIN   UPDATE friend_field_values SET source_type = NULL, source_id = NULL
+  WHERE friend_id = NEW.friend_id AND field_id = NEW.field_id; END;
+
 CREATE TRIGGER hq_attribute_skip_insert BEFORE INSERT ON hq_template_preflight_resolutions
 WHEN NEW.friend_attribute_mode IS NOT NULL AND NOT EXISTS (
   SELECT 1 FROM hq_templates t WHERE t.id=NEW.template_id AND t.tenant_id=NEW.tenant_id
@@ -10278,6 +10540,16 @@ WHEN NEW.id != OLD.id
   OR NEW.tenant_id != OLD.tenant_id
   OR NEW.template_type != OLD.template_type
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_BINDING_IMMUTABLE'); END;
+
+CREATE TRIGGER hq_template_delivery_insert BEFORE INSERT ON hq_templates
+WHEN NEW.delivery_type IS NOT NULL AND
+  (NEW.template_type!='template' OR NEW.extended_type IS NOT NULL OR NEW.friend_attribute_type IS NOT NULL)
+BEGIN SELECT RAISE(ABORT,'HQ_TYPE_INVALID'); END;
+
+CREATE TRIGGER hq_template_delivery_update BEFORE UPDATE ON hq_templates
+WHEN NEW.delivery_type IS NOT OLD.delivery_type OR
+  (NEW.delivery_type IS NOT NULL AND (NEW.template_type!='template' OR NEW.extended_type IS NOT NULL OR NEW.friend_attribute_type IS NOT NULL))
+BEGIN SELECT RAISE(ABORT,'HQ_TYPE_IMMUTABLE'); END;
 
 CREATE TRIGGER hq_template_extended_type_insert BEFORE INSERT ON hq_templates
 WHEN NEW.extended_type IS NOT NULL AND NEW.template_type!='template'
@@ -10439,6 +10711,16 @@ WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
 CREATE TRIGGER messages_search_invalidate AFTER UPDATE OF content,unsent_at,delivery_type ON messages_log
 WHEN OLD.content IS NOT NEW.content OR OLD.unsent_at IS NOT NEW.unsent_at OR OLD.delivery_type IS NOT NEW.delivery_type
 BEGIN UPDATE messages_log SET search_content=NULL WHERE id=NEW.id; END;
+
+CREATE TRIGGER mileage_reward_folders_common_delete AFTER DELETE ON mileage_reward_folders BEGIN DELETE FROM folders WHERE id=OLD.id AND kind='mileage_reward' AND account_id=OLD.line_account_id; END;
+
+CREATE TRIGGER mileage_reward_folders_common_insert AFTER INSERT ON mileage_reward_folders WHEN NOT EXISTS(SELECT 1 FROM folders WHERE id=NEW.id) BEGIN INSERT INTO folders(id,kind,account_id,name,display_order,created_at,updated_at) VALUES(NEW.id,'mileage_reward',NEW.line_account_id,NEW.name,NEW.display_order,NEW.created_at,NEW.updated_at); END;
+
+CREATE TRIGGER mileage_reward_folders_common_update AFTER UPDATE ON mileage_reward_folders WHEN EXISTS(SELECT 1 FROM folders WHERE id=NEW.id AND (name IS NOT NEW.name OR display_order IS NOT NEW.display_order)) BEGIN UPDATE folders SET name=NEW.name,display_order=NEW.display_order,revision=revision+1,updated_at=NEW.updated_at WHERE id=NEW.id AND kind='mileage_reward' AND account_id=NEW.line_account_id; END;
+
+CREATE TRIGGER mileage_rewards_folder_insert BEFORE INSERT ON mileage_rewards WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='mileage_reward' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
+
+CREATE TRIGGER mileage_rewards_folder_update BEFORE UPDATE OF folder_id,line_account_id ON mileage_rewards WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='mileage_reward' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
 
 CREATE TRIGGER outgoing_webhook_config_version
 AFTER UPDATE OF name, url, event_types, secret, secret_encrypted, is_active, max_retries, deleted_at
@@ -11067,3 +11349,18 @@ CREATE VIEW rt_inventory_occupancy AS SELECT i.*,
 -- Seed data required by tenant-aware inserts on a fresh database.
 INSERT OR IGNORE INTO tenants (id, name) VALUES
   ('00000000-0000-4000-8000-000000000001', '既定の統括');
+
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-name','名前','fixed_name','text','form',1,-7);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('name','fixed-name');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-kana','ふりがな','fixed_kana','text','form',1,-6);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('kana','fixed-kana');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-birthday','生年月日','fixed_birthday','date','form',1,-5);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('birthday','fixed-birthday');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-age','年齢','fixed_age','number','form',1,-4);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('age','fixed-age');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-email','メール','fixed_email','email','form',1,-3);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('email','fixed-email');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-tel','電話','fixed_tel','tel','form',1,-2);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('tel','fixed-tel');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-address','住所','fixed_address','textarea','form',1,-1);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('address','fixed-address');

@@ -173,6 +173,11 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
 
   // ----------------------------------------------------------
   // リマインド・案内 (reminder_dispatch)
+  {
+    id: 'visit-stamp-expiry-reminders', label: '来店スタンプの期限のお知らせ', kind: 'scheduled', capability: 'reminder_dispatch',
+    enforcement: [{ file: 'apps/worker/src/services/visit-stamp-reminders.ts', marker: "'reminder_dispatch'" }],
+    note: '財布と期限で一度だけ。自動送信としてプロキシを通す。',
+  },
   // ----------------------------------------------------------
   {
     id: 'reminder-cron',

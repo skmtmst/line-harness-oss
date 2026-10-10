@@ -30,7 +30,7 @@ describe('権限なしの板', () => {
     const html = renderToStaticMarkup(<NoPermissionBoard featureName="シナリオ配信" roleLabel="スタッフ" capabilitiesHref="/staff" />)
     expect(html).toContain('data-design-node="O5tUeE"')
     expect(html).toContain('シナリオ配信を開く権限がありません')
-    expect(html).toContain('いまの役割は「スタッフ」です。必要なら、管理者に役割の変更を頼んでください。')
+    expect(html).toContain('いまの役割は「スタッフ」です。この操作の権限がありません。オーナーか管理者に頼んでください。')
     expect(html).not.toContain('管理者：')
     expect(html).not.toContain('以上の役割で使えます')
     expect(html).toContain('役割でできることを見る')

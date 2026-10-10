@@ -7,15 +7,18 @@
  * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左の「統括の設定」の列
  * （型のフォルダの列）・問い合わせのカード・これまでの問い合わせの表。
  */
+import { Field as SharedField } from '@/components/shared/form-controls'
 import StatusPill from '@/components/shared/status-pill'
-import { CheckCircle2, ImagePlus, Plus, X } from 'lucide-react'
+import { CheckCircle2, Plus, X } from 'lucide-react'
 import Link from 'next/link'
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import MediaSlot from '@/components/shared/media-slot'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
+import { HqAccountSelectField } from '@/components/shared/hq-account-picker'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useTenantStatus } from '@/components/tenant-access-context'
@@ -39,6 +42,7 @@ import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import NoticeLineDialogV8 from './notice-line-dialog'
 import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
 import styles from './support.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -50,7 +54,6 @@ export default function HqSupportV8() {
   const tenantStatus = useTenantStatus()
   const tenantUnavailable = tenantStatus === 'suspended' || tenantStatus === 'archived'
   const uid = useId()
-  const fileRef = useRef<HTMLInputElement>(null)
   const [kinds, setKinds] = useState<Array<{ key: HqSupportKind; label: string }>>([])
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
   const [sender, setSender] = useState({ tenantName: '', name: '', email: null as string | null, planLabel: '—' })
@@ -89,7 +92,7 @@ export default function HqSupportV8() {
           tenantName: data.sender.tenantName ?? '',
           name: data.sender.name ?? '',
           email: data.sender.email ?? null,
-          planLabel: data.sender.planLabel ?? '—',
+          planLabel: data.sender.planLabel ?? emptyValue('unknown'),
         })
       }
     }).catch(() => {
@@ -120,7 +123,6 @@ export default function HqSupportV8() {
     } catch {
       setError('画像を読み取れませんでした')
     } finally {
-      if (fileRef.current) fileRef.current.value = ''
     }
   }
 
@@ -155,7 +157,7 @@ export default function HqSupportV8() {
     } catch (caught) {
       // M027：原文のまま出さず、共通の状態別案内へ渡す。
       setError(japaneseDetailOf(caught) || describeApiFailure(caught, '送信', {
-        forbidden: 'お問い合わせの送信はオーナー・管理者・担当者だけができます。',
+        scope: 'hq',
       }))
       // 確定応答を失った再送でも履歴で確かめられるよう、履歴を読み直す（重複は口側 M028 が防ぐ）。
       void loadHistory()
@@ -185,7 +187,7 @@ export default function HqSupportV8() {
     <ListPage
       boardId="b8xBtZ"
       title="お問い合わせ"
-      description="使い方の質問・不具合・料金の相談を運営へ送れます。返信は登録メールアドレスと、下の「これまでの問い合わせ」に届きます（平日 2 営業日以内）。"
+      help="使い方の質問・不具合・料金の相談を運営へ送れます。返信は登録メールアドレスと、下の「これまでの問い合わせ」に届きます（平日 2 営業日以内）。"
       folders={<HqSettingsNavV8 active="contact" />} folderNav={settingsNav}
     >
       <div className={styles.body}>
@@ -228,14 +230,15 @@ export default function HqSupportV8() {
               />
             </Field>
             <Field label="関係する店舗" htmlFor={`${uid}-account`}>
-              <Select
-                aria-label="関係する店舗"
+              <HqAccountSelectField
+                label="関係する店舗"
                 id={`${uid}-account`}
-                size="full"
+                accounts={accounts}
                 value={input.lineAccountId}
                 disabled={sending}
+                clearable
+                placeholder="（指定しない）"
                 onChange={(value) => set('lineAccountId', value)}
-                options={[{ value: '', label: '指定しない' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
               />
             </Field>
           </div>
@@ -264,16 +267,6 @@ export default function HqSupportV8() {
             />
           </Field>
 
-          {/* 本物の file input は出さない。開くのは下の「画像を添える」から。 */}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/png,image/jpeg"
-            className={styles.hiddenInput}
-            tabIndex={-1}
-            aria-hidden="true"
-            onChange={(event) => void addFile(event.target.files?.[0])}
-          />
           {attachments.length > 0 ? (
             <ul className={styles.thumbs}>
               {attachments.map((a, i) => (
@@ -288,15 +281,21 @@ export default function HqSupportV8() {
             </ul>
           ) : null}
           {attachments.length < SUPPORT_ATTACHMENT_MAX ? (
-            <button type="button" className={styles.attach} disabled={sending} onClick={() => fileRef.current?.click()}>
-              <ImagePlus aria-hidden="true" className={styles.attachIcon} />
-              {`画像を添える（PNG・JPEG、1枚 5MB まで）`}
-            </button>
+            <div className={styles.attachSlot}>
+              <MediaSlot
+                size="compact"
+                title="画像を添える"
+                accept="image/png,image/jpeg"
+                maxBytes={5 * 1024 * 1024} help={`${SUPPORT_ATTACHMENT_MAX}枚まで`}
+                disabled={sending}
+                onFile={(file) => void addFile(file)}
+              />
+            </div>
           ) : null}
 
           <div className={styles.sender}>
             <span className={styles.senderText} title="この内容が問い合わせに添えられます。返信はこのメールアドレスに届きます。">
-              {`送信者：${sender.name || '—'}${sender.email ? `（${sender.email}）` : ''}・統括：${sender.tenantName || '—'}・プラン：${sender.planLabel}`}
+              {`送信者：${sender.name || emptyValue('unknown')}${sender.email ? `（${sender.email}）` : ''}・統括：${sender.tenantName || emptyValue('unknown')}・プラン：${sender.planLabel}`}
             </span>
             {!tenantUnavailable ? (
               <button type="button" onClick={() => setLineGuide(true)} className={styles.linkButton}>
@@ -338,11 +337,11 @@ export default function HqSupportV8() {
               </div>
               {history.slice(0, 10).map((item) => (
                 <div key={item.id} className={styles.row} role="row">
-                  <span role="cell">{item.ticketLabel ?? '—'}</span>
+                  <span role="cell">{item.ticketLabel ?? emptyValue('unknown')}</span>
                   <span role="cell" className={styles.subjectCell}>
                     <Link href={`/hq/support/detail?id=${encodeURIComponent(item.id)}`} className={styles.subject} title={item.subject}>{item.subject}</Link>
                     {!tenantUnavailable && item.replies && item.replies.length > 0 ? (
-                      <span className={styles.replyNote}>運営からの返信 {item.replies.length}件・開いて続きを送れます</span>
+                      <span className={styles.replyNote}>運営からの返信 {item.replies.length} 件・開いて続きを送れます</span>
                     ) : null}
                   </span>
                   <span role="cell" className={styles.cell} title={item.kindLabel}>{supportKindWord(item.kind, item.kindLabel)}</span>
@@ -360,11 +359,6 @@ export default function HqSupportV8() {
   )
 }
 
-function Field({ label, htmlFor, tone, children }: { label: string; htmlFor: string; tone?: 'large'; children: ReactNode }) {
-  return (
-    <div className={styles.field}>
-      <label htmlFor={htmlFor} className={tone === 'large' ? styles.labelLarge : styles.label}>{label}</label>
-      {children}
-    </div>
-  )
+function Field({ label, htmlFor, children }: { label: string; htmlFor: string; tone?: 'large'; children: ReactNode }) {
+  return <SharedField label={label} htmlFor={htmlFor}>{children}</SharedField>
 }

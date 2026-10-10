@@ -15,6 +15,9 @@ function loadQrCode(): Promise<QrCodeModule> {
     // CJS モジュールなので束ね方によっては default に入る。
     const resolved = mod as QrCodeModule & { default?: QrCodeModule }
     return resolved.default ?? resolved
+  }).catch(error => {
+    loading = null
+    throw error
   })
   return loading
 }

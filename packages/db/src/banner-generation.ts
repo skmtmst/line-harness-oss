@@ -1,3 +1,4 @@
+import { readHqBannerFolderAssignment } from './hq-folders.js';
 import { jstNow } from './utils.js';
 import type { Media } from './media.js';
 
@@ -82,6 +83,7 @@ export function bannerReferencesFromRow(row: {
 }
 
 export interface BannerProject {
+  folder_id?: string | null;
   id: string;
   tenant_id: string;
   name: string;
@@ -98,6 +100,8 @@ export interface BannerProject {
 }
 
 export interface BannerGeneration {
+  crop_gravity?: 'center' | 'top' | 'bottom';
+  stop_requested_at?: string | null;
   id: string;
   tenant_id: string;
   project_id: string;
@@ -140,6 +144,7 @@ export interface BannerGeneration {
 }
 
 export interface BannerImage {
+  folder_id?: string | null;
   id: string;
   tenant_id: string;
   project_id: string;
@@ -174,10 +179,11 @@ export interface BannerImageDelivery {
 
 export async function listBannerProjects(
   db: D1Database,
-  opts: { tenantId: string; archived: boolean; query?: string },
+  opts: { tenantId: string; archived: boolean; query?: string; folderId?: string | null },
 ): Promise<BannerProject[]> {
   const conditions = ['p.tenant_id = ?', opts.archived ? 'p.archived_at IS NOT NULL' : 'p.archived_at IS NULL'];
   const values: unknown[] = [opts.tenantId];
+  if (opts.folderId !== undefined) { conditions.push(opts.folderId === null ? 'p.folder_id IS NULL' : 'p.folder_id = ?'); if (opts.folderId !== null) values.push(opts.folderId); }
   if (opts.query) {
     conditions.push('(p.name LIKE ? OR p.description LIKE ?)');
     const like = `%${opts.query}%`;
@@ -221,17 +227,18 @@ export async function getBannerProject(
 
 export async function createBannerProject(
   db: D1Database,
-  input: { tenantId: string; name: string; description?: string; createdBy?: string | null },
+  input: { tenantId: string; name: string; description?: string; createdBy?: string | null; folderId?: string | null },
 ): Promise<BannerProject> {
+  const folderId = await readHqBannerFolderAssignment(db,input.tenantId,'project',input.folderId);
   const id = crypto.randomUUID();
   const now = jstNow();
   await db
     .prepare(
       `INSERT INTO banner_projects
-         (id, tenant_id, name, description, is_favorite, archived_at, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 0, NULL, ?, ?, ?)`,
+         (id, tenant_id, name, description, is_favorite, archived_at, created_by, created_at, updated_at, folder_id)
+       VALUES (?, ?, ?, ?, 0, NULL, ?, ?, ?, ?)`,
     )
-    .bind(id, input.tenantId, input.name, input.description ?? '', input.createdBy ?? null, now, now)
+    .bind(id, input.tenantId, input.name, input.description ?? '', input.createdBy ?? null, now, now, folderId ?? null)
     .run();
   return (await getBannerProject(db, id, input.tenantId))!;
 }
@@ -240,10 +247,12 @@ export async function updateBannerProject(
   db: D1Database,
   id: string,
   tenantId: string,
-  patch: { name?: string; description?: string; isFavorite?: boolean; archived?: boolean },
+  patch: { name?: string; description?: string; isFavorite?: boolean; archived?: boolean; folderId?: string | null },
 ): Promise<BannerProject | null> {
+  const folderId=await readHqBannerFolderAssignment(db,tenantId,'project',patch.folderId);
   const sets: string[] = [];
   const values: unknown[] = [];
+  if (folderId !== undefined) { sets.push('folder_id = ?'); values.push(folderId); }
   if (patch.name !== undefined) { sets.push('name = ?'); values.push(patch.name); }
   if (patch.description !== undefined) { sets.push('description = ?'); values.push(patch.description); }
   if (patch.isFavorite !== undefined) { sets.push('is_favorite = ?'); values.push(patch.isFavorite ? 1 : 0); }
@@ -291,6 +300,7 @@ export async function createBannerGeneration(
     modelName: string | null;
     requestedCount: number;
     unitsPerImage: number;
+    cropGravity?: 'center' | 'top' | 'bottom';
     /** 参照画像（最大3枚・画像ごとに使い方）。無ければ空配列。 */
     references?: BannerReference[] | null;
     createdBy?: string | null;
@@ -305,8 +315,8 @@ export async function createBannerGeneration(
           text_lines, emphasis_lines, base_color, main_color, sub_color, accent_color,
           person_option, custom_prompt, free_prompt, final_prompt,
           engine, model_name, requested_count, done_count, failed_count, units_per_image,
-          error_message, reference_image_id, reference_mode, reference_images, created_by, created_at)
-       VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NULL, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`,
+          error_message, reference_image_id, reference_mode, reference_images, created_by, created_at, crop_gravity)
+       VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NULL, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`,
     )
     .bind(
       id,
@@ -338,6 +348,7 @@ export async function createBannerGeneration(
       references.length ? JSON.stringify(references) : null,
       input.createdBy ?? null,
       jstNow(),
+      input.cropGravity ?? 'center',
     )
     .run();
   return (await getBannerGeneration(db, id, input.tenantId))!;
@@ -453,10 +464,12 @@ export async function updateBannerImage(
   db: D1Database,
   id: string,
   tenantId: string,
-  patch: { isFavorite?: boolean; deleted?: boolean; projectId?: string },
+  patch: { isFavorite?: boolean; deleted?: boolean; projectId?: string; folderId?: string | null },
 ): Promise<BannerImage | null> {
+  const folderId=await readHqBannerFolderAssignment(db,tenantId,'image',patch.folderId);
   const sets: string[] = [];
   const values: unknown[] = [];
+  if (folderId !== undefined) { sets.push('folder_id = ?'); values.push(folderId); }
   if (patch.isFavorite !== undefined) { sets.push('is_favorite = ?'); values.push(patch.isFavorite ? 1 : 0); }
   if (patch.deleted !== undefined) { sets.push('deleted_at = ?'); values.push(patch.deleted ? jstNow() : null); }
   if (patch.projectId !== undefined) { sets.push('project_id = ?'); values.push(patch.projectId); }
@@ -470,6 +483,7 @@ export async function updateBannerImage(
 }
 
 export interface BannerImageListFilter {
+  folderId?: string | null;
   tenantId: string;
   delivered?: boolean;
   projectId?: string;
@@ -486,6 +500,7 @@ export interface BannerImageListFilter {
 function bannerImageConditions(filter: BannerImageListFilter) {
   const conditions = ['i.tenant_id = ?', 'i.deleted_at IS NULL'];
   const values: unknown[] = [filter.tenantId];
+  if (filter.folderId !== undefined) { conditions.push(filter.folderId === null ? 'i.folder_id IS NULL' : 'i.folder_id = ?'); if (filter.folderId !== null) values.push(filter.folderId); }
   if (filter.projectId) { conditions.push('i.project_id = ?'); values.push(filter.projectId); }
   if (filter.favoriteOnly) conditions.push('i.is_favorite = 1');
   if (filter.delivered !== undefined) conditions.push(`${filter.delivered ? '' : 'NOT '}EXISTS (

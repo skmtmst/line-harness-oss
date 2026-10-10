@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import React from 'react'
+import React, { act } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react'
 import type { HqBrowserAccount } from './account-browser-v8'
@@ -27,16 +27,18 @@ describe('V8 統括のアカウントを探す', () => {
     expect(select).toHaveBeenCalledWith('a2')
     expect(screen.getByText(/21〜23件/)).toBeTruthy()
   })
-  it('LINE ID検索でページを戻し、閲覧者の設定ボタンを無効にする', () => {
+  it('LINE ID検索でページを戻し、閲覧者の設定ボタンを無効にする', async () => {
     const settings = vi.fn()
     render(<AccountBrowser accounts={accounts} onSelect={vi.fn()} onSettings={settings} {...baseProps} />)
     fireEvent.click(screen.getByRole('button', { name: '2ページ目へ' }))
     fireEvent.change(screen.getByRole('searchbox', { name: 'アカウント名・LINE ID・タグで探す' }), { target: { value: '@shop11' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
     expect(screen.getByText('店舗11')).toBeTruthy()
     expect(screen.getByRole('button', { name: '店舗11 の設定' }).hasAttribute('disabled')).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: '店舗11 の設定' }))
     expect(settings).not.toHaveBeenCalled()
     fireEvent.change(screen.getByRole('searchbox', { name: 'アカウント名・LINE ID・タグで探す' }), { target: { value: '' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
     expect(screen.getByText('店舗22')).toBeTruthy()
     expect(screen.getByRole('button', { name: '1ページ目へ' }).getAttribute('aria-current')).toBe('page')
   })

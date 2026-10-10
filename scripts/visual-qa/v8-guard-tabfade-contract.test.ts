@@ -14,13 +14,8 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (rel: string) => readFileSync(join(HERE, rel), 'utf8')
 
 describe('タブのぼかしは比較撮影で隠す', () => {
-  it('友だち詳細のフェードに目印（data-tab-fade）がある', () => {
-    const page = read('../../apps/web/src/app/friends/detail/page.tsx')
-    expect(page).toContain('data-tab-fade="right"')
-    // 目印だけ足し、出す条件と見た目は変えない
-    expect(page).toContain('{tabsOverflowing ? (')
-    expect(page).toContain('bg-gradient-to-l')
-  })
+  // 友だち詳細（app/friends/detail/page.tsx）は 2026-10-09 の V7 削除（mainA）で V8 の画面だけになり、v7 のフェードが無くなったので外した。
+
 
   it('共通タブの前後フェードに目印（data-scroll-hint）がある', () => {
     const tabs = read('../../apps/web/src/components/layout/scrollable-tabs.tsx')

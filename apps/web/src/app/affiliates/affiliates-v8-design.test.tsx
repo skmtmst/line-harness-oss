@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 板 `KdFRI` アフィリエイタータブの絵合わせ。
+ * 板 `KdFRI` アフィリエイタータブの実入口の集計・権限・操作。
  * - 数の帯：アフィリエイター（計測中・停止中）、今月の成果（先月より±N）、
  *   今月の報酬（¥表示・承認待ち分は入れない）、承認待ち（認めると報酬に入ります）
  * - 道具：作るボタン、名前・紹介コードで探す、計測中／報酬ありの札、
@@ -9,7 +9,7 @@
  *   成果を見るボタン、脚注どおりの「…」の内訳
  */
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const AFFILIATES = [
   {
@@ -37,7 +37,7 @@ const DETAIL = [
 const MONTHLY_CURRENT = [{ totalConversions: 30 }, { totalConversions: 8 }]
 const MONTHLY_PREV = [{ totalConversions: 25 }, { totalConversions: 6 }]
 
-const fixture = vi.hoisted(() => ({ datedCalls: 0 }))
+const fixture = vi.hoisted(() => ({ datedCalls: 0, readonly: false }))
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -53,68 +53,73 @@ vi.mock('@/lib/api', () => ({
       links: () => Promise.resolve({ success: true, data: [] }),
       archive: () => Promise.resolve({ success: true, data: null }),
     },
+    affiliateOffers: { list: async () => ({ success: true, data: [] }) },
     accountSettings: {
       getLinkBaseUrl: () => Promise.resolve({ success: true, data: null }),
     },
   },
 }))
 
-vi.mock('./tabs', () => ({
-  CreateAffiliateModal: () => null,
+vi.mock('@/v8/affiliates/display', async original => ({
+  ...await original<typeof import('@/v8/affiliates/display')>(),
   distributionUrl: () => null,
   listAllConversionApprovals: async () => ({ items: [], truncated: false }),
 }))
 
-const { default: AffiliatesTabV8 } = await import('./v8-affiliates-tab')
+import AffiliatesPage from './page'
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-1' }) }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fixture.readonly ? 'staff' : 'owner', canManageRole: (role: string) => role === 'owner' }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/affiliates' }))
 
 afterEach(() => {
   cleanup()
   fixture.datedCalls = 0
+  fixture.readonly = false
 })
 
-describe('KdFRI アフィリエイタータブの絵合わせ', () => {
+describe('KdFRI アフィリエイタータブの実入口の集計・権限・操作', () => {
   test('数の帯が絵どおり（先月差分・¥表示）', async () => {
-    render(<AffiliatesTabV8 accountId="acc-1" canEdit registerHeaderActions={() => {}} />)
+    render(<AffiliatesPage />)
     await waitFor(() => {
-      expect(screen.getByText('今月の成果')).toBeTruthy()
+      expect(screen.getByText(/先月より\s*\+7/)).toBeTruthy()
     })
     expect(screen.getByText('計測中 2・停止中 1')).toBeTruthy()
     // 今月 38 − 先月 31 ＝ +7
-    expect(screen.getByText('先月より+7')).toBeTruthy()
+    expect(screen.getByText(/先月より\s*\+7/)).toBeTruthy()
     expect(screen.getByText('¥70,400')).toBeTruthy()
     expect(screen.getByText('承認待ち')).toBeTruthy()
     expect(screen.getByText('認めると報酬に入ります')).toBeTruthy()
   })
 
   test('v9JWQ 閲覧のみ：変える操作が止まり見る操作は残る', async () => {
-    render(<AffiliatesTabV8 accountId="acc-1" canEdit={false} registerHeaderActions={() => {}} />)
+    fixture.readonly = true
+    render(<AffiliatesPage />)
     await waitFor(() => {
       expect(screen.getAllByRole('button', { name: '成果を見る' }).length).toBe(3)
     })
-    // 作る・選ぶは止まる
-    expect((screen.getByRole('button', { name: /アフィリエイターを作る/ }) as HTMLButtonElement).disabled).toBe(true)
-    for (const box of screen.getAllByRole('checkbox')) {
-      expect((box as HTMLInputElement).disabled).toBe(true)
-    }
+    // 閲覧だけの人には作る・選ぶ操作を出さない
+    expect(screen.queryByRole('link', { name: /アフィリエイターを作る/ })).toBeNull()
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
     // 探す・絞る・見るは使える
     expect(screen.getByLabelText('名前・紹介コードで探す')).toBeTruthy()
     expect(screen.getByLabelText('よく使う絞り込み')).toBeTruthy()
   })
 
   test('道具が絵どおり', async () => {
-    render(<AffiliatesTabV8 accountId="acc-1" canEdit registerHeaderActions={() => {}} />)
+    render(<AffiliatesPage />)
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /アフィリエイターを作る/ })).toBeTruthy()
+      expect(screen.getByRole('link', { name: /アフィリエイターを作る/ })).toBeTruthy()
     })
     expect(screen.getByLabelText('名前・紹介コードで探す')).toBeTruthy()
     expect(screen.getByRole('button', { name: /計測中/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /報酬あり/ })).toBeTruthy()
     expect(screen.getByLabelText('よく使う絞り込み')).toBeTruthy()
-    expect(screen.getByLabelText('表示件数')).toBeTruthy()
+    expect(screen.getByLabelText('1ページに出す件数')).toBeTruthy()
   })
 
   test('行に約束行と札と操作が出る', async () => {
-    render(<AffiliatesTabV8 accountId="acc-1" canEdit registerHeaderActions={() => {}} />)
+    render(<AffiliatesPage />)
     await waitFor(() => {
       expect(screen.getAllByRole('button', { name: '成果を見る' }).length).toBe(3)
     })
@@ -122,6 +127,7 @@ describe('KdFRI アフィリエイタータブの絵合わせ', () => {
     expect(screen.getByText('報酬なし（計測のみ）')).toBeTruthy()
     expect(screen.getAllByText('計測中').length).toBeGreaterThan(0)
     expect(screen.getByText('停止中')).toBeTruthy()
-    expect(screen.getByText(/止めると、その人の紹介リンクからの成果を数えなくなります/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '田中 明の操作' }))
+    expect(screen.getByRole('menuitem', { name: '紹介を止める' })).toBeTruthy()
   })
 })

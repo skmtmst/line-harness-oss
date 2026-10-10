@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
-const SETTINGS = readFileSync(new URL('../settings/page.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('../../../v8/hq/members.tsx', import.meta.url), 'utf8')
+const SETTINGS = readFileSync(new URL('../../../v8/hq/settings.tsx', import.meta.url), 'utf8')
 
 /**
  * M026：権限ダイアログ原文・再送と統括名保存に再試行の案内なし。
@@ -11,7 +11,7 @@ const SETTINGS = readFileSync(new URL('../settings/page.tsx', import.meta.url), 
 describe('M026 権限者の失敗表示', () => {
   it('権限ダイアログの失敗は状態別案内へ渡す', () => {
     expect(PAGE).toContain("describeApiFailure(caught, '保存'")
-    expect(PAGE).toContain('権限者の招待・変更はオーナーか管理者だけができます')
+    expect(PAGE).toContain("scope: 'hq'")
     expect(PAGE).not.toContain("caught.message : '保存できませんでした。もう一度お試しください。'")
   })
 

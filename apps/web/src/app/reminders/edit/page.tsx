@@ -1,85 +1,18 @@
 'use client'
 
-import ReminderPublishFlow, {
-  type ReminderPublishStage,
-} from '@/components/reminders/reminder-publish-flow'
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import TargetMissing from '@/components/shared/target-missing'
-import { useAdminTheme } from '@/lib/use-admin-theme'
-import { Issue469ReminderStepEditor, Issue469ReminderTestStage } from './issue469-reminder-screens'
+import ListState from '@/components/shared/list-state'
 import ReminderEditV8 from '@/v8/reminders/edit'
-
-/**
- * リマインダの編集。
- *
- * 作れるのに直せない状態だった。名前を打ち間違えても、送る時刻を変えたくなっても、
- * 作り直すしかなかった。
- *
- * **配信方式（○日前の●時／残り時間）はここで変えられない。** 途中で変えると、
- * すでに登録済みの人の配信予定がすべて変わる。「3日前」で予約が入っている人が、
- * 突然「4320分前」の解釈に切り替わる。作るときに決めたものを守る。
- */
-
-/**
- * 公開までの段（設計 7-1-C〜G）。`?stage=` が付いていたらそちらへ渡す。
- *
- * **同じ `/reminders/edit` のまま段を切り替える。** 別のルートにすると、
- * 直しに戻るたびに URL が変わり、どこまで進んだのか分からなくなる。
- */
-const PUBLISH_STAGES = new Set<ReminderPublishStage>(['target', 'preview', 'test', 'confirm', 'done'])
-
-/*
- * U097: 「指定されていません」と言うだけでは戻れない。一覧へ戻る
- * 操作を文のそばに置く。
- */
-function MissingReminder() {
-  return (
-    <TargetMissing
-      kind="unspecified"
-      title="編集するリマインダが指定されていません"
-      description="一覧から編集するリマインダを選び直してください。"
-      backHref="/reminders"
-      backLabel="リマインダ一覧へ戻る"
-    />
-  )
-}
 
 function ReminderEditInner() {
   const params = useSearchParams()
-  const theme = useAdminTheme()
   const id = params.get('id') ?? ''
-  const rawStage = params.get('stage')
-  /*
-   * ★V8：テーマが v8 のときだけ新しい作る流れ（edit-v8.tsx、板 VE1u5〜hjNpJ）へ。
-   * v7 の分岐（テスト段・公開フロー・通知編集）はこの下をそのまま残す。
-   */
-  if (theme === 'v8') {
-    if (!id) {
-      return <MissingReminder />
-    }
-    return <ReminderEditV8 reminderId={id} stage={rawStage} />
-  }
-  if (rawStage === 'test' && id) {
-    return <Issue469ReminderTestStage reminderId={id} />
-  }
-  if (rawStage && PUBLISH_STAGES.has(rawStage as ReminderPublishStage)) {
-    if (!id) {
-      return <MissingReminder />
-    }
-    return <ReminderPublishFlow reminderId={id} stage={rawStage as ReminderPublishStage} />
-  }
-  if (!id) {
-    return <MissingReminder />
-  }
-  return <Issue469ReminderStepEditor reminderId={id} />
+  if (!id) return <TargetMissing kind="unspecified" title="編集するリマインダが指定されていません" description="一覧から編集するリマインダを選び直してください。" backHref="/reminders" backLabel="リマインダ一覧へ戻る" />
+  return <ReminderEditV8 reminderId={id} stage={params.get('stage')} />
 }
 
 export default function ReminderEditPage() {
-  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
-  return (
-    <Suspense fallback={<p className="text-ink-faint p-6 text-sm">読み込み中...</p>}>
-      <ReminderEditInner />
-    </Suspense>
-  )
+  return <Suspense fallback={<ListState kind="loading" />}><ReminderEditInner /></Suspense>
 }

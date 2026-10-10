@@ -663,15 +663,17 @@ export async function matchAndReply(
       // 「失敗したら止める」の指定があるアクションが失敗したら、後続は
       // 実行しない。無指定は `continue`（いまの動き）に倒してある。
       let actionFailed = false;
+      let continueAfterEventBookingStop = false;
       try {
         const result = await runAutoReplyAction(db, action, friend.id, {lineAccountId,sourceEventId:`auto-reply:${evaluationId}:${action.id}`,env:opts.operatorMailEnv});
         addActionResult(actionSummary, result);
         actionFailed = result.failed > 0;
+        continueAfterEventBookingStop = Boolean(result.eventBookingFailure);
         try {
           await finishAutoReplyActionRun(db, {
             id: reserved.id,
             status: actionResultStatus(result),
-            errorCode: result.failed > 0 ? 'action_failed' : null,
+            errorCode: result.eventBookingFailure?.code ?? (result.failed > 0 ? 'action_failed' : null),
             result: { ...result },
           });
         } catch (finishError) {
@@ -694,7 +696,7 @@ export async function matchAndReply(
         }
         console.error('[auto-reply] failed to run action', err);
       }
-      if (actionFailed && action.onFailure === 'stop') break;
+      if (actionFailed && action.onFailure === 'stop' && !continueAfterEventBookingStop) break;
     }
   }
 

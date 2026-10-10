@@ -431,7 +431,7 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
     await flush()
 
     // 0件として黙るのではなく、読み込めなかったことと再読み込み口が出る。
-    expect(host.textContent).toContain('予約の一覧を読み込めませんでした。')
+    expect(document.body.textContent).toContain('予約の一覧を読み込めませんでした。')
     expect(document.querySelector('[data-inbox-v6="scheduled-retry"]')).not.toBeNull()
     expect(scheduleToggleText()).toBe('予約')
   })
@@ -558,7 +558,7 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
     await typeDatetime('2026-09-25T10:30')
 
     const scheduleButton = () =>
-      [...document.querySelectorAll('button')].find((b) => b.textContent === 'この日時で予約する' || b.textContent === '予約中...')
+      [...document.querySelectorAll('button')].find((b) => /に予約$/.test(b.textContent ?? '') || b.textContent === '予約中...' )
 
     // 1回目: 通信中に保留 → 失敗させる。
     await click(scheduleButton() ?? null)

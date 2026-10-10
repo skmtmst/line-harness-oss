@@ -1,5 +1,5 @@
 import WaitlistOfferSheet from '../components/WaitlistOfferSheet.js';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import MenuList from '../components/MenuList.js';
 import RepeatCard from '../components/RepeatCard.js';
@@ -29,6 +29,8 @@ export default function Booking() {
   const navigate = useNavigate();
   const isPeek = params.get('mode') === 'peek';
 
+  const [initialMenuId] = useState(params.get('menu_id'));
+  const menuTouched = useRef(false);
   const [step, setStep] = useState<Step>('menu');
   const [menu, setMenu] = useState<MenuItem | null>(null);
   const [staff, setStaff] = useState<StaffItem | null>(null);
@@ -39,6 +41,16 @@ export default function Booking() {
   const [doneStatus, setDoneStatus] = useState('requested');
   // 予約のルール「お店が承認してから確定する」。読めなければ承認あり扱い。
   const [autoConfirm, setAutoConfirm] = useState(false);
+  useEffect(() => {
+    if (!initialMenuId) return;
+    let alive = true;
+    api.menus().then(({ menus }) => {
+      if (!alive || menuTouched.current) return;
+      const selected = menus.find(item => item.id === initialMenuId);
+      if (selected) { setMenu(selected); setStep('staff'); }
+    }).catch(() => { /* 非公開・削除済み・取得失敗は通常の選択へ戻す。 */ });
+    return () => { alive = false; };
+  }, [initialMenuId]);
   useEffect(() => {
     let alive = true;
     api
@@ -68,6 +80,7 @@ export default function Booking() {
   }
 
   function pickMenu(m: MenuItem) {
+    menuTouched.current = true;
     // 選び直したら後の選択は捨てる (古い担当・日時のまま送らない)。
     if (m.id !== menu?.id) {
       setStaff(null);
@@ -92,7 +105,7 @@ export default function Booking() {
   return (
     <LiffLookScope className="min-h-screen bg-canvas">
       <LiffHeader title="ご予約" />
-      {(params.get('waitlist')||params.get('seat_waitlist'))&&<WaitlistOfferSheet id={params.get('waitlist')||params.get('seat_waitlist')!} seat={!!params.get('seat_waitlist')} decline={params.get('action')==='decline'} onClose={()=>{const next=new URLSearchParams(params);next.delete('waitlist');next.delete('seat_waitlist');next.delete('action');navigate({pathname:'/booking',search:next.toString()},{replace:true});}}/>}
+      {(params.get('waitlist')||params.get('seat_waitlist'))&&<WaitlistOfferSheet id={params.get('waitlist')||params.get('seat_waitlist')!} seat={!!params.get('seat_waitlist')} decline={params.get('action')==='decline'} onClose={()=>{const next=new URLSearchParams(params);next.delete('waitlist');next.delete('seat_waitlist');next.delete('action');navigate({pathname:'/booking',search:next.toString()},{replace:true});}} />}
       {step !== 'done' && !waiting && <Stepper steps={STEPS} current={stepIndex} />}
       <div className={`mx-auto w-full max-w-md px-4 pt-3 ${waiting ? 'pb-3' : 'pb-40'}`}>
         {/* ★A: ページを移らず、段が替わるたび中身だけ右から移り変わる。 */}
@@ -183,13 +196,12 @@ export default function Booking() {
           <Button variant="primary" disabled={!staff} onClick={() => setStep('datetime')}>
             日時を選ぶ
           </Button>
-          <button
+          <Button variant="text"
             type="button"
             onClick={() => setStep('menu')}
-            className="liff-hit self-center text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
           >
             ← メニューを選び直す
-          </button>
+          </Button>
         </BottomBar>
       )}
     </LiffLookScope>

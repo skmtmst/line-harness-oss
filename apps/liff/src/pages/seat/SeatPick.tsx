@@ -1,3 +1,5 @@
+import { FormSelectControl, TextInput, FieldLabel } from '../../components/forms/controls.js';
+import Button from '../../components/ui/Button.js';
 import { useRef } from 'react';
 import type { RestaurantCustomerSlot, RestaurantUnavailableReason } from '@line-crm/shared';
 import {
@@ -10,6 +12,7 @@ import {
   zonedParts,
   type DayChip,
 } from '../../lib/seat-reserve.js';
+import { LiffInput } from '../../components/forms/controls.js'
 
 /** 札で選べる人数。5 は「5名以上」で、選ぶと下に人数の選択が出る。 */
 const GUESTS = [1, 2, 3, 4, 5] as const;
@@ -79,64 +82,53 @@ export default function SeatPick({
     <div className="space-y-3.5" data-design-node="glL3g">
       <h2 className="text-xl font-bold text-ink">人数と日時を選んでください</h2>
 
-      <p id="seat-guest" className="text-[13px] leading-5 font-bold text-ink">人数</p>
+      <FieldLabel id="seat-guest" required>人数</FieldLabel>
       <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-labelledby="seat-guest">
         {GUESTS.map((n) => {
           const on = n === 5 ? many : guestCount === n;
           return (
-            <button
+            <Button variant="chip" selected={on}
               key={n}
               type="button"
               role="radio"
               aria-checked={on}
               onClick={() => onGuest(n === 5 && many ? guestCount : n)}
-              className={`liff-hit liff-press rounded-full px-3.5 py-[7px] text-[13px] leading-5 font-semibold whitespace-nowrap focus-visible:outline-2 focus-visible:outline-ink ${
-                on ? 'bg-ink text-canvas' : 'bg-liff-chip text-ink'
-              }`}
             >
               {n === 5 ? '5名以上' : `${n}名`}
-            </button>
+            </Button>
           );
         })}
         {many && (
           <label className="flex items-center gap-1.5 text-[13px] text-ink">
             <span className="sr-only">人数</span>
-            <select
+            <FormSelectControl
               value={guestCount}
               onChange={(e) => onGuest(Number(e.target.value))}
-              className="h-[34px] rounded-full bg-canvas px-3 text-[13px] text-ink outline outline-1 -outline-offset-1 outline-liff-line-strong focus-visible:outline-2 focus-visible:outline-ink"
             >
               {Array.from({ length: MANY_MAX - 4 }, (_, i) => i + 5).map((n) => (
                 <option key={n} value={n}>
                   {n}名
                 </option>
               ))}
-            </select>
+            </FormSelectControl>
           </label>
         )}
       </div>
 
-      <p id="seat-day" className="text-[13px] leading-5 font-bold text-ink">日にち</p>
+      <FieldLabel id="seat-day" required>日にち</FieldLabel>
       <div className="flex gap-1.5" role="radiogroup" aria-labelledby="seat-day">
         {chips.map((c) => {
           const v = days[c.date];
           const off = v === 'closed' || (Array.isArray(v) && !hasOpenSlot(v));
           const on = c.date === date;
           return (
-            <button
+            <Button variant="day" selected={on} unavailable={off} className="flex-1"
               key={c.date}
               type="button"
               role="radio"
               aria-checked={on}
               aria-label={`${md(c.date)}（${weekday(c.date)}）${off ? '・空きなし' : ''}`}
               onClick={() => onDate(c.date)}
-              className={`liff-press flex min-w-0 flex-1 flex-col items-center rounded-(--liff-radius) py-2 focus-visible:outline-2 focus-visible:outline-ink ${
-                on
-                  ? 'bg-liff-soft outline-2 -outline-offset-1 outline-liff-primary'
-                  : off
-                    ? 'bg-liff-off-bg outline-1 -outline-offset-1 outline-liff-line'
-                    : 'bg-canvas outline-1 -outline-offset-1 outline-liff-line'
-              }`}
             >
               <span className={`liff-num text-[13px] leading-5 font-bold ${off && !on ? 'text-liff-off-ink' : 'text-ink'}`}>
                 {c.top}
@@ -144,22 +136,19 @@ export default function SeatPick({
               <span className={`text-[11px] leading-[17px] ${off && !on ? 'text-liff-off-ink' : 'text-liff-sub'}`}>
                 {c.bottom}
               </span>
-            </button>
+            </Button>
           );
         })}
       </div>
 
       <div className="flex">
-        <button
+        <Button variant="text"
           type="button"
           onClick={openOther}
-          className={`liff-hit text-[13px] leading-5 font-semibold text-liff-primary focus-visible:outline-2 focus-visible:outline-ink ${
-            inChips ? '' : 'underline underline-offset-2'
-          }`}
         >
           {inChips ? 'ほかの日を選ぶ ›' : `ほかの日：${md(date)}（${weekday(date)}） ›`}
-        </button>
-        <input
+        </Button>
+        <TextInput appearance="hidden"
           ref={otherRef}
           type="date"
           min={today}
@@ -167,11 +156,10 @@ export default function SeatPick({
           aria-label="ほかの日"
           tabIndex={-1}
           onChange={(e) => e.target.value && onDate(e.target.value)}
-          className="sr-only"
         />
       </div>
 
-      <p className="text-[13px] leading-5 font-bold text-ink">{`時刻（${guestCount}名で空いている時間）`}</p>
+      <FieldLabel required>{`時刻（${guestCount}名で空いている時間）`}</FieldLabel>
       {day === 'loading' || day === undefined ? (
         <div className="grid grid-cols-3 gap-1.5" aria-label="読み込み中">
           {Array.from({ length: 6 }, (_, i) => (
@@ -181,9 +169,9 @@ export default function SeatPick({
       ) : day === 'error' ? (
         <p className="text-[13px] leading-6 text-liff-sub">
           空きを読み込めませんでした。{' '}
-          <button type="button" onClick={onRetry} className="font-semibold text-liff-primary underline underline-offset-2">
+          <Button variant="text" type="button" onClick={onRetry}>
             もう一度読み込む
-          </button>
+          </Button>
         </p>
       ) : day === 'closed' || day.length === 0 ? (
         <p className="text-[13px] leading-6 text-liff-sub">この日は予約を受け付けていません。ほかの日を選んでください。</p>
@@ -194,7 +182,7 @@ export default function SeatPick({
             const on = s.startsAt === startsAt;
             const hm = zonedParts(s.startsAt, timeZone).hm;
             return (
-              <button
+              <Button variant="day" selected={on} unavailable={st === 'full'}
                 key={s.startsAt}
                 type="button"
                 role="radio"
@@ -202,13 +190,6 @@ export default function SeatPick({
                 aria-label={`${hm} ${slotLabel(s)}`}
                 disabled={st === 'full'}
                 onClick={() => onTime(s.startsAt)}
-                className={`liff-press flex flex-col items-center rounded-(--liff-radius) py-2 focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
-                  on
-                    ? 'bg-liff-soft outline-2 -outline-offset-1 outline-liff-primary'
-                    : st === 'full'
-                      ? 'bg-liff-off-bg outline-1 -outline-offset-1 outline-liff-line'
-                      : 'bg-canvas outline-1 -outline-offset-1 outline-liff-line'
-                }`}
               >
                 <span className={`liff-num text-[13px] leading-5 font-bold ${st === 'full' ? 'text-liff-full' : 'text-ink'}`}>
                   {hm}
@@ -220,7 +201,7 @@ export default function SeatPick({
                 >
                   {slotLabel(s)}
                 </span>
-              </button>
+              </Button>
             );
           })}
         </div>

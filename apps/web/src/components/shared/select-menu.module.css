@@ -172,4 +172,31 @@
   flex: none;
   color: var(--color-accent-deep);
 }
+
+/* 名前の下に1行の説明がある行（YPzmo「押したら」）。印は名前の行の高さにそろえて上に寄せる。 */
+.item[data-described] {
+  align-items: flex-start;
+}
+
+.texts {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--select-menu-desc-gap);
+}
+
+.description {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--select-menu-desc-size);
+  font-weight: 400;
+  line-height: var(--select-menu-desc-line);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item[data-described] .leading {
+  height: var(--select-menu-item-line);
+}
 }

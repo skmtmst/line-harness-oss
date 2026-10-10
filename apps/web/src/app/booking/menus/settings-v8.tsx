@@ -76,6 +76,7 @@ import {
 } from './settings-tabs/shared'
 import styles from './settings-v8.module.css'
 import ChannelsTabV8 from './channels-tab-v8'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /*
  * 速さのため、使わないタブの中身は後から読む（動的 import）。
@@ -506,8 +507,8 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
       <div className={styles.shell} data-design-node="owaS3">
         <header className={styles.boardHead} data-design="Head">
           <Link href="/booking/bookings" className={styles.backLink}>← 予約へ</Link>
-          <h1 className={styles.headTitle}>予約設定</h1>
-          <p className={styles.headNote}>お客さまの予約画面に出るメニュー・時間・ルールを決めます</p>
+          <PageHeading title="予約設定" help={<> お客さまの予約画面に出るメニュー・時間・ルールを決めます</>} />
+
           <div data-design="Tabs">
             <Tabs
               label="予約設定のタブ"

@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
+import { CollapsedFolderActions, type FolderPanelRow } from '@/components/shared/folder-panel'
 import Select from '@/components/shared/select'
+import HelpTip from '@/components/shared/help-tip'
 import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
 import styles from './page-templates.module.css'
 
@@ -10,7 +12,7 @@ import styles from './page-templates.module.css'
  * 閲覧のみの画面は createAction を渡さない（押せない作るボタンは出さない）。
  */
 export interface ListFolderNav {
-  rows: { id: string; label: string }[]
+  rows: Array<Pick<FolderPanelRow, 'id' | 'label'> & Partial<FolderPanelRow>>
   activeId: string
   onSelect: (id: string) => void
   /** 作るボタン。広い板でフォルダの列の上に置いているものと同じ操作。 */
@@ -38,7 +40,11 @@ export interface ListPageBodyProps {
   contentInset?: boolean
   /** 窓の本文（左寄せの flex）でも、一覧の幅を窓いっぱいに広げる。 */
   fillWidth?: boolean
+  /** 小窓の一覧は、ページの幅と独立してフォルダを横に並べる。 */
+  dialogLayout?: boolean
   toolbar?: ReactNode
+  /** 表の操作説明。本文に長い文を置かず、道具の段の「？」から読む。 */
+  listHelp?: ReactNode
   children: ReactNode
   pagination?: ReactNode
   overlays?: ReactNode
@@ -49,16 +55,17 @@ export interface ListPageProps extends PageHeadingProps, ListPageBodyProps {
   tabs?: ReactNode
 }
 /** 状態・取得処理を持つ子コンポーネントから使う、一覧型の本文。 */
-export function ListPageBody({ stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, fillWidth, toolbar, children, pagination, overlays }: ListPageBodyProps) {
+export function ListPageBody({ stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, fillWidth, dialogLayout, toolbar, listHelp, children, pagination, overlays }: ListPageBodyProps) {
   const navs = folderNav ? (Array.isArray(folderNav) ? folderNav : [folderNav]) : []
   const collapsed = collapsedFolders ?? (folders && navs.length > 0 ? navs.map((nav, index) => <CollapsedFolderNav key={nav.label ?? index} {...nav} />) : null)
-  return <div className={styles.listBody} style={fillWidth ? { width: '100%' } : undefined}>
+  return <div className={styles.listBody} data-dialog-layout={dialogLayout || undefined} style={fillWidth ? { width: '100%' } : undefined}>
     {stats ? <div className={styles.stats} data-template-region="stats">{stats}</div> : null}
     <div className={styles.split} data-template-region="body">
       {folders ? <aside className={styles.folders} data-template-region="folders" data-folder-inset={folderInset || undefined} data-folder-width={folderWidth ? true : undefined} style={folderWidth ? { width: folderWidth, boxSizing: 'border-box' } : undefined}>{folders}</aside> : null}
       <div className={styles.main}>
-        {toolbar || collapsed ? <div className={styles.toolbar} data-template-region="toolbar" data-collapsed-only={toolbar ? undefined : ''}>
+        {toolbar || collapsed || listHelp ? <div className={styles.toolbar} data-template-region="toolbar" data-collapsed-only={toolbar || listHelp ? undefined : ''}>
           {collapsed ? <div className={styles.collapsedFolders} data-template-region="collapsed-folders">{collapsed}</div> : null}{toolbar}
+          {listHelp ? <HelpTip label="一覧の操作の説明">{listHelp}</HelpTip> : null}
         </div> : null}
         <div className={styles.content} data-template-region="content" data-content-inset={contentInset || undefined}>{children}</div>
         {pagination ? <div className={styles.pagination} data-template-region="pagination">{pagination}</div> : null}
@@ -68,16 +75,18 @@ export function ListPageBody({ stats, folders, collapsedFolders, folderNav, fold
 }
 /** folderNav から組む、畳んだときの「作る・フォルダを選ぶ欄」。 */
 function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = 'フォルダ', width }: ListFolderNav) {
+  const selected = rows.find((row) => row.id === activeId)
   return <>
     {createAction ? <span className={styles.collapsedCreate}>{createAction}</span> : null}
     <span className={styles.collapsedSelect} style={width ? { width } : undefined}>
       <Select aria-label={label} value={activeId} onChange={onSelect} options={rows.map((row) => ({ value: row.id, label: `${label}：${row.label}` }))} />
     </span>
+    {selected?.leadingActions?.length ? <CollapsedFolderActions row={{ ...selected, count: selected.count ?? null }} /> : null}
   </>
 }
-export function ListPage({ boardId, standalone, tabs, title, description, help, identity, actions, crumbs, steps, headingSize, ...body }: ListPageProps) {
+export function ListPage({ boardId, standalone, tabs, title, help, identity, actions, crumbs, steps, headingSize, ...body }: ListPageProps) {
   return <PageFrame kind="list" boardId={boardId} standalone={standalone}>
-    <PageHeading {...{ title, description, help, identity, actions, crumbs, steps, headingSize }} />
+    <PageHeading {...{ title, help, identity, actions, crumbs, steps, headingSize }} />
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     <ListPageBody {...body} />
   </PageFrame>

@@ -203,7 +203,7 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
     staffRole.value = 'staff'
     act(() => { root.render(<CommonVarsListV8 />) })
     await flush()
-    expect(host.textContent).toContain('閲覧のみで見ています。変える操作は管理者に頼んでください。')
+    expect(host.textContent).toContain('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
     const create = [...host.querySelectorAll('button, a')].filter((b) => b.textContent?.includes('共通情報を作る'))
     expect(create).toHaveLength(0)
     expect(host.querySelector('button[aria-label^="共通情報「"][aria-label$="」の操作"]')).toBeNull()

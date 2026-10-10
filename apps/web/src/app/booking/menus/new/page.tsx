@@ -290,7 +290,7 @@ function NewBookingMenuPageV7() {
     <CreatePage
       designNode="GhOb3"
       title="予約メニューをつくる"
-      description="お客様が予約するときに選ぶ内容を登録します。"
+      help="お客様が予約するときに選ぶ内容を登録します。"
       parent={['予約設定', '/booking/menus']}
       saveLabel={
         createdMenuNeedingStaff

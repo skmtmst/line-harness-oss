@@ -25,6 +25,8 @@ const transport = vi.hoisted(() => ({
   supportMarks: vi.fn(),
   scenarios: vi.fn(),
   commonVars: vi.fn(),
+  reminders: vi.fn(),
+  events: vi.fn(),
   staffMe: vi.fn(),
   lineAccounts: vi.fn(),
 }))
@@ -49,6 +51,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
     ...actual,
+    eventsApi: { ...actual.eventsApi, listEvents: transport.events },
     api: {
       ...actual.api,
       autoReplies: {
@@ -64,6 +67,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
       supportMarks: { list: transport.supportMarks },
       scenarios: { list: transport.scenarios },
       commonVars: { list: transport.commonVars },
+      reminders: { list: transport.reminders },
       staff: { me: transport.staffMe },
       lineAccounts: { list: transport.lineAccounts },
     },
@@ -232,6 +236,8 @@ beforeEach(() => {
   transport.supportMarks.mockResolvedValue({ success: true, data: [] })
   transport.scenarios.mockResolvedValue({ success: true, data: [] })
   transport.commonVars.mockResolvedValue({ success: true, data: [] })
+  transport.reminders.mockResolvedValue({ success: true, data: [] })
+  transport.events.mockResolvedValue({ items: [], total: 0 })
 })
 
 afterEach(async () => {
@@ -260,7 +266,7 @@ describe('J7 R528 literal same-view rerender (原条件照合・別結果)', () 
     gate.reject(new TypeError('Failed to fetch'))
     await waitFor(() => expect(screen.getByText('表示できませんでした')).toBeTruthy())
     expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
-    expect(screen.queryByPlaceholderText('例：営業時間外の案内')).toBeNull()
+    expect(screen.queryByPlaceholderText('例：予約の日程変更')).toBeNull()
     expect(transport.getDraft).toHaveBeenCalledTimes(1)
 
     // 復旧はtransport mode変更だけ。callback/account/ID/roleの変更なし。
@@ -279,7 +285,7 @@ describe('J7 R528 literal same-view rerender (原条件照合・別結果)', () 
     expect(searchCalls.count).toBeGreaterThan(searchBefore)
     expect(transport.getDraft).toHaveBeenCalledTimes(1)
     expect(screen.getByText('表示できませんでした')).toBeTruthy()
-    expect(screen.queryByPlaceholderText('例：営業時間外の案内')).toBeNull()
+    expect(screen.queryByPlaceholderText('例：予約の日程変更')).toBeNull()
     expect(netCalls.count).toBe(0)
   })
 })
@@ -309,14 +315,14 @@ describe('J7 R528 explicit Retry (正の受入・別結果)', () => {
 
     // target API advance + actual form/menu recovery。
     await waitFor(() => expect(transport.getDraft).toHaveBeenCalledTimes(2))
-    const nameInput = await screen.findByPlaceholderText('例：営業時間外の案内') as HTMLInputElement
+    const nameInput = await screen.findByPlaceholderText('例：予約の日程変更') as HTMLInputElement
     expect(nameInput.value).toBe('J7 synthetic reply')
     expect(screen.getByRole('navigation', { name: '自動応答を作る進み方' })).toBeTruthy()
     expect(screen.queryByText('表示できませんでした')).toBeNull()
 
     // 入力保持: 回復後に変えた値が無関係rerenderで残る。
     fireEvent.change(nameInput, { target: { value: 'J7 synthetic reply 編集後' } })
-    expect((screen.getByPlaceholderText('例：営業時間外の案内') as HTMLInputElement).value)
+    expect((screen.getByPlaceholderText('例：予約の日程変更') as HTMLInputElement).value)
       .toBe('J7 synthetic reply 編集後')
     expect(netCalls.count).toBe(0)
   })

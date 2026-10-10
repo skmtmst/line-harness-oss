@@ -14,6 +14,10 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
+import CouponSettings from './coupon-settings'
+import { focusField } from './focus-field'
 import type {
   EntryRoute,
   CreateEntryRouteInput,
@@ -21,6 +25,8 @@ import type {
   Scenario,
   Tag,
 } from '@line-crm/shared'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 interface MessageTemplate {
   id: string
@@ -86,7 +92,7 @@ export default function EditRouteModal({
       if (!cancelled && result.success) {
         setPoolMembers(Object.fromEntries(result.data.map(({ poolId, accounts }) => [
           poolId,
-          accounts.filter((account) => account.isActive).map((account) => account.accountName ?? '—'),
+          accounts.filter((account) => account.isActive).map((account) => account.accountName ?? emptyValue('unknown')),
         ])))
       }
     })()
@@ -109,6 +115,9 @@ export default function EditRouteModal({
     poolId: route?.poolId ?? mainPool?.id ?? null,
     scenarioId: route?.scenarioId ?? null,
     introTemplateId: route?.introTemplateId ?? null,
+    couponEnabled: route?.couponEnabled ?? false,
+    couponAssetId: route?.couponAssetId ?? null,
+    couponAudience: route?.couponAudience ?? 'new_friends',
     runAccountFriendAddScenarios: route?.runAccountFriendAddScenarios ?? true,
     redirectUrl: route?.redirectUrl ?? null,
     isActive: route?.isActive ?? true,
@@ -116,11 +125,23 @@ export default function EditRouteModal({
   const [submitting, setSubmitting] = useState(false)
   const [warning, setWarning] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+  const validateFields = () => {
+    const errors: Record<string, string> = {}
+    if (!form.name.trim()) errors['route-name'] = '流入元の名前を入力してください'
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(form.refCode)) errors['route-ref'] = '半角英数字・_・ハイフンで1〜64文字にしてください'
+    if (form.couponEnabled && !form.couponAssetId) errors['route-coupon'] = '渡すクーポンを選んでください'
+    setFieldErrors(errors)
+    setError('')
+    if (Object.keys(errors).length) { focusField(Object.keys(errors)[0]); return false }
+    return true
+  }
 
   const validateBeforeSave = () => {
     const nothingDelivers =
       !form.runAccountFriendAddScenarios && !form.scenarioId && !form.introTemplateId
-    if (nothingDelivers) {
+    if (nothingDelivers && !form.couponEnabled) {
       setWarning(
         '上書きモードかつ起動シナリオも即時 push も未設定です。このリンクで友だち追加した人には何も届きません。続行しますか?',
       )
@@ -130,6 +151,7 @@ export default function EditRouteModal({
   }
 
   const doSave = async () => {
+    if (!validateFields()) return
     setSubmitting(true)
     setError('')
     try {
@@ -145,7 +167,7 @@ export default function EditRouteModal({
       else setError(res.error ?? '保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } catch (err) {
       // 400系はAPIの理由、403・5xxは運用の言葉へ写す（WRITE-01）。
-      setError(describeSaveFailure(err))
+      setError(withPermissionFailure(err, describeSaveFailure(err), 'store'))
     } finally {
       // 失敗時に「保存中…」のまま固まらないよう、必ず戻す。
       setSubmitting(false)
@@ -153,6 +175,7 @@ export default function EditRouteModal({
   }
 
   const onSubmit = async () => {
+    if (!validateFields()) return
     // If validation produced a warning, only the explicit "それでも保存"
     // button (which calls doSave directly) may bypass it. The main save
     // button must not be a second-click escape hatch.
@@ -161,13 +184,13 @@ export default function EditRouteModal({
   }
 
   // R270: 作成と同じくフォルダは任意。空欄は未分類のまま保存する。
-  const saveDisabled = submitting || !form.name.trim() || !form.refCode.trim()
+  const saveDisabled = submitting
   return (
     <Dialog
       open
       title={isNew ? '新規リファラルリンク' : 'リファラルリンク編集'}
       busy={submitting}
-      error={error || undefined}
+      error={error || fieldErrors['route-coupon'] || undefined}
       onCancel={onClose}
       footer={
         <div className="flex justify-end gap-2">
@@ -184,47 +207,44 @@ export default function EditRouteModal({
       }
     >
       <div className="space-y-3">
-        <Field label="フォルダ（任意）">
-          <input
+        <Field note={<>
+            {genreLocked
+              ? '左側で選択したフォルダへ登録されます。'
+              : '同じ協力会社や媒体を同じフォルダ名にすると、一覧でまとめて管理できます。空欄のまま保存すると未分類になります。'}
+          </>} label="フォルダ（任意）">
+          <TextField
             list={genreLocked ? undefined : 'referral-genre-options'}
             value={form.genre ?? ''}
             // R270: 空欄は未分類として null で送る。空文字のまま送ると
             // 口が400ではじくため、ここで null に寄せる。
             onChange={(e) => setForm({ ...form, genre: e.target.value.trim() ? e.target.value : null })}
             readOnly={genreLocked}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
-            placeholder="例: SNS（空欄なら未分類）"
+            placeholder="例：SNS（空欄なら未分類）"
             maxLength={80}
           />
           <datalist id="referral-genre-options">
             {existingGenres.map((genre) => <option key={genre} value={genre} />)}
           </datalist>
-          <p className="text-ink-faint mt-1 text-xs">
-            {genreLocked
-              ? '左側で選択したフォルダへ登録されます。'
-              : '同じ協力会社や媒体を同じフォルダ名にすると、一覧でまとめて管理できます。空欄のまま保存すると未分類になります。'}
-          </p>
+
         </Field>
 
-        <Field label="流入元の名前">
-          <input
+        <Field label="流入元の名前" htmlFor="route-name" error={fieldErrors['route-name']}>
+          <TextField
             value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
-            placeholder="例: Instagram プロフィール"
+            onChange={(e) => { setForm({ ...form, name: e.target.value }); setFieldErrors((old) => ({ ...old, 'route-name': '' })) }}
+            placeholder="例：Instagram プロフィール"
             maxLength={120}
           />
         </Field>
 
-        <Field label="URLに出る識別子">
-          <input
+        <Field label="URLに出る識別子" htmlFor="route-ref" error={fieldErrors['route-ref']}>
+          <TextField
             value={form.refCode}
-            onChange={(e) => setForm({ ...form, refCode: e.target.value })}
+            onChange={(e) => { setForm({ ...form, refCode: e.target.value }); setFieldErrors((old) => ({ ...old, 'route-ref': '' })) }}
             // R271: 作成済みの識別子は口も変更を拒否する。保存時にはじめて
             // 拒否せず、欄自体を読み取り専用にして理由を近くに出す。
             disabled={refCodeLocked || !isNew}
-            className="border-hairline rounded-control bg-canvas text-ink disabled:bg-canvas-sunken disabled:text-ink-faint w-full border px-3 py-2 font-mono text-sm"
-            placeholder="例: youtube"
+            placeholder="例：youtube"
           />
           {refCodeLocked && (
             <p className="text-ink-faint mt-1 text-xs">
@@ -238,7 +258,9 @@ export default function EditRouteModal({
           )}
         </Field>
 
-        <Field label="自動付与タグ（任意）">
+        <Field note={<>
+            友だち追加時にこのタグを自動付与します。タグ未作成の場合は先にタグを作成してください。
+          </>} label="自動付与タグ（任意）">
           <Combobox
             aria-label="自動付与タグ（任意）"
             placeholder="— 設定なし —"
@@ -247,9 +269,7 @@ export default function EditRouteModal({
             options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
             className="w-full"
           />
-          <p className="text-ink-faint mt-1 text-xs">
-            友だち追加時にこのタグを自動付与します。タグ未作成の場合は先にタグを作成してください。
-          </p>
+
         </Field>
 
         <Field label="送り先 Pool">
@@ -313,7 +333,7 @@ export default function EditRouteModal({
             action={(
               <Button
                 onClick={doSave}
-                disabled={submitting}
+                disabled={submitting} busy={Boolean(submitting)} busyLabel="処理中…"
               >
                 それでも保存する
               </Button>
@@ -321,15 +341,9 @@ export default function EditRouteModal({
           />
         )}
       </div>
+      <CouponSettings accountId={route?.lineAccountId ?? accountId} disabled={submitting}
+        value={{ couponEnabled: form.couponEnabled ?? false, couponAssetId: form.couponAssetId ?? null, couponAudience: form.couponAudience ?? 'new_friends' }}
+        onChange={(next) => { setForm((current) => ({ ...current, ...next })); setFieldErrors((current) => ({ ...current, 'route-coupon': '' })) }} />
     </Dialog>
-  )
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="text-ink-secondary mb-1 block text-xs font-medium">{label}</label>
-      {children}
-    </div>
   )
 }

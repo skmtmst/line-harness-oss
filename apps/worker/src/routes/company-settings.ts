@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { getCompanySettings, getStaffById, isCompanyLogo, saveCompanySettings } from '@line-crm/db';
 import type { CompanySettingsInput } from '@line-crm/shared';
@@ -25,7 +26,7 @@ companySettings.get('/api/settings/company', async c => {
   return data ? c.json({ success: true, data })
     : c.json({ success: false, code: 'NOT_FOUND', error: '会社が見つかりません' }, 404);
 });
-companySettings.put('/api/settings/company', requireRole('owner', 'admin'), async c => {
+companySettings.put('/api/settings/company', requireRole('owner', 'admin'), inputJsonBoundary(), async c => {
   let value: unknown;
   try { value = await c.req.json(); } catch { value = null; }
   const input = value as CompanySettingsInput | null;
@@ -35,11 +36,11 @@ companySettings.put('/api/settings/company', requireRole('owner', 'admin'), asyn
     || !(input.logoMediaId === null || (typeof input.logoMediaId === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(input.logoMediaId)))
     || typeof input.logoBackgroundColor !== 'string' || !/^#[0-9a-f]{6}$/i.test(input.logoBackgroundColor)
     || !Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 0) {
-    return c.json({ success: false, code: 'INVALID_INPUT', error: '会社名・表示名・画像・色・版の指定を確認してください' }, 400);
+    return inputError(c, { success: false, code: 'INVALID_INPUT', error: '会社名・表示名・画像・色・版の指定を確認してください' }, 400, ["companyName","loginDisplayName","logoMediaId","logoBackgroundColor","expectedVersion"]);
   }
   const db = dbFor(c.env), staff = c.get('staff')!, tenantId = staff.tenantId!;
   if (input.logoMediaId && !await isCompanyLogo(db, tenantId, input.logoMediaId)) {
-    return c.json({ success: false, code: 'INVALID_LOGO', error: 'この会社に登録された公開済みの画像を選んでください' }, 422);
+    return inputError(c, { success: false, code: 'INVALID_LOGO', error: 'この会社に登録された公開済みの画像を選んでください' }, 422, ["logoMediaId"]);
   }
   const data = await saveCompanySettings(db, tenantId, staff.id, staff.role as 'owner' | 'admin', {
     ...input, companyName: input.companyName.trim(), loginDisplayName: input.loginDisplayName.trim(),

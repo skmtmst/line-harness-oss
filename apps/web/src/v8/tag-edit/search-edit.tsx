@@ -34,11 +34,14 @@ import { CreatePage } from '@/components/templates'
 import TargetMissing from '@/components/shared/target-missing'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { savedSearchSummary, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
@@ -46,6 +49,8 @@ import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/com
 import { formatDateTime } from '@/lib/format'
 import { optionsWithCurrent, usageRowsOf, headUsageText } from './search-model'
 import styles from './search-edit.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /*
  * R185: 友だち画面で作れる条件はここでも編集できるようにする。実行側
@@ -67,7 +72,7 @@ const EDITABLE_KINDS: Array<{ value: SavedSearchConditionKind; label: string }> 
   { value: 'purchase', label: '購入履歴' },
   { value: 'last_activity', label: '最終反応日' },
   { value: 'reminder', label: 'リマインダ' },
-  { value: 'memo', label: '個別メモ' },
+  { value: 'memo', label: 'メモ' },
   { value: 'common_event', label: 'その他のイベント' },
   { value: 'chat_status', label: '対応状況' },
   { value: 'following', label: '友だち状態' },
@@ -187,17 +192,11 @@ function DateRangeEditor({
     <div className={styles.grow}>
       <div className={styles.dateRow}>
         <Select aria-label="日付の比べ方" value={op} onChange={setOp} options={[{ value: 'between', label: '期間' }, { value: 'after', label: '以降' }, { value: 'before', label: '以前' }]} width={120} />
-        <label className={styles.dateLabel}>
-          {op === 'before' ? '終了日' : '開始日'}
-          <DateField aria-label={op === 'before' ? '終了日' : '開始日'} value={op === 'before' ? to : from} onChange={op === 'before' ? setTo : setFrom} />
-        </label>
+        <Field label={<>{op === 'before' ? '終了日' : '開始日'}</>}><DateField aria-label={op === 'before' ? '終了日' : '開始日'} value={op === 'before' ? to : from} onChange={op === 'before' ? setTo : setFrom} /></Field>
         {op === 'between' ? (
           <>
             <span className={styles.dateDash} aria-hidden="true">〜</span>
-            <label className={styles.dateLabel}>
-              終了日
-              <DateField aria-label="終了日" value={to} onChange={setTo} />
-            </label>
+            <Field label="終了日"><DateField aria-label="終了日" value={to} onChange={setTo} /></Field>
           </>
         ) : null}
       </div>
@@ -251,7 +250,9 @@ function ConditionControls({
       {condition.kind === 'tag' ? (
         <>
           <Select aria-label="タグの比較" value={condition.op} onChange={(op) => onChange({ ...condition, op })} options={[{ value: 'includes', label: 'を含む' }, { value: 'excludes', label: 'を含まない' }]} width={120} />
-          <Select aria-label="タグ" value={rawValue} onChange={(value) => onChange({ ...condition, value })} options={[{ value: '', label: 'タグを選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} className={styles.grow} />
+          <div className={styles.grow}>
+            <EntityKindField kind="tag" label="タグ" value={rawValue} onChange={(value) => onChange({ ...condition, value })} options={tags} />
+          </div>
         </>
       ) : condition.kind === 'field' ? (
         <>
@@ -312,19 +313,17 @@ function ConditionControls({
           className={styles.grow}
         />
       ) : condition.kind === 'scenario' ? (
-        <Select
-          aria-label="シナリオ"
-          value={rawValue}
-          disabled={referenceErrors.scenarios}
-          onChange={(value) => onChange({ ...condition, value })}
-          options={optionsWithCurrent(
-            scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name })),
-            rawValue,
-            '選択済みのシナリオ',
-            referenceErrors.scenarios ? 'シナリオを読み込めませんでした' : scenarios.length ? 'シナリオを選ぶ' : 'シナリオがありません',
-          )}
-          className={styles.grow}
-        />
+        <div className={styles.grow}>
+          <EntityKindField
+            kind="scenario"
+            label="シナリオ"
+            value={rawValue}
+            disabled={referenceErrors.scenarios}
+            placeholder={referenceErrors.scenarios ? '（シナリオを読み込めませんでした）' : scenarios.length ? undefined : '（シナリオがありません）'}
+            onChange={(value) => onChange({ ...condition, value })}
+            options={scenarios}
+          />
+        </div>
       ) : condition.kind === 'following' ? (
         <Select aria-label="友だち状態" value={condition.value === false ? 'false' : 'true'} onChange={(value) => onChange({ ...condition, value: value === 'true' })} options={[{ value: 'true', label: '友だち中' }, { value: 'false', label: 'ブロック済み' }]} className={styles.grow} />
       ) : condition.kind === 'chat_status' ? (
@@ -338,19 +337,17 @@ function ConditionControls({
             options={[{ value: 'eq', label: '次の担当' }, { value: 'ne', label: '次以外' }]}
             width={120}
           />
-          <Select
-            aria-label="担当"
-            value={rawValue}
-            disabled={referenceErrors.operators}
-            onChange={(value) => onChange({ ...condition, value })}
-            options={optionsWithCurrent(
-              operators.map((operator) => ({ value: operator.id, label: operator.name })),
-              rawValue,
-              '選択済みの担当者',
-              referenceErrors.operators ? '担当者を読み込めませんでした' : operators.length ? '担当者を選ぶ' : '担当者がいません',
-            )}
-            className={styles.grow}
-          />
+          <div className={styles.grow}>
+            <EntityKindField
+              kind="staff"
+              label="担当"
+              value={rawValue}
+              disabled={referenceErrors.operators}
+              placeholder={referenceErrors.operators ? '（担当者を読み込めませんでした）' : operators.length ? '（担当者を選ぶ）' : '（担当者がいません）'}
+              onChange={(value) => onChange({ ...condition, value })}
+              options={operators}
+            />
+          </div>
         </>
       ) : condition.kind === 'form' ? (
         <>
@@ -400,7 +397,7 @@ function ConditionControls({
       ) : condition.kind === 'memo' ? (
         <>
           <Select
-            aria-label="個別メモの比較"
+            aria-label="メモの比較"
             value={['exists', 'has', 'not_exists', 'not_has', 'eq', 'contains'].includes(condition.op) ? condition.op : 'exists'}
             onChange={(op) => onChange({ ...condition, op, value: isSavedSearchValueOptionalOp(op) ? '' : condition.value })}
             options={[
@@ -447,6 +444,7 @@ function ConditionRow({
   referenceErrors,
   onChange,
   onDelete,
+  errorMessage,
 }: {
   label: '最初' | 'かつ' | 'または'
   condition: SavedSearchCondition
@@ -459,8 +457,10 @@ function ConditionRow({
   referenceErrors: { marks: boolean; scenarios: boolean; fields: boolean; forms: boolean; operators: boolean }
   onChange: (next: SavedSearchCondition) => void
   onDelete: () => void
+  errorMessage?: string
 }) {
   return (
+    <Field error={errorMessage}>
     <div className={styles.conditionRow}>
       <span className={label === '最初' ? styles.opFirst : label === 'かつ' ? styles.opAnd : styles.opOr}>{label}</span>
       <ConditionControls condition={condition} tags={tags} marks={marks} scenarios={scenarios} fields={fields} forms={forms} operators={operators} referenceErrors={referenceErrors} onChange={onChange} />
@@ -468,10 +468,12 @@ function ConditionRow({
         <X size={14} aria-hidden="true" />
       </button>
     </div>
+    </Field>
   )
 }
 
 export default function SavedSearchEditV8() {
+  const staffRole = useStaffRole()
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -486,6 +488,16 @@ export default function SavedSearchEditV8() {
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
   const [referenceErrors, setReferenceErrors] = useState({ marks: false, scenarios: false, fields: false, forms: false, operators: false })
   const [name, setName] = useState('')
+  const [nameError, setNameError] = useState('')
+  const [conditionsError, setConditionsError] = useState('')
+  const nameRef = useRef<HTMLInputElement>(null)
+  const conditionsRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (!conditionsError) return
+    const first = conditionsRef.current?.querySelector<HTMLElement>('[aria-invalid="true"], input, [role="combobox"], button')
+    first?.focus()
+    first?.scrollIntoView({ block: 'center' })
+  }, [conditionsError])
   const [conditions, setConditions] = useState<SavedSearchConditions>({ all: [], any: [] })
   const [isShared, setIsShared] = useState(false)
   /** 保存済みの総数。上限50件までの残りを共有範囲の下に出すために持つ。 */
@@ -699,18 +711,21 @@ export default function SavedSearchEditV8() {
     */
     gateRef.current.invalidate()
     setConditions(next)
+    setConditionsError('')
     setPreviewStale(true)
   }
 
   const save = async () => {
     if (!selectedAccountId || !id || saving) return
-    if (!name.trim()) { setError('条件名を入力してください'); return }
+    if (!name.trim()) { setNameError('条件名を入力してください'); setError(''); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
+    setNameError('')
     const editableConditions = [...(conditions.all ?? []), ...(conditions.any ?? [])]
     const problem = editableConditions.length === 0
       ? '条件を1つ以上追加してください'
       : editableConditions.map(conditionProblem).find(Boolean)
     if (problem) {
-      setError(problem)
+      setConditionsError(problem)
+      setError('')
       return
     }
     setSaving(true)
@@ -739,7 +754,7 @@ export default function SavedSearchEditV8() {
     const problem = editableConditions.length === 0
       ? '条件を1つ以上追加してください'
       : editableConditions.map(conditionProblem).find(Boolean)
-    if (problem) { setError(problem); return }
+    if (problem) { setConditionsError(problem); setError(''); return }
     setSaving(true)
     setError('')
     try {
@@ -811,15 +826,15 @@ export default function SavedSearchEditV8() {
   const countNote = previewError || preview?.error
     ? '人数をまだ数えていません。数え直してください。'
     : preview?.calculatedAt
-      ? `${formatDateTime(preview.calculatedAt)} に数えた数（LINE ${preview.byChannel.line ?? '—'}人・MAIL ${preview.byChannel.mail ?? '—'}人）。数え直している間は古い数を出しません`
+      ? `${formatDateTime(preview.calculatedAt)} に数えた数（LINE ${preview.byChannel.line ?? emptyValue('unknown')}人・MAIL ${preview.byChannel.mail ?? emptyValue('unknown')}人）。数え直している間は古い数を出しません`
       : '保存した条件でまだ数えていません。数え直すと出ます'
-  const deleteReason = original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使っている所を確かめられないため削除できません' : original.usedIn.length > 0 ? `使っている所があるため削除できません（${original.usedIn.length}件）` : '削除できるか確かめられません'
+  const deleteReason = original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使っている所を確かめられないため削除できません' : original.usedIn.length > 0 ? `使っている所があるため削除できません（${original.usedIn.length} 件）` : '削除できるか確かめられません'
 
   const side = (
     <div className={styles.side}>
       <div className={styles.sideHead}><h2 className={styles.sideTitle}>当てはまる人</h2></div>
       <p className={styles.count}>
-        {previewCount === null ? <span className={styles.countNum}>—</span> : <span className={styles.countNum}>{previewCount.toLocaleString('ja-JP')}</span>}
+        {previewCount === null ? <span className={styles.countNum}>{emptyValue('unknown')}</span> : <span className={styles.countNum}>{polishFormatNumber(previewCount)}</span>}
         <span className={styles.countUnit}>人</span>
       </p>
       {previewError ? <p role="alert" className={styles.errorText}>{previewError}</p> : null}
@@ -853,13 +868,15 @@ export default function SavedSearchEditV8() {
     </div>
   )
 
+  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+
   return (
     <div className={styles.page}>
       <CreatePage
         title={original.name}
         identity={<Link href="/tags?tab=searches" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />保存した検索へ</Link>}
-        description={[
-          previewCount === null ? '人数はまだ数えていません' : `${previewCount.toLocaleString('ja-JP')}人が当てはまる`,
+        help={[
+          previewCount === null ? '人数はまだ数えていません' : `${polishFormatNumber(previewCount)} 人が当てはまる`,
           original.isShared ? '全員に共有' : '自分だけ',
           headUsageText(original.usedIn),
         ].join('・')}
@@ -871,29 +888,22 @@ export default function SavedSearchEditV8() {
         footerActions={(
           <>
             <Button href="/tags?tab=searches">キャンセル</Button>
-            <Button type="button" disabled={saving} onClick={() => void duplicate()}><Copy size={14} aria-hidden="true" />複製して保存する</Button>
+            <Button type="button" disabled={saving} onClick={() => void duplicate()} busy={Boolean(saving)} busyLabel="処理中…"><Copy size={14} aria-hidden="true" />複製して保存する</Button>
             <Button type="button" variant="primary" disabled={saving || !dirty} onClick={() => void save()} busy={saving}><Check size={14} aria-hidden="true" />保存する</Button>
           </>
-        )}
+        )} dirty={false}
       >
         {error ? <Notice tone="danger" message={error} /> : null}
         <section className={styles.card} aria-label="名前と共有">
           <h2 className={styles.cardTitle}>名前と共有</h2>
-          <label className={styles.field}>
-            <span className={styles.labelStrong}>条件名</span>
-            <TextField value={name} maxLength={80} onChange={(event) => setName(event.target.value)} aria-label="条件名" className={styles.input} />
-            {/* IDEA-04：同名の検索がすでにあるとき、保存する前に知らせる。 */}
-            <DuplicateNameNote duplicates={nameDuplicates} kindLabel="保存した検索" />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.labelStrong}>説明</span>
-            <TextField value={conditions.description ?? ''} maxLength={300} onChange={(event) => patchConditions({ ...conditions, description: event.target.value })} placeholder="この検索を使う目的" aria-label="説明" className={styles.input} />
-          </label>
+          <Field label="条件名"><Field error={nameError}><TextField ref={nameRef} value={name} maxLength={80} onChange={(event) => { setName(event.target.value); setNameError('') }} aria-label="条件名" /></Field>
+<DuplicateNameNote duplicates={nameDuplicates} kindLabel="保存した検索" /></Field>
+          <Field label="説明"><TextField value={conditions.description ?? ''} maxLength={300} onChange={(event) => patchConditions({ ...conditions, description: event.target.value })} placeholder="この検索を使う目的" aria-label="説明" className={styles.input} /></Field>
           <div className={styles.field}>
             <span className={styles.labelRow}>
               <span className={styles.label}>共有</span>
               {/* 設計 XBkiQ：共有を選ぶ場所で、上限と共有すると何が起きるかを先に言う。 */}
-              <HelpTip label="共有の説明">{`${savedCount === null ? '保存できるのは50件までです。' : `保存できるのは50件までです（いま${savedCount}件）。`}共有すると、一斉配信・オートメーションの対象条件からも呼び出せます。`}</HelpTip>
+              <HelpTip label="共有の説明">{`${savedCount === null ? '保存できるのは50件までです。' : `保存できるのは50件までです（いま${savedCount} 件）。`}共有すると、一斉配信・オートメーションの対象条件からも呼び出せます。`}</HelpTip>
             </span>
             <div className={styles.seg} role="radiogroup" aria-label="共有">
               <button type="button" role="radio" aria-checked={isShared} className={isShared ? styles.segOn : styles.segBtn} onClick={() => setIsShared(true)}>全員</button>
@@ -902,17 +912,18 @@ export default function SavedSearchEditV8() {
           </div>
         </section>
 
-        <section className={styles.card} aria-label="条件">
+        <section ref={conditionsRef} className={styles.card} aria-label="条件">
           <div className={styles.cardTitles}>
             <h2 className={styles.cardTitle}>条件</h2>
             <p className={styles.cardNote}>「かつ」はすべて満たす人、「または」はどれかを満たす人に当てはまります。</p>
           </div>
-          {allConditions.length === 0 && anyConditions.length === 0 ? <p className={styles.hint}>条件はまだありません。下のボタンで足します。</p> : null}
+          {allConditions.length === 0 && anyConditions.length === 0 ? <p className={styles.hint} role={conditionsError ? 'alert' : undefined}>{conditionsError || '条件はまだありません。下のボタンで足します。'}</p> : null}
           {allConditions.map((condition, index) => (
             <ConditionRow
               key={`all-${index}`}
               label={index === 0 ? '最初' : 'かつ'}
               condition={condition}
+              errorMessage={conditionsError && condition === [...allConditions, ...anyConditions].find((item) => conditionProblem(item)) ? conditionsError : undefined}
               tags={tags}
               marks={marks}
               scenarios={scenarios}
@@ -929,6 +940,7 @@ export default function SavedSearchEditV8() {
               key={`any-${index}`}
               label={allConditions.length === 0 && index === 0 ? '最初' : 'または'}
               condition={condition}
+              errorMessage={conditionsError && condition === [...allConditions, ...anyConditions].find((item) => conditionProblem(item)) ? conditionsError : undefined}
               tags={tags}
               marks={marks}
               scenarios={scenarios}
@@ -956,7 +968,7 @@ export default function SavedSearchEditV8() {
             </div>
             <div className={styles.field}>
               <span className={styles.label}>表示件数</span>
-              <Select aria-label="表示件数" value={String(conditions.list?.limit ?? 20)} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, limit: Number(value) as 10 | 20 | 30 | 40 | 50 } })} options={[10, 20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件` }))} width={120} />
+              <Select aria-label="表示件数" value={String(conditions.list?.limit ?? 20)} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, limit: Number(value) as 10 | 20 | 30 | 40 | 50 } })} options={[10, 20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size} 件` }))} width={120} />
             </div>
           </div>
           <p className={styles.hint}>{`表示列：${conditions.list?.columns?.join('・') || '名前・タグ・担当者'}`}</p>
@@ -964,7 +976,7 @@ export default function SavedSearchEditV8() {
         {/* IDEA-04：印ならタグ・値なら情報欄・条件の保存は保存した検索、という違いを編集の場所でも確かめられる。 */}
         <AttributeKindGuide current="search" />
       </CreatePage>
-      <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使っている所が無いことをサーバーで確かめてあります。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); void remove() }} />
+      <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使っている所が無いことをサーバーで確かめてあります。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); return remove() }} />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="検索条件への変更" busy={saving} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )

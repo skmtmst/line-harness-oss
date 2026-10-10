@@ -18,7 +18,8 @@
   padding: var(--tpl-fr-panel-pad);
   padding-bottom: var(--tpl-fr-uid-lines-pad-bottom);
   border-radius: var(--radius-card);
-  box-shadow: var(--tpl-fr-shadow-outline);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 .card:has(> .lines) { gap: var(--tpl-fr-cmp-card-gap); }
 .cardHead { display: flex; flex-direction: column; gap: var(--tpl-compact-gap); }
@@ -102,7 +103,8 @@
   margin-left: var(--tpl-fr-mp-values-pull);
   padding: var(--tpl-fr-cmp-panel-pad);
   border-radius: var(--radius-card);
-  box-shadow: var(--tpl-fr-shadow-outline);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 .valuesTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-fr-back-lh); }
 .values { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }

@@ -24,6 +24,7 @@ export type EditContext = {
 
 /** 作る型（CreatePage）に渡す頭と下の帯。 */
 export type WizardChrome = {
+  actions?: ReactNode
   title: string
   identity: ReactNode
   steps: ReactNode
@@ -38,6 +39,7 @@ export type WizardChrome = {
 
 /** 詳細の頭（題・説明・タブ）。 */
 export type DetailChrome = {
+  menuActions?: ReactNode
   title: string
   subtitle: string
   participantsCount: number | null

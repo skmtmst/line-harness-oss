@@ -210,7 +210,7 @@ describe('identity candidate HTTP contract', () => {
     const response = await harness().request('/api/identity-candidates/candidate-a/decide', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: '{',
     });
-    expect(response.status).toBe(422);
+    expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ success: false, code: 'INVALID_JSON' });
     expect(identityMocks.decideIdentityCandidate).not.toHaveBeenCalled();
   });

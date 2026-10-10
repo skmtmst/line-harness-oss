@@ -3,6 +3,8 @@
  * 設定の形は @line-crm/shared の VisitStampSettings（サーバと同じ）。ここで形を変えない。
  */
 import type { VisitStampEntry, VisitStampMultiplier, VisitStampReward, VisitStampSettings } from '@line-crm/shared'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 export const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const
 const TZ = 'Asia/Tokyo'
@@ -12,6 +14,8 @@ export function defaultSettings(): VisitStampSettings {
   return {
     mode: 'visit', amountUnit: 1000, maxPerVisit: 5, firstVisitBonus: 0, expiryMonths: 6, timezone: TZ,
     slotCount: 10, stackingOrder: 'bonus_then_multipliers',
+    expiryBasis: 'last_visit', expiryReminder: 'none', completion: 'repeat', receiptBonus: 0,
+    instructions: '', stampInterval: { mode: 'same_day' },
     multipliers: [], rankMultipliers: [],
     rewards: [{ id: 'reward-1', name: 'ドリンク 1杯', stamps: 10 }],
   }
@@ -51,11 +55,21 @@ export function sortedRewards(rewards: VisitStampReward[]): VisitStampReward[] {
  * いちばん大きい特典はカードが空になる＝「新しいカードへ」。途中の特典は減る数をそのまま書く。
  */
 export function rewardNote(reward: VisitStampReward, settings: VisitStampSettings): string {
-  return reward.stamps >= slotCount(settings) ? '使ったら新しいカードへ' : `使うとスタンプが ${reward.stamps}個へる`
+  return reward.stamps >= Math.max(...settings.rewards.map(r => r.stamps))
+    ? settings.completion === 'next_card' ? '使ったら次のカードへ' : '使ったら新しいカードへ'
+    : `使うとスタンプが ${reward.stamps} 個へる`
 }
 
-export function expiryLabel(months: number | null): string {
-  return months === null ? '期限なし' : `最後の来店から ${months}か月`
+export function expiryLabel(months: number | null, basis: VisitStampSettings['expiryBasis'] = 'last_visit'): string {
+  return months === null || basis === 'none' ? '期限なし' : `${basis === 'first_visit' ? '最初' : '最後'}の来店から ${months}か月`
+}
+export function previewExpiry(months: number | null, basis: VisitStampSettings['expiryBasis'], at = new Date()): string {
+  if(months === null || basis === 'none') return '期限なし'
+  const date = new Date(at.getTime() + 9 * 3_600_000), day = date.getUTCDate()
+  date.setUTCDate(1); date.setUTCMonth(date.getUTCMonth() + months)
+  date.setUTCDate(Math.min(day, new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate()))
+  const label = polishFormatDate(new Date(date.getTime() - 9 * 3_600_000), { style: 'list-day' })
+  return `有効期限 ${label}（${expiryLabel(months, basis)}）`
 }
 
 export type Slot = { n: number; state: 'done' | 'reward' | 'empty' }
@@ -73,9 +87,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
 export const minuteLabel = (m: number) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`
 
 function monthDay(iso: string, minusDay = false): string {
-  const d = new Date(Date.parse(iso) - (minusDay ? 86_400_000 : 0))
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: TZ, month: 'numeric', day: 'numeric' }).formatToParts(d)
-  return `${parts.find((p) => p.type === 'month')?.value}/${parts.find((p) => p.type === 'day')?.value}`
+  return polishFormatDate(new Date(Date.parse(iso) - (minusDay ? 86_400_000 : 0)), { style: 'list-day' })
 }
 
 /** 倍率の名前。付けた名前があればそれ。無ければ「2倍デー」（曜日か時間）・「2倍の期間」（期間だけ）・「いつも 2倍」。 */
@@ -109,10 +121,7 @@ export function trimNumber(n: number): string {
 
 /** 日付と時刻「1/13 18:40」（店の暦＝日本時間）。 */
 export function shortDateTime(iso: string): string {
-  const d = new Date(iso.includes('T') || iso.endsWith('Z') ? iso : `${iso.replace(' ', 'T')}Z`)
-  const f = new Intl.DateTimeFormat('ja-JP', { timeZone: TZ, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(d)
-  const v = (t: string) => f.find((p) => p.type === t)?.value ?? ''
-  return `${v('month')}/${v('day')} ${v('hour')}:${v('minute')}`
+  return polishFormatDate(iso, { style: 'list', fallback: '—' })
 }
 
 export type HistoryRow = { id: string; friendId: string; at: string; count: string; why: string; actor: string; reversible: boolean; reversed: boolean }
@@ -180,12 +189,20 @@ export function friendLabel(friend: { displayName?: string | null; metadata?: Re
 }
 
 /** 設定の検査（サーバと同じ境目）。保存の前に、どこを直せばよいかを日本語で返す。 */
-export function settingsProblem(name: string, s: VisitStampSettings): string | null {
-  if (!name.trim()) return 'カードの名前を入れてください。'
-  if (!s.rewards.length) return '特典を1つ以上足してください。'
-  if (s.rewards.some((r) => !r.name.trim() || !Number.isInteger(r.stamps) || r.stamps < 1)) return '特典の名前と個数を確かめてください。'
-  if (s.mode === 'amount' && (!Number.isInteger(s.amountUnit) || s.amountUnit < 1)) return '何円ごとに 1個 かを入れてください。'
-  if (!Number.isInteger(s.maxPerVisit) || s.maxPerVisit < 1) return '1回の上限を 1個 以上にしてください。'
-  if (s.slotCount !== undefined && s.rewards.some((r) => r.stamps > (s.slotCount ?? 0))) return '特典の個数をマスの数以下にしてください。'
+export type StampSettingField = 'name' | 'instructions' | 'receiptBonus' | 'intervalHours' | 'nextCardId' | 'rewards' | 'amountUnit' | 'maxPerVisit'
+export function settingsIssue(name: string, s: VisitStampSettings): { field: StampSettingField; message: string } | null {
+  if (!name.trim()) return { field: 'name', message: 'カードの名前を入れてください。' }
+  if (s.instructions !== undefined && [...s.instructions].length > 500) return { field: 'instructions', message: '使い方の説明は500字までです。' }
+  if (s.receiptBonus !== undefined && (!Number.isInteger(s.receiptBonus) || s.receiptBonus < 0 || s.receiptBonus > 50)) return { field: 'receiptBonus', message: '受け取りボーナスは0〜50個です。' }
+  if (s.stampInterval?.mode === 'hours' && (!Number.isInteger(s.stampInterval.hours) || s.stampInterval.hours! < 1 || s.stampInterval.hours! > 23)) return { field: 'intervalHours', message: '押印の間隔は1〜23時間です。' }
+  if (s.completion === 'next_card' && !s.nextCardId) return { field: 'nextCardId', message: '次のカードを選んでください。' }
+  if (!s.rewards.length) return { field: 'rewards', message: '特典を1つ以上足してください。' }
+  if (s.rewards.some((r) => !r.name.trim() || !Number.isInteger(r.stamps) || r.stamps < 1)) return { field: 'rewards', message: '特典の名前と個数を確かめてください。' }
+  if (s.mode === 'amount' && (!Number.isInteger(s.amountUnit) || s.amountUnit < 1)) return { field: 'amountUnit', message: '何円ごとに 1個 かを入れてください。' }
+  if (!Number.isInteger(s.maxPerVisit) || s.maxPerVisit < 1) return { field: 'maxPerVisit', message: '1回の上限を 1個 以上にしてください。' }
+  if (s.slotCount !== undefined && s.rewards.some((r) => r.stamps > (s.slotCount ?? 0))) return { field: 'rewards', message: '特典の個数をマスの数以下にしてください。' }
   return null
+}
+export function settingsProblem(name: string, s: VisitStampSettings): string | null {
+  return settingsIssue(name, s)?.message ?? null
 }

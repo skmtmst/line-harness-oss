@@ -36,7 +36,7 @@ export default function UsersTable({
   const countAvailable = !loading && !error
 
   return (
-    <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
+    <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card-surface">
       <table className="w-full table-fixed">
         {/*
           列幅の決め方（1440pxで操作ボタンが枠をはみ出していたため固定化）。

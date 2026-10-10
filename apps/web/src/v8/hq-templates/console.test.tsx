@@ -20,7 +20,7 @@ vi.mock('@/lib/api', async (original) => {
     lineAccountFolders: { ...actual.api.lineAccountFolders, list: vi.fn(async () => ({ success: true, data: { folders: [{ id: 'direct', name: '直営店', color: '#2563eb', displayOrder: 0 }] } })) },
   } }
 })
-vi.mock('@/lib/hq-templates-api', () => ({ TEMPLATE_TYPES: ['tag', 'template', 'rich_menu', 'form', 'scenario'], hqTemplatesApi: { ...calls, folders: { list: calls.folderList } } }))
+vi.mock('@/lib/hq-templates-api', async (original) => ({ ...await original<typeof import('@/lib/hq-templates-api')>(), TEMPLATE_TYPES: ['tag', 'template', 'rich_menu', 'form', 'scenario'], hqTemplatesApi: { ...calls, folders: { list: calls.folderList } } }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams(''),
@@ -33,6 +33,7 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePa
 vi.mock('@/components/auto-replies/inline-action-list', () => ({ useActionOptions: () => ({ tags: [], scenarios: [], templates: [], forms: [], reminders: [], richMenus: [] }) }))
 
 import HqTemplatesV8 from './console'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 
 const message = {
   schemaVersion: 1,
@@ -60,9 +61,22 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('統括のテンプレートを作る（店の作る画面＋保存後に配り先を選ぶ）', () => {
+  it('リッチビデオの種類から店と同じ編集部品を統括で開ける', async () => {
+    render(<HqTemplatesV8 type="template" />)
+    fireEvent.click(await screen.findByRole('tab', { name: /リッチビデオ/ }))
+    await waitFor(() => expect(calls.listByKind).toHaveBeenCalledWith('rich_video'))
+    fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    expect(await screen.findByRole('heading', { name: 'リッチビデオを作る' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '下書きを保存' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '保存する' })).toBeTruthy()
+    expect(screen.getByLabelText('テンプレート名')).toBeTruthy()
+    expect(calls.create).not.toHaveBeenCalled()
+  })
+
   it('作る画面から一覧へは、上の帯のパンくず「テンプレート」で戻る（同じ URL のまま段を替える）', async () => {
     render(<HqTemplatesV8 type="template" />)
     fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    fireEvent.click(await screen.findByRole('button', { name: "メッセージを作るの説明" }))
     expect(await screen.findByText('保存後に、配るアカウントを選べます。一覧の「…」からも配れます。')).toBeTruthy()
     const crumb = chrome.crumbs?.find((item) => item.label === 'テンプレート')
     expect(crumb?.href).toBe('/hq/templates')
@@ -76,6 +90,7 @@ describe('統括のテンプレートを作る（店の作る画面＋保存後�
   it('作る画面から一覧へは、下の帯の［キャンセル］でも戻る', async () => {
     render(<HqTemplatesV8 type="template" />)
     fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    fireEvent.click(await screen.findByRole('button', { name: "メッセージを作るの説明" }))
     expect(await screen.findByText('保存後に、配るアカウントを選べます。一覧の「…」からも配れます。')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     await waitFor(() => expect(screen.queryByText('保存後に、配るアカウントを選べます。一覧の「…」からも配れます。')).toBeNull())
@@ -84,6 +99,7 @@ describe('統括のテンプレートを作る（店の作る画面＋保存後�
   it('メッセージは店の作る画面で作り、［保存する］で統括のひな形を作ってアカウントへ配るへ進む', async () => {
     render(<HqTemplatesV8 type="template" />)
     fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    fireEvent.click(await screen.findByRole('button', { name: "メッセージを作るの説明" }))
     expect(await screen.findByText('保存後に、配るアカウントを選べます。一覧の「…」からも配れます。')).toBeTruthy()
     // 板の頭の「← テンプレートへ」は無くした（2026-10-08）。一覧へは上の帯のパンくずで戻る。
     expect(screen.queryByText('← テンプレートへ')).toBeNull()
@@ -127,7 +143,7 @@ describe('統括のテンプレートを作る（店の作る画面＋保存後�
     fireEvent.change(screen.getByLabelText('テンプレート名'), { target: { value: '冬の10%オフ' } })
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
     /* 期間が無いと口を呼ばない。 */
-    expect((await screen.findByRole('alert')).textContent).toContain('使える期間')
+    await waitFor(() => expect(document.getElementById('te-coupon-start-error')?.textContent).toBe('開始を入力してください'))
     expect(calls.create).not.toHaveBeenCalled()
   })
 })
@@ -158,14 +174,14 @@ describe('統括のテンプレートを作る（質問・カルーセル）', (
     fireEvent.change(screen.getByPlaceholderText('例：夏の定番5点'), { target: { value: '写真付きのご案内' } })
     fireEvent.change(screen.getByLabelText(/本文（/), { target: { value: '画像と本文' } })
     const file = new File(['image'], 'card.png', { type: 'image/png' })
-    fireEvent.change(screen.getByLabelText('カードの画像ファイル'), { target: { files: [file] } })
+    fireEvent.change(screen.getByLabelText('画像を追加（ファイル）'), { target: { files: [file] } })
     await waitFor(() => expect(screen.getByAltText('カードの画像').getAttribute('src')).toBe(media.publicUrl))
     expect(calls.uploadImage).toHaveBeenCalledWith(file, 'message')
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
     await waitFor(() => expect(calls.create).toHaveBeenCalled())
     expect(calls.create.mock.calls[0][0].definition.media).toEqual([media])
     expect(JSON.parse(calls.create.mock.calls[0][0].definition.template.messageContent)[0].thumbnailImageUrl).toBe(media.publicUrl)
-    await waitFor(() => expect(screen.queryByLabelText('カードの画像ファイル')).toBeNull())
+    await waitFor(() => expect(screen.queryByLabelText('画像を追加（ファイル）')).toBeNull())
     expect(calls.deleteImage).not.toHaveBeenCalledWith(media.r2Key)
   })
 
@@ -176,7 +192,12 @@ describe('統括のテンプレートを作る（質問・カルーセル）', (
     expect(await screen.findByRole('heading', { name: 'カルーセルを作る' })).toBeTruthy()
     fireEvent.change(screen.getByPlaceholderText('例：夏の定番5点'), { target: { value: '定期便のご案内' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
-    expect((await screen.findByText('すべてのカードに本文を入力してください'))).toBeTruthy()
+    /* B-139（オーナーの写真の指摘）：帯だけにせず、本文の欄を赤くして真下に理由を出し、そこへ移る。 */
+    const body = document.getElementById('cr-text') as HTMLInputElement
+    await waitFor(() => expect(body.getAttribute('aria-invalid')).toBe('true'))
+    expect(document.getElementById('cr-text-error')?.textContent).toBe('本文を入力してください')
+    expect(screen.queryByText('すべてのカードに本文を入力してください')).toBeNull()
+    await waitFor(() => expect(document.activeElement).toBe(body))
     expect(calls.create).not.toHaveBeenCalled()
   })
 })
@@ -284,9 +305,9 @@ describe('統括のテンプレートを作る（リッチメッセージ g8d6ai
     expect(screen.queryByRole('button', { name: '登録メディアから選ぶ' })).toBeNull()
     fireEvent.change(screen.getByLabelText('テンプレート名'), { target: { value: '夏のキャンペーン告知' } })
     const file = new File(['png'], 'summer.png', { type: 'image/png' })
-    fireEvent.change(screen.getByLabelText('リッチメッセージの画像のファイル'), { target: { files: [file] } })
+    fireEvent.change(screen.getByLabelText('画像を追加（ファイル）'), { target: { files: [file] } })
     await waitFor(() => expect(calls.uploadRichMessageImage).toHaveBeenCalledWith(file))
-    fireEvent.click(screen.getByRole('button', { name: '1面' }))
+    fireEvent.click(screen.getByRole('radio', { name: '1面（面 A）' }))
     fireEvent.click(screen.getByRole('button', { name: '面 A を押したら' }))
     expect(screen.queryByRole('option', { name: '動きを実行する' })).toBeNull()
     fireEvent.click(within(await screen.findByRole('option', { name: 'URLを開く' })).getByRole('button'))
@@ -328,6 +349,28 @@ describe('統括のテンプレートを直す（質問・クーポン：店の�
     expect(JSON.parse(input.definition.template.questionJson)).toMatchObject({ text: 'どのお肉が好きですか？', choices: [{ label: '鹿肉' }, { label: '馬肉' }] })
   })
 
+  it('リッチビデオは保存済みの動画と画像の組から開き、統括へ保存して配り先を選べる', async () => {
+    const videoUrl='https://worker.test/images/hq-templates/tenant-a/video.mp4'
+    const previewUrl='https://worker.test/images/hq-templates/tenant-a/preview.jpg'
+    const payload={altText:'動画の通知',baseUrl:'https://worker.test/images/hq-templates/tenant-a/map',baseSize:{width:1040,height:520},actions:[],video:{originalContentUrl:videoUrl,previewImageUrl:previewUrl,area:{x:0,y:0,width:1040,height:520}}}
+    const video={id:'v',kind:'video',filename:'video.mp4',mimeType:'video/mp4',sizeBytes:3,width:null,height:null,durationMs:1000,r2Key:'hq-templates/tenant-a/video.mp4',publicUrl:videoUrl,versionId:'v',versionNo:1,contentHash:'a'.repeat(64)}
+    const media=[video,{...video,id:'p',kind:'image',mimeType:'image/jpeg',publicUrl:previewUrl,r2Key:'hq-templates/tenant-a/preview.jpg',width:1040,height:520}]
+    const definition={...message,template:{...message.template,messageType:'imagemap',name:'統括の動画',messageContent:JSON.stringify(payload)},media}
+    await open(definition,'rich_video','統括の動画')
+    expect(await screen.findByRole('heading',{name:'リッチビデオを作る'})).toBeTruthy()
+    calls.update.mockRejectedValueOnce(new Error('保存できませんでした。もう一度お試しください。'))
+    fireEvent.change(screen.getByLabelText('通知に出る文'),{target:{value:'直した通知'}})
+    fireEvent.click(screen.getByRole('button',{name:'保存する'}))
+    await screen.findByText('保存できませんでした。もう一度お試しください。')
+    expect(screen.getByDisplayValue('直した通知')).toBeTruthy()
+    expect(screen.queryByRole('checkbox',{name:/然 -NEN- 本店/})).toBeNull()
+    fireEvent.click(screen.getByRole('button',{name:'保存する'}))
+    await waitFor(()=>expect(calls.update).toHaveBeenCalledTimes(2))
+    const saved=calls.update.mock.calls[0][1].definition
+    expect(saved.media).toEqual(media);expect(saved.asset).toBeUndefined();expect(saved.template.messageType).toBe('imagemap')
+    expect(JSON.parse(saved.template.messageContent)).toEqual({...payload,altText:'直した通知'})
+    expect(await screen.findByRole('checkbox',{name:/然 -NEN- 本店/})).toBeTruthy()
+  })
   it('クーポンは保存してある期間・説明で店のクーポンの画面が開き、そのまま保存しても期間を落とさない', async () => {
     await open(couponDefinition, 'coupon', '冬の10%オフ')
     expect(await screen.findByRole('heading', { name: 'クーポンを作る' })).toBeTruthy()
@@ -387,7 +430,7 @@ describe('G-3：保存が済んでから配るか選ぶ', () => {
     expect(await within(dialog).findByText('版 2 を配布済み')).toBeTruthy()
     expect(within(dialog).getByText('配ると上書き')).toBeTruthy()
     fireEvent.click(await within(dialog).findByRole('checkbox', { name: '直営店をまとめて選ぶ' }))
-    fireEvent.change(within(dialog).getByRole('textbox', { name: 'アカウントを探す' }), { target: { value: '本店' } })
+    fireEvent.change(within(dialog).getByRole('searchbox', { name: 'アカウントを探す' }), { target: { value: '本店' } })
     expect(within(dialog).getByText('選んだ 2 アカウント')).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: '2 アカウントへ配る' }))
     await waitFor(() => expect(calls.preflight).toHaveBeenCalledWith('t-new', ['a-1', 'a-2']))
@@ -427,5 +470,121 @@ describe('G-3：保存が済んでから配るか選ぶ', () => {
     const dialog = screen.getByRole('dialog')
     expect(await within(dialog).findAllByText('配布状況を確認できません')).toHaveLength(2)
     expect(within(dialog).queryByText('未配布')).toBeNull()
+  })
+})
+
+describe('フォルダの「…」からまとめて配る（G-7）', () => {
+  const folderRows = () => [
+    { ...listRow, folder_id: 'f-1' },
+    { ...listRow, id: 't-2', name: '別の種類のひな形', folder_id: 'f-1', kind: 'carousel' },
+  ]
+  const checked = (id: string) => ({ preflightId: `run-${id}`, expiresAt: new Date(Date.now() + 60000).toISOString(), stores: [{ accountId: 'a-1', accountName: '然 -NEN- 本店', items: [{ sourceId: id, name: id, itemKind: 'template', duplicate: false, allowedModes: ['create'] }] }] })
+  const delivered = (id: string) => ({ runId: `run-${id}`, status: 'completed', stores: [{ accountId: 'a-1', status: 'succeeded', counts: { created: 1, overwritten: 0, aliased: 0 } }] })
+  /** 配る先の欄から共通の窓を開き、アカウントを選んで確定する（dJZ7Q）。 */
+  async function pickStores(dialog: HTMLElement, names: string[]) {
+    fireEvent.click(within(dialog).getByRole('button', { name: /^配る先：(選ぶ|変える)$/ }))
+    const picker = await screen.findByRole('dialog', { name: '配るアカウントを選ぶ' })
+    for (const name of names) fireEvent.click(within(picker).getByRole('checkbox', { name }))
+    fireEvent.click(within(picker).getByRole('button', { name: `この ${names.length} アカウントにする` }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '配るアカウントを選ぶ' })).toBeNull())
+  }
+  async function selectFolder() {
+    fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「予約」の操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'このフォルダを配る' }))
+    return screen.findByRole('dialog', { name: 'フォルダ「予約」の 2 件を配る' })
+  }
+  beforeEach(() => {
+    document.documentElement.dataset.theme = 'v8'
+    calls.list.mockResolvedValue(folderRows())
+    calls.listByKind.mockResolvedValue([folderRows()[0]])
+    calls.get.mockImplementation(async (id: string) => ({ ...detail(), template: folderRows().find((row) => row.id === id) }))
+    calls.preflight.mockImplementation(async (id: string) => checked(id))
+    calls.distribute.mockImplementation(async (id: string) => delivered(id))
+  })
+  afterEach(() => { delete document.documentElement.dataset.theme; window.history.replaceState(null, '', '/hq/templates') })
+  it('全種類のフォルダ内ひな形は全選択で始まり、片方0なら配れない', async () => {
+    render(<HqTemplatesV8 type="template" />)
+    const dialog = await selectFolder()
+    expect((within(dialog).getByRole('checkbox', { name: '別の種類のひな形' }) as HTMLInputElement).checked).toBe(true)
+    expect(within(dialog).getByText('本文')).toBeTruthy()
+    expect(within(dialog).getByText('カルーセル')).toBeTruthy()
+    expect(within(dialog).getByRole('button', { name: '2 件を 0 アカウントへ配る' }).hasAttribute('disabled')).toBe(true)
+    await pickStores(dialog, ['然 -NEN- 本店'])
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: '予約前日のご案内' }))
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: '別の種類のひな形' }))
+    expect(within(dialog).getByRole('button', { name: '0 件を 1 アカウントへ配る' }).hasAttribute('disabled')).toBe(true)
+    expect(calls.preflight).not.toHaveBeenCalled()
+  })
+  it('すべての確認が済むまで配らず、順に配った結果を同じ窓へまとめる', async () => {
+    render(<HqTemplatesV8 type="template" />)
+    const dialog = await selectFolder()
+    await pickStores(dialog, ['然 -NEN- 本店'])
+    fireEvent.click(within(dialog).getByRole('button', { name: '2 件を 1 アカウントへ配る' }))
+    fireEvent.click(await screen.findByRole('button', { name: '次のひな形を確かめる（1/2）' }))
+    await waitFor(() => expect(calls.preflight).toHaveBeenCalledWith('t-2', ['a-1']))
+    expect(calls.distribute).not.toHaveBeenCalled()
+    fireEvent.click(await screen.findByRole('button', { name: '2 件を 1 アカウントへ配る' }))
+    const result = await screen.findByRole('dialog', { name: '配った結果：フォルダ「予約」' })
+    expect(within(result).getByText('1 アカウントへ配りました。成功 2・失敗 0。成功した所はもう使えます。')).toBeTruthy()
+    expect(calls.distribute.mock.calls.map((call) => call[0])).toEqual(['t-1', 't-2'])
+  })
+  it('再読込後は記録した番号をGETで確認し、配り直さない', async () => {
+    window.sessionStorage.setItem('hq-folder-distribution:tenant-a:owner:template', JSON.stringify([{ templateId: 't-1', accountIds: ['a-1'], runId: 'run-t-1' }]))
+    calls.result.mockResolvedValue(delivered('t-1'))
+    render(<HqTemplatesV8 type="template" />)
+    expect(await screen.findByRole('dialog', { name: '配った結果：フォルダ「配布結果の再確認」' })).toBeTruthy()
+    expect(calls.result).toHaveBeenCalledWith('t-1', 'run-t-1')
+    expect(calls.distribute).not.toHaveBeenCalled()
+  })
+
+  it('失敗したひな形とアカウントだけ再確認し、先に成功した配布は送らない', async () => {
+    calls.distribute.mockImplementationOnce(async () => delivered('t-1')).mockImplementationOnce(async () => ({ ...delivered('t-2'), status: 'failed', stores: [{ ...delivered('t-2').stores[0], status: 'failed', reason: '更新を確認してください' }] }))
+    render(<HqTemplatesV8 type="template" />)
+    const dialog = await selectFolder()
+    await pickStores(dialog, ['然 -NEN- 本店'])
+    fireEvent.click(within(dialog).getByRole('button', { name: '2 件を 1 アカウントへ配る' }))
+    fireEvent.click(await screen.findByRole('button', { name: '次のひな形を確かめる（1/2）' }))
+    fireEvent.click(await screen.findByRole('button', { name: '2 件を 1 アカウントへ配る' }))
+    const result = await screen.findByRole('dialog', { name: '配った結果：フォルダ「予約」' })
+    fireEvent.click(within(result).getByRole('button', { name: '失敗した 1 件をやり直す' }))
+    fireEvent.click(await screen.findByRole('button', { name: '1 件を 1 アカウントへ配る' }))
+    await waitFor(() => expect(calls.distribute).toHaveBeenCalledTimes(3))
+    expect(calls.distribute.mock.calls.map((call) => call[0])).toEqual(['t-1', 't-2', 't-2'])
+    expect(calls.preflight.mock.calls.map((call) => [call[0], call[1]])).toEqual([['t-1', ['a-1']], ['t-2', ['a-1']], ['t-2', ['a-1']]])
+  })
+
+})
+
+
+describe('統括タグの札は詳細から配布結果まで同じ色を保つ', () => {
+  it.each([null, '#8b5cf6'])('一覧→詳細→配布の確認→配った結果でタグ札の色 %s を保ち、配布の操作も保つ', async (color) => {
+    window.history.replaceState(null, '', '/hq/templates')
+    const expectedColor = folderDisplayColor({ name: '予約', color })
+    const tagRow = { ...listRow, name: 'VIP', template_type: 'tag', folder_id: 'f-1' }
+    calls.list.mockResolvedValue([tagRow])
+    calls.folderList.mockResolvedValue([{ id: 'f-1', name: '予約', revision: 1, color }])
+    calls.get.mockResolvedValue({ template: tagRow, definition: { schemaVersion: 1, tag: { name: 'VIP', folderId: 'f-1' }, folders: [{ id: 'f-1', name: '予約', color }] } })
+    calls.preflight.mockResolvedValue({ preflightId: 'tag-run', expiresAt: new Date(Date.now() + 60000).toISOString(), stores: [{ accountId: 'a-1', accountName: '然 -NEN- 本店', items: [{ sourceId: 't-1', itemKind: 'tag', name: 'VIP', duplicate: false, allowedModes: ['create'] }] }] })
+    calls.distribute.mockResolvedValue({ runId: 'tag-run', status: 'completed', stores: [{ accountId: 'a-1', accountName: '然 -NEN- 本店', status: 'succeeded', counts: { created: 1, overwritten: 0, aliased: 0 } }] })
+    render(<HqTemplatesV8 type="tag" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「予約」の操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'このフォルダを配る' }))
+    const folderDialog = await screen.findByRole('dialog', { name: 'フォルダ「予約」の 1 件を配る' })
+    expect((within(folderDialog).getByRole('checkbox', { name: 'タグ「VIP」' }) as HTMLInputElement).checked).toBe(true)
+    expect(within(folderDialog).getByRole('group', { name: 'タグ「VIP」' }).querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)
+    fireEvent.click(within(folderDialog).getByRole('button', { name: 'キャンセル' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'タグ「VIP」', exact: true }))
+    const body = await screen.findByRole('region', { name: '本文' })
+    const pill = within(body).getByRole('group', { name: 'タグ「VIP」' })
+    expect(pill.querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)
+    fireEvent.click(screen.getByRole('button', { name: 'VIPを配る' }))
+    expect(screen.getByRole('heading', { name: /アカウントへ配る：/ }).querySelector('[role="group"]')).toBeTruthy()
+    fireEvent.click(screen.getByRole('checkbox', { name: '然 -NEN- 本店', exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: '1アカウントの重複を確認' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'この内容で1アカウントへ配る' }))
+    const result = await screen.findByRole('dialog', { name: '配った結果：VIP' })
+    expect(within(result).getByRole('group', { name: 'タグ「VIP」' }).querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)
+    expect(calls.distribute).toHaveBeenCalledOnce()
+    expect(within(result).getByText('成功')).toBeTruthy()
   })
 })

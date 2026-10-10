@@ -1,5 +1,6 @@
 'use client'
 
+import { notifySaved } from '@/components/shared/toast'
 import { Th } from '@/components/shared/table'
 
 /*
@@ -42,6 +43,11 @@ import {
 import { menuPriceLabel } from './lib/menu-price'
 import shell from './settings.module.css'
 import styles from './assign.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { PageHeading } from '@/components/templates/page-frame'
+import { Field } from '@/components/shared/form-controls'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import NumberInput from '@/components/shared/number-field'
 
 /* 予約設定の5タブ（settings-v8.tsx の V8_TABS と同じ並び）。 */
 const V8_TABS = [
@@ -228,13 +234,13 @@ export default function AssignMatrixV8() {
       await putGrid(grid)
       setSavedGrid(grid)
       flashDone()
-      notifyToast('保存しました', {
+      notifySaved('保存しました', {
         actionLabel: '元に戻す',
         onAction: () => void undoSave(before, grid),
       })
     } catch (e) {
       setError(
-        `${describeSaveFailure(e)}（保存は取り消されました。画面を再読み込みして最新の状態を確認してください）`,
+        `${withPermissionFailure(e, describeSaveFailure(e), 'store')}（保存は取り消されました。画面を再読み込みして最新の状態を確認してください）`,
       )
     } finally {
       setSaving(false)
@@ -259,14 +265,14 @@ export default function AssignMatrixV8() {
       notifyToast('元に戻しました')
     } catch (e) {
       setError(
-        `${describeSaveFailure(e)}（元に戻せませんでした。画面を再読み込みして最新の状態を確認してください）`,
+        `${withPermissionFailure(e, describeSaveFailure(e), 'store')}（元に戻せませんでした。画面を再読み込みして最新の状態を確認してください）`,
       )
     } finally {
       setSaving(false)
     }
   }
 
-  /* 「いま受付できる人数」（稼働中の担当だけ）と「割ってある人数」を分ける（v7 R308 と同じ）。 */
+  /* 「いま受付できる人数」（有効の担当だけ）と「割ってある人数」を分ける（v7 R308 と同じ）。 */
   const assignedCounts = useMemo(() => {
     const counts = new Map<string, number>()
     for (const m of menus) {
@@ -324,13 +330,11 @@ export default function AssignMatrixV8() {
 
   return (
     <div className={shell.shell} data-design-node="ooufy">
-      <header className={shell.boardHead} data-design="Head">
-        <h1 className={shell.headTitle}>担当メニューをまとめて決める</h1>
-        <p className={shell.headNote} role="status" aria-live="polite">
+      <PageHeading title={<>担当メニューをまとめて決める</>}
+        crumbs={<><p className={shell.headNote} role="status" aria-live="polite">
           {dirty ? '未保存の変更があります' : 'メニューごとに、予約を受けられるスタッフを決めます'}
-        </p>
-        <div data-design="Tabs">
-          <Tabs
+        </p></>}
+        tabs={<><Tabs
             label="予約設定のタブ"
             items={V8_TABS.map((item) => ({
               label: item.label,
@@ -341,9 +345,7 @@ export default function AssignMatrixV8() {
                   ? '/booking/menus'
                   : `/booking/menus?tab=${item.key}`,
             }))}
-          />
-        </div>
-      </header>
+          /></>} />
 
       <div className={shell.body} data-design="Body">
         <div className={shell.main}>
@@ -363,7 +365,7 @@ export default function AssignMatrixV8() {
               <p className={shell.stateDesc}>{loadFailure?.description ?? error}</p>
               {loadFailure?.retryable ? (
                 <div className={shell.stateActions}>
-                  <Button onClick={() => void load()}>読み直す</Button>
+                  <Button onClick={() => void load()}>もう一度読み込む</Button>
                 </div>
               ) : null}
             </div>
@@ -401,7 +403,7 @@ export default function AssignMatrixV8() {
                               title={`${staffLabel(s)}${!s.is_active ? '（止めている）' : ''}${s.is_designation_optional === 1 ? '（指名なしを受ける）' : ''}`}
                             >
                               {staffLabel(s)}
-                              {!s.is_active ? <span className={styles.matrixStaffOff}>止めている</span> : null}
+                              {!s.is_active ? <span className={styles.matrixStaffOff}>停止中</span> : null}
                             </span>
                           </Th>
                         ))}
@@ -415,7 +417,7 @@ export default function AssignMatrixV8() {
                           className={focusMenuId === m.id ? styles.matrixRowFocus : undefined}
                         >
                           <Th scope="row" className={styles.matrixMenuCell}>
-                            <span className={styles.matrixMenuName} title={m.name}>{m.name}</span>
+                            <span className={styles.matrixMenuName} ><TruncatedText value={String(m.name ?? '')} /></span>
                           </Th>
                           {staff.map((s) => {
                             const row = grid[s.id]?.[m.id]
@@ -459,10 +461,7 @@ export default function AssignMatrixV8() {
                       {`升を押したとき（${staffLabel(selectedStaff)} × ${selectedMenu.name}）`}
                     </h3>
                   <div className={styles.overrideFields}>
-                    <label className={styles.field}>
-                      <span className={styles.label}>このスタッフの所要時間</span>
-                      <span className={styles.unitField}>
-                        <input
+                    <Field label="このスタッフの所要時間" note={`メニューは ${selectedMenu.duration_minutes} 分`}><NumberInput unit="分"
                           type="number"
                           min={1}
                           disabled={!canEditMenus || !selectedRow.is_offered}
@@ -476,14 +475,8 @@ export default function AssignMatrixV8() {
                           placeholder={String(selectedMenu.duration_minutes)}
                           aria-label={`${staffLabel(selectedStaff)} の ${selectedMenu.name} の所要時間`}
                         />
-                        <span className={styles.unitSuffix}>分（メニューは {selectedMenu.duration_minutes} 分）</span>
-                      </span>
-                    </label>
-                    <label className={styles.field}>
-                      <span className={styles.label}>このスタッフの料金</span>
-                      <span className={styles.unitField}>
-                        <span className={styles.unitSuffix}>¥</span>
-                        <input
+                        </Field>
+                    <Field label="このスタッフの料金" note={`メニューは ${menuPriceLabel(selectedMenu)}`}><NumberInput unit="円"
                           type="number"
                           min={0}
                           disabled={!canEditMenus || !selectedRow.is_offered}
@@ -497,9 +490,7 @@ export default function AssignMatrixV8() {
                           placeholder={formatNumber(selectedMenu.base_price)}
                           aria-label={`${staffLabel(selectedStaff)} の ${selectedMenu.name} の料金`}
                         />
-                        <span className={styles.unitSuffix}>（メニューは {menuPriceLabel(selectedMenu)}）</span>
-                      </span>
-                    </label>
+                        </Field>
                     <span className={styles.overrideClear}>
                       <Button
                         disabled={!canEditMenus || !selectedOverridden}
@@ -580,7 +571,7 @@ export default function AssignMatrixV8() {
                   // WEB061：保存の失敗で保存を押せなくしない（やり直せるように）。止めるのは読み込みの失敗だけ。
                   disabled={saving || !selectedAccountId || loading || loadFailed}
                   busy={saving}
-                  done={saveDone}
+
                 >
                   <Check size={15} aria-hidden="true" />保存
                 </Button>

@@ -1,4 +1,5 @@
 'use client'
+import { jstDate } from "@/lib/jst-datetime"
 
 /* ③ 休業日（KRgTQ）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
@@ -21,6 +22,7 @@ import {
   type LoadStatus,
 } from './shared'
 import styles from '../settings.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 function monthWeeks(month: string): string[][] {
   const first = new Date(`${month}-01T00:00:00Z`)
@@ -59,7 +61,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
   onSaved: (settings: BookingSettings) => void
   onReload: () => void
 }) {
-  const today = useMemo(() => new Date(Date.now() + JST_OFFSET_MS).toISOString().slice(0, 10), [])
+  const today = useMemo(() => jstDate(), [])
   const [month, setMonth] = useState(today.slice(0, 7))
   const [editing, setEditing] = useState<BookingException | 'new' | null>(null)
   const [editFrom, setEditFrom] = useState('')
@@ -173,7 +175,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
         icon={<AccountIcon />}
         title="休業日を読み込めませんでした"
         description={error ?? '通信状態を確認して、もう一度お試しください。'}
-        action={<Button onClick={onReload}>読み直す</Button>}
+        action={<Button onClick={onReload}>もう一度読み込む</Button>}
       />
     )
   }
@@ -285,7 +287,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
 
       <p className={styles.closedNote}>
         {bookingCountOnClosed !== null && bookingCountOnClosed > 0
-          ? `すでに入っている予約は消えません。休みにした日に予約がある人には、お店から連絡してください（${bookingCountOnClosed}件）。`
+          ? `すでに入っている予約は消えません。休みにした日に予約がある人には、お店から連絡してください（${bookingCountOnClosed} 件）。`
           : 'すでに入っている予約は消えません。休みにした日に予約がある人には、お店から連絡してください。'}
       </p>
       </section>
@@ -297,18 +299,9 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
         busy={busy}
       >
         <div className="grid gap-3">
-          <label className={styles.fieldLabel}>
-            開始日
-            <DateField aria-label="休業の開始日" value={editFrom} onChange={setEditFrom} disabled={busy} className="mt-1" />
-          </label>
-          <label className={styles.fieldLabel}>
-            終了日
-            <DateField aria-label="休業の終了日" value={editTo} onChange={setEditTo} disabled={busy} className="mt-1" />
-          </label>
-          <label className={styles.fieldLabel}>
-            理由
-            <input aria-label="休業の理由" value={editReason} onChange={(event) => setEditReason(event.target.value)} disabled={busy} placeholder="例: お盆・店舗の改装" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" />
-          </label>
+          <Field label="開始日"><DateField aria-label="休業の開始日" value={editFrom} onChange={setEditFrom} disabled={busy} className="mt-1" /></Field>
+          <Field label="終了日"><DateField aria-label="休業の終了日" value={editTo} onChange={setEditTo} disabled={busy} className="mt-1" /></Field>
+          <Field label="理由"><input aria-label="休業の理由" value={editReason} onChange={(event) => setEditReason(event.target.value)} disabled={busy} placeholder="例：お盆・店舗の改装" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></Field>
           {editError ? <p className="text-danger text-xs" role="alert">{editError}</p> : null}
           <div className="flex justify-end gap-2">
             <Button onClick={() => { if (!busy) setEditing(null) }} disabled={busy}>キャンセル</Button>
@@ -320,13 +313,14 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
       <ConfirmDialog
         open={deleteTarget !== null}
         title="この休業日を消しますか？"
+        deleteName={deleteTarget?.reason?.trim() || `${deleteTarget?.dateFrom ?? ''}〜${deleteTarget?.dateTo ?? ''}の休業日`}
         description="削除すると、その期間は曜日の決めごとどおりの受付に戻ります。すでに入っている予約はそのまま残ります。"
         confirmLabel="休業日を削除する"
         destructive
         busy={busy}
         error={deleteError ?? undefined}
         onCancel={() => { if (!busy) { setDeleteTarget(null); setDeleteError(null) } }}
-        onConfirm={() => void remove()}
+        onConfirm={() => remove()}
       />
     </div>
   )

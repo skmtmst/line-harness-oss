@@ -38,6 +38,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { QA_TIMEZONE, captureClockFor } from './qa-clock.mjs'
 import { annotate, decodePng, diffImages, encodePng, scaleDown, sideBySide } from './v8-png.mjs'
 
 export const HERE = dirname(fileURLToPath(import.meta.url))
@@ -251,11 +252,13 @@ export function assertV8Theme(theme) {
  * 戻りは { measured, shotBuffer }。開けないときは throw。
  */
 export async function shootUrl(browser, base, route, width) {
-  const context = await browser.newContext({ viewport: { width, height: 900 } })
+  const context = await browser.newContext({ viewport: { width, height: 900 }, timezoneId: QA_TIMEZONE, locale: 'ja-JP' })
   await context.addInitScript(([entries]) => {
     for (const [key, value] of entries) localStorage.setItem(key, value)
   }, [Object.entries(PARITY_INIT)])
   const page = await context.newPage()
+  const clock = captureClockFor(route)
+  if (clock) await page.clock.setFixedTime(new Date(clock))
   const url = `${base}${route.startsWith('/') ? route : `/${route}`}`
   try {
     const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 })

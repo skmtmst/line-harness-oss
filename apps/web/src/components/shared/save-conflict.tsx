@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { GitCompare, RefreshCw, TriangleAlert } from 'lucide-react'
 import Button from './button'
 import Dialog from './dialog'
@@ -62,6 +62,7 @@ export type SaveConflictState<T> = {
 }
 
 export function useSaveConflict<T>(options: {
+  contextKey?: string
   /** 最新を取る。取れなければ null（窓に「取れませんでした」を出す）。 */
   fetchLatest: () => Promise<T | null>
   /** 最新を読み直して画面に入れる。読み直せたら帯は消す（clear を呼ぶ）。 */
@@ -74,6 +75,12 @@ export function useSaveConflict<T>(options: {
   const [compareBusy, setCompareBusy] = useState(false)
   const [compareError, setCompareError] = useState('')
   const busyRef = useRef(false)
+
+  const contextKey = options.contextKey
+  useEffect(() => {
+    busyRef.current = false
+    setConflict(null); setLatest(null); setCompareError(''); setCompareBusy(false)
+  }, [contextKey])
 
   const mark = useCallback((updatedAt = '') => setConflict({ updatedAt }), [])
   const closeCompare = useCallback(() => {
@@ -89,17 +96,18 @@ export function useSaveConflict<T>(options: {
   const compare = useCallback(async () => {
     if (busyRef.current) return
     busyRef.current = true
+    const atContext = optionsRef.current.contextKey
     setCompareBusy(true)
     setCompareError('')
     try {
       const next = await optionsRef.current.fetchLatest()
+      if (atContext !== optionsRef.current.contextKey) return
       if (next === null) setCompareError(FETCH_FAILED)
       else setLatest(next)
     } catch {
-      setCompareError(FETCH_FAILED)
+      if (atContext === optionsRef.current.contextKey) setCompareError(FETCH_FAILED)
     } finally {
-      busyRef.current = false
-      setCompareBusy(false)
+      if (atContext === optionsRef.current.contextKey) { busyRef.current = false; setCompareBusy(false) }
     }
   }, [])
 
@@ -128,19 +136,23 @@ export function SaveConflictBand({
   title,
   description = SAVE_CONFLICT_DESCRIPTION,
   compareBusy = false,
+  compareDisabled = false,
+  reloadHref,
   onCompare,
   compareHref,
   onReload,
   designNode,
 }: {
-  title: string
-  description?: string
+  title: ReactNode
+  description?: ReactNode
   compareBusy?: boolean
+  compareDisabled?: boolean
+  reloadHref?: string
   /** 「違いを比べる」を押したとき（窓を開くなど）。compareHref と どちらかを渡す。 */
   onCompare?: () => void
   /** 比べる先が別の画面のときは、ボタンをその画面へのリンクにする（新しいタブでも開ける）。 */
   compareHref?: string
-  onReload: () => void
+  onReload?: () => void
   /** 絵の板の印（J1pdB・k32cn など）。 */
   designNode?: string
 }) {
@@ -157,15 +169,15 @@ export function SaveConflictBand({
           違いを比べる
         </Button>
       ) : (
-        <Button onClick={onCompare} disabled={compareBusy} busy={compareBusy} busyLabel="比べています…">
+        <Button onClick={onCompare} disabled={compareBusy || compareDisabled} busy={compareBusy} busyLabel="比べています…">
           <GitCompare aria-hidden="true" className={styles.buttonIcon} />
           違いを比べる
         </Button>
       )}
-      <Button variant="primary" onClick={onReload}>
+      {reloadHref ? <Button variant="primary" href={reloadHref}><RefreshCw aria-hidden="true" className={styles.buttonIcon} />最新を読み込んで続ける</Button> : <Button variant="primary" onClick={onReload}>
         <RefreshCw aria-hidden="true" className={styles.buttonIcon} />
         最新を読み込んで続ける
-      </Button>
+      </Button>}
     </div>
   )
 }

@@ -2,7 +2,7 @@
  * ★V8 登録メディア一覧（O7hUt7）。頭・数の帯・フォルダの列・道具の段・本文の置き場は型（ListPage）が持つ。
  * ここは案内の段・札の格子（4列・間12・札の余白12）・表の下・見るだけの帯・名前を変える欄だけ。
  */
-:global([data-theme='v8']) .kpiStrip.kpiStrip { border-top: 0; }
+
 .noticeRow {
   display: flex;
   flex-basis: 100%;
@@ -73,9 +73,10 @@
   min-width: 0;
   overflow: hidden;
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .row {
   flex-direction: row;

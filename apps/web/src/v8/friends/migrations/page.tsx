@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 /friends/migrations の入口。`?tab=uid` は UID移行、それ以外は CSV で書き出す・取り込む。
+ * ★V8 /friends/migrations の入口。`?tab=uid` は UID移行、それ以外は CSVで書き出す・取り込む。
  */
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'

@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -7,7 +8,7 @@ import { imageDimensions } from '../services/media-metadata.js';
 const images = new Hono<Env>();
 
 // POST /api/images — upload image (base64 or binary)
-images.post('/api/images', requireRole('owner', 'admin', 'staff'), async (c) => {
+images.post('/api/images', requireRole('owner', 'admin', 'staff'), inputJsonBoundary({"data":["string"],"mimeType":["string"],"filename":["string"]}), async (c) => {
   try {
     const contentType = c.req.header('Content-Type') || '';
 
@@ -23,7 +24,7 @@ images.post('/api/images', requireRole('owner', 'admin', 'staff'), async (c) => 
       }>();
 
       if (!body.data) {
-        return c.json({ success: false, error: 'data (base64) is required' }, 400);
+        return inputError(c, { success: false, error: 'data (base64) is required' }, 400, ["data"]);
       }
 
       let base64 = body.data;
@@ -45,12 +46,12 @@ images.post('/api/images', requireRole('owner', 'admin', 'staff'), async (c) => 
     }
 
     if (data.byteLength > 10 * 1024 * 1024) {
-      return c.json({ success: false, error: 'Image too large (max 10MB)' }, 400);
+      return inputError(c, { success: false, error: 'Image too large (max 10MB)' }, 400, ["data"]);
     }
 
     const allowedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(mimeType)) {
-      return c.json({ success: false, error: `Unsupported image type: ${mimeType}. Allowed: ${allowedTypes.join(', ')}` }, 400);
+      return inputError(c, { success: false, error: `Unsupported image type: ${mimeType}. Allowed: ${allowedTypes.join(', ')}` }, 400, ["mimeType"]);
     }
 
     // 保存の前に検査の段を入れる。危険な中身は保存せず、URL も返さない。
@@ -67,7 +68,7 @@ images.post('/api/images', requireRole('owner', 'admin', 'staff'), async (c) => 
       const message = preCheck.verdict === 'quarantined'
         ? '確認のため受け付けできません'
         : `受け付けできません（${preCheck.detail}）`;
-      return c.json({ success: false, code: 'file_scan_blocked', error: message }, 422);
+      return inputError(c, { success: false, code: 'file_scan_blocked', error: message }, 422, []);
     }
 
     const ext = mimeType.split('/')[1] === 'jpeg' ? 'jpg' : mimeType.split('/')[1];
@@ -101,16 +102,19 @@ images.get('/images/*', async (c) => {
     return c.json({ success: false, error: 'Invalid image key' }, 400);
   }
   // 写真審査の原本は公開配信しない。管理画面もreview/public派生画像だけを使う。
-  if (key.startsWith('nen-photo-originals/') || key.startsWith('private/')) {
+  if (key.startsWith('nen-photo-originals/') || key.startsWith('private/') || /^hq-templates\/[^/]+\/pending\//.test(key)) {
     return c.json({ success: false, error: 'Image not found' }, 404);
   }
   // 検査が終わるまで出さない。記録が無い古いファイルは通す。
   const gateKind = key.startsWith('form-uploads/')
     ? 'form_file'
-    : key.startsWith('broadcast-media/')
+    : key.startsWith('broadcast-media/') || /^hq-templates\/[^/]+\/uploads\/[^/]+\.(mp4|m4a)$/.test(key)
       ? 'broadcast_asset'
       : null;
   if (gateKind) {
+    if (key.startsWith('hq-templates/') && !await c.env.DB.prepare("SELECT 1 FROM media_file_scans WHERE subject_kind='broadcast_asset' AND subject_id=?").bind(key).first()) {
+      return c.json({ success: false, error: 'ファイルの安全性を確かめています' }, 409);
+    }
     const gate = await checkKeyGate(c.env.DB, c.env.IMAGES, gateKind, key);
     if (!gate.allowed) {
       return c.json({ success: false, code: gate.code, error: gate.message }, 409);
@@ -141,6 +145,7 @@ images.get('/images/*', async (c) => {
 images.delete('/api/images/:key', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const key = c.req.param('key');
+    if (key.startsWith('hq-templates/')) return c.json({success:false,error:'統括のファイルは統括の削除操作から外してください'},403);
     await c.env.IMAGES.delete(key);
     return c.json({ success: true, data: null });
   } catch (err) {

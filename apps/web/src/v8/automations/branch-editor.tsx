@@ -6,6 +6,7 @@ import type { CommonActionResources, CommonActionStep } from '@/lib/api'
 import { newCommonActionStep, newStepId } from '@/components/automations/common-action-editor'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { ACTION_LABELS } from './version-diff'
 
 export function newBranchStep(): CommonActionStep {
@@ -162,11 +163,10 @@ export default function BranchEditors({
     ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` })),
   ]
   const tagOptions = (selected: string) => [
-    { value: '', label: 'タグを選ぶ' },
-    ...resources.tags.map((tag) => ({ value: tag.id, label: tag.name })),
+    ...resources.tags,
     // 保存済みのタグが選択肢に無いときも値を保つ（消さない）。
     ...(selected && !resources.tags.some((tag) => tag.id === selected)
-      ? [{ value: selected, label: '選択中のタグ（未取得。タグの一覧を読み込み直すと表示します）' }]
+      ? [{ id: selected, name: '選択中のタグ（未取得。タグの一覧を読み込み直すと表示します）' }]
       : []),
   ]
   return (
@@ -226,16 +226,18 @@ export default function BranchEditors({
             <div className="mt-3 space-y-2">
               {condition.rules.map((rule, ruleIndex) => rule.type === 'tag_exists' || rule.type === 'tag_not_exists' ? (
                 <div key={`${step.id}-rule-${ruleIndex}`} className="flex items-center gap-2">
-                  <label className="text-ink-secondary flex-1 text-sm">条件{ruleIndex + 1}（{RULE_TYPE_LABEL[rule.type]}）
-                    <Select
-                      size="full"
-                      aria-label={`条件${ruleIndex + 1}のタグ`}
-                      className="mt-1"
-                      value={rule.value}
-                      onChange={(value) => onUpdate(step.id, { kind: 'ruleTag', ruleIndex, tagId: value })}
-                      options={tagOptions(rule.value)}
-                    />
-                  </label>
+                  <div className="text-ink-secondary min-w-0 flex-1 text-sm">
+                    <span>条件{ruleIndex + 1}（{RULE_TYPE_LABEL[rule.type]}）</span>
+                    <div className="mt-1">
+                      <EntityKindField
+                        kind="tag"
+                        label={`条件${ruleIndex + 1}のタグ`}
+                        value={rule.value}
+                        onChange={(value) => onUpdate(step.id, { kind: 'ruleTag', ruleIndex, tagId: value })}
+                        options={tagOptions(rule.value)}
+                      />
+                    </div>
+                  </div>
                   {condition.rules.length > 1 ? (
                     <Button aria-label={`条件${ruleIndex + 1}を外す`} onClick={() => onUpdate(step.id, { kind: 'ruleRemove', ruleIndex })}>外す</Button>
                   ) : null}

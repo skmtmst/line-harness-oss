@@ -35,7 +35,7 @@ vi.mock('@/lib/api', () => ({
 }))
 
 import NotificationsV8 from './list'
-afterEach(cleanup)
+afterEach(() => { cleanup(); fx.account = 'account-a'; fx.rejectAll = null })
 
 test('A の「すべて既読」の失敗で、B の一覧を A に戻さない', async () => {
   const view = render(<NotificationsV8 />)
@@ -48,4 +48,26 @@ test('A の「すべて既読」の失敗で、B の一覧を A に戻さない'
   await act(async () => { await Promise.resolve() })
   expect(screen.queryByText('Aのお知らせ')).toBeNull()
   expect(screen.getByText('Bのお知らせ')).toBeTruthy()
+})
+
+
+test('A→B→Aへ戻っても前のAの失敗で新しい取得結果を巻き戻さない（WEB281）', async () => {
+  const { api } = await import('@/lib/api')
+  const view = render(<NotificationsV8 />)
+  await screen.findByText('Aのお知らせ')
+  await act(async () => { screen.getByRole('button', { name: /すべて既読にする/ }).click() })
+  const rejectOld = fx.rejectAll
+  fx.account = 'account-b'
+  view.rerender(<NotificationsV8 />)
+  await screen.findByText('Bのお知らせ')
+  vi.mocked(api.notifications.center.list).mockResolvedValueOnce({ success: true, data: {
+    items: [item('account-a-new', 'Aの新しいお知らせ')],
+    counts: { all: 1, error: 0, update: 1, unread: 1 }, unreadCount: 1,
+  } })
+  fx.account = 'account-a'
+  view.rerender(<NotificationsV8 />)
+  await screen.findByText('Aの新しいお知らせ')
+  await act(async () => { rejectOld?.(new Error('down')) })
+  expect(screen.queryByText('Aのお知らせ')).toBeNull()
+  expect(screen.getByText('Aの新しいお知らせ')).toBeTruthy()
 })

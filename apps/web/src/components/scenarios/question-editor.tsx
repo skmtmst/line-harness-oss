@@ -15,6 +15,7 @@ import { useAccount } from '@/contexts/account-context'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { scenarioReferenceData } from './scenario-reference-data'
 import Button from '@/components/shared/button'
 
@@ -37,6 +38,7 @@ export interface QuestionChoice {
   hideUserMessage?: boolean
   reply?: string
   repeatReply?: string
+  scoreChange?: number | null
   addTagIds?: string[]
   removeTagIds?: string[]
   field?: { fieldId: string; value: string }
@@ -160,7 +162,8 @@ export function deadAnswerSettings(choice: QuestionChoice): string[] {
   if (choice.reply?.trim()) dead.push('選択時の返信')
   if (choice.repeatReply?.trim()) dead.push('二度押し時の返信')
   if (choice.userMessage?.trim()) dead.push('ユーザーメッセージ')
-  if ((choice.addTagIds?.length ?? 0) > 0) dead.push('追加するタグ')
+  if ((choice.addTagIds?.length ?? 0) > 0 && (choice.behavior === 'tel' || choice.behavior === 'mail')) dead.push('追加するタグ')
+  if (choice.scoreChange && (choice.behavior === 'tel' || choice.behavior === 'mail')) dead.push('足すスコア')
   if ((choice.removeTagIds?.length ?? 0) > 0) dead.push('はずすタグ')
   if (choice.field?.fieldId) dead.push('友だち情報欄')
   return dead
@@ -221,7 +224,8 @@ export function clearDeadAnswerSettings(choice: QuestionChoice): QuestionChoice 
     reply: undefined,
     repeatReply: undefined,
     userMessage: undefined,
-    addTagIds: undefined,
+    addTagIds: choice.behavior === 'tel' || choice.behavior === 'mail' ? undefined : choice.addTagIds,
+    scoreChange: choice.behavior === 'tel' || choice.behavior === 'mail' ? undefined : choice.scoreChange,
     removeTagIds: undefined,
     field: undefined,
   }
@@ -252,6 +256,7 @@ export interface QuestionEditorProps {
   /** 選択肢ごとのアクション設定を開く。保存済みの通でだけ使える。 */
   onOpenChoiceActions?: (choiceIndex: number) => void
   /** 質問テンプレートのように、選択肢を横に見比べる画面。 */
+  accountId?: string | null
   choiceColumns?: boolean
 }
 
@@ -260,31 +265,42 @@ export default function QuestionEditor({
   onChange,
   onOpenChoiceActions,
   choiceColumns = false,
+  accountId,
 }: QuestionEditorProps) {
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId: contextAccountId } = useAccount()
+  const selectedAccountId = accountId === undefined ? contextAccountId : accountId
   /* 見出しの文字と欄をつなぐための番号。同じ画面に複数置いても重ならない。 */
   const fieldBase = useId()
+  const [referenceLoading, setReferenceLoading] = useState(true)
+  const [referenceError, setReferenceError] = useState(false)
+  const [referenceRetry, setReferenceRetry] = useState(0)
   const [tags, setTags] = useState<{ id: string; name: string }[]>([])
   const [fields, setFields] = useState<{ id: string; name: string }[]>([])
   const [scenarios, setScenarios] = useState<{ id: string; name: string }[]>([])
   const [openChoice, setOpenChoice] = useState<number | null>(0)
 
   useEffect(() => {
-    if (!selectedAccountId) {
-      setFields([])
-      return
-    }
+    let cancelled = false
+    setTags([]); setFields([]); setScenarios([]); setReferenceError(false)
+    setReferenceLoading(Boolean(selectedAccountId))
+    if (!selectedAccountId) return
     void (async () => {
-      const [tagRes, fieldRes, scenarioRes] = await Promise.all([
-        scenarioReferenceData.tags(selectedAccountId),
-        scenarioReferenceData.friendFields(selectedAccountId),
-        scenarioReferenceData.scenarios(selectedAccountId),
-      ])
-      if (tagRes.success) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))
-      if (fieldRes.success) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))
-      if (scenarioRes.success) setScenarios(scenarioRes.data.map((s) => ({ id: s.id, name: s.name })))
+      try {
+        const [tagRes, fieldRes, scenarioRes] = await Promise.all([
+          scenarioReferenceData.tags(selectedAccountId),
+          scenarioReferenceData.friendFields(selectedAccountId),
+          scenarioReferenceData.scenarios(selectedAccountId),
+        ])
+        if (cancelled) return
+        if (!tagRes.success || !fieldRes.success || !scenarioRes.success) throw new Error('候補を読み込めませんでした')
+        if (tagRes.success) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))
+        if (fieldRes.success) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))
+        if (scenarioRes.success) setScenarios(scenarioRes.data.map((s) => ({ id: s.id, name: s.name })))
+      } catch { if (!cancelled) setReferenceError(true) }
+      finally { if (!cancelled) setReferenceLoading(false) }
     })()
-  }, [selectedAccountId])
+    return () => { cancelled = true }
+  }, [selectedAccountId, referenceRetry])
 
   const setChoice = (index: number, patch: Partial<QuestionChoice>) => {
     const choices = [...value.choices]
@@ -294,14 +310,14 @@ export default function QuestionEditor({
 
   return (
     <div className="space-y-5">
+      {referenceError && <p role="alert">候補を読み込めませんでした。<Button onClick={() => setReferenceRetry(value => value + 1)}>もう一度読み込む</Button></p>}
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <label htmlFor={`${fieldBase}-intro`} className="text-ink-secondary text-xs font-medium">前文</label>
           <CharCount value={value.intro ?? ''} max={4500} />
         </div>
         <p className="text-ink-faint mt-0.5 mb-1.5 text-xs leading-relaxed">
-          質問の前に、ふつうのテキストメッセージとして流れます。空なら送りません。差し込み（
-          <code className="text-ink-faint">{'{{name}}'}</code> など）が使えます。
+          質問の前に、ふつうのテキストメッセージとして流れます。空なら送りません。名前などの差し込みが使えます。
         </p>
         <textarea
           id={`${fieldBase}-intro`}
@@ -466,26 +482,25 @@ export default function QuestionEditor({
                           { value: 'stop', label: '購読を止める' },
                         ]}
                       />
-                      <Select
-                        aria-label={`選択肢${index + 1}の移動先シナリオ`}
-                        value={choice.scenario?.scenarioId ?? ''}
-                        onChange={(next) =>
-                          setChoice(index, {
-                            scenario: {
-                              op: choice.scenario?.op ?? 'start',
-                              ...choice.scenario,
-                              scenarioId: next,
-                            },
-                          })
-                        }
-                        options={[
-                          {
-                            value: '',
-                            label: choice.scenario?.op === 'stop' ? 'このシナリオ' : 'シナリオを選ぶ',
-                          },
-                          ...scenarios.map((s) => ({ value: s.id, label: s.name })),
-                        ]}
-                      />
+                      <div className="min-w-0 flex-1">
+                        <EntityKindField
+                          kind="scenario"
+                          label={`選択肢${index + 1}の移動先シナリオ`}
+                          value={choice.scenario?.scenarioId ?? ''}
+                          clearable
+                          placeholder={choice.scenario?.op === 'stop' ? '（このシナリオ）' : '（シナリオを選ぶ）'}
+                          onChange={(next) =>
+                            setChoice(index, {
+                              scenario: {
+                                op: choice.scenario?.op ?? 'start',
+                                ...choice.scenario,
+                                scenarioId: next,
+                              },
+                            })
+                          }
+                          options={scenarios}
+                        />
+                      </div>
                     </div>
                     {(choice.scenario?.op ?? 'start') === 'start' && (
                       <>
@@ -498,7 +513,7 @@ export default function QuestionEditor({
                         ).map((opt) => (
                           <RadioCard
                             key={opt.value}
-                            name={`${fieldBase}-restart`}
+                            name={`${fieldBase}-${choice.key ?? index}-restart`}
                             value={opt.value}
                             checked={(choice.scenario?.restart ?? 'from_start') === opt.value}
                             onChange={() =>
@@ -617,12 +632,14 @@ export default function QuestionEditor({
                     </div>
 
                     <TagPicker
+                      status={referenceError ? 'error' : referenceLoading ? 'loading' : 'ready'}
                       label="選択時に追加するタグ"
                       tags={tags}
                       selected={choice.addTagIds ?? []}
                       onChange={(ids) => setChoice(index, { addTagIds: ids })}
                     />
                     <TagPicker
+                      status={referenceError ? 'error' : referenceLoading ? 'loading' : 'ready'}
                       label="選択時にはずすタグ"
                       tags={tags}
                       selected={choice.removeTagIds ?? []}
@@ -705,11 +722,13 @@ export default function QuestionEditor({
 }
 
 function TagPicker({
+  status = 'ready',
   label,
   tags,
   selected,
   onChange,
 }: {
+  status?: 'loading' | 'ready' | 'error'
   label: string
   tags: { id: string; name: string }[]
   selected: string[]
@@ -719,40 +738,24 @@ function TagPicker({
     id,
     name: tags.find((tag) => tag.id === id)?.name ?? '選択済みのタグ',
   }))
-  const availableTags = tags.filter((tag) => !selected.includes(tag.id))
 
   return (
     <div>
       <span className="text-ink-secondary text-xs font-medium">{label}</span>
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-        {selectedTags.map((tag) => (
-          <button
-            key={tag.id}
-            type="button"
-            onClick={() => onChange(selected.filter((id) => id !== tag.id))}
-            aria-label={`${tag.name}を選択から外す`}
-            className="bg-accent-soft text-accent-deep rounded-pill h-8 px-3 text-xs font-medium"
-          >
-            {tag.name} ×
-          </button>
-        ))}
-        {tags.length > 0 ? (
-          /* #973 U022: タグの選択は全幅の独立行にする。長いタグ名でも
-             カードを広げず、選んだタグの行と重ならない。 */
-          <Select
-            aria-label={label}
-            value=""
-            onChange={(next) => {
-              if (next) onChange([...selected, next])
-            }}
-            options={[
-              { value: '', label: selected.length > 0 ? 'ほかのタグを選ぶ' : 'タグを選ぶ' },
-              ...availableTags.map((tag) => ({ value: tag.id, label: tag.name })),
-            ]}
-            size="full"
+      <div className="mt-1.5">
+        {tags.length > 0 || selected.length > 0 ? (
+          /* #973 U022: タグの選択は全幅の独立行にする。選ぶ窓でまとめて選び、外すのも窓で行う。
+             候補から消えたタグも窓で外せるよう、選択済みの行を残す。 */
+          <EntityKindField
+            kind="tag"
+            multiple
+            label={label}
+            value={selected}
+            onChange={onChange}
+            options={[...tags, ...selectedTags.filter((tag) => !tags.some((item) => item.id === tag.id))]}
           />
         ) : (
-          <span className="text-ink-faint text-xs">タグがまだありません</span>
+          <span className="text-ink-faint text-xs">{status === 'loading' ? '読み込んでいます' : status === 'error' ? '候補を読み込めませんでした' : 'タグがまだありません'}</span>
         )}
       </div>
     </div>

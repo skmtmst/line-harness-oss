@@ -6,6 +6,7 @@ import { RequiredBadge } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { api } from '@/lib/api'
 import { FRIEND_SELECT_LIMIT, normalizeFriendIds } from './trigger-helpers'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /**
  * 対象の友だちの複数選択（R22・設計G-2）。
@@ -19,11 +20,13 @@ export function FriendMultiSelect({
   selectedIds,
   names,
   onChange,
+  error,
 }: {
   accountId: string | null
   selectedIds: ReadonlyArray<string>
   names: Record<string, string>
   onChange: (ids: string[], nextNames: Record<string, string>) => void
+  error?: string
 }) {
   const ids = normalizeFriendIds(selectedIds)
   const [query, setQuery] = useState('')
@@ -83,7 +86,7 @@ export function FriendMultiSelect({
   return (
     <div>
       <p id="au-friends-label" className="text-xs font-medium text-ink">
-        対象の友だち（{ids.length}人）<RequiredBadge />
+        対象の友だち（{ids.length} 人）<RequiredBadge />
       </p>
       {ids.length > 0 ? (
         <ul aria-labelledby="au-friends-label" className="mt-2 flex flex-wrap gap-2">
@@ -107,8 +110,11 @@ export function FriendMultiSelect({
       ) : null}
       <div className="relative mt-2">
         <TextField
+          id="au-friend-search"
+          invalid={Boolean(error)}
+          aria-describedby={error ? 'au-friend-error' : undefined}
           aria-label="友だちを名前で探す"
-          placeholder={accountId ? '名前で探して選ぶ（例: やま）' : '先にLINEアカウントを選んでください'}
+          placeholder={accountId ? '名前で探して選ぶ（例：やま）' : '先にLINEアカウントを選んでください'}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           disabled={!accountId}
@@ -128,7 +134,7 @@ export function FriendMultiSelect({
                   const full = ids.length >= FRIEND_SELECT_LIMIT && !selected
                   return (
                     <li key={option.id} className="flex items-center justify-between gap-2 border-t border-hairline px-3 py-2 first:border-t-0">
-                      <span className="min-w-0 truncate text-sm text-ink" title={option.name}>{option.name}</span>
+                      <span className="min-w-0 truncate text-sm text-ink" ><TruncatedText value={String(option.name ?? '')} /></span>
                       {selected ? (
                         <span className="shrink-0 text-xs font-medium text-accent-deep">選択中 ✓</span>
                       ) : (
@@ -144,6 +150,7 @@ export function FriendMultiSelect({
           </div>
         ) : null}
       </div>
+      {error ? <p id="au-friend-error" className="mt-2 text-xs text-danger" role="alert">{error}</p> : null}
       <p className="mt-2 text-xs text-ink-secondary">
         {ids.length >= FRIEND_SELECT_LIMIT
           ? '100人まで選べます。これ以上は選べません。'

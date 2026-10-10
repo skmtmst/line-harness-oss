@@ -2,7 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import FolderPanel, { type FolderPanelRow } from './folder-panel'
+import FolderPanel, { CollapsedFolderActions, type FolderPanelRow } from './folder-panel'
 
 let host: HTMLDivElement
 let root: Root
@@ -27,6 +27,7 @@ async function render(row: FolderPanelRow, activeId = '', onSelect = vi.fn()) {
   })
   const button = host.querySelector('nav button') as HTMLButtonElement
   const icon = button.querySelector('.v8-only svg') as SVGElement
+  if ((row.kind ?? (row.label === 'すべて' ? 'all' : row.label === '未分類' ? 'unfiled' : 'folder')) === 'folder') return { button, icon, onSelect }
   expect(icon).not.toBeNull()
   return { button, icon, onSelect }
 }
@@ -67,16 +68,76 @@ describe('V8 フォルダの列の共通の印（faSbC）', () => {
     expect(icon.style.color).toBe(color)
   })
 
-  it.each(['キャンペーン', 'すべて', '未分類'])('作ったフォルダ「%s」は名前に関係なく、そのフォルダの色で塗る', async (label) => {
-    const { icon } = await render({ id: 'folder', kind: 'folder', label, count: 3, color: 'rebeccapurple' })
-    expect(icon.querySelector('path')?.getAttribute('fill')).toBe('rebeccapurple')
-    expect(icon.classList.contains('lucide-inbox')).toBe(false)
-    expect(icon.classList.contains('lucide-folder-open')).toBe(false)
+  it.each(['キャンペーン', 'すべて', '未分類'])('作ったフォルダ「%s」は名前に関係なく、そのフォルダの色の丸を出す', async (label) => {
+    const { button } = await render({ id: 'folder', kind: 'folder', label, count: 3, color: 'rebeccapurple', icon: callerIcon })
+    const dot = button.querySelector('[data-folder-dot]') as HTMLElement
+    expect(dot.style.backgroundColor).toBe('rebeccapurple')
+    expect(dot.getAttribute('aria-label')).toBe(`フォルダ：${label}`)
+    expect(button.querySelector('.v8-only [data-caller-icon]')).toBeNull()
   })
 
   it('v7 の色の丸を引き継ぐ', async () => {
     document.documentElement.dataset.theme = 'v7'
     const { button } = await render({ id: 'all', kind: 'all', label: 'すべて', count: 1, color: 'red' })
     expect((button.querySelector('.v7-only') as HTMLElement).style.backgroundColor).toBe('red')
+  })
+})
+
+describe('フォルダの行ごとに追加する操作', () => {
+  it('追加操作だけの行にもメニューを出し、先頭に置いて今の操作と区切る', async () => {
+    const distribute = vi.fn()
+    await render({ id: 'test', label: 'テスト', count: 1, leadingActions: [{ id: 'send', label: 'このフォルダを配る', emphasis: true, onSelect: distribute }], onEdit: vi.fn() })
+    await act(async () => (host.querySelector('[aria-label="フォルダ「テスト」の操作"]') as HTMLButtonElement).click())
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 100)))
+    const items = [...document.querySelectorAll('[role="menuitem"]')]
+    expect(items[0].textContent).toBe('このフォルダを配る')
+    expect(items[0].querySelector('strong')).not.toBeNull()
+    expect(items[1].parentElement?.querySelector('hr')).not.toBeNull()
+    await act(async () => (items[0] as HTMLButtonElement).click())
+    expect(distribute).toHaveBeenCalledTimes(1)
+  })
+  it('畳んだフォルダにも同じ追加操作のメニューを出す', async () => {
+    const send = vi.fn()
+    await act(async () => root.render(<CollapsedFolderActions row={{ id: 'none', label: '未分類', count: 1,
+      leadingActions: [{ id: 'send', label: 'このフォルダを配る', onSelect: send }] }} />))
+    await act(async () => (host.querySelector('[aria-label="フォルダ「未分類」の操作"]') as HTMLButtonElement).click())
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 100)))
+    await act(async () => (document.querySelector('[role="menuitem"]') as HTMLButtonElement).click())
+    expect(send).toHaveBeenCalledTimes(1)
+  })
+
+})
+
+
+describe('選ぶだけのフォルダ列', () => {
+  it('操作を渡されても追加・編集・並べ替えを出さず、選択だけはできる', async () => {
+    const onSelect = vi.fn(), mutate = vi.fn()
+    await act(async () => root.render(<FolderPanel readOnly rows={[{
+      id: 'f1', kind: 'folder', label: '季節', count: 3, color: 'blue',
+      onEdit: mutate, onMoveUp: mutate, onMoveDown: mutate, onDelete: mutate,
+      leadingActions: [{ id: 'send', label: '配る', onSelect: mutate }],
+      trailing: <button onClick={mutate}>まとめて選ぶ</button>,
+    }]} activeId="f1" onSelect={onSelect} onAddFolder={mutate}
+      createAction={<button onClick={mutate}>作る</button>} reserveCreateSpace>
+      <button onClick={mutate}>追加操作</button>
+    </FolderPanel>))
+    const buttons = host.querySelectorAll('button')
+    expect(buttons).toHaveLength(1)
+    expect(buttons[0].getAttribute('aria-pressed')).toBe('true')
+    await act(async () => buttons[0].click())
+    expect(onSelect).toHaveBeenCalledWith('f1')
+    expect(mutate).not.toHaveBeenCalled()
+  })
+
+  it('処理中は選択も止め、未取得件数を0にしない', async () => {
+    const onSelect = vi.fn()
+    await act(async () => root.render(<FolderPanel readOnly disabled rows={[
+      { id: 'all', kind: 'all', label: 'すべて', count: null },
+    ]} activeId="all" onSelect={onSelect} />))
+    const button = host.querySelector('nav button') as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    expect(button.textContent).toBe('すべて')
+    await act(async () => button.click())
+    expect(onSelect).not.toHaveBeenCalled()
   })
 })

@@ -54,6 +54,15 @@ function app() {
 // with no credentials, or every update ends in a bogus health warning
 // (CLI) or rollback (self-update).
 describe('liveness endpoints are public', () => {
+  test.each(['/health', '/api/health'])('%s returns deployed SHA through auth middleware without secrets', async (path) => {
+    const bindings = { ...env(), BUILD_GIT_COMMIT: 'a'.repeat(40), BUILD_VERSION: '0.24.0', BUILD_RELEASED_AT: '2026-10-09T00:00:00Z' };
+    const res = await app().request(path, {}, bindings);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(await res.json()).toEqual({ success: true, data: {
+      status: 'ok', git_commit: bindings.BUILD_GIT_COMMIT, version: '0.24.0', released_at: bindings.BUILD_RELEASED_AT,
+    } });
+  });
   test.each(['/health', '/api/health'])('GET %s → 200 without credentials', async (path) => {
     const res = await app().request(path, {}, env());
     expect(res.status).toBe(200);

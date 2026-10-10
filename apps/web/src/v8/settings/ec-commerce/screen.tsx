@@ -9,8 +9,11 @@
  * 定期便・つなぎ先・注文の状況のパネルは今の部品を入口（page.tsx）から差し込む。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { notifySaved } from '@/components/shared/toast'
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { CircleDot, Plug, Star } from 'lucide-react'
 import { ecEventLabel, type ApiResponse } from '@line-crm/shared'
@@ -42,8 +45,14 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import EcConnector from './connector'
+import EcSubscriptions from './subscriptions'
+import { Tabs } from '@/components/shared/tabs'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import OrderDrawer from './order-drawer'
 import styles from './screen.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export type EcTabKey = 'events' | 'identity' | 'subscriptions' | 'connector'
 
@@ -65,12 +74,12 @@ const FAILURE_KIND_LABEL: Record<EcFailureKind, string> = {
   internal: '処理の失敗',
 }
 
-type StatusTone = 'good' | 'info' | 'muted' | 'danger'
+type StatusTone = StatusBadgeTone
 const ACTION_STATUS: Record<EcActionExecutionStatus, { label: string; tone: StatusTone }> = {
   pending: { label: '処理中', tone: 'info' },
   processing: { label: '処理中', tone: 'info' },
-  succeeded: { label: '処理完了', tone: 'good' },
-  skipped: { label: '送信なし', tone: 'muted' },
+  succeeded: { label: '処理完了', tone: 'success' },
+  skipped: { label: '送信なし', tone: 'neutral' },
   retryable_failed: { label: '失敗', tone: 'danger' },
   permanent_failed: { label: '失敗', tone: 'danger' },
 }
@@ -104,7 +113,7 @@ function actionStatusLabel(action: { status: EcActionExecutionStatus; eventType:
 
 function actionDone(action: EcActionExecution): string {
   if (action.status === 'retryable_failed' || action.status === 'permanent_failed') {
-    return action.errorMessage ?? `${action.attemptCount}回やり直しました`
+    return action.errorMessage ?? `${action.attemptCount} 回やり直しました`
   }
   if (action.status === 'skipped') {
     return action.eventType === 'ec.order.shipped' && action.errorCode === 'notification_disabled'
@@ -114,22 +123,18 @@ function actionDone(action: EcActionExecution): string {
   return ACTION_LABEL[action.eventType] ?? `未対応の出来事（${action.eventType}）`
 }
 
-const SHORT_DATE_TIME = new Intl.DateTimeFormat('ja-JP', {
-  timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-})
+
 
 /** 一覧の日時（年なし・例 9/30 10:12、日本時間）。壊れた値は「—」。 */
 function dateTime(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  return Number.isNaN(date.valueOf()) ? '—' : SHORT_DATE_TIME.format(date)
+  return polishFormatDate(value, { style: 'list' })
 }
 
 /** 補足の日時（年なし・曜日つき）。 */
 function longDateTime(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
-  return Number.isNaN(date.valueOf()) ? '—' : formatDateTime(date)
+  return Number.isNaN(date.valueOf()) ? emptyValue('unknown') : formatDateTime(date)
 }
 
 const ACTION_PAGE_SIZE = 20
@@ -159,14 +164,15 @@ function actionServerFilter(status: ActionTab): { status?: 'succeeded' | 'skippe
   return {}
 }
 
-function EventsPanel({ accountId }: { accountId: string | null }) {
+function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit: boolean }) {
   const [overviewSlot, setOverviewSlot] = useState<AccountBound<OverviewWithLatency | null>>(() => pendingFor(accountId, null))
   const [recordsSlot, setRecordsSlot] = useState<AccountBound<ImportRecords>>(() => pendingFor(accountId, EMPTY_RECORDS))
+  const [urlPage, setUrlPage] = useListUrlValue('page', 1)
   const [pageSlot, setPageSlot] = useState<{ accountId: string | null; page: number }>({ accountId, page: 1 })
-  const [query, setQuery] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [status, setStatus] = useState<ActionTab>('all')
-  const [sort, setSort] = useState<'newest' | 'oldest'>('newest')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [searchQuery, setSearchQuery] = useListUrlValue('q', '')
+  const [status, setStatus] = useListUrlValue<ActionTab>('status', 'all')
+  const [sort, setSort] = useListUrlValue<'newest' | 'oldest'>('sort', 'newest')
   const [retryingSlot, setRetryingSlot] = useState<{ accountId: string | null; id: string | null }>({ accountId, id: null })
   const [noticeSlot, setNoticeSlot] = useState<{ accountId: string | null; notice: { tone: 'success' | 'error'; text: string } | null }>({ accountId, notice: null })
   const [detailSlot, setDetailSlot] = useState<{ accountId: string | null; orderId: string | null }>({ accountId, orderId: null })
@@ -188,9 +194,9 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
   const actionSummary = recordsView.data.summary
   const actionTotal = recordsView.data.total
   const listState = recordsView.state
-  const page = pageSlot.accountId === accountId ? pageSlot.page : 1
+  const page = pageSlot.accountId === accountId ? urlPage : 1
   const notice = noticeSlot.accountId === accountId ? noticeSlot.notice : null
-  const setPage = useCallback((next: number) => setPageSlot({ accountId, page: next }), [accountId])
+  const setPage = useCallback((next: number) => { setPageSlot({ accountId, page: next }); setUrlPage(next) }, [accountId, setUrlPage])
   const setNotice = useCallback((next: { tone: 'success' | 'error'; text: string } | null) => {
     if (accountId !== currentAccountIdRef.current) return
     setNoticeSlot({ accountId, notice: next })
@@ -271,7 +277,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearchQuery(query.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [query, setPage])
 
@@ -289,7 +295,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
   }
 
   const retry = async (action: EcActionExecution) => {
-    if (!accountId || !action.retryAvailable) return
+    if (!canEdit || !accountId || !action.retryAvailable) return
     const retryAccountId = accountId
     setRetryingSlot({ accountId: retryAccountId, id: action.id })
     setNotice(null)
@@ -300,7 +306,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
         crypto.randomUUID(),
       )
       if (!response.success) throw new Error('retry_failed')
-      setNotice({ tone: 'success', text: '失敗した処理だけを、もう一度行う待ち行列へ戻しました。' })
+      notifySaved('失敗した処理だけを、もう一度行う待ち行列へ戻しました。')
       await loadRecords(false)
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) await loadRecords(false)
@@ -331,7 +337,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
         ? { id: 'friend', label: '中身を見る', onSelect: () => router.push(`/friends/detail?id=${encodeURIComponent(friendId)}`) }
         : { id: 'identity', label: 'つき合わせる', onSelect: () => router.push('/ec-commerce/identity-candidates') },
       ...(order ? [{ id: 'order', label: '注文の状況を見る', onSelect: () => setDetailSlot({ accountId, orderId: order.id }) }] : []),
-      ...(action.retryAvailable
+      ...(canEdit && action.retryAvailable
         ? [{
             id: 'retry',
             label: retryingId === action.id ? '戻しています…' : 'もう一度やる',
@@ -346,18 +352,18 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
 
   return (
     <>
-      <KpiBand data-kpi-presentation="cards" gridClassName={styles.kpis}>
-        <KpiCard presentation="card" icon={null} title="処理完了" value={listedSummary?.succeeded ?? null} unit="" detail="件" loading={listState === 'loading'} />
-        <KpiCard presentation="card" icon={null} title="処理中" value={processingCount ?? null} unit="" detail="件" loading={listState === 'loading'} />
-        <KpiCard presentation="card" icon={null} title="送信なし" value={listedSummary?.skipped ?? null} unit="" detail="件・送る設定がない" loading={listState === 'loading'} />
-        <KpiCard presentation="card" icon={null} title="失敗" value={failedCount ?? null} unit="" detail="件" valueTone={failedCount ? 'warning' : 'default'} loading={listState === 'loading'} />
+      <KpiBand presentation="band">
+        <KpiCard presentation="band" icon={null} title="処理完了" value={listedSummary?.succeeded ?? null} unit="" detail="件" loading={listState === 'loading'} />
+        <KpiCard presentation="band" icon={null} title="処理中" value={processingCount ?? null} unit="" detail="件" loading={listState === 'loading'} />
+        <KpiCard presentation="band" icon={null} title="送信なし" value={listedSummary?.skipped ?? null} unit="" detail="件・送る設定がない" loading={listState === 'loading'} />
+        <KpiCard presentation="band" icon={null} title="失敗" value={failedCount ?? null} unit="" detail="件" valueTone={failedCount ? 'warning' : 'default'} loading={listState === 'loading'} />
       </KpiBand>
       {kpiDetailMissing ? (
         <p className={styles.minor} role="status">
           {overviewState === 'forbidden'
-            ? '集計を表示する権限がありません。一覧は取得できた範囲で表示しています。'
+            ? permissionDeniedMessage('store')
             : '集計だけを読み込めませんでした。一覧は取得できた範囲で表示しています。'}
-          {overviewState === 'error' ? <button type="button" className={styles.inlineLink} onClick={() => void loadOverview(false)}>集計をもう一度読む</button> : null}
+          {overviewState === 'error' ? <Button variant="text" onClick={() => void loadOverview(false)}>集計をもう一度読む</Button> : null}
         </p>
       ) : null}
       {notice ? <p className={notice.tone === 'success' ? styles.noticeGood : styles.noticeBad} role={notice.tone === 'success' ? 'status' : 'alert'}>{notice.text}</p> : null}
@@ -385,7 +391,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
         ))}
         <span className={styles.spacer} />
         <span className={styles.sortBox}>
-          <Select
+          <ListToolbarSort
             aria-label="取り込みの並び順"
             value={sort}
             onChange={(value) => setSort(value as typeof sort)}
@@ -419,18 +425,16 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
           onRetry={listState === 'error' ? () => void loadRecords(false) : undefined}
         />
       ) : (
-        <div className={styles.table} role="table" aria-label="取り込みの記録">
-          <div role="rowgroup">
-            <div role="row" className={`${styles.row} ${styles.headRow}`}>
-              <span role="columnheader">いつ・何が届いたか</span>
-              <span role="columnheader">お客さま</span>
-              <span role="columnheader">中身</span>
-              <span role="columnheader">したこと</span>
-              <span role="columnheader">状態</span>
-              <span role="columnheader"><span className={styles.srOnly}>操作</span></span>
-            </div>
-          </div>
-          <div role="rowgroup">
+        <DataTable density="records" columns="var(--tpl-ecc-record-columns)" label="取り込みの記録">
+          <thead><TableHeadRow>
+              <Th>いつ・何が届いたか</Th>
+              <Th>お客さま</Th>
+              <Th>中身</Th>
+              <Th>したこと</Th>
+              <Th>状態</Th>
+              <Th><span className={styles.srOnly}>操作</span></Th>
+            </TableHeadRow></thead>
+          <tbody>
             {actions.map((action) => {
               const order = action.order
               const contents = order?.orderLines.length
@@ -445,29 +449,26 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
               const linked = Boolean(action.friendId ?? order?.friendId)
               const label = action.eventLabel || ecEventLabel(action.eventType, action.eventType)
               return (
-                <div role="row" key={action.id} className={styles.row}>
-                  <span role="cell" className={styles.stack}>
+                <Tr key={action.id} data-row-id={action.id}>
+                  <Td><span className={styles.stack}>
                     <span className={styles.main}>{dateTime(action.receivedAt)}</span>
                     <span className={styles.sub} title={action.orderNumber ? `注文 ${action.orderNumber}` : undefined}>{label}</span>
-                  </span>
-                  <span role="cell" className={styles.stack}>
+                  </span></Td>
+                  <Td><span className={styles.stack}>
                     <span className={styles.main}>{action.customerName ?? '見つかりません'}</span>
                     <span className={styles.sub}>{linked ? 'LINE 連携済み' : 'LINE 未連携'}</span>
-                  </span>
-                  <span role="cell" className={styles.text} title={amount ? `${contents}・${amount}` : contents}>
+                  </span></Td>
+                  <Td><span className={styles.text} title={amount ? `${contents}・${amount}` : contents}>
                     {amount ? `${contents}・${amount}` : contents}
-                  </span>
-                  <span role="cell" className={styles.done}>{actionDone(action)}</span>
-                  <span role="cell" className={styles.stack}>
-                    <span className={styles.status} data-tone={statusInfo.tone}>
-                      <span className={styles.dot} aria-hidden="true" />
-                      {actionStatusLabel(action)}
-                    </span>
+                  </span></Td>
+                  <Td><span className={styles.done}>{actionDone(action)}</span></Td>
+                  <Td><span className={styles.stack}>
+                    <StatusBadge tone={statusInfo.tone} size="compact">{actionStatusLabel(action)}</StatusBadge>
                     {action.failureKind && action.status !== 'succeeded'
                       ? <span className={styles.sub}>{FAILURE_KIND_LABEL[action.failureKind]}</span>
                       : null}
-                  </span>
-                  <span role="cell" className={styles.menuBox}>
+                  </span></Td>
+                  <Td><span className={styles.menuBox}>
                     <RowMenu
                       label="この行のその他操作"
                       menuLabel="この行の操作"
@@ -475,12 +476,12 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
                       open={openMenuId === action.id}
                       onOpenChange={(next) => setOpenMenuId(next ? action.id : null)}
                     />
-                  </span>
-                </div>
+                  </span></Td>
+                </Tr>
               )
             })}
-          </div>
-        </div>
+          </tbody>
+        </DataTable>
       )}
 
       <p className={styles.foot}>
@@ -493,7 +494,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
         <div className={styles.pager}>
           <span className={styles.minorText}>
             <ListRange label="取り込みの記録" total={actionTotal} first={(page - 1) * ACTION_PAGE_SIZE + 1} last={(page - 1) * ACTION_PAGE_SIZE + actions.length} />
-            {` 最後に届いた ${longDateTime(overview?.lastReceivedAt ?? null)}・今日 ${overview ? formatNumber(overview.last24h) : '—'}件。注文の本文や接続用の秘密値は表示しません。`}
+            {` 最後に届いた ${longDateTime(overview?.lastReceivedAt ?? null)}・今日 ${overview ? formatNumber(overview.last24h) : emptyValue('unknown')}件。注文の本文や接続用の秘密値は表示しません。`}
           </span>
           {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
         </div>
@@ -505,6 +506,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
         onClose={() => setDetailSlot({ accountId, orderId: null })}
         onRetryAction={retry}
         retryingId={retryingId}
+        canEdit={canEdit}
       />
     </>
   )
@@ -512,7 +514,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
 
 /** 4つの入口と、各 API が数えた実件数（取得できない数は作らない）。 */
 /** EC連携の中の切り替え（取り込みの記録・会員のつき合わせ・定期便・つなぎ先）。会員のつき合わせの画面も使う。 */
-export function EcTabsV8({ accountId, active }: { accountId: string | null; active: EcTabKey }) {
+export function EcTabsV8({ accountId, active, actions }: { accountId: string | null; active: EcTabKey; actions?: ReactNode }) {
   const [counts, setCounts] = useState<Partial<Record<EcTabKey, number>>>({})
   useEffect(() => {
     let alive = true
@@ -533,53 +535,35 @@ export function EcTabsV8({ accountId, active }: { accountId: string | null; acti
     return () => { alive = false }
   }, [accountId])
   return (
-    <nav className={styles.tabs} aria-label="EC連携の中の切り替え">
-      {TABS.map((tab) => {
-        const count = tab.key === 'connector' || tab.key === 'subscriptions' ? undefined : counts[tab.key]
-        return (
-          <Link
-            key={tab.key}
-            href={tab.href}
-            className={styles.tab}
-            aria-current={active === tab.key ? 'page' : undefined}
-            title={tab.key === 'subscriptions' && counts.subscriptions !== undefined ? `定期便 ${formatNumber(counts.subscriptions)}件` : undefined}
-          >
-            {count === undefined ? tab.label : `${tab.label} ${formatNumber(count)}`}
-          </Link>
-        )
-      })}
-    </nav>
+    <Tabs size="settings" actions={actions} label="EC連携の中の切り替え" items={TABS.map((tab) => {
+      const count = tab.key === 'connector' || tab.key === 'subscriptions' ? undefined : counts[tab.key]
+      return { label: count === undefined ? tab.label : `${tab.label} ${formatNumber(count)}`, href: tab.href, current: active === tab.key }
+    })} />
   )
 }
 
 export default function EcCommerceScreen({
   tab,
-  renderSubscriptions,
   renderConnector,
 }: {
   tab: EcTabKey
-  renderSubscriptions?: (accountId: string | null) => ReactNode
   renderConnector?: (accountId: string | null, canEdit: boolean) => ReactNode
 }) {
   const { selectedAccountId } = useAccount()
   const staffRole = useStaffRole()
   const canEdit = staffRole === null || canManageRole(staffRole)
-  const actions = tab === 'events'
-    ? <Button href="/ec-commerce?tab=connector" variant="secondary"><Plug className={styles.btnIcon} aria-hidden="true" />つなぎ先の設定</Button>
-    : tab === 'subscriptions' && canEdit
-      ? <Button href="/broadcasts/new" variant="primary">対象を選んで送る</Button>
-      : undefined
+  const actions = <Button href="/ec-commerce?tab=connector" variant="secondary"><Plug className={styles.btnIcon} aria-hidden="true" />つなぎ先の設定</Button>
   return (
     <SbSettingsScreen
       boardId={tab === 'subscriptions' ? 'wqC8x' : tab === 'connector' ? 'iLJmw' : 'GmVR5'}
       layout="narrow-nav"
       title="EC連携"
-      description="ネットショップから注文・発送・定期便の出来事を取り込み、LINE の友だちと結びつけます。"
+      help="ネットショップから注文・発送・定期便の出来事を取り込み、LINE の友だちと結びつけます。"
       actions={actions}
     >
       <EcTabsV8 accountId={selectedAccountId} active={tab} />
-      {tab === 'events' ? <EventsPanel accountId={selectedAccountId} /> : null}
-      {tab === 'subscriptions' ? renderSubscriptions?.(selectedAccountId) : null}
+      {tab === 'events' ? <EventsPanel accountId={selectedAccountId} canEdit={canEdit} /> : null}
+      {tab === 'subscriptions' ? <EcSubscriptions accountId={selectedAccountId} canEdit={canEdit} /> : null}
       {tab === 'connector' ? (renderConnector ? renderConnector(selectedAccountId, canEdit) : <EcConnector accountId={selectedAccountId} canEdit={canEdit} />) : null}
     </SbSettingsScreen>
   )

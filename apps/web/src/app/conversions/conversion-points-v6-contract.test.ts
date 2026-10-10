@@ -23,8 +23,8 @@ describe('V6 成果地点一覧の契約', () => {
     expect(PAGE).toContain('kind="error"')
     expect(PAGE).toContain('kind="empty"')
     expect(PAGE).toContain('成果地点を読み込めませんでした')
-    expect(PAGE).toContain('成果地点を再読み込み')
-    expect(PAGE).toContain('onClick={() => void load()}')
+    expect(PAGE).toContain('onRetry=')
+    expect(PAGE).toContain('onRetry={() => void load()}')
     expect(PAGE).toContain('const [loadFailed, setLoadFailed] = useState(false)')
   })
 

@@ -21,8 +21,10 @@ describe('設定の残り板', () => {
   it('機能設定は絞り込み0件、記録の一覧は状態の板を使う', () => {
     expect(FEATURE).toContain('filteredGroups.length === 0')
     expect(FEATURE).toContain('emptyPreset="filtered"')
-    expect(MANUAL).toContain('data-design-node="bR6a1"')
-    expect(SCAN).toContain('data-design-node="bR6a1"')
+    expect(MANUAL).toContain("kind={status === 'error' ? 'error' : 'loading'}")
+    expect(MANUAL).toContain('kind="empty"')
+    expect(SCAN).toContain('kind="error"')
+    expect(SCAN).toContain('kind="empty"')
   })
 
   it('絞り込み0件には条件を外す口がある', () => {
@@ -36,7 +38,7 @@ describe('設定の残り板', () => {
   })
 
   it('はじめの設定の順路に板IDを付ける（BOj1a）', () => {
-    expect(START).toContain('data-design-node="BOj1a"')
+    expect(START).toMatch(/(?:data-design-node|boardId)="BOj1a"/)
     expect(START).toContain('aria-label="はじめの設定の順路"')
   })
 })

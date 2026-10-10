@@ -3,7 +3,7 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { moveItemWithinGroup, type FeatureGroup, type MenuItemOrder } from '@/lib/feature-settings'
-import { ReorderDialog } from './feature-settings-v8'
+import { ReorderDialog } from '@/v8/settings/features/screen'
 
 afterEach(() => cleanup())
 
@@ -28,6 +28,19 @@ const move = (order: MenuItemOrder, groupId: string, itemId: string, direction: 
  * 手書きの窓に共通の窓の振る舞い（Esc・Tabの閉じ込め）を付ける。
  */
 describe('並びを変えるの窓', () => {
+  it('矢印で変えた下書きは確定まで元の設定を変えず、元に戻せる', () => {
+    const onApply = vi.fn()
+    render(<ReorderDialog groups={GROUPS} initialOrder={ORDER} onCancel={vi.fn()} onApply={onApply} moveItemInOrder={move} />)
+    fireEvent.click(screen.getByRole('button', { name: 'あを下へ' }))
+    expect(onApply).not.toHaveBeenCalled()
+    expect(ORDER.g1).toEqual(['a', 'b'])
+    expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['い', 'あ'])
+    fireEvent.click(screen.getByRole('button', { name: '元の並びに' }))
+    expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['あ', 'い'])
+    fireEvent.click(screen.getByRole('button', { name: 'あを下へ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'この並びにする' }))
+    expect(onApply).toHaveBeenCalledWith({ g1: ['b', 'a'] })
+  })
   it('Escで閉じる', () => {
     const onCancel = vi.fn()
     render(

@@ -14,6 +14,7 @@ import { ListPage, type ListFolderNav } from '@/components/templates'
 import { Tabs } from '@/components/shared/tabs'
 import Button from '@/components/shared/button'
 import styles from './mileage.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 export const MILEAGE_TABS = [
   { key: 'earning-rules', label: 'たまる決めごと', board: 'OC0gy' },
@@ -58,7 +59,7 @@ export function ViewerBand() {
   return (
     <p className={styles.viewerBand} role="note">
       <Eye size={16} aria-hidden="true" />
-      <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+      <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
     </p>
   )
 }
@@ -89,6 +90,7 @@ export function CreateButton({
 
 export interface MileageFrameProps {
   /** 板の頭の右（CSV など）。 */
+  help?: ReactNode
   actions?: ReactNode
   stats?: ReactNode
   folders?: ReactNode
@@ -102,7 +104,7 @@ export interface MileageFrameProps {
 }
 
 /** 5つのタブの共通の外側。題・説明・タブの段・閲覧のみの帯をここで持つ。 */
-export function MileageFrame({ actions, stats, folders, collapsedFolders, folderNav, toolbar, pagination, overlays, children }: MileageFrameProps) {
+export function MileageFrame({ help, actions, stats, folders, collapsedFolders, folderNav, toolbar, pagination, overlays, children }: MileageFrameProps) {
   const { tab, readonly, narrow, counts } = useMileageShell()
   const board = tab === 'earning-rules' && narrow
     ? 'ZJIyl'
@@ -111,14 +113,17 @@ export function MileageFrame({ actions, stats, folders, collapsedFolders, folder
       : MILEAGE_TABS.find((item) => item.key === tab)?.board
   return (
     <ListPage
+      help={<>{"行動でマイルがたまり、クーポン・特典と交換できます。"}{help}</>}
       boardId={board}
       headingSize="regular"
       title="マイル"
-      description="行動でマイルがたまり、クーポン・特典と交換できます。"
+
       actions={actions}
       tabs={
         <div className={styles.tabsBox}>
         <Tabs
+          /* 件数が読み込まれるとタブの幅が変わるので、下線の位置も測り直す。 */
+          key={MILEAGE_TABS.map((item) => counts[item.key] ?? '').join('|')}
           label="マイルのタブ"
           items={MILEAGE_TABS.map((item) => ({
             /* 絵は「たまる決めごと 6」で1つの文字。数を別の札に分けない。 */

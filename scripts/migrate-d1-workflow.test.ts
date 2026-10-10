@@ -17,6 +17,14 @@ const applyScript = readFileSync(
 const workflows = [manualWorkflow, productionWorkflow];
 
 describe('D1 migration workflow safety', () => {
+  it('dry-run lists via SELECT-only CLI; ledger DDL is behind the apply gate and backup', () => {
+    const pending = manualWorkflow.split('- name: List the pending migrations')[1].split('- name: Take a Time Travel bookmark')[0];
+    expect(pending).toContain('node scripts/deploy/d1-pending-readonly.mjs');
+    expect(pending).not.toMatch(/CREATE TABLE|INSERT |ALTER |DROP |wrangler d1 execute/);
+    const apply = manualWorkflow.split('- name: Apply the pending migrations')[1].split('- name: Say what happened')[0];
+    expect(apply).toContain("if: inputs.mode == 'apply' && steps.pending.outputs.count != '0'");
+    expect(apply).toContain('CREATE TABLE IF NOT EXISTS _migrations');
+  });
   it('uses the selected GitHub Environment and defaults to staging dry-run', () => {
     expect(manualWorkflow).toMatch(/environment:\n[\s\S]*?default: staging/);
     expect(manualWorkflow).toMatch(/mode:\n[\s\S]*?default: dry-run/);

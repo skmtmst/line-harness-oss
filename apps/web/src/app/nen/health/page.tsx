@@ -120,7 +120,7 @@ function HealthInner() {
       <PageHeader
         breadcrumb={[{ label: '専用機能' }, { label: '健康日記' }]}
         title="健康日記"
-        description=""
+        help=""
         actions={<Button type="button" onClick={() => window.print()} disabled={!canPrint} title={canPrint ? undefined : '一覧の「30日のまとめ」を開くと書き出せます'}>獣医師向けPDFを書き出す</Button>}
       />
       <div data-design="Tabs" data-design-node="health-tabs">

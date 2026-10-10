@@ -18,7 +18,7 @@ describe('ダッシュボードの更新時刻と鮮度表示(#759)', () => {
     expect(formatDashboardAsOf('2026-09-01T03:04:00.000Z', sameDay)).toBe('9月1日（火） 12:04')
     // 前日との境目。JSTで日が変わる瞬間は日付付きに切り替わる。
     expect(formatDashboardAsOf('2026-09-12T14:59:00.000Z', sameDay)).toBe('9月12日（土） 23:59')
-    expect(formatDashboardAsOf('2026-09-12T15:00:00.000Z', sameDay)).toBe('0:00')
+    expect(formatDashboardAsOf('2026-09-12T15:00:00.000Z', sameDay)).toBe('00:00')
   })
 
   it('stale・取得失敗・部分取得を同じ表示にしない', () => {
@@ -37,8 +37,8 @@ describe('ダッシュボードの更新時刻と鮮度表示(#759)', () => {
       const previous = process.env.TZ
       process.env.TZ = timezone
       try {
-        expect(formatDashboardAsOf('2026-09-13 03:04:00', sameDay)).toBe('3:04')
-        expect(formatDashboardAsOf('2026-09-13T03:04:00.123', sameDay)).toBe('3:04')
+        expect(formatDashboardAsOf('2026-09-13 03:04:00', sameDay)).toBe('03:04')
+        expect(formatDashboardAsOf('2026-09-13T03:04:00.123', sameDay)).toBe('03:04')
       } finally {
         process.env.TZ = previous
       }
@@ -47,7 +47,7 @@ describe('ダッシュボードの更新時刻と鮮度表示(#759)', () => {
 
   it('Z・offset付き時刻は指定された絶対時刻を維持する', () => {
     expect(formatDashboardAsOf('2026-09-13T03:04:00.000Z', sameDay)).toBe('12:04')
-    expect(formatDashboardAsOf('2026-09-13T03:04:00+07:00', sameDay)).toBe('5:04')
+    expect(formatDashboardAsOf('2026-09-13T03:04:00+07:00', sameDay)).toBe('05:04')
   })
 
   it.each([

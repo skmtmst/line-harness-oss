@@ -8,8 +8,10 @@ import HqBillingPage from './page'
 
 const calls = vi.hoisted(() => ({ summary: vi.fn(), invoices: vi.fn(), checkout: vi.fn(), portal: vi.fn() }))
 vi.mock('@/lib/api', () => ({ api: { hqBilling: calls }, ApiError: class extends Error {} }))
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(), usePathname: () => '/hq/billing' }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageChrome: () => ({ title: null, fullWidth: false, crumbs: null }) }))
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(), usePathname: () => '/hq/billing', useRouter: () => ({push: vi.fn()}) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined, usePageChrome: () => ({ title: null, fullWidth: false, crumbs: null }) }))
+
+vi.mock('@/lib/staff-role', () => ({useStaffRole: () => 'owner'}))
 
 const plans: BillingPlanView[] = [
   { key: 'light', name: 'ライト', monthlyYen: 9800, yearlyYen: 99000 },
@@ -60,18 +62,18 @@ async function openInterval() {
 }
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8')
-const page = read('./page.tsx')
+const page = read('../../../v8/hq/billing.tsx')
 const menu = read('../../../components/hq/account-menu.tsx')
 const limit = read('../../../components/hq/banners/limit-state.tsx')
 
 /** ★V6 36-2 / 36-2-A 課金プランの構造と実際の切り替え。 */
 describe('課金プラン（36-2）', () => {
   it('帯 → プラン3枚 → 注記 → 支払い履歴の順で、画面名はトップバーだけ', () => {
-    const order = ['data-design="Status"', 'data-design="Interval"', 'data-design="Plans"', 'data-design="Note"', 'data-design="History"']
+    const order = ['data-design="Status"', 'data-design="Interval"', 'data-design="Plans"', 'data-design="History"']
     const positions = order.map((n) => page.indexOf(n))
     expect(positions.every((p) => p >= 0)).toBe(true)
     expect([...positions].sort((a, b) => a - b)).toEqual(positions)
-    expect(page).toContain("usePageTitle('課金プラン')")
+    expect(page).toContain("usePageTitle('請求')")
     expect(page).not.toContain('<h1')
   })
 
@@ -117,7 +119,7 @@ describe('課金プラン（36-2）', () => {
     expect(screen.queryAllByText('約15% OFF')).toHaveLength(0)
     fireEvent.click(year)
     expect(year.getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getAllByText('約15% OFF')).toHaveLength(3)
+    expect(screen.queryAllByText('約15% OFF')).toHaveLength(3)
     for (const amount of ['¥8,250', '¥25,250', '¥50,750']) expect(screen.getByText(amount)).toBeTruthy()
     for (const amount of ['¥99,000', '¥303,000', '¥609,000']) expect(screen.getByText(`年額 ${amount}（税込）`)).toBeTruthy()
     fireEvent.click(month)
@@ -172,8 +174,7 @@ describe('Stripe価格の出所と仮表示の区別（R607）', () => {
     calls.summary.mockResolvedValue({ success: true, data: summaryWith(plansWith({ month: true, year: true })) })
     await openPage()
     expect(screen.queryByText(/料金と内容は仮置きです/)).toBeNull()
-    expect(screen.getByText(/料金は Stripe の価格です/)).toBeTruthy()
-    expect(screen.getByText(/プランの内容は仮置きです/)).toBeTruthy()
+    expect(document.querySelectorAll('[data-price-source="stripe"]')).toHaveLength(3)
     expect(screen.queryByText('仮の料金です')).toBeNull()
   })
 
@@ -181,7 +182,7 @@ describe('Stripe価格の出所と仮表示の区別（R607）', () => {
     calls.summary.mockResolvedValue({ success: true, data: summaryWith(plansWith({ month: false, year: false })) })
     await openPage()
     expect(screen.getAllByText('仮の料金です')).toHaveLength(3)
-    expect(screen.getByText(/料金と内容は仮置きです/)).toBeTruthy()
+    expect(document.querySelectorAll('[data-price-source="fallback"]')).toHaveLength(3)
   })
 
   it('プランごとに出所が違う場合は一律注記にせず、代替の分だけ仮表示する', async () => {
@@ -191,17 +192,17 @@ describe('Stripe価格の出所と仮表示の区別（R607）', () => {
     await openPage()
     expect(screen.getAllByText('仮の料金です')).toHaveLength(1)
     expect(screen.queryByText(/料金と内容は仮置きです/)).toBeNull()
-    expect(screen.getByText(/取得できなかった料金/)).toBeTruthy()
+    expect(document.querySelectorAll('[data-price-source="fallback"]')).toHaveLength(1)
   })
 
   it('注記は選んだ周期に追随する（月はStripe取得・年は代替）', async () => {
     calls.summary.mockResolvedValue({ success: true, data: summaryWith(plansWith({ month: true, year: false })) })
     const { year } = await openInterval()
     expect(screen.queryByText('仮の料金です')).toBeNull()
-    expect(screen.getByText(/料金は Stripe の価格です/)).toBeTruthy()
+    expect(document.querySelectorAll('[data-price-source="stripe"]')).toHaveLength(3)
     fireEvent.click(year)
     expect(screen.getAllByText('仮の料金です')).toHaveLength(3)
-    expect(screen.getByText(/料金と内容は仮置きです/)).toBeTruthy()
+    expect(document.querySelectorAll('[data-price-source="fallback"]')).toHaveLength(3)
   })
 
   it('注記は選んだ周期に追随する（月は代替・年はStripe取得）', async () => {
@@ -210,7 +211,7 @@ describe('Stripe価格の出所と仮表示の区別（R607）', () => {
     expect(screen.getAllByText('仮の料金です')).toHaveLength(3)
     fireEvent.click(year)
     expect(screen.queryByText('仮の料金です')).toBeNull()
-    expect(screen.getByText(/料金は Stripe の価格です/)).toBeTruthy()
+    expect(document.querySelectorAll('[data-price-source="stripe"]')).toHaveLength(3)
   })
 })
 

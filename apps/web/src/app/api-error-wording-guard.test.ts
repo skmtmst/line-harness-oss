@@ -149,7 +149,6 @@ const BASELINE: Record<string, number> = {
   'components/inflow-links/site-script.tsx': 3,
   'components/ops/ops-ui.tsx': 1,
   'components/rich-menus/apply-to-tag-modal.tsx': 1,
-  'components/scenarios/action-editor.tsx': 2,
   'components/scenarios/duplicate-scenario.ts': 2,
   'components/scenarios/scenario-dialogs.tsx': 1,
   'components/step-up-prompt.tsx': 1,

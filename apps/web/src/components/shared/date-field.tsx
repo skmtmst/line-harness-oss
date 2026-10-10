@@ -1,9 +1,11 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
 import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import MenuPortal from './menu-portal'
 import styles from './date-field.module.css'
+import { joinDescribedBy, useFieldContext } from './field-context'
 
 /**
  * 日付の選択。Pencil ★V8（V8.pen）「日付の入力（カレンダー）」。
@@ -24,6 +26,7 @@ export default function DateField({
   max,
   disabled = false,
   invalid = false,
+  size = 'standard',
   placeholder = '日付を選ぶ',
   id,
   name,
@@ -38,6 +41,7 @@ export default function DateField({
   max?: string
   disabled?: boolean
   invalid?: boolean
+  size?: 'standard' | 'compact'
   placeholder?: string
   id?: string
   name?: string
@@ -46,8 +50,11 @@ export default function DateField({
   'aria-labelledby'?: string
   'aria-describedby'?: string
 }) {
+  // Field の中に置くと、欄の誤り（赤）と説明の読み上げを受け取る（B-139）。
+  const field = useFieldContext()
+  invalid = invalid || Boolean(field?.invalid)
   const autoId = useId()
-  const fieldId = id ?? autoId
+  const fieldId = id ?? field?.controlId ?? autoId
   const dialogId = `${fieldId}-calendar`
   const selected = parseDate(value)
   const [open, setOpen] = useState(false)
@@ -153,6 +160,7 @@ export default function DateField({
         id={fieldId}
         type="button"
         className={styles.field}
+        data-size={size}
         disabled={disabled}
         data-invalid={invalid || undefined}
         // 狭い欄で切れても、重ねれば全文が読める（短い文字列は1行省略＋titleの決まり）。
@@ -162,7 +170,8 @@ export default function DateField({
         aria-controls={open ? dialogId : undefined}
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
-        aria-describedby={ariaDescribedBy}
+        aria-invalid={invalid || undefined}
+        aria-describedby={joinDescribedBy(ariaDescribedBy, field?.describedBy)}
         data-open={open || undefined}
         onClick={() => (open ? setOpen(false) : openCalendar())}
         onKeyDown={(event) => {
@@ -264,8 +273,7 @@ export default function DateField({
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
 
 function today(): Date {
-  const now = new Date()
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return parseDate(jstDate())!
 }
 
 /** `YYYY-MM-DD`（`YYYY-MM-DDTHH:mm` の日付部分も可）を、その日の 0 時の Date にする。 */

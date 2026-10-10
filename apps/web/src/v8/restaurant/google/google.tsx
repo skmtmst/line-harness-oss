@@ -29,6 +29,7 @@ import PerformanceBoard from './performance'
 import ProfileBoard from './profile'
 import SettingsBoard from './settings'
 import styles from './google.module.css'
+import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 
 export type { MediaUploadHelpers } from './posts'
 
@@ -125,9 +126,9 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     ?? stores.find((item) => item.id === data?.store.id)?.id ?? '', [stores, selectedAccountId, data])
 
   const picker = stores.length > 0 ? (
-    <Select
-      aria-label="店舗を選ぶ"
-      width={STORE_PICKER_WIDTH}
+    <StoreFilterTabs
+
+
       value={currentStoreId}
       onChange={(value) => {
         const next = stores.find((item) => item.id === value)
@@ -147,7 +148,8 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     return (
       <>
         <Tabs
-          className={boardId === 'j0Wcg' ? styles.tabsCompact : styles.tabs}
+          size="compact"
+          spacing={boardId === 'j0Wcg' ? 'compact' : undefined}
           label="Googleビジネスの機能"
           items={(Object.keys(TAB_LABELS) as GoogleTab[]).map((key) => {
             const count = !connected ? 0 : key === 'reviews' ? data.summary.storedCount : key === 'posts' ? data.summary.postsAttentionCount : 0
@@ -155,7 +157,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
               label: count ? `${TAB_LABELS[key]} ${count}` : TAB_LABELS[key],
               current: tab === key,
               disabled: !connected && key !== 'settings',
-              onClick: () => go({ tab: key }),
+              onClick: () => samePageUrl.replace(`/restaurant-test/google?tab=${key}`),
             }
           })}
         />

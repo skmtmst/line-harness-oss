@@ -1,43 +1,42 @@
 'use client'
 
+import { jstDateOffset, scheduledJstIso } from '@/lib/jst-datetime'
+
 /*
  * ★V8 統括 一括配信を作る（B-37・絵 V8.pen の BBRDb：① lmWCZ・② AL5vR・③ lLyFR・④ ZU4Ae・⑤ H9eG3n）。
  *
  * オーナー 10-08：「店の一斉配信とほぼ同じ画面にする。違いは送るアカウントを選ぶだけ」。
  * 店の一斉配信を作る画面（components/broadcasts/broadcast-form.tsx）と同じ5段・同じ部品（段の帯・選ぶカード・
  * LINE の見え方・下の帯）・同じ見た目（店の CSS をそのまま読む）で組む。統括だけの口は2つ：
- *   - ② 配信対象の上の「送るアカウント」（J5DH6o：フォルダの札で絞り、アカウントのカードにチェック）
+ *   - ② 配信対象の上の「送るアカウント」（選ぶボタンから共通の窓で選択）
  *   - ⑤ 最終確認の「アカウントごとの確かめ」（送る人数・今月の送信枠の残り・LINE の接続・止めているか。問題のある店は外す）
  * 読み書きは統括の一括配信の口（API-7 の hq-broadcasts）。店の口（承認・テスト送信・分散・配信後のアクション・
  * 除くタグ・詳細条件）は統括の口に無いので出さない（BEHAVIOR.md の「今の口で出せないもの」）。
  */
+import { notifySaved } from '@/components/shared/toast'
+import BroadcastAccountPicker, { type BroadcastAccount } from './account-picker'
+import { EntityPickerField, EntityPickerSummary } from '@/components/shared/entity-picker'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Steps } from '@/components/templates/steps'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, CheckCircle2, Eye, Plus, Save, Send, Trash2 } from 'lucide-react'
-import type { Folder, HqBroadcastInput, HqBroadcastPreflight, HqBroadcastRun, LineAccount, MessageTemplateDefinition, SegmentCondition } from '@line-crm/shared'
+import { AlertTriangle, ArrowDown, ArrowRight, Building2, CheckCircle2, Eye, Send, Tag as TagIcon, Workflow } from 'lucide-react'
+import type { Folder, HqBroadcastInput, HqBroadcastPreflight, HqBroadcastRun, MessageTemplateDefinition, SegmentCondition } from '@line-crm/shared'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import Dialog from '@/components/shared/dialog'
 import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval'
-import { BubblePreview, MediaUpload } from '@/components/broadcasts/broadcast-form'
-import MessageKindFields, { emptyMessageKindState, type MessageKind, type MessageKindState } from '@/components/scenarios/message-kind-fields'
+import { BubblePreview } from '@/components/broadcasts/broadcast-form'
 import { TARGET_MODES } from '@/lib/broadcast-audience'
 import { pruneCondition } from '@/lib/segment-condition'
 import { HqApprovalBlock, HqTestSendDialog, approvalGate, useHqApproval } from './approval'
 import Button from '@/components/shared/button'
-import CheckCard from '@/components/shared/check-card'
 import Checkbox from '@/components/shared/checkbox'
-import Combobox from '@/components/shared/combobox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
-import FilterChip from '@/components/shared/filter-chip'
-import { FolderDot, FolderDotName } from '@/components/shared/folder-dot'
 import HelpTip from '@/components/shared/help-tip'
-import SearchField from '@/components/shared/search-field'
-import InsertTextField, { InsertButton, type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import { InsertButton, type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -47,6 +46,7 @@ import Select from '@/components/shared/select'
 import FolderSelect from '@/components/shared/folder-select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
+import { useFormErrors } from '@/lib/use-form-errors'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
@@ -63,7 +63,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import RowMenu from './row-menu'
 import { ASSET_KIND, STORE_INSERTS, STORE_INSERT_CHIPS, type HqKind, fromApiContent, jpDateTime, preflightBadge, previewText, sendTotals, splitPreflightRows, toApiContent } from './model'
-import { HQ_KIND_LABEL, HQ_KIND_TABS, HQ_NOT_YET, bubbleFromTemplate, carouselColumns, emptyContent, fromApiBubble, hqBubbleProblem, previewBubbleOf, bubbleFromHostContent, hostContentOfBubble, templateContentOfBubble, hqBubbleSummary, newHqBubble, notYetText, toApiBubble, type HqBubble } from './bubbles'
+import { HQ_KIND_LABEL, bubbleFromTemplate, emptyContent, fromApiBubble, hqBubbleProblem, previewBubbleOf, bubbleFromHostContent, hostContentOfBubble, templateContentOfBubble, hqBubbleSummary, newHqBubble, notYetText, toApiBubble, type HqBubble } from './bubbles'
 import HqTemplatePicker from './template-picker'
 import HqBroadcastSourcePicker, { broadcastPickerItem } from './source-picker'
 import { SourcePickerSelection, type SourcePickerItem, type SourcePickerFolder } from '@/components/shared/source-picker-dialog'
@@ -73,8 +73,14 @@ import type { TemplateEditHost } from '@/v8/template-edit/host'
 import { hostDefinition } from '@/v8/hq-templates/console'
 import { freshDefinition } from '@/lib/hq-template-authoring'
 import styles from './create.module.css'
+import MessageComposer, { MessageComposerPage } from '@/components/shared/message-composer'
+import { PageHeading } from '@/components/templates/page-frame'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
-type Store = Pick<LineAccount, 'id' | 'name' | 'tags'> & { friendCount: number; folderId: string | null; folder: Folder | null }
+type Store = BroadcastAccount
 /** 配信対象（店の一斉配信と同じ4つ。名前は店の口と同じ：詳細条件は advanced）。 */
 type Audience = 'all' | 'scenario' | 'tag' | 'advanced'
 type Method = 'new' | 'template' | 'duplicate'
@@ -94,27 +100,17 @@ const TITLE_MAX = 60
 const BODY_MAX = 5000
 /** 表に1行ずつ出すのは4店まで。残りは「ほか N店」にまとめ、「…」から全部を開く。 */
 const ROWS_SHOWN = 4
-/** 「すべて」の札と、フォルダに入っていないアカウントの札。 */
-const ALL = '__all__'
-const UNFILED = '__none__'
 
 const KIND_LABEL = HQ_KIND_LABEL
 
 function errorText(caught: unknown, fallback: string): string {
   if (caught instanceof ApiError) {
-    if (caught.status === 403) return '統括全体の編集権限がある人だけが一括配信を作れます。'
+    if (caught.status === 403) return permissionDeniedMessage('hq')
     if (caught.status === 409) return japaneseDetailOf(caught) || 'ほかの人が先に操作しました。もう一度確かめてください。'
-    return describeSaveFailure(caught)
+    return withPermissionFailure(caught, describeSaveFailure(caught), 'hq')
   }
   // 「API error: 500」のような内部の文は出さない。
   return japaneseDetailOf(caught) || fallback
-}
-
-/** 「9/20」。 */
-function shortDate(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? '—' : `${d.getMonth() + 1}/${d.getDate()}`
 }
 
 /** 送った人数（外したアカウントを除く）。 */
@@ -127,15 +123,9 @@ function runKinds(run: HqBroadcastRun): string {
   return [...new Set(bubblesFromInput(run.input ?? { messageContent: '' }).map((b) => HQ_KIND_LABEL[b.kind]))].join('＋')
 }
 
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 /** 日付（YYYY-MM-DD）と時刻（HH:MM）を日本時間として ISO にする（店の一斉配信と同じ「日本時間」の欄）。 */
 function jstIso(date: string, time: string): string | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null
-  const d = new Date(`${date}T${time}:00+09:00`)
-  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+  return scheduledJstIso(date, time)
 }
 
 /** 下書きの日時（ISO）を、日本時間の日付と時刻の欄に戻す。 */
@@ -175,10 +165,11 @@ function audienceFromInput(saved: HqBroadcastInput): { audience: Audience; tagNa
 
 export default function HqBroadcastCreate() {
   /* ③ でカルーセル・リッチメッセージをその場で作っている間は、店の作る部品（template-edit/host の口）を画面いっぱいに出す。 */
+  const [composerBusy, setComposerBusy] = useState(false)
   const [composer, setComposer] = useState<null | 'carousel' | 'rich'>(null)
   /* 部品も画面名を付けるので、親（この画面）の名前で上書きする（部品より後に走る）。閉じたら一括配信を作るに戻す。 */
-  usePageTitle(composer === 'carousel' ? 'カルーセルを作る' : composer === 'rich' ? 'リッチメッセージを作る' : '一括配信を作る')
-  usePageCrumbs(composer ? [{ label: '一括配信', href: '/hq/broadcasts' }, { label: '一括配信を作る', href: '/hq/broadcasts/new' }] : [{ label: '一括配信', href: '/hq/broadcasts' }])
+  usePageTitle('一括配信を作る')
+  usePageCrumbs([{ label: '一括配信', href: '/hq/broadcasts' }])
   const router = useRouter()
   const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
@@ -196,7 +187,9 @@ export default function HqBroadcastCreate() {
   const [stores, setStores] = useState<Store[] | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [loadError, setLoadError] = useState<unknown>(null)
-  const [folderFilter, setFolderFilter] = useState<string>(params.get('folder') ?? ALL)
+  const [foldersFailed, setFoldersFailed] = useState(false)
+  const [accountPickerOpen, setAccountPickerOpen] = useState(false)
+  const accountPickerTrigger = useRef<HTMLButtonElement>(null)
   const [accountIds, setAccountIds] = useState<string[]>([])
   /* 昔の入口（?tag=<アカウントのタグ>）と、タグで作った下書き。読んだあとはアカウントを1つずつ選んだ形に直す。 */
   const legacyTags = useRef<string[]>(params.get('tag') ? [params.get('tag')!] : [])
@@ -259,7 +252,8 @@ export default function HqBroadcastCreate() {
   const [carousels, setCarousels] = useState<HqTemplateListItem[] | null>(null)
   const [carouselError, setCarouselError] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
-  /* ［保存してテンプレート化する］（開いている吹き出しを統括のひな形に保存する）。 */
+  const [pickerKind, setPickerKind] = useState<string | undefined>()
+  /* ［保存してテンプレートにする］（開いている吹き出しを統括のひな形に保存する）。 */
   const [saveTplOpen, setSaveTplOpen] = useState(false)
   const [saveTplName, setSaveTplName] = useState('')
   const [saveTplBusy, setSaveTplBusy] = useState(false)
@@ -272,7 +266,7 @@ export default function HqBroadcastCreate() {
   const [previewDevice, setPreviewDevice] = useState<'phone' | 'pc'>('phone')
 
   const [when, setWhen] = useState<'now' | 'later'>('later')
-  const [date, setDate] = useState(() => { const d = new Date(); d.setDate(d.getDate() + 1); return ymd(d) })
+  const [date, setDate] = useState(() => jstDateOffset(1))
   const [time, setTime] = useState('11:00')
 
   const [run, setRun] = useState<HqBroadcastRun | null>(null)
@@ -289,6 +283,8 @@ export default function HqBroadcastCreate() {
   const requestRef = useRef('')
   /* WEB011：requestRef を作った中身（key）。中身が同じやり直しは同じ依頼番号を使う。 */
   const createKeyRef = useRef('')
+  /** 保存の成功と事前確認の成功を分ける。後の工程が失敗しても同じ保存を繰り返さない。 */
+  const preparedKeyRef = useRef<{ id: string; key: string } | null>(null)
 
   useEffect(() => {
     let current = true
@@ -304,9 +300,10 @@ export default function HqBroadcastCreate() {
         if (!accounts.success) throw new Error(accounts.error)
         const list: Store[] = accounts.data
           .filter((a) => !a.archivedAt)
-          .map((a) => ({ id: a.id, name: a.name, tags: a.tags ?? [], friendCount: a.stats?.friendCount ?? 0, folderId: a.folderId ?? null, folder: a.folder ?? null }))
+          .map((a) => ({ ...a, friendCount: a.stats?.friendCount ?? null }))
         setStores(list)
         if (folderList?.success) setFolders(folderList.data.folders)
+        setFoldersFailed(!folderList?.success)
         const sent = runs ? runs.data.filter((r) => r.status !== 'prepared') : []
         setRecent(sent.slice(0, 2))
         if (legacyTags.current.length > 0) {
@@ -333,6 +330,8 @@ export default function HqBroadcastCreate() {
   useEffect(() => {
     const id = params.get('id')
     if (!id) return
+    // 自分の保存でURLへ記録した下書きを取り直して、編集中の内容を置き換えない。
+    if (id === run?.id) return
     let current = true
     void hqBroadcastsApi.get(id)
       .then((res) => {
@@ -353,7 +352,7 @@ export default function HqBroadcastCreate() {
       })
       .catch(() => { if (current) setDraftState('error') })
     return () => { current = false }
-  }, [params])
+  }, [params, run?.id])
 
   /* 詳細の［複製して作る］（?copy=<一括配信の id>）：配信名・中身・送るアカウント・対象を写して新しく作る。 */
   useEffect(() => {
@@ -475,6 +474,18 @@ export default function HqBroadcastCreate() {
     return result?.run.id ?? null
   }
 
+  /*
+   * 吹き出しの不備（B-139・店の一斉配信と同じ）：帯ではなく吹き出しの中身の下に理由、頭に赤い丸、
+   * メッセージの段を開いて1つ目の吹き出しへ移る。配信名・送り先・日時は段の帯（［〇〇へ移動］つき）のまま。
+   */
+  const fields = useFormErrors()
+  bubbles.forEach((item, index) => {
+    fields.define(`bubble-${index}`, `${index + 1} 通目`, () => hqBubbleProblem(item) || null, {
+      reveal: () => { if (step !== 'message') changeStep('message'); setOpenBubble(index) },
+      group: `bubble-${index}`,
+    })
+  })
+
   /** 入れていない所と、その欄のある段（店の一斉配信の「保存を押した段で理由を示す」と同じ）。 */
   const problem = (): { message: string; step: BroadcastStepKey } | null => {
     if (!title.trim()) return { message: '配信名を入れてください', step: 'basic' }
@@ -485,7 +496,7 @@ export default function HqBroadcastCreate() {
     for (const [index, item] of bubbles.entries()) {
       /* 質問・紹介（統括の口がまだ受けない）もここで止め、口を呼ばない。 */
       const why = hqBubbleProblem(item)
-      if (why) return { message: `${bubbles.length > 1 ? `${index + 1}通目の` : ''}${why}`, step: 'message' }
+      if (why) return { message: `${bubbles.length > 1 ? `${index + 1} 通目の` : ''}${why}`, step: 'message' }
     }
     if (when === 'later' && !scheduledAt) return { message: '送る日時を選んでください', step: 'schedule' }
     if (scheduledAt && Date.parse(scheduledAt) <= Date.now()) return { message: '予約日時は今より後にしてください', step: 'schedule' }
@@ -495,11 +506,14 @@ export default function HqBroadcastCreate() {
   /** 作る（下書きを固定）→ 確かめる → 問題のある店を外す。中身が変わったら同じ下書きを直す（版つき・依頼番号はそのまま）。 */
   const check = async (): Promise<{ run: HqBroadcastRun; checks: HqBroadcastPreflight[] } | null> => {
     const why = problem()
-    if (why) { setError(why.message); setErrorStep(why.step); return null }
+    if (why) {
+      if (why.step === 'message' && fields.submit().length > 0) { setError(''); setErrorStep(null); return null }
+      setError(why.message); setErrorStep(why.step); return null
+    }
     setChecking(true); setError(''); setErrorStep(null)
     try {
       let current = run
-      if (!current || runKey !== key) {
+      if (!current || preparedKeyRef.current?.id !== current.id || preparedKeyRef.current.key !== key) {
         const requestId = current?.input?.requestId || requestRef.current
         if (current && current.status === 'prepared' && requestId) {
           current = (await hqBroadcastsApi.update(current.id, { ...input, requestId, expectedVersion: current.version })).data
@@ -512,8 +526,16 @@ export default function HqBroadcastCreate() {
           current = (await hqBroadcastsApi.create({ ...input, requestId: requestRef.current })).data
         }
         // WEB011：作れた・直せた下書きは、確かめ（preflight）の前にすぐ覚える。
-        // 確かめが失敗してやり直したとき、同じ下書きを新しい版で直す（重複も 409 も起こさない）。
+        // 後の工程が失敗したやり直しは、保存済みの下書きと版から再開する。
         setRun(current)
+        preparedKeyRef.current = { id: current.id, key }
+      }
+      // 保存した下書きの住所は、後の確かめが失敗しても再読込から開けるよう直ちに残す。
+      if (current.id !== draftId) {
+        setDraftId(current.id)
+        const q = new URLSearchParams(window.location.search)
+        q.set('id', current.id)
+        samePageUrl.replace(`/hq/broadcasts/new?${q.toString()}`)
       }
       let list = (await hqBroadcastsApi.preflight(current.id)).data
       const blocked = list.filter((p) => p.blockedReasons.length > 0 && !p.excluded).map((p) => p.accountId)
@@ -524,13 +546,6 @@ export default function HqBroadcastCreate() {
         list = list.map((p) => (ids.includes(p.accountId) ? { ...p, excluded: true } : p))
       }
       setRun(current); setRunKey(key); setChecks(list); setSavedAt(new Date().toISOString())
-      if (current.id !== draftId) {
-        setDraftId(current.id)
-        // 今の URL（段の切り替えで書いた step）に id を足す。この関数を呼んだ時点の段（古い値）で書き戻さない。
-        const q = new URLSearchParams(window.location.search)
-        q.set('id', current.id)
-        samePageUrl.replace(`/hq/broadcasts/new?${q.toString()}`)
-      }
       return { run: current, checks: list }
     } catch (caught) {
       setError(errorText(caught, '送る前の確かめができませんでした。もう一度お試しください。'))
@@ -549,7 +564,9 @@ export default function HqBroadcastCreate() {
       setRun(next)
       setChecks(checks.map((c) => ({ ...c, excluded: ids.includes(c.accountId) })))
       setExcluded(ids)
-      setRunKey(JSON.stringify({ ...input, excludedAccountIds: ids.filter((id) => accountIds.includes(id)) }))
+      const nextKey = JSON.stringify({ ...input, excludedAccountIds: ids.filter((id) => accountIds.includes(id)) })
+      preparedKeyRef.current = { id: next.id, key: nextKey }
+      setRunKey(nextKey)
     } catch (caught) {
       setError(errorText(caught, 'アカウントを外せませんでした。もう一度お試しください。'))
     }
@@ -557,7 +574,7 @@ export default function HqBroadcastCreate() {
 
   const saveDraft = async () => {
     const result = await check()
-    if (result) notifyToast('下書きに保存しました')
+    if (result) notifySaved('下書きに保存しました')
   }
 
   /*
@@ -602,7 +619,7 @@ export default function HqBroadcastCreate() {
     try {
       const detail = await hqTemplatesApi.get(id)
       if (detail.template.template_type !== 'template') return 'メッセージのテンプレートを選んでください'
-      const read = bubbleFromTemplate(id, detail.definition as MessageTemplateDefinition)
+      const read = bubbleFromTemplate(id, detail.definition as MessageTemplateDefinition, detail.template.current_version_id)
       if ('error' in read) return read.error
       setBubbles([{ ...read.bubble, body: read.bubble.body.slice(0, BODY_MAX) }]); setOpenBubble(0)
       if (!title.trim()) setTitle((detail.definition as MessageTemplateDefinition).template.name.slice(0, TITLE_MAX))
@@ -619,7 +636,7 @@ export default function HqBroadcastCreate() {
     try {
       const detail = await hqTemplatesApi.get(id)
       if (detail.template.template_type !== 'template') return
-      const read = bubbleFromTemplate(id, detail.definition as MessageTemplateDefinition)
+      const read = bubbleFromTemplate(id, detail.definition as MessageTemplateDefinition, detail.template.current_version_id)
       if ('error' in read || read.bubble.kind !== 'carousel') { setCarouselError('error' in read ? read.error : 'カルーセルのテンプレートを選んでください'); return }
       setContent(read.bubble.content, read.bubble.cardAsset)
     } catch (caught) {
@@ -631,7 +648,7 @@ export default function HqBroadcastCreate() {
     try {
       const detail = await hqTemplatesApi.get(id)
       if (detail.template.template_type !== 'template') return 'メッセージのテンプレートを選んでください'
-      const read = bubbleFromTemplate(id, detail.definition as MessageTemplateDefinition)
+      const read = bubbleFromTemplate(id, detail.definition as MessageTemplateDefinition, detail.template.current_version_id)
       if ('error' in read) return read.error
       replaceActive({ ...read.bubble, body: read.bubble.body.slice(0, BODY_MAX) })
       setCarouselError('')
@@ -668,11 +685,14 @@ export default function HqBroadcastCreate() {
     samePage: (url) => url.pathname === '/hq/broadcasts/new',
   })
 
-  const visibleStores = (stores ?? []).filter((s) => folderFilter === ALL || (folderFilter === UNFILED ? !s.folderId : s.folderId === folderFilter))
-  const unfiledCount = (stores ?? []).filter((s) => !s.folderId).length
-  const friendTotal = chosen.filter((s) => !excluded.includes(s.id)).reduce((sum, s) => sum + s.friendCount, 0)
+  const sendableChosen = chosen.filter((s) => !excluded.includes(s.id))
+  const friendTotal = sendableChosen.some((s) => s.friendCount == null) ? null : sendableChosen.reduce((sum, s) => sum + (s.friendCount ?? 0), 0)
+  const accountSummary = `${chosen.slice(0, 2).map((account) => account.name).join('・')}${chosen.length > 2 ? ` ほか${chosen.length - 2}` : ''}`
+  /** 統括のタグ・シナリオは名前で送る（API-18）。窓の候補も名前を ID にする。 */
+  const byName = (rows: Array<{ name: string; accounts: number }> | null | undefined) => (rows ?? []).map((t) => ({ id: t.name, name: t.name, meta: `${t.accounts}/${chosen.length}アカウント` }))
+  const closeAccountPicker = () => { setAccountPickerOpen(false); requestAnimationFrame(() => accountPickerTrigger.current?.focus()) }
   const totals = checks && !stale ? sendTotals(checks) : null
-  const peopleLabel = totals ? `${formatNumber(totals.sendPeople)}人` : audience === 'all' && chosen.length > 0 ? `${formatNumber(friendTotal)}人` : '—人'
+  const peopleLabel = totals ? `${formatNumber(totals.sendPeople)} 人` : audience === 'all' && chosen.length > 0 && friendTotal != null ? `${formatNumber(friendTotal)} 人` : '—人'
   const audienceLabel = audience === 'tag' ? (tagName ? `タグ：${tagName}` : 'タグ：未選択')
     : audience === 'scenario' ? (scenarioName ? `シナリオ「${scenarioName}」を購読中` : 'シナリオ購読中の全員')
     : audience === 'advanced' ? (savedName ? `保存した条件「${savedName}」${pruneCondition(condition) ? '＋詳細条件' : ''}` : pruneCondition(condition) ? '詳細条件' : '詳細条件：未設定')
@@ -681,10 +701,10 @@ export default function HqBroadcastCreate() {
   const bubblesDone = bubbles.every((item) => !hqBubbleProblem(item))
   const bubbleSummary = hqBubbleSummary
   const accountsLabel = chosen.length === 0 ? '未選択' : chosen.length <= 2 ? chosen.map((s) => s.name).join('・') : `${chosen[0].name} ほか ${chosen.length - 1}アカウント`
-  const sendWhenLabel = when === 'now' ? '今すぐ' : scheduledAt ? jpDateTime(scheduledAt) : '未設定'
+  const sendWhenLabel = when === 'now' ? '今すぐ' : scheduledAt ? jpDateTime(scheduledAt) : emptyValue('unconfigured')
   const { shown, rest } = splitPreflightRows(checks ?? [], showAll ? Infinity : ROWS_SHOWN)
   const exampleStore = (checks ?? []).find((p) => !p.excluded && !p.blockedReasons.length)?.accountName ?? chosen[0]?.name ?? '店の名前'
-  const previewBubbles = bubbles.map((item) => previewBubbleOf(item, previewText(item.body, exampleStore)))
+  const previewBubbles = bubbles.map((item) => step === 'message' && item.kind === 'carousel' && !item.cardAsset ? toApiBubble(item, item.id) : previewBubbleOf(item, previewText(item.body, exampleStore)) ?? toApiBubble(item, item.id))
   const steps = broadcastSteps({
     basicDone: Boolean(title.trim()) && title.trim().length <= TITLE_MAX,
     audienceDone: chosen.length > 0 && (audience === 'all' || audience === 'scenario' || (audience === 'tag' && Boolean(tagName)) || (audience === 'advanced' && (Boolean(pruneCondition(condition)) || Boolean(savedName)))),
@@ -694,7 +714,7 @@ export default function HqBroadcastCreate() {
   const stepIndex = STEP_ORDER.indexOf(step)
   const draftLabel = savedAt ? `下書き保存済み・${formatRelative(savedAt)}` : draftState === 'ready' ? '保存済みの下書きを開いています' : '下書き・未保存'
 
-  /** ［保存してテンプレート化する］：開いている吹き出しを統括のひな形（メッセージ）として保存する。 */
+  /** ［保存してテンプレートにする］：開いている吹き出しを統括のひな形（メッセージ）として保存する。 */
   const saveAsTemplate = async () => {
     const name = saveTplName.trim()
     if (!name) { setSaveTplError('テンプレートの名前を入れてください'); return }
@@ -706,7 +726,7 @@ export default function HqBroadcastCreate() {
       await hqTemplatesApi.create({ type: 'template', name, definition }, crypto.randomUUID())
       setSaveTplOpen(false)
       setCarousels(null)
-      notifyToast(`テンプレート「${name}」に保存しました`)
+      notifySaved(`テンプレート「${name}」に保存しました`)
     } catch (caught) {
       setSaveTplError(errorText(caught, 'テンプレートに保存できませんでした。もう一度お試しください。'))
     } finally {
@@ -714,36 +734,41 @@ export default function HqBroadcastCreate() {
     }
   }
 
-  if (composer && canManage) {
+  const inlineEditor = composer && canManage ? (() => {
     /* 店のカルーセル・リッチメッセージの作る部品をそのまま使う（統括のテンプレートと同じ host の口）。保存は吹き出しに入れるだけ。 */
     const host: TemplateEditHost = {
+      composer: { index: openBubble, accountId: null },
       backHref: '/hq/broadcasts',
       description: '作った中身は、この一括配信のメッセージに入ります（テンプレートには残りません）',
       folders: [],
       folder: '',
       onFolderChange: () => {},
-      busy: false,
-      primaryLabel: 'メッセージに入れる',
+      busy: composerBusy,
+      primaryLabel: 'この吹き出しに入れる',
       initialContent: hostContentOfBubble(active),
-      onSave: (content) => {
+      onSave: async (content, alsoSave) => {
+        if (alsoSave) {
+          setComposerBusy(true)
+          try { await hqTemplatesApi.create({ type: 'template', name: content.name, definition: hostDefinition(freshDefinition('template') as MessageTemplateDefinition, content) }, crypto.randomUUID()) } catch (caught) { setCarouselError(errorText(caught, 'テンプレートに保存できませんでした。')); return false } finally { setComposerBusy(false) }
+        }
         const next = bubbleFromHostContent(content)
-        if (next) { replaceActive(next); setCarouselError('') }
+        if (next) { replaceActive({ ...next, content: { ...next.content, inline: true } }); setCarouselError('') }
+        if (!next) return false
         setComposer(null)
+        return true
       },
       onCancel: () => setComposer(null),
+      notice: carouselError ? <Notice tone="danger">{carouselError}</Notice> : undefined,
+      uploadCarouselImage: (file) => hqTemplatesApi.uploadImage(file, 'message'),
       uploadRichImage: (file) => hqTemplatesApi.uploadRichMessageImage(file),
     }
     return composer === 'carousel' ? <CarouselV8 host={host} /> : <TemplateRichEditor host={host} />
-  }
+  })() : null
 
   if (!canManage) {
     return (
       <div className={formStyles.root}>
-        <header className={formStyles.header}>
-          <div className={formStyles.heading}>
-            <h2>一括配信を作る</h2>
-          </div>
-        </header>
+        <PageHeading title={<>一括配信を作る</>} />
         <div className={formStyles.input}>
           <Notice tone="info">一括配信を作れるのは、統括全体の編集権限がある人（オーナー・管理者）だけです。</Notice>
         </div>
@@ -756,16 +781,11 @@ export default function HqBroadcastCreate() {
 
   return (
     <>
-      <div className={formStyles.root} data-step={step} data-hq-broadcast-create="">
-        <header className={formStyles.header} data-steps-below="">
-          <div className={formStyles.heading}>
-            <h2>一括配信を作る</h2>
-            <p aria-live="polite">{draftLabel}</p>
-          </div>
-          {/* 手順は題と説明のすぐ下・左寄せ・1行（型の共通部品 Steps・Fa8ED / q1xNMz）。 */}
-          <div className={formStyles.stepsBelow}><Steps label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} /></div>
-          <Button aria-expanded={previewOpen} aria-controls="hq-broadcast-line-preview" className={formStyles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={14} aria-hidden /> LINEの見え方</Button>
-        </header>
+      <MessageComposerPage active={step === 'message'}><div className={formStyles.root} data-step={step} data-hq-broadcast-create="">
+        <PageHeading title={<>一括配信を作る</>}
+        crumbs={<><p aria-live="polite">{draftLabel}</p></>}
+        steps={<><Steps connectorSize={step === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} /></>}
+        actions={<>{/* 手順は題と説明のすぐ下・左寄せ・1行（型の共通部品 Steps・Fa8ED / q1xNMz）。 */}<Button aria-expanded={previewOpen} aria-controls="hq-broadcast-line-preview" className={formStyles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={14} aria-hidden /> LINEの見え方</Button></>} />
         {error ? (
           <Notice
             tone="danger"
@@ -807,15 +827,12 @@ export default function HqBroadcastCreate() {
                 {method === 'duplicate' ? copiedRun ? (
                   <SourcePickerSelection buttonRef={basicPickerTrigger} item={broadcastPickerItem(copiedRun)} folders={hqFolders} onChange={() => setBasicPicker('duplicate')} />
                 ) : <Button ref={basicPickerTrigger} onClick={() => setBasicPicker('duplicate')}>過去の配信を選ぶ</Button> : null}
-                <label className={formStyles.nameField}>
-                  <span className={formStyles.labelRow}><span className="text-ink text-sm font-bold">配信名<RequiredBadge /></span><span className="text-xs text-ink-faint">{title.trim().length} / {TITLE_MAX}文字</span></span>
-                  <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={formStyles.textInput} aria-label="配信名" maxLength={TITLE_MAX * 2} />
-                  <small>友だちには表示されません。一覧で見分けるための名前です</small>
-                </label>
+                <Field label="配信名" required count={{ value: title.trim().length, max: TITLE_MAX }}><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={formStyles.textInput} aria-label="配信名" maxLength={TITLE_MAX * 2} />
+<small>友だちには表示されません。一覧で見分けるための名前です</small></Field>
                 {/* 店の一斉配信と同じフォルダ・社内メモ（統括の一括配信のフォルダ。API-18） */}
                 <div className={formStyles.basicFields}>
-                  <label><span className={formStyles.labelRow}>フォルダ</span><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={hqFolders.map((f) => ({ value: f.id, label: f.name, color: f.color }))} onCreate={canManage ? createHqFolder : undefined} size="full" /></label>
-                  <label><span className={formStyles.labelRow}>社内メモ <span className="text-ink-faint text-xs font-normal">任意</span><HelpTip label="社内メモの説明">友だちには表示されません。各アカウントの配信にも同じメモが残ります</HelpTip></span><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} maxLength={10000} className={formStyles.textInput} placeholder="友だちには表示されません" /></label>
+                  <Field label="フォルダ"><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={hqFolders.map((f) => ({ value: f.id, label: f.name, color: f.color }))} onCreate={canManage ? createHqFolder : undefined} size="full" /></Field>
+                  <Field label="社内メモ" help={<>友だちには表示されません。各アカウントの配信にも同じメモが残ります</>}><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} maxLength={10000} className={formStyles.textInput} placeholder="友だちには表示されません" /></Field>
                 </div>
                 <div className={formStyles.recentHeader}><h3>最近の配信</h3><Link href="/hq/broadcasts">一括配信の一覧を見る →</Link></div>
                 <div className={formStyles.recentList}>
@@ -824,7 +841,7 @@ export default function HqBroadcastCreate() {
                     return (
                       <div key={item.id} className={formStyles.recentRow}>
                         <Send size={14} aria-hidden /><span className={formStyles.recentName} title={item.title}>{item.title}</span>
-                        <span className="text-ink-faint">{jpDateTime(item.scheduledAt)} 送信 ・ {formatNumber(people)}人</span>
+                        <span className="text-ink-faint">{jpDateTime(item.scheduledAt)} 送信 ・ {formatNumber(people)} 人</span>
                         <Button size="compact" onClick={() => duplicate(item)}>複製する</Button>
                       </div>
                     )
@@ -838,36 +855,11 @@ export default function HqBroadcastCreate() {
               <section id="broadcast-step-audience" className={formStyles.section}>
                 <div className={styles.accounts} data-design-node="J5DH6o">
                   <h3>送るアカウント</h3>
-                  {loadError && !stores ? <ListState kind="error" error={loadError} onRetry={() => window.location.reload()} /> : !stores ? <ListState kind="loading" /> : (
-                    <>
-                      <div className={styles.folderChips} role="group" aria-label="フォルダで絞る">
-                        <FilterChip selected={folderFilter === ALL} onChange={() => setFolderFilter(ALL)} count={stores.length}>すべて</FilterChip>
-                        {folders.map((f) => (
-                          <FilterChip key={f.id} selected={folderFilter === f.id} onChange={() => setFolderFilter(folderFilter === f.id ? ALL : f.id)} icon={<FolderDot folder={f} />} count={stores.filter((s) => s.folderId === f.id).length}>{f.name}</FilterChip>
-                        ))}
-                        {unfiledCount > 0 && folders.length > 0 ? (
-                          <FilterChip selected={folderFilter === UNFILED} onChange={() => setFolderFilter(folderFilter === UNFILED ? ALL : UNFILED)} icon={<FolderDot folder={null} />} count={unfiledCount}>未分類</FilterChip>
-                        ) : null}
-                      </div>
-                      <div className={styles.accountCards}>
-                        {visibleStores.map((s) => (
-                          <CheckCard
-                            key={s.id}
-                            size="compact"
-                            checked={accountIds.includes(s.id)}
-                            onChange={(on) => setAccountIds((ids) => (on ? [...ids, s.id] : ids.filter((x) => x !== s.id)))}
-                            title={<span title={s.name}><FolderDotName folder={s.folder}>{s.name}</FolderDotName></span>}
-                            note={`友だち ${formatNumber(s.friendCount)} 人`}
-                          />
-                        ))}
-                        {visibleStores.length === 0 ? <p className="text-xs text-ink-faint">このフォルダにアカウントはありません。</p> : null}
-                      </div>
-                      <p className={styles.accountsNote} aria-live="polite">
-                        {chosen.length === 0
-                          ? 'アカウントを選んでください。送る相手は、下の条件で各アカウントの友だちから選びます。'
-                          : `${formatNumber(chosen.length)} アカウントを選んでいます。送る相手は、下の条件で各アカウントの友だちから選びます。`}
-                      </p>
-                    </>
+                  {loadError && !stores ? <ListState permissionScope="hq" kind="error" error={loadError} onRetry={() => window.location.reload()} /> : !stores ? <ListState permissionScope="hq" kind="loading" /> : (
+                    <div className={styles.accountSelection} aria-live="polite">
+                      <EntityPickerSummary label="送るアカウント" noun="送るアカウント" icon={Building2} name={chosen.length ? `${formatNumber(chosen.length)} アカウント` : ''} meta={accountSummary}
+                        readOnly={!canManage} buttonRef={accountPickerTrigger} onOpen={() => setAccountPickerOpen(true)} />
+                    </div>
                   )}
                 </div>
                 <h3>配信対象</h3>
@@ -898,17 +890,9 @@ export default function HqBroadcastCreate() {
                 ) : null}
                 {audience === 'scenario' ? (
                   <div className="border-hairline border-t pt-4">
-                    <label className="text-ink-secondary block text-xs font-semibold">どのシナリオ</label>
-                    <Combobox
-                      aria-label="どのシナリオ"
-                      placeholder="すべてのシナリオ（どれか1つでも購読中）"
-                      value={scenarioName}
-                      onChange={setScenarioName}
-                      options={(scenarioOptions ?? []).map((t) => ({ value: t.name, label: `${t.name}（${t.accounts}/${chosen.length}アカウント）` }))}
-                      loading={tagStatus === 'loading'}
-                      disabled={tagStatus !== 'ready' || chosen.length === 0}
-                      className="mt-1 w-full sm:max-w-sm"
-                    />
+                    <p className="text-ink-secondary mb-1 block text-xs font-semibold">どのシナリオ</p>
+                    <EntityPickerField label="どのシナリオ" noun="シナリオ" icon={Workflow} items={byName(scenarioOptions)} value={scenarioName} onChange={setScenarioName}
+                      clearable placeholder="（すべてのシナリオ：どれか1つでも購読中）" disabled={tagStatus !== 'ready' || chosen.length === 0} />
                     {scenarioName && (scenarioOptions ?? []).some((t) => t.name === scenarioName && t.accounts < chosen.length) ? (
                       <p className="mt-1 text-xs text-warning">このシナリオが無いアカウントには送りません（最終確認で外します）。</p>
                     ) : null}
@@ -916,17 +900,9 @@ export default function HqBroadcastCreate() {
                 ) : null}
                 {audience === 'tag' ? (
                   <div className="border-hairline border-t pt-4">
-                    <label className="text-ink-secondary block text-xs font-semibold">含めるタグ</label>
-                    <Combobox
-                      aria-label="含めるタグ"
-                      placeholder="タグを選んでください"
-                      value={tagName}
-                      onChange={setTagName}
-                      options={(tagOptions ?? []).map((t) => ({ value: t.name, label: `${t.name}（${t.accounts}/${chosen.length}アカウント）` }))}
-                      loading={tagStatus === 'loading'}
-                      disabled={tagStatus !== 'ready' || chosen.length === 0}
-                      className="mt-1 w-full sm:max-w-sm"
-                    />
+                    <p className="text-ink-secondary mb-1 block text-xs font-semibold">含めるタグ</p>
+                    <EntityPickerField label="含めるタグ" noun="タグ" icon={TagIcon} items={byName(tagOptions)} value={tagName} onChange={setTagName}
+                      disabled={tagStatus !== 'ready' || chosen.length === 0} />
                     {tagStatus === 'ready' && chosen.length > 0 && (tagOptions ?? []).length === 0 ? <p className="mt-1 text-xs text-ink-faint">選んだアカウントにタグがありません。</p> : null}
                     {tagName && (tagOptions ?? []).some((t) => t.name === tagName && t.accounts < chosen.length) ? (
                       <p className="mt-1 text-xs text-warning">このタグが無いアカウントには送りません（最終確認で外します）。</p>
@@ -961,7 +937,7 @@ export default function HqBroadcastCreate() {
                   <Checkbox checked onCheckedChange={() => {}} disabled>ブロック中の人を除く</Checkbox>
                   <small>ブロック中・非表示・宛先不明の友だちには送りません</small>
                 </div>
-                <label className={formStyles.excludeTag}><span className={formStyles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><Select aria-label="除くタグ" value={excludeTag} onChange={setExcludeTag} disabled={tagStatus !== 'ready' || chosen.length === 0} options={[{ value: '', label: '除外なし' }, ...(tagOptions ?? []).map((t) => ({ value: t.name, label: `${t.name}（${t.accounts}/${chosen.length}アカウント）` }))]} size="full" /></label>
+                <div className={formStyles.excludeTag}><span className={formStyles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><EntityPickerField label="除くタグ" noun="タグ" icon={TagIcon} items={byName(tagOptions)} value={excludeTag} onChange={setExcludeTag} clearable placeholder="（除外なし）" disabled={tagStatus !== 'ready' || chosen.length === 0} /></div>
                 <div className={formStyles.exclusion}>
                   <Checkbox checked={false} onCheckedChange={() => {}} disabled>この1週間に送った人を除く</Checkbox>
                   <small>最近送った人を除く機能は、まだ使えません</small>
@@ -975,127 +951,24 @@ export default function HqBroadcastCreate() {
             {/* ③ メッセージを作成（lLyFR） */}
             {shows('message') ? (
               <section id="broadcast-step-message" className={formStyles.section}>
-                <div className={styles.messageHead}>
-                  <h3>{`メッセージ（${Math.min(openBubble, bubbles.length - 1) + 1} / ${bubbles.length}）`}</h3>
-                  {/* 絵 lLyFR：見出しの右に［テンプレートから選ぶ］［保存してテンプレート化する］（開いている吹き出しを統括のひな形に保存）。 */}
-                  <span className={styles.messageHeadActions}>
-                    <Button size="compact" onClick={() => setPickerOpen(true)}>テンプレートから選ぶ</Button>
-                    <Button size="compact" onClick={() => { setSaveTplName(String(active.content.templateName ?? active.content.assetName ?? '') || title.trim()); setSaveTplError(''); setSaveTplOpen(true) }}><Save size={14} aria-hidden /> 保存してテンプレート化する</Button>
-                  </span>
-                </div>
-                {/* 店の一斉配信と同じく吹き出しは5つまで。開いているのは1つで、ほかは1行の要約（API-18 の複数の吹き出し）。 */}
-                {bubbles.map((item, index) => (
-                  <details key={item.id} className={formStyles.bubbleFrame} data-embedded open={index === Math.min(openBubble, bubbles.length - 1)}>
-                    <summary onClick={(event) => { event.preventDefault(); setOpenBubble(index) }}>
-                      <span className={formStyles.bubbleNumber}>{index + 1}</span>
-                      <span title={bubbleSummary(item)}>{index === Math.min(openBubble, bubbles.length - 1) ? KIND_LABEL[item.kind] : bubbleSummary(item)}</span>
-                      <span className={formStyles.bubbleControls} onClick={(event) => { event.preventDefault(); event.stopPropagation() }}>
-                        <Button size="compact" aria-label={`${index + 1}通目を上へ移動`} disabled={index === 0} onClick={() => { setBubbles((items) => { const next = [...items]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next }); setOpenBubble(index - 1) }}><ArrowUp size={12} aria-hidden /></Button>
-                        <Button size="compact" aria-label={`${index + 1}通目を下へ移動`} disabled={index === bubbles.length - 1} onClick={() => { setBubbles((items) => { const next = [...items]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; return next }); setOpenBubble(index + 1) }}><ArrowDown size={12} aria-hidden /></Button>
-                        <Button size="compact" aria-label={`${index + 1}通目を削除する`} disabled={bubbles.length === 1} onClick={() => { setBubbles((items) => items.filter((_, i) => i !== index)); setOpenBubble(0) }}><Trash2 size={12} aria-hidden /></Button>
-                      </span>
-                    </summary>
-                    {index === Math.min(openBubble, bubbles.length - 1) ? (
-                      <>
-                        <div className="flex flex-wrap gap-2" role="tablist" aria-label={bubbles.length > 1 ? `${index + 1}通目のメッセージの形式` : 'メッセージの形式'}>
-                          {HQ_KIND_TABS.map(([value, label]) => (
-                            <button key={value} type="button" role="tab" aria-selected={kind === value} tabIndex={kind === value ? 0 : -1} className="broadcast-message-type" data-active={kind === value || undefined}
-                              title={HQ_NOT_YET.has(value) ? notYetText(value) : value === 'coupon' ? 'クーポン' : undefined}
-                              onClick={() => { if (kind !== value) setKind(value) }}>{label}</button>
-                          ))}
-                        </div>
-                        {kind === 'text' ? (
-                          <section>
-                            <InsertTextField
-                              ref={bodyRef}
-                              aria-label="本文"
-                              rows={6}
-                              maxLength={BODY_MAX}
-                              value={body}
-                              onValueChange={setBody}
-                              extraTokens={STORE_INSERT_CHIPS}
-                              placeholder="{店名}より：…"
-                              className="border-hairline rounded-control w-full resize-none border p-3 text-sm focus:border-accent focus:outline-none"
-                            />
-                            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-                              <span className={styles.inserts}>
-                                <span className="text-ink-faint">差し込む：</span>
-                                {STORE_INSERTS.map((item) => (
-                                  <InsertButton key={item.label} label={item.label.slice(1, -1)} title={item.help} onClick={() => insert(item.label)} />
-                                ))}
-                              </span>
-                              <span className="text-ink-faint">{`${formatNumber(body.length)} / ${formatNumber(BODY_MAX)}`}</span>
-                            </div>
-                            <p className="mt-2 text-xs text-ink-faint">{'{店名}・{店の電話番号}・{予約ページ} は、送るアカウントの名前と共通情報に置き換わります。共通情報が無いアカウントは最終確認で外します。'}</p>
-                          </section>
-                        ) : HQ_NOT_YET.has(kind) ? (
-                          <p className={styles.notYet} role="note">{notYetText(kind)}</p>
-                        ) : kind === 'image' || kind === 'video' ? (
-                          /* 店の一斉配信と同じアップロード欄。置き場はどの店にも属さない（統括）ので、どのアカウントからも同じ URL で届く。 */
-                          <MediaUpload bubble={{ id: active.id, type: kind, content: active.content }} lineAccountId={null} onChange={(next) => setContent(next)} />
-                        ) : kind === 'audio' || kind === 'sticker' || kind === 'location' ? (
-                          <MessageKindFields
-                            kind={kind as MessageKind}
-                            value={(active.content.state as MessageKindState | undefined) ?? emptyMessageKindState()}
-                            onChange={(next) => setContent({ state: next })}
-                          />
-                        ) : kind === 'flex' ? (
-                          /* 統括のメッセージのひな形（画像・ボタンつきのカード）。中身はひな形のまま送る。直すときは統括のテンプレートで。 */
-                          <section>
-                            <p className="text-xs text-ink-secondary">{`テンプレート「${String(active.content.templateName ?? '')}」のカードをそのまま送ります。中身を直すときは統括の「テンプレート」で直してから選び直してください。`}</p>
-                            {hqBubbleProblem(active) ? <p className="mt-2 text-xs text-warning" role="alert">{hqBubbleProblem(active)}</p> : null}
-                          </section>
-                        ) : kind === 'carousel' ? (
-                          <section>
-                            {/* 統括のカルーセルのひな形（コンテンツ ＞ テンプレート ＞ カルーセル）から選ぶ。中身そのものを控えるので、ひな形を消しても送れる。 */}
-                            {carousels === null ? <p className="text-xs text-ink-faint">読み込んでいます…</p> : carousels.length === 0 ? (
-                              <p className="text-xs text-ink-faint">統括のカルーセルのテンプレートがありません。「テンプレート」でカルーセルを作ってください。</p>
-                            ) : (
-                              <Select
-                                aria-label="カルーセルを選ぶ"
-                                value={String(active.content.hqTemplateId ?? active.content.assetId ?? '')}
-                                onChange={(id) => void chooseCarousel(id)}
-                                size="full"
-                                options={[{ value: '', label: '選んでください' }, ...carousels.map((t) => ({ value: t.id, label: t.name }))]}
-                              />
-                            )}
-                            <div className={styles.composeRow}>
-                              {active.content.templateName || active.content.assetName ? <span>{`カード${carouselColumns(active).length}枚`}</span> : <span>ひな形が無ければ、ここで作れます</span>}
-                              <Button size="compact" onClick={() => setComposer('carousel')}><Plus size={14} aria-hidden /> {hostContentOfBubble(active) ? 'このカルーセルを直す' : 'カルーセルをその場で作る'}</Button>
-                            </div>
-                            {carouselError ? <p className="mt-2 text-xs text-warning" role="alert">{carouselError}</p> : (active.content.templateName || active.content.assetName) && hqBubbleProblem(active) ? <p className="mt-2 text-xs text-warning" role="alert">{hqBubbleProblem(active)}</p> : null}
-                          </section>
-                        ) : (
-                          <section>
-                            {kind === 'coupon' ? <p className="mb-2 text-xs text-ink-faint">その他の種類：クーポン</p> : null}
-                            {assets === null ? <p className="text-xs text-ink-faint">読み込んでいます…</p> : kindAssets.length === 0 ? (
-                              <p className="text-xs text-ink-faint">{`統括で使える${KIND_LABEL[kind]}がありません。「コンテンツ ＞ テンプレート」で、どの店にも属さない素材として作ってください。`}</p>
-                            ) : (
-                              <Select
-                                aria-label={`${KIND_LABEL[kind]}を選ぶ`}
-                                value={assetId}
-                                onChange={setAssetId}
-                                size="full"
-                                options={[{ value: '', label: '選んでください' }, ...kindAssets.map((a) => ({ value: a.id, label: a.name }))]}
-                              />
-                            )}
-                            {kind === 'rich' ? (
-                              <div className={styles.composeRow}>
-                                <span>{active.media?.length ? `その場で作ったリッチメッセージ：${String(active.content.assetName ?? '')}` : '素材が無ければ、ここで作れます'}</span>
-                                <Button size="compact" onClick={() => setComposer('rich')}><Plus size={14} aria-hidden /> {active.media?.length ? 'このリッチメッセージを直す' : 'リッチメッセージをその場で作る'}</Button>
-                              </div>
-                            ) : null}
-                            {assetId && hqBubbleProblem(active) ? <p className="mt-2 text-xs text-warning" role="alert">{hqBubbleProblem(active)}</p> : null}
-                          </section>
-                        )}
-                      </>
-                    ) : null}
-                  </details>
-                ))}
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => { setBubbles((items) => [...items, newBubble('text')]); setOpenBubble(bubbles.length) }}><Plus size={15} aria-hidden /> メッセージを追加する</Button>
-                  <span className="text-xs text-ink-faint">{bubbles.length >= MAX_BUBBLES ? '5つまでです' : `あと${MAX_BUBBLES - bubbles.length}つ`}</span>
-                </div>
+                <MessageComposer
+                  bubbleErrors={bubbles.map((_, index) => fields.error(`bubble-${index}`))}
+                  bubbleFieldProps={(index) => fields.bind(`bubble-${index}`)}
+                  bubbles={bubbles.map((item) => item.kind === 'text' ? { id: item.id, type: 'text', content: { text: item.body } } : toApiBubble(item, item.id) ?? { id: item.id, type: 'research', content: item.content })}
+                  accountId={null}
+                  busy={composerBusy} onBusyChange={setComposerBusy}
+                  extraTokens={STORE_INSERT_CHIPS}
+                  inserts={(ref, value, change) => <><span>差し込む：</span>{STORE_INSERTS.map((item) => <InsertButton size="compact" key={item.label} label={item.label.slice(1, -1)} title={item.help} onClick={() => { const field = ref.current; const start = field?.selectionStart ?? value.length; const end = field?.selectionEnd ?? start; change((value.slice(0, start) + item.label + value.slice(end)).slice(0, BODY_MAX)); requestAnimationFrame(() => { field?.focus(); field?.setSelectionRange(start + item.label.length, start + item.label.length) }) }} />)}</>}
+                  unavailable={{ intro: notYetText('intro'), rich_video: '統括からリッチビデオはまだ送れません。' }}
+                  onChange={(index, next) => { const item = fromApiBubble(next); if (item) setBubbles((items) => items.map((current, i) => i === index ? { ...current, ...item, id: current.id, ...(current.kind === item.kind ? { media: current.media, previewCard: current.previewCard } : {}) } : current)) }}
+                  onMove={(index, direction) => { setBubbles((items) => { const next = [...items]; [next[index], next[index + direction]] = [next[index + direction], next[index]]; return next }); setOpenBubble(index + direction) }}
+                  onDelete={(index) => { setBubbles((items) => items.filter((_, i) => i !== index)); setOpenBubble(0) }}
+                  onAdd={() => { setBubbles((items) => [...items, newBubble('text')]); setOpenBubble(bubbles.length) }}
+                  onPickTemplate={(index, kind) => { setPickerKind(kind); setOpenBubble(index); setPickerOpen(true) }}
+                  onSaveTemplate={(index) => { setOpenBubble(index); setSaveTplName(String(bubbles[index].content.templateName ?? bubbles[index].content.assetName ?? '') || title.trim()); setSaveTplError(''); setSaveTplOpen(true) }}
+                  onCompose={(index, kind) => { setOpenBubble(index); setCarouselError(''); setComposer(kind === 'carousel' ? 'carousel' : 'rich') }}
+                  extraFields={(index, item) => item.type === 'coupon' ? <Select aria-label="クーポンを選ぶ" value={String(item.content.assetId ?? '')} onChange={(id) => { const asset = (assets ?? []).find((a) => a.id === id); setBubbles((items) => items.map((current, i) => i === index ? { ...current, content: asset ? assetContent(asset) : {} } : current)) }} options={[{ value: '', label: '選んでください' }, ...(assets ?? []).filter((a) => a.kind === 'coupon').map((a) => ({ value: a.id, label: a.name }))]} size="full" /> : item.type === 'flex' ? <p>選んだテンプレートのカードをそのまま送ります。</p> : null}
+                />
               </section>
             ) : null}
 
@@ -1109,18 +982,12 @@ export default function HqBroadcastCreate() {
                 </RadioCardGroup>
                 {when === 'later' ? (
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label htmlFor="hq-bc-date" className="text-ink-secondary mb-1 block text-xs font-medium">送る日</label>
-                      <DateField id="hq-bc-date" value={date} onChange={setDate} aria-label="送る日" />
-                    </div>
-                    <div>
-                      <label htmlFor="hq-bc-time" className="text-ink-secondary mb-1 block text-xs font-medium">時刻（日本時間）</label>
-                      <TimeField id="hq-bc-time" size="field" value={time} onChange={setTime} aria-label="時刻（日本時間）" />
-                    </div>
+                    <div><Field label="送る日" htmlFor="hq-bc-date"><DateField id="hq-bc-date" value={date} onChange={setDate} aria-label="送る日" /></Field></div>
+                    <div><Field label="時刻（日本時間）" htmlFor="hq-bc-time"><TimeField id="hq-bc-time" size="field" value={time} onChange={setTime} aria-label="時刻（日本時間）" /></Field></div>
                   </div>
                 ) : null}
                 <div className={formStyles.quota}>
-                  <div className={formStyles.quotaHead}><strong>送信枠</strong><HelpTip label="送信枠の説明">LINE公式アカウントの月間送信枠です。アカウントごとに数えます</HelpTip><span>{totals ? `送る ${formatNumber(totals.sendPeople)}通` : 'アカウントごと'}</span></div>
+                  <div className={formStyles.quotaHead}><strong>送信枠</strong><HelpTip label="送信枠の説明">LINE公式アカウントの月間送信枠です。アカウントごとに数えます</HelpTip><span>{totals ? `送る ${formatNumber(totals.sendPeople)} 通` : 'アカウントごと'}</span></div>
                   <p>今月の残りは最終確認でアカウントごとに確かめます。足りないアカウントは外して送ります</p>
                 </div>
               </section>
@@ -1134,7 +1001,7 @@ export default function HqBroadcastCreate() {
                   {([
                     { key: 'basic', label: '配信名', value: title.trim() || '配信名を入力してください', done: steps[0].state === 'done' || Boolean(title.trim()), move: '基本設定へ戻る' },
                     { key: 'audience', label: '送るアカウント・配信対象', value: `${accountsLabel} ・ ${audienceFull} ・ ${peopleLabel}（ブロック中の人を除く）`, done: steps[1].state === 'done' || (chosen.length > 0 && (audience === 'all' || audience === 'scenario' || (audience === 'tag' && Boolean(tagName)) || (audience === 'advanced' && (Boolean(pruneCondition(condition)) || Boolean(savedName))))), move: '対象者へ戻る' },
-                    { key: 'message', label: 'メッセージ', value: `${bubbles.length > 1 ? `${bubbles.length}件` : KIND_LABEL[kind]} ・ ${previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}`, done: bubblesDone && previewConfirmed, move: 'メッセージへ戻る' },
+                    { key: 'message', label: 'メッセージ', value: `${bubbles.length > 1 ? `${bubbles.length} 件` : KIND_LABEL[kind]} ・ ${previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}`, done: bubblesDone && previewConfirmed, move: 'メッセージへ戻る' },
                     { key: 'schedule', label: '送信設定', value: sendWhenLabel, done: when === 'now' || Boolean(scheduledAt), move: '送信設定へ戻る' },
                   ] as const).map((row) => (
                     <div className={formStyles.checkRow} key={row.key}>
@@ -1148,7 +1015,7 @@ export default function HqBroadcastCreate() {
                   const left = [title.trim(), steps[1].state === 'done', bubblesDone && previewConfirmed, when === 'now' || scheduledAt].filter((ok) => !ok).length
                   return (
                     <Notice tone={left ? 'warn' : 'info'}>
-                      {left ? `${left}件の確認が残っています` : '配信する内容を確認してください'}
+                      {left ? `${left} 件の確認が残っています` : '配信する内容を確認してください'}
                     </Notice>
                   )
                 })()}
@@ -1178,8 +1045,8 @@ export default function HqBroadcastCreate() {
                           return (
                             <Tr key={p.accountId} className={styles.row}>
                               <Td className={styles.colStore}><span className={styles.store} title={p.accountName}>{p.accountName}</span></Td>
-                              <Td className={styles.colPeople}><span className={styles.num}>{p.audienceCount === null ? '—' : `${formatNumber(p.audienceCount)}人`}</span></Td>
-                              <Td className={styles.colQuota}><span className={styles.sub}>{p.remaining === null ? '—' : `${formatNumber(p.remaining)}通`}</span></Td>
+                              <Td className={styles.colPeople}><span className={styles.num}>{p.audienceCount === null ? emptyValue('unknown') : `${formatNumber(p.audienceCount)}人`}</span></Td>
+                              <Td className={styles.colQuota}><span className={styles.sub}>{p.remaining === null ? emptyValue('unknown') : `${formatNumber(p.remaining)}通`}</span></Td>
                               <Td className={styles.colCheck}><StatusBadge tone={badge.tone} title={p.blockedReasons.join('・') || undefined}>{badge.label}</StatusBadge></Td>
                               <Td className={styles.colSend}><StatusBadge tone={go ? 'success' : 'neutral'}>{go ? '送る' : '外す'}</StatusBadge></Td>
                               <Td className={styles.colMenu}>
@@ -1197,7 +1064,7 @@ export default function HqBroadcastCreate() {
                           <Tr className={styles.row}>
                             <Td className={styles.colStore}><span className={styles.store}>{`ほか ${rest.length}アカウント`}</span></Td>
                             <Td className={styles.colPeople}><span className={styles.num}>{`${formatNumber(rest.reduce((sum, p) => sum + (p.audienceCount ?? 0), 0))}人`}</span></Td>
-                            <Td className={styles.colQuota}><span className={styles.sub}>—</span></Td>
+                            <Td className={styles.colQuota}><span className={styles.sub}>{emptyValue('unknown')}</span></Td>
                             <Td className={styles.colCheck}><StatusBadge tone="success">すべて足りる</StatusBadge></Td>
                             <Td className={styles.colSend}><StatusBadge tone="success">送る</StatusBadge></Td>
                             <Td className={styles.colMenu}>
@@ -1209,8 +1076,8 @@ export default function HqBroadcastCreate() {
                     </DataTable>
                     {totals ? (
                       <p className={styles.totals}>
-                        <span className={styles.totalSend}>{`送る：${formatNumber(totals.sendStores)}アカウント・${formatNumber(totals.sendPeople)}人`}</span>
-                        <span className={styles.totalSkip}>{`外す：${formatNumber(totals.skipStores)}アカウント・${formatNumber(totals.skipPeople)}人`}</span>
+                        <span className={styles.totalSend}>{`送る：${formatNumber(totals.sendStores)}アカウント・${formatNumber(totals.sendPeople)} 人`}</span>
+                        <span className={styles.totalSkip}>{`外す：${formatNumber(totals.skipStores)}アカウント・${formatNumber(totals.skipPeople)} 人`}</span>
                       </p>
                     ) : null}
                   </>
@@ -1223,7 +1090,7 @@ export default function HqBroadcastCreate() {
                     onRequestClose={() => setApprovalRequestOpen(false)}
                     onChanged={() => { void hqBroadcastsApi.get(run.id).then((res) => { setRun(res.data); setRunKey(key) }).catch(() => undefined) }}
                     scheduledLabel={scheduledAt ? jpDateTime(scheduledAt) : null}
-                    messageSummary={`${bubbles.length}通`}
+                    messageSummary={`${bubbles.length} 通`}
                   />
                 ) : null}
                 <p className="text-xs text-ink-faint">{when === 'later' ? '予約後も送る前までは、一括配信の詳細から止められます。' : '「今すぐ送る」で確認の小窓を開き、そこで送ると友だちに届きます。送信は取り消せません。'}</p>
@@ -1242,18 +1109,19 @@ export default function HqBroadcastCreate() {
               <Button className={formStyles.previewClose} size="compact" onClick={() => setPreviewOpen(false)}>閉じる</Button>
             </div>
             <div className={previewDevice === 'pc' ? formStyles.pcPreview : formStyles.phonePreview}>
-              <LinePreview accountName={exampleStore} caption={when === 'now' ? '今日' : sendWhenLabel} note={`${exampleStore}の例です。差し込みはアカウントごとに変わります（{予約ページ}は省いて見せています）。`}
+              <LinePreview accountName={exampleStore} caption={when === 'now' ? '今日' : sendWhenLabel} note={`${exampleStore}の例です。差し込みはアカウントごとに変わります（予約ページは省いて見せています）。`}
                 empty={previewBubbles.every((item) => !item) ? 'メッセージは「メッセージを作成」で作ります' : false}>
                 <div className="flex flex-col gap-3 text-ink">
-                  {previewBubbles.map((item, index) => (item ? <BubblePreview key={bubbles[index].id} bubble={item} accountName={exampleStore} /> : null))}
+                  {previewBubbles.map((item, index) => (item ? <BubblePreview key={bubbles[index].id} bubble={item} accountName={exampleStore} composer={step === 'message'} /> : null))}
                 </div>
               </LinePreview>
             </div>
-            <p className={formStyles.previewCaption}>{'{店名} は例のアカウントの名前で見せています'}</p>
+            <p className={formStyles.previewCaption}>{'店名は例のアカウントの名前で見せています'}</p>
             <div className={formStyles.previewSummary}><h3>設定内容</h3><dl>{[
-              ['送るアカウント', chosen.length ? `${accountsLabel}（${formatNumber(chosen.length)}）` : '未選択'],
+              ...(step === 'message' ? [] : [['送るアカウント', chosen.length ? `${accountsLabel}（${formatNumber(chosen.length)}）` : '未選択']]),
               ['送る相手', `${audienceFull}（${peopleLabel}）`],
               ['送る日時', sendWhenLabel],
+              ...(step === 'message' ? [['配信後のアクション', '—']] : []),
             ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
             <div className={formStyles.previewActions}>
               <Button type="button" disabled={checking || chosen.length === 0} title={chosen.length === 0 ? '先に送るアカウントを選んでください' : undefined} onClick={() => setTestOpen(true)}><Send size={14} aria-hidden /> テストを送る</Button>
@@ -1266,9 +1134,9 @@ export default function HqBroadcastCreate() {
         <StickyBar className={formStyles.footer} actions={(
           <>
             {step === 'confirm' ? <Button type="button" onClick={() => changeStep('schedule')}>戻って修正</Button> : null}
-            <Button variant="secondary" className={formStyles.textButton} type="button" disabled={checking || sending} busy={checking && step !== 'confirm'} onClick={() => void saveDraft()}>下書きを保存する</Button>
+            <Button variant="secondary" className={formStyles.textButton} type="button" disabled={checking || sending || composerBusy} busy={checking && step !== 'confirm'} onClick={() => void saveDraft()}>下書きを保存する</Button>
             {step !== 'confirm' ? (
-              <Button variant="primary" onClick={() => changeStep(STEP_ORDER[Math.min(stepIndex + 1, STEP_ORDER.length - 1)])}>
+              <Button variant="primary" disabled={composerBusy} onClick={() => changeStep(STEP_ORDER[Math.min(stepIndex + 1, STEP_ORDER.length - 1)])}>
                 {step === 'message' ? <><span>{nextLabel}</span><ArrowRight size={15} aria-hidden /></> : nextLabel}
               </Button>
             ) : (
@@ -1278,7 +1146,8 @@ export default function HqBroadcastCreate() {
             )}
           </>
         )} />
-      </div>
+        {inlineEditor}
+    </div></MessageComposerPage>
 
       <UnsavedLeaveDialog
         open={leaveTarget !== null}
@@ -1291,11 +1160,11 @@ export default function HqBroadcastCreate() {
       <ConfirmDialog
         open={confirmOpen}
         title={`${formatNumber(totals?.sendStores ?? 0)}アカウントに送ります`}
-        description={`${formatNumber(totals?.sendPeople ?? 0)}人に${when === 'now' ? 'すぐ' : `${sendWhenLabel} に`}送ります。送った LINE は取り消せません。${totals && totals.skipStores ? `外した${formatNumber(totals.skipStores)}アカウントには送りません。` : ''}`}
+        description={`${formatNumber(totals?.sendPeople ?? 0)} 人に${when === 'now' ? 'すぐ' : `${sendWhenLabel} に`}送ります。送った LINE は取り消せません。${totals && totals.skipStores ? `外した${formatNumber(totals.skipStores)}アカウントには送りません。` : ''}`}
         confirmLabel={when === 'now' ? '送る' : '予約する'}
         busy={sending}
         warning
-        onConfirm={gate !== 'single' || (approval.state && Number(confirmCount) === approval.state.gate.recipientCount) ? () => void send() : undefined}
+        onConfirm={gate !== 'single' || (approval.state && Number(confirmCount) === approval.state.gate.recipientCount) ? () => send() : undefined}
         onCancel={() => setConfirmOpen(false)}
       >
         {gate === 'single' && approval.state ? <SingleOperatorFields recipientCount={approval.state.gate.recipientCount} value={confirmCount} onChange={setConfirmCount} /> : null}
@@ -1317,22 +1186,21 @@ export default function HqBroadcastCreate() {
           return bubble ? <BubblePreview key={item.id} bubble={bubble} /> : null
         })}
         onClose={() => { setBasicPicker(null); requestAnimationFrame(() => basicPickerTrigger.current?.focus()) }} /> : null}
-      <HqTemplatePicker open={pickerOpen} onClose={() => setPickerOpen(false)} onPick={pickTemplate} />
+      {accountPickerOpen && stores && canManage ? <BroadcastAccountPicker accounts={stores} folders={folders} foldersFailed={foldersFailed} initialIds={accountIds} initialFolder={params.get('folder') ?? undefined}
+        onConfirm={(ids) => { setAccountIds(ids); closeAccountPicker() }} onCancel={closeAccountPicker} /> : null}
+      <HqTemplatePicker kind={pickerKind} open={pickerOpen} onClose={() => setPickerOpen(false)} onPick={pickTemplate} />
       <Dialog
         open={saveTplOpen}
         title="テンプレートとして保存する"
-        description="開いているメッセージを、統括のテンプレートに保存します。保存したテンプレートはアカウントへ配ることもできます。"
+        description={`${openBubble + 1} 通目の吹き出しを保存します。ほかの吹き出しは含みません。保存したテンプレートはアカウントへ配れます。`}
         confirmLabel="保存する"
         cancelLabel="やめる"
         busy={saveTplBusy}
         error={saveTplError || undefined}
-        onConfirm={() => void saveAsTemplate()}
+        onConfirm={() => saveAsTemplate()}
         onCancel={() => setSaveTplOpen(false)}
       >
-        <label className={formStyles.nameField}>
-          <span className={formStyles.labelRow}>テンプレートの名前<RequiredBadge /></span>
-          <input value={saveTplName} onChange={(event) => setSaveTplName(event.target.value)} className={formStyles.textInput} aria-label="テンプレートの名前" maxLength={100} />
-        </label>
+        <Field label="テンプレートの名前" required><input value={saveTplName} onChange={(event) => setSaveTplName(event.target.value)} className={formStyles.textInput} aria-label="テンプレートの名前" maxLength={100} /></Field>
       </Dialog>
       <Dialog
         open={conditionOpen}

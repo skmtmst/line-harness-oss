@@ -17,7 +17,7 @@
  * 画面ごとに作り方を書かない。各画面は自分の種類のフォルダの受け口を onCreate に渡すだけ。
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import FolderDot from './folder-dot'
 import Select, { type SelectCreateContext, type SelectProps } from './select'
 import { isImeComposing } from './ime'
 import { japaneseDetailOf } from './api-error-message'
@@ -30,7 +30,7 @@ export { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 export interface FolderSelectFolder {
   value: string
   label: string
-  /** フォルダの色（#RRGGBB）。無いフォルダは灰の点。 */
+  /** フォルダの色（#RRGGBB）。無いフォルダは名前から共通の9色で塗る。 */
   color?: string | null
 }
 
@@ -52,10 +52,6 @@ export interface FolderSelectProps extends Pick<SelectProps, 'aria-label' | 'lab
   onCreate?: FolderSelectCreate
   /** false のときは色のボタンを出さず、作成時に null を渡す。 */
   colors?: boolean
-}
-
-function Dot({ color }: { color?: string | null }) {
-  return <span className={styles.dot} style={color ? { backgroundColor: color } : undefined} data-folder-select-dot="" />
 }
 
 /** API の答え（{ success, data } / { success: false, error }）を、作れたフォルダか Error に直す。 */
@@ -134,8 +130,8 @@ export default function FolderSelect({
     return [...folders, ...created.filter((folder) => !known.has(folder.value))]
   }, [folders, created])
   const options = [
-    ...(unfiled ? [{ value: unfiled.value, label: unfiled.label, leading: <Dot /> as ReactNode }] : []),
-    ...all.map((folder) => ({ value: folder.value, label: folder.label, leading: <Dot color={folder.color} /> as ReactNode })),
+    ...(unfiled ? [{ value: unfiled.value, label: unfiled.label, leading: <FolderDot /> }] : []),
+    ...all.map((folder) => ({ value: folder.value, label: folder.label, leading: <FolderDot folder={{ name: folder.label, color: folder.color }} /> })),
   ]
   return (
     <Select
@@ -143,6 +139,7 @@ export default function FolderSelect({
       value={value}
       onChange={onChange}
       options={options}
+      icon={options.find((option) => option.value === value)?.leading}
       // 絵（dLffh）は開いた中身の上に「フォルダ」。閉じたボタンに頭を付けたい画面は label を渡す。
       menuHeading="フォルダ"
       createAction={onCreate ? {

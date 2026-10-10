@@ -4,7 +4,7 @@
  * データの持ち方は v7（page.tsx）と同じ。ここでは見せ方だけを見る。
  */
 import React from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('next/navigation', () => ({
@@ -166,4 +166,13 @@ describe('NEN配信 V8', () => {
     }
     expect(screen.getByText('田中 明子', { exact: false })).toBeTruthy()
   })
+})
+
+it('選んだコラムの紹介文を入力でき、変更を保存側へ渡す',()=>{
+ const change=vi.fn()
+ render(<NenCampaignsV8 {...baseProps} tab="columns" selectedColumnId="c1" introDraft="元の紹介文" onIntroChange={change}/>)
+ const input=screen.getByRole('textbox',{name:'LINEに出る紹介文'}) as HTMLTextAreaElement
+ expect(input.value).toBe('元の紹介文')
+ fireEvent.change(input,{target:{value:'新しい紹介文'}})
+ expect(change).toHaveBeenCalledWith('新しい紹介文')
 })

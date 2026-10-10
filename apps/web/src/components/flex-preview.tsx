@@ -89,7 +89,7 @@ function FlexText({ node }: { node: FlexNode }) {
     ...(node.align === 'center' ? { textAlign: 'center' } : node.align === 'end' ? { textAlign: 'right' } : {}),
     ...(node.flex !== undefined ? { flex: node.flex } : {}),
   }
-  return <p style={style}>{node.text || ''}</p>
+  return <p style={style}>{Array.isArray(node.contents) && node.contents.length ? node.contents.map((span, index) => <span key={index} style={{ fontSize: span.size ? getSize(span.size) : undefined, color: span.color, fontWeight: span.weight === 'bold' ? 700 : undefined }}>{span.text ?? ''}</span>) : node.text || ''}</p>
 }
 
 function FlexButton({ node }: { node: FlexNode }) {
@@ -185,7 +185,7 @@ function FlexBox({ node }: { node: FlexNode }) {
 function FlexNodeRenderer({ node }: { node: FlexNode }) {
   if (!node || !node.type) return null
 
-  const marginStyle: React.CSSProperties = node.margin ? { marginTop: getMargin(node.margin) } : {}
+  const marginStyle: React.CSSProperties = { ...(node.margin ? { marginTop: getMargin(node.margin) } : {}), ...(node.flex !== undefined ? { flex: node.flex } : {}), minWidth: 0 }
 
   return (
     <div style={marginStyle}>

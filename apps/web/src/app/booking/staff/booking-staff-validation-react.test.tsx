@@ -214,7 +214,7 @@ describe('予約スタッフ保存前検証（実React）', () => {
     fireEvent.change(screen.getByLabelText(/スタッフ名/), { target: { value: '  田中  ' } })
     fireEvent.change(screen.getByLabelText(/お客様向けの表示名/), { target: { value: '  たなか  ' } })
     fireEvent.change(screen.getByLabelText(/肩書き/), { target: { value: '  店長  ' } })
-    fireEvent.change(screen.getByLabelText(/顔写真/), { target: { value: '  https://example.test/tanaka.png  ' } })
+    fireEvent.change(screen.getByRole('textbox', {name:'顔写真'}), { target: { value: '  https://example.test/tanaka.png  ' } })
     fireEvent.change(screen.getByLabelText(/紹介文/), { target: { value: '  丁寧に対応します。  ' } })
     fireEvent.click(await screen.findByRole('checkbox', { name: /カット/ }))
     fireEvent.click(screen.getByRole('button', { name: 'スタッフを追加する' }))
@@ -248,8 +248,8 @@ describe('N-411 項目別権限と画面の一致（実React）', () => {
     fixture.listStaff.mockResolvedValue({ staff: [STAFF_ROW] })
     render(<BookingStaffPage />)
     await screen.findByText('佐藤')
-    const create = screen.getByRole('button', { name: '＋ スタッフを作る' }) as HTMLButtonElement
-    expect(create.disabled).toBe(true)
+    // V8 では閲覧のみの人に押せないボタンを置かず隠す（決まり §2）。
+    expect(screen.queryByRole('button', { name: '＋ スタッフを作る' })).toBeNull()
     expect(screen.queryByText('編集')).toBeNull()
     expect(screen.queryByText('削除する')).toBeNull()
     // シフトへの導線は残す（閲覧権限があれば本人・他人どちらも開ける）

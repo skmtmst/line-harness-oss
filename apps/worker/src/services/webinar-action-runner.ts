@@ -1,9 +1,12 @@
 import {
   finishWebinarActionExecution,
   getWebinarActions,
+  getWebinarById,
   insertWebinarActionExecutionIgnore,
   type WebinarActionTrigger,
 } from '@line-crm/db';
+import { createAutomationActionExecutors, type AutomationActionExecutorDependencies } from './automation-action-executors.js';
+import { executeConfiguredAction } from './action-execution-context.js';
 import {
   attachTagAndFireSideEffects,
   detachTagAndFireSideEffects,
@@ -14,11 +17,11 @@ import {
  * 同じ設定・友だち・回・きっかけは冪等キーで1件にまとめ、二重実行しない。
  * 結果は webinar_action_executions へ残し、参加者・監視の面から読める。
  *
- * いま実行できるのはタグの付け外しだけ（既存の付随処理を再利用する）。
+ * タグは既存の付随処理を保ち、そのほかは共通の実行一覧へ渡す。
  * 実行口のない種類は skipped として記録し、実行しない。
  * 未視聴のきっかけは呼ぶ側の定時処理が無いため、ここでは扱わない。
  */
-const EXECUTABLE_ACTION_TYPES = new Set(['add_tag', 'remove_tag']);
+const EXECUTABLE_ACTION_TYPES = new Set(Object.keys(createAutomationActionExecutors()));
 
 export function webinarActionIdempotencyKey(
   webinarId: string,
@@ -45,6 +48,7 @@ export async function runWebinarTriggerActions(
     friendId: string;
     sessionStartAt: number | null;
     trigger: WebinarActionTrigger;
+    executorDependencies?: AutomationActionExecutorDependencies;
   },
 ): Promise<void> {
   const actions = (await getWebinarActions(db, input.webinarId))
@@ -67,7 +71,7 @@ export async function runWebinarTriggerActions(
       continue;
     }
     const tagId = readTagId(action.config_json);
-    if (!tagId) {
+    if (['add_tag', 'remove_tag'].includes(action.action_type) && !tagId) {
       await insertWebinarActionExecutionIgnore(db, {
         webinarActionId: action.id,
         webinarId: input.webinarId,
@@ -93,9 +97,15 @@ export async function runWebinarTriggerActions(
     if (!claimed) continue;
     try {
       if (action.action_type === 'add_tag') {
-        await attachTagAndFireSideEffects(db, input.friendId, tagId);
+        await attachTagAndFireSideEffects(db, input.friendId, tagId!);
+      } else if (action.action_type === 'remove_tag') {
+        await detachTagAndFireSideEffects(db, input.friendId, tagId!);
       } else {
-        await detachTagAndFireSideEffects(db, input.friendId, tagId);
+        const webinar = await getWebinarById(db, input.webinarId);
+        if (!webinar?.account_id) throw new Error('webinar_account_missing');
+        await executeConfiguredAction(db, {friendId: input.friendId, accountId: webinar.account_id,
+          source: 'webinar', sourceEventId: idempotencyKey, actionId: action.id, type: action.action_type,
+          params: JSON.parse(action.config_json), dependencies: input.executorDependencies});
       }
       await finishWebinarActionExecution(db, idempotencyKey, 'succeeded', null);
     } catch (err) {

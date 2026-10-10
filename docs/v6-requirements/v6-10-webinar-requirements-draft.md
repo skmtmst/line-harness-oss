@@ -174,7 +174,7 @@ Slack通知は必須の本体機能にせず、24運用者通知または26外�
 |---|---:|---:|---:|
 | 一覧・参加者・分析を見る | ○ | ○ | 許可範囲 |
 | 定義・下書き版の編集 | ○ | ○ | 個別権限 |
-| 公開・一時停止・archive | ○ | ○ | × |
+| 公開・止める・アーカイブ | ○ | ○ | × |
 | 参加者の個人視聴履歴 | ○ | ○ | 個別権限 |
 | 参加者CSV | ○ | ○ | 個別権限 |
 | action再実行 | ○ | ○ | 指定者のみ |
@@ -183,7 +183,7 @@ Slack通知は必須の本体機能にせず、24運用者通知または26外�
 | permission key | 対象操作 |
 |---|---|
 | `webinar.definition.edit` | 定義・下書き版の編集、動画upload |
-| `webinar.definition.publish` | 公開、一時停止、archive |
+| `webinar.definition.publish` | 公開、止める、アーカイブ |
 | `webinar.participant.view` | 参加者の個人視聴履歴を見る |
 | `webinar.participant.export` | 参加者CSVの生成 |
 | `webinar.action_run.retry` | action executionの再実行 |
@@ -219,7 +219,7 @@ V6の「元に戻せません」「履歴が見えなくなる」を物理削除
 ## 13. 状態
 
 - 動画処理中、失敗、ready
-- 下書き、公開予定、公開中、一時停止、終了、archive
+- 下書き、予定、開催中、終了、アーカイブ（2026-10-09 B-158・B-160 で書き換え）。旧「公開予定・公開中・一時停止」は使わない
 - 空、読込、error、権限不足
 - test送信成功/一部失敗
 - 公開検査error/警告

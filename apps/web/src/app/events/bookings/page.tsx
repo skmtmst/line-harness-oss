@@ -1159,7 +1159,7 @@ function BookingsInner() {
           <ListState
             kind="error"
             description="申込者は消えていません。開催回を読み直してから、もう一度お試しください。"
-            action={<Button onClick={() => void refreshOccurrenceSlots()}>開催回を再読み込み</Button>}
+            onRetry={() => void refreshOccurrenceSlots()}
           />
         ) : occurrenceSlots.length === 0 ? (
           <p className="text-ink-faint text-sm">有効な開催回がありません。</p>
@@ -1259,7 +1259,7 @@ function BookingsInner() {
             <ListState
               kind="error"
               description="受け付けた予約は消えていません。再読み込みしても直らない場合はエラー報告へ。"
-              action={<Button onClick={() => void Promise.all([refresh(), refreshSummary()])}>予約を再読み込み</Button>}
+              onRetry={() => void Promise.all([refresh(), refreshSummary()])}
             />
           ) : items.length === 0 ? (
             <div className="text-ink-faint p-12 text-center text-sm">

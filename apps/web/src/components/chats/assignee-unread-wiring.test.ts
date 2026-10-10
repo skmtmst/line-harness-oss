@@ -23,7 +23,7 @@ describe('V6 担当者ごとの未読数（YZaDK）の配線', () => {
       未読数の引き方だけを渡す（§1「使えない選び口を置かない」と、
       素の select を部品へ寄せる決めごとの両方に合わせる）。
     */
-    expect(PAGE).toContain('unreadOf={unreadLookup(assigneeUnread)}')
+    expect(PAGE).toContain('unreadLookup(assigneeUnread)(row.id)')
     // 画面に見えている行から数えない（一覧はページ送りされる）。
     expect(PAGE).not.toContain('items.filter((item) => item.operatorId')
   })
@@ -55,7 +55,7 @@ describe('V6 担当者ごとの未読数（YZaDK）の配線', () => {
   })
 
   it('失敗時だけ、0件ではない理由を選び口へ渡す', () => {
-    expect(PAGE).toContain("unreadUnavailable={assigneeUnreadStatus === 'error'}")
+    expect(PAGE).toContain("assigneeUnreadStatus === 'error' ? null")
   })
 
   it('初期値は未取得であって0件ではない', () => {

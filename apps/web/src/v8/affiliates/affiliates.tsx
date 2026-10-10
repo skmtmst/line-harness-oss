@@ -35,7 +35,7 @@ const TITLE_BY_TAB: Record<AffiliateTabKey, string> = {
 function AffiliatesInner() {
   const router = useRouter()
   const params = useSearchParams()
-  const rawTab = params.get('tab')
+  const rawTab = params.get('tab')?.split('/')[0]
   useEffect(() => {
     if (rawTab === 'points') router.replace('/conversions?tab=points')
   }, [rawTab, router])

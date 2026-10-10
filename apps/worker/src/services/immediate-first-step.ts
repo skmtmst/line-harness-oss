@@ -1,3 +1,4 @@
+import { decorateTapExtras } from './tap-extras.js';
 import {
   getScenarioById,
   getScenarioPublishedVersion,
@@ -451,6 +452,12 @@ export async function pushImmediateFirstStep(
       messages = [buildMessage(decorated.messageType, decorated.content)];
     }
 
+    if (question && JSON.stringify(messages).includes('\"tapExtras\"')) {
+      const decorated = await decorateTapExtras(db, messages, ctx.workerUrl || '', friend.line_account_id ?? ctxAccount?.id ?? null);
+      const { appendFriendToTrackedLinks } = await import('./auto-track.js');
+      const personalized = JSON.parse(await appendFriendToTrackedLinks(db, JSON.stringify(decorated), ctx.workerUrl || '', friendId));
+      messages.splice(0, messages.length, ...(personalized as Message[]));
+    }
     // メッセージ組み立ての間に停止へ切り替わった分も、外部送信の直前に拾う。
     // claim は戻し、cron が復旧後に1通目を届ける。
     if (await isOperationCapabilityStopped(db, scenarioRow.line_account_id ?? null, 'scenario_dispatch')) {

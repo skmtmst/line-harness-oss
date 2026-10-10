@@ -19,7 +19,7 @@ describe('V8 ダッシュボードの言葉', () => {
   })
 
   it('更新の行は「更新 日付時刻 ・ 動きの状態」。時刻が無ければ状態だけ', () => {
-    expect(headline('2026-01-13 09:30:00', 'normal')).toMatch(/^更新 (1月13日（火）)?9:30 ・ 正常に動いています$/)
+    expect(headline('2026-01-13 09:30:00', 'normal')).toMatch(/^更新 (1月13日（火）)?09:30 ・ 正常に動いています$/)
     expect(headline(null, 'danger')).toBe('止まっているところがあります')
     expect(headline(undefined, null)).toBe('動きを確かめています')
   })

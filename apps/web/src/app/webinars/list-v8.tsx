@@ -48,6 +48,10 @@ import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { formatDateTime } from '@/lib/format'
 import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-failure'
 import styles from './list-v8.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft' | 'archived'
@@ -127,7 +131,7 @@ function isUnpublished(webinar: WebinarListItem): boolean {
 }
 
 function peopleText(value: number | null | undefined): string {
-  return typeof value === 'number' && Number.isFinite(value) ? `${formatNumber(value)}人` : '—'
+  return typeof value === 'number' && Number.isFinite(value) ? `${formatNumber(value)}人` : emptyValue('unknown')
 }
 
 function metricText(metric: WebinarOverviewMetric | undefined, unit: string): string {
@@ -164,7 +168,7 @@ function webinarKpiCells(overview: WebinarOverview | null): KpiCell[] {
     : ' '
   const ctaClicks = metrics?.ctaTotalClicks?.state === 'available' && metrics.ctaTotalClicks.value !== null
     ? metricText(metrics?.ctaTotalClicks, '')
-    : '—'
+    : emptyValue('unknown')
   const ctaPeople = metrics?.ctaUniquePeople?.state === 'available' && metrics.ctaUniquePeople.value !== null
     ? `押した人 ${formatNumber(metrics.ctaUniquePeople.value)}人`
     : ' '
@@ -197,10 +201,8 @@ function WebinarFolderPanelForm({
   const [name, setName] = useState(folder?.name ?? '')
 
   return (
-    <div>
-      <p className="text-ink-secondary mt-2 text-sm">ウェビナーを整理する名前を入力してください。</p>
-      <label className="text-ink mt-4 block text-sm font-semibold" htmlFor="webinar-v8-folder-name">フォルダ名</label>
-      <input
+    <div><Field label={<>フォルダ名</>} htmlFor="webinar-v8-folder-name"><p className="text-ink-secondary mt-2 text-sm">ウェビナーを整理する名前を入力してください。</p>
+<input
         id="webinar-v8-folder-name"
         value={name}
         onChange={(event) => setName(event.target.value)}
@@ -208,15 +210,14 @@ function WebinarFolderPanelForm({
           if (event.key === 'Enter' && name.trim() && !busy) onSave(name.trim())
         }}
         className="border-hairline rounded-control focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-        placeholder="例: 商品説明"
+        placeholder="例：商品説明"
       />
-      {error ? <p className="text-danger mt-2 text-sm">{error}</p> : null}
-      <div className="mt-5 flex justify-end gap-2">
+{error ? <p className="text-danger mt-2 text-sm">{error}</p> : null}
+<div className="mt-5 flex justify-end gap-2">
         <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
         <Button variant="primary" onClick={() => onSave(name.trim())} disabled={!name.trim() || busy} busy={busy}>保存する
         </Button>
-      </div>
-    </div>
+      </div></Field></div>
   )
 }
 
@@ -384,7 +385,7 @@ export function WebinarListTableV8({
         <tbody>
           {items.map((w) => {
             const unpublished = w.status !== 'archived' && isUnpublished(w)
-            const viewStarted = unpublished ? '—' : peopleText(w.viewerCount)
+            const viewStarted = unpublished ? emptyValue('unknown') : peopleText(w.viewerCount)
             const period = publicationSummary(w)
             const menuItems = webinarRowMenuItems(w, canEdit, readonlyReason, router, onArchive)
             return (
@@ -405,7 +406,7 @@ export function WebinarListTableV8({
                   <span className={styles.slug} title={`/${w.slug}`}>/{w.slug}</span>
                 </td>
                 <td><span className={statusPillClass(w)}>● {statusLabelV8(w)}</span></td>
-                <td className={styles.countCell}>{unpublished ? '—' : peopleText(w.registrationCount)}</td>
+                <td className={styles.countCell}>{unpublished ? emptyValue('unknown') : peopleText(w.registrationCount)}</td>
                 <td>
                   <div className={styles.viewCell} title={unpublished ? '公開していないので視聴数はありません' : undefined}>
                     <div>視聴完了 —</div>
@@ -860,7 +861,7 @@ function WebinarListV8Inner() {
       const csv = await webinarListCsv({ accountId: selectedAccountId, params: { q: debouncedQuery.trim() || undefined, folder: selectedFolder || undefined, status: savedFilter || undefined, sort: sortKey }, list: webinarApi.list, isCurrent: () => currentCsvScope.current === csvScope })
       if (csv === null) return
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-      const link = document.createElement('a'); link.href = url; link.download = 'webinars.csv'; link.click(); URL.revokeObjectURL(url)
+      const link = document.createElement('a'); link.href = url; link.download = csvFileName("動画セミナー"); link.click(); URL.revokeObjectURL(url)
     } catch { if (currentCsvScope.current === csvScope) setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') }
     finally { csvLock.current = false; setCsvBusy(false) }
   }
@@ -870,8 +871,8 @@ function WebinarListV8Inner() {
     <div className={styles.board} data-design-node="UyUMw">
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>ウェビナー</h1>
-          <p className={styles.headDescription}>録画やライブのセミナーをLINEで案内し、申込から視聴・相談までをつなげます。</p>
+          <PageHeading title="ウェビナー" help={<> 録画やライブのセミナーをLINEで案内し、申込から視聴・相談までをつなげます。</>} />
+
         </div>
         <Button onClick={() => void exportCsv()} disabled={!hasListData || query !== debouncedQuery || csvBusy} busy={csvBusy} busyLabel="書き出しています…">CSVで書き出す</Button>
       </div>
@@ -1059,8 +1060,8 @@ function WebinarListV8Inner() {
             <p className={styles.archiveTargetSub}><span className={statusPillClass(active)}>● {statusLabelV8(active)}</span></p>
             <p className={styles.archiveTarget}>申込・視聴</p>
             <p className={styles.archiveTargetSub}>
-              申込 {isUnpublished(active) ? '—' : peopleText(active.registrationCount)}
-              　視聴開始 {isUnpublished(active) ? '—' : peopleText(active.viewerCount)}
+              申込 {isUnpublished(active) ? emptyValue('unknown') : peopleText(active.registrationCount)}
+              　視聴開始 {isUnpublished(active) ? emptyValue('unknown') : peopleText(active.viewerCount)}
             </p>
             <p className={styles.archiveTarget}>公開ページの目印</p>
             <p className={styles.archiveTargetSub}>/{active.slug}</p>

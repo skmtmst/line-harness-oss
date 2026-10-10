@@ -62,9 +62,11 @@ describe('「？」の正円', () => {
   })
 
   it('カードの見出しは題と「？」をひとかたまりで縦の中央にそろえる', () => {
-    expect(SIDE_CARDS).toContain('題と「？」・期間はひとかたまり')
-    expect(SIDE_CARDS).toContain('items-center gap-1')
-    expect(PAGE).toContain('題と「？」・期間はひとかたまり')
+    const head = fs.readFileSync(path.join(__dirname, '../v8/dashboard/head.tsx'), 'utf8')
+    const shared = fs.readFileSync(path.join(SHARED, 'section-header.tsx'), 'utf8')
+    expect(head).toContain('<SectionHeader wrap {...props}')
+    expect(shared).toContain('<HelpTip')
+    expect(shared).toContain('styles.title')
   })
 })
 

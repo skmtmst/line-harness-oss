@@ -9,6 +9,8 @@
  *   - 結果の列はアカウントの合計（届いた人数・失敗したアカウント）
  * 1行＝1回の一括配信。行を押すと詳細（送った結果）へ。動きは BEHAVIOR.md。
  */
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -23,11 +25,12 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { deleteFolderDescription } from '@/components/shared/folder-row-actions'
-import { TextField } from '@/components/shared/text-field'
-import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { describeFolderFailure } from '@/components/shared/folder-failure'
+import { notifyToast } from '@/components/shared/toast'
 import type { FolderPanelRow } from '@/components/shared/folder-panel'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -41,6 +44,8 @@ import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { failedCount, jpDateTime, runBadge, sendTotals } from './model'
 import styles from '../broadcasts/list.module.css'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type StatusKey = 'all' | 'scheduled' | 'draft' | 'sent' | 'error'
 const STATUS_CHIPS: { key: StatusKey; label: string; icon: typeof List }[] = [
@@ -85,17 +90,18 @@ export default function HqBroadcastList() {
   const canManage = role === null || canManageRole(role)
   const [runs, setRuns] = useState<HqBroadcastRun[] | null>(null)
   const [error, setError] = useState<unknown>(null)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [status, setStatus] = useState<StatusKey>('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   /* 並び順（絵 U4Eep0 の「新しい順」）。口は作った順の新しい順で返すので、古い順は逆に並べる。 */
-  const [sortKey, setSortKey] = useState<'newest' | 'oldest'>('newest')
+  const [sortKey, setSortKey] = useListUrlValue<'newest' | 'oldest'>('sortKey', 'newest')
   /* 左の列のフォルダ（店の一斉配信と同じ。API-18 の統括のフォルダ）。読めなくても一覧は出す。 */
   const [folders, setFolders] = useState<HqFolder[] | null>(null)
-  const [folderFilter, setFolderFilter] = useState('all')
+  const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', 'all')
   const [folderDialog, setFolderDialog] = useState<{ editing: HqFolder | null } | null>(null)
   const [folderName, setFolderName] = useState('')
+  const [folderColor, setFolderColor] = useState<string | null>(FOLDER_SELECT_COLORS[0].value)
   const [deletingFolder, setDeletingFolder] = useState<HqFolder | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderError, setFolderError] = useState('')
@@ -151,10 +157,10 @@ export default function HqBroadcastList() {
   const openReached = sentTargets.reduce((sum, t) => sum + t.successCount, 0)
   const openRate = openKnown && openReached > 0 ? Math.round((sentTargets.reduce((sum, t) => sum + (t.openedCount ?? 0), 0) / openReached) * 1000) / 10 : null
   const kpis = [
-    { key: 'scheduled', title: '予約中', icon: CalendarClock, value: ready ? counts.scheduled : null, unit: '件', detail: ready ? `下書き ${formatNumber(counts.draft)}件` : '—' },
-    { key: 'sent', title: '送った配信', icon: Send, value: ready ? counts.sent : null, unit: '件', detail: ready ? `${formatNumber(delivered)}人に届いた` : '—' },
-    { key: 'error', title: 'エラー', icon: AlertCircle, value: ready ? counts.error : null, unit: '件', detail: ready ? `失敗したアカウント ${formatNumber(failedStores)}件` : '—' },
-    { key: 'open', title: '平均の開封率', icon: MailOpen, value: ready ? openRate : null, unit: '%', detail: ready ? (openRate == null ? 'まだ数えていません' : '送った配信の合計') : '—' },
+    { key: 'scheduled', title: '予約中', icon: CalendarClock, value: ready ? counts.scheduled : null, unit: '件', detail: ready ? `下書き ${formatNumber(counts.draft)}件` : emptyValue('unknown') },
+    { key: 'sent', title: '送った配信', icon: Send, value: ready ? counts.sent : null, unit: '件', detail: ready ? `${formatNumber(delivered)}人に届いた` : emptyValue('unknown') },
+    { key: 'error', title: 'エラー', icon: AlertCircle, value: ready ? counts.error : null, unit: '件', detail: ready ? `失敗したアカウント ${formatNumber(failedStores)}件` : emptyValue('unknown') },
+    { key: 'open', title: '平均の開封率', icon: MailOpen, value: ready ? openRate : null, unit: '%', detail: ready ? (openRate == null ? 'まだ数えていません' : '送った配信の合計') : emptyValue('unknown') },
   ]
 
   const createButton = (full: boolean) => canManage ? (
@@ -172,26 +178,39 @@ export default function HqBroadcastList() {
       label: folder.name,
       color: folder.color,
       count: ready ? countIn(folder.id) : null,
-      colorEditable: false,
       ...(canManage ? {
-        onEdit: () => { setFolderError(''); setFolderName(folder.name); setFolderDialog({ editing: folder }) },
+        onEdit: () => { setFolderError(''); setFolderNameError(''); setFolderName(folder.name); setFolderColor(folderDisplayColor(folder)); setFolderDialog({ editing: folder }) },
         onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
       } : {}),
     })),
-    ...(folders && folders.length > 0 ? [{ kind: 'unfiled' as const, id: 'none', label: '未分類', count: ready ? countIn('none') : null }] : []),
+    // 未分類はほかの一覧と同じく、フォルダが1つも無くても出す（B-136）。読めなかったときは出さない。
+    ...(folders ? [{ kind: 'unfiled' as const, id: 'none', label: '未分類', count: ready ? countIn('none') : null }] : []),
   ]
   const selectFolder = (id: string) => { setFolderFilter(id); setPage(1) }
+  /* 送る版（revision）はいつも今の一覧から引く。409 で読み直したあとの2回目の保存が新しい版で通る。 */
+  const latestFolder = <F extends { id: string }>(folder: F): F => ((folders ?? []).find((f) => f.id === folder.id) as F | undefined) ?? folder
+  const [folderNameError, setFolderNameError] = useState('')
   const saveFolder = async () => {
     const name = folderName.trim()
     if (!name || folderBusy || !folderDialog) return
-    setFolderBusy(true); setFolderError('')
+    setFolderBusy(true); setFolderError(''); setFolderNameError('')
     try {
-      if (folderDialog.editing) await hqBroadcastsApi.updateFolder(folderDialog.editing.id, name, folderDialog.editing.revision)
-      else await hqBroadcastsApi.createFolder(name)
+      if (folderDialog.editing) await hqBroadcastsApi.updateFolder(folderDialog.editing.id, name, latestFolder(folderDialog.editing).revision, folderColor)
+      else await hqBroadcastsApi.createFolder(name, folderColor)
       await loadFolders()
       setFolderDialog(null)
     } catch (caught) {
-      setFolderError(japaneseDetailOf(caught) || 'フォルダを保存できませんでした')
+      // 理由ごとに言い分ける（共通の describeFolderFailure）。入力した名前と色は残す。
+      const failure = describeFolderFailure(caught, 'save')
+      if (failure.kind === 'missing') {
+        notifyToast(failure.message, { tone: 'error' })
+        await loadFolders()
+        setFolderDialog(null)
+        return
+      }
+      if (failure.kind === 'conflict') await loadFolders()
+      if (failure.nameError) setFolderNameError(failure.nameError)
+      else setFolderError(failure.message)
     } finally {
       setFolderBusy(false)
     }
@@ -200,11 +219,19 @@ export default function HqBroadcastList() {
     if (!deletingFolder || folderBusy) return
     setFolderBusy(true); setFolderError('')
     try {
-      await hqBroadcastsApi.deleteFolder(deletingFolder.id, deletingFolder.revision)
+      await hqBroadcastsApi.deleteFolder(deletingFolder.id, latestFolder(deletingFolder).revision)
       await loadFolders()
       setDeletingFolder(null); setFolderFilter('all')
     } catch (caught) {
-      setFolderError(japaneseDetailOf(caught) || 'フォルダを消せませんでした')
+      const failure = describeFolderFailure(caught, 'delete')
+      if (failure.kind === 'missing') {
+        notifyToast(failure.message, { tone: 'error' })
+        await loadFolders()
+        setDeletingFolder(null)
+        return
+      }
+      if (failure.kind === 'conflict') await loadFolders()
+      setFolderError(failure.message)
     } finally {
       setFolderBusy(false)
     }
@@ -235,22 +262,14 @@ export default function HqBroadcastList() {
             options={[{ value: '10', label: '10件表示' }, { value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }]}
           />
         </div>
-        <button
-          type="button"
-          className={styles.sortButton}
-          aria-label={`並び順：${sortKey === 'newest' ? '新しい順' : '古い順'}（押すと入れ替え）`}
-          onClick={() => { setSortKey((current) => (current === 'newest' ? 'oldest' : 'newest')); setPage(1) }}
-        >
-          <ArrowUpDown size={14} aria-hidden="true" />
-          {sortKey === 'newest' ? '新しい順' : '古い順'}
-        </button>
+<ListToolbarSort value={sortKey} onChange={(value) => { setSortKey(value as typeof sortKey); setPage(1) }} options={[{ value: 'newest', label: '新しい順' }, { value: 'oldest', label: '古い順' }]} />
       </div>
     </div>
   )
 
   let content
-  if (error && !runs) content = <ListState kind="error" error={error} onRetry={() => void load()} />
-  else if (!runs) content = <ListState kind="loading" />
+  if (error && !runs) content = <ListState permissionScope="hq" kind="error" error={error} onRetry={() => void load()} />
+  else if (!runs) content = <ListState permissionScope="hq" kind="loading" />
   else if (filtered.length === 0) {
     content = (
       <EmptyList
@@ -288,7 +307,7 @@ export default function HqBroadcastList() {
             const failed = live.filter((t) => t.status === 'failed' || failedCount(t) > 0).length
             const sent = statusKeyOf(run) === 'sent' || statusKeyOf(run) === 'error'
             return (
-              <Tr key={run.id} className={styles.row}>
+              <Tr key={run.id} className={styles.row} data-row-id={run.id}>
                 <Td>
                   <div className={styles.titleLine}>
                     <FolderDotName folder={(() => { const folder = (folders ?? []).find((f) => f.id === folderIdOf(run)); return folder ? { name: folder.name, color: folder.color } : null })()}>
@@ -303,16 +322,16 @@ export default function HqBroadcastList() {
                   <span className={styles.cellSub}>{audienceText(run)}</span>
                 </Td>
                 <Td>
-                  <span className={styles.cellMain}>{run.scheduledAt ? jpDateTime(run.scheduledAt) : run.status === 'prepared' ? '未設定' : 'すぐ送った'}</span>
+                  <span className={styles.cellMain}>{run.scheduledAt ? jpDateTime(run.scheduledAt) : run.status === 'prepared' ? emptyValue('unconfigured') : 'すぐ送った'}</span>
                   {statusKeyOf(run) === 'scheduled' && run.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
                 </Td>
                 <Td>
                   {sent ? (
                     <>
-                      <span className={styles.resultMain}>{`${formatNumber(reached)}人に届いた`}</span>
+                      <span className={styles.resultMain}>{`${formatNumber(reached)} 人に届いた`}</span>
                       {failed > 0 ? <span className={styles.cellSub}>{`失敗したアカウント ${formatNumber(failed)}`}</span> : rateLine(live, reached) ? <span className={styles.cellSub}>{rateLine(live, reached)}</span> : null}
                     </>
-                  ) : <span className={styles.cellMain}>—</span>}
+                  ) : <span className={styles.cellMain}>{emptyValue('unknown')}</span>}
                 </Td>
                 <Td className={styles.colMenu}>
                   <div className={styles.menuBox}>
@@ -332,7 +351,7 @@ export default function HqBroadcastList() {
 
   const pager = runs && filtered.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{pageCount > 1 ? `${formatNumber(filtered.length)}件中 ${(current - 1) * pageSize + 1}〜${Math.min(current * pageSize, filtered.length)}件` : `${formatNumber(filtered.length)}件`}</span>
+      <span className={styles.pagerCount}>{pageCount > 1 ? `${formatNumber(filtered.length)} 件中 ${(current - 1) * pageSize + 1}〜${Math.min(current * pageSize, filtered.length)} 件` : `${formatNumber(filtered.length)} 件`}</span>
       {pageCount > 1 ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="一括配信のページ送り" /> : null}
     </ListPagePagination>
   ) : null
@@ -342,7 +361,7 @@ export default function HqBroadcastList() {
       boardId="U4Eep0"
       headingSize="regular"
       title="一括配信"
-      description="選んだアカウントの友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
+      help="選んだアカウントの友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
       stats={(
         <KpiBand>
           {kpis.map((kpi) => (
@@ -356,7 +375,7 @@ export default function HqBroadcastList() {
           createAction={createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
           activeId={folderFilter}
           onSelect={selectFolder}
-          onAddFolder={canManage ? () => { setFolderError(''); setFolderName(''); setFolderDialog({ editing: null }) } : undefined}
+          onAddFolder={canManage ? () => { setFolderError(''); setFolderNameError(''); setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setFolderDialog({ editing: null }) } : undefined}
           addFolderLabel="フォルダを追加"
           rows={folderRows}
         >
@@ -366,19 +385,19 @@ export default function HqBroadcastList() {
       )}
       overlays={(
         <>
-          <Dialog
+          <FolderEditorDialog
+            name={folderName} onNameChange={(next) => { setFolderName(next); setFolderNameError('') }} color={folderColor} onColorChange={setFolderColor}
+            nameError={folderNameError || undefined}
             open={folderDialog !== null}
-            title={folderDialog?.editing ? 'フォルダの名前を変える' : 'フォルダを追加'}
+            title={folderDialog?.editing ? 'フォルダを直す' : 'フォルダを追加'}
             description="一括配信を分けてしまう箱です。消しても、中の配信は未分類に残ります。"
             busy={folderBusy}
             error={folderError || undefined}
             confirmLabel={folderDialog?.editing ? '保存する' : '追加する'}
             cancelLabel="やめる"
             onCancel={() => { if (!folderBusy) setFolderDialog(null) }}
-            onConfirm={() => void saveFolder()}
-          >
-            <TextField aria-label="フォルダの名前" value={folderName} maxLength={100} disabled={folderBusy} placeholder="例: キャンペーン" onChange={(event) => setFolderName(event.target.value)} />
-          </Dialog>
+            onConfirm={() => saveFolder()}
+          />
           <ConfirmDialog
             open={deletingFolder !== null}
             title={`フォルダ「${deletingFolder?.name ?? ''}」を消しますか？`}
@@ -389,7 +408,7 @@ export default function HqBroadcastList() {
             busy={folderBusy}
             error={folderError || undefined}
             onCancel={() => { if (!folderBusy) setDeletingFolder(null) }}
-            onConfirm={() => void removeFolder()}
+            onConfirm={() => removeFolder()}
           />
         </>
       )}

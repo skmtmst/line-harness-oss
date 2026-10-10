@@ -14,13 +14,13 @@ import { TableStateRow } from './table'
  * 画面は捕まえた失敗を `error` に渡すだけで済む。
  */
 describe('失敗の1枚の403・429出し分け', () => {
-  it('403は権限の案内にし、再試行の口を出さない', () => {
+  it('403は権限の案内にし、権限の変更後にも読み直せる', () => {
     const html = renderToStaticMarkup(
       <ListState kind="error" error={new ApiError(403, 'API error: 403')} onRetry={vi.fn()} />,
     )
     expect(html).toContain('権限がありません')
-    expect(html).not.toContain('もう一度読み込む')
-    expect(html).not.toContain('<button')
+    expect(html).toContain('もう一度読み込む')
+    expect(html).toContain('<button')
   })
 
   it('429は混み合いと待ち秒数を出し、再試行の口は残す', () => {
@@ -65,7 +65,7 @@ describe('失敗の1枚の403・429出し分け', () => {
     expect(html).toContain('独自の案内')
   })
 
-  it('開き先が無い1枚（TargetMissing）も403で再試行を出さない', () => {
+  it('開き先が無い1枚（TargetMissing）も403で権限の変更後にも読み直せる', () => {
     const html = renderToStaticMarkup(
       <TargetMissing
         kind="error"
@@ -76,17 +76,17 @@ describe('失敗の1枚の403・429出し分け', () => {
       />,
     )
     expect(html).toContain('表示できませんでした')
-    expect(html).not.toContain('<button')
+    expect(html).toContain('<button')
   })
 
-  it('表の中の1行も403で再試行を出さず、429で待ち案内を出す', () => {
+  it('表の中の1行も403でも読み直せ、429で待ち案内を出す', () => {
     const forbidden = renderToStaticMarkup(
       <table><tbody>
         <TableStateRow colSpan={2} kind="error" error={new ApiError(403, 'API error: 403')} onRetry={vi.fn()} />
       </tbody></table>,
     )
     expect(forbidden).toContain('権限がありません')
-    expect(forbidden).not.toContain('<button')
+    expect(forbidden).toContain('<button')
 
     const limited = renderToStaticMarkup(
       <table><tbody>

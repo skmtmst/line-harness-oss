@@ -37,14 +37,13 @@ describe('帯（Notice）の4種類', () => {
     expect(i.firstElementChild!.getAttribute('role')).toBe('status')
   })
 
-  it('V5 の呼び名（validation・error）は注意・危険として出す', () => {
-    const { container: v } = render(<Notice tone="validation" message="確かめてください" />)
-    const { container: w } = render(<Notice tone="warn" message="確かめてください" />)
-    expect(v.firstElementChild!.getAttribute('class')).toBe(w.firstElementChild!.getAttribute('class'))
-    const { container: e } = render(<Notice tone="error" message="失敗しました" />)
-    const { container: d } = render(<Notice tone="danger" message="失敗しました" />)
-    expect(e.firstElementChild!.getAttribute('class')).toBe(d.firstElementChild!.getAttribute('class'))
-    expect(e.firstElementChild!.getAttribute('role')).toBe('alert')
+  it('種類ごとの色と通知の役割を持つ', () => {
+    for (const tone of ['info', 'success', 'warn', 'danger'] as const) {
+      const { container, unmount } = render(<Notice tone={tone} message="お知らせ" />)
+      expect(container.firstElementChild!.className).toContain(tone)
+      expect(container.firstElementChild!.getAttribute('role')).toBe(tone === 'danger' ? 'alert' : 'note')
+      unmount()
+    }
   })
 
   it('右に操作を1つ置ける', () => {

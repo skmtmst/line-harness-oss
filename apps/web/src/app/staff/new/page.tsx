@@ -104,7 +104,7 @@ export default function NewStaffPage() {
   return <div data-design-node="I3ZSrU">
       <div className="v8-only"><PageHeading title="ユーザーを追加する" /></div><CreatePage
     title="ユーザーを追加する"
-    description="管理画面にログインできる人を追加し、できることの範囲を決めます。"
+    help="管理画面にログインできる人を追加し、できることの範囲を決めます。"
     parent={['ログインユーザー', '/staff?tab=members']}
     saveLabel="招待メールを送る"
     showHeader={false}

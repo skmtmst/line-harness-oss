@@ -31,9 +31,38 @@ beforeEach(() => {
   fx.uploadPaperPhoto.mockResolvedValue({ success: true, data: { id: 'ph-1', photoUrl: 'https://api.example/api/liff/visit-stamps/paper-photos/ph-1', contentType: 'image/jpeg', size: 1000 } });
   fx.requestPaper.mockResolvedValue({ success: true, data: { id: 'p-1', status: 'pending' } });
 });
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); window.history.replaceState(null, '', '/'); });
 
 describe('来店スタンプ（お客さまの LIFF）', () => {
+  it.each([['?page=visit-stamps&card=gold', '選んだカード'], ['?page=visit-stamps', '然 来店スタンプカード']])('URLのカード指定あり・なしで既存画面を開く: %s', async (search, name) => {
+    window.history.replaceState(null, '', `/${search}`);
+    fx.cards.mockResolvedValue({ success: true, data: [{ card, wallet: wallet(6) }, { card: { ...card, id: 'gold', name: '選んだカード' }, wallet: { ...wallet(2), cardId: 'gold' } }] });
+    render(<VisitStamps />); expect(await screen.findByText(name)).toBeTruthy();
+  });
+  it.each(['other-shop-card', 'missing-card'])('別店舗・存在しないカード指定は通常の表示に戻る: %s', async (id) => {
+    window.history.replaceState(null, '', `/?page=visit-stamps&card=${id}`);
+    render(<VisitStamps />);
+    expect(await screen.findByText('然 来店スタンプカード')).toBeTruthy();
+    expect(fx.cards).toHaveBeenCalledWith('acc-1');
+    expect(fx.card).not.toHaveBeenCalled();
+    expect(fx.paperRequests).toHaveBeenCalledWith('acc-1', 'c1');
+  });
+  it('ページを開き直すと、ゴールで受け取った次のカードを表示する', async () => {
+    const previous = { ...card, settings: { ...card.settings, completion: 'next_card' as const, nextCardId: 'gold' } };
+    const next = { ...card, id: 'gold', name: 'ゴールドカード' };
+    fx.cards.mockResolvedValue({ success: true, data: [{ card: previous, wallet: wallet(0) }, { card: next, wallet: { ...wallet(2), cardId: 'gold' } }] });
+    render(<VisitStamps />);
+    expect(await screen.findByText('ゴールドカード')).toBeTruthy();
+    expect(screen.getByText('2 / 10')).toBeTruthy();
+  });
+  it('使い方の説明・背景画像・最初の来店からの期限を表示する', async () => {
+    const configured = { ...card, settings: { ...card.settings, instructions: '1回で1個\n特典をお店で使えます', expiryBasis: 'first_visit' as const, backgroundColor: '#7b4a2e', backgroundImageUrl: 'https://example.test/card.png' } };
+    fx.cards.mockResolvedValue({ success: true, data: [{ card: configured, wallet: wallet(3) }] });
+    render(<VisitStamps />);
+    expect(await screen.findByText('1回で1個 特典をお店で使えます')).toBeTruthy();
+    expect(screen.getByText(/最初の来店から/)).toBeTruthy();
+    expect(document.querySelector('img[src="https://example.test/card.png"]')).toBeTruthy();
+  });
   it('いま使える特典と次の目標（特典は個数の順）', () => {
     const s = cardState(card, 6);
     expect(s.best?.name).toBe('ドリンク 1杯');

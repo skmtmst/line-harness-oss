@@ -1,3 +1,4 @@
+import type { HqMediaRuntime } from './hq-media.js';
 import { getLineAccountById, getFriendFieldMap } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { StampError } from './visit-stamps.js';
@@ -29,7 +30,7 @@ export async function hqBroadcastActivity(db:D1Database,run:Run,offset:number,li
   return {rows:rows.slice(0,limit),nextCursor:rows.length>limit?String(offset+limit):null};
 }
 /** 店と同じテスト宛先・吹き出し・差し込みを使う。送信前に全宛先を店の中へ限定する。 */
-export async function testHqBroadcast(db:D1Database,run:Run,actorId:string,accountId:string) {
+export async function testHqBroadcast(db:D1Database,run:Run,actorId:string,accountId:string,runtime?:HqMediaRuntime) {
   if(run.status!=='prepared')throw new StampError('下書きだけテスト送信できます',409);
   await child(db,run,accountId);
   const account=await getLineAccountById(db,accountId);
@@ -43,7 +44,7 @@ export async function testHqBroadcast(db:D1Database,run:Run,actorId:string,accou
   const friends=(await db.prepare(`SELECT id,line_user_id,display_name FROM friends WHERE line_account_id=? AND id IN (${ids.map(()=>'?').join(',')})
     AND is_following=1 AND COALESCE(is_hidden,0)=0 AND line_user_id IS NOT NULL AND line_user_id<>''`).bind(accountId,...ids).all<{id:string;line_user_id:string;display_name:string|null}>()).results;
   if(friends.length!==ids.length)throw new StampError('テスト宛先がこの店に属しているか確認してください',403);
-  const input=await resolveHqBroadcastMaterials(db,run.tenant_id,accountId,JSON.parse(run.input_json) as HqBroadcastInput),parts=addTestLabel(parseBroadcastMessageParts({...input,...mappedHqContent(input,account.name,account.liff_id)}));
+  const input=await resolveHqBroadcastMaterials(db,run.tenant_id,accountId,JSON.parse(run.input_json) as HqBroadcastInput,runtime ? {...runtime,copy:true} : undefined),parts=addTestLabel(parseBroadcastMessageParts({...input,...mappedHqContent(input,account.name,account.liff_id)}));
   const content=combinedMessageContent(parts),vars=await resolveSendCommonVars(db,accountId,content,{kind:'test_send',id:run.id});
   const rendered=[];
   for(const f of friends){const fields=contentNeedsFriendFields(content)?await getFriendFieldMap(db,f.id):undefined;

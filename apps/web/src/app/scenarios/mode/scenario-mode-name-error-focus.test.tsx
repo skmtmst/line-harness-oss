@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 /*
  * R172: シナリオ新規作成の必須エラーがスマホの画面外に出る。
  *
@@ -18,6 +19,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a' }),
 }))
@@ -65,7 +67,7 @@ async function mount() {
 }
 
 function nameInput(): HTMLInputElement {
-  const input = host.querySelector('input[placeholder="例: 友だち追加ウェルカム"]') as HTMLInputElement
+  const input = host.querySelector("input[placeholder=\"例：友だち追加ウェルカム\"]") as HTMLInputElement
   expect(input, 'シナリオ名の入力欄が見つかりません').toBeTruthy()
   return input
 }

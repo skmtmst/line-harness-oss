@@ -1,5 +1,19 @@
 import type { ReactNode } from 'react'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
+import TruncatedText from './truncated-text'
 import styles from './folder-dot.module.css'
+
+/**
+ * フォルダの見せる色。色が空のフォルダ（色の仕組みより前に作ったもの）は、名前から9色の1つを決まった形で選ぶ
+ * （2026-10-09 オーナー「フォルダで色がつくように」）。左の列と表の丸が同じ色になるよう、どちらもこれを使う。
+ */
+/* 同じ名前はいつも同じ色（B-136：色の無いフォルダが灰色の丸ばかりで、列と行の丸で見分けがつかなかった）。 */
+export function folderDisplayColor(folder: { name: string; color?: string | null }): string {
+  if (folder.color) return folder.color
+  let hash = 0
+  for (const char of folder.name) hash = (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0
+  return FOLDER_SELECT_COLORS[hash % FOLDER_SELECT_COLORS.length].value
+}
 
 /*
  * ★V8 一覧の行の名前の前に置く「フォルダの色の丸」（2026-10-07 オーナー決定）。
@@ -9,7 +23,7 @@ import styles from './folder-dot.module.css'
  */
 export interface FolderDotFolder {
   name: string
-  /** フォルダの色（#RRGGBB）。無いフォルダは薄い灰の丸。 */
+  /** フォルダの色（#RRGGBB）。無いフォルダは folderDisplayColor が名前から選ぶ。 */
   color?: string | null
 }
 
@@ -18,7 +32,7 @@ export function FolderDot({ folder }: { folder?: FolderDotFolder | null }) {
   return (
     <span
       className={folder ? styles.dot : `${styles.dot} ${styles.unfiled}`}
-      style={folder?.color ? { backgroundColor: folder.color } : undefined}
+      style={folder ? { backgroundColor: folderDisplayColor(folder) } : undefined}
       role="img"
       aria-label={label}
       title={label}
@@ -32,11 +46,11 @@ export function FolderDot({ folder }: { folder?: FolderDotFolder | null }) {
  * `dot={false}` は丸を置かず名前だけを返す（丸の無い絵の板。例：1152 の板でまだ丸を描いていない一覧）。
  */
 export function FolderDotName({ folder, dot = true, children }: { folder?: FolderDotFolder | null; dot?: boolean; children: ReactNode }) {
-  if (!dot) return <>{children}</>
+  if (!dot) return <>{typeof children === 'string' ? <TruncatedText value={children} /> : children}</>
   return (
     <span className={styles.line}>
       <FolderDot folder={folder} />
-      <span className={styles.name}>{children}</span>
+      {typeof children === 'string' ? <TruncatedText className={styles.name} value={children} /> : <span className={styles.name}>{children}</span>}
     </span>
   )
 }

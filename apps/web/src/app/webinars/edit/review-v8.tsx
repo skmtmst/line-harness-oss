@@ -11,6 +11,7 @@ import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { webinarApi, type Webinar, type WebinarEditor, type WebinarPublishValidation } from '@/lib/api'
 import { reviewActionSummaryText, reviewMonitoringText, reviewTestSummaryBody } from './review-text'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const NOTIFICATION_FLAGS = ['registrationEnabled', 'dayBeforeEnabled', 'hourBeforeEnabled', 'startEnabled', 'missedEnabled', 'completedEnabled'] as const
 
@@ -111,14 +112,14 @@ export default function ReviewV8({ webinar, editor, registrations, ctaCount, onP
   const rows = [
     ['開催形式', webinar.schedule.length > 0 ? '日時指定・開催回あり' : 'オンデマンド・いつでも視聴'],
     ['公開期間', publicationStateLabel(webinar.publicationState, webinar.publicationStartsAt, webinar.publicationEndsAt) ?? '—（公開期間は未設定）'],
-    ['CTA', ctaCount > 0 ? `${ctaCount}件` : webinar.cta ? '動画＋CTA＋フォーム' : '未設定'],
-    ['通知', notificationCount === null ? '—' : `${notificationCount}つ`],
+    ['CTA', ctaCount > 0 ? `${ctaCount}件` : webinar.cta ? '動画＋CTA＋フォーム' : emptyValue('unconfigured')],
+    ['通知', notificationCount === null ? emptyValue('unknown') : `${notificationCount}つ`],
     ['視聴後の動き', reviewActionSummaryText(validation)],
   ]
 
   return <div data-webinar-pane="review" data-design-node="XCUNf">
     <div className="space-y-3">
-      <section className="border-hairline bg-canvas rounded-card border p-4" aria-label="公開前の確認">
+      <section className="content-card bg-canvas rounded-card border p-4" aria-label="公開前の確認">
         <div className="flex items-center gap-2"><h2 className="text-ink text-base font-semibold">公開前の確認</h2><HelpTip label="公開前の確認の説明">公開に必要な設定と、公開ページ・通知のテスト結果を確認します。公開すると、その時点の保存版を使います。</HelpTip>{validationState === 'ready' ? <span className="text-ink-secondary text-xs tabular-nums">{passed}/{total}</span> : null}</div>
         {validationState === 'error' ? <Notice tone="info" action={<Button onClick={loadValidation}>もう一度読み込む</Button>}>公開前検査を読み込めませんでした。このままでは公開できません。</Notice> : null}
         <ul className="divide-hairline mt-3 divide-y">
@@ -130,14 +131,14 @@ export default function ReviewV8({ webinar, editor, registrations, ctaCount, onP
         {testNotice ? <p className="text-ink-secondary mt-2 text-xs" role="status">{testNotice}</p> : null}
         {publishError ? <p className="text-danger mt-2 text-xs" role="alert">{publishError}</p> : null}
       </section>
-      <section className="border-hairline bg-canvas rounded-card border p-4" aria-label="設定のまとめ"><h2 className="text-ink text-base font-semibold">設定のまとめ</h2><dl className="divide-hairline mt-3 divide-y">{rows.map(([label, value]) => <div key={label} className="flex items-baseline justify-between gap-4 py-3 text-xs"><dt className="text-ink-faint shrink-0">{label}</dt><dd className="text-ink min-w-0 text-right">{value}</dd></div>)}</dl></section>
+      <section className="content-card bg-canvas rounded-card border p-4" aria-label="設定のまとめ"><h2 className="text-ink text-base font-semibold">設定のまとめ</h2><dl className="divide-hairline mt-3 divide-y">{rows.map(([label, value]) => <div key={label} className="flex items-baseline justify-between gap-4 py-3 text-xs"><dt className="text-ink-faint shrink-0">{label}</dt><dd className="text-ink min-w-0 text-right">{value}</dd></div>)}</dl></section>
     </div>
     <aside aria-label="公開ページでの見え方">
       <h2 className="text-ink text-base font-semibold">公開ページでの見え方</h2>
       <p className="text-ink mt-3 truncate text-sm" title={webinar.title}>{webinar.title}</p>
       <p className="text-ink-secondary mt-3 text-xs">{reviewTestSummaryBody(validation, validationState)}</p>
       <p className="text-ink-faint mt-3 text-xs">{reviewMonitoringText(monitoringFailures)}・{registrations === null ? '申込人数—' : `申込人数 ${formatNumber(registrations)}人`}</p>
-      {canOpenPublicPage && publicUrl ? <Button className="mt-3" href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <p className="text-ink-faint mt-3 text-xs">{publicPageReason || '公開すると、友だちが見るページを確認できます。'}</p>}
+      {canOpenPublicPage && publicUrl ? <Button external className="mt-3" href={publicUrl}  >公開ページを見る</Button> : <p className="text-ink-faint mt-3 text-xs">{publicPageReason || '公開すると、友だちが見るページを確認できます。'}</p>}
     </aside>
     <StickyBar actions={<><Button href="/webinars">キャンセル</Button>{onBack ? <Button onClick={onBack} disabled={publishing || testing}>通知へ戻る</Button> : null}<Button variant="primary" disabled={!canPublish} busy={publishing} busyLabel="公開中…" onClick={() => void publish()}>この版を公開</Button></>} />
   </div>

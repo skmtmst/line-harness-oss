@@ -199,20 +199,15 @@ export default function BookingHistory() {
                   { key: 'past', label: 'これまで' },
                 ] as const
               ).map((t) => (
-                <button
+                <Button variant="tab" selected={tab === t.key}
                   key={t.key}
                   type="button"
                   role="tab"
                   aria-selected={tab === t.key}
                   onClick={() => setTab(t.key)}
-                  className={`liff-hit flex h-8 flex-1 items-center justify-center rounded-lg text-xs focus-visible:outline-2 focus-visible:outline-ink ${
-                    tab === t.key
-                      ? 'bg-canvas font-bold text-ink'
-                      : 'font-semibold text-liff-sub'
-                  }`}
                 >
                   {t.label}
-                </button>
+                </Button>
               ))}
             </div>
             {actionError && (
@@ -271,7 +266,7 @@ export default function BookingHistory() {
         }
         description="キャンセルすると元に戻せません。キャンセルの期限を過ぎると、ここからは変えられません（トークでご連絡ください）。"
         confirmLabel="キャンセルする"
-        cancelLabel="やめる"
+        cancelLabel="閉じる"
         destructive
         busy={busy}
         onCancel={() => {
@@ -284,7 +279,7 @@ export default function BookingHistory() {
         title={pendingChange ? `「${pendingChange.booking.menu_name}」の日時を変えますか` : ''}
         description="空いている日時から選びます。新しい日時を取れたときだけ、今の予約が変わります。"
         confirmLabel="この日時に変える"
-        cancelLabel="やめる"
+        cancelLabel="閉じる"
         busy={busy}
         error={pendingChange?.error ?? undefined}
         onCancel={() => {
@@ -319,16 +314,13 @@ export default function BookingHistory() {
                     pendingChange.selected?.date === slot.date && pendingChange.selected?.start === slot.start;
                   return (
                     <li key={`${slot.date}-${slot.start}`}>
-                      <button
+                      <Button variant="optionRow" selected={selected}
                         type="button"
                         disabled={busy}
                         aria-pressed={selected}
                         onClick={() =>
                           setPendingChange((prev) => (prev ? { ...prev, selected: slot, error: null } : prev))
                         }
-                        className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-(--liff-radius) border px-4 py-2.5 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${
-                          selected ? 'border-liff-primary bg-liff-primary' : 'border-hairline bg-canvas'
-                        }`}
                       >
                         <span
                           className={`liff-num text-sm font-semibold whitespace-nowrap ${selected ? 'text-(--liff-on-primary)' : 'text-ink'}`}
@@ -340,7 +332,7 @@ export default function BookingHistory() {
                         >
                           {selected ? 'この日時' : '空きあり'}
                         </span>
-                      </button>
+                      </Button>
                     </li>
                   );
                 })}

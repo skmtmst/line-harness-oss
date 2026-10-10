@@ -79,9 +79,10 @@
 .kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 /* 数の帯のマス（板 `FM94M`「数 共通情報」：余白 16/20・間 8）。 */
@@ -275,9 +276,10 @@
 /* 表。1列目（名前＋差し込み名）は伸び縮み、ほかは中身に合わせた幅。 */
 .tableWrap {
   overflow-x: auto;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .table {
@@ -483,9 +485,10 @@
 /* 状態の板（`RqO7O`）：まだ無い・0件・読み込み中・失敗は同じ枠・同じ高さ。 */
 .stateCard {
   min-height: 320px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 /* 止める・削除の窓の中身（板 `Hhl9M`・`xxKtW`）。 */

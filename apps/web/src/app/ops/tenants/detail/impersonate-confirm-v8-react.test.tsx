@@ -18,6 +18,7 @@ vi.mock('@/lib/api', async importOriginal => ({
 }))
 vi.mock('next/navigation', async importOriginal => ({
   ...await importOriginal<typeof import('next/navigation')>(),
+  useRouter:()=>({replace:vi.fn(),push:vi.fn()}),
   usePathname: () => '/ops/tenants/detail',
   useSearchParams: () => ({ get: (key: string) => (key === 'id' ? 'tenant-1' : null) }),
 }))

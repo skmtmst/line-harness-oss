@@ -1,3 +1,5 @@
+
+import { formatNumber as polishFormatNumber } from '@/lib/format'
 /* app/line-notifications/customer-kpis.ts から写した。題「今日 送った」と送信枠の数の書き方（「1,041 / 5,000」）だけ ★V8 g3iDs に合わせた。 */
 export type CustomerNotificationKpi = {
   label: string
@@ -44,7 +46,7 @@ export function customerNotificationKpis(input: {
         ? {
           label: '今月の送信枠',
           value: input.ready ? input.quota.used : null,
-          valueText: input.ready ? `${input.quota.used.toLocaleString('ja-JP')} / ${input.quota.total.toLocaleString('ja-JP')}` : undefined,
+          valueText: input.ready ? `${polishFormatNumber(input.quota.used)} / ${polishFormatNumber(input.quota.total)}` : undefined,
           unit: '通',
           note: quotaUnavailable,
           href: null,

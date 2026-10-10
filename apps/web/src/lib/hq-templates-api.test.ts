@@ -139,3 +139,8 @@ it('ひな形フォルダは色を保存・更新・一覧から読み返す',as
  expect(request).toHaveBeenLastCalledWith('/api/hq/templates/folders/f',{method:'PATCH',body:JSON.stringify({name:'改名',expectedRevision:1,color:null})});
  request.mockResolvedValue({success:true,data:[folder]});expect(await hqTemplatesApi.folders.list()).toEqual([folder]);
 });
+
+it('フォルダ交換は双方の版をまとめて送り、IDをescapeする',async()=>{
+ await hqTemplatesApi.folders.swapOrder('f/1','f/2',3,4);
+ expect(request).toHaveBeenLastCalledWith('/api/hq/templates/folders/f%2F1/swap-order',{method:'POST',body:JSON.stringify({withId:'f/2',expectedRevision:3,withExpectedRevision:4})});
+});

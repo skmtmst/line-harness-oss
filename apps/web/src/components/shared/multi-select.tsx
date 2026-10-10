@@ -9,6 +9,7 @@ import type { ComboboxOption } from './combobox'
 import MenuPortal from './menu-portal'
 import styles from './multi-select.module.css'
 import { isImeComposing } from './ime'
+import { joinDescribedBy, useFieldContext } from './field-context'
 
 export type MultiSelectOption = ComboboxOption
 
@@ -70,8 +71,11 @@ export default function MultiSelect({
   placeholder = '選ぶ',
   values,
 }: MultiSelectProps) {
+  // Field の中に置くと、欄の誤り（赤）と説明の読み上げを受け取る（B-139）。
+  const field = useFieldContext()
+  const invalid = Boolean(error) || Boolean(field?.invalid)
   const generatedId = useId()
-  const inputId = id ?? `${generatedId}-input`
+  const inputId = id ?? field?.controlId ?? `${generatedId}-input`
   const listboxId = `${generatedId}-listbox`
   const errorId = `${generatedId}-error`
   const rootRef = useRef<HTMLDivElement>(null)
@@ -181,7 +185,7 @@ export default function MultiSelect({
         : null}
       <div
         ref={fieldRef}
-        className={[styles.field, open ? styles.open : null, error ? styles.invalid : null, disabled ? styles.disabled : null]
+        className={[styles.field, open ? styles.open : null, invalid ? styles.invalid : null, disabled ? styles.disabled : null]
           .filter(Boolean)
           .join(' ')}
         onClick={() => {
@@ -237,8 +241,8 @@ export default function MultiSelect({
           aria-controls={listboxId}
           aria-activedescendant={open && active ? `${listboxId}-${activeMatchIndex}` : undefined}
           aria-autocomplete="list"
-          aria-invalid={Boolean(error) || undefined}
-          aria-describedby={error ? errorId : undefined}
+          aria-invalid={invalid || undefined}
+          aria-describedby={joinDescribedBy(error ? errorId : undefined, field?.describedBy)}
           aria-busy={loading || undefined}
           autoComplete="off"
           disabled={disabled}

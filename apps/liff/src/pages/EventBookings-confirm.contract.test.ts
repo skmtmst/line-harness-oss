@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
  * イベント予約の取り消し確認を、ブラウザの `confirm()` から
  * LIFF 共通の確認窓 (`ui/ConfirmDialog`) へ移した契約。
  *
- * 動き・送る中身は変えない。やめるを選ぶと何も起きず、
+ * 動き・送る中身は変えない。閉じるを選ぶと何も起きず、
  * 取り消すを選ぶと今までどおり取り消しが動く。
  * 題と注意書きは V8 の板 nUYyb の形（日時の題・待ちへの案内・前日の締め切り）。
  */
@@ -65,9 +65,9 @@ describe('イベント予約の取り消し確認', () => {
     expect(page).toContain('setPendingCancel(b)');
   });
 
-  it('題は日時＋行事の問いかけで、ボタンは「やめる」と取り消し', () => {
+  it('題は日時＋行事の問いかけで、ボタンは「閉じる」と取り消し', () => {
     expect(page).toContain('をキャンセルしますか');
-    expect(page).toContain('cancelLabel="やめる"');
+    expect(page).toContain('cancelLabel="閉じる"');
     expect(page).toContain('confirmLabel="キャンセルする"');
     expect(page).toContain('destructive');
     expect(page).toContain('キャンセル待ちの方へ順番に案内されます');
@@ -80,8 +80,8 @@ describe('イベント予約の取り消し確認', () => {
     expect(dialog).toContain('data-design-node={designNode}');
   });
 
-  it('やめるを選ぶと取り消しを送らない', () => {
-    // 取り消しの送信口は実行の経路に1つだけ。やめる側にあればここで落ちる。
+  it('閉じるを選ぶと取り消しを送らない', () => {
+    // 取り消しの送信口は実行の経路に1つだけ。閉じる側にあればここで落ちる。
     expect(page.match(/cancelMyEventBooking/g)?.length ?? 0).toBe(1);
     const body = fnBody(code(page), 'async function runCancel');
     expect(body, '実行する側が取り消しを送っていない').toContain('api.cancelMyEventBooking(b.id)');
@@ -101,7 +101,7 @@ describe('LIFF 共通の確認窓の形', () => {
     expect(dialog).toContain("role={destructive ? 'alertdialog' : 'dialog'}");
     expect(dialog).toContain("variant={destructive ? 'danger' : 'primary'}");
     expect(dialog).toContain('alert-triangle');
-    expect(dialog).toContain("cancelLabel = 'やめる'");
+    expect(dialog).toContain("cancelLabel = '閉じる'");
   });
 
   it('開いていないときは出さず、処理中は閉じさせない', () => {

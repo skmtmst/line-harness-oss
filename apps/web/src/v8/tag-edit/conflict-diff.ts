@@ -52,7 +52,7 @@ export function describeTagDiff(mine: TagEditorValues, incoming: TagDefinition):
     const incomingActions = incoming.automation?.actions ?? []
     if (!sameJson(mine.actions, incomingActions)) {
       lines.push(
-        `連動アクションが違います（最新${incomingActions.length}件／あなた${mine.actions.length}件）`,
+        `連動アクションが違います（最新${incomingActions.length} 件／あなた${mine.actions.length} 件）`,
       )
     }
   }

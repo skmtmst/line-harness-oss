@@ -49,6 +49,7 @@ describe('運営 ログイン 2段目（V8 の入口）', () => {
     await open('/login/two-factor?next=ops#lh_2fa=challenge-1&lh_method=password', 'v8')
     expect(host.querySelector('[data-design-node="tOPeY"]')).not.toBeNull()
     expect(host.textContent).toContain('6桁の確認')
+    await act(async () => { (host.querySelector('button[aria-label="6桁の確認の説明"]') as HTMLButtonElement).click() })
     expect(host.textContent).toContain('認証アプリが使えないときは、運営のオーナーに連絡してください。')
     const login = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('ログイン'))
     expect(login?.hasAttribute('disabled')).toBe(false)

@@ -65,3 +65,13 @@ describe('qr-print-pdf 印刷用PDF', () => {
     })).toThrow(QrPdfError);
   });
 });
+
+it('クーポン付きA5の本文に店名・クーポン名・案内が入り、QRの升目は隠さない', () => {
+  const qr = encodeQr('https://example.com/r/shop');
+  const text = latin1(buildQrPrintPdf({ accountName: '然の店', couponName: '店頭10%オフ', paper: 'A5', url: 'https://example.com/r/shop', issuedAt: '2026-10-10', qr }));
+  expect(text).toContain('/MediaBox [0 0 419.53 595.28]');
+  expect(text).toContain(`<${utf16beHex('店頭10%オフ').slice(4)}> Tj`);
+  expect(text).toContain(`<${utf16beHex('読み取って友だち追加でクーポン').slice(4)}> Tj`);
+  expect(text).toContain('/Encoding /UniJIS-UTF16-H');
+  expect(text.match(/ re f/g)).toHaveLength(qr.modules.reduce((sum, value) => sum + (value === 1 ? 1 : 0), 0));
+});

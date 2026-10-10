@@ -18,11 +18,17 @@ import type { FormFieldProblem } from '@/lib/use-form-errors'
 export default function ValidationSummary({
   problems,
   onFocusFirst,
+  minProblems = 1,
 }: {
   problems: FormFieldProblem[]
   onFocusFirst?: () => void
+  /**
+   * この数から出す。欄で知らせる画面（B-139）は 2 を渡し、直す欄が1つのときは
+   * 欄の赤と理由だけにする（帯と欄で同じことを二度言わない）。
+   */
+  minProblems?: number
 }) {
-  if (problems.length === 0) return null
+  if (problems.length === 0 || problems.length < minProblems) return null
   return (
     <div
       role="alert"

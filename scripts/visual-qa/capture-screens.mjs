@@ -21,7 +21,8 @@ import { chromium } from '@playwright/test'
 import { pathToFileURL } from 'node:url'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createHash } from 'node:crypto'
+import { QA_TIMEZONE, captureClockFor } from './qa-clock.mjs'
+import { mockFingerprint } from './mock-fingerprint.mjs'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { SCREENS, DESIGN_SIZE, WIDTHS, screensOf } from './screens.mjs'
 
@@ -153,7 +154,7 @@ async function newPage(browser, width, height, clock) {
   const page = await browser.newPage({
     viewport: { width, height },
     deviceScaleFactor: 1,
-    timezoneId: 'Asia/Tokyo',
+    timezoneId: QA_TIMEZONE,
     locale: 'ja-JP',
   })
   /*
@@ -428,8 +429,7 @@ function emptyLike(value) {
  * 違えば、撮る前に止めて「動かし直せ」と言う。
  */
 async function requireFreshMock() {
-  const file = join(ROOT, 'scripts', 'visual-qa', 'mock-api.mjs')
-  const want = createHash('sha256').update(readFileSync(file)).digest('hex').slice(0, 16)
+  const want = mockFingerprint()
   const api = process.env.VISUAL_QA_API ?? 'http://127.0.0.1:8788'
   let got = null
   try {
@@ -540,7 +540,7 @@ async function captureImpl(feature) {
 
     for (const shotSpec of shots) {
     for (const width of captureWidths) {
-      const page = await newPage(browser, width, implementationViewportHeight(s, designHeight), s.clock)
+      const page = await newPage(browser, width, implementationViewportHeight(s, designHeight), captureClockFor(s.route, s.clock))
       try {
         const stateHits = shotSpec.state ? await applyState(page, s.node, shotSpec.state) : null
         /*

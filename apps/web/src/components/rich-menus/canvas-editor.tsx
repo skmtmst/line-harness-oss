@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { RICH_MENU_DIMENSIONS, type RichMenuAreaIntent } from '@line-crm/shared'
 import {
-  CalendarClock, ClipboardList, Copy, FileText, Link2, MessageCircle, MousePointerClick, Phone, Repeat, Zap,
+  CalendarCheck, CalendarClock, ClipboardList, Copy, History, Stamp, FileText, Link2, MessageCircle, MousePointerClick, Phone, Repeat, Zap,
   type LucideIcon,
 } from 'lucide-react'
 import Notice from '@/components/shared/notice'
@@ -73,6 +73,10 @@ type Props = {
   /** 作成画面が持つ面一覧と重複させない。 */
   showAreaList?: boolean
   showTools?: boolean
+  /** 拡大の切り替えの帯を出す。既定は showTools と同じ。 */
+  showZoom?: boolean
+  /** 画像の幅の上限（px）。渡すと、置き場の幅に合わせてこの幅まで縮める（採用案 Wmch0 は 320）。 */
+  maxWidth?: number
 }
 
 function snap(value: number, others: number[]): number {
@@ -91,6 +95,7 @@ export function areaDisplayName(area: Area, index: number): string {
 const INTENT_ICON: Record<RichMenuAreaIntent, LucideIcon> = {
   url: Link2, tel: Phone, text: MessageCircle, template: FileText, form: ClipboardList,
   switch: Repeat, postback: Zap, datetime: CalendarClock, clipboard: Copy,
+  booking: CalendarCheck, booking_history: History, visit_stamp: Stamp,
 }
 function AreaIcon({ intent }: { intent?: RichMenuAreaIntent | null }) {
   const Icon = intent ? INTENT_ICON[intent] ?? MousePointerClick : MousePointerClick
@@ -123,6 +128,8 @@ export function CanvasEditor({
   appearance = 'default',
   showAreaList = true,
   showTools = true,
+  showZoom,
+  maxWidth,
 }: Props) {
   const canvasRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
@@ -133,19 +140,22 @@ export function CanvasEditor({
   const [limitNotice, setLimitNotice] = useState('')
 
   useEffect(() => {
-    if (appearance !== 'v8' || showTools) return
+    if (appearance !== 'v8' || (showTools && maxWidth === undefined)) return
     const viewport = viewportRef.current
     if (!viewport) return
     const fit = () => {
       const width = viewport.getBoundingClientRect().width
+      if (width <= 0) return
+      // 採用案 Wmch0：置き場の幅いっぱい、maxWidth まで。
+      if (maxWidth !== undefined) setScale(Math.min(width, maxWidth) / dims.width)
       // 絵（Z0uO6・kmTab）：画像は左右に 22 ずつ空けて、幅は 600 まで（1152 の板で 480）。
-      if (width > 0) setScale(Math.min(width - 44, 600) / dims.width)
+      else setScale(Math.min(width - 44, 600) / dims.width)
     }
     fit()
     const observer = new ResizeObserver(fit)
     observer.observe(viewport)
     return () => observer.disconnect()
-  }, [appearance, showTools, dims.width])
+  }, [appearance, showTools, dims.width, maxWidth])
 
   function toImageCoord(clientX: number, clientY: number) {
     // 描画前は ref がまだ無い。非null断言の代わりに原点へ倒す。
@@ -355,7 +365,7 @@ export function CanvasEditor({
           {limitNotice}
         </Notice>
       )}
-      {showTools ? <div className="flex flex-wrap items-center gap-2 text-sm">
+      {(showZoom ?? showTools) ? <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-ink-faint text-xs">ズーム</span>
         {[0.25, 0.3, 0.5, 0.75, 1].map((s) => (
           <button

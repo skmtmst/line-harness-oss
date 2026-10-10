@@ -11,12 +11,13 @@
  * v7 を直す必要が出たら各 route 側も同じ判断を入れる。
  */
 import { useCallback, useState, type ReactNode } from 'react'
-import Link from 'next/link'
+import { Tabs } from '@/components/shared/tabs'
 import { Eye } from 'lucide-react'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
 import Button from '@/components/shared/button'
 import styles from './automations-v8.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 export type AutoV8TabKey = 'rules' | 'common-actions' | 'runs' | 'templates'
 
@@ -60,7 +61,7 @@ export function V8AutoCreateButton({
 }) {
   if (readonly) {
     return (
-      <Button variant="primary" disabled title="閲覧のみのため作れません">
+      <Button variant="primary" disabled title="閲覧のみのため作れません" >
         {children}
       </Button>
     )
@@ -104,25 +105,13 @@ export function V8AutoShell({
     <div data-design-node={autoV8Node(tab)} className={styles.board}>
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>オートメーション</h1>
-          <p className={styles.headDescription}>「○○したら△△する」を決めておくと、友だちの動きに合わせて自動で動きます。</p>
+          <PageHeading title="オートメーション" help={<> 「○○したら△△する」を決めておくと、友だちの動きに合わせて自動で動きます。</>} />
+
         </div>
         {actions ? <div className={styles.headActions}>{actions}</div> : null}
       </div>
 
-      <nav className={styles.tabs} aria-label="オートメーションのタブ">
-        {TABS.map((item) => (
-          <Link
-            key={item.key}
-            href={item.href}
-            className={item.key === tab ? `${styles.tab} ${styles.tabActive}` : styles.tab}
-            aria-current={item.key === tab ? 'page' : undefined}
-          >
-            {item.label}
-            {countOf(item.key)}
-          </Link>
-        ))}
-      </nav>
+      <Tabs label="オートメーションのタブ" items={TABS.map(item => ({label:item.label, href:item.href.includes('?') ? item.href : `${item.href}?tab=${item.key}`, current:item.key===tab, count:countOf(item.key) ? Number(countOf(item.key).trim()) : undefined}))} />
 
       {readonly ? (
         <p className={styles.band} role="note">

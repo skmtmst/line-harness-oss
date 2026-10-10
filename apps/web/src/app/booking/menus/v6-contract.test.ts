@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ChannelsTabV8 from './channels-tab-v8'
 
-vi.mock('@/components/shared/toast', () => ({ notifyToast: vi.fn() }))
+vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 const ROOT = join(process.cwd(), 'src', 'app', 'booking', 'menus')

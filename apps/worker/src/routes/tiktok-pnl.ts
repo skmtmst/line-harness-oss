@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 /**
  * TikTok利益計算の自動化: 状態確認と手動同期のAPI。
  *
@@ -24,8 +25,10 @@ function fail(
   c: Context<Env>,
   status: 400 | 401 | 403 | 404 | 409 | 500 | 502 | 503,
   error: string,
+  extra: Record<string, unknown> = {},
+  fieldKeys: readonly string[] = [],
 ) {
-  return c.json({ success: false, error }, status);
+  return inputError(c, { success: false, error, ...extra }, status, fieldKeys);
 }
 
 /**
@@ -85,9 +88,9 @@ tiktokPnl.get(
 tiktokPnl.post(
   '/api/integrations/tiktok-pnl/sync',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const lineAccountId = c.req.query('account_id');
-    if (!lineAccountId) return fail(c, 400, 'account_id を指定してください');
+    if (!lineAccountId) return fail(c, 400, 'account_id を指定してください', {}, ["account_id"]);
     const integration = await connectedIntegration(c, lineAccountId);
     if (!integration) {
       return fail(c, 409, 'Google Sheets連携が未接続です。先に管理画面のスプレッドシート連携を接続してください');

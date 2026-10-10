@@ -18,10 +18,10 @@ afterEach(() => cleanup())
 
 type Doc = { name: string }
 
-function Harness({ fetchLatest, reload }: { fetchLatest: () => Promise<Doc | null>; reload: () => Promise<void> }) {
+function Harness({ fetchLatest, reload, contextKey }: { contextKey?: string; fetchLatest: () => Promise<Doc | null>; reload: () => Promise<void> }) {
   const [name, setName] = React.useState('わたしの名前')
   const conflict = useSaveConflict<Doc>({
-    fetchLatest,
+    contextKey, fetchLatest,
     reload: async () => {
       await reload()
       setName('最新の名前')
@@ -147,4 +147,19 @@ describe('比べる先が別の画面のとき', () => {
     const link = screen.getByRole('link', { name: /違いを比べる/ })
     expect(link.getAttribute('href')).toBe('/conversions?highlight=cv-1')
   })
+})
+
+it('比較の返事が遅れて届いても、別の対象の画面へ出さない', async () => {
+  let resolve!: (doc: Doc) => void
+  const old = vi.fn(() => new Promise<Doc>(done => { resolve = done }))
+  const view = render(<Harness contextKey="A" fetchLatest={old} reload={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: '保存（409）' }))
+  fireEvent.click(screen.getByRole('button', { name: '違いを比べる' }))
+  view.rerender(<Harness contextKey="B" fetchLatest={vi.fn(async () => ({ name: 'Bの最新' }))} reload={vi.fn()} />)
+  await act(async () => { resolve({ name: 'Aの遅い最新' }); await Promise.resolve() })
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.queryByRole('alert')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '保存（409）' }))
+  fireEvent.click(screen.getByRole('button', { name: '違いを比べる' }))
+  await screen.findByText(/Bの最新/)
 })

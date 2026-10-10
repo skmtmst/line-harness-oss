@@ -86,7 +86,7 @@ function TestBoundary() {
 }
 
 function Metric({ label, value, note, tone = 'normal', helpLabel, help }: { label: string; value: ReactNode; note: string; tone?: 'normal' | 'warning' | 'danger'; helpLabel?: string; help?: ReactNode }) {
-  return <div className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
+  return <div className="rounded-card border border-hairline bg-canvas p-4 shadow-card-surface">
     <p className="flex items-center gap-1 text-xs font-semibold text-ink-faint">{label}{help && helpLabel ? <HelpTip label={helpLabel}>{help}</HelpTip> : null}</p>
     <p className={`mt-2 text-2xl font-bold tabular-nums ${tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning' : 'text-ink'}`}>{value}</p>
     <p className="mt-1 text-xs text-ink-faint">{note}</p>

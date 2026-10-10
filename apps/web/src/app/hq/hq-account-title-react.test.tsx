@@ -7,11 +7,11 @@ const titles = vi.hoisted(() => ({ seen: [] as unknown[] }))
 // 描画のたびに別物が返ると effect が回り続けるので、固定の1つを返す。
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {},
   usePageTitle: (title: unknown) => { titles.seen.push(title) },
   usePageChrome: () => ({}),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(window.location.search),
   useRouter: () => router,
   usePathname: () => '/hq',
 }))
@@ -20,6 +20,9 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 vi.mock('@/lib/api', () => ({
   api: {
+    tenants: { me: vi.fn(async () => ({ success: true, data: { name: '然' } })) },
+    staff: { me: vi.fn(async () => ({ success: true, data: { role: 'owner' } })) },
+    lineAccountFolders: { list: vi.fn(async () => ({ success: true, data: { folders: [] } })) },
     lineAccounts: { list: vi.fn(async () => ({ success: true, data: [] })) },
     hqNotices: { list: vi.fn(async () => ({ success: true, data: [] })), markRead: vi.fn() },
     operatorHistory: vi.fn(async () => ({ success: true, data: [] })),
@@ -72,3 +75,5 @@ describe('本部のアカウント一覧の見出し', () => {
     expect(host.textContent).toContain('どのアカウントのタグを開きますか')
   })
 })
+
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))

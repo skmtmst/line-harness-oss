@@ -1,11 +1,13 @@
 // @vitest-environment happy-dom
 import React, { useState } from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { MessageTemplateDefinition } from '@/lib/hq-templates-api'
 import MessageForm from './message-form'
+import { useFormErrors } from '@/lib/use-form-errors'
 
-vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { messageReferences: async () => [] } }))
+vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { messageReferences: async () => [{ kind: 'form', id: 'f-1', name: 'アンケート', accountName: '本店' }] } }))
+vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ enabled: () => false }) }))
 afterEach(cleanup)
 
@@ -41,5 +43,43 @@ describe('統括の旧メッセージ編集（保存結果の再確認にも使�
     fireEvent.change(screen.getByLabelText('配信する本文'), { target: { value: 'https://img.test/new.png' } })
     fireEvent.click(screen.getByRole('button', { name: '保存', exact: true }))
     expect(save.mock.calls[0][0].template).toMatchObject({ messageType: 'image', messageContent: 'https://img.test/new.png' })
+  })
+
+  it('ボタンの押したらは共通の欄：回答フォームは窓で選び、保存は今の形（action・value）', async () => {
+    const save = vi.fn()
+    const card = { format: 'flex' as const, title: 'ご案内', body: '本文', buttons: [{ id: 'b-1', label: '答える', action: 'url' as const, value: 'https://example.test/a' }] }
+    render(<Harness initial={{ ...base, card, template: { ...base.template, messageType: 'flex' } }} save={save} />)
+    fireEvent.click(screen.getByRole('button', { name: 'ボタン1を押したとき' }))
+    const kinds = within(screen.getByRole('listbox')).getAllByRole('option').map((option) => option.getAttribute('aria-label'))
+    expect(kinds).toEqual(['URLを開く', 'テキストを送る', '回答フォーム', 'シナリオを始める'])
+    fireEvent.click(within(screen.getByRole('listbox')).getByText('回答フォーム'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'ボタン1の回答フォームを選ぶ' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'ボタン1の回答フォームを選ぶ' }))
+    const dialog = screen.getByRole('dialog')
+    await waitFor(() => expect(within(dialog).getByRole('radio', { name: 'アンケート（本店）' })).toBeTruthy())
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'アンケート（本店）' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存', exact: true }))
+    expect(save.mock.calls[0][0].card.buttons[0]).toEqual({ id: 'b-1', label: '答える', action: 'form', value: 'f-1' })
+  })
+})
+
+describe('統括のメッセージのひな形：欄ごとの誤り（B-139）', () => {
+  function FieldsHarness({ initial, save }: { initial: MessageTemplateDefinition; save: (value: MessageTemplateDefinition) => void }) {
+    const [value, setValue] = useState(initial)
+    const fields = useFormErrors()
+    return <><MessageForm name="" onNameChange={() => {}} value={value} onChange={setValue} folders={[]} folderId={null} onFolderChange={() => {}} folderLoadFailed={false} disabled={false} catalogFailed={false} onReloadCatalog={() => {}} fields={fields} /><button onClick={() => { if (fields.submit().length === 0) save(value) }}>保存</button></>
+  }
+  it('名前・本文・ボタンの中身が空なら保存せず、欄ごとに理由を出して名前へ移る', async () => {
+    const save = vi.fn()
+    const card = { format: 'flex' as const, title: 'ご案内', body: '', buttons: [{ id: 'b-1', label: '予約', action: 'url' as const, value: '' }] }
+    render(<FieldsHarness initial={{ ...base, card, template: { ...base.template, messageType: 'flex' } }} save={save} />)
+    fireEvent.click(screen.getByRole('button', { name: '保存', exact: true }))
+    expect(save).not.toHaveBeenCalled()
+    expect(document.getElementById('hq-msg-name-error')?.textContent).toBe('ひな形の名前を入力してください')
+    expect(document.getElementById('hq-msg-body-error')?.textContent).toBe('配信する本文を入力してください')
+    expect(document.getElementById('hq-msg-button-b-1-error')?.textContent).toBe('URLを入力してください')
+    expect(screen.getByLabelText('ひな形の名前').getAttribute('aria-invalid')).toBe('true')
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('ひな形の名前')))
   })
 })

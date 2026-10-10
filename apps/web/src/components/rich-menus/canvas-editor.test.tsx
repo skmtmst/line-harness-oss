@@ -59,7 +59,7 @@ describe('エリアのキーボード操作 (R233)', () => {
     expect(areaButtons[0].getAttribute('tabindex')).toBe('0')
     expect(areaButtons[0].getAttribute('aria-label')).toBe('予約サイトへ、動きはURLを開く')
     // 未命名のボタンは通し番号の名前になる
-    expect(areaButtons[1].getAttribute('aria-label')).toBe('2番目のボタン、動きはメッセージを送る')
+    expect(areaButtons[1].getAttribute('aria-label')).toBe('2番目のボタン、動きはテキストを送る')
   })
 
   test('エリアにfocusすると選択になり、選択状態は読み上げに伝わる', () => {
@@ -84,10 +84,10 @@ describe('エリアのキーボード操作 (R233)', () => {
     expect(screen.getByText('エリア一覧')).toBeTruthy()
 
     // 動きが行に添えられている（要件19-64「それぞれの動き」）
-    fireEvent.click(screen.getByRole('button', { name: /2番目のボタン.*動き: メッセージを送る/ }))
+    fireEvent.click(screen.getByRole('button', { name: /2番目のボタン.*動き: テキストを送る/ }))
     expect(screen.getByTestId('selected').textContent).toBe('a-2')
     expect(
-      screen.getByRole('button', { name: /2番目のボタン.*動き: メッセージを送る/ })
+      screen.getByRole('button', { name: /2番目のボタン.*動き: テキストを送る/ })
         .getAttribute('aria-current'),
     ).toBe('true')
   })

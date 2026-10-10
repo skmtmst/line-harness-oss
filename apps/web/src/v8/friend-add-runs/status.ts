@@ -6,6 +6,8 @@
 import type { FriendAddEventRoutingStatus } from '@line-crm/shared'
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
 import { formatDateTime } from '@/lib/format'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 const ROUTING_LABELS: Record<FriendAddEventRoutingStatus, { label: string; tone: StatusBadgeTone }> = {
   pending: { label: 'テスト待ち', tone: 'warning' },
@@ -38,14 +40,7 @@ export function routingAction(status: FriendAddEventRoutingStatus, errorCode: st
 
 /** DB には JST の時刻をオフセットなしで保存した古い行がある。UTC へ読み替えず、そのまま JST として出す。 */
 export function formatJstDateTime(value: string | null): string {
-  if (!value) return '—'
-  const bare = value.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/)
-  if (bare && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(value)) {
-    return `${bare[1]}/${bare[2]}/${bare[3]} ${bare[4]}:${bare[5]}`
-  }
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return '—'
-  return formatDateTime(parsed)
+  return polishFormatDate(value, { style: 'detail', fallback: '—' })
 }
 
 /** 表の「日時」は時:分だけ（全文は title）。 */

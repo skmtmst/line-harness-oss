@@ -282,7 +282,7 @@ function OpsAnnouncementsV7() {
 
   return (
     <div data-design-node="tQ2MJ" className="ops-ann-page">
-      <PageHeader breadcrumb={[]} title="お知らせ" description="契約先へ、画面のお知らせ・メール・契約者専用LINE でお知らせを送ります。" />
+      <PageHeader breadcrumb={[]} title="お知らせ" help="契約先へ、画面のお知らせ・メール・契約者専用LINE でお知らせを送ります。" />
       {notice ? <p role="status" className="text-caption text-accent-deep">{notice}</p> : null}
       <div className="ops-ann-columns">
         <section aria-label="作成" className="ops-ann-form">

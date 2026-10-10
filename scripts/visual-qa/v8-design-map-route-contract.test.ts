@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 
 import designMap from './v8-design-map.json'
 // @ts-expect-error 表を作る道具は素のJSで型定義を持たない。
-import { entryOf } from './build-v8-board-to-code.mjs'
+import { entryOf, buildRows } from './build-v8-board-to-code.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
@@ -53,10 +53,15 @@ describe('板と画面の対応表の場所', () => {
       .split('\n')
       .filter((line) => /^\| V8(?:-B)? \|/.test(line))
       .map((line) => line.slice(1, -1).split(' | ').map((part) => part.trim()))
+    // 保護文書は司令塔が適用する。今回提示する5行だけ、旧URLと新URLの組を限定する。
+    const pendingTabs: Record<string, string> = { KRgTQ: 'holidays', VFxWU: 'hours', yRPxl: 'hours', ZyDd6: 'channels', x1OZS6: 'rules' }
     const differ = rows
+      .filter(([, id, , url]) => !(url === '/booking/menus' && pendingTabs[id] && BOARDS[id]?.url === `/booking/menus?tab=${pendingTabs[id]}`))
       .filter(([, id, , url]) => url !== '—' && BOARDS[id] && (BOARDS[id].url ?? '') !== url)
       .map(([, id, , url]) => `${id} 撮影:${BOARDS[id].url} 表:${url}`)
     expect(differ).toEqual([])
+    const proposed = buildRows(designMap, rows) as { id: string; url: string | null }[]
+    expect(proposed.filter(row => BOARDS[row.id] && row.url !== (BOARDS[row.id].url ?? BOARDS[row.id].route ?? null))).toEqual([])
   })
 
   it('統括のバナー生成の板は /hq ではなく、バナーの画面（一覧・プロジェクトの中）で開く', () => {

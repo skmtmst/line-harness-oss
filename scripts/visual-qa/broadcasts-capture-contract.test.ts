@@ -11,7 +11,6 @@ import { SCREENS } from './screens.mjs'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
 const MOCK_API = readFileSync(join(HERE, 'mock-api.mjs'), 'utf8')
-const BROADCASTS_PAGE = readFileSync(join(ROOT, 'apps/web/src/app/broadcasts/page.tsx'), 'utf8')
 const FOLDER_PANEL = readFileSync(join(ROOT, 'apps/web/src/components/shared/folder-panel.tsx'), 'utf8')
 const FOLDER_DIALOG = readFileSync(join(ROOT, 'apps/web/src/components/shared/folder-add-dialog.tsx'), 'utf8')
 
@@ -36,7 +35,7 @@ describe('一斉配信の画面確認契約', () => {
   it('フォルダ操作を開ける固定行とAPIがある', () => {
     expect(BROADCAST_FOLDERS.length).toBeGreaterThan(0)
     expect(MOCK_API).toContain("query.get('kind') === 'broadcast'")
-    expect(BROADCASTS_PAGE).toContain("qaOpen: index === 1 ? 'xkRDb' : undefined")
+    // 旧一覧（v7）の撮影用の口 qaOpen は、入口が V8 の一覧だけになったので見ない（mainB で v7 の分岐を削除）。
     expect(screen('xkRDb')?.steps).toContainEqual(expect.objectContaining({ qaOpen: 'xkRDb' }))
     for (const label of ['名前を変更', '色を変える', '並び順を上へ', '並び順を下へ', 'フォルダを削除']) {
       expect(FOLDER_PANEL).toContain(label)

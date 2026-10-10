@@ -53,6 +53,13 @@ function dateCondition(
   return `${label}で使えない比較方法が指定されています`;
 }
 
+/** 保存条件の項目名・ID・差し込みキーを、実際の情報欄の保存値へ解決する。 */
+export function friendFieldValueSql(): string {
+  return `(SELECT ffv.value FROM friend_field_values ffv
+    JOIN friend_fields ff ON ff.id = ffv.field_id
+    WHERE ffv.friend_id = f.id AND ? IN (ff.id, ff.name, ff.field_key) LIMIT 1)`;
+}
+
 function compileCondition(condition: SavedSearchCondition): CompiledCondition | string {
   const value = text(condition.value);
   switch (condition.kind) {
@@ -81,7 +88,7 @@ function compileCondition(condition: SavedSearchCondition): CompiledCondition | 
     case 'field': {
       const key = text(condition.key);
       if (!key) return '友だち情報の条件に項目がありません';
-      const expr = `json_extract(f.metadata, '$.' || ?)`;
+      const expr = friendFieldValueSql();
       /*
         「登録あり／なし」は値を取らない。先にここへ逃がさないと、
         値なしで保存した条件が「値がありません」で止まる。
@@ -213,12 +220,12 @@ function compileCondition(condition: SavedSearchCondition): CompiledCondition | 
     }
 
     case 'memo':
-      if (condition.op === 'exists') return { sql: "COALESCE(TRIM(f.private_memo), '') != ''", binds: [] };
-      if (condition.op === 'not_exists') return { sql: "COALESCE(TRIM(f.private_memo), '') = ''", binds: [] };
-      if (!value) return '個別メモの条件に値がありません';
-      if (condition.op === 'eq') return { sql: 'f.private_memo = ?', binds: [value] };
-      if (condition.op === 'contains') return { sql: 'f.private_memo LIKE ?', binds: [`%${value}%`] };
-      return '個別メモで使えない比較方法が指定されています';
+      if (condition.op === 'exists') return { sql: "COALESCE(TRIM((SELECT memo_chat.notes FROM chats memo_chat WHERE memo_chat.friend_id = f.id)), '') != ''", binds: [] };
+      if (condition.op === 'not_exists') return { sql: "COALESCE(TRIM((SELECT memo_chat.notes FROM chats memo_chat WHERE memo_chat.friend_id = f.id)), '') = ''", binds: [] };
+      if (!value) return 'メモの条件に値がありません';
+      if (condition.op === 'eq') return { sql: '(SELECT memo_chat.notes FROM chats memo_chat WHERE memo_chat.friend_id = f.id) = ?', binds: [value] };
+      if (condition.op === 'contains') return { sql: '(SELECT memo_chat.notes FROM chats memo_chat WHERE memo_chat.friend_id = f.id) LIKE ?', binds: [`%${value}%`] };
+      return 'メモで使えない比較方法が指定されています';
 
     case 'created_at': {
       return dateCondition(condition, 'f.created_at', '友だち追加日');

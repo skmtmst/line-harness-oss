@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   listMessageTemplates,
@@ -49,7 +50,7 @@ messageTemplates.get('/api/message-templates/:id', async (c) => {
 });
 
 // POST /api/message-templates — create
-messageTemplates.post('/api/message-templates', requireRole('owner', 'admin'), async (c) => {
+messageTemplates.post('/api/message-templates', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"messageType":["string"],"messageContent":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       name: string;
@@ -58,11 +59,11 @@ messageTemplates.post('/api/message-templates', requireRole('owner', 'admin'), a
     }>();
 
     if (!body.name || !body.messageType || !body.messageContent) {
-      return c.json({ success: false, error: 'name, messageType, messageContent are required' }, 400);
+      return inputError(c, { success: false, error: 'name, messageType, messageContent are required' }, 400, ["name","messageType","messageContent"]);
     }
 
     if (!['text', 'flex'].includes(body.messageType)) {
-      return c.json({ success: false, error: 'messageType must be text or flex' }, 400);
+      return inputError(c, { success: false, error: 'messageType must be text or flex' }, 400, ["messageType"]);
     }
 
     // Validate flex JSON
@@ -70,7 +71,7 @@ messageTemplates.post('/api/message-templates', requireRole('owner', 'admin'), a
       try {
         JSON.parse(body.messageContent);
       } catch {
-        return c.json({ success: false, error: 'messageContent must be valid JSON for flex type' }, 400);
+        return inputError(c, { success: false, error: 'messageContent must be valid JSON for flex type' }, 422, ["messageContent"]);
       }
     }
 
@@ -87,7 +88,7 @@ messageTemplates.post('/api/message-templates', requireRole('owner', 'admin'), a
 });
 
 // PUT /api/message-templates/:id — update
-messageTemplates.put('/api/message-templates/:id', requireRole('owner', 'admin'), async (c) => {
+messageTemplates.put('/api/message-templates/:id', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"messageType":["string"],"messageContent":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       name?: string;
@@ -96,7 +97,7 @@ messageTemplates.put('/api/message-templates/:id', requireRole('owner', 'admin')
     }>();
 
     if (body.messageType && !['text', 'flex'].includes(body.messageType)) {
-      return c.json({ success: false, error: 'messageType must be text or flex' }, 400);
+      return inputError(c, { success: false, error: 'messageType must be text or flex' }, 400, ["messageType"]);
     }
 
     // Resolve effective type and content for validation
@@ -109,7 +110,7 @@ messageTemplates.put('/api/message-templates/:id', requireRole('owner', 'admin')
       try {
         JSON.parse(effectiveContent);
       } catch {
-        return c.json({ success: false, error: 'messageContent must be valid JSON for flex type' }, 400);
+        return inputError(c, { success: false, error: 'messageContent must be valid JSON for flex type' }, 422, ["messageContent"]);
       }
     }
 

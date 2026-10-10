@@ -3,16 +3,14 @@
 /*
  * ★V8 画像の詳細（Pencil `rI5uh`）と、そこから開く「一覧から外す」の確かめ（`B24oNg`）。
  * 共通の窓に絵の幅 860・上からの位置を渡し、中身を絵どおりに組む：
- * 左に画像とダウンロード・お気に入り、右に「アカウントへ渡す」（探す・タグの札・アカウントの一覧・渡す）、
+ * 左に画像とダウンロード・お気に入り、右に「アカウントへ配る」（探す・タグの札・アカウントの一覧・渡す）、
  * 下に「生成時の条件」（2列）、いちばん下に 一覧から外す（左）・参照画像にする・同じ設定でもう一度生成（右）。
  * 動き（渡す・外す・お気に入り・もう一度生成）は v7（components/hq/banners/image-detail-modal.tsx）と同じ。
  */
 import { Download, ImagePlus, RefreshCw, Send, Star, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
-import FilterChip from '@/components/shared/filter-chip'
-import SearchField from '@/components/shared/search-field'
+import { HqAccountPickerField } from '@/components/shared/hq-account-picker'
 import type { AccountWithStats } from '@/contexts/account-context'
 import { generationConditionRows, type BannerImage, type BannerPreset } from '@/lib/hq-banners'
 import { BannerConfirmDialogV8 } from './dialogs'
@@ -28,7 +26,7 @@ export function conditionRows(image: BannerImage, presets: BannerPreset[]): Arra
       const colors = [g.baseColor, g.mainColor, g.subColor, g.accentColor].filter(Boolean)
       return colors.length > 0 ? { label: '色', value: colors.join('・') } : row
     }
-    if (row.label === '作成') return { label: '作成', value: `${monthDayTime(image.createdAt)}・${image.sequence}枚目` }
+    if (row.label === '作成') return { label: '作成', value: `${monthDayTime(image.createdAt)}・${image.sequence} 枚目` }
     return row
   })
 }
@@ -65,23 +63,17 @@ export function BannerImageDetailV8({
   onUseAsReference?: () => void
 }) {
   const [selected, setSelected] = useState<string[]>([])
-  const [query, setQuery] = useState('')
-  const [tagId, setTagId] = useState<string | null>(null)
   const [confirmRemove, setConfirmRemove] = useState(false)
   // 読めない画像は壊れた印を出さず、地の色のままにする。
   const [previewFailed, setPreviewFailed] = useState(false)
 
   // アーカイブしたアカウントへは渡さない（受け取る口が止まっている）。
   const targets = useMemo(() => accounts.filter((a) => !a.archivedAt), [accounts])
-  const tags = useMemo(() => Array.from(new Map(targets.flatMap((a) => a.tags ?? []).map((t) => [t.id, t])).values()), [targets])
   const delivered = useMemo(() => new Set(image.deliveredAccountIds), [image.deliveredAccountIds])
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return targets.filter((a) => (!tagId || a.tags?.some((t) => t.id === tagId)) && (!q ||
-      `${a.displayName ?? a.name}\n${a.basicId ?? ''}\n${a.channelId ?? ''}\n${(a.tags ?? []).map((t) => t.name).join(' ')}`.toLowerCase().includes(q)))
-  }, [targets, query, tagId])
+  // 名前のほか LINE ID・タグの名前でも探せる（前の探す欄と同じ）。
+  const pickerAccounts = useMemo(() => targets.map((a) => ({ id: a.id, name: a.displayName ?? a.name,
+    keywords: `${a.basicId ?? ''} ${a.channelId ?? ''} ${(a.tags ?? []).map((t) => t.name).join(' ')}` })), [targets])
   const rows = conditionRows(image, presets)
-  const toggle = (id: string) => setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
 
   if (confirmRemove) {
     // 絵 B24oNg：詳細の窓は閉じ、確かめる窓だけを出す。やめると詳細へ戻る。
@@ -89,21 +81,16 @@ export function BannerImageDetailV8({
       <BannerConfirmDialogV8
         open
         title="この画像を一覧から外しますか？"
-        description="統括の一覧に出なくなります。すでにアカウントへ渡した画像は、そのアカウントの登録メディアに残ります。"
+        description="統括の一覧に出なくなります。すでにアカウントへ配った画像は、そのアカウントの登録メディアに残ります。"
         confirmLabel="一覧から外す"
         tone="danger"
         busy={busy}
         error={error}
         designNode="B24oNg"
-        onConfirm={() => void onRemove().then((ok) => { if (ok) setConfirmRemove(false) })}
+        onConfirm={() => onRemove().then((ok) => { if (ok) setConfirmRemove(false) })}
         onCancel={() => setConfirmRemove(false)}
       />
     )
-  }
-
-  const handle = (account: AccountWithStats) => {
-    const id = account.basicId ? `@${account.basicId.replace(/^@/, '')}` : account.channelId ?? ''
-    return [id, ...(account.tags ?? []).map((t) => t.name)].filter(Boolean).join('・')
   }
 
   return (
@@ -158,49 +145,13 @@ export function BannerImageDetailV8({
             </div>
           </div>
 
-          <section className={styles.deliver} aria-label="アカウントへ渡す">
-            <h3 className={styles.sectionTitle}>アカウントへ渡す</h3>
-            <p className={styles.note}>渡したアカウントの登録メディア（フォルダ「02_バナー」）に入ります</p>
-            <SearchField
-              placeholder="アカウント名・タグで探す"
-              aria-label="渡すアカウントをアカウント名・タグで探す"
-              value={query}
-              onChange={setQuery}
-              onClear={() => setQuery('')}
-            />
-            <div className={styles.chips} role="group" aria-label="配布先のタグ">
-              <FilterChip selected={!tagId} onChange={() => setTagId(null)}>{`すべて ${targets.length}`}</FilterChip>
-              {tags.map((t) => (
-                <FilterChip key={t.id} selected={tagId === t.id} icon={<Star size={14} aria-hidden="true" />} onChange={(on) => setTagId(on ? t.id : null)}>{t.name}</FilterChip>
-              ))}
-            </div>
-            {targets.length === 0 ? (
-              <p className={styles.note}>この統括にアカウントがありません。</p>
-            ) : visible.length === 0 ? (
-              <p className={styles.note}>当てはまるアカウントがありません。</p>
-            ) : (
-              <ul className={styles.accounts}>
-                {visible.map((account) => {
-                  const already = delivered.has(account.id)
-                  const name = account.displayName ?? account.name
-                  return (
-                    <li key={account.id} className={already ? `${styles.account} ${styles.accountDone}` : styles.account}>
-                      <Checkbox
-                        checked={already || selected.includes(account.id)}
-                        disabled={already || busy || !canManage}
-                        onCheckedChange={() => toggle(account.id)}
-                        aria-label={`${name}へ配布`}
-                      />
-                      <span className={styles.accountText}>
-                        <span className={styles.accountName} title={name}>{name}</span>
-                        <span className={styles.accountHandle}>{handle(account)}</span>
-                      </span>
-                      {already ? <span className={styles.pillOk}><span className={styles.dot} aria-hidden="true" />渡し済み</span> : null}
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
+          <section className={styles.deliver} aria-label="アカウントへ配る">
+            <h3 className={styles.sectionTitle}>アカウントへ配る</h3>
+            <p className={styles.note}>配ったアカウントの登録メディア（フォルダ「02_バナー」）に入ります</p>
+            <HqAccountPickerField label="配るアカウント" accounts={pickerAccounts} value={selected} onChange={setSelected}
+              disabledIds={image.deliveredAccountIds} readOnly={!canManage} disabled={busy}
+              meta={(account) => delivered.has(account.id) ? '配布済み' : undefined} />
+            {targets.length === 0 ? <p className={styles.note}>この統括にアカウントがありません。</p> : null}
             {canManage ? (
               <div className={styles.deliverFoot}>
                 <span className={styles.note}>{selected.length > 0 ? `${selected.length} アカウントを選んでいます` : 'アカウントを選んでください'}</span>
@@ -210,9 +161,9 @@ export function BannerImageDetailV8({
                   disabled={busy || selected.length === 0}
                   onClick={() => void onDeliver(selected).then((ok) => { if (ok) setSelected([]) })}
                   busy={busy}
-                  busyLabel="渡しています…"
+                  busyLabel="配っています…"
                 >
-                  <Send aria-hidden="true" className={styles.icon} />{`${selected.length}アカウントへ渡す`}
+                  <Send aria-hidden="true" className={styles.icon} />{`${selected.length}アカウントへ配る`}
                 </Button>
               </div>
             ) : null}

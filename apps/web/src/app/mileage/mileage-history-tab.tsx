@@ -278,7 +278,7 @@ export default function MileageHistoryTab({ accountId, canOperate = false }: { a
           <ListState
             kind="error"
             description="マイルの履歴を確認できませんでした。再読み込みしてください。"
-            action={<Button onClick={() => void load()}>履歴を再読み込み</Button>}
+            onRetry={() => void load()}
           />
         ) : items.length === 0 ? (
           <ListState

@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   getLineWebhookEvent,
@@ -46,7 +47,7 @@ lineWebhookEvents.get(
 lineWebhookEvents.post(
   '/api/line-webhook-events/:id/retry',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const db = dbFor(c.env);
       const scope = await getVisibleLineAccountScope(db, c.get('staff'));

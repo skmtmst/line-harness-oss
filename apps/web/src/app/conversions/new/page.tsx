@@ -389,7 +389,7 @@ function NewConversionPointPageV7() {
       </div>
     <CreatePage
       title="成果地点を作る"
-      description="「申込」「購入」など、成果として数えたい行動を登録します。"
+      help="「申込」「購入」など、成果として数えたい行動を登録します。"
       showHeader={false}
       parent={['コンバージョン', '/conversions?tab=points']}
       successHref={(id) => `/conversions?tab=points${id ? `&highlight=${encodeURIComponent(id)}` : ''}`}

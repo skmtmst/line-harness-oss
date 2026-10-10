@@ -104,6 +104,6 @@ test('一覧口の429は1枚の案内になり読み直しの口が残る', asyn
     expect(host.textContent).toContain('シナリオを読み込めませんでした')
   })
   const retry = [...host.querySelectorAll('button')]
-    .find((item) => item.textContent?.trim() === 'もう一度試す')
+    .find((item) => item.textContent?.trim() === 'もう一度読み込む')
   expect(retry).toBeTruthy()
 })

@@ -26,6 +26,8 @@ import TargetMissing from '@/components/shared/target-missing'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { formatDateTime } from '@/lib/format'
 import styles from './bookings-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 /** 予約・申込の状態の見え方。色だけに頼らず、必ず文字で言う。 */
 const STATUS_TONE: Record<string, StatusBadgeTone> = {
@@ -424,24 +426,24 @@ export default function BookingsV8({ eventId }: { eventId: string }) {
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>申込</span>
           <span className={styles.kpiValue}>
-            {applicantsStatus === 'ready' ? (occurrence?.activeSeats ?? confirmedSeats + requestedSeats) : '—'}
+            {applicantsStatus === 'ready' ? (occurrence?.activeSeats ?? confirmedSeats + requestedSeats) : emptyValue('unknown')}
             {capacity !== null ? <span className={styles.kpiUnit}> / {capacity}</span> : null}
           </span>
           <span className={styles.kpiDetail}>人・この回</span>
         </div>
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>承認待ち</span>
-          <span className={requestedSeats > 0 ? `${styles.kpiValue} ${styles.kpiValueWarn}` : styles.kpiValue}>{applicantsStatus === 'ready' ? requestedSeats : '—'}</span>
+          <span className={requestedSeats > 0 ? `${styles.kpiValue} ${styles.kpiValueWarn}` : styles.kpiValue}>{applicantsStatus === 'ready' ? requestedSeats : emptyValue('unknown')}</span>
           <span className={styles.kpiDetail}>件</span>
         </div>
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>キャンセル待ち</span>
-          <span className={styles.kpiValue}>{applicantsStatus === 'ready' ? waitingSeats + offeredSeats : '—'}</span>
+          <span className={styles.kpiValue}>{applicantsStatus === 'ready' ? waitingSeats + offeredSeats : emptyValue('unknown')}</span>
           <span className={styles.kpiDetail}>人</span>
         </div>
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>キャンセル</span>
-          <span className={styles.kpiValue}>{applicantsStatus === 'ready' ? cancelledCount : '—'}</span>
+          <span className={styles.kpiValue}>{applicantsStatus === 'ready' ? cancelledCount : emptyValue('unknown')}</span>
           <span className={styles.kpiDetail}>件</span>
         </div>
       </div>
@@ -505,7 +507,7 @@ export default function BookingsV8({ eventId }: { eventId: string }) {
                         ? formatJp(row.offerExpiresAt, '期限は未取得')
                         : row.status === 'waiting'
                           ? '案内前'
-                          : '—'}
+                          : emptyValue('unknown')}
                     </Td>
                     <Td align="right">
                       <span className={styles.rowActions}>
@@ -642,10 +644,10 @@ export default function BookingsV8({ eventId }: { eventId: string }) {
                     </StatusBadge>
                   </Td>
                   <Td className="text-xs">{formatJp(row.appliedAt, '—')}</Td>
-                  <Td className="text-xs">{row.offeredAt ? formatJp(row.offeredAt, '案内日時は未取得') : '—'}</Td>
+                  <Td className="text-xs">{row.offeredAt ? formatJp(row.offeredAt, '案内日時は未取得') : emptyValue('unknown')}</Td>
                   <Td className="text-xs">
                     {row.status === 'waiting' || row.status === 'offered' || row.status === 'accepted'
-                      ? '—'
+                      ? emptyValue('unknown')
                       : formatJp(history.find((entry) => entry.id === row.id)?.updatedAt ?? null, '—')}
                   </Td>
                 </Tr>
@@ -735,15 +737,12 @@ export default function BookingsV8({ eventId }: { eventId: string }) {
         }}
       >
         {rejectApplicant ? (
-          <label className="grid gap-1 text-xs font-medium text-ink-secondary">
-            断る理由（任意・内部メモ）
-            <textarea
+          <Field label="断る理由（・内部メモ）"><textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               rows={2}
               className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
-            />
-          </label>
+            /></Field>
         ) : null}
       </ConfirmDialog>
 
@@ -820,15 +819,12 @@ export default function BookingsV8({ eventId }: { eventId: string }) {
                 </Button>
               </div>
             ) : null}
-            <label className="grid gap-1 text-xs font-medium text-ink-secondary">
-              理由（必須・記録に残ります）
-              <textarea
+            <Field label="理由（・記録に残ります）" required><textarea
                 value={waitlistReason}
                 onChange={(e) => setWaitlistReason(e.target.value)}
                 rows={2}
                 className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
-              />
-            </label>
+              /></Field>
           </>
         ) : null}
       </ConfirmDialog>

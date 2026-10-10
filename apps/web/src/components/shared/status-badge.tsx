@@ -1,5 +1,7 @@
 import React, { type HTMLAttributes, type ReactNode } from 'react'
+import { statusLabel, type StandardStatus } from '@/lib/status-labels'
 import HelpTip from './help-tip'
+import TruncatedText from './truncated-text'
 import styles from './status-badge.module.css'
 
 export type StatusBadgeTone = 'neutral' | 'info' | 'warning' | 'success' | 'danger'
@@ -7,6 +9,7 @@ export type StatusBadgeTone = 'neutral' | 'info' | 'warning' | 'success' | 'dang
 /** 色だけに頼らず、必ず状態を文字で伝える共通バッジ。 */
 export default function StatusBadge({
   children,
+  status,
   tone = 'neutral',
   size = 'default',
   className,
@@ -14,11 +17,15 @@ export default function StatusBadge({
   helpLabel,
   helpHref,
   dot = true,
+  surface = 'tinted',
   ...props
 }: Omit<HTMLAttributes<HTMLSpanElement>, 'children'> & {
-  children: ReactNode
+  children?: ReactNode
+  status?: StandardStatus
   tone?: StatusBadgeTone
-  size?: 'default' | 'compact'
+  size?: 'default' | 'compact' | 'micro' | 'annotation'
+  /** 選んだ顧客の連携情報（rm92Y）だけ白地にする。 */
+  surface?: 'tinted' | 'white'
   /**
    * 札の意味（例：審査中・保留・期限切れの違い）。札のすぐ右の「？」へ入れる
    * （★V7・§2-1b）。札の列が並ぶ表では、見出しの「？」にまとめるのも可。
@@ -34,14 +41,15 @@ export default function StatusBadge({
    */
   dot?: boolean
 }) {
-  const classes = [styles.badge, styles[tone], size === 'compact' ? styles.compact : null, dot ? null : styles.noDot, className]
+  const label = status ? statusLabel(status) : typeof children === 'string' ? statusLabel(children) : children
+  const classes = [styles.badge, styles[tone], size === 'compact' ? styles.compact : size === 'micro' ? styles.micro : size === 'annotation' ? styles.annotation : null, dot ? null : styles.noDot, className]
     .filter(Boolean)
     .join(' ')
   const hasHelp = help !== undefined && help !== null
-  const heading = helpLabel ?? (typeof children === 'string' ? children : 'この状態')
+  const heading = helpLabel ?? (typeof label === 'string' ? label : 'この状態')
   return (
-    <span className={classes} data-design-node="xRvDB" {...props}>
-      {children}
+    <span className={classes} data-tone={tone} data-design-node="xRvDB" data-surface={surface} {...props}>
+      {typeof label === 'string' ? <TruncatedText value={label} /> : label}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>
           {help}

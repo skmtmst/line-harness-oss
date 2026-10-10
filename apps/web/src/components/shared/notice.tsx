@@ -6,27 +6,9 @@ import HelpTip from './help-tip'
 import styles from './notice.module.css'
 import { humanizeErrorText } from './human-error-text'
 
-/**
- * 帯（Notice）の種類。★V7 共通部品その2 §1 の4つ。
- *
- * - `info` 案内（青）／`success` うまくいった（緑）
- * - `warn` 注意（黄）／`danger` 危険（赤）
- *
- * `validation` と `error` は V5 時代の呼び名。同じ見た目（warn・danger）
- * として残してある。新しく書くときは4つの名前を使う。
- */
-export type NoticeTone = 'info' | 'success' | 'warn' | 'danger' | 'validation' | 'error'
-
-type CanonicalTone = 'info' | 'success' | 'warn' | 'danger'
-
-const CANONICAL: Record<NoticeTone, CanonicalTone> = {
-  info: 'info',
-  success: 'success',
-  warn: 'warn',
-  danger: 'danger',
-  validation: 'warn',
-  error: 'danger',
-}
+/** 知らせは案内・成功・注意・危険の4種類。呼び名と見た目はここが持つ。 */
+export type NoticeTone = 'info' | 'success' | 'warn' | 'danger'
+type CanonicalTone = NoticeTone
 
 /* 正本は Pencil ★V8 `ThDed`「帯/案内」。下の節点の印 uR9s8 は前の版から引き継いだ値で、4種とも同じ。 */
 const NODE_BY_TONE: Record<CanonicalTone, string> = {
@@ -45,6 +27,13 @@ const ICON_BY_TONE: Record<CanonicalTone, typeof CircleCheck> = {
 
 export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   tone: NoticeTone
+  density?: 'compact'
+  /** 2行の競合通知。既定の案内帯は変えない。 */
+  heading?: ReactNode
+  /** カード内などの小さな帯。本文を1行に省略し、title で全文を渡す。 */
+  compact?: boolean
+  /** 枠線のない注意帯を描く板だけで指定する。既定の帯は変えない。 */
+  appearance?: 'soft'
   /** 本文（1〜2文）。`children` があるときはそちらが勝つ。 */
   message?: string
   children?: ReactNode
@@ -67,6 +56,8 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
    * 既定の描画は変えない（v7 の画素も不変）。
    */
   icon?: ReactNode
+  /** アカウントの短い説明。既定の帯の色・寸法は変えない。 */
+  presentation?: 'account-note'
 }
 
 /**
@@ -77,6 +68,10 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
  */
 export default function Notice({
   tone,
+  density,
+  heading,
+  compact = false,
+  appearance,
   message,
   children,
   action,
@@ -86,21 +81,26 @@ export default function Notice({
   helpLabel,
   helpHref,
   icon,
+  presentation,
   role,
   ...props
 }: NoticeProps) {
-  const canonical = CANONICAL[tone]
+  const canonical = tone
   const Icon = ICON_BY_TONE[canonical]
   const node = NODE_BY_TONE[canonical]
   const hasHelp = help !== undefined && help !== null
   return (
     <div
       {...props}
-      className={[styles.notice, styles[canonical], className].filter(Boolean).join(' ')}
+      className={[styles.notice, styles[canonical], heading ? styles.twoLine : null, className].filter(Boolean).join(' ')}
       // 呼び出し側が role を指定したらそれを優先する（下書きの競合帯の alert など）。
       // 指定がないときだけ、種類から既定（危険＝alert、ほかは note）を決める。
       role={role ?? (canonical === 'danger' ? 'alert' : 'note')}
+      data-compact={compact || undefined}
+      data-appearance={appearance}
       data-design-part="notice"
+      data-density={density}
+      data-presentation={presentation}
       data-design-node={node}
     >
       {icon === undefined ? (
@@ -112,7 +112,8 @@ export default function Notice({
         <span className={styles.icon} aria-hidden="true">{icon}</span>
       )}
       <span className={styles.message}>
-        {typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))}
+        {heading ? <><span className={styles.heading}>{heading}</span><span className={styles.description}>{typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))}</span></>
+          : typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))}
         {hasHelp ? (
           <HelpTip label={`${helpLabel ?? 'この案内'}の説明`}>
             {help}

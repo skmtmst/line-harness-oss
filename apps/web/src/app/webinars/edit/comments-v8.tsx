@@ -9,6 +9,7 @@ import { Th } from '@/components/shared/table'
 import { WEBINAR_SAKURA_COMMENTS_MAX } from '@/components/webinars/webinar-limits'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { ApiError, webinarApi, type WebinarSakuraComment } from '@/lib/api'
+import NumberInput from '@/components/shared/number-field'
 
 function validateImportRow(raw: unknown): WebinarSakuraComment | string {
   if (typeof raw !== 'object' || raw === null) return 'オブジェクトではありません'
@@ -126,7 +127,7 @@ export default function CommentsV8({ webinarId, onDirtyChange, registerSave }: {
   return (
     <div className="flex flex-col gap-4" data-design-node="Omqd4">
       <div className="min-w-0 flex-1 space-y-3">
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="コメント演出">
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface" aria-label="コメント演出">
           <h2 className="text-ink text-base font-bold">コメント演出<HelpTip label="コメント演出の説明">動画の途中で出すコメントをあらかじめ入れます。{WEBINAR_SAKURA_COMMENTS_MAX}件まで。</HelpTip></h2>
           {message ? <Notice tone={isErrorMessage ? 'danger' : 'info'}>{message}</Notice> : null}
           {state === 'error' ? <Notice tone="info" action={<Button onClick={() => setAttempt((value) => value + 1)}>もう一度読み込む</Button>}>コメントを読み込めませんでした。保存前に読み直してください。</Notice> : state === 'denied' ? <Notice tone="info">コメントを編集する権限がありません。管理者に確認してください。</Notice> : state === 'loading' ? (
@@ -149,7 +150,7 @@ export default function CommentsV8({ webinarId, onDirtyChange, registerSave }: {
                     {comments.map((c, i) => (
                       <tr key={i}>
                         <td className="px-4 py-2">
-                          <input
+                          <NumberInput
                             type="number"
                             value={c.atSeconds}
                             onChange={(e) => update(i, { atSeconds: Number(e.target.value) })}

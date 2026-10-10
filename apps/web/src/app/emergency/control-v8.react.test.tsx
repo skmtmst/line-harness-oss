@@ -8,12 +8,13 @@ vi.hoisted(() => {
 })
 
 import EmergencyControlV8 from './control-v8'
+;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 /*
  * ★V8-B 運用状態の緊急コントロール（板 `OHwbU`）の契約。
  * 新しい制御タブに切り替わり、何を止めますか・止めるアカウント・
  * 記録の表が出ること、権限が無い人には閲覧のみの帯が出て止める操作が
- * 押せない形になること、止める確認の窓は「停止」の言葉が合うまで
+ * 隠れること、止める確認の窓は「停止」の言葉が合うまで
  * 進めないことを実DOMで固定する。
  */
 vi.mock('next/link', () => ({
@@ -49,6 +50,7 @@ const controlBase = {
 }
 
 let canControl = true
+let activeIncidentId: string | null = null
 
 const response = (data: unknown, status = 200) => new Response(
   JSON.stringify(data),
@@ -60,6 +62,7 @@ let host: HTMLDivElement | null = null
 
 beforeEach(() => {
   canControl = true
+  activeIncidentId = null
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -69,6 +72,7 @@ beforeEach(() => {
     if (url.includes('/api/auth/step-up')) {
       return response({ success: true, data: { token: 'step-up-test-token' } })
     }
+    if (url.includes('/restore-preview')) return response({ success: false, error: '閲覧のみです' }, 403)
     if (url.includes('/api/operations/incidents')) {
       const raw = (init as { body?: string } | undefined)?.body
       stopCalls.push({ url, body: (raw ? JSON.parse(raw) : {}) as Record<string, unknown> })
@@ -78,7 +82,7 @@ beforeEach(() => {
       return response({
         success: true,
         data: {
-          control: controlBase,
+          control: { ...controlBase, activeIncidentId, stoppedAt: activeIncidentId ? '2026-10-02T06:00:00.000Z' : null },
           counts: {},
           impact,
           permissions: { canControl },
@@ -157,13 +161,17 @@ test('新しい制御タブ（OHwbU）が出る', async () => {
   expect(host?.textContent).toContain('止めた・戻した記録')
 })
 
-test('権限が無い人には閲覧のみの帯が出て止められない', async () => {
+test('PKG107: 閲覧のみには停止操作を隠し、状態と記録を残す', async () => {
   canControl = false
   await renderControl()
   expect(host?.textContent).toContain('閲覧のみで見ています')
   const stopButton = Array.from(host?.querySelectorAll('button') ?? [])
     .find((button) => button.textContent === '選んだものを止める')
-  expect(stopButton?.hasAttribute('disabled')).toBe(true)
+  expect(stopButton).toBeUndefined()
+  expect(host?.querySelector('input[type="checkbox"]')).toBeNull()
+  // 対象アカウントは状態を見るためにも使うので、閲覧だけでも選べる。
+  expect(host?.querySelector('[aria-label="緊急停止の対象アカウント"]')).not.toBeNull()
+  expect(host?.textContent).toContain('止めた・戻した記録')
 })
 
 /*
@@ -323,3 +331,11 @@ test('WEB312: 状態が読めないときは「—」と読み直しを出す', 
   expect(host?.textContent).not.toContain('いまは止めていません')
   expect(host?.textContent).toContain('いまの停止状態を確認できませんでした')
 })
+
+test('PKG107: 停止中の閲覧のみでは復旧操作を隠し、停止の状態を読める', async () => {
+  canControl = false
+  activeIncidentId = 'incident-1'
+  await renderControl()
+  expect(host?.textContent).toContain('止めているとき')
+  expect([...host!.querySelectorAll('button')].find((el) => el.textContent?.trim() === '復旧する')).toBeUndefined()
+ })

@@ -8,6 +8,7 @@
  * データの口（取得・絞り込み・並び・ページ送り・名前の変更・削除・フォルダ）は今の V8
  * （src/app/events/events-list-v8.tsx）と同じ。行の名前の前にフォルダの色の丸（2026-10-07 オーナー）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -22,6 +23,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
+import TagPill from '@/components/shared/tag-pill'
 import Select from '@/components/shared/select'
 import ListToolbar from '@/components/shared/list-toolbar'
 import FilterChip from '@/components/shared/filter-chip'
@@ -30,9 +32,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import HelpTip from '@/components/shared/help-tip'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import { useFolderRowActions } from '@/components/shared/folder-row-actions'
+import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DetailPanel from '@/components/shared/detail-panel'
@@ -47,13 +47,16 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { daysUntilIso, eventRowState, isLowApplication, summarizeEventAttention, type EventRowState } from './attention'
 import { jstDay, jstTime } from './shared'
 import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /** 未分類を表す印。裏側（events.ts）が `__ungrouped__` で受ける。 */
 const UNFILED = '__ungrouped__'
 const PAGE_SIZES = [10, 20, 50]
-const VIEWER_NOTE = '閲覧のみで見ています。イベントを作る・直す・消す操作は管理者に頼んでください。'
+const VIEWER_NOTE = '閲覧のみで見ています。イベントを作る・直す・消す操作はオーナーか管理者に頼んでください。'
 
 /*
  * よく使う絞り込み（絵の選ぶ欄）。並びと「満席の回がある」をここから選ぶ。
@@ -67,7 +70,7 @@ const SAVED_OPTIONS = [
 
 const STATE_LABEL: Record<EventRowState, string> = {
   draft: '下書き',
-  paused: '一時停止',
+  paused: '停止中',
   cancelled: '中止',
   ended: '終了',
   full: '満席',
@@ -100,16 +103,15 @@ export default function EventsListV8() {
   const [listTotal, setListTotal] = useState(0)
   const [summary, setSummary] = useState<EventListSummary | null>(null)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<'all' | 'open' | 'pending' | 'full'>('all')
-  const [sort, setSort] = useState<'soon' | 'name'>('soon')
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(20)
-  const [folderFilter, setFolderFilter] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<'all' | 'open' | 'pending' | 'full'>('filter', 'all')
+  const [sort, setSort] = useListUrlValue<'soon' | 'name'>('sort', 'soon')
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [perPage, setPerPage] = useListUrlValue('perPage', 20)
+  const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', '')
   const [folders, setFolders] = useState<Folder[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [foldersError, setFoldersError] = useState(false)
-  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [pendingTotal, setPendingTotal] = useState<number | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -138,17 +140,6 @@ export default function EventsListV8() {
     }
   }, [selectedAccountId])
 
-  /* フォルダの「…」：名前を変える・色を変える・並べ替える・消す（共通部品・B-35）。 */
-  const folderActions = useFolderRowActions({
-    kind: 'event',
-    folders,
-    accountId: selectedAccountId ?? null,
-    enabled: canEdit,
-    itemLabel: 'イベント',
-    countOf: (id) => folders.find((f) => f.id === id)?.itemCount ?? null,
-    onChanged: () => loadFolders(),
-    onDeleted: (id) => { if (folderFilter === id) setFolderFilter('') },
-  })
 
   useEffect(() => {
     void loadFolders()
@@ -290,7 +281,7 @@ export default function EventsListV8() {
   const filterActive = Boolean(query.trim() || filter !== 'all' || folderFilter)
   const pageCount = Math.max(1, Math.ceil(listTotal / perPage))
   const current = Math.min(page, pageCount)
-  const kpiDetail = (ready: string) => (!selectedAccountId ? 'アカウントを選択' : loadStatus === 'loading' ? '—' : loadStatus === 'ready' ? ready : '読み込めませんでした')
+  const kpiDetail = (ready: string) => (!selectedAccountId ? 'アカウントを選択' : loadStatus === 'loading' ? emptyValue('unknown') : loadStatus === 'ready' ? ready : '読み込めませんでした')
 
   const kpis = [
     {
@@ -299,7 +290,7 @@ export default function EventsListV8() {
     },
     {
       key: 'active', title: '申込', icon: Users, value: dataReady ? kpi.upcoming_active : null, unit: '人',
-      detail: kpiDetail(kpi.fill_rate === null ? '今後の回への申込' : `定員 ${kpi.upcoming_capacity ?? '—'} 人に対して ${kpi.fill_rate}%`),
+      detail: kpiDetail(kpi.fill_rate === null ? '今後の回への申込' : `定員 ${kpi.upcoming_capacity ?? emptyValue('unknown')} 人に対して ${kpi.fill_rate}%`),
     },
     {
       key: 'nearly-full', title: 'あと少しで満席', icon: Hourglass, value: dataReady ? kpi.nearly_full : null, unit: '回',
@@ -308,7 +299,7 @@ export default function EventsListV8() {
     {
       key: 'low', title: '申し込みが少ない', icon: TrendingDown, value: dataReady ? kpi.low_applications : null, unit: '回',
       detail: kpiDetail(kpi.nearest_low_starts_at
-        ? `${jstDay(kpi.nearest_low_starts_at)}の回。あと ${daysUntilIso(kpi.nearest_low_starts_at) ?? '—'} 日`
+        ? `${jstDay(kpi.nearest_low_starts_at)}の回。あと ${daysUntilIso(kpi.nearest_low_starts_at) ?? emptyValue('unknown')} 日`
         : '声をかけると埋まります'),
     },
   ]
@@ -320,28 +311,32 @@ export default function EventsListV8() {
     </Button>
   ) : <span className={styles.createSpace} aria-hidden="true" />
 
-  const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: '', label: 'すべて', count: loadStatus === 'ready' && !folderFilter ? listTotal : null },
-    ...folders.map((folder, index) => ({ kind: 'folder' as const, ...folderActions.rowActions(folder, index), id: folder.id, label: folder.name, count: folder.itemCount ?? null, color: folder.color })),
-    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
-  ]
+  const folderRows = managedFolderNavRows('event', folders, { allId: '', unfiledId: UNFILED })
 
   const folderPanel = (
-    <FolderPanel
+    <ManagedFolderPanel
+      kind="event"
+      accountId={selectedAccountId ?? null}
+      folders={folders}
+      onChanged={loadFolders}
+      canManage={canEdit && Boolean(selectedAccountId)}
+      itemLabel="イベント"
       activeId={folderFilter}
       onSelect={setFolderFilter}
-      onAddFolder={canEdit ? () => { closeDetail(); setFolderDialogOpen(true) } : undefined}
-      addFolderLabel="フォルダを追加"
-      rows={folderRows}
+      allId=""
+      unfiledId={UNFILED}
+      allCount={loadStatus === 'ready' && !folderFilter ? listTotal : null}
+      unfiledCount={unfiledCount}
+      onAddStart={closeDetail}
+      placeholder="例：教室"
     >
-      <p className={styles.folderNote}>フォルダを消しても、中のイベントは未分類に残ります。</p>
       {foldersError ? (
         <p role="alert" className={styles.folderNote}>
           フォルダを読み込めませんでした。
           <button type="button" onClick={() => void loadFolders()} className={styles.textButton}>もう一度</button>
         </p>
       ) : null}
-    </FolderPanel>
+    </ManagedFolderPanel>
   )
 
   const savedValue = filter === 'full' ? 'full' : sort === 'name' ? 'sort-name' : ''
@@ -370,9 +365,10 @@ export default function EventsListV8() {
         trailing={(
           <>
             <div className={styles.savedBox}>
-              <Bookmark size={14} aria-hidden="true" className={styles.savedIcon} />
               <Select
                 aria-label="よく使う絞り込み"
+                icon={<Bookmark aria-hidden="true" />}
+                size="full"
                 value={savedValue}
                 options={SAVED_OPTIONS}
                 onChange={(value) => {
@@ -393,7 +389,7 @@ export default function EventsListV8() {
                 aria-label="表示件数"
                 size="page-size"
                 value={String(perPage)}
-                options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
+                options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
                 onChange={(value) => setPerPage(Number(value))}
               />
             </div>
@@ -472,7 +468,7 @@ export default function EventsListV8() {
       </div>
     )
   } else if (loadStatus === 'forbidden') {
-    listBody = stateCard(<TriangleAlert size={18} aria-hidden="true" />, 'イベントを見る権限がありません', '選んでいるアカウントでは見られません。管理者に権限を確かめてください。', undefined, true)
+    listBody = stateCard(<TriangleAlert size={18} aria-hidden="true" />, 'イベントを見る権限がありません', '選んでいるアカウントでは見られません。管理者に権限を確かめてください。', <Button onClick={() => refresh()}>もう一度読み込む</Button>, true)
   } else if (loadStatus === 'error') {
     listBody = stateCard(
       <TriangleAlert size={18} aria-hidden="true" />,
@@ -524,17 +520,17 @@ export default function EventsListV8() {
                         </FolderDotName>
                       </ContextMenu>
                     )}
-                    sub={<span className={styles.cellSub} title={e.venue_name ?? '場所は未設定'}>{e.venue_name ?? '場所は未設定'}</span>}
+                    sub={<span className={styles.cellSub} ><TruncatedText value={String(e.venue_name ?? '場所は未設定')} /></span>}
                   />
                   <Td>
                     <span className={styles.whenMain} title={when}>{when}</span>
-                    <span className={styles.whenSub}>{e.next_slot_starts_at ? '次の回' : '—'}</span>
+                    <span className={styles.whenSub}>{e.next_slot_starts_at ? '次の回' : emptyValue('unknown')}</span>
                   </Td>
-                  <Td align="right" className={styles.num}>{`${e.total_active} / ${e.total_capacity ?? '—'}`}</Td>
+                  <Td align="right" className={styles.num}>{`${e.total_active} / ${e.total_capacity ?? emptyValue('unknown')}`}</Td>
                   <Td align="right" className={styles.num}>
                     {e.pending_count > 0 ? (
                       <Link href={`/events/bookings?id=${e.id}`} className={styles.pendingLink}>{e.pending_count}</Link>
-                    ) : <span className={styles.faint}>—</span>}
+                    ) : <span className={styles.faint}>{emptyValue('unknown')}</span>}
                   </Td>
                   <Td className={styles.stateCell}>
                     <span className={styles.stateLine}>
@@ -543,10 +539,10 @@ export default function EventsListV8() {
                           ? <span className={`${styles.pill} ${styles.pillWarn}`}>あと少しで満席</span>
                           : state === 'open' ? <span className={`${styles.pill} ${styles.pillOn}`}>公開中</span>
                             : state === 'full' ? <span className={`${styles.pill} ${styles.pillWarn}`}>満席</span>
-                              : state === 'paused' ? <span className={`${styles.pill} ${styles.pillWarn}`}>一時停止</span>
+                              : state === 'paused' ? <span className={`${styles.pill} ${styles.pillWarn}`}>停止中</span>
                                 : <span className={`${styles.pill} ${styles.pillOff}`}>{STATE_LABEL[state]}</span>}
                       {e.visible_tag_id ? (
-                        <span className={styles.audience} title={e.visible_tag_name ?? '消えたタグ'}>{e.visible_tag_name ?? '消えたタグ'}</span>
+                        <TagPill name={e.visible_tag_name ?? '消えたタグ'} size="sm" />
                       ) : null}
                     </span>
                   </Td>
@@ -571,7 +567,7 @@ export default function EventsListV8() {
 
   const pager = !dataReady || items.length === 0 ? null : (
     <div className={styles.pagerBlock}>
-      <p className={styles.footNote}>行の「…」から 中身を見る・申込者を見る・日時と定員を変える・プレビュー・削除。申込中・キャンセル待ちがいるイベントは削除できません。</p>
+
       {pageCount > 1 ? (
         <Pagination
           page={current}
@@ -586,17 +582,6 @@ export default function EventsListV8() {
 
   const overlays = (
     <>
-      {folderActions.dialogs}
-      {folderDialogOpen && selectedAccountId ? (
-        <FolderAddDialog
-          kind="event"
-          accountId={selectedAccountId}
-          note="イベントを分けてしまう箱です。消しても、入っていたイベントは未分類として残ります。"
-          placeholder="例：教室"
-          onClose={() => setFolderDialogOpen(false)}
-          onAdded={() => void loadFolders()}
-        />
-      ) : null}
       <DetailPanel
         open={active !== null}
         title={active?.name ?? ''}
@@ -623,7 +608,7 @@ export default function EventsListV8() {
             <p className={styles.panelLabel}>状態</p>
             <p className={styles.panelText}>{STATE_LABEL[eventRowState(active)]}</p>
             <p className={styles.panelLabel}>予約・承認待ち</p>
-            <p className={styles.panelText}>{`予約 ${active.total_active} / ${active.total_capacity ?? '—'}　承認待ち ${active.pending_count > 0 ? active.pending_count : '—'}`}</p>
+            <p className={styles.panelText}>{`予約 ${active.total_active} / ${active.total_capacity ?? emptyValue('unknown')}　承認待ち ${active.pending_count > 0 ? active.pending_count : emptyValue('unknown')}`}</p>
             <div className={styles.panelActions}>
               <Button onClick={() => router.push(`/events/bookings?id=${active.id}`)}>申込者を見る</Button>
               <Button onClick={() => router.push(`/events/preview?id=${active.id}`)}>プレビュー</Button>
@@ -640,7 +625,7 @@ export default function EventsListV8() {
         confirmLabel="削除する"
         busy={deleteBusy}
         error={deleteError}
-        onConfirm={() => void confirmDeleteEvent()}
+        onConfirm={() => confirmDeleteEvent()}
         onCancel={() => {
           if (deleteBusy) return
           setDeleteError('')
@@ -652,10 +637,11 @@ export default function EventsListV8() {
 
   return (
     <ListPage
+      help={<>{"教室・体験会・相談会など、回ごとに定員のあるイベントの申込を受けます。"}{"行の「…」から 中身を見る・申込者を見る・日時と定員を変える・プレビュー・削除。申込中・キャンセル待ちがいるイベントは削除できません。"}</>}
       boardId="e2ekFu"
       headingSize="regular"
       title="イベント予約"
-      description="教室・体験会・相談会など、回ごとに定員のあるイベントの申込を受けます。"
+
       tabs={!canEdit ? (
         <div className={styles.viewerBand} role="status">
           <Eye size={16} aria-hidden="true" />
@@ -663,7 +649,7 @@ export default function EventsListV8() {
         </div>
       ) : undefined}
       stats={(
-        <KpiBand data-design="KPIs" className={styles.kpiStrip}>
+        <KpiBand data-design="KPIs">
           {kpis.map((item) => (
             <KpiCard
               key={item.key}

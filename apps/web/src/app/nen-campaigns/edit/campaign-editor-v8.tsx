@@ -36,6 +36,9 @@ import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import { formatCampaignTiming } from '../campaign-display'
 import { formatNumber } from '@/lib/format'
 import styles from './campaign-editor-v8.module.css'
+import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const TRIGGER_LABEL: Record<string, string> = {
   'ec.order.confirmed': '注文を受け付けたとき',
@@ -290,8 +293,8 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
         <nav className={styles.crumb} aria-label="パンくず">
           <Link href="/nen-campaigns">← NEN配信へ</Link>
         </nav>
-        <h1 className={styles.headTitle}>{setting.label}（配信を直す）</h1>
-        <p className={styles.headDesc}>{timing}。保存した新しい中身は、次のきっかけからの配信に使われます。</p>
+        <PageHeading title={<>{setting.label}（配信を直す）</>} help={<> {timing}。保存した新しい中身は、次のきっかけからの配信に使われます。</>} />
+
       </div>
 
       {error ? <Notice tone="danger" message={error} /> : null}
@@ -319,11 +322,11 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
               <div className={styles.fieldLabel}>
                 きっかけ
                 <p className={styles.static}>{triggerLabel(setting)}</p>
-                {!isBirthday ? <label className={styles.delay}>
-                  <TextInput aria-label="きっかけからの日数" type="number" min={0} max={365}
+                {!isBirthday ? <div className={styles.delay}>
+                  <NumberInput unit="日後" aria-label="きっかけからの日数" type="number" min={0} max={365}
                     value={String(merged.delayDays)} onChange={(event) => setDraft((previous) => ({ ...previous, delayDays: Number(event.target.value) }))} />
-                  <span>日後</span>
-                </label> : null}
+
+                </div> : null}
               </div>
               <div className={styles.fieldLabel}>
                 送る時刻
@@ -368,21 +371,17 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
                 <RadioCard name="message-kind" value="text" checked={false} onChange={() => {}} title="文字だけ" disabled disabledReason="この配信では選べません" />
               </RadioCardGroup>
             </div>
-            <label className={styles.fieldLabel}>
-              配信本文
-              <span className={styles.note}>差し込み：友だち情報欄「ペットの名前」・注文の「商品名」</span>
-              <span className={styles.toolbar}>
+            <Field label={<>配信本文
+              <span className={styles.note}>差し込み：友だち情報欄「ペットの名前」・注文の「商品名」</span><span className={styles.toolbar}>
                 <InsertToolbar targetRef={bodyRef} value={merged.bodyText} onChange={(bodyText) => setDraft((previous) => ({ ...previous, bodyText }))} />
-              </span>
-              <textarea
+              </span></>}><textarea
                 ref={bodyRef}
                 rows={5}
                 value={merged.bodyText}
                 onChange={(event) => setDraft((previous) => ({ ...previous, bodyText: event.target.value }))}
                 aria-label="配信本文"
                 className={styles.textarea}
-              />
-            </label>
+              /></Field>
             {bodyCheck.fits ? (
               <p className={styles.note}>あと{formatNumber(NEN_CAMPAIGN_BODY_MAX_LENGTH - bodyCheck.length)}字（上限{bodyLimitLabel}字。長すぎるとLINEで送れません）</p>
             ) : (
@@ -416,10 +415,7 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
             )}
             {mileageAction?.kind === 'award_mileage' ? (
               <div className={styles.actionRow}>
-                <div>
-                  <label className={styles.fieldLabel}>回答後に付けるマイル<TextInput aria-label="回答後に付けるマイル" type="number" min={1} max={1_000_000} step={1} value={mileageAction.amount || ''} onChange={(event) => setActions(actions.map((action) => action === mileageAction ? { ...action, amount: Number(event.target.value) } : action))} /></label>
-                  <p className={styles.note}>回答フォームへの送信をきっかけにしています</p>
-                </div>
+                <div><Field note={<>回答フォームへの送信をきっかけにしています</>} label="回答後に付けるマイル"><NumberInput unit="マイル" aria-label="回答後に付けるマイル" type="number" min={1} max={1_000_000} step={1} value={mileageAction.amount || ''} onChange={(event) => setActions(actions.map((action) => action === mileageAction ? { ...action, amount: Number(event.target.value) } : action))} /></Field></div>
                 <Button type="button" variant="secondary" aria-label="マイル付与を外す" onClick={() => setActions(actions.filter((action) => action !== mileageAction))}>外す</Button>
               </div>
             ) : (
@@ -454,16 +450,13 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
           </section>
           <section className={styles.card} aria-label="自分にテストを送る">
             <h2 className={styles.cardTitle}>自分にテストを送る</h2>
-            <label className={styles.fieldLabel}>
-              テスト送信の相手を名前で探す
-              <TextField
+            <Field label="テスト送信の相手を名前で探す"><TextField
                 aria-label="テスト送信の相手を名前で探す"
                 type="search"
                 value={testSearch}
                 onChange={(event) => setTestSearch(event.target.value)}
                 onKeyDown={(event) => { if (event.key === 'Enter') void searchFriends() }}
-              />
-            </label>
+              /></Field>
             <span className={styles.selectFoot}>
               <Button type="button" variant="secondary" onClick={() => void searchFriends()}>探す</Button>
               {testCandidates.slice(0, 3).map((candidate) => (

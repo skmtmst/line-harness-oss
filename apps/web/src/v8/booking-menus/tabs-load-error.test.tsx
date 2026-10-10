@@ -20,7 +20,7 @@ describe('予約設定のタブの読み込み失敗（WEB053）', () => {
   it('予約のルール：失敗したら読み直しを出す', () => {
     render(<RulesTabV8 accountId="a" settings={null} status="error" error="通信が切れました" staff={[]} staffReady canEdit onSaved={() => undefined} onReload={() => undefined} />)
     expect(screen.getByText('予約のルールを読み込めませんでした')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '読み直す' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
   })
 
   it('受付枠：失敗したら読み直しを出す', () => {

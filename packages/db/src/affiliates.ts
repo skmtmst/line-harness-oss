@@ -1,3 +1,4 @@
+import { readFolderAssignment } from './folder-assignment.js';
 import { jstNow } from './utils.js';
 import { FRIEND_ADD_WINNER_SUBQUERY } from './affiliate-report.js';
 import { generateRefSlug } from './affiliate-links.js';
@@ -6,6 +7,7 @@ import { generateRefSlug } from './affiliate-links.js';
 // =============================================================================
 
 export interface Affiliate {
+  folder_id?: string | null;
   id: string;
   tenant_id: string;
   line_account_id: string | null;
@@ -100,6 +102,7 @@ export async function getAffiliateByCode(
 }
 
 export interface CreateAffiliateInput {
+  folderId?: string | null;
   tenantId: string;
   lineAccountId: string;
   name: string;
@@ -152,6 +155,7 @@ export async function createAffiliate(
     if (existing) return existing;
   }
 
+  const folderId=await readFolderAssignment(db,'affiliate',input.lineAccountId,input.folderId);
   const id = crypto.randomUUID();
   const now = jstNow();
 
@@ -159,8 +163,8 @@ export async function createAffiliate(
     await db
       .prepare(
         `INSERT INTO affiliates
-           (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id, reward_mode)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id, reward_mode, folder_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -175,6 +179,7 @@ export async function createAffiliate(
         input.friendId ?? null,
         input.operationId ?? null,
         input.rewardMode ?? ((input.commissionRate ?? 0) > 0 ? 'rate' : 'fixed'),
+        folderId ?? null,
       )
       .run();
   } catch (err) {
@@ -190,6 +195,7 @@ export async function createAffiliate(
 }
 
 export interface CreateAffiliateWithRandomCodeInput {
+  folderId?: string | null;
   tenantId: string;
   lineAccountId: string;
   name: string;
@@ -226,6 +232,7 @@ export async function createAffiliateWithRandomCode(
     if (existing) return existing;
   }
 
+  const folderId=await readFolderAssignment(db,'affiliate',input.lineAccountId,input.folderId);
   const id = crypto.randomUUID();
   const now = jstNow();
 
@@ -239,8 +246,8 @@ export async function createAffiliateWithRandomCode(
       await db
         .prepare(
           `INSERT INTO affiliates
-             (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id, reward_mode)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id, reward_mode, folder_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -255,6 +262,7 @@ export async function createAffiliateWithRandomCode(
           input.friendId ?? null,
           input.operationId ?? null,
           input.rewardMode ?? ((input.commissionRate ?? 0) > 0 ? 'rate' : 'fixed'),
+          folderId ?? null,
         )
         .run();
 
@@ -291,6 +299,7 @@ export type UpdateAffiliateInput = Partial<
     | 'hold_days'
     | 'payout_cycle'
     | 'notify_on_conversion'
+    | 'folder_id'
   >
 >;
 
@@ -300,8 +309,13 @@ export async function updateAffiliate(
   updates: UpdateAffiliateInput,
   scope?: AffiliateScope,
 ): Promise<Affiliate | null> {
+  if(updates.folder_id!==undefined) {
+    const current=await getAffiliateById(db,id,scope);if(!current)return null;
+    updates = { ...updates, folder_id: await readFolderAssignment(db,'affiliate',current.line_account_id,updates.folder_id) };
+  }
   const fields: string[] = [];
   const values: unknown[] = [];
+  if(updates.folder_id!==undefined){fields.push('folder_id = ?');values.push(updates.folder_id);}
 
   if (updates.reward_mode !== undefined || updates.commission_rate !== undefined) {
     const current = await getAffiliateById(db, id, scope);

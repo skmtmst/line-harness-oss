@@ -27,7 +27,7 @@ describe('カルーセルのボタンの押したら（JkLOF）：保存の形',
     const content = buildCarouselContent([panelWith([
       choice({ kind: 'uri', uri: ' https://nen.example/a ' }),
       choice({ kind: 'message', text: ' 予約したい ' }),
-      choice({ kind: 'form', formId: 'form 1' }),
+      choice({ kind: 'form', formId: 'form-1' }),
     ]), panelWith([
       choice({ kind: 'booking' }),
       choice({ kind: 'booking_history' }),
@@ -37,7 +37,7 @@ describe('カルーセルのボタンの押したら（JkLOF）：保存の形',
     expect(columns[0].actions).toEqual([
       { type: 'uri', label: 'ボタン', uri: 'https://nen.example/a' },
       { type: 'message', label: 'ボタン', text: '予約したい' },
-      { type: 'uri', label: 'ボタン', uri: `https://liff.line.me/${LIFF}/?page=form&id=form%201` },
+      { type: 'uri', label: 'ボタン', uri: `https://liff.line.me/${LIFF}/?page=form&id=form-1` },
     ])
     expect(columns[1].actions).toEqual([
       { type: 'uri', label: 'ボタン', uri: `https://liff.line.me/${LIFF}/?page=salon-book` },
@@ -87,18 +87,23 @@ describe('カルーセルのボタンの押したら（JkLOF）：保存の形',
   })
 })
 
-describe('カルーセルのボタンの押したら（JkLOF）：出す候補', () => {
-  const values = (opts: Parameters<typeof choiceKindOptions>[0]) => choiceKindOptions(opts).map((item) => item.value)
-  it('店（LIFF あり）は絵の順に6つ', () => {
-    expect(values({ host: false, hasLiff: true })).toEqual(['uri', 'message', 'form', 'booking', 'booking_history', 'action'])
+describe('カルーセルのボタンの押したら（YPzmo）：出す候補', () => {
+  it('店は LIFF の有無にかかわらず6つ＋動きを実行する（LIFF が無いときは中身の欄で案内する）', () => {
+    expect(choiceKindOptions({ host: false })).toEqual(['uri', 'message', 'booking', 'form', 'booking_history', 'visit_stamp', 'action'])
   })
-  it('店（LIFF なし）は回答フォーム・予約・予約履歴を出さない', () => {
-    expect(values({ host: false, hasLiff: false })).toEqual(['uri', 'message', 'action'])
-  })
-  it('統括は URL を開く・テキストを送るだけ（回答フォーム・予約・予約履歴・動きを実行するは出ない）', () => {
-    expect(values({ host: true, hasLiff: true })).toEqual(['uri', 'message'])
+  it('統括は URL を開く・テキストを送るだけ（配った先の LIFF に付け替える口がまだ無い）', () => {
+    expect(choiceKindOptions({ host: true })).toEqual(['uri', 'message'])
   })
   it('いま選んでいる種類は候補から消さない（読み込んだ保存を壊さない）', () => {
-    expect(values({ host: false, hasLiff: false, current: 'form' })).toContain('form')
+    expect(choiceKindOptions({ host: true, current: 'form' })).toContain('form')
+  })
+})
+
+describe('来店スタンプ・予約メニューの URL（仮の形・lib/tap-actions）', () => {
+  it('組み立てと読み戻しが行って戻る', () => {
+    const content = JSON.parse(buildCarouselContent([panelWith([choice({ kind: 'visit_stamp', formId: 'c1' }), choice({ kind: 'booking', formId: 'm1' })])], 't1', 'L-1'))
+    expect(content[0].actions.map((a: { uri: string }) => a.uri)).toEqual(['https://liff.line.me/L-1/?page=visit-stamps&card=c1', 'https://liff.line.me/L-1/?page=salon-book&menu_id=m1'])
+    const back = panelsFromContent(JSON.stringify(content))
+    expect(back[0].actions.map((a) => [a.kind, a.formId])).toEqual([['visit_stamp', 'c1'], ['booking', 'm1']])
   })
 })

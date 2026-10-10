@@ -34,6 +34,9 @@ import { scenarioReferenceData } from '@/components/scenarios/scenario-reference
 import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs'
 import { shortDateTime } from '@/lib/hq-banners'
 import { formatNumber } from '@/lib/format'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -274,8 +277,8 @@ export default function ScenarioResultsV8() {
       ...sortedSteps.map((step) => {
         const result = statsByOrder.get(step.stepOrder)
         return [
-          `${step.stepOrder}通目`, scheduleLabel(step), result?.reachedCount ?? '—',
-          result ? percentLabel(result.reachedCount, stats.enrolledTotal) : '—', '—', '—',
+          `${step.stepOrder}通目`, scheduleLabel(step), result?.reachedCount ?? emptyValue('unknown'),
+          result ? percentLabel(result.reachedCount, stats.enrolledTotal) : emptyValue('unknown'), '—', '—',
         ]
       }),
     ]
@@ -283,7 +286,7 @@ export default function ScenarioResultsV8() {
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `scenario-results-${id}.csv`
+    anchor.download = csvFileName("シナリオ配信の結果")
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -325,7 +328,7 @@ export default function ScenarioResultsV8() {
     }
   }
 
-  /** 「移す」の窓を開く。移し先の候補は、いま配っているシナリオ以外の稼働中だけ。 */
+  /** 「移す」の窓を開く。移し先の候補は、いま配っているシナリオ以外の有効だけ。 */
   const openMoveDialog = async (subscription: { id: string; friendName: string }) => {
     setMoveTarget({ subscriptionId: subscription.id, friendName: subscription.friendName })
     setMoveScenarioId('')
@@ -429,7 +432,7 @@ export default function ScenarioResultsV8() {
       {scenario && (
         <div className={styles.head}>
           <div className={styles.titleRow}>
-            <h1 className={styles.title}>{scenario.name}</h1>
+            <PageHeading title={scenario.name} />
             <StatusChip status={scenario.isActive ? 'running' : 'paused'} />
             <span className={styles.titleSuffix}>配信結果</span>
           </div>
@@ -481,7 +484,7 @@ export default function ScenarioResultsV8() {
               <p className={styles.kpiValue}>
                 {(runs?.steps ?? []).some((s) => s.failed.state === 'available')
                   ? formatNumber(failedTotal)
-                  : '—'}
+                  : emptyValue('unknown')}
                 <span className={styles.kpiUnit}>人</span>
               </p>
               <p className={styles.kpiDetail}>
@@ -493,7 +496,7 @@ export default function ScenarioResultsV8() {
             <div className={styles.kpi}>
               <p className={styles.kpiLabel}>進んでいる途中</p>
               <p className={styles.kpiValue}>
-                {inProgress === null ? '—' : formatNumber(inProgress)}
+                {inProgress === null ? emptyValue('unknown') : formatNumber(inProgress)}
                 <span className={styles.kpiUnit}>人</span>
               </p>
               <p className={styles.kpiDetail}>
@@ -503,7 +506,7 @@ export default function ScenarioResultsV8() {
             <div className={styles.kpi}>
               <p className={styles.kpiLabel}>全部終わった</p>
               <p className={styles.kpiValue}>
-                {completedCount === null ? '—' : formatNumber(completedCount)}
+                {completedCount === null ? emptyValue('unknown') : formatNumber(completedCount)}
                 <span className={styles.kpiUnit}>人</span>
               </p>
               <p className={styles.kpiDetail}>
@@ -546,17 +549,17 @@ export default function ScenarioResultsV8() {
                           />
                         </span>
                         <span className={styles.stepReachText}>
-                          {reached === undefined || reached === null ? '—' : `${formatNumber(reached)}人到達`}
+                          {reached === undefined || reached === null ? emptyValue('unknown') : `${formatNumber(reached)}人到達`}
                           {reachPct !== null ? `（${percentLabel(reached ?? 0, stats.enrolledTotal)}）` : ''}
                         </span>
                       </span>
                       <span className={styles.stepMeta}>
-                        開封 {run?.opened.value ?? '—'}
-                        {'　クリック '}{run?.clicked.value ?? '—'}
+                        開封 {run?.opened.value ?? emptyValue('unknown')}
+                        {'　クリック '}{run?.clicked.value ?? emptyValue('unknown')}
                         {'　失敗 '}
                         {run?.failed.state === 'available' && run.failed.value !== null
                           ? formatNumber(run.failed.value)
-                          : '—'}
+                          : emptyValue('unknown')}
                       </span>
                     </li>
                   )
@@ -672,8 +675,8 @@ export default function ScenarioResultsV8() {
                           </Td>
                           <Td className="whitespace-nowrap">
                             {sub.status === 'completed'
-                              ? '—'
-                              : sub.nextDeliveryAt ? shortDateTime(sub.nextDeliveryAt) : '—'}
+                              ? emptyValue('unknown')
+                              : sub.nextDeliveryAt ? shortDateTime(sub.nextDeliveryAt) : emptyValue('unknown')}
                           </Td>
                           <ActionCell>
                             {/* #641: 主操作は枠つき「予定を見る」、購読操作は「その他（…）」へ集約。 */}
@@ -785,7 +788,7 @@ export default function ScenarioResultsV8() {
         />
       ) : null}
 
-      {/* 「別のシナリオへ移す」の窓。移し先は稼働中の別シナリオだけ選べる。 */}
+      {/* 「別のシナリオへ移す」の窓。移し先は有効の別シナリオだけ選べる。 */}
       <Dialog
         open={moveTarget !== null}
         title={moveTarget ? `${moveTarget.friendName} を別のシナリオへ移す` : ''}
@@ -848,7 +851,7 @@ export default function ScenarioResultsV8() {
                 label: moveOptions === null
                   ? '読み込んでいます'
                   : moveChoices.length === 0
-                    ? '稼働中の他のシナリオがありません'
+                    ? '有効の他のシナリオがありません'
                     : 'シナリオを選んでください',
               },
               ...moveChoices.map((item) => ({ value: item.id, label: item.name })),

@@ -7,7 +7,7 @@ import { useAdminTheme } from '@/lib/use-admin-theme'
  * 表の中の失敗の行・数のカードの再試しなど、フックを持たない部品から使う。
  */
 export function RetryLabel() {
-  return <>{useAdminTheme() === 'v8' ? 'もう一度試す' : 'もう一度読み込む'}</>
+  return <>もう一度読み込む</>
 }
 
 export function FailureTitle({ title }: { title: string }) {

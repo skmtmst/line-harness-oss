@@ -42,8 +42,10 @@
   align-self: stretch;
   padding: var(--tpl-wc-cm-side-pad);
   border-radius: var(--tpl-wc-card-radius);
-  box-shadow: var(--tpl-an-ring);
+
   background: var(--color-canvas);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 .pageTitle {
   margin: 0;

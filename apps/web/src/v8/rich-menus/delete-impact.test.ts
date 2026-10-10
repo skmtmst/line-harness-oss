@@ -31,7 +31,7 @@ describe('表示中の人数', () => {
   })
 
   it('取得できた0は0人と書く', () => {
-    expect(audienceText({ value: 0, reason: 'assignment_ledger_unavailable' })).toBe('0人')
+    expect(audienceText({ value: 0, reason: 'assignment_ledger_unavailable' })).toBe('0 人')
     expect(audienceReason({ value: 0, reason: 'assignment_ledger_unavailable' })).toBeNull()
   })
 
@@ -41,7 +41,7 @@ describe('表示中の人数', () => {
       state: 'partial' as const,
       reason: 'preexisting_assignments_not_backfilled' as const,
     }
-    expect(audienceText(audience)).toBe('1,842人')
+    expect(audienceText(audience)).toBe('1,842 人')
     expect(audienceReason(audience)).toContain('記録開始後')
   })
 })

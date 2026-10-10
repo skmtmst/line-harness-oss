@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 /* eslint-disable @typescript-eslint/no-explicit-any -- 実DOMと失敗応答を最小mockで対照する */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'

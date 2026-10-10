@@ -19,6 +19,10 @@ import { useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import StatusBadge from '@/components/shared/status-badge'
+import Card from '@/components/shared/card'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { TextField } from '@/components/shared/text-field'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -33,6 +37,9 @@ import {
 } from './shell'
 import { shortDateTime } from './words'
 import styles from './sheets.module.css'
+import { Field } from '@/components/shared/form-controls'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -53,7 +60,6 @@ const CALLBACK_MESSAGES: Record<string, { tone: 'success' | 'warn' | 'danger'; t
 const RUN_KIND_LABEL: Record<GoogleSheetsSyncRun['kind'], string> = { manual: '手動', scheduled: '定期' }
 const RUN_DATA_LABEL: Record<GoogleSheetsSyncRun['dataType'], string> = { friends: '友だち', form_answers: 'フォーム回答' }
 const RUN_STATUS_LABEL: Record<GoogleSheetsSyncRun['status'], string> = { running: '実行中', ok: '完了', partial: '一部だけ完了', error: '失敗' }
-const RUN_STATUS_TONE: Record<GoogleSheetsSyncRun['status'], string> = { running: 'neutral', ok: 'active', partial: 'warn', error: 'danger' }
 
 /** 30分以上「実行中」のままの記録は止まったものとみなす（v7 と同じ）。 */
 const STALE_RUN_MS = 30 * 60 * 1000
@@ -305,7 +311,7 @@ export default function WebhooksSheetsV8() {
   const lastKind = runs.find((run) => run.startedAt === connection?.lastSyncedAt)?.kind
   const lastSyncText = connection?.lastSyncedAt
     ? `${shortDateTime(connection.lastSyncedAt)}${lastKind ? ` ${RUN_KIND_LABEL[lastKind]}` : ''}・${connection.lastSyncStatus === 'partial' ? '一部だけ完了' : connection.lastSyncStatus === 'error' ? '失敗' : '完了'}`
-    : '—'
+    : emptyValue('unknown')
 
   /* ===== 左：書き出しのカード ===== */
   let mainCard
@@ -337,15 +343,15 @@ export default function WebhooksSheetsV8() {
         <div className={styles.statusRow}>
           <span className={styles.statusLabel}>接続しているGoogleアカウント</span>
           <span className={styles.spacer} aria-hidden="true" />
-          <span className={styles.statusValue}>{connection?.googleAccountEmail ?? '—'}</span>
+          <span className={styles.statusValue}>{connection?.googleAccountEmail ?? emptyValue('unknown')}</span>
         </div>
         <div className={styles.statusRow}>
           <span className={styles.statusLabel}>書き出し先</span>
           <span className={styles.spacer} aria-hidden="true" />
           {connection?.spreadsheetUrl ? (
-            <a href={connection.spreadsheetUrl} target="_blank" rel="noopener noreferrer" className={styles.statusValue}>
+            <TextLink external href={connection.spreadsheetUrl}   className={styles.statusValue}>
               {`${connection.spreadsheetTitle ?? connection.spreadsheetUrl}（シート：友だち・フォーム回答）`}
-            </a>
+            </TextLink>
           ) : (
             <span className={styles.statusValue}>まだ決めていません</span>
           )}
@@ -394,12 +400,12 @@ export default function WebhooksSheetsV8() {
         )}
         {showTargetForm && canManage && connStatus !== 'expired' ? (
           <form onSubmit={handleSaveTarget} className={styles.targetForm}>
-            <label className={styles.fieldLabel} htmlFor="wh-sheets-target">スプレッドシートのURLまたはID</label>
+
             <p className={styles.cardNote}>
               共有設定で「{connection?.googleAccountEmail ?? '接続したGoogleアカウント'}」に編集権限を付けたシートを指定してください。指定したシート内に「友だち」「フォーム回答」のタブを自動で作ります。
             </p>
             <div className={styles.targetRow}>
-              <input id="wh-sheets-target" value={targetInput} onChange={(event) => setTargetInput(event.target.value)} className={styles.input} placeholder="https://docs.google.com/spreadsheets/d/…" required />
+              <Field label="スプレッドシートのURLまたはID" htmlFor="wh-sheets-target"><TextField id="wh-sheets-target" value={targetInput} onChange={(event) => setTargetInput(event.target.value)}  placeholder="https://docs.google.com/spreadsheets/d/…" required /></Field>
               <Button type="submit" variant="primary" disabled={busy !== null} busy={busy === 'target'} busyLabel="確認しています…">保存する</Button>
             </div>
           </form>
@@ -417,10 +423,10 @@ export default function WebhooksSheetsV8() {
         <DelayedSkeleton
           loading
           skeleton={(
-            <div aria-hidden="true" className={styles.card}>
+            <Card spacing="integration" aria-hidden="true">
               <Skeleton className={styles.skeletonTitle} />
               {[0, 1, 2, 3].map((row) => <Skeleton key={row} className={styles.skeletonRow} />)}
-            </div>
+            </Card>
           )}
         />
       </div>
@@ -431,21 +437,21 @@ export default function WebhooksSheetsV8() {
         kind="error"
         title="連携の状態を読み込めませんでした"
         description="連携の内容は変わっていません。上で選んでいるLINEアカウントが合っているか確かめてください。"
-        action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+        onRetry={() => void load()}
       />
     )
   } else {
     body = (
       <>
-        <section className={styles.card} aria-labelledby="wh-sheets-export">
+        <Card spacing="integration" aria-labelledby="wh-sheets-export">
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle} id="wh-sheets-export">Google Sheets への書き出し</h2>
             <p className={styles.cardNote}>友だち・フォーム回答をスプレッドシートへ書き出します</p>
           </div>
           {mainCard}
-        </section>
+        </Card>
         {connStatus !== 'disconnected' ? (
-          <section className={styles.card} aria-labelledby="wh-sheets-runs">
+          <Card spacing="integration" aria-labelledby="wh-sheets-runs">
             <div className={styles.cardHead}>
               <h2 className={styles.cardTitle} id="wh-sheets-runs">同期の記録</h2>
             </div>
@@ -460,28 +466,31 @@ export default function WebhooksSheetsV8() {
             ) : null}
             {groups.length > 0 ? (
               <>
-                <div className={styles.runHead} role="presentation">
-                  <span className={styles.colWhen}>日時</span>
-                  <span className={styles.colKind}>きっかけ</span>
-                  <span className={styles.colWhat}>書き出したもの</span>
-                  <span className={styles.colResult}>結果</span>
-                </div>
+                <DataTable aria-label="同期の記録" columnLayout={{ headHeight: 'auto', rowHeight: 'var(--tpl-wh-run-row-h)', gap: 'var(--tpl-rule-row-gap)', padding: 'var(--tpl-wh-mini-row-pad)', headPadding: 'var(--tpl-wh-mini-head-pad)', headRadius: 'var(--radius-segment)', rowGap: 'var(--tpl-rule-row-gap)', headTextSize: 'var(--text-micro)', bodyTextSize: 'var(--text-caption)' }}>
+                  <thead>
+                    <TableHeadRow data-table-layout="columns">
+                  <Th className={styles.colWhen}>日時</Th>
+                  <Th className={styles.colKind}>きっかけ</Th>
+                  <Th className={styles.colWhat}>書き出したもの</Th>
+                  <Th className={styles.colResult}>結果</Th>
+                </TableHeadRow>
+                </thead>
+                <tbody>
                 {groups.map((group) => (
-                  <div key={group.key} className={styles.runRow}>
-                    <span className={styles.colWhen}>{shortDateTime(group.startedAt)}</span>
-                    <span className={styles.colKind}>{RUN_KIND_LABEL[group.kind] ?? group.kind}</span>
-                    <span className={styles.colWhat} title={group.parts.join('・')}>{group.parts.join('・') || '—'}</span>
-                    <span className={styles.colResult}>
-                      <span className={styles.pill} data-tone={RUN_STATUS_TONE[group.status]}>
-                        <span className={styles.pillDot} aria-hidden="true" />
-                        {RUN_STATUS_LABEL[group.status] ?? group.status}
-                      </span>
-                    </span>
-                  </div>
+                  <Tr key={group.key} data-table-layout="columns">
+                    <Td className={styles.colWhen}>{shortDateTime(group.startedAt)}</Td>
+                    <Td className={styles.colKind}>{RUN_KIND_LABEL[group.kind] ?? group.kind}</Td>
+                    <Td className={styles.colWhat} title={group.parts.join('・')}>{group.parts.join('・') || emptyValue('unknown')}</Td>
+                    <Td className={styles.colResult}>
+                      <StatusBadge tone={group.status === 'ok' ? 'success' : group.status === 'partial' ? 'warning' : group.status === 'running' ? 'neutral' : 'danger'}>{RUN_STATUS_LABEL[group.status] ?? group.status}</StatusBadge>
+                    </Td>
+                  </Tr>
                 ))}
+                </tbody>
+                </DataTable>
               </>
             ) : null}
-          </section>
+          </Card>
         ) : null}
       </>
     )
@@ -492,7 +501,7 @@ export default function WebhooksSheetsV8() {
       boardId="DxAAA"
       headingSize="regular"
       title="外部連携"
-      description={WEBHOOKS_DESCRIPTION}
+      help={WEBHOOKS_DESCRIPTION}
       actions={isOwner ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button> : undefined}
       tabs={<WebhookTabs active="sheets" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
@@ -509,7 +518,7 @@ export default function WebhooksSheetsV8() {
         <Dialog
           open={disconnectFor !== null}
           title="Google Sheets との接続を解除しますか？"
-          description="書き出しが止まります。シートの中身は消えません。この操作は取り消せません。"
+          description="書き出しを止め、連携設定・同期の記録・Google側の許可を消します。シートの中身は残ります。元に戻せません。"
           descriptionBand="danger"
           tone="destructive"
           confirmation
@@ -519,11 +528,9 @@ export default function WebhooksSheetsV8() {
           designTop={280}
           busy={busy === 'disconnect'}
           confirmLabel="接続を解除する"
-          onConfirm={() => void handleDisconnect()}
+          onConfirm={() => handleDisconnect()}
           onCancel={() => { if (busy !== 'disconnect') setDisconnectFor(null) }}
-        >
-          <p className={styles.dialogNote}>{`「${disconnectFor?.label ?? ''}」の連携設定と同期の記録を消し、Google側の許可も取り消します。`}</p>
-        </Dialog>
+        />
       )}
     >
       <div className={styles.body}>
@@ -536,7 +543,7 @@ export default function WebhooksSheetsV8() {
           ) : null}
           {body}
         </div>
-        <aside className={`${styles.card} ${styles.sideCard}`} aria-labelledby="wh-sheets-care">
+        <Card spacing="integration" className={styles.sideCard} aria-labelledby="wh-sheets-care">
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle} id="wh-sheets-care">気をつけること</h2>
           </div>
@@ -544,7 +551,7 @@ export default function WebhooksSheetsV8() {
             ・Google 側でこのアプリの許可を取り消したときは、「再接続する」からやり直します<br />
             ・解除しても、書き出したスプレッドシートは消えません
           </p>
-        </aside>
+        </Card>
       </div>
     </ListPage>
   )

@@ -25,11 +25,14 @@ describe('一斉配信の作成', () => {
   })
 
   it('本文の上限を直書きしない', () => {
-    // 500 が3か所に散っていて、片方だけ直すと数え方がずれていた。
+    // G-9では入力欄と上限表示を共通部品へ移した。保存時の上限検査はフォームに残す。
+    const composer = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../shared/message-composer.tsx'), 'utf8')
     expect(FORM).not.toMatch(/maxLength=\{500\}/)
     expect(FORM).not.toMatch(/\/ 500/)
-    expect(FORM).toContain('MAX_TEXT_LENGTH')
-    expect(FORM).toContain('MAX_BUBBLES')
+    expect(composer).toContain('maxLength={MAX_TEXT_LENGTH}')
+    expect(composer).toContain('messageLengthLabel(value.length)')
+    expect(composer).toContain('bubbles.length >= MAX_BUBBLES')
+    expect(FORM).toContain('messageLengthNotice')
   })
 
   it('送信対象の未取得を半角ハイフンで書かない', () => {
@@ -70,8 +73,11 @@ describe('一斉配信の作成', () => {
  * 390px で解除や並べ替えが右側へ隠れる。段の列自体も縮める。
  */
 describe('狭い幅で操作が隠れない', () => {
-  it('吹き出しの見出し行は折れる', () => {
-    expect(FORM).toContain('flex flex-wrap items-center gap-3 border-b border-hairline bg-canvas-sunken')
+  it('吹き出しは共通 composer で幅を縮め、操作の幅を保つ', () => {
+    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../shared/message-composer.module.css'), 'utf8')
+    expect(css).toContain('min-width: 0')
+    expect(css).toContain('flex-shrink: 0')
+    expect(FORM).toContain('<MessageComposer')
   })
 
   it('メッセージの段の列は狭い幅でも縮む', () => {

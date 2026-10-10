@@ -154,7 +154,7 @@ export default function KnowledgeEditor({ article: initial, ticket, onClose, onS
             </Checkbox>
           ) : null}
           {ticketBlocked ? (
-            <Notice tone="error">
+            <Notice tone="danger">
               元の問い合わせ {ticket?.label} がまだ「{ticket?.stageLabel}」です。解決にしてから承認できます。
             </Notice>
           ) : null}
@@ -173,7 +173,7 @@ function KnowledgeSurface({ fullPage, articleTitle, description, title, designNo
 }) {
   if (!fullPage) return <Dialog open title={title} designNode={designNode} busy={busy} error={error} onCancel={onCancel} footer={footer}>{children}</Dialog>
   return <div className={v8.page} data-design-node="R5ckwJ">
-    <PageHeader breadcrumb={[]} title={articleTitle} titleDisplay="always" description={description} actions={footer} />
+    <PageHeader breadcrumb={[]} title={articleTitle} titleDisplay="always" help={description} actions={footer} />
     <Button onClick={onCancel} disabled={busy} size="compact">ナレッジ一覧へ</Button>
     {error ? <p role="alert" className="text-caption text-danger">{error}</p> : null}
     {children}

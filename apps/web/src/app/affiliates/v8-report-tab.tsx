@@ -27,6 +27,8 @@ import AffiliateDrawerV8 from './v8-drawer'
 import { reportMonthKey as monthKeyShifted, reportPeriodLabel as monthLabel, type ReportPeriod } from './report-period'
 import Notice from '@/components/shared/notice'
 import './list-v8.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function formatYen(n: number): string {
   return `¥${formatNumber(Math.round(n))}`
@@ -223,7 +225,7 @@ export default function ReportTabV8({
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `affiliate-report-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("アフィリエイト成果レポート")
     anchor.click()
     URL.revokeObjectURL(url)
   }, [view, shownAffiliates, shownOffers])
@@ -233,7 +235,7 @@ export default function ReportTabV8({
   useEffect(() => {
     registerHeaderActions(
       <Button key="csv" type="button" onClick={exportCsv} disabled={csvDisabled}>
-        <Download size={15} aria-hidden="true" /> CSV で書き出す
+        <Download size={15} aria-hidden="true" /> CSVで書き出す
       </Button>,
     )
     return () => registerHeaderActions(null)
@@ -384,18 +386,18 @@ export default function ReportTabV8({
                 {shownAffiliates.map((row) => (
                   <tr key={row.id}>
                     <td>
-                      <button type="button" className="af-list-personName" title={row.name} onClick={() => openDrawer(row.id)}>
+                      <button type="button" className="af-list-personName" title={row.name}  onClick={() => openDrawer(row.id)}>
                         {row.name}
                       </button>
-                      <span className="af-list-cellSub">{row.topOfferName ?? '—'}</span>
+                      <span className="af-list-cellSub">{row.topOfferName ?? emptyValue('unknown')}</span>
                     </td>
                     <td className="af-list-numRight">
                       <strong>{formatNumber(row.conversions)}件</strong>
-                      <span className="af-list-cellSub">{row.conversions > 0 ? formatYen(row.revenue) : '—'}</span>
+                      <span className="af-list-cellSub">{row.conversions > 0 ? formatYen(row.revenue) : emptyValue('unknown')}</span>
                     </td>
                     <td className="af-list-numRight">
-                      {row.conversions === 0 || row.missingReward ? '—' : row.reward === 0 ? '計測のみ' : (
-                        <strong>{row.missingReward ? '—' : formatYen(row.reward)} <span style={{ fontWeight: 400, color: 'var(--color-ink-faint)', fontSize: 11 }}>{row.missingReward ? null : diffText(row.reward, row.prevReward, row.conversions)}</span></strong>
+                      {row.conversions === 0 || row.missingReward ? emptyValue('unknown') : row.reward === 0 ? '計測のみ' : (
+                        <strong>{row.missingReward ? emptyValue('unknown') : formatYen(row.reward)} <span style={{ fontWeight: 400, color: 'var(--color-ink-faint)', fontSize: 11 }}>{row.missingReward ? null : diffText(row.reward, row.prevReward, row.conversions)}</span></strong>
                       )}
                     </td>
                     <td>
@@ -443,7 +445,7 @@ export default function ReportTabV8({
                       <span className="af-list-cellSub">{formatYen(row.revenue)}</span>
                     </td>
                     <td className="af-list-numRight">
-                      <strong>{row.missingReward ? '—' : formatYen(row.reward)} <span style={{ fontWeight: 400, color: 'var(--color-ink-faint)', fontSize: 11 }}>{row.missingReward ? null : diffText(row.reward, row.prevReward, row.conversions)}</span></strong>
+                      <strong>{row.missingReward ? emptyValue('unknown') : formatYen(row.reward)} <span style={{ fontWeight: 400, color: 'var(--color-ink-faint)', fontSize: 11 }}>{row.missingReward ? null : diffText(row.reward, row.prevReward, row.conversions)}</span></strong>
                     </td>
                   </tr>
                 ))}

@@ -82,7 +82,7 @@ function PreviewImage({ block }: { block: FormBlock & { kind: 'image' } }) {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={block.mediaUrl}
-        alt=""
+        alt={block.alt ?? ""}
         onLoad={() => setStatus('ok')}
         onError={() => setStatus('error')}
         className={`rounded-control ${block.size === 'full' ? 'w-full' : 'mx-auto max-w-[70%]'}`}

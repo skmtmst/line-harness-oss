@@ -27,6 +27,7 @@
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { BatteryFull, ChevronDown, ChevronLeft, Menu, Phone, Search, Signal, Wifi } from 'lucide-react'
 import HelpTip from './help-tip'
+import FlexPreview from '@/components/flex-preview'
 import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 import styles from './line-preview.module.css'
 
@@ -177,10 +178,14 @@ export default function LinePreview({
 }
 
 /** cfVyj の受信メッセージ。日時・送り主・本文をそのまま渡す。 */
-export function LinePreviewMessage({ accountName, avatar, time, children }: {
-  accountName: string; avatar: ReactNode; time: string; children: ReactNode
+export function LinePreviewMessage({ accountName, avatar, time, children, direction = 'incoming', density }: {
+  accountName: string; avatar: ReactNode; time: string; children: ReactNode; direction?: 'incoming' | 'outgoing'; density?: 'compact'
 }) {
-  return <div className={styles.messageRow}>
+  if (direction === 'outgoing') return <div className={styles.outgoingRow}>
+    {time ? <span className={styles.messageTime}>{time}</span> : null}
+    <div className={styles.outgoingBubble}>{children}</div>
+  </div>
+  return <div className={styles.messageRow} data-density={density}>
     <span className={styles.senderAvatar}>{avatar}</span>
     <div className={styles.senderBody}>
       <span className={styles.senderName}>{accountName}</span>
@@ -213,3 +218,6 @@ export function LinePreviewCard({ imageUrl, title, description, price, time, act
     <span className={styles.messageTime}>{time}</span>
   </div>
 }
+
+/** Flex はトーク枠内で描く。JSON の検査・安全な描画は既存レンダラーに任せる。 */
+export function LinePreviewFlex({ content, maxWidth }: { content: string; maxWidth?: number }) { return <FlexPreview content={content} maxWidth={maxWidth} /> }

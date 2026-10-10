@@ -28,6 +28,7 @@ const ACTION_TYPES = new Set([
   'stop_scenario',
   'resume_scenario',
   'send_message',
+  'event_booking',
   'send_webhook',
   'switch_rich_menu',
   'remove_rich_menu',
@@ -188,6 +189,20 @@ async function validateActionResources(
       await requireResource(db, 'SELECT id FROM templates WHERE id = ? AND line_account_id = ?', [templateId, lineAccountId], `${field}.templateId`, 'テンプレート');
     } else {
       requiredString(params.content, `${field}.content`, '送信内容');
+    }
+  } else if (action.type === 'event_booking') {
+    const eventId = requiredString(params.eventId, `${field}.eventId`, 'イベント');
+    await requireResource(db, `SELECT id FROM events WHERE id = ? AND deleted_at IS NULL AND (
+      (target_type = 'single' AND line_account_id = ?) OR
+      (target_type = 'multi-account-dedup' AND EXISTS (SELECT 1 FROM json_each(account_ids) WHERE value = ?)))`,
+      [eventId, lineAccountId, lineAccountId], `${field}.eventId`, 'イベント');
+    if (params.slotId != null) {
+      const slotId = requiredString(params.slotId, `${field}.slotId`, 'イベントの回');
+      await requireResource(db, 'SELECT id FROM event_slots WHERE id = ? AND event_id = ? AND deleted_at IS NULL',
+        [slotId, eventId], `${field}.slotId`, 'イベントの回');
+    }
+    if (params.op != null && !['register', 'book', 'cancel'].includes(String(params.op))) {
+      throw new ScenarioContractError('event_operation_invalid', 'イベント予約の操作が不正です', 422, `${field}.op`);
     }
   } else if (action.type === 'send_webhook') {
     const webhookId = requiredString(params.webhookId, `${field}.webhookId`, '送信Webhook');

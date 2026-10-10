@@ -1,3 +1,5 @@
+import { storeAt } from './qa-clock.mjs'
+
 /**
  * 画面確認のための、固定の中身。
  *
@@ -4180,13 +4182,10 @@ export const REMINDER_PREVIEW = {
 /*
  * 板 `ltAaq`（確認）の配信予定の行は `今後7日 124通（重なり 3件はまとめる）`。
  * `T0nis` の表は「今後7日」を実時計で絞るため、行の日時は見本の API を立てた
- * 時刻から数える（明日 18:00 ×2〈重なり〉・明後日 13:00・明後日 18:00 の4行）。
+ * 固定時計から数える（明日 18:00 ×2〈重なり〉・明後日 13:00・明後日 18:00 の4行）。
  */
 function reminderNewPreviewAt(dayOffset, hour) {
-  const at = new Date()
-  at.setDate(at.getDate() + dayOffset)
-  at.setHours(hour, 0, 0, 0)
-  return at.toISOString()
+  return storeAt(hour, 0, dayOffset)
 }
 export const REMINDER_NEW_PREVIEW = {
   ...REMINDER_PREVIEW,
@@ -5004,7 +5003,7 @@ export const LOGIN_AUDIT = [
  * STAFF_MEMBERS とID・メールを一致させる(#530)。違うID・メールの
  * ままでは画面の名寄せが「要確認」になり、EOTS4の撮影が回らない。
  */
-const accessUser = (id, name, roleBundle, status, options = {}) => ({
+export const accessUser = (id, name, roleBundle, status, options = {}) => ({
   id, name, email: options.email ?? `${id}@example.invalid`, jobTitle: options.jobTitle ?? null,
   roleBundle, featureCount: roleBundle === 'administrator' ? null : (options.featureCount ?? 8),
   hasFieldMasks: null,
@@ -5012,8 +5011,8 @@ const accessUser = (id, name, roleBundle, status, options = {}) => ({
     type: 'accounts', assignedLineAccountId: 'visual-qa-account',
     lineAccountIds: ['visual-qa-account'], includesDescendants: false,
   },
-  lastLoginAt: options.lastLoginAt ?? (status === 'active' ? '2026-09-06T23:02:00.000Z' : null),
-  lastActionAt: options.lastActionAt ?? (status === 'active' ? '2026-09-07T00:18:00.000Z' : null),
+  lastLoginAt: options.lastLoginAt !== undefined ? options.lastLoginAt : (status === 'active' ? '2026-09-06T23:02:00.000Z' : null),
+  lastActionAt: options.lastActionAt !== undefined ? options.lastActionAt : (status === 'active' ? '2026-09-07T00:18:00.000Z' : null),
   mfaEnabled: options.mfaEnabled ?? false,
   status, policyVersion: options.policyVersion ?? 1,
   createdAt: options.createdAt ?? '2026-01-10T00:00:00.000Z',
@@ -5713,14 +5712,14 @@ export const AFFILIATE_SETTLEMENT_PREVIEW = {
 
 export const AFFILIATE_SETTLEMENT_CREATED = {
   kind: 'created', settlementId: 'visual-qa-settlement-2026-08',
-  totalAmount: 174000, conversionCount: 36, version: 1,
+  totalAmount: AFFILIATE_SETTLEMENT_PREVIEW.totalAmount, conversionCount: AFFILIATE_SETTLEMENT_PREVIEW.conversionCount, version: 1,
   closedAt: '2026-09-07T02:00:00.000Z',
 }
 
 export const AFFILIATE_PAYOUT_BATCH = {
   id: 'visual-qa-payout-batch-2026-08', lineAccountId: 'visual-qa-account',
   settlementId: AFFILIATE_SETTLEMENT_CREATED.settlementId,
-  totalAmount: 174000, currency: 'JPY', lineCount: 36, state: 'created',
+  totalAmount: AFFILIATE_SETTLEMENT_CREATED.totalAmount, currency: 'JPY', lineCount: AFFILIATE_SETTLEMENT_CREATED.conversionCount, state: 'created',
   bankFormat: 'zengin_csv', fileChecksum: null, version: 1,
   downloadExpiresAt: null, createdAt: '2026-09-07T02:01:00.000Z',
 }
@@ -5728,7 +5727,7 @@ export const AFFILIATE_PAYOUT_BATCH = {
 export const AFFILIATE_STATEMENT = {
   id: 'visual-qa-affiliate-statement-2026-08', lineAccountId: 'visual-qa-account',
   affiliateId: 'af-1', settlementId: AFFILIATE_SETTLEMENT_CREATED.settlementId,
-  totalAmount: 62000, status: 'generated', version: 1,
+  totalAmount: AFFILIATE_SETTLEMENT_PREVIEW.affiliates.find((item) => item.affiliateId === 'af-1').amount, status: 'generated', version: 1,
   expiresAt: '2026-10-07T02:02:00.000Z', createdAt: '2026-09-07T02:02:00.000Z',
 }
 
@@ -6629,34 +6628,39 @@ export const EC_NOTIFICATION_RUNS = {
   },
 }
 
-export const LINE_NOTIFICATION_DELIVERIES = {
-  items: [...EC_NOTIFICATION_RUNS.items.map((run) => ({
-    ...run,
-    attemptCount: run.status === 'failed' ? 3 : 1,
-    nextRetryAt: run.status === 'failed' ? '2026-08-25T11:14:00+09:00' : null,
-    clickedAt: run.status === 'accepted' ? '2026-08-25T10:45:00+09:00' : null,
-    version: 2,
-    retryAvailable: run.status === 'failed',
-    attemptHistory: [{ attempt: 1, status: run.status === 'failed' ? 'failed' : run.status, occurredAt: run.receivedAt }],
-  })),
-  // 再試行待ち。本番の failures 絞り込み（excluded / retry_wait / failed）の3つ目を撮る。
-  {
-    id: 'ec-run-5', recipientType: 'customer', notificationName: '発送のお知らせ', source: 'EC連携',
-    sourceEventId: 'ec-event-1005', friendId: 'friend-5', friendName: '石田 未来', orderNumber: 'NEN-10478',
-    channel: 'line', status: 'retry_wait', reason: 'LINEが混み合っているため、後でもう一度送ります',
-    receivedAt: '2026-08-25T10:09:00+09:00', acceptedAt: null,
-    attemptCount: 2, nextRetryAt: '2026-08-25T11:09:00+09:00', clickedAt: null, version: 2,
-    executionMode: 'retry', retryAvailable: true,
-    attemptHistory: [
-      { attempt: 1, status: 'failed', occurredAt: '2026-08-25T10:09:00+09:00' },
-      { attempt: 2, status: 'retry_wait', occurredAt: '2026-08-25T10:39:00+09:00' },
-    ],
+const deliveryRun = (id, name, friendId, friendName, orderNumber, status, receivedAt, extras = {}) => ({
+  id, recipientType: 'customer', notificationName: name, source: 'EC連携',
+  sourceEventId: `event-${id}`, friendId, friendName, orderNumber,
+  channel: 'line', status, reason: null, receivedAt,
+  acceptedAt: status === 'accepted' ? receivedAt : null,
+  attemptCount: status === 'excluded' ? 0 : 1,
+  nextRetryAt: null, clickedAt: null, version: 2, recordVersion: 1,
+  providerStatus: status === 'accepted' ? 'provider_accepted' : null,
+  executionMode: 'automatic', retryAvailable: false,
+  resolved: false, resolvedAt: null, resolvedBy: null,
+  attemptHistory: status === 'excluded' ? [] : [{
+    number: 1, outcome: status === 'accepted' ? 'provider_accepted' : status === 'pending' ? 'retry_wait' : 'failed',
+    attemptedAt: receivedAt, providerRequestId: null, errorCode: null, error: null,
   }],
-  summary: EC_NOTIFICATION_RUNS.summary,
+  ...extras,
+})
+
+export const LINE_NOTIFICATION_DELIVERIES = {
+  items: [
+    deliveryRun('ec-run-1', '発送のお知らせ', 'friend-1', '田中 明子', '#A-10425', 'accepted', '2026-10-01T21:30:00+09:00', { clickedAt: '2026-10-01T21:35:00+09:00' }),
+    deliveryRun('ec-run-2', '注文ありがとうございます', 'friend-2', '山本 大輔', '#A-10424', 'pending', '2026-10-01T21:20:00+09:00'),
+    deliveryRun('ec-run-3', '定期便のお届け日', 'friend-3', '中村 彩', '#S-2201', 'excluded', '2026-10-01T20:02:00+09:00', { reason: '通知を受け取らない設定' }),
+    deliveryRun('ec-run-4', '発送のお知らせ', 'friend-4', '高橋 直人', '#A-10422', 'failed', '2026-10-01T21:14:00+09:00', { reason: 'ブロックされています（対応不要）' }),
+    deliveryRun('ec-run-5', '新しい予約が入りました', null, '森 涼太', null, 'failed', '2026-10-01T18:02:00+09:00', { recipientType: 'operator', source: '予約管理', reason: 'LINE未ログイン', retryAvailable: false }),
+    deliveryRun('ec-run-6', '入金の確認', 'friend-6', '佐藤 由美', '#A-10398', 'failed', '2026-09-30T12:40:00+09:00', {
+      attemptCount: 3, reason: '一時的なエラー', nextRetryAt: '2026-10-02T06:00:00+09:00', retryAvailable: true,
+      attemptHistory: [1, 2, 3].map(number => ({ number, outcome: 'failed', attemptedAt: '2026-09-30T12:40:00+09:00', providerRequestId: null, errorCode: null, error: '一時的なエラー' })),
+    }),
+  ],
+  summary: { accepted: 1, pending: 1, excluded: 1, failed: 3 },
   coverage: { source: 'notification_delivery_ledger', unassignedHistoricalRowsExcluded: true, attemptHistoryAvailable: true, retryAvailable: true },
 }
 
-/** 機能24 DpxOK / N2gAza。運用者向けの宛先と当日実行を同じ固定結果で再現する。 */
 export const OPERATOR_NOTIFICATION_RECIPIENTS = {
   items: [
     { id: 'staff-owner', name: '高橋 直人', lineLinked: true, emailVerified: true, channels: { line: true, email: false, dashboard: true }, canReceive: true },
@@ -6684,12 +6688,12 @@ export const OPERATOR_NOTIFICATION_TEAMS = [
 ]
 
 export const OPERATOR_NOTIFICATION_RULES = [
-  operatorRule('operator-rule-1', '新しい予約が入りました', 'message_received', '予約チーム 3人', 18, 'published', ['staff-owner', 'staff-support', 'staff-store']),
-  operatorRule('operator-rule-2', '審査を待っている写真があります', 'cv_fire', '審査チーム 2人', 4),
-  operatorRule('operator-rule-3', '配信が失敗しました', 'incoming_webhook.custom', '運用チーム 2人', 2),
-  operatorRule('operator-rule-4', '外部連携でエラーが出ました', 'incoming_webhook.custom', '運用チーム 2人', 0),
-  operatorRule('operator-rule-5', '緊急の受信があります', 'message_received', '店長 1人', 1, 'published', ['staff-owner']),
-  operatorRule('operator-rule-6', '月の配信数が上限に近づきました', 'friend_add', '受け取る人がいません', 0, 'draft', []),
+  operatorRule('operator-rule-1', '新しい予約が入りました', 'booking_created', '予約チーム 3人', 18, 'published', ['staff-owner', 'staff-support', 'staff-store']),
+  operatorRule('operator-rule-2', 'フォームに回答がありました', 'form_submitted', '審査チーム 2人', 4),
+  operatorRule('operator-rule-3', '一斉配信が完了しました', 'broadcast_completed', '運用チーム 2人', 2),
+  operatorRule('operator-rule-4', 'マニュアルのリンクが開きません', 'manual_link_broken', '運用チーム 2人', 0),
+  operatorRule('operator-rule-5', '誕生日クーポンを確認してください', 'nen_birthday_coupon_failed', '店長 1人', 1, 'published', ['staff-owner']),
+  operatorRule('operator-rule-6', '共通情報の期限が近づきました', 'common_var_expiry', '受け取る人がいません', 0, 'draft', []),
 ]
 
 /*

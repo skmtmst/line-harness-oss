@@ -972,7 +972,7 @@ describe('フォーム回答の冪等予約', () => {
       body: JSON.stringify({ data: { full_name: '山田' } }),
     }), env());
     expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ success: false, error: 'idempotency_key_required' });
+    expect(await res.json()).toMatchObject({ success: false, code: 'idempotency_key_required' , fields: expect.any(Object), error: expect.any(String) });
     expect(mocks.getFormById).not.toHaveBeenCalled();
     expect(mocks.createFormSubmitClaim).not.toHaveBeenCalled();
   });

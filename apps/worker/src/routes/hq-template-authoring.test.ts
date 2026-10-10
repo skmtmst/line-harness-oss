@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import type { Env } from '../index.js';
 import { hqTemplates } from './hq-templates.js';
+import { liffActionFromUrl } from '@line-crm/shared';
 // The real pure Web authoring functions feed the real HTTP + SQLite executor.
 const webAuthoringPath = '../../../web/src/lib/hq-template-authoring.ts';
 const { freshDefinition, withUploadedImage, withMessageCard } = await import(/* @vite-ignore */ webAuthoringPath);
@@ -63,6 +64,42 @@ describe('HQ authoring Web payload to HTTP/SQLite/R2 distribution',()=>{
     (value.template as any).name='案内';
     return withMessageCard(value,{format:'flex',title:'タイトル',body:'scenario-a',buttons:[{id:'form',label:'回答する',action:'form',value:'form-a'},{id:'scenario',label:'始める',action:'scenario',value:'scenario-a'}]});
   }
+  test.each([
+    ['url', 'https://example.com'], ['message', '予約したい'], ['booking', ''],
+    ['booking_history', ''], ['form', 'form-a'], ['visit_stamp', ''],
+    ['booking', 'menu-a'], ['visit_stamp', 'card-a'],
+  ])('6つの動きと選択先ありをHTTPで保存・3店舗へ配布・読み戻す: %s %s', async (action, value) => {
+    const source = referencedCard();
+    for (const account of ['a', 'b', 'c']) {
+      sql.raw.prepare('INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price) VALUES (?,?,?,30,0)').run(`menu-${account}`, account, '相談');
+      sql.raw.prepare("INSERT INTO visit_stamp_cards(id,tenant_id,name,settings_json) VALUES (?,'tenant','来店','{}')").run(`card-${account}`);
+      sql.raw.prepare('INSERT INTO visit_stamp_card_accounts(card_id,line_account_id) VALUES (?,?)').run(`card-${account}`, account);
+    }
+    const definition = withMessageCard(source, { format: 'flex', title: '案内', body: '本文', buttons: [{ id: 'one', label: '開く', action, value }] });
+    const id = await save('template', definition);
+    expect((await request(`/${id}`)).body.data.definition.card.buttons[0]).toMatchObject({ action, value });
+    await distribute(id);
+    for (const account of ['a', 'b', 'c']) {
+      const row = sql.raw.prepare('SELECT message_content FROM templates WHERE line_account_id=?').get(account) as { message_content: string };
+      const button = JSON.parse(row.message_content).footer.contents[0].action;
+      expect(button.type).toBe(action === 'message' ? 'message' : 'uri');
+      if (['booking', 'booking_history', 'form', 'visit_stamp'].includes(action)) {
+        expect(button.uri).toContain(`https://liff.line.me/liff-${account}/`);
+        expect(liffActionFromUrl(button.uri)?.kind).toBe(action);
+        if (action === 'booking' && value) expect(liffActionFromUrl(button.uri)).toEqual({ kind: action, menuId: `menu-${account}` });
+        if (action === 'visit_stamp' && value) expect(liffActionFromUrl(button.uri)).toEqual({ kind: action, cardId: `card-${account}` });
+      }
+    }
+  });
+  test('LIFFが無い理由をHTTPで具体的に返す', async () => {
+    const source = referencedCard();
+    const definition = withMessageCard(source, { format: 'flex', title: '案内', body: '本文', buttons: [{ id: 'one', label: '予約', action: 'booking', value: '' }] });
+    const id = await save('template', definition);
+    sql.raw.exec("UPDATE line_accounts SET liff_id=NULL WHERE id='b'");
+    const result = await request(`/${id}/preflight`, 'POST', { accountIds: ['b'] });
+    expect(result.status).toBe(409); expect(result.body.code).toBe('LIFF_UNAVAILABLE');
+    expect(result.body.error).toContain('LIFFが設定されていません');
+  });
   test('one save preserves title/body/buttons and maps references and postbacks per destination',async()=>{
     const value=referencedCard(),id=await save('template',value);
     const saved=await request(`/${id}`);expect(saved.body.data.definition.card).toEqual(value.card);
@@ -71,7 +108,7 @@ describe('HQ authoring Web payload to HTTP/SQLite/R2 distribution',()=>{
     for(const row of rows) {
       const bubble=JSON.parse(row.message_content),account=row.line_account_id;
       expect(bubble.body.contents.map((item:any)=>item.text)).toEqual(['タイトル','scenario-a']);
-      expect(bubble.footer.contents[0].action.uri).toBe(`https://liff.line.me/liff-${account}?form=form-${account}`);
+      expect(bubble.footer.contents[0].action.uri).toBe(`https://liff.line.me/liff-${account}/?page=form&id=form-${account}`);
       expect(bubble.footer.contents[1].action.data).toBe(`ctpl=${row.id}&c=0&a=1`);
       expect(JSON.parse(row.carousel_actions_json)[0][1][0].config).toEqual({op:'start',scenarioId:`scenario-${account}`});
     }

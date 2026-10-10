@@ -36,6 +36,8 @@ import OfferTermsDialog from './offer-terms'
 import { confirmedThisMonth, confirmedTotals, confirmedValue, confirmedUnit, confirmedDetail, type ConfirmedState } from './offer-kpi'
 import { KpiStrip, KpiCell, NoticeBar, EmptyState, ZeroResultState, LoadingRows, LoadError } from './v8-shared'
 import './list-v8.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function formatYen(n: number): string {
   return `¥${formatNumber(Math.round(n))}`
@@ -191,7 +193,7 @@ export default function OffersTabV8({
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const a = document.createElement('a')
     a.href = url
-    a.download = `affiliate-offers-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = csvFileName("アフィリエイト案件")
     a.click()
     URL.revokeObjectURL(url)
   }, [shown, accountMap, tagMap, scenarioMap])
@@ -199,7 +201,7 @@ export default function OffersTabV8({
   useEffect(() => {
     registerHeaderActions(
       <Button key="csv" type="button" onClick={exportCsv} disabled={shown.length === 0}>
-        <Download size={15} aria-hidden="true" /> CSV で書き出す
+        <Download size={15} aria-hidden="true" /> CSVで書き出す
       </Button>,
     )
     return () => registerHeaderActions(null)
@@ -430,7 +432,7 @@ export default function OffersTabV8({
                           </span>
                         </td>
                         <td className="af-list-numRight">
-                          <strong>{offer.rewardAmount != null ? formatYen(offer.rewardAmount) : '—'}</strong>
+                          <strong>{offer.rewardAmount != null ? formatYen(offer.rewardAmount) : emptyValue('unknown')}</strong>
                           {offer.rewardMiles > 0 ? (
                             <span className="af-list-cellSub">＋{formatNumber(offer.rewardMiles)}マイル</span>
                           ) : null}

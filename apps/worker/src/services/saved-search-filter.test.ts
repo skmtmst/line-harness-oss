@@ -136,3 +136,29 @@ describe('R183 逆転期間は0人として扱わず断る', () => {
     }
   });
 });
+
+describe('友だち情報の保存値で検索する（実SQL）', () => {
+  it('metadataの古い値ではなく情報欄の値・未登録・空を判定する', async () => {
+    const { createTestD1 } = await import('../test-utils/d1-sqlite.js');
+    const f = createTestD1();
+    try {
+      f.raw.exec(`
+        INSERT INTO friends(id,line_user_id,line_account_id,metadata) VALUES
+          ('yes','Uyes','a','{"plan":"古い"}'),('empty','Uempty','a','{"plan":"契約"}'),('none','Unone','a','{"plan":"契約"}');
+        INSERT INTO friend_fields(id,name,field_key,type) VALUES ('plan-id','plan','plan-key','text');
+        INSERT INTO friend_field_values(friend_id,field_id,value) VALUES ('yes','plan-id','契約'),('empty','plan-id','');
+      `);
+      for (const [op, value, expected] of [
+        ['eq', '契約', ['yes']], ['ne', '契約', ['empty', 'none']],
+        ['exists', undefined, ['yes']], ['not_exists', undefined, ['empty', 'none']],
+        ['contains', '契', ['yes']], ['not_contains', '契', ['empty', 'none']],
+      ] as const) {
+        for (const key of ['plan', 'plan-id']) {
+          const compiled = compileSavedSearch({ all: [{ kind: 'field', key, op, value }] });
+          if (!compiled.ok) throw new Error(compiled.error);
+          expect(f.raw.prepare(`SELECT f.id FROM friends f WHERE ${compiled.value.sql} ORDER BY f.id`).all(...compiled.value.binds).map((r: any) => r.id), `${key}/${op}`).toEqual(expected);
+        }
+      }
+    } finally { f.raw.close(); }
+  });
+});

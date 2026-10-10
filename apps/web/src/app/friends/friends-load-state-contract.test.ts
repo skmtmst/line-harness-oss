@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
@@ -13,7 +13,8 @@ describe('V6 友だち一覧の読込状態', () => {
   })
 
   it('読込失敗を0件の友だち一覧として表示しない', () => {
-    expect(PAGE).toContain('status={loadStatus}')
+    expect(PAGE).toContain("loadStatus === 'error'")
+    expect(PAGE).toContain('<ListState kind="error"')
     expect(TABLE).toContain("status === 'error'")
     expect(TABLE).toContain('表示できませんでした')
     expect(PAGE).toContain('onRetry={() => void loadFriends()}')
@@ -27,13 +28,14 @@ describe('V6 友だち一覧の読込状態', () => {
      */
     expect(TABLE).toContain("status === 'ready' ? `${formatNumber(total)}件` : '—'")
     expect(PAGE).not.toContain("{loadStatus === 'ready' ? `${formatNumber(total)}件` : '—'}")
-    expect(PAGE).toContain("onExportReady(loadStatus === 'ready' ? exportCurrentPage : null)")
-    expect(PAGE).toContain('<FriendsListHeadV8 onExportCurrentPage={exportCurrentPage} />')
+    expect(PAGE).toContain("onClick={exportCurrentPage} disabled={loadStatus !== 'ready'}")
+    expect(PAGE).toContain('<ListPage')
   })
 
   it('条件変更前の遅い応答と古い一覧を採用しない', () => {
     expect(PAGE).toContain('const loadRequestRef = useRef(0)')
-    expect(PAGE).toContain('if (requestId !== loadRequestRef.current) return')
+    expect(PAGE).toContain('return requestId !== loadRequestRef.current')
+    expect(PAGE.match(/if \(stale\(\)\) return/g)?.length).toBeGreaterThanOrEqual(2)
     expect(PAGE).toContain('loadRequestRef.current += 1')
     expect(PAGE).toContain('setFriends([])')
   })

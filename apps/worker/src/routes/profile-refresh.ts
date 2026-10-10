@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
@@ -55,13 +56,13 @@ async function visibleAccountNames(
  *
  * Caller (cron / curl) は hasMore=false まで offset を進めて再 POST する想定。
  */
-profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), async (c) => {
+profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), inputJsonBoundary(), async (c) => {
   const offset = Number.parseInt(c.req.query('offset') ?? '0', 10);
   const limit = listLimit(c.req.query('limit'), 100, 500);
   const accountIdFilter = c.req.query('accountId') ?? null;
 
   if (!Number.isFinite(offset) || offset < 0) {
-    return c.json({ success: false, error: 'invalid offset' }, 400);
+    return inputError(c, { success: false, error: 'invalid offset' }, 400, ["offset"]);
   }
 
   const db = c.env.DB;
@@ -185,7 +186,7 @@ profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), async (
  * messages_log がゼロ件であることを安全条件に強制する (誤って配信済の
  * broadcast を reset してしまうと送信痕跡が消えて重複配信のリスクがある)。
  */
-profileRefresh.post('/api/admin/broadcasts/:id/reset-to-draft', requireRole('owner'), async (c) => {
+profileRefresh.post('/api/admin/broadcasts/:id/reset-to-draft', requireRole('owner'), inputJsonBoundary(), async (c) => {
   const id = c.req.param('id');
   const db = c.env.DB;
 
@@ -234,10 +235,10 @@ profileRefresh.post('/api/admin/broadcasts/:id/reset-to-draft', requireRole('own
  * 使い方: video-launch-rest が test-100/500/2000 既送ユーザーと cross-account で
  * 重複してないか確認する用。
  */
-profileRefresh.post('/api/admin/tag-leak-check', requireRole('owner'), async (c) => {
+profileRefresh.post('/api/admin/tag-leak-check', requireRole('owner'), inputJsonBoundary({"tagsA":["array"],"tagsB":["array"]}), async (c) => {
   const body = await c.req.json<{ tagsA: string[]; tagsB: string[] }>();
   if (!Array.isArray(body.tagsA) || !Array.isArray(body.tagsB)) {
-    return c.json({ success: false, error: 'tagsA/tagsB must be string arrays' }, 400);
+    return inputError(c, { success: false, error: 'tagsA/tagsB must be string arrays' }, 400, ["tagsA","tagsB"]);
   }
   const db = c.env.DB;
 
@@ -287,10 +288,10 @@ profileRefresh.post('/api/admin/tag-leak-check', requireRole('owner'), async (c)
  * cross-account 相当の人物単位検出も含めるため、tag 内 friend の ident_key と
  * 同一の ident_key を持つ別 friend が既受信なら counted (= 別アカで受信済 person)。
  */
-profileRefresh.post('/api/admin/content-leak-check', requireRole('owner'), async (c) => {
+profileRefresh.post('/api/admin/content-leak-check', requireRole('owner'), inputJsonBoundary({"tagName":["string"],"contentSubstring":["string"]}), async (c) => {
   const body = await c.req.json<{ tagName: string; contentSubstring: string }>();
   if (typeof body.tagName !== 'string' || typeof body.contentSubstring !== 'string' || !body.contentSubstring) {
-    return c.json({ success: false, error: 'tagName + contentSubstring required' }, 400);
+    return inputError(c, { success: false, error: 'tagName + contentSubstring required' }, 400, ["tagName","contentSubstring"]);
   }
   const db = c.env.DB;
   const idCol = `COALESCE(
@@ -337,7 +338,7 @@ profileRefresh.post('/api/admin/content-leak-check', requireRole('owner'), async
  * 配信状況の包括メトリクスを返す。account 別の friend 数 / 受信済人数、人物単位
  * (ident_key) の重複/未到達数、rest 配信時の重複予測などを一発で出す。
  */
-profileRefresh.post('/api/admin/broadcast-coverage', requireRole('owner'), async (c) => {
+profileRefresh.post('/api/admin/broadcast-coverage', requireRole('owner'), inputJsonBoundary({"tagName":["string"],"contentSubstring":["string"]}), async (c) => {
   const body = await c.req.json<{ tagName: string; contentSubstring: string }>();
   const db = c.env.DB;
 
@@ -446,7 +447,7 @@ profileRefresh.post('/api/admin/broadcast-coverage', requireRole('owner'), async
  * 用途: video-launch-rest の中で、test 100/500/2000/test10/直送り 等で既に
  * 動画 URL を受け取ってる人を除外して、二重配信を防ぐ。
  */
-profileRefresh.post('/api/admin/tag-remove-content-dups', requireRole('owner'), async (c) => {
+profileRefresh.post('/api/admin/tag-remove-content-dups', requireRole('owner'), inputJsonBoundary({"tagName":["string"],"contentSubstring":["string"]}), async (c) => {
   const body = await c.req.json<{ tagName: string; contentSubstring: string }>();
   const db = c.env.DB;
 

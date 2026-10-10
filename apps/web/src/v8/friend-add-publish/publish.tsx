@@ -13,7 +13,6 @@
  * 公開したときの数をそのまま出す。`?done=1` は作る⑤（編集画面）から有効にして来たとき。
  */
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CircleAlert, CircleCheck, Power, Send, Smartphone } from 'lucide-react'
 import type { FriendAddRoutingValidation } from '@line-crm/shared'
@@ -38,6 +37,8 @@ import { resendSuppressionText } from '@/v8/friend-add/text'
 import { actionSummaryText, blockedReason, canPublish, firstSendText, idempotencyKeyFor, PUBLISH_STEPS, editStepHref } from './flow'
 import FriendAddDoneV8 from './done'
 import styles from './publish.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Phase = 'loading' | 'ready' | 'empty' | 'error' | 'forbidden' | 'missing'
 type RuleDetail = {
@@ -131,6 +132,8 @@ function FriendAddPublish() {
     requestRef.current = { accountId: selectedAccountId, generation }
     const isCurrent = () => alive && requestRef.current.accountId === selectedAccountId && requestRef.current.generation === generation
     setPhase('loading')
+    setBusy(false)
+    setTesting(false)
     setFailure(null)
     // アカウント固有の結果を先に捨てる。残すと、別のアカウントの数を見ながら公開することになる。
     setDetail(null)
@@ -159,7 +162,7 @@ function FriendAddPublish() {
         // 404 は「確認する下書きがない」。失敗と混ぜない。
         if (caught instanceof ApiError && caught.status === 404) { setPhase('empty'); return }
         if (caught instanceof ApiError && caught.status === 403) {
-          setFailure({ title: 'この設定を公開する権限がありません', description: '見るには権限が要ります。オーナーか管理者に追加を依頼してください。' })
+          setFailure({ title: 'この設定を公開する権限がありません', description: permissionDeniedMessage('store') })
           setPhase('forbidden')
           return
         }
@@ -220,7 +223,7 @@ function FriendAddPublish() {
     } catch (caught) {
       if (!stillHere()) return
       setError(caught instanceof ApiError && caught.status === 403
-        ? 'この設定を公開する権限がありません。オーナーか管理者に依頼してください。'
+        ? permissionDeniedMessage('store')
         : '有効化できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       if (stillHere()) setBusy(false)
@@ -256,7 +259,7 @@ function FriendAddPublish() {
 
   /* 有効にしたあと（e0FD1J）。`?done=1` は作る⑤から有効にして来たとき（読み込んだ設定で出す）。 */
   if (published) return <FriendAddDoneV8 {...published} ruleId={ruleId} />
-  if (searchParams.get('done') === '1') {
+  if (searchParams.get('done') === '1' && detail.rule.status === 'published') {
     return <FriendAddDoneV8 ruleId={ruleId} ruleName={detail.rule.name} routeNames={detail.rule.routeNames} priority={detail.rule.priority} slackConnected={slackOf(detail)} />
   }
 
@@ -273,7 +276,7 @@ function FriendAddPublish() {
   const routeNames = rule.isFallback ? ['経路が分からなかった人'] : rule.routeNames
 
   const rows: Array<{ label: string; value: string; href: string }> = [
-    { label: '名前・フォルダ', value: `${rule.name || '（未入力）'}${rule.folderName ? `・${rule.folderName}` : ''}`, href: editHref('basic') },
+    { label: '名前・フォルダ', value: `${rule.name || emptyValue('unconfigured')}${rule.folderName ? `・${rule.folderName}` : ''}`, href: editHref('basic') },
     { label: 'だれに', value: rule.friendKind === 'returning' ? '以前からの友だち・ブロック解除した人' : 'はじめて友だち追加した人', href: editHref('basic') },
     { label: '流入リンク', value: routeNames.length > 0 ? routeNames.join('・') : '未選択', href: editHref('routes') },
     { label: '最初に送るもの', value: firstSendText(rule), href: editHref('message') },
@@ -350,7 +353,6 @@ function FriendAddPublish() {
     <CreatePage
       boardId="U8Xm3X"
       title="初回案内を作る"
-      identity={<Link href="/friend-add-settings" className={styles.backLink}>← 友だち追加時の配信へ</Link>}
       steps={(
         <Steps
           label="初回案内の作る手順"
@@ -361,7 +363,7 @@ function FriendAddPublish() {
           }))}
         />
       )}
-      description={`名前：${rule.name}・いまは${statusLabel}です`}
+      help={`名前：${rule.name}・いまは${statusLabel}です`}
       preview={preview}
       status={busy ? '有効にしています' : undefined}
       footerActions={canEdit ? (
@@ -385,7 +387,7 @@ function FriendAddPublish() {
         <Button href="/friend-add-settings">一覧へ戻る</Button>
       )}
     >
-      {!canEdit ? <p className={styles.viewerBand} role="status">閲覧のみで見ています。有効にする操作は管理者に頼んでください。</p> : null}
+      {!canEdit ? <p className={styles.viewerBand} role="status">閲覧のみで見ています。有効にする操作はオーナーか管理者に頼んでください。</p> : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}
 

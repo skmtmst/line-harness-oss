@@ -772,7 +772,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
           kind="error"
           title="担当者の勤務とシフトを表示できませんでした"
           description="保存済みの内容は消えていません。時間をおいて、もう一度読み込んでください。"
-          action={<Button onClick={() => setReloadKey((value) => value + 1)}>勤務とシフトを再読み込み</Button>}
+          onRetry={() => setReloadKey((value) => value + 1)}
         />
       </div>
     )

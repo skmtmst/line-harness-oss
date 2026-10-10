@@ -486,6 +486,7 @@ export default function EmailThread({
   }
 
   const closeMemoEditor = () => {
+    if (memoSaving) return
     // 閉じたあとに届く保存結果は画面へ適用しない(INBOX-25)。
     memoSaveGenRef.current += 1
     setMemoDraft(detail?.thread.notes ?? '')
@@ -806,6 +807,7 @@ export default function EmailThread({
                 <textarea
                   id="email-internal-memo"
                   value={memoDraft}
+                  disabled={memoSaving}
                   onChange={(event) => setMemoDraft(event.target.value)}
                   rows={7}
                   autoFocus
@@ -815,7 +817,7 @@ export default function EmailThread({
                 {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
               </div>
               <div className="flex justify-end gap-2 border-t border-hairline px-5 py-4">
-                <Button variant="secondary" className="px-4 py-2 text-ink-faint h-auto whitespace-normal" type="button" onClick={closeMemoEditor}>キャンセル</Button>
+                <Button variant="secondary" className="px-4 py-2 text-ink-faint h-auto whitespace-normal" type="button" disabled={memoSaving} onClick={closeMemoEditor}>キャンセル</Button>
                 <Button variant="primary" className="px-4 py-2 hover:bg-accent-deep/90 disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={() => void saveMemo()} disabled={memoSaving || memoDraft === (detail.thread.notes ?? '')}>
                   {memoSaving ? '保存中...' : '保存する'}
                 </Button>

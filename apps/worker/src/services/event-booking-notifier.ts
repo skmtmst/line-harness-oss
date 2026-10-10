@@ -86,6 +86,8 @@ export function renderEventNotificationText(
 
 export interface SendEventNotificationParams {
   channelAccessToken: string;
+  /** Fixed for one logical automatic reminder. */
+  retryKey?: string;
   toLineUserId: string;
   kind: EventNotificationKind;
   ctx: EventNotificationContext;
@@ -96,7 +98,7 @@ export async function sendEventBookingNotification(
 ): Promise<void> {
   const text = renderEventNotificationText(params.kind, params.ctx);
   const client = new LineClient(params.channelAccessToken);
-  await client.pushMessage(params.toLineUserId, [{ type: 'text', text }]);
+  await client.pushMessage(params.toLineUserId, [{ type: 'text', text }], params.retryKey);
 }
 
 export type EventBookingNotificationSender = (

@@ -20,7 +20,7 @@ describe('窓の頭の余白・高さを絵から渡す', () => {
     const panel = screen.getByRole('dialog')
     expect(panel.hasAttribute('data-design-header-padding')).toBe(false)
     expect(panel.hasAttribute('data-design-header-height')).toBe(false)
-    expect(panel.getAttribute('style')).toBeNull()
+    expect(panel.style.getPropertyValue('--dialog-design-width')).toBe('560px')
   })
 
   it('Dialog：渡すと印と変数が付く（幅と一緒でも両方残る）', () => {
@@ -29,7 +29,7 @@ describe('窓の頭の余白・高さを絵から渡す', () => {
     expect(panel.hasAttribute('data-design-header-padding')).toBe(true)
     expect(panel.style.getPropertyValue('--dialog-design-header-padding')).toBe('20px 20px 0')
     expect(panel.style.getPropertyValue('--dialog-design-header-height')).toBe('44px')
-    expect(panel.style.getPropertyValue('--dialog-design-width')).toBe('520px')
+    expect(panel.style.getPropertyValue('--dialog-design-width')).toBe('560px')
   })
 
   it('ConfirmDialog も同じ口を素通しする', () => {

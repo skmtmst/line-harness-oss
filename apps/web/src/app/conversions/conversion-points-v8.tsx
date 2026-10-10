@@ -48,6 +48,9 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { inputClass } from '@/components/shared/form-controls'
 import styles from './conversion-points-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /** V8 の絞り込み。`all` を含む以外は v7 の `StatusFilter` と同じ。 */
 export type ConversionPointsV8Status = 'all' | ConversionDefinitionFilter
@@ -113,8 +116,8 @@ const READONLY_REASON = 'この操作にはオーナーか管理者の権限が�
 
 const CHIPS: Array<{ value: ConversionPointsV8Status; label: string }> = [
   { value: 'all', label: 'すべて' },
-  { value: 'active', label: '動いている' },
-  { value: 'stopped', label: '止めている' },
+  { value: 'active', label: '有効' },
+  { value: 'stopped', label: '停止中' },
   { value: 'draft', label: '下書き' },
   { value: 'invalid', label: '入力不良' },
   { value: 'sourceStopped', label: '起点停止' },
@@ -239,10 +242,10 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
     <div className={styles.board} data-design-node="r6dJFy">
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>コンバージョン</h1>
-          <p className={styles.headDescription}>
+          <PageHeading title="コンバージョン" help={<>
             成果として数えるできごと（成果地点）を決めます。配信・流入・アフィリエイトの成果は、この数え方で集計します。
-          </p>
+          </>} />
+
         </div>
         <Button
           onClick={() => model.onExportCsv()}
@@ -269,32 +272,32 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
         <li className={styles.kpi}>
           <span className={styles.kpiLabel}>成果地点</span>
           <div className={styles.kpiValue}>
-            {model.total == null ? '—' : <>{formatNumber(model.total)}<span className={styles.kpiValueSmall}> 件</span></>}
+            {model.total == null ? emptyValue('unknown') : <>{formatNumber(model.total)}<span className={styles.kpiValueSmall}> 件</span></>}
           </div>
           <div className={styles.kpiNote}>
             {model.stateCounts == null
-              ? '—'
+              ? emptyValue('unknown')
               : <>動いている {formatNumber(model.stateCounts.active)}・止めている {formatNumber(model.stateCounts.stopped)}</>}
           </div>
         </li>
         <li className={styles.kpi}>
           <span className={styles.kpiLabel}>この30日の成果</span>
           <div className={styles.kpiValue}>
-            {model.loadFailed ? '—' : <>{formatNumber(totalCount)}<span className={styles.kpiValueSmall}> 件</span></>}
+            {model.loadFailed ? emptyValue('unknown') : <>{formatNumber(totalCount)}<span className={styles.kpiValueSmall}> 件</span></>}
           </div>
           <div className={styles.kpiNote}>表の行の合計です{model.listTruncated ? '（直近5000件まで）' : ''}</div>
         </li>
         <li className={styles.kpi}>
           <span className={styles.kpiLabel}>この30日の金額</span>
           <div className={styles.kpiValue}>
-            {model.loadFailed ? '—' : <>¥{formatNumber(totalValue)}</>}
+            {model.loadFailed ? emptyValue('unknown') : <>¥{formatNumber(totalValue)}</>}
           </div>
           <div className={styles.kpiNote}>表の行の合計です{model.listTruncated ? '（直近5000件まで）' : ''}</div>
         </li>
         <li className={styles.kpi}>
           <span className={styles.kpiLabel}>どこからも使われていない</span>
           <div className={styles.kpiValue}>
-            {model.stateCounts == null ? '—' : <>{formatNumber(model.stateCounts.unused)}<span className={styles.kpiValueSmall}> 件</span></>}
+            {model.stateCounts == null ? emptyValue('unknown') : <>{formatNumber(model.stateCounts.unused)}<span className={styles.kpiValueSmall}> 件</span></>}
           </div>
           <div className={styles.kpiNote}>配信・流入・アフィリエイトで未使用</div>
         </li>
@@ -322,7 +325,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
             <li>
               <span className={`${styles.railRow} ${styles.railRowActive}`} aria-current="true">
                 <span className={styles.railName}>すべて</span>
-                <span className={styles.railCount}>{model.total == null ? '—' : formatNumber(model.total)}</span>
+                <span className={styles.railCount}>{model.total == null ? emptyValue('unknown') : formatNumber(model.total)}</span>
               </span>
             </li>
           </ul>
@@ -462,7 +465,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                         </button>
                         <span className={`${styles.statePill} ${PILL_CLASS[point.state]}`}>
                           <span className={styles.statePillDot} aria-hidden="true" />
-                          {point.state === 'active' ? '動いている' : STATE_LABELS[point.state]}
+                          {point.state === 'active' ? '有効' : STATE_LABELS[point.state]}
                         </span>
                       </td>
                       <td>
@@ -473,11 +476,11 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                       </td>
                       <td className={styles.numeric}>{formatNumber(point.metrics.netCount)}件</td>
                       <td className={styles.numeric}>
-                        {point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : <span className={styles.cellMuted}>—</span>}
+                        {point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : <span className={styles.cellMuted}>{emptyValue('unknown')}</span>}
                       </td>
                       <td>
                         {point.usageCount === 0
-                          ? <span className={styles.cellMuted}>—</span>
+                          ? <span className={styles.cellMuted}>{emptyValue('unknown')}</span>
                           : <span title={usageLabel(point)}>{usageLabel(point)}</span>}
                       </td>
                       <td className={styles.opCell} onClick={(event) => event.stopPropagation()}>
@@ -565,7 +568,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
               <p className={styles.panelLead}>
                 <span className={`${styles.statePill} ${PILL_CLASS[panelPoint.state]}`}>
                   <span className={styles.statePillDot} aria-hidden="true" />
-                  {panelPoint.state === 'active' ? '動いている' : STATE_LABELS[panelPoint.state]}
+                  {panelPoint.state === 'active' ? '有効' : STATE_LABELS[panelPoint.state]}
                 </span>{' '}
                 {sourceTriggerLabel(panelPoint)}・{deduplicationLabel(panelPoint.deduplicationMode, panelPoint.deduplicationWindowDays)}
               </p>
@@ -727,17 +730,14 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                   />
                 </span>
               ) : null}
-              <label className={styles.reasonField}>
-                <span className={styles.reasonLabel}>理由（必須）</span>
-                <input
+              <Field label="理由" required><input
                   aria-label="止める理由"
                   className={inputClass}
                   value={model.stopReason}
                   maxLength={500}
                   placeholder="計測の仕方を変えるため"
                   onChange={(event) => model.onStopReasonChange(event.target.value)}
-                />
-              </label>
+                /></Field>
               {model.stopError ? <p className={styles.panelError} role="alert">{model.stopError}</p> : null}
               <div className={styles.panelButtons}>
                 <Button variant="secondary" onClick={() => model.onCancelStop()} disabled={model.stopping}>

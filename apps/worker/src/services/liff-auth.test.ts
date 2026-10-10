@@ -51,3 +51,11 @@ describe('LIFF caller identity', () => {
     })).resolves.toBe('U-line-user');
   });
 });
+
+test('B-173: LIFFで指定したアカウントのチャンネルだけで本人確認する', async () => {
+ dbMocks.getLineAccounts.mockResolvedValue([{id:'a',login_channel_id:'login-a'},{id:'b',login_channel_id:'login-b'}]);
+ const verify=vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({sub:'U1'}),{status:200}));vi.stubGlobal('fetch',verify);
+ expect(await verifyCallerLineIdentity('Bearer token',{DB,LINE_LOGIN_CHANNEL_ID:'login-a'},'b')).toEqual({lineUserId:'U1',lineAccountId:'b'});
+ expect(verify).toHaveBeenCalledTimes(1);expect(new URLSearchParams(String(verify.mock.calls[0][1]?.body)).get('client_id')).toBe('login-b');
+ expect(await verifyCallerLineIdentity('Bearer token',{DB},'missing')).toBeNull();expect(verify).toHaveBeenCalledTimes(1);
+});

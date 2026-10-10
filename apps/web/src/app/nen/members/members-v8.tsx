@@ -29,7 +29,7 @@ import { RowActions, DeleteAction } from '@/components/shared/row-actions'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
@@ -55,6 +55,10 @@ import {
 import type { LoadStatus, MemberTab } from './page'
 import { RankChip, yen } from './rank-view'
 import styles from './members-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { csvFileName } from '@/lib/csv-file-name'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -104,12 +108,12 @@ export default function MembersPageV8({
     <div className={styles.board} data-design-node={BOARD_NODE[tab]}>
       <header className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>会員</h1>
-          <p className={styles.headDescription}>
+          <PageHeading title="会員" help={<>
             ネットショップの会員と LINE の友だちを結びつけて、ランクやペットの情報を見ます。
-          </p>
+          </>} />
+
         </div>
-        {/* fb9NJ・e5yBLx：ランク設定の板にも「CSV で書き出す」がある。 */}
+        {/* fb9NJ・e5yBLx：ランク設定の板にも「CSVで書き出す」がある。 */}
         {(tab === 'members' || tab === 'ranks') && accountId ? <CsvExportButton accountId={accountId} /> : null}
       </header>
 
@@ -200,15 +204,15 @@ export function MembersKpiBand({
   const pending = loading || !kpis
   return (
     <section className={styles.kpiBand} aria-label="会員の数の帯">
-      {cell(<Users size={14} />, '会員', pending ? '—' : formatNumber(kpis!.members), pending ? null : '人', pending ? ' ' : `LINE 連携済み ${formatNumber(kpis!.linkedMembers ?? 0)}`)}
-      {cell(<ShoppingBag size={14} />, topTwoLabel, pending || topTwo.length === 0 ? '—' : formatNumber(topTwoCount ?? 0), pending || topTwo.length === 0 ? null : '人', topTwo[1] ? `今年の購入 ${yen(topTwo[1].annualThresholdYen)} 以上` : ' ')}
-      {cell(<PawPrint size={14} />, 'ペット登録あり', pending ? '—' : formatNumber(kpis!.petMembers ?? 0), pending ? null : '人', pending || petPercent === null ? ' ' : `会員の ${petPercent}%`)}
-      {cell(<Link2 size={14} />, '今月の購入', pending ? '—' : yen(kpis!.monthPurchaseYen ?? 0), null, pending ? ' ' : `会員 ${formatNumber(kpis!.monthBuyers ?? 0)} 人`)}
+      {cell(<Users size={14} />, '会員', pending ? emptyValue('unknown') : formatNumber(kpis!.members), pending ? null : '人', pending ? ' ' : `LINE 連携済み ${formatNumber(kpis!.linkedMembers ?? 0)}`)}
+      {cell(<ShoppingBag size={14} />, topTwoLabel, pending || topTwo.length === 0 ? emptyValue('unknown') : formatNumber(topTwoCount ?? 0), pending || topTwo.length === 0 ? null : '人', topTwo[1] ? `今年の購入 ${yen(topTwo[1].annualThresholdYen)} 以上` : ' ')}
+      {cell(<PawPrint size={14} />, 'ペット登録あり', pending ? emptyValue('unknown') : formatNumber(kpis!.petMembers ?? 0), pending ? null : '人', pending || petPercent === null ? ' ' : `会員の ${petPercent}%`)}
+      {cell(<Link2 size={14} />, '今月の購入', pending ? emptyValue('unknown') : yen(kpis!.monthPurchaseYen ?? 0), null, pending ? ' ' : `会員 ${formatNumber(kpis!.monthBuyers ?? 0)} 人`)}
     </section>
   )
 }
 
-/** 「CSV で書き出す」。いまの絞り込みは付けず、見えている会員をすべて書き出す。 */
+/** 「CSVで書き出す」。いまの絞り込みは付けず、見えている会員をすべて書き出す。 */
 function CsvExportButton({ accountId }: { accountId: string }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -246,12 +250,12 @@ function CsvExportButton({ accountId }: { accountId: string }) {
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `nen-members-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("NEN会員")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch (caught) {
       setError(describeApiFailure(caught, 'CSVの書き出し', {
-        forbidden: 'CSVを書き出す権限がありません。権限を確認してください。',
+        scope: 'store',
       }))
     } finally {
       setBusy(false)
@@ -262,7 +266,7 @@ function CsvExportButton({ accountId }: { accountId: string }) {
     <span className={styles.csvWrap}>
       <Button variant="secondary" onClick={() => void exportCsv()} disabled={busy}>
         <Download aria-hidden="true" className="h-4 w-4" />
-        {busy ? '書き出しています…' : 'CSV で書き出す'}
+        {busy ? '書き出しています…' : 'CSVで書き出す'}
       </Button>
       {error ? <span className={styles.csvError} role="alert">{error}</span> : null}
     </span>
@@ -520,11 +524,11 @@ function MemberRowV8({
       <Td align="right" className="w-24"><span className="text-label tabular-nums text-ink">{formatNumber(member.mileBalance)}</span></Td>
       <Td>
         <span className="block truncate text-label text-ink-secondary" title={member.petNames ?? ''}>
-          {member.petNames ? `${member.petNames}${member.petCount > 2 ? ` ほか${member.petCount - 2}頭` : ''}` : '—'}
+          {member.petNames ? `${member.petNames}${member.petCount > 2 ? ` ほか${member.petCount - 2}頭` : ''}` : emptyValue('unknown')}
         </span>
       </Td>
-      <Td className="cq-hide-below-1010 w-20"><span className="text-label text-ink-secondary">{member.lastPurchasedAt ? member.lastPurchasedAt.slice(5, 10).replace('-', '/') : '—'}</span></Td>
-      <Td className="cq-hide-below-1010 w-20" align="right"><span className="text-label font-semibold tabular-nums text-ink">{member.mileRatePercent == null ? '—' : `${member.mileRatePercent}%`}</span></Td>
+      <Td className="cq-hide-below-1010 w-20"><span className="text-label text-ink-secondary">{member.lastPurchasedAt ? member.lastPurchasedAt.slice(5, 10).replace('-', '/') : emptyValue('unknown')}</span></Td>
+      <Td className="cq-hide-below-1010 w-20" align="right"><span className="text-label font-semibold tabular-nums text-ink">{member.mileRatePercent == null ? emptyValue('unknown') : `${member.mileRatePercent}%`}</span></Td>
       <Td align="right" className="w-14">
         {/*
           板の行の「…」：会員の詳細（＝友だち詳細の会員の区画）・友だちを開く・ECで開く。
@@ -664,7 +668,7 @@ export function RankSettingsTabV8({
         : 'ランク設定を保存しました。ECへの同期は失敗したので、右の「もう一度同期」で送り直せます。')
     } catch (caught) {
       setError(describeApiFailure(caught, 'ランク設定の保存', {
-        forbidden: 'ランク設定を保存する権限がありません。権限を確認してください。',
+        scope: 'store',
       }))
     } finally {
       setBusy(false)
@@ -700,7 +704,7 @@ export function RankSettingsTabV8({
         setRemoveTarget(null)
       } else {
         setError(describeApiFailure(caught, 'ランクの削除', {
-          forbidden: 'ランクを削除する権限がありません。権限を確認してください。',
+          scope: 'store',
         }))
       }
     } finally {
@@ -729,7 +733,7 @@ export function RankSettingsTabV8({
       setNotice(res.data.sync?.status === 'synced' ? 'ECへ同期しました。' : `ECへの同期に失敗しました：${res.data.sync?.error ?? ''}`)
     } catch (caught) {
       setError(describeApiFailure(caught, 'ECへの同期', {
-        forbidden: 'ECへ同期する権限がありません。権限を確認してください。',
+        scope: 'store',
       }))
     } finally {
       setBusy(false)
@@ -805,7 +809,7 @@ export function RankSettingsTabV8({
                         </Td>
                         <Td className="w-36">
                           <span className="flex items-center gap-2">
-                            <TextField aria-label={`しきい値 ${index + 1}`} inputMode="numeric" value={row.threshold} disabled={readonly || isBase} onChange={(event) => update(index, { threshold: event.target.value })} />
+                            <NumberInput numericText aria-label={`しきい値 ${index + 1}`} inputMode="numeric" value={row.threshold} disabled={readonly || isBase} onChange={(event) => update(index, { threshold: event.target.value })} />
                             <span className="shrink-0 text-caption font-semibold text-ink-faint">円〜{isBase ? '（固定）' : null}</span>
                           </span>
                         </Td>
@@ -817,7 +821,7 @@ export function RankSettingsTabV8({
                         </Td>
                         <Td>
                           <span className="block truncate text-label text-ink-secondary" title={row.tagName ?? ''}>
-                            {row.tagName ?? (row.name.trim() ? `[会員] ランク：${row.name.trim()}（保存すると作られます）` : '—')}
+                            {row.tagName ?? (row.name.trim() ? `[会員] ランク：${row.name.trim()}（保存すると作られます）` : emptyValue('unknown'))}
                           </span>
                         </Td>
                         <Td align="right" className="cq-hide-below-1010 w-20"><span className="text-label font-semibold tabular-nums text-ink">{formatNumber(row.memberCount)}人</span></Td>
@@ -918,7 +922,7 @@ export function RankSettingsTabV8({
         {conflict ? (
           <div className={styles.diffGrid}>
             <div>
-              <p className={styles.diffHead}>最新（{conflict.latest.rules ? formatJstShortDateTime(conflict.latest.rules.updatedAt) : '—'}）</p>
+              <p className={styles.diffHead}>最新（{conflict.latest.rules ? formatJstShortDateTime(conflict.latest.rules.updatedAt) : emptyValue('unknown')}）</p>
               <ul className={styles.diffList}>
                 {conflict.latest.ranks.map((rank) => (
                   <li key={rank.id}>{rank.name} — {yen(rank.annualThresholdYen)}〜 / {rank.mileRatePercent}%</li>
@@ -929,7 +933,7 @@ export function RankSettingsTabV8({
               <p className={styles.diffHead}>いまの下書き</p>
               <ul className={styles.diffList}>
                 {drafts.map((row, index) => (
-                  <li key={row.id ?? `draft-${index}`}>{row.name || '（名前なし）'} — {yen(Number(row.threshold.replace(/[,，]/g, '')) || 0)}〜 / {row.rate || '—'}%</li>
+                  <li key={row.id ?? `draft-${index}`}>{row.name || '（名前なし）'} — {yen(Number(row.threshold.replace(/[,，]/g, '')) || 0)}〜 / {row.rate || emptyValue('unknown')}%</li>
                 ))}
               </ul>
             </div>
@@ -1016,7 +1020,7 @@ function LifetimeTabV8({
       setNotice(res.data.sync?.status === 'synced' ? '節目を保存し、ECへ同期しました。' : '節目を保存しました。ECへの同期は失敗したので、ランク設定の「もう一度同期」で送り直せます。')
     } catch (caught) {
       setError(describeApiFailure(caught, '節目の保存', {
-        forbidden: '節目を保存する権限がありません。権限を確認してください。',
+        scope: 'store',
       }))
     } finally {
       setBusy(false)
@@ -1062,8 +1066,8 @@ function LifetimeTabV8({
                 <Tr key={row.id ?? `new-${index}`}>
                   <Td className="w-44">
                     <span className="flex items-center gap-2">
-                      <TextField aria-label={`節目 ${index + 1}`} inputMode="numeric" value={row.threshold} disabled={readonly} onChange={(event) => update(index, { threshold: event.target.value })} />
-                      <span className="shrink-0 text-caption font-semibold text-ink-faint">円</span>
+                      <NumberInput numericText unit="円" aria-label={`節目 ${index + 1}`} inputMode="numeric" value={row.threshold} disabled={readonly} onChange={(event) => update(index, { threshold: event.target.value })} />
+
                     </span>
                   </Td>
                   <Td className="w-48"><TextField aria-label={`称号 ${index + 1}`} value={row.title} maxLength={30} disabled={readonly} onChange={(event) => update(index, { title: event.target.value })} /></Td>
@@ -1085,7 +1089,7 @@ function LifetimeTabV8({
                       /* 閲覧のみ：押せない文字で出す。locked は「オン固定」なので実際の値を見せられない */
                       <span className="text-label text-ink-secondary">{row.notify ? '通知する' : '通知しない'}</span>
                     ) : (
-                      <Toggle checked={row.notify} onChange={(checked) => update(index, { notify: checked })} label={row.notify ? '通知する' : '通知しない'} />
+                      <SettingCheckbox checked={row.notify} onChange={(checked) => update(index, { notify: checked })} label={row.notify ? '通知する' : '通知しない'} />
                     )}
                   </Td>
                   <Td align="right" className="w-14">

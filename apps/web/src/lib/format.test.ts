@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatBig,
+  formatListDateTime,
+  formatListDay,
   formatCount,
   formatDay,
   formatDateTime,
@@ -18,21 +20,21 @@ const NOW = '2026-09-29T15:48:00Z'
 
 describe('★V7 日付と数の書き方（板 ZzBqa §2）', () => {
   it('日時は今年なら M月D日（曜）H:mm、秒も年も出さない', () => {
-    expect(formatDateTime('2026-09-29T15:48:00Z', '—', NOW)).toBe('9月30日（水）0:48')
-    expect(formatDateTime('2026-09-29T15:48:59Z', '—', NOW)).toBe('9月30日（水）0:48')
+    expect(formatDateTime('2026-09-29T15:48:00Z', '—', NOW)).toBe('9月30日（水）00:48')
+    expect(formatDateTime('2026-09-29T15:48:59Z', '—', NOW)).toBe('9月30日（水）00:48')
   })
 
   it('年が違うときだけ頭に YYYY年 を付ける', () => {
-    expect(formatDateTime('2025-04-03T01:00:00Z', '—', NOW)).toBe('2025年4月3日 10:00')
+    expect(formatDateTime('2025-04-03T01:00:00Z', '—', NOW)).toBe('2025年4月3日（木）10:00')
   })
 
   it('PCの地域に左右されない（UTC入力が必ずJSTで出る）', () => {
-    expect(formatDateTime('2026-09-30T15:00:00Z', '—', NOW)).toBe('10月1日（木）0:00')
+    expect(formatDateTime('2026-09-30T15:00:00Z', '—', NOW)).toBe('10月1日（木）00:00')
   })
 
   it('日付だけは M月D日（曜）', () => {
     expect(formatDay('2026-10-03T15:00:00Z', '—', NOW)).toBe('10月4日（日）')
-    expect(formatDay('2025-04-03T01:00:00Z', '—', NOW)).toBe('2025年4月3日')
+    expect(formatDay('2025-04-03T01:00:00Z', '—', NOW)).toBe('2025年4月3日（木）')
   })
 
   it('近い時刻: たった今・◯分前・◯時間前・昨日・◯日前・7日より前は日付', () => {
@@ -51,9 +53,9 @@ describe('★V7 日付と数の書き方（板 ZzBqa §2）', () => {
   })
 
   it('件数・人数は3桁カンマ＋単位、0は「0件」', () => {
-    expect(formatCount(12480, '人')).toBe('12,480人')
-    expect(formatCount(3, '件')).toBe('3件')
-    expect(formatCount(0, '件')).toBe('0件')
+    expect(formatCount(12480, '人')).toBe('12,480 人')
+    expect(formatCount(3, '件')).toBe('3 件')
+    expect(formatCount(0, '件')).toBe('0 件')
   })
 
   it('大きな数は1万2千以上で △△万（目盛り用）', () => {
@@ -83,6 +85,21 @@ describe('★V7 日付と数の書き方（板 ZzBqa §2）', () => {
   })
 
   it('formatTime は秒を出さない', () => {
-    expect(formatTime('2026-09-29T15:48:59Z')).toBe('0:48')
+    expect(formatTime('2026-09-29T15:48:59Z')).toBe('00:48')
   })
+})
+
+// UTCの日付とJSTの日付が違う境界・前年・無効値を守る。
+describe('B-152 一覧と詳細の書式', () => {
+  it('一覧は今年の日時を短く、別の年は年を出す', () => {
+    expect(formatListDateTime('2026-10-08T01:12:00Z', '—', NOW)).toBe('10/08 10:12')
+    expect(formatListDateTime('2025-10-08T01:12:00Z', '—', NOW)).toBe('2025/10/08')
+    expect(formatListDay('2026-10-07T15:00:00Z', '—', NOW)).toBe('10/08')
+    expect(formatListDateTime('invalid')).toBe('—')
+  })
+})
+
+
+it('来年以降の予約も、一覧で開始時刻を確認できる', () => {
+  expect(formatListDateTime('2027-01-02T01:12:00Z', '—', NOW)).toBe('2027/01/02 10:12')
 })

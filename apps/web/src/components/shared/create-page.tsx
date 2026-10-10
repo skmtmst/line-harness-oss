@@ -3,9 +3,11 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import Header from '@/components/layout/header'
+import { PageHeading } from '@/components/templates/page-frame'
 import styles from './create-page.module.css'
+import { AutoFormLeaveGuard } from './form-leave-guard'
 import Button from '@/components/shared/button'
+import { notifySaved } from '@/components/shared/toast'
 import HelpTip from '@/components/shared/help-tip'
 import StickyBar from '@/components/shared/sticky-bar'
 import ValidationSummary from '@/components/shared/validation-summary'
@@ -63,7 +65,7 @@ const VariantContext = createContext<CreatePageVariant>('default')
  */
 export interface CreatePageProps {
   title: string
-  description?: string
+  help?: ReactNode
   /** パンくずの親。[表示名, ルート] */
   parent: [string, string]
   /** 保存する。作ったもののIDを返すと、一覧で目立たせる */
@@ -107,7 +109,7 @@ export interface CreatePageProps {
 
 export default function CreatePage({
   title,
-  description,
+  help,
   parent,
   onSave,
   successHref,
@@ -182,9 +184,10 @@ export default function CreatePage({
     setNotice('')
     try {
       const id = await onSave()
+      if (!andAnother) notifySaved()
       if (andAnother) {
         onReset?.()
-        setNotice('保存しました。続けて作れます。')
+        notifySaved('保存しました。続けて作れます。')
         return
       }
       // 作った行を一覧で目立たせる。どこに増えたのか探させない。
@@ -205,7 +208,7 @@ export default function CreatePage({
     <>
       <Button href={parent[1]}>キャンセル</Button>
       {onReset && (
-        <Button onClick={() => run(true)} disabled={saving}>
+        <Button onClick={() => run(true)} disabled={saving} busy={saving}>
           保存して続けて作る
         </Button>
       )}
@@ -215,11 +218,11 @@ export default function CreatePage({
     </>
   ) : (
     <>
-      <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => run(false)} disabled={saving}>
-        {saving ? '保存中...' : (saveLabel ?? '保存する')}
+      <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => run(false)} disabled={saving} busy={saving}>
+        {saveLabel ?? '保存する'}
       </Button>
       {onReset && (
-        <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => run(true)} disabled={saving}>
+        <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => run(true)} disabled={saving} busy={saving}>
           保存して続けて作る
         </Button>
       )}
@@ -249,17 +252,18 @@ export default function CreatePage({
   return (
     <VariantContext.Provider value={variant}>
     <div data-design-node={designNode} data-create-variant={variant}>
+      <AutoFormLeaveGuard busy={saving} />
       {showHeader ? (
         <div data-design="Head" className={styles.head}>
           {crumb}
-          <Header title={title} description={description} />
+          <PageHeading title={title} help={help} />
         </div>
       ) : crumb}
 
       <div data-design="Body" className={aside ? 'flex flex-col gap-4 xl:flex-row' : undefined}>
         <div
           data-design="Left"
-          className={`bg-canvas border-hairline border ${
+          className={`bg-canvas content-card border ${
             v6 ? 'rounded-card space-y-3 p-[18px]' : 'rounded-card space-y-5 p-6'
           } ${aside ? 'min-w-0 flex-1' : 'max-w-2xl'}`}
         >
@@ -366,7 +370,7 @@ export function AsideCard({
   children: ReactNode
 }) {
   return (
-    <section className="bg-canvas rounded-card border-hairline border p-4">
+    <section className="bg-canvas rounded-card content-card border p-4">
       <h2 className="text-ink text-sm font-semibold">{title}</h2>
       {note && <p className="text-ink-faint mt-0.5 text-xs">{note}</p>}
       <div className="mt-3">{children}</div>

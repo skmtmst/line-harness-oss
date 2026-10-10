@@ -172,3 +172,10 @@ test('長い検索語で一覧口が落ちても、失敗行＋再読み込み�
     expect(quickTabCounts()).toEqual(['3', '2', '1'])
   })
 })
+
+test('過去本文だけで一致したサーバーの検索結果を消さない（WEB282）', async () => {
+  handler = url => url.pathname === '/api/chats' && url.searchParams.get('q')
+    ? response({ success:true,data:[{ id:'old-hit',friendName:'山本',status:'unread',lastMessageContent:'こんにちは',lastMessageAt:'2026-10-01T00:00:00Z',revision:1 }] }) : base(url)
+  await act(async()=>root.render(<ChatsPage />));await settle();await typeQuery('過去の注文')
+  await eventually(()=>{ expect(list().textContent).toContain('山本') })
+})

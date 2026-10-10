@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -17,7 +17,8 @@ describe('投稿V8のAPIと失敗時の契約', () => {
   it('読み込み・空・権限・失敗を分け、未取得の数を0としない', () => {
     for (const kind of ['loading', 'empty', 'forbidden', 'error']) expect(page).toContain(`kind="${kind}"`)
     expect(page).toContain('const countsReady = Boolean(accountId) && !loading && !loadError')
-    expect(page).toContain('value === null')
+    expect(page).toContain('value={countsReady ?')
+    expect(page).toMatch(/value=\{countsReady \?[^}]*: null\}/)
     expect(page).toContain('photoReviewMetrics(accountId)')
     expect(page).toContain('reasonCounts')
     expect(page).not.toContain('自動審査を実行')

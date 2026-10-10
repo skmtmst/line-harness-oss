@@ -1,3 +1,4 @@
+import Button from './Button.js';
 import { useEffect, useState } from 'react';
 import liff from '@line/liff';
 import { api } from '../../lib/api.js';
@@ -42,14 +43,13 @@ export default function LiffHeader({ title }: { title: string }) {
   return (
     <header className="sticky top-0 z-10 border-b border-liff-line bg-canvas">
       <div className="mx-auto flex h-(--liff-header-h) w-full max-w-md items-center gap-2 px-3">
-        <button
+        <Button variant="icon"
           type="button"
           aria-label="閉じる"
           onClick={() => liff.closeWindow()}
-          className="liff-hit flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-ink focus-visible:outline-2 focus-visible:outline-ink"
         >
           <Icon name="x" className="h-5 w-5" />
-        </button>
+        </Button>
         <div className="flex min-w-0 flex-1 flex-col items-center">
           <p className="max-w-full truncate text-[13px] font-bold text-ink">
             {title}

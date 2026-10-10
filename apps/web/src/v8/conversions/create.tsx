@@ -12,11 +12,11 @@
  * - 競合（cXqlS）：同じ名前の成果地点がすでにある（入力中に見つかった／保存したら先に作られていた 409）とき、
  *   板の頭の下に帯を出し、主ボタンは「比べてから保存」になる
  */
+import { notifySaved } from '@/components/shared/toast'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftRight, Check, ChevronLeft, Plus, RefreshCw, TriangleAlert } from 'lucide-react'
+import { Check, Plus } from 'lucide-react'
 import {
   api,
   ApiError,
@@ -43,11 +43,18 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
+import Card from '@/components/shared/card'
+import { focusConversionField, type ConversionFieldIssue } from './field-issue'
 import ConditionBuilder, { findConditionDraftIssue, isEmptyCondition, pruneCondition } from '@/components/shared/condition-builder'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { originInfoOf } from './origin-labels'
 import { createLatestPreviewRequestGate, type LatestPreviewRequest } from './latest-preview-request'
 import styles from './create.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /* 数えるきっかけ6種（今の作る画面と同じ中身）。 */
 type TriggerKind = 'order' | 'form' | 'booking' | 'page' | 'video' | 'tag'
@@ -184,6 +191,10 @@ function ConversionCreate() {
   const previewRequests = useRef(createLatestPreviewRequestGate())
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [fieldIssue, setFieldIssue] = useState<ConversionFieldIssue | null>(null)
+  useEffect(() => {
+    if (fieldIssue) focusConversionField(fieldIssue.field)
+  }, [fieldIssue])
   const [savedNotice, setSavedNotice] = useState<string | null>(null)
   /* 保存したら、ほかの人が先に同じ名前で作っていた（409）。名前を変えるまで帯を出す。 */
   const [serverConflictName, setServerConflictName] = useState<string | null>(null)
@@ -320,21 +331,19 @@ function ConversionCreate() {
   }
 
   /* 入力の点検（今の作る画面と同じ）。 */
-  const validate = (): string | null => {
-    if (!name.trim()) return '成果地点の名前を入力してください'
-    if (duplicateName) return `「${duplicateName.name}」と同じ名前の成果地点がすでにあります`
-    if (measureMethod === 'url_reach' && !targetUrl.trim()) return '指定ページへの到達で数えるときは、対象のURLが要ります'
-    if (!lineAccountId) return '集計対象のLINEアカウントを選んでください（画面上部で選べます）'
-    if (exclusionMemo.trim().length > 500) return '数えない条件のメモは500文字以内で入力してください'
+  const validate = (): ConversionFieldIssue | null => {
+    if (!name.trim()) return { field: 'cv-name', message: '成果地点の名前を入力してください' }
+    if (measureMethod === 'url_reach' && !targetUrl.trim()) return { field: 'cv-url', message: '指定ページへの到達で数えるときは、対象のURLが要ります' }
+    if (exclusionMemo.trim().length > 500) return { field: 'cv-memo', message: '数えない条件のメモは500文字以内で入力してください' }
     const exclusionIssue = findConditionDraftIssue(exclusion)
-    if (exclusionIssue) return exclusionIssue
+    if (exclusionIssue) return { field: 'cv-exclusion-fields', message: exclusionIssue }
     if (!origin.valueModes.includes(valueMode)) {
-      return 'この起点には注文の金額が無いため、金額の出し方は「決まった額」か「金額を集計しない」を選んでください'
+      return { field: 'cv-value-mode', message: 'この起点には注文の金額が無いため、金額の出し方は「決まった額」か「金額を集計しない」を選んでください' }
     }
-    if (valueMode === 'fixed' && (yen === null || !Number.isFinite(yen) || yen < 0)) return '固定で付ける金額は0以上の数値で入力してください'
+    if (valueMode === 'fixed' && (yen === null || !Number.isFinite(yen) || yen < 0)) return { field: 'cv-value', message: '固定で付ける金額は0以上の数値で入力してください' }
     if (attributionDays) {
       const days = Number(attributionDays)
-      if (!Number.isInteger(days) || days < 1 || days > 365) return '成果を紐づける日数は1〜365日で入力してください'
+      if (!Number.isInteger(days) || days < 1 || days > 365) return { field: 'cv-days', message: '成果を紐づける日数は1〜365日で入力してください' }
     }
     return null
   }
@@ -356,10 +365,16 @@ function ConversionCreate() {
 
   const runSave = async (andContinue: boolean) => {
     if (!canEdit || saving) return
+    if (conflict) { focusConversionField('cv-name'); return }
     const failed = validate()
-    setSaveError(failed)
+    setFieldIssue(failed)
+    setSaveError(null)
     setSavedNotice(null)
     if (failed) return
+    if (!lineAccountId) {
+      setSaveError('集計対象のLINEアカウントを選んでください（画面上部で選べます）')
+      return
+    }
     setSaving(true)
     try {
       const res = await api.conversions.createDefinition({
@@ -382,7 +397,7 @@ function ConversionCreate() {
       if (!res.success) throw new Error(res.error)
       if (andContinue) {
         resetForm()
-        setSavedNotice('保存しました。続けて作れます。')
+        notifySaved('保存しました。続けて作れます。')
       } else {
         router.push(`/conversions?tab=points${res.data.id ? `&highlight=${encodeURIComponent(res.data.id)}` : ''}`)
       }
@@ -423,17 +438,16 @@ function ConversionCreate() {
     requestPoints()
   }
 
-  const back = <Link href="/conversions?tab=points" className={styles.backLink}><ChevronLeft size={14} aria-hidden="true" />コンバージョンへ</Link>
   const excluded = preview ? preview.excludedCount ?? preview.duplicateExcludedCount + preview.cancellationCount : null
   const previewNote = previewFailed
     ? '保存前の試算を読み込めませんでした。入力内容は保存されていません。'
     : preview
-      ? `入力中の条件だけで試算しています。重複除外 ${formatNumber(preview.duplicateExcludedCount)}件・取消 ${formatNumber(preview.cancellationCount)}件・1日あたり ${formatNumber(preview.dailyAverage)}件。試算では成果を追加しません。`
+      ? `入力中の条件だけで試算しています。重複除外 ${formatNumber(preview.duplicateExcludedCount)} 件・取消 ${formatNumber(preview.cancellationCount)} 件・1日あたり ${formatNumber(preview.dailyAverage)} 件。試算では成果を追加しません。`
       : '入力中の条件を試算しています。'
 
   const previewColumn = (
     <div className={styles.side}>
-      <section className={styles.sideCard} aria-labelledby="cv-new-preview">
+      <Card variant="aside" aria-labelledby="cv-new-preview">
         <div className={styles.sideHead}>
           <h2 className={styles.sideTitle} id="cv-new-preview">この決めごとを この30日に あてはめると</h2>
           <p className={styles.sideNote} aria-busy={previewLoading}>
@@ -442,19 +456,19 @@ function ConversionCreate() {
           </p>
         </div>
         <dl className={styles.previewRows}>
-          <div className={styles.previewRow}><dt>成果</dt><dd>{preview ? `${formatNumber(preview.estimatedCount)}件` : '—'}</dd></div>
-          <div className={styles.previewRow}><dt>金額</dt><dd>{preview ? `¥${formatNumber(preview.estimatedValue)}` : '—'}</dd></div>
-          <div className={styles.previewRow}><dt>人数</dt><dd>{preview && typeof preview.uniqueFriendCount === 'number' ? `${formatNumber(preview.uniqueFriendCount)}人` : '—'}</dd></div>
-          <div className={styles.previewRow}><dt>除いた注文</dt><dd>{excluded == null ? '—' : `${formatNumber(excluded)}件`}</dd></div>
+          <div className={styles.previewRow}><dt>成果</dt><dd>{preview ? `${formatNumber(preview.estimatedCount)}件` : emptyValue('unknown')}</dd></div>
+          <div className={styles.previewRow}><dt>金額</dt><dd>{preview ? `¥${formatNumber(preview.estimatedValue)}` : emptyValue('unknown')}</dd></div>
+          <div className={styles.previewRow}><dt>人数</dt><dd>{preview && typeof preview.uniqueFriendCount === 'number' ? `${formatNumber(preview.uniqueFriendCount)}人` : emptyValue('unknown')}</dd></div>
+          <div className={styles.previewRow}><dt>除いた注文</dt><dd>{excluded == null ? emptyValue('unknown') : `${formatNumber(excluded)}件`}</dd></div>
         </dl>
         {preview && !previewFailed && preview.excludedReasons.length > 0 ? (
           <ul className={styles.previewReasons}>
             {preview.excludedReasons.map((reason) => <li key={reason}>{reason}</li>)}
           </ul>
         ) : null}
-      </section>
+      </Card>
 
-      <section className={styles.sideCard} aria-labelledby="cv-new-usage">
+      <Card variant="aside" aria-labelledby="cv-new-usage">
         <div className={styles.sideHead}>
           <h2 className={styles.sideTitle} id="cv-new-usage">この成果地点を使う場所</h2>
           <p className={styles.sideNote}>使う所にチェックを入れます（作ったあとにも足せます）</p>
@@ -467,12 +481,12 @@ function ConversionCreate() {
             const stateText = result.state === 'loading' || result.state === 'idle'
               ? '読み込み中'
               : result.state === 'forbidden'
-                ? '見る権限なし'
+                ? permissionDeniedMessage('store')
                 : result.state === 'error'
                   ? '読み込めません'
                   : all === 0
                     ? 'まだ無い'
-                    : chosen === 0 ? '使わない' : chosen === all ? '使う' : `${chosen}/${all}件`
+                    : chosen === 0 ? '使わない' : chosen === all ? '使う' : `${chosen}/${all} 件`
             return (
               <div key={group.kind} className={styles.usageRow}>
                 <Checkbox
@@ -482,7 +496,7 @@ function ConversionCreate() {
                   onCheckedChange={(next) => toggleUsageGroup(group.kind, next)}
                 >{group.label}</Checkbox>
                 {result.state === 'error' ? (
-                  <Button variant="text" onClick={() => requestUsageKind(group.kind, lineAccountId)} disabled={!lineAccountId}>読み直す</Button>
+                  <Button variant="text" onClick={() => requestUsageKind(group.kind, lineAccountId)} disabled={!lineAccountId}>もう一度読み込む</Button>
                 ) : (
                   <span className={styles.usageState} role={result.state === 'forbidden' ? 'status' : undefined}>{stateText}</span>
                 )}
@@ -495,7 +509,7 @@ function ConversionCreate() {
             <Button variant="text" onClick={() => setUsagePickerOpen(true)}><Plus size={15} aria-hidden="true" />使う場所を足す</Button>
           </div>
         ) : null}
-      </section>
+      </Card>
     </div>
   )
 
@@ -534,40 +548,34 @@ function ConversionCreate() {
     <CreatePage
       boardId="j8p3yj"
       title="成果地点を作る"
-      description="「何が起きたら・何回まで・いくら」を決めると、その日から数えはじめます。前の日にさかのぼっては数えません。"
-      identity={back}
-      /*
-       * 競合の帯（cXqlS）は板の頭の下・左右の列の上に、板いっぱいで出す。型のその場所の口
-       * （previewToggle：頭と本文の間の段）に渡し、帯があるときだけ広い幅でも見せる（create.module.css）。
-       */
-      previewToggle={conflictBand}
+      help="「何が起きたら・何回まで・いくら」を決めると、その日から数えはじめます。前の日にさかのぼっては数えません。"
+      /* 競合の帯は型の notice に渡し、入力欄と右の列の上に置く。 */
+      notice={conflictBand}
       preview={viewerOnly ? undefined : previewColumn}
-      footerActions={footerActions}
+      footerActions={footerActions} dirty={false}
     >
       {viewerOnly ? (
-        <div className={styles.viewerBand} role="status">閲覧のみで見ています。作る操作は管理者に頼んでください。</div>
+        <div className={styles.viewerBand} role="status">閲覧のみで見ています。作る操作はオーナーか管理者に頼んでください。</div>
       ) : null}
       {savedNotice ? <Notice tone="success">{savedNotice}</Notice> : null}
       {saveError ? <Notice tone="danger">{saveError}</Notice> : null}
 
       {viewerOnly ? null : (<>
 
-      <section className={styles.card} aria-labelledby="cv-new-what">
+      <Card variant="form" aria-labelledby="cv-new-what">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="cv-new-what">何が起きたら数えますか</h2>
           <p className={styles.cardNote}>名前は一覧で見分けるため。お客さまには見えません</p>
         </div>
-        <label className={styles.field}>
-          <span className={styles.label}>名前</span>
-          <input
+        <Field label="名前" htmlFor="cv-name" error={fieldIssue?.field === 'cv-name' ? fieldIssue.message : undefined}>
+          <TextField
             aria-label="成果地点の名前"
-            className={styles.input}
             value={name}
             maxLength={120}
             placeholder="商品を買った"
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => { setFieldIssue((current) => current?.field === 'cv-name' ? null : current); setName(event.target.value) }}
           />
-        </label>
+        </Field>
         {pointsFailed ? (
           <div className={styles.inlineRetry}>
             <p className={styles.fieldNote} role="alert">同じ名前があるか確認できませんでした。同じ意味の成果地点があるかもしれません。</p>
@@ -587,18 +595,16 @@ function ConversionCreate() {
           </div>
         </div>
         {measureMethod === 'url_reach' ? (
-          <label className={styles.field}>
-            <span className={styles.label}>数えてよいページ</span>
-            <input
+          <Field label="数えてよいページ" htmlFor="cv-url" error={fieldIssue?.field === 'cv-url' ? fieldIssue.message : undefined}>
+            <TextField
               aria-label="数えてよいページ"
-              className={styles.input}
               inputMode="url"
               value={targetUrl}
               maxLength={2000}
               placeholder="https://example.com/thanks"
-              onChange={(event) => setTargetUrl(event.target.value)}
+              onChange={(event) => { setFieldIssue((current) => current?.field === 'cv-url' ? null : current); setTargetUrl(event.target.value) }}
             />
-          </label>
+          </Field>
         ) : null}
         <div className={styles.chipRow}>
           <span className={styles.conditionTag}>{isEmptyCondition(pruneCondition(exclusion)) ? '除外なし' : '数えない条件あり'}</span>
@@ -608,9 +614,9 @@ function ConversionCreate() {
             </button>
           ) : null}
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="cv-new-dedup">
+      <Card variant="form" aria-labelledby="cv-new-dedup">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="cv-new-dedup">同じ人を何回まで数えるか</h2>
           <p className={styles.cardNote}>くり返し起きるできごとは、数えすぎを防ぎます</p>
@@ -623,7 +629,7 @@ function ConversionCreate() {
             onChange={() => setDeduplicationMode('once_per_friend')}
             title="1人1回だけ"
             note="はじめての人だけを数えます"
-            className={styles.dedupCard}
+            size="small"
           />
           <RadioCard
             name="conversion-create-dedup"
@@ -632,7 +638,7 @@ function ConversionCreate() {
             onChange={() => setDeduplicationMode('window')}
             title="30日に1回まで"
             note="短い間にくり返し起きるものに"
-            className={styles.dedupCard}
+            size="small"
           />
           <RadioCard
             name="conversion-create-dedup"
@@ -641,12 +647,12 @@ function ConversionCreate() {
             onChange={() => setDeduplicationMode('every')}
             title="何回でも"
             note="買うたびに数えます。売上を追うときに"
-            className={styles.dedupCard}
+            size="small"
           />
         </RadioCardGroup>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="cv-new-value">
+      <Card variant="form" aria-labelledby="cv-new-value">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="cv-new-value">金額をどう出すか</h2>
           <p className={styles.cardNote}>アフィリエイトの報酬や、配信ごとの売上の計算に使います</p>
@@ -657,10 +663,13 @@ function ConversionCreate() {
             <div className={styles.selectBox}>
               <Select
                 size="full"
+                id="cv-value-mode"
+                error={fieldIssue?.field === 'cv-value-mode' ? fieldIssue.message : undefined}
                 aria-label="金額の出し方"
                 value={valueMode}
                 options={origin.valueModes.map((mode) => ({ value: mode, label: VALUE_MODE_LABELS[mode] }))}
                 onChange={(next) => {
+                  setFieldIssue((current) => current?.field === 'cv-value-mode' ? null : current)
                   setValueMode(next as ConversionValueMode)
                   setValueModeNotice(null)
                 }}
@@ -682,47 +691,46 @@ function ConversionCreate() {
         </div>
         {valueModeNotice ? <p className={styles.fieldNote} role="status">{valueModeNotice}</p> : null}
         {valueMode === 'fixed' ? (
-          <label className={styles.field}>
-            <span className={styles.label}>1件あたりの金額（円）</span>
-            <input
+          <Field label="1件あたりの金額（円）" htmlFor="cv-value" error={fieldIssue?.field === 'cv-value' ? fieldIssue.message : undefined}>
+            <NumberInput numericText unit="円"
               aria-label="決まった金額"
-              className={styles.input}
               inputMode="numeric"
               value={value}
               placeholder="0"
-              onChange={(event) => setValue(event.target.value)}
+              onChange={(event) => { setFieldIssue((current) => current?.field === 'cv-value' ? null : current); setValue(event.target.value) }}
             />
-          </label>
+          </Field>
         ) : null}
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="cv-new-exclusion" id="cv-exclusion">
+      <Card variant="form" aria-labelledby="cv-new-exclusion" id="cv-exclusion">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="cv-new-exclusion">数えない条件</h2>
           <p className={styles.cardNote}>任意。テスト用の注文などを除きます</p>
         </div>
-        <label className={styles.field}>
-          <span className={styles.labelRow}><span className={styles.label}>メモ</span><span className={styles.optional}>任意</span></span>
-          <input
+        <Field label="メモ"><TextField
+            id="cv-memo"
             aria-label="数えない条件のメモ"
-            className={styles.input}
+            invalid={fieldIssue?.field === 'cv-memo'}
+            aria-describedby={fieldIssue?.field === 'cv-memo' ? 'cv-memo-error' : undefined}
             value={exclusionMemo}
             maxLength={500}
             placeholder="例：テスト用の注文は条件で除いています"
-            onChange={(event) => setExclusionMemo(event.target.value)}
-          />
-        </label>
-        <div className={styles.field}>
-          <span className={styles.pickLabel}>除く条件</span>
+            onChange={(event) => { setFieldIssue((current) => current?.field === 'cv-memo' ? null : current); setExclusionMemo(event.target.value) }}
+          /></Field>
+        {fieldIssue?.field === 'cv-memo' ? <p id="cv-memo-error" className={styles.fieldError} role="alert">{fieldIssue.message}</p> : null}
+        <div id="cv-exclusion-fields" aria-invalid={fieldIssue?.field === 'cv-exclusion-fields' || undefined}>
+          <Field label="除く条件" error={fieldIssue?.field === 'cv-exclusion-fields' ? fieldIssue.message : undefined}>
           {canEdit ? (
-            <ConditionBuilder value={exclusion} onChange={setExclusion} label="数えない条件" showCount={false} />
+            <ConditionBuilder value={exclusion} onChange={(next) => { setFieldIssue((current) => current?.field === 'cv-exclusion-fields' ? null : current); setExclusion(next) }} label="数えない条件" showCount={false} />
           ) : (
             <p className={styles.fieldNote}>{isEmptyCondition(pruneCondition(exclusion)) ? '除外なし' : '数えない条件あり'}</p>
           )}
+          </Field>
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="cv-new-more">
+      <Card variant="form" aria-labelledby="cv-new-more">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="cv-new-more">下書きと詳細設定</h2>
           <p className={styles.cardNote}>任意。すぐに数えはじめないときや、紐づける日数を変えるときに</p>
@@ -734,25 +742,23 @@ function ConversionCreate() {
         >まだ計測せず、下書きとして保存する</Checkbox>
         <Disclosure size="compact" title="詳細設定" hint="帰属期間・集計対象">
           <div className={styles.fieldRow}>
-            <label className={styles.field}>
-              <span className={styles.label}>友だち追加からの計測期間（日）</span>
-              <input
+            <Field note={<>空欄なら既定の90日です。</>} label="友だち追加からの計測期間（日）" htmlFor="cv-days" error={fieldIssue?.field === 'cv-days' ? fieldIssue.message : undefined}>
+              <NumberInput numericText unit="日"
                 aria-label="友だち追加からの計測期間"
-                className={styles.input}
                 inputMode="numeric"
                 value={attributionDays}
                 placeholder="90"
-                onChange={(event) => setAttributionDays(event.target.value)}
+                onChange={(event) => { setFieldIssue((current) => current?.field === 'cv-days' ? null : current); setAttributionDays(event.target.value) }}
               />
-              <span className={styles.fieldNote}>空欄なら既定の90日です。</span>
-            </label>
+
+            </Field>
             <div className={styles.field}>
               <span className={styles.label}>集計対象アカウント</span>
               <p className={styles.fixedBox}>{selectedAccount ? selectedAccount.name : '未選択（画面上部で選んでください）'}</p>
             </div>
           </div>
         </Disclosure>
-      </section>
+      </Card>
       </>)}
 
       <Dialog
@@ -781,7 +787,7 @@ function ConversionCreate() {
                 ) : (
                   <p className={styles.fieldNote}>
                     {result.state === 'ok' ? `使える${group.label}がまだありません`
-                      : result.state === 'forbidden' ? `このアカウントの${group.label}を見る権限がありません`
+                      : result.state === 'forbidden' ? permissionDeniedMessage('store')
                         : result.state === 'error' ? `使える${group.label}を読み込めませんでした`
                           : '候補を読み込んでいます'}
                   </p>

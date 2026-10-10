@@ -28,6 +28,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import styles from './mode-v8.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 export default function ScenarioModeV8() {
   usePageTitle('シナリオを作成')
@@ -358,7 +359,7 @@ export default function ScenarioModeV8() {
               disabled={disabled}
               onChange={(e) => { setName(e.target.value); if (nameError) setNameError('') }}
               onBlur={() => void saveDetails()}
-              placeholder="例: 友だち追加ウェルカム"
+              placeholder="例：友だち追加ウェルカム"
               invalid={Boolean(nameError)}
               aria-describedby={nameError ? 'scenario-name-error' : undefined}
             />
@@ -484,7 +485,7 @@ export default function ScenarioModeV8() {
 
 function scenarioSaveError(cause: unknown): string {
   if (cause instanceof ApiError) {
-    if (cause.status === 403) return 'シナリオ情報を変更する権限がありません。'
+    if (cause.status === 403) return permissionDeniedMessage('store')
     if (cause.status === 404) return 'シナリオが見つかりませんでした。一覧から開き直してください。'
   }
   return 'シナリオ情報を保存できませんでした。時間をおいてもう一度お試しください。'
@@ -493,7 +494,7 @@ function scenarioSaveError(cause: unknown): string {
 function scenarioModeError(cause: unknown): string {
   if (cause instanceof ApiError) {
     if (cause.status === 400 && !cause.message.startsWith('API error:')) return cause.message
-    if (cause.status === 403) return '配信方式を変更する権限がありません。'
+    if (cause.status === 403) return permissionDeniedMessage('store')
     if (cause.status === 404) return 'シナリオが見つかりませんでした。一覧から開き直してください。'
   }
   return '配信方式を保存できませんでした。時間をおいてもう一度お試しください。'

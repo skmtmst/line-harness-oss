@@ -45,7 +45,7 @@ export function impactMatchesRequest(
  */
 export function audienceText(audience: RichMenuDeleteImpact['currentAudience']): string {
   if (audience.value === null) return NOT_AVAILABLE
-  return `${formatNumber(audience.value)}人`
+  return `${formatNumber(audience.value)} 人`
 }
 
 export function audienceReason(audience: RichMenuDeleteImpact['currentAudience']): string | null {

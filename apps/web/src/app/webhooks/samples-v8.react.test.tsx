@@ -83,7 +83,13 @@ test('v8 では SAUCs の見本カードがタブ名とそろって出る', asyn
   expect(board?.textContent).toContain('友だちが追加されたとき')
   expect(board?.textContent).toContain('注文が確定したとき')
   expect(board?.textContent).toContain('friend_add')
+  expect(board?.textContent).not.toContain('見本に書いたことだけを送ります')
+  const help = host.querySelector<HTMLButtonElement>('button[aria-label="外部連携の説明"]')
+  expect(help).not.toBeNull()
+  act(() => { help!.click() })
   expect(board?.textContent).toContain('見本に書いたことだけを送ります')
+  act(() => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
+  expect(board?.textContent).not.toContain('見本に書いたことだけを送ります')
 })
 
 test('v7 では従来の見本タブが出て SAUCs は出ない', async () => {

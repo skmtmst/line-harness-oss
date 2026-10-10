@@ -5,19 +5,17 @@
  * `input[type="radio"]`・`input[type="checkbox"]` を直接書かない。
  * 共通の RadioCard・Checkbox を使う。1件でも素に戻すと赤になる。
  *
- * 例外: app/scenarios/mode/page.tsx の比較カード1件は、表入りの見比べを
- * 残すため素のまま（使いやすさ優先の判断。詳細は報告に書く）。
- * app/scenarios/mode-v8.tsx は同じ画面の★V8版で、同じ見比べカードを
- * 持つため同じ扱いにする。
+ * 旧比較カード（app/scenarios/mode-v8.tsx）は残存コードの例外。実際に描く
+ * V8の方式選択（v8/scenarios/create.tsx）は共通RadioCardを使う。
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import {readdirSync,  statSync} from 'node:fs'
+import { readUiSource as readFileSync } from '../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)))
 const EXCEPTIONS = new Set([
-  'app/scenarios/mode/page.tsx',
   'app/scenarios/mode-v8.tsx',
   /*
    * リマインダV8の選ぶカード（ChoiceCardV8）は共通 RadioCard が持たない
@@ -60,8 +58,12 @@ describe('m21u: 素の選ぶ入力は残っていない', () => {
     expect(offenders).toEqual([])
   })
 
-  it('例外の比較カードは使いやすさのために残している', () => {
-    const body = readFileSync(join(SRC, 'app/scenarios/mode/page.tsx'), 'utf8')
-    expect(body).toContain('type="radio"')
+  it('V8の配信方式は共通の選択カードで両方式を選べる', () => {
+    const body = readFileSync(join(SRC, 'v8/scenarios/create.tsx'), 'utf8')
+    expect(body).toContain('<RadioCardGroup legend="配信方式"')
+    expect(body.match(/<RadioCard\s/g)).toHaveLength(2)
+    expect(body).toContain("onChange={() => setSelectedMode('absolute_time')}")
+    expect(body).toContain("onChange={() => setSelectedMode('elapsed')}")
+    expect(body).not.toContain('type="radio"')
   })
 })

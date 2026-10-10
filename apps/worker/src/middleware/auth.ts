@@ -224,7 +224,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/auto-replies', '/auto-replies'], ['/api/auto-reply-runs', '/auto-replies'], ['/api/friend-add', '/friend-add-settings'], ['/api/webinars', '/webinars'],
   ['/api/templates', '/templates'], ['/api/rich-menu', '/rich-menus'], ['/api/rich-menus', '/rich-menus'],
   ['/api/rich-menu-groups', '/rich-menus'], ['/api/rich-menu-images', '/rich-menus'],
-  ['/api/forms', '/form-submissions'], ['/api/contents', '/contents'], ['/api/media', '/contents'],
+  ['/api/form-files', '/form-submissions'], ['/api/forms', '/form-submissions'], ['/api/contents', '/contents'], ['/api/media', '/contents'],
   // 危険なファイルの検査は登録メディアと同じ contents の鍵で守る。
   // 一覧・設定・戻し・消去は route 側で owner/admin に絞っている。
   ['/api/file-scans', '/contents'],
@@ -514,7 +514,8 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     normalizedMethod === 'POST' &&
     (/^\/api\/forms\/[^/]+\/submit$/.test(path) ||
       /^\/api\/forms\/[^/]+\/opened$/.test(path) ||
-      /^\/api\/forms\/[^/]+\/partial$/.test(path))
+      /^\/api\/forms\/[^/]+\/partial$/.test(path) ||
+      /^\/api\/forms\/[^/]+\/files$/.test(path))
   ) {
     return true;
   }

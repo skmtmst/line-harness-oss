@@ -38,6 +38,9 @@ import AccountHandoverV8 from './handover'
 import { credentialLine, summaryLine, type AccountDetailView } from './view'
 import { countsLine, handoverPill, totalsMatch } from './handover-view'
 
+/** 欄の読み上げにつながる誤りの文（共通の Field が欄の下に出す）。 */
+const errorTextOf = (el: Element) => (el.getAttribute('aria-describedby') ?? '').split(' ').map((id) => document.getElementById(id)).find((node) => node?.getAttribute('role') === 'alert' || /-error$/.test(node?.id ?? ''))?.textContent
+
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
@@ -125,6 +128,7 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
   it('管理者には編集・差し替え・止めるを出し、動いているあいだはアーカイブを押せない（理由を書く）', async () => {
     await act(async () => root.render(<AccountDetailV8 />))
     await settle()
+    await act(async () => { (host.querySelector('button[aria-label$="の説明"]') as HTMLButtonElement)?.click() })
     expect(document.body.textContent).toContain('@nen-test・要確認（LINE ID・接続状態を確かめてください）・既定ではない・親アカウントなし')
     expect(buttons('編集する')).toHaveLength(1)
     expect(buttons('差し替える')).toHaveLength(3)
@@ -157,8 +161,12 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     await click(dialogButtons[dialogButtons.length - 1])
     expect(document.body.textContent).toContain('理由を入れてください')
     expect(sent.filter((s) => s.url.endsWith('/deactivate'))).toHaveLength(0)
+    expect(document.querySelectorAll('[role="alert"]')).toHaveLength(1)
     const input = document.querySelector('[role="dialog"] input') as HTMLInputElement
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(input)
     await type(input, '乗り換えの準備のため')
+    expect(input.getAttribute('aria-invalid')).not.toBe('true')
     const again = buttons('送受信を止める')
     await click(again[again.length - 1])
     expect(sent.find((s) => s.url.endsWith('/deactivate'))?.body).toEqual({ reason: '乗り換えの準備のため' })
@@ -241,6 +249,28 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     expect(put?.body).toEqual({ timezone: 'Europe/Paris' })
   })
 
+  it('B-139：名前を消し、警告を上限より大きくして保存すると、送らず2つの欄に理由を出し、名前の欄へ移る', async () => {
+    await act(async () => root.render(<AccountDetailV8 />))
+    await settle()
+    await click(buttons('編集する')[0])
+    const dialog = document.querySelector('[role="dialog"]')!
+    const name = dialog.querySelector('input[required]') as HTMLInputElement
+    await type(name, '')
+    const cap = dialog.querySelector('input[placeholder="管理しない"]') as HTMLInputElement
+    const warn = dialog.querySelector('input[placeholder="警告しない"]') as HTMLInputElement
+    await type(cap, '100')
+    await type(warn, '200')
+    sent.length = 0
+    await click(buttons('保存する')[0])
+    await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(sent.some((s) => s.method === 'PUT')).toBe(false)
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(errorTextOf(name)).toBe('アカウント名を入れてください。')
+    expect(warn.getAttribute('aria-invalid')).toBe('true')
+    expect(errorTextOf(warn)).toContain('上限以下にしてください')
+    expect(document.activeElement).toBe(name)
+  })
+
   it('管理者（オーナーでない）にはタイムゾーンの欄を出さない', async () => {
     role = 'admin'
     await act(async () => root.render(<AccountDetailV8 />))
@@ -275,7 +305,7 @@ describe('LINEアカウントの乗り換え（V8 x2dSNv）', () => {
     expect(document.body.textContent).not.toContain('書き換えをまだ保存していません')
     await click(document.querySelector('[aria-label="高橋 直人の判断"]') as HTMLElement)
     await click(buttons('新しく作る')[0])
-    expect(document.body.textContent).toContain('1件の書き換えをまだ保存していません')
+    expect(document.body.textContent).toContain('1 件の書き換えをまだ保存していません')
     const run = buttons('本実行する（あと 1 人）')[0] as HTMLButtonElement
     expect(run.disabled).toBe(true)
     await click(buttons('判断を保存する')[0])
@@ -296,8 +326,8 @@ describe('LINEアカウントの乗り換え（V8 x2dSNv）', () => {
 describe('言葉', () => {
   it('資格情報の1行は、値を出さず登録・末尾・確認・更新だけ', () => {
     expect(credentialLine({ configured: false })).toBe('未登録')
-    expect(credentialLine({ configured: true, last4: 'x9Qa', updatedAt: '2026-09-28T01:10:00.000Z' })).toBe('登録済み・末尾 …x9Qa・更新 9/28')
-    expect(credentialLine({ configured: true, checkedAt: '2026-10-01T21:00:00.000Z' })).toBe('登録済み・最後の確認 10/2 06:00')
+    expect(credentialLine({ configured: true, last4: 'x9Qa', updatedAt: '2026-09-28T01:10:00.000Z' })).toBe('登録済み・末尾 …x9Qa・更新 09/28')
+    expect(credentialLine({ configured: true, checkedAt: '2026-10-01T21:00:00.000Z' })).toBe('登録済み・最後の確認 10/02 06:00')
   })
   it('題の下の1行は、確認が通っていれば「正常」', () => {
     const ok = { ...ACCOUNT, connection: { lastTestStatus: 'succeeded' } }

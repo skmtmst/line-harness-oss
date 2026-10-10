@@ -9,7 +9,7 @@
  * 違うのは見せ方：タグ連動（付いたときの動き）は絵のとおり「作ったあとの編集で足す」。
  * 複製して作る（?copy=）ときは、複製元の連動の中身は画面に出さずにそのまま写して作る。
  */
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Check, ClipboardList, Link2, Plus, Workflow } from 'lucide-react'
@@ -23,7 +23,8 @@ import TagPill from '@/components/shared/tag-pill'
 import Notice from '@/components/shared/notice'
 import FolderSelect, { folderCreateResult } from '@/components/shared/folder-select'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
+import { TextField } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
 import { notifyToast } from '@/components/shared/toast'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -32,14 +33,10 @@ import { DuplicateNameNote, findDuplicateNames } from '@/components/friend-field
 import { definitionsForSave, linkedActionFromDefinition } from '@/components/friend-fields/tag-editor-v4'
 import styles from './create.module.css'
 
-/** 作る前の検査（今の作る画面と同じ）。問題なければ null。 */
-export function tagNameProblem(name: string): string | null {
-  const trimmed = name.trim()
-  if (!trimmed) return 'タグ名を入力してください'
-  if (trimmed.length > 80) return 'タグ名は80文字までで入力してください'
-  if ([...trimmed].some((ch) => { const code = ch.charCodeAt(0); return code < 32 || code === 127 })) return 'タグ名に使えない文字が含まれています'
-  return null
-}
+import { tagNameProblem } from './tag-name'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { Field } from '@/components/shared/form-controls'
+export { tagNameProblem } from './tag-name'
 
 export default function TagCreateV8() {
   return (
@@ -72,6 +69,8 @@ function TagCreate() {
   const [siblings, setSiblings] = useState<Array<{ id: string; name: string }>>([])
 
   const [name, setName] = useState('')
+  const [nameError, setNameError] = useState('')
+  const nameRef = useRef<HTMLInputElement>(null)
   const [groupId, setGroupId] = useState('')
   const [isStarred, setIsStarred] = useState(false)
   const dirty = Boolean(name.trim() || groupId || isStarred)
@@ -133,9 +132,13 @@ function TagCreate() {
     if (saving) return
     const problem = tagNameProblem(name)
     if (problem) {
-      setError(problem)
+      setNameError(problem)
+      setError('')
+      nameRef.current?.focus()
+      nameRef.current?.scrollIntoView({ block: 'center' })
       return
     }
+    setNameError('')
     if (!selectedAccountId) {
       setError('LINE公式アカウントを選んでください')
       return
@@ -187,6 +190,8 @@ function TagCreate() {
 
   if (loading) return <ListState kind="loading" title="複製元を読み込んでいます…" />
 
+  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+
   const back = <Link href="/tags" className={styles.backLink}>← タグへ</Link>
   const groupFolders = groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))
   // その場でタグのフォルダを作る（dLffh）。左の列の「フォルダを追加」と同じ受け口・同じ権限。
@@ -206,16 +211,16 @@ function TagCreate() {
         preview={(
           <div className={styles.aside}>
             <h2 className={styles.asideTitle}>できあがるタグ</h2>
-            <TagPill name={name || 'タグ名'} color={groups.find((group) => group.id === groupId)?.color} />
+            <TagPill name={name || 'タグ名'} color={(() => { const group = groups.find((group) => group.id === groupId); return group ? folderDisplayColor(group) : null })()} />
             <h2 className={styles.asideTitle}>このあと</h2>
             <p className={styles.asideText}>作ると、すぐに友だちへ付けられます。タグ連動（付いたときの動き）は作ったあとの編集で足します。</p>
           </div>
         )}
         footerActions={<>
           <Button type="button" onClick={() => guard.guarded(() => router.push('/tags'))} disabled={saving}>キャンセル</Button>
-          <Button type="button" onClick={() => void save(true)} disabled={saving}><Plus size={15} aria-hidden="true" />保存して続けて作る</Button>
+          <Button type="button" onClick={() => void save(true)} disabled={saving} busy={Boolean(saving)} busyLabel="処理中…"><Plus size={15} aria-hidden="true" />保存して続けて作る</Button>
           <Button type="button" variant="primary" onClick={() => void save(false)} busy={saving} busyLabel="作っています…"><Check size={15} aria-hidden="true" />タグを作る</Button>
-        </>}
+        </>} dirty={false}
       >
         {createdName ? <Notice tone="success" message={`「${createdName}」を作成しました。続けて新しいタグを作れます。`} /> : null}
         {error || copyError ? <Notice tone="danger" message={error || copyError} /> : null}
@@ -224,18 +229,19 @@ function TagCreate() {
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle} id="tag-new-basic">基本</h2>
           </div>
-          <label className={styles.field}>
-            <span className={styles.label}>タグ名</span>
-            <input
-              className={styles.input}
+          <Field label="タグ名"><TextField
+              ref={nameRef}
+              aria-label="タグ名"
+              invalid={Boolean(nameError)}
+              aria-describedby={nameError ? 'tag-name-error' : undefined}
               value={name}
               maxLength={80}
               placeholder="例：定期購入者"
               aria-required="true"
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => { setName(event.target.value); setNameError('') }}
             />
-            <DuplicateNameNote duplicates={duplicates} kindLabel="タグ" />
-          </label>
+{nameError ? <p id="tag-name-error" className={styles.fieldError} role="alert">{nameError}</p> : null}
+<DuplicateNameNote duplicates={duplicates} kindLabel="タグ" /></Field>
           <div className={styles.field}>
             <span className={styles.label} id="tag-new-folder">所属フォルダ</span>
             <span className={styles.selectBox}>
@@ -253,7 +259,7 @@ function TagCreate() {
               <span className={styles.switchTitle}>友だち一覧に出す</span>
               <span className={styles.switchNote}>オンにすると、友だち一覧の名前の下にこのタグが出ます</span>
             </span>
-            <Toggle checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" />
+            <SettingCheckbox checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" />
           </div>
         </section>
 

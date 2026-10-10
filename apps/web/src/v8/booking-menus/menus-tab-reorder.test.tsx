@@ -12,16 +12,18 @@
 import React, { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushListUrlState } from '@/components/shared/list-url-state'
 import type { BookingMenu } from '@/lib/api'
 
 const updateMenu = vi.hoisted(() => vi.fn())
+const reorderMenus = vi.hoisted(() => vi.fn())
 const toasts = vi.hoisted(() => [] as string[])
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
-  return { ...actual, bookingApi: { ...actual.bookingApi, updateMenu } }
+  return { ...actual, bookingApi: { ...actual.bookingApi, updateMenu, reorderMenus } }
 })
-vi.mock('@/components/shared/toast', () => ({ notifyToast: (message: string) => { toasts.push(message) } }))
+vi.mock('@/components/shared/toast', () => ({ notifyToast: (message: string) => { toasts.push(message) }, notifySaved: (message: string) => { toasts.push(message) } }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
 }))
@@ -58,6 +60,8 @@ function Harness({ canEdit = true }: { canEdit?: boolean }) {
 }
 
 beforeEach(() => {
+  flushListUrlState()
+  window.history.replaceState(null, "", "/")
   server = [
     { id: 'a', name: 'カット', sort_order: 10, version: 1 },
     { id: 'b', name: 'カラー', sort_order: 20, version: 1 },
@@ -67,14 +71,17 @@ beforeEach(() => {
   calls = 0
   toasts.length = 0
   updateMenu.mockReset()
-  updateMenu.mockImplementation(async (_account: string, id: string, version: number, body: Partial<BookingMenu>) => {
+  reorderMenus.mockReset().mockImplementation(async (_account: string, body: { changes: Array<{ id: string; expectedVersion: number; sortOrder: number }> }) => {
     calls += 1
     if (failOnCall && calls === failOnCall) throw new Error('network')
-    const row = server.find((item) => item.id === id)!
-    if (row.version !== version) throw new Error('conflict')
-    row.sort_order = body.sort_order as number
-    row.version += 1
-    return { ok: true, version: row.version }
+    for (const change of body.changes) {
+      if (server.find((row) => row.id === change.id)?.version !== change.expectedVersion) throw new Error('conflict')
+    }
+    for (const change of body.changes) {
+      const row = server.find((row) => row.id === change.id)!
+      row.sort_order = change.sortOrder; row.version += 1
+    }
+    return { ok: true, versions: server.map((row) => ({ id: row.id, version: row.version })) }
   })
 })
 afterEach(cleanup)
@@ -142,6 +149,7 @@ describe('予約メニューの並び替え', () => {
   it('検索中・閲覧のみはつまみを出さず、「…」にも上へ・下へを出さない', async () => {
     const { container, unmount } = render(<Harness />)
     fireEvent.change(screen.getByRole('searchbox', { name: 'メニュー名で探す' }), { target: { value: 'カ' } })
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 320)) })
     expect(container.querySelector('[data-reorder-handle]')).toBeNull()
     expect(container.querySelector('[data-reorder-disabled]')?.getAttribute('title')).toBe('検索を外すと動かせます')
     fireEvent.click(screen.getByRole('button', { name: '「カット」のそのほかの操作' }))
@@ -153,8 +161,8 @@ describe('予約メニューの並び替え', () => {
     expect(viewer.container.querySelector('[data-reorder-disabled]')?.getAttribute('title')).toBe('閲覧のみのため並び替えできません')
   })
 
-  it('保存の途中で失敗したら、書き換えた分を戻して元の位置で理由を出す', async () => {
-    failOnCall = 2
+  it('一括保存が失敗したら、元の位置で理由を出す', async () => {
+    failOnCall = 1
     const { container } = render(<Harness />)
     fireEvent.keyDown(handleOf('カット'), { key: 'ArrowDown' })
     await flush()
@@ -164,19 +172,24 @@ describe('予約メニューの並び替え', () => {
   })
 })
 
-describe('並べ替えが途中で失敗し、戻しもできなかったとき（WEB052）', () => {
-  it('「一部だけが変わりました」と知らせる', async () => {
-    // 1件目（カット→20）は通り、2件目で失敗、戻す（カット→10）も失敗する。
-    updateMenu.mockImplementation(async (_account: string, id: string, version: number, body: Partial<BookingMenu>) => {
-      calls += 1
-      if (calls >= 2) throw new Error('network')
-      const row = server.find((item) => item.id === id)!
-      row.sort_order = body.sort_order as number
-      row.version = version + 1
-      return { ok: true, version: row.version }
-    })
+describe('一括並べ替えの失敗（WEB052）', () => {
+  it('個別更新へ戻らず、全件を元の順番で残す', async () => {
+    reorderMenus.mockRejectedValueOnce(new Error('network'))
     const { container } = render(<Harness />)
     await moveBy('key', container)
-    expect(toasts.at(-1)).toContain('一部だけが変わりました')
+    expect(updateMenu).not.toHaveBeenCalled()
+    expect(serverOrder()).toEqual(['a', 'b', 'c'])
+    expect(shownNames(container)).toEqual(['a', 'b', 'c'])
+    expect(toasts.at(-1)).toContain('予約メニューを保存できませんでした')
   })
 })
+
+ it('WEB052：並び替えは変更分の版を添えて一括で確定する', async () => {
+   const { container } = render(<Harness />)
+   await moveBy('key', container)
+   expect(updateMenu).not.toHaveBeenCalled()
+   expect(reorderMenus).toHaveBeenCalledWith('account-a', expect.objectContaining({ changes: expect.arrayContaining([
+     expect.objectContaining({ id: 'a', expectedVersion: 1 }),
+     expect.objectContaining({ id: 'b', expectedVersion: 1 }),
+   ]) }))
+ })

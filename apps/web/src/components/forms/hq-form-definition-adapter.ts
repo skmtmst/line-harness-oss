@@ -54,7 +54,7 @@ export function hqFormEditorToDefinition(value: HqFormEditorValue): FormDefiniti
 export function hqFormPortableReferenceError(value: HqFormEditorValue): string | null {
   const unsupportedKeys = new Set([
     'friendFieldId', 'friendFieldIds', 'choiceFriendFieldId', 'fieldId',
-    'templateId', 'reminderId', 'mediaUrl', 'backgroundImageUrl',
+    'templateId', 'reminderId', 'backgroundImageUrl',
   ])
   const visit = (item: unknown): string | null => {
     if (Array.isArray(item)) {

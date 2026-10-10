@@ -59,7 +59,7 @@ describe('絞り込みなし・写せない条件', () => {
     ).toEqual({ kind: 'blocked' })
   })
 
-  it('写せない条件種別（個別メモ）が混ざると blocked', () => {
+  it('写せない条件種別（メモ）が混ざると blocked', () => {
     const conditions: SavedSearchConditions = {
       all: [
         { kind: 'tag', op: 'includes', value: 'tag-1' },

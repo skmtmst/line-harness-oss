@@ -1,0 +1,101 @@
+{
+  "booking": {
+    "before": {
+      "role": "owner",
+      "readOnly": false,
+      "availability": {
+        "status": 200,
+        "query": "account_id=visual-qa-account&menu_ids=bm-1%2Cbm-2%2Cbm-3%2Cbm-4%2Cbm-5%2Cbm-7&from=2026-10-09&to=2026-10-09",
+        "keys": [
+          "by_staff",
+          "closed_dates"
+        ],
+        "menus": []
+      },
+      "unreadableSlots": true
+    },
+    "after": {
+      "role": "owner",
+      "readOnly": false,
+      "availability": {
+        "status": 200,
+        "query": "account_id=visual-qa-account&menu_ids=bm-1%2Cbm-2%2Cbm-3%2Cbm-4%2Cbm-5%2Cbm-7&from=2026-10-09&to=2026-10-09",
+        "keys": [
+          "by_menu"
+        ],
+        "menus": [
+          "bm-1",
+          "bm-2",
+          "bm-3",
+          "bm-4",
+          "bm-5",
+          "bm-7"
+        ]
+      },
+      "unreadableSlots": false
+    }
+  },
+  "v7": {
+    "baseSha": "2b0460c94a8220e287ba3d6d9ff66208e0ec6e4e",
+    "headSha": "f69c833ac76c16e34cb96f67825405a0e83058fe",
+    "cssOrder": {
+      "base": [
+        {
+          "stylesheetOrder": 4,
+          "stylesheet": "/_next/static/css/2a9a242bec555700.css",
+          "rule": ".card_card__iX2aF{border:1px solid var(--color-hairline);border-radius:var(--radius-card);background:var(--color-canvas);box-shadow:var(--shadow-card)}"
+        },
+        {
+          "stylesheetOrder": 18,
+          "stylesheet": "/_next/static/css/6afb9aef3e7b94b7.css",
+          "rule": ".message-composer_bubble__gkpa5{border-radius:var(--radius-card);box-shadow:none;border:0;outline:1px solid var(--color-hairline);outline-offset:-1px}"
+        }
+      ],
+      "head": [
+        {
+          "stylesheetOrder": 3,
+          "stylesheet": "/_next/static/css/c37b904ac016b11d.css",
+          "rule": ".message-composer_bubble__gkpa5{border-radius:var(--radius-card);box-shadow:none;border:0;outline:1px solid var(--color-hairline);outline-offset:-1px}"
+        },
+        {
+          "stylesheetOrder": 4,
+          "stylesheet": "/_next/static/css/5d18977608ff4b97.css",
+          "rule": ".card_card__iX2aF{border:1px solid var(--color-hairline);border-radius:var(--radius-card);background:var(--color-canvas);box-shadow:var(--shadow-card)}"
+        }
+      ]
+    },
+    "pixelDiff": [
+      {
+        "width": 1152,
+        "ciPixels": 34046,
+        "localPixels": 32313,
+        "bounds": [
+          149,
+          324,
+          1002,
+          667
+        ],
+        "diagnosticPixels": 0
+      },
+      {
+        "width": 1440,
+        "ciPixels": 30442,
+        "localPixels": 29145,
+        "bounds": [
+          319,
+          278,
+          996,
+          621
+        ],
+        "diagnosticPixels": 0
+      }
+    ],
+    "diagnosticOnly": "ブラウザ内で共通メッセージ部品の既存 border:0 と box-shadow:none をカード部品より後に適用。製品ファイルは変更なし。"
+  },
+  "stressCors": {
+    "returnedRowsBefore": 2000,
+    "browserErrorBefore": "Access-Control-Allow-Origin: * is invalid for credentials: include",
+    "fix": "要求元の Origin と Access-Control-Allow-Credentials: true を差し替え応答へ渡す",
+    "browserTestRowsAfter": 2000
+  }
+}

@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDateOffset } from '@/lib/jst-datetime'
+
 /*
  * ★V8-B 分析「ファネルを作る」（板 `VDPz5`）と「ファネルを直す」（同じ形）。
  *
@@ -9,13 +11,17 @@
  * （情報欄・サイトのページ・リンク・オートメーション）は「ほかの条件（IDで決める）」を選ぶと、
  * その段の下に種類とIDの欄が出る。保存の形（kind・match・版の追加）は今と同じ。
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, X } from 'lucide-react'
-import { api } from '@/lib/api'
+import { ApiError, api } from '@/lib/api'
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
+import { notifySaved } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import type { FunnelEditDraft } from './funnel'
 import styles from './funnel-form.module.css'
 
@@ -25,7 +31,7 @@ export const FUNNEL_STEP_KINDS = [
   { key: 'tag', label: 'タグが付いた', hint: 'タグのID' },
   { key: 'field', label: '情報欄に値が入った', hint: '項目のID（値は問いません）' },
   { key: 'form', label: 'フォームに答えた', hint: 'フォームのID' },
-  { key: 'site_event', label: 'サイトのページを見た', hint: 'パスのまとまり（例: thanks）' },
+  { key: 'site_event', label: 'サイトのページを見た', hint: 'パスのまとまり（例：thanks）' },
   { key: 'purchase', label: '購入が確定した', hint: '' },
   { key: 'link_click', label: 'リンクを踏んだ', hint: '計測リンクのID' },
   { key: 'conversion', label: '成果が記録された', hint: '成果地点のID' },
@@ -96,8 +102,7 @@ const TARGET_LABEL: Record<Target['kind'], string> = { conversion: '成果', tag
 const EMPTY_LABEL: Record<Target['kind'], string> = { conversion: '成果（成果地点を選ぶ）', tag: 'タグ（タグを選ぶ）', form: 'フォーム（フォームを選ぶ）' }
 
 function isoDay(offsetDays: number): string {
-  const d = new Date(Date.now() + offsetDays * 86400000)
-  return d.toISOString().slice(0, 10)
+  return jstDateOffset(offsetDays)
 }
 
 export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, presetConversion }: {
@@ -117,8 +122,27 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
     ],
   )
   const [targets, setTargets] = useState<Target[]>([])
+  const [expectedVersion, setExpectedVersion] = useState(edit?.expectedVersionNumber ?? 0)
+  const [versionContext, setVersionContext] = useState({ segment: edit?.segment, comparisonGroups: edit?.comparisonGroups })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const formRef = useRef<HTMLDivElement>(null)
+  const focusTarget = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!focusTarget.current) return
+    const control = formRef.current?.querySelector<HTMLElement>(`[id="${focusTarget.current}"]`)
+    control?.focus()
+    control?.scrollIntoView?.({ block: 'center' })
+    focusTarget.current = null
+  }, [fieldErrors])
+
+  const clearFieldError = (id: string) => setFieldErrors((current) => {
+    const next = { ...current }
+    delete next[id]
+    return next
+  })
 
   // 何をしたらの相手（成果地点・タグ・フォーム）。読めなかったものは並べないだけ（IDで決める道は残る）。
   useEffect(() => {
@@ -172,6 +196,11 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
   }
 
   const update = (index: number, patch: Partial<Step>) => {
+    if ('label' in patch) clearFieldError(`fn-v8-step-${index}`)
+    if ('kind' in patch || 'value' in patch || 'other' in patch) {
+      clearFieldError(`fn-v8-choice-${index}`)
+      clearFieldError(`fn-v8-value-${index}`)
+    }
     setSteps((prev) => prev.map((s, j) => (j === index ? { ...s, ...patch } : s)))
   }
 
@@ -186,10 +215,43 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
     update(index, { kind, value: id, other: false, matchBase: undefined })
   }
 
+  type Definition = Awaited<ReturnType<typeof api.analytics.v6Funnels.get>> & { success: true }
+  const fetchLatest = async () => {
+    if (!edit) return null
+    const response = await api.analytics.v6Funnels.get(accountId, edit.funnelId)
+    return response.success ? response.data : null
+  }
+  const conflict = useSaveConflict<Definition['data']>({
+    contextKey: `${accountId}:${edit?.funnelId ?? 'new'}`,
+    fetchLatest,
+    reload: async () => {
+      const latest = await fetchLatest()
+      if (!latest?.currentVersion) throw new Error('最新の内容を読み込めませんでした')
+      setName(latest.name)
+      setWindowDays(String(latest.currentVersion.windowDays))
+      setSteps(latest.currentVersion.steps.map(step => ({
+        label: step.label, kind: step.kind,
+        value: step.match[funnelStepPrimaryKey(step.kind) ?? ''] ?? '',
+        matchBase: step.match, other: false,
+      })))
+      setExpectedVersion(latest.currentVersion.versionNumber)
+      setVersionContext({ segment: latest.currentVersion.segment, comparisonGroups: latest.currentVersion.comparisonGroups })
+      setFieldErrors({}); setError(''); conflict.clear()
+    },
+  })
+  const isConflict = (code: string | undefined) => code === 'analytics_funnel_version_conflict' || code === 'analytics_funnel_status_conflict'
+
   const save = async () => {
-    if (!name.trim()) return setError('名前を入力してください')
-    if (steps.some((s) => !s.label.trim())) return setError('すべての段に名前を付けてください')
-    if (steps.some((s) => kindNeedsValue(s.kind) && !s.value.trim())) return setError('すべての段で、何をしたら進むかを選んでください（IDで決める段はIDを入れてください）')
+    const errors: Record<string, string> = {}
+    if (!name.trim()) errors['fn-v8-name'] = '名前を入力してください'
+    steps.forEach((step, index) => {
+      if (!step.label.trim()) errors[`fn-v8-step-${index}`] = 'この段に名前を付けてください'
+      if (kindNeedsValue(step.kind) && !step.value.trim()) errors[`fn-v8-${step.other ? 'value' : 'choice'}-${index}`] = step.other ? 'IDを入力してください' : '何をしたら進むかを選んでください'
+    })
+    focusTarget.current = Object.keys(errors)[0] ?? null
+    setFieldErrors(errors)
+    setError('')
+    if (focusTarget.current) return
     setSaving(true)
     setError('')
     try {
@@ -207,18 +269,27 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
           name: name.trim(),
           windowDays: Number(windowDays),
           steps: payloadSteps,
-          segment: edit.segment,
-          comparisonGroups: edit.comparisonGroups,
-          expectedVersionNumber: edit.expectedVersionNumber,
+          segment: versionContext.segment,
+          comparisonGroups: versionContext.comparisonGroups,
+          expectedVersionNumber: expectedVersion,
         })
-        if (!res.success) return setError(explainSaveError(res.error, res.error))
+        if (!res.success) {
+          if (isConflict(res.error)) conflict.mark()
+          else setError(explainSaveError(res.error, res.error))
+          return
+        }
+        setExpectedVersion(res.data.versionNumber)
+        conflict.clear()
+        notifySaved()
         onCreated(edit.funnelId, res.data.usageWarnings)
       } else {
         const res = await api.analytics.v6Funnels.create(accountId, { name: name.trim(), windowDays: Number(windowDays), steps: payloadSteps })
         if (!res.success) return setError(res.error)
+        notifySaved()
         onCreated(res.data.funnelId, res.data.usageWarnings)
       }
-    } catch {
+    } catch (caught) {
+      if (caught instanceof ApiError && (caught.status === 409 || isConflict(caught.code))) { conflict.mark(); return }
       setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
@@ -244,16 +315,20 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
         </div>
       )}
     >
-      <div className={styles.form}>
+      <div className={styles.form} ref={formRef}>
+        {conflict.conflict ? <SaveConflictBand title="ほかの人が先にこのファネルを保存しました" compareBusy={conflict.compareBusy} onCompare={conflict.compare} onReload={conflict.reloadLatest} /> : null}
+        <SaveConflictCompareDialog open={conflict.compareOpen} onCancel={conflict.closeCompare} onReload={conflict.reloadLatest} error={conflict.compareError} lines={conflict.latest ? [
+          { text: `あなたの入力：${name}／${windowDays}日／${JSON.stringify(steps)}` },
+          { text: `最新の内容：${conflict.latest.name}／${conflict.latest.currentVersion?.windowDays}日／${JSON.stringify(conflict.latest.currentVersion?.steps)}` },
+        ] : null} />
         {presetConversion && !edit ? (
           <Notice tone="info">
             成果地点「{presetConversion.name}」を2段目に入れています。このまま段を組んで作成すると、その成果地点を使う分析として登録されます。
           </Notice>
         ) : null}
-        <div className={styles.field}>
-          <label htmlFor="fn-v8-name" className={styles.label}>名前</label>
-          <input id="fn-v8-name" type="text" className={styles.input} value={name} onChange={(e) => setName(e.target.value)} placeholder="例：広告から購入まで" />
-        </div>
+        <Field label="名前" htmlFor="fn-v8-name" error={fieldErrors['fn-v8-name']}>
+          <TextField id="fn-v8-name" value={name} onChange={(e) => { setName(e.target.value); clearFieldError('fn-v8-name') }} placeholder="例：広告から購入まで" />
+        </Field>
         <div className={styles.field}>
           <span className={styles.subLabel} id="fn-v8-window-label">何日以内の通過で数えるか</span>
           <Select
@@ -277,19 +352,20 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
               <div key={i} className={styles.stepBlock}>
                 <div className={styles.stepRow}>
                   <div className={styles.stepCol}>
-                    <div className={styles.labelRow}>
-                      <label htmlFor={`fn-v8-step-${i}`} className={styles.label}>{`段${i + 1}の名前`}</label>
+                    <Field label={`段${i + 1}の名前`} htmlFor={`fn-v8-step-${i}`} error={fieldErrors[`fn-v8-step-${i}`]}>
+                      <TextField id={`fn-v8-step-${i}`} value={step.label} onChange={(e) => update(i, { label: e.target.value })} placeholder="例：友だち追加" />
+                    </Field>
                       {steps.length > MIN_STEPS ? (
-                        <button type="button" className={styles.removeStep} onClick={() => setSteps((prev) => prev.filter((_, j) => j !== i))} aria-label={`段${i + 1}を外す`}>
+                        <button type="button" className={styles.removeStep} onClick={() => { setSteps((prev) => prev.filter((_, j) => j !== i)); setFieldErrors({}) }} aria-label={`段${i + 1}を外す`}>
                           <X size={12} aria-hidden="true" />外す
                         </button>
                       ) : null}
-                    </div>
-                    <input id={`fn-v8-step-${i}`} type="text" className={styles.input} value={step.label} onChange={(e) => update(i, { label: e.target.value })} placeholder="例：友だち追加" />
                   </div>
                   <div className={styles.stepCol}>
                     <span className={styles.subLabel}>何をしたら</span>
                     <Select
+                      id={`fn-v8-choice-${i}`}
+                      error={fieldErrors[`fn-v8-choice-${i}`]}
                       aria-label={`${i + 1}段目で何をしたら進むか`}
                       size="full"
                       value={choiceOf(step, targets)}
@@ -311,8 +387,9 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
                       />
                     </div>
                     <div className={styles.stepCol}>
-                      <label htmlFor={`fn-v8-value-${i}`} className={styles.subLabel}>{kindHint || '追加の指定はありません'}</label>
-                      <input id={`fn-v8-value-${i}`} type="text" className={styles.input} value={step.value} disabled={!kindNeedsValue(step.kind)} onChange={(e) => update(i, { value: e.target.value })} />
+                      <Field label={kindHint || '追加の指定はありません'} htmlFor={`fn-v8-value-${i}`} error={fieldErrors[`fn-v8-value-${i}`]}>
+                        <TextField id={`fn-v8-value-${i}`} value={step.value} disabled={!kindNeedsValue(step.kind)} onChange={(e) => update(i, { value: e.target.value })} />
+                      </Field>
                     </div>
                   </div>
                 ) : null}

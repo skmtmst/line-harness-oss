@@ -188,7 +188,7 @@ export async function createTagDefinition(
           mileage_reward, referral_mileage_reward, mileage_multiplier_bps,
           mileage_multiplier_priority, status, version, created_by, updated_by,
           created_at, updated_at)
-       VALUES (?, ?, ?, '#3B82F6', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 1, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, '#94a3b8', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 1, ?, ?, ?, ?)`,
     ).bind(
       tagId,
       input.name,

@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 アフィリエイターを作る（板 `RaMf3`、紹介コードがぶつかったときは `Gqve5` の帯の形）。
+ * ★V8 アフィリエイターを作る（板 `RaMf3`、競合の絵 `Gqve5` は同時編集APIが必要）。
  *
  * app/affiliates/new-affiliate-v8.tsx から動きを写し、作る型（CreatePage）で組み直した。
  * データの口・動きは今と同じ：登録（合言葉 operationId つき）→ 追加情報の保存。追加情報だけ
@@ -10,30 +10,33 @@
  * 絵との違い：
  * - 「タグを付ける」の段は、登録の口にタグを付ける項目が無いので置かない。同じ場所に
  *   「すぐに計測を始める」（今の画面にある）を同じ形で置く。
- * - 競合の帯（Gqve5）の「だれが・いつ保存したか」は口が返さないので出さない。紹介コードの
- *   重なり（既に使われている）のときに、同じ場所・同じ形で出す。
+ * - Gqve5 の同時編集の比較・再読込はAPIが無いため出さない。紹介コードの重複は欄で知らせる。
  */
+import { notifySaved } from '@/components/shared/toast'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Check, ChevronLeft, Link as LinkIcon, List, TriangleAlert } from 'lucide-react'
+import { Check, Link as LinkIcon } from 'lucide-react'
 import type { Friend } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { Field } from '@/components/shared/form-controls'
+import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
-import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { distributionUrl } from './display'
 import styles from './create.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 const FRIEND_PAGE_SIZE = 20
 const LIST_PATH = '/affiliates'
@@ -94,7 +97,6 @@ export default function CreateAffiliateV8() {
   const [friendReload, setFriendReload] = useState(0)
   const [friendPickerOpen, setFriendPickerOpen] = useState(false)
   const [linkBaseUrl, setLinkBaseUrl] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
   const [issuedUrl, setIssuedUrl] = useState<string | null>(null)
   const [createdId, setCreatedId] = useState<string | null>(null)
   const [partialSave, setPartialSave] = useState(false)
@@ -104,7 +106,15 @@ export default function CreateAffiliateV8() {
   const [saveError, setSaveError] = useState('')
   const [saveNote, setSaveNote] = useState('')
   /* 紹介コードの重なり（ほかの人が先に同じコードで登録した）。入力は残す。 */
-  const [codeConflict, setCodeConflict] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<'name' | 'code' | 'rate' | 'hold', string>>>({})
+  const focusField = (key: 'name' | 'code' | 'rate' | 'hold') => {
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`af-${key}`)
+      el?.focus()
+      el?.scrollIntoView?.({ block: 'center' })
+    })
+  }
+  const clearField = (key: 'name' | 'code' | 'rate' | 'hold') => setFieldErrors((old) => ({ ...old, [key]: undefined }))
 
   /* 配布URLの土台（短縮ドメイン）。できる紹介リンクの形を見せるのに使う。 */
   useEffect(() => {
@@ -164,24 +174,31 @@ export default function CreateAffiliateV8() {
   /* 発行済みなら本物のURL。まだなら、入力した紹介コードで発行される形（空欄なら自動で作るので「—」）。 */
   const previewUrl = issuedUrl ?? (code.trim() ? distributionUrl(code.trim(), linkBaseUrl).replace(/^https?:\/\//, '') : null)
 
-  const validate = (): string | null => {
-    if (!selectedAccountId) return 'LINEアカウントを選んでください（画面上部で選べます）'
-    if (!name.trim()) return '名前・屋号を入力してください'
-    if (code.trim() && !/^[A-Za-z0-9]{4,}$/.test(code.trim())) return '紹介コードは英数字4文字以上で入力してください'
+  const validate = (): boolean => {
+    if (!selectedAccountId) {
+      setSaveError('LINEアカウントを選んでください（画面上部で選べます）')
+      return false
+    }
+    const errors: typeof fieldErrors = {}
+    if (!name.trim()) errors.name = '名前・屋号を入力してください'
+    if (code.trim() && !/^[A-Za-z0-9]{4,}$/.test(code.trim())) errors.code = '紹介コードは英数字4文字以上で入力してください'
     const rateError = commissionRateError(payoutKind, commissionRate)
-    if (rateError) return rateError
+    if (rateError) errors.rate = rateError
     if (holdDays.trim()) {
       const days = Number(holdDays)
-      if (!Number.isInteger(days) || days < 0 || days > 365) return '確定までの保留期間は0日から365日の整数で入力してください'
+      if (!Number.isInteger(days) || days < 0 || days > 365) errors.hold = '確定までの保留期間は0日から365日の整数で入力してください'
     }
-    return null
+    setFieldErrors(errors)
+    const first = (['name', 'code', 'rate', 'hold'] as const).find((key) => errors[key])
+    if (first) focusField(first)
+    return !first
   }
 
   const reset = () => {
     setName('')
     setEmail('')
     setCode('')
-    setCodeConflict(false)
+    setFieldErrors({})
     setPayoutKind('per_conversion')
     setCommissionRate('')
     setHoldDays('30')
@@ -190,7 +207,6 @@ export default function CreateAffiliateV8() {
     setSelectedFriend(null)
     setNotifyOnConversion(true)
     setStartTracking(true)
-    setCopied(false)
     setCreatedId(null)
     setIssuedUrl(null)
     setPartialSave(false)
@@ -216,7 +232,6 @@ export default function CreateAffiliateV8() {
         })
         if (!res.success) {
           if ((res.error ?? '').includes('既に使われています')) {
-            setCodeConflict(true)
             throw new Error('この紹介コードは既に使われています。別のコードを入力してください。')
           }
           throw new Error('create_failed')
@@ -229,7 +244,6 @@ export default function CreateAffiliateV8() {
         setSavedIsActive(persistedIsActive)
       } catch (caught) {
         if (caught instanceof Error && caught.message.includes('既に使われています')) {
-          setCodeConflict(true)
           throw new Error('この紹介コードは既に使われています。別のコードを入力してください。')
         }
         throw new Error('アフィリエイターを登録できませんでした。入力を確認して、もう一度お試しください。')
@@ -257,26 +271,29 @@ export default function CreateAffiliateV8() {
 
   const runSave = async (after: 'continue' | 'finish') => {
     if (saving) return
-    const invalid = validate()
-    if (invalid) {
-      setSaveError(invalid)
-      setSaveNote('')
-      return
-    }
+    setSaveError('')
+    setSaveNote('')
+    if (!validate()) return
     setSaving(true)
     setSaveError('')
     setSaveNote('')
-    setCodeConflict(false)
+    setFieldErrors({})
     try {
       const affiliateId = await save()
       if (after === 'finish' || partialSave) {
         router.push(`${LIST_PATH}?affiliate=${encodeURIComponent(affiliateId)}&highlight=${encodeURIComponent(affiliateId)}`)
       } else {
         reset()
-        setSaveNote('保存しました。続けて作れます。')
+        notifySaved('保存しました。続けて作れます。')
       }
     } catch (caught) {
-      setSaveError(caught instanceof Error ? caught.message : '保存できませんでした')
+      const message = caught instanceof Error ? caught.message : '保存できませんでした'
+      if (message.includes('既に使われています')) {
+        setFieldErrors({ code: message })
+        focusField('code')
+      } else {
+        setSaveError(message)
+      }
     } finally {
       setSaving(false)
     }
@@ -294,39 +311,21 @@ export default function CreateAffiliateV8() {
 
   const preview = (
     <div className={styles.rail}>
-      <section className={styles.sideCard} aria-label="できる紹介リンク">
-        <h2 className={styles.sideTitle}>できる紹介リンク</h2>
-        <p className={styles.sideNote}>{issuedUrl ? '発行しました' : '登録すると発行されます'}</p>
-        <dl className={styles.kvList}>
-          <div className={styles.kvRow}>
-            <dt>リンク</dt>
-            <dd title={previewUrl ?? undefined}>{previewUrl ?? '—'}</dd>
-          </div>
-          <div className={styles.kvRow}>
-            <dt>報酬</dt>
-            <dd>{payoutKind === 'none' ? '計測のみ' : payoutKind === 'rate' ? `売上の ${commissionRate.trim() || '◯'}%` : '1件ごと（案件の額）'}</dd>
-          </div>
-          <div className={styles.kvRow}>
-            <dt>締め</dt>
-            <dd>{payoutCycle.trim() || '—'}</dd>
-          </div>
-        </dl>
-        {issuedUrl ? (
-          <div>
-            <Button type="button" onClick={() => { void navigator.clipboard?.writeText(issuedUrl).then(() => setCopied(true), () => setCopied(false)) }}>
-              {copied ? 'コピーしました' : 'リンクをコピー'}
-            </Button>
-          </div>
-        ) : null}
-      </section>
-      <section className={styles.sideCard} aria-label="気をつけること">
-        <h2 className={styles.sideTitle}>気をつけること</h2>
-        <p className={styles.sideList}>
-          ・紹介コードはあとから変えられません（配ったリンクが動かなくなるため）
-          <br />
-          ・報酬を払う人は、振込先の登録が要ります
-        </p>
-      </section>
+      <CreateSummaryCard
+        title="できる紹介リンク"
+        variant="link"
+        description={issuedUrl ? '発行しました' : '登録すると発行されます'}
+        rows={[
+          { label: 'リンク', value: <span title={previewUrl ?? undefined}>{previewUrl ?? emptyValue('unknown')}</span> },
+          { label: '報酬', value: payoutKind === 'none' ? '計測のみ' : payoutKind === 'rate' ? `売上の ${commissionRate.trim() || '◯'}%` : '1件ごと（案件の額）' },
+          { label: '締め', value: payoutCycle.trim() || emptyValue('unknown') },
+        ]}
+      >
+        {issuedUrl ? <div><CopyTextButton value={issuedUrl} label="リンクをコピー" aria-label="リンクをコピー" /></div> : null}
+      </CreateSummaryCard>
+      <CreateSummaryCard title="気をつけること" variant="link" rows={[]}>
+        <p className={styles.sideList}>・紹介コードはあとから変えられません（配ったリンクが動かなくなるため）<br />・報酬を払う人は、振込先の登録が要ります</p>
+      </CreateSummaryCard>
     </div>
   )
 
@@ -334,20 +333,8 @@ export default function CreateAffiliateV8() {
     <CreatePage
       boardId="RaMf3"
       title="アフィリエイターを作る"
-      description="登録すると紹介リンクができます。成果はその人の紹介リンクから来た人で数えます。"
-      identity={<Link href={LIST_PATH} className={styles.backLink}><ChevronLeft size={14} aria-hidden="true" />成果とアフィリエイトへ</Link>}
+      help="登録すると紹介リンクができます。成果はその人の紹介リンクから来た人で数えます。"
       preview={preview}
-      /* 競合の帯は2列の上に全幅で出す（絵 Gqve5）。 */
-      notice={codeConflict ? (
-      <div className={styles.conflict} role="alert">
-        <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
-        <div className={styles.conflictText}>
-          <p className={styles.conflictTitle}>この紹介コードは、ほかの人が先に登録しました</p>
-          <p className={styles.conflictNote}>入力は残っています。別の紹介コードに変えて保存してください</p>
-        </div>
-        <Button href={LIST_PATH}><List size={15} aria-hidden="true" /> 一覧で確かめる</Button>
-      </div>
-      ) : undefined}
       status={saving ? '登録しています' : partialSave ? '基本情報は保存済み・追加情報は未保存' : 'まだ保存していません'}
       footerActions={<>
         <Button href={LIST_PATH}>キャンセル</Button>
@@ -357,7 +344,7 @@ export default function CreateAffiliateV8() {
         <Button variant="primary" disabled={saving} busy={saving} busyLabel="登録しています" onClick={() => void runSave('finish')}>
           <Check size={15} aria-hidden="true" /> 登録して紹介リンクを発行する
         </Button>
-      </>}
+      </>} dirty={false}
     >
 
       {partialSave && createdId ? (
@@ -382,22 +369,15 @@ export default function CreateAffiliateV8() {
           <p className={styles.cardNote}>会社でも個人でも登録できます</p>
         </div>
         <div className={styles.grid2}>
-          <label className={styles.field} htmlFor="af-name">
-            <span className={styles.label}>名前（表示名）</span>
-            <TextField id="af-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：ペットライフ編集部" maxLength={120} />
-          </label>
-          <label className={styles.field} htmlFor="af-code">
-            <span className={styles.label}>
-              紹介コード（リンクの最後に付く）
-              <HelpTip label="紹介コードの決まり">登録後は変更できません。英数字4文字以上。空欄なら推測されにくいコードを自動で作ります。</HelpTip>
-            </span>
-            <TextField id="af-code" value={code} onChange={(event) => { setCode(event.target.value); setCodeConflict(false) }} placeholder="petlife2026" maxLength={64} />
-          </label>
+          <Field label="名前（表示名）" htmlFor="af-name" error={fieldErrors.name}>
+            <TextField id="af-name" value={name} onChange={(event) => { setName(event.target.value); clearField('name') }} placeholder="例：ペットライフ編集部" maxLength={120} />
+          </Field>
+          <Field label="紹介コード（リンクの最後に付く）" htmlFor="af-code" error={fieldErrors.code}
+            help="登録後は変更できません。英数字4文字以上。空欄なら推測されにくいコードを自動で作ります。">
+            <TextField id="af-code" value={code} onChange={(event) => { setCode(event.target.value); clearField('code') }} placeholder="petlife2026" maxLength={64} />
+          </Field>
         </div>
-        <label className={styles.field} htmlFor="af-email">
-          <span className={styles.label}>連絡先メール</span>
-          <TextField id="af-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="contact@example.com" maxLength={200} />
-        </label>
+        <Field label="連絡先メール" htmlFor="af-email"><TextField id="af-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="contact@example.com" maxLength={200} /></Field>
         <div className={styles.friendRow}>
           <Button type="button" aria-expanded={friendPickerOpen} onClick={() => setFriendPickerOpen((open) => !open)}>
             <LinkIcon size={15} aria-hidden="true" /> LINE の友だちと結びつける
@@ -421,7 +401,7 @@ export default function CreateAffiliateV8() {
                     setFriendReload((value) => value + 1)
                   }}
                 >
-                  <TextField aria-label="友だちの名前で検索" value={friendSearchInput} onChange={(event) => setFriendSearchInput(event.target.value)} placeholder="友だちの名前で探す" />
+                  <TextField aria-label="友だちの名前で探す" value={friendSearchInput} onChange={(event) => setFriendSearchInput(event.target.value)} placeholder="友だちの名前で探す" />
                   <Button type="submit">検索</Button>
                 </form>
                 <Select
@@ -445,7 +425,7 @@ export default function CreateAffiliateV8() {
                   </div>
                 ) : (
                   <div className={styles.friendSearch}>
-                    <p className={styles.cardNote}>{friendLoading ? '友だちを読み込んでいます' : `全${formatNumber(friendTotal)}件`}</p>
+                    <p className={styles.cardNote}>{friendLoading ? '友だちを読み込んでいます' : `全${formatNumber(friendTotal)} 件`}</p>
                     {friendPageCount > 1 ? (
                       <Select
                         id="af-friend-page"
@@ -478,29 +458,20 @@ export default function CreateAffiliateV8() {
               onChange={(value) => setPayoutKind(value as PayoutKind)}
               title={kind.label}
               note={kind.note}
-              variant="compact"
-              className={styles.choiceCard}
+              variant="form"
             />
           ))}
         </RadioCardGroup>
         {payoutKind === 'rate' ? (
-          <label className={styles.field} htmlFor="af-rate">
-            <span className={styles.label}>売上に対する割合（%）</span>
-            <TextField id="af-rate" type="number" min={0} step="0.1" value={commissionRate} onChange={(event) => setCommissionRate(event.target.value)} placeholder="10" />
-          </label>
+          <Field label="売上に対する割合（%）" htmlFor="af-rate" error={fieldErrors.rate}>
+            <NumberInput unit="%" id="af-rate" type="number" min={0} step="0.1" value={commissionRate} onChange={(event) => { setCommissionRate(event.target.value); clearField('rate') }} placeholder="10" />
+          </Field>
         ) : null}
         <div className={styles.grid2}>
-          <label className={styles.field} htmlFor="af-cycle">
-            <span className={styles.label}>締めと支払い</span>
-            <TextField id="af-cycle" value={payoutCycle} onChange={(event) => setPayoutCycle(event.target.value)} placeholder="例：月末締め・翌月末払い" maxLength={100} />
-          </label>
-          <div className={styles.field}>
-            <span className={styles.label}>
-              保留期間
-              <HelpTip label="保留期間の意味">返品・キャンセルを待つ期間です。過ぎた成果が次の締めに入ります。</HelpTip>
-            </span>
-            <Select id="af-hold" aria-label="保留期間" size="full" value={holdDays} onChange={setHoldDays} options={holdOptions} />
-          </div>
+          <Field label="締めと支払い" htmlFor="af-cycle"><TextField id="af-cycle" value={payoutCycle} onChange={(event) => setPayoutCycle(event.target.value)} placeholder="例：月末締め・翌月末払い" maxLength={100} /></Field>
+          <Field label="保留期間" htmlFor="af-hold" error={fieldErrors.hold} help="返品・キャンセルを待つ期間です。過ぎた成果が次の締めに入ります。">
+            <Select id="af-hold" aria-label="保留期間" size="full" value={holdDays} onChange={(value) => { setHoldDays(value); clearField('hold') }} options={holdOptions} />
+          </Field>
         </div>
       </section>
 
@@ -510,14 +481,14 @@ export default function CreateAffiliateV8() {
           <p className={styles.cardNote}>任意</p>
         </div>
         <div className={styles.switchRow}>
-          <Toggle checked={notifyOnConversion} label="本人に LINE で知らせる" onChange={setNotifyOnConversion} />
+          <SettingCheckbox checked={notifyOnConversion} label="本人に LINE で知らせる" onChange={setNotifyOnConversion} />
           <div className={styles.switchBody}>
             <p className={styles.switchName}>本人に LINE で知らせる</p>
             <p className={styles.switchNote}>成果 1 件ごとに</p>
           </div>
         </div>
         <div className={styles.switchRow}>
-          <Toggle checked={startTracking} label="すぐに計測を始める" onChange={setStartTracking} />
+          <SettingCheckbox checked={startTracking} label="すぐに計測を始める" onChange={setStartTracking} />
           <div className={styles.switchBody}>
             <p className={styles.switchName}>すぐに計測を始める</p>
             <p className={styles.switchNoteFaint}>{startTracking ? '登録したらすぐに数え始めます' : 'オフでもリンクは発行されます'}</p>

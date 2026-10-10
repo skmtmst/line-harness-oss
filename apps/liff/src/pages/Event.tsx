@@ -231,26 +231,18 @@ export default function Event() {
                 // 満席は押せない灰色の箱。白 (bg-canvas) と重ねると白く見えるので
                 // 押せない時は地を1つ (bg-shell-gray) だけにする。
                 // 待ちに入る満席の枠は白のまま、黄土色の札で分かるようにする。
-                const tone = disabled
-                  ? 'border-hairline bg-shell-gray'
-                  : selected && !full
-                    ? 'border-liff-primary bg-liff-primary'
-                    : selected
-                      ? 'border-liff-wait-ink bg-liff-wait-bg'
-                      : 'border-hairline bg-canvas';
                 const timeText = `${utcToJstMd(s.starts_at)}(${utcToJstWeekday(s.starts_at)}) ${utcToJstHm(s.starts_at)}〜${utcToJstHm(s.ends_at)}`;
                 // 満席で待ちに入る枠の札。数は数えられる分だけ (seatLabel と同じ)。
                 const fullLabel = full && !disabled ? '満席・キャンセル待ち' : seatLabel(s);
                 return (
                   <li key={s.id}>
-                    <button
+                    <Button variant="optionRow" selected={selected} unavailable={disabled} waitlisted={full}
                       type="button"
                       disabled={disabled}
                       aria-pressed={selected}
                       aria-label={full ? `${timeText} 満席` : undefined}
                       onClick={() => setSelectedId(s.id)}
                       title={formatJstEventAt(s.starts_at)}
-                      className={`liff-hit flex min-h-[42px] w-full items-center justify-between gap-3 rounded-(--liff-radius) border px-4 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${tone}`}
                     >
                       <span
                         className={`liff-num text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected && !full ? 'text-(--liff-on-primary)' : 'text-ink'}`}
@@ -265,7 +257,7 @@ export default function Event() {
                       >
                         {fullLabel}
                       </span>
-                    </button>
+                    </Button>
                   </li>
                 );
               })}

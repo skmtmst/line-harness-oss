@@ -2,7 +2,7 @@
 /*
  * R308/R309: 担当割当表を実物の React で描いて確かめる。
  *
- * - R308: 「提供できる数」は稼働中の担当だけ。非公開の担当は割当として
+ * - R308: 「提供できる数」は有効の担当だけ。非公開の担当は割当として
  *   数え、列見出しに「非公開」と出す。受付できる担当がいないメニューは
  *   警告する（誰も割っていない場合と、非公開しかいない場合を分ける）。
  * - R309: 標準の料金は一覧と同じ言葉（お問い合わせ・無料・¥）で出す。
@@ -96,7 +96,7 @@ function menuRow(name: string): HTMLElement {
   return screen.getByText(name).closest('tr') as HTMLElement
 }
 
-describe('R308 提供できる数は稼働中の担当だけ', () => {
+describe('R308 提供できる数は有効の担当だけ', () => {
   test('非公開の担当は割当として数え、見出しに「非公開」と出す', async () => {
     render(<MenuStaffMatrix />)
     await screen.findByText('カット')
@@ -104,7 +104,7 @@ describe('R308 提供できる数は稼働中の担当だけ', () => {
     // 列見出しで非公開と分かる。
     const header = screen.getByText('非公開さん').closest('th') as HTMLElement
     expect(within(header).getByText('非公開')).toBeTruthy()
-    // 稼働中の見出しには付けない。
+    // 有効の見出しには付けない。
     const activeHeader = screen.getByText('稼働さん').closest('th') as HTMLElement
     expect(within(activeHeader).queryByText('非公開')).toBeNull()
 
@@ -127,11 +127,11 @@ describe('R308 提供できる数は稼働中の担当だけ', () => {
     expect(screen.getByText('「お試し」は担当できるスタッフがいません。')).toBeTruthy()
   })
 
-  test('稼働中を外す（未保存）と受付できる数が減り、警告が出る', async () => {
+  test('有効を外す（未保存）と受付できる数が減り、警告が出る', async () => {
     render(<MenuStaffMatrix />)
     await screen.findByText('カット')
 
-    // 相談は稼働中だけの割当。外すと受付できる数が0人になる。
+    // 相談は有効だけの割当。外すと受付できる数が0人になる。
     const row = menuRow('相談')
     const [activeBox] = within(row).getAllByRole('checkbox', { name: '対応できる' })
     fireEvent.click(activeBox)

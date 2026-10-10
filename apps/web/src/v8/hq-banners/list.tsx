@@ -9,15 +9,20 @@
  * 頭（型 ListPage）・左の「見る」の列（型のフォルダの列＋共通 FolderPanel）・数のカード4枚・
  * 案内の帯・タブ・道具の段・カード（プロジェクト）／画像のます（ライブラリ）・件数と次へ。
  */
+import { useListUrlValue, useListUrlJsonValue } from '@/components/shared/list-url-state'
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { CircleDot, Folder, Gauge, Inbox, Plus, Send, Sparkles, Star, Upload } from 'lucide-react'
+import { CircleDot, Folder, Gauge, Plus, Send, Sparkles, Star, Upload } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ListPage } from '@/components/templates'
+import KpiBand from '@/components/shared/kpi-band'
+import { formatNumber } from '@/lib/format'
+import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import { notifyToast } from '@/components/shared/toast'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
@@ -27,7 +32,6 @@ import { Tabs } from '@/components/shared/tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import type { AccountWithStats } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
-import { formatNumber } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import {
   SHAPE_FILTERS,
@@ -44,6 +48,7 @@ import { CreateProjectDialogV8, UploadDialogV8 } from './dialogs'
 import BannerLimitNotice from './limit-notice'
 import { bannerFailureMessage, monthDay, shortPresetLabel } from './words'
 import styles from './list.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Tab = 'projects' | 'library'
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -59,6 +64,10 @@ const PROJECT_SORTS: Array<{ value: ProjectSort; label: string }> = [
 
 /** 画像ライブラリは 12 枚ずつ（絵 W5Wxr の「1–12 件 / 23 件」「次の 12 件」）。 */
 const LIBRARY_PAGE = 12
+
+function isCursorHistory(value: unknown): value is Array<string | null> {
+  return Array.isArray(value) && value.length > 0 && value[0] === null && value.every(item => item === null || typeof item === 'string')
+}
 
 export default function HqBannersListV8() {
   return (
@@ -113,19 +122,19 @@ function BannersInner() {
   const changeTab = (next: Tab) => samePageUrl.replace(next === 'library' ? '/hq/banners?tab=library' : '/hq/banners')
 
   const kpis = (
-    <div className={styles.kpis} data-design="KPIs">
-      <StatCard title="プロジェクト" icon={<Folder aria-hidden="true" />} value={stats ? stats.projects.active : null} unit="件" detail={stats ? `アーカイブ ${stats.projects.archived}` : '—'} loading={summaryLoading} />
-      <StatCard title="今月の生成" icon={<Sparkles aria-hidden="true" />} value={usage ? usage.month.used : null} unit="枚" detail={usage ? `今日 ${usage.today.used}枚・1日の上限 ${usage.today.limit}枚` : '—'} loading={summaryLoading} />
-      <StatCard title="今月の残り" icon={<Gauge aria-hidden="true" />} value={usage ? usage.month.remaining : null} unit="枚" detail={usage ? `上限 ${usage.month.limit}枚・${nextMonthResetLabel()} に戻る` : '—'} loading={summaryLoading} />
-      <StatCard title="アカウントへ渡した画像" icon={<Send aria-hidden="true" />} value={stats ? stats.deliveredImages : null} unit="枚" detail={stats ? `${stats.deliveredAccounts}アカウント` : '—'} loading={summaryLoading} />
-    </div>
+    <KpiBand data-design="KPIs">
+      <KpiCard presentation="band" title="プロジェクト" icon={<Folder aria-hidden="true" />} value={stats ? stats.projects.active : null} unit="件" detail={summaryLoading ? '読み込んでいます' : stats ? `アーカイブ ${stats.projects.archived}` : '—'} loading={summaryLoading} />
+      <KpiCard presentation="band" title="今月の生成" icon={<Sparkles aria-hidden="true" />} value={usage ? usage.month.used : null} unit="枚" detail={summaryLoading ? '読み込んでいます' : usage ? `今日 ${usage.today.used}枚・1日の上限 ${usage.today.limit}枚` : '—'} loading={summaryLoading} />
+      <KpiCard presentation="band" title="今月の残り" icon={<Gauge aria-hidden="true" />} value={usage ? usage.month.remaining : null} unit="枚" detail={summaryLoading ? '読み込んでいます' : usage ? `上限 ${usage.month.limit}枚・${nextMonthResetLabel()} に戻る` : '—'} loading={summaryLoading} />
+      <KpiCard presentation="band" title="アカウントへ配った画像" icon={<Send aria-hidden="true" />} value={stats ? stats.deliveredImages : null} unit="枚" detail={summaryLoading ? '読み込んでいます' : stats ? `${stats.deliveredAccounts}アカウント` : '—'} loading={summaryLoading} />
+    </KpiBand>
   )
 
   const head = (
     <>
       {kpis}
       <NoteBar tone="info">
-        作った画像は統括の登録メディアに保存されます。アカウントへ渡すと、そのアカウントの配信・リッチメニュー・回答フォームから選べるようになります。
+        作った画像は統括の登録メディアに保存されます。アカウントへ配ると、そのアカウントの配信・リッチメニュー・回答フォームから選べるようになります。
       </NoteBar>
       <div className={styles.tabs}>
         <Tabs
@@ -144,30 +153,6 @@ function BannersInner() {
     : <LibraryView head={head} canManage={canManage} presets={presets} accounts={accounts} onChanged={() => void loadSummary()} />
 }
 
-/**
- * 数のカード（絵の「数 プロジェクト」など）。絵はつながった帯ではなく、間 12 の別々のカード。
- * 数が取れないときは「—」（推測で埋めない）。読み込み中は数の所を「…」にする。
- */
-function StatCard({ title, icon, value, unit, detail, loading }: {
-  title: string
-  icon: React.ReactNode
-  value: number | null
-  unit: string
-  detail: string
-  loading: boolean
-}) {
-  return (
-    <div className={styles.stat} aria-busy={loading || undefined}>
-      <p className={styles.statHead}><span className={styles.statIcon}>{icon}</span><span className={styles.statTitle} title={title}>{title}</span></p>
-      <p className={styles.statValue}>
-        <span className={styles.statNumber}>{loading ? '…' : value === null ? '—' : formatNumber(value)}</span>
-        {!loading && value !== null ? <span className={styles.statUnit}>{unit}</span> : null}
-      </p>
-      <p className={styles.statDetail}>{loading ? '読み込んでいます' : detail}</p>
-    </div>
-  )
-}
-
 /* ───────── プロジェクト一覧（B9ZAr） ───────── */
 
 function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
@@ -181,9 +166,9 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
   const [projects, setProjects] = useState<BannerProject[]>([])
   const [thumbnails, setThumbnails] = useState<Record<string, BannerImage[]>>({})
   const [status, setStatus] = useState<LoadStatus>('loading')
-  const [view, setView] = useState<ProjectView>('all')
-  const [query, setQuery] = useState('')
-  const [sort, setSort] = useState<ProjectSort>('updated')
+  const [view, setView] = useListUrlValue<ProjectView>('view', 'all')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [sort, setSort] = useListUrlValue<ProjectSort>('sort', 'updated')
   const [actionError, setActionError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -232,7 +217,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
       if (!res.success) throw new Error(res.error)
       setFormOpen(false)
       onChanged()
-      router.push(`/hq/banners/project?id=${encodeURIComponent(res.data.id)}`)
+      router.push(createPageReturnHref('/hq/banners', res.data.id))
     } catch (caught) {
       // M022：原文のまま出さず、共通の状態別案内へ渡す。窓は開いたまま送り直せる。
       setFormError(bannerFailureMessage(caught, 'プロジェクトの作成'))
@@ -269,11 +254,14 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
   }, [projects, query, view, sort])
 
   const ready = status === 'ready' && !archivedMode
-  const rows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? projects.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
-    { kind: 'folder' as const, id: 'favorite', label: 'お気に入り', count: ready ? projects.filter((p) => p.isFavorite).length : null, color: 'var(--color-status-info)' },
-    { kind: 'folder' as const, id: 'running', label: '生成中', count: ready ? projects.filter((p) => p.runningCount > 0).length : null, color: 'var(--color-accent)' },
-    { kind: 'folder' as const, id: 'archived', label: 'アーカイブ', count: archivedCount, color: 'var(--color-status-warn)' },
+  /*
+   * お気に入り・生成中・アーカイブは作ったフォルダではなく状態なので、左の列ではなく上の絞り込みの札に置く（B-136）。
+   * 左の列は共通の ManagedFolderPanel。プロジェクトのフォルダの口（API）がまだ無いので「すべて」だけ。
+   */
+  const viewChips: Array<{ key: ProjectView; label: string; count: number | null }> = [
+    { key: 'favorite', label: 'お気に入り', count: ready ? projects.filter((p) => p.isFavorite).length : null },
+    { key: 'running', label: '生成中', count: ready ? projects.filter((p) => p.runningCount > 0).length : null },
+    { key: 'archived', label: 'アーカイブ', count: archivedCount },
   ]
 
   const createProject = canManage ? (
@@ -281,25 +269,31 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
       <Plus aria-hidden="true" className={styles.buttonIcon} />プロジェクトを作る
     </Button>
   ) : null
-  const selectView = (id: string) => setView(id as ProjectView)
   const folders = (
     <div className={styles.folderInset}>
-      <FolderPanel
+      <ManagedFolderPanel
+        kind={null}
+        folders={[]}
+        onChanged={() => undefined}
+        canManage={canManage}
+        itemLabel="プロジェクト"
         createAction={createProject}
-        heading="見る"
-        rows={rows}
-        activeId={view}
-        onSelect={selectView}
+        activeId="all"
+        onSelect={() => setView('all')}
+        allCount={ready ? projects.length : null}
       />
     </div>
   )
+  const viewFilter = (
+    <ViewChips chips={viewChips} active={view} onChange={(next) => setView((next ?? 'all') as ProjectView)} />
+  )
 
   const body = status === 'loading' ? (
-    <ListState kind="loading" title="プロジェクトを読み込んでいます" />
+    <ListState permissionScope="hq" kind="loading" title="プロジェクトを読み込んでいます" />
   ) : status === 'forbidden' ? (
-    <ListState kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" />
+    <ListState permissionScope="hq" kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" />
   ) : status === 'error' ? (
-    <ListState
+    <ListState permissionScope="hq"
       kind="error"
       title="一覧を読み込めませんでした"
       description="通信の状態を確認して、もう一度お試しください。何度も続く場合はお問い合わせから知らせてください。"
@@ -307,12 +301,12 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
     />
   ) : projects.length === 0 ? (
     archivedMode ? (
-      <ListState kind="empty" title="アーカイブしたプロジェクトはありません" description="進行中の一覧でアーカイブすると、ここに移ります。" />
+      <ListState permissionScope="hq" kind="empty" title="アーカイブしたプロジェクトはありません" description="進行中の一覧でアーカイブすると、ここに移ります。" />
     ) : (
-      <ListState
+      <ListState permissionScope="hq"
         kind="empty"
         title="まだプロジェクトがありません"
-        description="案件やキャンペーンごとにプロジェクトを作り、その中で画像を生成します。作った画像はアカウントへ渡せます。"
+        description="案件やキャンペーンごとにプロジェクトを作り、その中で画像を生成します。作った画像はアカウントへ配れます。"
         action={canManage ? (
           <Button variant="primary" onClick={() => setFormOpen(true)}>
             <Plus aria-hidden="true" className={styles.buttonIcon} />最初のプロジェクトを作る
@@ -322,7 +316,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
     )
   ) : visible.length === 0 ? (
     // R605: 検索・絞り込みの結果が0件。条件を外す口を付ける（作る口は出さない）。
-    <ListState kind="empty" emptyPreset="filtered" action={<Button onClick={() => { setQuery(''); setView('all') }}>条件を外す</Button>} />
+    <ListState permissionScope="hq" kind="empty" emptyPreset="filtered" action={<Button onClick={() => { setQuery(''); setView('all') }}>条件を外す</Button>} />
   ) : (
     <div className={styles.projectGrid}>
       {visible.map((project) => (
@@ -343,13 +337,14 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
     <ListPage
       boardId="B9ZAr"
       title="バナー生成"
-      description="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ渡します。"
+      help="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
       folders={folders}
-      folderNav={{ rows, activeId: view, onSelect: selectView, createAction: createProject, label: '見る' }}
+      folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => setView('all'), createAction: createProject }}
     >
       <div className={styles.body}>
         {head}
         <BannerLimitNotice usage={usage} />
+        {viewFilter}
         <div className={styles.tools}>
           <div className={styles.projectSearch}>
             <SearchField
@@ -383,6 +378,26 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
   )
 }
 
+/** 上の絞り込みの札（見る：お気に入り・状態）。もう一度押すと外れて「すべて」に戻る。 */
+function ViewChips<K extends string>({ chips, active, onChange }: {
+  chips: Array<{ key: K; label: string; count: number | null }>
+  active: string
+  onChange: (next: K | null) => void
+}) {
+  return (
+    <div className={styles.tools}>
+      <span className={styles.toolLabel}>見る</span>
+      <div role="group" aria-label="見るもので絞り込む" className={styles.chips}>
+        {chips.map((chip) => (
+          <FilterChip key={chip.key} selected={active === chip.key} onChange={(on) => onChange(on ? chip.key : null)}>
+            {chip.count === null ? chip.label : `${chip.label} ${formatNumber(chip.count)}`}
+          </FilterChip>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 /** プロジェクトのカード（絵の「プロジェクト 秋のキャンペーン」）。上に3枚、下に名前・説明・枚数と更新。 */
 function ProjectCard({ project, thumbnails, busy, canManage, onOpen, onToggleFavorite }: {
   project: BannerProject
@@ -403,7 +418,7 @@ function ProjectCard({ project, thumbnails, busy, canManage, onOpen, onToggleFav
       </button>
       <div className={styles.cardBody}>
         <div className={styles.cardTitleRow}>
-          <button type="button" className={styles.cardTitle} onClick={onOpen} title={project.name}>{project.name}</button>
+          <button type="button" className={styles.cardTitle} onClick={onOpen} title={project.name} >{project.name}</button>
           {canManage ? (
             <button
               type="button"
@@ -455,11 +470,11 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   const [counts, setCounts] = useState<import('@line-crm/shared').HqBannerImageCounts | null>(null)
   const [projects, setProjects] = useState<Record<string, BannerProject>>({})
   const [status, setStatus] = useState<LoadStatus>('loading')
-  const [view, setView] = useState<LibraryView>('all')
-  const [shape, setShape] = useState<ShapeFilter | null>(null)
-  const [query, setQuery] = useState('')
+  const [view, setView] = useListUrlValue<LibraryView>('view', 'all')
+  const [shape, setShape] = useListUrlValue<ShapeFilter | null>('shape', null)
+  const [query, setQuery] = useListUrlValue('q', '')
   /** ページごとの「この日時より前」。1ページ目は null。 */
-  const [cursors, setCursors] = useState<Array<string | null>>([null])
+  const [cursors, setCursors] = useListUrlJsonValue<Array<string | null>>('libraryCursors', [null], isCursorHistory)
   const [nextBefore, setNextBefore] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [openImage, setOpenImage] = useState<BannerImage | null>(null)
@@ -538,7 +553,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       onChanged()
       return true
     } catch (caught) {
-      setModalError(bannerFailureMessage(caught, 'アカウントへの受け渡し'))
+      setModalError(bannerFailureMessage(caught, 'アカウントへの配布'))
       return false
     } finally {
       setModalBusy(false)
@@ -564,11 +579,11 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   }
 
   const ready = status === 'ready'
-  const rows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? counts?.all ?? images.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
-    { kind: 'folder' as const, id: 'favorite', label: 'お気に入り', count: ready ? counts?.favorite ?? null : null, color: 'var(--color-status-info)' },
-    { kind: 'folder' as const, id: 'delivered', label: '渡し済み', count: ready ? counts?.delivered ?? null : null, color: 'var(--color-accent)' },
-    { kind: 'folder' as const, id: 'unused', label: '未使用', count: ready ? counts?.unused ?? null : null, color: 'var(--color-status-warn)' },
+  /* お気に入り・配布済み・未使用は状態なので上の絞り込みの札へ（B-136）。左の列は共通の ManagedFolderPanel（画像のフォルダの口が無いので「すべて」だけ）。 */
+  const viewChips: Array<{ key: LibraryView; label: string; count: number | null }> = [
+    { key: 'favorite', label: 'お気に入り', count: ready ? counts?.favorite ?? null : null },
+    { key: 'delivered', label: '配布済み', count: ready ? counts?.delivered ?? null : null },
+    { key: 'unused', label: '未使用', count: ready ? counts?.unused ?? null : null },
   ]
 
   const uploadImage = canManage ? (
@@ -579,12 +594,16 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   const selectView = (id: string) => { setView(id as LibraryView); resetPage() }
   const folders = (
     <div className={styles.folderInset}>
-      <FolderPanel
+      <ManagedFolderPanel
+        kind={null}
+        folders={[]}
+        onChanged={() => undefined}
+        canManage={canManage}
+        itemLabel="画像"
         createAction={uploadImage}
-        heading="見る"
-        rows={rows}
-        activeId={view}
-        onSelect={selectView}
+        activeId="all"
+        onSelect={() => selectView('all')}
+        allCount={ready ? counts?.all ?? images.length : null}
       />
     </div>
   )
@@ -594,11 +613,11 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   const last = page * LIBRARY_PAGE + images.length
 
   const body = status === 'loading' ? (
-    <ListState kind="loading" title="画像を読み込んでいます" />
+    <ListState permissionScope="hq" kind="loading" title="画像を読み込んでいます" />
   ) : status === 'forbidden' ? (
-    <ListState kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" />
+    <ListState permissionScope="hq" kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" />
   ) : status === 'error' ? (
-    <ListState
+    <ListState permissionScope="hq"
       kind="error"
       title="一覧を読み込めませんでした"
       description="通信の状態を確認して、もう一度お試しください。何度も続く場合はお問い合わせから知らせてください。"
@@ -606,8 +625,8 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
     />
   ) : images.length === 0 ? (
     query || shape || view !== 'all'
-      ? <ListState kind="empty" emptyPreset="filtered" action={<Button onClick={() => { setQuery(''); setShape(null); setView('all'); resetPage() }}>条件を外す</Button>} />
-      : <ListState kind="empty" title="まだ画像がありません" description="プロジェクトの中で生成した画像と、取り込んだ画像がここに並びます。" />
+      ? <ListState permissionScope="hq" kind="empty" emptyPreset="filtered" action={<Button onClick={() => { setQuery(''); setShape(null); setView('all'); resetPage() }}>条件を外す</Button>} />
+      : <ListState permissionScope="hq" kind="empty" title="まだ画像がありません" description="プロジェクトの中で生成した画像と、取り込んだ画像がここに並びます。" />
   ) : (
     <>
       <div className={styles.imageGrid}>
@@ -621,14 +640,14 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
               <div className={styles.tileMeta}>
                 <span className={styles.metaText}>{image.source === 'upload' ? '取り込み' : shortPresetLabel(preset, image)}</span>
                 <span className={styles.spacer} />
-                {image.deliveredAccountIds.length > 0 ? <span className={`${styles.pill} ${styles.pillOk}`}><span className={styles.dot} aria-hidden="true" />渡し済み</span> : null}
+                {image.deliveredAccountIds.length > 0 ? <span className={`${styles.pill} ${styles.pillOk}`}><span className={styles.dot} aria-hidden="true" />配布済み</span> : null}
                 {canManage ? (
                   <button type="button" className={styles.star} onClick={() => void toggleFavorite(image)} aria-pressed={image.isFavorite} aria-label={image.isFavorite ? 'お気に入りから外す' : 'お気に入りにする'}>
                     <Star aria-hidden="true" className={image.isFavorite ? styles.starOn : styles.starOff} />
                   </button>
                 ) : null}
               </div>
-              <p className={styles.tileProject}>{projects[image.projectId]?.name ?? '—'}</p>
+              <p className={styles.tileProject}>{projects[image.projectId]?.name ?? emptyValue('unknown')}</p>
             </article>
           )
         })}
@@ -646,17 +665,18 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
     <ListPage
       boardId="W5Wxr"
       title="バナー生成"
-      description="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ渡します。"
+      help="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
       folders={folders}
-      folderNav={{ rows, activeId: view, onSelect: selectView, createAction: uploadImage, label: '見る' }}
+      folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => selectView('all'), createAction: uploadImage }}
     >
       <div className={styles.body}>
         {head}
+        <ViewChips chips={viewChips} active={view} onChange={(next) => selectView(next ?? 'all')} />
         <div className={styles.tools}>
           <div className={styles.librarySearch}>
             <SearchField
-              placeholder="テキスト・指示で検索"
-              aria-label="テキスト・指示で検索"
+              placeholder="テキスト・指示で探す"
+              aria-label="テキスト・指示で探す"
               value={query}
               onChange={(value) => { setQuery(value); resetPage() }}
               onClear={() => { setQuery(''); resetPage() }}

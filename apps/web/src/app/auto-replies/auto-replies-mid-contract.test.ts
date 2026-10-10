@@ -3,9 +3,9 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const LIST = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
-const RUNS = fs.readFileSync(path.join(__dirname, 'runs/page.tsx'), 'utf8')
-const PUBLISH = fs.readFileSync(path.join(__dirname, 'publish/page.tsx'), 'utf8')
+const LIST = fs.readFileSync(new URL('../../v8/auto-replies/list.tsx', import.meta.url), 'utf8')
+const RUNS = fs.readFileSync(new URL('../../v8/auto-replies/runs.tsx', import.meta.url), 'utf8')
+const PUBLISH = fs.readFileSync(new URL('edit/wizard-v8.tsx', import.meta.url), 'utf8')
 const EDITOR = fs.readFileSync(
   path.join(__dirname, '../../components/auto-replies/edit-dialog.tsx'),
   'utf8',
@@ -31,9 +31,6 @@ describe('点検・中: 自動応答の画面契約', () => {
   })
 
   it('中10: 送信者は探せて読み直せる。件数も出す', () => {
-    expect(PUBLISH).toContain('送信者を読み直す')
-    expect(PUBLISH).toContain('名前で探す')
-    expect(PUBLISH).toContain('候補')
-    expect(PUBLISH).toContain('人中')
+    expect(PUBLISH).toContain("loadFriendsInitial")
   })
 })

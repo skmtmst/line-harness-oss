@@ -63,7 +63,7 @@ function point(id: string, name: string, overrides: Record<string, unknown> = {}
 }
 
 const items = [
-  point('cp-1', '商品を買った'),
+  point('cp-1', '商品を買った', { folderId: 'f-ec' }),
   point('cp-6', '資料をダウンロードした', { sourceType: 'url_reach', measureMethod: 'url_reach', targetUrl: 'https://example.com/dl', deduplicationMode: 'once_per_friend', valueMode: 'none', status: 'stopped', state: 'stopped', usageCount: 0, usageNames: [], stoppedAt: '2026-09-20T09:00:00.000Z' }),
 ]
 
@@ -102,6 +102,9 @@ beforeEach(() => {
     if (url.pathname === '/api/conversions/report') {
       return json({ success: true, data: { kpis: { netCount: 52, previousNetCount: 40, netValue: 412000 }, byDefinition: [] } })
     }
+    if (url.pathname === '/api/folders') {
+      return json({ success: true, data: [{ id: 'f-ec', kind: 'conversion', name: '通販', parentId: null, displayOrder: 0, color: '#16a34a', createdAt: '', updatedAt: '', itemCount: 1 }], unfiledCount: 1 })
+    }
     if (url.pathname.endsWith('/delete-impact')) {
       return json({ success: true, data: { definition: { ...items[0], version: 3 }, usages: [], eventCount: 52, canDelete: false, stopImpact: { affectedUsageCount: 2, preservesPastEvents: true, preservesUsages: true }, replacementCandidates: [] } })
     }
@@ -117,13 +120,53 @@ afterEach(() => {
 })
 
 describe('V8 コンバージョンの一覧', () => {
+  it('一覧の読み込みが失敗しても空とは扱わず、読み直すと成果地点を表示する', async () => {
+    const base = globalThis.fetch
+    let failed = true
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (failed && new URL(String(input)).pathname === '/api/conversions/definitions') {
+        return json({ success: false, error: 'unavailable' }, 503)
+      }
+      return base(input, init)
+    })
+    await mount()
+    expect(screen.getByText('成果地点を読み込めませんでした')).toBeTruthy()
+    expect(screen.queryByText('まだ成果地点がありません')).toBeNull()
+    failed = false
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    await flush()
+    expect(screen.getByText('商品を買った')).toBeTruthy()
+    expect(screen.queryByText('成果地点を読み込めませんでした')).toBeNull()
+  })
+  it('編集で名前が空なら、その欄で理由を知らせ、欄へ移り、更新しない', async () => {
+    await mount()
+    fireEvent.click(screen.getByRole('button', { name: '成果地点「商品を買った」の操作' }))
+    await flush()
+    fireEvent.click(screen.getByRole('menuitem', { name: '編集する' }))
+    await flush()
+    const input = screen.getByLabelText('成果地点の名前') as HTMLInputElement
+    const scroll = vi.fn()
+    input.scrollIntoView = scroll
+    fireEvent.change(input, { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'この内容にする' }))
+    await flush()
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(input)
+    expect(scroll).toHaveBeenCalledWith({ block: 'center' })
+    const error = screen.getByRole('alert')
+    expect(error.textContent).toBe('名前を入れてください')
+    expect(input.getAttribute('aria-describedby')?.split(/\s+/)).toContain(error.id)
+    expect(screen.getAllByText('名前を入れてください')).toHaveLength(1)
+    expect(calls.some((call) => call.startsWith('POST '))).toBe(false)
+  })
+
   it('状態の札に口の件数を出し、行に数え方と使われている場所を出す', async () => {
     await mount()
-    expect(screen.getByRole('button', { name: /動いている 1/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /有効 1/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /どこからも使われていない 1/ })).toBeTruthy()
     expect(screen.getByText('注文が確定したとき')).toBeTruthy()
     expect(screen.getByText('1回ごと・取り消しは引く')).toBeTruthy()
-    expect(screen.getByText('1人1回・止めた日 9/20')).toBeTruthy()
+    expect(screen.getByText('1人1回・止めた日 09/20')).toBeTruthy()
     expect(screen.getByText('ファネル 1')).toBeTruthy()
     expect(screen.getByText('アフィリエイト 1')).toBeTruthy()
   })
@@ -150,7 +193,7 @@ describe('V8 コンバージョンの一覧', () => {
   it('閲覧のみ：帯を出し、作る・使う場所を足す・変える操作は置かない（見る操作は残す）', async () => {
     role.value = 'staff'
     await mount()
-    expect(screen.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeTruthy()
+    expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryByRole('link', { name: /成果地点を作る/ })).toBeNull()
     expect(screen.queryByRole('link', { name: '使う場所を足す' })).toBeNull()
     expect(Array.from(document.querySelectorAll('button')).filter((button) => button.disabled)).toEqual([])
@@ -166,8 +209,8 @@ describe('V8 コンバージョンの一覧', () => {
   it('1152 の板：札は「動いている」「止めている」の2つだけ（ほかはよく使う絞り込みから）', async () => {
     narrow.value = true
     await mount()
-    expect(screen.getByRole('button', { name: /動いている 1/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /止めている 1/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /有効 1/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /停止中 1/ })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /下書き 0/ })).toBeNull()
     expect(screen.getByText('使われていない')).toBeTruthy()
   })
@@ -188,7 +231,8 @@ describe('V8 コンバージョンの一覧', () => {
     await flush()
     const panel = screen.getByRole('region', { name: '詳細の小窓' })
     expect(panel.textContent).toContain('（動いています）')
-    fireEvent.click(screen.getByRole('button', { name: '受け口を止める' }))
+    fireEvent.click(screen.getByRole('button', { name: '詳細「商品を買った」のその他の操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '受け口を止める' }))
     await flush()
     expect(calls).toContain('POST /api/conversions/definitions/cp-1/ingest-disable')
     // 返事を待たずに変わっている
@@ -201,9 +245,37 @@ describe('V8 コンバージョンの一覧', () => {
 
   it('札で絞ると、その状態の行だけになる', async () => {
     await mount()
-    fireEvent.click(screen.getByRole('button', { name: /止めている 1/ }))
+    fireEvent.click(screen.getByRole('button', { name: /停止中 1/ }))
     await flush()
     expect(screen.queryByText('商品を買った')).toBeNull()
     expect(screen.getByText('資料をダウンロードした')).toBeTruthy()
+  })
+
+  it('左のフォルダの列（共通・種類 conversion）：すべて・通販・未分類で絞り、名前の前にフォルダの色の丸。閲覧のみは追加・「…」を出さない', async () => {
+    await mount()
+    expect(calls).toContain('GET /api/folders')
+    const folderNav = screen.getByRole('navigation', { name: 'フォルダ' })
+    expect([...folderNav.querySelectorAll('button[title]')].map((b) => b.getAttribute('title')).filter((t) => !t?.startsWith('フォルダ「'))).toEqual(['すべて', '通販', '未分類'])
+    expect(screen.getByRole('button', { name: /フォルダを追加/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'フォルダ「通販」の操作' })).toBeTruthy()
+    expect(host.querySelector('tr[data-row-id="cp-1"] [aria-label="フォルダ：通販"]')).not.toBeNull()
+    expect(host.querySelector('tr[data-row-id="cp-6"] [aria-label="フォルダ：未分類"]')).not.toBeNull()
+    fireEvent.click(folderNav.querySelector('button[title="通販"]')!)
+    await flush()
+    expect(screen.getByText('商品を買った')).toBeTruthy()
+    expect(screen.queryByText('資料をダウンロードした')).toBeNull()
+    fireEvent.click(folderNav.querySelector('button[title="未分類"]')!)
+    await flush()
+    expect(screen.queryByText('商品を買った')).toBeNull()
+    expect(screen.getByText('資料をダウンロードした')).toBeTruthy()
+    fireEvent.click(folderNav.querySelector('button[title="すべて"]')!)
+    await flush()
+
+    act(() => root.unmount())
+    root = createRoot(host)
+    role.value = 'viewer'
+    await mount()
+    expect(screen.queryByRole('button', { name: /フォルダを追加/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'フォルダ「通販」の操作' })).toBeNull()
   })
 })

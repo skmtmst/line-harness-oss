@@ -284,7 +284,7 @@ describe('V8 リッチメニューの通し：作る→押す所→保存→既�
     const areaRow = await screen.findByRole('button', { name: /未設定/ })
     fireEvent.click(areaRow)
     const intentSelect = await screen.findByLabelText('押したときの動き')
-    fireEvent.change(intentSelect, { target: { value: 'url' } })
+    fireEvent.change(intentSelect, { target: { value: 'uri' } })
     const urlInput = await screen.findByPlaceholderText('https://...')
     fireEvent.change(urlInput, { target: { value: 'https://example.com/menu' } })
     // 動きが付いた印に変わる。

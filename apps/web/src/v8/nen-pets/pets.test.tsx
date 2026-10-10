@@ -75,7 +75,7 @@ async function render(tab: PetTab) {
   await settle()
 }
 const buttons = () => Array.from(document.querySelectorAll('button'))
-const byText = (text: string) => buttons().find((b) => b.textContent?.trim() === text)
+const byText = (text: string) => [...document.querySelectorAll<HTMLButtonElement>('button,a')].find((b) => b.textContent?.trim() === text)
 const byLabel = (label: string) => buttons().find((b) => b.getAttribute('aria-label') === label)
 async function click(target: Element | undefined) {
   expect(target).toBeTruthy()
@@ -86,6 +86,7 @@ const listCalls = () => fetchApi.mock.calls.filter(([path]) => String(path).star
 
 describe('V8 マイペット（src/v8/nen-pets）', () => {
   beforeEach(() => {
+    window.history.replaceState(null, "", "/")
     document.documentElement.dataset.theme = 'v8'
     role.value = 'owner'
     fetchApi.mockReset()
@@ -116,6 +117,25 @@ describe('V8 マイペット（src/v8/nen-pets）', () => {
     expect(host.textContent).toContain('約560kcal・鹿肉 12g')
     expect(host.textContent).toContain('約560kcal・シニア')
     expect(host.textContent).toContain('06/12')
+  })
+
+  it('名前が空なら保存せず、欄を赤くしてそこへ移動し、直すと理由が消える', async () => {
+    await render('pets')
+    await click(byLabel('「こむぎ」の操作'))
+    await click(byText('ペットの情報を直す'))
+    const name = document.querySelector<HTMLInputElement>('input[aria-label="ペットの名前"]')!
+    const update = vi.spyOn(api.nenCampaigns, 'updatePet')
+    await act(async () => { fireEvent.change(name, { target: { value: '' } }) })
+    await click(byText('保存する'))
+    await settle(40)
+    expect(update).not.toHaveBeenCalled()
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(name.getAttribute('aria-describedby')).toContain('pet-edit-name-error')
+    expect(document.activeElement).toBe(name)
+    expect(document.querySelectorAll('[role="alert"]')).toHaveLength(1)
+    await act(async () => { fireEvent.change(name, { target: { value: 'こむぎ' } }) })
+    expect(name.getAttribute('aria-invalid')).not.toBe('true')
+    expect(document.getElementById('pet-edit-name-error')).toBeNull()
   })
 
   it('「…」→ペットの情報を直す：版つきで保存し、体重の「kg」は外して数で送る', async () => {
@@ -170,7 +190,7 @@ describe('V8 マイペット（src/v8/nen-pets）', () => {
     await click(byLabel('「こむぎ」の操作'))
     expect(byText('ペットの情報を直す')).toBeFalsy()
     expect(byText('飼い主を開く')).toBeTruthy()
-    expect(buttons().some((b) => b.textContent?.includes('CSV で書き出す'))).toBe(true)
+    expect(buttons().some((b) => b.textContent?.includes('CSVで書き出す'))).toBe(true)
     await act(async () => { root.render(<PetsV8 accountId="acc-1" tab="feeding" onChangeTab={() => {}} />) })
     await settle()
     for (const text of ['既定にする', 'これを使う', '＋ 主食を追加する', '＋ 然の商品を追加する', '保存する', 'キャンセル']) {

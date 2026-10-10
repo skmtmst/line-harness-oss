@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { LinkProps } from 'next/link'
-import { Check, LoaderCircle } from 'lucide-react'
+import { Check, LoaderCircle, ArrowUpRight } from 'lucide-react'
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type {
   AnchorHTMLAttributes,
@@ -8,6 +8,7 @@ import type {
   ReactNode,
 } from 'react'
 import styles from './button.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 type CommonProps = {
   /**
@@ -15,13 +16,18 @@ type CommonProps = {
    * `#976` U077/U084: 危険操作は共通ボタンの1役割として持ち、
    * 画面ごとの直書き赤（濃さがバラバラだった）を1本にする。
    */
-  variant?: 'primary' | 'secondary' | 'danger' | 'text'
+  variant?: 'primary' | 'secondary' | 'danger' | 'danger-outline' | 'text'
   /**
    * `compact` は一覧の行内・絞り込み行など、32px級の操作と高さを
    * そろえるときだけ使う（★V7：行内の操作は32）。本文の操作は
    * `standard` のままにする。
    */
-  size?: 'standard' | 'field' | 'compact'
+  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail' | 'composer' | 'composer-small'
+  align?: 'start'
+  /** 行内の時刻など、リンク色にしない文字操作。 */
+  textTone?: 'action' | 'ink'
+  /** 欄の横の小さな文字操作。指定した操作だけ詰め、既定のボタンは変えない。 */
+  presentation?: 'account-inline' | 'registration-inline'
   className?: string
   children: ReactNode
 }
@@ -53,6 +59,7 @@ type NativeButtonProps = CommonProps &
 
 type LinkButtonProps = CommonProps &
   Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'aria-disabled' | 'children' | 'className' | 'disabled' | 'href'> & {
+    external?: boolean
     href: LinkProps['href']
     disabled?: never
     'aria-disabled'?: never
@@ -70,16 +77,31 @@ const DONE_FLASH_MS = 1200
  * 見た目は部品が固定し、呼び出し側は幅と外側余白だけを `className` で決める。
  * 表示制御にはTailwindのdisplayクラスではなくHTMLの `hidden` 属性を使う。
  */
+/** 図柄だけの操作には title と同じ読み上げ名を付ける。文字の操作の名前は保つ。 */
+function hasButtonText(children: ReactNode): boolean {
+  return React.Children.toArray(children).some((child) => {
+    if (typeof child === 'string') return child.trim().length > 0
+    if (typeof child === 'number') return true
+    if (!React.isValidElement<{children?:ReactNode; 'aria-hidden'?: boolean | 'true' | 'false'}>(child)) return false
+    if (child.type === 'svg' || child.props['aria-hidden'] === true || child.props['aria-hidden'] === 'true') return false
+    return hasButtonText(child.props.children)
+  })
+}
+function iconButtonLabel(props: {children:ReactNode;title?:string;'aria-label'?:string;'aria-labelledby'?:string}) {
+  return props['aria-label'] ?? (!props['aria-labelledby'] && !hasButtonText(props.children) ? props.title : undefined)
+}
+
 export default function Button(props: ButtonProps) {
   const variant = props.variant ?? 'secondary'
   const size = props.size ?? 'standard'
-  const classes = [styles.button, styles[variant], styles[size], props.className].filter(Boolean).join(' ')
+  const classes = [styles.button, styles[variant], styles[size], props.textTone === 'ink' ? styles.textInk : null, props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, className: _className, href, size: _size, variant: _variant, ...linkProps } = props
+    const { children, className: _className, href, external, size: _size, variant: _variant, align, textTone: _textTone, presentation, ...linkProps } = props
     return (
-      <Link href={href} className={classes} {...linkProps}>
+      <Link href={href} className={classes} data-align={align} data-presentation={presentation} {...linkProps} target={external ? '_blank' : linkProps.target} rel={external ? 'noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
         {children}
+        {external ? <ArrowUpRight size={13} aria-hidden="true" data-external-icon /> : null}
       </Link>
     )
   }
@@ -94,6 +116,9 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     className: _className,
     variant: _variant,
     size: _size,
+    align,
+    textTone: _textTone,
+    presentation,
     href: _href,
     type = 'button',
     busy,
@@ -102,6 +127,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     doneLabel = '保存しました',
     disabled,
     ref,
+    onClick,
     ...buttonProps
   } = props
 
@@ -111,8 +137,11 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
    * 幅はぶれないよう、平常時に測った幅を `min-width` に留めておき、
    * 「保存中…」「保存しました」の間もその幅を下回らない。
    */
-  const stateful = busy !== undefined || done !== undefined
-  const busyNow = busy === true
+  const [automaticBusy, setAutomaticBusy] = useState(false)
+  const [automaticError, setAutomaticError] = useState('')
+  const automaticLock = useRef(false)
+  const stateful = busy !== undefined || done !== undefined || automaticBusy
+  const busyNow = busy === true || (busy === undefined && automaticBusy)
 
   /* done が true になったら 1.2 秒だけ ✓ を出して元の文字へ戻す。 */
   const [doneFlashing, setDoneFlashing] = useState(false)
@@ -126,6 +155,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   }, [done, busy])
 
   const elementRef = useRef<HTMLButtonElement | null>(null)
+  const v8 = useAdminTheme() === 'v8'
   const idleWidthRef = useRef(0)
   useLayoutEffect(() => {
     const el = elementRef.current
@@ -136,6 +166,20 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     }
     el.style.minWidth = ''
     idleWidthRef.current = el.offsetWidth
+    if (!v8) return
+    // いちばん長い結果の文字も最初に測る。成功した瞬間に幅が跳ねない。
+    const sample = el.cloneNode(false) as HTMLButtonElement
+    sample.removeAttribute('id')
+    sample.setAttribute('aria-hidden', 'true')
+    sample.style.cssText = 'position:absolute;visibility:hidden;width:max-content;min-width:0;pointer-events:none'
+    el.parentElement?.appendChild(sample)
+    let widest = idleWidthRef.current
+    for (const label of [busyLabel, doneLabel]) {
+      sample.textContent = label
+      widest = Math.max(widest, sample.offsetWidth + 21)
+    }
+    sample.remove()
+    el.style.width = `${widest}px`
   })
 
   const setRefs = (el: HTMLButtonElement | null) => {
@@ -144,19 +188,38 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     else if (ref) ref.current = el
   }
 
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (busyNow || disabled || automaticLock.current) return
+    setAutomaticError('')
+    const pending = onClick?.(event) as unknown
+    if (busy !== undefined || !pending || typeof (pending as PromiseLike<unknown>).then !== 'function') return
+    automaticLock.current = true
+    setAutomaticBusy(true)
+    void Promise.resolve(pending).catch(() => {
+      setAutomaticError('処理できませんでした。もう一度お試しください。')
+    }).finally(() => {
+      automaticLock.current = false
+      setAutomaticBusy(false)
+    })
+  }
   const shownDone = doneFlashing && !busyNow
-  return (
+  return (<>
     <button
       type={type}
       className={classes}
+      data-align={align}
+      data-presentation={presentation}
       ref={setRefs}
       disabled={disabled || busyNow}
       aria-busy={busyNow ? true : undefined}
       {...buttonProps}
+      aria-label={iconButtonLabel(props)}
+      onClick={handleClick}
     >
       {busyNow ? <LoaderCircle className={styles.spin} size={15} aria-hidden="true" /> : null}
       {shownDone ? <Check size={15} aria-hidden="true" /> : null}
       {busyNow ? busyLabel : shownDone ? doneLabel : children}
     </button>
-  )
+    {automaticError ? <span role="alert" data-button-error>{automaticError}</span> : null}
+  </>)
 }

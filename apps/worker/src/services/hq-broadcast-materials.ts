@@ -1,14 +1,19 @@
 import type { HqBroadcastInput } from '@line-crm/shared';
 import { StampError } from './visit-stamps.js';
+import { resolveHqAudio, type HqMediaRuntime } from './hq-media.js';
 
 /** 配布済みの同じ統括版だけを使う。別テナント・別店舗の素材は混ぜない。 */
 export async function resolveHqBroadcastMaterials(
-  db: D1Database, tenantId: string, accountId: string, input: HqBroadcastInput,
+  db: D1Database, tenantId: string, accountId: string, input: HqBroadcastInput, runtime?: HqMediaRuntime,
 ): Promise<HqBroadcastInput> {
   const bubbles = input.messageBubbles ? JSON.parse(JSON.stringify(input.messageBubbles)) : (input.messageBubblesJson ? JSON.parse(input.messageBubblesJson) : null);
   if (!bubbles) return input;
   for (const bubble of bubbles) {
     const content = bubble.content;
+    if (bubble.type === 'audio' && content?.state?.audio) {
+      try { content.state.audio = await resolveHqAudio(db, tenantId, accountId, content.state.audio, runtime); }
+      catch { throw new StampError('統括の音声を確認できません。取り込みと安全性の確認をやり直してください', 409); }
+    }
     if (!content?.hqTemplateId) continue;
     const templateId = content.hqTemplateId, versionId = content.hqTemplateVersionId;
     if (typeof templateId !== 'string' || typeof versionId !== 'string' || !versionId.trim()) {
@@ -49,9 +54,11 @@ export async function resolveHqBroadcastMaterials(
         const media = definition.media?.find((m: { id: string }) => m.id === sourceId);
         if (!local?.public_url || !media) throw new StampError('店舗の登録メディアを確認してください', 409);
         for (const url of [media.publicUrl, media.r2Key]) if (typeof url === 'string' && url) replacements.set(url, local.public_url);
-        if (definition.asset?.kind==='rich_message' && media.publicUrl===definition.asset.payload.baseUrl+'/1040') {
+        const sourceBase = definition.asset?.kind === 'rich_message' ? definition.asset.payload.baseUrl
+          : definition.template?.messageType === 'imagemap' ? JSON.parse(definition.template.messageContent).baseUrl : null;
+        if (sourceBase && media.publicUrl === sourceBase + '/1040') {
           if (!local.public_url.endsWith('/1040')) throw new StampError('店舗のリッチ素材の画像を確認してください',409);
-          replacements.set(definition.asset.payload.baseUrl,local.public_url.slice(0,-5));
+          replacements.set(sourceBase,local.public_url.slice(0,-5));
         }
       }
     }
@@ -73,7 +80,11 @@ export async function resolveHqBroadcastMaterials(
       return value;
     };
     bubble.content = walk(content);
-    if (definition.asset) bubble.content.assetId = localTemplateId;
+    if (definition.asset?.kind === 'research') {
+      const local = await db.prepare(`SELECT payload_json,published_version,name FROM broadcast_message_assets WHERE id=? AND line_account_id=? AND kind='research'`).bind(localTemplateId, accountId).first<{ payload_json: string; published_version: number; name: string }>();
+      if (!local || local.published_version < 1) throw new StampError('店舗の公開済みリサーチを確認してください', 409);
+      bubble.content = { ...JSON.parse(local.payload_json), assetId: localTemplateId, assetName: local.name, hqTemplateId: templateId, hqTemplateVersionId: versionId };
+    } else if (definition.asset) bubble.content.assetId = localTemplateId;
     else if (bubble.type === 'carousel') bubble.content.templateId = localTemplateId;
   }
   return { ...input, messageBubbles: bubbles, messageBubblesJson: undefined };

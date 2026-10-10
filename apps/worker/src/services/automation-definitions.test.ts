@@ -549,8 +549,8 @@ describe('V6オートメーションの一覧・対象見込み・1人テスト'
 
 /*
  * #942 N-352: 一覧の稼働切替と「保管」。
- * active / stopped / archived の一方通行の状態遷移。保管は戻せない
- * （複製して作り直す）。実行記録は消えない。
+ * 状態切替から保管を直接再開できない。B-173 の専用入口で
+ * 停止中または下書きへ戻す。実行記録は消えない。
  */
 describe('定義の状態遷移（#942 N-352）', () => {
   let testDb: SqliteD1;
@@ -582,7 +582,7 @@ describe('定義の状態遷移（#942 N-352）', () => {
     ).get()).toEqual({ status: 'archived' });
   });
 
-  it('保管した定義はどの状態にも戻せない', async () => {
+  it('状態切替の入口では保管を解除できない', async () => {
     addDefinition(testDb.raw, { id: 'auto-1', status: 'archived' });
     for (const status of ['active', 'stopped'] as const) {
       await expect(updateAutomationDefinitionStatus(testDb.db, {

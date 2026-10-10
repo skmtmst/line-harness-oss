@@ -1,13 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { motionMs } from './overlay-utils'
+import Button from './button'
 import styles from './bulk-bar.module.css'
 
 export type BulkBarProps = {
   /** 選んでいる数。0 のときは何も出さない（下がって消える）。 */
   count: number
+  total?: number
+  onSelectAll?: () => void | Promise<void>
   /** 数の単位。規定は「件」（友だち一覧は「人」、写真は「枚」）。 */
   unit?: string
   /** 件数の右に出す補足（なぜ今この操作が出ているか等）。 */
@@ -62,7 +65,16 @@ export function useEscapeToClearSelection(active: boolean, onClear: (() => void)
   }, [active, onClear])
 }
 
-export default function BulkBar({ count, unit = '件', hint, children, overflow, below, className, onClear }: BulkBarProps) {
+export default function BulkBar({ count, unit = '件', hint, children, overflow, below, className, onClear, total, onSelectAll }: BulkBarProps) {
+  const [selectingAll, setSelectingAll] = useState(false)
+  const [selectError, setSelectError] = useState('')
+  const selectLock = useRef(false)
+  const selectAll = async () => {
+    if (selectLock.current || !onSelectAll) return
+    selectLock.current = true; setSelectingAll(true); setSelectError('')
+    try { await onSelectAll() } catch { setSelectError('すべての対象を読み込めませんでした。もう一度お試しください。') }
+    finally { selectLock.current = false; setSelectingAll(false) }
+  }
   const visible = count > 0
   const [rendered, setRendered] = useState(visible)
 
@@ -91,6 +103,8 @@ export default function BulkBar({ count, unit = '件', hint, children, overflow,
         {count}
         {unit}を選択中
       </strong>
+      {total !== undefined && count < total && onSelectAll ? <Button size="compact" busy={selectingAll} busyLabel="対象を読み込んでいます…" onClick={() => void selectAll()}>{total}件すべてを選ぶ</Button> : null}
+      {selectError ? <span role="alert">{selectError}</span> : null}
       {hint ? <span className={styles.hint}>{hint}</span> : null}
       {children || overflow ? (
         <span className={styles.actions}>

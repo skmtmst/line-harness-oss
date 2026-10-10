@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import path from 'node:path'
 import {
   defaultDashboardPreferences,
@@ -41,17 +41,20 @@ function booking(id: string, startsAt: string, status = 'confirmed'): BookingReq
   }
 }
 
-describe('ダッシュボードV4の初期表示', () => {
-  it('編集パネルとQRコードをPencil V6の文言・寸法にそろえる', () => {
-    const editor = readFileSync(path.join(process.cwd(), 'src/components/dashboard/dashboard-editor.tsx'), 'utf8')
+const dashboardSource = () => readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+const notificationsSource = () => readFileSync(path.join(process.cwd(), 'src/v8/notifications/list.tsx'), 'utf8')
+
+describe('ダッシュボードV8の初期表示', () => {
+  it('V8の編集パネルで反映でき、QRコードを生成・ダウンロードできる', () => {
+    const editor = readFileSync(path.join(process.cwd(), 'src/v8/dashboard/dashboard-editor.tsx'), 'utf8')
     const qrDialog = readFileSync(path.join(process.cwd(), 'src/components/dashboard/qr-dialog.tsx'), 'utf8')
 
-    expect(editor).toContain('max-w-[540px]')
+    expect(editor).toContain('<Drawer')
+    expect(editor).toContain('width="editor"')
     expect(editor).toContain('表示するカードと位置を変更します')
     expect(editor).toContain('ダッシュボードに反映')
-    expect(editor).toContain('5つ目をONにすると、いちばん下のカードが自動でOFFになります。')
-    expect(qrDialog).toContain('style={{ maxWidth: 820 }}')
-    expect(qrDialog).toContain('border p-8 shadow-')
+    expect(editor).toContain('onApply(draft)')
+    expect(editor).toContain('onReset()')
     expect(qrDialog).toContain("{ value: '300x300', label: '小（300px）'")
     expect(qrDialog).toContain('ダウンロード形式')
     expect(qrDialog).toContain('画像をダウンロード')
@@ -73,9 +76,9 @@ describe('ダッシュボードV4の初期表示', () => {
   })
 
   it('応答生成時刻ではなく取得元の時刻と鮮度を表示する', () => {
-    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
-    expect(source).toContain('<DashboardFreshness freshness={data?.freshness} asOf={data?.asOf} />')
-    expect(source).toContain('freshness={section.freshness} asOf={section.asOf}')
+    const source = dashboardSource()
+    expect(source).toContain('headline(data?.asOf, d.displayedHealthRisk)')
+    expect(source).toContain('dashboardFreshnessText(section.freshness, section.asOf, section.reason)')
     expect(source).not.toContain('asOf={data?.generatedAt}')
   })
 
@@ -89,22 +92,19 @@ describe('ダッシュボードV4の初期表示', () => {
   })
 
   it('撮影固定応答だけが設計見本QRと固定URLを選べる', () => {
-    const page = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
-    expect(page).toContain('visualQa?.friendAddUrl')
-    expect(page).toContain('visualReferenceQr={visualQa?.referenceQr ?? false}')
-    expect(page).toContain('data?.visualQa?.notificationUnreadCount')
-    expect(page).toContain('reference?.pendingPhotos')
-    expect(page).toContain('referenceCount={reference?.operationalAlerts}')
+    const source = dashboardSource()
+    expect(source).toContain('visualQa?.friendAddUrl')
+    expect(source).toContain('visualReferenceQr={visualQa?.referenceQr ?? false}')
+    expect(source).toContain('reference?.pendingPhotos')
+    expect(source).toContain('referenceCount={reference?.operationalAlerts}')
   })
 
   it('旧Workerが追加集計を返さなくてもダッシュボードを描画できる', () => {
-    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
-    expect(source).toContain('data?.partialFailures?.length')
-    expect(source).toContain('data?.operations?.scenarios')
-    expect(source).toContain('data?.operations?.migrations')
-    expect(source).toContain('data?.operations?.bookings')
+    const source = dashboardSource()
+    expect(source).toContain('data?.partialFailures ?? []')
+    expect(source).toContain("d.sectionAvailable('operations') ? data?.operations : undefined")
+    for (const key of ['scenarios', 'migrations', 'bookings']) expect(source).toContain(`ops?.${key}`)
     expect(source).not.toContain('data?.partialFailures.length')
-    expect(source).not.toMatch(/data\?\.operations\.[a-zA-Z]/)
   })
 
   it('旧Workerが友だちの流入元を返さなくても推移表を描画できる', () => {
@@ -129,30 +129,26 @@ describe('ダッシュボードV4の初期表示', () => {
   })
 
   it('撮影専用のvisualQaが無くても本番の受信・予約・通知は描画できる', () => {
-    /*
-      `visualQa`(hideBookings・supportInbox・notificationUnreadCount 等)は
-      撮影モックだけの値で、本番 API は返さない。画面側は `?.`・`??` で
-      無視する。本番相当の値と食い違っていてもそろえない。
-    */
-    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    const source = dashboardSource()
     expect(source).toContain('reference?.hideBookings')
-    expect(source).toContain('data?.visualQa?.notificationUnreadCount ??')
     expect(source).toContain('data?.inbox ?? null')
+    expect(source).toContain('notificationData.accountId === selectedAccountId')
   })
 
   it('通知は選択中アカウントの取得・1件既読・全件既読へ接続する', () => {
-    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    const source = notificationsSource()
     expect(source).toContain('api.notifications.center.list(selectedAccountId')
     expect(source).toContain('api.notifications.center.markRead(item.id, accountId)')
     expect(source).toContain('api.notifications.center.markAllRead(accountId, filter)')
-    expect(source).toContain('通知を読み込めませんでした。もう一度お試しください。')
+    expect(source).toContain("loadFailureNotice(caught, '通知')")
+    expect(source).toContain('setLoadError(caught)')
   })
 
   it('アカウントや絞り込みを切り替えた後は、遅れて届いた既読処理を反映しない', () => {
-    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
-    expect(source).toContain('selectedAccountIdRef.current !== accountId')
-    expect(source).toContain('notificationFilterRef.current !== filter')
-    expect(source).toContain('notificationAccountId === selectedAccountId ? notificationData : null')
+    const source = notificationsSource()
+    expect(source).toContain('viewKeyRef.current === key && viewGeneration.current === generation && requestId.current === request')
+    expect(source.match(/if \(!isCurrent\(\)\) return/g)?.length).toBeGreaterThanOrEqual(2)
+    expect(source).toContain('if (isCurrent()) void load(0, false)')
   })
 
   it('既存カードは表示し、追加候補と友だちの状態はOFFにする', () => {
@@ -315,8 +311,7 @@ describe('ダッシュボード通知', () => {
     expect(isDashboardNotificationData(data)).toBe(true)
     expect(isDashboardNotificationData({})).toBe(false)
     expect(isDashboardNotificationData({ ...data, counts: undefined })).toBe(false)
-    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
-    expect(source).toContain('!isDashboardNotificationData(response.data)')
+    expect(notificationsSource()).toContain('!isDashboardNotificationData(response.data)')
   })
 
   it('本文と日本時間を表示し、種類と未読状態を保つ', () => {
@@ -341,10 +336,10 @@ describe('ダッシュボード通知', () => {
   })
 
   it('まとめて既読にした後はAPIの総対象数を引かず、未読数を再取得する', () => {
-    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    const source = notificationsSource()
     expect(source).toContain('api.notifications.center.markAllRead(accountId, filter)')
-    expect(source).toContain('await loadNotificationCenter()')
-    expect(source).not.toContain('markDashboardNotificationsRead')
+    expect(source).toContain('onSuccess: () => { if (isCurrent()) void load(0, false) }')
+    expect(source).not.toContain('counts.unread - response.data')
   })
 
   it('通知種類ごとに安全な管理画面へ送る', () => {

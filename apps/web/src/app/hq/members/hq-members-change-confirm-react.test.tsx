@@ -40,7 +40,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/hq/members',
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {},
   usePageTitle: vi.fn(),
   usePageChrome: () => ({ title: null, fullWidth: false, crumbs: null }),
 }))
@@ -126,7 +126,7 @@ describe('招待メールの期限は7日（板 yLKwV）', () => {
     await flush()
     const dialog = document.body.querySelector('[data-design-node="yLKwV"]')
     expect(dialog, '招待の窓に目印がない').not.toBeNull()
-    expect(dialog?.textContent ?? '').toContain('送った日から7日')
+    expect((dialog?.textContent ?? '').replace(/\s/g, '')).toContain('送った日から7日')
   })
 })
 
@@ -154,9 +154,9 @@ describe('権限を変える確認（板 M4jS9）', () => {
     const confirm = document.body.querySelector('[data-design-node="M4jS9"]')
     expect(confirm, '確認の小窓が出ない').not.toBeNull()
     for (const row of ['佐藤 直人さんの権限を変えますか？', '役割', '管理者 → 閲覧のみ', '変わる']) {
-      expect(confirm?.textContent ?? '', `「${row}」がない`).toContain(row)
+      expect((confirm?.textContent ?? '').replace(/\s/g, ''), `「${row}」がない`).toContain(row.replace(/\s/g, ''))
     }
-    const go = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => (b.textContent ?? '').trim() === '変える')
+    const go = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => (b.textContent ?? '').trim().endsWith('変える'))
     await act(async () => { (go as HTMLButtonElement).click() })
     await flush()
     expect(mocks.update).toHaveBeenCalledTimes(1)
@@ -177,7 +177,7 @@ describe('権限を変える確認（板 M4jS9）', () => {
     await flush()
     // 確認を挟んでから送る。
     const confirm = document.body.querySelector('[data-design-node="M4jS9"]')
-    const go = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => (b.textContent ?? '').trim() === '変える')
+    const go = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => (b.textContent ?? '').trim().endsWith('変える'))
     await act(async () => { (go as HTMLButtonElement).click() })
     await flush()
     expect(mocks.update).toHaveBeenCalledTimes(1)

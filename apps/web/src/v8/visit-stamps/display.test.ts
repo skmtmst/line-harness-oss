@@ -22,7 +22,7 @@ describe('来店スタンプの見せ方', () => {
   })
 
   it('特典の下の1行は、サーバの減らし方どおり（途中の特典は減る数・最後は新しいカード）', () => {
-    expect(rewardNote(settings.rewards[0], settings)).toBe('使うとスタンプが 5個へる')
+    expect(rewardNote(settings.rewards[0], settings)).toBe('使うとスタンプが 5 個へる')
     expect(rewardNote(settings.rewards[1], settings)).toBe('使ったら新しいカードへ')
   })
 
@@ -36,7 +36,7 @@ describe('来店スタンプの見せ方', () => {
   it('倍率の名前と中身（期間の終わりはその日を含めて見せる）', () => {
     const m = { multiplier: 2, weekdays: [2], startMinute: 1020, endMinute: 1140, from: '2025-12-31T15:00:00.000Z', to: '2026-03-31T15:00:00.000Z' }
     expect(multiplierName(m)).toBe('2倍デー')
-    expect(multiplierDetail(m)).toBe('毎週 火曜 17:00〜19:00 ・ 1/1〜3/31')
+    expect(multiplierDetail(m)).toBe('毎週 火曜 17:00〜19:00 ・ 01/01〜03/31')
     expect(multiplierName({ multiplier: 1.5, from: '2026-01-01T00:00:00Z' })).toBe('1.5倍の期間')
     expect(multiplierDetail({ multiplier: 3 })).toBe('いつでも')
   })
@@ -58,8 +58,8 @@ describe('来店スタンプの見せ方', () => {
   })
 
   it('日時は日本時間（D1 の「YYYY-MM-DD HH:MM:SS」も UTC として読む）', () => {
-    expect(shortDateTime('2026-01-13T09:40:00.000Z')).toBe('1/13 18:40')
-    expect(shortDateTime('2026-01-12 11:14:00')).toBe('1/12 20:14')
+    expect(shortDateTime('2026-01-13T09:40:00.000Z')).toBe('01/13 18:40')
+    expect(shortDateTime('2026-01-12 11:14:00')).toBe('01/12 20:14')
   })
 
   it('手入力の理由とメモ・友だちの名前', () => {

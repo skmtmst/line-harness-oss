@@ -8,9 +8,12 @@
  * 下の帯：キャンセル／下書きを保存／保存して公開。
  * 動き（読み込み・保存・公開・409・利用先の確認）は BEHAVIOR.md。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { CircleAlert, GitCompare, Link2, RotateCcw, Send } from 'lucide-react'
 import { validateFlexContent, type Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
@@ -19,6 +22,9 @@ import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
+import { useFormErrors } from '@/lib/use-form-errors'
+import ValidationSummary from '@/components/shared/validation-summary'
+import { FieldError } from '@/components/shared/form-controls'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -28,9 +34,9 @@ import LinePreview, { LinePreviewMessage } from '@/components/shared/line-previe
 import Notice from '@/components/shared/notice'
 import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { notifyToast } from '@/components/shared/toast'
-import FlexPreview from '@/components/flex-preview'
+import { LinePreviewFlex as FlexPreview } from '@/components/shared/line-preview'
 import { buildTemplatePreview, extractMessageUrls, LEGACY_MESSAGE_NOTICE } from '@/components/templates/message-template-editor'
 import {
   ACCOUNT_MISMATCH_MESSAGE,
@@ -62,6 +68,8 @@ import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared
 import { referenceTokenNames } from '@/components/shared/insert-tokens'
 import { loadTemplateExamples } from '@/v8/templates/examples'
 import styles from './edit.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
 
 const snapshot = (draft: TemplateDraft) => JSON.stringify(draft)
 
@@ -116,6 +124,14 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     setAutoCreated(null)
   }
   const { name, folderId, messageType, messageContent } = editor.draft
+  /* 保存で落ちた欄は、その欄を赤くして真下に理由を出し、1つ目の欄へ移る（B-139）。 */
+  const fields = useFormErrors()
+  fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'テンプレート名を入力してください。'))
+  fields.define('content', messageType === 'text' ? '本文' : 'メッセージ内容', () => {
+    if (!messageContent.trim()) return '本文を入力してください。'
+    if (messageType === 'flex' && validateFlexContent('flex', messageContent)) return 'カードの形を直してから保存してください。'
+    return null
+  })
   const updateDraft = (patch: Partial<TemplateDraft>) => setEditor((prev) => ({ ...prev, draft: { ...prev.draft, ...patch } }))
 
   const binding = { templateId: id, templateStatus: editor.status, templateAccountId: editor.templateAccountId, selectedAccountId }
@@ -271,6 +287,10 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
    * 競合（409）は自動でも帯を出す（このまま書くと相手の変更が消えるため）。
    */
   const saveNow = async ({ silent = false }: { silent?: boolean } = {}): Promise<string | null> => {
+    if (!silent && fields.submit().length > 0) {
+      setError('')
+      return null
+    }
     if (!silent) {
       setSaving(true)
       setError('')
@@ -314,9 +334,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     save: async () => (await saveNow({ silent: true })) !== null,
   })
 
-  const leave = () => {
-    disarm()
-    router.push('/templates')
+  const leave = (savedId: string) => {
+    if (!id) { disarm(); router.push(createPageReturnHref('/templates', savedId)) }
   }
 
   const publishNow = async (templateId: string): Promise<boolean> => {
@@ -346,9 +365,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const hostSave = (distribute: boolean) => {
     if (!host) return
     const draft = editor.draft
-    if (!draft.name.trim()) { setError('テンプレート名を入力してください。'); return }
-    if (!draft.messageContent.trim()) { setError('本文を入力してください。'); return }
-    if (draft.messageType === 'flex' && validateFlexContent('flex', draft.messageContent)) { setError('カードの形を直してから保存してください。'); return }
+    if (fields.submit().length > 0) { setError(''); return }
     setError('')
     setClean(snapshot(draft))
     host.onSave({ kind: 'message', name: draft.name.trim(), messageType: draft.messageType, messageContent: draft.messageContent }, distribute)
@@ -359,8 +376,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     const savedId = await saveNow()
     if (savedId) autosave.markSaved()
     if (savedId) {
-      notifyToast('下書きを保存しました')
-      leave()
+      notifySaved('下書きを保存しました')
+      leave(savedId)
     }
   }
 
@@ -383,7 +400,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
       }
       if (await publishNow(savedId)) {
         notifyToast('公開しました')
-        leave()
+        leave(savedId)
       }
     } finally {
       setPublishing(false)
@@ -479,25 +496,9 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         title={title}
         description={description}
         band={conflict ? (
-          <div className={styles.band} role="alert" data-design-node="NCbYn">
-            <CircleAlert size={18} aria-hidden="true" className={styles.bandIcon} />
-            <div className={styles.bandText}>
-              <p className={styles.bandTitle} title={conflict.name}>
-                {`ほかの人が${conflict.at ? ` ${conflict.at} に` : '先に'}テンプレート「${conflict.name}」を保存しました`}
-              </p>
-              <p className={styles.bandDesc}>あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。</p>
-            </div>
-            <div className={styles.bandActions}>
-              <Button type="button" onClick={() => void openCompare()} disabled={compareBusy}>
-                <GitCompare size={15} aria-hidden="true" />
-                違いを比べる
-              </Button>
-              <Button type="button" variant="primary" onClick={reloadLatest}>
-                <RotateCcw size={15} aria-hidden="true" />
-                最新を読み込んで続ける
-              </Button>
-            </div>
-          </div>
+          <SaveConflictBand designNode="NCbYn"
+            title={`ほかの人が${conflict.at ? ` ${conflict.at} に` : '先に'}テンプレート「${conflict.name}」を保存しました`}
+            compareBusy={compareBusy} onCompare={openCompare} onReload={reloadLatest} />
         ) : undefined}
         side={(
           <>
@@ -549,19 +550,16 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
             {messageType === 'flex' || messageType === 'image' ? <Notice tone="warn" message={LEGACY_MESSAGE_NOTICE} /> : null}
             {error || loadFailed ? <p role="alert" className={styles.error}>{loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error}</p> : null}
             {exampleNote && !id ? <p role="status" className={styles.error}>{exampleNote}</p> : null}
+            <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
             <Card padding="none" layout="vertical" className={styles.card}>
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>名前とフォルダ</h2>
                 <p className={styles.cardNote}>一覧に出る名前です。友だちには見えません。</p>
               </div>
               <div className={styles.pair}>
-                <div className={`${styles.field} ${styles.grow}`}>
-                  <label htmlFor="te-name" className={styles.label}>テンプレート名</label>
-                  <TextField id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" />
-                </div>
-                <div className={`${styles.field} ${styles.folderField}`}>
-                  <label htmlFor="te-folder" className={styles.labelSmall}>フォルダ</label>
-                  <FolderSelect
+                <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="te-name"><TextField {...fields.bind('name')} id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-name-error' : undefined} />
+<FieldError id="te-name-error">{fields.error('name')}</FieldError></Field></div>
+                <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="te-folder"><FolderSelect
                     id="te-folder"
                     aria-label="フォルダ"
                     value={host ? host.folder : folderId ?? ''}
@@ -573,8 +571,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                       : canMutate && editorAccountId
                         ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: editorAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
                         : undefined}
-                  />
-                </div>
+                  /></Field></div>
               </div>
             </Card>
 
@@ -582,10 +579,12 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>中身</h2>
               </div>
-              <div className={styles.bodyBox}>
+              <div className={styles.bodyBox} {...fields.bind('content')}>
                 <InsertTextField
                   id="te-content"
                   ref={contentRef}
+                  aria-invalid={fields.invalid('content') || undefined}
+                  aria-describedby={fields.invalid('content') ? 'te-content-error' : undefined}
                   aria-label={messageType === 'text' ? '本文' : 'メッセージ内容'}
                   aria-required="true"
                   className={styles.bodyText}
@@ -593,12 +592,13 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                   value={messageContent}
                   onValueChange={(next) => updateDraft({ messageContent: next })}
                   tokenNames={tokenNames}
-                  placeholder={messageType === 'flex' ? '{"type":"bubble", …}' : '例：{{name}}さん、こんにちは。'}
+                  placeholder={messageType === 'flex' ? '{"type":"bubble", …}' : '例：いつもご利用ありがとうございます。今月のおすすめをお知らせします。'}
                 />
                 <span className={styles.bodySpacer} aria-hidden="true" />
                 <InsertRow accountId={editorAccountId} state={referenceState} references={references} length={messageContent.length} onInsert={insert} />
               </div>
-              {messageType === 'flex' && flexError && messageContent.trim() ? (
+              <FieldError id="te-content-error">{fields.error('content')}</FieldError>
+              {messageType === 'flex' && flexError && messageContent.trim() && !fields.invalid('content') ? (
                 <p role="alert" className={styles.error}>{flexError}このままでは保存できません。</p>
               ) : null}
               <p className={styles.hint}>
@@ -628,9 +628,9 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                   {urls.map((url) => (
                     <div key={url} className={styles.urlRow}>
                       <Link2 size={14} aria-hidden="true" className={styles.urlIcon} />
-                      <span className={styles.urlText} title={url}>{url}</span>
+                      <span className={styles.urlText} ><TruncatedText value={String(url ?? '')} url /></span>
                       <span className={styles.urlNote}>短縮して、押された数を数える</span>
-                      <Toggle checked locked label={`${url}を短縮して数える（いつもオン）`} />
+                      <SettingCheckbox checked locked label={`${url}を短縮して数える（いつもオン）`} />
                     </div>
                   ))}
                   <p className={styles.hint}>リンク名（計測に出る名前）と短縮URLは、配信のときに自動で付きます。</p>
@@ -679,7 +679,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
             if (await publishNow(publishCheck.id)) {
               setPublishCheck(null)
               notifyToast('公開しました')
-              leave()
+              leave(publishCheck.id)
             }
           } finally {
             setPublishing(false)

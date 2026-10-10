@@ -86,9 +86,10 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   padding: 14px 16px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .kpi {
@@ -205,10 +206,11 @@
   align-items: center;
   gap: 8px;
   padding: 48px 16px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
   text-align: center;
+  box-shadow: var(--card-shadow);
 }
 
 .stateIcon {
@@ -237,9 +239,10 @@
 /* 表。 */
 .tableWrap {
   overflow-x: auto;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .table {
@@ -396,9 +399,10 @@
 
 .card {
   padding: 16px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .cardTitle {

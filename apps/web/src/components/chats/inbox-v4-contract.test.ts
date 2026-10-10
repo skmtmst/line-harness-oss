@@ -6,6 +6,7 @@ import { buildSupportEmailInboxQuery } from '../../app/chats/support-email-query
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'page.tsx'), 'utf8')
+const HEAD_MENUS = readFileSync(join(HERE, '..', '..', 'v8', 'inbox-chat', 'head-menus.tsx'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 const TEMPLATE_PICKER = readFileSync(join(HERE, 'template-picker.tsx'), 'utf8')
 // 受信箱の指標カード（inbox-kpis.tsx）はどの画面からも描かれないので 2026-10-07 に消した。それを見ていた行も外した。
@@ -61,8 +62,8 @@ describe('受信箱V4で既存機能を失わない', () => {
 describe('受信箱V4の画面契約', () => {
   it('一括確認を画面に出さず、送信元と担当者を分けて表示する', () => {
     expect(PAGE).not.toContain('すべて確認済みにする')
-    expect(PAGE).toContain('selectedAccount?.pictureUrl')
-    expect(PAGE).toContain("msg.sentByStaffName ?? '担当者'")
+    expect(PAGE).toContain('pictureUrl={chatDetail.friendPictureUrl}')
+    expect(PAGE).toContain('{msg.sentByStaffName} が送信')
   })
 
   it('担当変更では、絞り込み用の「すべて」を担当者として送らない', () => {
@@ -72,8 +73,8 @@ describe('受信箱V4の画面契約', () => {
       割り当てようとする。設計 `L35UOV`（2-9）も 河野・菅野・未割り当て の
       3つだけで、「すべて」を置いていない。
     */
-    expect(PAGE).toContain('allowAll={false}')
-    expect(PAGE).toContain("if (next === 'all') return")
+    expect(PAGE).toContain("handleOperatorUpdate(next === 'unassigned' ? null : next)")
+    expect(HEAD_MENUS).toContain('buildOperatorRows(operators, false, value)')
   })
 
   it('内部メモは送信欄と分けて編集でき、保存の口を残す', () => {
@@ -90,7 +91,7 @@ describe('受信箱V4の画面契約', () => {
 
   it('自分担当チップを外し、担当者プルダウンでLINEとメールを絞る', () => {
     expect(PAGE).not.toContain("{ key: 'mine' as const, label: '自分担当' }")
-    expect(PAGE).toContain('ariaLabel="担当者で絞り込む"')
+    expect(PAGE).toContain('aria-label="担当者で絞り込む"')
     const lineParams = region(PAGE, 'const buildListParams = useCallback', 'return params')
     expect(lineParams).toContain("if (assigneeFilter !== 'all') params.operatorId = assigneeFilter")
     expect(lineParams).toContain('if (unreadOnly) params.unreadOnly = true')

@@ -1,3 +1,4 @@
+import type { HqMediaRuntime } from './hq-media.js';
 import { resolveHqBroadcastAudience, countHqAudience } from './hq-broadcast-audience.js';
 import { hqBroadcastApprovalState } from './hq-broadcast-approval.js';
 import { getLineAccountById, getStaffById, getBroadcastById, getRetryableRecipientIds,
@@ -55,32 +56,32 @@ export function mappedHqContent(input:HqBroadcastInput,name:string,liffId?:strin
     altText:input.altText?expandHqVariables(input.altText,name,liffId):null};
 }
 export async function prepareHqBroadcast(db:D1Database,tenantId:string,actorId:string,b:HqBroadcastInput, update?:{run:RunRow;expectedVersion:number}) {
-  if(!b||typeof b.title!=='string'||!b.title.trim()||b.title.length>200||typeof b.messageContent!=='string'||(!b.messageContent.trim()&&!b.messageBubbles&&!b.messageBubblesJson)||b.messageContent.length>200000)throw new StampError('配信名と本文を確認してください');
+  if(!b||typeof b.title!=='string'||!b.title.trim()||b.title.length>200||typeof b.messageContent!=='string'||(!b.messageContent.trim()&&!b.messageBubbles&&!b.messageBubblesJson)||b.messageContent.length>200000)throw new StampError('配信名と本文を確認してください', 400, ["title","messageContent","messageBubbles","messageBubblesJson"]);
   stampId(b.requestId);
-  if(b.targetType!==undefined&&!['all','tag','segment'].includes(b.targetType))throw new StampError('配信対象の種類を確認してください');
-  if(b.targetType==='multi-account-dedup'||b.afterActionVersionId)throw new StampError('配布先の店で決める設定は指定できません');
-  if(b.internalMemo!=null&&(typeof b.internalMemo!=='string'||b.internalMemo.length>10000))throw new StampError('社内メモを確認してください');
-  if(b.excludedTagIds!==undefined&&(!Array.isArray(b.excludedTagIds)||b.excludedTagIds.length>100||b.excludedTagIds.some(v=>typeof v!=='string')))throw new StampError('除くタグを確認してください');
-  if(b.folderId&&!await db.prepare('SELECT id FROM hq_broadcast_folders WHERE id=? AND tenant_id=? AND archived_at IS NULL').bind(b.folderId,tenantId).first())throw new StampError('分類を確認してください',403);
-  if(b.messageBubbles&&b.messageBubblesJson)throw new StampError('吹き出しは1つの形式で指定してください');
-  if(b.trackLinks!==undefined&&typeof b.trackLinks!=='boolean'||b.measureOpens!==undefined&&typeof b.measureOpens!=='boolean')throw new StampError('計測設定を確認してください');
-  if(b.stealthSpreadMinutes!==undefined&&(!Number.isInteger(b.stealthSpreadMinutes)||b.stealthSpreadMinutes<0||b.stealthSpreadMinutes>1440))throw new StampError('配信時間を確認してください');
-  if(update&&(!Number.isSafeInteger(update.expectedVersion)||update.expectedVersion<1))throw new StampError('読み込んだ版を指定してください');
-  if(update&&(update.run.status!=='prepared'||b.requestId!==(JSON.parse(update.run.input_json) as HqBroadcastInput).requestId))throw new StampError('下書きだけ変更できます。同じ依頼番号を使ってください',409);
-  for(const ids of [b.accountIds,b.accountTagIds,b.excludedAccountIds])if(!Array.isArray(ids)||ids.length>100||new Set(ids).size!==ids.length)throw new StampError('店舗・分類を確認してください');else ids.forEach(stampId);
-  if(!b.accountIds.length&&!b.accountTagIds.length)throw new StampError('対象店か分類を選んでください');
-  if(!b.audience||!['all','tag'].includes(b.audience.kind)||(b.audience.kind==='tag'&&(typeof b.audience.tagName!=='string'||!b.audience.tagName.trim()||b.audience.tagName.length>100)))throw new StampError('全員か、同じ名前のタグを選んでください');
-  if(!['text','image','video','audio','flex','sticker','location','carousel','imagemap','rich_message','card_message','coupon','research'].includes(b.messageType))throw new StampError('本文の種類を確認してください');
+  if(b.targetType!==undefined&&!['all','tag','segment'].includes(b.targetType))throw new StampError('配信対象の種類を確認してください', 400, ["targetType"]);
+  if(b.targetType==='multi-account-dedup'||b.afterActionVersionId)throw new StampError('配布先の店で決める設定は指定できません', 400, ["targetType","afterActionVersionId"]);
+  if(b.internalMemo!=null&&(typeof b.internalMemo!=='string'||b.internalMemo.length>10000))throw new StampError('社内メモを確認してください', 400, ["internalMemo"]);
+  if(b.excludedTagIds!==undefined&&(!Array.isArray(b.excludedTagIds)||b.excludedTagIds.length>100||b.excludedTagIds.some(v=>typeof v!=='string')))throw new StampError('除くタグを確認してください', 400, ["excludedTagIds"]);
+  if(b.folderId&&!await db.prepare('SELECT id FROM hq_broadcast_folders WHERE id=? AND tenant_id=? AND archived_at IS NULL').bind(b.folderId,tenantId).first())throw new StampError('分類を確認してください', 403, ["folderId"]);
+  if(b.messageBubbles&&b.messageBubblesJson)throw new StampError('吹き出しは1つの形式で指定してください', 400, ["messageBubbles","messageBubblesJson"]);
+  if(b.trackLinks!==undefined&&typeof b.trackLinks!=='boolean'||b.measureOpens!==undefined&&typeof b.measureOpens!=='boolean')throw new StampError('計測設定を確認してください', 400, ["trackLinks","measureOpens"]);
+  if(b.stealthSpreadMinutes!==undefined&&(!Number.isInteger(b.stealthSpreadMinutes)||b.stealthSpreadMinutes<0||b.stealthSpreadMinutes>1440))throw new StampError('配信時間を確認してください', 400, ["stealthSpreadMinutes"]);
+  if(update&&(!Number.isSafeInteger(update.expectedVersion)||update.expectedVersion<1))throw new StampError('読み込んだ版を指定してください', 400, ["expectedVersion"]);
+  if(update&&(update.run.status!=='prepared'||b.requestId!==(JSON.parse(update.run.input_json) as HqBroadcastInput).requestId))throw new StampError('下書きだけ変更できます。同じ依頼番号を使ってください', 409, ["requestId"]);
+  for(const ids of [b.accountIds,b.accountTagIds,b.excludedAccountIds])if(!Array.isArray(ids)||ids.length>100||new Set(ids).size!==ids.length)throw new StampError('店舗・分類を確認してください', 400, ["accountIds","accountTagIds"]);else ids.forEach(stampId);
+  if(!b.accountIds.length&&!b.accountTagIds.length)throw new StampError('対象店か分類を選んでください', 400, ["accountIds","accountTagIds"]);
+  if(!b.audience||!['all','tag'].includes(b.audience.kind)||(b.audience.kind==='tag'&&(typeof b.audience.tagName!=='string'||!b.audience.tagName.trim()||b.audience.tagName.length>100)))throw new StampError('全員か、同じ名前のタグを選んでください', 400, ["audience"]);
+  if(!['text','image','video','audio','flex','sticker','location','carousel','imagemap','rich_message','card_message','coupon','research'].includes(b.messageType))throw new StampError('本文の種類を確認してください', 400, ["messageType"]);
   try {const content=mappedHqContent(b,'確認用の店名'),parts=parseBroadcastMessageParts({...b,...content});buildMessages(parts);if(unsupportedMessageVariables(parts).length)throw new Error();}
-  catch {throw new StampError('本文・差し込みの形式を確認してください');}
+  catch {throw new StampError('本文・差し込みの形式を確認してください', 400, ["messageContent"]);}
   const canonical=JSON.stringify(Object.fromEntries(Object.entries(b).sort(([a],[z])=>a.localeCompare(z)))),existing=await db.prepare('SELECT id,input_json FROM hq_broadcast_runs WHERE tenant_id=? AND request_id=?').bind(tenantId,b.requestId).first<{id:string;input_json:string}>();
   if(existing&&!update){if(existing.input_json!==canonical)throw new StampError('同じ実行の依頼で内容が変わっています',409);return getHqBroadcastRun(db,tenantId,existing.id);}
-  if(b.scheduledAt!==null&&(typeof b.scheduledAt!=='string'||!Number.isFinite(Date.parse(b.scheduledAt))||Date.parse(b.scheduledAt)<=Date.now()))throw new StampError('予約日時は未来にしてください');
+  if(b.scheduledAt!==null&&(typeof b.scheduledAt!=='string'||!Number.isFinite(Date.parse(b.scheduledAt))||Date.parse(b.scheduledAt)<=Date.now()))throw new StampError('予約日時は未来にしてください', 400, ["scheduledAt"]);
   for(const tag of b.accountTagIds)if(!await db.prepare('SELECT id FROM line_account_tags WHERE id=? AND tenant_id=?').bind(tag,tenantId).first())throw new StampError('分類を確認してください',403);
   const all=(await db.prepare('SELECT id,name FROM line_accounts WHERE tenant_id=? AND archived_at IS NULL').bind(tenantId).all<{id:string;name:string}>()).results;
   for(const id of [...b.accountIds,...b.excludedAccountIds])if(!all.some(a=>a.id===id))throw new StampError('店舗を確認してください',403);
   const tagged=b.accountTagIds.length?(await db.prepare(`SELECT DISTINCT line_account_id FROM line_account_tag_links WHERE tenant_id=? AND tag_id IN (${b.accountTagIds.map(()=>'?').join(',')})`).bind(tenantId,...b.accountTagIds).all<{line_account_id:string}>()).results.map(x=>x.line_account_id):[];
-  const selected=all.filter(a=>[...b.accountIds,...tagged].includes(a.id));if(!selected.length)throw new StampError('対象店がありません');
+  const selected=all.filter(a=>[...b.accountIds,...tagged].includes(a.id));if(!selected.length)throw new StampError('対象店がありません', 400, ["accountIds","accountTagIds"]);
   const id=update?.run.id??crypto.randomUUID(),token=crypto.randomUUID(),statements=[db.prepare('INSERT INTO hq_broadcast_runs(id,tenant_id,request_id,actor_id,input_json,scheduled_at) VALUES(?,?,?,?,?,?)').bind(id,tenantId,b.requestId,actorId,canonical,b.scheduledAt)];
   if(update){
    statements.splice(0,1,db.prepare(`UPDATE hq_broadcast_runs SET input_json=?,scheduled_at=?,approval_json=NULL,version=version+1,dispatch_token=?,updated_at=datetime('now') WHERE id=? AND tenant_id=? AND status='prepared' AND version=?`).bind(canonical,b.scheduledAt,token,id,tenantId,update.expectedVersion));
@@ -99,7 +100,7 @@ export async function prepareHqBroadcast(db:D1Database,tenantId:string,actorId:s
   try {const result=await db.batch(statements);if(update&&!result[0].meta.changes)throw new StampError('下書きが更新されました。読み直してください',409);}catch(e){if(update)throw e;const winner=await db.prepare('SELECT id,input_json FROM hq_broadcast_runs WHERE tenant_id=? AND request_id=?').bind(tenantId,b.requestId).first<{id:string;input_json:string}>();if(!winner)throw e;if(winner.input_json!==canonical)throw new StampError('同じ実行の依頼で内容が変わっています',409);return getHqBroadcastRun(db,tenantId,winner.id);}
   return getHqBroadcastRun(db,tenantId,id);
 }
-export async function preflightHqBroadcast(db:D1Database,run:RunRow,persist=true):Promise<HqBroadcastPreflight[]> {
+export async function preflightHqBroadcast(db:D1Database,run:RunRow,persist=true,runtime?:HqMediaRuntime):Promise<HqBroadcastPreflight[]> {
   const input=JSON.parse(run.input_json) as HqBroadcastInput,targets=(await db.prepare('SELECT * FROM hq_broadcast_targets WHERE run_id=? ORDER BY line_account_id').bind(run.id).all<Target>()).results;
   const result:HqBroadcastPreflight[]=[];
   for(const t of targets) {
@@ -121,7 +122,7 @@ export async function preflightHqBroadcast(db:D1Database,run:RunRow,persist=true
     // APIエラーも接続不明として人に返す。別の店舗の枠では補えない。
     if(remaining===null)reasons.push('今月の送信枠・LINE接続を確認できません');
     else if(audienceCount!==null&&audienceCount>remaining)reasons.push('今月の送信枠が足りません');
-    try {const materials=await resolveHqBroadcastMaterials(db,run.tenant_id,t.line_account_id,input),content=mappedHqContent(materials,account?.name??t.account_name,account?.liff_id),parts=parseBroadcastMessageParts({...materials,...content});for(const p of parts)await resolveSendCommonVars(db,t.line_account_id,p.messageContent,{kind:'broadcast',id:run.id});}
+    try {const materials=await resolveHqBroadcastMaterials(db,run.tenant_id,t.line_account_id,input,runtime ? {...runtime,copy:false} : undefined),content=mappedHqContent(materials,account?.name??t.account_name,account?.liff_id),parts=parseBroadcastMessageParts({...materials,...content});for(const p of parts)await resolveSendCommonVars(db,t.line_account_id,p.messageContent,{kind:'broadcast',id:run.id});}
     catch(e) {reasons.push(e instanceof StampError?e.message:'店舗の共通情報を確認してください');}
     const p={accountId:t.line_account_id,accountName:account?.name??t.account_name,audienceCount,remaining,connected:connected&&remaining!==null,paused,blockedReasons:reasons,excluded:!!t.excluded,broadcastId:t.broadcast_id};
     result.push(p);
@@ -136,11 +137,11 @@ export async function excludeHqBroadcastTargets(db:D1Database,run:RunRow,actorId
   const token=crypto.randomUUID();const ops=[db.prepare(`UPDATE hq_broadcast_runs SET approval_json=NULL,version=version+1,dispatch_token=? WHERE id=? AND status='prepared' AND version=?`).bind(token,run.id,version)];
   for(const t of targets){ops.push(db.prepare(`UPDATE hq_broadcast_targets SET excluded=? WHERE run_id=? AND line_account_id=? AND EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND dispatch_token=?)`).bind(ids.includes(t.line_account_id)?1:0,run.id,t.line_account_id,run.id,token));
     ops.push(db.prepare(`INSERT INTO hq_broadcast_audit(id,run_id,line_account_id,actor_id,action) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND dispatch_token=?)`).bind(crypto.randomUUID(),run.id,t.line_account_id,actorId,ids.includes(t.line_account_id)?'excluded':'included',run.id,token));}
-  const r=await db.batch(ops);if(!r[0].meta.changes)throw new StampError('対象店が更新されました。読み直してください',409);
+  const r=await db.batch(ops);if(!r[0].meta.changes)throw new StampError('対象店が更新されました。読み直してください', 409, ["accountIds","accountTagIds"]);
 }
-export async function dispatchHqBroadcast(db:D1Database,run:RunRow,actorId:string,version:number, confirmedRecipientCount?:number) {
+export async function dispatchHqBroadcast(db:D1Database,run:RunRow,actorId:string,version:number, confirmedRecipientCount?:number, runtime?:HqMediaRuntime) {
   if(run.status!=='prepared')return readHqBroadcastResult(db,run);
-  const preflight=await preflightHqBroadcast(db,run),selected=preflight.filter(p=>!p.excluded);
+  const preflight=await preflightHqBroadcast(db,run,true,runtime),selected=preflight.filter(p=>!p.excluded);
   if(!selected.length||selected.some(p=>p.blockedReasons.length))throw new StampError('送れない店舗を外して再確認してください',409);
   const approval=await hqBroadcastApprovalState(db,run,actorId,preflight);
   if(approval.gate.required) {
@@ -153,7 +154,7 @@ export async function dispatchHqBroadcast(db:D1Database,run:RunRow,actorId:strin
     const resolved=await resolveHqBroadcastAudience(db,run.tenant_id,p.accountId,input);
     const account=await getLineAccountById(db,p.accountId);
     if(!account||account.tenant_id!==run.tenant_id)throw new StampError('店舗を確認してください',409);
-    const materials=await resolveHqBroadcastMaterials(db,run.tenant_id,p.accountId,input);
+    const materials=await resolveHqBroadcastMaterials(db,run.tenant_id,p.accountId,input,runtime ? {...runtime,copy:true} : undefined);
     const content=mappedHqContent(materials,account.name,account.liff_id);
     ops.push(db.prepare(`INSERT INTO broadcasts(id,title,message_type,message_content,message_bubbles_json,target_type,status,scheduled_at,line_account_id,alt_text,segment_conditions,hq_run_id,
       internal_memo,track_links,measure_opens,stealth_spread_minutes,message_options_json,approval_status,approval_requested_by_staff_id,approval_decided_by_staff_id,approval_confirmed_count)

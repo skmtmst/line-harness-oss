@@ -7,11 +7,11 @@
  * 絵：幅 520・余白 20・間 12。送るもの（テンプレートから入れる）→ 送る日時の札 → 注意 → 真ん中にキャンセル・予約。
  */
 import { useEffect, useRef, useState } from 'react'
-import { Clock, FileText } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import type { Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
-import ActionMenu from '@/components/shared/action-menu'
+import { EntityKindDialog } from '@/components/shared/entity-picker-sources'
 import Button from '@/components/shared/button'
 import DateTimeField from '@/components/shared/date-time-field'
 import Dialog from '@/components/shared/dialog'
@@ -97,19 +97,25 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
     setBusy(true)
     setError('')
     const signature = `${friendId}:${scheduledAt}`
-    const result = await api.chats.schedule(
-      friendId,
-      { content: content.trim(), scheduledAt: `${scheduledAt}:00+09:00` },
-      keysRef.current.get(signature),
-    )
-    setBusy(false)
-    if (!result.success) {
-      setError(result.error || '予約できませんでした')
-      return
+    try {
+      const result = await api.chats.schedule(
+        friendId,
+        { content: content.trim(), scheduledAt: `${scheduledAt}:00+09:00` },
+        keysRef.current.get(signature),
+      )
+      if (!result.success) {
+        setError(result.error || '予約できませんでした')
+        return
+      }
+      keysRef.current.clear(signature)
+      onReserved()
+      onClose()
+    } catch {
+      // 結果が分からない失敗では鍵を残し、同じ予約の再試行を二重に作らない。
+      setError('予約できませんでした。通信状態を確認して、もう一度お試しください。')
+    } finally {
+      setBusy(false)
     }
-    keysRef.current.clear(signature)
-    onReserved()
-    onClose()
   }
 
   return (
@@ -125,8 +131,9 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
       <div className={styles.body}>
         <div className={styles.group}>
           <p className={styles.label}>送るもの</p>
-          <div className={styles.textBox}>
+          <div>
             <TextArea
+              density="compact"
               aria-label="送るもの"
               rows={3}
               value={content}
@@ -138,25 +145,16 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
             <Button
               ref={templateAnchor}
               type="button"
-              aria-haspopup="menu"
-              aria-expanded={templateMenuOpen}
+              aria-haspopup="dialog"
               disabled={templates.length === 0}
               title={templates.length === 0 ? '文のテンプレートがありません' : undefined}
               onClick={() => setTemplateMenuOpen((value) => !value)}
             >
               <FileText size={15} aria-hidden="true" />テンプレートを選択
             </Button>
-            <ActionMenu
-              open={templateMenuOpen}
-              anchorRef={templateAnchor}
-              ariaLabel="テンプレートを選ぶ"
-              onClose={() => setTemplateMenuOpen(false)}
-              items={templates.map((template) => ({
-                id: template.id,
-                label: template.name,
-                onSelect: () => { setContent(template.messageContent); setTemplateMenuOpen(false) },
-              }))}
-            />
+            {templateMenuOpen ? <EntityKindDialog kind="template" options={templates} confirmLabel="この文を入れる"
+              onCancel={() => setTemplateMenuOpen(false)}
+              onConfirm={(id) => { const picked = templates.find((template) => template.id === id); if (picked) setContent(picked.messageContent); setTemplateMenuOpen(false) }} /> : null}
           </div>
         </div>
         <div className={styles.group}>
@@ -178,7 +176,6 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
         <div className={styles.footer}>
           <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
           <Button type="button" variant="primary" onClick={() => void reserve()} disabled={busy} busy={busy}>
-            {!busy ? <Clock size={15} aria-hidden="true" /> : null}
             {scheduledAt ? formatReserveLabel(scheduledAt) : '日時を選んで予約'}
           </Button>
         </div>

@@ -5,5 +5,5 @@ export const UNANSWERED_REFRESH_EVENT = 'lh:unanswered-refresh'
 /* ★V8 外側: 左メニューの畳み切替。上の帯のボタンと ⌘\ が投げ、Sidebar が受ける。 */
 export const SIDEBAR_TOGGLE_EVENT = 'lh:sidebar-toggle'
 
-/* ★V8: 設定画面の見た目スイッチが投げる。帯の通知件数など遅れて読む部品が受ける。 */
+/* 見た目の切り替えの合図。画面の切り替え口は V8 固定（2026-10-09）で外し、今は試験の中でだけ投げる。 */
 export const ADMIN_THEME_CHANGED_EVENT = 'lh:admin-theme-changed'

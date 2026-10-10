@@ -8,6 +8,7 @@ const store = vi.hoisted(() => ({ list: vi.fn(), retroactivePreview: vi.fn() }))
 vi.mock('@/lib/api', () => ({ api: { tags: store } }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/hq/friend-attributes' }))
 import HqTagEditorV8 from './tag-editor'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 
 const definition: TagDefinition = {
   schemaVersion: 1,
@@ -47,7 +48,7 @@ describe('統括の V8 タグ編集と保存先', () => {
     const view = render(<HqTagEditorV8 {...props} readOnly />)
     expect(screen.queryByRole('button', { name: 'タグを作る' })).toBeNull()
     expect(screen.queryByRole('switch', { name: 'タグ連動' })).toBeNull()
-    expect(screen.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。').getAttribute('role')).toBe('note')
+    expect(screen.getByText('閲覧のみで見ています。変える操作は統括の管理者に頼んでください。').getAttribute('role')).toBe('note')
     view.rerender(<HqTagEditorV8 {...props} key="new" definition={{ ...definition, tag: { name: '' } }} />)
     expect(screen.getByRole('button', { name: 'タグを作る' }).hasAttribute('disabled')).toBe(true)
   })
@@ -59,4 +60,48 @@ describe('統括の V8 タグ編集と保存先', () => {
     fireEvent.click(screen.getByRole('button', { name: '最新の内容を読み込む' }))
     expect(reload).toHaveBeenCalledTimes(1)
   })
+
+  it('所属フォルダは統括のフォルダ（左の列と同じ）から選べ、その場で作れる。選んだフォルダはひな形にも入れる', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    const save = vi.fn<(definition: TagDefinition, another?: boolean) => Promise<void>>().mockResolvedValue(undefined)
+    const create = vi.fn(async (name: string, color: string | null) => ({ value: 'new', label: name, color }))
+    render(<HqTagEditorV8 definition={{ ...definition, tag: { name: '定期', folderId: null }, folders: [] }}
+      folders={[{ id: 'f-test', name: 'テスト', revision: 1, color: null }, { id: 'f-test1', name: 'テスト1', revision: 1, color: '#ef4444' }]}
+      onCreateFolder={create} editing={false} saving={false} onCancel={() => {}} onSave={save} />)
+    fireEvent.click(screen.getByRole('button', { name: /所属フォルダ/ }))
+    expect(await screen.findByText('テスト')).toBeTruthy()
+    expect(screen.getByText('テスト1')).toBeTruthy()
+    expect(screen.getByText('新しいフォルダを作る')).toBeTruthy()
+    fireEvent.click(screen.getByText('テスト1'))
+    fireEvent.click(screen.getByRole('button', { name: 'タグを作る' }))
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
+    expect(save.mock.calls[0][0].tag.folderId).toBe('f-test1')
+    expect(save.mock.calls[0][0].folders).toEqual([{ id: 'f-test1', name: 'テスト1', color: '#ef4444' }])
+  })
+
+  it('閲覧のみでは所属フォルダの欄から作れない', () => {
+    document.documentElement.dataset.theme = 'v8'
+    render(<HqTagEditorV8 definition={definition} folders={[{ id: 'f-test', name: 'テスト', revision: 1 }]} onCreateFolder={vi.fn()} readOnly editing={false} saving={false} onCancel={() => {}} onSave={vi.fn(async () => {})} />)
+    expect(screen.queryByText('新しいフォルダを作る')).toBeNull()
+  })
+})
+
+
+it.each([null, '#ef4444'])('統括のタグひな形は所属フォルダの色 %s を選ぶ欄・閉じた欄・タグの札へ出す', (color) => {
+  document.documentElement.dataset.theme = 'v8'
+  const folder = { id: 'f-test', name: 'テスト', color, revision: 1 }
+  const { container } = render(<HqTagEditorV8 definition={{ ...definition, tag: { name: '定期', folderId: null }, folders: [] }} folders={[folder]}
+    editing={false} saving={false} onCancel={() => {}} onSave={vi.fn(async () => {})} />)
+  const trigger = screen.getByRole('button', { name: '所属フォルダ' })
+  fireEvent.click(trigger)
+  const option = screen.getAllByRole('option').find((row) => row.textContent === 'テスト')!
+  const expected = document.createElement('span')
+  expected.style.backgroundColor = folderDisplayColor(folder)
+  expect(option.querySelector<HTMLElement>('[data-folder-dot]')!.style.backgroundColor).toBe(expected.style.backgroundColor)
+  fireEvent.click(option.querySelector('button')!)
+  expect(trigger.querySelector<HTMLElement>('[data-folder-dot]')!.style.backgroundColor).toBe(expected.style.backgroundColor)
+  const pill = screen.getByRole('group', { name: 'タグ「定期」' })
+  expect(pill.querySelector<HTMLElement>('span')!.style.backgroundColor).toBe(expected.style.backgroundColor)
+  expect(container.textContent).toContain('テスト')
+  delete document.documentElement.dataset.theme
 })

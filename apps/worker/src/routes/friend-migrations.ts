@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   UID_EVIDENCE_TYPES,
@@ -160,7 +161,7 @@ friendMigrations.get('/api/friends/migrations', requireRole('owner', 'admin', 's
   }
 });
 
-friendMigrations.post('/api/friends/migrations', requireRole('owner', 'admin'), async (c) => {
+friendMigrations.post('/api/friends/migrations', requireRole('owner', 'admin'), inputJsonBoundary({"fromAccountId":["string"],"toAccountId":["string"],"purpose":["string"],"sourceKind":["string"],"sourceFilename":["string"],"sourceChecksum":["string"],"mappings":["array"]}), async (c) => {
   try {
     const body = await c.req.json<{
       fromAccountId?: string;
@@ -181,10 +182,10 @@ friendMigrations.post('/api/friends/migrations', requireRole('owner', 'admin'), 
     const purpose = body.purpose?.trim();
     const mappings = body.mappings ?? [];
     if (!from || !to || !purpose || from === to) {
-      return c.json({ success: false, error: '異なる移行元・移行先と利用目的を指定してください' }, 400);
+      return inputError(c, { success: false, error: '異なる移行元・移行先と利用目的を指定してください' }, 400, ["fromAccountId","toAccountId","purpose"]);
     }
     if (mappings.length === 0 || mappings.length > MAX_MAPPING_ROWS) {
-      return c.json({ success: false, error: `対応表は1〜${MAX_MAPPING_ROWS}行で指定してください` }, 400);
+      return inputError(c, { success: false, error: `対応表は1〜${MAX_MAPPING_ROWS}行で指定してください` }, 400, ["mappings"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [from, to])) {
       return c.json({ success: false, error: 'Not found' }, 404);
@@ -196,7 +197,7 @@ friendMigrations.post('/api/friends/migrations', requireRole('owner', 'admin'), 
       evidence: mapping.evidence,
     }));
     if (normalized.some((mapping) => !mapping.oldUid || !UID_EVIDENCE_TYPES.includes(mapping.evidenceType))) {
-      return c.json({ success: false, error: '旧UIDと確認済みの一致根拠が必要です' }, 400);
+      return inputError(c, { success: false, error: '旧UIDと確認済みの一致根拠が必要です' }, 400, ["mappings"]);
     }
     const staff = c.get('staff');
     const run = await createUidMigrationRun(c.env.DB, {
@@ -271,7 +272,7 @@ friendMigrations.get('/api/friends/migrations/:id', requireRole('owner', 'admin'
   }
 });
 
-friendMigrations.patch('/api/friends/migrations/:id/items/:itemId', requireRole('owner', 'admin'), async (c) => {
+friendMigrations.patch('/api/friends/migrations/:id/items/:itemId', requireRole('owner', 'admin'), inputJsonBoundary({"decision":["string"]}), async (c) => {
   try {
     const run = await accessibleRun(c, c.req.param('id'));
     if (!run) return c.json({ success: false, error: 'Not found' }, 404);
@@ -285,14 +286,14 @@ friendMigrations.patch('/api/friends/migrations/:id/items/:itemId', requireRole(
     }
     const body = await c.req.json<{ decision?: 'link' | 'create' | 'exclude' }>();
     if (!body.decision || !['link', 'create', 'exclude'].includes(body.decision)) {
-      return c.json({ success: false, error: '判断を選んでください' }, 400);
+      return inputError(c, { success: false, error: '判断を選んでください' }, 400, ["decision"]);
     }
     const item = await c.env.DB.prepare(
       'SELECT * FROM uid_migration_items WHERE id = ? AND run_id = ?',
     ).bind(c.req.param('itemId'), run.id).first<UidMigrationItemRow>();
     if (!item) return c.json({ success: false, error: 'Not found' }, 404);
     if (body.decision === 'link' && (!item.old_friend_id || !item.new_friend_id)) {
-      return c.json({ success: false, error: '新旧の友だちが両方見つからないため結び付けられません' }, 422);
+      return inputError(c, { success: false, error: '新旧の友だちが両方見つからないため結び付けられません' }, 422, ["decision"]);
     }
     /*
       F-3: 一致先のない行の「新規作成」は、本移行で移行先UIDの友だちを
@@ -300,7 +301,7 @@ friendMigrations.patch('/api/friends/migrations/:id/items/:itemId', requireRole(
       引き継ぐ名前がないので、ここで止めて対応表の修正か除外へ案内する。
     */
     if (body.decision === 'create' && (!item.old_friend_id || !item.new_uid)) {
-      return c.json({ success: false, error: '移行元の友だちと移行先のUIDがそろわない行は新規作成できません。対応表を直すか、除外してください' }, 422);
+      return inputError(c, { success: false, error: '移行元の友だちと移行先のUIDがそろわない行は新規作成できません。対応表を直すか、除外してください' }, 422, ["decision"]);
     }
     const now = new Date().toISOString();
     await c.env.DB.prepare(`UPDATE uid_migration_items
@@ -320,7 +321,7 @@ friendMigrations.patch('/api/friends/migrations/:id/items/:itemId', requireRole(
   }
 });
 
-friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'), async (c) => {
+friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'), inputJsonBoundary(), async (c) => {
   try {
     const run = await accessibleRun(c, c.req.param('id'));
     if (!run) return c.json({ success: false, error: 'Not found' }, 404);
@@ -341,7 +342,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
     */
     const pending = await countUidMigrationItems(c.env.DB, run.id, { pendingOnly: true });
     if ((run.status !== 'ready' && run.status !== 'failed') || (run.status === 'failed' && pending > 0)) {
-      return c.json({ success: false, error: '要確認をすべて判断してから本移行してください' }, 422);
+      return inputError(c, { success: false, error: '要確認をすべて判断してから本移行してください' }, 422, []);
     }
     const items = await listUidMigrationItems(c.env.DB, run.id);
     const now = new Date().toISOString();
@@ -654,7 +655,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
   }
 });
 
-friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner'), async (c) => {
+friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner'), inputJsonBoundary(), async (c) => {
   try {
     const run = await accessibleRun(c, c.req.param('id'));
     if (!run) return c.json({ success: false, error: 'Not found' }, 404);
@@ -808,21 +809,21 @@ friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner
   }
 });
 
-friendMigrations.post('/api/friends/exports', requireRole('owner', 'admin'), async (c) => {
+friendMigrations.post('/api/friends/exports', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"columns":["array"],"encoding":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: string; columns?: ExportColumn[]; encoding?: 'utf-8' | 'shift_jis' }>();
     const accountId = body.accountId?.trim();
     const columns = body.columns ?? ['basic'];
     if (!accountId || columns.some((column) => !EXPORT_COLUMNS.includes(column))) {
-      return c.json({ success: false, error: '対象アカウントと書き出す項目を選んでください' }, 400);
+      return inputError(c, { success: false, error: '対象アカウントと書き出す項目を選んでください' }, 400, ["accountId","columns"]);
     }
     // R114: タグと対応情報の書き出しは未接続。友だち情報は friend_fields で指定。
     // 5列だけのCSVを渡すより、作る前に理由を返して止める（Shift_JISと同じ扱い）。
     if (columns.some((column) => column !== 'basic' && column !== 'friend_fields')) {
-      return c.json({ success: false, error: 'タグ・友だち情報、対応情報の書き出しはまだ使えません。基本だけ選んでください' }, 422);
+      return inputError(c, { success: false, error: 'タグ・友だち情報、対応情報の書き出しはまだ使えません。基本だけ選んでください' }, 422, ["columns"]);
     }
     if (body.encoding === 'shift_jis') {
-      return c.json({ success: false, error: 'Shift_JIS書き出しはまだ接続されていません。UTF-8を選んでください' }, 422);
+      return inputError(c, { success: false, error: 'Shift_JIS書き出しはまだ接続されていません。UTF-8を選んでください' }, 422, ["encoding"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
@@ -895,7 +896,7 @@ friendMigrations.get('/api/friends/exports/:id/download', requireRole('owner', '
   });
 });
 
-friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), async (c) => {
+friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"sourceFilename":["string"],"sourceChecksum":["string"],"rows":["array"]}), async (c) => {
   try {
     const body = await c.req.json<{
       accountId?: string;
@@ -914,7 +915,7 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), asy
     const checksum = body.sourceChecksum?.trim();
     const rows = body.rows ?? [];
     if (!accountId || !filename || !checksum || rows.length === 0 || rows.length > MAX_MAPPING_ROWS) {
-      return c.json({ success: false, error: `対象・ファイル情報と1〜${MAX_MAPPING_ROWS}行のデータが必要です` }, 400);
+      return inputError(c, { success: false, error: `対象・ファイル情報と1〜${MAX_MAPPING_ROWS}行のデータが必要です` }, 400, ["accountId","sourceFilename","sourceChecksum","rows"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
@@ -1001,7 +1002,7 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), asy
   }
 });
 
-friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', 'admin'), async (c) => {
+friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const job = await c.env.DB.prepare('SELECT * FROM friend_import_jobs WHERE id = ?').bind(c.req.param('id')).first<{
       id: string; line_account_id: string; status: string; result_json: string;
@@ -1025,7 +1026,7 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
       return c.json({ success: false, error: `競合が${remainingConflict}件のこっています。確認画面で解消してから反映してください` }, 409);
     }
     if (remainingError > 0) {
-      return c.json({ success: false, error: `入力不備が${remainingError}件のこっています。ファイルを確認画面で直してから反映してください` }, 422);
+      return inputError(c, { success: false, error: `入力不備が${remainingError}件のこっています。ファイルを確認画面で直してから反映してください` }, 422, []);
     }
     const now = new Date().toISOString();
     const fields = result.rows.some((row) => row.values.friendFields !== undefined)
@@ -1034,7 +1035,7 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
     let applied = 0;
     for (const row of result.rows) {
       const checked = importFields(row.values.friendFields, fields);
-      if (checked.error) return c.json({ success: false, error: `${row.lineUid}: ${checked.error}` }, 422);
+      if (checked.error) return inputError(c, { success: false, error: `${row.lineUid}: ${checked.error}` }, 422, []);
       if (row.kind === 'add') {
         applied += 1;
         statements.push(c.env.DB.prepare(`INSERT INTO friends (

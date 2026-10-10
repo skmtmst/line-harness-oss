@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsAnnouncementsPage from './page'
+import OpsAnnouncementsV8 from '@/v8/ops/announcements'
 import { previewLabel, toLocalInput, toPublishAt } from './format'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -76,6 +77,7 @@ beforeEach(() => {
     if (url.endsWith('/api/ops/announcements/preview')) payload = { success: true, data: { tenants: 12, staff: 24, lineLinked: 21, withEmail: 24 } }
     else if (url.endsWith('/api/ops/announcements') && method === 'POST') payload = { success: true, data: { ...sent, id: 'a3', recipientsTotal: 24, lineSent: 21, mailSent: 24 } }
     else if (url.endsWith('/api/ops/announcements')) payload = { success: true, data: announcements, linked: { linked: 21, total: 24 }, noticeLineConfigured: lineConfigured }
+    else if (url.endsWith('/api/ops/me')) payload = { success: true, data: { readOnly: false } }
     else if (url.includes('/api/ops/tenants')) payload = { success: true, data: [] }
     else payload = { success: true, data: null }
     return new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } })
@@ -314,4 +316,21 @@ describe('二重押しと同時保存（M512/M513）', () => {
     // 一覧を読み直す（GET がもう一度呼ばれる）。
     expect(calls.filter((c) => c.url.endsWith('/api/ops/announcements') && c.method === 'GET')).toHaveLength(2)
   })
+})
+
+it('編集の保存後も件名と本文を残し、次の保存には更新後の版を添える', async () => {
+  await act(async () => root.render(<OpsAnnouncementsV8 />))
+  await flush()
+  await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="「料金改定のご案内（下書き）」を直す"]')!.click())
+  const title = document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!
+  await act(async () => setValue(title, '編集した件名'))
+  putOverride = { status: 200, payload: { success: true, data: { ...draft, subject: '編集した件名', updatedAt: '2026-10-09T11:00:00+09:00' } } }
+  await act(async () => button('下書きを保存する')!.click())
+  await flush()
+  expect(title.value).toBe('編集した件名')
+  await act(async () => button('下書きを保存する')!.click())
+  await flush()
+  const saved = calls.filter(call => call.method === 'PUT')
+  expect(saved).toHaveLength(2)
+  expect(saved[1].body).toMatchObject({ expectedUpdatedAt: '2026-10-09T11:00:00+09:00' })
 })

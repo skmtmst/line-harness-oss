@@ -47,9 +47,9 @@ describe('V6 代理予約の接続契約', () => {
   })
 
   test('アカウントや予約対象が変わったあとの古い返事を画面へ反映しない', () => {
-    expect(PAGE).toContain("const selectionKey = [selectedAccountId ?? '', friend?.id ?? customer?.id ?? '', menuId, staffId, date, time]")
+    expect(PAGE).toContain("const selectionKey = [selectedAccountId ?? '', friend?.id ?? (phoneCustomer ?")
     expect(PAGE).toContain('latestSelectionKey.current = selectionKey')
-    expect(PAGE).toContain('const requestKey = [selectedAccountId, friend?.id ?? \'\', menuId, staffId, date, time]')
+    expect(PAGE).toContain('const requestKey = selectionKey')
     expect(PAGE).toContain('if (latestSelectionKey.current !== requestKey) return')
     expect(PAGE).toContain('if (latestSelectionKey.current === requestKey) setLoading(false)')
     expect(PAGE).toContain("setIdempotencyKey('')")
@@ -123,7 +123,7 @@ describe('V6 代理予約の接続契約', () => {
   test('電話客の台帳は確定時に作り、確認の往復では直した値を見せる(R147)', () => {
     // 確認へ進むときに作ると、入力へ戻って直した値が反映されない。
     // 台帳は「この内容で予約を入れる」の直前に1件だけ作る。
-    expect(PAGE).toContain('await ensureCustomerForBooking()')
+    expect(PAGE).toContain('await ensureCustomerForBooking(requestKey)')
     expect(PAGE).not.toContain('selectedCustomer = await ensureCustomer')
     // 保存済みと同じ入力なら作り直さない（二重作成なし）。
     expect(PAGE).toContain('customerSavedInput')

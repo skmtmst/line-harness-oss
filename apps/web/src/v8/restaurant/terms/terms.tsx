@@ -24,7 +24,7 @@ export default function TermsV8() {
     <PageFrame kind="list" boardId="VdKOK">
       <PageHeading
         title="利用規約"
-        description={`musubo 飲食店向け機能（検証環境）の利用規約と個人情報の取扱い・最終改定 ${slashDate(TERMS_DOCUMENT.updatedAt)}`}
+        help={`musubo 飲食店向け機能（検証環境）の利用規約と個人情報の取扱い・最終改定 ${slashDate(TERMS_DOCUMENT.updatedAt)}`}
       />
       <div className={styles.body}>
         <article className={styles.document} aria-label={TERMS_DOCUMENT.title}>

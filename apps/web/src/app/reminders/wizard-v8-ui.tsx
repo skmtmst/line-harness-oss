@@ -12,6 +12,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import Button from '@/components/shared/button'
 import styles from './wizard-v8.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /*
  * ★V8 リマインダの作る・確かめる・詳細で共用する部品。
@@ -117,7 +118,7 @@ export function WizardHeadV8({
         リマインダへ
       </Link>
       <div className={styles.headText}>
-        <h1 className={styles.headTitle}>{title}</h1>
+        <PageHeading title={title} />
         {note ? <p className={styles.headMeta}>{note}</p> : null}
       </div>
       <ReminderV8Stepper current={current} reminderId={reminderId} />

@@ -17,7 +17,7 @@ const calls = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/api', () => ({ api: { hqSupport: calls } }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageChrome: () => ({}) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined, usePageChrome: () => ({}) }))
 vi.mock('@/components/tenant-access-context', () => ({ useTenantStatus: () => 'suspended' }))
 vi.mock('@/components/hq/notice-line-register-dialog', () => ({ default: () => <div data-line-guide /> }))
 
@@ -61,3 +61,5 @@ describe('停止中のお問い合わせ本文（V6 IwfA0）', () => {
     expect(host.textContent).not.toContain('契約者専用LINEの登録案内')
   })
 })
+
+vi.mock('next/navigation', () => ({ usePathname: () => window.location.pathname, useSearchParams: () => new URLSearchParams(window.location.search), useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))

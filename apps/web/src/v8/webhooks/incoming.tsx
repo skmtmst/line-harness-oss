@@ -9,6 +9,7 @@
  * 試し・作成・動かす/止める・合言葉・名前・削除）。
  * 絵と今の作りが合わない所は BEHAVIOR.md に書いた。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Copy, LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical, Inbox } from 'lucide-react'
@@ -21,10 +22,16 @@ import {
   type IncomingWebhookUnmatchedItem,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { useOnAccountSwitch } from '@/components/shared/list-url-state'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole } from '@/lib/staff-role'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import StatusBadge from '@/components/shared/status-badge'
+import Card from '@/components/shared/card'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { TextField, TextArea } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
 import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -50,6 +57,8 @@ import {
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import { shortDateTime } from './words'
 import styles from './incoming.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -117,6 +126,8 @@ export default function WebhooksIncomingV8() {
   const { selectedAccountId, accounts } = useAccount()
   const accountRef = useRef(selectedAccountId)
   accountRef.current = selectedAccountId
+  const accountScopeRef = useRef({ accountId: selectedAccountId })
+  if (accountScopeRef.current.accountId !== selectedAccountId) accountScopeRef.current = { accountId: selectedAccountId }
   const staffRole = useStaffRole()
   /* 受け取り口の変更は統括だけ（R32）。届物の結び付けは管理者も使える。 */
   const canManage = staffRole === null || staffRole === 'owner'
@@ -172,6 +183,27 @@ export default function WebhooksIncomingV8() {
   const [rotateError, setRotateError] = useState('')
   const [rotating, setRotating] = useState(false)
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
+
+  // 初回の null → アカウントは見本の選択を保ち、実際に店を替えたときだけ消す。
+  useOnAccountSwitch(selectedAccountId, () => {
+    setShowCreate(false)
+    setCreateName('')
+    setCreateSource(SOURCE_PRESETS[0].value)
+    setCreateSourceFree('')
+    setCreateSecret('')
+    setCreateFieldError({})
+    setCreating(false)
+    setCreatedSecret(null)
+    setDeleteTarget(null)
+    setDeleteError('')
+    setRotateTarget(null)
+    setRotateSecret('')
+    setRotateError('')
+    setStepUp(null)
+    setOptimisticActive({})
+    togglingRef.current.clear()
+    setTogglingIds([])
+  })
 
   useEffect(() => {
     if (staffRole !== null && staffRole !== 'owner') setShowCreate(false)
@@ -267,6 +299,8 @@ export default function WebhooksIncomingV8() {
   /* ===== 動かす・止める（押した瞬間に変え、裏で保存する） ===== */
   const handleToggle = async (item: IncomingWebhook, currentActive: boolean) => {
     const accountId = selectedAccountId
+    const scope = accountScopeRef.current
+    const isCurrent = () => accountScopeRef.current === scope
     if (!accountId || loadedAccountId !== accountId) {
       setError('LINEアカウントの一覧を読み直してください')
       return
@@ -285,32 +319,34 @@ export default function WebhooksIncomingV8() {
     })
     const fail = (message: string) => {
       clear()
-      notifyToast(message, { tone: 'error', actionLabel: 'もう一度', onAction: () => { void handleToggle(item, currentActive) } })
+      notifyToast(message, { tone: 'error', actionLabel: 'もう一度', onAction: () => { if (isCurrent()) void handleToggle(item, currentActive) } })
     }
     try {
       const res = await api.webhooks.incoming.update(item.id, accountId, { isActive: !currentActive })
-      // 返事の前にアカウントを移った：知らせは出さないが、仮の表示は必ず外す。
-      // 外さないと、戻ったときにサーバーの状態と違う「止めています」が残る（監査 WEB-024）。
-      if (accountRef.current !== accountId) { clear(); return }
+      // 仮の表示は切替時に外してある。前の要求で新しい店の表示を触らない。
+      if (!isCurrent()) return
       if (!res.success) {
         fail(`「${item.name}」は切り替えできませんでした。状態は変わっていません。確かめてから、もう一度お試しください。`)
         return
       }
       await reload()
+      if (!isCurrent()) return
       clear()
       notifyToast(`「${item.name}」を${!currentActive ? '動かしました' : '止めました'}。`, {
         actionLabel: '元に戻す',
-        onAction: () => { void handleToggle(item, !currentActive) },
+        onAction: () => { if (isCurrent()) void handleToggle(item, !currentActive) },
       })
     } catch (caught) {
-      if (accountRef.current !== accountId) { clear(); return }
+      if (!isCurrent()) return
       const forbidden = caught instanceof ApiError && caught.status === 403
       fail(forbidden
-        ? `「${item.name}」は統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。`
+        ? permissionDeniedMessage('store')
         : `「${item.name}」は切り替えに失敗しました。状態は変わっていません。時間をおいて、もう一度お試しください。`)
     } finally {
-      togglingRef.current.delete(item.id)
-      setTogglingIds((current) => current.filter((id) => id !== item.id))
+      if (isCurrent()) {
+        togglingRef.current.delete(item.id)
+        setTogglingIds((current) => current.filter((id) => id !== item.id))
+      }
     }
   }
 
@@ -334,7 +370,7 @@ export default function WebhooksIncomingV8() {
       if (accountRef.current !== accountId) return
       const forbidden = caught instanceof ApiError && caught.status === 403
       setDeleteError(forbidden
-        ? 'この受け取り口の削除は統括だけができます。必要なときは統括に頼んでください。'
+        ? permissionDeniedMessage('store')
         : 'この受け取り口を削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setDeleting(false)
@@ -373,7 +409,7 @@ export default function WebhooksIncomingV8() {
       }
       if (accountRef.current !== accountId) return
       setRotateError(describeApiFailure(caught, 'シークレットの更新', {
-        forbidden: '合言葉の更新は統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       setRotating(false)
@@ -396,10 +432,12 @@ export default function WebhooksIncomingV8() {
     const sourceValue = createSource === SOURCE_OTHER ? createSourceFree.trim() : createSource
     if (!createName.trim()) {
       setCreateFieldError({ name: '名前を入力してください' })
+      requestAnimationFrame(() => { const field = document.getElementById('wh-incoming-name'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
       return
     }
     if (createSecret.length < MIN_SECRET_LENGTH) {
       setCreateFieldError({ secret: `シークレットは${MIN_SECRET_LENGTH}文字以上にしてください` })
+      requestAnimationFrame(() => { const field = document.getElementById('wh-incoming-secret'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
       return
     }
     setCreating(true)
@@ -430,7 +468,7 @@ export default function WebhooksIncomingV8() {
       if (accountRef.current !== accountId) return
       setCreateFieldError({
         form: describeApiFailure(caught, '作成', {
-          forbidden: '受け取り口の作成は統括だけができます。必要なときは統括に頼んでください。',
+          scope: 'store',
         }),
       })
     } finally {
@@ -468,7 +506,7 @@ export default function WebhooksIncomingV8() {
         setUnmatchedActionError({
           id: item.id,
           message: describeApiFailure(caught, '確認', {
-            forbidden: 'この操作は統括または管理者だけができます。必要なときは統括に頼んでください。',
+            scope: 'store',
           }),
         })
         return
@@ -502,7 +540,7 @@ export default function WebhooksIncomingV8() {
       }
       setTestResult(res.data)
     } catch (caught) {
-      setTestError(describeApiFailure(caught, '試し', { forbidden: 'この操作を行う権限がありません。統括に頼んでください。' }))
+      setTestError(describeApiFailure(caught, '試し', { scope: 'store' }))
       setTestResult(null)
     } finally {
       setTestBusy(false)
@@ -548,7 +586,7 @@ export default function WebhooksIncomingV8() {
         </div>
       ) : null}
       {incomingStatus === 'error' ? (
-        <ListState kind="error" title="受け取り口を読み込めませんでした" action={<Button onClick={() => void reload()}>もう一度読み込む</Button>} />
+        <ListState kind="error" title="受け取り口を読み込めませんでした" onRetry={() => void reload()} />
       ) : null}
       {displayed.map((item) => {
         const isSelected = selected?.id === item.id
@@ -565,7 +603,7 @@ export default function WebhooksIncomingV8() {
             <span className={styles.inletRow}>
               <span className={styles.inletName}>{item.name}</span>
               <span className={styles.spacer} aria-hidden="true" />
-              <span className={styles.inletState}>{item.isActive ? '動いている' : '止めている'}</span>
+              <span className={styles.inletState}>{item.isActive ? '有効' : '停止中'}</span>
             </span>
             <span className={styles.inletSub}>{sourceName(item.sourceType)}から</span>
           </button>
@@ -602,10 +640,7 @@ export default function WebhooksIncomingV8() {
               ? <InlineEdit value={selected.name} label="受け取り口の名前" onSave={renameInlet} />
               : selected.name}
           </h2>
-          <span className={styles.pill} data-tone={toggling ? 'neutral' : selected.isActive ? 'active' : 'neutral'}>
-            <span className={styles.pillDot} aria-hidden="true" />
-            {toggling ? '切り替え中' : selected.isActive ? '動いています' : '止めています'}
-          </span>
+          <StatusBadge tone={toggling ? 'neutral' : selected.isActive ? 'success' : 'neutral'}>{toggling ? '切り替え中' : selected.isActive ? '動いています' : '止めています'}</StatusBadge>
           <span className={styles.spacer} aria-hidden="true" />
           {canManage ? (
             <>
@@ -615,7 +650,7 @@ export default function WebhooksIncomingV8() {
           ) : null}
         </div>
 
-        <section className={styles.card} aria-labelledby="wh-in-receive">
+        <Card spacing="integration" aria-labelledby="wh-in-receive">
           <div className={styles.cardHead}>
             <h3 className={styles.cardTitle} id="wh-in-receive">どこから受け取るか</h3>
             <p className={styles.cardNote}>相手のサービスで「Webhook（ウェブフック）」の送り先にこの URL を貼ります</p>
@@ -623,11 +658,9 @@ export default function WebhooksIncomingV8() {
           <div className={styles.fieldRow}>
             <div className={styles.field}>
               <span className={styles.fieldLabel}>受け取る URL（相手のサービスに貼る）</span>
-              <span className={styles.valueBox} title={endpointUrl(selected.id)}>{endpointUrl(selected.id)}</span>
+              <span className={styles.valueBox} ><TruncatedText value={String(endpointUrl(selected.id) ?? '')} url /></span>
             </div>
-            <Button onClick={() => { void navigator.clipboard.writeText(endpointUrl(selected.id)); notifyToast('受け取る URL を写しました') }}>
-              <Copy size={15} aria-hidden="true" />写す
-            </Button>
+            <CopyTextButton value={endpointUrl(selected!.id)} aria-label="受け取るURLをコピー"  />
           </div>
           <div className={styles.fieldRow}>
             <div className={styles.field}>
@@ -644,9 +677,9 @@ export default function WebhooksIncomingV8() {
           {selected.previousSecretUsableUntil ? (
             <p className={styles.smallNote}>前の合言葉は {shortDateTime(selected.previousSecretUsableUntil)} まで使えます。</p>
           ) : null}
-        </section>
+        </Card>
 
-        <section className={styles.card} aria-labelledby="wh-in-identity">
+        <Card spacing="integration" aria-labelledby="wh-in-identity">
           <div className={styles.cardHead}>
             <h3 className={styles.cardTitle} id="wh-in-identity">だれの出来事か（人の見分けかた）</h3>
             <p className={styles.cardNote}>人が見つからないと何も起きません</p>
@@ -665,9 +698,9 @@ export default function WebhooksIncomingV8() {
               </span>
             </div>
           </div>
-        </section>
+        </Card>
 
-        <section className={styles.card} aria-labelledby="wh-in-actions">
+        <Card spacing="integration" aria-labelledby="wh-in-actions">
           <div className={styles.cardHead}>
             <h3 className={styles.cardTitle} id="wh-in-actions">届いたらすること</h3>
             <p className={styles.cardNote}>上から順に動きます</p>
@@ -675,7 +708,7 @@ export default function WebhooksIncomingV8() {
           {detailStatus === 'loading' ? (
             <p className={styles.cardNote}>保存されている処理を読み込んでいます。</p>
           ) : detailStatus === 'error' ? (
-            <ListState kind="error" title="届いた後の処理を表示できませんでした" action={<Button onClick={() => setDetailReloadKey((key) => key + 1)}>詳細を読み直す</Button>} />
+            <ListState kind="error" title="届いた後の処理を表示できませんでした" onRetry={() => setDetailReloadKey((key) => key + 1)} />
           ) : detail && detail.actions.length > 0 ? (
             detail.actions.map((action, index) => (
               <div key={`${action.refKind}-${index}`} className={styles.actionRow}>
@@ -692,10 +725,10 @@ export default function WebhooksIncomingV8() {
           {detail?.actionExecution.state === 'needs_attention' && detail.actionExecution.reason ? (
             <p className={styles.smallNote}>{detail.actionExecution.reason}</p>
           ) : null}
-        </section>
+        </Card>
 
         {detail && (detail.identityMatching.onNotFound !== 'do_nothing' || unmatched.length > 0 || (detail.pendingUnmatched ?? 0) > 0 || unmatchedStatus === 'error') ? (
-          <section className={styles.card} aria-labelledby="wh-in-unmatched">
+          <Card spacing="integration" aria-labelledby="wh-in-unmatched">
             <div className={styles.cardHead}>
               <h3 className={styles.cardTitle} id="wh-in-unmatched">人が見つからなかった届物</h3>
               <p className={styles.cardNote}>
@@ -713,28 +746,32 @@ export default function WebhooksIncomingV8() {
               <p className={styles.cardNote}>いま確認が必要な届物はありません。</p>
             ) : (
               <>
-                <div className={styles.miniHead} role="presentation">
-                  <span className={styles.miniWhen}>届いた日時</span>
-                  <span className={styles.miniValue}>届いた値</span>
-                  <span className={styles.miniCandidate}>候補</span>
-                  <span className={styles.miniOps} />
-                </div>
+                <DataTable aria-label="人が見つからなかった届物" columnLayout={{ headHeight: 'auto', rowHeight: 'var(--tpl-wh-mini-row-h)', gap: 'var(--tpl-rule-row-gap)', padding: 'var(--tpl-wh-mini-row-pad)', headPadding: 'var(--tpl-wh-mini-head-pad)', headRadius: 'var(--radius-segment)', rowGap: 'var(--tpl-rule-row-gap)', headTextSize: 'var(--text-micro)', bodyTextSize: 'var(--text-caption)' }}>
+                  <thead>
+                    <TableHeadRow data-table-layout="columns">
+                  <Th className={styles.miniWhen}>届いた日時</Th>
+                  <Th className={styles.miniValue}>届いた値</Th>
+                  <Th className={styles.miniCandidate}>候補</Th>
+                  <Th className={styles.miniOps}><span className={styles.srOnly}>操作</span></Th>
+                </TableHeadRow>
+                </thead>
+                <tbody>
                 {unmatched.map((item) => (
-                  <div key={item.id} className={styles.miniRow}>
-                    <span className={styles.miniWhen}>{shortDateTime(item.receivedAt)}</span>
-                    <span className={styles.miniValue} title={item.identityAttempts.map((attempt: { kind: string; value: string }) => `${identityKindLabel(attempt.kind)}：${attempt.value}`).join('、')}>
+                  <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
+                    <Td className={styles.miniWhen}>{shortDateTime(item.receivedAt)}</Td>
+                    <Td className={styles.miniValue} title={item.identityAttempts.map((attempt: { kind: string; value: string }) => `${identityKindLabel(attempt.kind)}：${attempt.value}`).join('、')}>
                       {item.identityAttempts.length > 0
                         ? item.identityAttempts.map((attempt: { kind: string; value: string }) => attempt.value).join('、')
                         : '照合に使える値が届いていません'}
-                    </span>
-                    <span className={styles.miniCandidate}>
+                    </Td>
+                    <Td className={styles.miniCandidate}>
                       {item.kind === 'candidate'
                         ? '1人の友だちに一致'
                         : item.kind === 'ambiguous'
-                          ? item.candidates.length > 0 ? `${item.candidates.length}人の友だちに一致` : '2人以上に一致'
+                          ? item.candidates.length > 0 ? `${item.candidates.length} 人の友だちに一致` : '2人以上に一致'
                           : '一致する友だちがいません'}
-                    </span>
-                    <span className={styles.miniOps}>
+                    </Td>
+                    <Td className={styles.miniOps}>
                       {canResolveUnmatched ? (
                         item.kind === 'candidate' && item.candidates[0] ? (
                           <Button disabled={dismissingId !== null} busy={dismissingId === item.id} onClick={() => void resolveUnmatched(item, { action: 'link', friendId: item.candidates[0].friendId })}>結び付ける</Button>
@@ -744,24 +781,26 @@ export default function WebhooksIncomingV8() {
                           </Button>
                         )
                       ) : null}
-                    </span>
                     {unmatchedActionError && unmatchedActionError.id === item.id ? (
                       <p role="alert" className={styles.fieldError}>{unmatchedActionError.message}</p>
                     ) : null}
-                  </div>
+                    </Td>
+                  </Tr>
                 ))}
+                </tbody>
+                </DataTable>
                 {(unmatchedTotal ?? detail.pendingUnmatched ?? 0) > unmatched.length ? (
                   <div className={styles.moreRow}>
-                    <span className={styles.cardNote}>ほか{(unmatchedTotal ?? detail.pendingUnmatched ?? 0) - unmatched.length}件あります。</span>
+                    <span className={styles.cardNote}>ほか{(unmatchedTotal ?? detail.pendingUnmatched ?? 0) - unmatched.length} 件あります。</span>
                     <Button disabled={unmatchedMoreBusy} busy={unmatchedMoreBusy} onClick={() => { setUnmatchedMoreBusy(true); setUnmatchedShown((shown) => shown + UNMATCHED_PAGE_SIZE) }}>さらに表示</Button>
                   </div>
                 ) : null}
               </>
             )}
-          </section>
+          </Card>
         ) : null}
 
-        <section className={styles.card} aria-labelledby="wh-in-try">
+        <Card spacing="integration" aria-labelledby="wh-in-try">
           <div className={styles.cardHead}>
             <h3 className={styles.cardTitle} id="wh-in-try">届いたつもりで試す</h3>
             <p className={styles.cardNote}>見本の JSON で、どの人に届くかと何が動くかを確かめます。実際の処理は動きません</p>
@@ -779,7 +818,7 @@ export default function WebhooksIncomingV8() {
               <FlaskConical size={15} aria-hidden="true" />試す
             </Button>
           </div>
-        </section>
+        </Card>
         {/* 削除は絵に無い。消さずに、カードの下へ小さく置く（押すと確かめの窓）。 */}
         {canManage ? (
           <div className={styles.dangerRow}>
@@ -797,7 +836,7 @@ export default function WebhooksIncomingV8() {
       boardId="gW0F2"
       headingSize="regular"
       title="外部連携"
-      description={WEBHOOKS_DESCRIPTION}
+      help={WEBHOOKS_DESCRIPTION}
       actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button> : undefined}
       tabs={<WebhookTabs active="incoming" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
@@ -820,22 +859,19 @@ export default function WebhooksIncomingV8() {
           busy={creating}
           error={createFieldError.form}
           onCancel={() => { if (!creating) setShowCreate(false) }}
-          onConfirm={() => void runCreate()}
+          onConfirm={() => runCreate()}
           confirmLabel="作る"
           confirmIcon={<Plus size={15} aria-hidden="true" />}
         >
           <div className={`${styles.form} ${styles.formTight}`}>
-            <label className={styles.formField}>
-              <span className={styles.fieldLabel}>名前</span>
-              <input
+            <Field label="名前" htmlFor="wh-incoming-name" error={createFieldError.name}>
+              <TextField
                 value={createName}
                 onChange={(event) => setCreateName(event.target.value)}
                 placeholder="体験申込フォーム（自社サイト）"
-                className={styles.input}
                 aria-invalid={Boolean(createFieldError.name) || undefined}
               />
-              {createFieldError.name ? <span className={styles.fieldError} role="alert">{createFieldError.name}</span> : null}
-            </label>
+              </Field>
             <div className={styles.formField}>
               <span className={styles.pickLabel}>どこから来るか</span>
               <Select
@@ -849,29 +885,27 @@ export default function WebhooksIncomingV8() {
                 ]}
               />
               {createSource === SOURCE_OTHER ? (
-                <input
+                <TextField
                   value={createSourceFree}
                   onChange={(event) => setCreateSourceFree(event.target.value)}
                   placeholder="見本に無いものを自由に書けます"
-                  className={styles.input}
                   aria-label="どこから来るか（自由入力）"
                 />
               ) : null}
             </div>
             <div className={styles.fieldRow}>
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>シークレット</span>
-                <input
+              <div className={styles.grow}>
+                <Field label="シークレット" htmlFor="wh-incoming-secret" error={createFieldError.secret}>
+                <TextField
                   value={createSecret}
                   onChange={(event) => setCreateSecret(event.target.value)}
                   placeholder="相手と決めた合言葉（32文字以上）"
-                  className={`${styles.input} ${styles.mono}`}
                   aria-invalid={Boolean(createFieldError.secret) || undefined}
                 />
-              </label>
+              </Field>
+          </div>
               <Button type="button" onClick={() => setCreateSecret(generateSecret())}><RefreshCw size={15} aria-hidden="true" />自動生成</Button>
             </div>
-            {createFieldError.secret ? <span className={styles.fieldError} role="alert">{createFieldError.secret}</span> : null}
             <p className={styles.noteBox}>作るときに本人確認が出ます。</p>
           </div>
         </Dialog>
@@ -885,10 +919,7 @@ export default function WebhooksIncomingV8() {
           busy={testBusy}
           confirmLabel="試す"
         >
-          <label className={styles.formField}>
-            <span className={styles.fieldLabel}>届いたつもりのJSON</span>
-            <textarea className={`${styles.input} ${styles.textarea}`} value={testJson} onChange={(event) => setTestJson(event.target.value)} placeholder='{"friendId": "…"}' />
-          </label>
+          <Field label="届いたつもりのJSON"><TextArea value={testJson} onChange={(event) => setTestJson(event.target.value)} placeholder='{"friendId": "…"}' /></Field>
           {testError ? <p className={styles.fieldError} role="alert">{testError}</p> : null}
           {testResult ? (
             <div className={styles.form}>
@@ -897,7 +928,7 @@ export default function WebhooksIncomingV8() {
                 {testResult.match.status === 'matched'
                   ? '1人の友だちに一致しました'
                   : testResult.match.status === 'ambiguous'
-                    ? `同じ値の友だちが${testResult.match.friendIds.length}人います。実際に届くと保留になり、人が選びます。`
+                    ? `同じ値の友だちが${testResult.match.friendIds.length} 人います。実際に届くと保留になり、人が選びます。`
                     : '一致する友だちがいません'}
               </p>
               <span className={styles.fieldLabel}>動く予定の処理</span>
@@ -905,7 +936,7 @@ export default function WebhooksIncomingV8() {
                 <div key={action.refIndex} className={styles.actionRow}>
                   <span className={styles.actionName}>{incomingActionLabel(action.refKind)}：{action.displayName}</span>
                   <span className={styles.spacer} aria-hidden="true" />
-                  <span className={styles.actionTarget}>{action.ok ? `(${action.plan?.length ?? 0}件の処理)` : action.error}</span>
+                  <span className={styles.actionTarget}>{action.ok ? `(${action.plan?.length ?? 0} 件の処理)` : action.error}</span>
                 </div>
               )) : <p className={styles.cardNote}>動く処理はまだ決めていません</p>}
             </div>
@@ -920,7 +951,7 @@ export default function WebhooksIncomingV8() {
           destructive
           busy={deleting}
           error={deleteError || undefined}
-          onConfirm={() => void runDelete()}
+          onConfirm={() => runDelete()}
           onCancel={() => { if (!deleting) { setDeleteTarget(null); setDeleteError('') } }}
         />
 
@@ -931,14 +962,13 @@ export default function WebhooksIncomingV8() {
           description="新しい合言葉を設定します。保存したあとは二度と全部は表示されません。前の合言葉は24時間だけ使えるので、相手側の切り替え中も受け取りは止まりません。"
           error={rotateError || undefined}
           onCancel={() => { setRotateTarget(null); setRotateSecret('') }}
-          onConfirm={() => void runRotate()}
+          onConfirm={() => runRotate()}
           confirmLabel="保存する"
         >
           <div className={styles.fieldRow}>
-            <input
+            <TextField
               value={rotateSecret}
               onChange={(event) => setRotateSecret(event.target.value)}
-              className={`${styles.input} ${styles.mono}`}
               placeholder="ランダムな英数字32文字以上"
               aria-label="新しい合言葉"
               autoFocus
@@ -958,8 +988,8 @@ export default function WebhooksIncomingV8() {
             <p className={styles.cardNote}>{createdSecret.name}</p>
             <span className={styles.fieldLabel}>合言葉（今回だけ表示）</span>
             <div className={styles.fieldRow}>
-              <p className={`${styles.valueBox} ${styles.mono} ${styles.grow}`}>{createdSecret.secret}</p>
-              <Button onClick={() => { void navigator.clipboard.writeText(createdSecret.secret); notifyToast('合言葉を写しました') }}><Copy size={15} aria-hidden="true" />写す</Button>
+              <p className={`${styles.valueBox} ${styles.grow}`}>{createdSecret.secret}</p>
+              <CopyTextButton value={createdSecret!.secret} aria-label="合言葉をコピー"  />
             </div>
           </Dialog>
         ) : null}

@@ -16,6 +16,7 @@
  *   入らない）。その件数は一覧側の説明に出す。
  */
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchApi } from '@/lib/api'
@@ -23,6 +24,8 @@ import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { formatDay, formatNumber } from '@/lib/format'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 /** EC連携画面（order-detail-drawer）の状態文言とそろえる。 */
 const ORDER_STATUS_TEXT: Record<string, string> = {
@@ -73,10 +76,7 @@ function formatMoney(currency: string, amount: number | null): string {
 }
 
 function formatDate(iso: string): string {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return formatDay(d)
+  return polishFormatDate(iso, { style: 'detail', fallback: '—' })
 }
 
 export default function RefOrdersPanel({
@@ -93,7 +93,7 @@ export default function RefOrdersPanel({
 }) {
   const [state, setState] = useState<LoadState>('loading')
   const [data, setData] = useState<RefOrdersResponse | null>(null)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const requestRef = useRef(0)
 
   const load = useCallback(async () => {
@@ -135,7 +135,7 @@ export default function RefOrdersPanel({
   return (
     <div>
       <p className="text-xs font-semibold text-ink-faint uppercase">
-        この経路からの注文{state === 'ready' ? `（全${formatNumber(total)}件）` : ''}
+        この経路からの注文{state === 'ready' ? `（全${formatNumber(total)} 件）` : ''}
       </p>
       {/*
         IDEA-18: 帰属ルールと計測できない範囲を明細のすぐそばで説明する。

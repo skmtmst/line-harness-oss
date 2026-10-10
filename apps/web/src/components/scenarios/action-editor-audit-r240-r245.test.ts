@@ -151,7 +151,7 @@ describe('R245 対象は名前で選ぶ', () => {
     expect(EDITOR).not.toContain('リマインダID')
     expect(EDITOR).not.toContain('イベント予約ID')
     expect(EDITOR).toContain('TargetSelector')
-    expect(EDITOR).toContain('名前で探す')
+    expect(EDITOR).toContain('EntityKindField')
   })
 
   it('リマインダ・イベント予約の候補は今のアカウントで絞る', async () => {

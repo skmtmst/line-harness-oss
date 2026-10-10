@@ -31,7 +31,7 @@ import InflowDetailV8 from './detail'
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
 const route = (id: string, refCode: string, name: string) => ({
-  id, refCode, genre: null, name, tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null,
+  id, refCode, genre: null, name, tagId: configuredTag, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null,
   runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, lineAccountId: null,
   createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
 })
@@ -39,10 +39,12 @@ const funnel = (adds: number) => ({ click_count: 100, friend_add_count: adds, cv
 
 let root: Root
 let host: HTMLDivElement
+let configuredTag: string | null = null
 let friendsFor: (ref: string) => Promise<Response>
 
 beforeEach(() => {
   nav.id = 'er-a'
+  configuredTag = null
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -53,6 +55,7 @@ beforeEach(() => {
     if (url.pathname === '/api/entry-routes/er-b') return json({ success: true, data: route('er-b', 'ref-b', '経路B') })
     if (url.pathname === '/api/entry-routes/er-a/funnel') return json({ success: true, data: funnel(111) })
     if (url.pathname === '/api/entry-routes/er-b/funnel') return json({ success: true, data: funnel(222) })
+    if (url.pathname === '/api/tags') return json({ success: true, data: configuredTag ? [{ id: configuredTag, name: 'VIP' }] : [] })
     if (url.pathname.startsWith('/api/analytics/ref/')) return friendsFor(decodeURIComponent(url.pathname.split('/').pop() ?? ''))
     return json({ success: true, data: [] })
   })
@@ -70,6 +73,18 @@ async function settle() {
 }
 
 describe('流入経路の詳細（WEB035/036）', () => {
+  it('経路で設定したタグを、各友だちへ付いたタグの実績として代用しない', async () => {
+    configuredTag = 'tag-vip'
+    friendsFor = async () => json({ success: true, data: { friends: [{ id: 'f1', displayName: '来た友だち', trackedAt: '2026-10-01T00:00:00Z', currentStatus: 'active' }] } })
+    await act(async () => { root.render(<InflowDetailV8 />) })
+    await settle()
+    expect(host.textContent).toContain('タグ「VIP」を付けて')
+    const row = [...host.querySelectorAll('tbody tr')].find((element) => element.textContent?.includes('来た友だち'))
+    expect(row).toBeTruthy()
+    expect(row?.querySelectorAll('td')[4].textContent).toBe('—')
+    expect(row?.textContent).not.toContain('VIP')
+  })
+
   it('来た友だちが読めなかったら、「まだいません」ではなく読み直しを出す', async () => {
     friendsFor = async () => json({ success: false, error: 'down' }, 503)
     await act(async () => { root.render(<InflowDetailV8 />) })

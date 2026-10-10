@@ -1,0 +1,11 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.root { container: tap-extras / inline-size; display: flex; flex-direction: column; gap: var(--tap-action-gap); min-width: 0; width: 100%; padding: var(--tap-action-note-pad); border-radius: var(--radius-control); background: var(--color-surface-pearl); }
+.head { display: flex; align-items: center; justify-content: space-between; gap: var(--tap-action-gap); font-size: var(--text-caption); font-weight: 600; }
+.row { display: flex; align-items: center; gap: var(--tap-action-gap); min-width: 0; }
+.row > input { flex: 1; min-width: 0; width: 0; }
+.label { flex: none;  font-size: var(--text-caption); color: var(--color-ink-secondary); }
+.unit, .note { font-size: var(--text-caption); color: var(--color-ink-secondary); }
+@container tap-extras (max-width: 399px) { .row { flex-wrap: wrap; }
+.label { width: 100%; } .row > label { width: 100%; } .row > button { flex: 1 1 100%; } }
+}

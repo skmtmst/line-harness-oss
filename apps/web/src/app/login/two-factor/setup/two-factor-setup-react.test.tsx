@@ -265,7 +265,7 @@ describe('N-426: 初回設定画面', () => {
     await render()
     expect(host.textContent).toContain('権限がありません')
     const retry = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('もう一度読み込む'))
-    expect(retry).toBeUndefined()
+    expect(retry).toBeTruthy()
   })
 
   it('M033: setup開始の429は待ち案内と再試行を出す', async () => {

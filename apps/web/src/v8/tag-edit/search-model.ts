@@ -45,5 +45,5 @@ export function headUsageText(usedIn: SavedSearch['usedIn']): string {
   if (usedIn === undefined) return '使っている所は確かめられません'
   if (usedIn.length === 0) return '使っている所はありません'
   const first = usedIn[0]!
-  return `${KIND_LABELS[first.kind]}「${first.name}」で使っている${usedIn.length > 1 ? `（ほか${usedIn.length - 1}件）` : ''}`
+  return `${KIND_LABELS[first.kind]}「${first.name}」で使っている${usedIn.length > 1 ? `（ほか${usedIn.length - 1} 件）` : ''}`
 }

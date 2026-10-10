@@ -38,7 +38,7 @@ beforeEach(() => {
 })
 
 describe('M034 30日のまとめの取得失敗', () => {
-  it('403は権限の案内になり、再試行の口は出ない', async () => {
+  it('403は権限の案内になり、再読み込みの口を出す', async () => {
     m.summary.mockRejectedValueOnce(new ApiError(403, 'API error: 403'))
     render(<Page />)
     fireEvent.click(screen.getByText('開くA'))
@@ -46,7 +46,7 @@ describe('M034 30日のまとめの取得失敗', () => {
 
     expect(document.body.textContent).toContain('権限')
     expect(document.body.textContent).not.toContain('API error: 403')
-    expect(screen.queryByRole('button', { name: 'もう一度読み込む' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
   })
 
   it('429は待ち案内になり、再試行の口は残る', async () => {

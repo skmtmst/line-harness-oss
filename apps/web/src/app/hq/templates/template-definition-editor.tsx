@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { parseHqMessageCard, type HqMessageCard, type HqMessageReference } from '@line-crm/shared'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { hqTemplatesApi } from '@/lib/hq-templates-api'
 import { decodeImageSize } from './image-size'
 import { freshDefinition, withUploadedImage, withMessageCard } from '@/lib/hq-template-authoring'
@@ -149,11 +148,10 @@ export function CardEditor({ value, disabled, onChange, onBusyChange, onReceipt 
 }
 
 function MessageEditor({ value, disabled, onChange, onBusyChange, onReceipt }: { value: MessageTemplateDefinition; disabled: boolean; onChange: (next: MessageTemplateDefinition) => void; onBusyChange?: (busy: boolean) => void; onReceipt?: (media: MessageTemplateDefinition['media'][number]) => void }) {
-  const theme = useAdminTheme()
   const current = value.template
   const [targetDate, setTargetDate] = useState('')
   const [advanced, setAdvanced] = useState(false)
-  if (theme === 'v8' && (value.card || (!advanced && current.id === 'hq-authored-message' && current.messageType === 'text' && !current.carouselActionsJson && !current.questionJson))) return <>
+  if (value.card || (!advanced && current.id === 'hq-authored-message' && current.messageType === 'text' && !current.carouselActionsJson && !current.questionJson)) return <>
     <CardEditor value={value} disabled={disabled} onChange={onChange} onBusyChange={onBusyChange} onReceipt={onReceipt} />
     {!value.card && <button type="button" disabled={disabled} onClick={() => setAdvanced(true)}>画像・カルーセルの詳細編集を使う</button>}
   </>
@@ -167,7 +165,6 @@ function MessageEditor({ value, disabled, onChange, onBusyChange, onReceipt }: {
   ]
   const legacyDisabled = disabled || Boolean(value.card)
   return (<>
-    {theme === 'v7' && value.card && <p role="status">タイトルとボタンをまとめて作ったひな形は、設定の「画面の見た目（試作）」をV8に切り替えて編集してください。</p>}
     <MessageTemplateEditor
       value={{ messageType: current.messageType, messageContent: current.messageContent }}
       onChange={(next) => onChange({

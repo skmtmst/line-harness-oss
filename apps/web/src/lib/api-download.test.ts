@@ -1,3 +1,4 @@
+import { csvFileName } from './csv-file-name'
 // @vitest-environment happy-dom
 /*
  * TECH-03: Cookie が使えない認証経路でも CSV を出せることの回帰試験。
@@ -60,7 +61,7 @@ const csvResponse = () =>
   })
 
 describe('downloadApiFile（TECH-03）', () => {
-  it('Bearer 補完セッションを付けて取り、サーバーのファイル名で保存する', async () => {
+  it('Bearer 補完セッションを付けて取り、日本時間の共通ファイル名で保存する', async () => {
     storeAdminSession('session-token-1')
     const fetchSpy = vi.fn(async () => csvResponse())
     vi.stubGlobal('fetch', fetchSpy)
@@ -73,7 +74,7 @@ describe('downloadApiFile（TECH-03）', () => {
     expect(init.credentials).toBe('include')
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer lh_session:session-token-1')
     // Cookie に頼る画面遷移ではなく、取得した Blob を保存する。
-    expect(clicked).toEqual([{ href: 'blob:fake-csv', download: 'booking-ledger-20260922.csv' }])
+    expect(clicked).toEqual([{ href: 'blob:fake-csv', download: csvFileName('予約台帳') }])
   })
 
   it('イベント申込者CSVも同じく認証付き取得で取る', async () => {

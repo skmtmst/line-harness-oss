@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getScoringRules,
@@ -96,7 +97,7 @@ const scoring = new Hono<Env>();
 
 function mileageRewardError(c: Parameters<typeof auditLog>[0], error: unknown) {
   if (error instanceof MileageRewardError) {
-    return c.json({ success: false, error: error.message, code: error.code }, error.status as 400);
+    return inputError(c, { success: false, error: error.message, code: error.code }, error.status as 400, []);
   }
   console.error('mileage rewards error:', error);
   return c.json({ success: false, error: '使い道を処理できませんでした' }, 500);
@@ -104,12 +105,12 @@ function mileageRewardError(c: Parameters<typeof auditLog>[0], error: unknown) {
 
 function mileageV6Error(c: Parameters<typeof auditLog>[0], error: unknown) {
   if (error instanceof MileageV6Error) {
-    return c.json({
+    return inputError(c, {
       success: false,
       error: error.message,
       code: error.code,
       ...(error.field ? { field: error.field } : {}),
-    }, error.status as 400);
+    }, error.status as 400, []);
   }
   console.error('mileage V6 API error:', error);
   return c.json({ success: false, error: 'マイル情報を処理できませんでした' }, 500);
@@ -184,7 +185,7 @@ async function handleMileageRewardDraftUpdate(c: Context<Env>) {
       return c.json({ success: false, error: 'LINE公式アカウントが見つかりません' }, 404);
     }
     if (!body.draft || !expectedVersionId || expectedRevision == null) {
-      return c.json({ success: false, error: '読み込んだ版と変更内容が必要です' }, 400);
+      return inputError(c, { success: false, error: '読み込んだ版と変更内容が必要です' }, 400, ["draft","expectedVersionId","expectedRevision"]);
     }
     const reward = await updateMileageRewardDraft(c.env.DB, {
       id: c.req.param('id') ?? '', lineAccountId: accountId, expectedVersionId, expectedRevision,
@@ -207,31 +208,31 @@ scoring.get('/api/mileage/reward-folders', requireRole('owner', 'admin', 'staff'
     return c.json({ success: true, data: await listMileageRewardFolders(c.env.DB, accountId) });
   } catch (error) { return mileageRewardError(c, error); }
 });
-scoring.post('/api/mileage/reward-folders', requireRole('owner', 'admin'), async (c) => {
+scoring.post('/api/mileage/reward-folders', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: unknown; name?: unknown }>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
     if (!await canUseMileageAccount(c, accountId)) return c.json({ success: false, error: 'Not found' }, 404);
-    if (typeof body.name !== 'string') return c.json({ success: false, error: 'フォルダ名を入力してください' }, 422);
+    if (typeof body.name !== 'string') return inputError(c, { success: false, error: 'フォルダ名を入力してください' }, 422, ["name"]);
     return c.json({ success: true, data: await createMileageRewardFolder(c.env.DB, accountId, body.name) }, 201);
   } catch (error) { return mileageRewardError(c, error); }
 });
-scoring.put('/api/mileage/reward-folders/order', requireRole('owner', 'admin'), async (c) => {
+scoring.put('/api/mileage/reward-folders/order', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: unknown; ids?: unknown }>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
     if (!await canUseMileageAccount(c, accountId)) return c.json({ success: false, error: 'Not found' }, 404);
-    if (!Array.isArray(body.ids) || body.ids.some((id) => typeof id !== 'string')) return c.json({ success: false, error: 'フォルダの順番を指定してください' }, 422);
+    if (!Array.isArray(body.ids) || body.ids.some((id) => typeof id !== 'string')) return inputError(c, { success: false, error: 'フォルダの順番を指定してください' }, 422, ["ids"]);
     await reorderMileageRewardFolders(c.env.DB, accountId, body.ids);
     return c.json({ success: true, data: await listMileageRewardFolders(c.env.DB, accountId) });
   } catch (error) { return mileageRewardError(c, error); }
 });
-scoring.put('/api/mileage/rewards/:id/folder', requireRole('owner', 'admin'), async (c) => {
+scoring.put('/api/mileage/rewards/:id/folder', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: unknown; folderId?: unknown }>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
     if (!await canUseMileageAccount(c, accountId)) return c.json({ success: false, error: 'Not found' }, 404);
-    if (body.folderId !== null && (typeof body.folderId !== 'string' || !body.folderId)) return c.json({ success: false, error: 'フォルダか未分類を指定してください' }, 422);
+    if (body.folderId !== null && (typeof body.folderId !== 'string' || !body.folderId)) return inputError(c, { success: false, error: 'フォルダか未分類を指定してください' }, 422, ["folderId"]);
     await moveMileageRewardToFolder(c.env.DB, accountId, c.req.param('id'), body.folderId);
     return c.json({ success: true, data: await getMileageReward(c.env.DB, { id: c.req.param('id'), lineAccountId: accountId }) });
   } catch (error) { return mileageRewardError(c, error); }
@@ -275,14 +276,14 @@ scoring.get('/api/mileage/rewards/:id', requireRole('owner', 'admin', 'staff'), 
   }
 });
 
-scoring.post('/api/mileage/rewards', requireRole('owner', 'admin'), async (c) => {
+scoring.post('/api/mileage/rewards', requireRole('owner', 'admin'), inputJsonBoundary({"draft":["object"]}), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: unknown; draft?: MileageRewardDraftInput }>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
     if (!await canUseMileageAccount(c, accountId)) {
       return c.json({ success: false, error: 'LINE公式アカウントが見つかりません' }, 404);
     }
-    if (!body.draft) return c.json({ success: false, error: '使い道の内容を入力してください' }, 400);
+    if (!body.draft) return inputError(c, { success: false, error: '使い道の内容を入力してください' }, 400, ["draft"]);
     const reward = await createMileageRewardDraft(c.env.DB, {
       lineAccountId: accountId,
       createdBy: c.get('staff').id,
@@ -298,17 +299,17 @@ scoring.post('/api/mileage/rewards', requireRole('owner', 'admin'), async (c) =>
 scoring.patch(
   '/api/mileage/rewards/:id/draft',
   requireRole('owner', 'admin'),
-  handleMileageRewardDraftUpdate,
+  inputJsonBoundary({"draft":["object"]}), handleMileageRewardDraftUpdate,
 );
 
 // 旧画面が段階的に移行できる間だけ、同じ契約をPUTでも受ける。
 scoring.put(
   '/api/mileage/rewards/:id/draft',
   requireRole('owner', 'admin'),
-  handleMileageRewardDraftUpdate,
+  inputJsonBoundary({"draft":["object"]}), handleMileageRewardDraftUpdate,
 );
 
-scoring.post('/api/mileage/rewards/:id/draft', requireRole('owner', 'admin'), async (c) => {
+scoring.post('/api/mileage/rewards/:id/draft', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: unknown }>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
@@ -328,7 +329,7 @@ scoring.post(
   '/api/mileage/rewards/:id/publish',
   requireRole('owner', 'admin'),
   requireIrreversibleConfirmation('mileage-reward-publish'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const body = await c.req.json<{
         accountId?: unknown;
@@ -357,7 +358,7 @@ scoring.post(
   },
 );
 
-scoring.post('/api/mileage/rewards/:id/test', requireRole('owner', 'admin'), async (c) => {
+scoring.post('/api/mileage/rewards/:id/test', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: unknown }>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
@@ -385,7 +386,7 @@ scoring.post('/api/mileage/rewards/:id/test', requireRole('owner', 'admin'), asy
   }
 });
 
-scoring.post('/api/mileage/rewards/:id/stop', requireRole('owner', 'admin'), async (c) => {
+scoring.post('/api/mileage/rewards/:id/stop', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: unknown }>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
@@ -402,14 +403,14 @@ scoring.post('/api/mileage/rewards/:id/stop', requireRole('owner', 'admin'), asy
   }
 });
 
-scoring.post('/api/mileage/rewards/:id/status', requireRole('owner', 'admin'), async (c) => {
+scoring.post('/api/mileage/rewards/:id/status', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: unknown; status?: unknown }>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
     const status = body.status === 'published' || body.status === 'stopped' || body.status === 'archived'
       ? body.status
       : null;
-    if (!status) return c.json({ success: false, error: '状態を確認してください' }, 400);
+    if (!status) return inputError(c, { success: false, error: '状態を確認してください' }, 400, ["status"]);
     if (!await canUseMileageAccount(c, accountId)) {
       return c.json({ success: false, error: 'LINE公式アカウントが見つかりません' }, 404);
     }
@@ -423,7 +424,7 @@ scoring.post('/api/mileage/rewards/:id/status', requireRole('owner', 'admin'), a
   }
 });
 
-scoring.put('/api/mileage/rewards-order', requireRole('owner', 'admin'), async (c) => {
+scoring.put('/api/mileage/rewards-order', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: unknown; ids?: unknown }>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
@@ -440,7 +441,7 @@ scoring.put('/api/mileage/rewards-order', requireRole('owner', 'admin'), async (
   }
 });
 
-scoring.post('/api/mileage/rewards/:id/codes', requireRole('owner', 'admin'), async (c) => {
+scoring.post('/api/mileage/rewards/:id/codes', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: unknown; codes?: unknown }>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
@@ -452,7 +453,7 @@ scoring.post('/api/mileage/rewards/:id/codes', requireRole('owner', 'admin'), as
         .map((code) => code.trim()).filter(Boolean))]
       : [];
     if (!codes.length || codes.length > 10_000) {
-      return c.json({ success: false, error: '交換コードは1〜10,000件で登録してください' }, 400);
+      return inputError(c, { success: false, error: '交換コードは1〜10,000件で登録してください' }, 400, ["codes"]);
     }
     const protectedCodes = await Promise.all(codes.map(async (code) => ({
       ciphertext: await encryptCredential(code, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY),
@@ -472,7 +473,7 @@ scoring.post(
   '/api/mileage/redemptions',
   requireRole('owner', 'admin'),
   requireIrreversibleConfirmation('mileage-redemption'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const body = await c.req.json<{
         accountId?: unknown;
@@ -484,7 +485,7 @@ scoring.post(
       const rewardId = typeof body.rewardId === 'string' ? body.rewardId.trim() : '';
       const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
       if (!friendId || !rewardId || !isValidIdempotencyKey(idempotencyKey)) {
-        return c.json({ success: false, error: '友だち、使い道、処理IDを確認してください' }, 400);
+        return inputError(c, { success: false, error: '友だち、使い道、処理IDを確認してください' }, 400, ["friendId","rewardId","requestId"]);
       }
       if (!await canUseMileageAccount(c, accountId)) {
         return c.json({ success: false, error: 'LINE公式アカウントが見つかりません' }, 404);
@@ -581,7 +582,7 @@ scoring.get(
 scoring.post(
   '/api/mileage/redemptions/:id/retry-fulfillment',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const body = await c.req.json<{ accountId?: unknown }>();
       const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
@@ -686,7 +687,7 @@ scoring.get('/api/mileage/earning-rules', requireRole('owner', 'admin', 'staff')
   try {
     const accountId = c.req.query('accountId')?.trim() ?? '';
     if (!await canUseMileageAccount(c, accountId)) {
-      return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+      return inputError(c, { success: false, error: 'LINE account not found' }, accountId ? 404 : 400, []);
     }
     const requestedLimit = Number(c.req.query('limit') || 20);
     const requestedOffset = Number(c.req.query('offset') || 0);
@@ -707,7 +708,7 @@ scoring.get('/api/mileage/earning-rules', requireRole('owner', 'admin', 'staff')
  * 途中失敗で一部だけ反映され得るため、rewards-order と同じ一括口の構造で
  * アカウントの一覧と一致する全順序だけを受け付ける。
  */
-scoring.put('/api/mileage/earning-rules-order', requireRole('owner', 'admin'), async (c) => {
+scoring.put('/api/mileage/earning-rules-order', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: unknown; ids?: unknown }>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
@@ -729,19 +730,19 @@ scoring.put('/api/mileage/earning-rules-order', requireRole('owner', 'admin'), a
   }
 });
 
-scoring.patch('/api/mileage/earning-rules/:id/draft', requireRole('owner', 'admin'), async (c) => {
+scoring.patch('/api/mileage/earning-rules/:id/draft', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     type Body = { accountId?: unknown; expectedVersion?: unknown; draft?: unknown };
     const body = await c.req.json<Body>().catch((): Body => ({}));
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
     if (!await canUseMileageAccount(c, accountId)) {
-      return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+      return inputError(c, { success: false, error: 'LINE account not found' }, accountId ? 404 : 400, []);
     }
     const expectedVersion = body.expectedVersion === null || body.expectedVersion === undefined
       ? null
       : Number(body.expectedVersion);
     if (expectedVersion !== null && (!Number.isInteger(expectedVersion) || expectedVersion < 0)) {
-      return c.json({ success: false, error: 'expectedVersion is invalid' }, 400);
+      return inputError(c, { success: false, error: 'expectedVersion is invalid' }, 400, ["expectedVersion"]);
     }
     const data = await saveMileageEarningRuleDraft(c.env.DB, {
       ruleId: c.req.param('id'),
@@ -767,23 +768,23 @@ scoring.post(
   '/api/mileage/earning-rules/:id/publish',
   requireRole('owner', 'admin'),
   requireIrreversibleConfirmation('mileage-earning-rule-publish'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       type Body = { accountId?: unknown; expectedVersion?: unknown };
       const body = await c.req.json<Body>().catch((): Body => ({}));
       const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
       if (!await canUseMileageAccount(c, accountId)) {
-        return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+        return inputError(c, { success: false, error: 'LINE account not found' }, accountId ? 404 : 400, []);
       }
       const idempotencyKey = c.req.header('Idempotency-Key');
       if (!isValidIdempotencyKey(idempotencyKey)) {
-        return c.json({ success: false, error: '公開には有効な冪等キーが必要です' }, 400);
+        return inputError(c, { success: false, error: '公開には有効な冪等キーが必要です' }, 400, ["friendId","rewardId","requestId"]);
       }
       const expectedVersion = typeof body.expectedVersion === 'number'
         ? body.expectedVersion
         : Number.NaN;
       if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
-        return c.json({ success: false, error: '公開する下書きの版が必要です' }, 400);
+        return inputError(c, { success: false, error: '公開する下書きの版が必要です' }, 400, ["expectedVersion"]);
       }
       const data = await publishMileageEarningRule(c.env.DB, {
         ruleId: c.req.param('id'),
@@ -936,13 +937,13 @@ scoring.get('/api/mileage/adjustment-policy', requireRole('owner', 'admin'), asy
   }
 });
 
-scoring.put('/api/mileage/adjustment-policy', requireRole('owner'), async (c) => {
+scoring.put('/api/mileage/adjustment-policy', requireRole('owner'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: unknown; approvalThreshold?: unknown }>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
     const approvalThreshold = Number(body.approvalThreshold);
     if (!accountId || !Number.isInteger(approvalThreshold) || approvalThreshold <= 0) {
-      return c.json({ success: false, error: 'accountId and a positive integer approvalThreshold are required' }, 400);
+      return inputError(c, { success: false, error: 'accountId and a positive integer approvalThreshold are required' }, 400, ["accountId","approvalThreshold"]);
     }
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     if (!scope.allowedAccountIds.includes(accountId)) {
@@ -961,11 +962,11 @@ scoring.post(
   '/api/mileage/adjustments',
   requireRole('owner', 'admin'),
   requireIrreversibleConfirmation('mileage-adjustment'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
       if (!isValidIdempotencyKey(idempotencyKey)) {
-        return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+        return inputError(c, { success: false, error: '有効なIdempotency-Keyが必要です' }, 400, ["friendId","rewardId","requestId"]);
       }
       const body = await c.req.json<{
         accountId?: unknown;
@@ -991,31 +992,31 @@ scoring.post(
         : '';
       if (body.expiresAt !== undefined && body.expiresAt !== null && body.expiresAt !== ''
         && typeof body.expiresAt !== 'string') {
-        return c.json({ success: false, error: 'expiresAt must be a date-time string' }, 400);
+        return inputError(c, { success: false, error: 'expiresAt must be a date-time string' }, 400, ["expiresAt"]);
       }
       const expiresAtValue = typeof body.expiresAt === 'string' ? body.expiresAt.trim() : '';
       const expiresAt = expiresAtValue ? new Date(expiresAtValue) : null;
       const notifyFriend = body.notifyFriend === undefined ? false : body.notifyFriend;
       if (!accountId || !friendId || !direction || !Number.isInteger(amount) || amount <= 0) {
-        return c.json({ success: false, error: 'accountId, friendId, direction and a positive integer amount are required' }, 400);
+        return inputError(c, { success: false, error: 'accountId, friendId, direction and a positive integer amount are required' }, 400, ["accountId","friendId","direction","amount"]);
       }
       if (amount > 1_000_000_000) {
-        return c.json({ success: false, error: 'amount is too large' }, 400);
+        return inputError(c, { success: false, error: 'amount is too large' }, 400, ["amount"]);
       }
       if (!MILEAGE_ADJUSTMENT_REASON_CATEGORIES.has(reasonCategory)) {
-        return c.json({ success: false, error: 'reasonCategory is invalid' }, 400);
+        return inputError(c, { success: false, error: 'reasonCategory is invalid' }, 400, ["reasonCategory"]);
       }
       if (!reason || reason.length > 500 || sourceReferenceId.length > 128) {
-        return c.json({ success: false, error: 'reason is required and one or more fields are too long' }, 400);
+        return inputError(c, { success: false, error: 'reason is required and one or more fields are too long' }, 400, ["reason","sourceReferenceId"]);
       }
       if (typeof notifyFriend !== 'boolean') {
-        return c.json({ success: false, error: 'notifyFriend must be a boolean' }, 400);
+        return inputError(c, { success: false, error: 'notifyFriend must be a boolean' }, 400, ["notifyFriend"]);
       }
       if (expiresAt && Number.isNaN(expiresAt.getTime())) {
-        return c.json({ success: false, error: 'expiresAt must be a date-time' }, 400);
+        return inputError(c, { success: false, error: 'expiresAt must be a date-time' }, 400, ["expiresAt"]);
       }
       if (expiresAt && direction !== 'increase') {
-        return c.json({ success: false, error: 'expiresAt can only be set when increasing mileage' }, 400);
+        return inputError(c, { success: false, error: 'expiresAt can only be set when increasing mileage' }, 400, ["expiresAt","direction"]);
       }
 
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
@@ -1087,16 +1088,16 @@ scoring.post(
 
       // R378: 期限切れの判定と承認境界は「新しい調整」だけに適用する。
       if (expiresAt && expiresAt.getTime() <= Date.now()) {
-        return c.json({ success: false, error: 'expiresAt must be a future date-time' }, 400);
+        return inputError(c, { success: false, error: 'expiresAt must be a future date-time' }, 400, ["expiresAt"]);
       }
 
       const policy = await getMileageManualAdjustmentPolicy(c.env.DB, accountId);
       if (!policy) {
-        return c.json({
+        return inputError(c, {
           success: false,
           error: '高額調整の承認境界が未設定です。オーナーが先に設定してください。',
           code: 'ADJUSTMENT_POLICY_REQUIRED',
-        }, 400);
+        }, 400, ["accountId"]);
       }
       if (amount >= policy.approvalThreshold) {
         /*
@@ -1167,7 +1168,7 @@ scoring.post(
     } catch (err) {
       if (err instanceof MileageAdjustmentError) {
         if (err.code === 'insufficient_balance') {
-          return c.json({ success: false, error: '利用可能な残高を超えて減らすことはできません', code: err.code }, 400);
+          return inputError(c, { success: false, error: '利用可能な残高を超えて減らすことはできません', code: err.code }, 400, []);
         }
         if (err.code === 'idempotency_conflict') {
           return c.json({ success: false, error: '同じIdempotency-Keyが別の内容で使われています', code: err.code }, 409);
@@ -1190,7 +1191,7 @@ scoring.get('/api/mileage/adjustment-approvals', requireRole('owner', 'admin'), 
   try {
     const accountId = c.req.query('accountId')?.trim() ?? '';
     if (!await canUseMileageAccount(c, accountId)) {
-      return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+      return inputError(c, { success: false, error: 'LINE account not found' }, accountId ? 404 : 400, []);
     }
     const rawStatus = c.req.query('status')?.trim() ?? '';
     const status = ['pending', 'approved', 'rejected', 'cancelled'].includes(rawStatus)
@@ -1209,13 +1210,13 @@ scoring.get('/api/mileage/adjustment-approvals', requireRole('owner', 'admin'), 
 scoring.post(
   '/api/mileage/adjustment-approvals/:id/approve',
   requireRole('owner'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const body = await c.req.json<{ accountId?: unknown; reason?: unknown }>()
         .catch(() => ({} as { accountId?: unknown; reason?: unknown }));
       const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
       if (!await canUseMileageAccount(c, accountId)) {
-        return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+        return inputError(c, { success: false, error: 'LINE account not found' }, accountId ? 404 : 400, []);
       }
       const staff = c.get('staff');
       const { request, entry } = await approveMileageAdjustmentRequest(c.env.DB, {
@@ -1260,13 +1261,13 @@ scoring.post(
 scoring.post(
   '/api/mileage/adjustment-approvals/:id/reject',
   requireRole('owner'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const body = await c.req.json<{ accountId?: unknown; reason?: unknown }>()
         .catch(() => ({} as { accountId?: unknown; reason?: unknown }));
       const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
       if (!await canUseMileageAccount(c, accountId)) {
-        return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+        return inputError(c, { success: false, error: 'LINE account not found' }, accountId ? 404 : 400, []);
       }
       const staff = c.get('staff');
       const request = await rejectMileageAdjustmentRequest(c.env.DB, {
@@ -1289,13 +1290,13 @@ scoring.post(
 scoring.post(
   '/api/mileage/adjustment-approvals/:id/cancel',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const body = await c.req.json<{ accountId?: unknown }>()
         .catch(() => ({} as { accountId?: unknown }));
       const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
       if (!await canUseMileageAccount(c, accountId)) {
-        return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+        return inputError(c, { success: false, error: 'LINE account not found' }, accountId ? 404 : 400, []);
       }
       const request = await cancelMileageAdjustmentRequest(c.env.DB, {
         requestId: c.req.param('id'),
@@ -1319,17 +1320,17 @@ scoring.post(
 scoring.post(
   '/api/mileage/entries/:id/confirm',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const body = await c.req.json<{ accountId?: unknown; reason?: unknown }>()
         .catch(() => ({} as { accountId?: unknown; reason?: unknown }));
       const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
       const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
       if (!accountId) {
-        return c.json({ success: false, error: 'accountId is required' }, 400);
+        return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
       }
       if (!reason) {
-        return c.json({ success: false, error: '理由を入力してください', code: 'reason_required' }, 400);
+        return inputError(c, { success: false, error: '理由を入力してください', code: 'reason_required' }, 400, ["reason"]);
       }
       if (!await canUseMileageAccount(c, accountId)) {
         return c.json({ success: false, error: 'LINE account not found' }, 404);
@@ -1356,17 +1357,17 @@ scoring.post(
   '/api/mileage/entries/:id/void',
   requireRole('owner', 'admin'),
   requireIrreversibleConfirmation('mileage-entry-void'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const body = await c.req.json<{ accountId?: unknown; reason?: unknown }>()
         .catch(() => ({} as { accountId?: unknown; reason?: unknown }));
       const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
       const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
       if (!accountId) {
-        return c.json({ success: false, error: 'accountId is required' }, 400);
+        return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
       }
       if (!reason) {
-        return c.json({ success: false, error: '理由を入力してください', code: 'reason_required' }, 400);
+        return inputError(c, { success: false, error: '理由を入力してください', code: 'reason_required' }, 400, ["reason"]);
       }
       if (!await canUseMileageAccount(c, accountId)) {
         return c.json({ success: false, error: 'LINE account not found' }, 404);
@@ -1399,13 +1400,13 @@ scoring.post(
 scoring.post(
   '/api/mileage/entries/:id/notification-retry',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const body = await c.req.json<{ accountId?: unknown }>()
         .catch(() => ({} as { accountId?: unknown }));
       const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
       if (!await canUseMileageAccount(c, accountId)) {
-        return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+        return inputError(c, { success: false, error: 'LINE account not found' }, accountId ? 404 : 400, []);
       }
       const entryId = c.req.param('id');
       const entry = await c.env.DB.prepare(
@@ -1468,13 +1469,13 @@ scoring.post(
 scoring.post(
   '/api/mileage/earning-rules/test',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const body = await c.req.json<{ accountId?: unknown; draft?: unknown }>()
         .catch(() => ({} as { accountId?: unknown; draft?: unknown }));
       const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
       if (!await canUseMileageAccount(c, accountId)) {
-        return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+        return inputError(c, { success: false, error: 'LINE account not found' }, accountId ? 404 : 400, []);
       }
       const draft = validateMileageEarningRuleDraft(body.draft);
       const data = await testMileageEarningRuleDraft(c.env.DB, {
@@ -1588,7 +1589,7 @@ scoring.get('/api/mileage/rules/export', requireRole('owner', 'admin', 'staff'),
 
 // Generic authenticated ingestion point for future Harness products/SNS.
 // The request only records an event + queue row; mileage is calculated by cron.
-scoring.post('/api/mileage/events', requireRole('owner', 'admin'), async (c) => {
+scoring.post('/api/mileage/events', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   auditLog(c, 'mileage.event.create', { kind: 'mileage_event' });
   try {
     const body = await c.req.json<{
@@ -1605,10 +1606,10 @@ scoring.post('/api/mileage/events', requireRole('owner', 'admin'), async (c) => 
     const source = typeof body.source === 'string' ? body.source.trim() : '';
     const sourceEventId = typeof body.sourceEventId === 'string' ? body.sourceEventId.trim() : '';
     if (!friendId || !eventType || !source || !sourceEventId) {
-      return c.json({ success: false, error: 'friendId, eventType, source and sourceEventId are required' }, 400);
+      return inputError(c, { success: false, error: 'friendId, eventType, source and sourceEventId are required' }, 400, ["friendId","eventType","source","sourceEventId"]);
     }
     if (friendId.length > 128 || eventType.length > 100 || source.length > 100 || sourceEventId.length > 256) {
-      return c.json({ success: false, error: 'one or more fields are too long' }, 400);
+      return inputError(c, { success: false, error: 'one or more fields are too long' }, 400, ["friendId","eventType","source","sourceEventId"]);
     }
     const metadata = body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata)
       ? body.metadata as Record<string, unknown>
@@ -1741,7 +1742,7 @@ async function createMileageRuleIdempotent(
   return { status: 201, body: { success: true, data: serializeMileageRule(created) } };
 }
 
-scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), async (c) => {
+scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"eventType":["string"],"source":["null","string"],"amount":["number"],"initialStatus":["string"],"conditions":["null","object"],"validFrom":["null","string"],"validUntil":["null","string"],"lineAccountId":["string"],"isActive":["boolean"]}), async (c) => {
   auditLog(c, 'mileage.rule.create', { kind: 'mileage_rule' });
   try {
     const body = await c.req.json<{
@@ -1767,10 +1768,10 @@ scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), async (c) => {
       isActive?: boolean;
     }>();
     if (!body.name?.trim() || !body.eventType?.trim() || !Number.isInteger(body.amount) || (body.amount ?? 0) <= 0) {
-      return c.json({ success: false, error: 'name, eventType and a positive integer amount are required' }, 400);
+      return inputError(c, { success: false, error: 'name, eventType and a positive integer amount are required' }, 400, ["name","eventType","amount"]);
     }
     if (!body.lineAccountId?.trim()) {
-      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+      return inputError(c, { success: false, error: 'lineAccountId is required' }, 400, ["lineAccountId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -1779,7 +1780,7 @@ scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), async (c) => {
     const requestKey = c.req.header('Idempotency-Key')?.trim();
     if (requestKey !== undefined && requestKey !== '') {
       if (!isValidIdempotencyKey(requestKey)) {
-        return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+        return inputError(c, { success: false, error: '有効なIdempotency-Keyが必要です' }, 400, ["friendId","rewardId","requestId"]);
       }
       const result = await createMileageRuleIdempotent(c.env.DB, {
         name: body.name.trim(),
@@ -1815,7 +1816,7 @@ scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), async (c) => {
   }
 });
 
-scoring.put('/api/mileage/rules/:id', requireRole('owner', 'admin'), async (c) => {
+scoring.put('/api/mileage/rules/:id', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"eventType":["string"],"source":["null","string"],"amount":["number"],"initialStatus":["string"],"conditions":["null","object"],"isActive":["boolean"]}), async (c) => {
   auditLog(c, 'mileage.rule.update', { kind: 'mileage_rule', id: c.req.param('id') });
   try {
     const body = await c.req.json<{
@@ -1836,7 +1837,7 @@ scoring.put('/api/mileage/rules/:id', requireRole('owner', 'admin'), async (c) =
       isActive?: boolean;
     }>();
     if (body.amount !== undefined && (!Number.isInteger(body.amount) || body.amount <= 0)) {
-      return c.json({ success: false, error: 'amount must be a positive integer' }, 400);
+      return inputError(c, { success: false, error: 'amount must be a positive integer' }, 400, ["amount"]);
     }
     const existing = await getMileageRuleById(c.env.DB, c.req.param('id'));
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
@@ -1970,11 +1971,11 @@ scoring.get('/api/scoring-rules/:id', async (c) => {
   }
 });
 
-scoring.post('/api/scoring-rules', requireRole('owner', 'admin'), async (c) => {
+scoring.post('/api/scoring-rules', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"eventType":["string"],"scoreValue":["number"]}), async (c) => {
   try {
     const body = await c.req.json<{ name: string; eventType: string; scoreValue: number }>();
     if (!body.name || !body.eventType || body.scoreValue === undefined) {
-      return c.json({ success: false, error: 'name, eventType, scoreValue are required' }, 400);
+      return inputError(c, { success: false, error: 'name, eventType, scoreValue are required' }, 400, ["name","eventType","scoreValue"]);
     }
     const item = await createScoringRule(c.env.DB, body);
     return c.json({ success: true, data: { id: item.id, name: item.name, eventType: item.event_type, scoreValue: item.score_value } }, 201);
@@ -1984,7 +1985,7 @@ scoring.post('/api/scoring-rules', requireRole('owner', 'admin'), async (c) => {
   }
 });
 
-scoring.put('/api/scoring-rules/:id', requireRole('owner', 'admin'), async (c) => {
+scoring.put('/api/scoring-rules/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json();
@@ -2051,16 +2052,16 @@ scoring.get('/api/friends/:id/score', requireVisibleFriendForScore, async (c) =>
 });
 
 // 手動スコア加算
-scoring.post('/api/friends/:id/score', requireRole('owner', 'admin'), requireVisibleFriendForScore, async (c) => {
+scoring.post('/api/friends/:id/score', requireRole('owner', 'admin'), requireVisibleFriendForScore, inputJsonBoundary({"scoreChange":["number"],"reason":["string"]}), async (c) => {
   try {
     const friendId = c.req.param('id');
     const body = await c.req.json<{ scoreChange: number; reason?: string }>();
     if (typeof body.scoreChange !== 'number' || !Number.isFinite(body.scoreChange)) {
-      return c.json({ success: false, error: 'scoreChange must be a finite number' }, 400);
+      return inputError(c, { success: false, error: 'scoreChange must be a finite number' }, 400, ["scoreChange"]);
     }
     const requestKey = c.req.header('Idempotency-Key');
     if (requestKey !== undefined && (!requestKey.trim() || requestKey.length > 128)) {
-      return c.json({ success: false, error: 'Invalid Idempotency-Key' }, 400);
+      return inputError(c, { success: false, error: 'Invalid Idempotency-Key' }, 400, ["friendId","rewardId","requestId"]);
     }
     const staff = c.get('staff');
     await addScore(c.env.DB, {

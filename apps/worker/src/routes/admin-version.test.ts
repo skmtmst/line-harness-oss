@@ -29,6 +29,21 @@ describe('GET /admin/version', () => {
     expect(typeof j.git_commit).toBe('string');
   });
 
+  it('returns the deployed source SHA without login or secrets', async () => {
+    const app = new Hono();
+    app.route('/admin', adminVersion);
+    const sha = 'a'.repeat(40);
+    const res = await app.request('/admin/version', {}, {
+      BUILD_GIT_COMMIT: sha, BUILD_VERSION: '0.24.0',
+      BUILD_RELEASED_AT: '2026-10-09T00:00:00Z', DEPLOY_ENV: 'staging',
+      ADMIN_API_KEY: 'must-not-leak',
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ git_commit: sha, version: '0.24.0', released_at: '2026-10-09T00:00:00Z' });
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(await (await app.request('/admin/version', {}, { ADMIN_API_KEY: 'must-not-leak' })).text()).not.toContain('must-not-leak');
+  });
+
   it('returns the deploy env from wrangler vars (null when unset)', async () => {
     const app = new Hono();
     app.route('/admin', adminVersion);

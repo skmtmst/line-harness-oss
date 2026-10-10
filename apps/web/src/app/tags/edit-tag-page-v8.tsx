@@ -3,7 +3,7 @@
 /*
  * ★V8「タグを編集」（Pencil `Qat9s`）の入口。
  *
- * 読み込み・参照件数の確認窓・保管済みタグの扱い・保存・削除は
+ * 読み込み・参照件数の確認窓・アーカイブタグの扱い・保存・削除は
  * v7（edit-tag-page-v4）と同じ。違うのは中身の部品——`TagEditorV8`。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -220,7 +220,7 @@ export default function EditTagPageV8() {
     )
   }
 
-  // 保管済み(archived)タグは、通常の編集フォームを出さない(#710)。
+  // アーカイブ(archived)タグは、通常の編集フォームを出さない(#710)。
   if (tag.status === 'archived') {
     return (
       <ArchivedTagEditor

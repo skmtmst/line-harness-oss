@@ -14,6 +14,7 @@ import OpsMembersPage from './page'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
+vi.mock('next/navigation',()=>({useRouter:()=>({replace:vi.fn(),push:vi.fn()}),usePathname:()=>'/ops/members'}))
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => <a>{children}</a> }))
 
 const members = [
@@ -76,8 +77,8 @@ describe('FvbHW メンバー管理の絵合わせ', () => {
     expect(body).not.toContain('キャンセル')
     // 行
     expect(body).toContain('Kenta Kawano（自分）')
-    expect(body).toContain('10/2 07:10')
-    expect(body).toContain('10/1 22:40')
+    expect(body).toContain('10/02 07:10')
+    expect(body).toContain('10/01 22:40')
     expect(body).toContain('2要素認証待ち')
     expect(body).toContain('招待中')
     expect(body).toContain('停止')

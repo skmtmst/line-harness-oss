@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   createBookingPayment,
@@ -88,9 +89,9 @@ bookingPayments.get(
 bookingPayments.put(
   '/api/booking/admin/payment-config',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = c.req.query('account_id')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+    if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["account_id"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: '対象が見つかりません' }, 404);
     }
@@ -101,16 +102,16 @@ bookingPayments.put(
     const provider = validProvider(body?.provider);
     const holdMinutes = Number(body?.holdMinutes);
     if (!mode || !provider) {
-      return c.json({ success: false, error: 'mode と provider を指定してください' }, 400);
+      return inputError(c, { success: false, error: 'mode と provider を指定してください' }, 400, ["mode","provider"]);
     }
     if (!Number.isInteger(holdMinutes) || holdMinutes < 5 || holdMinutes > 1440) {
-      return c.json({ success: false, error: 'holdMinutes は 5〜1440 の整数で指定してください' }, 400);
+      return inputError(c, { success: false, error: 'holdMinutes は 5〜1440 の整数で指定してください' }, 400, ["holdMinutes"]);
     }
     if (mode === 'online' && provider !== 'stripe') {
-      return c.json({ success: false, error: 'online の provider は stripe を指定してください' }, 400);
+      return inputError(c, { success: false, error: 'online の provider は stripe を指定してください' }, 400, ["mode","provider"]);
     }
     if (mode !== 'online' && provider === 'stripe') {
-      return c.json({ success: false, error: 'stripe を使うときは mode を online にしてください' }, 400);
+      return inputError(c, { success: false, error: 'stripe を使うときは mode を online にしてください' }, 400, ["mode","provider"]);
     }
     const saved = await saveBookingPaymentConfig(c.env.DB, accountId, { mode, provider, holdMinutes });
     return c.json({ success: true, data: saved });
@@ -121,9 +122,9 @@ bookingPayments.put(
 bookingPayments.put(
   '/api/booking/admin/menus/:id/payment',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = c.req.query('account_id')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+    if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["account_id"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: '対象が見つかりません' }, 404);
     }
@@ -136,7 +137,7 @@ bookingPayments.put(
     const mode = validMode(body?.mode);
     const provider = validProvider(body?.provider);
     if (!mode || !provider) {
-      return c.json({ success: false, error: 'mode と provider を指定してください' }, 400);
+      return inputError(c, { success: false, error: 'mode と provider を指定してください' }, 400, ["mode","provider"]);
     }
     await saveBookingPaymentMenuSetting(c.env.DB, accountId, menuId, { mode, provider });
     const effective = await resolveBookingPaymentConfig(c.env.DB, accountId, menuId);
@@ -245,10 +246,10 @@ async function bookingPaymentStatusPayload(
 bookingPayments.post(
   '/api/booking/payments/start',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const body = await c.req.json<{ bookingId?: unknown; idempotencyKey?: unknown }>().catch(() => null);
     const bookingId = String(body?.bookingId ?? '');
-    if (!bookingId) return c.json({ success: false, error: 'bookingId が必要です' }, 400);
+    if (!bookingId) return inputError(c, { success: false, error: 'bookingId が必要です' }, 400, ["bookingId"]);
     const booking = await c.env.DB.prepare(
       `SELECT id, line_account_id, price_at_booking, status FROM bookings WHERE id = ?`,
     ).bind(bookingId).first<StartBookingRow>();
@@ -260,7 +261,7 @@ bookingPayments.post(
       ? body.idempotencyKey.slice(0, 200)
       : `booking:${bookingId}`;
     const result = await startBookingPayment(c.env.DB, c.env, booking, idempotencyKey);
-    if (!result.ok) return c.json({ success: false, error: result.error }, result.status);
+    if (!result.ok) return inputError(c, { success: false, error: result.error }, result.status, []);
     const current = await getBookingPaymentByBooking(c.env.DB, booking.line_account_id, bookingId);
     return c.json(
       { success: true, data: { payment: current, checkoutUrl: result.checkoutUrl } },
@@ -270,7 +271,7 @@ bookingPayments.post(
 );
 
 // POST /api/liff/booking/payments/start — 支払いを始める（お客さま用）
-bookingPayments.post('/api/liff/booking/payments/start', async (c) => {
+bookingPayments.post('/api/liff/booking/payments/start', inputJsonBoundary(), async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
   if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
   const callerLineUserId = await verifyCallerLineUserId(c);
@@ -279,7 +280,7 @@ bookingPayments.post('/api/liff/booking/payments/start', async (c) => {
   if (!friendId) return c.json({ error: 'friend_not_found' }, 404);
   const body = await c.req.json<{ bookingId?: unknown }>().catch(() => null);
   const bookingId = String(body?.bookingId ?? '');
-  if (!bookingId) return c.json({ error: 'bookingId が必要です' }, 400);
+  if (!bookingId) return inputError(c, { error: 'bookingId が必要です' }, 400, ["bookingId"]);
   const booking = await c.env.DB.prepare(
     `SELECT id, line_account_id, price_at_booking, status FROM bookings WHERE id = ? AND friend_id = ?`,
   ).bind(bookingId, friendId).first<StartBookingRow>();
@@ -287,7 +288,7 @@ bookingPayments.post('/api/liff/booking/payments/start', async (c) => {
     return c.json({ error: '対象が見つかりません' }, 404);
   }
   const result = await startBookingPayment(c.env.DB, c.env, booking, `booking:${bookingId}`);
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) return inputError(c, { error: result.error }, result.status, []);
   const current = await getBookingPaymentByBooking(c.env.DB, accountId, bookingId);
   return c.json(
     { payment: current, checkoutUrl: result.checkoutUrl },
@@ -368,7 +369,7 @@ export async function expireBookingPaymentIfHeld(
 bookingPayments.post(
   '/api/booking/payments/:id/refund',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const paymentId = c.req.param('id');
     const record = await c.env.DB.prepare(
       `SELECT * FROM booking_payments WHERE id = ?`,
@@ -399,7 +400,7 @@ bookingPayments.post(
 // POST /api/booking/payments/webhook/:provider — 支払い済みの知らせ
 bookingPayments.post(
   '/api/booking/payments/webhook/:provider',
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const providerName = c.req.param('provider');
     const rawBody = await c.req.text();
     if (new TextEncoder().encode(rawBody).byteLength > 256 * 1024) {

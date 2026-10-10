@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { parseExecutionDateRange } from '@line-crm/shared';
 import { Hono } from 'hono';
 import {
@@ -333,7 +334,7 @@ autoReplyRuns.get(
 autoReplyRuns.post(
   '/api/auto-reply-runs/:id/retry',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       const outcome = await retryAutoReplyActionRuns(c.env.DB, {
@@ -346,7 +347,7 @@ autoReplyRuns.post(
     } catch (error) {
       if (error instanceof AutoReplyActionRetryError) {
         const status = error.code === 'not_found' ? 404 : 409;
-        return c.json({ success: false, error: error.message, code: error.code }, status);
+        return inputError(c, { success: false, error: error.message, code: error.code }, status);
       }
       console.error('POST /api/auto-reply-runs/:id/retry failed', error);
       return c.json({ success: false, error: '失敗した処理をもう一度実行できませんでした' }, 500);

@@ -16,7 +16,7 @@ describe('V6 シナリオ一覧の読込状態', () => {
     expect(PAGE).toContain('scenarioList.error')
     /* 板 `BxGhV`「読み込めなかった」：細い帯＋もう一度試す。 */
     expect(PAGE).toContain('シナリオを読み込めませんでした')
-    expect(PAGE).toContain('>もう一度試す<')
+    expect(PAGE).toContain('>もう一度読み込む<')
     expect(PAGE).toContain('onClick={() => void loadScenarios()}')
     expect(PAGE).not.toContain("setError(res.error)")
   })

@@ -10,7 +10,7 @@ import ActionMenu from './action-menu'
 /**
  * その他操作メニュー（Pencil ★V8 `hnuY9`）の共通部品の試験。
  *
- * - 項目は高さ36（補足つき52）・アイコン16＋文字14・折り返さない
+ * - 項目は高さ36（補足つき52）・アイコン16＋文字13・折り返さない
  * - 区切り線・小さな見出し、危ない操作は danger、別画面へ行く項目は ↗
  * - キーボード（矢印・Enter・Esc・開いたら最初の項目）、role=menu/menuitem
  * - 画面の端で切れない（横・縦にはみ出さない）
@@ -209,14 +209,14 @@ describe('ActionMenu R13: 行の中でも行へ伝えない', () => {
   })
 })
 
-describe('ActionMenu ★V7 の見た目', () => {
-  it('白地・角丸12・枠・影、項目36（補足つき52）・文字14・触った時の地は shell', () => {
+describe('ActionMenu ★V8 の見た目', () => {
+  it('白地・角丸12・枠・影、項目36（補足つき52）・文字13・触った時の地は shell', () => {
     const css = read('action-menu.module.css')
     expect(css).toMatch(/\.menu\s*{[^}]*min-width:\s*224px/s)
     expect(css).toMatch(/\.menu\s*{[^}]*max-width:\s*min\(320px,\s*calc\(100vw - 16px\)\)/s)
     expect(css).toMatch(/\.menu\s*{[^}]*background:\s*var\(--color-canvas\)/s)
     expect(css).toMatch(/\.menu\s*{[^}]*border-radius:\s*var\(--radius-card\)/s)
-    expect(css).toMatch(/\.menu\s*{[^}]*border:\s*1px solid var\(--color-hairline\)/s)
+    expect(css).toMatch(/\.menu\s*{[^}]*border:\s*1px solid var\(--card-edge\)/s)
     expect(css).toMatch(/\.menu\s*{[^}]*box-shadow:\s*var\(--shadow-float\)/s)
     expect(css).toMatch(/\.item\s*{[^}]*height:\s*36px/s)
     expect(css).toMatch(/\.itemTall\s*{[^}]*height:\s*52px/s)

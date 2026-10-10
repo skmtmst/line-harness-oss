@@ -1,0 +1,19 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hb2-op-col-gap);
+  padding: var(--tpl-hb2-op-card-pad);
+  border-radius: var(--tpl-hb2-op-card-radius);
+  outline: 1px solid var(--card-edge);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  min-width: 0;
+  box-shadow: var(--card-shadow);
+}
+.header { display: flex; align-items: center; justify-content: space-between; }
+.heading { display: flex; flex-direction: column; gap: var(--tpl-hb2-op-head-gap); min-width: 0; }
+.title { margin: 0; color: var(--color-ink); font-size: var(--text-body); font-weight: 700; line-height: normal; }
+.description { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: normal; }
+}

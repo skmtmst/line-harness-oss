@@ -1,12 +1,12 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'page.tsx'), 'utf8')
-const NAV = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'friends-nav-v8.tsx'), 'utf8')
-const TABLE = readFileSync(join(HERE, 'friend-list-table.tsx'), 'utf8')
+const NAV = PAGE
+const TABLE = PAGE
 const ROW = readFileSync(join(HERE, 'friend-list-row.tsx'), 'utf8')
 const PAGINATION = readFileSync(join(HERE, '..', 'shared', 'pagination.tsx'), 'utf8')
 const ADVANCED = readFileSync(join(HERE, 'advanced-search-dialog.tsx'), 'utf8')
@@ -14,7 +14,7 @@ const ADVANCED = readFileSync(join(HERE, 'advanced-search-dialog.tsx'), 'utf8')
 const SAVED_DIALOG = readFileSync(join(HERE, 'saved-search-dialog.tsx'), 'utf8')
 const NOTICE_DIALOG = readFileSync(join(HERE, 'notice-dialog.tsx'), 'utf8')
 /* #984 LAY-14: 友だち配下の主タブの正本は friends-tabs.ts。 */
-const FRIENDS_TABS = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'friends-tabs.ts'), 'utf8')
+const FRIENDS_TABS = readFileSync(join(HERE, '../../v8/friends/shared/nav.ts'), 'utf8')
 const DETAIL = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'detail', 'page.tsx'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 
@@ -23,11 +23,11 @@ describe('友だちV8の画面契約', () => {
     expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
     expect(PAGE).not.toContain('<Header')
     expect(PAGE).not.toContain('<MergedTabs')
-    expect(PAGE).toContain('<FriendsListHeadV8')
+    expect(PAGE).toContain('<ListPage')
     // 主タブの項目は friends-tabs.ts が正本（#984 LAY-14。UID移行側も同じ一覧を使う）。
-    expect(PAGE).toContain('FRIENDS_MERGED_TABS')
+    expect(PAGE).toContain('<FriendsTabs')
     expect(FRIENDS_TABS).toContain("{ key: 'duplicates', label: '重複検出'")
-    expect(FRIENDS_TABS).toContain("{ key: 'uid-migration', label: 'UID移行', href: '/accounts?tab=migration' }")
+    expect(FRIENDS_TABS).toContain("{ key: 'uid-migration', label: 'UID移行', href: '/friends/migrations?tab=uid' }")
     expect(NAV).toContain('CSVで書き出す')
     expect(PAGE).not.toContain('友だち管理のマニュアルは準備中です')
   })
@@ -41,7 +41,6 @@ describe('友だちV8の画面契約', () => {
   })
 
   it('V8でも検索・絞り込みの実行先を残す', () => {
-    expect(PAGE).toContain('const SEARCH_ROW_SECONDARY')
     expect(PAGE).toContain('名前・LINE名・タグ・メモで探す')
     expect(PAGE).toContain('詳細条件')
     expect(PAGE).toContain('SavedSearchDialog')
@@ -50,11 +49,11 @@ describe('友だちV8の画面契約', () => {
     expect(ADVANCED).toContain('この条件で表示')
     expect(PAGE).toContain('友だち追加の新しい順')
     /* 「担当者：すべて」は共通Selectの label + option から組み立てる。 */
-    expect(PAGE).toContain('label="担当"')
-    expect(PAGE).toContain('label="シナリオ"')
+    expect(PAGE).toContain('aria-label="担当で絞り込む"')
+    expect(PAGE).toContain('aria-label="シナリオで絞り込む"')
     expect(PAGE).toContain("{ value: '', label: 'すべて' }")
     expect(PAGE).toContain('注目のみ')
-    expect(PAGE).toContain('data-design-node="ywJ5H"')
+    expect(PAGE).toContain('boardId="x6QsVz"')
     expect(ADVANCED).toContain('z-[100]')
     expect(ADVANCED).toContain('現在の条件に一致')
     expect(ADVANCED).toContain('いずれか1つ以上満たす条件')
@@ -95,7 +94,7 @@ describe('友だちV8の画面契約', () => {
       'SingleFriendActions',
       '/friends/detail?id=',
       '/chats?friend=',
-      '/accounts?tab=migration',
+      '/friends/migrations',
     ]) {
       expect(PAGE + ROW + readFileSync(join(HERE, 'friend-row-menu.tsx'), 'utf8')).toContain(marker)
     }

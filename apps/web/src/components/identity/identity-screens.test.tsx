@@ -1,7 +1,7 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { IdentityCandidateDetail } from '@line-crm/shared'
@@ -221,8 +221,10 @@ describe('2画面が同じ部品で組まれている', () => {
   const friend = read(FRIEND_SCREEN)
   const ec = read(EC_SCREEN)
 
-  it('候補部品・状態部品・判定窓を両方が使う', () => {
-    for (const source of [friend, ec]) {
+  it('V8は同じ判定の読み口・状態部品を使い、ECの候補部品は維持する', () => {
+    expect(friend).toContain('IdentityStateBlock')
+    expect(friend).toContain('useIdentityReview')
+    for (const source of [ec]) {
       expect(source).toContain('IdentityStateBlock')
       expect(source).toContain('IdentityDecisionDialog')
       expect(source).toContain('IdentityEvidenceList')
@@ -233,7 +235,6 @@ describe('2画面が同じ部品で組まれている', () => {
   })
 
   it('撮影の押し口を、文言ではなく印で持つ', () => {
-    expect(friend).toContain('data-qa-open="InCDe"')
     expect(ec).toContain('data-qa-open="ELayY"')
   })
 

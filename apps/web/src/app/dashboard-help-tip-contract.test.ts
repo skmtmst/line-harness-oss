@@ -9,7 +9,9 @@
  * 題をふさがず補足だけを入れる、という意図は残す。）
  */
 
-import fs from 'node:fs'
+import { readUiSource } from '../../scripts/test-ui-source.mjs'
+import { existsSync } from 'node:fs'
+const fs = { readFileSync: readUiSource, existsSync }
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'

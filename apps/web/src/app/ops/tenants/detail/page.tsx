@@ -133,7 +133,7 @@ function OpsTenantDetailContent() {
   if (!detail) {
     return (
       <div data-design-node="Oub6x">
-        <OpsPageHeader breadcrumb={[]} description="" title="契約先アカウント" actions={<BackToList />} />
+        <OpsPageHeader breadcrumb={[]} help="" title="契約先アカウント" actions={<BackToList />} />
         {error
           ? <ListState kind="error" title="契約先を表示できませんでした" description={error} onRetry={() => void load()} />
           : <ListState kind="loading" title="契約先を読み込んでいます" />}
@@ -146,7 +146,7 @@ function OpsTenantDetailContent() {
   return (
     <div data-design-node="Oub6x" className={`ops-detail-page flex flex-col gap-4`}>
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      <OpsPageHeader breadcrumb={[]} title={tenant.name} titleDisplay="always" description={`${planLabel(tenant.plan_key)}・${PLAN_STATUS_LABEL[tenant.plan_status] ?? tenant.plan_status}・${formatDate(tenant.created_at)} から`} actions={
+      <OpsPageHeader breadcrumb={[]} title={tenant.name} titleDisplay="always" help={`${planLabel(tenant.plan_key)}・${PLAN_STATUS_LABEL[tenant.plan_status] ?? tenant.plan_status}・${formatDate(tenant.created_at)} から`} actions={
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => setImpersonateConfirm(true)} disabled={busy || tenant.status === 'archived'}><Eye aria-hidden="true" className="h-4 w-4" />代理ログイン（閲覧のみ）</Button>
           {tenant.status === 'active' ? <><Button variant="danger" onClick={() => setStatusDialog('suspended')}>停止</Button><Button onClick={() => setStatusDialog('archived')}>アーカイブ</Button></> : <Button onClick={() => setStatusDialog('active')}>再開</Button>}

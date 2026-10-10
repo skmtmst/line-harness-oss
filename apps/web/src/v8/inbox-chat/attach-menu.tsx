@@ -11,6 +11,7 @@ import { useRef, useState } from 'react'
 import { FileText, Image as ImageIcon, Paperclip } from 'lucide-react'
 import MenuPortal from '@/components/shared/menu-portal'
 import Button from '@/components/shared/button'
+import MediaSlot from '@/components/shared/media-slot'
 import { FILE_ACCEPT, MEDIA_ACCEPT, type AttachSlot } from './attachments'
 import styles from './inbox-chat.module.css'
 
@@ -31,12 +32,6 @@ export default function AttachMenu({
     setOpen(false)
     ;(slot === 'media' ? mediaRef : fileRef).current?.click()
   }
-  const take = (slot: AttachSlot) => (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    // 同じものをもう一度選べるように値を戻す。
-    event.target.value = ''
-    if (file) onPick(file, slot)
-  }
 
   return (
     <div ref={wrapRef} className={styles.popWrap}>
@@ -53,8 +48,8 @@ export default function AttachMenu({
       >
         <Paperclip aria-hidden size={16} />
       </Button>
-      <input ref={mediaRef} type="file" accept={MEDIA_ACCEPT} hidden data-inbox-v8="attach-media-input" onChange={take('media')} />
-      <input ref={fileRef} type="file" accept={FILE_ACCEPT} hidden data-inbox-v8="attach-file-input" onChange={take('file')} />
+      <MediaSlot title="画像・動画を添付" accept={MEDIA_ACCEPT} fileInputRef={mediaRef} renderTrigger={() => null} onFile={(file) => onPick(file, 'media')} />
+      <MediaSlot kind="file" title="ファイルを添付" accept={FILE_ACCEPT} fileInputRef={fileRef} renderTrigger={() => null} onFile={(file) => onPick(file, 'file')} />
       <MenuPortal open={open} align="start" getAnchor={() => wrapRef.current} onClose={() => setOpen(false)}>
         <div role="menu" aria-label="添付するもの" className={styles.attachPop}>
           <button type="button" role="menuitem" className={styles.attachItem} onClick={() => choose('media')}>

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import React, { act } from 'react'
@@ -31,6 +31,7 @@ const SCENARIOS_PAGE = readFileSync(join(HERE, '../../v8/scenarios/list.tsx'), '
 const SERVER_LIST = readFileSync(join(HERE, '../../lib/use-server-list.ts'), 'utf8')
 
 import { CardsSkeleton, DelayedSkeleton, Skeleton, StatTilesSkeleton, TableSkeleton } from './skeleton'
+import ListState from './list-state'
 import { RefreshCover } from './refresh-cover'
 
 let host: HTMLDivElement
@@ -154,8 +155,13 @@ describe('前の表示を残したまま読む（★V7 `sTJsh` §2）', () => {
   it('一覧の読み直しでは行を消さず refreshing を画面へ渡す', () => {
     // 友だち一覧: 行があるときは消さず、refreshing で薄め＋線を出す。
     expect(FRIENDS_PAGE).toContain('setRefreshing(true)')
-    expect(FRIENDS_PAGE).toContain('refreshing={refreshing}')
-    expect(FRIENDS_TABLE).toContain('<RefreshCover')
+    expect(FRIENDS_PAGE).toContain('refreshing ? `${styles.tableWrap} ${styles.refreshing}` : styles.tableWrap')
+    expect(FRIENDS_PAGE).toContain("aria-busy={loadStatus === 'loading' || refreshing || undefined}")
+    const load = FRIENDS_PAGE.slice(FRIENDS_PAGE.indexOf('const loadFriends'), FRIENDS_PAGE.indexOf('const resetPageWith'))
+    expect(load).toContain('hasRowsRef.current')
+    const refreshingBranch = load.slice(load.indexOf('if (hasRowsRef.current)'), load.indexOf('} else {'))
+    expect(refreshingBranch).toContain('setRefreshing(true)')
+    expect(refreshingBranch).not.toContain('setFriends([])')
     // 共有の一覧 hook: 読み直しで items を消さず refreshing を返す。
     expect(SERVER_LIST).toContain('refreshing: state.loading && state.items.length > 0')
     expect(SERVER_LIST).not.toMatch(/items:\s*\[\],\s*loaded:\s*false,\s*loading:\s*true/)
@@ -185,5 +191,23 @@ describe('形の決まった骨組みの組み合わせ（V8「サクサク感�
     const tiles = document.createElement('div')
     tiles.innerHTML = renderToStaticMarkup(<StatTilesSkeleton count={4} />)
     expect(tiles.querySelectorAll('[data-skeleton]')).toHaveLength(8)
+  })
+})
+
+
+describe('B-152 一覧の読み込み', () => {
+  it('V8 は300msまで場所だけ確保し、その後4行の骨格を出す', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    try {
+      await act(async () => { root.render(<ListState kind="loading" />) })
+      await tick(299)
+      expect(host.querySelector('[data-skeleton-reserve]')).not.toBeNull()
+      await tick(1)
+      expect(host.querySelector('[data-skeleton-reserve]')).toBeNull()
+      expect(host.querySelectorAll('[data-skeleton]')).toHaveLength(12)
+      expect(host.querySelector('[aria-busy="true"]')).not.toBeNull()
+      await act(async () => { root.render(<ListState kind="empty" />) })
+      expect(host.querySelector('[aria-busy="true"]')).toBeNull()
+    } finally { delete document.documentElement.dataset.theme }
   })
 })

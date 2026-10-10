@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRef, type ReactNode } from 'react'
 import { listInterpolations, validateFlexContent, type CommonVar, type FriendField } from '@line-crm/shared'
-import FlexPreviewComponent from '@/components/flex-preview'
+import { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import Button from '@/components/shared/button'
 import LinePreview from '@/components/shared/line-preview'
@@ -205,7 +205,7 @@ export function TemplateInsertControls({
           目標日
           <DateField aria-label="日数を数える目標日" value={targetDate} disabled={disabled} onChange={onTargetDateChange} className="w-48" />
         </span>
-        <Button size="field" disabled={disabled || !targetDate} onClick={() => onInsert(`{{days_until:${targetDate}}`)}>目標日までの日数</Button>
+        <Button size="field" disabled={disabled || !targetDate} onClick={() => onInsert(`{{days_until:${targetDate}}}`)}>目標日までの日数</Button>
       </div>
       <p className="text-ink-faint text-xs">フォーム回答は直接差し込めません。回答を保存した友だち情報を選んでください。</p>
       {accountLabel && <p className="text-ink-faint text-xs">候補は「{accountLabel}」の友だち情報と共通情報です。</p>}
@@ -310,7 +310,7 @@ export function MessageTemplateEditor({
 
   return (
     <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
-      <div data-design="Left" className="bg-canvas rounded-card border-hairline min-w-0 flex-1 space-y-5 border p-6">
+      <div data-design="Left" className="bg-canvas rounded-card content-card min-w-0 flex-1 space-y-5 border p-6">
         {beforeType}
         {editorContent ?? <>
         {showTypeSelector ? <Field label="種類" htmlFor="tp-type" note={typeNote}>

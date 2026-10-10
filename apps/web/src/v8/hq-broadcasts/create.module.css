@@ -32,6 +32,8 @@
   line-height: var(--tpl-e49-lh-18);
 }
 
+.accountSelection { display: flex; align-items: center; gap: var(--tpl-e49-gap-m); min-width: 0; }
+
 /* 本文の下の差し込み（店の一斉配信の「差し込む：」と同じ並び） */
 .inserts {
   display: inline-flex;
@@ -193,9 +195,10 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--tpl-e49-radius-l);
   overflow: hidden;
+  box-shadow: var(--card-shadow);
 }
 
 .pickerList > li + li {

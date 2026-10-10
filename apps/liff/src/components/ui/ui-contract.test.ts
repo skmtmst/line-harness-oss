@@ -27,7 +27,7 @@ const V7_FILES = [
   ui('Button.tsx'),
   ui('Card.tsx'),
   ui('Badge.tsx'),
-  ui('PageHeader.tsx'),
+  ui('LiffHeader.tsx'),
   ui('BottomBar.tsx'),
   ui('Stepper.tsx'),
   ui('StatusView.tsx'),

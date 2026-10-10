@@ -7,6 +7,7 @@ import type { MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
 import { ApiError, api, type MediaVersionBlocker, type MediaVersionPreview } from '@/lib/api'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
+import MediaSlot from '@/components/shared/media-slot'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { formatMediaSize } from './media-usage-display'
@@ -26,6 +27,11 @@ import {
   validateMediaFile,
 } from './media-direct-upload'
 import { formatDateTime } from '@/lib/format'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 版追加を止めた理由を、互換基準ごとに運用者へ説明する。 */
 function versionBlockerText(blockers: MediaVersionBlocker[]): string {
@@ -47,9 +53,7 @@ function versionBlockerText(blockers: MediaVersionBlocker[]): string {
 }
 
 function formatDate(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—（未取得）'
-  return formatDateTime(date)
+  return polishFormatDate(value, { style: 'detail', fallback: '—（未取得）' })
 }
 
 function mediaKind(item: MediaItem): string {
@@ -424,7 +428,7 @@ export default function MediaDetailDialog({
             <span aria-hidden="true">›</span>
             <span>{folderName}</span>
             <span aria-hidden="true">›</span>
-            <span className="text-ink-faint max-w-md truncate" title={item.filename}>{item.filename}</span>
+            <span className="text-ink-faint max-w-md truncate" ><TruncatedText value={String(item.filename ?? '')} /></span>
           </nav>
           <h2 className="text-ink mt-3 truncate text-xl font-bold" title={item.filename}>{item.filename}</h2>
         </div>
@@ -449,11 +453,11 @@ export default function MediaDetailDialog({
             ) : item.kind === 'audio' ? (
               <audio src={displaySrc} controls />
             ) : (
-              <a href={displaySrc} target="_blank" rel="noreferrer" className="text-action text-sm font-semibold">PDFを開く</a>
+              <TextLink external href={displaySrc}   className="text-action text-sm font-semibold">PDFを開く</TextLink>
             )}
           </div>
 
-          <section className="border-hairline rounded-card border bg-canvas p-4">
+          <section className="content-card rounded-card border bg-canvas p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="text-ink text-sm font-bold">この{item.kind === 'image' ? '画像' : 'メディア'}を差し替える</h3>
@@ -461,28 +465,18 @@ export default function MediaDetailDialog({
               </div>
               <span className="bg-accent-soft text-accent-deep rounded-pill px-2 py-1 text-xs font-semibold">安全確認して追加</span>
             </div>
-            <label
-              htmlFor={fileInputId}
-              className="border-info text-info rounded-control mt-4 flex min-h-24 cursor-pointer items-center justify-center border border-dashed p-4 text-center"
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault()
-                chooseVersionFile(event.dataTransfer.files[0] ?? null)
-              }}
-            >
-              <div>
-                <p className="text-sm font-bold">ここにファイルをドラッグ、または押して選ぶ</p>
-                <p className="text-ink-faint mt-1 text-xs">いまのメディアと同じ種類を選びます。</p>
-                {versionFile ? <p className="text-ink mt-2 text-xs font-medium">{versionFile.name}</p> : null}
-              </div>
-            </label>
-            <input id={fileInputId} type="file" className="sr-only" accept={mediaAcceptForKind(item.kind)} onChange={(event) => chooseVersionFile(event.target.files?.[0] ?? null)} />
-            {versionPhase === 'uploading' ? (
-              <div className="mt-3" aria-live="polite">
-                <div className="flex justify-between text-xs"><span>保存先へ直接送信しています</span><span>{versionProgress}%</span></div>
-                <progress className="mt-1 h-1 w-full" max={100} value={versionProgress} aria-label="差し替えファイルの送信進捗" />
-              </div>
-            ) : null}
+            <div className="mt-4">
+              <MediaSlot
+                kind={item.kind}
+                title={`新しい${item.kind === 'image' ? '画像' : item.kind === 'video' ? '動画' : item.kind === 'audio' ? '音声' : 'ファイル'}を追加`}
+                accept={mediaAcceptForKind(item.kind)}
+                help="いまのメディアと同じ種類"
+                busy={versionPhase === 'uploading'}
+                progress={versionPhase === 'uploading' ? versionProgress : undefined}
+                onFile={(file) => chooseVersionFile(file)}
+              />
+              {versionFile ? <p className="text-ink mt-2 truncate text-xs font-medium" title={versionFile.name}>{`選んだファイル：${versionFile.name}`}</p> : null}
+            </div>
             {versionPreview ? (
               <div className={versionPreview.canReplace ? 'bg-accent-soft text-accent-deep mt-3 rounded-control p-3 text-xs' : 'bg-danger-bg text-danger mt-3 rounded-control p-3 text-xs'}>
                 {versionPreview.canReplace
@@ -491,10 +485,7 @@ export default function MediaDetailDialog({
               </div>
             ) : null}
             {versionPreview?.canReplace ? (
-              <div className="mt-3">
-                <label htmlFor={`${fileInputId}-reason`} className="text-ink-secondary block text-xs font-semibold">変更理由</label>
-                <input id={`${fileInputId}-reason`} value={changeReason} onChange={(event) => setChangeReason(event.target.value)} maxLength={500} className="border-hairline rounded-control mt-1 min-h-10 w-full border px-3 text-sm" placeholder="例：秋の写真へ更新" />
-              </div>
+              <div className="mt-3"><Field label="変更理由" htmlFor={`${fileInputId}-reason`}><input id={`${fileInputId}-reason`} value={changeReason} onChange={(event) => setChangeReason(event.target.value)} maxLength={500} className="border-hairline rounded-control mt-1 min-h-10 w-full border px-3 text-sm" placeholder="例：秋の写真へ更新" /></Field></div>
             ) : null}
             {versionError ? <Notice tone="danger" message={versionError} className="mt-3" /> : null}
             {impact && impact.usageCount > 0 ? (
@@ -516,7 +507,7 @@ export default function MediaDetailDialog({
         </div>
 
         <aside className="space-y-4">
-          <section className="border-hairline rounded-card border bg-canvas p-4">
+          <section className="content-card rounded-card border bg-canvas p-4">
             <h3 className="text-ink text-sm font-bold">ファイルのこと</h3>
             <dl className="mt-4 space-y-3 text-xs">
               {[
@@ -537,7 +528,7 @@ export default function MediaDetailDialog({
             </dl>
           </section>
 
-          <section className="border-hairline rounded-card border bg-canvas p-4">
+          <section className="content-card rounded-card border bg-canvas p-4">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-ink text-sm font-bold">利用の期限・同意</h3>
               {canManage && !termsEditing ? (
@@ -566,18 +557,13 @@ export default function MediaDetailDialog({
             </p>
             {termsEditing ? (
               <div className="border-hairline mt-3 space-y-3 border-t pt-3">
-                <div>
-                  <label htmlFor={`${fileInputId}-expires`} className="text-ink-secondary block text-xs font-semibold">利用期限（分かる場合だけ）</label>
-                  <DateField
+                <div><Field label="利用期限（分かる場合だけ）" htmlFor={`${fileInputId}-expires`}><DateField
                     id={`${fileInputId}-expires`}
                     value={termsExpiresAt}
                     onChange={setTermsExpiresAt}
                     className="mt-1"
-                  />
-                </div>
-                <div>
-                  <label htmlFor={`${fileInputId}-consent`} className="text-ink-secondary block text-xs font-semibold">同意・権利の記録（確認した内容だけ）</label>
-                  <input
+                  /></Field></div>
+                <div><Field label="同意・権利の記録（確認した内容だけ）" htmlFor={`${fileInputId}-consent`}><input
                     id={`${fileInputId}-consent`}
                     type="text"
                     value={termsConsentNote}
@@ -585,8 +571,7 @@ export default function MediaDetailDialog({
                     maxLength={500}
                     className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm"
                     placeholder="例：出演者の同意書を確認済み（2026-01-10）"
-                  />
-                </div>
+                  /></Field></div>
                 {termsError ? <Notice tone="danger" message={termsError} /> : null}
                 <div className="flex justify-end gap-2">
                   <Button type="button" onClick={() => setTermsEditing(false)} disabled={termsBusy}>キャンセル</Button>
@@ -597,14 +582,14 @@ export default function MediaDetailDialog({
             ) : null}
           </section>
 
-          <section className="border-hairline rounded-card border bg-canvas p-4">
+          <section className="content-card rounded-card border bg-canvas p-4">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-ink text-sm font-bold">使われている場所</h3>
               {/* R34: 未確認の0件は「0か所」にしない。件数は「—」で出す。 */}
               <span className="text-action text-xs font-medium">
                 {impact && (impact.verified !== false || impact.references.length > 0)
                   ? `${impact.usageCount}か所`
-                  : '—'}
+                  : emptyValue('unknown')}
               </span>
             </div>
             {phase === 'loading' ? (
@@ -612,7 +597,7 @@ export default function MediaDetailDialog({
             ) : phase === 'error' ? (
               <div className="mt-3 space-y-2" role="alert">
                 <p className="text-danger text-xs">使われている場所を確認できませんでした。</p>
-                <Button type="button" onClick={() => void loadImpact()}>読み直す</Button>
+                <Button type="button" onClick={() => void loadImpact()}>もう一度読み込む</Button>
               </div>
             ) : impact ? (
               <>
@@ -628,7 +613,7 @@ export default function MediaDetailDialog({
                         ? 'ほかに確認できていない場所があります。'
                         : '使われている場所を確かめられませんでした。'}
                     </p>
-                    <Button type="button" onClick={() => void loadImpact()}>読み直す</Button>
+                    <Button type="button" onClick={() => void loadImpact()}>もう一度読み込む</Button>
                   </div>
                 ) : null}
                 {impact.references.length > 0 ? (
@@ -688,7 +673,7 @@ export default function MediaDetailDialog({
           </section>
 
           {impact && impact.versions.length > 0 ? (
-            <section className="border-hairline rounded-card border bg-canvas p-4">
+            <section className="content-card rounded-card border bg-canvas p-4">
               <h3 className="text-ink text-sm font-bold">版と元ファイル</h3>
               <p className="text-ink-faint mt-1 text-xs leading-5">
                 第1版は登録時の元ファイルです。差し替えても各版は残り、ここから取り戻せます。

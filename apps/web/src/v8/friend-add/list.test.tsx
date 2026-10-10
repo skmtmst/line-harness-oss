@@ -106,7 +106,7 @@ const openMenu = async (name: string) => {
   const button = host.querySelector<HTMLButtonElement>(`button[aria-label="設定「${name}」の操作"]`)
   expect(button).not.toBeNull()
   await act(async () => { button!.click() })
-  return Array.from(document.querySelectorAll('[role="menuitem"]')).map((el) => el.textContent?.trim() ?? '')
+  return Array.from(document.querySelectorAll('[role="menuitem"]')).filter(el => !el.closest('[aria-hidden="true"], [inert]')).map((el) => el.textContent?.trim() ?? '')
 }
 
 describe('友だち追加時の配信の一覧（V8）', () => {
@@ -155,3 +155,16 @@ it('保存されたフォルダの色を設定名の前と左の列に表示す�
   expect(dot.style.backgroundColor).toBe('#16a34a')
   expect(host.innerHTML).toContain('#16a34a')
 })
+
+it('WEB160: 主シナリオと別の開始処理を両方要約する',()=>{
+ const target=rule({definition:{...rule().definition, actions:[...rule().definition.actions,{type:'start_scenario',label:'別シナリオを開始する',targetId:'scenario-other'}]}})
+ expect(actionLine(target)).toContain('別シナリオ')
+});
+
+it('WEB158: 表にはページ内の番号でなく保存済み優先順位を出す',async()=>{
+ items[0].priority=21
+ try { await render()
+ const row=[...host.querySelectorAll('tbody tr')].find(row=>row.textContent?.includes('店頭QRの初回案内'))!
+ expect(row.querySelector('td')?.textContent).toContain('21')
+ } finally {items[0].priority=1}
+});

@@ -3,6 +3,7 @@
  * 自動配席ルールと同じ考え：人数が入る稼働中の卓のうち、余る席がいちばん少ない卓。
  * 同じ時間に重なる予約がある卓は外す（サーバも重なりを 409 で断る）。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
 
 const INACTIVE = new Set(['cancelled', 'no_show', 'completed', 'visited'])
@@ -31,9 +32,7 @@ export function pickMoveTarget(
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
 /** 「10/3（土）19:00 山田 花子 4名」 */
-export function reservationLine(item: RestaurantReservation): string {
-  const date = new Date(item.starts_at)
-  if (Number.isNaN(date.getTime())) return `${item.customer_name} ${item.guest_count}名`
-  const time = `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`
-  return `${date.getMonth() + 1}/${date.getDate()}（${WEEKDAY[date.getDay()]}）${time} ${item.customer_name} ${item.guest_count}名`
+export function reservationLine(item: RestaurantReservation, timezone?: string): string {
+  const date = polishFormatDate(item.starts_at, { style: 'detail', fallback: '', timeZone: timezone || 'Asia/Tokyo' })
+  return `${date ? `${date} ` : ''}${item.customer_name} ${item.guest_count.toLocaleString('ja-JP')} 名`
 }

@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   getDailyMessageCounts,
@@ -76,7 +77,7 @@ async function resolveAccount(c: Context<Env>): Promise<
   if (!accountId) {
     return {
       ok: false,
-      response: c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400),
+      response: inputError(c, { success: false, error: 'LINE公式アカウントを選んでください' }, 400, ["account_id"]),
     };
   }
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
@@ -97,7 +98,7 @@ const MAX_RANGE_DAYS = 366;
 
 function readRange(
   c: { req: { query: (k: string) => string | undefined } },
-): { ok: true; value: { from: string; to: string } } | { ok: false; error: string } {
+): { ok: true; value: { from: string; to: string } } | { ok: false; error: string; field?: string } {
   const jstNow = new Date(Date.now() + 9 * 3600_000);
   const toRaw = c.req.query('to') ?? jstNow.toISOString().slice(0, 10);
   const fromRaw =
@@ -214,11 +215,11 @@ function parseReportBody(raw: unknown): { ok: true; value: {
   sendTime: string; timeZone: string; periodDays: number;
   recipients: AnalyticsReportRecipient[]; channels: AnalyticsReportChannel[];
   alertRules: AnalyticsReportAlertRule[];
-} } | { ok: false; error: string } {
+} } | { ok: false; error: string; field?: string } {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, error: '入力内容が正しくありません' };
   const body = raw as Record<string, unknown>;
   const name = typeof body.name === 'string' ? body.name.trim() : '';
-  if (!name || name.length > 120) return { ok: false, error: 'レポート名は1〜120文字で入力してください' };
+  if (!name || name.length > 120) return { ok: false, error: 'レポート名は1〜120文字で入力してください' , field: "name" };
   const sections = Array.isArray(body.sections)
     ? [...new Set(body.sections.filter((item): item is AnalyticsReportSection =>
       typeof item === 'string' && (ANALYTICS_REPORT_SECTIONS as readonly string[]).includes(item)))]
@@ -226,49 +227,49 @@ function parseReportBody(raw: unknown): { ok: true; value: {
   const savedAnalysisIds = Array.isArray(body.savedAnalysisIds)
     ? [...new Set(body.savedAnalysisIds.filter((item): item is string => typeof item === 'string' && Boolean(item.trim())).map((item) => item.trim()))]
     : [];
-  if (!sections.length && !savedAnalysisIds.length) return { ok: false, error: 'レポートに入れる項目を選んでください' };
+  if (!sections.length && !savedAnalysisIds.length) return { ok: false, error: 'レポートに入れる項目を選んでください' , field: "sections" };
   const cadence = body.cadence === 'monthly' ? 'monthly' : body.cadence === 'weekly' ? 'weekly' : null;
   const weekday = Number.isInteger(body.weekday) ? Number(body.weekday) : null;
   const monthDay = Number.isInteger(body.monthDay) ? Number(body.monthDay) : null;
   if (!cadence || (cadence === 'weekly' && (weekday === null || weekday < 0 || weekday > 6))
     || (cadence === 'monthly' && (monthDay === null || monthDay < 1 || monthDay > 28))) {
-    return { ok: false, error: '送信間隔と日を確認してください' };
+    return { ok: false, error: '送信間隔と日を確認してください' , field: "cadence" };
   }
   const sendTime = typeof body.sendTime === 'string' ? body.sendTime : '';
-  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(sendTime)) return { ok: false, error: '送信時刻を確認してください' };
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(sendTime)) return { ok: false, error: '送信時刻を確認してください' , field: "sendTime" };
   const timeZone = typeof body.timeZone === 'string' ? body.timeZone.trim() : '';
-  try { new Intl.DateTimeFormat('ja-JP', { timeZone }).format(new Date()); } catch { return { ok: false, error: 'タイムゾーンが正しくありません' }; }
+  try { new Intl.DateTimeFormat('ja-JP', { timeZone }).format(new Date()); } catch { return { ok: false, error: 'タイムゾーンが正しくありません' , field: "timeZone" }; }
   const periodDays = Number(body.periodDays);
-  if (!Number.isInteger(periodDays) || periodDays < 1 || periodDays > 397) return { ok: false, error: '集計期間は1〜397日で指定してください' };
+  if (!Number.isInteger(periodDays) || periodDays < 1 || periodDays > 397) return { ok: false, error: '集計期間は1〜397日で指定してください' , field: "periodDays" };
   const channels = Array.isArray(body.channels)
     ? [...new Set(body.channels.filter((item): item is AnalyticsReportChannel => item === 'dashboard' || item === 'email' || item === 'line'))]
     : [];
-  if (!channels.length) return { ok: false, error: '通知方法を選んでください' };
+  if (!channels.length) return { ok: false, error: '通知方法を選んでください' , field: "channels" };
   const recipients: AnalyticsReportRecipient[] = [];
   // R228: 形が合わない宛先を黙って外さない。正しい宛先と混ざっていても、
   // 不備のある行を示して止める（送ったつもりが届いていないを防ぐ）。
   for (const item of Array.isArray(body.recipients) ? body.recipients : []) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) {
-      return { ok: false, error: '宛先に読み取れない行があります' };
+      return { ok: false, error: '宛先に読み取れない行があります' , field: "recipients" };
     }
     const value = item as Record<string, unknown>;
     const label = typeof value.label === 'string' ? value.label.trim().slice(0, 120) : '';
     if (value.kind === 'staff') {
       if (typeof value.staffId !== 'string' || !value.staffId.trim()) {
-        return { ok: false, error: '宛先のログインユーザーを読み取れませんでした' };
+        return { ok: false, error: '宛先のログインユーザーを読み取れませんでした' , field: "recipients" };
       }
       recipients.push({ kind: 'staff', staffId: value.staffId.trim(), label: label || 'ログインユーザー' });
     } else if (value.kind === 'email') {
       const email = typeof value.email === 'string' ? value.email.trim() : '';
       if (!isEmail(email)) {
-        return { ok: false, error: `宛先のメールアドレス「${email || '(空)'}」は形が正しくありません` };
+        return { ok: false, error: `宛先のメールアドレス「${email || '(空)'}」は形が正しくありません` , field: "recipients" };
       }
       recipients.push({ kind: 'email', email: email.toLowerCase(), label: label || email });
     } else {
-      return { ok: false, error: '宛先に読み取れない行があります' };
+      return { ok: false, error: '宛先に読み取れない行があります' , field: "recipients" };
     }
   }
-  if (!recipients.length) return { ok: false, error: '受け取る人を選んでください' };
+  if (!recipients.length) return { ok: false, error: '受け取る人を選んでください' , field: "recipients" };
   const alertRules = Array.isArray(body.alertRules) ? body.alertRules.flatMap((item) => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
     const value = item as Record<string, unknown>;
@@ -291,7 +292,7 @@ export function readAnalyticsOverviewRange(
   timeZone: string,
   now = new Date(),
 ): { ok: true; value: Omit<AnalyticsOverviewContext, 'lineAccountId'> } |
-   { ok: false; error: string } {
+   { ok: false; error: string; field?: string } {
   const toDate = query('to') ?? dateInZone(now, timeZone);
   const fromDate = query('from') ?? addDateDays(toDate, -29);
   if (!isDateOnly(fromDate) || !isDateOnly(toDate)) {
@@ -331,7 +332,7 @@ async function overviewContext(
     selected.timezone || 'Asia/Tokyo',
   );
   if (!range.ok) {
-    return { ok: false, response: c.json({ success: false, error: range.error }, 400) };
+    return { ok: false, response: inputError(c, { success: false, error: range.error }, 400, []) };
   }
   return { ok: true, value: { lineAccountId: accountId, ...range.value } };
 }
@@ -501,7 +502,7 @@ analytics.get('/api/analytics/broadcasts', async (c) => {
 });
 
 // V6: クロス分析はCronで非同期実行し、HTTPの処理時間とD1負荷を固定する。
-analytics.post('/api/analytics/cross/query', async (c) => {
+analytics.post('/api/analytics/cross/query', inputJsonBoundary(), async (c) => {
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
@@ -530,10 +531,10 @@ analytics.post('/api/analytics/cross/query', async (c) => {
   } catch (error) {
     const status = funnelErrorStatus(error);
     if (status === 500) console.error('POST /api/analytics/cross/query error:', error);
-    return c.json({
+    return inputError(c, {
       success: false,
       error: status === 500 ? 'Internal server error' : (error as Error).message,
-    }, status);
+    }, status, []);
   }
 });
 
@@ -563,7 +564,7 @@ analytics.get('/api/analytics/saved', async (c) => {
   }
 });
 
-analytics.post('/api/analytics/saved', requireRole('owner', 'admin'), async (c) => {
+analytics.post('/api/analytics/saved', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
@@ -573,10 +574,10 @@ analytics.post('/api/analytics/saved', requireRole('owner', 'admin'), async (c) 
       sourceResultId?: unknown;
     }>();
     if (body.sourceKind !== 'cross' && body.sourceKind !== 'funnel') {
-      return c.json({ success: false, error: '分析の種類が不正です' }, 422);
+      return inputError(c, { success: false, error: '分析の種類が不正です' }, 422, ["sourceKind"]);
     }
     if (typeof body.sourceResultId !== 'string' || !body.sourceResultId.trim()) {
-      return c.json({ success: false, error: '保存する分析結果が必要です' }, 422);
+      return inputError(c, { success: false, error: '保存する分析結果が必要です' }, 422, ["sourceResultId"]);
     }
     const staff = c.get('staff');
     const result = await createSavedAnalyticsFromResult(c.env.DB, {
@@ -592,10 +593,10 @@ analytics.post('/api/analytics/saved', requireRole('owner', 'admin'), async (c) 
   } catch (error) {
     const status = funnelErrorStatus(error);
     if (status === 500) console.error('POST /api/analytics/saved error:', error);
-    return c.json({
+    return inputError(c, {
       success: false,
       error: status === 500 ? 'Internal server error' : (error as Error).message,
-    }, status);
+    }, status, []);
   }
 });
 
@@ -747,25 +748,25 @@ function reportScheduleIdConflict(existingId: string) {
   };
 }
 
-analytics.post('/api/analytics/report-schedules', requireRole('owner', 'admin'), async (c) => {
+analytics.post('/api/analytics/report-schedules', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
     const rawBody = await c.req.json<unknown>();
     const parsed = parseReportBody(rawBody);
-    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 422);
+    if (!parsed.ok) return inputError(c, { success: false, error: parsed.error, field: parsed.field }, 422, []);
     const selected = await getLineAccountById(c.env.DB, account.accountId);
     if (!selected) return c.json({ success: false, error: 'Not found' }, 404);
     if ((selected.timezone || 'Asia/Tokyo') !== parsed.value.timeZone) {
-      return c.json({ success: false, error: '選択中のLINEアカウントとタイムゾーンが一致しません' }, 422);
+      return inputError(c, { success: false, error: '選択中のLINEアカウントとタイムゾーンが一致しません' }, 422, ["timeZone"]);
     }
     const validationError = await validateReportPayload(c, account.accountId, parsed.value);
-    if (validationError) return c.json({ success: false, error: validationError }, 422);
+    if (validationError) return inputError(c, { success: false, error: validationError }, 422, [validationError.includes('保存済み分析') ? 'savedAnalysisIds' : 'recipients']);
     // R526: 要求キー（UUID）を付けた作成は、応答消失後の再送でも
     // 同じ予約へ戻す。キーが無い従来の呼び出しはそのまま通す。
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim() || null;
     if (idempotencyKey && !isValidIdempotencyKey(idempotencyKey)) {
-      return c.json({ success: false, error: 'Idempotency-Key はUUIDで送ってください' }, 400);
+      return inputError(c, { success: false, error: 'Idempotency-Key はUUIDで送ってください' }, 400, []);
     }
     const now = new Date();
     const sendOnce = Boolean(rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)
@@ -822,29 +823,29 @@ analytics.post('/api/analytics/report-schedules', requireRole('owner', 'admin'),
   }
 });
 
-analytics.put('/api/analytics/report-schedules/:id', requireRole('owner', 'admin'), async (c) => {
+analytics.put('/api/analytics/report-schedules/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
     const rawBody = await c.req.json<unknown>();
     const parsed = parseReportBody(rawBody);
-    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 422);
+    if (!parsed.ok) return inputError(c, { success: false, error: parsed.error, field: parsed.field }, 422, []);
     const expectedUpdatedAt = expectedUpdatedAtOf(rawBody);
     if (!expectedUpdatedAt) {
-      return c.json({ success: false, error: 'expectedUpdatedAtを付けてください' }, 422);
+      return inputError(c, { success: false, error: 'expectedUpdatedAtを付けてください' }, 422, ["expectedUpdatedAt"]);
     }
     const selected = await getLineAccountById(c.env.DB, account.accountId);
     if (!selected) return c.json({ success: false, error: 'Not found' }, 404);
     if ((selected.timezone || 'Asia/Tokyo') !== parsed.value.timeZone) {
-      return c.json({ success: false, error: '選択中のLINEアカウントとタイムゾーンが一致しません' }, 422);
+      return inputError(c, { success: false, error: '選択中のLINEアカウントとタイムゾーンが一致しません' }, 422, ["timeZone"]);
     }
     const existing = await getAnalyticsReportSchedule(c.env.DB, c.req.param('id'), account.accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     if (existing.isOneTime) {
-      return c.json({ success: false, error: '1回だけ送る依頼は変更できません' }, 422);
+      return inputError(c, { success: false, error: '1回だけ送る依頼は変更できません' }, 422, []);
     }
     const validationError = await validateReportPayload(c, account.accountId, parsed.value);
-    if (validationError) return c.json({ success: false, error: validationError }, 422);
+    if (validationError) return inputError(c, { success: false, error: validationError }, 422, [validationError.includes('保存済み分析') ? 'savedAnalysisIds' : 'recipients']);
     const now = new Date();
     const outcome = await updateAnalyticsReportSchedule(c.env.DB, {
       id: existing.id, lineAccountId: account.accountId, expectedUpdatedAt,
@@ -867,24 +868,24 @@ analytics.put('/api/analytics/report-schedules/:id', requireRole('owner', 'admin
   }
 });
 
-analytics.put('/api/analytics/report-schedules/:id/status', requireRole('owner', 'admin'), async (c) => {
+analytics.put('/api/analytics/report-schedules/:id/status', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
     const rawBody = await c.req.json<unknown>().catch(() => null);
     const expectedUpdatedAt = expectedUpdatedAtOf(rawBody);
     if (!expectedUpdatedAt) {
-      return c.json({ success: false, error: 'expectedUpdatedAtを付けてください' }, 422);
+      return inputError(c, { success: false, error: 'expectedUpdatedAtを付けてください' }, 422, ["expectedUpdatedAt"]);
     }
     const requested = rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)
       ? (rawBody as Record<string, unknown>).status : null;
     if (requested !== 'paused' && requested !== 'active' && requested !== 'archived') {
-      return c.json({ success: false, error: 'statusにはpaused・active・archivedのどれかを指定してください' }, 422);
+      return inputError(c, { success: false, error: 'statusにはpaused・active・archivedのどれかを指定してください' }, 422, ["status"]);
     }
     const existing = await getAnalyticsReportSchedule(c.env.DB, c.req.param('id'), account.accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     if (existing.isOneTime) {
-      return c.json({ success: false, error: '1回だけ送る依頼は変更できません' }, 422);
+      return inputError(c, { success: false, error: '1回だけ送る依頼は変更できません' }, 422, []);
     }
     if (existing.status === requested) {
       // 同じ状態への再送はそのまま返す。一覧を二度押ししても壊れない。
@@ -936,7 +937,7 @@ analytics.get('/api/analytics/report-schedules/:id/runs', async (c) => {
 // R454: 確定失敗の1回送信だけ送り直せる入口。一部でも届いたものは
 // 送り直さない（重複を防ぐ）。届いていないことの確認は最新履歴の
 // 宛先別結果で行い、送り直しは新しい実行記録として残す。
-analytics.post('/api/analytics/report-schedules/:id/retry', requireRole('owner', 'admin'), async (c) => {
+analytics.post('/api/analytics/report-schedules/:id/retry', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
@@ -951,14 +952,14 @@ analytics.post('/api/analytics/report-schedules/:id/retry', requireRole('owner',
     });
     const latest = runs[0] ?? null;
     if (!latest || latest.state === 'running') {
-      return c.json({ success: false, error: '送信結果がまだ確定していません' }, 422);
+      return inputError(c, { success: false, error: '送信結果がまだ確定していません' }, 422, []);
     }
     const sent = latest.deliveryResults.some(
       (item) => Boolean(item) && typeof item === 'object'
         && (item as { status?: unknown }).status === 'sent',
     );
     if (sent) {
-      return c.json({ success: false, error: '一部は届いているため送り直せません' }, 422);
+      return inputError(c, { success: false, error: '一部は届いているため送り直せません' }, 422, []);
     }
     const outcome = await requeueOneTimeAnalyticsReportSchedule(c.env.DB, {
       id: schedule.id, lineAccountId: account.accountId, now: new Date().toISOString(),
@@ -1091,7 +1092,7 @@ analytics.get('/api/analytics/funnels', async (c) => {
   }
 });
 
-analytics.post('/api/analytics/funnels', requireRole('owner', 'admin'), async (c) => {
+analytics.post('/api/analytics/funnels', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
@@ -1121,7 +1122,7 @@ analytics.post('/api/analytics/funnels', requireRole('owner', 'admin'), async (c
   } catch (error) {
     const status = funnelErrorStatus(error);
     if (status === 500) console.error('POST /api/analytics/funnels error:', error);
-    return c.json({ success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status);
+    return inputError(c, { success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status, []);
   }
 });
 
@@ -1149,7 +1150,7 @@ analytics.get('/api/analytics/funnels/:id', async (c) => {
   }
 });
 
-analytics.post('/api/analytics/funnels/:id/versions', requireRole('owner', 'admin'), async (c) => {
+analytics.post('/api/analytics/funnels/:id/versions', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
@@ -1183,12 +1184,12 @@ analytics.post('/api/analytics/funnels/:id/versions', requireRole('owner', 'admi
   } catch (error) {
     const status = funnelErrorStatus(error);
     if (status === 500) console.error('POST /api/analytics/funnels/:id/versions error:', error);
-    return c.json({ success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status);
+    return inputError(c, { success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status, []);
   }
 });
 
 // 停止・保管・再開。今の状態を expectedStatus で渡させ、二重操作や読み違えを 409 で弾く。
-analytics.put('/api/analytics/funnels/:id/status', requireRole('owner', 'admin'), async (c) => {
+analytics.put('/api/analytics/funnels/:id/status', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
@@ -1197,7 +1198,7 @@ analytics.put('/api/analytics/funnels/:id/status', requireRole('owner', 'admin')
     const expected = String(body.expectedStatus ?? '');
     if (!['active', 'stopped', 'archived'].includes(next)
         || !['active', 'stopped', 'archived'].includes(expected)) {
-      return c.json({ success: false, error: 'analytics_funnel_status_invalid' }, 422);
+      return inputError(c, { success: false, error: 'analytics_funnel_status_invalid' }, 422, ["status","expectedStatus"]);
     }
     const funnel = await setFunnelStatus(c.env.DB, {
       lineAccountId: account.accountId,
@@ -1209,11 +1210,11 @@ analytics.put('/api/analytics/funnels/:id/status', requireRole('owner', 'admin')
   } catch (error) {
     const status = funnelErrorStatus(error);
     if (status === 500) console.error('PUT /api/analytics/funnels/:id/status error:', error);
-    return c.json({ success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status);
+    return inputError(c, { success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status, []);
   }
 });
 
-analytics.post('/api/analytics/funnels/:id/run', async (c) => {
+analytics.post('/api/analytics/funnels/:id/run', inputJsonBoundary(), async (c) => {
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
@@ -1249,7 +1250,7 @@ analytics.post('/api/analytics/funnels/:id/run', async (c) => {
   } catch (error) {
     const status = funnelErrorStatus(error);
     if (status === 500) console.error('POST /api/analytics/funnels/:id/run error:', error);
-    return c.json({ success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status);
+    return inputError(c, { success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status, []);
   }
 });
 
@@ -1264,14 +1265,14 @@ analytics.get('/api/analytics/funnels/:id/runs/latest', async (c) => {
   } catch (error) {
     const status = funnelErrorStatus(error);
     if (status === 500) console.error('GET /api/analytics/funnels/:id/runs/latest error:', error);
-    return c.json({
+    return inputError(c, {
       success: false,
       error: status === 500 ? 'Internal server error' : (error as Error).message,
-    }, status);
+    }, status, []);
   }
 });
 
-analytics.post('/api/analytics/results/:id/audiences', requireRole('owner', 'admin'), async (c) => {
+analytics.post('/api/analytics/results/:id/audiences', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
@@ -1291,7 +1292,7 @@ analytics.post('/api/analytics/results/:id/audiences', requireRole('owner', 'adm
       return c.json({ success: true, data: result }, 201);
     }
     if (!['reached', 'stopped', 'in_progress'].includes(String(body.selection))) {
-      return c.json({ success: false, error: '対象者の種類が不正です' }, 422);
+      return inputError(c, { success: false, error: '対象者の種類が不正です' }, 422, ["selection"]);
     }
     const result = await createFunnelResultAudience(c.env.DB, {
       lineAccountId: account.accountId,
@@ -1306,7 +1307,7 @@ analytics.post('/api/analytics/results/:id/audiences', requireRole('owner', 'adm
   } catch (error) {
     const status = funnelErrorStatus(error);
     if (status === 500) console.error('POST /api/analytics/results/:id/audiences error:', error);
-    return c.json({ success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status);
+    return inputError(c, { success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status, []);
   }
 });
 
@@ -1348,7 +1349,7 @@ analytics.get('/api/analytics/audiences/:id', async (c) => {
   }
 });
 
-analytics.post('/api/funnels', requireRole('owner', 'admin'), async (c) => {
+analytics.post('/api/funnels', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
@@ -1358,30 +1359,30 @@ analytics.post('/api/funnels', requireRole('owner', 'admin'), async (c) => {
       steps?: unknown;
     }>();
     const name = typeof body.name === 'string' ? body.name.trim() : '';
-    if (!name) return c.json({ success: false, error: '名前を入力してください' }, 400);
+    if (!name) return inputError(c, { success: false, error: '名前を入力してください' }, 400, ["name"]);
 
     if (!Array.isArray(body.steps) || body.steps.length < 2) {
       // 1段のファネルは「ただの件数」で、離脱を見るという目的を果たさない。
-      return c.json({ success: false, error: '段は2つ以上にしてください' }, 422);
+      return inputError(c, { success: false, error: '段は2つ以上にしてください' }, 422, ["steps"]);
     }
     if (body.steps.length > 10) {
-      return c.json({ success: false, error: '段は10個までです' }, 422);
+      return inputError(c, { success: false, error: '段は10個までです' }, 422, ["steps"]);
     }
 
     const steps: Array<{ label: string; kind: FunnelStepKind; match: unknown }> = [];
     for (const raw of body.steps as unknown[]) {
       const step = raw as { label?: unknown; kind?: unknown; match?: unknown };
       const label = typeof step.label === 'string' ? step.label.trim() : '';
-      if (!label) return c.json({ success: false, error: '段の名前を入力してください' }, 422);
+      if (!label) return inputError(c, { success: false, error: '段の名前を入力してください' }, 422, ["steps"]);
       if (!(FUNNEL_STEP_KINDS as readonly string[]).includes(String(step.kind))) {
-        return c.json({ success: false, error: `知らない段の種類です: ${String(step.kind)}` }, 422);
+        return inputError(c, { success: false, error: `知らない段の種類です: ${String(step.kind)}` }, 422, ["steps"]);
       }
       steps.push({ label, kind: step.kind as FunnelStepKind, match: step.match ?? {} });
     }
 
     const windowDays = body.windowDays === undefined ? 30 : Number(body.windowDays);
     if (!Number.isInteger(windowDays) || windowDays < 1 || windowDays > 365) {
-      return c.json({ success: false, error: '期間は1〜365日で指定してください' }, 422);
+      return inputError(c, { success: false, error: '期間は1〜365日で指定してください' }, 422, ["windowDays"]);
     }
 
     const funnel = await createFunnel(c.env.DB, {

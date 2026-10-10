@@ -99,6 +99,18 @@ function Thread({ hasMore, onLoadOlder = () => {}, total, scrollToId, scrollSeq 
 }
 
 describe('吹き出しの窓分け', () => {
+  test('WEB238: 過去の表示範囲にもTabで入れる吹き出しを1つ残す', async () => {
+    stubLayout(true)
+    const view = render(<Thread hasMore={false} />)
+    const scroller = view.container.querySelector<HTMLElement>('[data-test-scroller]')!
+    await act(async () => {
+      scroller.scrollTop = 500
+      scroller.dispatchEvent(new Event('scroll'))
+      await new Promise(resolve => requestAnimationFrame(resolve))
+    })
+    expect(view.container.querySelector('[data-index="999"]')).toBeNull()
+    expect(view.container.querySelectorAll('[role="article"][tabindex="0"]').length).toBe(1)
+  })
   test('1,000 個でも描くのは一部だけ。いちばん新しい吹き出しから見せる', async () => {
     stubLayout(true)
     let view!: ReturnType<typeof render>

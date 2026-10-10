@@ -11,7 +11,7 @@ export function makeFormBlock(kind: string, type?: FormInputType, count = 0): Fo
   switch (kind) {
     case 'heading': return { id, kind: 'heading', text: '見出し', level: 2 }
     case 'text': return { id, kind: 'text', text: '' }
-    case 'image': return { id, kind: 'image', mediaUrl: '', size: 'normal' }
+    case 'image': return { id, kind: 'image', mediaUrl: '', alt: '', size: 'full' }
     case 'button': return { id, kind: 'button', label: 'ボタン', url: '', style: 'default' }
     default:
       return {

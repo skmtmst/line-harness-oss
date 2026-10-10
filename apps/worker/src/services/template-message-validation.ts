@@ -1,5 +1,6 @@
 import {
   TEMPLATE_TEXT_MAX_CHARACTERS,
+  validateTapExtrasTree,
   countTemplateTextCharacters,
   validateFlexMessage,
   validateImagemapMessage,
@@ -35,13 +36,15 @@ export function validateTemplateMessage(
     let error: string | null = null;
     try {
       const parsed = JSON.parse(messageContent);
+      error = validateTapExtrasTree(parsed);
+      if (error) throw new Error(error);
       if (messageType === 'flex') error = validateFlexMessage(parsed);
       else if (messageType === 'imagemap') error = validateImagemapMessage(parsed);
       else if (isBroadcastAssetKind(messageType)) {
         const converted = convertBroadcastAsset(messageType, parsed.assetName ?? '', parsed);
         if (!converted.ok) error = converted.error;
       }
-    } catch { error = 'メッセージの中身を正しいJSON形式で入力してください'; }
+    } catch (cause) { error = error || 'メッセージの中身を正しいJSON形式で入力してください'; }
     if (error) return { ok: false, code: 'INVALID_MESSAGE', error, field: 'messageContent', maxCharacters: 0, actualCharacters: 0 };
   }
   if (messageType !== 'text' || messageContent === undefined) return { ok: true };

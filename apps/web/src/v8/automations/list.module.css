@@ -17,19 +17,6 @@
   width: var(--tpl-am-create-w);
   height: var(--tpl-chip-h);
 }
-/* 閲覧のみで「フォルダを追加」を置かないときの場所。 */
-.addSpace {
-  display: block;
-  height: var(--tpl-am-add-space);
-}
-.folderNote {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-am-note-lh);
-  /* 絵は字の途中で折る（全体の言葉のまとまりで折ると3行になる）。 */
-  word-break: normal;
-}
 
 /* 案内の帯（表の上の主列）。帯の下は道具の段の上の余白と同じだけ空ける。 */
 .noticeRow {
@@ -97,16 +84,16 @@
 .colState { width: var(--tpl-am-col-state); flex-shrink: 0; }
 .colOps { width: var(--tpl-am-col-ops); flex-shrink: 0; }
 
-/* ルール名（緑の 13/600）。広い板は1行、狭い板は2行まで。 */
+/* 短い名前は途中で折らず、全文は title で確かめる。 */
 .name {
-  display: -webkit-box;
+  display: block;
   overflow: hidden;
   color: var(--color-accent-deep);
   font-size: var(--tpl-row-name-size);
   font-weight: 600;
   line-height: normal;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* きっかけ・だれに：12 の文字で2行まで。 */

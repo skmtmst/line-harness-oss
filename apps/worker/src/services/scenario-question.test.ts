@@ -156,6 +156,28 @@ describe('押されたとき', () => {
     expect(tags).toEqual([{ tag_id: 't1' }])
   })
 
+  it('選択肢の合計点を1回だけ足し、別の選択肢の点は足さない', async () => {
+    const q = { ...QUESTION, choices: QUESTION.choices.map((choice, i) => ({ ...choice, scoreChange: i === 0 ? 10 : 100 })) }
+    raw.prepare("UPDATE scenario_steps SET question_json=? WHERE id='st1'").run(JSON.stringify(q))
+    await handleQuestionAnswer(db, client, friend, { stepId: 'st1', choiceIndex: 0 }, 'tok')
+    await handleQuestionAnswer(db, client, friend, { stepId: 'st1', choiceIndex: 1 }, 'tok')
+    expect(raw.prepare("SELECT score FROM friends WHERE id='f1'").get()).toEqual({ score: 10 })
+    expect(raw.prepare("SELECT COUNT(*) n FROM friend_scores WHERE friend_id='f1'").get()).toEqual({ n: 1 })
+  })
+
+  it('別店舗の質問を指定してもタグ・合計点・押下記録を変えない', async () => {
+    raw.prepare("UPDATE friends SET line_account_id='friend-store' WHERE id='f1'").run()
+    raw.prepare("UPDATE scenarios SET line_account_id='other-store' WHERE id='s1'").run()
+    raw.prepare("UPDATE scenario_steps SET question_json=? WHERE id='st1'").run(JSON.stringify({
+      text: '質問', tapMode: 'single', choices: [{ label: '回答', behavior: 'none', addTagIds: ['t1'], scoreChange: 100 }],
+    }))
+    expect((await handleQuestionAnswer(db, client, friend, { stepId: 'st1', choiceIndex: 0, lineAccountId: 'friend-store' }, 'tok')).handled).toBe(false)
+    expect(raw.prepare("SELECT score FROM friends WHERE id='f1'").get()).toEqual({ score: 0 })
+    expect(raw.prepare("SELECT COUNT(*) n FROM friend_scores WHERE friend_id='f1'").get()).toEqual({ n: 0 })
+    expect(raw.prepare("SELECT COUNT(*) n FROM friend_tags WHERE friend_id='f1'").get()).toEqual({ n: 0 })
+    expect(raw.prepare("SELECT COUNT(*) n FROM messages_log WHERE friend_id='f1'").get()).toEqual({ n: 0 })
+  })
+
   it('2度目は二度押しの返事になり、タグは増えない', async () => {
     await handleQuestionAnswer(db, client, friend, { stepId: 'st1', choiceIndex: 0 }, 'tok')
     const second = await handleQuestionAnswer(db, client, friend, { stepId: 'st1', choiceIndex: 1 }, 'tok')

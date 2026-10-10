@@ -22,7 +22,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import StatusBadge from '@/components/shared/status-badge'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -49,6 +49,12 @@ import MenuVersionHistory from '../menu-version-history'
 import { LiffPhoneMenuStep } from '../liff-phone-v8'
 import shell from '../settings-v8.module.css'
 import styles from './menu-form-v8.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -754,10 +760,10 @@ export default function MenuFormV8() {
     <div className={shell.shell} data-design-node="QqER7">
       <header className={shell.boardHead} data-design="Head">
         <Link href="/booking/menus" className={shell.backLink}>← 予約へ</Link>
-        <h1 className={shell.headTitle}>{editTarget ? '予約メニューを直す' : '予約メニューを作る'}</h1>
-        <p className={shell.headNote}>
+        <PageHeading title={editTarget ? '予約メニューを直す' : '予約メニューを作る'} help={<>
           {editTarget ? '保存すると、お客さまの画面にすぐ出ます' : 'まだお客さまの画面には出ていません'}
-        </p>
+        </>} />
+
       </header>
 
       {conflict && (
@@ -786,9 +792,7 @@ export default function MenuFormV8() {
               <h2 className={shell.sectionTitle}>メニューの中身</h2>
             </div>
             <div className={styles.fieldGrid}>
-              <label className={styles.field}>
-                <span className={styles.label}>メニュー名</span>
-                <input
+              <Field label="メニュー名"><input
                   className={styles.input}
                   type="text"
                   value={name}
@@ -801,13 +805,12 @@ export default function MenuFormV8() {
                   onBlur={() => {
                     setFieldErrors((previous) => ({ ...previous, name: bookingMenuNameError(name) ?? undefined }))
                   }}
-                  placeholder="例: トリミング（小型犬）"
+                  placeholder="例：トリミング（小型犬）"
                   aria-invalid={fieldErrors.name !== undefined}
                 />
-                {fieldErrors.name !== undefined ? (
+{fieldErrors.name !== undefined ? (
                   <span className="text-danger mt-1 text-xs" role="alert">{fieldErrors.name}</span>
-                ) : null}
-              </label>
+                ) : null}</Field>
               <span className={styles.field}>
                 <span className={styles.label}>分類</span>
                 <Select
@@ -831,27 +834,22 @@ export default function MenuFormV8() {
                     type="text"
                     value={categoryNew}
                     onChange={(e) => setCategoryNew(e.target.value)}
-                    placeholder="新しい分類の名前（例: トリミング）"
+                    placeholder="新しい分類の名前（例：トリミング）"
                     aria-label="新しい分類の名前"
                   />
                 )}
               </span>
-              <label className={`${styles.field} ${styles.fieldFull}`}>
-                <span className={styles.label}>説明（お客さまに見えます）<span className={styles.optional}>任意</span></span>
-                <input
+              <Field label="説明（お客さまに見えます）"><input
                   className={styles.input}
                   type="text"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="例: シャンプー・カット・爪切り"
-                />
-              </label>
+                  placeholder="例：シャンプー・カット・爪切り"
+                /></Field>
             </div>
             <div className={`${styles.fieldGrid} ${styles.fieldGrid3}`}>
-              <label className={styles.field}>
-                <span className={styles.label}>かかる時間</span>
-                <span className={styles.unitField}>
-                  <input
+              <Field label="かかる時間"><span className={styles.unitField}>
+                  <NumberInput unit="分"
                     type="number"
                     min={1}
                     value={durationMinutes}
@@ -867,17 +865,14 @@ export default function MenuFormV8() {
                     aria-label="かかる時間（分）"
                     aria-invalid={fieldErrors.duration !== undefined}
                   />
-                  <span className={styles.unitSuffix}>分</span>
+
                 </span>
-                {fieldErrors.duration !== undefined ? (
+{fieldErrors.duration !== undefined ? (
                   <span className="text-danger mt-1 text-xs" role="alert">{fieldErrors.duration}</span>
-                ) : null}
-              </label>
-              <label className={styles.field}>
-                <span className={styles.label}>金額（空なら「お問い合わせ」）</span>
-                <span className={styles.unitField}>
+                ) : null}</Field>
+              <Field label="金額（空なら「お問い合わせ」）"><span className={styles.unitField}>
                   <span className={styles.unitSuffix}>¥</span>
-                  <input
+                  <NumberInput
                     type="number"
                     min={0}
                     value={basePrice}
@@ -885,8 +880,7 @@ export default function MenuFormV8() {
                     placeholder="8,400"
                     aria-label="金額（円）"
                   />
-                </span>
-              </label>
+                </span></Field>
               <span className={styles.field}>
                 <span className={styles.label}>予約したときのマイル</span>
                 <span className={styles.unitField}>
@@ -895,7 +889,7 @@ export default function MenuFormV8() {
                     value={
                       mileageStatus === 'loading' ? '…'
                         : mileageStatus === 'error' ? '未取得'
-                        : bookingMileage === null ? '未設定'
+                        : bookingMileage === null ? emptyValue('unconfigured')
                         : formatNumber(bookingMileage)
                     }
                     disabled
@@ -959,7 +953,7 @@ export default function MenuFormV8() {
                 </div>
                 <div className={`${shell.toggleRow} mt-3`}>
                   <span className={shell.toggleRowLabel}>「指名なし」でも受ける</span>
-                  <Toggle
+                  <SettingCheckbox
                     label="「指名なし」でも受ける"
                     checked={noAssign}
                     onChange={toggleNoAssign}
@@ -981,22 +975,22 @@ export default function MenuFormV8() {
                   <div className={styles.ruleRow}>
                     <span className={styles.ruleLabel}>先の予約が取れる範囲</span>
                     <span className={`${styles.ruleValue} ${styles.ruleOwn}`}>
-                      <input type="number" min={1} value={windowDays} onChange={(e) => setWindowDays(e.target.value)} aria-label="先の予約が取れる範囲（日）" />
+                      <NumberInput type="number" min={1} value={windowDays} onChange={(e) => setWindowDays(e.target.value)} aria-label="先の予約が取れる範囲（日）" />
                       <span className={styles.unitSuffix}>日先まで</span>
                     </span>
                   </div>
                   <div className={styles.ruleRow}>
                     <span className={styles.ruleLabel}>受付の締め切り</span>
                     <span className={`${styles.ruleValue} ${styles.ruleOwn}`}>
-                      <input type="number" min={1} value={cutoffHours} onChange={(e) => setCutoffHours(e.target.value)} aria-label="受付の締め切り（時間前）" />
-                      <span className={styles.unitSuffix}>時間前</span>
+                      <NumberInput unit="時間前" type="number" min={1} value={cutoffHours} onChange={(e) => setCutoffHours(e.target.value)} aria-label="受付の締め切り（時間前）" />
+
                     </span>
                   </div>
                   <div className={styles.ruleRow}>
                     <span className={styles.ruleLabel}>キャンセルの期限</span>
                     <span className={`${styles.ruleValue} ${styles.ruleOwn}`}>
-                      <input type="number" min={1} value={cancelDeadlineHours} onChange={(e) => setCancelDeadlineHours(e.target.value)} aria-label="キャンセルの期限（時間前）" />
-                      <span className={styles.unitSuffix}>時間前</span>
+                      <NumberInput unit="時間前" type="number" min={1} value={cancelDeadlineHours} onChange={(e) => setCancelDeadlineHours(e.target.value)} aria-label="キャンセルの期限（時間前）" />
+
                     </span>
                   </div>
                 </>
@@ -1032,23 +1026,18 @@ export default function MenuFormV8() {
               <h2 className={shell.sectionTitle}>受け方</h2>
             </div>
             <div className={styles.fieldCol}>
-              <label className={styles.field}>
-                <span className={styles.label}>同時に受けられる件数</span>
-                <span className={styles.unitField}>
-                  <input
+              <Field label="同時に受けられる件数"><span className={styles.unitField}>
+                  <NumberInput unit="件"
                     type="number"
                     min={1}
                     value={concurrentCapacity}
                     onChange={(e) => setConcurrentCapacity(e.target.value)}
                     aria-label="同時に受けられる件数"
                   />
-                  <span className={styles.unitSuffix}>件</span>
-                </span>
-              </label>
-              <label className={styles.field}>
-                <span className={styles.label}>後の空き時間（片付け・移動）</span>
-                <span className={styles.unitField}>
-                  <input
+
+                </span></Field>
+              <Field label="後の空き時間（片付け・移動）"><span className={styles.unitField}>
+                  <NumberInput unit="分"
                     type="number"
                     min={0}
                     value={bufferAfterMinutes}
@@ -1064,12 +1053,11 @@ export default function MenuFormV8() {
                     aria-label="後の空き時間（分）"
                     aria-invalid={fieldErrors.buffer !== undefined}
                   />
-                  <span className={styles.unitSuffix}>分</span>
+
                 </span>
-                {fieldErrors.buffer !== undefined ? (
+{fieldErrors.buffer !== undefined ? (
                   <span className="text-danger mt-1 text-xs" role="alert">{fieldErrors.buffer}</span>
-                ) : null}
-              </label>
+                ) : null}</Field>
             </div>
           </section>
 
@@ -1120,24 +1108,21 @@ export default function MenuFormV8() {
               </span>
               <div className={shell.toggleRow}>
                 <span className={shell.toggleRowLabel}>予約するときに質問を出す</span>
-                <Toggle
+                <SettingCheckbox
                   label="予約するときに質問を出す"
                   checked={askQuestion}
                   onChange={setAskQuestion}
                 />
               </div>
               {askQuestion && (
-                <label className={styles.field}>
-                  <span className={styles.label}>質問文</span>
-                  <input
+                <Field label="質問文"><input
                     className={styles.input}
                     type="text"
                     value={intakeQuestion}
                     onChange={(e) => setIntakeQuestion(e.target.value)}
-                    placeholder="例: 気になるところ・アレルギーがあれば教えてください"
+                    placeholder="例：気になるところ・アレルギーがあれば教えてください"
                     maxLength={200}
-                  />
-                </label>
+                  /></Field>
               )}
             </div>
           </section>
@@ -1238,7 +1223,7 @@ export default function MenuFormV8() {
           </div>
           <p className={shell.sideLineLink}>
             {previewUrl
-              ? <a href={previewUrl} target="_blank" rel="noreferrer">実際の画面で確かめる ↗</a>
+              ? <TextLink external href={previewUrl}  >実際の画面で確かめる</TextLink>
               : 'このアカウントには予約画面のURLがまだありません'}
           </p>
         </aside>
@@ -1292,7 +1277,7 @@ export default function MenuFormV8() {
 
 function bookingErrorText(error: unknown, action: '読み込み' | '保存'): string {
   if (error instanceof ApiError) {
-    if (error.status === 403) return `予約メニューを${action}する権限がありません。`
+    if (error.status === 403) return permissionDeniedMessage('store')
     if (error.status === 409) return `ほかの変更と重なったため、予約メニューを${action}できませんでした。`
   }
   return `予約メニューを${action}できませんでした。通信状態を確認して、もう一度お試しください。`

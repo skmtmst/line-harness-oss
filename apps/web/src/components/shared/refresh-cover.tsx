@@ -2,6 +2,8 @@
 
 import type { ReactNode } from 'react'
 import { useDelayedShow } from './skeleton'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import styles from './refresh-cover.module.css'
 
 /*
  * 前の表示を残したまま読み直す（★V7 `sTJsh` §2）。
@@ -25,11 +27,12 @@ export function RefreshCover({
   className?: string
 }) {
   const dimming = useDelayedShow(refreshing)
+  const v8 = useAdminTheme() === 'v8'
   return (
-    <div className={['v7-refresh', className].filter(Boolean).join(' ')}>
-      {dimming ? <div className="v7-refresh-line" aria-hidden="true" /> : null}
+    <div className={['v7-refresh', styles.root, className].filter(Boolean).join(' ')}>
+      {dimming ? (v8 ? <span role="status" className={styles.updating}>更新中</span> : <div className="v7-refresh-line" aria-hidden="true" />) : null}
       <div
-        className={dimming ? 'v7-refresh-dim' : undefined}
+        className={dimming && !v8 ? 'v7-refresh-dim' : undefined}
         aria-busy={refreshing || undefined}
       >
         {children}

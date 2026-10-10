@@ -120,8 +120,11 @@ describe('#634 予約管理の空き枠・一覧の再読み込み', () => {
     const retries = screen.getAllByRole('button', { name: 'もう一度読み込む' })
     expect(retries.length).toBeGreaterThan(0)
 
+    const before = fixture.listRequests.mock.calls.length
     fireEvent.click(retries[0])
 
-    await waitFor(() => expect(fixture.listRequests).toHaveBeenCalledTimes(3))
+    // 一覧と、表示中のカレンダー期間の両方を取り直す（WEB296）。
+    await waitFor(() => expect(fixture.listRequests.mock.calls.length).toBeGreaterThanOrEqual(before + 2))
+    await waitFor(() => expect(screen.queryByText('予約を読み込めませんでした')).toBeNull())
   })
 })

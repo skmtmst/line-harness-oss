@@ -5,6 +5,7 @@
  * - RowMore：行の右端の「…」（右クリックだけで開く操作にしない）。
  * - RsDialog：絵の窓（幅・上からの位置・題の下 14 の間・下の線と右寄せのボタン）。
  */
+import { Field as SharedField } from '@/components/shared/form-controls'
 import { type FormEvent, type ReactNode } from 'react'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Dialog from '@/components/shared/dialog'
@@ -26,7 +27,7 @@ export function RowMore({ subject, items }: { subject: string; items: ActionMenu
  * （題の段のあと 14 の間・各段 14・下の線の上 14）で置く。
  * onSubmit を渡すと中身を form にする（Enter で保存できる）。
  */
-export function RsDialog({ open, title, width, top, tone, busy, designNode, onCancel, onSubmit, actions, children }: {
+export function RsDialog({ open, title, width, top, tone, busy, designNode, onCancel, onSubmit, noValidate = false, actions, children }: {
   open: boolean
   title: string
   width: number
@@ -36,6 +37,7 @@ export function RsDialog({ open, title, width, top, tone, busy, designNode, onCa
   designNode?: string
   onCancel: () => void
   onSubmit?: () => void
+  noValidate?: boolean
   actions: ReactNode
   children: ReactNode
 }) {
@@ -59,6 +61,7 @@ export function RsDialog({ open, title, width, top, tone, busy, designNode, onCa
       {onSubmit ? (
         <form
           className={styles.dialogBody}
+          noValidate={noValidate}
           onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); onSubmit() }}
         >
           {body}
@@ -71,18 +74,8 @@ export function RsDialog({ open, title, width, top, tone, busy, designNode, onCa
 }
 
 /** 窓の中の欄（題＋中身）。題は選ぶ欄なら 12/600、入力欄なら 13/500（絵のとおり）。 */
-export function DialogField({ label, kind = 'input', htmlFor, children }: {
-  label: ReactNode
-  kind?: 'input' | 'select'
-  htmlFor?: string
-  children: ReactNode
-}) {
-  return (
-    <div className={styles.field}>
-      <label htmlFor={htmlFor} className={kind === 'select' ? styles.fieldLabelSelect : styles.fieldLabel}>{label}</label>
-      {children}
-    </div>
-  )
+export function DialogField({ label, htmlFor, children }: { label: ReactNode; kind?: 'input' | 'select'; htmlFor?: string; children: ReactNode }) {
+  return <SharedField label={label} htmlFor={htmlFor}>{children}</SharedField>
 }
 
 export function DialogNote({ children }: { children: ReactNode }) {

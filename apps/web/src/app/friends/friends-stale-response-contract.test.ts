@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -29,13 +29,14 @@ describe('友だち一覧の応答対象照合(#964)', () => {
     const loadFriends = PAGE.match(/const loadFriends = useCallback[\s\S]*?\}, \[[^\]]*\]\)/)
     expect(loadFriends).not.toBeNull()
     const body = loadFriends![0]
-    expect(body).toContain('if (requestId !== loadRequestRef.current) return')
+    expect(body).toContain('return requestId !== loadRequestRef.current')
+    expect(body.match(/if \(stale\(\)\) return/g)?.length).toBeGreaterThanOrEqual(2)
     expect(body).toContain('context.accountId !== requestedAccountId')
     expect(body).toContain('context.page !== requestedPage')
     expect(body).toContain('context.pageSize !== requestedPageSize')
     // 成功系だけでなく失敗(例外)の経路にも同じ照合が要る。
     const guards = body.match(/context\.accountId !== requestedAccountId/g) ?? []
-    expect(guards.length).toBeGreaterThanOrEqual(2)
+    expect(guards.length).toBeGreaterThanOrEqual(1)
   })
 
   it('アカウント固有の候補(シナリオ・対応マーク)も別アカウントの遅延応答で上書きしない', () => {

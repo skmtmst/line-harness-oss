@@ -7,8 +7,9 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({
-  operations: vi.fn(), overview: vi.fn(), select: vi.fn(), openDialog: vi.fn(),
+  role: 'owner', operations: vi.fn(), overview: vi.fn(), select: vi.fn(), openDialog: vi.fn(),
 }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fixture.role, canManageRole: (role: string) => role === 'owner' }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('next/navigation', () => ({ usePathname: () => '/ec-commerce/identity-candidates', useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
@@ -27,6 +28,7 @@ vi.mock('@/components/identity/identity-review', () => ({
 import EcIdentityCandidatesScreen from './identity'
 
 beforeEach(() => {
+  fixture.role = 'owner'
   fixture.overview.mockResolvedValue({ success: true, data: { total: 0 } })
   fixture.operations.mockResolvedValue({ success: true, data: { items: [{ id: 'c-1', impact: [{ key: 'orders', value: 3, unit: '件' }] }], summary: { unmatched: 24, candidates: 6, candidateExternalCustomers: 6, withoutCandidates: 18, duplicateSuspicions: 2, linked: 1128, potentialRevenue: 84300 } } })
 })
@@ -52,4 +54,12 @@ it('集計だけが読めないときも候補の表は残し、数は 0 と書�
   await waitFor(() => expect(screen.getAllByText('読み込めませんでした').length).toBeGreaterThan(0))
   // 表の候補なしの行と、表の下の件数（読めていないので —）の2つ
   expect(screen.getAllByText('結びついていない —')).toHaveLength(2)
+})
+
+it('閲覧のみでは候補は確認でき、決める操作は隠す', async () => {
+  fixture.role = 'staff'
+  render(<EcIdentityCandidatesScreen />)
+  const table = await screen.findByRole('table', { name: '会員のつき合わせの候補' })
+  expect(within(table).getByRole('button', { name: '候補を見る' })).toBeTruthy()
+  expect(within(table).queryByRole('button', { name: '決める' })).toBeNull()
 })

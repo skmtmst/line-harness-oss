@@ -150,7 +150,7 @@ test('一覧口が落ちても失敗表示＋再読み込みが出て、無限�
   })
   expect(host.textContent).not.toContain('読み込み中')
   const retry = [...host.querySelectorAll('button')]
-    .find((item) => item.textContent?.trim() === 'イベントを再読み込み')
+    .find((item) => item.textContent?.trim() === 'もう一度読み込む')
   expect(retry).toBeTruthy()
 
   // 再読み込みで同じ検索語のまま取り直せる。

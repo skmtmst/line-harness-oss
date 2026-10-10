@@ -32,7 +32,7 @@ vi.mock('./select', () => ({
   ),
 }))
 
-afterEach(() => cleanup())
+afterEach(() => { cleanup(); vi.useRealTimers() })
 
 function DateTimeHarness({ initial = '2026-10-01T10:00' }: { initial?: string }) {
   const [value, setValue] = useState(initial)
@@ -75,7 +75,9 @@ describe('日時の選択（★V7）', () => {
     expect(parseDateTime('2026-10-01T25:00')).toBeNull()
   })
 
-  it('日付を選ぶと時刻 10:00 で値が決まる（日本時間の文字列）', () => {
+  it('日本で日付が変わった直後の今日を選ぶと、日本の日付と10:00で値が決まる', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-09T15:00:00Z'))
     /*
      * 固定の日付ボタン名で押すと、その日が「今日」のとき名前が
      * 「…、今日」に変わって見つからない（月初境界で落ちた）。
@@ -86,9 +88,7 @@ describe('日時の選択（★V7）', () => {
     fireEvent.click(screen.getByRole('button', { name: '送る日時' }))
     expect(screen.getByRole('dialog', { name: '日時を選ぶ' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '日付' }))
-    const now = new Date()
-    const pad2 = (n: number) => String(n).padStart(2, '0')
-    const ymd = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`
+    const ymd = '2026-10-10'
     fireEvent.click(screen.getByRole('button', { name: '今日' }))
     expect(screen.getByTestId('value').textContent).toBe(`${ymd}T10:00`)
     const expected = formatDateTimeLabel(parseDateTime(`${ymd}T10:00`)!)

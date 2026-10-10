@@ -281,7 +281,7 @@ describe('N-422 申込時点の承認期限', () => {
       }),
     });
     expect(response.status).toBe(422);
-    await expect(response.json()).resolves.toEqual({ error: 'invalid_approval_deadline_hours' });
+    await expect(response.json()).resolves.toMatchObject({ code: 'invalid_approval_deadline_hours' , fields: expect.any(Object), error: expect.any(String) });
     expect((raw.prepare(`SELECT COUNT(*) AS count FROM events`).get() as { count: number }).count).toBe(0);
     expect((raw.prepare(`SELECT COUNT(*) AS count FROM event_versions`).get() as { count: number }).count).toBe(0);
   });

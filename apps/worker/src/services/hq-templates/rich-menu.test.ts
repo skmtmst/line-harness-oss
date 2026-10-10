@@ -17,6 +17,7 @@ function fixture(messageText = 'ご案内') {
     sql.raw.prepare('INSERT INTO form_accounts VALUES (?,?,?)').run(`form-${account}`, account, 'now');
     sql.raw.prepare("INSERT INTO scenarios(id,name,trigger_type,line_account_id) VALUES (?,?,'manual',?)").run(`scenario-${account}`, 'Scenario', account);
   }
+  sql.raw.exec("UPDATE line_accounts SET liff_id='fixture-' || id");
   const definition: RichMenuHqDefinition = { schemaVersion: 1, richMenu: { id: 'menu', name: 'Menu', chatBarText: '開く', size: 'large', defaultPageId: 'p1', pages: [
     { id: 'p1', name: 'One', imageR2Key: 'hq-templates/tenant/image1', areas: [{ id: 'ar1', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'uri', actionData: {}, intent: 'form', formId: 'source-form', label: 'フォーム' }, { id: 'ar3', bounds: { x: 100, y: 0, width: 100, height: 100 }, actionType: 'message', actionData: { text: messageText }, intent: 'text', tagIds: ['source-tag'], label: 'ご案内' }, { id: 'ar4', bounds: { x: 200, y: 0, width: 100, height: 100 }, actionType: 'postback', actionData: {}, intent: 'template', templateId: 'source-template', label: 'テンプレ' }] },
     { id: 'p2', name: 'Two', imageR2Key: 'hq-templates/tenant/image2', areas: [{ id: 'ar2', bounds: { x: 0, y: 0, width: 100, height: 100 }, actionType: 'richmenuswitch', actionData: { targetPageId: 'p1' }, intent: 'switch', label: '1ページ目' }] },
@@ -62,7 +63,7 @@ describe('rich-menu HQ store atomic adapter', () => {
       expect(pages).toHaveLength(2);
       for (const [i, page] of pages.entries()) { expect(page.line_richmenu_id).toBeNull(); expect(page.image_r2_key.startsWith(`rich-menus/${account}/`)).toBe(true); expect(f.objects.get(page.image_r2_key)?.bytes).toEqual(new Uint8Array([i + 1, 2, 3])); }
       const area = f.raw.prepare('SELECT * FROM rich_menu_areas WHERE page_id=?').get(pages[0].id) as any;
-      expect(area.form_id).toBe(`form-${account}`); expect(JSON.parse(area.action_data)).toEqual({});
+      expect(area.form_id).toBe(`form-${account}`); expect(JSON.parse(area.action_data)).toEqual({ uri: `https://liff.line.me/fixture-${account}/?page=form&id=form-${account}` });
       expect((f.raw.prepare("SELECT tag_ids FROM rich_menu_areas WHERE page_id=? AND intent='text'").get(pages[0].id) as any).tag_ids).toBe(JSON.stringify([`tag-${account}`]));
       expect((f.raw.prepare("SELECT template_id FROM rich_menu_areas WHERE page_id=? AND intent='template'").get(pages[0].id) as any).template_id).toBe(`template-${account}`);
       const switchArea = f.raw.prepare('SELECT * FROM rich_menu_areas WHERE page_id=?').get(pages[1].id) as any;
@@ -140,7 +141,7 @@ describe('rich-menu HQ store atomic adapter', () => {
     const line = { createRichMenu, uploadRichMenuImage: vi.fn(), deleteRichMenu: vi.fn() } as unknown as LineRichMenuClient;
     await createRichMenuShells(group, line, { get: async key => ({ body: f.objects.get(key)!.bytes }) });
     const payloads = createRichMenu.mock.calls.map(c => c[0] as any);
-    expect(payloads[0].areas[0].action).toEqual({ type: 'uri', uri: 'https://liff.line.me/fixture-a?form=form-a' });
+    expect(payloads[0].areas[0].action).toEqual({ type: 'uri', uri: 'https://liff.line.me/fixture-a/?page=form&id=form-a' });
     expect(payloads[0].areas[1].action).toMatchObject({ type: 'postback', displayText: messageText });
     expect(payloads[0].areas[1].action.data.length).toBe(postbackLength);
     expect(payloads[0].areas[1].action.data).toContain(pages[0].areas[1].id);

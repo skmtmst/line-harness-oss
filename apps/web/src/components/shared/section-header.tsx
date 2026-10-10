@@ -11,6 +11,7 @@ import styles from './section-header.module.css'
  */
 export default function SectionHeader({
   title,
+  size,
   note,
   help,
   helpLabel,
@@ -20,6 +21,7 @@ export default function SectionHeader({
 }: {
   /** 段の題（例「最近の動き」） */
   title: React.ReactNode
+  size?: 'small'
   /** 題の右の小さな補足（例「直近30日」） */
   note?: React.ReactNode
   /** 「？」を押すと出る補足文。helpLabel とセットで渡す */
@@ -37,7 +39,7 @@ export default function SectionHeader({
   wrap?: boolean
 }) {
   return (
-    <div className={styles.root} data-wrap={wrap ? '' : undefined}>
+    <div className={styles.root} data-size={size} data-wrap={wrap ? '' : undefined}>
       <h3 className={styles.title} title={typeof title === 'string' ? title : undefined}>
         {title}
       </h3>

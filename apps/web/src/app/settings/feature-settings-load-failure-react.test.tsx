@@ -99,11 +99,11 @@ async function settle() {
 }
 
 function switches(): number {
-  return host.querySelectorAll('[role="switch"]').length
+  return host.querySelectorAll('[type="checkbox"]').length
 }
 
 function retryButton(): HTMLButtonElement | undefined {
-  return [...host.querySelectorAll('button')].find((item) => item.textContent?.trim() === 'もう一度試す') as HTMLButtonElement | undefined
+  return [...host.querySelectorAll('button')].find((item) => item.textContent?.trim() === 'もう一度読み込む') as HTMLButtonElement | undefined
 }
 
 describe('D019 機能設定の読み込み失敗', () => {

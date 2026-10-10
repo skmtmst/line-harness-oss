@@ -12,7 +12,7 @@
 ## 呼ぶ口（今と同じ）
 - 一覧：`api.friendAddRules.list(accountId, kind, { cursor, limit, q, folder, status })`（`folder` は `__uncategorized` で未分類）
 - 並べ替え：`reorder(accountId, kind, ids)`（絞り込みなし・全件が見えているときだけ）
-- 止める：`stop(accountId, id, version)`／削除：`archive(accountId, id)`／フォルダ：`createFolder(accountId, name, key)`
+- 止める：`stop(accountId, id, version)`／削除：`archive(accountId, id)`／フォルダ：`createFolder(accountId, name, key, color)`／色と名前の変更：`updateFolder(accountId, id, { name, color })`
 - 作る・直す：`get`・`list`（流入リンクを使っているほかの設定を出すため、直すときも読む）・`conflicts`・`createDraft`・`saveDraft`（冪等の鍵）・`validate`・`test`・`publish`
 - 未保存の変更があるときの離脱は `useUnsavedGuard` で確かめる
 
@@ -23,5 +23,11 @@
 - 1152 では「直近7日」の列を出さず、道具は2段（作る・フォルダ・探す … 件数／状態の札）
 - 作る②：選んだ流入リンクを上に並べる。ほかの有効な設定が使っているリンクには「いま「〇〇」（順番N）が動いています」
 - 作る②の友だち条件は1行の言い方（タグの有無）で出し、「条件を足す」で組み立てを開く
+- 1152 の作る②では、期間と友だち条件を「対象をしぼる（任意）」の小窓で見る・変える。小窓を閉じても変更を保ち、下書きの保存に含める
+- 入力不足は上の帯に重ねず、名前・流入リンク・シナリオの欄を赤くし、理由を欄へ結び付け、最初の誤りへ focus と中央へのスクロールを行う。保存・次へ・先の手順を選ぶ操作でも確認する
+- ページ内の戻るリンクは置かず、型の題・説明とパンくず・キャンセルを使う
 - 下書きの保存が版の競合（409）になったら、頭の中に帯を出す：「違いを比べる」（最新の保存と項目ごとに並べる）・「最新を読み込んで続ける」
 - 1152 の作る画面は、右の列の上に「LINEでの見え方を見る」（窓で開く）
+
+## フォルダの色（fcolall・2026-10-09）
+- 追加・名前と色の変更は共通の横並びの窓。設定のフォルダ名とは別に、保存用のフォルダIDも一覧の候補から保持する。色の保存失敗は窓内に出し、入力と窓を残して再試行できる。閲覧のみには操作を出さない。

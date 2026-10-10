@@ -106,6 +106,7 @@ export function runUndoable(options: {
  * 保存できたときは何も出さない（静かに終わる）。
  */
 export function runOptimistic(options: {
+  isCurrent?: () => boolean
   request: Commit
   revert: () => void
   /** 失敗の知らせの文面（例「タグを付けられませんでした」）。 */
@@ -118,15 +119,17 @@ export function runOptimistic(options: {
   void Promise.resolve()
     .then(() => options.request())
     .then((res) => {
+      if (options.isCurrent?.() === false) return
       if (res && res.success === false) throw new Error(res.error ?? '')
       options.onSuccess?.()
     })
     .catch(() => {
+      if (options.isCurrent?.() === false) return
       options.revert()
       notifyToast(options.failureMessage, {
         tone: 'error',
         actionLabel: options.retry ? 'もう一度' : undefined,
-        onAction: options.retry,
+        onAction: options.retry ? () => { if (options.isCurrent?.() !== false) options.retry?.() } : undefined,
       })
     })
 }
@@ -146,6 +149,8 @@ const failureReason = (error: unknown): string => japaneseDetailOf(error)
  */
 export function runOptimisticWithUndo(options: {
   request: Commit
+  /** 対象や同じ項目の後続操作が変わったら、表示・再試行・取り消しを失効させる。 */
+  isCurrent?: () => boolean
   revert: () => void
   /** 成功の知らせ（例「対応状況を対応中にしました」）。 */
   successMessage: string
@@ -163,19 +168,22 @@ export function runOptimisticWithUndo(options: {
 }): { dismiss: () => void } {
   let dismissCurrent: () => void = () => {}
   const handle = { dismiss: () => dismissCurrent() }
+  const current = () => options.isCurrent?.() ?? true
   const fail = (error: unknown) => {
+    if (!current()) return
     options.revert()
     options.onFailure?.(error)
     const reason = failureReason(error)
     dismissCurrent = notifyToast(`${options.failureMessage}${reason ? reason : '通信を確かめて、もう一度お試しください。'}`, {
       tone: 'error',
       actionLabel: 'もう一度試す',
-      onAction: options.retry,
+      onAction: () => { if (current()) options.retry() },
     })
   }
   void Promise.resolve()
     .then(() => options.request())
     .then((res) => {
+      if (!current()) return
       if (res && res.success === false) throw new ApiError(400, res.error ?? '')
       options.onSuccess?.(res)
       const undoRequest = options.undoRequest
@@ -185,6 +193,7 @@ export function runOptimisticWithUndo(options: {
       dismissCurrent = notifyToast(message, undoRequest ? {
         actionLabel: '元に戻す',
         onAction: () => {
+          if (!current()) return
           options.revert()
           void Promise.resolve()
             .then(() => undoRequest())
@@ -192,6 +201,7 @@ export function runOptimisticWithUndo(options: {
               if (undoRes && undoRes.success === false) throw new ApiError(400, undoRes.error ?? '')
             })
             .catch((error: unknown) => {
+              if (!current()) return
               options.reapply?.()
               const reason = failureReason(error)
               notifyToast(`元に戻せませんでした。${reason || '通信を確かめて、もう一度お試しください。'}`, { tone: 'error' })

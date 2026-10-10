@@ -12,20 +12,27 @@
  *   開いたとき・知らせが要るときだけ場所を取る。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Eye, Image as ImageIcon, Save, Type } from 'lucide-react'
+import { Eye, Image as ImageIcon, Save, Type } from 'lucide-react'
 import type { Tag } from '@line-crm/shared'
 import { CreatePage } from '@/components/templates'
+import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
+import Drawer from '@/components/shared/drawer'
 import DateTimeField from '@/components/shared/date-time-field'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import RadioCard from '@/components/shared/radio-card'
-import Select from '@/components/shared/select'
+import MediaSlot from '@/components/shared/media-slot'
+import { uploadImageFile } from '@/components/shared/media-library-upload'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { TextField } from '@/components/shared/text-field'
+import { FieldError } from '@/components/shared/form-controls'
+import { focusFormField } from '@/lib/use-field-validation'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
@@ -48,17 +55,14 @@ import {
   type Failure,
 } from './column-form'
 import styles from './form.module.css'
-
-/** 配信対象の選ぶ欄の値。全員は 'all'、タグは 'tag:<id>'。 */
-function targetValue(draft: ColumnDraft): string {
-  return draft.targetMode === 'tag' ? `tag:${draft.targetTagId}` : 'all'
-}
+import { Field } from '@/components/shared/form-controls'
 
 export default function ColumnNew() {
+  const [previewOpen, setPreviewOpen] = useState(false)
   const router = useRouter()
   const { selectedAccountId, selectedAccount } = useAccount()
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const canEdit = canManageRole(staffRole)
   const [draft, setDraft] = useState<ColumnDraft>(EMPTY_DRAFT)
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<Failure | null>(null)
@@ -93,8 +97,6 @@ export default function ColumnNew() {
       .catch(() => setAudienceCount(null))
   }, [draft.targetMode, draft.targetTagId, selectedAccountId])
 
-  const back = <Link href="/nen-campaigns?tab=columns" className={styles.backLink}><ChevronLeft size={14} aria-hidden="true" />NEN配信へ</Link>
-
   if (!selectedAccountId) {
     return (
       <ListState
@@ -111,14 +113,10 @@ export default function ColumnNew() {
       <CreatePage
         boardId="yRDwW"
         title="コラムを書く"
-        description="外部サイトの記事へつなぐ下書きを作ります。記事本文は外部サイトで管理します。"
-        identity={back}
-        footerActions={<Button href="/nen-campaigns?tab=columns">一覧へ戻る</Button>}
+        help="外部サイトの記事へつなぐ下書きを作ります。記事本文は外部サイトで管理します。"
+        footerActions={<Button href="/nen-campaigns?tab=columns">一覧へ戻る</Button>} dirty={false}
       >
-        <div className={styles.viewerBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。コラムを書くのは管理者に頼んでください。</span>
-        </div>
+        <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。コラムを書くのは管理者に頼んでください。" />
       </CreatePage>
     )
   }
@@ -132,13 +130,19 @@ export default function ColumnNew() {
 
   const save = async () => {
     setTouched(true)
+    setFailure(null)
+    if (errors.length) {
+      if (errors[0].field === 'publishedAt') setPublishOpen(true)
+      focusFormField(`nen-col-${errors[0].field}`)
+      return
+    }
     if (!canSubmit({ draft, busy })) return
     setBusy(true)
     setFailure(null)
     try {
       const res = await api.nenCampaigns.createColumn(selectedAccountId, toCreateInput(draft))
       if (!res.success) throw new Error('failed')
-      router.push('/nen-campaigns?tab=columns')
+      router.push(createPageReturnHref('/nen-campaigns?tab=columns', res.data.id))
     } catch (e) {
       const status = e instanceof ApiError ? e.status : undefined
       const code = e instanceof ApiError ? e.code : undefined
@@ -158,18 +162,18 @@ export default function ColumnNew() {
           <span className={styles.bubbleText}>{`【コラム】${title}\n${excerpt}\n▶ コラムを読む`}</span>
         </LinePreviewMessage>
       </LinePreview>
-      <section className={styles.sideCard} aria-labelledby="nen-col-tips">
+      <Card role="region" layout="vertical" padding="compact" surface="standard" spacing="tight" aria-labelledby="nen-col-tips">
         <h2 className={styles.sideTitle} id="nen-col-tips">読まれるコラムの書きかた</h2>
         <ul className={styles.sideText}>
           <li>・相談の言葉から始める</li>
           <li>・売り込みを入れない</li>
           <li>・差し込む言葉（お名前・ペット名）は1つまで</li>
         </ul>
-      </section>
-      <section className={styles.sideCard} aria-labelledby="nen-col-cannot">
+      </Card>
+      <Card role="region" layout="vertical" padding="compact" surface="standard" spacing="tight" aria-labelledby="nen-col-cannot">
         <h2 className={styles.sideTitle} id="nen-col-cannot">この画面でできないこと</h2>
         <p className={`${styles.sideText} ${styles.sideTextTight}`}>記事の本文を書く（外部サイトで書きます）・出しかたの細かい設定（一斉配信と同じ）</p>
-      </section>
+      </Card>
     </div>
   )
 
@@ -177,9 +181,10 @@ export default function ColumnNew() {
     <CreatePage
       boardId="yRDwW"
       title="コラムを書く"
-      description="外部サイトの記事へつなぐ下書きを作ります。記事本文は外部サイトで管理します。"
-      identity={back}
-      preview={preview}
+      help="外部サイトの記事へつなぐ下書きを作ります。記事本文は外部サイトで管理します。"
+      preview={previewOpen ? undefined : preview}
+      hidePreviewWhenNarrow
+      previewToggle={<Button type="button" onClick={() => setPreviewOpen(true)}>プレビューを見る</Button>}
       status={canSubmit({ draft, busy }) ? 'まだ保存していません。保存すると下書きとして一覧に並びます。' : '題名と記事のURLを入れると保存できます。'}
       footerActions={(
         <>
@@ -188,61 +193,58 @@ export default function ColumnNew() {
             <Save size={15} aria-hidden="true" />下書きを保存
           </Button>
         </>
-      )}
+      )} dirty={false}
     >
       {failure ? <Notice tone="danger" message={failure.message} data-failure-kind={failure.kind} /> : null}
       {tagPruneNotice ? <Notice tone="warn" message={tagPruneNotice} onClose={() => setTagPruneNotice(null)} /> : null}
 
-      <section className={`${styles.card} ${styles.cardWide}`} aria-labelledby="nen-col-title" data-nen-part="title">
-        <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-title">題名と分類</h2>
-        <label className={styles.field}>
-          <span className={styles.labelRow}>
-            <span className={styles.label}>題名</span>
-            {longTitle ? <span className={styles.labelNote} title={longTitle}>{longTitle}</span> : null}
-          </span>
-          <TextField aria-label="題名" value={draft.title} maxLength={TITLE_MAX} placeholder={`LINE の通知には${TITLE_NOTICE_LENGTH}文字まで出ます`} invalid={Boolean(errorFor('title'))} onChange={(event) => set({ title: event.target.value })} />
-          {errorFor('title') ? <span className={styles.error} role="alert">{errorFor('title')}</span> : null}
-        </label>
+      <Card layout="vertical" padding="spacious" surface="standard" spacing="roomy" aria-labelledby="nen-col-title-heading" data-nen-part="title">
+        <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-title-heading">題名と分類</h2>
+        <Field label="題名"><TextField id="nen-col-title" aria-describedby={errorFor('title') ? 'nen-col-title-error' : undefined} aria-label="題名" value={draft.title} maxLength={TITLE_MAX} placeholder={`LINE の通知には${TITLE_NOTICE_LENGTH}文字まで出ます`} invalid={Boolean(errorFor('title'))} onChange={(event) => set({ title: event.target.value })} />
+<FieldError id="nen-col-title-error">{errorFor('title')}</FieldError></Field>
         <div className={styles.row}>
-          <label className={styles.field}>
-            <span className={styles.label}>分類</span>
-            <TextField aria-label="分類" value={draft.category} maxLength={CATEGORY_MAX} placeholder="例: 季節のこと" onChange={(event) => set({ category: event.target.value })} />
-          </label>
+          <Field label="分類"><TextField id="nen-col-category" aria-describedby={errorFor('category') ? 'nen-col-category-error' : undefined} aria-label="分類" value={draft.category} invalid={Boolean(errorFor('category'))} maxLength={CATEGORY_MAX} placeholder="例：季節のこと" onChange={(event) => set({ category: event.target.value })} />
+<FieldError id="nen-col-category-error">{errorFor('category')}</FieldError></Field>
           <div className={styles.field}>
             <span className={styles.labelSmall}>前のコラムを下敷きにする</span>
             <Link href="/nen-campaigns?tab=columns" className={styles.linkAction}>一覧で元のコラムを選びます →</Link>
           </div>
         </div>
-        <label className={styles.field}>
-          <span className={styles.label}>概要（LINE のカードに出る短い紹介文）</span>
-          <TextField aria-label="概要" value={draft.excerpt} maxLength={EXCERPT_MAX} onChange={(event) => set({ excerpt: event.target.value })} />
-        </label>
-      </section>
+        <Field label="概要（LINE のカードに出る短い紹介文）"><TextField id="nen-col-excerpt" aria-describedby={errorFor('excerpt') ? 'nen-col-excerpt-error' : undefined} aria-label="概要" value={draft.excerpt} invalid={Boolean(errorFor('excerpt'))} maxLength={EXCERPT_MAX} onChange={(event) => set({ excerpt: event.target.value })} />
+<FieldError id="nen-col-excerpt-error">{errorFor('excerpt')}</FieldError></Field>
+      </Card>
 
-      <section className={`${styles.card} ${styles.cardWide}`} aria-labelledby="nen-col-link" data-nen-part="article">
+      <Card layout="vertical" padding="spacious" surface="standard" spacing="roomy" aria-labelledby="nen-col-link" data-nen-part="article">
         <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-link">記事のリンク</h2>
-        <label className={styles.field}>
-          <span className={styles.label}>記事の URL</span>
-          <TextField aria-label="記事の URL" value={draft.articleUrl} placeholder="https://example.com/columns/..." invalid={Boolean(errorFor('articleUrl'))} onChange={(event) => set({ articleUrl: event.target.value })} />
-          {errorFor('articleUrl') ? <span className={styles.error} role="alert">{errorFor('articleUrl')}</span> : null}
-        </label>
-        <label className={styles.field}>
-          <span className={styles.label}>画像の URL</span>
-          <TextField id="nen-col-image" aria-label="画像の URL" value={draft.imageUrl} placeholder="https://cdn.example.com/..." invalid={Boolean(errorFor('imageUrl'))} onChange={(event) => set({ imageUrl: event.target.value })} />
-          {errorFor('imageUrl') ? <span className={styles.error} role="alert">{errorFor('imageUrl')}</span> : null}
-        </label>
-      </section>
+        <Field label="記事の URL"><TextField id="nen-col-articleUrl" aria-describedby={errorFor('articleUrl') ? 'nen-col-articleUrl-error' : undefined} aria-label="記事の URL" value={draft.articleUrl} placeholder="https://example.com/columns/..." invalid={Boolean(errorFor('articleUrl'))} onChange={(event) => set({ articleUrl: event.target.value })} />
+<FieldError id="nen-col-articleUrl-error">{errorFor('articleUrl')}</FieldError></Field>
+        <div className={styles.field} id="nen-col-imageUrl" tabIndex={-1}>
+          <span className={styles.label}>画像</span>
+          <MediaSlot
+            title="画像を追加"
+            previewAlt="コラムの画像"
+            value={draft.imageUrl || null}
+            accept="image/jpeg,image/png"
 
-      <section className={`${styles.card} ${styles.cardWide}`} aria-labelledby="nen-col-kind">
+            maxBytes={10 * 1024 * 1024}
+            error={errorFor('imageUrl') || undefined}
+            upload={uploadImageFile}
+            onChange={(url) => set({ imageUrl: url ?? '' })}
+            urlEntry={{ value: draft.imageUrl, onChange: (url) => set({ imageUrl: url }), label: '画像の URL', placeholder: 'https://cdn.example.com/...' }}
+          />
+        </div>
+      </Card>
+
+      <Card layout="vertical" padding="spacious" surface="standard" spacing="roomy" aria-labelledby="nen-col-kind">
         <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-kind">届く形</h2>
         {/* 届く形は画像の URL で決まる（写真つき＝画像あり、文字だけ＝画像なし）。文字だけを選ぶと画像の URL を外し、写真つきを選ぶと画像の URL の欄へ移る。 */}
         <div className={styles.pickRow} role="radiogroup" aria-label="届く形">
-          <RadioCard name="column-kind" value="card" checked={hasImage} onChange={() => { if (!hasImage) document.getElementById('nen-col-image')?.focus() }} icon={<ImageIcon size={16} aria-hidden="true" />} title="上の写真＋コラムを読む" note={hasImage ? '写真の下に題名とボタン' : '画像の URL を入れると選べます'} />
+          <RadioCard name="column-kind" value="card" checked={hasImage} onChange={() => { if (!hasImage) document.getElementById('nen-col-imageUrl')?.focus() }} icon={<ImageIcon size={16} aria-hidden="true" />} title="上の写真＋コラムを読む" note={hasImage ? '写真の下に題名とボタン' : '画像の URL を入れると選べます'} />
           <RadioCard name="column-kind" value="text" checked={!hasImage} onChange={() => set({ imageUrl: '' })} icon={<Type size={16} aria-hidden="true" />} title="文字だけ" note="題名と概要とリンク" />
         </div>
-      </section>
+      </Card>
 
-      <section className={`${styles.card} ${styles.cardWide}`} aria-labelledby="nen-col-when" data-nen-part="publish">
+      <Card layout="vertical" padding="spacious" surface="standard" spacing="roomy" aria-labelledby="nen-col-when" data-nen-part="publish">
         <div className={styles.cardHead}>
           <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-when">いつ・だれに出しますか</h2>
           <p className={`${styles.cardNote} ${styles.cardNoteDark}`}>この日時は下書きに記録されます。実際の配信は、一覧で「この内容で予約する」を押したときだけ始まります</p>
@@ -250,62 +252,62 @@ export default function ColumnNew() {
         <div className={styles.row}>
           <div className={styles.field}>
             <span className={styles.labelRow}>
-              <label className={styles.label} htmlFor="nen-schedule-v8">配信日時（日本時間）</label>
+
               <button type="button" className={styles.labelAside} aria-expanded={publishOpen} onClick={() => setPublishOpen((current) => !current)}>{publishOpen ? '公開日時を閉じる' : '公開日時も記録する'}</button>
             </span>
-            <DateTimeField id="nen-schedule-v8" aria-label="配信日時（日本時間）" value={draft.scheduledAt} invalid={Boolean(errorFor('scheduledAt'))} onChange={(value) => set({ scheduledAt: value })} />
-            {errorFor('scheduledAt') ? <span className={styles.error} role="alert">{errorFor('scheduledAt')}</span> : null}
+            <Field label="配信日時（日本時間）" htmlFor="nen-col-scheduledAt"><DateTimeField id="nen-col-scheduledAt" aria-describedby={errorFor('scheduledAt') ? 'nen-col-scheduledAt-error' : undefined} aria-label="配信日時（日本時間）" value={draft.scheduledAt} invalid={Boolean(errorFor('scheduledAt'))} onChange={(value) => set({ scheduledAt: value })} /></Field>
+            <FieldError id="nen-col-scheduledAt-error">{errorFor('scheduledAt')}</FieldError>
           </div>
           <div className={styles.field}>
             <span className={styles.labelRow}>
               <span className={styles.labelSmall}>配信対象</span>
-              <span className={styles.labelNote}>{audienceCount == null ? '' : `${formatNumber(audienceCount)}人に届きます`}</span>
+              <span className={styles.labelNote}>{audienceCount == null ? '' : `${formatNumber(audienceCount)} 人に届きます`}</span>
             </span>
-            <Select
-              aria-label="配信対象"
-              size="full"
-              value={targetValue(draft)}
-              error={errorFor('targetTagId')}
-              options={[
-                { value: 'all', label: '友だち全員' },
-                ...(draft.targetMode === 'tag' && !draft.targetTagId ? [{ value: 'tag:', label: 'タグで絞る：タグを選んでください' }] : []),
-                ...accountTags.map((tag) => ({ value: `tag:${tag.id}`, label: `タグで絞る：${tag.name}` })),
-              ]}
-              onChange={(value) => set(value === 'all' ? { targetMode: 'all', targetTagId: '' } : { targetMode: 'tag', targetTagId: value.slice(4) })}
+            {/* 1つの欄で選ぶ。空＝友だち全員、タグを選ぶ＝そのタグで絞る（「外す」で全員へ戻す）。 */}
+            <EntityKindField
+              id="nen-col-targetTagId"
+              describedBy={errorFor('targetTagId') ? 'nen-col-targetTagId-error' : undefined}
+              kind="tag"
+              label="配信対象"
+              value={draft.targetMode === 'tag' ? draft.targetTagId : ''}
+              clearable
+              invalid={Boolean(errorFor('targetTagId'))}
+              placeholder={draft.targetMode === 'tag' ? '（タグで絞る：タグを選んでください）' : '（友だち全員）'}
+              options={accountTags}
+              meta={() => 'タグで絞る'}
+              onChange={(value) => set(value ? { targetMode: 'tag', targetTagId: value } : { targetMode: 'all', targetTagId: '' })}
             />
+            <FieldError id="nen-col-targetTagId-error">{errorFor('targetTagId')}</FieldError>
           </div>
         </div>
         {publishOpen ? (
           <div className={styles.row}>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="nen-publish-v8">公開日時（日本時間・任意）</label>
-              <DateTimeField id="nen-publish-v8" aria-label="公開日時（日本時間）" value={draft.publishedAt} invalid={Boolean(errorFor('publishedAt'))} onChange={(value) => set({ publishedAt: value })} />
-              {errorFor('publishedAt') ? <span className={styles.error} role="alert">{errorFor('publishedAt')}</span> : <span className={styles.muted}>空のままなら公開日時は入りません。日本時間で保存します。</span>}
-            </div>
+            <div className={styles.field}><Field label="公開日時（日本時間・）" htmlFor="nen-col-publishedAt"><DateTimeField id="nen-col-publishedAt" aria-label="公開日時（日本時間）" aria-describedby={errorFor('publishedAt') ? 'nen-col-publishedAt-error' : undefined} value={draft.publishedAt} invalid={Boolean(errorFor('publishedAt'))} onChange={(value) => set({ publishedAt: value })} />
+{errorFor('publishedAt') ? <FieldError id="nen-col-publishedAt-error">{errorFor('publishedAt')}</FieldError> : <span className={styles.muted}>空のままなら公開日時は入りません。日本時間で保存します。</span>}</Field></div>
             <span aria-hidden="true" />
           </div>
         ) : null}
-      </section>
+      </Card>
 
-      <section className={`${styles.card} ${styles.cardWide}`} aria-labelledby="nen-col-read">
+      <Card layout="vertical" padding="spacious" surface="standard" spacing="roomy" aria-labelledby="nen-col-read">
         <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-read">読んだ人にすること</h2>
         <div className={styles.row}>
-          <label className={styles.field}>
-            <span className={styles.label}>読了イベント名</span>
-            <TextField aria-label="読了イベント名" value={draft.completionEventName} placeholder="例: 秋の食事コラムを読了" onChange={(event) => set({ completionEventName: event.target.value })} />
-          </label>
+          <Field label="読了イベント名"><TextField aria-label="読了イベント名" value={draft.completionEventName} placeholder="例：秋の食事コラムを読了" onChange={(event) => set({ completionEventName: event.target.value })} /></Field>
           <div className={styles.field}>
             <span className={styles.labelSmall}>読了後に付けるタグ</span>
-            <Select
-              aria-label="読了後に付けるタグ"
-              size="full"
+            <EntityKindField
+              kind="tag"
+              label="読了後に付けるタグ"
               value={draft.completionTagId}
-              options={[{ value: '', label: '付けない' }, ...accountTags.map((tag) => ({ value: tag.id, label: tag.name }))]}
+              clearable
+              placeholder="（付けない）"
+              options={accountTags}
               onChange={(value) => set({ completionTagId: value })}
             />
           </div>
         </div>
-      </section>
+      </Card>
+      <Drawer open={previewOpen} title="配信のプレビュー" width="narrow" onClose={() => setPreviewOpen(false)}>{preview}</Drawer>
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage>
   )

@@ -6,7 +6,7 @@
  * 読み込み・保存・削除・クエリの切り替え（古い応答を捨てる）は今の画面（app/tags/folders/new/page.tsx）と同じ。
  * 受け付ける URL：`/tags/folders/new`（タグのフォルダを追加）・`?id=<フォルダ>`（直す・削除）・
  * `?kind=friend_field`（友だち情報欄のフォルダを追加。今の「作成する場所」の切り替えの代わり）。
- * 色は名前つきの9色を、名前の横の共通ボタンから選ぶ。
+ * 色は共通部品と同じ名前つきの8色を、名前の横の共通ボタンから選ぶ。
  */
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -16,23 +16,18 @@ import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import Notice from '@/components/shared/notice'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 import ListState from '@/components/shared/list-state'
 import TagsList from './list'
 import styles from './create.module.css'
 
 /* 絵の9色。保存する値は色コード、読み上げと見出しは名前。既定は緑（基調色）。 */
-export const TAG_FOLDER_COLORS: ReadonlyArray<{ value: string; name: string }> = [
-  { value: '#EF4444', name: '赤' },
-  { value: '#F97316', name: 'オレンジ' },
-  { value: '#F59E0B', name: '黄' },
-  { value: '#06C755', name: '緑' },
-  { value: '#3B82F6', name: '青' },
-  { value: '#06B6D4', name: '水色' },
-  { value: '#7C3AED', name: '紫' },
-  { value: '#EC4899', name: 'ピンク' },
-  { value: '#6B7280', name: 'グレー' },
-]
-const DEFAULT_COLOR = TAG_FOLDER_COLORS[3].value
+import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+export { TAG_FOLDER_COLORS } from './folder-colors'
+const DEFAULT_COLOR = DEFAULT_TAG_FOLDER_COLOR
 
 type RequestKey = { editId: string | null; generation: number }
 const sameRequest = (a: RequestKey, b: RequestKey) => a.editId === b.editId && a.generation === b.generation
@@ -41,7 +36,7 @@ const sameRequest = (a: RequestKey, b: RequestKey) => a.editId === b.editId && a
 export function folderSaveError(status?: number): string {
   switch (status) {
     case 400: return '入力内容を確認してください。フォルダ名は60文字以内で入力してください。'
-    case 403: return 'フォルダを変更する権限がありません。管理者に確認してください。'
+    case 403: return permissionDeniedMessage('store')
     case 404: return 'フォルダが見つかりません。一覧へ戻って最新の状態を確認してください。'
     case 409: return 'ほかの担当者が先に変更しました。最新の内容を読み直してください。'
     default: return '保存できませんでした。時間を置いて、もう一度お試しください。'
@@ -51,7 +46,7 @@ export function folderSaveError(status?: number): string {
 function folderDeleteError(status?: number): string {
   switch (status) {
     case 400: return '削除できませんでした。フォルダの状態を確認して、もう一度お試しください。'
-    case 403: return 'フォルダを削除する権限がありません。管理者に確認してください。'
+    case 403: return permissionDeniedMessage('store')
     case 404: return '削除しようとしたフォルダが見つかりません。一覧へ戻って最新の状態を確認してください。'
     case 409: return 'ほかの担当者が先に変更したため、削除できませんでした。最新の内容を読み直してください。'
     default: return '削除できませんでした。時間を置いて、もう一度お試しください。'
@@ -67,12 +62,15 @@ export default function TagFolderPageV8() {
 }
 
 function TagFolderPage() {
+  const staffRole = useStaffRole()
   const router = useRouter()
   const params = useSearchParams()
   const { selectedAccountId } = useAccount()
   const editId = params.get('id')
   const scope: 'tag' | 'friend_field' = !editId && params.get('kind') === 'friend_field' ? 'friend_field' : 'tag'
   const [name, setName] = useState('')
+  const [nameError, setNameError] = useState('')
+  const nameRef = useRef<HTMLInputElement>(null)
   const [color, setColor] = useState(DEFAULT_COLOR)
   const [folderAccountId, setFolderAccountId] = useState<string | null>(selectedAccountId)
   const [saving, setSaving] = useState(false)
@@ -88,6 +86,7 @@ function TagFolderPage() {
     const request = { editId, generation: activeRef.current.generation + 1 }
     activeRef.current = request
     setError('')
+    setNameError('')
     setSaving(false)
     if (!editId) {
       setName('')
@@ -106,7 +105,7 @@ function TagFolderPage() {
         const group = result.data.find((item) => item.id === editId)
         if (!group) { setLoadState('error'); return }
         setName(group.name)
-        setColor(group.color ?? DEFAULT_COLOR)
+        setColor(folderDisplayColor(group))
         setFolderAccountId(group.accountId)
         setLoadState('ready')
       })
@@ -119,7 +118,9 @@ function TagFolderPage() {
   useEffect(loadFolder, [editId, selectedAccountId])
 
   const save = async () => {
-    if (!name.trim() || saving || loadState !== 'ready') return
+    if (saving || loadState !== 'ready') return
+    if (!name.trim()) { setNameError('フォルダ名を入力してください'); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
+    setNameError('')
     const request = { ...activeRef.current }
     setSaving(true)
     setError('')
@@ -162,13 +163,14 @@ function TagFolderPage() {
     }
   }
 
+  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+
   /* 止まっている理由は押せない見た目だけにせず、ボタンの title と本文に出す。 */
   const blockedReason =
     loadState === 'loading' ? '読み込んでいます'
       : loadState === 'error' ? '読み込めませんでした'
-        : loadState === 'forbidden' ? '操作する権限がありません'
-          : !name.trim() ? 'フォルダ名を入力すると保存できます'
-            : null
+        : loadState === 'forbidden' ? permissionDeniedMessage('store')
+          : null
   const title = editId ? 'フォルダを直す' : scope === 'friend_field' ? '友だち情報欄のフォルダを追加する' : 'フォルダを追加する'
 
   return (
@@ -179,9 +181,9 @@ function TagFolderPage() {
         designNode="IjVpM"
         designTop={300}
         title={title}
-        name={name} onNameChange={setName} color={color} onColorChange={(next) => setColor(next ?? DEFAULT_COLOR)}
+        name={name} nameError={nameError} nameRef={nameRef} onNameChange={(next) => { setName(next); setNameError('') }} color={color} onColorChange={(next) => setColor(next ?? DEFAULT_COLOR)}
         colors={TAG_FOLDER_COLORS} maxLength={60} disabled={loadState !== 'ready'}
-        onConfirm={() => void save()}
+        onConfirm={() => save()}
         busy={saving}
         error={error || undefined}
         onCancel={close}
@@ -194,7 +196,7 @@ function TagFolderPage() {
             ) : null}
             <span className={styles.dialogFooterEnd}>
               <Button type="button" disabled={saving} onClick={close}>キャンセル</Button>
-              <Button type="button" variant="primary" disabled={saving || blockedReason !== null} title={blockedReason ?? undefined} onClick={() => void save()} busy={saving}>
+              <Button type="button" variant="primary" disabled={saving || blockedReason !== null} title={blockedReason ?? undefined}  onClick={() => void save()} busy={saving}>
                 {editId ? <FolderCheck size={15} aria-hidden="true" /> : <FolderPlus size={15} aria-hidden="true" />}
                 {editId ? 'フォルダを保存する' : 'フォルダを作る'}
               </Button>
@@ -203,12 +205,12 @@ function TagFolderPage() {
         )}
       >
         <>
-          {loadState === 'forbidden' ? <p className={styles.fieldNote}>見る権限がありません</p> : null}
+          {loadState === 'forbidden' ? <p className={styles.fieldNote}>{permissionDeniedMessage('store')}</p> : null}
           {loadState === 'loading' ? <p className={styles.fieldNote}>読み込んでいます</p> : null}
           {loadState === 'error' ? (
             <div className={styles.inlineRetry}>
               <p className={styles.fieldError}>読み込めませんでした</p>
-              <Button type="button" variant="text" onClick={loadFolder}>再読み込み</Button>
+              <Button type="button" variant="text" onClick={loadFolder}>もう一度読み込む</Button>
             </div>
           ) : null}
         </>
@@ -221,7 +223,7 @@ function TagFolderPage() {
         destructive
         busy={saving}
         onCancel={() => { if (!saving) setDeleteOpen(false) }}
-        onConfirm={() => void remove()}
+        onConfirm={() => remove()}
       />
     </>
   )

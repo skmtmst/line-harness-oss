@@ -82,15 +82,6 @@ describe('#670 25/09 オートメーションの状態と行高・ページ送�
   })
 })
 
-describe('#670 08 自動応答の帯と凡例', () => {
-  it('案内の帯2段を1本にまとめ、凡例を内側へ入れる', () => {
-    expect(AUTO_REPLIES).toContain('最初に当てはまった1つだけ')
-    expect(AUTO_REPLIES).toContain('EFFECTIVE_LEGEND.map')
-    // ★V7（#701）：1本にまとめた案内は、毎回読むものではないので開閉する欄にしまう。
-    expect(AUTO_REPLIES.match(/<Disclosure size="compact" title="ルールの動き方と札の見方"/g)).toHaveLength(1)
-  })
-})
-
 describe('#670 16/22 アフィリエイトの操作セルと緑文字', () => {
   it('計測中・停止中は名前の下の札で出し、操作セルに置かない', () => {
     expect(AFFILIATES).toContain("<Chip tone={row.isActive ? 'ok' : 'neutral'}>")
@@ -164,3 +155,5 @@ describe('#670 28 予約メニューに押せないドラッグ持ち手を置�
     expect(BOOKING_MENUS).toContain('label="並び順"')
   })
 })
+
+// 自動応答の V7 の帯・凡例固定は廃止。V8の説明と札はV8の絵で確かめる。

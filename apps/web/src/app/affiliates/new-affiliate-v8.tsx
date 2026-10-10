@@ -24,12 +24,17 @@ import Button from '@/components/shared/button'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import HelpTip from '@/components/shared/help-tip'
 import Disclosure from '@/components/shared/disclosure'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import Notice from '@/components/shared/notice'
 import { formatNumber } from '@/lib/format'
 import './create-v8.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const FRIEND_PAGE_SIZE = 20
 const AFFILIATE_LIST_PATH = '/conversions?tab=affiliates'
@@ -289,8 +294,8 @@ export function NewAffiliateV8() {
     <div data-design-node="RaMf3" className="af-create-board">
       <div className="af-create-head">
         <Link href="/affiliates" className="af-create-backLink">← 成果とアフィリエイトへ</Link>
-        <h1 className="af-create-headTitle">アフィリエイターを作る</h1>
-        <p className="af-create-headDescription">登録すると紹介リンクができます。成果はその人の紹介リンクから来た人で数えます。</p>
+        <PageHeading title="アフィリエイターを作る" help={<> 登録すると紹介リンクができます。成果はその人の紹介リンクから来た人で数えます。</>} />
+
       </div>
 
       {codeConflict ? (
@@ -352,38 +357,29 @@ export function NewAffiliateV8() {
             <h2 className="af-create-cardTitle">だれを登録するか</h2>
             <p className="af-create-cardNote">会社でも個人でも登録できます</p>
             <div className="af-create-grid2">
-              <label className="af-create-fieldLabel" htmlFor="af-name">
-                名前（表示名）
-                <TextField
+              <Field label="名前（表示名）" htmlFor="af-name"><TextField
                   id="af-name"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   placeholder="例：ペットライフ編集部"
                   maxLength={120}
-                />
-              </label>
-              <label className="af-create-fieldLabel" htmlFor="af-code">
-                <span className="af-create-toolbar">紹介コード（リンクの最後に付く）<HelpTip label="紹介コードの決まり">登録後は変更できません。英数字4文字以上。空欄なら推測されにくいコードを自動で作ります。</HelpTip></span>
-                <TextField
+                /></Field>
+              <Field label="紹介コード（リンクの最後に付く）" htmlFor="af-code" help={<>登録後は変更できません。英数字4文字以上。空欄なら推測されにくいコードを自動で作ります。</>}><TextField
                   id="af-code"
                   value={code}
                   onChange={(event) => setCode(event.target.value)}
                   placeholder="petlife2026"
                   maxLength={64}
-                />
-              </label>
+                /></Field>
             </div>
-            <label className="af-create-fieldLabel" htmlFor="af-email">
-              連絡先メール
-              <TextField
+            <Field label="連絡先メール" htmlFor="af-email"><TextField
                 id="af-email"
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="contact@example.com"
                 maxLength={200}
-              />
-            </label>
+              /></Field>
             <div>
               <div className="af-create-toolbar">
                 <Button type="button" variant="secondary" aria-expanded={friendPickerOpen} onClick={() => setFriendPickerOpen((open) => !open)}>
@@ -407,7 +403,7 @@ export function NewAffiliateV8() {
                     }}
                   >
                     <TextField
-                      aria-label="友だちの名前で検索"
+                      aria-label="友だちの名前で探す"
                       value={friendSearchInput}
                       onChange={(event) => setFriendSearchInput(event.target.value)}
                       placeholder="友だちの名前で探す"
@@ -473,10 +469,8 @@ export function NewAffiliateV8() {
               ))}
             </RadioCardGroup>
             {payoutKind === 'rate' ? (
-              <label className="af-create-fieldLabel" htmlFor="af-rate">
-                売上に対する割合
-                <span className="af-create-toolbar">
-                  <TextField
+              <Field label="売上に対する割合" htmlFor="af-rate"><span className="af-create-toolbar">
+                  <NumberInput unit="%"
                     id="af-rate"
                     type="number"
                     min={0}
@@ -485,25 +479,19 @@ export function NewAffiliateV8() {
                     onChange={(event) => setCommissionRate(event.target.value)}
                     placeholder="10"
                   />
-                  <span className="af-create-footnote">%</span>
-                </span>
-              </label>
+
+                </span></Field>
             ) : null}
             <div className="af-create-grid2">
-              <label className="af-create-fieldLabel" htmlFor="af-cycle">
-                締めと支払い
-                <TextField
+              <Field label="締めと支払い" htmlFor="af-cycle"><TextField
                   id="af-cycle"
                   value={payoutCycle}
                   onChange={(event) => setPayoutCycle(event.target.value)}
                   placeholder="例：月末締め翌月末払い"
                   maxLength={100}
-                />
-              </label>
-              <label className="af-create-fieldLabel" htmlFor="af-hold">
-                <span className="af-create-toolbar">保留期間<HelpTip label="保留期間の意味">返品・キャンセルを考慮する期間です。</HelpTip></span>
-                <span className="af-create-toolbar">
-                  <TextField
+                /></Field>
+              <Field label="保留期間" htmlFor="af-hold" help={<>返品・キャンセルを考慮する期間です。</>}><span className="af-create-toolbar">
+                  <NumberInput
                     id="af-hold"
                     type="number"
                     min={0}
@@ -512,8 +500,7 @@ export function NewAffiliateV8() {
                     onChange={(event) => setHoldDays(event.target.value)}
                   />
                   <span className="af-create-footnote">日（取り消しを待つ）</span>
-                </span>
-              </label>
+                </span></Field>
             </div>
           </section>
 
@@ -521,7 +508,7 @@ export function NewAffiliateV8() {
             <h2 className="af-create-cardTitle">成果が出たときにすること</h2>
             <p className="af-create-cardNote">任意</p>
             <div className="af-create-switchRow">
-              <Toggle checked={notifyOnConversion} label="本人にLINEで知らせる" onChange={setNotifyOnConversion} />
+              <SettingCheckbox checked={notifyOnConversion} label="本人にLINEで知らせる" onChange={setNotifyOnConversion} />
               <div className="af-create-switchBody">
                 <p className="af-create-switchName">本人にLINEで知らせる</p>
                 <p className="af-create-switchNote">成果1件ごとに</p>
@@ -529,7 +516,7 @@ export function NewAffiliateV8() {
             </div>
             <Disclosure title="計測の開始" hint={startTracking ? "登録後すぐに開始" : "開始しない"} size="compact">
             <div className="af-create-switchRow">
-              <Toggle checked={startTracking} label="すぐに計測を始める" onChange={setStartTracking} />
+              <SettingCheckbox checked={startTracking} label="すぐに計測を始める" onChange={setStartTracking} />
               <div className="af-create-switchBody">
                 <p className="af-create-switchName">すぐに計測を始める</p>
                 <p className="af-create-switchNote">オフでもリンクは発行されます</p>
@@ -552,7 +539,7 @@ export function NewAffiliateV8() {
                 <dd className="af-create-kvValue">
                   {previewUrl ? (
                     <span className="af-create-urlRow">
-                      <span className="af-create-urlText" title={previewUrl}>{previewUrl}</span>
+                      <span className="af-create-urlText" ><TruncatedText value={String(previewUrl ?? '')} url /></span>
                       <Button
                         variant="secondary"
                         size="compact"
@@ -567,7 +554,7 @@ export function NewAffiliateV8() {
                         コピー
                       </Button>
                     </span>
-                  ) : '—'}
+                  ) : emptyValue('unknown')}
                 </dd>
               </div>
               <div className="af-create-kvRow">
@@ -578,7 +565,7 @@ export function NewAffiliateV8() {
               </div>
               <div className="af-create-kvRow">
                 <dt className="af-create-kvKey">締め</dt>
-                <dd className="af-create-kvValue">{payoutCycle.trim() || '—'}</dd>
+                <dd className="af-create-kvValue">{payoutCycle.trim() || emptyValue('unknown')}</dd>
               </div>
             </dl>
             <p className="af-create-footnote">

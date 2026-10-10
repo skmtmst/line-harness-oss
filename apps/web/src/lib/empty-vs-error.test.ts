@@ -10,7 +10,7 @@
  * ここでは**文字列そのものではなく、`error` で分岐しているか**を見る。
  * 文面は変わってよい。「失敗したのに『ありません』と言い切らない」ことだけを守る。
  */
-import { readFileSync } from 'node:fs';
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -21,8 +21,8 @@ const APP = join(dirname(fileURLToPath(import.meta.url)), '..', 'app');
 const PAGES = [
   /* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る。 */
   { file: 'reminders/list-v8.tsx', empty: 'まだリマインダがありません' },
-  { file: 'auto-replies/page.tsx', empty: '自動応答は0件です' },
-  { file: 'broadcasts/page.tsx', empty: '配信がありません' },
+  { file: '../v8/auto-replies/list.tsx', empty: 'まだ自動応答のルールはありません' },
+  { file: '../v8/broadcasts/list.tsx', empty: 'まだ一斉配信がありません' },
 ];
 
 /**
@@ -55,6 +55,14 @@ describe('「1件も無い」と「読み込めなかった」', () => {
         return;
       }
 
+      if (page.file.includes('/v8/')) {
+        const stateAt = src.indexOf('const listBody =');
+        const branch = src.slice(stateAt, at);
+        expect(stateAt).toBeGreaterThan(-1);
+        expect(branch).toMatch(/(?:visibleLoadState === 'error'|\) : error \? \()/);
+        expect(branch).toContain('<EmptyList');
+        return;
+      }
       const expr = enclosingExpression(src, at);
       // 失敗したかどうかを見ずに「ありません」と出していないか。
       expect(

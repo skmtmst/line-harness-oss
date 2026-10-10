@@ -5,7 +5,7 @@
  * - 210：複製は決まりも写す（読めなければ複製しない）
  */
 import React from 'react'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 const net = vi.hoisted(() => ({ capStatus: vi.fn(), create: vi.fn(), approvalsFull: false }))
@@ -43,13 +43,35 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
   usePathname: () => '/affiliates',
 }))
-vi.mock('@/components/shared/toast', () => ({ notifyToast: vi.fn() }))
+vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
 
 import OfferFormModal from './offer-form'
 import OffersTab from './offers'
 afterEach(() => { cleanup(); vi.clearAllMocks(); net.approvalsFull = false })
 
 const offer = { id: 'of-1', name: '紹介A', description: null, rewardAmount: 1000, rewardMiles: 0, lineAccountId: null, tagId: null, scenarioId: null, isActive: true }
+
+test('案件の入力の誤りは欄に一度だけ出し、保存せずその欄へ移る', async () => {
+  render(<OfferFormModal accounts={[]} tags={[]} scenarios={[]} onClose={() => undefined} onSaved={() => undefined} />)
+  const name = screen.getByLabelText(/案件名/) as HTMLInputElement
+  const scroll = vi.fn()
+  name.scrollIntoView = scroll
+  fireEvent.click(screen.getByRole('button', { name: '作成' }))
+  await waitFor(() => expect(document.activeElement).toBe(name))
+  expect(name.getAttribute('aria-invalid')).toBe('true')
+  expect(screen.getAllByText('案件名は必須です')).toHaveLength(1)
+  expect(scroll).toHaveBeenCalledWith({ block: 'center' })
+  expect(net.create).not.toHaveBeenCalled()
+
+  fireEvent.input(name, { target: { value: '紹介B' } })
+  const windowDays = screen.getByLabelText('数える期間（日）') as HTMLInputElement
+  fireEvent.change(windowDays, { target: { value: '0' } })
+  fireEvent.click(screen.getByRole('button', { name: '作成' }))
+  await waitFor(() => expect(document.activeElement).toBe(windowDays))
+  expect(windowDays.getAttribute('aria-invalid')).toBe('true')
+  expect(name.getAttribute('aria-invalid')).not.toBe('true')
+  expect(net.create).not.toHaveBeenCalled()
+})
 
 test('207：決まりが読めなかったら知らせ、決まりの欄は触れない', async () => {
   net.capStatus.mockRejectedValue(new Error('down'))
@@ -62,7 +84,7 @@ test('207：読み直して読めたら、決まりの欄を触れる', async ()
   net.capStatus.mockRejectedValueOnce(new Error('down')).mockResolvedValue({ success: true, data: { version: { windowDays: 14, capTotal: 5, capMonthlyPerAffiliate: null, receptionFrom: null, receptionTo: null } } })
   render(<OfferFormModal initial={offer as never} accounts={[]} tags={[]} scenarios={[]} onClose={() => undefined} onSaved={() => undefined} />)
   await screen.findByText(/読み込めませんでした。このまま保存しても/)
-  const again = [...document.querySelectorAll('button')].find((b) => b.textContent === '読み直す') as HTMLButtonElement
+  const again = [...document.querySelectorAll('button')].find((b) => b.textContent === 'もう一度読み込む') as HTMLButtonElement
   await act(async () => { again.click() })
   await waitFor(() => expect((screen.getByLabelText('数える期間（日）') as HTMLInputElement).value).toBe('14'))
   expect((screen.getByLabelText('数える期間（日）') as HTMLInputElement).disabled).toBe(false)
@@ -76,7 +98,7 @@ test('210：複製は数える期間・上限・受付の期間も写す', async
   await act(async () => { menu.click() })
   const item = [...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.includes('複製')) as HTMLElement
   await act(async () => { item.click() })
-  await waitFor(() => expect(net.create).toHaveBeenCalledWith(expect.objectContaining({ windowDays: 14, capTotal: 5, capMonthlyPerAffiliate: 2, receptionFrom: '2026-10-01', receptionTo: '2026-10-31', isActive: false })))
+  await waitFor(() => expect(net.create).toHaveBeenCalledWith(expect.objectContaining({ name: '紹介A（コピー）', rewardAmount: 1000, rewardMiles: 0, windowDays: 14, capTotal: 5, capMonthlyPerAffiliate: 2, receptionFrom: '2026-10-01', receptionTo: '2026-10-31', isActive: false })))
 })
 
 test('209：承認を読み切れなかったときは、平均報酬を言い切らない', async () => {
@@ -84,4 +106,15 @@ test('209：承認を読み切れなかったときは、平均報酬を言い�
   net.capStatus.mockResolvedValue({ success: true, data: { version: null } })
   render(<OffersTab />)
   await waitFor(() => expect(screen.getByText('件数が多く、全部は数えられませんでした')).toBeTruthy())
+})
+
+test('B-136：成果のときの動き（タグ・シナリオ・マイル）は上の絞り込み。左のフォルダの列は「すべて」だけで、フォルダを追加は置かない', async () => {
+  net.capStatus.mockResolvedValue({ success: true, data: { version: null } })
+  render(<OffersTab />)
+  await screen.findByRole('button', { name: '紹介Aの操作' })
+  const nav = document.querySelector('nav[aria-label="フォルダ"]') as HTMLElement
+  expect([...nav.querySelectorAll('button[title]')].map((b) => b.getAttribute('title'))).toEqual(['すべて'])
+  expect(nav.textContent).not.toContain('タグを付ける')
+  expect(document.body.textContent).not.toContain('フォルダを追加')
+  expect(screen.getAllByLabelText('成果のときの動き').length).toBeGreaterThan(0)
 })

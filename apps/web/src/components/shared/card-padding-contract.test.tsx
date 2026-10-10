@@ -20,9 +20,11 @@ describe('Card の内側の余白（変わり形）', () => {
     const rule = css.match(/\.paddingSpacious\s*{[^}]*}/s)
     expect(rule, 'spacious の指定がありません').toBeTruthy()
     expect(rule![0]).toMatch(/padding:\s*20px/)
-    // 既定の余白は変えない。
+    // V7 の余白は保持。V8 は B-152 の段へ寄せる。
     expect(css).toMatch(/\.paddingDefault\s*{[^}]*padding:\s*16px/s)
-    expect(css).toMatch(/\.paddingRoomy\s*{[^}]*padding:\s*18px/s)
+    expect(css).toMatch(/\.paddingRoomy\s*{[^}]*padding:\s*24px/s)
+    expect(css).toContain("[data-theme='v8'] .paddingRoomy, [data-theme='v8'] .paddingSpacious { padding: var(--polish-space-section); }")
+    expect(css).toContain("[data-theme='v8'] .paddingDefault, [data-theme='v8'] .paddingCompact { padding: var(--polish-space-card); }")
   })
 
   it('padding="spacious" で余白のクラスが付く', () => {

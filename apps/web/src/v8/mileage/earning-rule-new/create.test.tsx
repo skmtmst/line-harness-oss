@@ -5,7 +5,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -101,6 +101,24 @@ describe('V8 たまる決めごとを作る', () => {
     await mount()
     await clickButton('保存して動かす')
     expect(screen.getByText('ルール名を入力してください')).toBeTruthy()
+    const name = screen.getByLabelText('名前')
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(screen.getAllByText('ルール名を入力してください')).toHaveLength(1)
+    await waitFor(() => expect(document.activeElement).toBe(name))
+    expect(calls.some((call) => call.method === 'POST')).toBe(false)
+  })
+
+  it('畳まれた有効期限に誤りがあれば、開いてその欄へ移り、保存しない', async () => {
+    await mount()
+    type('名前', 'リンクをクリック')
+    type('マイル', '10')
+    type('有効期限の日数', '0')
+    await clickButton('保存して動かす')
+    const expiry = screen.getByLabelText('有効期限の日数')
+    await waitFor(() => expect(document.activeElement).toBe(expiry))
+    expect(expiry.closest('details')?.open).toBe(true)
+    expect(expiry.getAttribute('aria-invalid')).toBe('true')
+    expect(screen.getAllByText('有効期限は1〜3650日で入力してください')).toHaveLength(1)
     expect(calls.some((call) => call.method === 'POST')).toBe(false)
   })
 
@@ -116,7 +134,7 @@ describe('V8 たまる決めごとを作る', () => {
     ])
     expect(writes[0].body).toMatchObject({ name: 'リンクをクリック', amount: 10, lineAccountId: 'account-a', initialStatus: 'available' })
     expect(writes[1].body).toMatchObject({ accountId: 'account-a', expectedVersion: 0 })
-    expect(push).toHaveBeenCalledWith('/mileage?tab=earning-rules')
+    expect(push).toHaveBeenCalledWith('/mileage?tab=earning-rules&highlight=rule-new')
     expect(document.querySelector('[data-design-node="BnrQp"]')).toBeNull()
   })
 
@@ -126,7 +144,7 @@ describe('V8 たまる決めごとを作る', () => {
     type('名前', 'リンクをクリック')
     type('マイル', '10')
     await clickButton('保存して動かす')
-    const band = screen.getByRole('alert', { name: 'ほかの人が先に保存しました' })
+    const band = screen.getByRole('alert')
     expect(band.textContent).toContain('坂本さんが 14:02 にこの決めごとを保存しました')
     expect(band.textContent).toContain('このまま保存すると、坂本さんの変更が消えます')
     expect(document.querySelector('[data-design-node="BnrQp"]')).toBeTruthy()

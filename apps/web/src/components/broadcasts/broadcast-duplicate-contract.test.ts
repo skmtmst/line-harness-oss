@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const FORM = readFileSync(join(HERE, 'broadcast-form.tsx'), 'utf8')
-const DETAIL = readFileSync(join(HERE, '..', '..', 'app', 'broadcasts', 'detail', 'page.tsx'), 'utf8')
+const DETAIL = readFileSync(join(HERE, '..', '..', 'v8', 'broadcast-detail', 'detail.tsx'), 'utf8')
 
 /** 始まりと終わりの目印の間だけを切り出す。ファイル全体を見ると素通しになる。 */
 function between(src: string, from: string, to: string): string {
@@ -25,7 +25,7 @@ function between(src: string, from: string, to: string): string {
 describe('同じ設定で作り直す', () => {
   it('詳細に押せる作り直しがあり、準備中のまま置かない', () => {
     expect(DETAIL).toContain('/broadcasts/new?duplicateFrom=')
-    expect(DETAIL).toContain('同じ設定で作り直す')
+    expect(DETAIL).toContain('複製して作る')
     expect(DETAIL, '押せない作り直しが残っている').not.toContain('作り直しは準備中')
   })
 

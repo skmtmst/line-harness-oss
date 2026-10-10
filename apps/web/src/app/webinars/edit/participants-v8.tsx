@@ -27,6 +27,9 @@ import {
   percent,
   type ParticipantRow,
 } from './participants-shared'
+import TruncatedText from '@/components/shared/truncated-text'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export type ParticipantExport = { download: () => void; busy: boolean; available: boolean }
 
@@ -108,7 +111,7 @@ export default function ParticipantsV8({
     const request = generation.current
     setCsvBusy(true)
     setCsvError('')
-    void downloadApiFile(webinarApi.participantsCsvUrl(webinarId, selected), 'webinar-participants.csv')
+    void downloadApiFile(webinarApi.participantsCsvUrl(webinarId, selected), csvFileName("動画セミナー"))
       .catch(() => { if (request === generation.current) setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') })
       .finally(() => { csvLock.current = false; setCsvBusy(false) })
   }, [webinarId])
@@ -182,7 +185,7 @@ export default function ParticipantsV8({
 
   if (state === 'denied') {
     return (
-      <div className="border-hairline bg-canvas rounded-card border p-8 text-center shadow-card" role="note">
+      <div className="border-hairline bg-canvas rounded-card border p-8 text-center shadow-card-surface" role="note">
         <p className="text-ink text-sm font-bold">個人の参加履歴はオーナーと管理者だけが確認できます。</p>
         <p className="text-ink-faint mt-2 text-xs">友だちごとの視聴・申込の記録を出す権限がないため、この段は表示できません。集計だけは「分析」から確認できます。</p>
       </div>
@@ -338,7 +341,7 @@ export default function ParticipantsV8({
                         <span className="flex min-w-0 items-center gap-3">
                           <ParticipantAvatar name={name} pictureUrl={participant.pictureUrl} size="sm" />
                           <span className="min-w-0">
-                            <a href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`} title={name} className="text-action block truncate font-semibold">{name}</a>
+                            <a href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`}  className="text-action block truncate font-semibold"><TruncatedText value={String(name ?? '')} /></a>
                             <span className="text-ink-faint block truncate text-xs">
                               {joinNote(participant)}
                               {joinKindLabel(participant)}
@@ -351,7 +354,7 @@ export default function ParticipantsV8({
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-ink block tabular-nums">
-                          {participant.maxWatchedSeconds > 0 ? `${fmtSec(participant.maxWatchedSeconds)}（${rate}%）` : '—'}
+                          {participant.maxWatchedSeconds > 0 ? `${fmtSec(participant.maxWatchedSeconds)}（${rate}%）` : emptyValue('unknown')}
                         </span>
                         <span className="text-ink-faint block text-xs">{participantStateLabel(participant, durationSeconds)}</span>
                       </td>

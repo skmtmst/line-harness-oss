@@ -4,7 +4,7 @@
  * 「流入経路を読み込めませんでした」＋再読み込みボタンで、
  * 権限不足と分からず通らない再試行を促していた（M021同系統）。
  * 本物のReactで動かして見る。
- * - 403 → 権限の案内。再試行の口は出さない（押しても直らない）。
+ * - 403 → 権限の案内。再読み込みの口を出す（押しても直らない）。
  * - 429 → 待ち秒数の案内。再試行の口は残す。
  * - 500 → 今までどおりの1枚。再試行の口は残す。
  */
@@ -97,7 +97,7 @@ describe('M029 流入経路一覧の取得失敗は原因どおりに言い分�
     vi.unstubAllGlobals()
   })
 
-  it('403は権限の案内にし、再試行の口を出さない', async () => {
+  it('403は権限の案内にし、再読み込みの口を出す', async () => {
     entryRoutesStatus = 403
     await act(async () => {
       root.render(<InflowLinksPage />)
@@ -107,8 +107,8 @@ describe('M029 流入経路一覧の取得失敗は原因どおりに言い分�
     const card = errorCard()
     expect(card).not.toBeNull()
     expect(card!.textContent).toContain('見る権限がありません')
-    // 押しても直らない再試行は促さない。
-    expect(card!.querySelector('button')).toBeNull()
+    // 権限が追加された後も同じ画面で読み直せる。
+    expect(card!.querySelector('button')).toBeTruthy()
     expect(card!.textContent).not.toContain('流入経路を読み込めませんでした')
   })
 
@@ -186,6 +186,7 @@ describe('R173 検索・絞り込みの0件は未登録と混ぜない', () => {
       setter.call(input, 'そんざいしないさーち')
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
     await settle()
 
     expect(host.textContent).toContain('条件に合う流入経路がありません')

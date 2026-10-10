@@ -109,45 +109,6 @@
   overflow-y: auto;
 }
 
-.kpis {
-  display: flex;
-  gap: var(--tpl-toolbar-gap);
-}
-.kpi {
-  display: flex;
-  flex: 1 1 0;
-  flex-direction: column;
-  gap: var(--tpl-af-dr-kpi-gap);
-  min-width: 0;
-  padding: var(--tpl-af-dr-kpi-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-canvas-sunken);
-}
-.kpiLabel {
-  overflow: hidden;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-micro);
-  line-height: normal;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.kpiValue {
-  color: var(--color-ink);
-  font-size: var(--text-lead);
-  font-weight: 700;
-  line-height: var(--tpl-af-dr-kpi-value-lh);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.kpiSub {
-  overflow: hidden;
-  color: var(--color-ink-faint);
-  font-size: var(--text-nano);
-  line-height: var(--tpl-af-dr-kpi-sub-lh);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .section {
   display: flex;
   flex-direction: column;

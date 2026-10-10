@@ -57,7 +57,7 @@ export function friendAddFlowSteps(input: {
       : '対象の流入リンクは未選択です'
     const notes = ['選んだ経路のURL・QR（どちらも同じ入口）から追加された人に動きます。']
     if (input.missingRouteCount > 0) {
-      notes.push(`停止・削除済みの経路が${input.missingRouteCount}件含まれています。`)
+      notes.push(`停止・削除済みの経路が${input.missingRouteCount} 件含まれています。`)
     }
     notes.push('基本の追加URLなど経路を特定できない追加には、この設定ではなく「経路が分からなかった人」の設定が動きます。')
     routeDetail = notes.join('')
@@ -140,7 +140,7 @@ export function timeWindowsSummary(windows: FriendAddTimeWindow[] | undefined): 
   const list = windows ?? []
   if (list.length === 0) return 'いつでも'
   if (list.length === 1) return `${list[0].start}〜${list[0].end}`
-  return `${list[0].start}〜${list[0].end} など${list.length}件`
+  return `${list[0].start}〜${list[0].end} など${list.length} 件`
 }
 
 /**

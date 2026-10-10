@@ -8,17 +8,22 @@
  * use-feature-settings.ts（写し）に1つだけ置く。見た目だけを型（SettingsPage）と部品で組み直した。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpDown, ChevronDown, ChevronRight, Eye, GitCompare, Info, Lock, RefreshCw, RotateCcw, Save, TriangleAlert } from 'lucide-react'
+import { ArrowUpDown, Check, ChevronDown, ChevronRight, Eye, GitCompare, Lock, RefreshCw, RotateCcw, Save, TriangleAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Dialog from '@/components/shared/dialog'
+import ReorderList from '@/components/shared/reorder-list'
+import { RowMenu } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import SearchField from '@/components/shared/search-field'
-import SegmentedControl from '@/components/shared/segmented'
-import { applyAdminTheme } from '@/components/theme-preview-switch'
+import Notice from '@/components/shared/notice'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import {
@@ -39,6 +44,7 @@ import {
   type UsageCategory,
 } from './use-feature-settings'
 import styles from './screen.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const TITLE = '機能設定'
 const DESCRIPTION = '使わない機能をオフにすると、左のメニューから消えます。作ったデータは消えません'
@@ -52,7 +58,7 @@ function UsageBadge({ category, onRetry }: { category: UsageCategory; onRetry?: 
     return (
       <span className={styles.usage} title={category.inUse.reason ?? category.created.reason ?? '利用状況はまだ分かりません'}>
         利用数は未取得
-        {onRetry && <button type="button" onClick={onRetry} aria-label="利用数を読み直す">読み直す</button>}
+        {onRetry && <button type="button" onClick={onRetry} aria-label="利用数を読み直す">もう一度読み込む</button>}
       </span>
     )
   }
@@ -75,7 +81,7 @@ function FeatureUsageBadge({ usage, label, onRetry }: { usage: FeatureUsage; lab
     return (
       <span className={styles.usage} title={title}>
         利用状況は取得失敗
-        {onRetry && <button type="button" onClick={onRetry} aria-label="利用状況を読み直す">読み直す</button>}
+        {onRetry && <button type="button" onClick={onRetry} aria-label="利用状況を読み直す">もう一度読み込む</button>}
       </span>
     )
   }
@@ -123,7 +129,7 @@ function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwi
           必須
         </span>
       ) : canManage ? (
-        <Toggle
+        <SettingCheckbox
           checked={enabled}
           label={`${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
           disabled={busy}
@@ -216,7 +222,7 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
 }
 
 /** 並び替えの窓（★V8-B `ztgRD`）。下書きの並びを動かし、確定で反映する。 */
-export function ReorderDialog({ groups, initialOrder, onCancel, onApply, moveItemInOrder }: {
+export function ReorderDialog({ groups, initialOrder, onCancel, onApply }: {
   groups: FeatureGroup[]
   initialOrder: MenuItemOrder
   onCancel: () => void
@@ -225,88 +231,35 @@ export function ReorderDialog({ groups, initialOrder, onCancel, onApply, moveIte
 }) {
   const [draft, setDraft] = useState<MenuItemOrder>(initialOrder)
   const draftGroups = useMemo(() => applyItemOrder(groups, draft), [groups, draft])
-  const panelRef = useOverlayFocus(true, onCancel)
+  const [groupId, setGroupId] = useState(groups.find((group) => group.id === 'delivery')?.id ?? groups[0]?.id ?? '')
+  const [groupMenuOpen, setGroupMenuOpen] = useState(false)
+  const group = draftGroups.find((item) => item.id === groupId)
   return (
-    <div className={styles.dialogOverlay} role="presentation" onClick={onCancel}>
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="左のメニューの並びを変える"
-        className={styles.dialog}
-        tabIndex={-1}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className={styles.dialogHead}>
-          <p className={styles.dialogTitle}>左のメニューの並びを変える</p>
-          <p className={styles.dialogDesc}>
-            上下のボタンで同じ区分の中だけを入れ替えます。「この並びにする」を押すまで左のメニューは変わりません。
-          </p>
-        </div>
-        <div className={styles.dialogBody}>
-          {draftGroups.map((group) => (
-            <div key={group.id}>
-              <p className={styles.orderGroupLabel}>{group.label}</p>
-              {group.items.map((item, index) => (
-                <div key={item.id} className={styles.orderRow}>
-                  <span className={styles.orderRowLabel}>{item.label}</span>
-                  <button
-                    type="button"
-                    className={styles.moveBtn}
-                    aria-label={`${item.label}を上へ`}
-                    disabled={index === 0}
-                    onClick={() => setDraft((current) => moveItemInOrder(current, group.id, item.id, -1))}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.moveBtn}
-                    aria-label={`${item.label}を下へ`}
-                    disabled={index === group.items.length - 1}
-                    onClick={() => setDraft((current) => moveItemInOrder(current, group.id, item.id, 1))}
-                  >
-                    ↓
-                  </button>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-        <div className={styles.dialogFoot}>
-          <span className={styles.dialogFootLead}>
-            <button type="button" onClick={() => setDraft(initialOrder)}>元の並びに戻す</button>
-          </span>
-          <Button variant="secondary" onClick={onCancel}>キャンセル</Button>
-          <Button variant="primary" onClick={() => onApply(draft)}>この並びにする</Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/** 画面の見た目（いまの見た目／新しい見た目）。このブラウザだけで切り替える。 */
-function ThemeCard() {
-  const [theme, setTheme] = useState<'v7' | 'v8' | null>(null)
-  useEffect(() => {
-    setTheme(document.documentElement.dataset.theme === 'v8' ? 'v8' : 'v7')
-  }, [])
-  if (theme === null) return null
-  return (
-    <section className={styles.themeCard} data-design="theme-preview" aria-label="画面の見た目">
-      <p className={styles.themeTitle}>画面の見た目</p>
-      <p className={styles.themeDesc}>新しい見た目（V8）を試せます。このブラウザだけで、ほかの人には影響しません。</p>
-      <SegmentedControl
-        aria-label="画面の見た目"
-        value={theme}
-        options={[{ value: 'v7', label: 'いまの見た目' }, { value: 'v8', label: '新しい見た目（試す）' }]}
-        onChange={(next) => {
-          applyAdminTheme(next)
-          setTheme(next)
-        }}
-        className={styles.themeSeg}
-      />
-    </section>
+    <Dialog
+      open
+      designNode="ztgRD"
+      designWidth={560}
+      designTop={140}
+      designHeaderPadding="24px 24px 0"
+      designContentPadding="4px 24px 0"
+      designFooterPadding="10px 24px 24px"
+      footerAlign="start"
+      footerDivider={false}
+      footerLeadFlexible={false}
+      confirmIcon={<Check size={14} aria-hidden="true" />}
+      title="左のメニューの並びを変える"
+      titleHelp={<RowMenu label="並びを変える区分を選ぶ" open={groupMenuOpen} onOpenChange={setGroupMenuOpen} items={groups.map((item) => ({ id: item.id, label: item.label, onSelect: () => { setGroupId(item.id); setGroupMenuOpen(false) } }))} />}
+      confirmLabel="この並びにする"
+      footerLead={<Button variant="text" onClick={() => setDraft(initialOrder)}><RotateCcw size={14} aria-hidden="true" />元の並びに</Button>}
+      onCancel={onCancel}
+      onConfirm={() => onApply(draft)}
+    >
+      <p className={styles.orderDescription}>つまみで動かすか、矢印で1つずつ動かします。区分（メイン・配信…）の中で並べ替えます。</p>
+      {group ? <>
+        <p className={styles.orderGroupName}>{group.label}</p>
+        <ReorderList items={group.items} visibleRows={5} onChange={(ids) => setDraft((current) => ({ ...current, [group.id]: ids }))} />
+      </> : null}
+    </Dialog>
   )
 }
 
@@ -324,6 +277,7 @@ export default function FeatureSettingsScreen() {
     loadFailed,
     reason,
     setReason,
+    setError,
     itemOrder,
     setItemOrder,
     moveItemInOrder,
@@ -360,7 +314,7 @@ export default function FeatureSettingsScreen() {
   const staffRole = useStaffRole()
   const canManage = staffRole ? canManageRole(staffRole) : true
 
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [compareOpen, setCompareOpen] = useState(false)
   const [reorderOpen, setReorderOpen] = useState(false)
   const [openGroups, setOpenGroups] = useState<Set<string> | null>(null)
@@ -403,6 +357,20 @@ export default function FeatureSettingsScreen() {
     })
   }
 
+  const reasonRef = useRef<HTMLInputElement>(null)
+  const reasonError = error === '変更理由を入力してください' ? error : ''
+  const focusReason = () => {
+    reasonRef.current?.focus()
+    reasonRef.current?.scrollIntoView({ block: 'center' })
+  }
+  useEffect(() => { if (reasonError) focusReason() }, [reasonError])
+  const validateReason = () => {
+    if (reason.trim()) return true
+    setError('変更理由を入力してください')
+    focusReason()
+    return false
+  }
+
   const ready = Boolean(selectedAccountId) && !loading && !loadFailed
 
   /*
@@ -421,13 +389,7 @@ export default function FeatureSettingsScreen() {
   }, [conflicted])
   const conflictBand = conflicted ? (
     <div ref={conflictRef} className={styles.conflict} role="status" data-design-node="ziYCN">
-      <TriangleAlert className={styles.conflictIcon} aria-hidden="true" />
-      <div className={styles.conflictText}>
-        <p className={styles.conflictTitle}>ほかの人が先に機能設定を保存しました</p>
-        <p className={styles.conflictDesc}>あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。</p>
-      </div>
-      <Button variant="secondary" onClick={() => setCompareOpen(true)}><GitCompare className={styles.btnIcon} aria-hidden="true" />違いを比べる</Button>
-      <Button variant="primary" onClick={() => void load()}><RefreshCw className={styles.btnIcon} aria-hidden="true" />最新を読み込んで続ける</Button>
+      <SaveConflictBand title="ほかの人が先に機能設定を保存しました" onCompare={() => setCompareOpen(true)} onReload={() => void load()} />
     </div>
   ) : null
 
@@ -435,7 +397,7 @@ export default function FeatureSettingsScreen() {
     <SbSettingsScreen
       boardId="ywFJT"
       title={TITLE}
-      description={conflictBand ? <>{DESCRIPTION}<span className={styles.conflictSlot}>{conflictBand}</span></> : DESCRIPTION}
+      help={DESCRIPTION}
       saveActions={ready && canManage ? (
         <>
           <Button
@@ -448,10 +410,10 @@ export default function FeatureSettingsScreen() {
           </Button>
           <Button
             variant="primary"
-            onClick={() => conflicted ? setCompareOpen(true) : void save()}
+            onClick={() => { if (!validateReason()) return; if (conflicted) setCompareOpen(true); else void save() }}
             disabled={saving || !dirty}
             busy={saving}
-            done={savedTick}
+
             doneLabel="保存しました"
             title={!dirty ? '変更すると保存できます' : undefined}
           >
@@ -470,16 +432,14 @@ export default function FeatureSettingsScreen() {
         </span>
       ) : undefined}
     >
+      {conflictBand}
       {!canManage && (
         <div className={styles.viewerBand} role="status">
           <Eye className={styles.bandIcon} aria-hidden="true" />
           <span>{VIEWER_NOTE}</span>
         </div>
       )}
-      <p className={styles.infoBand}>
-        <Info className={styles.bandIcon} aria-hidden="true" />
-        <span>公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順は「並びを変える」から入れ替えます。</span>
-      </p>
+      <Notice tone="info">公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順は「並びを変える」から入れ替えます。</Notice>
 
       {!selectedAccountId ? (
         <p className={styles.stateBox}>先に上部でLINEアカウントを選んでください。</p>
@@ -503,12 +463,12 @@ export default function FeatureSettingsScreen() {
         <ListState
           kind="error"
           title={error || '設定を読み込めませんでした'}
-          action={<Button type="button" variant="secondary" onClick={() => void load()}>もう一度試す</Button>}
+          onRetry={() => void load()}
         />
       ) : (
         <>
           <div aria-live="polite" className={styles.live}>
-            {error && !conflicted && <p role="alert" className={styles.dangerBand}>{error}</p>}
+            {error && !conflicted && !reasonError && <Notice tone="danger" message={error} />}
           </div>
 
           <div className={styles.toolbar}>
@@ -558,23 +518,20 @@ export default function FeatureSettingsScreen() {
             </div>
           )}
 
-          <ThemeCard />
-
           {/* N-444：変更があるときだけ理由の欄を出す。 */}
           {canManage && dirty && (
-            <div className={styles.field}>
-              <label htmlFor="feature-settings-reason" className={styles.fieldLabel}>変更理由（必須）</label>
-              <input
+            <Field label="変更理由（必須）" htmlFor="feature-settings-reason" error={reasonError || undefined} note="空のままでは保存できません。運用状態の更新履歴に残ります。">
+              <TextField
+                ref={reasonRef}
                 id="feature-settings-reason"
-                className={styles.fieldInput}
+                aria-required="true"
                 value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                placeholder="例: マイルを使わないのでオフにする"
+                onChange={(event) => { setReason(event.target.value); if (reasonError) setError('') }}
+                placeholder="例：マイルを使わないのでオフにする"
                 maxLength={300}
                 disabled={saving}
               />
-              <p className={styles.fieldHint}>空のままでは保存できません。運用状態の更新履歴に残ります。</p>
-            </div>
+            </Field>
           )}
         </>
       )}
@@ -585,9 +542,8 @@ export default function FeatureSettingsScreen() {
         description="保存済みの値と編集中の値を確認してください。"
         confirmLabel="比べてから保存"
         busy={saving}
-        error={reason.trim() ? undefined : '保存するには変更理由を入力してください。'}
         onCancel={() => setCompareOpen(false)}
-        onConfirm={() => { if (!reason.trim()) return; setCompareOpen(false); void save() }}
+        onConfirm={() => { if (!validateReason()) { setCompareOpen(false); return }; setCompareOpen(false); return save() }}
       >
         <ul className={styles.compareList}>
           {Object.keys(features).filter((key) => features[key] !== savedFeatures[key]).map((key) => (
@@ -645,7 +601,7 @@ export default function FeatureSettingsScreen() {
           setImpactOpen(false)
           setImpactError('')
         }}
-        onConfirm={() => void confirmImpactSave()}
+        onConfirm={() => confirmImpactSave()}
       >
         <div>
           {impactGroups.map((group) => (

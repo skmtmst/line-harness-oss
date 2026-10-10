@@ -14,11 +14,13 @@ import { Eye, Inbox, ListChecks, Send, TriangleAlert } from 'lucide-react'
 import type { IncomingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
 import { api, type OutgoingWebhookOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import Notice from '@/components/shared/notice'
 import { Tabs } from '@/components/shared/tabs'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { formatNumber } from '@/lib/format'
 import styles from './shell.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 export type WebhookTabKey = 'outgoing' | 'incoming' | 'api-tokens' | 'sheets' | 'interactions' | 'notify'
 export type LoadStatus = 'loading' | 'ready' | 'error'
@@ -30,7 +32,7 @@ export const SAMPLE_COUNT = 9
 export const WEBHOOKS_DESCRIPTION = 'ほかのシステムと、友だちの動きをやり取りします。送る・受け取る・API・Google Sheets をここで決めます。'
 
 /** 変更は統括だけ（v7 と同じ R32）。見るだけの人への一言。 */
-export const MANAGE_REASON = '統括だけが変更できます。必要なときは統括に頼んでください。'
+export const MANAGE_REASON = permissionDeniedMessage('store')
 
 /*
  * タブ（絵の並び）。行き先は今と同じ ?tab=。送るタブだけ素の /webhooks（今と同じ）。
@@ -51,8 +53,8 @@ export function WebhookTabs({ active, outgoingCount, incomingCount }: {
     { key: 'notify', label: `見本 ${SAMPLE_COUNT}` },
   ]
   return (
-    <div className={styles.tabs}>
     <Tabs
+      size="short"
       label="外部連携の種類"
       items={items.map((item) => ({
         label: item.label,
@@ -60,7 +62,6 @@ export function WebhookTabs({ active, outgoingCount, incomingCount }: {
         current: item.key === active,
       }))}
     />
-    </div>
   )
 }
 
@@ -148,7 +149,7 @@ export interface BandCell {
 
 /*
  * 送る・受け取る・Sheets・見本タブの帯（絵 ZSbFY）。
- * 「先月より」は先月の集計の口が無いので、今月送ったの下は成功の回数を出す。
+ * 「先月より」は先月の集計の口が無いので、直近30日 送ったの下は成功の回数を出す。
  */
 export function overviewBandCells(args: {
   outgoing: OutgoingWebhookOverview[] | null
@@ -168,11 +169,11 @@ export function overviewBandCells(args: {
     },
     {
       key: 'sent',
-      title: '今月送った',
+      title: '直近30日 送った',
       icon: <Send size={13} aria-hidden="true" />,
       value: summary ? summary.outgoing : null,
       unit: '回',
-      detail: summary ? `成功 ${formatNumber(Math.max(0, summary.outgoing - summary.outgoingFailed))}回` : '集計を読み込めませんでした',
+      detail: summary ? `成功 ${formatNumber(Math.max(0, summary.outgoing - summary.outgoingFailed))} 回` : '集計を読み込めませんでした',
     },
     {
       key: 'failed',
@@ -188,15 +189,14 @@ export function overviewBandCells(args: {
       icon: <Inbox size={13} aria-hidden="true" />,
       value: incomingCount,
       unit: '件',
-      detail: summary ? `今月 ${formatNumber(summary.incoming)} 回` : '集計を読み込めませんでした',
+      detail: summary ? `直近30日 ${formatNumber(summary.incoming)} 回` : '集計を読み込めませんでした',
     },
   ]
 }
 
 export function WebhookBand({ cells }: { cells: BandCell[] }) {
   return (
-    <div className={styles.stats}>
-    <KpiBand aria-label="外部連携の数の帯">
+    <KpiBand border="inset-top" aria-label="外部連携の数の帯">
       {cells.map((cell) => (
         <KpiCard
           key={cell.key}
@@ -209,7 +209,6 @@ export function WebhookBand({ cells }: { cells: BandCell[] }) {
         />
       ))}
     </KpiBand>
-    </div>
   )
 }
 
@@ -217,10 +216,7 @@ export function WebhookBand({ cells }: { cells: BandCell[] }) {
 export function ViewerBand() {
   return (
     <div className={styles.viewerRow}>
-      <div className={styles.viewerBand} role="status">
-        <Eye size={16} aria-hidden="true" />
-        <span>閲覧のみで見ています。変える操作は統括に頼んでください。</span>
-      </div>
+      <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />}>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</Notice>
     </div>
   )
 }

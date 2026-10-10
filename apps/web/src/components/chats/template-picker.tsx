@@ -121,6 +121,7 @@ export default function TemplatePicker({
 
   useEffect(() => {
     if (!open) {
+      setLoadingMore(false)
       // 閉じている間に前回分を捨て、次に開いた最初の描画から
       // 未取得状態にする（effect後の一瞬だけ前アカウントを出さない）。
       listGenRef.current += 1
@@ -180,6 +181,7 @@ export default function TemplatePicker({
     if (!open) return
     const myGen = ++listGenRef.current
     const account = selectedAccountId ?? undefined
+    setLoadingMore(false)
     setTemplatesStatus('loading')
     void api.templates.listPage({
       accountId: account,

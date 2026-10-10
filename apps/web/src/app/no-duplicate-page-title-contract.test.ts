@@ -80,16 +80,13 @@ describe('画面名を本文とトップバーで2回出さない', () => {
     expect(PAGES.length).toBe(193)  // 2026-10-08 に V2〜V7 の見本 6 画面（visual-qa/friend-attributes・-v2・-v3・v7-combobox・v7-progress-filedrop・v7-target-missing）を撤去。2026-10-07 に提案 E-7 の来店スタンプ（/visit-stamps）、提案 E-4 予約サイト・グルメ媒体（/settings/booking-media）と E-9 統括の一括配信（/hq/broadcasts・new・detail）を追加。同日に提案 E の枠を閉じる知らせ（/restaurant-test/close-tasks）と SNS 連携（/settings/sns）を追加。情報欄の編集画面と運営専用ナレッジ（37-11）、★V7見本（v7-progress-filedrop・v7-combobox・v7-target-missing）、設定の中のファイルの検査を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。2026-09-28 にイベントの変更の確認・お客様表示の確認の2画面を追加（U）。同日に付与ルールの下書き編集画面を追加（R296）。2026-10-01 に ★V8 新部品の見本画面（visual-qa/v8-parts）を追加。2026-10-03 に /scenarios/new の転送画面を追加。2026-10-04 に予約からの売上（/booking/sales）を追加。
   })
 
-  it('PageHeader は、トップバーと同じ言葉のときだけ題を隠す', () => {
+  it('既存の PageHeader も PageHeading を使い、頭を二重に手書きしない', () => {
     const header = fs.readFileSync(path.join(SRC, 'components', 'shared', 'page-header.tsx'), 'utf8')
-    // 既定は auto。トップバーが出す題と見比べて決める。
-    expect(header).toMatch(/titleDisplay\s*=\s*'auto'/)
-    expect(header).toContain('defaultTitleForPath')
-    expect(header).toMatch(/barTitle !== title/)
-    // 同じ言葉のときは出さない。画面の h1 はトップバーが持つので、本文の題は h2（2026-09-24）。
-    // V8は板の頭に題を置く。V7は同じ題のときv8-onlyで隠す。
-    expect(header).toContain("${shown ? '' : 'v8-only'}")
-    expect(header).toMatch(/<h2[^>]*title=\{title\}>\{title\}<\/h2>/)
-    expect(visible(header)).not.toMatch(/<h1[\s>]/)
+    const frame = fs.readFileSync(path.join(SRC, 'components', 'templates', 'page-frame.tsx'), 'utf8')
+    expect(header).toContain('<PageHeading')
+    expect(header).toContain('help={help}')
+    expect(visible(header)).not.toMatch(/<h[12][\s>]/)
+    expect(frame).toContain("titleAs: HeadingTag = 'h2'")
+    expect(frame).toMatch(/<HeadingTag[^>]*title=/)
   })
 })

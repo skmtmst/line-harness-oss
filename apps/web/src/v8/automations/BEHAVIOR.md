@@ -13,7 +13,7 @@
 | 見本 | `templates.tsx` | `c7dxp` | `app/automations/page.tsx`（`?tab=templates`） |
 | 共通（頭・タブ・数の帯・閲覧のみの帯・権限） | `shell.tsx` | 上のすべて | — |
 
-ルールを作る（`/automations/new`・`M4torY`・`tJqST`）は今の V8 のまま。見本（`c7dxp`）は 2026-10-07 にここへ一から書いた（今までの V8 は `app/automations/templates-v8.tsx`）。
+ルールを作る（`/automations/new`・`M4torY`・`tJqST`）は `create/create.tsx`。見本（`c7dxp`）は 2026-10-07 にここへ一から書いた（今までの V8 は `app/automations/templates-v8.tsx`）。
 
 ## 受け付ける URL と指定（今と同じ）
 - `/automations`（ルール）、`/automations?tab=templates`（見本）。
@@ -24,7 +24,7 @@
 
 ## 呼ぶ口（今と同じ）
 - ルール：`api.automations.list`（数の帯の今月動いた・失敗は `summary`）、条件に外れたは `/api/automation-runs?limit=1` の `summary.skipped`。
-  編集＝`createDraftFromAutomation`→`/automations/drafts?id=`、複製＝`duplicate`、止める・動かす・削除＝`setStatus`（確認の窓）、1人で試す＝`test`（窓で友だちIDを入れる）。
+  編集＝`createDraftFromAutomation`→`/automations/drafts?id=`、複製＝`duplicate`、止める・動かす・保管＝`setStatus`（確認の窓）、1人で試す＝`test`（窓で友だちIDを入れる）。
 - タブの件数：ルール＝一覧の件数、共通アクション＝`api.commonActions.list` の件数、見本＝`api.automations.templates` の件数。読めないときは数を出さない。
 - 動いた記録：`/api/automation-runs`（`limit`・`offset`・`search`・`status`・`include_test`）、中身＝`getRun`、もう一度やる＝`POST /retry`、取りやめ＝`cancelRun`、CSV＝`runsCsvUrl`＋`downloadApiFile`。
 - 共通アクション：`api.commonActions.list`（`status`・`query`・`limit`・`offset`、数の帯は `summary`）、複製＝`duplicate`→編集、保管・戻す＝`archive`/`unarchive`、CSV＝`csvUrl`。
@@ -39,7 +39,7 @@
 
 ## 今の V8 と違うところ
 - ルール・共通アクションのフォルダ：箱は出すが、**ルール・共通アクションをフォルダへ入れる口がまだ無い**（表に folder_id が無い）ので、全件が未分類。箱を選ぶと0件。箱の件数は口が返さないので出さない。
-- ルールの並び：既定は更新が新しい順（絵の並び）。動いた回数順・名前順は「よく使う絞り込み」から。失敗があったルール・この30日に動いていないルールもそこから絞れる。
+- ルールの並び：既定は更新が新しい順（絵の並び）。広い一覧は「並び順」から動いた回数順・名前順へ変更でき、絞り込みは保つ。狭い一覧は「よく使う絞り込み」から並びも変えられる。失敗があったルール・この30日に動いていないルールもそこから絞れる。
 - ルールの「きっかけ」：言葉で動くもの（メッセージ＋言葉）は「「〇〇」と送られた」、ほかは正本の名前。「この30日」の2行目は動いているものは失敗の回数、止めているものは最後に変えた日。
 - 数の帯の「先月より」は先月の集計の口が無いので出さない（今月動いた＝この30日の回数）。
 - 動いた記録：結果の札は「動いた・失敗・条件に外れた」の3つ（すべては数の帯）。テスト実行を含めるのは「よく使う絞り込み」から。中身は右の詳細パネル。行の「…」に ルールを開く・トークを開く を足した。
@@ -50,10 +50,11 @@
 今の V8（`app/common-actions/common-action-new-v8.tsx`）と同じ口と動き：`api.commonActions.resources`（選択肢。失敗は帯と「もう一度読み込む」）、
 `api.commonActions.create`（名前・説明・処理・要求キー）→ `/common-actions/versions?id=`。閲覧のみ（権限なし）は作らせない。
 - 入口：`app/common-actions/new/page.tsx`（`/common-actions/new`）
-- 見せ方：処理は「番号・何を・どれを」の1行で並べ、押すとその処理の設定（今の部品 CommonActionEditor／分岐は BranchEditors の写し）を開く。↑↓は開いた設定の中
+- 見せ方：処理は「番号・何を・どれを」の1行で並べ、押すとその処理の設定（今の部品 CommonActionEditor／分岐は BranchEditors の写し）を開く。↑↓と削除は閉じた行の右端から使える。設定を開かなくても並べ替え・削除でき、保存する順番に反映する。
 - 足す：処理を足す・待ち時間を入れる・条件で分ける・見本から受け渡す（公開版を呼ぶ処理を足す）。足した行は閉じたまま
 - 「失敗したとき」の段：全部の処理の「失敗したとき」をまとめて決める。違うものがあれば「処理ごとに違う」と出す
 - 写したもの：`branch-editor.tsx`・`action-order.ts`（app/common-actions から。src/v8 は @/app を読めない）
+- 入力の誤り：名前は欄を赤くし、その下に理由を1回だけ出して欄へ移る。処理が空の場合は「処理を足す」のそばへ理由を出してそのボタンへ移る。上の帯は通信・保存の失敗だけ。
 
 ## 見本（`templates.tsx`・`c7dxp`）
 - 呼ぶ口（今と同じ）：見本＝`api.automations.templates`、数の帯＝`api.automations.list`（ルールの数・`summary`）と `/api/automation-runs?limit=1` の `summary.skipped`。
@@ -65,3 +66,7 @@
 - きっかけの言い方は口の「〇〇とき」から「とき」を落として出す（絵：「友だちになった」）。
 - きっかけの札は、かっこの補足を外した同じきっかけを1つにまとめ（「注文が確定した（初回）」→「注文が確定した」）、**先に出てきた順に6つまで**（絵は「すべて」＋6つ）。7つ目以降のきっかけの見本は「すべて」から見る。
 - 数の帯はルールの一覧と同じ4つ（今月動いた＝この30日に動いた回数。「先月より」は口が無いので出さない）。
+
+## B-173 保管から戻す
+- `?archived=1` の保管の札で保管したルールだけを見る（一覧APIに `includeArchived=1`）。
+- 行の「…」→「保管から戻す」→確認の窓→`POST /api/automations/:id/restore`。公開版ありは停止中、公開前は下書きへ。同じID・版・実行記録を残し、稼働は再開しない。閲覧のみでは戻す操作を隠す。

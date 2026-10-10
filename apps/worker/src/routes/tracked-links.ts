@@ -1,3 +1,6 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { extrasFromTrackedLink } from '../services/tap-extras.js';
+import { recordTrackedClick, processTrackedClick } from '../services/tracked-click-steps.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getTrackedLinks,
@@ -6,12 +9,10 @@ import {
   createTrackedLink,
   updateTrackedLink,
   deleteTrackedLink,
-  recordLinkClick,
   getLinkClicks,
   getFriendByLineUserIdForAccount,
 } from '@line-crm/db';
-import { enrollFriendInScenario, getUrlReachConversionPoints, trackConversion } from '@line-crm/db';
-import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
+import { getUrlReachConversionPoints } from '@line-crm/db';
 import type { TrackedLink } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -19,10 +20,7 @@ import { isLinkPreviewBot } from '../lib/og-bot.js';
 import { buildOgHtml } from '../lib/og-html.js';
 import { resolveOgForTrackedLink } from '../lib/og-resolver.js';
 import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
-import { awardActivityMileage } from '../services/activity-mileage.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
-import { applyActionScoreEvent } from '../services/action-score-events.js';
 
 const trackedLinks = new Hono<Env>();
 
@@ -163,7 +161,7 @@ trackedLinks.get('/api/tracked-links/:id', requireVisibleTrackedLink, async (c) 
 });
 
 // POST /api/tracked-links — create
-trackedLinks.post('/api/tracked-links', requireRole('owner', 'admin'), async (c) => {
+trackedLinks.post('/api/tracked-links', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"originalUrl":["string"],"tagId":["null","string"],"scenarioId":["null","string"],"introTemplateId":["null","string"],"rewardTemplateId":["null","string"],"lineAccountId":["null","string"],"ogTitle":["null","string"],"ogDescription":["null","string"],"ogImageUrl":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       name: string;
@@ -179,7 +177,7 @@ trackedLinks.post('/api/tracked-links', requireRole('owner', 'admin'), async (c)
     }>();
 
     if (!body.name || !body.originalUrl) {
-      return c.json({ success: false, error: 'name and originalUrl are required' }, 400);
+      return inputError(c, { success: false, error: 'name and originalUrl are required' }, 400, ["name","originalUrl"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId ?? null])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -207,7 +205,7 @@ trackedLinks.post('/api/tracked-links', requireRole('owner', 'admin'), async (c)
 });
 
 // PATCH /api/tracked-links/:id — update mutable fields
-trackedLinks.patch('/api/tracked-links/:id', requireRole('owner', 'admin'), requireVisibleTrackedLink, async (c) => {
+trackedLinks.patch('/api/tracked-links/:id', requireRole('owner', 'admin'), requireVisibleTrackedLink, inputJsonBoundary({"name":["string"],"tagId":["null","string"],"scenarioId":["null","string"],"introTemplateId":["null","string"],"rewardTemplateId":["null","string"],"lineAccountId":["null","string"],"isActive":["boolean"],"ogTitle":["null","string"],"ogDescription":["null","string"],"ogImageUrl":["null","string"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -389,104 +387,14 @@ trackedLinks.get('/t/:linkId', async (c) => {
     }
   }
 
-  // Run side-effects async (click recording, tag/scenario actions)
-  const ctx = c.executionCtx as ExecutionContext;
-  ctx.waitUntil(
-    (async () => {
-      try {
-        // Record the click (link.id, not the raw param — it may be a short code)
-        const click = await recordLinkClick(c.env.DB, link.id, friendId);
-
-        if (friendId) {
-          await awardActivityMileage(c.env.DB, {
-            eventType: 'link_clicked',
-            source: 'tracked_link',
-            sourceEventId: click.id,
-            friendId,
-            subjectKey: link.id,
-            metadata: { trackedLinkId: link.id, linkName: link.name },
-            occurredAt: click.clicked_at,
-          });
-          const accountId = await resolveLinkAccountId(c.env.DB, link);
-          if (accountId) {
-            const results = await Promise.allSettled([
-              applyActionScoreEvent(c.env.DB, {
-                lineAccountId: accountId,
-                friendId,
-                eventType: 'link_clicked',
-                source: 'tracked_link',
-                sourceEventId: click.id,
-                subjectKey: link.id,
-                occurredAt: click.clicked_at,
-              }),
-              dispatchAutomationEventWithLogging(c.env.DB, {
-                lineAccountId: accountId,
-                eventType: 'link_clicked',
-                sourceEventId: click.id,
-                friendId,
-                eventData: { trackedLinkId: link.id, clickId: click.id },
-              }),
-            ]);
-            for (const result of results) {
-              if (result.status === 'rejected') console.error('tracked link action event failed:', result.reason);
-            }
-          }
-        }
-
-        // Run automatic actions if a friend is identified
-        if (friendId) {
-          const actions: Promise<unknown>[] = [];
-
-          // 「このURLに着いたら成果」と決めてある地点があれば数える。
-          // 判定は転送先URL（link.original_url）に対して行う。/t/ 自体は
-          // 短縮URLで、成果地点の設定には出てこないため。
-          //
-          // ここで数えるのは、リンクを踏んだ人が確実に分かるのがこの経路だけ
-          // だから。転送先のページに計測を仕込む方法だと、そのページを
-          // こちらで触れる必要がある。
-          actions.push(
-            (async () => {
-              const points = await getUrlReachConversionPoints(
-                c.env.DB,
-                link.original_url,
-                link.line_account_id ?? null,
-              );
-              for (const point of points) {
-                // 一人一回の地点で二度目のときは trackConversion 側が
-                // 既存の1件を返すので、ここでは重複を気にしなくてよい。
-                await trackConversion(c.env.DB, {
-                  conversionPointId: point.id,
-                  friendId: friendId!,
-                  metadata: JSON.stringify({ via: 'tracked_link', trackedLinkId: link.id }),
-                });
-              }
-            })(),
-          );
-
-          if (link.tag_id) {
-            // Guarded attach: fires tag_added scenario enrollment only when
-            // the tag is NEWLY applied — an in-app /t click must start a
-            // tag-triggered campaign exactly like the /auth/line ref path
-            // does, and stay silent on re-clicks.
-            actions.push(attachTagAndFireSideEffects(c.env.DB, friendId, link.tag_id, {
-              defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
-              workerUrl: c.env.WORKER_URL,
-            }));
-          }
-
-          if (link.scenario_id) {
-            actions.push(enrollFriendInScenario(c.env.DB, friendId, link.scenario_id));
-          }
-
-          if (actions.length > 0) {
-            await Promise.allSettled(actions);
-          }
-        }
-      } catch (err) {
-        console.error(`/t/${linkId} async tracking error:`, err);
-      }
-    })(),
-  );
+  // Record the click and its fixed work plan before returning the redirect. Cron owns continuation.
+  const accountId=await resolveLinkAccountId(c.env.DB,link);
+  const points=friendId ? await getUrlReachConversionPoints(c.env.DB,link.original_url,accountId) : [];
+  const click=await recordTrackedClick(c.env.DB,{linkId:link.id,friendId,accountId,tagId:link.tag_id,scenarioId:link.scenario_id,
+    linkName:link.name,conversionPointIds:points.map(point=>point.id),tapExtras:extrasFromTrackedLink(link)});
+  c.executionCtx.waitUntil(processTrackedClick(c.env,click.id,click.plan).catch(()=>{
+    console.error('tracked_click_work_pending');
+  }));
 
   // App-link domains: return HTML with JS redirect for Universal Link support
   if (useAppRedirect) {

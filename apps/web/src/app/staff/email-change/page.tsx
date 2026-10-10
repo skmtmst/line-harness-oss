@@ -51,7 +51,7 @@ export default function StaffEmailChangePage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-xl items-center px-6 py-16">
-      <section className="w-full rounded-card border border-hairline bg-canvas p-8 shadow-card">
+      <section className="w-full rounded-card border border-hairline bg-canvas p-8 shadow-card-surface">
         <p className="text-sm font-semibold text-ink-secondary">musubo</p>
         <div role="heading" aria-level={1} className="mt-3 text-2xl font-bold text-ink">メールアドレスの変更</div>
 

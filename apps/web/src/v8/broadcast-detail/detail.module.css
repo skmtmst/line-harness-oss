@@ -97,13 +97,13 @@
 /* 下書きの進み（型の共通部品 Steps）。説明の行の下。 */
 .draftSteps {
   min-width: 0;
-  padding-top: var(--tpl-bd-rail-pad-top);
+  padding-top: var(--tpl-bd-draft-steps-top);
 }
 
 /* 進みの帯（送るまでの段階）：丸18・丸と字の間5・線20・間8。 */
 .rail {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: var(--tpl-bd-rail-gap);
   margin: 0;
@@ -447,64 +447,6 @@ a.railStep:hover .railLabel {
 }
 
 /* 数の帯：枠1つ・4つの升を縦の線で分ける（絵「数の帯」）。 */
-.stats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  border-radius: var(--radius-card);
-  box-shadow: var(--tpl-bd-ring);
-}
-
-.stat {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-bd-stat-gap);
-  min-width: 0;
-  padding: var(--tpl-bd-stat-pad);
-}
-
-.stat + .stat {
-  box-shadow: var(--tpl-bd-line-l);
-}
-
-.statLabel {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-bd-stat-label-size);
-  line-height: var(--tpl-bd-stat-label-lh);
-}
-
-.statValue {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--tpl-bd-stat-unit-gap);
-  margin: 0;
-}
-
-.statNum,
-.statDetail[data-numeric] {
-  font-family: var(--font-inter), Inter, system-ui, sans-serif;
-}
-
-.statNum {
-  color: var(--color-ink);
-  font-size: var(--tpl-bd-stat-num-size);
-  font-weight: 700;
-  line-height: var(--tpl-bd-stat-num-lh);
-  font-variant-numeric: tabular-nums;
-}
-
-.statUnit {
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-bd-stat-unit-size);
-  line-height: var(--tpl-bd-stat-unit-lh);
-}
-
-.statDetail {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: var(--tpl-bd-stat-detail-size);
-  line-height: var(--tpl-bd-stat-detail-lh);
-}
 
 /* 反応：リンクごとの行（枠1つ・行の間は線）。 */
 .linkList {
@@ -769,3 +711,14 @@ a.railStep:hover .railLabel {
   /* 絵は字の途中で折る（全体の言葉のまとまりで折ると3行になる）。 */
   word-break: normal;
 }
+
+.side > .secTitle { font-size: var(--tpl-bd-side-title-size); line-height: var(--tpl-bd-side-title-lh); }
+
+.head:has(.rail) { padding-bottom: var(--tpl-bd-delivery-head-bottom); }
+.conflictWrap { padding-top: var(--tpl-body-gap); }
+
+.head:has(.rail) ~ .split .side { padding-top: var(--tpl-section-pad); }
+
+.railItem[data-finished] .railMark { background: var(--color-ink); }
+.railItem[data-finished] .railStep { color: var(--color-ink); font-weight: 700; }
+.railItem[data-state='current'] .railMark { background: var(--color-ink); box-shadow: none; }

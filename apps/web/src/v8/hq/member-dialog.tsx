@@ -10,13 +10,18 @@
  * 行内のラジオ、担当するアカウントは枠の中に縦1列のチェック、下の帯は線の下で真ん中寄せ。
  * 窓の枠・×・題は共通の Dialog、頭の寸法は dialog-head.module.css。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { Field } from '@/components/shared/form-controls'
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Send, ShieldCheck } from 'lucide-react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
+import { EntityMultiSelect } from '@/components/shared/entity-picker'
+import { toHqAccountItems, toPickerFolders, useHqAccountFolders } from '@/components/shared/hq-account-picker'
+import SearchField from '@/components/shared/search-field'
 import Dialog from '@/components/shared/dialog'
-import { Field as FormField } from '@/components/shared/form-controls'
+import { Field as FormField, FieldError } from '@/components/shared/form-controls'
+import { focusFieldById } from '@/lib/use-form-errors'
 import Radio from '@/components/shared/radio'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
@@ -47,13 +52,7 @@ export type MemberDialogValue = {
  * 絵 `yLKwV` の「10/9（金）18:40」の形で出す。
  */
 export function inviteExpiryLabel(now: Date = new Date()): string {
-  const at = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric',
-    weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).formatToParts(at)
-  const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${pick('month')}/${pick('day')}（${pick('weekday')}）${pick('hour')}:${pick('minute')}`
+  return polishFormatDate(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), { style: 'detail', now })
 }
 
 /** 担当範囲で選べるアカウント。アーカイブしたものは選ばせない（今の担当範囲に入っているものは残す）。 */
@@ -114,8 +113,10 @@ export default function MemberDialogV8({
   const uid = useId()
   const [value, setValue] = useState<MemberDialogValue>(initial(member, accounts))
   const [localError, setLocalError] = useState('')
+  const [scopeQuery, setScopeQuery] = useState('')
+  const accountFolders = useHqAccountFolders(open)
   /* 板 `ukPgd`：名前・メールの間違いは欄の下に赤で出し、直すまで送るボタンを押せなくする。 */
-  const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string }>({})
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; scope?: string; assigned?: string }>({})
 
   useEffect(() => {
     setValue(initial(member, accounts))
@@ -125,28 +126,28 @@ export default function MemberDialogV8({
 
   const set = <K extends keyof MemberDialogValue>(key: K, next: MemberDialogValue[K]) => {
     setValue((v) => ({ ...v, [key]: next }))
-    if (key === 'name' || key === 'email') {
-      const field = key as 'name' | 'email'
-      setFieldErrors((errors) => (errors[field] ? { ...errors, [field]: undefined } : errors))
-    }
+    const field: 'name' | 'email' | 'scope' | 'assigned' | null = key === 'name' || key === 'email' ? key
+      : key === 'scopedLineAccountIds' || key === 'accountScope' ? 'scope'
+        : key === 'assignedLineAccountId' ? 'assigned' : null
+    if (field) setFieldErrors((errors) => (errors[field] ? { ...errors, [field]: undefined } : errors))
   }
-  const toggleAccount = (id: string) =>
-    set('scopedLineAccountIds', value.scopedLineAccountIds.includes(id) ? value.scopedLineAccountIds.filter((x) => x !== id) : [...value.scopedLineAccountIds, id])
 
   const submit = () => {
-    if (!member) {
-      const errors = {
-        name: value.name.trim() ? undefined : '名前を入力してください',
-        email: !value.email.trim()
-          ? 'メールアドレスを入力してください'
-          : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email.trim()) ? undefined : 'メールアドレスの形が正しくありません（@ のあとに .com などが要ります）',
-      }
-      setFieldErrors(errors)
-      if (errors.name || errors.email) return setLocalError('')
-      if (!value.assignedLineAccountId) return setLocalError('最初に表示するアカウントを選んでください')
+    /* 欄の誤りは全部その欄の下に出し、上から1つ目へ移る（板 ukPgd・B-139）。 */
+    const errors = {
+      name: member || value.name.trim() ? undefined : '名前を入力してください',
+      email: member ? undefined : !value.email.trim()
+        ? 'メールアドレスを入力してください'
+        : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email.trim()) ? undefined : 'メールアドレスの形が正しくありません（@ のあとに .com などが要ります）',
+      scope: value.accountScope === 'accounts' && value.scopedLineAccountIds.length === 0 ? '担当するアカウントを1つ以上選んでください' : undefined,
+      assigned: !member && !value.assignedLineAccountId ? '最初に表示するアカウントを選んでください' : undefined,
     }
-    if (value.accountScope === 'accounts' && value.scopedLineAccountIds.length === 0) {
-      return setLocalError('担当するアカウントを1つ以上選んでください')
+    setFieldErrors(errors)
+    const first = (['name', 'email', 'scope', 'assigned'] as const).find((key) => errors[key])
+    if (first) {
+      setLocalError('')
+      focusFieldById(`${uid}-${first}`)
+      return
     }
     setLocalError('')
     onSubmit({ ...value, name: value.name.trim(), email: value.email.trim() })
@@ -198,10 +199,10 @@ export default function MemberDialogV8({
         {!member ? (
           <div className={styles.pair}>
             <FormField label="名前" htmlFor={`${uid}-name`} error={fieldErrors.name}>
-              <TextField id={`${uid}-name`} value={value.name} maxLength={100} disabled={busy} autoFocus invalid={Boolean(fieldErrors.name)} onChange={(e) => set('name', e.target.value)} className={styles.full} placeholder="例: 山田 太郎" />
+              <TextField id={`${uid}-name`} value={value.name} maxLength={100} disabled={busy} autoFocus invalid={Boolean(fieldErrors.name)} onChange={(e) => set('name', e.target.value)} className={styles.full} placeholder="例：山田 太郎" />
             </FormField>
             <FormField label="メールアドレス" htmlFor={`${uid}-email`} error={fieldErrors.email}>
-              <TextField id={`${uid}-email`} type="email" value={value.email} disabled={busy} invalid={Boolean(fieldErrors.email)} onChange={(e) => set('email', e.target.value)} className={styles.full} placeholder="例: staff@example.com" />
+              <TextField id={`${uid}-email`} type="email" value={value.email} disabled={busy} invalid={Boolean(fieldErrors.email)} onChange={(e) => set('email', e.target.value)} className={styles.full} placeholder="例：staff@example.com" />
             </FormField>
           </div>
         ) : null}
@@ -225,15 +226,18 @@ export default function MemberDialogV8({
             <Radio name={`${uid}-scope`} value="accounts" checked={value.accountScope === 'accounts'} disabled={busy} onChange={() => set('accountScope', 'accounts')}>指定したアカウントだけ</Radio>
           </div>
           {value.accountScope === 'accounts' ? (
-            <div className={styles.checks} role="group" aria-label="担当するアカウント">
-              {scopeAccounts.map((account) => (
-                <Checkbox key={account.id} checked={value.scopedLineAccountIds.includes(account.id)} disabled={busy} onCheckedChange={() => toggleAccount(account.id)}>{account.name}</Checkbox>
-              ))}
-              {scopeAccounts.length === 0 ? <p className={styles.note}>アカウントがまだありません。</p> : null}
+            <div id={`${uid}-scope`} className={styles.checks} role="group" aria-label="担当するアカウント" aria-describedby={fieldErrors.scope ? `${uid}-scope-error` : undefined}>
+              {scopeAccounts.length === 0 ? <p className={styles.note}>アカウントがまだありません。</p> : (
+                /* 選ぶ窓（dJZ7Q）のまとめて選ぶ中身を、この窓の中に埋め込む。 */
+                <EntityMultiSelect embedded items={toHqAccountItems(scopeAccounts, accountFolders)} folders={toPickerFolders(accountFolders.folders)} foldersFailed={accountFolders.failed}
+                  selected={value.scopedLineAccountIds} onChange={(ids) => set('scopedLineAccountIds', ids)} query={scopeQuery} busy={busy} listLabel="担当するアカウント"
+                  searchSlot={<SearchField aria-label="担当するアカウントを探す" placeholder="名前で探す" value={scopeQuery} onChange={setScopeQuery} onClear={() => setScopeQuery('')} />} />
+              )}
             </div>
           ) : (
             <p className={styles.note}>統括のすべてのアカウントを見て操作できます。</p>
           )}
+          <FieldError id={`${uid}-scope-error`}>{fieldErrors.scope}</FieldError>
         </div>
 
         <Field label="最初に表示するアカウント" htmlFor={`${uid}-assigned`}>
@@ -243,9 +247,11 @@ export default function MemberDialogV8({
             id={`${uid}-assigned`}
             value={value.assignedLineAccountId}
             disabled={busy}
+            error={fieldErrors.assigned}
             onChange={(next) => set('assignedLineAccountId', next)}
             options={accounts.map((a) => ({ value: a.id, label: a.name }))}
           />
+          <FieldError id={`${uid}-assigned-error`}>{fieldErrors.assigned}</FieldError>
         </Field>
 
         {member ? (
@@ -261,18 +267,6 @@ export default function MemberDialogV8({
         {note ? <p className={styles.callout}>{note}</p> : null}
       </form>
     </Dialog>
-  )
-}
-
-function Field({ label, note, htmlFor, children }: { label: string; note?: string; htmlFor: string; children: ReactNode }) {
-  return (
-    <div className={styles.field}>
-      <div className={styles.labelRow}>
-        <label htmlFor={htmlFor} className={styles.label}>{label}</label>
-        {note ? <span className={styles.note}>{note}</span> : null}
-      </div>
-      {children}
-    </div>
   )
 }
 

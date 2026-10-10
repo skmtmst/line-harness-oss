@@ -1,8 +1,13 @@
 'use client'
 
+import { formAnswerText } from '@/lib/form-answer'
+import { DragHandle } from '@/components/shared/row-actions'
+
+import Link from 'next/link'
+import CustomerInfoPanel from '@/components/shared/customer-info-panel'
 import StatusPill, { StatusDot, SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import Avatar from '@/components/shared/avatar'
-import { useCallback, useState, useEffect, useRef } from 'react'
+import { Children, cloneElement, isValidElement, useCallback, useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { api, ApiError, type FriendUpcoming, type MileageHistoryItem, type MileageSummary } from '@/lib/api'
 import { tagTextColor } from '@/lib/presentation'
@@ -19,8 +24,8 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import InlineEdit from '@/components/shared/inline-edit'
 import { runOptimisticWithUndo } from '@/lib/undoable'
 import PrepayBadgeV8 from '@/app/booking/prepay-badge-v8'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
-import { GripVertical, X } from 'lucide-react'
+import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
+import { X } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import v8 from '@/v8/inbox-chat/customer-panel.module.css'
@@ -168,6 +173,7 @@ function isFriendDetailShape(value: unknown): boolean {
  * 値の中身（URL・長文）はそのまま出し、枠の中で安全に折り返す。
  */
 function renderValue(value: unknown): string {
+  if (typeof value === 'string' && value.includes('[object Object]')) return formAnswerText(value)
   if (value === null || value === undefined || value === '') return '-'
   if (typeof value === 'string') return value
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
@@ -245,6 +251,20 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   const [localOperatorId, setLocalOperatorId] = useState<string | null | undefined>(undefined)
   const [localNotes, setLocalNotes] = useState<string | null | undefined>(undefined)
   const [localTags, setLocalTags] = useState<Array<{ id: string; name: string; color: string }> | undefined>(undefined)
+  const targetKey = `${accountId ?? ''}:${friendId ?? ''}:${chatId ?? ''}`
+  const targetRef = useRef({ key: targetKey, generation: 0 })
+  const operationRef = useRef(new Map<string, number>())
+  if (targetRef.current.key !== targetKey) {
+    targetRef.current = { key: targetKey, generation: targetRef.current.generation + 1 }
+    operationRef.current.clear()
+  }
+  const beginChange = useCallback((scope: string) => {
+    const generation = targetRef.current.generation
+    const operation = (operationRef.current.get(scope) ?? 0) + 1
+    operationRef.current.set(scope, operation)
+    return () => targetRef.current.generation === generation && operationRef.current.get(scope) === operation
+  }, [])
+  useEffect(() => () => { targetRef.current = { ...targetRef.current, generation: targetRef.current.generation + 1 } }, [])
   const effectiveStatus = localStatus !== undefined ? localStatus : chatStatus?.status
   const effectiveOperatorId = localOperatorId !== undefined ? localOperatorId : operatorId
   const effectiveNotes = localNotes !== undefined ? localNotes : chatStatus?.notes
@@ -257,7 +277,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     setLocalNotes(undefined)
     setLocalTags(undefined)
     setTagToRemove(null)
-  }, [friendId, chatId])
+  }, [friendId, chatId, accountId])
   const isV8 = useAdminTheme() === 'v8'
   const [showSettings, setShowSettings] = useState(false)
   const [draggedGroupKey, setDraggedGroupKey] = useState<string | null>(null)
@@ -345,16 +365,16 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   }, [])
 
   useEffect(() => {
-    if (!prefsLoaded) return
+    if (!prefsLoaded || isV8) return
     try {
       localStorage.setItem('chat.friendInfoSections.v4', JSON.stringify({ order: sectionOrder, hidden: hiddenSections }))
     } catch {
       // 保存できないブラウザでは、この表示中だけ設定を保つ。
     }
-  }, [hiddenSections, prefsLoaded, sectionOrder])
+  }, [hiddenSections, prefsLoaded, sectionOrder, isV8])
 
   const sectionStyle = (key: DetailSectionKey) => ({ order: sectionOrder.indexOf(key) })
-  const sectionVisibility = (key: DetailSectionKey) => hiddenSections.includes(key) ? 'hidden' : ''
+  const sectionVisibility = (key: DetailSectionKey) => !isV8 && hiddenSections.includes(key) ? 'hidden' : ''
 
   const moveGroup = (groupKey: string, delta: -1 | 1) => {
     setSectionOrder((current) => {
@@ -412,6 +432,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       return
     }
     let cancelled = false
+    setFriend(null)
     setLoading(true)
     setError(null)
     api.friends.get(friendId).then((res) => {
@@ -430,7 +451,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       if (!cancelled) setLoading(false)
     })
     return () => { cancelled = true }
-  }, [friendId, friendRetry])
+  }, [friendId, accountId, friendRetry])
 
   useEffect(() => {
     if (!friendId) {
@@ -450,7 +471,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       if (!cancelled) setMileage({ kind: 'error' })
     })
     return () => { cancelled = true }
-  }, [friendId, mileageRetry])
+  }, [friendId, accountId, mileageRetry])
 
   /*
    * INBOX-05/07: ★つき項目と、友だち情報の項目名（内部キーではなく
@@ -460,7 +481,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   type FriendFieldsState =
     | { kind: 'loading' }
     | { kind: 'error' }
-    | { kind: 'data'; items: FriendField[] }
+    | { kind: 'data'; items: FriendField[]; hiddenPersonalCount: number }
   const [friendFields, setFriendFields] = useState<FriendFieldsState>({ kind: 'loading' })
 
   useEffect(() => {
@@ -473,7 +494,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     api.friendFields.forFriend(friendId, { suppressFeatureDisabledEvent: true }).then((res) => {
       if (cancelled) return
       if (res.success && res.data) {
-        setFriendFields({ kind: 'data', items: asArray(res.data.items) })
+        setFriendFields({ kind: 'data', items: asArray(res.data.items), hiddenPersonalCount: res.data.hiddenPersonalCount })
       } else {
         setFriendFields({ kind: 'error' })
       }
@@ -481,7 +502,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       if (!cancelled) setFriendFields({ kind: 'error' })
     })
     return () => { cancelled = true }
-  }, [friendId, fieldsRetry])
+  }, [friendId, accountId, fieldsRetry])
 
   // リッチメニュー — loading / error / data を区別して、null=未設定 を取得失敗と
   // 混同しないようにする。Codex review (P3) の指摘で導入。
@@ -510,7 +531,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       setRichMenu({ kind: 'error' })
     })
     return () => { cancelled = true }
-  }, [friendId, richMenuRetry])
+  }, [friendId, accountId, richMenuRetry])
 
   /*
    * IDEA-02: 次回予約と次の確定した自動配信。
@@ -542,16 +563,19 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       if (!cancelled) setUpcoming({ kind: 'error' })
     })
     return () => { cancelled = true }
-  }, [friendId, upcomingRetry])
+  }, [friendId, accountId, upcomingRetry])
 
   /*
    * A-2: 押した瞬間に画面を変えて裏で保存（lib/undoable の runOptimistic）。
    * 成功は白い知らせに「元に戻す」、失敗は戻して「もう一度」。
    * 知らせは notifyToast の白い板（黒にしない。オーナー決定 2026-10-04）。
    */
-  const canEditChat = Boolean(chatId)
+  const canEditChat = Boolean(chatId) && canEditFeature('/chats')
+  const canEditFriend = Boolean(friendId) && canEditFeature('/friends')
   const statusButtonRef = useRef<HTMLDivElement | null>(null)
   const tagSearchRef = useRef<HTMLInputElement | null>(null)
+  const [tagPickerOpen, setTagPickerOpen] = useState(false)
+  useEffect(() => { setTagPickerOpen(false) }, [friendId])
   const memoAreaRef = useRef<HTMLTextAreaElement | null>(null)
 
   /*
@@ -571,17 +595,21 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     const next = (res as { data?: { revision?: unknown } } | undefined)?.data?.revision
     if (typeof next === 'number') revisionRef.current = next
   }
+  const targetGeneration = targetRef.current.generation
   const changed = useCallback((res: unknown) => {
+    if (targetRef.current.generation !== targetGeneration) return
     noteRevision(res)
     onChatChanged?.()
-  }, [onChatChanged])
+  }, [onChatChanged, targetGeneration])
 
   const saveChatStatus = useCallback((next: NonNullable<ChatStatusInfo['status']>) => {
     if (!chatId) return
     const previous = effectiveStatus ?? null
     if (previous === next) return
     setLocalStatus(next)
+    const isCurrent = beginChange('status')
     runOptimisticWithUndo({
+      isCurrent,
       request: () => api.chats.update(chatId, { status: next }),
       revert: () => setLocalStatus(previous),
       reapply: () => setLocalStatus(next),
@@ -590,12 +618,12 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       retry: () => saveChatStatus(next),
       undoRequest: previous ? async () => {
         const res = await api.chats.update(chatId, { status: previous })
-        changed(res)
+        if (isCurrent()) changed(res)
         return res
       } : undefined,
       onSuccess: changed,
     })
-  }, [chatId, effectiveStatus, changed, isV8])
+  }, [chatId, effectiveStatus, changed, isV8, beginChange])
 
   const saveAssignee = useCallback((nextOperatorId: string | null) => {
     if (!chatId) return
@@ -603,7 +631,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     if (previous === nextOperatorId) return
     setLocalOperatorId(nextOperatorId)
     const nameOf = (id: string | null) => (id ? operators?.find((op) => op.id === id)?.name ?? '担当' : '未割り当て')
+    const isCurrent = beginChange('assignee')
     runOptimisticWithUndo({
+      isCurrent,
       request: () => api.chats.update(chatId, { operatorId: nextOperatorId }),
       revert: () => setLocalOperatorId(previous),
       reapply: () => setLocalOperatorId(nextOperatorId),
@@ -612,12 +642,12 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       retry: () => saveAssignee(nextOperatorId),
       undoRequest: async () => {
         const res = await api.chats.update(chatId, { operatorId: previous })
-        changed(res)
+        if (isCurrent()) changed(res)
         return res
       },
       onSuccess: changed,
     })
-  }, [chatId, effectiveOperatorId, operators, changed, isV8])
+  }, [chatId, effectiveOperatorId, operators, changed, isV8, beginChange])
 
   /*
    * メモは書くのをやめて1秒で自動保存。最後に直した日時（版）で比べる：
@@ -634,7 +664,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   const queueMemoSave = useCallback((text: string) => {
     if (!chatId) return
     if (memoTimerRef.current) clearTimeout(memoTimerRef.current)
+    const isCurrent = beginChange('memo')
     memoTimerRef.current = setTimeout(() => {
+      if (!isCurrent()) return
       const previous = effectiveNotes ?? null
       const next = text.trim() || null
       if (next === previous) return
@@ -648,6 +680,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
         } catch (error) {
           if (!(error instanceof ApiError) || error.code !== 'REVISION_CONFLICT') throw error
           const latest = await api.chats.get(chatId, { limit: 1 })
+          if (!isCurrent()) return latest
           if (!latest.success) throw error
           revisionRef.current = latest.data.revision
           const theirs = latest.data.notes ?? null
@@ -657,6 +690,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       }
       memoToastRef.current = runOptimisticWithUndo({
         request: save,
+        isCurrent,
         revert: () => setLocalNotes(previous),
         reapply: () => setLocalNotes(next),
         successMessage: '',
@@ -668,7 +702,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
           // 書く欄（手で書く欄なので値を持たない）にも戻した文を入れる。
           if (memoAreaRef.current) memoAreaRef.current.value = back ?? ''
           const res = await api.chats.update(chatId, { notes: back ?? '' })
-          changed(res)
+          if (isCurrent()) changed(res)
           return res
         },
         onSuccess: (res) => {
@@ -681,7 +715,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
           : 'メモを保存しました',
       })
     }, 1000)
-  }, [chatId, effectiveNotes, changed, isV8])
+  }, [chatId, effectiveNotes, changed, isV8, beginChange])
   useEffect(() => () => {
     if (memoTimerRef.current) clearTimeout(memoTimerRef.current)
   }, [])
@@ -692,6 +726,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   const [tagOptions, setTagOptions] = useState<Tag[]>([])
   const [tagActive, setTagActive] = useState(0)
   const [tagSaving, setTagSaving] = useState(false)
+  useEffect(() => { setTagSaving(false); setMemoSaving(false); setTagQuery('') }, [targetKey])
   useEffect(() => {
     if (!friendId) return
     let cancelled = false
@@ -700,7 +735,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       if (res.success && Array.isArray(res.data)) setTagOptions(res.data as Tag[])
     }).catch(() => {})
     return () => { cancelled = true }
-  }, [friendId])
+  }, [friendId, accountId])
   const addTagById = useCallback((tagId: string, known?: { name: string; color: string }) => {
     if (!friendId || !tagId) return
     const target = known ?? tagOptions.find((t) => t.id === tagId)
@@ -712,6 +747,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     setLocalTags((now) => [...(now ?? effectiveTags ?? []), tag])
     const drop = () => setLocalTags((now) => (now ?? effectiveTags ?? []).filter((t) => t.id !== tagId))
     runOptimisticWithUndo({
+      isCurrent: beginChange(`tag:${tagId}`),
       request: () => api.friends.addTag(friendId, tagId),
       revert: drop,
       reapply: () => setLocalTags((now) => [...(now ?? effectiveTags ?? []).filter((t) => t.id !== tagId), tag]),
@@ -733,6 +769,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     const putBack = () => setLocalTags((now) => [...(now ?? effectiveTags ?? []).filter((t) => t.id !== tagId), tag])
     setLocalTags((now) => (now ?? effectiveTags ?? []).filter((t) => t.id !== tagId))
     runOptimisticWithUndo({
+      isCurrent: beginChange(`tag:${tagId}`),
       request: () => api.friends.removeTag(friendId, tagId),
       revert: putBack,
       reapply: () => setLocalTags((now) => (now ?? effectiveTags ?? []).filter((t) => t.id !== tagId)),
@@ -744,10 +781,29 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   }, [friendId, effectiveTags, isV8])
 
   // 購入（EC の直近3件と合計）。今ある口だけを使い、結びつきが無い人は「—」で出す。
+  const createAndAddTag = async (query: string) => {
+    const name = query.trim()
+    if (!name || !friendId) return
+    const isCurrent = beginChange('create-tag')
+    setTagSaving(true)
+    try {
+      const res = await api.tags.create({ name })
+      if (!isCurrent()) return
+      if (!res.success) throw new Error('failed')
+      const created = res.data
+      setTagOptions((prev) => [...prev, created])
+      addTagById(created.id, { name: created.name, color: created.color })
+    } catch {
+      if (isCurrent()) notifyToast(`タグ「${name}」を作れませんでした。もう一度お試しください。`, { tone: 'error' })
+    } finally {
+      if (isCurrent()) setTagSaving(false)
+    }
+  }
+
   type PurchaseState =
     | { kind: 'loading' }
     | { kind: 'empty'; reason: string }
-    | { kind: 'data'; total: number; count: number; items: Array<{ id: string; title: string; amount: number; at: string }> }
+    | { kind: 'data'; total: number; count: number; items: Array<{ id: string; title: string; amount: number | null; at: string }> }
   const [purchase, setPurchase] = useState<PurchaseState>({ kind: 'loading' })
   const [purchaseRetry, setPurchaseRetry] = useState(0)
   useEffect(() => {
@@ -759,37 +815,36 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     setPurchase({ kind: 'loading' })
     // 友だち名で EC の注文を3件まで探す（friend_id の絞り口が無いため）。
     // 名前が取れない・見つからないときは合計を出さず「—」にする（0にしない）。
-    const name = friend?.displayName ?? friend?.realName ?? ''
+    const name = friend?.id === friendId ? friend.displayName ?? friend.realName ?? '' : ''
     if (!name) {
       setPurchase({ kind: 'empty', reason: 'no-name' })
       return
     }
-    const accountId = ''
+    if (!accountId) { setPurchase({ kind: 'empty', reason: 'no-account' }); return }
     void purchaseRetry
-    api.ecCommerce.orders({ lineAccountId: accountId, query: name, limit: 3 }).then((res: { success: boolean; data?: unknown }) => {
+    api.ecCommerce.orders({ lineAccountId: accountId, query: name, limit: 3 }).then((res) => {
       if (cancelled) return
       if (!res.success || !res.data) {
         setPurchase({ kind: 'empty', reason: 'unavailable' })
         return
       }
-      const list = (res.data as unknown as { orders?: Array<{ id: string; orderNumber?: string; total?: number; createdAt?: string }> }).orders ?? []
-      if (list.length === 0) {
-        setPurchase({ kind: 'empty', reason: 'none' })
-        return
-      }
-      const items = list.slice(0, 3).map((o) => ({
-        id: o.id,
-        title: o.orderNumber ?? o.id,
-        amount: typeof o.total === 'number' ? o.total : 0,
-        at: o.createdAt ?? '',
+      const candidates = res.data.items
+      if (!Array.isArray(candidates)) { setPurchase({ kind: 'empty', reason: 'unavailable' }); return }
+      // 名前は候補検索だけ。APIの連携済み友だちIDで確かめた注文のみを出す。
+      const list = candidates.filter((order) => order.friendId === friendId)
+      if (list.length === 0) { setPurchase({ kind: 'empty', reason: candidates.length ? 'unlinked' : 'none' }); return }
+      const items = list.slice(0, 3).map((order) => ({
+        id: order.id, title: order.orderNumber ?? order.id,
+        amount: order.totalAmount, at: order.orderedAt,
       }))
-      const total = items.reduce((sum, item) => sum + item.amount, 0)
+      if (items.some((item) => item.amount === null)) { setPurchase({ kind: 'empty', reason: 'unavailable' }); return }
+      const total = items.reduce((sum, item) => sum + (item.amount ?? 0), 0)
       setPurchase({ kind: 'data', total, count: list.length, items })
     }).catch(() => {
       if (!cancelled) setPurchase({ kind: 'empty', reason: 'unavailable' })
     })
     return () => { cancelled = true }
-  }, [friendId, friend?.displayName, friend?.realName, purchaseRetry])
+  }, [friendId, accountId, friend?.displayName, friend?.realName, purchaseRetry])
 
   /*
    * キーボード T・M・S（書く欄に字があるときは効かない）。
@@ -801,20 +856,23 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return
       if (event.metaKey || event.ctrlKey || event.altKey) return
       const key = event.key.toLowerCase()
-      if (key === 't') {
+      if (key === 't' && canEditFriend) {
         event.preventDefault()
-        ;(tagSearchRef.current ?? document.getElementById('inbox-panel-tag'))?.focus()
-      } else if (key === 'm') {
+        if (isV8) {
+          setTagPickerOpen(true)
+          requestAnimationFrame(() => document.getElementById('inbox-panel-tag')?.focus())
+        } else tagSearchRef.current?.focus()
+      } else if (key === 'm' && canEditChat) {
         event.preventDefault()
         memoAreaRef.current?.focus()
-      } else if (key === 's') {
+      } else if (key === 's' && canEditChat) {
         event.preventDefault()
         statusButtonRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
       }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [])
+  }, [isV8, canEditFriend, canEditChat])
 
   /*
    * 友だち情報（metadata）のキーを、画面に出す項目名へ写す対応表。
@@ -850,39 +908,8 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
    * 顧客情報の節（基本情報・マイル・次の対応・タグ・★つき・リッチメニュー・友だち情報・フォーム回答）。
    * v7 は今までどおり右の欄に線で並べ、★V8 は角丸の枠（顧客情報）の中に並べる。中身は同じ。
    */
-  const renderDetailSections = (friend: FriendDetail) => (
-    <>
-            {/* 前払いのみの印（友だち詳細と同じ置き場所・顔の下）。前払いの人だけ出る。 */}
-            {accountId && friendId ? (
-              /* ★V8：前払いでない人は中身が空。空の帯（上下12＋線）を残さない（オーナー指摘）。 */
-              <div className="border-hairline border-b px-5 py-3 v8:empty:hidden">
-                <PrepayBadgeV8 accountId={accountId} friendId={friendId} canEdit={canClearPrepay} />
-              </div>
-            ) : null}
-
-            {/*
-              名前（設計 `友だち詳細` の「名前」）。
-              LINEの表示名と、こちらで付けた本名は別物。取り違えると
-              別人に送ってしまうので、両方を並べて出す。
-            */}
-            <div style={sectionStyle('names')} className={`${sectionVisibility('names')} space-y-2 px-5 py-4`}>
-              <h4 className="text-ink mb-2 text-xs font-bold">基本情報</h4>
-              <div className="flex justify-between items-center gap-2">
-                <span className="text-micro text-ink-faint shrink-0">本名</span>
-                <ExpandableText value={friend.realName} className="text-xs text-ink-secondary v8:text-label" />
-              </div>
-              <div className="flex justify-between items-center gap-2">
-                <span className="text-micro text-ink-faint shrink-0">システム表示名</span>
-                <ExpandableText value={friend.systemDisplayName} className="text-xs text-ink-secondary v8:text-label" />
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="shrink-0 text-micro text-ink-faint">登録日</span>
-                <span className="truncate text-xs text-ink-secondary v8:text-label">{formatDate(friend.createdAt)}</span>
-              </div>
-            </div>
-
-            {/* Harness Mileage — canonical user identity across LINE accounts */}
-            <div style={sectionStyle('mileage')} className={`${sectionVisibility('mileage')} px-5 py-4`}>
+  const renderMileage = (friend: FriendDetail) => (
+<div data-customer-section="mileage" style={sectionStyle('mileage')} className={`${sectionVisibility('mileage')} px-5 py-4`}>
               <h4 className="text-ink mb-2 text-xs font-bold">マイル</h4>
               {mileage.kind === 'loading' ? (
                 <DelayedSkeleton loading skeleton={<div className="h-24 animate-pulse rounded-card bg-shell" />} />
@@ -922,7 +949,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                         <div key={item.id} className="flex items-center justify-between gap-2 text-nano">
                           <span className="text-ink-faint min-w-0 truncate">{item.reason}</span>
                           <span className={`shrink-0 font-semibold tabular-nums ${item.amount > 0 ? 'text-success' : 'text-ink-secondary'}`}>
-                            {item.amount > 0 ? '+' : ''}{formatNumber(item.amount)}
+                            {item.amount > 0 ? '+' : ''}{formatNumber(item.amount ?? 0)}
                           </span>
                         </div>
                       ))}
@@ -935,15 +962,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                 </div>
               )}
             </div>
-
-            {/* Status / Operator */}
-            {/*
-              対応（設計 `友だち詳細` の「対応」）。
-              値が無くても節ごと出す。以前は空だと見出しごと消えていて、
-              「この画面には対応の情報が無い」ように見えていた。
-              設計は「未設定」「未割り当て」と書いて枠を残している。
-            */}
-            <div style={sectionStyle('support')} className={`${sectionVisibility('support')} space-y-3 px-5 py-4`}>
+  )
+  const renderSupport = (friend: FriendDetail) => (
+<div data-customer-section="support" style={sectionStyle('support')} className={`${sectionVisibility('support')} space-y-3 px-5 py-4`}>
               <h4 className="text-ink mb-2 text-xs font-bold">次の対応</h4>
               {/* ①対応状況（3つのボタン・1タップ）。押した瞬間に変えて裏で保存。 */}
               <div>
@@ -956,7 +977,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                       aria-label="対応状況を変える"
                       treatment="pill"
                       icon={<StatusDot tone={SUPPORT_STATUS_TONES[effectiveStatus ?? 'unread']} />}
-                      options={STATUS_OPTIONS.map((option) => ({ ...option, leading: <StatusDot tone={SUPPORT_STATUS_TONES[option.value]} /> }))}
+                      options={STATUS_OPTIONS.map((option) => ({ ...option, tone: SUPPORT_STATUS_TONES[option.value], leading: <StatusDot tone={SUPPORT_STATUS_TONES[option.value]} /> }))}
                       value={effectiveStatus ?? 'unread'}
                       onChange={(next) => saveChatStatus(next as NonNullable<ChatStatusInfo['status']>)}
                     />
@@ -1024,7 +1045,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                 )}
               </div>
               {/* ④メモ（書くのをやめて1秒で自動保存）。 */}
-              <div>
+              <div data-customer-memo>
                 <label htmlFor="inbox-panel-memo" className="text-micro text-ink-faint">メモ（Mキー）{memoSaving ? '・保存中…' : ''}</label>
                 {canEditChat && isV8 ? (
                   /* ★V8 B-26：共通の複数行の入力欄。書くのをやめて1秒で保存し、知らせに元に戻す。 */
@@ -1111,19 +1132,19 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                 )}
               </div>
             </div>
-
-            {/* ③タグ（×で外す・＋で探して付ける・↑↓Enter・新しいタグも作れる）。 */}
-            <div style={sectionStyle('tags')} className={`${sectionVisibility('tags')} px-5 py-4`}>
+  )
+  const renderTags = (friend: FriendDetail) => (
+<div data-customer-section="tags" style={sectionStyle('tags')} className={`${sectionVisibility('tags')} px-5 py-4 ${isV8 ? v8.tagsSection : ''}`}>
               <div className="mb-1.5 flex items-center justify-between">
                 <h4 className="text-ink text-xs font-bold">タグ（Tキー）</h4>
-                <a href={`/friends/detail?id=${friend.id}`} className="text-action text-micro hover:underline">
+                {isV8 && canEditFriend ? <Button variant="text" size="inline" aria-expanded={tagPickerOpen} aria-controls="inbox-panel-tag-picker" onClick={() => setTagPickerOpen((value) => !value)}>＋ 追加</Button> : <a href={`/friends/detail?id=${friend.id}`} className="text-action text-micro hover:underline">
                   すべて見る
-                </a>
+                </a>}
               </div>
               <div className="flex flex-wrap gap-1">
                 {(effectiveTags ?? []).map((tag) => isV8 ? (
-                  <TagPill key={tag.id} name={tag.name} color={tag.color}
-                    onRemove={friendId ? () => setTagToRemove({ id: tag.id, name: tag.name, friendId }) : undefined} />
+                  <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs"
+                    onRemove={canEditFriend && friendId ? () => setTagToRemove({ id: tag.id, name: tag.name, friendId }) : undefined} />
                 ) : (
                   <span
                     key={tag.id}
@@ -1134,7 +1155,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                     }}
                   >
                     <ExpandableText value={tag.name} className="max-w-full text-inherit" />
-                    {friendId ? (
+                    {canEditFriend ? (
                       <button
                         type="button"
                         aria-label={`${tag.name}を外す`}
@@ -1150,9 +1171,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               {(effectiveTags ?? []).length === 0 ? (
                 <p className="text-micro text-ink-faint italic mt-1.5">タグなし</p>
               ) : null}
-              {friendId && isV8 ? (
+              {canEditFriend && isV8 ? (
                 /* ★V8 B-26：共通の候補つき入力。選ぶと付け、無ければ「＋ 新しく作る」で作って付ける。 */
-                <div className={v8.editField}>
+                <div id="inbox-panel-tag-picker" hidden={!tagPickerOpen} className={v8.editField}>
                   <Combobox
                     id="inbox-panel-tag"
                     aria-label="タグを探して付ける"
@@ -1163,24 +1184,11 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                       .map((t) => ({ value: t.id, label: t.name }))}
                     onChange={(tagId) => { if (tagId) addTagById(tagId) }}
                     createLabel={(query) => `＋「${query}」を作って付ける`}
-                    onCreate={(query) => {
-                      const name = query.trim()
-                      if (!name) return
-                      setTagSaving(true)
-                      api.tags.create({ name }).then((res) => {
-                        if (res.success && res.data) {
-                          const created = res.data as Tag
-                          setTagOptions((prev) => [...prev, created])
-                          addTagById(created.id, { name: created.name, color: created.color })
-                        }
-                      }).catch(() => {
-                        notifyToast(`タグ「${name}」を作れませんでした。もう一度お試しください。`, { tone: 'error' })
-                      }).finally(() => setTagSaving(false))
-                    }}
+                    onCreate={(query) => { void createAndAddTag(query) }}
                     loading={tagSaving}
                   />
                 </div>
-              ) : friendId ? (
+              ) : canEditFriend ? (
                 <div className="mt-2">
                   <input
                     ref={tagSearchRef}
@@ -1206,16 +1214,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                         if (picked) {
                           addTagById(picked.id)
                         } else if (tagQuery.trim()) {
-                          // 新しいタグも作れる。
-                          const name = tagQuery.trim()
-                          setTagSaving(true)
-                          api.tags.create({ name }).then((res) => {
-                            if (res.success && res.data) {
-                              const created = res.data as Tag
-                              setTagOptions((prev) => [...prev, created])
-                              addTagById(created.id)
-                            }
-                          }).catch(() => {}).finally(() => setTagSaving(false))
+                          void createAndAddTag(tagQuery)
                         }
                       }
                     }}
@@ -1251,6 +1250,99 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                 </div>
               ) : null}
             </div>
+  )
+  const renderRichMenu = (friend: FriendDetail) => (
+<div data-customer-section="richMenu" style={sectionStyle('richMenu')} className={`${sectionVisibility('richMenu')} p-4`}>
+              <h4 className="text-micro font-semibold text-ink-faint mb-1.5">リッチメニュー</h4>
+              <p className="text-micro text-ink-faint mb-1">現在の設定</p>
+              {richMenu.kind === 'loading' ? (
+                <p className="text-micro text-ink-faint italic">読み込み中...</p>
+              ) : richMenu.kind === 'error' ? (
+                /* INBOX-08: 失敗と未設定を分け、その場で再試行できる。 */
+                <div className="space-y-1.5">
+                  <p className="text-micro text-danger">リッチメニューを読み込めませんでした</p>
+                  <button
+                    type="button"
+                    onClick={() => setRichMenuRetry((key) => key + 1)}
+                    className="text-action text-micro font-semibold underline underline-offset-2"
+                  >
+                    再試行する
+                  </button>
+                </div>
+              ) : richMenu.id === null ? (
+                <p className="text-micro text-ink-faint italic">未設定</p>
+              ) : (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-ink-secondary">{richMenu.name ?? '(名前なし)'}</span>
+                  {richMenu.isDefault && (
+                    <span className="px-1.5 py-0 rounded-mini text-nano font-medium bg-shell text-ink-faint">
+                      デフォルト
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+  )
+
+  // 見出し・枠は共通欄が持ち、v7 の節の中身と操作を再利用する。
+  const stripSectionHeadings = (children: React.ReactNode): React.ReactNode => Children.map(children, child => {
+    if (!isValidElement<{ children?: React.ReactNode }>(child)) return child
+    if (child.type === 'h4') return null
+    return child.props.children ? cloneElement(child, {}, stripSectionHeadings(child.props.children)) : child
+  })
+  const sectionBody = (node: ReturnType<typeof renderSupport>) =>
+    Children.toArray(stripSectionHeadings(node.props.children))
+
+  const renderDetailSections = (friend: FriendDetail) => (
+    <>
+            {!canEditChat && !canEditFriend ? <p role="note" className="text-micro text-ink-faint">閲覧のみで見ています。変更は管理者に頼んでください。</p> : null}
+            {/* 前払いのみの印（友だち詳細と同じ置き場所・顔の下）。前払いの人だけ出る。 */}
+            {accountId && friendId ? (
+              /* ★V8：前払いでない人は中身が空。空の帯（上下12＋線）を残さない（オーナー指摘）。 */
+              <div className="border-hairline border-b px-5 py-3 v8:empty:hidden">
+                <PrepayBadgeV8 accountId={accountId} friendId={friendId} canEdit={canClearPrepay} />
+              </div>
+            ) : null}
+
+            {isV8 ? <div style={sectionStyle('profile')} className={`${sectionVisibility('profile')} ${v8.profileSection}`}>
+              <h4>プロフィール</h4>
+              <p>{friend.displayName}・{formatAddedDate(friend.createdAt)}</p>
+            </div> : null}
+            {/*
+              名前（設計 `友だち詳細` の「名前」）。
+              LINEの表示名と、こちらで付けた本名は別物。取り違えると
+              別人に送ってしまうので、両方を並べて出す。
+            */}
+            <div data-customer-section="names" style={sectionStyle('names')} className={`${sectionVisibility('names')} space-y-2 px-5 py-4 ${isV8 ? v8.basicSection : ''}`}>
+              <h4 className="text-ink mb-2 text-xs font-bold">基本情報</h4>
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-micro text-ink-faint shrink-0">本名</span>
+                <ExpandableText value={friend.realName} className="text-xs text-ink-secondary v8:text-label" />
+              </div>
+              {(!isV8 || (friend.systemDisplayName && friend.systemDisplayName !== friend.displayName)) ? <div className="flex justify-between items-center gap-2">
+                <span className="text-micro text-ink-faint shrink-0">システム表示名</span>
+                <ExpandableText value={friend.systemDisplayName} className="text-xs text-ink-secondary v8:text-label" />
+              </div> : null}
+              {!isV8 ? <div className="flex items-center justify-between gap-2">
+                <span className="shrink-0 text-micro text-ink-faint">登録日</span>
+                <span className="truncate text-xs text-ink-secondary v8:text-label">{formatDate(friend.createdAt)}</span>
+              </div> : null}
+            </div>
+
+            {/* Harness Mileage — canonical user identity across LINE accounts */}
+            {renderMileage(friend)}
+
+            {/* Status / Operator */}
+            {/*
+              対応（設計 `友だち詳細` の「対応」）。
+              値が無くても節ごと出す。以前は空だと見出しごと消えていて、
+              「この画面には対応の情報が無い」ように見えていた。
+              設計は「未設定」「未割り当て」と書いて枠を残している。
+            */}
+            {renderSupport(friend)}
+
+            {/* ③タグ（×で外す・＋で探して付ける・↑↓Enter・新しいタグも作れる）。 */}
+            {renderTags(friend)}
 
             {/*
               ★つき友だち情報（設計 `友だち詳細`）。
@@ -1259,7 +1351,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               情報が並び、4件目以降の★項目は届かなかった。
               0件なら付け方への導線を出す。
             */}
-            <div style={sectionStyle('starred')} className={`${sectionVisibility('starred')} p-4`}>
+            <div data-customer-section="starred" style={sectionStyle('starred')} className={`${sectionVisibility('starred')} p-4`}>
               <div className="mb-2 flex items-center justify-between">
                 <h4 className="text-micro font-semibold text-ink-faint">★つき友だち情報</h4>
                 <a href={`/friends/detail?id=${friend.id}`} className="text-action text-micro hover:underline">
@@ -1304,39 +1396,10 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
             </div>
 
             {/* Rich Menu */}
-            <div style={sectionStyle('richMenu')} className={`${sectionVisibility('richMenu')} p-4`}>
-              <h4 className="text-micro font-semibold text-ink-faint mb-1.5">リッチメニュー</h4>
-              <p className="text-micro text-ink-faint mb-1">現在の設定</p>
-              {richMenu.kind === 'loading' ? (
-                <p className="text-micro text-ink-faint italic">読み込み中...</p>
-              ) : richMenu.kind === 'error' ? (
-                /* INBOX-08: 失敗と未設定を分け、その場で再試行できる。 */
-                <div className="space-y-1.5">
-                  <p className="text-micro text-danger">リッチメニューを読み込めませんでした</p>
-                  <button
-                    type="button"
-                    onClick={() => setRichMenuRetry((key) => key + 1)}
-                    className="text-action text-micro font-semibold underline underline-offset-2"
-                  >
-                    再試行する
-                  </button>
-                </div>
-              ) : richMenu.id === null ? (
-                <p className="text-micro text-ink-faint italic">未設定</p>
-              ) : (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-ink-secondary">{richMenu.name ?? '(名前なし)'}</span>
-                  {richMenu.isDefault && (
-                    <span className="px-1.5 py-0 rounded-mini text-nano font-medium bg-shell text-ink-faint">
-                      デフォルト
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
+            {renderRichMenu(friend)}
 
             {/* Metadata custom fields */}
-            <div style={sectionStyle('metadata')} className={`${sectionVisibility('metadata')} p-4`}>
+            <div data-customer-section="metadata" style={sectionStyle('metadata')} className={`${sectionVisibility('metadata')} p-4`}>
               <h4 className="text-micro font-semibold text-ink-faint mb-2">友だち情報</h4>
               {/* 設計は追加日と流入元を必ず出す。どちらも既に持っている値。 */}
               <dl className="mb-2 space-y-1 text-xs">
@@ -1379,12 +1442,15 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                       <div key={entry.key}>
                         <dt className="text-nano text-ink-faint break-words">{entry.label}</dt>
                         <dd className="text-ink-secondary mt-0.5 break-words">
-                          {friendId ? (
+                          {canEditFriend && friendId ? (
                             <InlineEdit
+                              key={`${targetKey}:${entry.key}`}
                               value={renderValue(entry.value)}
                               label={entry.label}
                               onSave={async (next) => {
+                                const isCurrent = beginChange(`metadata:${entry.key}`)
                                 const res = await api.friends.updateMetadata(friendId, { [entry.key]: next || null })
+                                if (!isCurrent()) return
                                 if (!res.success) throw new Error('failed')
                                 setFriend((prev) => prev ? { ...prev, metadata: { ...prev.metadata, [entry.key]: next } } : prev)
                               }}
@@ -1419,7 +1485,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                     {purchase.items.map((item) => (
                       <li key={item.id} className="flex items-center justify-between gap-2 text-xs">
                         <span className="text-ink-secondary min-w-0 truncate">{item.title}</span>
-                        <span className="text-ink shrink-0 font-semibold tabular-nums">{formatNumber(item.amount)}円</span>
+                        <span className="text-ink shrink-0 font-semibold tabular-nums">{formatNumber(item.amount ?? 0)}円</span>
                       </li>
                     ))}
                   </ul>
@@ -1443,7 +1509,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
             </div>
 
             {/* Form answers — save_to_metadata の設定に関係なく回答履歴を表示 */}
-            <div style={sectionStyle('forms')} className={`${sectionVisibility('forms')} p-4`}>
+            <div data-customer-section="forms" style={sectionStyle('forms')} className={`${sectionVisibility('forms')} p-4`}>
               <div className="mb-2 flex items-center justify-between gap-2">
                 <h4 className="text-micro font-semibold text-ink-faint">フォーム回答</h4>
                 {/*
@@ -1477,7 +1543,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                             <div key={key}>
                               <dt className="text-nano text-ink-faint">{labels.get(key) ?? key}</dt>
                               <dd className="mt-0.5 whitespace-pre-wrap break-words text-xs text-ink-secondary">
-                                {renderValue(value)}
+                                {formAnswerText(value) || '-'}
                               </dd>
                             </div>
                           ))}
@@ -1569,15 +1635,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                     className="border-hairline rounded-control flex items-center gap-2 border px-2 py-1.5"
                   >
                     <span className="flex shrink-0 items-center">
-                      <button
-                        type="button"
-                        disabled={index === 0}
-                        onClick={() => moveGroup(group.key, -1)}
-                        aria-label={`${group.label}を上へ`}
-                        className="text-ink-faint hover:text-ink rounded-mini disabled:opacity-30"
-                      >
-                        <GripVertical aria-hidden="true" size={15} />
-                      </button>
+                      <DragHandle label={`${group.label}を並べ替える`} draggable onDragStart={() => setDraggedGroupKey(group.key)} onDragEnd={() => setDraggedGroupKey(null)} onMove={direction => moveGroup(group.key, direction)} />
                     </span>
                     <span className="text-ink min-w-0 flex-1 truncate text-xs">{group.label}</span>
                     {/* 共通の Checkbox（本物の input）。見た目だけの button にすると読み上げで「入／切」が伝わらない。 */}
@@ -1673,14 +1731,14 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                     <Button variant="secondary" href={`/friends/detail?id=${friend.id}`}>
                       友だち詳細
                     </Button>
-                    {settingsButton}
+                    {isV8 ? null : settingsButton}
                   </div>
                 </div>
                 <dl style={{ order: -2 }} className={v8.summary} data-inbox-v8="customer-summary">
                   <div className={v8.summaryRow}>
                     <dt>タグ</dt>
                     <dd title={(effectiveTags ?? []).map((t) => t.name).join('・')}>
-                      {(effectiveTags ?? []).length > 0 ? (effectiveTags ?? []).map((t) => t.name).join('・') : <span className={v8.empty}>なし</span>}
+                      {(effectiveTags ?? []).length > 0 ? (effectiveTags ?? []).map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />) : <span className={v8.empty}>なし</span>}
                     </dd>
                   </div>
                   <div className={v8.summaryRow}>
@@ -1695,9 +1753,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                     <dt>購入</dt>
                     <dd>
                       {purchase.kind === 'data'
-                        ? `${purchase.count}件・${formatNumber(purchase.total)}円`
+                        ? `直近${purchase.count}件・${formatNumber(purchase.total)}円`
                         : purchase.kind === 'loading' ? <span className={v8.empty}>…</span>
-                        : purchase.reason === 'none' ? <span className={v8.empty}>0件</span> : <span className={v8.empty}>—</span>}
+                        : purchase.reason === 'none' ? <span className={v8.empty}>0件</span> : <span className={v8.empty}>—{purchase.reason === 'unavailable' ? <><span role="alert">購入を読み込めませんでした</span><Button aria-label="購入をもう一度読み込む" onClick={() => setPurchaseRetry((current) => current + 1)}>もう一度</Button></> : null}</span>}
                     </dd>
                   </div>
                   <div className={v8.summaryRow}>
@@ -1713,12 +1771,28 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   ★V8（M0393 XqSvX「顧客情報」）：節は角丸の枠の中に、見出し＋中身を線で区切って並べる。
                   上の要点（顔・名前・タグ・シナリオ・購入・マイル）とは線で切らず、枠で分ける。
                 */}
-                <section style={{ order: -1 }} className={v8.infoCard} data-inbox-v8="customer-info" aria-label="顧客情報">
-                  <h3 className={v8.infoTitle}>顧客情報</h3>
-                  <div className={v8.infoSections}>
-                    {renderDetailSections(friend)}
-                  </div>
-                </section>
+                {accountId && friendId ? <PrepayBadgeV8 accountId={accountId} friendId={friendId} canEdit={canClearPrepay} /> : null}
+                <CustomerInfoPanel
+                  friendId={friend.id}
+                  fields={friendFields.kind === 'data' ? friendFields.items : []}
+                  state={friendFields.kind === 'data' ? 'ready' : friendFields.kind}
+                  onRetry={() => setFieldsRetry(key => key + 1)}
+                  canEdit={isOwnerOrAdmin() || canEditFeature('attribute.personal_info.edit')}
+                  hiddenPersonalCount={friendFields.kind === 'data' ? friendFields.hiddenPersonalCount : 0}
+                  sections={[
+                    { key: 'support', label: '対応', content: sectionBody(renderSupport(friend)).filter(child => !(isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo'])) },
+                    { key: 'tags', label: 'タグ', content: sectionBody(renderTags(friend)) },
+                    { key: 'mileage', label: 'マイル', content: sectionBody(renderMileage(friend)) },
+                    { key: 'richMenu', label: 'リッチメニュー', action: isOwnerOrAdmin() ? <Link href="/rich-menus">編集する</Link> : null, content: sectionBody(renderRichMenu(friend)) },
+                    { key: 'memo', label: 'メモ', content: sectionBody(renderSupport(friend)).filter(child => isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo']) },
+                  ]}
+                  extraSections={Children.toArray(renderDetailSections(friend).props.children).flatMap(child => {
+                    if (!isValidElement<{ 'data-customer-section'?: string; children?: React.ReactNode }>(child)) return []
+                    const key = child.props['data-customer-section'] ?? ''
+                    const label = ({ starred: '★つき友だち情報', metadata: '友だち情報', forms: 'フォーム回答' } as Record<string, string>)[key]
+                    return label ? [{ key, label, content: stripSectionHeadings(child.props.children) }] : []
+                  })}
+                />
               </>
             ) : (
             <div style={sectionStyle('profile')} className={`${sectionVisibility('profile')} flex flex-col items-center px-5 py-5 text-center`}>

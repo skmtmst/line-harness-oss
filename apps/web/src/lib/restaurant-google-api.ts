@@ -179,6 +179,18 @@ export type GooglePostOffer = { couponCode: string | null; redeemOnlineUrl: stri
 export type GooglePostSchedule = { startDate: string; startTime: string; endDate: string; endTime: string }
 export type GooglePostMedia = { mediaId: string; filename: string; sourceUrl: string }
 
+/** Instagram への同時投稿（★V8-B `U1X7T2`・`HEEN9`／2026-10-07 承認）。 */
+export type GooglePostInstagramStatus = 'none' | 'published' | 'failed'
+export type GooglePostInstagram = {
+  /** この投稿を Instagram にも出すか。 */
+  enabled: boolean
+  /** Instagram 用の文章。`null` なら Google の本文をそのまま使う。 */
+  caption: string | null
+  status: GooglePostInstagramStatus
+  permalink: string | null
+  error: string | null
+}
+
 export type GooglePost = {
   id: string
   kind: GooglePostKind
@@ -189,6 +201,8 @@ export type GooglePost = {
   cta: GooglePostCta | null
   offer: GooglePostOffer | null
   media: GooglePostMedia[]
+  /** `null` は「この口が Instagram 同時投稿に未対応」。札も操作も出さない。 */
+  instagram: GooglePostInstagram | null
   publishMode: 'now' | 'scheduled'
   status: GooglePostStatus
   googleState: string | null
@@ -209,6 +223,8 @@ export type GooglePostDraftInput = {
   cta?: GooglePostCta | null
   offer?: GooglePostOffer | null
   mediaId?: string | null
+  /** Instagram 同時投稿（★V8-B `U1X7T2`／2026-10-07 承認）。`caption` が空なら本文を使う。 */
+  instagram?: { enabled: boolean; caption?: string | null } | null
 }
 
 export type GooglePostListData = {
@@ -320,6 +336,9 @@ export const restaurantGoogleApi = {
     fetchApi<{ success: true; alreadyPublished: boolean; post: GooglePost }>(withAccount(`${base}/posts/${encodeURIComponent(id)}/publish`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true }) }),
   removePost: (accountId: string, id: string) =>
     fetchApi<{ success: true; post: GooglePost }>(withAccount(`${base}/posts/${encodeURIComponent(id)}/remove`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true }) }),
+  /** Instagram だけをもう一度送る（Google の公開はそのまま・★V8-B `HEEN9`／2026-10-07 承認）。 */
+  retryInstagram: (accountId: string, id: string) =>
+    fetchApi<{ success: true; post: GooglePost }>(withAccount(`${base}/posts/${encodeURIComponent(id)}/instagram/retry`, accountId), { method: 'POST', body: '{}' }),
 
   // 第4段：パフォーマンス
   performance: (accountId: string, days: GooglePerformanceDays) =>

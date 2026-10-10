@@ -7,9 +7,11 @@
  * 下の中央に キャンセル・保存して EC へ同期。
  * 競合の帯はタブの下・数の帯の上（型の tabs の段）に出すので、外枠へ渡す（onTopBand）。
  */
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, GitCompareArrows, Plus, RefreshCw, TriangleAlert } from 'lucide-react'
+import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import { RowActions } from '@/components/shared/row-actions'
 import Dialog from '@/components/shared/dialog'
@@ -17,6 +19,8 @@ import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
+import { FieldError } from '@/components/shared/form-controls'
+import { useFieldValidation } from '@/lib/use-field-validation'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -25,6 +29,8 @@ import { formatNumber } from '@/lib/format'
 import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
 import { RULE_LABELS, parsePercent, parseYen, shortDateTime, shortTime, yen, type LoadStatus, type SavedHandler } from './parts'
 import styles from './members.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 type RankDraft = { id: string | null; name: string; threshold: string; rate: string; tagId: string | null; tagName: string | null; memberCount: number }
 
@@ -75,6 +81,14 @@ export default function RankSettingsV8({
   const [removeTarget, setRemoveTarget] = useState<number | null>(null)
   const [replacement, setReplacement] = useState('')
 
+  const fields = useFieldValidation(drafts.flatMap((row, index) => [
+    ...(!row.name.trim() ? [{ id: `rank-name-${index}`, message: 'ランク名を入れるか、行を消してください。' }] : []),
+    ...(!Number.isFinite(parseYen(row.threshold)) || parseYen(row.threshold) < 0
+      ? [{ id: `rank-threshold-${index}`, message: 'しきい値は0以上の金額で入れてください。' }] : []),
+    ...(!Number.isFinite(parsePercent(row.rate)) || parsePercent(row.rate) < 0
+      ? [{ id: `rank-rate-${index}`, message: 'マイル還元は0以上の数（%）で入れてください。' }] : []),
+  ]))
+
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
 
   useEffect(() => {
@@ -97,6 +111,7 @@ export default function RankSettingsV8({
     setDirty(true)
   }
   const cancel = () => {
+    fields.reset()
     setDirty(false)
     setError('')
     setConflict(null)
@@ -129,9 +144,8 @@ export default function RankSettingsV8({
       annualThresholdYen: parseYen(row.threshold),
       mileRatePercent: parsePercent(row.rate),
     }))
-    if (rows.some((row) => !row.name)) { setError('ランク名が空の行があります。名前を入れるか、行を消してください。'); return }
-    if (rows.some((row) => !Number.isFinite(row.annualThresholdYen) || row.annualThresholdYen < 0)) { setError('通年のしきい値は 0 以上の金額で入れてください。'); return }
-    if (rows.some((row) => !Number.isFinite(row.mileRatePercent) || row.mileRatePercent < 0)) { setError('マイル還元は 0 以上の数（%）で入れてください。'); return }
+    setError('')
+    if (!fields.submit()) return
     setBusy(true)
     setError('')
     setNotice('')
@@ -152,7 +166,7 @@ export default function RankSettingsV8({
         await showConflict()
       } else {
         setError(describeApiFailure(caught, 'ランク設定の保存', {
-          forbidden: 'ランク設定を保存する権限がありません。権限を確認してください。',
+          scope: 'store',
         }))
       }
     } finally {
@@ -199,7 +213,7 @@ export default function RankSettingsV8({
         await showConflict()
       } else {
         setError(describeApiFailure(caught, 'ランクの削除', {
-          forbidden: 'ランクを削除する権限がありません。権限を確認してください。',
+          scope: 'store',
         }))
       }
     } finally {
@@ -228,7 +242,7 @@ export default function RankSettingsV8({
       setNotice(res.data.sync?.status === 'synced' ? 'ECへ同期しました。' : `ECへの同期に失敗しました：${res.data.sync?.error ?? ''}`)
     } catch (caught) {
       setError(describeApiFailure(caught, 'ECへの同期', {
-        forbidden: 'ECへ同期する権限がありません。権限を確認してください。',
+        scope: 'store',
       }))
     } finally {
       setBusy(false)
@@ -240,15 +254,7 @@ export default function RankSettingsV8({
   useEffect(() => {
     onTopBand(conflict ? (
       <div className={styles.conflictSlot}>
-        <div className={styles.conflictBand} role="alert">
-          <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
-          <div className={styles.conflictText}>
-            <p className={styles.conflictTitle}>{conflictAt ? `ほかの人が ${conflictAt} にランク設定を保存しました` : 'ほかの人がランク設定を保存しました'}</p>
-            <p className={styles.conflictSub}>このまま保存すると、ほかの人の変更が消えます</p>
-          </div>
-          <Button variant="secondary" onClick={() => setComparing(true)}><GitCompareArrows size={15} aria-hidden="true" />違いを比べる</Button>
-          <Button variant="secondary" onClick={reloadLatest}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
-        </div>
+        <SaveConflictBand title={conflictAt ? `ほかの人が ${conflictAt} にランク設定を保存しました` : 'ほかの人がランク設定を保存しました'} description="このまま保存すると、ほかの人の変更が消えます" onCompare={() => setComparing(true)} onReload={reloadLatest} />
       </div>
     ) : null)
     // reloadLatest は conflict だけを読む。帯は conflict が変わったときだけ作り直す。
@@ -278,7 +284,7 @@ export default function RankSettingsV8({
 
       <div className={styles.rankSplit}>
         <div className={styles.rankMain}>
-          <section className={styles.card} aria-labelledby="nen-rank-rules">
+          <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-rank-rules">
             <div className={styles.cardHead}>
               <h2 id="nen-rank-rules" className={styles.cardTitle}>ランクの決まり</h2>
               <p className={styles.cardDesc}>通年の購入額でランクが決まります</p>
@@ -291,9 +297,9 @@ export default function RankSettingsV8({
               <RuleBox label="上がったとき" value={RULE_LABELS.applyOnReach} />
               <RuleBox label="維持する期間" value={RULE_LABELS.keepUntil} />
             </div>
-          </section>
+          </Card>
 
-          <section className={styles.card} aria-labelledby="nen-rank-list">
+          <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-rank-list">
             <div className={styles.cardHead}>
               <h2 id="nen-rank-list" className={styles.cardTitle}>ランク</h2>
               <p className={styles.cardDesc}>上から高い順。行の「…」から消すと、そのランクの会員を移し先のランクへ反映します</p>
@@ -310,23 +316,26 @@ export default function RankSettingsV8({
               return (
                 <div key={row.id ?? `new-${index}`} className={styles.rankRow} title={row.tagName ? `タグ：${row.tagName}・会員 ${formatNumber(row.memberCount)} 人` : undefined}>
                   <div className={styles.rankColName}>
-                    <TextField aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} readOnly={readonly} onChange={(event) => update(index, { name: event.target.value })} />
+                    <TextField {...fields.bind(`rank-name-${index}`)} aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} readOnly={readonly} onChange={(event) => update(index, { name: event.target.value })} />
+                    <FieldError id={`rank-name-${index}-error`}>{fields.error(`rank-name-${index}`)}</FieldError>
                   </div>
                   <div className={styles.rankColThreshold}>
                     {isBase ? (
                       <span className={styles.fixedBox} title="いちばん下のランクは ¥0 から（変えられません）">¥0〜（固定）</span>
                     ) : (
-                      <TextField aria-label={`しきい値 ${index + 1}`} inputMode="numeric" placeholder="¥0〜" value={row.threshold} readOnly={readonly} onChange={(event) => update(index, { threshold: event.target.value })} />
+                      <NumberInput numericText {...fields.bind(`rank-threshold-${index}`)} aria-label={`しきい値 ${index + 1}`} inputMode="numeric" placeholder="¥0〜" value={row.threshold} readOnly={readonly} onChange={(event) => update(index, { threshold: event.target.value })} />
                     )}
+                    <FieldError id={`rank-threshold-${index}-error`}>{fields.error(`rank-threshold-${index}`)}</FieldError>
                   </div>
                   <div className={styles.rankColRate}>
-                    <TextField aria-label={`マイル還元 ${index + 1}`} inputMode="decimal" placeholder="0%" value={row.rate} readOnly={readonly} onChange={(event) => update(index, { rate: event.target.value })} />
+                    <TextField {...fields.bind(`rank-rate-${index}`)} aria-label={`マイル還元 ${index + 1}`} inputMode="decimal" placeholder="0%" value={row.rate} readOnly={readonly} onChange={(event) => update(index, { rate: event.target.value })} />
+                    <FieldError id={`rank-rate-${index}-error`}>{fields.error(`rank-rate-${index}`)}</FieldError>
                   </div>
                   <div className={styles.rankColAction}>
                     {/* 行の右端は「…」（タグを開く・ランクを削除する）。1つの機能の印にしない。 */}
                     <RowActions
                       subjectName={`ランク「${label}」`}
-                      menuItems={row.tagId ? [{ id: 'tag', label: 'タグを開く', external: true, onSelect: () => router.push(`/tags/edit?id=${encodeURIComponent(row.tagId ?? '')}`) }] : []}
+                      menuItems={row.tagId ? [{ id: 'tag', label: 'タグを開く', external: true, href: `/tags/edit?id=${encodeURIComponent(row.tagId ?? '')}`, onSelect: () => router.push(`/tags/edit?id=${encodeURIComponent(row.tagId ?? '')}`) }] : []}
                       destructiveItem={readonly ? undefined : {
                         id: 'delete',
                         label: 'ランクを削除する',
@@ -346,10 +355,10 @@ export default function RankSettingsV8({
                 </Button>
               </div>
             )}
-          </section>
+          </Card>
         </div>
 
-        <section className={`${styles.card} ${styles.sideCard}`} aria-labelledby="nen-rank-sync">
+        <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" className={styles.sideCard} aria-labelledby="nen-rank-sync">
           <div className={styles.cardHead}>
             <h2 id="nen-rank-sync" className={styles.cardTitle}>ECとの同期</h2>
             <p className={styles.cardDesc}>保存すると、ランクをネットショップへ送り、タグも付け替えます。送れなかったときは、理由がここに出ます</p>
@@ -366,18 +375,18 @@ export default function RankSettingsV8({
           </div>
           {readonly ? null : (
             <div className={styles.syncAction}>
-              <Button variant="secondary" onClick={() => void resync()} disabled={busy || dirty}>
+              <Button variant="secondary" onClick={() => void resync()} disabled={busy || dirty} busy={Boolean(busy)} busyLabel="処理中…">
                 <RefreshCw size={15} aria-hidden="true" />もう一度同期
               </Button>
             </div>
           )}
-        </section>
+        </Card>
       </div>
 
       {readonly ? null : (
         <div className={styles.saveRow}>
           <Button variant="secondary" onClick={cancel} disabled={busy || !dirty}>キャンセル</Button>
-          <Button variant="primary" onClick={() => (conflict ? setComparing(true) : void save())} disabled={busy || !dirty}>
+          <Button variant="primary" onClick={() => (conflict ? setComparing(true) : void save())} disabled={busy || !dirty} busy={Boolean(busy)} busyLabel="処理中…">
             <Check size={15} aria-hidden="true" />{conflict ? '比べてから保存' : '保存して EC へ同期'}
           </Button>
         </div>
@@ -398,7 +407,7 @@ export default function RankSettingsV8({
         busy={busy}
         confirmLabel={moving > 0 ? `${formatNumber(moving)} 人を移して消す` : '消す'}
         cancelLabel="キャンセル"
-        onConfirm={moving > 0 && !replacement ? undefined : () => void removeRank()}
+        onConfirm={moving > 0 && !replacement ? undefined : () => removeRank()}
         onCancel={() => setRemoveTarget(null)}
       >
         <div className={styles.removeBody}>
@@ -437,13 +446,13 @@ export default function RankSettingsV8({
         confirmLabel="この内容で保存する"
         cancelLabel="閉じる"
         busy={busy}
-        onConfirm={() => void save(true)}
+        onConfirm={() => save(true)}
         onCancel={() => setComparing(false)}
       >
         {conflict ? (
           <div className={styles.diffGrid}>
             <div>
-              <p className={styles.diffHead}>最新（{conflict.latest.rules ? shortDateTime(conflict.latest.rules.updatedAt) : '—'}）</p>
+              <p className={styles.diffHead}>最新（{conflict.latest.rules ? shortDateTime(conflict.latest.rules.updatedAt) : emptyValue('unknown')}）</p>
               <ul className={styles.diffList}>
                 {conflict.latest.ranks.map((rank) => (
                   <li key={rank.id}>{rank.name} — {thresholdText(rank.annualThresholdYen)} / {rateText(rank.mileRatePercent)}</li>
@@ -454,7 +463,7 @@ export default function RankSettingsV8({
               <p className={styles.diffHead}>いまの下書き</p>
               <ul className={styles.diffList}>
                 {drafts.map((row, index) => (
-                  <li key={row.id ?? `draft-${index}`}>{row.name || '（名前なし）'} — {row.threshold || '—'} / {row.rate || '—'}</li>
+                  <li key={row.id ?? `draft-${index}`}>{row.name || '（名前なし）'} — {row.threshold || emptyValue('unknown')} / {row.rate || emptyValue('unknown')}</li>
                 ))}
               </ul>
             </div>

@@ -114,11 +114,11 @@ export const BOARD_URLS = {
   Msb1j: '/accounts/detail?id=visual-qa-account&tab=credentials', // LINEアカウント 資格情報を差し替える V8
   WOfBN: '/accounts/detail?id=visual-qa-account-old', // LINEアカウント アーカイブ V8
   AjZhH: '/booking/bookings', // 予約台帳 予約の詳細 V8
-  KRgTQ: '/booking/menus', // 予約設定 休業日 V8
-  VFxWU: '/booking/menus', // 予約設定 受付枠（1152）V8
-  ZyDd6: '/booking/menus', // 予約設定 予約経路の連携（人）V8
-  x1OZS6: '/booking/menus', // 予約設定 予約のルール V8
-  yRPxl: '/booking/menus', // 予約設定 受付枠 V8
+  KRgTQ: '/booking/menus?tab=holidays', // 予約設定 休業日 V8
+  VFxWU: '/booking/menus?tab=hours', // 予約設定 受付枠（1152）V8
+  ZyDd6: '/booking/menus?tab=channels', // 予約設定 予約経路の連携（人）V8
+  x1OZS6: '/booking/menus?tab=rules', // 予約設定 予約のルール V8
+  yRPxl: '/booking/menus?tab=hours', // 予約設定 受付枠 V8
   CcA4k: '/booking/staff/new', // 予約設定 予約スタッフを登録 V8
   E3YDK: '/booking/staff/shifts', // 自分の勤務（スタッフ本人）V8
   d5fmnM: '/booking/staff/shifts', // 予約設定 勤務とシフト（管理者）V8

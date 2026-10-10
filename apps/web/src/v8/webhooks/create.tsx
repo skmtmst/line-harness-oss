@@ -9,10 +9,11 @@
  * データの口は v7 と同じ（作成・本人確認・未保存の番兵）。`?event=` で見本の出来事を選んでおく。
  * 絵と今の作りが合わない所は BEHAVIOR.md に書いた（競合の口が無い・それでも送れないときの口が無い など）。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronDown, ChevronLeft, ChevronUp, Inbox, RefreshCw, Send } from 'lucide-react'
+import { ChevronDown, ChevronUp, Inbox, RefreshCw, Send } from 'lucide-react'
 import { EC_EVENT_TYPES, ecEventLabel } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -22,6 +23,9 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
@@ -29,6 +33,7 @@ import Select from '@/components/shared/select'
 import { isStepUpRequired, useStepUpGate } from '@/components/step-up-prompt'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import styles from './create.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /*
  * 送る出来事。正本は packages/db/src/webhooks.ts の KNOWN_OUTGOING_EVENT_TYPES。
@@ -190,7 +195,7 @@ function WebhooksCreateV8Inner() {
 
   async function save(next: 'draft' | 'active') {
     if (staffRole !== null && staffRole !== 'owner') {
-      setError('送り先の作成は統括だけができます。必要なときは統括に頼んでください。')
+      setError(permissionDeniedMessage('store'))
       return
     }
     const accountId = selectedAccountId
@@ -201,7 +206,12 @@ function WebhooksCreateV8Inner() {
     const errors = validate()
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) {
-      setError('直す所があります。赤い理由を確かめてください。')
+      setError(null)
+      requestAnimationFrame(() => {
+        const first = document.getElementById(`wh-new-${Object.keys(errors)[0]}`)
+        first?.focus()
+        first?.scrollIntoView?.({ block: 'center' })
+      })
       return
     }
     setSaving(true)
@@ -214,7 +224,7 @@ function WebhooksCreateV8Inner() {
     if (next === 'active' && pendingStop && pendingStop.accountId === accountId) {
       // もう作れていて動いている。同じ送り先をもう1つ作らない。
       createdActiveRef.current = null
-      router.push('/webhooks')
+      router.push(createPageReturnHref('/webhooks', pendingStop.id))
       return
     }
     if (next === 'draft' && pendingStop && pendingStop.accountId === accountId) {
@@ -222,7 +232,7 @@ function WebhooksCreateV8Inner() {
         const stop = await api.webhooks.outgoing.update(pendingStop.id, accountId, { isActive: false })
         if (!stop.success) throw new Error(stop.error)
         createdActiveRef.current = null
-        router.push('/webhooks')
+        router.push(createPageReturnHref('/webhooks', pendingStop.id))
       } catch {
         setError('送り先は作れましたが、まだ止められていません（いまは動いています）。もう一度「下書きを保存」を押すと、止めるところだけやり直します。')
         setSaving(false)
@@ -249,7 +259,7 @@ function WebhooksCreateV8Inner() {
         res = await create()
       } catch (caught) {
         if (!isStepUpRequired(caught)) {
-          if (caught instanceof ApiError && caught.status === 403) throw new Error('送り先の作成は統括だけができます。必要なときは統括に頼んでください。')
+          if (caught instanceof ApiError && caught.status === 403) throw new Error(permissionDeniedMessage('store'))
           throw caught
         }
         const token = await gate('webhook.secret', 'Webhookを登録する')
@@ -274,7 +284,7 @@ function WebhooksCreateV8Inner() {
         }
         createdActiveRef.current = null
       }
-      router.push('/webhooks')
+      router.push(createPageReturnHref('/webhooks', res.data.id))
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '保存できませんでした。もう一度お試しください。')
       setSaving(false)
@@ -283,7 +293,6 @@ function WebhooksCreateV8Inner() {
 
   const sampleKey = selectedEvents.find((value) => SAMPLES[value]) ?? 'friend_add'
   const sample = SAMPLES[sampleKey]
-  const back = <Link href="/webhooks" className={styles.backLink}><ChevronLeft size={14} aria-hidden="true" />外部連携へ</Link>
 
   /* 作るのは統括だけ（R32）。見るだけの人には押せない物を置かず、一覧へ戻る道だけ出す。 */
   if (staffRole !== null && staffRole !== 'owner') {
@@ -291,39 +300,38 @@ function WebhooksCreateV8Inner() {
       <CreatePage
         boardId="hsD8e"
         title="送り先を作る"
-        description="友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。"
-        identity={back}
-        footerActions={<Button href="/webhooks">一覧へ戻る</Button>}
+        help="友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。"
+        footerActions={<Button href="/webhooks">一覧へ戻る</Button>} dirty={false}
       >
-        <Notice tone="info">送り先の作成は統括だけができます。必要なときは統括に頼んでください。</Notice>
+        <Notice tone="info">{permissionDeniedMessage('store')}</Notice>
       </CreatePage>
     )
   }
 
   const preview = (
     <div className={styles.side}>
-      <section className={styles.sideCard} aria-labelledby="wh-new-sample">
+      <Card spacing="preview" aria-labelledby="wh-new-sample">
         <h2 className={styles.sideTitle} id="wh-new-sample">届く中身の見本</h2>
         <p className={styles.sideNote}>{sample.when}</p>
         <div className={styles.sampleBox} aria-label="届く中身の見本">
           {sample.lines.map((line, index) => <div key={index} className={styles.sampleLine}>{line}</div>)}
         </div>
-      </section>
-      <section className={styles.sideCard} aria-labelledby="wh-new-test">
+      </Card>
+      <Card spacing="preview" aria-labelledby="wh-new-test">
         <h2 className={styles.sideTitle} id="wh-new-test">試しに送る</h2>
         <p className={styles.sideNote}>見本の中身を1回だけ送ります</p>
         <div>
           <Button disabled title="送り先を作ってから送れます（一覧の「設定 → 試しに送る」）"><Send size={15} aria-hidden="true" />試しに送る</Button>
         </div>
-      </section>
-      <section className={styles.sideCard} aria-labelledby="wh-new-care">
+      </Card>
+      <Card spacing="preview" aria-labelledby="wh-new-care">
         <h2 className={styles.sideTitle} id="wh-new-care">気をつけること</h2>
         <p className={styles.careText}>
           ・秘密の鍵は保存すると二度と全部は見えません<br />
           ・作り直すと、前の鍵では届かなくなります<br />
           ・個人情報は必要なものだけ送ります
         </p>
-      </section>
+      </Card>
     </div>
   )
 
@@ -331,8 +339,7 @@ function WebhooksCreateV8Inner() {
     <CreatePage
       boardId="hsD8e"
       title="送り先を作る"
-      description="友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。"
-      identity={back}
+      help="友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。"
       preview={preview}
       status="下書き（まだ動いていません）"
       footerActions={(
@@ -341,11 +348,11 @@ function WebhooksCreateV8Inner() {
           <Button disabled={saving} onClick={() => void save('draft')} busy={saving}>下書きを保存</Button>
           <Button variant="primary" disabled={saving} onClick={() => void save('active')} busy={saving}>つくって動かす</Button>
         </>
-      )}
+      )} dirty={false}
     >
       {error ? <Notice tone="danger">{error}</Notice> : null}
 
-      <section className={styles.card} aria-labelledby="wh-new-direction">
+      <Card variant="form" aria-labelledby="wh-new-direction">
         <h2 className={styles.cardTitle} id="wh-new-direction">どちら向きの連携か</h2>
         <RadioCardGroup legend="どちら向きの連携か" className={styles.cardRow}>
           <RadioCard
@@ -374,13 +381,12 @@ function WebhooksCreateV8Inner() {
             受け取り口はこの画面では作れません。<Link href="/webhooks?tab=incoming" className={styles.inlineLink}>「こちらで受け取る」から作ってください</Link>。
           </p>
         ) : null}
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="wh-new-dest">
+      <Card variant="form" aria-labelledby="wh-new-dest">
         <h2 className={styles.cardTitle} id="wh-new-dest">どこへ送りますか</h2>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="wh-new-name">名前</label>
-          <input
+        <Field label="名前" htmlFor="wh-new-name" error={fieldErrors.name}>
+          <TextField
             id="wh-new-name"
             value={name}
             onChange={(event) => {
@@ -389,15 +395,12 @@ function WebhooksCreateV8Inner() {
             }}
             onBlur={() => blurField('name')}
             placeholder="顧客台帳（CRM）"
-            className={styles.input}
             aria-invalid={fieldErrors.name ? true : undefined}
             required
           />
-          {fieldErrors.name ? <p className={styles.fieldError} role="alert">{fieldErrors.name}</p> : null}
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="wh-new-url">送り先の URL</label>
-          <input
+        </Field>
+        <Field label="送り先の URL" htmlFor="wh-new-url" error={fieldErrors.url}>
+          <TextField
             id="wh-new-url"
             type="url"
             value={url}
@@ -407,16 +410,14 @@ function WebhooksCreateV8Inner() {
             }}
             onBlur={() => blurField('url')}
             placeholder="https://crm.example.com/line/hook"
-            className={styles.input}
             aria-invalid={fieldErrors.url ? true : undefined}
             required
           />
-          {fieldErrors.url ? <p className={styles.fieldError} role="alert">{fieldErrors.url}</p> : null}
-        </div>
+        </Field>
         <div className={styles.secretRow}>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="wh-new-secret">秘密の鍵</label>
-            <input
+          <div className={styles.grow}>
+            <Field label="秘密の鍵" htmlFor="wh-new-secret" error={fieldErrors.secret}>
+            <TextField
               id="wh-new-secret"
               value={secret}
               onChange={(event) => {
@@ -424,26 +425,27 @@ function WebhooksCreateV8Inner() {
                 if (fieldErrors.secret && validateSecret(event.target.value) === null) blurField('secret', event.target.value)
               }}
               onBlur={() => blurField('secret')}
-              className={`${styles.input} ${styles.mono}`}
               aria-invalid={fieldErrors.secret ? true : undefined}
               required
             />
+          </Field>
           </div>
           <Button type="button" onClick={() => setSecret(generateSecret())}><RefreshCw size={15} aria-hidden="true" />作り直す</Button>
         </div>
-        {fieldErrors.secret ? <p className={styles.fieldError} role="alert">{fieldErrors.secret}</p> : null}
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="wh-new-when">
+      <Card variant="form" aria-labelledby="wh-new-when">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="wh-new-when">いつ送りますか</h2>
           <p className={styles.cardNote}>選んだできごとが起きるたびに送ります</p>
         </div>
+        <div id="wh-new-events" tabIndex={-1} aria-invalid={Boolean(fieldErrors.events) || undefined} aria-describedby={fieldErrors.events ? "wh-new-events-error" : undefined}>
         <RadioCardGroup legend="送る範囲" className={styles.radioRow}>
-          <RadioCard variant="row" name="wh-new-mode" value="all" checked={sendAll} onChange={() => setSendAll(true)} title="すべて送る" />
-          <RadioCard variant="row" name="wh-new-mode" value="selected" checked={!sendAll} onChange={() => setSendAll(false)} title="選んだものだけ送る" />
+          <RadioCard variant="row" invalid={Boolean(fieldErrors.events)} name="wh-new-mode" value="all" checked={sendAll} onChange={() => setSendAll(true)} title="すべて送る" />
+          <RadioCard variant="row" invalid={Boolean(fieldErrors.events)} name="wh-new-mode" value="selected" checked={!sendAll} onChange={() => setSendAll(false)} title="選んだものだけ送る" />
         </RadioCardGroup>
-        {fieldErrors.events ? <p className={styles.fieldError} role="alert">{fieldErrors.events}</p> : null}
+        {fieldErrors.events ? <p id="wh-new-events-error" className={styles.fieldError} role="alert">{fieldErrors.events}</p> : null}
+        </div>
         {!sendAll ? (
           <>
             {EVENT_GROUPS.map((group) => (
@@ -476,22 +478,18 @@ function WebhooksCreateV8Inner() {
               </div>
             ) : null}
             {detailsOpen ? (
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor="wh-new-incoming">受け取った知らせも送る（受け取り口の種類。カンマで区切る）</label>
-                <input
+              <div className={styles.field}><Field label="受け取った知らせも送る（受け取り口の種類。カンマで区切る）" htmlFor="wh-new-incoming"><TextField
                   id="wh-new-incoming"
                   value={incomingSources}
                   onChange={(event) => setIncomingSources(event.target.value)}
-                  placeholder="例: form, booking"
-                  className={styles.input}
-                />
-              </div>
+                  placeholder="例：form, booking"
+                /></Field></div>
             ) : null}
           </>
         ) : null}
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="wh-new-retry">
+      <Card variant="form" aria-labelledby="wh-new-retry">
         <h2 className={styles.cardTitle} id="wh-new-retry">送れなかったとき</h2>
         <div className={styles.pickRow}>
           <div className={styles.field}>
@@ -500,7 +498,7 @@ function WebhooksCreateV8Inner() {
           </div>
           <span className={styles.field} aria-hidden="true" />
         </div>
-      </section>
+      </Card>
 
       {stepUpPrompt}
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した送り先" onConfirm={confirmLeave} onCancel={cancelLeave} />

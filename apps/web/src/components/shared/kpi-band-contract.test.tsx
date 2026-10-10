@@ -1,3 +1,8 @@
+// @vitest-environment happy-dom
+
+import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import KpiBand from './kpi-band'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -26,19 +31,19 @@ describe('数の帯（Pp3nS）', () => {
     )
     expect(strip, 'v8 の帯の指定がありません').toBeTruthy()
     expect(strip![0]).toMatch(/gap:\s*var\(--tpl-band-gap\)/)
-    expect(strip![0]).toMatch(/border-block:\s*1px solid var\(--color-hairline\)/)
+    expect(strip![0]).toMatch(/border-block:\s*1px solid var\(--tpl-band-line\)/)
     expect(strip![0]).toMatch(/border-radius:\s*var\(--radius-none\)/)
     expect(css).toMatch(
-      /\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] > \* \+ \* \{[^}]*border-left:\s*1px solid var\(--color-hairline\)/s,
+      /\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] > \*:not\(:last-child\) \{[^}]*border-right:\s*1px solid var\(--tpl-band-line\)/s,
     )
     expect(css).toMatch(
       /\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] \.number \{[^}]*font-size:\s*var\(--tpl-band-number-size\)/s,
     )
   })
 
-  it('既定（v7）のカードの角は変えない', () => {
+  it('数のマスは角0・影なし', () => {
     const css = read('kpi-card.module.css')
-    expect(css).toMatch(/\.card \{[^}]*border-radius:\s*var\(--radius-card\)/s)
+    expect(css).toMatch(/\.card \{[^}]*border-radius:\s*0/s)
   })
 
   it('v8 の単位（件・通）は 12px', () => {
@@ -47,10 +52,10 @@ describe('数の帯（Pp3nS）', () => {
   })
 
   it('包み（KpiBand）は帯の印を持ち、並べ方は呼び出し側のまま', () => {
-    const source = read('kpi-band.tsx')
-    expect(source).toContain('data-kpi-strip')
-    expect(source).toContain('data-kpi-presentation="band"')
-    expect(source).toContain('gridClassName')
+    const html = renderToStaticMarkup(<KpiBand gridClassName="custom-grid"><span>数</span></KpiBand>)
+    expect(html).toContain('data-kpi-strip')
+    expect(html).toContain('data-kpi-presentation="band"')
+    expect(html).toContain('custom-grid')
   })
 
   it('帯の指定は層の外にある（ユーティリティ層の gap 等に勝つ）', () => {

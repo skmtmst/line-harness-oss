@@ -109,11 +109,11 @@
    * v8 では row1/row2/filters の入れ子を display:contents で
    * ほぐし、中身を帯の直接の子として1段に並べる。並びは
    * Pencil の順：検索 → 絞り込み → 道具 → 右端に並び順・件数。
-   * 入りきらない幅では flex-wrap で下へ折り返す。
+   * 入りきらない低優先度の道具は「…」へ畳み、帯は折り返さない。
    */
   [data-theme='v8'] .toolbar {
     flex-direction: row;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     gap: var(--tpl-toolbar-gap);
     padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side);
@@ -146,9 +146,8 @@
   /*
    * ★V8「道具の1段」（c4n9Kr）：探す欄は幅 280px・縮まない
    * （flex-shrink: 0）。中の文だけが flex:1 で伸び縮みする。
-   * 白い板が狭い幅（1100〜1200）では帯全体の flex-wrap で
-   * 下へ折り返すので、右端がはみ出さない。
-   * 繰り返す1行の形（幅・枠・高さ）を守り、行数は問わない。
+   * 白い板が狭いときは、低優先度の道具を「…」へ畳む。
+   * 選ぶ欄の幅は中身に合わせ、道具どうしの間は8を守る。
    */
 
 }
@@ -156,6 +155,31 @@
 [data-theme='v8'] :global([data-template-region='toolbar']) .toolbar { padding: 0; flex: 1; min-width: 0; }
 [data-theme='v8'] .trailing { margin-left: auto; display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
 [data-theme='v8'] .toolbar [role='group'] { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
+/* 道具の幅は文字と印から決める。親より広い選ぶ欄を残さない。 */
+[data-theme='v8'] .trailing { flex: none; flex-wrap: nowrap; }
+[data-theme='v8'] .trailing > * { width: max-content; flex: none; }
+[data-theme='v8'] .toolbar :global([data-design-node='rpot9']),
+[data-theme='v8'] .toolbar :global([data-design-node='Gfsb4']),
+[data-theme='v8'] .toolbar :global([data-design-node='niGPF']) { width: max-content; min-width: 0; max-width: 100%; }
+[data-theme='v8'] .toolbar :global(button[aria-haspopup='listbox']) { width: max-content; max-width: 100%; }
+[data-theme='v8'] .row1 > .search { flex: 0 1 var(--list-search-width, 280px); }
+[data-theme='v8'] .toolbar:has(.optional) .row1 > .search { flex: none; }
+.optional { position: relative; flex: none; width: max-content; }
+.optional > summary { display: none; }
+.optional > div { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
+.optional[data-collapsed] > summary {
+  display: flex; align-items: center; justify-content: center; list-style: none;
+  height: var(--tpl-chip-h); padding: 0 var(--tpl-toolbar-gap); cursor: pointer;
+  border: 1px solid var(--color-hairline); border-radius: var(--radius-control);
+}
+.optional > summary::-webkit-details-marker { display: none; }
+.optional > summary:focus-visible { outline: 2px solid var(--color-action); }
+.optional[data-collapsed] > div {
+  position: absolute; right: 0; top: 100%; z-index: 50;
+  padding: var(--tpl-toolbar-gap); background: var(--color-canvas);
+  border: 1px solid var(--color-hairline); border-radius: var(--radius-control);
+}
+.optional[data-collapsed]:not([open]) > div { display: none; }
 [data-theme='v8'] .row1 > .search { width: var(--list-search-width, 280px); min-width: 0; }
 /*
  * ★V8「道具の2段」（acRIl 予約管理）：1段目＝探す・担当・経路・CSV、

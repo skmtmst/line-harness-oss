@@ -9,13 +9,14 @@
  * 健康日記はお客さまがマイページで付けるので、ここに変える操作は無い（閲覧のみでも同じ画面）。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useListUrlJsonValue } from '@/components/shared/list-url-state'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Activity, Bookmark, CalendarCheck, CalendarDays, Columns2, FileText, History, PawPrint } from 'lucide-react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -41,6 +42,7 @@ import HealthItemsV8 from './items'
 import SummaryDrawerV8, { SummarySheet } from './summary'
 import { EMPTY_FILTERS, Pill, RowMenu, WeightBars, changeBadges, md, rangeText, type HealthFilters, type HealthTabKey } from './parts'
 import styles from './health.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export type { HealthTabKey } from './parts'
 
@@ -60,7 +62,7 @@ export default function HealthV8({
 }) {
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const [kpis, setKpis] = useState<NenHealthKpis | null>(null)
-  const [filters, setFilters] = useState<HealthFilters>(EMPTY_FILTERS)
+  const [filters, setFilters] = useListUrlJsonValue<HealthFilters>('filters', EMPTY_FILTERS)
 
   /*
    * 「30日のまとめ」は対象スナップショットとして持つ（今の画面の DEEP-23 と同じ）。
@@ -149,12 +151,6 @@ export default function HealthV8({
     printWhenReady(0)
   }, [printPetId, canPrint, summaryPetId])
 
-  /** 数の帯・札からの絞り込み。記録のあるペットのタブへ戻して当てる。 */
-  const applyFilter = (patch: Partial<HealthFilters>) => {
-    setFilters((current) => ({ ...current, ...patch }))
-    if (tab !== 'logs') onChangeTab('logs')
-  }
-
   const tabs = (
     <div className={styles.tabs}>
       <Tabs
@@ -169,13 +165,12 @@ export default function HealthV8({
   )
 
   const pending = kpis === null
-  const kpiMenu = (title: string, items: ActionMenuItem[]) => <KpiMenu title={title} items={items} />
   const stats = accountId ? (
-    <KpiBand data-design="KPIs" className={styles.band} aria-label="健康日記の数の帯">
-      <KpiCard presentation="band" title="記録のあるペット" icon={<History size={13} aria-hidden="true" />} menu={kpiMenu('記録のあるペット', [{ id: 'all', label: 'すべてのペットを出す', onSelect: () => applyFilter(EMPTY_FILTERS) }])} value={pending ? null : kpis.petsWithRecords} unit="匹" loading={pending} detail={pending ? '読み込んでいます' : `登録 ${kpis.petsTotal} 匹のうち`} />
-      <KpiCard presentation="band" title="気になる変化" icon={<Activity size={13} aria-hidden="true" />} menu={kpiMenu('気になる変化', [{ id: 'concern', label: '気になる変化だけ出す', onSelect: () => applyFilter({ change: 'concern', last: '' }) }])} value={pending ? null : kpis.concerning} unit="匹" loading={pending} detail="体重 ±10%（8週）など" />
-      <KpiCard presentation="band" title="今週の記録" icon={<CalendarCheck size={13} aria-hidden="true" />} menu={kpiMenu('今週の記録', [{ id: 'week', label: '今週 記録のあるペットを出す', onSelect: () => applyFilter({ last: '7' }) }])} value={pending ? null : kpis.recordsThisWeek} unit="件" loading={pending} detail="直近7日に付いた記録" />
-      <KpiCard presentation="band" title="30日 記録なし" icon={<PawPrint size={13} aria-hidden="true" />} menu={kpiMenu('30日 記録なし', [{ id: 'silent', label: '30日 記録なしのペットを出す', onSelect: () => applyFilter({ change: 'silent', last: '' }) }])} value={pending ? null : kpis.silent30} unit="匹" loading={pending} detail="声をかけられます" />
+    <KpiBand data-design="KPIs" aria-label="健康日記の数の帯">
+      <KpiCard presentation="band" title="記録のあるペット" icon={<History size={13} aria-hidden="true" />} value={pending ? null : kpis.petsWithRecords} unit="匹" loading={pending} detail={pending ? '読み込んでいます' : `登録 ${kpis.petsTotal} 匹のうち`} />
+      <KpiCard presentation="band" title="気になる変化" icon={<Activity size={13} aria-hidden="true" />} value={pending ? null : kpis.concerning} unit="匹" loading={pending} detail="体重 ±10%（8週）など" />
+      <KpiCard presentation="band" title="今週の記録" icon={<CalendarCheck size={13} aria-hidden="true" />} value={pending ? null : kpis.recordsThisWeek} unit="件" loading={pending} detail="直近7日に付いた記録" />
+      <KpiCard presentation="band" title="30日 記録なし" icon={<PawPrint size={13} aria-hidden="true" />} value={pending ? null : kpis.silent30} unit="匹" loading={pending} detail="声をかけられます" />
     </KpiBand>
   ) : undefined
 
@@ -184,7 +179,7 @@ export default function HealthV8({
       boardId={BOARD[tab]}
       headingSize="regular"
       title="健康日記"
-      description="お客さまがマイページで付けたペットの記録（体重・食事・うんち・元気）を見ます。気になる変化を見つけて声をかけられます。"
+      help="お客さまがマイページで付けたペットの記録（体重・食事・うんち・元気）を見ます。気になる変化を見つけて声をかけられます。"
       actions={(
         <Button type="button" onClick={() => window.print()} disabled={!canPrint} title={canPrint ? 'ブラウザの印刷で PDF に保存します' : '一覧の行の「…」から「30日のまとめ」を開くと書き出せます'}>
           <FileText size={15} aria-hidden="true" />獣医師向け PDF を書き出す
@@ -217,16 +212,6 @@ export default function HealthV8({
   )
 }
 
-/** 数の帯の「…」。その数で一覧を絞る。 */
-function KpiMenu({ title, items }: { title: string; items: ActionMenuItem[] }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <span className={styles.kpiMenu}>
-      <SharedRowMenu className={styles.kpiMenuButton} label={`${title}のメニュー`} open={open} onOpenChange={setOpen} items={items.map((item) => ({ ...item, onSelect: () => { setOpen(false); item.onSelect() } }))} />
-    </span>
-  )
-}
-
 /**
  * 記録のあるペット／気になる変化（mIwA4）。
  * 案内の帯 → 道具の段（探す・よく使う札3つ・よく使う絞り込み・件数）→ 表 → 件数 → ヒント。
@@ -252,8 +237,8 @@ function HealthListV8({
   const [status, setStatus] = useState<ListStatus>('loading')
   const [data, setData] = useState<NenHealthListData | null>(null)
   const [draft, setDraft] = useState(filters.q)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
   const [savedOpen, setSavedOpen] = useState(false)
   const savedRef = useRef<HTMLSpanElement | null>(null)
   const requestRef = useRef(0)
@@ -288,11 +273,6 @@ function HealthListV8({
   }, [filters.q])
 
   // 探す欄は打ち終わってから（0.3秒）取り直す。
-  useEffect(() => {
-    if (draft.trim() === filters.q) return
-    const timer = window.setTimeout(() => { onFiltersChange({ ...filters, q: draft.trim() }); setPage(1) }, 300)
-    return () => window.clearTimeout(timer)
-  }, [draft, filters, onFiltersChange])
 
   const set = (patch: Partial<HealthFilters>) => { onFiltersChange({ ...filters, ...patch }); setPage(1) }
   const filtering = filters.q !== '' || (!concernOnly && filters.change !== '') || filters.last !== ''
@@ -323,7 +303,7 @@ function HealthListV8({
 
       <div className={styles.toolsRow} data-design="ListControls">
         <span className={styles.searchBox}>
-          <SearchField aria-label="ペットを探す" placeholder="ペットを探す" value={draft} onChange={setDraft} onClear={() => setDraft('')} />
+          <SearchField aria-label="ペットを探す" placeholder="ペットを探す" value={draft} onChange={(value: string) => { setDraft(value); onFiltersChange({ ...filters, q: value.trim() }); setPage(1) }} onClear={() => { setDraft(''); onFiltersChange({ ...filters, q: '' }); setPage(1) }} />
         </span>
         {concernOnly ? null : (
           <span className={styles.chips} role="group" aria-label="よく使う札">
@@ -351,7 +331,7 @@ function HealthListV8({
               items={savedItems.map((item) => ({ ...item, onSelect: () => { setSavedOpen(false); item.onSelect() } }))}
             />
           </span>
-          <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))} />
+          <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))} />
         </span>
       </div>
 
@@ -415,8 +395,8 @@ function HealthRow({ row, onOpenSummary, onOpenPdf }: { row: NenHealthRow; onOpe
     { id: 'summary', label: '30日のまとめ', onSelect: () => onOpenSummary(row.pet.id) },
     /* 1匹の PDF は「30日のまとめ」を開いてから印刷する（開いた引き出しの「印刷・PDF に保存する」）。 */
     { id: 'pdf', label: '獣医師向け PDF', onSelect: () => onOpenPdf(row.pet.id) },
-    { id: 'owner', label: '飼い主を開く', external: true, onSelect: () => { router.push(`/friends/detail?id=${friendId}`) } },
-    { id: 'talk', label: '飼い主にトークで声をかける', external: true, onSelect: () => { router.push(`/chats?friend=${friendId}`) } },
+    { id: 'owner', label: '飼い主を開く', external: true, href: `/friends/detail?id=${friendId}`, onSelect: () => { router.push(`/friends/detail?id=${friendId}`) } },
+    { id: 'talk', label: '飼い主にトークで声をかける', external: true, href: `/chats?friend=${friendId}`, onSelect: () => { router.push(`/chats?friend=${friendId}`) } },
   ]
   return (
     <Tr className={styles.row} data-table-layout="columns">
@@ -435,10 +415,10 @@ function HealthRow({ row, onOpenSummary, onOpenPdf }: { row: NenHealthRow; onOpe
         </span>
       </Td>
       <Td className={styles.colOwner}><span className={styles.cell} title={row.owner.name}>{row.owner.name || '（名前なし）'}</span></Td>
-      <Td className={styles.colLast}><span className={styles.cell} title={row.lastLoggedLabel}>{row.lastLoggedOn ? md(row.lastLoggedOn) : '—'}</span></Td>
+      <Td className={styles.colLast}><span className={styles.cell} title={row.lastLoggedLabel}>{row.lastLoggedOn ? md(row.lastLoggedOn) : emptyValue('unknown')}</span></Td>
       <Td className={styles.colCount}><span className={styles.num}>{`${row.count30d} 日`}</span></Td>
       <Td className={styles.colWeight}><WeightBars series={row.weightSeries} warn={weightWarn} /></Td>
-      <Td className={styles.colStool}><span className={styles.cell}>{row.latestStool && row.latestAppetite ? `${row.latestStool}・${row.latestAppetite}` : '—'}</span></Td>
+      <Td className={styles.colStool}><span className={styles.cell}>{row.latestStool && row.latestAppetite ? `${row.latestStool}・${row.latestAppetite}` : emptyValue('unknown')}</span></Td>
       <Td className={styles.colChange}>
         <span className={styles.badges}>
           {changeBadges(row).map((badge) => <Pill key={badge.key} tone={badge.tone} title={badge.detail}>{badge.label}</Pill>)}

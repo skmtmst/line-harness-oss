@@ -217,8 +217,11 @@ export function hasLinkedActions(tag: Tag): boolean {
  * 9時間ぶんがずれる（8/1 の朝に作ったタグが7月扱いになる）。
  */
 export function isThisMonth(value: string): boolean {
-  const month = (d: Date) =>
-    formatDay(d)
+  const month = (d: Date) => {
+    if (Number.isNaN(d.getTime())) return null
+    const jst = new Date(d.getTime() + 9 * 60 * 60 * 1000)
+    return `${jst.getUTCFullYear()}-${jst.getUTCMonth()}`
+  }
   return month(new Date(value)) === month(new Date())
 }
 
@@ -247,7 +250,7 @@ export const QUICK_FILTERS: Array<[string, string]> = [
   ['starred', '★のみ表示'],
 ]
 
-const cardShadow = 'shadow-card'
+const cardShadow = 'shadow-card-surface'
 
 export const FRIEND_ATTRIBUTES_QA_GROUPS: TagGroup[] = [
   { id: 'qa-vip', accountId: null, name: 'VIP', sortOrder: 0, color: 'var(--color-status-warn-deep)', createdAt: '', updatedAt: '' },

@@ -100,6 +100,30 @@ async function click(element: Element | undefined) {
 }
 
 describe('V8 投稿（審査）', () => {
+  it('次のページを含む全件選択でも審査対象の写真と版を保持する', async () => {
+    const rows = Array.from({ length: 201 }, (_, index) => photo(`page-${index}`, `写真${index}`, 'pending'))
+    const originalFetch = globalThis.fetch
+    const offsets: string[] = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), 'http://worker.test')
+      if (url.pathname === '/api/nen-members/photos') {
+        const offset = Number(url.searchParams.get('offset') ?? '0')
+        offsets.push(String(offset))
+        return json({ success: true, data: rows.slice(offset, offset + 200) })
+      }
+      return originalFetch(input, init)
+    })
+    await render()
+    const checkbox = host.querySelector('input[type="checkbox"]')!
+    await click(checkbox)
+    expect(buttons('201件すべてを選ぶ')).toHaveLength(1)
+    await click(buttons('201件すべてを選ぶ')[0])
+    expect(host.textContent).toContain('201枚を選択中')
+    expect(offsets).toContain('200')
+    await click(buttons('まとめて採用')[0])
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('201枚をまとめて採用')
+  })
+
   it('V8 のテーマで、札の名前と件数を1つの文字で出し、数の帯と右の決まりを並べる', async () => {
     await render()
     expect(document.documentElement.dataset.theme).toBe('v8')
@@ -118,8 +142,23 @@ describe('V8 投稿（審査）', () => {
     const dialog = document.querySelector('[data-design-node="ujcar"]')
     expect(dialog?.textContent).toContain('この写真を見送りますか？')
     expect(dialog?.textContent).toContain('写真が暗い・ぼやけている')
-    await click([...document.querySelectorAll('[role="radio"]')].find((radio) => radio.textContent?.includes('ほかの人の顔')))
+    await click([...document.querySelectorAll('input[type="radio"]')].find((radio) => radio.parentElement?.textContent?.includes('ほかの人の顔')))
     expect(document.querySelector('[data-design-node="ujcar"]')?.textContent).toContain('人の顔や個人情報が写っている')
+  })
+
+  it('そのほかの理由が空なら送らず、補足の欄だけで知らせる', async () => {
+    await render()
+    await click(buttons('そらちゃんの写真を見送る')[0])
+    await click([...document.querySelectorAll('input[type="radio"]')].find((radio) => radio.parentElement?.textContent?.includes('自分で書く')))
+    const dialog = document.querySelector('[data-design-node="ujcar"]')!
+    const confirm = [...dialog.querySelectorAll('button')].find((button) => button.textContent?.trim() === '見送る')!
+    await click(confirm)
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 40)) })
+    const note = document.getElementById('photo-reject-note')!
+    expect(note.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(note)
+    expect(dialog.querySelectorAll('[role="alert"]')).toHaveLength(1)
+    expect(dialog.textContent).toContain('そのほかの理由を入力してください')
   })
 
   it('WEB225：見送りの保存に失敗したら、理由を開いている窓の中に出す', async () => {

@@ -37,8 +37,8 @@ describe('質問エディタのはみ出し（#973 U022）', () => {
   })
 
   it('タグの選択欄は全幅の独立した行で、長いタグ名でカードを広げない', () => {
-    // U022: タグの選択は全幅の独立行。共通 Select の size="full" で持たせる。
-    const tagSelect = EDITOR.match(/aria-label=\{label\}[\s\S]{0,600}?size="full"/)
+    // U022: タグの選択は全幅の独立行。選ぶ窓の欄（1行・名前は省略表示）を札の行と分けて置く。
+    const tagSelect = EDITOR.match(/<div className="mt-1\.5">[\s\S]{0,600}?<EntityKindField\s+kind="tag"\s+multiple/)
     expect(tagSelect, 'タグ選択欄が見つからない').not.toBeNull()
   })
 })

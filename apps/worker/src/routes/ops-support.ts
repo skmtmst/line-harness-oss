@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -208,24 +209,24 @@ opsSupport.get('/api/ops/support/tickets/:id', async (c) => {
   });
 });
 
-opsSupport.patch('/api/ops/support/tickets/:id', requirePlatformAdminWrite(), async (c) => {
+opsSupport.patch('/api/ops/support/tickets/:id', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const db = dbFor(c.env);
   const body = await c.req.json<{ stage?: unknown; priority?: unknown }>().catch(() => null);
-  if (!body) return c.json({ success: false, error: '内容を読み取れませんでした' }, 400);
+  if (!body) return inputError(c, { success: false, error: '内容を読み取れませんでした' }, 400, []);
   const patch: { stage?: SupportStage; priority?: SupportPriority } = {};
   if (body.stage !== undefined) {
     if (typeof body.stage !== 'string' || !(SUPPORT_STAGES as readonly string[]).includes(body.stage)) {
-      return c.json({ success: false, error: '状態の値が正しくありません' }, 400);
+      return inputError(c, { success: false, error: '状態の値が正しくありません' }, 400, ["stage"]);
     }
     patch.stage = body.stage as SupportStage;
   }
   if (body.priority !== undefined) {
     if (typeof body.priority !== 'string' || !(SUPPORT_PRIORITIES as readonly string[]).includes(body.priority)) {
-      return c.json({ success: false, error: '優先度の値が正しくありません' }, 400);
+      return inputError(c, { success: false, error: '優先度の値が正しくありません' }, 400, ["priority"]);
     }
     patch.priority = body.priority as SupportPriority;
   }
-  if (!patch.stage && !patch.priority) return c.json({ success: false, error: '変更する項目がありません' }, 400);
+  if (!patch.stage && !patch.priority) return inputError(c, { success: false, error: '変更する項目がありません' }, 400, ["stage","priority"]);
   const before = await getSupportTicket(db, c.req.param('id'));
   if (!before) return c.json({ success: false, error: 'チケットが見つかりません' }, 404);
   const after = await updateSupportTicket(db, before.id, patch);
@@ -260,18 +261,18 @@ function replyMailBody(input: { staffName: string; ticketLabel: string; subject:
   ].join('\n');
 }
 
-opsSupport.post('/api/ops/support/tickets/:id/reply', requirePlatformAdminWrite(), async (c) => {
+opsSupport.post('/api/ops/support/tickets/:id/reply', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const db = dbFor(c.env);
   const staff = c.get('staff');
   const body = await c.req.json<{ body?: unknown; nextStage?: unknown; aiAssisted?: unknown }>().catch(() => null);
-  if (!body) return c.json({ success: false, error: '内容を読み取れませんでした' }, 400);
+  if (!body) return inputError(c, { success: false, error: '内容を読み取れませんでした' }, 400, []);
   const text = typeof body.body === 'string' ? body.body.trim() : '';
-  if (!text) return c.json({ success: false, error: '返信を入力してください' }, 400);
-  if (text.length > REPLY_MAX) return c.json({ success: false, error: `返信は${REPLY_MAX}文字以内で入力してください` }, 400);
+  if (!text) return inputError(c, { success: false, error: '返信を入力してください' }, 400, ["body"]);
+  if (text.length > REPLY_MAX) return inputError(c, { success: false, error: `返信は${REPLY_MAX}文字以内で入力してください` }, 400, ["body"]);
   let nextStage: SupportStage | undefined;
   if (body.nextStage !== undefined) {
     if (typeof body.nextStage !== 'string' || !(SUPPORT_STAGES as readonly string[]).includes(body.nextStage)) {
-      return c.json({ success: false, error: '状態の値が正しくありません' }, 400);
+      return inputError(c, { success: false, error: '状態の値が正しくありません' }, 400, ["nextStage"]);
     }
     nextStage = body.nextStage as SupportStage;
   }
@@ -319,12 +320,12 @@ opsSupport.post('/api/ops/support/tickets/:id/reply', requirePlatformAdminWrite(
   }, 201);
 });
 
-opsSupport.put('/api/ops/support/tickets/:id/draft', requirePlatformAdminWrite(), async (c) => {
+opsSupport.put('/api/ops/support/tickets/:id/draft', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const db = dbFor(c.env);
   const staff = c.get('staff');
   const body = await c.req.json<{ body?: unknown }>().catch(() => null);
   const text = typeof body?.body === 'string' ? body.body : '';
-  if (text.length > REPLY_MAX) return c.json({ success: false, error: `下書きは${REPLY_MAX}文字以内です` }, 400);
+  if (text.length > REPLY_MAX) return inputError(c, { success: false, error: `下書きは${REPLY_MAX}文字以内です` }, 400, ["body"]);
   const ticket = await getSupportTicket(db, c.req.param('id'));
   if (!ticket) return c.json({ success: false, error: 'チケットが見つかりません' }, 404);
   if (!text.trim()) {
@@ -407,7 +408,7 @@ async function currentReferences(db: D1Database, json: string): Promise<Knowledg
   return result.filter((ref): ref is NonNullable<typeof ref> => ref !== null);
 }
 
-opsSupport.post('/api/ops/support/tickets/:id/draft/ai', requirePlatformAdminWrite(), async (c) => {
+opsSupport.post('/api/ops/support/tickets/:id/draft/ai', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const db = dbFor(c.env);
   const staff = c.get('staff');
   if (!c.env.AI) return c.json({ success: false, error: 'AI の下書きは、この環境では使えません（AI の設定が未設定）' }, 503);
@@ -416,7 +417,7 @@ opsSupport.post('/api/ops/support/tickets/:id/draft/ai', requirePlatformAdminWri
   const messages = await listSupportMessages(db, ticket.id);
   const body = await c.req.json<{ excludeArticleIds?: unknown }>().catch(() => ({} as { excludeArticleIds?: unknown }));
   if (!body || typeof body !== 'object' || Array.isArray(body) || (body.excludeArticleIds !== undefined && (!Array.isArray(body.excludeArticleIds) || body.excludeArticleIds.length > 50 || body.excludeArticleIds.some(id => typeof id !== 'string' || id.length > 100)))) {
-    return c.json({ success: false, error: '除外する記事を確認してください' }, 400);
+    return inputError(c, { success: false, error: '除外する記事を確認してください' }, 400, ["excludeArticleIds"]);
   }
   const names = [...knowledgeNames(ticket, messages), staff.name];
   const clean = (text: string) => redactKnowledgeText(text, names);
@@ -446,7 +447,7 @@ opsSupport.post('/api/ops/support/tickets/:id/draft/ai', requirePlatformAdminWri
     id: article.id, kind: knowledgeKindLabel(article.article_kind), title: clean(article.title),
     question: clean(article.question), answer: clean(article.answer),
   })));
-  if (prompt.user.length > 30_000) return c.json({ success: false, error: 'やり取りが長いため、内容を確認して手で返信してください' }, 422);
+  if (prompt.user.length > 30_000) return inputError(c, { success: false, error: 'やり取りが長いため、内容を確認して手で返信してください' }, 422, []);
   const model = c.env.OPS_SUPPORT_AI_MODEL || DEFAULT_AI_MODEL;
   const callId = crypto.randomUUID();
   const started = Date.now();
@@ -494,22 +495,22 @@ opsSupport.post('/api/ops/support/tickets/:id/draft/ai', requirePlatformAdminWri
 // 運営が起票する（＋ チケットを作る）
 // ---------------------------------------------------------------------------
 
-opsSupport.post('/api/ops/support/tickets', requirePlatformAdminWrite(), async (c) => {
+opsSupport.post('/api/ops/support/tickets', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const db = dbFor(c.env);
   const staff = c.get('staff');
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  if (!body) return c.json({ success: false, error: '内容を読み取れませんでした' }, 400);
+  if (!body) return inputError(c, { success: false, error: '内容を読み取れませんでした' }, 400, []);
   const tenantId = typeof body.tenantId === 'string' ? body.tenantId : '';
   const tenant = tenantId
     ? await db.prepare('SELECT id, name FROM tenants WHERE id = ?').bind(tenantId).first<{ id: string; name: string }>()
     : null;
-  if (!tenant) return c.json({ success: false, error: '契約先を選んでください' }, 400);
+  if (!tenant) return inputError(c, { success: false, error: '契約先を選んでください' }, 400, ["tenantId"]);
   const subject = typeof body.subject === 'string' ? body.subject.trim() : '';
-  if (!subject) return c.json({ success: false, error: '件名を入力してください' }, 400);
-  if (subject.length > SUBJECT_MAX) return c.json({ success: false, error: `件名は${SUBJECT_MAX}文字以内で入力してください` }, 400);
+  if (!subject) return inputError(c, { success: false, error: '件名を入力してください' }, 400, ["subject"]);
+  if (subject.length > SUBJECT_MAX) return inputError(c, { success: false, error: `件名は${SUBJECT_MAX}文字以内で入力してください` }, 400, ["subject"]);
   const text = typeof body.body === 'string' ? body.body.trim() : '';
-  if (!text) return c.json({ success: false, error: '本文を入力してください' }, 400);
-  if (text.length > BODY_MAX) return c.json({ success: false, error: `本文は${BODY_MAX}文字以内で入力してください` }, 400);
+  if (!text) return inputError(c, { success: false, error: '本文を入力してください' }, 400, ["body"]);
+  if (text.length > BODY_MAX) return inputError(c, { success: false, error: `本文は${BODY_MAX}文字以内で入力してください` }, 400, ["body"]);
   const kind = typeof body.kind === 'string' && (HQ_SUPPORT_KINDS as readonly string[]).includes(body.kind) ? (body.kind as HqSupportKind) : 'other';
   const priority = typeof body.priority === 'string' && (SUPPORT_PRIORITIES as readonly string[]).includes(body.priority) ? (body.priority as SupportPriority) : 'medium';
   const channel = body.channel === 'line' ? 'line' : 'ops';

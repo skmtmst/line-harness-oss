@@ -1,5 +1,6 @@
 import { friendFieldReminderTargetStatements } from './reminders.js';
 import { jstNow } from './utils.js';
+import { ageFromBirthday } from '@line-crm/shared';
 
 /** 移行前の情報欄を所属させる既定テナント。既存IDと値は変えない。 */
 const LEGACY_TENANT_ID = '00000000-0000-4000-8000-000000000001';
@@ -56,6 +57,11 @@ export interface FriendField {
   updated_at: string;
   status?: 'active' | 'read_only' | 'archived';
   version?: number;
+  fixed_key?: import("@line-crm/shared").FixedFriendFieldKey | null;
+  value_updated_at?: string | null;
+  source_type?: string | null;
+  source_id?: string | null;
+  source_name?: string | null;
 }
 
 export interface ScopedFriendField extends FriendField {
@@ -714,10 +720,13 @@ export async function getFriendFieldsWithValues(
 ): Promise<Array<FriendField & { value: string | null; updated_by: string | null }>> {
   const result = await db
     .prepare(
-      `SELECT f.*, v.value, v.updated_by
+      `SELECT f.*, v.value, v.updated_by, v.updated_at AS value_updated_at,
+              fx.fixed_key, v.source_type, v.source_id, source_form.name AS source_name
          FROM friend_fields f
          LEFT JOIN friend_field_values v
            ON v.field_id = f.id AND v.friend_id = ?
+         LEFT JOIN friend_fixed_fields fx ON fx.field_id = f.id
+         LEFT JOIN forms source_form ON v.source_type = 'form' AND source_form.id = v.source_id
         ORDER BY f.display_order ASC, f.name ASC`,
     )
     .bind(friendId)
@@ -727,6 +736,7 @@ export async function getFriendFieldsWithValues(
 
 export interface FriendFieldValueCheckTarget {
   type: string;
+  field_key?: string;
   options_json?: string | null;
 }
 
@@ -798,6 +808,13 @@ export function validateFriendFieldValue(
   }
   if (raw === null || raw === undefined) return { ok: true, value: null };
   if (typeof raw === 'string' && raw.trim() === '') return { ok: true, value: null };
+
+  if (field.field_key === 'fixed_age' && (!/^\d{1,3}$/.test(String(raw).trim()) || Number(raw) > 150)) {
+    return { ok: false, error: '年齢は0〜150の整数で入力してください' };
+  }
+  if (field.field_key === 'fixed_birthday' && ageFromBirthday(String(raw).trim()) === null) {
+    return { ok: false, error: '生年月日は過去の存在する日付で入力してください' };
+  }
 
   if (type === 'checkbox') {
     if (raw === true || raw === '1' || (typeof raw === 'string' && raw.trim().toLowerCase() === 'true')) {
@@ -942,7 +959,7 @@ export function validateFriendFieldValue(
  */
 export async function setFriendFieldValue(
   db: D1Database,
-  input: { friendId: string; fieldId: string; value: string | null; updatedBy: string; field?: FriendFieldValueCheckTarget },
+  input: { friendId: string; fieldId: string; value: string | null; updatedBy: string; field?: FriendFieldValueCheckTarget; sourceType?: string; sourceId?: string },
 ): Promise<void> {
   let value = input.value;
   if (input.field) {
@@ -953,10 +970,11 @@ export async function setFriendFieldValue(
   const now = jstNow();
   const statement = value === null || value === ''
     ? db.prepare(`DELETE FROM friend_field_values WHERE friend_id = ? AND field_id = ?`).bind(input.friendId, input.fieldId)
-    : db.prepare(`INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at)
-        VALUES (?, ?, ?, ?, ?) ON CONFLICT(friend_id, field_id)
-        DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by, updated_at = excluded.updated_at`)
-        .bind(input.friendId,input.fieldId,value,input.updatedBy,now);
+    : db.prepare(`INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at, source_type, source_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(friend_id, field_id)
+        DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by, updated_at = excluded.updated_at,
+          source_type = excluded.source_type, source_id = excluded.source_id`)
+        .bind(input.friendId,input.fieldId,value,input.updatedBy,now,input.sourceType ?? null,input.sourceId ?? null);
   await db.batch([statement, ...friendFieldReminderTargetStatements(db, [{ friendId: input.friendId, fieldId: input.fieldId, value }], now)]);
 }
 
@@ -1074,4 +1092,15 @@ export async function getFriendFieldMap(
     out[row.field_key] = row.value;
   }
   return out;
+}
+
+
+/** 固定項目の対応は migration 623 だけが定義する。アカウント固有のIDは使わない。 */
+export async function getFixedFriendField(
+  db: D1Database, key: import("@line-crm/shared").FixedFriendFieldKey,
+): Promise<FriendField | null> {
+  const row = await db.prepare(`SELECT f.* FROM friend_fields f
+    JOIN friend_fixed_fields fixed ON fixed.field_id = f.id WHERE fixed.fixed_key = ?`)
+    .bind(key).first<FriendField>();
+  return row ? normalizeFriendField(row) : null;
 }

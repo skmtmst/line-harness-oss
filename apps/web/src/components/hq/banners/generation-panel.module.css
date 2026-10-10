@@ -10,6 +10,21 @@
  * （高さ 26・枠 1.5・左右の余白 9）だけに留める。
  */
 @layer components {
+.v8LineRemove { min-height: 0; display: inline-flex; align-items: center; justify-content: center; padding: 0; width: 14px; height: 14px; color: var(--color-ink-faint); }
+.v8LineAdd { min-height: 0; display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; color: var(--color-accent-deep); font-size: var(--text-caption); font-weight: 600; line-height: normal; }
+.v8ColorNote { margin-top: 4px; color: var(--color-ink-secondary); font-size: var(--text-micro); line-height: normal; }
+
+.v8UsageLabels { display: flex; justify-content: space-between; font-size: var(--text-micro); line-height: normal; color: var(--color-ink-secondary); }
+.v8SmallMuted { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: normal; }
+.v8SmallTitle { color: var(--color-ink); font-size: var(--text-micro); line-height: normal; font-weight: 600; }
+.v8ColorTitle { font-size: var(--text-label); font-weight: 700; line-height: 17px; color: var(--color-ink); }
+.v8Caption { color: var(--color-ink); font-size: var(--text-caption); line-height: normal; font-weight: 600; }
+.v8TextRow { display: flex; align-items: center; gap: 6px; }
+.v8LineNumber { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: normal; font-weight: 600; }
+.v8Emphasis { padding: 0 8px; height: 25px; border-width: 1px; }
+
+.v8HeadTitle { color: var(--color-ink); font-size: var(--text-body); line-height: var(--tpl-hq-nav-item-lh-20); font-weight: 700; }
+.v8Body { display: flex; flex-direction: column; gap: var(--tpl-hq-plans-gap); padding: var(--tpl-hq-form-gap) var(--tpl-hq-plans-gap) var(--tpl-hq-plans-gap); }
 
 /*
  * 「強調」の入り切り（`g64HOD` の行ごとのボタン）。

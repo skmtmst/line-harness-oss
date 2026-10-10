@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest'
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const read = (p: string) => readFileSync(join(SRC, p), 'utf8')
 
-const PUBLISH = read('app/auto-replies/publish/page.tsx')
-const RUN_DETAIL = read('app/friend-add-settings/runs/detail/page.tsx')
+const PUBLISH = read('app/auto-replies/edit/wizard-v8.tsx')
+const RUN_DETAIL = read('v8/friend-add-runs/detail.tsx')
 const PUBLISHED = read('app/webinars/published/page.tsx')
 const FRIEND_DETAIL = read('app/mileage/friends/detail/page.tsx')
 
@@ -18,24 +18,21 @@ const FRIEND_DETAIL = read('app/mileage/friends/detail/page.tsx')
  */
 describe('再読み込みだけにしない（#975 U098）', () => {
   it('公開する自動応答は、対象未指定・権限なし・失敗を分けて案内する', () => {
-    expect(PUBLISH).toContain("loadState === 'missing'")
-    expect(PUBLISH).toContain('公開する自動応答が指定されていません')
-    expect(PUBLISH).toContain('この自動応答を有効化する権限がありません')
+    expect(PUBLISH).toContain("loadState === 'not-found'")
     // 戻り先は ★V7 TargetMissing の backHref、再読み込みは onRetry が持つ。
     expect(PUBLISH).toContain('backHref="/auto-replies"')
-    expect(PUBLISH).toContain('自動応答の一覧へ戻る')
     expect(PUBLISH).toContain('onRetry={() => void load()}')
   })
 
   it('追加設定の実施詳細は、対象未指定・アカウント未選択・失敗で履歴へ戻れる', () => {
-    expect(RUN_DETAIL).toContain('見る実行詳細が指定されていません')
-    expect(RUN_DETAIL).toContain('LINEアカウントを選んでください')
+    expect(RUN_DETAIL).toContain("見る実行詳細が指定されていません")
+    expect(RUN_DETAIL).toContain("LINEアカウントを選んでください")
     // R268: 戻り先は一覧から受け取った絞り込み・ページ位置を残す listHref。
     // 条件なしのとき listHref は '/friend-add-settings/runs' に落ちる。
     expect(RUN_DETAIL).toContain('backHref={listHref}')
-    expect(RUN_DETAIL).toContain('実行履歴の一覧へ戻る')
-    expect(RUN_DETAIL).toContain('もう一度読み込む')
-    expect(RUN_DETAIL).toContain('対象の記録が見つかりません')
+    expect(RUN_DETAIL).toContain("実行履歴の一覧へ戻る")
+    expect(RUN_DETAIL).toContain('onRetry')
+    expect(RUN_DETAIL).toContain("この実行詳細は見つかりません")
   })
 
   it('公開ウェビナーは、対象未指定と読み込み失敗を分けて案内する', () => {

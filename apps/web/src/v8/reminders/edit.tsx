@@ -1,5 +1,6 @@
 'use client'
 
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -59,10 +60,10 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { TextField } from '@/components/shared/text-field'
 import { TimeField } from '@/components/shared/date-time-field'
-import ConditionBuilder, { pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
+import ConditionBuilder, { findConditionDraftIssue, pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
 import { firstReminderStepMessage, reminderStepTimings, reminderStopSummary, reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels'
 import { useReminderTestRecipient } from '@/components/reminders/use-reminder-test-recipient'
 import { useReminderTestSend } from '@/components/reminders/use-reminder-test-send'
@@ -81,6 +82,9 @@ import { BackToReminders, ChoiceCardV8, PhoneV8, ReminderV8Stepper, SummaryCardV
 import styles from './edit.module.css'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import type { InsertTokenSpec } from '@/components/shared/insert-tokens'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /** リマインダの本文で札にする差し込み（{{date}} はリマインダでは予約日時）。 */
 const REMINDER_TOKENS: readonly InsertTokenSpec[] = [
@@ -120,27 +124,24 @@ export function stageFor(raw: string | null): V8Stage {
 }
 
 function countLabel(value: number | null, unit: string): string {
-  return value == null ? `—${unit}` : `${formatNumber(value)}${unit}`
+  return value == null ? `—${unit}` : `${formatNumber(value)} ${unit}`
 }
 
 const WEEKDAYS_JA = ['日', '月', '火', '水', '木', '金', '土']
 
 /** 「10/1（水）18:00」の形。 */
 function formatMd(value: Date | string | null): string {
-  if (!value) return '—'
-  const date = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return `${date.getMonth() + 1}/${date.getDate()}（${WEEKDAYS_JA[date.getDay()]}）${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 /** 「10/1 18:00」の形（例の文の短い日時）。 */
 function formatShort(value: Date): string {
-  return `${value.getMonth() + 1}/${value.getDate()} ${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`
+  return polishFormatDate(value, { style: 'detail' })
 }
 
 /** 「10月2日(木) 14:00」の形。 */
 function formatJpDay(value: Date): string {
-  return `${value.getMonth() + 1}月${value.getDate()}日(${WEEKDAYS_JA[value.getDay()]}) ${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`
+  return polishFormatDate(value, { style: 'detail' })
 }
 
 /** 届く日時の例に使う見本の基準日。3日後の14:00（端末の時計）。 */
@@ -189,7 +190,7 @@ type StageFrame = {
   title: string
   identity: ReactNode
   steps: ReactNode
-  description: ReactNode
+  help: ReactNode
   /** 頭の線の下に板の幅で置く帯（競合 k32cn）。 */
   notice?: ReactNode
   noticeSpacing?: 'band'
@@ -381,6 +382,10 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
    * 応答で上書きせず、そのまま残す（次の自動保存で追って送る）。
    */
   async function saveSettings(next: ReminderDraftSettings, { silent = false }: { silent?: boolean } = {}): Promise<boolean> {
+    if (next.targetCondition && (!pruneCondition(next.targetCondition as SegmentCondition) || findConditionDraftIssue(next.targetCondition as SegmentCondition))) {
+      if (!silent) setError('対象者の条件を完成させてください。')
+      return false
+    }
     if (!silent) {
       setBusy(true)
       setError('')
@@ -404,7 +409,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
       setDraft(response.data)
       setConflict(false)
       const untouched = settingsRef.current === sentSettings && basicsRef.current === sentBasics
-      if (!silent || untouched) {
+      if (untouched) {
         setSettings(response.data.settings)
         setBasics(basicsFromDraft(response.data.settings))
       }
@@ -485,7 +490,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     )
   }
   if (!subjectDraft || !subjectSettings) {
-    return <ListState kind="error" title="下書きを表示できませんでした" description={error || '下書きを読み込めませんでした。'} action={<Button onClick={() => void loadDraft()}>再読み込み</Button>} />
+    return <ListState kind="error" title="下書きを表示できませんでした" description={error || '下書きを読み込めませんでした。'} onRetry={() => void loadDraft()} />
   }
 
   const testIssue = testSend.phase.kind === 'failed' || testSend.phase.kind === 'unknown' ? testSend.phase.message : ''
@@ -509,19 +514,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
    * （notice・noticeSpacing='band'）に入れる。
    */
   const conflictBand = conflict ? (
-    <div className={styles.conflictBand} role="alert">
-      <TriangleAlert size={18} aria-hidden="true" className={styles.conflictIcon} />
-      <div className={styles.conflictText}>
-        <p className={styles.conflictTitle}>ほかの人が先にリマインダ「{subjectSettings.name}」を保存しました</p>
-        <p className={styles.conflictNote}>あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。</p>
-      </div>
-      <Button type="button" variant="secondary" onClick={() => void openCompare()} disabled={compareBusy}>
-        <GitCompare size={15} aria-hidden="true" />{compareBusy ? '比べています…' : '違いを比べる'}
-      </Button>
-      <Button type="button" variant="primary" onClick={() => void reloadAfterConflict()}>
-        <RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける
-      </Button>
-    </div>
+    <SaveConflictBand title={<>ほかの人が先にリマインダ「{subjectSettings.name}」を保存しました</>} description="あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。" onCompare={() => void openCompare()} compareDisabled={compareBusy} onReload={() => void reloadAfterConflict()} />
   ) : null
 
   const frame: StageFrame = {
@@ -529,7 +522,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     title: 'リマインダを作る',
     identity: <BackToReminders />,
     steps: <ReminderV8Stepper current={currentKey} reminderId={reminderId} />,
-    description: (
+    help: (
       <>
         {v8stage === 'basics'
           ? 'いまは下書きとして作ります。最後の「確認」で有効にします。'
@@ -548,13 +541,14 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     : null
 
   return (
-    <>
+    <fieldset disabled={busy} className="contents">
       {v8stage === 'basics' ? (
         <BasicsStageV8
           frame={frame}
           notice={stageError}
           value={basics ?? basicsFromDraft(subjectSettings)}
           onChange={setBasics}
+          onTemplate={(template) => setSettings(current => current ? {...current, steps: [{stableStepId: crypto.randomUUID(), messageType: 'text', ...template.step}]} : current)}
           stepCount={subjectSettings.steps.length}
           busy={busy}
           onSave={async (value) => {
@@ -658,7 +652,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
         cancelLabel="閉じる"
         busy={sendBusy}
         error={testIssue}
-        onConfirm={() => void sendTest()}
+        onConfirm={() => sendTest()}
         onCancel={() => setTestConfirm(false)}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="この手順への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
@@ -669,7 +663,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
         confirmLabel="最新を読み込んで続ける"
         busy={compareBusy}
         error={compareError || undefined}
-        onConfirm={() => void reloadAfterConflict()}
+        onConfirm={() => reloadAfterConflict()}
         onCancel={() => {
           setCompareTarget(null)
           setCompareError('')
@@ -689,7 +683,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
           )
         })()}
       </ConfirmDialog>
-    </>
+    </fieldset>
   )
 }
 
@@ -700,6 +694,7 @@ function BasicsStageV8({
   notice,
   value,
   onChange,
+  onTemplate,
   stepCount,
   busy,
   onSave,
@@ -710,6 +705,7 @@ function BasicsStageV8({
   notice: ReactNode
   value: BasicsValue
   onChange: (value: BasicsValue) => void
+  onTemplate: (template: ReminderTemplateV8) => void
   stepCount: number
   busy: boolean
   onSave: (value: BasicsValue) => void
@@ -740,13 +736,14 @@ function BasicsStageV8({
       (appliedTemplateId !== null && appliedTemplateId !== template.id) ||
       value.triggerFieldId !== '' ||
       value.triggerEventId !== '' ||
-      value.repeatYearly
+      value.repeatYearly || stepCount > 0
     if (hasInputsToReplace) setPendingTemplate(template)
     else applyTemplate(template)
   }
 
   function applyTemplate(template: ReminderTemplateV8) {
     setAppliedTemplateId(template.id)
+    onTemplate(template)
     onChange({
       ...value,
       triggerType: template.triggerType,
@@ -776,7 +773,7 @@ function BasicsStageV8({
             rows={[
               { key: '基準日', value: basicsBaseSummary(value, dateFields, events) },
               { key: '対象者', value: '手順2で決める' },
-              { key: '通知', value: stepCount > 0 ? `${stepCount}通` : '手順3で作る' },
+              { key: '通知', value: stepCount > 0 ? `${stepCount} 通` : '手順3で作る' },
               { key: '状態', value: '下書き' },
             ]}
           />
@@ -794,7 +791,7 @@ function BasicsStageV8({
           onNext={() => onSave(value)}
           nextDisabled={candidatesPending || busy || !value.name.trim()}
         />
-      )}
+      )} dirty={false}
     >
       {notice}
       <ReminderBasicsFormV8
@@ -810,7 +807,7 @@ function BasicsStageV8({
       <ConfirmDialog
         open={pendingTemplate !== null}
         title="ひな形の内容で上書きしますか？"
-        description="いま選んでいる基準日や繰り返しの設定は、ひな形の内容に置き換わります。"
+        description="基準日・繰り返し・通知日時・本文をひな形の内容に置き換えます。いまの通知は残りません。"
         confirmLabel="このひな形を使う"
         onConfirm={() => {
           if (pendingTemplate) applyTemplate(pendingTemplate)
@@ -854,7 +851,7 @@ function TargetStageV8({
   const { selectedAccount } = useAccount()
   const stop = settings.stopConditions
   const condition = (settings.targetCondition ?? null) as SegmentCondition | null
-  const mode = pruneCondition(condition) ? 'condition' : 'all'
+  const mode = condition !== null ? 'condition' : 'all'
 
   // 保存前の条件で数え直した人数。条件が空なら保存済みの検査結果を出す。
   const [recount, setRecount] = useState<{ matched: number; excluded: number; sample: Array<{ id: string; displayName: string }> } | null>(null)
@@ -935,7 +932,7 @@ function TargetStageV8({
           <SummaryCardV8
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
-              { key: '対象者', value: matched == null ? '—' : `${formatNumber(matched)}人に送る予定` },
+              { key: '対象者', value: matched == null ? emptyValue('unknown') : `${formatNumber(matched)}人に送る予定` },
               { key: '通知', value: settings.steps.length > 0 ? `${settings.steps.length}通` : '手順3で作る' },
               { key: '状態', value: '下書き' },
             ]}
@@ -959,7 +956,7 @@ function TargetStageV8({
           onNext={onNext}
           nextDisabled={busy}
         />
-      )}
+      )} dirty={false}
     >
       {notice}
       <section className={styles.card} aria-labelledby="rm-target-title">
@@ -993,11 +990,11 @@ function TargetStageV8({
         <div className={styles.countBand}>
           <div className={styles.countItem}>
             <span className={styles.countLabel}>当てはまる人</span>
-            <strong className={styles.countValue}>{`${counting ? '…' : total == null ? '—' : formatNumber(total)} 人`}</strong>
+            <strong className={styles.countValue}>{`${counting ? '…' : total == null ? emptyValue('unknown') : formatNumber(total)} 人`}</strong>
           </div>
           <div className={styles.countItem}>
             <span className={styles.countLabel}>送る予定（ブロックを除く）</span>
-            <strong className={styles.countValue}>{`${counting ? '…' : matched == null ? '—' : formatNumber(matched)} 人`}</strong>
+            <strong className={styles.countValue}>{`${counting ? '…' : matched == null ? emptyValue('unknown') : formatNumber(matched)} 人`}</strong>
           </div>
           <span className={styles.spacer} aria-hidden="true" />
           <Button type="button" variant="text" onClick={openFaces} disabled={counting}>
@@ -1031,8 +1028,8 @@ function TargetStageV8({
                 <span className={styles.stopNote}>{row.note}</span>
               </span>
               {row.locked
-                ? <Toggle label={row.label} checked locked />
-                : <Toggle label={row.label} checked={row.checked} onChange={(next) => row.onChange?.(next)} />}
+                ? <SettingCheckbox label={row.label} checked locked />
+                : <SettingCheckbox label={row.label} checked={row.checked} onChange={(next) => row.onChange?.(next)} />}
             </div>
           ))}
         </div>
@@ -1052,7 +1049,7 @@ function TargetStageV8({
       <Dialog
         open={facesOpen}
         title="対象者を確認"
-        description={faces?.matched != null ? `送る予定 ${countLabel(faces.matched, '人')}の先頭${faces.sample.length}人です。` : undefined}
+        description={faces?.matched != null ? `送る予定 ${countLabel(faces.matched, '人')}の先頭${faces.sample.length} 人です。` : undefined}
         onCancel={() => setFacesOpen(false)}
       >
         {!faces || faces.loading
@@ -1183,11 +1180,11 @@ function MessagesStageV8({
   const examples = (
     <section className={styles.sideBox} aria-label="届く日時の例">
       <h2 className={styles.sideBoxTitle}>届く日時の例</h2>
-      <p className={styles.sideBoxNote}>{formatJpDay(sampleBase.current)} に{settings.triggerType === 'friend_field' ? '基準日がある' : '予約した'}人</p>
+      <p className={styles.sideBoxNote}>{formatJpDay(sampleBase.current)} に{settings.triggerType === 'friend_field' ? '基準日がある' : '予約した'} 人</p>
       <dl className={styles.sideRows}>
         {settings.steps.map((step, index) => (
           <div key={step.stableStepId} className={styles.sideRow}>
-            <dt>{index + 1}通目</dt>
+            <dt>{index + 1} 通目</dt>
             <dd>{formatMd(exampleSendAt(step, settings.deliveryMode, sampleBase.current))}</dd>
           </div>
         ))}
@@ -1224,7 +1221,7 @@ function MessagesStageV8({
             onNext={onNext}
             nextDisabled={busy || !allStepsHaveContent}
           />
-        )}
+        )} dirty={false}
       >
         {notice}
         <section className={styles.card} aria-labelledby="rm-steps-title">
@@ -1243,7 +1240,7 @@ function MessagesStageV8({
                   <ReorderHandle
                     look="bare"
                     className={styles.grip}
-                    label={`${index + 1}通目の通知`}
+                    label={`${index + 1} 通目の通知`}
                     {...stepOrder.handle(step.stableStepId)}
                     {...stepOrder.handleProps(step.stableStepId)}
                   >
@@ -1283,7 +1280,7 @@ function MessagesStageV8({
                         className={styles.bodyArea}
                         value={step.messageContent}
                         maxLength={BODY_LIMIT}
-                        aria-label={`${index + 1}通目の本文`}
+                        aria-label={`${index + 1} 通目の本文`}
                         placeholder="友だちに届く本文を書きます"
                         onValueChange={(next) => updateStep(step.stableStepId, { messageContent: next })}
                         extraTokens={REMINDER_TOKENS}
@@ -1394,7 +1391,7 @@ function TimingEditor({
   return (
     <div className={styles.timingRow}>
       <span className={styles.timingWord}>基準日の</span>
-      <TextField
+      <NumberInput
         type="number"
         min={0}
         max={unit === 'day' ? 365 : undefined}
@@ -1485,7 +1482,7 @@ function ScheduleStageV8({
           <SummaryCardV8
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
-              { key: '対象者', value: preview ? countLabel(preview.summary.audience, '人') : '—' },
+              { key: '対象者', value: preview ? countLabel(preview.summary.audience, '人') : emptyValue('unknown') },
               { key: '通知', value: `${settings.steps.length}通` },
               { key: '状態', value: '下書き' },
             ]}
@@ -1509,7 +1506,7 @@ function ScheduleStageV8({
           onNext={onNext}
           nextDisabled={busy || settings.steps.length === 0}
         />
-      )}
+      )} dirty={false}
     >
       {notice}
       <section className={styles.card} aria-labelledby="rm-schedule-title">
@@ -1555,7 +1552,7 @@ function ScheduleStageV8({
                 <span role="cell" className={`${styles.colWho} ${styles.planWho}`} title={`対象になる人 全員（${countLabel(preview.summary.audience, '人')}）`}>
                   {`対象になる人 全員（${countLabel(preview.summary.audience, '人')}）`}
                 </span>
-                <span role="cell" className={styles.colStep}>{item.stepNumber}通目</span>
+                <span role="cell" className={styles.colStep}>{item.stepNumber} 通目</span>
                 <span role="cell" className={styles.colState} data-tone={item.state === 'duplicate' ? 'warn' : undefined}>
                   {item.state === 'duplicate' ? '重なり→1通にまとめる' : item.state === 'past' ? '基準日が過去' : '送る予定'}
                 </span>
@@ -1567,7 +1564,7 @@ function ScheduleStageV8({
       {preview && preview.summary.duplicateCount > 0 ? (
         <p className={styles.infoBand}>
           <Layers size={16} aria-hidden="true" />
-          同じ時刻に送る通知は、止めずに1通にまとめて送ります（{formatNumber(preview.summary.duplicateCount)}件）。まとめたくないときは時刻をずらしてください。
+          同じ時刻に送る通知は、止めずに1通にまとめて送ります（{formatNumber(preview.summary.duplicateCount)} 件）。まとめたくないときは時刻をずらしてください。
         </p>
       ) : null}
     </CreatePage>
@@ -1659,7 +1656,7 @@ function ConfirmStageV8({
     { key: '基準日', value: reminderTriggerLabel(settings.triggerType), stage: 'basics' },
     {
       key: '対象者',
-      value: `${pruneCondition(settings.targetCondition as SegmentCondition | null) ? '条件に合う人だけ' : '基準日がある人すべて'}${validation?.audience.matched != null ? `（${formatNumber(validation.audience.matched)}人に送る予定）` : ''}`,
+      value: `${pruneCondition(settings.targetCondition as SegmentCondition | null) ? '条件に合う人だけ' : '基準日がある人すべて'}${validation?.audience.matched != null ? `（${formatNumber(validation.audience.matched)} 人に送る予定）` : ''}`,
       stage: 'target',
     },
     { key: '止める条件', value: reminderStopSummary(settings.stopConditions), stage: 'target' },
@@ -1667,7 +1664,7 @@ function ConfirmStageV8({
     {
       key: '配信予定',
       value: preview
-        ? `今後7日 ${countLabel(preview.summary.next7Days, '通')}${preview.summary.duplicateCount > 0 ? `（重なり ${formatNumber(preview.summary.duplicateCount)}件はまとめる）` : ''}`
+        ? `今後7日 ${countLabel(preview.summary.next7Days, '通')}${preview.summary.duplicateCount > 0 ? `（重なり ${formatNumber(preview.summary.duplicateCount)} 件はまとめる）` : ''}`
         : previewFailed ? '読み込めませんでした' : '確認中',
       stage: 'preview',
     },
@@ -1681,7 +1678,7 @@ function ConfirmStageV8({
           <SummaryCardV8
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
-              { key: '対象者', value: validation?.audience.matched != null ? `${formatNumber(validation.audience.matched)}人` : '—' },
+              { key: '対象者', value: validation?.audience.matched != null ? `${formatNumber(validation.audience.matched)}人` : emptyValue('unknown') },
               { key: '通知', value: `${settings.steps.length}通` },
               { key: '状態', value: '下書き → 有効にする' },
             ]}
@@ -1707,7 +1704,7 @@ function ConfirmStageV8({
           nextDisabled={busy || !publishReady}
           nextBusy={busy}
         />
-      )}
+      )} dirty={false}
     >
       {notice}
       <section className={styles.card} aria-labelledby="rm-confirm-title">
@@ -1762,7 +1759,7 @@ function ConfirmStageV8({
             <CheckRow
               ok={validation.audience.matched != null}
               title="対象者を数えた"
-              note={validation.audience.matched != null ? `${formatNumber(validation.audience.matched)}人に送る予定` : '対象者を数えられませんでした'}
+              note={validation.audience.matched != null ? `${formatNumber(validation.audience.matched)} 人に送る予定` : '対象者を数えられませんでした'}
               action={<Button variant="text" href={editHref(reminderId, 'target')}>見直す</Button>}
             />
             {validation.checks.filter((check) => check.key !== 'test_send').map((check) => (

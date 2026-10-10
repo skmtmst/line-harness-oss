@@ -185,14 +185,14 @@ describe('狭い幅でも題を「…」で切らない（1280・1152）', () =>
 })
 
 describe('概要が取れないとき・やり直しの言葉', () => {
-  it('送信枠は骨組みのまま待たせず「読み込めませんでした」と「もう一度試す」', async () => {
+  it('送信枠は骨組みのまま待たせず「読み込めませんでした」と「もう一度読み込む」', async () => {
     document.documentElement.dataset.theme = 'v8'
     const { SendQuota } = await import('./sections')
     const onRetry = vi.fn()
     render(<SendQuota overviewFailed delivery={null} metric={undefined} onRetry={onRetry} />)
     expect(screen.getByText(/データを読み込めませんでした/)).toBeTruthy()
     expect(screen.queryByLabelText('送信枠を読み込んでいます')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'もう一度試す' }))
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
     expect(onRetry).toHaveBeenCalledTimes(1)
   })
 

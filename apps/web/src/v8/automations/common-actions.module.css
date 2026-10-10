@@ -3,23 +3,12 @@
  * 枠・見出し・タブ・数の帯・フォルダの列は型（ListPage）と shell が持つ。ここは表と道具の中身だけ。
  */
 
-/* 閲覧のみで「共通アクションを作る」「フォルダを追加」を置かないときの場所。 */
+/* 閲覧のみで「共通アクションを作る」を置かないときの場所。 */
 .createSpace {
   display: block;
   flex-shrink: 0;
   height: var(--tpl-chip-h);
   margin-bottom: var(--tpl-am-create-after);
-}
-.addSpace {
-  display: block;
-  height: var(--tpl-am-add-space);
-}
-.folderNote {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-am-note-lh);
-  word-break: normal;
 }
 
 /* 案内の帯（表の上の主列）。 */

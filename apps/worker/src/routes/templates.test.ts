@@ -172,7 +172,7 @@ describe('テンプレートのLINEアカウント境界', () => {
     );
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ error: 'account_id_required' });
+    expect(await response.json()).toMatchObject({ code: 'account_id_required' , fields: expect.any(Object), error: expect.any(String) });
     expect(mocks.createTemplate).not.toHaveBeenCalled();
   });
 

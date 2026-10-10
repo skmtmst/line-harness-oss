@@ -3,15 +3,15 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const ROOT = process.cwd()
-const FLOW = readFileSync(join(ROOT, 'src/components/reminders/reminder-publish-flow.tsx'), 'utf8')
-const NEW_PAGE = readFileSync(join(ROOT, 'src/app/reminders/new/page.tsx'), 'utf8')
-const STEP_EDITOR = readFileSync(join(ROOT, 'src/app/reminders/edit/issue469-reminder-screens.tsx'), 'utf8')
-const EDIT_PAGE = readFileSync(join(ROOT, 'src/app/reminders/edit/page.tsx'), 'utf8')
-const DETAIL_PAGE = readFileSync(join(ROOT, 'src/app/reminders/detail/page.tsx'), 'utf8')
+const FLOW = readFileSync(join(ROOT, 'src/v8/reminders/edit.tsx'), 'utf8')
+const NEW_PAGE = readFileSync(join(ROOT, 'src/app/reminders/new/new-v8.tsx'), 'utf8')
+const STEP_EDITOR = readFileSync(join(ROOT, 'src/v8/reminders/edit.tsx'), 'utf8')
+const EDIT_PAGE = readFileSync(join(ROOT, 'src/v8/reminders/edit.tsx'), 'utf8')
+const DETAIL_PAGE = readFileSync(join(ROOT, 'src/v8/reminders/detail.tsx'), 'utf8')
 const API = readFileSync(join(ROOT, 'src/lib/api.ts'), 'utf8')
 const WORKER_ROUTE = readFileSync(join(ROOT, '../worker/src/routes/reminders.ts'), 'utf8')
 
-describe('V6 リマインダの公開フロー', () => {
+describe('リマインダの公開フロー', () => {
   it('作成時に公開せず、下書きから対象確認へ進む', () => {
     expect(NEW_PAGE).toContain('api.reminders.createDraft(settings)')
     expect(NEW_PAGE).toContain('&stage=target')
@@ -24,7 +24,7 @@ describe('V6 リマインダの公開フロー', () => {
     expect(API).toContain('/api/reminders/${id}/test-send')
     expect(API).toContain('/api/reminders/${id}/validate')
     expect(API).toContain('/api/reminders/${id}/publish')
-    expect(FLOW).toContain("draft.lastTestStatus !== 'succeeded'")
+    expect(FLOW).toContain("draft?.lastTestStatus !== 'succeeded'")
     expect(FLOW).toContain('!validation?.valid')
   })
 
@@ -34,9 +34,11 @@ describe('V6 リマインダの公開フロー', () => {
     expect(FLOW).toContain("audience.excluded")
   })
 
-  it('配信予定は仮の基準日を明示する', () => {
-    expect(FLOW).toContain('preview.targetDate')
-    expect(FLOW).toContain('とした場合の送信予定です')
+  it('V8の配信予定は取得した予定と人数を使い、仮の日付を作らない', () => {
+    expect(FLOW).toContain('api.reminders.previewDraft(reminderId)')
+    expect(FLOW).toContain('preview?.items')
+    expect(FLOW).toContain('preview.summary.audience')
+    expect(FLOW).toContain('onRetry={onRetryPreview}')
   })
 
   it('押しても動かないボタンは描かない（出す＝使える）', () => {
@@ -89,10 +91,10 @@ describe('V6 リマインダの公開フロー', () => {
 
   it('押しても動かないボタンを残さない', () => {
     // 完了画面の主ボタンは詳細画面への実リンクを持つ。
-    expect(FLOW).toContain('/reminders/detail?id=${draft.reminderId}')
-    expect(FLOW).toContain('>通知予定を確認<')
+    expect(FLOW).toContain('/reminders/detail?id=${encodeURIComponent(reminderId)}')
+    expect(FLOW).toContain('配信予定を見る')
     // 絞り込みボタンは state を実際に切り替える。
-    expect(FLOW).toContain('setRange(')
+    expect(FLOW).toContain('onChange={setRange}')
     // 「戻って修正」は編集画面への実遷移を持つ。
     expect(FLOW).not.toContain("secondary={{ label: '戻って修正' }}")
     // テスト段のフッターは固定日時ではなく下書きの記録を見る。

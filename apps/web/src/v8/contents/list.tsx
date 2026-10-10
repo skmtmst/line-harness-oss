@@ -8,6 +8,8 @@
  * 選んだときの一括バーをはめる。データの口・確かめの窓は今の V8（src/app/contents/list-v8.tsx）から写した。
  * 札の名前の前にフォルダの色の丸（2026-10-07 オーナー）。札の操作は「…」へ集める。
  */
+import { collectListRows } from '@/components/shared/collect-list-rows'
+import { useListUrlSetValue, useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   Folder,
@@ -38,10 +40,8 @@ import {
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel from '@/components/shared/folder-panel'
+import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import { FolderDot, type FolderDotFolder } from '@/components/shared/folder-dot'
-import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import BulkBar from '@/components/shared/bulk-bar'
@@ -61,6 +61,10 @@ import { ListPage } from '@/components/templates'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type MediaSort = 'newest' | 'oldest' | 'name' | 'size' | 'usage'
 const UNGROUPED = '__ungrouped__'
@@ -137,7 +141,7 @@ const EMPTY_KPIS: MediaKpis = {
 }
 
 export default function MediaLibraryListV8() {
-  const [view, setView] = useState<MediaView>('grid')
+  const [view, setView] = useListUrlValue<MediaView>('view', 'grid')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
@@ -177,30 +181,21 @@ export default function MediaLibraryListV8() {
   */
   const [folderFailure, setFolderFailure] = useState<unknown>(null)
   const [folderReloading, setFolderReloading] = useState(false)
-  const [folderFilter, setFolderFilter] = useState('')
-  const [addingFolder, setAddingFolder] = useState(false)
-  const [folderName, setFolderName] = useState('')
-  const [savingFolder, setSavingFolder] = useState(false)
+  const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', '')
   /*
-    R37: フォルダの名前変更・削除を FolderPanel の「…」へ接続する。
+    R37: フォルダの名前・色・並べ替え・削除は共通のフォルダの列（ManagedFolderPanel）の「…」から。
     追加だけあって直し・消しが無いと、整理し直す手段が無い。
   */
-  const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
-  const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
-  const [folderBusy, setFolderBusy] = useState(false)
-  const [folderError, setFolderError] = useState('')
   const [uploadOpen, setUploadOpen] = useState(false)
   /* 札の操作は「…」へ集める。行末にボタンは1つも置かない。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
-  const [kinds, setKinds] = useState<Set<MediaItem['kind']>>(
-    () => new Set(KINDS.map((k) => k.key)),
-  )
-  const [query, setQuery] = useState('')
-  const [showUnusedOnly, setShowUnusedOnly] = useState(false)
-  const [showNearLimitOnly, setShowNearLimitOnly] = useState(false)
+  const [kinds, setKinds] = useListUrlSetValue<MediaItem['kind']>('kinds', KINDS.map((k) => k.key))
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [showUnusedOnly, setShowUnusedOnly] = useListUrlValue('showUnusedOnly', false)
+  const [showNearLimitOnly, setShowNearLimitOnly] = useListUrlValue('showNearLimitOnly', false)
   /** 退避済みだけを見る棚。普段の一覧には出ない。 */
-  const [showArchivedOnly, setShowArchivedOnly] = useState(false)
+  const [showArchivedOnly, setShowArchivedOnly] = useListUrlValue('showArchivedOnly', false)
   /*
     退避・一覧への復帰はどちらも理由が必須（あとから「なぜ」を追えるように）。
     押し口を開いた札と向きを持ち、確定時に同じ窓で理由を聞く。
@@ -214,9 +209,9 @@ export default function MediaLibraryListV8() {
   const [moveFolderId, setMoveFolderId] = useState('')
   const [moveBusy, setMoveBusy] = useState(false)
   const [moveError, setMoveError] = useState('')
-  const [sort, setSort] = useState<MediaSort>('newest')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [sort, setSort] = useListUrlValue<MediaSort>('sort', 'newest')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   /** 名前を直している札。null なら誰も直していない。 */
@@ -639,51 +634,11 @@ export default function MediaLibraryListV8() {
     }
   }
 
-  async function addFolder() {
-    const name = folderName.trim()
-    if (!name || savingFolder) return
-    setSavingFolder(true)
-    setError('')
-    try {
-      const response = await api.folders.create({ kind: 'media', name })
-      if (!response.success) throw new Error(response.error)
-      setFolders((current) => [...current, response.data])
-      setFolderFilter(response.data.id)
-      setFolderName('')
-      setAddingFolder(false)
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'フォルダを追加できませんでした')
-    } finally {
-      setSavingFolder(false)
-    }
-  }
-
-  /** R37: フォルダを消す。中身は消えず未分類に戻る。消した先を選んでいたら「すべて」へ戻す。 */
-  async function removeFolder() {
-    if (!deletingFolder || !selectedAccountId || folderBusy) return
-    const accountAtRequest = selectedAccountId
-    setFolderBusy(true)
-    setFolderError('')
-    try {
-      const response = await api.folders.delete(deletingFolder.id, accountAtRequest)
-      if (!response.success) throw new Error(response.error)
-      if (accountAtRequest !== latestAccountRef.current) return
-      setDeletingFolder(null)
-      if (folderFilter === deletingFolder.id) setFolderFilter('')
-      void load()
-      void loadFolders()
-    } catch {
-      if (accountAtRequest === latestAccountRef.current) setFolderError('フォルダを削除できませんでした。')
-    } finally {
-      setFolderBusy(false)
-    }
-  }
-
   /** 選んだ札をまとめて消す。使用中はAPIでも必ず止める。 */
   const removeSelected = async () => {
     if (selected.size === 0 || !selectedAccountId) return
     const removableSelected = [...selected].filter((id) =>
-      items.some((item) => item.id === id && isKnownUnused(item)),
+      [...items, ...selectionItems].some((item) => item.id === id && isKnownUnused(item)),
     )
     if (removableSelected.length !== selected.size) {
       setSelected(new Set(removableSelected))
@@ -707,7 +662,7 @@ export default function MediaLibraryListV8() {
     let deleted = 0
     const failedNames: string[] = []
     for (const id of ids) {
-      const name = items.find((m) => m.id === id)?.filename ?? id
+      const name = [...items, ...selectionItems].find((m) => m.id === id)?.filename ?? id
       try {
         await api.media.delete(id, accountAtRequest)
       } catch {
@@ -1011,19 +966,56 @@ export default function MediaLibraryListV8() {
   }, [page, pageCount])
 
   // まとめて削除の候補は未使用かつ一覧にいるものだけ。退避済みは選ばない。
+  const [selectionItems, setSelectionItems] = useState<MediaItem[]>([])
+  const [selectionTotal, setSelectionTotal] = useState<number | undefined>(undefined)
+  const [selectionLoading, setSelectionLoading] = useState(false)
+  const [selectionError, setSelectionError] = useState('')
+  const selectionScope = JSON.stringify([selectedAccountId, folderFilter, query, [...kinds].sort(), showNearLimitOnly, showArchivedOnly, sort])
+  const selectionScopeRef = useRef(selectionScope)
+  selectionScopeRef.current = selectionScope
+  useEffect(() => { setSelected(new Set()); setSelectionItems([]); setSelectionTotal(undefined); setSelectionLoading(false); setSelectionError('') }, [selectionScope])
+  const readSelectableMedia = useCallback(async () => {
+    const account = selectedAccountId
+    const scope = selectionScope
+    if (!account) return
+    setSelectionLoading(true)
+    setSelectionError('')
+    try {
+      const all = await collectListRows(total, async (offset, limit) => {
+        const response = await api.media.list(account, { kind: kinds.size === 1 ? [...kinds][0] : undefined, folderId: folderFilter || undefined, query: query.trim() || undefined, unusedOnly: true, nearLimitOnly: showNearLimitOnly, archived: showArchivedOnly ? 'only' : undefined, sort, limit, offset })
+        if (!response.success) throw new Error('読み込めませんでした')
+        return response.data
+      })
+      if (scope !== selectionScopeRef.current) return
+      const eligible = all.filter(item => isKnownUnused(item) && !item.archivedAt && kinds.has(item.kind))
+      setSelectionItems(eligible)
+      setSelectionTotal(eligible.length)
+    } catch {
+      if (scope === selectionScopeRef.current) setSelectionError('すべての対象を読み込めませんでした。')
+    } finally {
+      if (scope === selectionScopeRef.current) setSelectionLoading(false)
+    }
+  }, [selectedAccountId, selectionScope, total, kinds, folderFilter, query, showNearLimitOnly, showArchivedOnly, sort])
+  useEffect(() => {
+    if (selected.size > 0 && selectionTotal === undefined && !selectionLoading && !selectionError) void readSelectableMedia()
+  }, [selected.size, selectionTotal, selectionLoading, selectionError, readSelectableMedia])
+  const selectAllMedia = () => {
+    if (selectionTotal === undefined) return
+    setSelected(new Set(selectionItems.map(item => item.id)))
+  }
   const removable = items.filter((item) => isKnownUnused(item) && !item.archivedAt)
   const allSelected = removable.length > 0 && removable.every((item) => selected.has(item.id))
   /** R587: フォルダ欄の失敗は403（権限）とそれ以外（通信）で案内を分ける。 */
   const folderForbidden = folderFailure != null && classifyApiFailure(folderFailure) === 'forbidden'
 
   /* 数の帯の文言。失敗・未取得は「—」で出し、偽ゼロを置かない。 */
-  const kpiTotalText = !listKnown || loadFailed ? '—' : formatNumber(overallTotal ?? total)
+  const kpiTotalText = !listKnown || loadFailed ? emptyValue('unknown') : formatNumber(overallTotal ?? total)
   const kindBreakdown = KINDS
     .map((kind) => (kpis.kindTotals[kind.key] == null ? null : `${kind.label}${formatNumber(kpis.kindTotals[kind.key] as number)}`))
     .filter((text): text is string => text !== null)
     .join('・')
-  const unusedText = kpis.unusedTotal == null ? '—' : formatNumber(kpis.unusedTotal)
-  const archivedText = kpis.archivedTotal == null ? '—' : formatNumber(kpis.archivedTotal)
+  const unusedText = kpis.unusedTotal == null ? emptyValue('unknown') : formatNumber(kpis.unusedTotal)
+  const archivedText = kpis.archivedTotal == null ? emptyValue('unknown') : formatNumber(kpis.archivedTotal)
   const quotaPercent = quota && quota.limitBytes > 0
     ? Math.round((quota.usageBytes / quota.limitBytes) * 100)
     : null
@@ -1033,13 +1025,14 @@ export default function MediaLibraryListV8() {
   }
 
   if (detailId && (detailPhase === 'unavailable' || !detailsFor)) {
-    // R588: 403は権限案内にする。押しても直らない再試行は出さない。
+    // R588: 403は権限案内を残し、権限変更後に同じIDを読み直せる。
     if (detailFailure === 'denied') {
       return (
         <ListState
           kind="forbidden"
+          onRetry={retryDetail}
           title="メディアの詳細を見る権限がありません"
-          description="見るには権限が要ります。オーナーか管理者に追加を依頼してください。"
+          description={permissionDeniedMessage('store')}
           action={<Button type="button" onClick={() => setDetailUrl(null)}>登録メディア一覧へ戻る</Button>}
         />
       )
@@ -1137,11 +1130,6 @@ export default function MediaLibraryListV8() {
       // 数える計算は、黙って別の母集団にすり替わるため廃止。
       count: folder.itemCount ?? null,
       color: folder.color,
-      // R37: 名前変更・削除を「…」へ接続する。権限の無い人には
-      // 押して失敗する口を見せない。
-      onEdit: canManageMedia ? () => setEditingFolder(folder) : undefined,
-      onDelete: canManageMedia ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
-      deleteNote: '削除しても、中のメディアは未分類に残ります。',
     })),
     { kind: 'unfiled' as const, id: UNGROUPED, label: '未分類', count: unfiledCount },
   ]
@@ -1151,7 +1139,7 @@ export default function MediaLibraryListV8() {
       boardId="O7hUt7"
       headingSize="regular"
       title="登録メディア一覧"
-      description="配信で使う画像・動画・音声・ファイルの置き場です。LINE アカウントごとに管理します。"
+      help="配信で使う画像・動画・音声・ファイルの置き場です。LINE アカウントごとに管理します。"
       tabs={!canManageMedia ? (
         <p className={styles.roBand} role="note">
           <Eye size={16} aria-hidden="true" />
@@ -1159,7 +1147,7 @@ export default function MediaLibraryListV8() {
         </p>
       ) : undefined}
       stats={(
-        <KpiBand className={styles.kpiStrip} aria-label="登録メディアの集計">
+        <KpiBand aria-label="登録メディアの集計">
           {kpiCards.map((card) => (
             <KpiCard
               key={card.key}
@@ -1177,19 +1165,32 @@ export default function MediaLibraryListV8() {
       folders={(
         <>
           {uploadButton}
-          <FolderPanel
-            /* m18s: 見出しの総数は「すべて」の行と同じ数なので出さない（回答フォーム #m18k と同じ形）。絞り込み後の件数は一覧側の ListRange に出す。 */
+          {/*
+            共通のフォルダの列（種類 media・B-136）。m18s: 見出しの総数は「すべて」の行と同じ数なので出さない。
+            閲覧のみ：フォルダを追加・「…」は置かない（理由は上の閲覧のみの帯で伝える。2026-10-06 オーナー決定）。
+            名前・色・並べ替え・消すは「…」から。消すと中身は未分類へ移るので、一覧も読み直す。
+          */}
+          <ManagedFolderPanel
+            kind="media"
+            accountId={selectedAccountId}
+            folders={folders}
+            onChanged={() => Promise.all([load(), loadFolders()]).then(() => undefined)}
+            canManage={canManageMedia && Boolean(selectedAccountId)}
+            itemLabel="メディア"
             activeId={folderFilter}
             onSelect={selectFolder}
-            /* 閲覧のみ：フォルダを追加は置かない（理由は上の閲覧のみの帯で伝える。2026-10-06 オーナー決定）。 */
-            onAddFolder={canManageMedia ? () => setAddingFolder(true) : undefined}
-            rows={mediaFolderRows}
+            allId=""
+            unfiledId={UNGROUPED}
+            allCount={mediaFolderRows[0].count}
+            unfiledCount={unfiledCount}
+            onAdded={(created) => setFolderFilter(created.id)}
+            placeholder="例：01_商品写真"
           >
             {folderFailure ? (
               <div role="alert">
                 <p>
                   {folderForbidden
-                    ? 'フォルダを見る権限がありません。オーナーか管理者に追加を依頼してください。'
+                    ? permissionDeniedMessage('store')
                     : 'フォルダを読み込めませんでした。登録したメディアは消えていません。'}
                 </p>
                 {folderForbidden ? null : (
@@ -1199,30 +1200,7 @@ export default function MediaLibraryListV8() {
                 )}
               </div>
             ) : null}
-            {folderError ? <p role="alert">{folderError}</p> : null}
-            {addingFolder ? (
-              <div>
-                <input
-                  type="text"
-                  autoFocus
-                  value={folderName}
-                  onChange={(event) => setFolderName(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') void addFolder()
-                    if (event.key === 'Escape') setAddingFolder(false)
-                  }}
-                  placeholder="フォルダ名を入力"
-                  aria-label="フォルダ名"
-                />
-                <div>
-                  <Button type="button" onClick={() => setAddingFolder(false)}>キャンセル</Button>
-                  <Button type="button" variant="primary" onClick={() => void addFolder()} disabled={!folderName.trim() || savingFolder}>追加する</Button>
-                </div>
-              </div>
-            ) : (
-              <p>フォルダを消しても、中のメディアは未分類に残ります。</p>
-            )}
-          </FolderPanel>
+          </ManagedFolderPanel>
         </>
       )}
       folderNav={{ rows: mediaFolderRows, activeId: folderFilter, onSelect: selectFolder, createAction: uploadButton }}
@@ -1368,7 +1346,9 @@ export default function MediaLibraryListV8() {
           {canManageMedia ? (
             <BulkBar
               count={selected.size}
-              hint="対象を確認してから操作を選んでください"
+              total={selectionTotal}
+              onSelectAll={selectAllMedia}
+              hint={selectionLoading ? 'すべての対象を確認しています…' : selectionError ? <><span role="alert">{selectionError}</span><Button size="compact" onClick={() => void readSelectableMedia()}>もう一度読み込む</Button></> : '対象を確認してから操作を選んでください'}
             >
               <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>
                 選択を外す
@@ -1440,7 +1420,7 @@ export default function MediaLibraryListV8() {
               使われている場所を確認できませんでした。読み直してから、もう一度お試しください。
             </p>
             {/* R34: 詳細と同じように、確認時刻と読み直しを一覧でも出す。 */}
-            <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>読み直す</Button>
+            <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>もう一度読み込む</Button>
           </div>
         ) : impact ? (
           <div>
@@ -1450,7 +1430,7 @@ export default function MediaLibraryListV8() {
             </p>
             {impact.verified === false ? (
               <div>
-                <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>読み直す</Button>
+                <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>もう一度読み込む</Button>
               </div>
             ) : null}
 
@@ -1489,7 +1469,7 @@ export default function MediaLibraryListV8() {
       <Dialog
         open={bulkConfirm !== null}
         tone="destructive"
-        title={bulkConfirm ? `${bulkConfirm.length}件のメディアを削除しますか？` : ''}
+        title={bulkConfirm ? `${bulkConfirm.length} 件のメディアを削除しますか？` : ''}
         description="どこにも使われていないと確かめたものだけを消します。元に戻せません。"
         busy={bulkBusy}
         onCancel={() => {
@@ -1515,7 +1495,7 @@ export default function MediaLibraryListV8() {
         </p>
         {bulkBusy && bulkProgress ? (
           <p aria-live="polite">
-            処理中…（{bulkProgress.done}/{bulkProgress.total}件）
+            処理中…（{bulkProgress.done}/{bulkProgress.total} 件）
           </p>
         ) : null}
       </Dialog>
@@ -1553,17 +1533,14 @@ export default function MediaLibraryListV8() {
           </div>
         }
       >
-        <label>
-          <span>理由<RequiredBadge /><span>（あとから履歴で確認できます）</span></span>
-          <input
+        <Field label="理由（あとから履歴で確認できます）" required><input
             type="text"
             autoFocus
             value={archiveReason}
             onChange={(event) => setArchiveReason(event.target.value)}
             placeholder={archiveTarget?.mode === 'archive' ? '例：古いキャンペーンの素材のため' : '例：再び使うため'}
             aria-label="理由"
-          />
-        </label>
+          /></Field>
       </Dialog>
 
       {/*
@@ -1637,35 +1614,6 @@ export default function MediaLibraryListV8() {
         }}
       />
 
-      {editingFolder && (
-        <FolderAddDialog
-          kind="media"
-          folder={editingFolder}
-          accountId={selectedAccountId}
-          note="メディアを分けてしまう箱です。削除しても、中のメディアは未分類に残ります。"
-          placeholder="例: 01_商品写真"
-          onClose={() => setEditingFolder(null)}
-          onAdded={() => { setEditingFolder(null); void load() }}
-        />
-      )}
-
-      {/*
-        R37: 消す前に、中身がどうなるかを本文で読ませる。
-        「中身は未分類に戻ります」の確認を ConfirmDialog で行う。
-      */}
-      <ConfirmDialog
-        open={deletingFolder !== null}
-        title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
-        description={deletingFolder?.itemCount != null
-          ? `削除しても、中のメディアは未分類に残ります。いまこのフォルダに入っているのは${deletingFolder.itemCount}件です。`
-          : '削除しても、中のメディアは未分類に残ります。'}
-        confirmLabel="削除する"
-        destructive
-        busy={folderBusy}
-        error={folderError || undefined}
-        onCancel={() => { if (!folderBusy) { setDeletingFolder(null); setFolderError('') } }}
-        onConfirm={() => void removeFolder()}
-      />
 
       {preview && (
         <MediaPreviewOverlay
@@ -1691,7 +1639,7 @@ export default function MediaLibraryListV8() {
               kind="error"
               title="表示できませんでした"
               description="再読み込みしても直らないときは、エラー報告へお知らせください。"
-              action={<Button variant="secondary" onClick={() => void load()}>もう一度読み込む</Button>}
+              onRetry={() => void load()}
             />
           ) : current.length === 0 ? (
             <div>
@@ -1861,6 +1809,7 @@ function MediaCardV8({
               value={renaming.value}
               onChange={(e) => onRenameChange(e.target.value)}
               onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return
                 if (e.key === 'Enter') onRenameConfirm()
                 if (e.key === 'Escape') onRenameCancel()
               }}
@@ -1902,8 +1851,8 @@ function MediaCardV8({
               <span className={styles.nameDot}>
                 <FolderDot folder={folder} />
               </span>
-              <span className={styles.fileName} title={item.filename}>
-                {item.filename}
+              <span className={styles.fileName} >
+                <TruncatedText value={String(item.filename ?? '')} />
               </span>
             </span>
             <p className={styles.meta} title={formatMediaDetails(item)}>

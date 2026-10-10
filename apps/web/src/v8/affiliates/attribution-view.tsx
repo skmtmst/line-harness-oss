@@ -4,6 +4,7 @@
  * G-1 成果の付け方（#823）。候補になった紹介を並べ、どの決まりで
  * 付けたかを1件ずつ出す。付けなかった紹介には、その理由を残す。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type AttributionDecisionView } from '@/lib/api'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -39,10 +40,7 @@ export function attributionSkipReasonText(
 }
 
 function formatTouchedAt(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return polishFormatDate(iso, { style: 'list', fallback: iso })
 }
 
 export default function AttributionSection({ eventId }: { eventId: string }) {

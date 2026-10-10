@@ -316,9 +316,7 @@ describe('V8 自動応答の通し：作る→止める→再開する', () => {
 
     openRowMenu()
     fireEvent.click(within(document.querySelector('[role="menu"]') as HTMLElement).getByText('再開する'))
-    const resumeDialog = await screen.findByRole('dialog')
-    expect(resumeDialog.textContent).toContain('を再開しますか？')
-    fireEvent.click(within(resumeDialog).getByRole('button', { name: '再開する' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
     await waitFor(() => expect(updateReply).toHaveBeenCalledTimes(1))
     await screen.findByText('自動応答を再開しました')
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
@@ -333,6 +331,54 @@ describe('V8 自動応答の通し：作って有効にする', () => {
     renderNode(<AutoReplyEditPage />)
     await flush()
   }
+
+  it('入力不足は該当欄へ移り、理由を一度だけ出して保存を止める', async () => {
+    const scroll = vi.fn()
+    const originalScroll = HTMLElement.prototype.scrollIntoView
+    HTMLElement.prototype.scrollIntoView = scroll
+    try {
+      await goStep('step=trigger')
+      fireEvent.click(screen.getByRole('button', { name: /^次へ：/ }))
+      const keywordInput = screen.getByLabelText('反応する言葉を足す')
+      await waitFor(() => expect(document.activeElement).toBe(keywordInput))
+      expect(keywordInput.getAttribute('aria-invalid')).toBe('true')
+      expect(screen.getAllByText('反応する言葉を入れてください')).toHaveLength(1)
+      expect(scroll).toHaveBeenLastCalledWith({ block: 'center' })
+      expect(replaceMock).not.toHaveBeenCalled()
+      expect(createDraft).not.toHaveBeenCalled()
+
+      fireEvent.change(keywordInput, { target: { value: '予約変更' } })
+      fireEvent.keyDown(keywordInput, { key: 'Enter' })
+      fireEvent.click(screen.getByRole('button', { name: /^次へ：/ }))
+      await goStep(navState.replaces[navState.replaces.length - 1])
+      fireEvent.click(screen.getByRole('button', { name: /^次へ：/ }))
+      const contentInput = host.querySelector('#wiz-content') as HTMLTextAreaElement
+      await waitFor(() => expect(document.activeElement).toBe(contentInput))
+      expect(contentInput.getAttribute('aria-invalid')).toBe('true')
+      expect(screen.getAllByText('返す内容を入力してください')).toHaveLength(1)
+      expect(createDraft).not.toHaveBeenCalled()
+
+      fireEvent.change(contentInput, { target: { value: '変更を承りました' } })
+      expect(screen.queryByText('返す内容を入力してください')).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: /^次へ：/ }))
+      await waitFor(() => expect(createDraft).toHaveBeenCalledTimes(1))
+    } finally {
+      HTMLElement.prototype.scrollIntoView = originalScroll
+    }
+  })
+
+  it('別の手順から保存しても入力を残して最初の不足欄へ移る', async () => {
+    await goStep('step=basic')
+    fireEvent.change(host.querySelector('#wiz-name') as HTMLInputElement, { target: { value: '入力を残すルール' } })
+    fireEvent.click(screen.getByRole('button', { name: '下書きとして保存' }))
+    expect(replaceMock).toHaveBeenLastCalledWith('/auto-replies/edit?step=trigger')
+    expect(createDraft).not.toHaveBeenCalled()
+    await goStep(navState.replaces[navState.replaces.length - 1])
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('反応する言葉を足す')))
+    expect(screen.getAllByText('反応する言葉を入れてください')).toHaveLength(1)
+    await goStep('step=basic')
+    expect((host.querySelector('#wiz-name') as HTMLInputElement).value).toBe('入力を残すルール')
+  })
 
   it('基本→条件→返し→順番→確認→有効にする・知らせと完了が出る', async () => {
     await goStep('step=basic')
@@ -373,9 +419,9 @@ describe('V8 自動応答の通し：作って有効にする', () => {
     await waitFor(() => expect(testDraft).toHaveBeenCalledTimes(1))
     await screen.findByText('このルールが返します。')
     fireEvent.click(screen.getByRole('button', { name: /^次へ：/ }))
-    // 「次へ」の直読みと画面遷移後の読み直しで2回走ることがある。
-    await waitFor(() => expect(validateDraft).toHaveBeenCalled())
+    // 取得は遷移先のeffectに一本化し、同じ版を一度だけ確かめる。
     await goStep(navState.replaces[navState.replaces.length - 1])
+    await waitFor(() => expect(validateDraft).toHaveBeenCalledTimes(1))
 
     // 手順5：有効にする→知らせと完了・一覧への戻り口。
     const enableButton = screen.getByRole('button', { name: '有効にする' })

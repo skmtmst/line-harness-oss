@@ -8,6 +8,7 @@
  * 中身（帯・入力欄・下の操作）はここで並べる。保存の口・本人確認の流れは今の画面
  * （app/accounts/detail・components/accounts/account-edit-modal）と同じ。
  */
+import ImageUploader from '@/components/shared/image-uploader'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Check, ShieldCheck } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
@@ -16,12 +17,17 @@ import { formatNumber } from '@/lib/format'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
 import OtpInput from '@/components/shared/otp-input'
 import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
+import { useFormErrors } from '@/lib/use-form-errors'
 import StepUpPrompt, { isStepUpRequired, stepUpFailureMessage, type StepUpRequest } from '@/components/step-up-prompt'
 import TestRecipientsSetting from '@/components/accounts/test-recipients-setting'
 import { ARCHIVE_BLOCKER_MESSAGES, parseCount, type AccountDetailView } from './view'
 import styles from './dialogs.module.css'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import NumberInput from '@/components/shared/number-field'
 
 /** 窓の枠。題・右上の×・中身・下の操作（右寄せ）。 */
 function Frame({ open, node, width, top, title, busy, onCancel, actions, children }: {
@@ -44,20 +50,29 @@ function Frame({ open, node, width, top, title, busy, onCancel, actions, childre
       designTop={top}
       busy={busy}
       onCancel={onCancel}
-      footer={actions ? <div className={styles.footer}>{actions}</div> : undefined}
+      layout="account-inset"
+      footer={actions}
     >
       <div className={styles.body}>{children}</div>
     </Dialog>
   )
 }
 
-function Field({ label, children, htmlFor }: { label: ReactNode; children: ReactNode; htmlFor?: string }) {
-  return (
-    <div className={styles.field}>
-      <label className={styles.label} htmlFor={htmlFor}>{label}</label>
-      {children}
-    </div>
-  )
+/** 欄の誤りが描画されたら、先頭へ移動する。通信失敗は上の案内へ残す。 */
+function useInvalidFocus(errors: Record<string, string>, ids: Record<string, string>) {
+  const idsRef = useRef(ids)
+  idsRef.current = ids
+  useEffect(() => {
+    const key = Object.keys(errors)[0]
+    if (!key) return
+    // 窓を開いた直後のフォーカス移動より後に、誤りの欄を標的にする。
+    const frame = requestAnimationFrame(() => {
+      const input = document.getElementById(idsRef.current[key])
+      input?.focus()
+      input?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [errors])
 }
 
 function ErrorLine({ message }: { message: string }) {
@@ -75,13 +90,16 @@ export function StopDialog({ account, onClose, onDone }: {
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const inputId = useId()
+  useInvalidFocus(fieldErrors, { reason: inputId })
   const stopping = account?.isActive ?? true
 
   const close = () => {
     if (busy) return
     setReason('')
+    setFieldErrors({})
     setError('')
     onClose()
   }
@@ -90,7 +108,8 @@ export function StopDialog({ account, onClose, onDone }: {
     if (!account) return
     const trimmed = reason.trim()
     if (!trimmed) {
-      setError('理由を入れてください。あとから「なぜ止めたか」を追えるようにします。')
+      setFieldErrors({ reason: '理由を入れてください。あとから「なぜ止めたか」を追えるようにします。' })
+      setError('')
       return
     }
     setBusy(true)
@@ -114,7 +133,7 @@ export function StopDialog({ account, onClose, onDone }: {
         return
       }
       // 接続が通らなくて再開できない等の理由は、API の言葉をそのまま見せる。
-      setError(describeSaveFailure(caught))
+      setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
     } finally {
       setBusy(false)
     }
@@ -137,18 +156,18 @@ export function StopDialog({ account, onClose, onDone }: {
           </Button>
         </>}
       >
-        <p className={styles.warnBand}>
+        <Notice tone="warn" presentation="account-note" icon={null}>
           {stopping
             ? '止めているあいだ、配信も受信もしません。予約した配信は送られません。'
             : '再開の前にLINEとの接続を確かめます。止めているあいだに予約していた配信は、自動で送り直しません。'}
-        </p>
-        <Field label={stopping ? '止める理由（必須）' : '再開する理由（必須）'} htmlFor={inputId}>
+        </Notice>
+        <Field label={stopping ? '止める理由（必須）' : '再開する理由（必須）'} htmlFor={inputId} error={fieldErrors.reason}>
           <TextField
             id={inputId}
             maxLength={500}
-            placeholder={stopping ? '例: 乗り換えの準備のため' : '例: 接続を直したので再開する'}
+            placeholder={stopping ? '例：乗り換えの準備のため' : '例：接続を直したので再開する'}
             value={reason}
-            onChange={(event) => setReason(event.target.value)}
+            onChange={(event) => { setReason(event.target.value); setFieldErrors({}) }}
             disabled={busy}
           />
         </Field>
@@ -172,7 +191,7 @@ function archiveFailureMessage(caught: unknown): string {
     if (messages.length > 0) return messages.join(' / ')
     return 'このアカウントはいまアーカイブできません。止まっているか、既定でないかを確かめてください。'
   }
-  return describeSaveFailure(caught)
+  return withPermissionFailure(caught, describeSaveFailure(caught), 'store')
 }
 
 export function ArchiveDialog({ account, onClose, onDone }: {
@@ -247,12 +266,12 @@ export function ArchiveDialog({ account, onClose, onDone }: {
         </Button>
       </>}
     >
-      <p className={styles.infoBand}>一覧から外します。送受信は止まり、友だちと履歴は残ります。</p>
+      <Notice tone="info" presentation="account-note" icon={null}>一覧から外します。送受信は止まり、友だちと履歴は残ります。</Notice>
       <Field label="アーカイブの理由（任意）" htmlFor={reasonId}>
         <TextField
           id={reasonId}
           maxLength={500}
-          placeholder="例: 使わなくなったため"
+          placeholder="例：使わなくなったため"
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           disabled={busy}
@@ -261,16 +280,14 @@ export function ArchiveDialog({ account, onClose, onDone }: {
       {method === 'totp' ? (
         <div className={styles.verify}>
           <p className={styles.sub} id={secretId}>本人確認（認証アプリの6桁）</p>
-          <div className={styles.otp}>
-            <OtpInput value={secret} onChange={setSecret} onComplete={(entered) => void run(entered)} visualLabel="認証コード（6桁）" labelledBy={secretId} invalid={Boolean(error)} busy={busy} />
-          </div>
+          <OtpInput value={secret} onChange={setSecret} onComplete={(entered) => void run(entered)} visualLabel="認証コード（6桁）" labelledBy={secretId} invalid={Boolean(error)} busy={busy} />
         </div>
       ) : method === 'password' ? (
         <Field label="本人確認（パスワード）" htmlFor={secretId}>
           <TextField id={secretId} type="password" autoComplete="current-password" value={secret} onChange={(event) => setSecret(event.target.value)} disabled={busy} />
         </Field>
       ) : (
-        <p className={styles.infoBand}>本人確認の方法（2段階認証・パスワード）が登録されていません。そのままアーカイブします。</p>
+        <Notice tone="info" presentation="account-note" icon={null}>本人確認の方法（2段階認証・パスワード）が登録されていません。そのままアーカイブします。</Notice>
       )}
       <ErrorLine message={error} />
     </Frame>
@@ -307,7 +324,7 @@ export function RestoreDialog({ account, onClose, onDone }: {
         setStepUp({ purpose: 'line_account.credentials', action: `「${account.name}」をアーカイブから戻す`, retry: run })
         return
       }
-      setError(describeSaveFailure(caught))
+      setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
     } finally {
       setBusy(false)
     }
@@ -326,7 +343,7 @@ export function RestoreDialog({ account, onClose, onDone }: {
           <Button type="button" variant="primary" onClick={() => void run()} disabled={busy} busy={busy} busyLabel="処理中…">アーカイブから戻す</Button>
         </>}
       >
-        <p className={styles.infoBand}>一覧へ戻します。戻った直後は「止まっている」状態です。送受信を始めるには、接続を確かめてから「送受信を再開する」を使います。</p>
+        <Notice tone="info" presentation="account-note" icon={null}>一覧へ戻します。戻った直後は「止まっている」状態です。送受信を始めるには、接続を確かめてから「送受信を再開する」を使います。</Notice>
         <ErrorLine message={error} />
       </Frame>
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
@@ -371,9 +388,11 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
   const [token, setToken] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const secretId = useId()
   const tokenId = useId()
+  useInvalidFocus(fieldErrors, { secret: secretId })
 
   const close = () => {
     if (busy) return
@@ -392,7 +411,8 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
       payload.loginChannelSecret = secret.trim()
     }
     if (Object.keys(payload).length === 0) {
-      setError('差し替える値を入れてください。空の欄は今の値のままにします。')
+      setFieldErrors({ secret: '差し替える値を入れてください。空の欄は今の値のままにします。' })
+      setError('')
       return
     }
     setBusy(true)
@@ -436,15 +456,15 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
         </>}
       >
         <p className={styles.sub}>{kind === 'messaging' ? 'Messaging API' : 'LINE Login'}</p>
-        <Field label={kind === 'messaging' ? 'Channel Secret' : 'Login Channel Secret'} htmlFor={secretId}>
-          <TextField id={secretId} type="password" autoComplete="off" placeholder="••••••••••••（新しい値を貼る）" value={secret} onChange={(event) => setSecret(event.target.value)} disabled={busy} />
+        <Field label={kind === 'messaging' ? 'Channel Secret' : 'Login Channel Secret'} htmlFor={secretId} error={fieldErrors.secret}>
+          <TextField id={secretId} type="password" autoComplete="off" placeholder="••••••••••••（新しい値を貼る）" value={secret} onChange={(event) => { setSecret(event.target.value); setFieldErrors({}) }} disabled={busy} />
         </Field>
         {kind === 'messaging' ? (
           <Field label="Channel Access Token" htmlFor={tokenId}>
-            <TextField id={tokenId} type="password" autoComplete="off" placeholder="••••••••••••（新しい値を貼る）" value={token} onChange={(event) => setToken(event.target.value)} disabled={busy} />
+            <TextField id={tokenId} type="password" autoComplete="off" placeholder="••••••••••••（新しい値を貼る）" value={token} onChange={(event) => { setToken(event.target.value); setFieldErrors({}) }} disabled={busy} />
           </Field>
         ) : null}
-        <p className={styles.infoBand}>保存のときに本人確認が出ます。差し替えたあと、接続を確かめます。</p>
+        <Notice tone="info" presentation="account-note" icon={null}>保存のときに本人確認が出ます。差し替えたあと、接続を確かめます。</Notice>
         <ErrorLine message={error} />
       </Frame>
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
@@ -487,27 +507,32 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
-  const ids = { name: useId(), tz: useId(), login: useId(), liff: useId(), og: useId(), ogDesc: useId(), ogImage: useId(), cap: useId(), warn: useId(), icon: useId() }
+  const ids = { name: useId(), tz: useId(), login: useId(), liff: useId(), og: useId(), ogDesc: useId(), cap: useId(), warn: useId() }
+
 
   const close = () => {
     if (!busy) onClose()
   }
 
+  /* 保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
+  const fields = useFormErrors()
+  fields.define('name', 'アカウント名', () => (name.trim() ? null : 'アカウント名を入れてください。'))
+  fields.define('cap', '友だちの上限', () => (Number.isNaN(parseCount(capacity)) ? '数字で入れてください。' : null))
+  fields.define('warn', '警告を出す人数', () => {
+    const capacityNext = parseCount(capacity)
+    const warnNext = parseCount(warnAt)
+    if (Number.isNaN(warnNext)) return '数字で入れてください。'
+    return capacityNext !== null && !Number.isNaN(capacityNext) && warnNext !== null && warnNext > capacityNext ? '警告を出す人数は上限以下にしてください。上限を超える値は鳴りません。' : null
+  })
+  const fieldProps = (key: string) => ({ ...fields.bind(key), invalid: fields.invalid(key) })
+
   const save = async (stepUpToken?: string) => {
-    if (!name.trim()) {
-      setError('アカウント名を入れてください。')
+    if (fields.submit().length > 0) {
+      setError('')
       return
     }
     const capacityNext = parseCount(capacity)
     const warnNext = parseCount(warnAt)
-    if (Number.isNaN(capacityNext) || Number.isNaN(warnNext)) {
-      setError('友だちの上限と警告を出す人数は、数字で入れてください。')
-      return
-    }
-    if (capacityNext !== null && warnNext !== null && warnNext > capacityNext) {
-      setError('警告を出す人数は上限以下にしてください。上限を超える値は鳴りません。')
-      return
-    }
     const payload: Parameters<typeof api.lineAccounts.update>[1] = {}
     if (name.trim() !== account.name) payload.name = name.trim()
     if (canEditTimezone && timezone.trim() !== initialTimezone) payload.timezone = timezone.trim()
@@ -564,8 +589,8 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
         </>}
       >
         <div className={styles.pair}>
-          <Field label="アカウント名" htmlFor={ids.name}>
-            <TextField id={ids.name} required maxLength={100} value={name} onChange={(event) => setName(event.target.value)} disabled={busy} />
+          <Field label="アカウント名" htmlFor={ids.name} error={fields.error('name')}>
+            <TextField {...fieldProps('name')} id={ids.name} required maxLength={100} value={name} onChange={(event) => setName(event.target.value)} disabled={busy} />
           </Field>
           {canEditTimezone ? (
             <div className={styles.narrow}>
@@ -585,34 +610,46 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
         </div>
         <div className={styles.field}>
           <div className={styles.labelRow}>
-            <label className={styles.label} htmlFor={ids.og}>ブランド設定（OGP）</label>
-            <button type="button" className={styles.more} aria-expanded={showOgMore} onClick={() => setShowOgMore((value) => !value)}>
+
+            <Button type="button" variant="text" presentation="account-inline" aria-expanded={showOgMore} onClick={() => setShowOgMore((value) => !value)}>
               {showOgMore ? '説明と画像を閉じる' : '説明と画像も変える'}
-            </button>
+            </Button>
           </div>
-          <TextField id={ids.og} placeholder="共有したときに出る名前" value={ogSiteName} onChange={(event) => setOgSiteName(event.target.value)} disabled={busy} />
+          <Field label="ブランド設定（OGP）" htmlFor={ids.og}><TextField id={ids.og} placeholder="共有したときに出る名前" value={ogSiteName} onChange={(event) => setOgSiteName(event.target.value)} disabled={busy} /></Field>
         </div>
         {showOgMore ? (
           <>
             <Field label="共有したときの説明" htmlFor={ids.ogDesc}>
               <TextField id={ids.ogDesc} value={ogDescription} onChange={(event) => setOgDescription(event.target.value)} disabled={busy} />
             </Field>
-            <Field label="共有したときの画像のURL" htmlFor={ids.ogImage}>
-              <TextField id={ids.ogImage} type="url" value={ogImageUrl} onChange={(event) => setOgImageUrl(event.target.value)} disabled={busy} />
-            </Field>
+            <ImageUploader
+              mode="url"
+              size="compact"
+              label="共有したときの画像"
+              title="共有したときの画像を追加"
+              disabled={busy}
+              value={ogImageUrl ? { mode: 'url', url: ogImageUrl } : null}
+              onChange={(next) => setOgImageUrl(next?.mode === 'url' ? next.url : '')}
+            />
           </>
         ) : null}
         <div className={styles.pair}>
-          <Field label="友だちの上限" htmlFor={ids.cap}>
-            <TextField id={ids.cap} inputMode="numeric" placeholder="管理しない" value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={busy} />
+          <Field label="友だちの上限" htmlFor={ids.cap} error={fields.error('cap')}>
+            <NumberInput numericText {...fieldProps('cap')} id={ids.cap} inputMode="numeric" placeholder="管理しない" value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={busy} />
           </Field>
-          <Field label="警告を出す人数" htmlFor={ids.warn}>
-            <TextField id={ids.warn} inputMode="numeric" placeholder="警告しない" value={warnAt} onChange={(event) => setWarnAt(event.target.value)} disabled={busy} />
+          <Field label="警告を出す人数" htmlFor={ids.warn} error={fields.error('warn')}>
+            <NumberInput numericText {...fieldProps('warn')} id={ids.warn} inputMode="numeric" placeholder="警告しない" value={warnAt} onChange={(event) => setWarnAt(event.target.value)} disabled={busy} />
           </Field>
         </div>
-        <Field label="アイコンのURL" htmlFor={ids.icon}>
-          <TextField id={ids.icon} type="url" placeholder="https://example.com/icon.png" value={iconUrl} onChange={(event) => setIconUrl(event.target.value)} disabled={busy} />
-        </Field>
+        <ImageUploader
+          mode="url"
+          size="compact"
+          label="アイコン"
+          title="アイコンを追加"
+          disabled={busy}
+          value={iconUrl ? { mode: 'url', url: iconUrl } : null}
+          onChange={(next) => setIconUrl(next?.mode === 'url' ? next.url : '')}
+        />
         <ErrorLine message={error} />
       </Frame>
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
@@ -632,7 +669,7 @@ export function TestRecipientsDialog({ accountId, open, onClose }: { accountId: 
       title="テスト送信先"
       onCancel={onClose}
     >
-      <p className={styles.infoBand}>リマインダや配信のテスト送信が届く先です。変更はこのアカウントだけに効きます。</p>
+      <Notice tone="info" presentation="account-note" icon={null}>リマインダや配信のテスト送信が届く先です。変更はこのアカウントだけに効きます。</Notice>
       <div className={styles.fill}><TestRecipientsSetting accountId={accountId} /></div>
     </Frame>
   )

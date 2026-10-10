@@ -1,5 +1,8 @@
 /** Conservatively classify exactly one supported SQLite statement, never a SQL prefix. */
-function classifySingleStatement(sql: string): { readOnly: boolean; sql: string } {
+export function classifySingleStatement(
+  sql: string,
+  options: { withAsMutation?: boolean } = {},
+): { readOnly: boolean; sql: string } {
   const unsupported = () => { throw new Error('incoming_receipt_unsupported_sql'); };
   if (sql.includes('\0')) unsupported();
   let keyword = '';
@@ -26,7 +29,9 @@ function classifySingleStatement(sql: string): { readOnly: boolean; sql: string 
     if (terminated) unsupported();
     if (!keyword) {
       const word = /^[A-Za-z_][A-Za-z_0-9$]*/.exec(sql.slice(i))?.[0];
-      if (!word || !/^(SELECT|INSERT|UPDATE|DELETE|REPLACE)$/i.test(word)) unsupported();
+      // 工程記録の DB だけは WITH を書き込みとして扱う（必ず柵つきの一括で実行し、first/all は拒否）。
+      const allowed = options.withAsMutation ? /^(SELECT|INSERT|UPDATE|DELETE|REPLACE|WITH)$/i : /^(SELECT|INSERT|UPDATE|DELETE|REPLACE)$/i;
+      if (!word || !allowed.test(word)) unsupported();
       keyword = word!.toUpperCase();
       i += word!.length;
       continue;

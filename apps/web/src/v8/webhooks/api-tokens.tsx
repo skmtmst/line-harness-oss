@@ -10,6 +10,7 @@
  * - 止めた鍵は一覧の口が返さないので、「止めている」行と「動かす」は出ない（動かす口も無い）。
  * - 発行・入れ替え・停止は統括だけ（R32）。閲覧のみの人には押せないボタンを置かず、場所だけ空ける。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Copy, KeyRound, LayoutTemplate, Plus, RefreshCw } from 'lucide-react'
 import { api, ApiError, type IntegrationApiTokenInfo } from '@/lib/api'
@@ -20,6 +21,10 @@ import { describeApiFailure } from '@/components/shared/api-error-message'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import StatusBadge from '@/components/shared/status-badge'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
 import EmptyList from '@/components/shared/empty-list'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -38,6 +43,8 @@ import {
   useWebhookOverview,
 } from './shell'
 import styles from './api-tokens.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'disabled'
 
@@ -66,21 +73,11 @@ export function scopeLabel(scope: string): string {
 
 /** 作った日は「2026/06/02」、最後に使ったは「9/30 10:02」（絵の書き方）。読めない日時は「—」。 */
 export function tokenDate(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('year')}/${get('month')}/${get('day')}`
+  return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }
 
 export function tokenUsedAt(value: string | null): string {
-  if (!value) return 'まだ使っていません'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+  return polishFormatDate(value, { style: 'list', fallback: value ? '—' : 'まだ使っていません' })
 }
 
 export default function WebhooksApiTokensV8() {
@@ -101,6 +98,7 @@ export default function WebhooksApiTokensV8() {
   const [createOpen, setCreateOpen] = useState(false)
   const [name, setName] = useState('')
   const [nameError, setNameError] = useState('')
+  const [scopesError, setScopesError] = useState('')
   const [scopes, setScopes] = useState<string[]>([...SCOPES])
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
@@ -184,6 +182,7 @@ export default function WebhooksApiTokensV8() {
     setName('')
     setNameError('')
     setCreateError('')
+    setScopesError('')
     setScopes([...SCOPES])
     setCreateOpen(true)
   }
@@ -191,15 +190,18 @@ export default function WebhooksApiTokensV8() {
   const handleCreate = async (stepUpToken?: string) => {
     setCreateError('')
     setNameError('')
+    setScopesError('')
     const requestAccountId = selectedAccountId
     if (!requestAccountId) return
     const trimmed = name.trim()
     if (!trimmed) {
       setNameError('名前を入力してください')
+      requestAnimationFrame(() => { const field = document.getElementById('wh-token-name'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
       return
     }
     if (scopes.length === 0) {
-      setCreateError('できることを1つ以上選んでください')
+      setScopesError('できることを1つ以上選んでください')
+      requestAnimationFrame(() => { const field = document.getElementById('wh-token-scopes'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
       return
     }
     setCreating(true)
@@ -222,7 +224,7 @@ export default function WebhooksApiTokensV8() {
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
       setCreateError(describeApiFailure(caught, '発行', {
-        forbidden: '鍵の発行は統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setCreating(false)
@@ -263,7 +265,7 @@ export default function WebhooksApiTokensV8() {
         return
       }
       setDialogError(describeApiFailure(caught, '入れ替え', {
-        forbidden: '鍵の入れ替えは統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
@@ -296,29 +298,22 @@ export default function WebhooksApiTokensV8() {
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
       setDialogError(describeApiFailure(caught, '停止', {
-        forbidden: '鍵の停止は統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
     }
   }
 
-  const copyIssued = async () => {
-    if (!issued) return
-    try {
-      await navigator.clipboard.writeText(issued.token)
-      setCopied(true)
-    } catch {
-      // 手で選んで写せるので、失敗しても文は出さない。
-    }
-  }
+
 
   return (
     <ListPage
+      help={<>{WEBHOOKS_DESCRIPTION}{"行の「…」から止める。止めても、すでに付けたタグは残ります。"}</>}
       boardId="ralAc"
       headingSize="regular"
       title="外部連携"
-      description={WEBHOOKS_DESCRIPTION}
+
       actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button> : undefined}
       tabs={<WebhookTabs active="api-tokens" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
@@ -340,33 +335,30 @@ export default function WebhooksApiTokensV8() {
           confirmIcon={<KeyRound size={15} />}
           busy={creating}
           error={createError || undefined}
-          onConfirm={() => void handleCreate()}
+          onConfirm={() => handleCreate()}
           onCancel={() => { if (!creating) setCreateOpen(false) }}
         >
           <div className={styles.createBody}>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="wh-token-name">名前</label>
-              <input
+            <Field label="名前" htmlFor="wh-token-name" error={nameError}>
+              <TextField
                 id="wh-token-name"
                 value={name}
                 maxLength={120}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="例：在庫システム"
-                className={styles.input}
                 aria-invalid={nameError ? true : undefined}
-                aria-describedby={nameError ? 'wh-token-name-error' : undefined}
               />
-              {nameError ? <p id="wh-token-name-error" className={styles.fieldError} role="alert">{nameError}</p> : null}
-            </div>
-            <fieldset className={styles.field}>
+            </Field>
+            <fieldset className={styles.field} id="wh-token-scopes" tabIndex={-1} aria-invalid={Boolean(scopesError) || undefined} aria-describedby={scopesError ? "wh-token-scopes-error" : undefined}>
               <legend className={styles.label}>できること</legend>
               <div className={styles.checkRow}>
                 {SCOPES.map((scope) => (
-                  <Checkbox key={scope} checked={scopes.includes(scope)} onCheckedChange={() => toggleScope(scope)}>
+                  <Checkbox key={scope} invalid={Boolean(scopesError)} aria-describedby={scopesError ? "wh-token-scopes-error" : undefined} checked={scopes.includes(scope)} onCheckedChange={() => toggleScope(scope)}>
                     {scopeLabel(scope)}
                   </Checkbox>
                 ))}
               </div>
+              {scopesError ? <p id="wh-token-scopes-error" className={styles.fieldError} role="alert">{scopesError}</p> : null}
             </fieldset>
             <p className={styles.createNote}>発行した鍵は1回だけ表示されます。名前は、どの仕組みに渡した鍵かが分かるように付けます。</p>
           </div>
@@ -396,9 +388,7 @@ export default function WebhooksApiTokensV8() {
               <p className={styles.issuedNote}>この鍵は今だけ表示されます。閉じると二度と見られません。安全な場所に写してください。</p>
               <div className={styles.issuedTokenRow}>
                 <code className={styles.issuedToken}>{issued.token}</code>
-                <Button onClick={() => void copyIssued()}>
-                  <Copy size={15} aria-hidden="true" />{copied ? '写しました' : '鍵を写す'}
-                </Button>
+                <CopyTextButton value={issued!.token} aria-label="発行した鍵をコピー"  />
               </div>
               <p className={styles.issuedMeta} title={issued.name}>
                 {`接続の名前：${issued.name}${issued.scopes.length ? ` ・ できること：${issued.scopes.map(scopeLabel).join('・')}` : ''}`}
@@ -414,7 +404,7 @@ export default function WebhooksApiTokensV8() {
           confirmLabel="入れ替える"
           busy={mutating}
           error={dialogError}
-          onConfirm={() => void handleRotate()}
+          onConfirm={() => handleRotate()}
           onCancel={() => {
             if (mutating) return
             setRotateTarget(null)
@@ -429,7 +419,7 @@ export default function WebhooksApiTokensV8() {
           destructive
           busy={mutating}
           error={dialogError}
-          onConfirm={() => void handleRevoke()}
+          onConfirm={() => handleRevoke()}
           onCancel={() => {
             if (mutating) return
             setRevokeTarget(null)
@@ -479,7 +469,7 @@ export default function WebhooksApiTokensV8() {
             kind="error"
             title="鍵を読み込めませんでした"
             description={loadError}
-            action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+            onRetry={() => void load()}
           />
         ) : null}
         {status === 'forbidden' ? (
@@ -519,27 +509,30 @@ export default function WebhooksApiTokensV8() {
                 return true
               }}
             >
-              <div className={styles.table} role="table" aria-label="API 接続の鍵">
-                <div className={styles.headRow} role="row">
-                  <span role="columnheader" className={styles.colName}>名前</span>
-                  <span role="columnheader" className={styles.colScopes}>できること</span>
-                  <span role="columnheader" className={styles.colCreated}>作った日</span>
-                  <span role="columnheader" className={styles.colUsed}>最後に使った</span>
-                  <span role="columnheader" className={styles.colState}>状態</span>
-                  <span role="columnheader" className={styles.colOps}><span className={styles.srOnly}>操作</span></span>
-                </div>
+              <DataTable aria-label="API 接続の鍵" columnLayout={{ headHeight: 'auto', rowHeight: 'var(--tpl-ms-key-row-h)', gap: 'var(--tpl-ms-key-col-gap)', padding: 'var(--tpl-ms-key-row-pad)', headPadding: 'var(--tpl-ms-key-head-row-pad)', headRadius: 'var(--tpl-ms-key-box-radius)', headTextSize: 'var(--text-micro)', bodyTextSize: 'var(--text-caption)' }}>
+                <thead>
+                  <TableHeadRow data-table-layout="columns">
+                  <Th className={styles.colName}>名前</Th>
+                  <Th className={styles.colScopes}>できること</Th>
+                  <Th className={styles.colCreated}>作った日</Th>
+                  <Th className={styles.colUsed}>最後に使った</Th>
+                  <Th className={styles.colState}>状態</Th>
+                  <Th className={styles.colOps}><span className={styles.srOnly}>操作</span></Th>
+                </TableHeadRow>
+                </thead>
+                <tbody>
                 {tokens.map((token) => {
                   const scopeText = token.scopes.map(scopeLabel).join('・')
                   return (
-                    <div key={token.id} className={styles.row} role="row" data-ctx-row={token.id}>
-                      <span role="cell" className={styles.colName} title={token.name}>{token.name}</span>
-                      <span role="cell" className={styles.colScopes} title={scopeText}>{scopeText}</span>
-                      <span role="cell" className={styles.colCreated}>{tokenDate(token.createdAt)}</span>
-                      <span role="cell" className={styles.colUsed}>{tokenUsedAt(token.lastUsedAt)}</span>
-                      <span role="cell" className={styles.colState}>
-                        <span className={styles.pill}><span className={styles.pillDot} aria-hidden="true" />使っている</span>
-                      </span>
-                      <span role="cell" className={styles.colOps}>
+                    <Tr key={token.id} data-table-layout="columns" data-ctx-row={token.id} data-row-id={token.id}>
+                      <Td className={styles.colName} title={token.name}>{token.name}</Td>
+                      <Td className={styles.colScopes} title={scopeText}>{scopeText}</Td>
+                      <Td className={styles.colCreated}>{tokenDate(token.createdAt)}</Td>
+                      <Td className={styles.colUsed}>{tokenUsedAt(token.lastUsedAt)}</Td>
+                      <Td className={styles.colState}>
+                        <StatusBadge tone="success">使っている</StatusBadge>
+                      </Td>
+                      <Td className={styles.colOps}>
                         {canManage ? (
                           <span className={styles.menuBox}>
                             <Button
@@ -568,13 +561,13 @@ export default function WebhooksApiTokensV8() {
                             />
                           </span>
                         ) : null}
-                      </span>
-                    </div>
+                      </Td>
+                    </Tr>
                   )
                 })}
-              </div>
+              </tbody>
+              </DataTable>
             </ContextMenu>
-            <p className={styles.footNote}>行の「…」から止める。止めても、すでに付けたタグは残ります。</p>
           </>
         ) : null}
       </div>

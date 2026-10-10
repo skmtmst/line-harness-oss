@@ -16,16 +16,18 @@ describe('ListState の再読み込み', () => {
   it('失敗状態にだけ読み直す口を出す', () => {
     const onRetry = vi.fn()
 
+    expect(renderToStaticMarkup(<ListState kind="forbidden" onRetry={onRetry} />)).toContain('もう一度読み込む')
+
     // 副ボタンは「もう一度読み込む」1つ（TargetMissing の error と同じ）。
     expect(renderToStaticMarkup(<ListState kind="error" onRetry={onRetry} />)).toContain('>もう一度読み込む<')
 
-    for (const kind of ['loading', 'empty', 'forbidden'] as const) {
+    for (const kind of ['loading', 'empty'] as const) {
       expect(renderToStaticMarkup(<ListState kind={kind} onRetry={onRetry} />)).not.toContain('もう一度読み込む')
     }
   })
 
-  it('読み直す関数が無い失敗状態にはボタンを出さない', () => {
-    expect(renderToStaticMarkup(<ListState kind="error" />)).not.toContain('<button')
+  it('読み直す関数が無い場合もページを読み直す口を出す', () => {
+    expect(renderToStaticMarkup(<ListState kind="error" />)).toContain('<button')
   })
 
   it('読み直している間は二度押しを止める', () => {

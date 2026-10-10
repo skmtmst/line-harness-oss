@@ -12,7 +12,7 @@
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
 import { Suspense, useCallback, useState, type ReactNode } from 'react'
-import Link from 'next/link'
+import { Tabs } from '@/components/shared/tabs'
 import { useSearchParams } from 'next/navigation'
 import { Eye } from 'lucide-react'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -26,6 +26,7 @@ import V8BalancesTab from './v8-balances-tab'
 import V8HistoryTab from './v8-history-tab'
 import V8RewardsTab from './v8-rewards-tab'
 import V8ScoreTab from './v8-score-tab'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const TABS = [
   { key: 'earning-rules', label: 'たまる決めごと', node: 'OC0gy' },
@@ -57,7 +58,7 @@ export function V8CreateButton({
 }) {
   if (readonly) {
     return (
-      <Button variant="primary" disabled title="閲覧のみのため作れません">
+      <Button variant="primary" disabled title="閲覧のみのため作れません" >
         {children}
       </Button>
     )
@@ -74,8 +75,8 @@ export function V8Head({ actions }: { actions?: React.ReactNode }) {
   return (
     <div className={styles.head}>
       <div className={styles.headText}>
-        <h1 className={styles.headTitle}>マイル</h1>
-        <p className={styles.headDescription}>行動でマイルがたまり、クーポン・特典と交換できます。</p>
+        <PageHeading title="マイル" help={<> 行動でマイルがたまり、クーポン・特典と交換できます。</>} />
+
       </div>
       {actions ? <div className={styles.headActions}>{actions}</div> : null}
     </div>
@@ -120,19 +121,7 @@ function MileageV8Inner() {
     <div data-design-node={MileageV8Node({ tab })} className={styles.board}>
       <V8Head actions={headerActions} />
 
-      <nav className={styles.tabs} aria-label="マイルのタブ">
-        {TABS.map((item) => (
-          <Link
-            key={item.key}
-            href={item.key === 'earning-rules' ? '/mileage' : `/mileage?tab=${item.key}`}
-            className={item.key === tab ? `${styles.tab} ${styles.tabActive}` : styles.tab}
-            aria-current={item.key === tab ? 'page' : undefined}
-          >
-            {item.label}
-            {tabCounts[item.key] ? ` ${tabCounts[item.key]}` : null}
-          </Link>
-        ))}
-      </nav>
+      <Tabs label="マイルのタブ" items={TABS.map(item => ({label:item.label, href:`/mileage?tab=${item.key}`, current:item.key===tab, count:tabCounts[item.key] === undefined ? undefined : Number(tabCounts[item.key]!.replaceAll(',', ''))}))} />
 
       {readonly ? (
         <p className={styles.band} role="note">

@@ -1,0 +1,857 @@
+[
+  {
+    "file": "v8/friend-detail/detail.module.css",
+    "selector": ".tag",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/friend-detail/detail.module.css",
+    "selector": ".rowIcon",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/friend-detail/detail.module.css",
+    "selector": ".multi",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/friend-detail/detail.module.css",
+    "selector": ".emptyIcon",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/analytics/analytics.module.css",
+    "selector": ".table",
+    "reason": "表・一覧の行。外側のカードと影を重ねない。"
+  },
+  {
+    "file": "v8/analytics/analytics.module.css",
+    "selector": ".thead",
+    "reason": "表・一覧の行。外側のカードと影を重ねない。"
+  },
+  {
+    "file": "v8/analytics/analytics.module.css",
+    "selector": ".reportTable",
+    "reason": "表・一覧の行。外側のカードと影を重ねない。"
+  },
+  {
+    "file": "v8/analytics/analytics.module.css",
+    "selector": ":global([data-theme='v8']) .rowMenuButton",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/analytics/analytics.module.css",
+    "selector": ".waitBox",
+    "reason": "警告・閲覧のみ・状態・待機の帯。線で区別する。"
+  },
+  {
+    "file": "v8/dashboard/dashboard.module.css",
+    "selector": ".viewerBand",
+    "reason": "警告・閲覧のみ・状態・待機の帯。線で区別する。"
+  },
+  {
+    "file": "v8/dashboard/dashboard.module.css",
+    "selector": ".errorBand",
+    "reason": "警告・閲覧のみ・状態・待機の帯。線で区別する。"
+  },
+  {
+    "file": "v8/dashboard/dashboard.module.css",
+    "selector": ".route",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/dashboard/dashboard.module.css",
+    "selector": ".urlField",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/dashboard/first-steps.module.css",
+    "selector": ".step",
+    "reason": "表・一覧の行。外側のカードと影を重ねない。"
+  },
+  {
+    "file": "v8/restaurant/booking-kit/parts.module.css",
+    "selector": ".more",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/restaurant/booking-kit/shell.module.css",
+    "selector": ".boundary",
+    "reason": "警告・閲覧のみ・状態・待機の帯。線で区別する。"
+  },
+  {
+    "file": "v8/restaurant/booking-kit/shell.module.css",
+    "selector": ".noticeSuccess",
+    "reason": "警告・閲覧のみ・状態・待機の帯。線で区別する。"
+  },
+  {
+    "file": "v8/restaurant/booking-kit/shell.module.css",
+    "selector": ".noticeError",
+    "reason": "警告・閲覧のみ・状態・待機の帯。線で区別する。"
+  },
+  {
+    "file": "v8/form-edit/edit.module.css",
+    "selector": ".emptyBlocks",
+    "reason": "警告・閲覧のみ・状態・待機の帯。線で区別する。"
+  },
+  {
+    "file": "v8/form-edit/edit.module.css",
+    "selector": ".pageChip",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/form-edit/edit.module.css",
+    "selector": ".blockRow",
+    "reason": "カード内の小箱・入れ子・階層の行。影を重ねない。"
+  },
+  {
+    "file": "v8/form-edit/edit.module.css",
+    "selector": ".blockOpenCard",
+    "reason": "カード内の小箱・入れ子・階層の行。影を重ねない。"
+  },
+  {
+    "file": "v8/form-edit/edit.module.css",
+    "selector": ".addCard",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/form-edit/edit.module.css",
+    "selector": ".addCard[data-fresh]",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/form-edit/edit.module.css",
+    "selector": ".actionRow",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/form-edit/edit.module.css",
+    "selector": ".readonlyBox",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/form-edit/edit.module.css",
+    "selector": ".subBox",
+    "reason": "カード内の小箱・入れ子・階層の行。影を重ねない。"
+  },
+  {
+    "file": "v8/form-edit/edit.module.css",
+    "selector": ".selectLike",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/form-edit/edit.module.css",
+    "selector": ".phone",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/form-edit/edit.module.css",
+    "selector": ":global([data-theme='v8']) .more :global(button)",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/restaurant/approvals/approvals.module.css",
+    "selector": ".payload",
+    "reason": "カード内の小箱・入れ子・階層の行。影を重ねない。"
+  },
+  {
+    "file": "v8/ops/auth.module.css",
+    "selector": ".qr",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/ops/auth.module.css",
+    "selector": ".digit",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/restaurant/closures/closures.module.css",
+    "selector": ".swatch",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/restaurant/closures/closures.module.css",
+    "selector": ".grid",
+    "reason": "表・一覧の行。外側のカードと影を重ねない。"
+  },
+  {
+    "file": "v8/restaurant/closures/closures.module.css",
+    "selector": ".route",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/templates/question-new.module.css",
+    "selector": ".choice",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/templates/list.module.css",
+    "selector": ".kindBadge",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "app/reminders/wizard-v8.module.css",
+    "selector": ".choice",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "app/reminders/wizard-v8.module.css",
+    "selector": ".addStep",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/webinar-edit/cta.module.css",
+    "selector": ".ctaCard",
+    "reason": "カード内の小箱・入れ子・階層の行。影を重ねない。"
+  },
+  {
+    "file": "v8/visit-stamps/visit-stamps.module.css",
+    "selector": ".rewards",
+    "reason": "カード内の小箱・入れ子・階層の行。影を重ねない。"
+  },
+  {
+    "file": "v8/visit-stamps/visit-stamps.module.css",
+    "selector": ".slot",
+    "reason": "カード内の小箱・入れ子・階層の行。影を重ねない。"
+  },
+  {
+    "file": "v8/visit-stamps/visit-stamps.module.css",
+    "selector": ".slotReward",
+    "reason": "カード内の小箱・入れ子・階層の行。影を重ねない。"
+  },
+  {
+    "file": "v8/visit-stamps/visit-stamps.module.css",
+    "selector": ".thumb",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/rich-menus/connections.module.css",
+    "selector": ".menu",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/rich-menus/list.module.css",
+    "selector": ".thumb",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/broadcast-detail/detail.module.css",
+    "selector": ".railItem[data-state='current'] .railMark",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/broadcast-detail/detail.module.css",
+    "selector": ".actions > button.iconButton",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/broadcast-detail/detail.module.css",
+    "selector": ".conflict",
+    "reason": "警告・閲覧のみ・状態・待機の帯。線で区別する。"
+  },
+  {
+    "file": "v8/broadcast-detail/detail.module.css",
+    "selector": ".stats",
+    "reason": "数の帯。B-153に従い線で区切る。"
+  },
+  {
+    "file": "v8/broadcast-detail/detail.module.css",
+    "selector": ".linkList",
+    "reason": "表・一覧の行。外側のカードと影を重ねない。"
+  },
+  {
+    "file": "v8/broadcast-detail/detail.module.css",
+    "selector": ".approval",
+    "reason": "警告・閲覧のみ・状態・待機の帯。線で区別する。"
+  },
+  {
+    "file": "v8/broadcast-detail/phone.module.css",
+    "selector": ".phone",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/inbox-chat/inbox-chat.module.css",
+    "selector": ".schRow",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/inbox-chat/inbox-chat.module.css",
+    "selector": ".inputBox",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/inflow-links/ad-pages.module.css",
+    "selector": ".table",
+    "reason": "表・一覧の行。外側のカードと影を重ねない。"
+  },
+  {
+    "file": "v8/account-new/register.module.css",
+    "selector": ".checkList",
+    "reason": "表・一覧の行。外側のカードと影を重ねない。"
+  },
+  {
+    "file": "v8/inflow-links/qr-dialog.module.css",
+    "selector": ".qr",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/webhooks/interactions.module.css",
+    "selector": ".payloadBox",
+    "reason": "カード内の小箱・入れ子・階層の行。影を重ねない。"
+  },
+  {
+    "file": "v8/scenario-detail/detail.module.css",
+    "selector": ".iconButton",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/scenario-detail/detail.module.css",
+    "selector": ".stepRow,\n.stepRowSelected",
+    "reason": "カード内の小箱・入れ子・階層の行。影を重ねない。"
+  },
+  {
+    "file": "v8/scenario-detail/detail.module.css",
+    "selector": ".kindChip",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/restaurant/google/google.module.css",
+    "selector": ".picker",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/restaurant/google/google.module.css",
+    "selector": ".inlinePanel",
+    "reason": "カード内の小箱・入れ子・階層の行。影を重ねない。"
+  },
+  {
+    "file": "v8/restaurant/google/google.module.css",
+    "selector": ".diffList",
+    "reason": "表・一覧の行。外側のカードと影を重ねない。"
+  },
+  {
+    "file": "v8/restaurant/store-new/store-new.module.css",
+    "selector": ".termsBox",
+    "reason": "カード内の小箱・入れ子・階層の行。影を重ねない。"
+  },
+  {
+    "file": "v8/scenarios/results.module.css",
+    "selector": ".kpiBox",
+    "reason": "数の帯。B-153に従い線で区切る。"
+  },
+  {
+    "file": "v8/scenarios/results.module.css",
+    "selector": ".stepList",
+    "reason": "表・一覧の行。外側のカードと影を重ねない。"
+  },
+  {
+    "file": "v8/scenarios/results.module.css",
+    "selector": ".table",
+    "reason": "表・一覧の行。外側のカードと影を重ねない。"
+  },
+  {
+    "file": "v8/not-found/not-found.module.css",
+    "selector": ".mark",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/hq-banners/list.module.css",
+    "selector": ".statIcon",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "app/emergency/control-v8.module.css",
+    "selector": ".kpiTile",
+    "reason": "数の帯。B-153に従い線で区切る。"
+  },
+  {
+    "file": "v8/conversions/list.module.css",
+    "selector": ".tableWrap",
+    "reason": "表・一覧の行。外側のカードと影を重ねない。"
+  },
+  {
+    "file": "v8/restaurant/organization/organization.module.css",
+    "selector": ".treeStore",
+    "reason": "カード内の小箱・入れ子・階層の行。影を重ねない。"
+  },
+  {
+    "file": "v8/booking-menus/menu-form.module.css",
+    "selector": ".subSection",
+    "reason": "カード内の小箱・入れ子・階層の行。影を重ねない。"
+  },
+  {
+    "file": "v8/settings/staff/staff.module.css",
+    "selector": ".chip",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/settings/staff/staff.module.css",
+    "selector": ".chip[aria-pressed='true']",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/settings/staff/staff.module.css",
+    "selector": ".avatar",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/nen-members/members.module.css",
+    "selector": ".lifeTable",
+    "reason": "表・一覧の行。外側のカードと影を重ねない。"
+  },
+  {
+    "file": "v8/hq-templates/console.module.css",
+    "selector": ".search",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/hq-templates/console.module.css",
+    "selector": ".search:focus-within",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/hq-templates/console.module.css",
+    "selector": ".tableBox",
+    "reason": "表・一覧の行。外側のカードと影を重ねない。"
+  },
+  {
+    "file": "v8/settings/accounts/accounts.module.css",
+    "selector": ".table",
+    "reason": "表・一覧の行。外側のカードと影を重ねない。"
+  },
+  {
+    "file": "v8/settings/ec-commerce/connector.module.css",
+    "selector": ".keyRow",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "v8/settings/getting-started/getting-started.module.css",
+    "selector": ".steps",
+    "reason": "表・一覧の行。外側のカードと影を重ねない。"
+  },
+  {
+    "file": "v8/settings/getting-started/getting-started.module.css",
+    "selector": ".mark",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "app/chats/inbox-v8.module.css",
+    "selector": ":global([data-theme='v8']) .channelBadge",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/settings/emergency/history.module.css",
+    "selector": ".kpiTile",
+    "reason": "数の帯。B-153に従い線で区切る。"
+  },
+  {
+    "file": "v8/settings/pools/pools.module.css",
+    "selector": ".member",
+    "reason": "カード内の小箱・入れ子・階層の行。影を重ねない。"
+  },
+  {
+    "file": "v8/settings/pools/create.module.css",
+    "selector": ".account",
+    "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
+  },
+  {
+    "file": "app/accounts/migration.tsx",
+    "selector": "className=\"bg-canvas rounded-card border-hairline border\"",
+    "reason": "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"
+  },
+  {
+    "file": "app/affiliates/attribution-view.tsx",
+    "selector": "className=\"bg-canvas border-hairline mt-2 overflow-x-auto rounded-card border\"",
+    "reason": "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"
+  },
+  {
+    "file": "app/affiliates/tabs.tsx",
+    "selector": "className=\"bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-2 border p-3\"",
+    "reason": "絞り込み・段の切り替え・選択の枠。中身のカードではない。"
+  },
+  {
+    "file": "app/affiliates/tabs.tsx",
+    "selector": "className=\"bg-canvas rounded-card border-hairline border\"",
+    "reason": "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"
+  },
+  {
+    "file": "app/affiliates/tabs.tsx",
+    "selector": "className=\"bg-canvas rounded-card border-hairline overflow-x-auto border\"",
+    "reason": "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"
+  },
+  {
+    "file": "app/affiliates/tabs.tsx",
+    "selector": "className=\"rounded-card border-hairline bg-canvas border p-4\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "app/affiliates/tabs.tsx",
+    "selector": "className=\"bg-canvas rounded-card border-hairline mt-3 flex flex-wrap items-center gap-3 border p-3\"",
+    "reason": "絞り込み・段の切り替え・選択の枠。中身のカードではない。"
+  },
+  {
+    "file": "app/broadcasts/detail/broadcast-recipients.tsx",
+    "selector": "className=\"bg-canvas rounded-card border-hairline border p-5\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "app/common-actions/branch-editor.tsx",
+    "selector": "className=\"border-hairline bg-canvas-sunken mt-3 rounded-card border p-4\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "app/contents/media-detail-dialog.tsx",
+    "selector": "className=\"bg-canvas-sunken rounded-card flex min-h-96 items-center justify-center overflow-hidden border border-hairline\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "app/emergency/send-path-coverage-panel.tsx",
+    "selector": "className=\"border-hairline rounded-card border bg-canvas px-4 py-3 text-xs text-ink-faint\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "app/events/change-review/change-review-v8.tsx",
+    "selector": "className=\"text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "app/events/new/events-new-v8.tsx",
+    "selector": "className=\"bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "app/nen/health/summary-drawer.tsx",
+    "selector": "className=\"rounded-card border border-hairline bg-canvas p-3\"",
+    "reason": "数の帯のマス。B-153に従い線で区切る。"
+  },
+  {
+    "file": "app/nen/pets/pets-tab.tsx",
+    "selector": "className=\"divide-hairline divide-y rounded-card border-hairline border bg-canvas md:hidden\"",
+    "reason": "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"
+  },
+  {
+    "file": "app/nen-members/photo-review-detail.tsx",
+    "selector": "className=\"mt-4 rounded-card border border-hairline bg-canvas p-4\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "app/restaurant-test/google/google-business.tsx",
+    "selector": "className=\"border-hairline bg-canvas text-ink min-w-0 overflow-hidden rounded-card border\"",
+    "reason": "画面全体の外枠。内側の中身のカードにだけ影を付ける。"
+  },
+  {
+    "file": "app/restaurant-test/google/google-business.tsx",
+    "selector": "className=\"border-hairline mb-3 rounded-card border p-4\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "app/restaurant-test/google/google-posts.tsx",
+    "selector": "className=\"border-hairline rounded-card border p-4\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "app/restaurant-test/google/google-profile.tsx",
+    "selector": "className=\"border-hairline bg-accent-soft flex flex-col gap-4 rounded-card border p-5\"",
+    "reason": "今日の営業状態の帯。カードではなく状態の通知。"
+  },
+  {
+    "file": "app/restaurant-test/google/google-profile.tsx",
+    "selector": "className=\"border-hairline bg-canvas flex w-full flex-col gap-2 rounded-card border p-4\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "app/restaurant-test/google/google-profile.tsx",
+    "selector": "className=\"border-hairline bg-canvas flex min-w-0 flex-col gap-3 rounded-card border p-5\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "app/restaurant-test/google/google-profile.tsx",
+    "selector": "className=\"border-hairline overflow-hidden rounded-card border\"",
+    "reason": "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"
+  },
+  {
+    "file": "app/restaurant-test/google/google-profile.tsx",
+    "selector": "className=\"border-hairline bg-canvas flex flex-col gap-3 rounded-card border p-5\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "app/scenarios/detail/detail-v8.tsx",
+    "selector": "className={editingStepId ? '' : 'border-hairline rounded-card bg-canvas-sunken border p-4'}",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "app/scenarios/detail/detail-v8.tsx",
+    "selector": "className=\"border-hairline rounded-card border p-4\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "app/tags/edit-field-page-v8.tsx",
+    "selector": "className=\"rounded-card border border-hairline bg-canvas p-5 text-sm text-ink-secondary\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "app/tags/search-editor-v8.tsx",
+    "selector": "className=\"rounded-card border border-hairline bg-canvas p-5 text-sm text-ink-secondary\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "app/templates/staff-asset-list.tsx",
+    "selector": "className=\"bg-canvas border-hairline text-ink-faint col-span-full rounded-card border border-dashed p-12 text-center text-sm\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "app/webhooks/outgoing-v8.tsx",
+    "selector": "className=\"overflow-x-auto rounded-card border border-hairline bg-canvas\"",
+    "reason": "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"
+  },
+  {
+    "file": "components/automations/common-action-editor.tsx",
+    "selector": "className=\"border-hairline rounded-card border bg-canvas p-4\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "components/broadcasts/broadcast-approval.tsx",
+    "selector": "className=\"bg-warning-bg rounded-card border-hairline border p-5\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "components/broadcasts/broadcast-form.tsx",
+    "selector": "className=\"border-hairline mt-4 rounded-card border bg-canvas p-5\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "components/broadcasts/broadcast-form.tsx",
+    "selector": "className=\"rounded-card border border-hairline bg-canvas p-8 text-center\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "components/broadcasts/broadcast-form.tsx",
+    "selector": "className=\"bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "components/broadcasts/broadcast-form.tsx",
+    "selector": "className=\"border-hairline bg-canvas-sunken text-ink-secondary mt-3 rounded-card border px-4 py-2 text-xs\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "components/broadcasts/broadcast-step-rail.tsx",
+    "selector": "className=\"border-hairline bg-canvas rounded-card mb-4 border p-4 sm:hidden\"",
+    "reason": "絞り込み・段の切り替え・選択の枠。中身のカードではない。"
+  },
+  {
+    "file": "components/broadcasts/segment-preset-controls.tsx",
+    "selector": "className=\"divide-y divide-hairline rounded-card border border-hairline bg-canvas\"",
+    "reason": "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"
+  },
+  {
+    "file": "components/dashboard/dashboard-editor.tsx",
+    "selector": "className=\"border-hairline bg-canvas-sunken rounded-card border p-3\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "components/events/event-wizard.tsx",
+    "selector": "className=\"bg-canvas rounded-card border-hairline border p-12 text-center text-sm text-ink-faint\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "components/events/event-wizard.tsx",
+    "selector": "className=\"bg-canvas rounded-card border-hairline mb-4 flex flex-col gap-2 border p-4 sm:flex-row\"",
+    "reason": "絞り込み・段の切り替え・選択の枠。中身のカードではない。"
+  },
+  {
+    "file": "components/events/event-wizard.tsx",
+    "selector": "className=\"text-ink-faint border-hairline rounded-card border border-dashed p-6 text-center text-sm\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "components/forms/block-editor.tsx",
+    "selector": "className={`rounded-card border p-4 transition-colors ${\n        selected ? 'border-accent bg-canvas' : 'border-hairline bg-canvas'\n      }`}",
+    "reason": "絞り込み・段の切り替え・選択の枠。中身のカードではない。"
+  },
+  {
+    "file": "components/forms/form-preview.tsx",
+    "selector": "className=\"rounded-card border-hairline border p-4\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "components/forms/hq-form-definition-editor.tsx",
+    "selector": "className=\"rounded-card border border-dashed border-hairline bg-canvas p-8 text-center text-sm text-ink-faint\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "components/friend-fields/saved-search-list.tsx",
+    "selector": "className=\"bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "components/friend-fields/tags-page-v4.tsx",
+    "selector": "className={`h-fit rounded-card border border-hairline bg-canvas ${cardShadow}`}",
+    "reason": "本番切り替え前の旧テーマ用分岐。V8固定環境では出ない。"
+  },
+  {
+    "file": "components/friend-fields/tags-page-v4.tsx",
+    "selector": "className={`overflow-hidden rounded-card border border-hairline bg-canvas ${cardShadow}`}",
+    "reason": "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"
+  },
+  {
+    "file": "components/friends/saved-search-dialog.tsx",
+    "selector": "className=\"mt-4 rounded-card border border-hairline bg-surface-pearl p-4\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "components/friends/single-friend-actions.tsx",
+    "selector": "className=\"bg-canvas rounded-card border-hairline mt-2 border p-3\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "components/rich-menus/rich-menu-create-form.tsx",
+    "selector": "className=\"border-hairline rounded-card space-y-4 border p-4\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "components/rich-menus/rich-menu-create-form.tsx",
+    "selector": "className=\"border-hairline bg-canvas-sunken rounded-card border p-4\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "components/scenarios/action-editor.tsx",
+    "selector": "className=\"border-hairline rounded-card border\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "components/scenarios/action-editor.tsx",
+    "selector": "className=\"text-ink-faint rounded-card border-hairline border border-dashed py-8 text-center text-sm\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "components/scenarios/carousel-picker.tsx",
+    "selector": "className=\"border-hairline rounded-card border border-dashed px-4 py-6 text-center\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "components/scenarios/message-kind-fields.tsx",
+    "selector": "className={(`rounded-card border p-1.5 transition-colors ${\n                  on ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'\n                }`) + ' h-auto whitespace-normal'}",
+    "reason": "絞り込み・段の切り替え・選択の枠。中身のカードではない。"
+  },
+  {
+    "file": "components/scenarios/question-editor.tsx",
+    "selector": "className=\"border-hairline rounded-card border\"",
+    "reason": "絞り込み・段の切り替え・選択の枠。中身のカードではない。"
+  },
+  {
+    "file": "components/scenarios/step-preview.tsx",
+    "selector": "className=\"border-hairline rounded-card text-ink-faint border border-dashed px-3 py-6 text-center text-micro\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "components/scenarios/trigger-editor.tsx",
+    "selector": "className=\"border-hairline rounded-card flex flex-wrap items-center justify-between gap-2 border px-4 py-3\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "components/shared/condition-builder.tsx",
+    "selector": "className=\"border-hairline bg-canvas rounded-card flex flex-wrap items-start gap-2 border p-3\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "components/shared/condition-builder.tsx",
+    "selector": "className=\"border-hairline rounded-card border p-4\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "components/shared/create-page.tsx",
+    "selector": "className={`${styles.choice} rounded-card border p-3 text-left transition-colors ${\n        selected ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'\n      }`}",
+    "reason": "絞り込み・段の切り替え・選択の枠。中身のカードではない。"
+  },
+  {
+    "file": "components/shared/folder-panel.tsx",
+    "selector": "className={`${styles.panel} v7:bg-canvas v7:rounded-card v7:border-hairline v7:h-fit overflow-visible v7:border`}",
+    "reason": "本番切り替え前の旧テーマ用分岐。V8固定環境では出ない。"
+  },
+  {
+    "file": "components/shared/stepper.tsx",
+    "selector": "className=\"border-hairline bg-canvas rounded-card mb-4 border p-4\"",
+    "reason": "絞り込み・段の切り替え・選択の枠。中身のカードではない。"
+  },
+  {
+    "file": "components/shared/version-history.tsx",
+    "selector": "className={\n                active\n                  ? 'rounded-card border border-accent bg-canvas'\n                  : 'rounded-card border border-hairline bg-canvas'\n              }",
+    "reason": "絞り込み・段の切り替え・選択の枠。中身のカードではない。"
+  },
+  {
+    "file": "components/staff/login-audit.tsx",
+    "selector": "className=\"overflow-hidden rounded-card border border-hairline bg-canvas\"",
+    "reason": "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"
+  },
+  {
+    "file": "components/staff/login-audit.tsx",
+    "selector": "className=\"flex h-28 flex-col gap-1 rounded-card border border-hairline bg-canvas p-4\"",
+    "reason": "数の帯のマス。B-153に従い線で区切る。"
+  },
+  {
+    "file": "components/templates/message-template-editor.tsx",
+    "selector": "className=\"border-hairline rounded-card border p-4\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "components/theme-preview-switch.tsx",
+    "selector": "className=\"rounded-card border-hairline bg-canvas border p-4\"",
+    "reason": "本番切り替え前の旧テーマ用分岐。V8固定環境では出ない。"
+  },
+  {
+    "file": "components/webinars/webinar-form.tsx",
+    "selector": "className=\"group rounded-card border border-hairline bg-canvas-sunken/60\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "v8/affiliates/attribution-view.tsx",
+    "selector": "className=\"bg-canvas border-hairline mt-2 overflow-x-auto rounded-card border\"",
+    "reason": "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"
+  },
+  {
+    "file": "v8/automations/branch-editor.tsx",
+    "selector": "className=\"border-hairline bg-canvas-sunken mt-3 rounded-card border p-4\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "v8/contents/media-detail-dialog.tsx",
+    "selector": "className=\"bg-canvas-sunken rounded-card flex min-h-96 items-center justify-center overflow-hidden border border-hairline\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "v8/nen-posts/detail.tsx",
+    "selector": "className=\"mt-4 rounded-card border border-hairline bg-canvas p-4\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "v8/scenario-detail/detail.tsx",
+    "selector": "className={editingStepId ? '' : 'border-hairline rounded-card bg-canvas-sunken border p-4'}",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "v8/scenario-detail/detail.tsx",
+    "selector": "className=\"border-hairline rounded-card border p-4\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "v8/settings/staff/staff.tsx",
+    "selector": "className=\"rounded-card border border-hairline bg-canvas p-4\"",
+    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
+  },
+  {
+    "file": "v8/settings/staff/staff.tsx",
+    "selector": "className=\"mt-2 divide-y divide-hairline overflow-hidden rounded-card border border-hairline\"",
+    "reason": "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"
+  },
+  {
+    "file": "v8/templates/staff-asset-list.tsx",
+    "selector": "className=\"bg-canvas border-hairline text-ink-faint col-span-full rounded-card border border-dashed p-12 text-center text-sm\"",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "app/accounts/new/register-v8.module.css",
+    "selector": ".checkList",
+    "reason": "設定項目の一覧の外枠。行で区切り、影を重ねない。"
+  }
+]

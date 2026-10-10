@@ -51,7 +51,7 @@ export function IdentityStateBlock({
       kind={kind}
       title={failure?.title}
       description={failure?.description}
-      onRetry={kind === 'error' ? onRetry : undefined}
+      onRetry={onRetry}
       retrying={retrying}
     />
   )

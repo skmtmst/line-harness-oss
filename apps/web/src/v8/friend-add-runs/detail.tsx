@@ -10,9 +10,8 @@
  */
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { AlertCircle, ArrowLeft, CheckCircle2, Clock, MessageCircle, RotateCcw, Settings2, XCircle } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Clock, MessageCircle, RotateCcw, Settings2, XCircle } from 'lucide-react'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -26,6 +25,8 @@ import { describeFriendAddFailure } from '@/v8/friend-add/failure'
 import { MESSAGE_TYPE_LABEL } from '@/v8/friend-add/flow'
 import { DELIVERY_UNKNOWN_CODE, jstClock, jstShortDateTime, jstTitleDate, routingAction } from './status'
 import styles from './detail.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 type ActionRun = FriendAddRunDetail['actionRuns'][number]
 
@@ -86,7 +87,7 @@ function shortId(id: string): string {
 
 export default function FriendAddRunDetailV8() {
   return (
-    <Suspense fallback={<ListState kind="loading" />}>
+    <Suspense fallback={<DetailLoading />}>
       <FriendAddRunDetailInner />
     </Suspense>
   )
@@ -174,7 +175,7 @@ function FriendAddRunDetailInner() {
         setNotice('失敗した処理を再試行できませんでした。状態を読み直してください。')
         return
       }
-      setNotice(`${response.data.retried}件の失敗処理を再試行しました。`)
+      setNotice(`${response.data.retried} 件の失敗処理を再試行しました。`)
       await load()
     } catch (caught) {
       // M011：409 は応答が消えたあとの再送（実際は通っている）ことがあるので、読み直してから文を出す。
@@ -186,7 +187,7 @@ function FriendAddRunDetailInner() {
     }
   }
 
-  if (accountLoading || loading) return <ListState kind="loading" title="実行詳細を読み込んでいます" />
+  if (accountLoading || loading) return <DetailLoading label="実行詳細を読み込んでいます" />
   if (!runId) {
     return (
       <TargetMissing
@@ -235,7 +236,7 @@ function FriendAddRunDetailInner() {
   const routeName = detail.attribution.status === 'captured'
     ? detail.attribution.routeName || detail.attribution.reason || '選択した経路'
     : '経路が分からない'
-  const ruleLabel = detail.rule ? `${detail.rule.name ?? '名前は未取得'}（第${detail.rule.versionNumber ?? '—'}版）` : '使用ルールは未取得'
+  const ruleLabel = detail.rule ? `${detail.rule.name ?? '名前は未取得'}（第${detail.rule.versionNumber ?? emptyValue('unknown')}版）` : '使用ルールは未取得'
   const messageType = detail.rule?.definition?.messageType
   const messageLabel = messageType ? MESSAGE_TYPE_LABEL[messageType] ?? '案内' : '案内'
   const deliveryUnknown = detail.errorCode === DELIVERY_UNKNOWN_CODE
@@ -245,7 +246,7 @@ function FriendAddRunDetailInner() {
   const talkHref = !detail.friend.redacted ? `/chats?friend=${encodeURIComponent(detail.friend.id)}` : null
   const settingsHref = detail.rule ? `/friend-add-settings?view=edit&id=${encodeURIComponent(detail.rule.id)}` : null
 
-  const bandTitle = failedActions.length > 0
+  const bandTitle = deliveryUnknown ? '送達不明・要確認（自動では送り直しません）' : failedActions.length > 0
     ? `${firstFailed + (messageSent ? 2 : 1)}つ目の処理を完了できませんでした`
     : routingAction(detail.status, detail.errorCode)
   const bandNote = failedActions.length > 0
@@ -257,9 +258,8 @@ function FriendAddRunDetailInner() {
   return (
     <PageFrame kind="detail" boardId="N43uVX">
       <PageHeading
-        identity={<Link href={listHref} className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />実行結果へ</Link>}
         title={`${displayName}さんの友だち追加`}
-        description={`${jstTitleDate(detail.receivedAt)} に追加・${friendKindLabel}`}
+        help={`${jstTitleDate(detail.receivedAt)} に追加・${friendKindLabel}`}
       />
       <div className={styles.split}>
         <div className={styles.main}>
@@ -313,14 +313,15 @@ function FriendAddRunDetailInner() {
                     <span className={styles.stepText}>
                       <span className={styles.stepTitle}>{actionTitle(action, detail.configuredActions)}</span>
                       <span className={styles.stepSub} data-kind={message || state === 'wait' ? undefined : 'time'}>
-                        {message ?? (state === 'wait' ? `${time}・実行を待っています` : action.attemptCount > 1 ? `${time}・${action.attemptCount}回目` : time)}
+                        {message ?? (state === 'wait' ? `${time}・実行を待っています` : action.attemptCount > 1 ? `${time}・${action.attemptCount} 回目` : time)}
                       </span>
                     </span>
                   </li>
                 )
               })}
             </ol>
-            {!messageSent && actionRuns.length === 0 ? <p className={styles.cardSub}>行った処理はありません。</p> : null}
+            {detail.status === 'suppressed' && !deliveryUnknown ? <p className={styles.cardSub}>配信なし</p> : null}
+            {actionRuns.length === 0 ? <p className={styles.cardSub}>追加の処理はありません。</p> : null}
           </section>
           {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
         </div>
@@ -353,7 +354,7 @@ function FriendAddRunDetailInner() {
         description="届かなかった処理だけをもう一度行います。相手には新しく届きます。"
         confirmLabel="もう一度行う"
         busy={retrying}
-        onConfirm={() => void retry()}
+        onConfirm={() => retry()}
         onCancel={() => { if (!retrying) setResendConfirmOpen(false) }}
       />
     </PageFrame>

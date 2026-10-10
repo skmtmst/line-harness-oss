@@ -1,14 +1,5 @@
 // @vitest-environment happy-dom
-/*
- * m13m: ダッシュボードの出荷予定は表示ONなら0件でも出す。
- * 画面の見出し「今日やること」は出さない。
- *
- * 実React＋通信差替で確かめる。押さえる契約:
- *  - 表示ON・0件でメインの出荷予定カードが描かれる（hiddenにしない）
- *  - 0件は1行の空表示「今日・明日の出荷予定はありません」
- *  - 画面に見出し「今日やること」を出さない（上段4枚は残す）
- *  - パネル単体の主な状態（読み込み中・空・失敗・正常）
- */
+/* V8では出荷一覧は出荷があるときだけ出す。0件も数の帯では確認できる。 */
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -118,14 +109,15 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
-describe('m13m 表示ON・0件でも出荷予定カードを出す', () => {
-  it('0件でもカードを描き、1行の空表示を出す', async () => {
+describe('V8：0件でも出荷の件数を取得する', () => {
+  it('0件は数の帯に表示し、出荷の一覧は省く', async () => {
     await act(async () => { root.render(<DashboardPage />) })
     await flush()
-    const shipment = host.querySelector('[data-design="Shipment"]')
-    expect(shipment).not.toBeNull()
-    expect(shipment!.classList.contains('hidden')).toBe(false)
-    expect(shipment!.textContent).toContain('今日・明日の出荷予定はありません')
+    expect(host.querySelector('[data-design="Shipment"]')).toBeNull()
+    const label = Array.from(host.querySelectorAll('[data-kpi-presentation] p[title]'))
+      .find((node) => node.getAttribute('title') === '出荷予定（今日・明日）')
+    expect(label?.closest('[data-kpi-presentation]')?.textContent).toContain('0')
+    expect(net.calls.some((call) => call.includes('/api/ec-commerce/shipments'))).toBe(true)
   })
 
   it('画面に見出し「今日やること」を出さず、上段4枚は残す', async () => {
@@ -133,9 +125,9 @@ describe('m13m 表示ON・0件でも出荷予定カードを出す', () => {
     await flush()
     const headings = Array.from(host.querySelectorAll('h2')).map((node) => node.textContent?.trim())
     expect(headings).not.toContain('今日やること')
-    const smallCards = Array.from(host.querySelectorAll('h3')).map((node) => node.textContent?.trim())
+    const smallCards = Array.from(host.querySelectorAll('[data-kpi-presentation] p[title]')).map((node) => node.getAttribute('title'))
     for (const title of ['対応が必要な受信', '写真審査', '今日の予約', '出荷予定']) {
-      expect(smallCards).toContain(title)
+      expect(smallCards.some((value) => value?.startsWith(title))).toBe(true)
     }
   })
 })
@@ -167,7 +159,7 @@ describe('m13m 出荷予定パネルの主な状態', () => {
     await flush()
     expect(host.textContent).toContain('出荷予定を読み込めませんでした')
     const before = net.calls.filter((call) => call.includes('/api/ec-commerce/shipments')).length
-    const retry = Array.from(host.querySelectorAll('button')).find((node) => node.textContent === 'もう一度読み込む')
+    const retry = Array.from(document.body.querySelectorAll('button')).find((node) => node.textContent === 'もう一度読み込む')
     expect(retry).not.toBeUndefined()
     await act(async () => { retry!.click() })
     await flush()

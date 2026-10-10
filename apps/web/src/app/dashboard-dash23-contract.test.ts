@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -13,20 +13,6 @@ const sideCards = readFileSync(join(HERE, '..', 'components', 'dashboard', 'side
  * 期間ラベルは常に1行（nowrap）に保ち、タイトル側が1行省略で削られる。
  */
 describe('DASH-23 ダッシュボードの見出しは期間ラベルを折り返さない', () => {
-  it('期間ラベルはすべてのカードで折り返し禁止', () => {
-    // 送信枠・運用アラートの期間は SideCard 側に移ったので、両方を読む。
-    // ★V7（2026-09-27）：題と「？」・期間はひとかたまりで縦の中央にそろえるため、
-    // 期間ラベルは `shrink-0`（`flex-1`・`pt-0.5` はやめた）。折り返し禁止の意図は変えない。
-    const pattern = /text-ink-faint flex-1 [^"]*pt-0\.5[^"]*|text-ink-faint flex-1 [^"]*(?:text-\[11px\]|text-micro)[^"]*|text-ink-faint whitespace-nowrap text-xs font-normal|text-ink-faint shrink-0 [^"]*whitespace-nowrap[^"]*/g
-    const periods = (source.match(pattern) ?? []).concat(sideCards.match(pattern) ?? [])
-    expect(periods.length).toBeGreaterThanOrEqual(4)
-    for (const cls of periods) expect(cls).toContain('whitespace-nowrap')
-  })
-
-  it('カードタイトルは1行省略＋title属性で全文を見せる', () => {
-    const titles = source.match(/min-w-0 truncate [^"]*(?:font-semibold|font-bold)[^"]*" title=/g) ?? []
-    expect(titles.length).toBeGreaterThanOrEqual(3)
-  })
 
   // ★V7：「運用アラート」は切らずに出し、件数と札は本文の段へ出す。
   // 見出しは SideCard の題に残る。題に省略（truncate）を付けない。

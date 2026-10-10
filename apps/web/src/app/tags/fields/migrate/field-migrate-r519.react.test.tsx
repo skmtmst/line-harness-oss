@@ -10,11 +10,13 @@ const fixture = vi.hoisted(() => ({
   migrationPreview: vi.fn(),
 }))
 
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin', canManageRole: () => true }))
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/tags',
   useRouter: () => ({ push: fixture.routerPush }),
   useSearchParams: () => new URLSearchParams('id=source-1'),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-1' }),
 }))
@@ -60,6 +62,7 @@ const SOURCE = {
 const CREATED = {
   ...SOURCE,
   id: 'ff-new',
+  type: 'select',
   name: '旧項目（新）',
   fieldKey: 'old_key_new',
 }
@@ -78,6 +81,8 @@ async function waitForReady() {
     CI run36668283000 はここを待たずに押し、2回目だけ新しいキーになった。
   */
   await act(async () => {})
+  // V8の変換見本の取得と、本移行先を作った後の事前確認を分けて数える。
+  fixture.migrationPreview.mockClear()
 }
 
 beforeEach(() => {
@@ -127,7 +132,7 @@ describe('R519 移行先の作成応答を失っても復帰する', () => {
       'source-1', 'account-1', { targetFieldId: 'ff-new' },
     )
     // 事前確認の描画まで進む。不完全な応答のままでは画面が落ち、ここで赤になる。
-    await screen.findByText('確認が必要な値はありません。')
+    await screen.findByText('事前確認の結果')
   })
 
   it('差し込み名の重複では同一内容の作成済みを取り直して続ける', async () => {

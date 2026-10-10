@@ -3,6 +3,7 @@
  * src/v8 からは @/app を読めないので、今の画面（app/templates）の
  * 決め事を写している。言い回しを変えるときは両方を見る。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import type { api } from '@/lib/api'
 
 /** 詳細口（GET /api/templates/:id）が返す1件分の形。 */
@@ -141,7 +142,7 @@ export function buildUsageRows(usage: TemplateUsage | null | undefined): UsageRo
     ...usage.scenarioSteps.map((u) => ({
       key: `scenario-step-${u.stepId}`,
       kind: 'シナリオ配信',
-      name: `${u.scenarioName}・${u.stepOrder}通目`,
+      name: `${u.scenarioName}・${u.stepOrder} 通目`,
       version: versionText(u.templateVersion ?? null),
       versionNumber: u.templateVersion ?? null,
       fixed: u.templateVersion !== null && u.templateVersion !== undefined,
@@ -210,26 +211,30 @@ export function publishRowState(row: UsageRow): string {
 
 /** 版の差（行ごと）。消えた行は「－」、増えた行は「＋」。同じ行は出さない。 */
 export function lineChanges(before: string, after: string): Array<{ kind: 'removed' | 'added'; text: string }> {
-  const beforeLines = before.split('\n').map((line) => line.trimEnd()).filter((line) => line !== '')
-  const afterLines = after.split('\n').map((line) => line.trimEnd()).filter((line) => line !== '')
-  const afterSet = new Set(afterLines)
-  const beforeSet = new Set(beforeLines)
+  const lines = (text: string) => [...new Set(text.split('\n').map(line => line.trimEnd()).filter(line => line.trim() !== ''))]
+  const left = lines(before), right = lines(after)
+  // 最長の共通順序を残す。同じ文字があっても順番が変わった行は削除＋追加にする。
+  const lengths = Array.from({ length: left.length + 1 }, () => new Uint32Array(right.length + 1))
+  for (let i = left.length - 1; i >= 0; i--) {
+    for (let j = right.length - 1; j >= 0; j--) {
+      lengths[i][j] = left[i] === right[j] ? lengths[i + 1][j + 1] + 1 : Math.max(lengths[i + 1][j], lengths[i][j + 1])
+    }
+  }
+  const removed: string[] = [], added: string[] = []
+  let i = 0, j = 0
+  while (i < left.length && j < right.length) {
+    if (left[i] === right[j]) { i++; j++ }
+    else if (lengths[i + 1][j] >= lengths[i][j + 1]) removed.push(left[i++])
+    else added.push(right[j++])
+  }
+  removed.push(...left.slice(i)); added.push(...right.slice(j))
   return [
-    ...beforeLines.filter((line) => !afterSet.has(line)).map((text) => ({ kind: 'removed' as const, text })),
-    ...afterLines.filter((line) => !beforeSet.has(line)).map((text) => ({ kind: 'added' as const, text })),
+    ...removed.map(text => ({ kind: 'removed' as const, text })),
+    ...added.map(text => ({ kind: 'added' as const, text })),
   ]
 }
 
 /** 「8月21日 18:02」（日本時間）。年が違うときは年も出す。 */
 export function shortStamp(value: string | null | undefined, now: Date = new Date()): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', hourCycle: 'h23' })
-      .formatToParts(date).map((p) => [p.type, p.value]),
-  )
-  const nowYear = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric' }).formatToParts(now).find((p) => p.type === 'year')?.value
-  const head = parts.year !== nowYear ? `${parts.year}年` : ''
-  return `${head}${parts.month}月${parts.day}日 ${parts.hour}:${parts.minute}`
+  return polishFormatDate(value, { style: 'detail', now })
 }

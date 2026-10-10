@@ -38,7 +38,7 @@ export const NOT_AVAILABLE = '—'
 export function inExecutionOrder(rules: SupportMarkAutomationRule[]): SupportMarkAutomationRule[] {
   return [...rules].sort((a, b) => {
     if (b.priority !== a.priority) return b.priority - a.priority
-    return a.updatedAt.localeCompare(b.updatedAt)
+    return 0 // APIは同順位を作成日時順で返す。更新日時で並べ替えない。
   })
 }
 
@@ -142,12 +142,13 @@ export type RuleDraft = {
   priority: string
   manualProtectionMinutes: string
   isActive: boolean
+  condition?: SupportMarkAutomationRule['condition']
 }
 
 export type RuleBody = {
   name: string
   event: SupportMarkAutomationEvent
-  condition: null
+  condition: SupportMarkAutomationRule['condition']
   priority: number
   manualProtectionMinutes: number
   isActive: boolean
@@ -164,7 +165,7 @@ export function toRuleBody(draft: RuleDraft): RuleBody {
   return {
     name: draft.name.trim(),
     event: draft.event,
-    condition: null,
+    condition: draft.condition ?? null,
     priority: Number(draft.priority),
     manualProtectionMinutes: Number(draft.manualProtectionMinutes),
     isActive: draft.isActive,

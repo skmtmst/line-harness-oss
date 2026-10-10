@@ -8,6 +8,7 @@
  * 聞く項目・保存の口・送る形・入力の断り方は今の画面（app/affiliate-offers/new-offer-v8.tsx）から写した。
  * 成果地点を案件につなぐ口がまだ無い（F-23）ので、成果地点の欄は押せない形で置く（BEHAVIOR.md）。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -24,9 +25,16 @@ import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
+import { useFormErrors } from '@/lib/use-form-errors'
+import ValidationSummary from '@/components/shared/validation-summary'
+import { FieldError } from '@/components/shared/form-controls'
 import styles from './create.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import NumberInput from '@/components/shared/number-field'
 
 const OFFER_LIST_PATH = '/conversions?tab=offers'
 
@@ -123,16 +131,21 @@ export default function AffiliateOfferCreateV8() {
   const yen = rewardAmount ? Number(rewardAmount) : 0
   const miles = rewardMiles ? Number(rewardMiles) : 0
 
+  /* 欄に結び付く誤りは欄で知らせて1つ目へ移る（B-139）。上の帯はアカウントと候補の読み込みだけ。 */
+  const fields = useFormErrors()
+  fields.define('name', '案件名', () => (name.trim() ? null : '案件名を入力してください'))
+  fields.define('amount', '報酬額（円）', () => (!rewardAmount && !rewardMiles ? '報酬（円かマイル）のどちらかを入れてください' : rewardIntegerError(rewardAmount, 'amount')))
+  fields.define('miles', 'マイル', () => rewardIntegerError(rewardMiles, 'miles'))
+  fields.define('tag', '付けるタグ', () => (tagEnabled && !tagId ? '付けるタグを選んでください' : null))
+  fields.define('scenario', '開始するシナリオ', () => (scenarioEnabled && !scenarioId ? '開始するシナリオを選んでください' : null))
+  const describedBy = (key: string) => (fields.invalid(key) ? `of-${key}-error` : undefined)
+
   const validate = (): string | null => {
-    if (!name.trim()) return '案件名を入力してください'
     if (!selectedAccountId) return 'LINEアカウントを選んでください（画面上部で選べます）'
     if (tagsFetch === 'failed' || scenariosFetch === 'failed') {
       return 'タグまたはシナリオの候補を読み込めませんでした。「もう一度読み込む」で取り直してから保存してください'
     }
-    if (tagEnabled && !tagId) return '付けるタグを選んでください'
-    if (scenarioEnabled && !scenarioId) return '開始するシナリオを選んでください'
-    if (!rewardAmount && !rewardMiles) return '報酬（円かマイル）のどちらかを入れてください'
-    return rewardIntegerError(rewardAmount, 'amount') ?? rewardIntegerError(rewardMiles, 'miles')
+    return null
   }
 
   const reset = () => {
@@ -151,6 +164,11 @@ export default function AffiliateOfferCreateV8() {
   /* `publish` が真なら公開で作る（保存して公開）。偽なら下書きで作り、続けて作れるよう空にする。 */
   const runSave = async (publish: boolean) => {
     if (saving) return
+    if (fields.submit().length > 0) {
+      setSaveError('')
+      setSaveNote('')
+      return
+    }
     const invalid = validate()
     if (invalid) {
       setSaveError(invalid)
@@ -188,7 +206,7 @@ export default function AffiliateOfferCreateV8() {
         router.push(`${OFFER_LIST_PATH}&highlight=${encodeURIComponent(offerId)}`)
       } else {
         reset()
-        setSaveNote('下書きに保存しました。続けて作れます。')
+        notifySaved('下書きに保存しました。続けて作れます。')
       }
     } catch (caught) {
       setSaveError(caught instanceof Error ? caught.message : '保存できませんでした')
@@ -236,7 +254,7 @@ export default function AffiliateOfferCreateV8() {
       boardId="Td4TN"
       identity={<Link href="/affiliates" className={styles.back}>← 成果とアフィリエイトへ</Link>}
       title="案件を作る"
-      description="「何を紹介すると、いくら払うか」を決めます。公開すると、アフィリエイターの画面に出ます。"
+      help="「何を紹介すると、いくら払うか」を決めます。公開すると、アフィリエイターの画面に出ます。"
       preview={preview}
       status={canEdit ? (saving ? '保存しています' : createdId ? '下書きを保存済み・続きを作れます' : undefined) : undefined}
       footerActions={(
@@ -253,25 +271,21 @@ export default function AffiliateOfferCreateV8() {
             </>
           ) : null}
         </>
-      )}
+      )} dirty={false}
     >
-      {canEdit ? null : <p className={styles.viewerBand} role="status">閲覧のみで見ています。案件を作るのは管理者に頼んでください。</p>}
+      {canEdit ? null : <p className={styles.viewerBand} role="status">閲覧のみで見ています。案件を作るのはオーナーか管理者に頼んでください。</p>}
       {saveError ? <p className={styles.error} role="alert">{saveError}</p> : null}
       {saveNote ? <p className={styles.note} role="status">{saveNote}</p> : null}
+      <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
 
       <section className={styles.card} aria-labelledby="af-new-what">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="af-new-what">どんな案件か</h2>
           <p className={styles.cardNote}>アフィリエイターの画面に出ます</p>
         </div>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="of-name">案件名</label>
-          <TextField id="of-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：定期便の初回" maxLength={120} readOnly={!canEdit} />
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="of-description">説明<span className={styles.optional}>任意</span></label>
-          <TextField id="of-description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：初回の定期便をお申し込みいただいた方が対象です。" maxLength={500} readOnly={!canEdit} />
-        </div>
+        <div className={styles.field}><Field label="案件名" htmlFor="of-name"><TextField {...fields.bind('name')} invalid={fields.invalid('name')} aria-describedby={describedBy('name')} id="of-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：定期便の初回" maxLength={120} readOnly={!canEdit} />
+<FieldError id="of-name-error">{fields.error('name')}</FieldError></Field></div>
+        <div className={styles.field}><Field label="説明" htmlFor="of-description"><TextField id="of-description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：初回の定期便をお申し込みいただいた方が対象です。" maxLength={500} readOnly={!canEdit} /></Field></div>
       </section>
 
       <section className={styles.card} aria-labelledby="af-new-point">
@@ -304,17 +318,10 @@ export default function AffiliateOfferCreateV8() {
           <p className={styles.cardNote}>アフィリエイター側の決まりが「定額」のときにこの額を使います</p>
         </div>
         <div className={styles.pair}>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="of-amount">報酬額（円）</label>
-            <TextField id="of-amount" type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="2000" readOnly={!canEdit} />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="of-miles">
-              マイル（任意）<span className={styles.optional}>任意</span>
-              <HelpTip label="マイルの説明">現金とマイルは併用できます。マイルは標準プログラムで付けます。</HelpTip>
-            </label>
-            <TextField id="of-miles" type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="200" readOnly={!canEdit} />
-          </div>
+          <div className={styles.field}><Field label="報酬額（円）" htmlFor="of-amount"><NumberInput unit="円" {...fields.bind('amount')} invalid={fields.invalid('amount')} aria-describedby={describedBy('amount')} id="of-amount" type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="2000" readOnly={!canEdit} />
+<FieldError id="of-amount-error">{fields.error('amount')}</FieldError></Field></div>
+          <div className={styles.field}><Field label="マイル" htmlFor="of-miles" help={<>現金とマイルは併用できます。マイルは標準プログラムで付けます。</>}><NumberInput {...fields.bind('miles')} invalid={fields.invalid('miles')} aria-describedby={describedBy('miles')} id="of-miles" type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="200" readOnly={!canEdit} />
+<FieldError id="of-miles-error">{fields.error('miles')}</FieldError></Field></div>
         </div>
       </section>
 
@@ -324,43 +331,55 @@ export default function AffiliateOfferCreateV8() {
           <p className={styles.cardNote}>任意</p>
         </div>
         <div className={styles.switchRow}>
-          <Toggle checked={tagEnabled} label="タグを付ける" onChange={canEdit ? (next) => { setTagEnabled(next); if (!next) setTagId('') } : undefined} />
+          <SettingCheckbox checked={tagEnabled} label="タグを付ける" onChange={canEdit ? (next) => { setTagEnabled(next); if (!next) setTagId('') } : undefined} />
           <div className={styles.switchBody}>
             <p className={styles.switchName}>タグを付ける</p>
             <p className={styles.switchNote}>{tagName ?? 'まだ決めていません'}</p>
             {tagEnabled ? (
-              <div className={styles.selectBox}>
-                <Select
+              <div className={styles.selectBox} {...fields.bind('tag')}>
+                <EntityKindField
+                  invalid={fields.invalid('tag')}
+                  describedBy={fields.error('tag') ? 'of-tag-error' : undefined}
                   id="of-tag"
-                  aria-label="付けるタグ"
-                  size="full"
+                  kind="tag"
+                  label="付けるタグ"
                   value={tagId}
                   onChange={(value) => setTagId(value)}
-                  options={[{ value: '', label: '（なし）' }, ...tags.filter((t) => (t.status ?? 'active') === 'active').map((t) => ({ value: t.id, label: t.name }))]}
+                  clearable
+                  placeholder="（なし）"
+                  readOnly={!canEdit}
+                  options={tags.filter((t) => (t.status ?? 'active') === 'active')}
                 />
               </div>
             ) : null}
+            {tagEnabled ? <FieldError id="of-tag-error">{fields.error('tag')}</FieldError> : null}
             {tagsFetch === 'loading' && tagEnabled ? <p className={styles.switchNote}>タグの候補を読み込んでいます</p> : null}
             {tagsFetch === 'failed' ? retry('タグ') : null}
           </div>
         </div>
         <div className={styles.switchRow}>
-          <Toggle checked={scenarioEnabled} label="シナリオ配信を始める" onChange={canEdit ? (next) => { setScenarioEnabled(next); if (!next) setScenarioId('') } : undefined} />
+          <SettingCheckbox checked={scenarioEnabled} label="シナリオ配信を始める" onChange={canEdit ? (next) => { setScenarioEnabled(next); if (!next) setScenarioId('') } : undefined} />
           <div className={styles.switchBody}>
             <p className={styles.switchName}>シナリオ配信を始める</p>
             <p className={styles.switchNote}>{scenarioName ?? 'まだ決めていません'}</p>
             {scenarioEnabled ? (
-              <div className={styles.selectBox}>
-                <Select
+              <div className={styles.selectBox} {...fields.bind('scenario')}>
+                <EntityKindField
+                  invalid={fields.invalid('scenario')}
+                  describedBy={fields.error('scenario') ? 'of-scenario-error' : undefined}
+                  kind="scenario"
                   id="of-scenario"
-                  aria-label="開始するシナリオ"
-                  size="full"
+                  label="開始するシナリオ"
                   value={scenarioId}
                   onChange={(value) => setScenarioId(value)}
-                  options={[{ value: '', label: '（なし）' }, ...scenarios.filter((s) => s.isActive !== false).map((s) => ({ value: s.id, label: s.name }))]}
+                  clearable
+                  placeholder="（なし）"
+                  readOnly={!canEdit}
+                  options={scenarios.filter((s) => s.isActive !== false)}
                 />
               </div>
             ) : null}
+            {scenarioEnabled ? <FieldError id="of-scenario-error">{fields.error('scenario')}</FieldError> : null}
             {scenariosFetch === 'loading' && scenarioEnabled ? <p className={styles.switchNote}>シナリオの候補を読み込んでいます</p> : null}
             {scenariosFetch === 'failed' ? retry('シナリオ') : null}
           </div>

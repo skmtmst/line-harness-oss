@@ -1,0 +1,132 @@
+{
+  "measured": [
+    {
+      "name": "dashboard",
+      "route": "/",
+      "showMs": 755,
+      "pressMs": 80,
+      "lcpMs": 208,
+      "jsBytes": 3233452,
+      "longTaskMs": 0
+    },
+    {
+      "name": "inbox",
+      "route": "/chats",
+      "showMs": 702,
+      "pressMs": 84,
+      "lcpMs": 160,
+      "jsBytes": 1396356,
+      "longTaskMs": 0
+    },
+    {
+      "name": "friends",
+      "route": "/friends",
+      "showMs": 723,
+      "pressMs": 85,
+      "lcpMs": 152,
+      "jsBytes": 1638694,
+      "longTaskMs": 0
+    },
+    {
+      "name": "broadcasts",
+      "route": "/broadcasts",
+      "showMs": 737,
+      "pressMs": 84,
+      "lcpMs": 144,
+      "jsBytes": 1816416,
+      "longTaskMs": 0
+    },
+    {
+      "name": "broadcast-new",
+      "route": "/broadcasts/new",
+      "showMs": 702,
+      "pressMs": null,
+      "lcpMs": 168,
+      "jsBytes": 1716457,
+      "longTaskMs": 0
+    },
+    {
+      "name": "templates",
+      "route": "/templates",
+      "showMs": 754,
+      "pressMs": 80,
+      "lcpMs": 168,
+      "jsBytes": 1457135,
+      "longTaskMs": 0
+    },
+    {
+      "name": "booking",
+      "route": "/booking/bookings",
+      "showMs": 696,
+      "pressMs": 85,
+      "lcpMs": 164,
+      "jsBytes": 1233626,
+      "longTaskMs": 0
+    },
+    {
+      "name": "answers",
+      "route": "/form-submissions",
+      "showMs": 706,
+      "pressMs": 85,
+      "lcpMs": 148,
+      "jsBytes": 1297283,
+      "longTaskMs": 0
+    },
+    {
+      "name": "tags",
+      "route": "/tags",
+      "showMs": 715,
+      "pressMs": 83,
+      "lcpMs": 140,
+      "jsBytes": 1891670,
+      "longTaskMs": 0
+    },
+    {
+      "name": "settings",
+      "route": "/settings",
+      "showMs": 716,
+      "pressMs": 88,
+      "lcpMs": 104,
+      "jsBytes": 2846353,
+      "longTaskMs": 0
+    }
+  ],
+  "failures": [
+    "inbox pressMs=84 が基準 67 より20%を超えて悪い",
+    "friends pressMs=85 が基準 67 より20%を超えて悪い",
+    "templates pressMs=80 が基準 66 より20%を超えて悪い",
+    "booking pressMs=85 が基準 66 より20%を超えて悪い",
+    "tags pressMs=83 が基準 67 より20%を超えて悪い"
+  ],
+  "targetMisses": [],
+  "environment": {
+    "sourceSha": "06b97de4797515d0860fbefd6b5433645e4a0ca5",
+    "mockFixSha": "e36fab8818",
+    "corsFixSha": "ae664e67fd",
+    "node": "22.23.3",
+    "chromium": "151.0.7922.34",
+    "platform": "macOS arm64",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "theme": "v8",
+    "samplesPerScreen": 3,
+    "statistic": "median",
+    "api": "http://127.0.0.1:8788",
+    "web": "http://127.0.0.1:4310",
+    "allowJsBaselineUpdate": false,
+    "budgetSha256": "2db09887f91e36c40f651f6872beeaa5fc6a8c896dffa7bb78ea031d2e9a72f5"
+  },
+  "stress": {
+    "name": "friends-2000",
+    "route": "/friends",
+    "status": "timeout",
+    "requestedRows": 2000,
+    "navigationTimeoutMs": 20000,
+    "fallbackNavigationTimeoutMs": 20000,
+    "extendedDiagnosticTimeoutMs": 90000,
+    "measured": null,
+    "note": "標準CLIは負荷測定で時間切れになりJSONを書かないため、通常10画面は同じmeasureScreen・median・judge・targetMissesを呼び出して保存。負荷の表示・反応・LCP・長い作業・JS量は確定していない。"
+  }
+}

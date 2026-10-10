@@ -76,6 +76,7 @@ export function HeadStatusMenu({
       options={STATUS_ORDER.map((status) => ({
         value: status,
         label: HEAD_STATUS_LABEL[status],
+        tone: SUPPORT_STATUS_TONES[status],
         leading: <StatusDot tone={SUPPORT_STATUS_TONES[status]} />,
       }))}
     />

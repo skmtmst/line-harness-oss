@@ -256,10 +256,62 @@ test('v8 の削除の窓（VsSyu）は危ない操作を左端に離し、動い
   await act(async () => { remove.click() })
   await eventually(() => {
     const dialog = document.querySelector('[data-design-node="VsSyu"]')
-    expect(dialog?.textContent).toContain('「契約終了の前に知らせる」を削除する')
+    expect(dialog?.textContent).toContain('「契約終了の前に知らせる」を削除しますか？')
     expect(dialog?.textContent).toContain('削除は元に戻せません。')
     const buttons = [...dialog!.querySelectorAll('button')].map((button) => button.textContent?.trim())
     // 右上の×（文字なし）のあと、左端に削除、真ん中に取消と代わりの操作。
     expect(buttons.filter(Boolean)).toEqual(['削除する', 'キャンセル', '代わりに一時停止'])
   })
+})
+
+test('下書きの削除も確認前には送信せず、元に戻すで延期しない', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  handler = url => url.pathname === '/api/reminders'
+    ? response({ success: true, data: { items: [{ ...reminder, isActive: false, lifecycleStatus: 'draft', plannedDeliveries: 0 }], total: 1, limit: 20 } })
+    : base(url)
+  await act(async () => root.render(<RemindersPage />))
+  await eventually(() => expect(host.querySelector('tbody tr')).toBeTruthy())
+  await act(async () => (host.querySelector('tbody button[aria-label*="操作"]') as HTMLElement).click())
+  await eventually(() => expect(document.querySelector('[role="menuitem"]')).toBeTruthy())
+  await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim() === '削除') as HTMLElement).click())
+  await eventually(() => expect(document.querySelector('[data-design-node="VsSyu"]')?.textContent).toContain('削除しますか？'))
+  expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
+  const confirm = [...document.querySelectorAll('[data-design-node="VsSyu"] button')].find(button => button.textContent === '削除する') as HTMLElement
+  await act(async () => confirm.click())
+  expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(true)
+})
+
+test('停止中のリマインダーの再開は確認も延期もせず送る', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  handler = url => url.pathname === '/api/reminders'
+    ? response({ success: true, data: { items: [{ ...reminder, isActive: false, lifecycleStatus: 'stopped' }], total: 1, limit: 20 } })
+    : base(url)
+  await act(async () => root.render(<RemindersPage />))
+  await eventually(() => expect(host.querySelector('tbody tr')).toBeTruthy())
+  await act(async () => (host.querySelector('tbody button[aria-label*="操作"]') as HTMLElement).click())
+  await eventually(() => expect(document.querySelector('[role="menuitem"]')).toBeTruthy())
+  await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim() === '再開する') as HTMLElement).click())
+  expect(vi.mocked(fetch).mock.calls.some(([url, init]) => String(url).includes('/api/reminders/r-1') && init?.method === 'PUT')).toBe(true)
+  expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
+})
+
+test('リマインダーの全件選択はページ外の停止対象も確認する', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  const rows = Array.from({ length: 101 }, (_, i) => ({ ...reminder, id: `r-${i}`, name: `お知らせ${i}` }))
+  handler = url => {
+    if (url.pathname !== '/api/reminders') return base(url)
+    const limit = Number(url.searchParams.get('limit')) || 20
+    const page = Number(url.searchParams.get('page')) || 1
+    return response({ success: true, data: { items: rows.slice((page - 1) * limit, page * limit), total: rows.length, limit } })
+  }
+  await act(async () => root.render(<RemindersPage />))
+  await eventually(() => expect(host.querySelector('tbody tr')).toBeTruthy())
+  await act(async () => (host.querySelector('thead input[type="checkbox"]') as HTMLElement).click())
+  const all = [...host.querySelectorAll('button')].find(button => button.textContent === '101件すべてを選ぶ') as HTMLElement
+  expect(all).toBeTruthy()
+  await act(async () => all.click())
+  expect(host.textContent).toContain('101件を選択中')
+  const stop = [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === '止める') as HTMLElement
+  await act(async () => stop.click())
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('101件のリマインダーを停止しますか？')
 })

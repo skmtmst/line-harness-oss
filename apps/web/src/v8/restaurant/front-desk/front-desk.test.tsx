@@ -97,12 +97,26 @@ describe('電話予約（E-2）', () => {
     expect((screen.getByRole('textbox', { name: 'お名前' }) as HTMLInputElement).value).toBe('鈴木 美咲')
     fireEvent.click(screen.getByText(/明日/))
     fireEvent.click(await screen.findByRole('button', { name: '19:00' }))
-    expect(screen.getByRole('switch', { name: 'LINE で確認を送る' })).not.toBeNull()
+    expect(screen.getByRole('checkbox', { name: 'LINE で確認を送る' })).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /予約を入れる/ }))
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith({ lineFailed: false }))
     expect(api.createReservation).toHaveBeenCalledWith('acc', expect.objectContaining({
       source: 'phone', customerName: '鈴木 美咲', customerPhone: '090-1234-5678', lineUid: 'U-1', guestCount: 2, tableId: 't1', notifyLine: true,
     }))
+  })
+
+  it('B-139：お名前も時刻も無いまま入れると、口を呼ばず2つの欄に理由が出て、お名前の欄へ移る', async () => {
+    render(<PhoneReservationDrawer open accountId="acc" storeId="store-1" tables={T} onClose={() => {}} onSaved={vi.fn()} />)
+    fireEvent.click(screen.getByText(/明日/))
+    await screen.findByRole('button', { name: '19:00' })
+    fireEvent.click(screen.getByRole('button', { name: /予約を入れる/ }))
+    await new Promise((r) => requestAnimationFrame(r))
+    expect(api.createReservation).not.toHaveBeenCalled()
+    const name = screen.getByRole('textbox', { name: 'お名前' })
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(document.getElementById('e2-name-error')?.textContent).toBe('お名前を入れてください。')
+    expect(document.getElementById('e2-time-error')?.textContent).toBe('時刻を選んでください。')
+    await waitFor(() => expect(document.activeElement).toBe(name))
   })
 
   it('友だちでないときは「LINE で確認を送る」を出さず、送らない', async () => {

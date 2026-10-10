@@ -65,7 +65,7 @@ describe('切替器の小型（d8X09）', () => {
 
   it('箱型の既定（項目 6/12・文 13・器 control）は変えない', () => {
     expect(CSS).toMatch(/\.item\s*\{[^}]*padding:\s*6px 12px/s)
-    expect(CSS).toMatch(/\.item\s*\{[^}]*font-size:\s*var\(--text-label\)/s)
+    expect(CSS).toMatch(/\.item\s*\{[^}]*font-size:\s*var\(--text-body\)/s)
   })
 })
 

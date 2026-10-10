@@ -29,11 +29,11 @@ describe('任意の札', () => {
     expect(screen.getByText('必須')).toBeTruthy()
   })
 
-  it('11px・行は変数・左に6・丸い地なし（v7 は変えない）', () => {
+  it('V7の札を保ち、V8は共通の札の地を持つ', () => {
     expect(css).toMatch(/\.optional\s*\{[^}]*margin-left:\s*6px/s)
     expect(css).toMatch(/\.optional\s*\{[^}]*font-size:\s*var\(--text-micro\)/s)
     expect(css).toMatch(/\.optional\s*\{[^}]*line-height:\s*var\(--text-micro--line-height\)/s)
-    expect(css).not.toMatch(/\.optional\s*\{[^}]*background/s)
-    expect(css).not.toMatch(/\.optional\s*\{[^}]*border-radius/s)
+    expect(css.split("[data-theme='v8'] .optional")[0]).not.toMatch(/\.optional\s*\{[^}]*background/s)
+    expect(css.split("[data-theme='v8'] .optional")[0]).not.toMatch(/\.optional\s*\{[^}]*border-radius/s)
   })
 })

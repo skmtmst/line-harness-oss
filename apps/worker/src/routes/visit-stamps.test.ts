@@ -15,6 +15,15 @@ describe('スタンプAPIの本人・店舗・権限',()=>{
   expect((await call('/api/liff/visit-stamps/cards?accountId=shop','GET',undefined,'invalid')).status).toBe(401);
   expect((await call('/api/liff/visit-stamps/cards?accountId=other')).status).toBe(401);
  });
+ it('カード一覧は別店舗のカードを含まず、URL指定で店舗の範囲を変えない',async()=>{
+  const otherCard=await saveStampCard(f.db,tenant,{name:'別店舗のカード',accountIds:['other'],active:true,expectedVersion:0,settings:{mode:'visit',amountUnit:1000,maxPerVisit:1,firstVisitBonus:0,expiryMonths:null,timezone:'Asia/Tokyo',multipliers:[],rankMultipliers:[],rewards:[{id:'other-reward',name:'別店舗の特典',stamps:1}]}});
+  for(const wanted of [card,otherCard.id,'missing-card']){
+   const res=await call(`/api/liff/visit-stamps/cards?accountId=shop&card=${wanted}`);
+   expect(res.status).toBe(200);
+   const body=await res.json() as {data:Array<{card:{id:string}}>};
+   expect(body.data.map(x=>x.card.id)).toEqual([card]);
+  }
+ });
  it('LIFFの特典選択では使用済みにならず、PINなしの使用を拒否する',async()=>{
   await grantStamps(f.db,{cardId:card,friendId:'friend',accountId:'shop',count:2,reason:'試験',actorId:'staff',requestId:'grant',kind:'manual'});
   const r=await call(`/api/liff/visit-stamps/cards/${card}/rewards?accountId=shop`,'POST',{rewardId:'reward',requestId:'request'});expect(r.status).toBe(201);
@@ -73,4 +82,32 @@ it('専用キーを止めるとLIFFも手動押印も拒み、予約キー停止
  f.raw.exec("INSERT INTO account_settings(line_account_id,key,value) VALUES('shop','feature.booking','false')");expect((await call('/api/liff/visit-stamps/cards?accountId=shop')).status).toBe(200);
  f.raw.exec("INSERT INTO account_settings(line_account_id,key,value) VALUES('shop','feature.visit_stamps','false')");expect((await call('/api/liff/visit-stamps/cards?accountId=shop')).status).toBe(403);
  expect((await call(`/api/visit-stamps/cards/${card}/grants`,'POST',{accountId:'shop',friendId:'friend',count:1,reason:'試験',requestId:'disabled'})).status).toBe(403);
+});
+
+it('背景は既存の画像置き場のJPG・PNGだけ保存し、3MB超・外部URL・閲覧のみを拒む',async()=>{
+ const old=await (await call('/api/visit-stamps/cards')).json() as any;
+ const original=old.data.find((x:any)=>x.id===card);
+ const input={name:original.name,accountIds:original.accountIds,active:true,expectedVersion:original.version,settings:{...original.settings,backgroundImageUrl:'https://localhost/images/card.png'}};
+ const head=vi.fn(async()=>({size:3*1024*1024,httpMetadata:{contentType:'image/png'}}));
+ const update=()=>app.request(`https://localhost/api/visit-stamps/cards/${card}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)},{DB:f.db,IMAGES:{head}} as unknown as Env['Bindings']);
+ head.mockResolvedValueOnce({size:3*1024*1024+1,httpMetadata:{contentType:'image/png'}});expect((await update()).status).toBe(400);
+ input.settings.backgroundImageUrl='https://outside.test/images/card.png';expect((await update()).status).toBe(400);
+ input.settings.backgroundImageUrl='https://localhost/images/card.png';head.mockResolvedValueOnce({size:20,httpMetadata:{contentType:'image/webp'}});expect((await update()).status).toBe(400);
+ readonly=true;expect((await update()).status).toBe(403);readonly=false;
+ const saved=await update();expect(saved.status).toBe(200);expect((await saved.json() as any).data.settings.backgroundImageUrl).toBe(input.settings.backgroundImageUrl);
+});
+it('LIFFはゴール特典の使用前には次のカードを受け取れず、使用後は次の財布を読める',async()=>{
+ const {readStampCard,stampCard,setStampPin}=await import('../services/visit-stamps.js');
+ const original=await readStampCard(f.db,await stampCard(f.db,card));
+ const next=await saveStampCard(f.db,tenant,{name:'ゴールド',accountIds:['shop'],active:true,expectedVersion:0,settings:{...original.settings,receiptBonus:2}});
+ await saveStampCard(f.db,tenant,{...original,expectedVersion:original.version,settings:{...original.settings,completion:'next_card',nextCardId:next.id}},card);
+ const list=()=>call('/api/liff/visit-stamps/cards?accountId=shop');
+ expect((await (await list()).json() as any).data.map((x:any)=>x.card.id)).toEqual([card]);
+ expect((await call(`/api/liff/visit-stamps/cards/${next.id}?accountId=shop`)).status).toBe(409);
+ await grantStamps(f.db,{cardId:card,friendId:'friend',accountId:'shop',count:1,reason:'試験',actorId:'staff',requestId:'level-up',kind:'manual'});
+ const offered=await call(`/api/liff/visit-stamps/cards/${card}/rewards?accountId=shop`,'POST',{rewardId:'reward',requestId:'level-offer'});const id=(await offered.json() as any).data.id;
+ expect((await (await list()).json() as any).data).toHaveLength(1);
+ await setStampPin(f.db,'shop','staff','1234');const used=await call(`/api/liff/visit-stamps/redemptions/${id}/use?accountId=shop`,'POST',{pin:'1234'});
+ expect((await used.json() as any).data.nextCardId).toBe(next.id);
+ for(let i=0;i<2;i++){const cards=(await (await list()).json() as any).data;expect(cards.find((x:any)=>x.card.id===next.id).wallet.balance).toBe(2);}
 });

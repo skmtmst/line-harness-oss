@@ -190,7 +190,7 @@ function QuestionTemplateV8Inner() {
       }
       return true
     } catch (caught) {
-      setError(describeApiFailure(caught, '保存', { forbidden: '質問テンプレートの作成・変更はオーナーと管理者だけができます。' }))
+      setError(describeApiFailure(caught, '保存', { scope: 'store' }))
       return false
     } finally {
       setSaving(false)

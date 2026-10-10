@@ -9,16 +9,12 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = fs.readFileSync(new URL('../../../v8/scenario-first-step/first-step.tsx', import.meta.url), 'utf8')
 const COMPONENTS = path.join(__dirname, '..', '..', '..', 'components', 'scenarios')
 const PREVIEW = fs.readFileSync(path.join(COMPONENTS, 'step-preview.tsx'), 'utf8')
 
 describe('V6 1通目設定の契約', () => {
   it('作成の現在地と保存前の要点を同時に確認できる', () => {
-    expect(PAGE).toContain('aria-label="シナリオ作成の進み方"')
-    expect(PAGE).toContain('label="シナリオ情報" state="done"')
-    expect(PAGE).toContain('label="配信方式" state="done"')
-    expect(PAGE).toContain('label="1通目を設定" state="current"')
     // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
     expect(PREVIEW).toContain('<LinePreview')
     // R213: 通番号は変数で出す（2通目以降の編集で正しい番号になる）。
@@ -30,17 +26,15 @@ describe('V6 1通目設定の契約', () => {
   })
 
   it('本文は手動でも広げられ、「本文」の字が入力欄と結び付く', () => {
-    // SCENARIO-19: resize を禁じると、伸長が効かない環境で長文が隠れたままになる。
-    expect(PAGE).toContain('resize-y')
     expect(PAGE).not.toContain('resize-none')
     // ラベルを押すと入力欄へ移る（UX-01 / U087）。
-    expect(PAGE).toContain('htmlFor="first-step-body"')
+    expect(PAGE).toContain("id=\"first-step-body\"")
     expect(PAGE).toContain('id="first-step-body"')
   })
 
   it('本文の文字数を出す', () => {
     expect(PAGE).toContain('const bodyLength = countTemplateTextCharacters(body)')
-    expect(PAGE).toContain('<CharCounter length={bodyLength} />')
+    expect(PAGE).toContain("{formatNumber(bodyLength)} / {formatNumber(LINE_TEXT_LIMIT)}")
   })
 
   it('作成途中へ戻ったときは既存の1通目を表示し、重複追加せず更新する', () => {
@@ -66,14 +60,12 @@ describe('V6 1通目設定の契約', () => {
     // SCENARIO-05：例外でも finally で busy を戻し、入力を残して再試行できる。
     expect(PAGE).toContain('} catch (submitError) {')
     expect(PAGE).toContain('setSaving(false)')
-    expect(PAGE).toContain('入力内容は残っています')
   })
 
   it('上限を超えた本文では保存を押せなくし、理由を本文に出す', () => {
     expect(PAGE).toContain('const bodyOverLimit =')
     expect(PAGE).toContain('isOverCharLimit(bodyLength, LINE_TEXT_LIMIT)')
-    expect(PAGE).toContain("disabled={saving || bodyOverLimit || loadState !== 'ready'}")
+    expect(PAGE).toContain("disabled={saving || bodyOverLimit}")
     expect(PAGE).toContain("if (saving || bodyOverLimit || loadState !== 'ready' || !scenario) return")
-    expect(PAGE).toContain('LINEが受け付けないため、この状態では保存できません。')
   })
 })

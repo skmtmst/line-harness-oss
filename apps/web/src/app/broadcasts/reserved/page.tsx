@@ -18,7 +18,6 @@ import { ApiError, api, type ApiBroadcast } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
 import { audienceSummary } from '@/lib/broadcast-summary'
 import { formatDateTime, formatNumber } from '@/lib/format'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useStaffRole } from '@/lib/staff-role'
 import { canEditFeature } from '@/lib/staff-capability'
 import ReservedV8 from '@/v8/broadcast-detail/reserved'
@@ -59,13 +58,12 @@ function belongsToAccount(broadcast: ApiBroadcast, selectedAccountId: string | n
 }
 
 function ReservedBroadcastContent() {
-  const adminTheme = useAdminTheme()
   /*
    * ★V8：上の帯のパンくずは「一斉配信 › 予約しました」。
    * v7 ではパンくずが描かれないので、渡しても見た目は変わらない。
    */
   usePageCrumbs([{ label: '一斉配信', href: '/broadcasts' }])
-  usePageTitle(adminTheme === 'v8' ? '予約しました' : '一斉配信・予約完了')
+  usePageTitle('予約しました')
   const router = useRouter()
   const id = useSearchParams().get('id')
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
@@ -363,8 +361,7 @@ function ReservedBroadcastContent() {
   }
 
   /* ★V8：見せ方は別の部品へ。読み込み・取消・複製・テスト送信は同じものを渡す。 */
-  if (adminTheme === 'v8') {
-    return (
+  return (
       <ReservedV8
         broadcast={broadcast}
         estimate={estimate}
@@ -387,134 +384,6 @@ function ReservedBroadcastContent() {
         cancelled={cancelled}
       />
     )
-  }
-
-  return (
-    <div data-design-node="bPF0s" className="space-y-4 pb-10">
-      <Link href="/broadcasts" className="text-action hover:text-action-hover inline-flex text-sm font-semibold hover:underline">
-        ← 一斉配信一覧
-      </Link>
-
-      <BroadcastStepRail steps={[
-        { key: 'basic', order: 1, label: '基本設定', anchor: 'reservation-summary', state: 'done' },
-        { key: 'audience', order: 2, label: '対象者', anchor: 'reservation-summary', state: 'done' },
-        { key: 'message', order: 3, label: 'メッセージ', anchor: 'reservation-summary', state: 'done' },
-        { key: 'schedule', order: 4, label: '送信設定', anchor: 'reservation-summary', state: 'done' },
-        { key: 'confirm', order: 5, label: '確認', anchor: 'reservation-summary', state: 'done' },
-      ]} />
-
-      {/*
-        #985 CHK-03: 右の390pxは「次にできること」欄。狭い幅では
-        固定の右列で本文が潰れるので、1列に畳んで下へ並べる。
-      */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        <section id="reservation-summary" style={{ minHeight: 760 }} className="bg-canvas border-hairline rounded-card min-w-0 flex-1 border px-6 py-8 text-center shadow-card">
-          <span className="bg-accent-soft text-accent-deep mx-auto flex h-14 w-14 items-center justify-center rounded-pill">
-            <CalendarCheck2 size={28} aria-hidden="true" />
-          </span>
-          <h2 className="text-ink mt-5 text-xl font-bold">一斉配信を予約しました</h2>
-          <p className="text-ink-secondary mt-3 text-sm font-semibold">
-            {audienceCount === null
-              ? `${scheduledSentenceLabel}に配信します。対象人数は現在確認できません。`
-              : `${scheduledSentenceLabel}に、${formatNumber(audienceCount)}人へ配信します。`}
-          </p>
-
-          <dl className="bg-canvas-sunken border-hairline mx-auto mt-5 max-w-3xl rounded-card border px-5 text-sm">
-            {[
-              ['管理名', broadcast.title],
-              ['配信対象', audienceLabel],
-              ['送信予定', scheduledLabel],
-              ['状態', '予約中'],
-            ].map(([label, value]) => (
-              <div key={label} className="border-hairline flex items-center justify-between gap-6 border-b py-4 text-left last:border-b-0">
-                <dt className="text-ink-faint shrink-0 font-semibold">{label}</dt>
-                <dd className="text-ink min-w-0 truncate font-bold" title={value}>{value}</dd>
-              </div>
-            ))}
-          </dl>
-
-          <NoteBar className="mx-auto mt-4 max-w-3xl">
-            {notificationText || '配信対象は送信開始直前に再集計します。現在の見込みは、友だちやタグの変化で予約時刻までに増減します。'}
-          </NoteBar>
-
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            <Button href="/broadcasts"><List size={16} aria-hidden="true" />一覧へ戻る</Button>
-            <Button variant="primary" href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`}>
-              <Eye size={16} aria-hidden="true" />予約内容を確認
-            </Button>
-          </div>
-        </section>
-
-        <aside className="bg-canvas border-hairline rounded-card shrink-0 border p-4 shadow-card lg:w-97.5">
-          <h2 className="text-ink text-base font-bold">次にできること</h2>
-          <p className="text-ink-faint mt-1 text-xs">予約後も開始前まで確認・取消できます。</p>
-          <div className="mt-4 grid gap-2">
-            <Button href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`} className="w-full">
-              <Eye size={16} aria-hidden="true" />予約の内容を見る
-            </Button>
-            <Button onClick={() => void testSend()} disabled={actionBusy !== null} className="w-full" busy={actionBusy === 'test'} busyLabel="テスト送信中…">
-              <Send size={16} aria-hidden="true" />テストを送る
-            </Button>
-            <Button onClick={() => void duplicateBroadcast()} disabled={actionBusy !== null} className="w-full" busy={actionBusy === 'duplicate'} busyLabel="複製中…">
-              <Copy size={16} aria-hidden="true" />複製して別配信を作る
-            </Button>
-            {broadcast.status === 'scheduled' && !cancelled && (
-              <Button onClick={() => { setCancelError(''); setCancelOpen(true) }} disabled={actionBusy !== null} className="w-full">
-                予約を取り消す
-              </Button>
-            )}
-          </div>
-          <p className="text-ink-faint mt-4 text-xs">配信内容: {bubbleCount}通</p>
-          {estimate ? <p className="text-ink-faint mt-1 text-xs">除外見込み: {formatNumber(estimate.hiddenExcluded)}人</p> : null}
-          {actionError ? <Notice tone="danger" message={actionError} onClose={() => setActionError('')} className="mt-3" /> : null}
-        </aside>
-      </div>
-
-      {estimate?.warnings.length ? (
-        <Notice tone="warn">
-          <p className="font-bold">配信前に確認すること</p>
-          <ul className="mt-2 list-disc space-y-1 pl-5">
-            {estimate.warnings.map((warning, index) => <li key={`${warning.level}-${index}`}>{warning.message}</li>)}
-          </ul>
-        </Notice>
-      ) : null}
-
-      {cancelled && (
-        <Notice tone="success" message="予約を取り消しました。内容は下書きとして残っています。" />
-      )}
-
-      <ConfirmDialog
-        open={cancelOpen}
-        title={`「${broadcast.title}」の予約を取り消しますか？`}
-        description="予約が取り消され、この配信は送られなくなります。書いた内容は下書きとして残るので、作り直しにはなりません。送信が始まったあとは取り消せません。"
-        confirmLabel="予約を取り消す"
-        destructive
-        busy={cancelling}
-        error={cancelError || undefined}
-        onCancel={() => {
-          if (cancelling) return
-          setCancelOpen(false)
-        }}
-        onConfirm={() => void confirmCancel()}
-      >
-        <dl className="text-ink-secondary space-y-1 text-xs">
-          <div className="flex gap-2">
-            <dt className="text-ink-faint shrink-0">配信日時</dt>
-            <dd className="min-w-0">{formatJst(broadcast.scheduledAt)}</dd>
-          </div>
-        </dl>
-      </ConfirmDialog>
-      <style jsx global>{`
-        [data-design-node='bPF0s'] > nav[aria-label='配信作成の進み'] {
-          margin-bottom: 1.5rem;
-          border: 0;
-          border-radius: 0;
-          background: transparent;
-          padding: 0;
-        }
-      `}</style>
-    </div>
-  )
 }
 
 export default function ReservedBroadcastPage() {

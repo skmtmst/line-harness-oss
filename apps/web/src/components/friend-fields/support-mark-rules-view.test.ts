@@ -60,12 +60,17 @@ describe('実行順', () => {
     expect(sorted.map((r) => r.id)).toEqual(['high', 'low'])
   })
 
-  it('同じ優先順位なら古いほうが先', () => {
+  it('同順位はAPIの作成順を保ち、更新日時で並べ直さない（WEB248）', () => {
     const sorted = inExecutionOrder([
-      rule({ id: 'new', priority: 10, updatedAt: '2026-08-31T10:00:00+09:00' }),
-      rule({ id: 'old', priority: 10, updatedAt: '2026-08-01T10:00:00+09:00' }),
+      rule({ id: 'first-created', priority: 10, updatedAt: '2026-10-09T00:00:00Z' }),
+      rule({ id: 'second-created', priority: 10, updatedAt: '2026-08-01T00:00:00Z' }),
     ])
-    expect(sorted.map((r) => r.id)).toEqual(['old', 'new'])
+    expect(sorted.map((r) => r.id)).toEqual(['first-created', 'second-created'])
+  })
+
+  it('名前だけを直すときも保存済み条件を保持する（WEB249）', () => {
+    const condition = { operator: 'AND' as const, rules: [{ type: 'tag', value: 'vip' }] }
+    expect(toRuleBody({ name: '新しい名前', event: 'staff_assigned', priority: '10', manualProtectionMinutes: '0', isActive: true, condition }).condition).toEqual(condition)
   })
 
   it('元の配列を壊さない', () => {

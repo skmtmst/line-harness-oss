@@ -1,0 +1,55 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/* 採用案 Wmch0：画像は幅 320 を左、面の一覧は残りの幅いっぱい。寸法は部品が持ち、呼ぶ画面から上書きしない。 */
+.root { display: flex; flex-direction: column; gap: var(--tpl-hb2-op-gap, 14px); min-width: 0; }
+.frame {
+  display: flex; flex-direction: column; gap: var(--tpl-hb2-rm-section-gap, 14px); min-width: 0;
+  padding: var(--tpl-hb2-rm-section-pad, 20px); border-radius: var(--tpl-hb2-op-card-radius, 12px);
+  outline: 1px solid var(--color-hairline); outline-offset: -1px; background: var(--color-canvas);
+}
+.plain { display: flex; flex-direction: column; gap: var(--tpl-hb2-rm-section-gap, 14px); min-width: 0; }
+.head { display: flex; flex-direction: column; gap: var(--tpl-hb2-op-head-gap, 2px); }
+.title { margin: 0; color: var(--color-ink); font-size: var(--tpl-hb2-rm-title, 15px); font-weight: 700; line-height: normal; }
+.note { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption, 12px); line-height: 18px; }
+.body { display: flex; align-items: flex-start; gap: 16px; min-width: 0; }
+.canvas { flex: none; width: 320px; max-width: 100%; min-width: 0; }
+.list { flex: 1 1 0; display: flex; flex-direction: column; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.empty { flex: 1 1 0; min-width: 0; }
+
+/* 部品が描く画像（リッチメッセージ）。画像が無いときは面の線だけ。 */
+.image { position: relative; width: 100%; overflow: hidden; border-radius: var(--radius-mini, 6px); background: var(--color-canvas-sunken); outline: 1px solid var(--color-hairline); outline-offset: -1px; }
+.image img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.area {
+  position: absolute; display: flex; align-items: center; justify-content: center; margin: 0; padding: 0;
+  border: 1px solid var(--color-hairline); background: transparent; color: var(--color-ink-secondary); font: inherit; cursor: pointer;
+}
+.image[data-image] .area { border-color: color-mix(in srgb, var(--color-canvas) 67%, transparent); }
+.area:hover { background: color-mix(in srgb, var(--color-canvas) 20%, transparent); }
+.area[data-selected] { border: 3px solid var(--color-accent-deep); background: color-mix(in srgb, var(--color-canvas) 33%, transparent); color: var(--color-accent-deep); }
+.area:focus-visible { outline: 2px solid var(--color-action); outline-offset: -2px; }
+.areaLetter { font-size: 13px; font-weight: 600; line-height: 19px; text-shadow: 0 0 3px var(--color-canvas), 0 0 3px var(--color-canvas); pointer-events: none; }
+
+/* 面の一覧（Z0uO6）：記号は 22px・角丸 6・未選択は薄い地＋灰色の字。選んだ行は薄い緑・記号は濃い緑。 */
+.row {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 0;
+  border-radius: var(--radius-control, 8px); background: transparent; text-align: left; font: inherit; cursor: pointer;
+}
+.row:hover { background: var(--color-canvas-sunken); }
+.row[data-selected], .row[data-selected]:hover { background: var(--color-accent-soft); }
+.row:focus-visible { outline: 2px solid var(--color-action); outline-offset: -2px; }
+.letter {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
+  border-radius: var(--radius-mini, 6px); background: var(--color-surface-pearl); color: var(--color-ink-secondary); font-size: 11px; font-weight: 700;
+}
+.row[data-selected] .letter { background: var(--color-accent-deep); color: var(--color-on-accent); }
+.name { flex: 1 1 0; min-width: 0; overflow: hidden; color: var(--color-ink); font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+/* 動きの要約と未設定は 11px。未設定は太字にしない。 */
+.summary { flex: none; max-width: 60%; margin-left: auto; overflow: hidden; color: var(--color-ink-secondary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.unset { flex: none; margin-left: auto; color: var(--color-warning); font-size: 11px; }
+
+/* 狭い白い板では画像の下に一覧を回す（画像は 320 のまま）。 */
+@container (max-width: 560px) {
+  .body { flex-direction: column; }
+  .list { width: 100%; }
+}
+}

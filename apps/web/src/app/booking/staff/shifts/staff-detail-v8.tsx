@@ -39,13 +39,20 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
 import { formatDay } from '@/lib/format'
 import { LiffPhoneDatetimeStep } from '../../menus/liff-phone-v8'
 import shell from '../../menus/settings-v8.module.css'
 import styles from './staff-detail-v8.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { DetailLoading } from '@/components/templates/detail-page'
+import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -86,7 +93,7 @@ function addDays(date: string, days: number): string {
 
 function staffErrorMessage(error: unknown, action: string): string {
   if (error instanceof ApiError) {
-    if (error.status === 403) return `担当者の設定を${action}する権限がありません。オーナーか管理者に頼んでください。`
+    if (error.status === 403) return permissionDeniedMessage('store')
     if (error.status === 404) return '担当者が見つかりませんでした。削除された可能性があります。一覧に戻って選び直してください。'
     if (error.status === 409) return 'ほかの変更と重なりました。最新の状態を読み直したので、確かめてからもう一度保存してください。'
   }
@@ -842,8 +849,8 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
       {isStaffRole ? null : (
         <Link href="/booking/menus?tab=staff" className={shell.backLink}>← 担当スタッフへ</Link>
       )}
-      <h1 className={shell.headTitle}>{node === 'wvGke' ? '自分の勤務' : headTitle}</h1>
-      <p className={shell.headNote}>{headDesc}</p>
+      <PageHeading title={node === 'wvGke' ? '自分の勤務' : headTitle} help={<> {headDesc}</>} />
+
     </header>
   )
 
@@ -870,8 +877,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
         <div className={shell.body} data-design="Body">
           <div className={shell.main}>
             <div className={shell.stateCard}>
-              <p className={shell.stateTitle}>読み込み中</p>
-              <p className={shell.stateDesc}>担当者の勤務とシフトを読み込んでいます。</p>
+              <DetailLoading label="担当者の勤務とシフトを読み込んでいます" />
             </div>
           </div>
         </div>
@@ -956,19 +962,13 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
               </span>
             </p>
           ) : (
-            <div className={styles.switcherRow}>
-              <label className={styles.switcherField}>
-                <span className={styles.switcherLabel}>担当者を切り替える</span>
-                <Select
+            <div className={styles.switcherRow}><Field note={<>保存すると、右の予約画面にすぐ出ます。</>} label="担当者を切り替える"><Select
                   aria-label="担当者を切り替える"
                   size="full"
                   value={staffId}
                   onChange={(value) => router.push(`/booking/staff/shifts?staff_id=${value}`)}
                   options={staffList.map((item) => ({ value: item.id, label: item.display_name }))}
-                />
-              </label>
-              <p className={styles.switcherNote}>保存すると、右の予約画面にすぐ出ます。</p>
-            </div>
+                /></Field></div>
           )}
 
           {/* N-411: 本人勤務が閲覧のみのときは全編集部品をまとめて無効化する。
@@ -989,7 +989,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
                   return (
                     <div className={styles.dayRow} key={day.weekday}>
                       <strong className={styles.dayName}>{day.label.slice(0, 1)}</strong>
-                      <Toggle
+                      <SettingCheckbox
                         label={`${day.label}は出勤する`}
                         checked={row.active}
                         onChange={(checked) => updateDraft(day.weekday, { active: checked })}
@@ -1189,7 +1189,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
                       type="text"
                       value={dayAddMemo}
                       onChange={(e) => setDayAddMemo(e.target.value)}
-                      placeholder="理由（任意・例: 研修のため）"
+                      placeholder="理由（任意・例：研修のため）"
                       aria-label="休みの理由"
                       className={styles.input}
                     />
@@ -1215,10 +1215,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
                   開始日
                   <DateField aria-label="まとめて作り始める日" value={genFrom} onChange={setGenFrom} className="mt-1" />
                 </span>
-                <label className={styles.fieldLabel}>
-                  週の数（1〜12）
-                  <input aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className={`${styles.input} mt-1`} />
-                </label>
+                <Field label="週の数（1〜12）"><NumberInput aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className={`${styles.input} mt-1`} /></Field>
                 <div className={styles.genAction}>
                   <Button variant="primary" onClick={() => void generateFromRules()} disabled={generating} busy={generating} busyLabel="作成中…">作る</Button>
                 </div>
@@ -1236,10 +1233,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
               {!serviceConfigured ? (
                 <p className={shell.warnBand} role="status">Googleの接続設定がまだなのでつなげません。管理者に連絡してください。</p>
               ) : null}
-              <div className={styles.calendarRow}>
-                <label className={styles.calendarField}>
-                  <span className={styles.fieldLabel}>カレンダーの ID</span>
-                  <input
+              <div className={styles.calendarRow}><Field label="カレンダーの ID"><input
                     aria-label="カレンダーのID"
                     value={calendarId ? (calendarInput || calendarId) : calendarInput}
                     onChange={(event) => {
@@ -1250,20 +1244,17 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
                         setCalendarInput(event.target.value)
                       }
                     }}
-                    placeholder="例: example@example.invalid"
+                    placeholder="例：example@example.invalid"
                     className={styles.input}
-                  />
-                </label>
-                {calendarId ? (
+                  />{calendarId ? (
                   <span className={styles.connectedBadge}>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="5" /><path d="M3.8 6.2l1.4 1.4 3-3.2" /></svg>
                     つながっている
                   </span>
-                ) : null}
-              </div>
+                ) : null}</Field></div>
               {calendarId ? (
                 <p className={styles.calendarMeta}>
-                  最後に読んだ {calendarVerifiedAt ? formatDay(calendarVerifiedAt) : '—'}
+                  最後に読んだ {calendarVerifiedAt ? formatDay(calendarVerifiedAt) : emptyValue('unknown')}
                   {calendarError ? <span className={styles.fieldError}>　最新の確認で失敗しています：{calendarError}</span> : null}
                 </p>
               ) : null}
@@ -1300,7 +1291,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
           </div>
           <p className={shell.sideLineLink}>
             {previewUrl
-              ? <a href={previewUrl} target="_blank" rel="noreferrer">実際の画面で確かめる ↗</a>
+              ? <TextLink external href={previewUrl}  >実際の画面で確かめる</TextLink>
               : 'このアカウントには予約画面のURLがまだありません'}
           </p>
           {!hasActiveMenu ? (
@@ -1426,8 +1417,8 @@ export function OwnShiftEntryV8() {
 
   const head = (
     <header className={shell.boardHead} data-design="Head">
-      <h1 className={shell.headTitle}>自分の勤務</h1>
-      <p className={shell.headNote}>あなたの出勤・休憩・この日だけのシフトを決めます。</p>
+      <PageHeading title="自分の勤務" help={<> あなたの出勤・休憩・この日だけのシフトを決めます。</>} />
+
     </header>
   )
 
@@ -1476,7 +1467,7 @@ export function OwnShiftEntryV8() {
       <div className={shell.body} data-design="Body">
         <div className={shell.main}>
           <div className={shell.stateCard}>
-            <p className={shell.stateTitle}>読み込み中</p>
+            <DetailLoading />
             <p className={shell.stateDesc}>自分の勤務を探しています。</p>
           </div>
         </div>

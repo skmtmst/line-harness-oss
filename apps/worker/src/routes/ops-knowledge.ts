@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   HQ_SUPPORT_KINDS, editKnowledgeArticle, getKnowledgeArticle, getSupportTicket,
@@ -51,7 +52,7 @@ opsKnowledge.get('/api/ops/knowledge/:id', async c => {
   return c.json({ success: true, data: { ...serializeKnowledge(article), sourceSubject } });
 });
 
-opsKnowledge.put('/api/ops/knowledge/:id', requirePlatformAdminWrite(), async c => {
+opsKnowledge.put('/api/ops/knowledge/:id', requirePlatformAdminWrite(), inputJsonBoundary(), async c => {
   const db = dbFor(c.env);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   if (!body || !Number.isSafeInteger(body.version) || Number(body.version) < 1 ||
@@ -59,7 +60,7 @@ opsKnowledge.put('/api/ops/knowledge/:id', requirePlatformAdminWrite(), async c 
     typeof body.question !== 'string' || body.question.length > 1000 ||
     typeof body.answer !== 'string' || body.answer.length > 12000 ||
     !HQ_SUPPORT_KINDS.some(value => value === body.kind) || !Array.isArray(body.keywords) ||
-    body.keywords.length > 12 || body.keywords.some(word => typeof word !== 'string' || word.length > 40)) return c.json(invalid, 400);
+    body.keywords.length > 12 || body.keywords.some(word => typeof word !== 'string' || word.length > 40)) return inputError(c, invalid, 400, ["version","title","question","answer","kind","keywords"]);
   const before = await getKnowledgeArticle(db, c.req.param('id'));
   if (!before) return c.json({ success: false, error: '記事が見つかりません' }, 404);
   const ticket = await getSupportTicket(db, before.source_request_id);
@@ -71,7 +72,7 @@ opsKnowledge.put('/api/ops/knowledge/:id', requirePlatformAdminWrite(), async c 
     answer: redactKnowledgeText(body.answer, names), kind: body.kind as KnowledgeArticleInput['kind'],
     keywords: (body.keywords as string[]).map(word => redactKnowledgeText(word, names)).filter(Boolean),
   };
-  if (!input.title) return c.json(invalid, 400);
+  if (!input.title) return inputError(c, invalid, 400, ["title"]);
   const contentChanged = input.question !== before.question || input.answer !== before.answer;
   const articleKind = contentChanged ? 'answer_example' : before.article_kind;
   const evidence = contentChanged
@@ -84,15 +85,15 @@ opsKnowledge.put('/api/ops/knowledge/:id', requirePlatformAdminWrite(), async c 
   return c.json({ success: true, data: serializeKnowledge((await getKnowledgeArticle(db, before.id))!) });
 });
 
-opsKnowledge.post('/api/ops/knowledge/:id/review', requirePlatformAdminWrite(), async c => {
+opsKnowledge.post('/api/ops/knowledge/:id/review', requirePlatformAdminWrite(), inputJsonBoundary(), async c => {
   const db = dbFor(c.env);
   const body = await c.req.json<{ action?: unknown; version?: unknown; confirmed?: unknown }>().catch(() => null);
-  if (!body || !Number.isSafeInteger(body.version) || !['approve', 'dismiss', 'disable'].includes(String(body.action))) return c.json(invalid, 400);
+  if (!body || !Number.isSafeInteger(body.version) || !['approve', 'dismiss', 'disable'].includes(String(body.action))) return inputError(c, invalid, 400, ["version","action"]);
   const article = await getKnowledgeArticle(db, c.req.param('id'));
   if (!article) return c.json({ success: false, error: '記事が見つかりません' }, 404);
   const action = body.action as 'approve' | 'dismiss' | 'disable';
   if (action === 'approve') {
-    if (body.confirmed !== true || !article.question.trim() || !article.answer.trim()) return c.json(invalid, 400);
+    if (body.confirmed !== true || !article.question.trim() || !article.answer.trim()) return inputError(c, invalid, 400, ["confirmed"]);
     if (article.article_kind === 'verified') {
       const ticket = await getSupportTicket(db, article.source_request_id);
       const messages = ticket ? await listSupportMessages(db, ticket.id) : [];
@@ -107,9 +108,9 @@ opsKnowledge.post('/api/ops/knowledge/:id/review', requirePlatformAdminWrite(), 
   return c.json({ success: true, data: serializeKnowledge((await getKnowledgeArticle(db, article.id))!) });
 });
 
-opsKnowledge.post('/api/ops/knowledge/:id/feedback', requirePlatformAdminWrite(), async c => {
+opsKnowledge.post('/api/ops/knowledge/:id/feedback', requirePlatformAdminWrite(), inputJsonBoundary(), async c => {
   const body = await c.req.json<{ requestId?: unknown; feedback?: unknown }>().catch(() => null);
-  if (!body || typeof body.requestId !== 'string' || (body.feedback !== 'helpful' && body.feedback !== 'unhelpful')) return c.json(invalid, 400);
+  if (!body || typeof body.requestId !== 'string' || (body.feedback !== 'helpful' && body.feedback !== 'unhelpful')) return inputError(c, invalid, 400, ["requestId","feedback"]);
   const db = dbFor(c.env);
   if (!(await knowledgeFeedback(db, c.req.param('id'), body.requestId, body.feedback))) return c.json(conflict, 409);
   const staff = c.get('staff');
@@ -120,7 +121,7 @@ opsKnowledge.post('/api/ops/knowledge/:id/feedback', requirePlatformAdminWrite()
 
 // Await on this dedicated request, not waitUntil (45s AI budget exceeds its 30s
 // post-response lifetime). Resolution stays fast; no scheduled notification job runs.
-opsKnowledge.post('/api/ops/knowledge/tickets/:id/process', requirePlatformAdminWrite(), async c => {
+opsKnowledge.post('/api/ops/knowledge/tickets/:id/process', requirePlatformAdminWrite(), inputJsonBoundary(), async c => {
   const db = dbFor(c.env);
   const id = c.req.param('id');
   if (!(await getSupportTicket(db, id))) return c.json({ success: false, error: '問い合わせが見つかりません' }, 404);
@@ -133,7 +134,7 @@ opsKnowledge.post('/api/ops/knowledge/tickets/:id/process', requirePlatformAdmin
   } });
 });
 
-opsKnowledge.post('/api/ops/knowledge/tickets/:id/retry', requirePlatformAdminWrite(), async c => {
+opsKnowledge.post('/api/ops/knowledge/tickets/:id/retry', requirePlatformAdminWrite(), inputJsonBoundary(), async c => {
   const db = dbFor(c.env);
   if (!(await retryKnowledgeJob(db, c.req.param('id')))) return c.json(conflict, 409);
   const staff = c.get('staff');

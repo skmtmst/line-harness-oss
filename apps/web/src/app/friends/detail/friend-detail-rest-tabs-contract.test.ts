@@ -14,7 +14,7 @@ const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
  */
 describe('友だち詳細の残りタブ（Q5F2QE）', () => {
   it('V8の詳細全体に板IDを付け、4タブを切り替えられる', () => {
-    expect(PAGE).toContain('data-friends-detail-design="v8" data-design-node="Q5F2QE"')
+    expect(PAGE).toContain('boardId="Q5F2QE"')
     for (const tab of ['timeline', 'history', 'forms', 'info']) {
       expect(PAGE).toContain(`tab === '${tab}'`)
     }

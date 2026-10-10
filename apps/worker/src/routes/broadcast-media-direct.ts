@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { jstNow } from '@line-crm/db';
@@ -10,14 +11,14 @@ import { ensureFileScanForUpload } from './file-scan.js';
 
 const broadcastMediaDirect = new Hono<Env>();
 interface Session { id:string; line_account_id:string|null; created_by:string; r2_key:string; public_key:string|null; filename:string; mime_type:string; expected_size:number; expires_at:string; completed_at:string|null }
-broadcastMediaDirect.post('/api/broadcast-message-assets/upload-sessions',requireRole('owner','admin','staff'),requirePermission('/broadcasts'),async c => {
+broadcastMediaDirect.post('/api/broadcast-message-assets/upload-sessions',requireRole('owner','admin','staff'),requirePermission('/broadcasts'),inputJsonBoundary({"lineAccountId":["null","string"],"filename":["string"],"mimeType":["string"],"sizeBytes":["number"]}), async c => {
   const body = await c.req.json<{lineAccountId?:string|null;filename?:string;mimeType?:string;sizeBytes?:number}>();
   const accountId = body.lineAccountId ?? null;
   if (!await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[accountId])) return c.json({success:false,error:'このLINEアカウントを操作する権限がありません'},403);
   const mime = body.mimeType ?? '';
   const max = mime === 'video/mp4' ? 200*1024*1024 : 10*1024*1024;
   const extension = mime === 'video/mp4' ? 'mp4' : mime === 'image/jpeg' ? 'jpg' : 'png';
-  if (!['video/mp4','image/png','image/jpeg'].includes(mime) || !body.filename || !Number.isSafeInteger(body.sizeBytes) || Number(body.sizeBytes) < 1 || Number(body.sizeBytes)>max) return c.json({success:false,error:'動画はMP4・200MB、画像はJPEG/PNG・10MBまでです'},400);
+  if (!['video/mp4','image/png','image/jpeg'].includes(mime) || !body.filename || !Number.isSafeInteger(body.sizeBytes) || Number(body.sizeBytes) < 1 || Number(body.sizeBytes)>max) return inputError(c, {success:false,error:'動画はMP4・200MB、画像はJPEG/PNG・10MBまでです'}, 400, ["mimeType","filename","sizeBytes"]);
   if (!c.env.CF_ACCOUNT_ID || !c.env.MEDIA_R2_ACCESS_KEY_ID || !c.env.MEDIA_R2_SECRET_ACCESS_KEY || !c.env.MEDIA_R2_BUCKET_NAME) return c.json({success:false,error:'直接アップロードが未設定です。管理者に確認してください'},503);
   const id = crypto.randomUUID();
   const key = `broadcast-upload/${id}.${extension}`;
@@ -25,7 +26,7 @@ broadcastMediaDirect.post('/api/broadcast-message-assets/upload-sessions',requir
   await c.env.DB.prepare(`INSERT INTO broadcast_media_upload_sessions (id,line_account_id,created_by,r2_key,filename,mime_type,expected_size,expires_at,created_at) VALUES (?,?,?,?,?,?,?,?,?)`).bind(id,accountId,c.get('staff').id,key,body.filename,mime,body.sizeBytes,signed.expiresAt,jstNow()).run();
   return c.json({success:true,data:{id,uploadUrl:signed.url,requiredHeaders:signed.headers,expiresAt:signed.expiresAt}},201);
 });
-broadcastMediaDirect.post('/api/broadcast-message-assets/upload-sessions/:id/complete',requireRole('owner','admin','staff'),requirePermission('/broadcasts'),async c => {
+broadcastMediaDirect.post('/api/broadcast-message-assets/upload-sessions/:id/complete',requireRole('owner','admin','staff'),requirePermission('/broadcasts'),inputJsonBoundary({"etag":["string"]}), async c => {
   const session = await c.env.DB.prepare('SELECT * FROM broadcast_media_upload_sessions WHERE id = ? AND created_by = ?').bind(c.req.param('id'),c.get('staff').id).first<Session>();
   if (!session || !await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[session.line_account_id])) return c.notFound();
   const origin = c.env.WORKER_URL || new URL(c.req.url).origin;
@@ -36,7 +37,7 @@ broadcastMediaDirect.post('/api/broadcast-message-assets/upload-sessions/:id/com
   if (!object || object.size !== session.expected_size || object.httpMetadata?.contentType !== session.mime_type || object.etag !== body.etag?.replace(/^"|"$/g,'') || object.customMetadata?.['upload-session-id'] !== session.id || object.customMetadata?.['line-account-id'] !== (session.line_account_id ?? '')) return c.json({success:false,error:'アップロードしたファイルを確認できませんでした'},409);
   const prefix = await c.env.IMAGES.get(session.r2_key,{range:{offset:0,length:16}});
   const validation = validateBroadcastMediaUpload(prefix ? new Uint8Array(await prefix.arrayBuffer()) : new Uint8Array(),session.mime_type,session.filename);
-  if (!validation.ok) return c.json({success:false,error:validation.error},422);
+  if (!validation.ok) return inputError(c, {success:false,error:validation.error}, 422, []);
   const source = await c.env.IMAGES.get(session.r2_key,{onlyIf:{etagMatches:object.etag}});
   if (!source || !('body' in source)) return c.json({success:false,error:'ファイルが変更されました。やり直してください'},409);
   // 署名URLで上書きできる一時キーから、公開する変更不能のキーへ移す。

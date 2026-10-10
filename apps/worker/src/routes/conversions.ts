@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { createBroadcastRetryKey } from '../services/broadcast-retry-key.js';
 import { conversionApprovalCounts } from '../services/tab-counts.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
@@ -154,7 +155,7 @@ function conversionPermission(permission: ConversionPermission): MiddlewareHandl
 
 function conversionContractError(c: Context<Env>, error: unknown): Response {
   if (error instanceof ConversionDefinitionError) {
-    return c.json({ success: false, code: error.code, error: error.message }, error.status);
+    return inputError(c, { success: false, code: error.code, error: error.message }, error.status, []);
   }
   console.error(JSON.stringify({
     event: 'conversion_definition_contract_failed',
@@ -186,14 +187,14 @@ function conversionRange(c: Context<Env>):
   if (!fromDate || !toDate || fromDate > toDate) {
     return {
       ok: false,
-      response: c.json({ success: false, error: 'from と to は正しい日付順で指定してください' }, 400),
+      response: inputError(c, { success: false, error: 'from と to は正しい日付順で指定してください' }, 400, ["from","to"]),
     };
   }
   const inclusiveDays = Math.floor((toDate.getTime() - fromDate.getTime()) / 86_400_000) + 1;
   if (inclusiveDays > 366) {
     return {
       ok: false,
-      response: c.json({ success: false, error: '集計期間は366日以内で指定してください' }, 400),
+      response: inputError(c, { success: false, error: '集計期間は366日以内で指定してください' }, 400, ["to","from"]),
     };
   }
   const previousTo = new Date(fromDate.getTime() - 24 * 60 * 60 * 1000);
@@ -298,17 +299,17 @@ function definitionFilters(c: Context<Env>) {
   const state = c.req.query('state');
   const sort = c.req.query('sort') ?? 'count_desc';
   if (status && !DEFINITION_STATUSES.has(status as ConversionDefinitionStatus)) {
-    return { ok: false as const, response: c.json({ success: false, error: 'status が正しくありません' }, 400) };
+    return { ok: false as const, response: inputError(c, { success: false, error: 'status が正しくありません' }, 400, ["status"]) };
   }
   if (state && !DEFINITION_STATES.has(state as ConversionDefinitionFilter)) {
-    return { ok: false as const, response: c.json({ success: false, error: 'state が正しくありません' }, 400) };
+    return { ok: false as const, response: inputError(c, { success: false, error: 'state が正しくありません' }, 400, ["state"]) };
   }
   if (state && status) {
     // 導出状態と素の status の両方が来たら意味が曖昧になるため弾く。
-    return { ok: false as const, response: c.json({ success: false, error: 'state と status は同時に指定できません' }, 400) };
+    return { ok: false as const, response: inputError(c, { success: false, error: 'state と status は同時に指定できません' }, 400, ["state","status"]) };
   }
   if (!DEFINITION_SORTS.has(sort as ConversionDefinitionSort)) {
-    return { ok: false as const, response: c.json({ success: false, error: 'sort が正しくありません' }, 400) };
+    return { ok: false as const, response: inputError(c, { success: false, error: 'sort が正しくありません' }, 400, ["sort"]) };
   }
   return {
     ok: true as const,
@@ -461,10 +462,10 @@ conversions.get('/api/conversions/definitions', conversionPermission('view'), as
 });
 
 // POST /api/conversions/definitions - save the complete V6 definition and its initial usages
-conversions.post('/api/conversions/definitions', conversionPermission('edit'), async (c) => {
+conversions.post('/api/conversions/definitions', conversionPermission('edit'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-    if (!body) return c.json({ success: false, error: 'JSON本文が正しくありません' }, 400);
+    if (!body) return inputError(c, { success: false, error: 'JSON本文が正しくありません' }, 400, []);
     const definition = readDefinitionInput(body);
     const rawUsages = Array.isArray(body.usages) ? body.usages : [];
     const usages = rawUsages.map((raw) => {
@@ -480,7 +481,7 @@ conversions.post('/api/conversions/definitions', conversionPermission('edit'), a
         : null;
     });
     if (!definition || usages.some((usage) => usage === null)) {
-      return c.json({ success: false, error: '成果地点の入力内容を正しく指定してください' }, 400);
+      return inputError(c, { success: false, error: '成果地点の入力内容を正しく指定してください' }, 400, ["name","sourceType","sourceConfig","lineAccountId","deduplicationMode","valueMode","reversalPolicy","deduplicationWindowDays","fixedValue","attributionDays","targetUrl","usages"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [definition.lineAccountId])) {
       return c.json({ success: false, error: '成果地点が見つかりません' }, 404);
@@ -501,12 +502,12 @@ conversions.post('/api/conversions/definitions', conversionPermission('edit'), a
 });
 
 // POST /api/conversions/definitions/preview - calculate from the submitted draft without saving it
-conversions.post('/api/conversions/definitions/preview', conversionPermission('edit'), async (c) => {
+conversions.post('/api/conversions/definitions/preview', conversionPermission('edit'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-    if (!body) return c.json({ success: false, error: 'JSON本文が正しくありません' }, 400);
+    if (!body) return inputError(c, { success: false, error: 'JSON本文が正しくありません' }, 400, []);
     const definition = readDefinitionInput({ name: '保存前試算', reversalPolicy: 'manual', ...body });
-    if (!definition) return c.json({ success: false, error: '試算する入力内容を正しく指定してください' }, 400);
+    if (!definition) return inputError(c, { success: false, error: '試算する入力内容を正しく指定してください' }, 400, ["definition"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [definition.lineAccountId])) {
       return c.json({ success: false, error: '成果地点が見つかりません' }, 404);
     }
@@ -560,15 +561,15 @@ conversions.get('/api/conversions/definitions/:id/delete-impact', conversionPerm
   }
 });
 
-conversions.post('/api/conversions/definitions/:id/stop', conversionPermission('edit'), async (c) => {
+conversions.post('/api/conversions/definitions/:id/stop', conversionPermission('edit'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const expectedVersion = positiveVersion(body?.expectedVersion);
     if (!body || expectedVersion === null) {
-      return c.json({ success: false, error: 'expectedVersionを正しく指定してください' }, 400);
+      return inputError(c, { success: false, error: 'expectedVersionを正しく指定してください' }, 400, ["expectedVersion"]);
     }
     const parsedReason = readReason(body);
-    if (!parsedReason.ok) return c.json({ success: false, error: parsedReason.error }, 400);
+    if (!parsedReason.ok) return inputError(c, { success: false, error: parsedReason.error }, 400, ["reason"]);
     const scope = await conversionDefinitionScope(c);
     if (!scope.ok) return scope.response;
     const data = await stopConversionDefinition(c.env.DB, {
@@ -589,18 +590,18 @@ conversions.post('/api/conversions/definitions/:id/stop', conversionPermission('
  * 停止・差し替えと同じく、版は本文で受けて CAS に使う。負けたら 409 で、
  * DBには何も残さない。過去の成果は書き換えない（集計は計測時の控えを見ている）。
  */
-conversions.post('/api/conversions/definitions/:id/revise', conversionPermission('edit'), async (c) => {
+conversions.post('/api/conversions/definitions/:id/revise', conversionPermission('edit'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const expectedVersion = positiveVersion(body?.expectedVersion);
     if (!body || expectedVersion === null) {
-      return c.json({ success: false, error: 'expectedVersionを正しく指定してください' }, 400);
+      return inputError(c, { success: false, error: 'expectedVersionを正しく指定してください' }, 400, ["expectedVersion"]);
     }
     const parsedReason = readReason(body);
-    if (!parsedReason.ok) return c.json({ success: false, error: parsedReason.error }, 400);
+    if (!parsedReason.ok) return inputError(c, { success: false, error: parsedReason.error }, 400, ["reason"]);
     const definition = readDefinitionInput(body, { requireAccount: false });
     if (!definition) {
-      return c.json({ success: false, error: '成果地点の入力内容を正しく指定してください' }, 400);
+      return inputError(c, { success: false, error: '成果地点の入力内容を正しく指定してください' }, 400, ["name","sourceType","sourceConfig","lineAccountId","deduplicationMode","valueMode","reversalPolicy","deduplicationWindowDays","fixedValue","attributionDays","targetUrl"]);
     }
     const scope = await conversionDefinitionScope(c);
     if (!scope.ok) return scope.response;
@@ -630,17 +631,17 @@ conversions.post('/api/conversions/definitions/:id/revise', conversionPermission
   }
 });
 
-conversions.post('/api/conversions/definitions/:id/replace', conversionPermission('edit'), async (c) => {
+conversions.post('/api/conversions/definitions/:id/replace', conversionPermission('edit'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const expectedVersion = positiveVersion(body?.expectedVersion);
     const replacementExpectedVersion = positiveVersion(body?.replacementExpectedVersion);
     const replacementId = typeof body?.replacementId === 'string' ? body.replacementId.trim() : '';
     if (!body || expectedVersion === null || replacementExpectedVersion === null || !replacementId) {
-      return c.json({ success: false, error: '差し替え先と版を正しく指定してください' }, 400);
+      return inputError(c, { success: false, error: '差し替え先と版を正しく指定してください' }, 400, ["expectedVersion","replacementExpectedVersion","replacementId"]);
     }
     const parsedReason = readReason(body);
-    if (!parsedReason.ok) return c.json({ success: false, error: parsedReason.error }, 400);
+    if (!parsedReason.ok) return inputError(c, { success: false, error: parsedReason.error }, 400, ["reason"]);
     const scope = await conversionDefinitionScope(c);
     if (!scope.ok) return scope.response;
     const data = await replaceConversionDefinitionUsages(c.env.DB, {
@@ -690,12 +691,12 @@ conversions.delete('/api/conversions/definitions/:id', conversionPermission('edi
  * 下書きは保存だけの状態で、どの計測経路にも乗らない。公開すると
  * status='active' になり、内部起点・外部受信の両方で数え始める。
  */
-conversions.post('/api/conversions/definitions/:id/publish', conversionPermission('edit'), async (c) => {
+conversions.post('/api/conversions/definitions/:id/publish', conversionPermission('edit'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const expectedVersion = positiveVersion(body?.expectedVersion);
     if (!body || expectedVersion === null) {
-      return c.json({ success: false, error: 'expectedVersionを正しく指定してください' }, 400);
+      return inputError(c, { success: false, error: 'expectedVersionを正しく指定してください' }, 400, ["expectedVersion"]);
     }
     const scope = await conversionDefinitionScope(c);
     if (!scope.ok) return scope.response;
@@ -719,12 +720,12 @@ conversions.post('/api/conversions/definitions/:id/publish', conversionPermissio
  * POST /api/conversions/definitions/:id/ingest-secret — 受信鍵の発行・再発行。
  * 平文はこの応答でだけ返す。再発行は古い鍵をその場で無効にする。
  */
-conversions.post('/api/conversions/definitions/:id/ingest-secret', conversionPermission('edit'), async (c) => {
+conversions.post('/api/conversions/definitions/:id/ingest-secret', conversionPermission('edit'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const expectedVersion = positiveVersion(body?.expectedVersion);
     if (!body || expectedVersion === null) {
-      return c.json({ success: false, error: 'expectedVersionを正しく指定してください' }, 400);
+      return inputError(c, { success: false, error: 'expectedVersionを正しく指定してください' }, 400, ["expectedVersion"]);
     }
     const scope = await conversionDefinitionScope(c);
     if (!scope.ok) return scope.response;
@@ -754,12 +755,12 @@ conversions.post('/api/conversions/definitions/:id/ingest-secret', conversionPer
 });
 
 /** POST /api/conversions/definitions/:id/ingest-disable — 外部受信を止める(起点停止)。 */
-conversions.post('/api/conversions/definitions/:id/ingest-disable', conversionPermission('edit'), async (c) => {
+conversions.post('/api/conversions/definitions/:id/ingest-disable', conversionPermission('edit'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const expectedVersion = positiveVersion(body?.expectedVersion);
     if (!body || expectedVersion === null) {
-      return c.json({ success: false, error: 'expectedVersionを正しく指定してください' }, 400);
+      return inputError(c, { success: false, error: 'expectedVersionを正しく指定してください' }, 400, ["expectedVersion"]);
     }
     const scope = await conversionDefinitionScope(c);
     if (!scope.ok) return scope.response;
@@ -778,12 +779,12 @@ conversions.post('/api/conversions/definitions/:id/ingest-disable', conversionPe
 });
 
 /** POST /api/conversions/definitions/:id/ingest-enable — 止めた外部受信を再開する。 */
-conversions.post('/api/conversions/definitions/:id/ingest-enable', conversionPermission('edit'), async (c) => {
+conversions.post('/api/conversions/definitions/:id/ingest-enable', conversionPermission('edit'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const expectedVersion = positiveVersion(body?.expectedVersion);
     if (!body || expectedVersion === null) {
-      return c.json({ success: false, error: 'expectedVersionを正しく指定してください' }, 400);
+      return inputError(c, { success: false, error: 'expectedVersionを正しく指定してください' }, 400, ["expectedVersion"]);
     }
     const scope = await conversionDefinitionScope(c);
     if (!scope.ok) return scope.response;
@@ -852,7 +853,7 @@ const INGEST_EVENT_ID_HEADER = 'X-Conversion-Event-Id';
  * 成否は conversion_ingestion_events に残す。台帳の失敗で受信そのものを
  * 止めないよう、台帳への書き込みは握りつぶしてログだけ残す。
  */
-conversions.post('/api/conversions/ingest/:id', async (c) => {
+conversions.post('/api/conversions/ingest/:id', inputJsonBoundary(), async (c) => {
   const pointId = c.req.param('id');
   const log = async (
     entry: Omit<Parameters<typeof recordConversionIngestionEvent>[1], 'conversionPointId'>,
@@ -930,7 +931,7 @@ conversions.post('/api/conversions/ingest/:id', async (c) => {
     }
     if (!payload) {
       await log({ result: 'rejected', reason: 'invalid_json', signatureSha256: signatureHash });
-      return c.json({ success: false, error: 'Invalid JSON body' }, 400);
+      return inputError(c, { success: false, error: 'Invalid JSON body' }, 400, []);
     }
     const payloadShape = maskedPayloadShape(payload);
     /*
@@ -950,10 +951,10 @@ conversions.post('/api/conversions/ingest/:id', async (c) => {
         result: 'rejected', reason: 'source_event_id_missing', isTest,
         payloadShape, signatureSha256: signatureHash,
       });
-      return c.json({
+      return inputError(c, {
         success: false,
         error: `${INGEST_EVENT_ID_HEADER} header or sourceEventId is required`,
-      }, 400);
+      }, 400, ["sourceEventId"]);
     }
 
     const friendId = typeof payload.friendId === 'string' ? payload.friendId.trim() : '';
@@ -970,7 +971,7 @@ conversions.post('/api/conversions/ingest/:id', async (c) => {
         sourceEventId: sourceEventId.trim().slice(0, 200),
         payloadShape, signatureSha256: signatureHash,
       });
-      return c.json({ success: false, error: 'friendId or lineUserId is required' }, 400);
+      return inputError(c, { success: false, error: 'friendId or lineUserId is required' }, 400, ["friendId"]);
     }
     const value = payload.value === null || payload.value === undefined
       ? null : Number(payload.value);
@@ -1027,7 +1028,7 @@ conversions.post('/api/conversions/ingest/:id', async (c) => {
           sourceEventId: sourceEventId.trim().slice(0, 200),
           friendId: resolvedFriendId, payloadShape, signatureSha256: signatureHash,
         });
-        return c.json({ success: false, error: 'Friend not found or out of scope' }, 422);
+        return inputError(c, { success: false, error: 'Friend not found or out of scope' }, 422, []);
       }
       // R40: 数えない条件に当てはまる受信は、失敗ではなく対象外として残す。
       if (message === 'conversion_excluded') {
@@ -1036,7 +1037,7 @@ conversions.post('/api/conversions/ingest/:id', async (c) => {
           sourceEventId: sourceEventId.trim().slice(0, 200),
           friendId: resolvedFriendId, payloadShape, signatureSha256: signatureHash,
         });
-        return c.json({ success: false, error: 'Excluded by the conversion point exclusion condition' }, 422);
+        return inputError(c, { success: false, error: 'Excluded by the conversion point exclusion condition' }, 422, []);
       }
       throw trackError;
     }
@@ -1045,7 +1046,7 @@ conversions.post('/api/conversions/ingest/:id', async (c) => {
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
-conversions.post('/api/conversions/definitions/:id/usages', conversionPermission('edit'), async (c) => {
+conversions.post('/api/conversions/definitions/:id/usages', conversionPermission('edit'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{
       lineAccountId?: unknown;
@@ -1054,7 +1055,7 @@ conversions.post('/api/conversions/definitions/:id/usages', conversionPermission
       refId?: unknown;
       refVersionId?: unknown;
     }>().catch(() => null);
-    if (!body) return c.json({ success: false, error: 'JSON本文が正しくありません' }, 400);
+    if (!body) return inputError(c, { success: false, error: 'JSON本文が正しくありません' }, 400, []);
     const lineAccountId = typeof body.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
     const refId = typeof body.refId === 'string' ? body.refId.trim() : '';
     const expectedVersion = Number(body.expectedVersion);
@@ -1066,7 +1067,7 @@ conversions.post('/api/conversions/definitions/:id/usages', conversionPermission
       || !Number.isInteger(expectedVersion) || expectedVersion < 1
       || !CONVERSION_DEFINITION_USAGE_KINDS.includes(refKind)
       || (refVersionId !== null && (!refVersionId || refVersionId.length > 200))) {
-      return c.json({ success: false, error: 'lineAccountId、expectedVersion、refKind、refIdを正しく指定してください' }, 400);
+      return inputError(c, { success: false, error: 'lineAccountId、expectedVersion、refKind、refIdを正しく指定してください' }, 400, ["lineAccountId","refId","expectedVersion","refKind","refVersionId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: '成果地点が見つかりません' }, 404);
@@ -1175,20 +1176,20 @@ conversions.get('/api/conversions/points', conversionPermission('view'), async (
 });
 
 // POST /api/conversions/points - create
-conversions.post('/api/conversions/points', requireRole('owner', 'admin'), async (c) => {
+conversions.post('/api/conversions/points', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<ConversionPointBody>();
 
     if (!body.name || !body.eventType) {
-      return c.json({ success: false, error: 'name and eventType are required' }, 400);
+      return inputError(c, { success: false, error: 'name and eventType are required' }, 400, ["name","eventType"]);
     }
     // 定義作成と同じ120文字上限。一覧表示が崩れないため(#513 L14)。
     if (String(body.name).trim().length > 120) {
-      return c.json({ success: false, error: 'name must be 120 characters or less' }, 400);
+      return inputError(c, { success: false, error: 'name must be 120 characters or less' }, 400, ["name"]);
     }
 
     const options = readMeasureOptions(body);
-    if (!options.ok) return c.json({ success: false, error: options.error }, 400);
+    if (!options.ok) return inputError(c, { success: false, error: options.error }, 400, ["measureMethod","targetUrl","countRepeat","attributionDays","lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [options.value.lineAccountId as string | null])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
@@ -1211,7 +1212,7 @@ conversions.post('/api/conversions/points', requireRole('owner', 'admin'), async
 // ただし旧口のまま版・利用先確認を通さず上書きすると、稼働中の数え方が
 // 後から変わる(N-254)。定義系と同じく版の一致を求め、稼働中または
 // 成果・利用先のある地点の数え方は新版作成か停止後の手順へ案内する。
-conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), requireVisibleConversionPoint, async (c) => {
+conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), requireVisibleConversionPoint, inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const current = await getConversionPointById(c.env.DB, id);
@@ -1225,7 +1226,7 @@ conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), re
     const expectedVersion = positiveVersion(body.expectedVersion)
       ?? positiveVersion(c.req.query('expectedVersion'));
     if (expectedVersion === null) {
-      return c.json({ success: false, error: 'expectedVersionを正しく指定してください。本文が落ちる通信経路ではクエリでも指定できます' }, 400);
+      return inputError(c, { success: false, error: 'expectedVersionを正しく指定してください。本文が落ちる通信経路ではクエリでも指定できます' }, 400, ["expectedVersion"]);
     }
     if (current.version !== expectedVersion) {
       return c.json({
@@ -1236,7 +1237,7 @@ conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), re
     }
 
     const options = readMeasureOptions(body, current);
-    if (!options.ok) return c.json({ success: false, error: options.error }, 400);
+    if (!options.ok) return inputError(c, { success: false, error: options.error }, 400, ["measureMethod","targetUrl","countRepeat","attributionDays","lineAccountId"]);
     if ('lineAccountId' in options.value
       && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [options.value.lineAccountId as string | null])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -1245,8 +1246,8 @@ conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), re
     const patch: Record<string, unknown> = { ...options.value };
     if (body.name !== undefined) {
       const name = String(body.name).trim();
-      if (!name) return c.json({ success: false, error: 'name must not be empty' }, 400);
-      if (name.length > 120) return c.json({ success: false, error: 'name must be 120 characters or less' }, 400);
+      if (!name) return inputError(c, { success: false, error: 'name must not be empty' }, 400, ["name"]);
+      if (name.length > 120) return inputError(c, { success: false, error: 'name must be 120 characters or less' }, 400, ["name"]);
       patch.name = name;
     }
     if (body.eventType !== undefined) patch.eventType = String(body.eventType);
@@ -1328,7 +1329,7 @@ conversions.delete('/api/conversions/points/:id', requireRole('owner', 'admin'),
 // ── Conversion Tracking ─────────────────────────────────────────────────────
 
 // POST /api/conversions/track - record conversion
-conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async (c) => {
+conversions.post('/api/conversions/track', requireRole('owner', 'admin'), inputJsonBoundary({"conversionPointId":["string"],"friendId":["string"],"userId":["null","string"],"affiliateCode":["null","string"],"metadata":["null","object"],"idempotencyKey":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       conversionPointId: string;
@@ -1340,10 +1341,7 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
     }>();
 
     if (!body.conversionPointId || !body.friendId) {
-      return c.json(
-        { success: false, error: 'conversionPointId and friendId are required' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'conversionPointId and friendId are required' }, 400, ["conversionPointId","friendId"]);
     }
 
     const [pointAccount, friendAccount] = await Promise.all([
@@ -1373,7 +1371,7 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
         || body.idempotencyKey.length < 1
         || body.idempotencyKey.length > 200)
     ) {
-      return c.json({ success: false, error: 'idempotencyKey must be 1 to 200 characters' }, 400);
+      return inputError(c, { success: false, error: 'idempotencyKey must be 1 to 200 characters' }, 400, ["idempotencyKey"]);
     }
 
     const event = await trackConversion(c.env.DB, {
@@ -1412,7 +1410,7 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
     }
     // R40: 数えない条件に当てはまる人は記録しない。失敗ではなく対象外。
     if (err instanceof Error && err.message === 'conversion_excluded') {
-      return c.json({ success: false, error: '「数えない条件」に当てはまるため記録できません' }, 422);
+      return inputError(c, { success: false, error: '「数えない条件」に当てはまるため記録できません' }, 422, []);
     }
     console.error('POST /api/conversions/track error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -1512,7 +1510,7 @@ conversions.get(
 conversions.post(
   '/api/conversions/events/:id/reversals',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       const eventId = c.req.param('id');
@@ -1536,11 +1534,11 @@ conversions.post(
       const body = await c.req.json<{ kind?: unknown; reason?: unknown }>();
       const kind = body.kind === 'restore' ? 'restore' : body.kind === 'reverse' ? 'reverse' : null;
       if (!kind) {
-        return c.json({ success: false, error: 'kind は reverse か restore で指定してください' }, 400);
+        return inputError(c, { success: false, error: 'kind は reverse か restore で指定してください' }, 400, ["kind"]);
       }
       const reason = String(body.reason ?? '').trim();
       if (!reason || reason.length > 500) {
-        return c.json({ success: false, error: '理由を入れてください（500文字以内）' }, 400);
+        return inputError(c, { success: false, error: '理由を入れてください（500文字以内）' }, 400, ["reason"]);
       }
       const staff = c.get('staff');
       try {
@@ -1977,7 +1975,7 @@ conversions.get('/api/conversions/events/:id/attribution', conversionPermission(
 });
 
 // PATCH /api/conversions/events/:id/approval - approve/reject an attributed CV
-conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermission, requireVisibleConversionEvent, async (c) => {
+conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermission, requireVisibleConversionEvent, inputJsonBoundary(), async (c) => {
   // 監査は更新の成功が確定してから残す(#513 M7)。以前は検証の前に
   // 書いていたため、400/404の失敗も「更新」の記録に混ざっていた。
   try {
@@ -1987,7 +1985,7 @@ conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermiss
 
     const parsed = readApprovalDecision(body);
     if (!parsed.ok) {
-      return c.json({ success: false, error: parsed.error }, 400);
+      return inputError(c, { success: false, error: parsed.error }, 400, ["status","expectedStatus"]);
     }
 
     const decided = await decideConversionApproval(
@@ -2021,15 +2019,12 @@ conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermiss
       // F-23: 記録した当時の報酬額を確認できない成果は、承認すると今の額で
       // 固まってしまうため承認しない。状態は変えず、監査にも残さない。
       // 422 を返す: fetchApi は本文だけを文言として画面へ渡す。
-      return c.json(
-        {
+      return inputError(c, {
           success: false,
           code: 'approval_unbillable',
           error: '記録した当時の報酬額を確認できないため、承認できませんでした。対応方法が決まるまでこのままにしてください。',
           data: { id: c.req.param('id'), currentStatus: decided.currentStatus },
-        },
-        422,
-      );
+        }, 422, ["status","expectedStatus"]);
     }
     auditLog(c, 'conversion.approval.update', { kind: 'conversion_event', id: c.req.param('id') });
 
@@ -2059,8 +2054,7 @@ conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermiss
     if (parsed.status === 'approved') {
       const actionFailures = await runApprovedConversionOfferActions(c.env.DB, c.req.param('id'));
       if (actionFailures.length > 0) {
-        return c.json(
-          {
+        return inputError(c, {
             success: false,
             code: 'offer_actions_incomplete',
             error: offerActionFailureMessage(actionFailures),
@@ -2069,9 +2063,7 @@ conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermiss
               approvalStatus: 'approved',
               actionFailures,
             },
-          },
-          422,
-        );
+          }, 422, []);
       }
     }
 
@@ -2166,16 +2158,13 @@ async function notifyApprovalOnce(
   }
 }
 
-conversions.post('/api/conversions/approvals/bulk', requireApprovalPermission, async (c) => {
+conversions.post('/api/conversions/approvals/bulk', requireApprovalPermission, inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req
       .json<{ items?: unknown }>()
       .catch(() => ({}) as { items?: unknown });
     if (!Array.isArray(body.items) || body.items.length === 0 || body.items.length > BULK_APPROVAL_MAX_ITEMS) {
-      return c.json(
-        { success: false, error: `items must be 1-${BULK_APPROVAL_MAX_ITEMS} approval decisions` },
-        400,
-      );
+      return inputError(c, { success: false, error: `items must be 1-${BULK_APPROVAL_MAX_ITEMS} approval decisions` }, 400, ["items"]);
     }
     const result: BulkApprovalItemResult = { succeeded: [], conflicted: [], denied: [], failed: [] };
     // m22u R355: 入口で有効と判定されたアカウントの集合。対象ごとに機能オフを

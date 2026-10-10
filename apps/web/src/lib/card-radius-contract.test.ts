@@ -11,27 +11,19 @@ function token(name: string): string {
   return hit ? hit[1].trim() : '(未定義)'
 }
 
-/**
- * **カードと窓の角丸は、名前を分けたまま同じ 12px へ畳む（★V7）。**
- *
- * V6 ではカードが `$radius-md`(10)、窓が `$radius-panel`(12) と別物だった。
- * ★V7「見た目の物差し」§1 で丸みは 6 / 8 / 12 / 999 の4段だけになり、
- * 「カード・ダイアログ・知らせ」は同じ 12px 段に入る。
- * 値が同じでも名前は用途ごとに残す。画面側の `rounded-card` /
- * `rounded-panel` は触らず、ここで値だけが読み替わる。
- */
-describe('カードと窓の角丸は V7 の 12px 段に揃う', () => {
-  it('カードは V7 の12px', () => {
+/** V8 §6: 中身のカードは12、窓は16。役割を混ぜない。 */
+describe('カードと窓の角丸は V8 の役割ごとの段に揃う', () => {
+  it('カードは12px', () => {
     // ★V7: 丸みは 6 / 8 / 12 / 999 の4段。カードは 12px。
     expect(token('radius-card')).toBe('12px')
   })
 
-  it('窓は V7 の12px', () => {
+  it('窓は16px', () => {
     // J6x4Q 標準確認モーダル / z7O873 友だち 詳細検索モーダル
-    expect(token('radius-panel')).toBe('12px')
+    expect(token('radius-panel')).toBe('16px')
   })
 
-  it('値が同じでも、用途の名前は別のまま残す', () => {
+  it('用途の名前を別のまま残す', () => {
     // 2つの名前があるので、将来片方だけを変えられる。
     expect(token('radius-card')).not.toBe('(未定義)')
     expect(token('radius-panel')).not.toBe('(未定義)')

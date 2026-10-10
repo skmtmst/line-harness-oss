@@ -57,7 +57,7 @@ function DuplicatesPageV7() {
 
   return (
     <div className="flex flex-col gap-4" data-duplicates-design="v4">
-      <section className="rounded-card border border-hairline bg-canvas px-4 py-3 shadow-card">
+      <section className="rounded-card border border-hairline bg-canvas px-4 py-3 shadow-card-surface">
         <p className="text-sm font-bold text-ink">重複の可能性を検出します。自動統合はしません。</p>
         <p className="mt-1 text-xs leading-5 text-ink-secondary">確定済みID・連携UID・メール／電話の一致は強い根拠、プロフィール画像や名前だけの一致は候補として表示します。確認後も元のLINE友だちデータは残ります。</p>
       </section>
@@ -207,7 +207,7 @@ function DuplicatesPageV7() {
             </div>
           </div>
 
-          <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" aria-busy={candidatesLoading}>
+          <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card-surface" aria-busy={candidatesLoading}>
             <table className="w-full table-fixed text-sm">
               <colgroup><col style={{ width: '17%' }}/><col style={{ width: '8%' }}/><col style={{ width: '24%' }}/><col style={{ width: '17%' }}/><col style={{ width: '11%' }}/><col style={{ width: '8%' }}/><col style={{ width: '15%' }}/></colgroup>
               {/*
@@ -290,13 +290,13 @@ function DuplicatesPageV7() {
           */}
           {data ? (
           <>
-          <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
+          <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card-surface">
             <h2 className="text-sm font-bold text-ink">アカウント別ブレイクダウン</h2>
             <p className="mt-1 text-xs text-ink-faint">どのアカウントに重複が偏っているかを見ます。</p>
             {data.perAccount.length === 0 ? (
               <p className="mt-3 text-sm text-ink-faint">アカウントが登録されていません。</p>
             ) : (
-              <div className="mt-3 overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
+              <div className="mt-3 overflow-hidden rounded-card border border-hairline bg-canvas shadow-card-surface">
                 <table className="w-full table-fixed text-sm">
                   <thead>
                     <TableHeadRow>
@@ -329,7 +329,7 @@ function DuplicatesPageV7() {
             // keep the non-undefined narrowing.
             const pairwise = data.pairwiseOverlap
             return (
-            <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
+            <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card-surface">
               <h2 className="text-sm font-bold text-ink">アカウント間 重複マトリックス</h2>
               <p className="mt-1 text-xs text-ink-faint">
                 行アカウントの友だちのうち、列アカウントにも居る人数 （行のアカウントに対する割合）。
@@ -339,7 +339,7 @@ function DuplicatesPageV7() {
                 （16px。先頭列の pl-4 とそろえる）。
               */}
               <style>{`[data-duplicates-matrix] tr > :last-child { padding-right: 16px; }`}</style>
-              <div data-duplicates-matrix className="mt-3 overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
+              <div data-duplicates-matrix className="mt-3 overflow-hidden rounded-card border border-hairline bg-canvas shadow-card-surface">
                 <table className="w-full table-fixed text-sm">
                   <thead>
                     <TableHeadRow>

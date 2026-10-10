@@ -71,8 +71,10 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
 
   it('R12: リマインダは見出しの総数を「すべて」の行と重ねて出さない', () => {
     const src = read('reminders/list-v8.tsx')
-    expect(src).toContain("kind: 'all'")
-    expect(src).toContain("id: '', label: 'すべて', count: reminderList.total ?? null, color: 'var(--color-accent)' }")
+    // 「すべて」の行は共通のフォルダの列（ManagedFolderPanel）が作る。件数は行が表す総数（B-136）。
+    expect(src).toMatch(/<ManagedFolderPanel[\s\S]*?allId=""[\s\S]*?allCount=\{reminderList\.total \?\? null\}/)
+    const panel = src.match(/<ManagedFolderPanel[\s\S]*?>/)?.[0] ?? ''
+    expect(panel).not.toMatch(/\stotal=/)
     expect(src).not.toContain('`${listTotal}件`')
   })
 })

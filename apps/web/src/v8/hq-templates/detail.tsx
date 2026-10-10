@@ -15,18 +15,22 @@ import { templateKind } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import LinePreview from '@/components/shared/line-preview'
+import TagPill from '@/components/shared/tag-pill'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { ChangeBox, DetailFrame } from '@/v8/template-detail/detail'
 import type { HqAccount, HqTemplateListItem, TemplateDetail } from '@/lib/hq-templates-api'
 import { KIND_TABS, sentLabel } from './store-list'
 import styles from '../template-detail/detail.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 /** 「8月21日 18:02」（日本時間）。 */
 function stamp(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  const j = new Date(d.getTime() + 9 * 60 * 60 * 1000)
-  return `${j.getUTCMonth() + 1}月${j.getUTCDate()}日 ${j.getUTCHours()}:${String(j.getUTCMinutes()).padStart(2, '0')}`
+  return polishFormatDate(iso, { style: 'detail', fallback: '—' })
 }
 
 /** 本文の差し込み（{{name}} など）の名前。 */
@@ -65,7 +69,7 @@ export function receivedLabels(row: HqTemplateReceivedVersion): { version: strin
 }
 
 export default function HqTemplateDetail({
-  detail, row, accounts, folderName, canEdit, busy, notices, versions, versionsError, received, onReloadVersions, onCompare, onRestore,
+  detail, row, accounts, folderName, folderColor, canEdit, busy, notices, versions, versionsError, received, onReloadVersions, onCompare, onRestore,
   onBack, onEdit, onDistribute, onDuplicate, onEnterAccount,
 }: {
   detail: TemplateDetail
@@ -73,6 +77,7 @@ export default function HqTemplateDetail({
   row?: HqTemplateListItem
   accounts: HqAccount[]
   folderName: string
+  folderColor?: string | null
   canEdit: boolean
   busy: boolean
   notices?: React.ReactNode
@@ -98,7 +103,10 @@ export default function HqTemplateDetail({
 
   const definition = detail.definition as MessageTemplateDefinition
   const kind = 'template' in definition ? templateKind(definition) : 'message'
-  const kindLabel = KIND_TABS.find((tab) => tab.kind === kind)?.label ?? 'メッセージ'
+  const tag = 'tag' in detail.definition ? detail.definition.tag : null
+  const tagFolder = tag && 'folders' in detail.definition ? detail.definition.folders.find((folder) => folder.id === tag.folderId) : null
+  const tagColor = tagFolder ? folderDisplayColor(tagFolder) : folderColor
+  const kindLabel = tag ? 'タグ' : KIND_TABS.find((tab) => tab.kind === kind)?.label ?? 'メッセージ'
   const content = 'template' in definition ? definition.template.messageContent : ''
   const summary = row?.content_summary ?? null
   const distributedNames = row?.distributed_account_names ?? []
@@ -153,7 +161,7 @@ export default function HqTemplateDetail({
           <div className={styles.aboutRow}><dt>種類</dt><dd>{kindLabel}</dd></div>
           <div className={styles.aboutRow}><dt>フォルダ</dt><dd>{folderName}</dd></div>
           <div className={styles.aboutRow}><dt>今月送った数</dt><dd title={row?.this_month_sent_count == null ? '今月送った数は、この種類では数えていません' : '配った先の合計'}>{sentLabel(row?.this_month_sent_count)}</dd></div>
-          <div className={styles.aboutRow}><dt>差し込み</dt><dd title={words.join('・')}>{words.length > 0 ? words.join('・') : 'なし'}</dd></div>
+          <div className={styles.aboutRow}><dt>差し込み</dt><dd title={words.join('・')}>{words.length > 0 ? words.join('・') : emptyValue('none')}</dd></div>
         </dl>
       </section>
       <LinePreview accountName="公式アカウント" note="受け取る人のLINEでの見え方です。{ } の差し込みは、配った先のアカウントで送るときに、受け取る人ごとの値に変わります。">
@@ -183,7 +191,7 @@ export default function HqTemplateDetail({
   const enterButton = (accountId: string | null) => accountId
     ? <button type="button" className={styles.ghostButton} onClick={() => onEnterAccount(accountId)} aria-label="このアカウントへ入る"><LogIn size={14} aria-hidden="true" />入る</button>
     : <span className={styles.ghostSpacer} aria-hidden="true" />
-  const creator = (version: HqTemplateVersionDisplay) => `${version.creator_name ?? '—'}・${stamp(version.created_at)}`
+  const creator = (version: HqTemplateVersionDisplay) => `${version.creator_name ?? emptyValue('unknown')}・${stamp(version.created_at)}`
   const sortedVersions = [...(versions ?? [])].sort((a, b) => b.version - a.version)
 
   const restore = async () => {
@@ -209,7 +217,7 @@ export default function HqTemplateDetail({
         description={[kindLabel, folderName, current?.creator_name ? `作った人 ${current.creator_name}` : null, `更新 ${stamp(detail.template.updated_at)}`].filter(Boolean).join('・')}
         preview={side}
       >
-        {canEdit ? null : <p className={styles.roBand} role="note">閲覧のみで見ています。編集・配る操作は管理者に頼んでください。</p>}
+        {canEdit ? null : <p className={styles.roBand} role="note">閲覧のみで見ています。編集・配る操作は統括の管理者に頼んでください。</p>}
         {notices}
         {canEdit ? (
           <div className={styles.draftBand} role="status">
@@ -249,7 +257,7 @@ export default function HqTemplateDetail({
               </Button>
             ) : null}
           </div>
-          <div className={styles.bodyBox}>{kind === 'message' ? content : `［${kindLabel}］${summary ?? ''}`}</div>
+          <div className={styles.bodyBox}>{tag ? <TagPill name={tag.name} color={tagColor} /> : kind === 'message' ? content : `［${kindLabel}］${summary ?? ''}`}</div>
         </section>
 
         <section className={styles.card} aria-label="配った先">
@@ -277,7 +285,7 @@ export default function HqTemplateDetail({
               {distributedNames.map((name) => (
                 <div key={name} className={styles.usageRow}>
                   <span className={styles.usageKind} title={name}>{shortName(name)}</span>
-                  <span className={styles.usageNameQuiet} title={name}>{name}</span>
+                  <span className={styles.usageNameQuiet} ><TruncatedText value={String(name ?? '')} /></span>
                   <span className={styles.usageVersion}>—</span>
                   <span className={styles.usageState}>受け取り済み</span>
                   {enterButton(accountIdOf(name))}
@@ -298,7 +306,7 @@ export default function HqTemplateDetail({
             <h2 className={styles.cardTitle}>版の履歴</h2>
             <p className={styles.cardNote}>戻すと、その版を下書きとして作り直します。配るまで配った先は変わりません</p>
           </div>
-          {versions === null && !versionsError ? <p className={styles.empty} role="status">読み込み中…</p> : versionsError ? (
+          {versions === null && !versionsError ? <DetailLoading /> : versionsError ? (
             <div className={styles.versionError}>
               <p className={styles.errorText}>版の履歴を読み込めませんでした。もう一度お試しください。</p>
               <Button variant="secondary" onClick={onReloadVersions}>もう一度読み込む</Button>
@@ -347,7 +355,7 @@ export default function HqTemplateDetail({
         confirmLabel="この版に戻す"
         busy={restoring}
         error={restoreError || undefined}
-        onConfirm={() => void restore()}
+        onConfirm={() => restore()}
         onCancel={() => {
           if (restoring) return
           setRestoreTarget(null)

@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   getUsersForAccess,
@@ -76,7 +77,7 @@ users.get('/api/users/:id', requireRole('owner', 'admin', 'staff'), async (c) =>
 });
 
 // POST /api/users - create
-users.post('/api/users', requireRole('owner', 'admin'), async (c) => {
+users.post('/api/users', requireRole('owner', 'admin'), inputJsonBoundary({"email":["null","string"],"phone":["null","string"],"externalId":["null","string"],"displayName":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       email?: string | null;
@@ -103,7 +104,7 @@ users.post('/api/users', requireRole('owner', 'admin'), async (c) => {
 });
 
 // PUT /api/users/:id - update
-users.put('/api/users/:id', requireRole('owner', 'admin'), async (c) => {
+users.put('/api/users/:id', requireRole('owner', 'admin'), inputJsonBoundary({"email":["null","string"],"phone":["null","string"],"externalId":["null","string"],"displayName":["null","string"]}), async (c) => {
   try {
     const id = c.req.param('id');
     if (!await visibleUser(c, id)) {
@@ -172,13 +173,13 @@ users.delete('/api/users/:id', requireRole('owner'), async (c) => {
 });
 
 // POST /api/users/:id/link - link friend to user UUID
-users.post('/api/users/:id/link', requireRole('owner', 'admin'), async (c) => {
+users.post('/api/users/:id/link', requireRole('owner', 'admin'), inputJsonBoundary({"friendId":["string"]}), async (c) => {
   try {
     const userId = c.req.param('id');
     const body = await c.req.json<{ friendId: string }>();
 
     if (!body.friendId) {
-      return c.json({ success: false, error: 'friendId is required' }, 400);
+      return inputError(c, { success: false, error: 'friendId is required' }, 400, ["friendId"]);
     }
 
     if (!await visibleUser(c, userId)) {
@@ -237,7 +238,7 @@ users.get('/api/users/:id/accounts', requireRole('owner', 'admin', 'staff'), asy
 });
 
 // POST /api/users/match - find user by email or phone
-users.post('/api/users/match', requireRole('owner', 'admin'), async (c) => {
+users.post('/api/users/match', requireRole('owner', 'admin'), inputJsonBoundary({"email":["string"],"phone":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ email?: string; phone?: string }>();
     const scope = await userAccessScope(c);

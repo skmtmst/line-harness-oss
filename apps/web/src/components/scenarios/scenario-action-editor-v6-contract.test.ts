@@ -38,7 +38,7 @@ describe('V6 送信後アクションの契約', () => {
     expect(EDITOR).toContain('api.scenarios.getDraft(scenarioId, selectedAccountId)')
     expect(EDITOR).toContain('api.scenarios.saveDraft(scenarioId')
     expect(EDITOR).toContain('expectedVersion: draftVersion')
-    expect(EDITOR).toContain('afterActions: toDraftActions(next)')
+    expect(EDITOR).toContain('afterActions: [...siblings, ...toDraftActions(next)]')
     expect(EDITOR).toContain('変更時にV6下書きへ保存')
   })
 })

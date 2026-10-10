@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   ANALYTICS_EXPORT_MAX_BYTES,
@@ -61,7 +62,7 @@ async function resolveExportAccount(
 ): Promise<{ ok: true; accountId: string } | { ok: false; response: Response }> {
   const trimmed = accountId?.trim();
   if (!trimmed) {
-    return { ok: false, response: c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400) };
+    return { ok: false, response: inputError(c, { success: false, error: 'LINE公式アカウントを選んでください' }, 400, ["lineAccountId"]) };
   }
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   if (!scope.allowedAccountIds.includes(trimmed)) {
@@ -173,24 +174,24 @@ async function buildExportRows(
 analyticsExports.post(
   '/api/analytics/exports',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const body = await c.req.json<Record<string, unknown>>().catch(() => null);
       const account = await resolveExportAccount(c, body?.accountId as string | undefined);
       if (!account.ok) return account.response;
       const target = parseAnalyticsExportTarget(body?.target);
       if (!target) {
-        return c.json({ success: false, error: '書き出す内容を選んでください' }, 400);
+        return inputError(c, { success: false, error: '書き出す内容を選んでください' }, 400, ["target"]);
       }
       const params = parseAnalyticsExportParams(body?.params);
       if (target === 'cross' && !params.resultId) {
-        return c.json({ success: false, error: 'クロス分析の結果を選んでください' }, 422);
+        return inputError(c, { success: false, error: 'クロス分析の結果を選んでください' }, 422, ["target","params"]);
       }
       if (target === 'funnel' && !params.funnelId) {
-        return c.json({ success: false, error: 'ファネルを選んでください' }, 422);
+        return inputError(c, { success: false, error: 'ファネルを選んでください' }, 422, ["target","params"]);
       }
       if ((target === 'cross' || target === 'funnel') && (params.from || params.to)) {
-        return c.json({ success: false, error: '期間の指定はこの書き出しには使えません' }, 400);
+        return inputError(c, { success: false, error: '期間の指定はこの書き出しには使えません' }, 400, ["target","params"]);
       }
       // 存在しない集計の待ち行列を作らない。IDの打ち間違いはここで落とす。
       if (target === 'cross') {
@@ -207,7 +208,7 @@ analyticsExports.post(
           (key) => (key === 'from' ? params.from : key === 'to' ? params.to : undefined),
           selected?.timezone || 'Asia/Tokyo',
         );
-        if (!range.ok) return c.json({ success: false, error: range.error }, 400);
+        if (!range.ok) return inputError(c, { success: false, error: range.error }, 400, ["params","accountId"]);
       }
       const staff = c.get('staff');
       const now = new Date();

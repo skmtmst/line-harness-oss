@@ -8,11 +8,9 @@
  * 面はここで組む（リッチメニューの yOyCg と同じ作り）。フォーカスの移動・Esc・
  * 背景を止めるのは共通の useOverlayFocus。
  */
-import { useEffect, useId, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
-import { TriangleAlert, X } from 'lucide-react'
-import IconButton from '@/components/shared/icon-button'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { type ReactNode } from 'react'
+import { TriangleAlert } from 'lucide-react'
+import Dialog from '@/components/shared/dialog'
 import styles from './sheet-dialog.module.css'
 
 export default function SheetDialog({
@@ -43,57 +41,9 @@ export default function SheetDialog({
   designNode?: string
   onClose: () => void
 }) {
-  const titleId = useId()
-  const descriptionId = useId()
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
-  const panelRef = useOverlayFocus(open && mounted, onClose, busy)
-  if (!open) return null
-
-  const overlay = (
-    <div
-      className={styles.overlay}
-      role="presentation"
-      data-design-node={designNode}
-      onMouseDown={(event) => {
-        if (!busy && event.target === event.currentTarget) onClose()
-      }}
-    >
-      <div
-        ref={panelRef}
-        className={styles.panel}
-        role={destructive ? 'alertdialog' : 'dialog'}
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={descriptionId}
-        aria-busy={busy || undefined}
-        tabIndex={-1}
-      >
-        <div className={styles.head}>
-          <h2 id={titleId} className={styles.title}>{title}</h2>
-          <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={onClose} disabled={busy}>
-            <X size={16} aria-hidden="true" />
-          </IconButton>
-        </div>
-        <p id={descriptionId} className={styles.description}>{description}</p>
-        {band ? (
-          <div className={styles.band} data-tone={bandTone}>
-            <TriangleAlert size={16} aria-hidden="true" className={styles.bandIcon} />
-            <div className={styles.bandText}>{band}</div>
-          </div>
-        ) : null}
-        {error ? <p className={styles.error} role="alert">{error}</p> : null}
-        {destructive ? (
-          <div className={styles.footerSplit}>
-            <div className={styles.footerLead}>{destructive}</div>
-            <div className={styles.footerCenter}>{actions}</div>
-            <div className={styles.footerLead} aria-hidden="true" />
-          </div>
-        ) : (
-          <div className={styles.footer}>{actions}</div>
-        )}
-      </div>
-    </div>
-  )
-  return mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay
+  return <Dialog open={open} title={title} description={description} onCancel={onClose} busy={busy} error={error} designNode={designNode}
+    tone={destructive ? 'destructive' : 'default'} confirmation designLayout="stacked" designWidth={720}
+    footer={<>{destructive}{actions}</>} footerAlign="center">
+    {band ? <div className={styles.band} data-tone={bandTone}><TriangleAlert size={16} aria-hidden="true" className={styles.bandIcon} /><div className={styles.bandText}>{band}</div></div> : null}
+  </Dialog>
 }

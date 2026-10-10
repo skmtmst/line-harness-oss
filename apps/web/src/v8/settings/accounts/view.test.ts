@@ -9,7 +9,7 @@ const account = (id: string, options: Partial<AccountWithStats> = {}): AccountWi
 } as unknown as AccountWithStats)
 
 describe('★V8 LINEアカウント一覧（V7vn3）の数と並び', () => {
-  it('数の4枚：つないでいる＝全部、稼働中・接続に問題・友だちの合計はアーカイブを数えない', () => {
+  it('数の4枚：つないでいる＝全部、有効・接続に問題・友だちの合計はアーカイブを数えない', () => {
     const kpis = accountKpis([
       account('a', { stats: { friendCount: 1284, activeScenarios: 0, messagesThisMonth: 0 } }),
       account('b', { isActive: false, webhook: { status: 'mismatched' } as LineAccount['webhook'], stats: { friendCount: 14, activeScenarios: 0, messagesThisMonth: 0 } }),

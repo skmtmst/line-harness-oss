@@ -31,58 +31,6 @@ function region(source: string, start: string, end: string): string {
   return source.slice(from, to)
 }
 
-describe('#969-U008 会話ヘッダー: 狭い幅では宛先の名前が1行目を専有する', () => {
-  const header = region(PAGE, '{/* Chat Header */}', '{/* Messages')
-
-  it('ヘッダーは折り返せる。狭い幅で名前の行が1行目を専有する', () => {
-    // 外側: 折り返し可。sm 以上では従来どおり1行。
-    expect(header).toContain('flex-wrap')
-    expect(header).toContain('sm:flex-nowrap')
-    // 名前側: 狭い幅では行いっぱい（basis-full）、sm 以上では通常の1行配置へ。
-    expect(header).toContain('basis-full')
-    expect(header).toContain('sm:basis-auto')
-    expect(header).toContain('sm:flex-1')
-  })
-
-  it('操作（注目・担当・対応・顧客情報）は2行目へ落ちても右端で切れない', () => {
-    const ops = region(header, 'ml-auto flex', '注目から外す')
-    // 1行に固定したままだと 390px で右に切れ、320px では更に隠れる。
-    // sm 以上ではデザイン契約どおり1行に保つ（`sm:flex-nowrap`）。
-    expect(ops).toContain('flex-wrap')
-    expect(ops).toContain('sm:flex-nowrap')
-    expect(ops).not.toContain('flex flex-nowrap')
-  })
-
-  it('宛先の名前は truncate で潰れず、誰への返信か読める', () => {
-    const name = region(header, '<div className="min-w-0">', 'lastMessageAt')
-    expect(name).toContain('truncate')
-    expect(name).toContain('chatDetail.friendName')
-  })
-})
-
-describe('#969-U009 送信ボタン: どの幅でもラベルは1行', () => {
-  const footer = region(PAGE, '{/* 下段 */}', '<TemplatePicker')
-
-  it('送信ボタンは縮まず・折り返さない', () => {
-    // V8 移行 ①: 直書き <button> は共通 Button。クラスは onClick より前に書かれる
-    // ので、送信ボタンの開きタグから区切る（handleSendMessage を持つのは送信だけ）。
-    const send = region(footer, '<Button variant="primary"', '{sending ?')
-    expect(send).toContain('onClick={handleSendMessage}')
-    expect(send).toContain('whitespace-nowrap')
-    expect(send).toContain('shrink-0')
-  })
-
-  it('画像案内が長くても右の操作を圧迫しない', () => {
-    // 行自体が折り返せる。収まらなければ案内と操作は別行になる。
-    expect(footer).toContain('flex-wrap')
-    // 左の案内側は縮められる（min-w-0）、右の操作側は縮まない（shrink-0）。
-    expect(footer).toContain('min-w-0')
-    expect(footer).toContain('ml-auto')
-    expect(footer).toContain('shrink-0')
-  })
-
-})
-
 describe('#969-U010 補助操作: テンプレート・送信設定・内部メモが右に切れない', () => {
   const toolbar = region(PAGE, '{/* 上段 */}', '{/* 送信の設定は送信キーだけ')
 

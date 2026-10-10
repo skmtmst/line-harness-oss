@@ -18,11 +18,12 @@ import styles from './settings-screen.module.css'
 export function SbSettingsScreen({
   boardId,
   title,
-  description,
+  help,
   actions,
   children,
   saveActions,
   saveStatus,
+  savePlacement,
   layout = 'wide-nav',
 }: {
   /**
@@ -32,23 +33,26 @@ export function SbSettingsScreen({
   layout?: 'wide-nav' | 'narrow-nav'
   boardId?: string
   title: ReactNode
-  description?: ReactNode
+  help?: ReactNode
   /** @deprecated ★V8 では板の頭に戻るを描かない（オーナー 2026-10-08）。戻るのは上の帯のパンくず。 */
   identity?: ReactNode
   actions?: ReactNode
   children: ReactNode
   saveActions?: ReactNode
   saveStatus?: ReactNode
+  savePlacement?: 'content'
 }) {
   return (
     <SettingsPage
+      layout={layout}
       boardId={boardId}
       title={title}
-      description={description}
+      help={help}
       actions={actions}
       navigation={<SettingsInnerNav inline />}
       saveActions={saveActions}
       saveStatus={saveStatus}
+      savePlacement={savePlacement}
     >
       <div className={styles.screen} data-sb-settings-screen="" data-sb-layout={layout}>{children}</div>
     </SettingsPage>

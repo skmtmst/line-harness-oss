@@ -156,7 +156,7 @@ function describeConditionRule(
     }
     case 'private_memo': {
       const text = typeof rule.value === 'string' ? rule.value.trim() : ''
-      return text ? `個別メモに「${text}」を含む人` : '個別メモで絞る人'
+      return text ? `メモに「${text}」を含む人` : 'メモで絞る人'
     }
     case 'status_message': {
       const text = typeof rule.value === 'string' ? rule.value.trim() : ''

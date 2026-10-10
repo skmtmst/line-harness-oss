@@ -255,7 +255,7 @@ describe('V8 回答フォームの通し：作る→保存→公開→一覧', (
     // 下書きを保存する（画面の知らせとトーストの両方に出る）。
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
     await waitFor(() => expect(formsUpdate).toHaveBeenCalledTimes(1))
-    await waitFor(() => expect(screen.getAllByText('下書きを保存しました')).toHaveLength(2))
+    await waitFor(() => expect(screen.getAllByText('下書きを保存しました')).toHaveLength(1))
 
     // この版を公開する（公開の確かめ Z9wXm が出るので窓の中でもう一度押す。
     // 画面の知らせとトーストの両方に出る）。
@@ -263,7 +263,7 @@ describe('V8 回答フォームの通し：作る→保存→公開→一覧', (
     const publishDialog = await screen.findByRole('dialog', { name: 'この版を公開する' })
     fireEvent.click(within(publishDialog).getByRole('button', { name: 'この版を公開' }))
     await waitFor(() => expect(formsPublish).toHaveBeenCalledTimes(1))
-    await waitFor(() => expect(screen.getAllByText('この版を公開しました')).toHaveLength(2))
+    await waitFor(() => expect(screen.getAllByText('この版を公開しました')).toHaveLength(1))
 
     // 一覧に戻ると増えている。
     store.forms = [...store.forms, formRow('form-new', '流れの型2')]

@@ -56,7 +56,7 @@ it('閲覧のみには作る・編集・変更・停止・発行のボタンを�
   fixture.role = 'staff'
   render(<OrganizationV8 />)
   expect(await screen.findByText('試験担当')).toBeTruthy()
-  expect(screen.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeTruthy()
+  expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
   for (const name of ['店舗を追加する', '編集', 'ユーザーを追加する', '変更', '停止', 'アドレスを発行']) {
     expect(screen.queryByRole('button', { name })).toBeNull()
   }
@@ -76,4 +76,12 @@ it('ユーザーの保存中は窓の×・キャンセル・Escで閉じられ�
   fireEvent.keyDown(document, { key: 'Escape' })
   expect(screen.getByRole('dialog')).toBeTruthy()
   await act(async () => resolve({ success: true }))
+})
+
+it('WEB169：店舗編集のタイムゾーンは日本時間の表示だけ', async () => {
+  render(<OrganizationV8 />)
+  await screen.findAllByText('試験店')
+  fireEvent.click(screen.getByRole('button', { name: '編集' }))
+  expect(screen.queryByRole('textbox', { name: 'タイムゾーン' })).toBeNull()
+  expect(screen.getByRole('dialog').textContent).toContain('日本時間（Asia/Tokyo）')
 })

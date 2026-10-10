@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { automationTabCounts } from '../services/tab-counts.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -13,7 +14,7 @@ import {
   type AutomationRunDomainStatus,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   AutomationDraftError,
@@ -32,6 +33,7 @@ import {
   previewAutomationAudience,
   runAutomationTest,
   updateAutomationDefinitionStatus,
+  restoreAutomationDefinition,
 } from '../services/automation-definitions.js';
 import {
   AutomationRunCancelError,
@@ -87,7 +89,7 @@ async function requireAutomationRetryPermission(c: Context<Env>, next: () => Pro
 
 async function requireDraftAccount(c: Context<Env>): Promise<string | Response> {
   const id = c.req.query('account_id')?.trim();
-  if (!id) return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  if (!id) return inputError(c, { success: false, error: 'LINE公式アカウントを選んでください' }, 400, ["account_id"]);
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   if (!scope.allowedAccountIds.includes(id)) {
     return c.json({ success: false, error: '対象のLINE公式アカウントが見つかりません' }, 404);
@@ -99,24 +101,24 @@ function draftErrorResponse(c: Context<Env>, error: AutomationDraftError): Respo
   const status = error.code === 'version_conflict' ? 409
     : new Set(['not_found', 'template_not_found']).has(error.code) ? 404
       : 422;
-  return c.json({
+  return inputError(c, {
     success: false,
     error: error.message,
     code: error.code,
     ...(error.field ? { field: error.field } : {}),
-  }, status);
+  }, status, []);
 }
 
 function definitionErrorResponse(c: Context<Env>, error: AutomationDefinitionError): Response {
   const status = error.code === 'version_conflict' ? 409
     : error.code === 'not_found' ? 404
       : 422;
-  return c.json({
+  return inputError(c, {
     success: false,
     error: error.message,
     code: error.code,
     ...(error.field ? { field: error.field } : {}),
-  }, status);
+  }, status, []);
 }
 
 async function definitionEndpoint<T>(c: Context<Env>, run: () => Promise<T>): Promise<Response> {
@@ -505,7 +507,7 @@ automations.post(
   '/api/automation-templates/:key/drafts',
   requireAutomationPermission,
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
     /*
@@ -544,7 +546,7 @@ automations.put(
   '/api/automation-drafts/:id',
   requireAutomationPermission,
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
     type DraftBody = {
@@ -579,7 +581,7 @@ automations.post(
   '/api/automation-drafts/:id/publish',
   requireAutomationPermission,
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
     const body = await c.req.json<{ expectedDraftVersionId?: unknown; activate?: unknown; expectedStatus?: unknown }>()
@@ -628,9 +630,7 @@ automations.get(
     const result = await listAutomationDefinitions(
       c.env.DB,
       requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
-      limit === undefined && offset === undefined
-        ? undefined
-        : { limit, offset },
+      { limit, offset, includeArchived: c.req.query('includeArchived') === '1' },
     );
     return c.json({
       success: true,
@@ -653,7 +653,7 @@ automations.post(
   '/api/automations/:id/audience-preview',
   requireAutomationPermission,
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
     const body = await c.req.json<{ versionId?: unknown }>()
@@ -671,7 +671,7 @@ automations.post(
   requireAutomationPermission,
   requireAutomationTestPermission,
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
     const body = await c.req.json<{
@@ -793,7 +793,7 @@ automations.post(
   requireAutomationPermission,
   requireAutomationRetryPermission,
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       const prepared = await retryAutomationRun(c.env.DB, {
@@ -813,7 +813,7 @@ automations.post(
     } catch (error) {
       if (error instanceof AutomationRunRetryError) {
         const status = error.code === 'not_found' ? 404 : 409;
-        return c.json({ success: false, error: error.message, code: error.code }, status);
+        return inputError(c, { success: false, error: error.message, code: error.code }, status, []);
       }
       console.error(JSON.stringify({
         event: 'automation_run_retry_failed',
@@ -885,7 +885,7 @@ automations.post(
   requireAutomationPermission,
   requireAutomationRetryPermission,
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       const result = await cancelAutomationRun(c.env.DB, {
@@ -896,7 +896,7 @@ automations.post(
     } catch (error) {
       if (error instanceof AutomationRunCancelError) {
         const status = error.code === 'not_found' ? 404 : 409;
-        return c.json({ success: false, error: error.message, code: error.code }, status);
+        return inputError(c, { success: false, error: error.message, code: error.code }, status, []);
       }
       console.error(JSON.stringify({
         event: 'automation_run_cancel_failed',
@@ -927,7 +927,7 @@ automations.post(
   '/api/automations/:id/draft',
   requireAutomationPermission,
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = await definitionAccountId(c);
     if (typeof accountId !== 'string') return accountId;
     return draftEndpoint(c, () => createAutomationDraftFromDefinition(c.env.DB, {
@@ -943,7 +943,7 @@ automations.post(
   '/api/automations/:id/duplicate',
   requireAutomationPermission,
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = await definitionAccountId(c);
     if (typeof accountId !== 'string') return accountId;
     return draftEndpoint(c, () => duplicateAutomationDefinition(c.env.DB, {
@@ -958,23 +958,23 @@ automations.post(
  * #942 N-352: 一覧の稼働切替と「保管」。
  *
  * body は `{ status: 'active' | 'stopped' | 'archived' }`。
- * 保管は一方通行（戻すときは複製）。実行記録は残る。
+ * 保管から戻せる。戻すだけでは動かさず、実行記録は残る。
  */
 automations.post(
   '/api/automations/:id/status',
   requireAutomationPermission,
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = await definitionAccountId(c);
     if (typeof accountId !== 'string') return accountId;
     const body = await c.req.json<{ status?: unknown }>()
       .catch((): { status?: unknown } => ({}));
     const status = body.status;
     if (status !== 'active' && status !== 'stopped' && status !== 'archived') {
-      return c.json({
+      return inputError(c, {
         success: false,
         error: 'status は active / stopped / archived のどれかで送ってください',
-      }, 400);
+      }, 400, ["status"]);
     }
     return definitionEndpoint(c, () => updateAutomationDefinitionStatus(c.env.DB, {
       id: c.req.param('id'),
@@ -983,6 +983,14 @@ automations.post(
     }));
   },
 );
+
+automations.post('/api/automations/:id/restore', requireAutomationPermission, requireRole('owner', 'admin', 'staff'), denyReadOnly(), async (c) => {
+  const accountId = await definitionAccountId(c);
+  if (typeof accountId !== 'string') return accountId;
+  const requested = c.req.query('lineAccountId') ?? c.req.query('account_id');
+  if (requested && requested !== accountId) return c.json({ success: false, error: 'ルールが見つかりません' }, 404);
+  return definitionEndpoint(c, () => restoreAutomationDefinition(c.env.DB, { id: c.req.param('id'), lineAccountId: accountId }));
+});
 
 // 詳細・ログは一覧より機微度が高い（friendId・eventDataを含む）ため、
 // アカウント範囲の検査に加えて機能の権限キー検査も直接付ける。
@@ -1055,12 +1063,12 @@ function parseAutomationToggle(body: unknown): { ok: true; isActive: boolean } |
   return { ok: true, isActive };
 }
 
-automations.put('/api/automations/:id', requireRole('owner', 'admin'), async (c) => {
+automations.put('/api/automations/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json().catch(() => undefined);
     const toggle = parseAutomationToggle(body);
-    if (!toggle.ok) return c.json({ success: false, error: toggle.error }, 400);
+    if (!toggle.ok) return inputError(c, { success: false, error: toggle.error }, 400, ['isActive']);
     await updateAutomation(c.env.DB, id, { isActive: toggle.isActive });
     const updated = await getAutomationById(c.env.DB, id);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);

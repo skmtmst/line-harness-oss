@@ -17,6 +17,7 @@ const draftStore = vi.hoisted(() => ({
   draft: null as null | Record<string, unknown>,
   conflict: false,
   saved: [] as Array<Record<string, unknown>>,
+  wait: null as Promise<void> | null,
 }))
 
 vi.mock('next/link', () => ({
@@ -39,6 +40,8 @@ vi.mock('@/components/shell/page-chrome', () => ({
   usePageCrumbs: () => {},
 }))
 
+vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ enabled: () => false }) }))
+
 vi.mock('@/lib/api', () => {
   class ApiError extends Error {
     status: number
@@ -57,6 +60,7 @@ vi.mock('@/lib/api', () => {
       reminders: {
         getDraft: vi.fn(async () => ({ success: true, data: draftStore.draft })),
         saveDraft: vi.fn(async (_id: string, settings: Record<string, unknown>) => {
+          if (draftStore.wait) await draftStore.wait
           if (draftStore.conflict) throw new ApiError(409, 'VERSION_CONFLICT')
           draftStore.saved.push(settings)
           draftStore.draft = { ...(draftStore.draft ?? {}), settings, versionId: 'v2', updatedAt: '2026-10-01T00:00:00Z' }
@@ -163,6 +167,7 @@ describe('V8 リマインダを作る②〜⑤', () => {
     await render('target')
     const frame = host.querySelector('[data-page-template="create"]')
     expect(frame?.getAttribute('data-design-node')).toBe('YChR6')
+    await act(async () => { buttonByText('?')!.click() })
     expect(host.textContent).toContain('名前：予約前日のご案内・いまは下書きです')
     expect(host.textContent).toContain('186 人')
     expect(host.textContent).toContain('172 人')
@@ -196,7 +201,7 @@ describe('V8 リマインダを作る②〜⑤', () => {
     // happy-dom の窓は幅 1024 なので 1152 の板（r1l0bT）：右の列は「LINEでの見え方を見る」と例だけ。
     expect(host.querySelector('[data-page-template="create"]')?.getAttribute('data-design-node')).toBe('r1l0bT')
     expect(buttonByText('LINEでの見え方を見る')).toBeTruthy()
-    expect(host.querySelector('[aria-label="届く日時の例"]')?.textContent).toContain('2通目')
+    expect(host.querySelector('[aria-label="届く日時の例"]')?.textContent).toContain('2 通目')
     const cards = host.querySelectorAll('[data-open]')
     expect(cards).toHaveLength(1)
     expect(host.textContent).toContain('1日前 18:00')
@@ -205,7 +210,7 @@ describe('V8 リマインダを作る②〜⑤', () => {
     expect((host.querySelector('input[aria-label="送る時刻"]') as HTMLInputElement | null)?.value).toBe('18 : 00')
     const add = buttonByText('通知を足す')
     await act(async () => { add!.click() })
-    expect(host.textContent).toContain('3通目')
+    expect(host.textContent).toContain('3 通目')
   })
 
   it('通知の並べ替え：つまみのドラッグ・上下キー・「後ろへ」は同じ結果になる', async () => {
@@ -240,9 +245,9 @@ describe('V8 リマインダを作る②〜⑤', () => {
   it('配信予定（T0nis）：重なりの行は「1通にまとめる」と出し、案内の帯で件数を言う', async () => {
     await render('preview')
     expect(host.querySelector('[data-page-template="create"]')?.getAttribute('data-design-node')).toBe('T0nis')
-    expect(host.textContent).toContain('今後7日 124通')
+    expect(host.textContent).toContain('今後7日 124 通')
     expect(host.textContent).toContain('重なり→1通にまとめる')
-    expect(host.textContent).toContain('1通にまとめて送ります（3件）')
+    expect(host.textContent).toContain('1通にまとめて送ります（3 件）')
   })
 
   it('有効にした（hjNpJ）：下の帯は無く、一覧・配信予定・詳細へ行ける', async () => {
@@ -296,3 +301,64 @@ describe('V8 リマインダの下書き自動保存（一斉配信と同じ形�
     expect(draftStore.saved).toHaveLength(0)
   })
 })
+
+it('WEB-087：手動保存中は追加編集を止める', async () => {
+  await render('basics')
+  let release!: () => void
+  draftStore.wait = new Promise(resolve => { release = resolve })
+  const name = host.querySelector('#v8-reminder-name') as HTMLInputElement
+  await act(async () => { const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!; setter.call(name, '保存する名前'); name.dispatchEvent(new Event('input', { bubbles: true })) })
+  await act(async () => buttonByText('下書きを保存')!.click())
+  expect(name.closest('fieldset')?.disabled).toBe(true)
+  await act(async () => release()); draftStore.wait = null
+})
+describe('監査 WEB079/080/082', () => {
+  it('遅いフォルダ取得は、その間に入力した名前を消さない', async () => {
+    const { api } = await import('@/lib/api')
+    let complete!: (v: Awaited<ReturnType<typeof api.folders.list>>) => void
+    vi.mocked(api.folders.list).mockImplementationOnce(() => new Promise(resolve => { complete = resolve }))
+    await render('basics')
+    const input = host.querySelector('#v8-reminder-name') as HTMLInputElement
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '新しい名前')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => { complete({ success: true, data: [{ id: 'booking-folder', name: '予約', color: null }] }) })
+    expect((host.querySelector('#v8-reminder-name') as HTMLInputElement).value).toBe('新しい名前')
+  })
+  it('条件に合う人だけを選ぶと空の条件編集を開き、未完成では次へ進まない', async () => {
+    await render('target')
+    const pick = [...host.querySelectorAll<HTMLElement>('[role="radio"], input[type="radio"]')].find(el => el.textContent?.includes('条件に合う人だけ') || el.getAttribute('value') === 'condition')!
+    await act(async () => { pick.click() })
+    expect(host.querySelector('[aria-label="追加する条件を選ぶ"]')).toBeTruthy()
+    await act(async () => { buttonByText('次へ：通知の中身')!.click() })
+    expect(draftStore.saved).toHaveLength(0)
+    expect(pushMock).not.toHaveBeenCalled()
+  })
+  it('手動保存待ち中の名前編集を応答で戻さない', async () => {
+    const { api } = await import('@/lib/api')
+    let complete!: (v: Awaited<ReturnType<typeof api.reminders.saveDraft>>) => void
+    vi.mocked(api.reminders.saveDraft).mockImplementationOnce(() => new Promise(resolve => { complete = resolve }))
+    await render('basics')
+    await act(async () => { buttonByText('下書きを保存')!.click() })
+    const input = host.querySelector('#v8-reminder-name') as HTMLInputElement
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '保存待ちに入力')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => { complete({ success: true, data: { ...baseDraft(), versionId: 'v2' } }) })
+    expect((host.querySelector('#v8-reminder-name') as HTMLInputElement).value).toBe('保存待ちに入力')
+  })
+})
+
+it('WEB081: 誕生日のひな形を確認して使うと通知日時と本文も入る',async()=>{
+ await render('basics')
+ const buttons=[...host.querySelectorAll('button')].filter(button=>button.textContent==='このひな形を使う')
+ await act(async()=>buttons.at(-1)!.click())
+ const confirm=[...document.querySelectorAll('[role="dialog"] button')].find(button=>button.textContent==='このひな形を使う')
+ if(document.querySelector('[role="dialog"]')) await act(async()=>confirm!.click())
+ await act(async()=>buttonByText('下書きを保存')!.click())
+ const saved=draftStore.saved.at(-1) as { steps: unknown[] }
+ expect(saved.steps).toHaveLength(1)
+ expect(saved.steps[0]).toMatchObject({offsetDays:0,offsetMinutes:0,sendAtTime:'10:00',messageContent:'お誕生日おめでとうございます。いつもありがとうございます。'})
+});

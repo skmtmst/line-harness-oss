@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context, MiddlewareHandler } from 'hono';
 import {
@@ -58,6 +59,9 @@ import {
 } from '../services/scenario-v6-contract.js';
 import { listLimit, listPage } from './list-pagination.js';
 
+import { resumeQuestionAnswer, registerLegacyQuestionAnswers } from '../services/scenario-question-answer.js';
+import { LineClient } from '@line-crm/line-sdk';
+import { getWorkflowStep } from '@line-crm/db';
 const scenarios = new Hono<Env>();
 
 function scenarioPermission(
@@ -81,12 +85,12 @@ function scenarioPermission(
 
 function scenarioContractError(c: Context<Env>, error: unknown): Response {
   if (error instanceof ScenarioContractError) {
-    return c.json({
+    return inputError(c, {
       success: false,
       code: error.code,
       error: error.message,
       ...(error.field ? { field: error.field } : {}),
-    }, error.status);
+    }, error.status, []);
   }
   console.error(JSON.stringify({
     event: 'scenario_v6_contract_failed',
@@ -145,6 +149,44 @@ async function requireVisibleScenario(c: Context<Env>, next: () => Promise<void>
   }
   await next();
 }
+
+scenarios.get('/api/scenarios/:id/question-answers', requireRole('owner','admin'), requireVisibleScenario, async(c)=>{
+  const scenario=await getScenarioById(c.env.DB,c.req.param('id'));
+  await registerLegacyQuestionAnswers(c.env.DB,scenario!.id,accountId=>canAccessAllLineAccounts(c.env.DB,c.get('staff'),[accountId]));
+  const rows=await c.env.DB.prepare(`SELECT scope_id,subject_id,status,error_code,input_json,updated_at FROM workflow_steps
+    WHERE process_kind='question_answer' AND step_key='__run' AND status!='succeeded'
+      AND json_extract(input_json,'$.target.scenarioId')=? ORDER BY updated_at DESC LIMIT 100`)
+    .bind(scenario!.id).all<{scope_id:string;subject_id:string;status:string;error_code:string|null;input_json:string;updated_at:number}>();
+  const visible=[];
+  for(const row of rows.results)if(await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[row.scope_id.slice(5)==='default'?null:row.scope_id.slice(5)]))visible.push(row);
+  return c.json({success:true,data:visible.map(row=>({executionId:row.subject_id,status:row.status,errorCode:row.error_code,
+    friendId:JSON.parse(row.input_json).friendId,updatedAt:new Date(row.updated_at).toISOString()}))});
+});
+scenarios.post('/api/scenarios/:id/question-answers/:executionId/resume',requireRole('owner','admin'),requireVisibleScenario,inputJsonBoundary(), async(c)=>{
+  if(c.get('staff')?.readOnly) return c.json({success:false,error:'閲覧のみの権限では再開できません'},403);
+  const body=await c.req.json().catch(()=>null);
+  if(!body || typeof body.reason!=='string' || !body.reason.trim() || body.reason.length>500)
+    return inputError(c, {success:false,error:'再開する理由を1〜500文字で入力してください'}, 400, ["reason"]);
+  const scenario=await getScenarioById(c.env.DB,c.req.param('id'));
+  const root=await c.env.DB.prepare(`SELECT * FROM workflow_steps WHERE process_kind='question_answer' AND subject_id=? AND step_key='__run'`)
+    .bind(c.req.param('executionId')).first<import('@line-crm/db').WorkflowStepRow>();
+  const scopeId=root?.scope_id ?? '';
+  const accountId=scopeId.slice(5)==='default'?null:scopeId.slice(5);
+  if(!await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[accountId]))return c.json({success:false,error:'回答が見つかりません'},404);
+  if(!root?.input_json || JSON.parse(root.input_json).target.scenarioId!==scenario!.id)
+    return c.json({success:false,error:'回答が見つかりません'},404);
+
+  try{
+    const resumed=await resumeQuestionAnswer(c.env.DB,{scopeId,executionId:c.req.param('executionId'),actorId:c.get('staff')!.id,
+      reason:body.reason.trim(),lineClient:new LineClient(''),
+      confirmedChoiceIndex:body.confirmedChoiceIndex,confirmedCompletedSteps:body.confirmedCompletedSteps});
+    const latest=await getWorkflowStep(c.env.DB,{scopeId,processKind:'question_answer',subjectId:c.req.param('executionId'),stepKey:'__run'});
+    return c.json({success:true,data:{resumed,status:latest?.status}});
+  }catch(error){
+    const code=error instanceof Error?error.message:'answer_resume_failed';
+    return c.json({success:false,code,error:code==='legacy_answer_unknown'?'古い回答の成功した工程は不明です。確認した工程と最初の選択肢を指定してください':'回答を再開できませんでした'},409);
+  }
+});
 
 /** Convert D1 snake_case Scenario row to shared camelCase shape */
 function serializeScenario(row: DbScenario) {
@@ -416,14 +458,14 @@ function validScenarioPublishKey(value: string | undefined): value is string {
  * 経路が /api/scenarios/:id より前にあるのは、:id に "reorder" として
  * 食われないようにするため。
  */
-scenarios.patch('/api/scenarios/reorder', requireRole('owner', 'admin'), async (c) => {
+scenarios.patch('/api/scenarios/reorder', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ ids?: unknown }>();
     if (!Array.isArray(body.ids) || body.ids.some((v) => typeof v !== 'string')) {
-      return c.json({ success: false, error: 'ids must be an array of scenario ids' }, 400);
+      return inputError(c, { success: false, error: 'ids must be an array of scenario ids' }, 400, ["ids"]);
     }
     if (body.ids.length > 500) {
-      return c.json({ success: false, error: 'too many ids' }, 400);
+      return inputError(c, { success: false, error: 'too many ids' }, 400, ["ids"]);
     }
     await reorderScenarios(c.env.DB, body.ids as string[]);
     return c.json({ success: true, data: { updated: body.ids.length } });
@@ -589,7 +631,7 @@ scenarios.get('/api/scenarios/:id', scenarioPermission('view'), async (c) => {
 });
 
 // POST /api/scenarios - create
-scenarios.post('/api/scenarios', requireRole('owner', 'admin'), async (c) => {
+scenarios.post('/api/scenarios', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"description":["null","string"],"triggerType":["string"],"triggerTagId":["null","string"],"isActive":["boolean"],"lineAccountId":["null","string"],"deliveryMode":["string"],"allowConcurrent":["boolean"],"folderId":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       name: string;
@@ -604,7 +646,7 @@ scenarios.post('/api/scenarios', requireRole('owner', 'admin'), async (c) => {
     }>();
 
     if (!body.name || !body.triggerType) {
-      return c.json({ success: false, error: 'name and triggerType are required' }, 400);
+      return inputError(c, { success: false, error: 'name and triggerType are required' }, 400, ["name","triggerType"]);
     }
 
     if (body.lineAccountId
@@ -614,7 +656,7 @@ scenarios.post('/api/scenarios', requireRole('owner', 'admin'), async (c) => {
 
     const deliveryMode = body.deliveryMode ?? 'relative';
     if (!VALID_DELIVERY_MODES.includes(deliveryMode as DeliveryMode)) {
-      return c.json({ success: false, error: 'invalid deliveryMode' }, 400);
+      return inputError(c, { success: false, error: 'invalid deliveryMode' }, 400, ["deliveryMode"]);
     }
 
     let scenario = await createScenario(c.env.DB, {
@@ -655,7 +697,7 @@ scenarios.post('/api/scenarios', requireRole('owner', 'admin'), async (c) => {
 });
 
 // PUT /api/scenarios/:id - update (accepts camelCase fields from clients)
-scenarios.put('/api/scenarios/:id', requireScenarioEditBoundary, async (c) => {
+scenarios.put('/api/scenarios/:id', requireScenarioEditBoundary, inputJsonBoundary({"name":["string"],"description":["null","string"],"triggerType":["string"],"triggerTagId":["null","string"],"isActive":["boolean"],"reason":["string"],"deliveryMode":["string"],"allowConcurrent":["boolean"],"folderId":["null","string"],"onCompleteMode":["string"],"onCompleteScenarioId":["null","string"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -681,10 +723,10 @@ scenarios.put('/api/scenarios/:id', requireScenarioEditBoundary, async (c) => {
       || typeof body.reason !== 'string'
       || Array.from(body.reason).length > 200
     )) {
-      return c.json({ success: false, error: '止める理由は停止時だけ指定でき、200字以内の文字列が必要です' }, 400);
+      return inputError(c, { success: false, error: '止める理由は停止時だけ指定でき、200字以内の文字列が必要です' }, 400, ["reason","isActive"]);
     }
     if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
-      return c.json({ success: false, error: 'isActive は真偽値で指定してください' }, 400);
+      return inputError(c, { success: false, error: 'isActive は真偽値で指定してください' }, 400, ["isActive"]);
     }
 
     /*
@@ -705,21 +747,18 @@ scenarios.put('/api/scenarios/:id', requireScenarioEditBoundary, async (c) => {
         .bind(id)
         .first<{ n: number }>();
       if ((row?.n ?? 0) > 0) {
-        return c.json(
-          {
+        return inputError(c, {
             success: false,
             error:
               '通がすでにあるため、配信方式を変えられません。通の予定の持ち方が方式ごとに違うためです。通を消してから変えてください。',
-          },
-          400,
-        );
+          }, 400, ["deliveryMode"]);
       }
     }
 
     let audienceJson: string | null | undefined;
     if (body.audienceCondition !== undefined) {
       const checked = validateConditionForStorage(body.audienceCondition, 'シナリオの配信対象');
-      if (!checked.ok) return c.json({ success: false, error: checked.error }, 400);
+      if (!checked.ok) return inputError(c, { success: false, error: checked.error }, 400, ["audienceCondition"]);
       audienceJson = checked.json;
     }
 
@@ -728,17 +767,11 @@ scenarios.put('/api/scenarios/:id', requireScenarioEditBoundary, async (c) => {
      * 配り終えた人がどこにも行けずに黙って止まる。
      */
     if (body.onCompleteMode === 'move' && !body.onCompleteScenarioId) {
-      return c.json(
-        { success: false, error: '「別のシナリオへ移動」には移動先のシナリオが要ります。' },
-        400,
-      );
+      return inputError(c, { success: false, error: '「別のシナリオへ移動」には移動先のシナリオが要ります。' }, 400, ["onCompleteMode","onCompleteScenarioId"]);
     }
     // 自分自身へは移せない。配り終えた直後にまた最初から始まって止まらなくなる。
     if (body.onCompleteScenarioId && body.onCompleteScenarioId === id) {
-      return c.json(
-        { success: false, error: '移動先に自分自身は選べません。配信が終わらなくなります。' },
-        400,
-      );
+      return inputError(c, { success: false, error: '移動先に自分自身は選べません。配信が終わらなくなります。' }, 400, ["onCompleteScenarioId"]);
     }
 
     const updated = await updateScenario(c.env.DB, id, {
@@ -818,7 +851,7 @@ scenarios.delete('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) 
 });
 
 // POST /api/scenarios/:id/steps - add step
-scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), async (c) => {
+scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), inputJsonBoundary({"stepOrder":["number"],"delayMinutes":["number"],"offsetDays":["number"],"offsetMinutes":["number"],"deliveryTime":["string"],"messageType":["string"],"messageContent":["string"],"conditionType":["null","string"],"conditionValue":["null","string"],"nextStepOnFalse":["null","number"],"templateId":["null","string"],"onReachTagId":["null","string"],"afterSend":["string"],"isDraft":["boolean"]}), async (c) => {
   try {
     const scenarioId = c.req.param('id');
     const body = await c.req.json<{
@@ -843,10 +876,7 @@ scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), async 
     }>();
 
     if (body.stepOrder === undefined || !body.messageType || body.messageContent === undefined) {
-      return c.json(
-        { success: false, error: 'stepOrder, messageType, and messageContent are required' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'stepOrder, messageType, and messageContent are required' }, 400, ["stepOrder","messageType","messageContent"]);
     }
 
     // 画面の disabled だけでは、古い画面や直接APIを呼ぶ経路を止められない。
@@ -854,7 +884,7 @@ scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), async 
     const message = validateTemplateMessage(body.messageType, body.messageContent);
     if (!message.ok) {
       const { ok: _ok, ...failure } = message;
-      return c.json({ success: false, ...failure }, 422);
+      return inputError(c, { success: false, ...failure }, 422, ["messageType","messageContent"]);
     }
 
     const scenarioRow = await c.env.DB
@@ -866,10 +896,10 @@ scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), async 
     }
 
     const v = validateStepSchedule(scenarioRow.delivery_mode, body);
-    if (!v.ok) return c.json({ success: false, error: v.error }, 400);
+    if (!v.ok) return inputError(c, { success: false, error: v.error }, 400, ["offsetDays","offsetMinutes","deliveryTime","delayMinutes"]);
 
     const cv = validateStepCondition(body.conditionType, body.conditionValue);
-    if (!cv.ok) return c.json({ success: false, error: cv.error }, 400);
+    if (!cv.ok) return inputError(c, { success: false, error: cv.error }, 400, ["conditionType","conditionValue"]);
 
     // templateId / onReachTagId 参照整合性チェック
     if (body.templateId != null) {
@@ -877,14 +907,14 @@ scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), async 
         .prepare(`SELECT id FROM templates WHERE id = ?`)
         .bind(body.templateId)
         .first<{ id: string }>();
-      if (!tpl) return c.json({ success: false, error: 'templateId not found' }, 400);
+      if (!tpl) return inputError(c, { success: false, error: 'templateId not found' }, 400, ["templateId"]);
     }
     if (body.onReachTagId != null) {
       const tag = await c.env.DB
         .prepare(`SELECT id FROM tags WHERE id = ?`)
         .bind(body.onReachTagId)
         .first<{ id: string }>();
-      if (!tag) return c.json({ success: false, error: 'onReachTagId not found' }, 400);
+      if (!tag) return inputError(c, { success: false, error: 'onReachTagId not found' }, 400, ["onReachTagId"]);
     }
 
     /*
@@ -911,11 +941,11 @@ scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), async 
     }
 
     const stepTarget = validateConditionForStorage(body.targetCondition, 'この通の配信対象');
-    if (!stepTarget.ok) return c.json({ success: false, error: stepTarget.error }, 400);
+    if (!stepTarget.ok) return inputError(c, { success: false, error: stepTarget.error }, 400, ["targetCondition"]);
     const stepQuestion = validateQuestionForStorage(body.question);
-    if (!stepQuestion.ok) return c.json({ success: false, error: stepQuestion.error }, 400);
+    if (!stepQuestion.ok) return inputError(c, { success: false, error: stepQuestion.error }, 400, ["question"]);
     if (body.messageType === 'text' && body.messageContent.trim() === '' && stepQuestion.json === null) {
-      return c.json({ success: false, error: '本文または質問を入力してください。' }, 400);
+      return inputError(c, { success: false, error: '本文または質問を入力してください。' }, 400, ["messageType","messageContent","question"]);
     }
 
     const step = await createScenarioStep(c.env.DB, {
@@ -948,7 +978,7 @@ scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), async 
 });
 
 // PUT /api/scenarios/:id/steps/:stepId - update step (accepts camelCase)
-scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'), async (c) => {
+scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'), inputJsonBoundary({"stepOrder":["number"],"delayMinutes":["number"],"offsetDays":["number"],"offsetMinutes":["number"],"deliveryTime":["string"],"messageType":["string"],"messageContent":["string"],"conditionType":["null","string"],"conditionValue":["null","string"],"nextStepOnFalse":["null","number"],"templateId":["null","string"],"onReachTagId":["null","string"],"afterSend":["string"],"isDraft":["boolean"]}), async (c) => {
   try {
     const scenarioId = c.req.param('id');
     const stepId = c.req.param('stepId');
@@ -979,7 +1009,7 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'),
       const message = validateTemplateMessage(body.messageType, body.messageContent);
       if (!message.ok) {
         const { ok: _ok, ...failure } = message;
-        return c.json({ success: false, ...failure }, 422);
+        return inputError(c, { success: false, ...failure }, 422, ["messageType","messageContent"]);
       }
     }
 
@@ -999,7 +1029,7 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'),
       const effectiveType = body.conditionType !== undefined ? body.conditionType : existingCond.condition_type;
       const effectiveValue = body.conditionValue !== undefined ? body.conditionValue : existingCond.condition_value;
       const cv = validateStepCondition(effectiveType, effectiveValue);
-      if (!cv.ok) return c.json({ success: false, error: cv.error }, 400);
+      if (!cv.ok) return inputError(c, { success: false, error: cv.error }, 400, ["conditionType","conditionValue"]);
     }
 
     // templateId / onReachTagId 参照整合性チェック (null は解除を意図、bypass)
@@ -1010,7 +1040,7 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'),
         .prepare(`SELECT id, message_type, message_content FROM templates WHERE id = ?`)
         .bind(body.templateId)
         .first<{ id: string; message_type: string; message_content: string }>();
-      if (!tpl) return c.json({ success: false, error: 'templateId not found' }, 400);
+      if (!tpl) return inputError(c, { success: false, error: 'templateId not found' }, 400, ["templateId"]);
       templateSnapshot = { message_type: tpl.message_type, message_content: tpl.message_content };
     }
     if (body.onReachTagId !== undefined && body.onReachTagId !== null) {
@@ -1018,7 +1048,7 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'),
         .prepare(`SELECT id FROM tags WHERE id = ?`)
         .bind(body.onReachTagId)
         .first<{ id: string }>();
-      if (!tag) return c.json({ success: false, error: 'onReachTagId not found' }, 400);
+      if (!tag) return inputError(c, { success: false, error: 'onReachTagId not found' }, 400, ["onReachTagId"]);
     }
 
     // スケジュールフィールドが1つでも指定されている場合は、既存値を DB から読んで
@@ -1088,7 +1118,7 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'),
         }
       }
       const v = validateStepSchedule(scenarioRow.delivery_mode, scheduleForValidation);
-      if (!v.ok) return c.json({ success: false, error: v.error }, 400);
+      if (!v.ok) return inputError(c, { success: false, error: v.error }, 400, ["delayMinutes","offsetDays","offsetMinutes","deliveryTime"]);
     }
 
     // templateId が指定された場合は snapshot (message_type/message_content) も
@@ -1117,19 +1147,19 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'),
     const message = validateTemplateMessage(effectiveMessageType, effectiveMessageContent);
     if (!message.ok) {
       const { ok: _ok, ...failure } = message;
-      return c.json({ success: false, ...failure }, 422);
+      return inputError(c, { success: false, ...failure }, 422, ["messageType","messageContent"]);
     }
 
     let targetJson: string | null | undefined;
     if (body.targetCondition !== undefined) {
       const checked = validateConditionForStorage(body.targetCondition, 'この通の配信対象');
-      if (!checked.ok) return c.json({ success: false, error: checked.error }, 400);
+      if (!checked.ok) return inputError(c, { success: false, error: checked.error }, 400, ["targetCondition"]);
       targetJson = checked.json;
     }
     let questionJson: string | null | undefined;
     if (body.question !== undefined) {
       const checked = validateQuestionForStorage(body.question);
-      if (!checked.ok) return c.json({ success: false, error: checked.error }, 400);
+      if (!checked.ok) return inputError(c, { success: false, error: checked.error }, 400, ["question"]);
       questionJson = checked.json;
     }
 
@@ -1177,17 +1207,17 @@ scenarios.delete('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin
 });
 
 // POST /api/scenarios/:id/steps/reorder - bulk update step_order
-scenarios.post('/api/scenarios/:id/steps/reorder', requireRole('owner', 'admin'), async (c) => {
+scenarios.post('/api/scenarios/:id/steps/reorder', requireRole('owner', 'admin'), inputJsonBoundary({"orders":["array"]}), async (c) => {
   try {
     const scenarioId = c.req.param('id');
     const body = await c.req.json<{ orders: { stepId: string; stepOrder: number }[] }>();
 
     if (!Array.isArray(body.orders) || body.orders.length === 0) {
-      return c.json({ success: false, error: 'orders must be a non-empty array' }, 400);
+      return inputError(c, { success: false, error: 'orders must be a non-empty array' }, 400, ["orders"]);
     }
     for (const o of body.orders) {
       if (typeof o.stepId !== 'string' || typeof o.stepOrder !== 'number' || o.stepOrder < 1) {
-        return c.json({ success: false, error: 'invalid orders entry' }, 400);
+        return inputError(c, { success: false, error: 'invalid orders entry' }, 400, ["orders"]);
       }
     }
 
@@ -1391,14 +1421,14 @@ scenarios.get('/api/scenarios/:id/stats', scenarioPermission('view'), async (c) 
 });
 
 // POST /api/scenarios/:id/simulate — 実データを数えるが、送信・購読は行わない。
-scenarios.post('/api/scenarios/:id/simulate', scenarioPermission('view'), async (c) => {
+scenarios.post('/api/scenarios/:id/simulate', scenarioPermission('view'), inputJsonBoundary(), async (c) => {
   const body = await c.req.json<{
     lineAccountId?: unknown;
     startAt?: unknown;
   }>().catch(() => ({} as { lineAccountId?: unknown; startAt?: unknown }));
   const lineAccountId = typeof body.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
   if (!lineAccountId) {
-    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    return inputError(c, { success: false, error: 'LINE公式アカウントを選んでください' }, 400, ["lineAccountId"]);
   }
   const scopeError = await requireScenarioAccountScope(c, lineAccountId);
   if (scopeError) return scopeError;
@@ -1472,7 +1502,7 @@ scenarios.get('/api/scenarios/:id/friends/:friendId/plan', scenarioPermission('v
 });
 
 // PUT /api/scenarios/:id/draft — compare-and-set で送信後アクションを保存する。
-scenarios.put('/api/scenarios/:id/draft', scenarioPermission('edit'), async (c) => {
+scenarios.put('/api/scenarios/:id/draft', scenarioPermission('edit'), inputJsonBoundary(), async (c) => {
   const body = await c.req.json<{
     lineAccountId?: unknown;
     expectedVersion?: unknown;
@@ -1484,7 +1514,7 @@ scenarios.put('/api/scenarios/:id/draft', scenarioPermission('edit'), async (c) 
   }));
   const lineAccountId = typeof body.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
   if (!lineAccountId) {
-    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    return inputError(c, { success: false, error: 'LINE公式アカウントを選んでください' }, 400, ["lineAccountId"]);
   }
   const scopeError = await requireScenarioAccountScope(c, lineAccountId);
   if (scopeError) return scopeError;
@@ -1503,7 +1533,7 @@ scenarios.put('/api/scenarios/:id/draft', scenarioPermission('edit'), async (c) 
 });
 
 // POST /api/scenarios/:id/enroll/:friendId - manually enroll friend
-scenarios.post('/api/scenarios/:id/enroll/:friendId', requireRole('owner', 'admin'), async (c) => {
+scenarios.post('/api/scenarios/:id/enroll/:friendId', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const scenarioId = c.req.param('id');
     const friendId = c.req.param('friendId');
@@ -1532,13 +1562,10 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireRole('owner', 'admi
       return c.json({ success: false, error: '登録する友だちが見つかりません。' }, 404);
     }
     if (scenario.line_account_id && friendAccountId !== scenario.line_account_id) {
-      return c.json(
-        { success: false, error: 'このシナリオと同じLINEアカウントの友だちを選んでください。' },
-        422,
-      );
+      return inputError(c, { success: false, error: 'このシナリオと同じLINEアカウントの友だちを選んでください。' }, 422, ["scenario","friend"]);
     }
     if ((friend as { is_following?: number | null }).is_following !== 1) {
-      return c.json({ success: false, error: 'ブロック中の友だちは登録できません。' }, 422);
+      return inputError(c, { success: false, error: 'ブロック中の友だちは登録できません。' }, 422, ["friend"]);
     }
     /*
      * 未公開・停止中の契約はここで正直に返す。enrollFriendInScenario は
@@ -1546,10 +1573,10 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireRole('owner', 'admi
      * 理由を 422 で返す（N-050 / #644）。
      */
     if (!scenario.is_active) {
-      return c.json({ success: false, error: '停止中のシナリオには登録できません。' }, 422);
+      return inputError(c, { success: false, error: '停止中のシナリオには登録できません。' }, 422, ["scenario"]);
     }
     if (!await getScenarioPublishedVersion(db, scenarioId)) {
-      return c.json({ success: false, error: 'まだ公開されていないため登録できません。先に公開してください。' }, 422);
+      return inputError(c, { success: false, error: 'まだ公開されていないため登録できません。先に公開してください。' }, 422, []);
     }
 
     const enrollment = await enrollFriendInScenario(db, friendId, scenarioId);
@@ -1568,11 +1595,11 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireRole('owner', 'admi
 // 下書きの編集は公開するまで配信へ混入しない。購読は開始時の版へ固定され、
 // 開始後の編集は次に公開した版の購読から使う（N-050 / #644）。
 // アカウント境界は /api/scenarios/:id 系の共通ミドルウェアで 404 にする。
-scenarios.post('/api/scenarios/:id/publish', requireScenarioEditBoundary, async (c) => {
+scenarios.post('/api/scenarios/:id/publish', requireScenarioEditBoundary, inputJsonBoundary(), async (c) => {
   try {
     const requestKey = c.req.header('Idempotency-Key');
     if (!validScenarioPublishKey(requestKey)) {
-      return c.json({ success: false, error: '公開操作の確認キーが必要です' }, 400);
+      return inputError(c, { success: false, error: '公開操作の確認キーが必要です' }, 400, []);
     }
     const published = await publishScenarioVersion(c.env.DB, c.req.param('id'), {
       staffId: c.get('staff')?.id ?? null,
@@ -1741,18 +1768,18 @@ scenarios.get('/api/scenarios/:id/actions', scenarioPermission('view'), async (c
 });
 
 // POST /api/scenarios/:id/actions — アクションを1つ足す
-scenarios.post('/api/scenarios/:id/actions', requireRole('owner', 'admin'), async (c) => {
+scenarios.post('/api/scenarios/:id/actions', requireRole('owner', 'admin'), inputJsonBoundary({"hook":["string"],"stepId":["null","string"],"choiceIndex":["null","number"],"actionType":["string"],"repeatOnRefire":["boolean"],"sortOrder":["number"]}), async (c) => {
   try {
     const scenarioId = c.req.param('id');
     const body = await c.req.json<ActionBody>();
 
     const hook = String(body.hook ?? '');
     if (!(VALID_ACTION_HOOKS as readonly string[]).includes(hook)) {
-      return c.json({ success: false, error: 'アクションの発火点が不正です。' }, 400);
+      return inputError(c, { success: false, error: 'アクションの発火点が不正です。' }, 400, ["hook"]);
     }
     const actionType = String(body.actionType ?? '');
     if (!(VALID_ACTION_TYPES as readonly string[]).includes(actionType)) {
-      return c.json({ success: false, error: 'アクションの種別が不正です。' }, 400);
+      return inputError(c, { success: false, error: 'アクションの種別が不正です。' }, 400, ["actionType"]);
     }
 
     // 発火点ごとに、要る／要らない参照が違う。ここでそろえておかないと
@@ -1760,10 +1787,10 @@ scenarios.post('/api/scenarios/:id/actions', requireRole('owner', 'admin'), asyn
     const stepId = hook === 'scenario_completed' ? null : (body.stepId || null);
     const choiceIndex = hook === 'choice_selected' ? Number(body.choiceIndex ?? 0) : null;
     if (hook !== 'scenario_completed' && !stepId) {
-      return c.json({ success: false, error: 'この発火点には通の指定が要ります。' }, 400);
+      return inputError(c, { success: false, error: 'この発火点には通の指定が要ります。' }, 400, ["hook","stepId"]);
     }
     if (hook === 'choice_selected' && (!Number.isInteger(choiceIndex) || (choiceIndex ?? -1) < 0)) {
-      return c.json({ success: false, error: '選択肢の番号が不正です。' }, 400);
+      return inputError(c, { success: false, error: '選択肢の番号が不正です。' }, 400, ["hook","choiceIndex"]);
     }
     if (stepId) {
       const step = await c.env.DB.prepare(
@@ -1771,13 +1798,13 @@ scenarios.post('/api/scenarios/:id/actions', requireRole('owner', 'admin'), asyn
       )
         .bind(stepId, scenarioId)
         .first<{ id: string }>();
-      if (!step) return c.json({ success: false, error: '通が見つかりません。' }, 400);
+      if (!step) return inputError(c, { success: false, error: '通が見つかりません。' }, 400, ["hook","stepId"]);
     }
 
     const configCheck = validateActionConfig(actionType, body.config);
-    if (!configCheck.ok) return c.json({ success: false, error: configCheck.error }, 400);
+    if (!configCheck.ok) return inputError(c, { success: false, error: configCheck.error }, 400, ["actionType","config"]);
     const conditionCheck = validateConditionForStorage(body.condition, 'アクションの実行');
-    if (!conditionCheck.ok) return c.json({ success: false, error: conditionCheck.error }, 400);
+    if (!conditionCheck.ok) return inputError(c, { success: false, error: conditionCheck.error }, 400, ["condition"]);
 
     // N-053: 参照先の存在と所属を保存前に確かめる。幽霊・他アカウントは
     // 1行も書かず 400 で返す。実行時の読み飛ばしに頼らない。
@@ -1790,7 +1817,7 @@ scenarios.post('/api/scenarios/:id/actions', requireRole('owner', 'admin'), asyn
     const refCheck = await validateScenarioActionReferences(
       c.env.DB, scenarioRow.line_account_id, actionType, body.config,
     );
-    if (!refCheck.ok) return c.json({ success: false, error: refCheck.issue.message }, 400);
+    if (!refCheck.ok) return inputError(c, { success: false, error: refCheck.issue.message }, 400, ["actionType","config"]);
 
     // 並び順を渡されなければ、同じ発火点の末尾に置く。
     let sortOrder = body.sortOrder;
@@ -1840,7 +1867,7 @@ scenarios.post('/api/scenarios/:id/actions', requireRole('owner', 'admin'), asyn
 });
 
 // PUT /api/scenarios/:id/actions/:actionId — 中身と並び順を変える
-scenarios.put('/api/scenarios/:id/actions/:actionId', requireRole('owner', 'admin'), async (c) => {
+scenarios.put('/api/scenarios/:id/actions/:actionId', requireRole('owner', 'admin'), inputJsonBoundary({"hook":["string"],"stepId":["null","string"],"choiceIndex":["null","number"],"actionType":["string"],"repeatOnRefire":["boolean"],"sortOrder":["number"]}), async (c) => {
   try {
     const scenarioId = c.req.param('id');
     const actionId = c.req.param('actionId');
@@ -1858,7 +1885,7 @@ scenarios.put('/api/scenarios/:id/actions/:actionId', requireRole('owner', 'admi
 
     if (body.config !== undefined) {
       const check = validateActionConfig(existing.action_type, body.config);
-      if (!check.ok) return c.json({ success: false, error: check.error }, 400);
+      if (!check.ok) return inputError(c, { success: false, error: check.error }, 400, ["config"]);
       // N-053: 新しく保存する設定だけ確かめる。並び順だけの変更や既存の
       // 幽霊参照には触らない（既存データの読み・実行を壊さない）。
       const scenarioRow = await c.env.DB.prepare(
@@ -1870,13 +1897,13 @@ scenarios.put('/api/scenarios/:id/actions/:actionId', requireRole('owner', 'admi
       const refCheck = await validateScenarioActionReferences(
         c.env.DB, scenarioRow.line_account_id, existing.action_type, body.config,
       );
-      if (!refCheck.ok) return c.json({ success: false, error: refCheck.issue.message }, 400);
+      if (!refCheck.ok) return inputError(c, { success: false, error: refCheck.issue.message }, 400, ["config"]);
       fields.push('config_json = ?');
       values.push(JSON.stringify(body.config));
     }
     if (body.condition !== undefined) {
       const check = validateConditionForStorage(body.condition, 'アクションの実行');
-      if (!check.ok) return c.json({ success: false, error: check.error }, 400);
+      if (!check.ok) return inputError(c, { success: false, error: check.error }, 400, ["condition"]);
       fields.push('condition_json = ?');
       values.push(check.json);
     }
@@ -1889,7 +1916,7 @@ scenarios.put('/api/scenarios/:id/actions/:actionId', requireRole('owner', 'admi
       values.push(body.sortOrder);
     }
     if (fields.length === 0) {
-      return c.json({ success: false, error: '変えるものがありません。' }, 400);
+      return inputError(c, { success: false, error: '変えるものがありません。' }, 400, []);
     }
 
     values.push(actionId);
@@ -1945,7 +1972,7 @@ async function runTestSend(
   const body = await c.req.json<{ friendId?: string }>().catch(() => ({ friendId: undefined }));
   const friendId = body.friendId;
   if (!friendId) {
-    return c.json({ success: false, error: '送り先の友だちを選んでください。' }, 400);
+    return inputError(c, { success: false, error: '送り先の友だちを選んでください。' }, 400, ["friendId"]);
   }
 
   const scenario = await c.env.DB.prepare(
@@ -1963,10 +1990,7 @@ async function runTestSend(
     return c.json({ success: false, error: '送り先の友だちが見つかりません。' }, 404);
   }
   if (scenario.line_account_id && friendAccountId !== scenario.line_account_id) {
-    return c.json(
-      { success: false, error: 'このシナリオと同じLINEアカウントの友だちを選んでください。' },
-      422,
-    );
+    return inputError(c, { success: false, error: 'このシナリオと同じLINEアカウントの友だちを選んでください。' }, 422, ["friendId"]);
   }
 
   const rows = stepId
@@ -1980,7 +2004,7 @@ async function runTestSend(
         .all<DbScenarioStep>();
   const steps = rows.results ?? [];
   if (steps.length === 0) {
-    return c.json({ success: false, error: '送る通がありません。' }, 400);
+    return inputError(c, { success: false, error: '送る通がありません。' }, 400, []);
   }
 
   const token = c.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -1998,10 +2022,7 @@ async function runTestSend(
       { dedupeKey: `${scenarioId}:${stepId ?? 'all'}` },
     );
     if (!result.ok) {
-      return c.json(
-        { success: false, error: result.error },
-        result.deduped ? 409 : 400,
-      );
+      return inputError(c, { success: false, error: result.error }, result.deduped ? 409 : 400, []);
     }
     return c.json({ success: true, data: { sent: result.sent } });
   } catch (err) {
@@ -2013,14 +2034,14 @@ async function runTestSend(
   }
 }
 
-scenarios.post('/api/scenarios/:id/test-send', requireRole('owner', 'admin'), async (c) =>
+scenarios.post('/api/scenarios/:id/test-send', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) =>
   runTestSend(c, c.req.param('id'), null),
 );
 
 scenarios.post(
   '/api/scenarios/:id/steps/:stepId/test-send',
   requireRole('owner', 'admin'),
-  async (c) => runTestSend(c, c.req.param('id'), c.req.param('stepId')),
+  inputJsonBoundary(), async (c) => runTestSend(c, c.req.param('id'), c.req.param('stepId')),
 );
 
 // ============================================================
@@ -2050,16 +2071,16 @@ scenarios.get('/api/scenarios/:id/triggers', scenarioPermission('view'), async (
   }
 });
 
-scenarios.post('/api/scenarios/:id/triggers', requireScenarioEditBoundary, async (c) => {
+scenarios.post('/api/scenarios/:id/triggers', requireScenarioEditBoundary, inputJsonBoundary({"kind":["string"],"tagId":["null","string"]}), async (c) => {
   try {
     const scenarioId = c.req.param('id');
     const body = await c.req.json<{ kind?: string; tagId?: string | null }>();
     const kind = String(body.kind ?? '');
     if (!['friend_add', 'tag_added', 'form_answer', 'booking_confirmed'].includes(kind)) {
-      return c.json({ success: false, error: 'きっかけの種類が不正です。' }, 400);
+      return inputError(c, { success: false, error: 'きっかけの種類が不正です。' }, 400, ["kind"]);
     }
     if (kind === 'tag_added' && !body.tagId) {
-      return c.json({ success: false, error: 'きっかけになるタグを選んでください。' }, 400);
+      return inputError(c, { success: false, error: 'きっかけになるタグを選んでください。' }, 400, ["kind","tagId"]);
     }
 
     const scenario = await c.env.DB.prepare(`SELECT id, line_account_id FROM scenarios WHERE id = ?`)
@@ -2071,14 +2092,14 @@ scenarios.post('/api/scenarios/:id/triggers', requireScenarioEditBoundary, async
       const tag = await c.env.DB.prepare(`SELECT id, line_account_id FROM tags WHERE id = ?`)
         .bind(body.tagId)
         .first<{ id: string; line_account_id: string | null }>();
-      if (!tag) return c.json({ success: false, error: 'タグが見つかりません。' }, 400);
+      if (!tag) return inputError(c, { success: false, error: 'タグが見つかりません。' }, 400, ["tagId"]);
       // 別組織のタグを開始条件に付けると、そのタグ操作で別組織の購読が
       // 作られてしまう（R435）。共通タグと自組織のタグだけ受け付ける。
       // 全体共通のシナリオはどの組織のタグでもよい（どの友だちにも流れる設計）。
       if (tag.line_account_id !== null
         && scenario.line_account_id !== null
         && tag.line_account_id !== scenario.line_account_id) {
-        return c.json({ success: false, error: 'ほかのLINEアカウントのタグは開始条件にできません。' }, 400);
+        return inputError(c, { success: false, error: 'ほかのLINEアカウントのタグは開始条件にできません。' }, 400, ["tagId"]);
       }
     }
 
@@ -2254,7 +2275,7 @@ async function runFriendScenarioOp(
 scenarios.post(
   '/api/scenario-subscriptions/:subscriptionId/pause',
   requirePermission('scenario.subscription.edit'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       return await runFriendScenarioOp(c, 'pause', async (subscription) => {
         if (subscription.status === 'paused') {
@@ -2293,7 +2314,7 @@ scenarios.post(
 scenarios.post(
   '/api/scenario-subscriptions/:subscriptionId/resume',
   requirePermission('scenario.subscription.edit'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       return await runFriendScenarioOp(c, 'resume', async (subscription) => {
         if (subscription.status === 'active') {
@@ -2334,7 +2355,7 @@ scenarios.post(
 scenarios.post(
   '/api/scenario-subscriptions/:subscriptionId/retry',
   requirePermission('scenario.step_run.retry'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       return await runFriendScenarioOp(c, 'retry', async (subscription) => {
         if (subscription.status === 'active') {
@@ -2369,7 +2390,7 @@ scenarios.post(
 scenarios.post(
   '/api/scenario-subscriptions/:subscriptionId/move',
   requirePermission('scenario.subscription.edit'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       return await runFriendScenarioOp(c, 'move', async (subscription) => {
         const body = await c.req.json<{ targetScenarioId?: unknown }>().catch(() => null);

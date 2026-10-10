@@ -7,6 +7,7 @@
  * 見せ方：頭（← 友だちへ・タブ・表示中をCSVで書き出す）→ 案内の帯 → 数4つ →
  * 探す・状態の札・見直した時刻・もう一度見直す → 重複の候補（比べて決める）→ アカウントごとの重なり。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import Link from 'next/link'
 import { Download, Info, RotateCw } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
@@ -25,6 +26,8 @@ import { csvExportLine } from '../list/csv-export'
 import { CANDIDATE_PAGE_SIZE, useDuplicatesData } from './use-duplicates-data'
 import { CONFIDENCE_WORD, STATUS_FILTERS, STATUS_WORD, confidenceTone, slashDateTime, statusTone } from './words'
 import styles from './list.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export default function DuplicatesListV8() {
   usePageTitle('友だち')
@@ -51,7 +54,7 @@ export default function DuplicatesListV8() {
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `duplicates-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("重複した友だち")
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -66,7 +69,7 @@ export default function DuplicatesListV8() {
     },
     {
       key: 'linked', title: '結び付けた',
-      valueText: counts !== null ? formatNumber(counts.linked ?? 0) : '—',
+      valueText: counts !== null ? formatNumber(counts.linked ?? 0) : emptyValue('unknown'),
       unit: '組',
       detail: counts !== null ? 'これまで' : '読み込めませんでした',
       help: '統合ユーザーに結び付けた組の数です。',
@@ -82,7 +85,7 @@ export default function DuplicatesListV8() {
     },
     {
       key: 'weak', title: '根拠が足りない',
-      valueText: d.lowConfidenceCount !== null ? formatNumber(d.lowConfidenceCount) : '—',
+      valueText: d.lowConfidenceCount !== null ? formatNumber(d.lowConfidenceCount) : emptyValue('unknown'),
       unit: '組',
       detail: d.lowConfidenceCount !== null ? '名前だけ一致' : '読み込めませんでした',
       help: '名前やプロフィール画像だけが一致していて、決め手が無い組です。',
@@ -208,10 +211,10 @@ export default function DuplicatesListV8() {
                 </td></tr>
               ) : d.candidates.map((candidate) => {
                 const href = `/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`
-                const accounts = [candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' ／ ') || '—'
+                const accounts = [candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' ／ ') || emptyValue('unknown')
                 const evidence = candidate.evidenceSummary.length ? candidate.evidenceSummary.join('・') : '根拠を確認'
                 return (
-                  <Tr key={candidate.id} className={styles.row}>
+                  <Tr key={candidate.id} className={styles.row} data-row-id={candidate.id}>
                     <Td className={styles.td}>
                       <Link href={href} className={styles.pair} title={`${candidate.left.label} ↔ ${candidate.right.label}`}>
                         {`${candidate.left.label} ↔ ${candidate.right.label}`}
@@ -308,7 +311,7 @@ export default function DuplicatesListV8() {
                   <Tr key={row.accountId} className={styles.rowCompact}>
                     <Td className={styles.td}><span className={styles.cellText} title={row.accountName}>{row.accountName}</span></Td>
                     {d.data!.perAccount.map((col) => {
-                      if (row.accountId === col.accountId) return <Td key={col.accountId} className={styles.td}><span className={styles.faint}>—</span></Td>
+                      if (row.accountId === col.accountId) return <Td key={col.accountId} className={styles.td}><span className={styles.faint}>{emptyValue('unknown')}</span></Td>
                       const pair = d.data!.pairwiseOverlap!.find((p) => p.fromAccountId === row.accountId && p.toAccountId === col.accountId)
                       return <Td key={col.accountId} className={styles.td}>{formatNumber(pair?.overlap ?? 0)}</Td>
                     })}

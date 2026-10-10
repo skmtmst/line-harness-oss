@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useRef, useState, type RefObject } from 'react'
+import { isImeComposing } from './ime'
 
 export const OverlayDepthContext = createContext(0)
 const activeOverlays = new Map<object, { depth: number; order: number }>()
@@ -17,7 +18,7 @@ const FOCUSABLE = [
 ].join(',')
 
 /** モーダル系のフォーカス移動・Escape・背景スクロール停止を1か所にまとめる。 */
-export function useOverlayFocus(
+export function useOverlayFocus<T extends HTMLElement = HTMLDivElement>(
   open: boolean,
   onClose: () => void,
   closeDisabled = false,
@@ -26,12 +27,14 @@ export function useOverlayFocus(
    * 未保存の離脱確認のように「残る方」を主にする窓で、主のボタンへ寄せる。
    */
   initialFocus?: () => HTMLElement | null,
-): RefObject<HTMLDivElement | null> {
+): RefObject<T | null> {
   const depth = useContext(OverlayDepthContext)
   const identity = useRef<object>({})
-  const containerRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<T>(null)
   const onCloseRef = useRef(onClose)
   const initialFocusRef = useRef(initialFocus)
+  const closeDisabledRef = useRef(closeDisabled)
+  closeDisabledRef.current = closeDisabled
 
   useEffect(() => {
     onCloseRef.current = onClose
@@ -63,12 +66,14 @@ export function useOverlayFocus(
       Array.from(containerRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])
     // 初回フォーカスの予約は cleanup で取消せるようにしておく。
     const initialFocusFrame = requestAnimationFrame(() => {
-      if (isTop()) (initialFocusRef.current?.() ?? focusable()[0])?.focus()
+      if (isTop() && !containerRef.current?.contains(document.activeElement)) {
+        (initialFocusRef.current?.() ?? focusable()[0])?.focus()
+      }
     })
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!isTop()) return
-      if (event.key === 'Escape' && !closeDisabled) {
+      if (!isTop() || event.defaultPrevented || isImeComposing(event)) return
+      if (event.key === 'Escape' && !closeDisabledRef.current) {
         event.preventDefault()
         onCloseRef.current()
         return
@@ -102,7 +107,7 @@ export function useOverlayFocus(
       }
       if (restoreFocus) previous?.focus()
     }
-  }, [closeDisabled, open, depth])
+  }, [open, depth])
 
   return containerRef
 }

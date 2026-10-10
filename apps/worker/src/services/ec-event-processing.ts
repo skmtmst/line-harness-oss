@@ -1,4 +1,6 @@
+import { acquireWorkflow, runWorkflowStep, type WorkflowExecution } from './workflow-execution.js';
 import {
+  getWorkflowStep,failWorkflowStep,
   attachEcOrderFriend,
   getCustomerNotificationSource,
   getFriendByLineUserIdForAccount,
@@ -76,6 +78,7 @@ async function fireEcV6Event(
     eventId: string; lineAccountId: string; externalEventId: string;
     event: EcEvent; friendId: string; accessToken: string; now: string;
     credentialKey?: string;
+    execution?: WorkflowExecution;
   },
 ): Promise<void> {
   const idempotencyKey = ecDispatchIdempotencyKey(input.lineAccountId, input.externalEventId, 'v6');
@@ -86,7 +89,7 @@ async function fireEcV6Event(
   try {
     await fireEvent(
       db, v6Event.eventType, v6Event.payload, input.accessToken, input.lineAccountId,
-      undefined, input.credentialKey,
+      input.execution, input.credentialKey,
     );
   } catch (error) {
     try {
@@ -132,6 +135,39 @@ export async function processEcEvent(
   ).bind(now, row.id).run();
   if (!claim.meta.changes) return 'duplicate';
 
+  // W11-B adds checkpoints after A's existing event/version claim. It never reclaims event ownership.
+  const execution=await acquireWorkflow(db,{scopeId:`line:${lineAccountId}`,processKind:'ec_event',subjectId:row.id},{maxAttempts:50});
+  if(!execution) {
+    const done=await getWorkflowStep(db,{scopeId:`line:${lineAccountId}`,processKind:'ec_event',subjectId:row.id,stepKey:'__run'});
+    if(done?.status==='succeeded') {
+      if(await getEcDispatchStatus(db,row.id,'notification')==='sent' && event.line_user_id){
+        const friend=await getFriendByLineUserIdForAccount(db,event.line_user_id,lineAccountId);
+        const source=await getCustomerNotificationSource(db,lineAccountId,event.event_type);
+        if(friend)await recordCustomerEcDelivery(db,{lineAccountId,sourceEventType:event.event_type,sourceEventId:event.event_id,
+          metadata:{orderNumber:event.order?.number ?? null},definitionId:source?.definitionId ?? null,definitionVersionId:source?.versionId ?? null,
+          recipientId:friend.id,idempotencyKey:await ecNotificationRetryKey(lineAccountId,event.event_id),attemptedSend:false,finish:{kind:'accepted'}});
+      }
+      const outcome=JSON.parse(done.result_json ?? '{}')?.outcome ?? 'processed';
+      await db.prepare(`UPDATE ec_events SET status=?,updated_at=? WHERE id=? AND status='processing'`).bind(outcome,now,row.id).run();
+      await setEcActionExecutionStatus(db,{eventId:row.id,lineAccountId,status:outcome==='processed'?'succeeded':'skipped',now});
+      return outcome;
+    }
+    return 'duplicate';
+  }
+  try {
+    const outcome=await processClaimedEcEvent(execution.db,input,execution);
+    await execution.complete({outcome});
+    return outcome;
+  }catch(error){
+    const latest=await getWorkflowStep(db,execution.ref);
+    if(latest?.lease_owner!==execution.owner && ['running','succeeded'].includes(latest?.status ?? '')) return 'duplicate';
+    await execution.fail();throw error;
+  }
+}
+
+async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof processEcEvent>[1],execution:WorkflowExecution):Promise<EcEventOutcome>{
+  const {account,lineAccountId,event,now,credentialKey}=input;
+  const row={id:input.eventRowId};
   // 受付口では弾いているが、保存済み payload の直叩きに備えてここでも守る。
   // 無いまま進むと誰宛か分からない送信になる。
   if (!event.line_user_id) {
@@ -200,8 +236,8 @@ export async function processEcEvent(
     const accessToken = account.channel_access_token;
     if (!accessToken) throw new Error('LINE access token is not configured');
 
-    await syncMemberSnapshot(db, friend.id, event, now);
-    await syncNenEcTags(db, friend.id);
+    await execution.step('member_snapshot',()=>syncMemberSnapshot(execution.mutationDb('member_snapshot'),friend.id,event,now));
+    await execution.step('member_tags',()=>syncNenEcTags(execution.mutationDb('member_tags'),friend.id));
 
     // 注文の確定を成果計測へ接続する(#648)。「注文が確定した」を起点に選んだ
     // 地点は、ここを通らないと 0 件のままになる。
@@ -247,15 +283,16 @@ export async function processEcEvent(
 
     if (event.event_type === 'ec.customer.profile_updated') {
       const { syncNenPetProfiles } = await import('./nen-engagement.js');
-      await syncNenPetProfiles(db, event, friend.id);
-      await syncNenPetTags(db, friend.id);
+      await execution.step('pet_profiles',()=>syncNenPetProfiles(execution.mutationDb('pet_profiles'),event,friend.id));
+      await execution.step('pet_tags',()=>syncNenPetTags(execution.mutationDb('pet_tags'),friend.id));
+
+      await fireEcV6Event(db, {
+        eventId: row.id, lineAccountId, externalEventId: event.event_id,
+        event, friendId: friend.id, accessToken, now, credentialKey, execution,
+      });
       await db.prepare(
         `UPDATE ec_events SET friend_id = ?, status = 'processed', processed_at = ?, updated_at = ? WHERE id = ?`,
       ).bind(friend.id, now, now, row.id).run();
-      await fireEcV6Event(db, {
-        eventId: row.id, lineAccountId, externalEventId: event.event_id,
-        event, friendId: friend.id, accessToken, now, credentialKey,
-      });
       await setEcActionExecutionStatus(db, {
         eventId: row.id, lineAccountId, status: 'succeeded', now,
       });
@@ -291,17 +328,13 @@ export async function processEcEvent(
         }>();
 
     if (event.event_type === 'ec.order.shipped') {
-      await enqueuePostShippingFollowUps(
-        db, event, friend.id, account.id,
-      );
+      await execution.step('shipping_followups',()=>enqueuePostShippingFollowUps(execution.mutationDb('shipping_followups'),event,friend.id,account.id));
     }
 
     // Transactional delivery can be paused independently while automation
     // events continue to fire for segmentation and step campaigns.
     if (setting?.is_enabled === 0) {
-      await db.prepare(
-        `UPDATE ec_events SET friend_id = ?, status = 'skipped', error_message = 'notification_disabled', processed_at = ?, updated_at = ? WHERE id = ?`,
-      ).bind(friend.id, now, now, row.id).run();
+
       // N-328 (#943): 通知停止(定義の draft/stopped、旧設定のOFF)も共通台帳へ
       // 「対象外」として残す。この処理では送っていないので試行は増やさない。
       await recordCustomerEcDelivery(db, {
@@ -317,8 +350,11 @@ export async function processEcEvent(
       });
       await fireEcV6Event(db, {
         eventId: row.id, lineAccountId, externalEventId: event.event_id,
-        event, friendId: friend.id, accessToken, now, credentialKey,
+        event, friendId: friend.id, accessToken, now, credentialKey, execution,
       });
+      await db.prepare(
+        `UPDATE ec_events SET friend_id = ?, status = 'skipped', error_message = 'notification_disabled', processed_at = ?, updated_at = ? WHERE id = ?`,
+      ).bind(friend.id, now, now, row.id).run();
       await setEcActionExecutionStatus(db, {
         eventId: row.id, lineAccountId, status: 'skipped',
         errorCode: 'notification_disabled', errorMessageSafe: 'この通知は設定で停止されています', now,
@@ -363,7 +399,14 @@ export async function processEcEvent(
       });
       let providerRequestId: string | null = null;
       try {
-        const pushed = await lineClient.pushMessageWithRequestId(event.line_user_id, [message], retryKey);
+        const pushed = await runWorkflowStep(execution.db,{...execution.ref,stepKey:'customer_notification'},async lease=>{
+          if(lease.attempt_count>1 && Date.now()-lease.first_attempt_at!>=23*3600_000){
+            await failWorkflowStep(execution.db,{...execution.ref,stepKey:'customer_notification'},lease.lease_owner!,{unknown:true,code:'delivery_unknown'});
+            throw new Error('delivery_unknown');
+          }
+          const original=JSON.parse(lease.input_json!);
+          return lineClient.pushMessageWithRequestId(original.to,original.messages,lease.retry_key);
+        },{input:{to:event.line_user_id,messages:[message]},retryKey,maxAttempts:5});
         providerRequestId = pushed.requestId;
       } catch (pushError) {
         try {
@@ -421,14 +464,15 @@ export async function processEcEvent(
       });
     }
 
-    await db.prepare(
-      `UPDATE ec_events SET friend_id = ?, status = 'processed', processed_at = ?, updated_at = ? WHERE id = ?`,
-    ).bind(friend.id, now, now, row.id).run();
+
 
     await fireEcV6Event(db, {
       eventId: row.id, lineAccountId, externalEventId: event.event_id,
-      event, friendId: friend.id, accessToken, now, credentialKey,
+      event, friendId: friend.id, accessToken, now, credentialKey, execution,
     });
+    await db.prepare(
+      `UPDATE ec_events SET friend_id = ?, status = 'processed', processed_at = ?, updated_at = ? WHERE id = ?`,
+    ).bind(friend.id, now, now, row.id).run();
 
     await setEcActionExecutionStatus(db, {
       eventId: row.id, lineAccountId, status: 'succeeded', now,

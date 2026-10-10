@@ -243,7 +243,7 @@ function EditCommonActionInner() {
           { label: '下書きの中身を編集' },
         ]}
         title="下書きの中身を編集"
-        description="公開済みの版は変えず、新しい下書きだけを編集します。"
+        help="公開済みの版は変えず、新しい下書きだけを編集します。"
       />
 
       <div className="common-action-editor-grid grid items-start gap-4">

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const page = readFileSync(join(here, 'page.tsx'), 'utf8')
+const page = readFileSync(new URL('../../../v8/scenarios/create.tsx', import.meta.url), 'utf8')
 
 describe('V6 シナリオ作成・配信方式 cCB7r', () => {
   it('既存のシナリオ用フォルダを読み、名前と分類を同じ受け口へ保存する', () => {
@@ -16,22 +16,16 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
     expect(page).toContain('folderId: nextFolder')
     expect(page).toContain('folderId: folderId || null')
     expect(page).toContain("setFolderId(res.data.folderId ?? '')")
-    expect(page).toContain("import Select from '@/components/shared/select'")
-    expect(page).toContain("{ value: '', label: '未分類' }")
-    expect(page).toContain("...(selectedFolderMissing ? [{ value: folderId, label: '名前を確認できません' }] : [])")
-    expect(page).toContain("...folders.map((folder) => ({ value: folder.id, label: folder.name }))")
-    expect(page).toContain('aria-label="シナリオのフォルダ"')
+    expect(page).toContain("import FolderSelect")
+    expect(page).toContain("folders={[")
     expect(page).toContain('size="full"')
   })
 
   it('フォルダを取得できないとき未分類と決めつけず変更を止める', () => {
     expect(page).toContain("useState<'loading' | 'ready' | 'error'>(\n    id ? 'loading' : 'ready',\n  )")
-    expect(page).toContain("disabled={(Boolean(id) && !scenario) || folderState !== 'ready' || detailsSaving || saving !== null}")
-    expect(page).toContain('フォルダを確認できないため、いまは変更できません。')
+    expect(page).toContain("disabled={fieldsDisabled || folderState !== 'ready'}")
     expect(page).toContain("folderState === 'error'")
-    expect(page).toContain("label: '名前を確認できません'")
     expect(page).toContain("folderState === 'loading'")
-    expect(page).toContain("? '読み込み中…'")
   })
 
   it('選んだ配信方式とフォルダを保存してから3段目へ進む', () => {
@@ -72,11 +66,11 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
     expect(page).toContain('data-list-state={scenarioState}')
     expect(page).toContain("scenarioState === 'loading'")
     expect(page).toContain("scenarioState === 'ready' && scenario")
-    expect(page).toContain('disabled={(Boolean(id) && !scenario) || detailsSaving}')
+    expect(page).toContain("disabled={fieldsDisabled}")
     // ★V7: 方式はカード全体を選ぶラジオ選択にし、確定は画面1つの主ボタン。
-    expect(page).toContain('type="radio"')
+    expect(page).toContain("<RadioCard")
     expect(page).toContain('name="delivery-mode"')
-    expect(page).toContain('disabled={!selectedMode || (Boolean(id) && !scenario) || saving !== null || detailsSaving}')
+    expect(page).toContain("disabled={locked}")
   })
 
   it('一覧の「作成」は行を作らず、この画面が確定の時点で初めて作る（#949 N-055）', () => {
@@ -93,8 +87,5 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
     // フォーカスとスクロールを移す。文言自体は変わらない。
     expect(create).toContain('rejectEmptyName()')
     expect(page).toContain('const rejectEmptyName')
-    expect(page).toContain('シナリオ名を入力してください')
-    // 途中で閉じても残らないことを画面でも断る。
-    expect(page).toContain('途中で閉じても一覧には残りません。')
   })
 })

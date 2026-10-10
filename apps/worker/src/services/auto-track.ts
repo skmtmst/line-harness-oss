@@ -1,3 +1,5 @@
+import { convertBroadcastAsset, isBroadcastAssetKind } from '@line-crm/shared';
+import { decorateTapExtras } from './tap-extras.js';
 import { getOrCreateAutoTrackedLink } from '@line-crm/db';
 import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
 
@@ -247,6 +249,16 @@ export async function autoTrackContent(
   options?: AutoTrackOptions,
 ): Promise<AutoTrackResult> {
   if (messageType === 'image') return { messageType, content };
+  if (messageType !== 'text' && content.includes('\"tapExtras\"')) {
+    let tree = JSON.parse(content);
+    if (isBroadcastAssetKind(messageType)) {
+      const converted = convertBroadcastAsset(messageType, tree.assetName ?? '', tree);
+      if (!converted.ok) throw new Error(converted.error);
+      messageType = converted.message.messageType;
+      tree = JSON.parse(converted.message.messageContent);
+    }
+    content = JSON.stringify(await decorateTapExtras(db, tree, workerUrl, options?.lineAccountId ?? null, options?.templateId, options?.broadcastId));
+  }
 
   // Extract first so URL-free messages (the common case in per-friend
   // delivery loops) skip the settings lookup entirely.

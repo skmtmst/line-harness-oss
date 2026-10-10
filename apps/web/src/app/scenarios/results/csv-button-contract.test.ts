@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = fs.readFileSync(new URL('../../../v8/scenarios/results.tsx', import.meta.url), 'utf8')
 
 /** 注釈を落とす。直した理由の文が、自分の見張りに当たらないように。 */
 function code(src: string): string {

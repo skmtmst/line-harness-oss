@@ -247,7 +247,7 @@ export default function RichMenuCreateForm({
       <Stepper label="リッチメニュー作成の進み方" steps={[{ label: '形とボタン', state: 'current' }, { label: '誰に出すか', state: 'todo' }, { label: '公開のしかた', state: 'todo' }]} />
       {compatibilityError || validationError ? <Notice tone="danger" className="mt-4">{compatibilityError ?? validationError}</Notice> : null}
       <div className="mt-4 grid items-start gap-4 lg:grid-cols-4">
-        <div className="border-hairline bg-canvas rounded-card min-w-0 space-y-4 border p-4 shadow-card lg:col-span-3">
+        <div className="border-hairline bg-canvas rounded-card min-w-0 space-y-4 border p-4 shadow-card-surface lg:col-span-3">
           {/*
             m18s: 3欄は均等（2/2/2）に割る。フォルダの選択欄は決まった幅
             （176px）を持つため、1/6幅では隣の入力欄へはみ出して枠線が隠れる。

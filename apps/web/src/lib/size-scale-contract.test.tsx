@@ -1,17 +1,8 @@
 // @vitest-environment happy-dom
 /*
- * #704 デザイントークン収束（サイズ系のみ。色は #669 の範囲なので触らない）。
- *
- * 正規の段は globals.css の @theme に定義する:
- *   文字 6段 micro11/caption12/body14/lead16/title20/hero28（★V7 で hero は28）
- *   角丸 4段 mini6/control8/card12/pill9999（★V7 でカード・窓は12に一本化）
- *   余白 5段 4/8/12/16/24（gap-1/2/3/4/6。Tailwind 既定の4px基準を使う）
- *
- * 既存の半端値は M10 polish で同pxトークンへ寄せた（text-[17px]・
- * [26px] 各1だけ v7 側の見た目が変わるため残す）。新規で増やさない
- * ことをここで見張る（ラチェット）。落ちたらトークンか正規段へ寄せ、
- * 減った分だけ基準値を下げる（増やさない）。それでも足りない段があれば、
- * Issue #704 で設計（Pencil）と合わせて決めてから基準値を更新する。
+ * ★V8 §6の文字・角丸を固定する。余白は4px単位。
+ * 画面の半端値はラチェットで増加を防ぎ、部品の役割の値を使う。
+ * 旧画面の残る値は切り替え前の分岐として、件数を増やさず維持する。
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -65,20 +56,20 @@ function increased(counts: Map<string, number>, baseline: Record<string, number>
 }
 
 describe('#704 正規のサイズトークンがある', () => {
-  it('文字は正規6段（10/12/14/16/20/28）', () => {
+  it('V8の文字の段（10/12/13/15/20/28）', () => {
     expect(token('text-nano')).toBe('10px')
     expect(token('text-caption')).toBe('12px')
-    expect(token('text-body')).toBe('14px')
-    expect(token('text-lead')).toBe('16px')
+    expect(token('text-body')).toBe('13px')
+    expect(token('text-lead')).toBe('15px')
     expect(token('text-title')).toBe('20px')
     // ★V7「見た目の物差し」§1: 大きな数は 28/700/1.3（#704 の 24px から改定）
     expect(token('text-hero')).toBe('28px')
   })
 
-  it('角丸は正規4段（6/8/12/full）', () => {
+  it('V8の角丸の段（6/10/12/full）', () => {
     expect(token('radius-mini')).toBe('6px')
-    expect(token('radius-control')).toBe('8px')
-    // ★V7「見た目の物差し」§1: カード・ダイアログ・知らせは 12px
+    expect(token('radius-control')).toBe('10px')
+    // 中身のカードは12px。窓の16pxと混ぜない。
     expect(token('radius-card')).toBe('12px')
     expect(token('radius-pill')).toBe('9999px')
   })
@@ -88,17 +79,16 @@ describe('#704 正規のサイズトークンがある', () => {
     expect(flat).toContain('gap-1 / gap-2 / gap-3 / gap-4 / gap-6')
   })
 
-  it('既存の段を消さない（置き換えは画面ごとに段階的）', () => {
-    // 文字: 使う画面があるので残す。11/13px は可読性基準との兼ね合いで
-    // 新規には使わず、正規段へ寄せる。
+  it('補助の段もV8の写しに合わせる', () => {
+    // 補助文字・大きな数の役割も、写しの値を守る。
     expect(token('text-micro')).toBe('11px')
-    expect(token('text-label')).toBe('13px')
+    expect(token('text-label')).toBe('12px')
     expect(token('text-heading')).toBe('18px')
-    expect(token('text-metric')).toBe('22px')
-    expect(token('text-display')).toBe('30px')
+    expect(token('text-metric')).toBe('28px')
+    expect(token('text-display')).toBe('22px')
     // 角丸: 設計固定テストが値を pin している画面があるので残す。
-    expect(token('radius-icon')).toBe('3px')
-    expect(token('radius-panel')).toBe('12px')
+    expect(token('radius-icon')).toBe('6px')
+    expect(token('radius-panel')).toBe('16px')
     expect(token('radius-large')).toBe('18px')
   })
 })
@@ -172,7 +162,7 @@ describe('#704 正規トークンを実Reactで読む', () => {
     expect(card?.className).toContain('rounded-card')
     expect(card?.className).toContain('gap-2')
     // 描画した綴りが、定義されたトークンを指している。
-    expect(token('text-body')).toBe('14px')
+    expect(token('text-body')).toBe('13px')
     expect(token('text-hero')).toBe('28px')
     expect(token('radius-card')).toBe('12px')
   })

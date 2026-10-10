@@ -102,7 +102,7 @@ function SummaryAside({
   children?: ReactNode
 }) {
   const summary = (
-    <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+    <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface">
         <h2 className="text-ink text-sm font-bold">設定サマリー</h2>
         <dl className="divide-hairline mt-3 divide-y">
           {rows.map(([label, value]) => (
@@ -112,7 +112,7 @@ function SummaryAside({
     </section>
   )
   const preview = (
-    <div className="min-h-[365px] shadow-card">
+    <div className="min-h-[365px] shadow-card-surface">
     <LinePreview
       note="実際のLINE表示に近いプレビューです"
     >
@@ -363,27 +363,27 @@ function WebinarActionsTab({ webinarId, editor, onEditorChange }: { webinarId: s
   return (
     <div className="flex flex-col gap-4 xl:flex-row" data-design-node="Xjk8q">
       <div className="min-w-0 flex-1 space-y-3">
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface">
           <h2 className="text-ink text-base font-bold">CTA・フォーム</h2>
           <p className="text-ink-faint mt-1 text-xs">視聴完了・CTAクリック・未視聴ごとの処理を設定します。</p>
           <div className="mt-4 flex flex-wrap gap-2">{TRIGGERS.map((item) => <span key={item.key} className="rounded-pill border border-hairline px-3 py-1 text-xs font-semibold text-ink-secondary">{item.label}</span>)}</div>
         </section>
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface">
           <div className="flex items-center justify-between gap-3"><h2 className="text-ink text-base font-bold">視聴完了メッセージ</h2><Button disabled>変数を挿入</Button></div>
           <textarea value={templateBody} onChange={(event) => setTemplateBody(event.target.value)} className="border-hairline bg-canvas-sunken text-ink mt-4 min-h-28 w-full rounded-control border p-4 text-sm leading-relaxed" aria-label="視聴完了メッセージ本文" />
           <div className="mt-3 flex flex-wrap gap-2"><Button disabled>資料を受け取る</Button><Button disabled>個別相談を予約</Button><Button disabled>あとで見る</Button></div>
         </section>
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface">
           <dl className="divide-hairline divide-y rounded-control border border-hairline">
             <div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">実行タイミング</dt><dd className="text-ink text-sm font-semibold">視聴完了直後</dd></div>
             <div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">同じ視聴への実行</dt><dd className="text-ink text-sm font-semibold">1回だけ</dd></div>
           </dl>
         </section>
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface">
           <div className="flex items-center justify-between gap-3"><div><h2 className="text-ink text-base font-bold">配信後の通知・アクション</h2><p className="text-ink-faint mt-1 text-xs">保存済みの実行内容です。</p></div><span className="text-ink-faint text-xs">{completedActions.length}件</span></div>
           <ul className="divide-hairline mt-3 divide-y rounded-control border border-hairline">{completedActions.length === 0 ? <li className="text-ink-faint p-4 text-sm">まだ設定されていません。</li> : completedActions.map((action, index) => <li key={action.id ?? index} className="text-ink px-4 py-3 text-sm font-semibold">{ACTION_LABELS[action.actionType]}</li>)}</ul>
         </section>
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-sm font-bold">視聴結果を取得できない場合</h2><p className="text-ink-faint mt-1 text-xs">再取得するか、要対応へ追加するか選択できます。</p><div className="mt-3 max-w-sm"><Select aria-label="視聴結果を取得できない場合" value={missingResultPolicy} onChange={(value) => setMissingResultPolicy(value as WebinarEditor['actionPolicy']['missingResultPolicy'])} options={[{ value: 'escalate', label: '要対応へ追加' }, { value: 'retry_next_day', label: '翌日に再取得' }]} /></div></section>
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface"><h2 className="text-ink text-sm font-bold">視聴結果を取得できない場合</h2><p className="text-ink-faint mt-1 text-xs">再取得するか、要対応へ追加するか選択できます。</p><div className="mt-3 max-w-sm"><Select aria-label="視聴結果を取得できない場合" value={missingResultPolicy} onChange={(value) => setMissingResultPolicy(value as WebinarEditor['actionPolicy']['missingResultPolicy'])} options={[{ value: 'escalate', label: '要対応へ追加' }, { value: 'retry_next_day', label: '翌日に再取得' }]} /></div></section>
         <EditorDetails label="通知・アクションの詳細を編集する">
         <section className="space-y-4">
       <div><h2 className="text-ink font-bold">視聴後の通知・アクション</h2><p className="text-ink-faint mt-1 text-xs">視聴完了・CTAクリック・未視聴ごとの処理を設定します。</p></div>
@@ -459,8 +459,8 @@ function PublicPreviewStep({
   return (
     <div className="flex flex-col gap-4 xl:flex-row" data-design-node="GB0NR">
       <div className="min-w-0 flex-1 space-y-3">
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-semibold">公開ページ</h2><p className="text-ink-faint mt-1 text-xs">タイトル・説明・申込フォームを最終確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">ページタイトル</dt><dd className="text-ink text-sm font-semibold">{webinar.title}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">公開URL</dt><dd className="text-ink max-w-2xl truncate text-sm font-semibold" title={publicUrl ?? undefined}>{publicUrl ?? '—（LIFF ID未設定）'}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">説明</dt><dd className="text-ink max-w-2xl text-right text-sm font-semibold">{editor.publicDescription || '—（未設定）'}</dd></div></dl></section>
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-semibold">表示内容</h2><p className="text-ink-faint mt-1 text-xs">PC・スマートフォンの表示を確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">メイン動画</dt><dd className="text-ink text-sm font-semibold">16:9・自動再生なし</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">申込フォーム</dt><dd className="text-ink text-sm font-semibold">{editor.publicPage.form ? `${editor.publicPage.form.name}（${editor.publicPage.form.fields.length}項目）` : '—（未設定）'}</dd></div></dl></section>
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface"><h2 className="text-ink text-base font-semibold">公開ページ</h2><p className="text-ink-faint mt-1 text-xs">タイトル・説明・申込フォームを最終確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">ページタイトル</dt><dd className="text-ink text-sm font-semibold">{webinar.title}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">公開URL</dt><dd className="text-ink max-w-2xl truncate text-sm font-semibold" title={publicUrl ?? undefined}>{publicUrl ?? '—（LIFF ID未設定）'}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">説明</dt><dd className="text-ink max-w-2xl text-right text-sm font-semibold">{editor.publicDescription || '—（未設定）'}</dd></div></dl></section>
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface"><h2 className="text-ink text-base font-semibold">表示内容</h2><p className="text-ink-faint mt-1 text-xs">PC・スマートフォンの表示を確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">メイン動画</dt><dd className="text-ink text-sm font-semibold">16:9・自動再生なし</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">申込フォーム</dt><dd className="text-ink text-sm font-semibold">{editor.publicPage.form ? `${editor.publicPage.form.name}（${editor.publicPage.form.fields.length}項目）` : '—（未設定）'}</dd></div></dl></section>
       </div>
       <SummaryAside rows={[
         ['状態', webinar.videoPrefix ? '公開準備完了' : '動画未設定'],

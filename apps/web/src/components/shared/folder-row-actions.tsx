@@ -13,6 +13,8 @@ import type { Folder } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import ConfirmDialog from './confirm-dialog'
 import FolderAddDialog from './folder-add-dialog'
+import { describeFolderFailure } from './folder-failure'
+import { notifyToast } from './toast'
 import type { FolderPanelRow } from './folder-panel'
 
 export interface FolderRowActionsOptions {
@@ -76,8 +78,18 @@ export function useFolderRowActions({
       onDeleted?.(deleting.id)
       setDeleting(null)
       await onChanged()
-    } catch {
-      setError('フォルダを消せませんでした。通信を確かめて、もう一度お試しください。')
+    } catch (caught) {
+      // 理由ごとに言い分ける（共通の describeFolderFailure）。消されていたら読み直して窓を閉じる。
+      const failure = describeFolderFailure(caught, 'delete')
+      if (failure.kind === 'missing') {
+        notifyToast(failure.message, { tone: 'error' })
+        onDeleted?.(deleting.id)
+        setDeleting(null)
+        await onChanged()
+        return
+      }
+      if (failure.kind === 'conflict') await onChanged()
+      setError(failure.message)
     } finally {
       setBusy(false)
     }
@@ -101,6 +113,7 @@ export function useFolderRowActions({
           placeholder={placeholder}
           onClose={() => setEditing(null)}
           onAdded={() => { setEditing(null); void onChanged() }}
+          onReload={onChanged}
         />
       ) : null}
       <ConfirmDialog

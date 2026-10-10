@@ -14,6 +14,7 @@ import { ListPage, type ListFolderNav } from '@/components/templates'
 import { Tabs } from '@/components/shared/tabs'
 import Button from '@/components/shared/button'
 import styles from './affiliates.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 export const AFFILIATE_TABS = [
   { key: 'affiliates', label: 'アフィリエイター', board: 'nJlxX' },
@@ -63,7 +64,7 @@ export function ViewerBand() {
   return (
     <p className={styles.viewerBand} role="note">
       <Eye size={16} aria-hidden="true" />
-      <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+      <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
     </p>
   )
 }
@@ -95,6 +96,7 @@ export function CreateButton({
 
 export interface AffiliateFrameProps {
   /** 板の頭の右（CSV など）。 */
+  help?: ReactNode
   actions?: ReactNode
   stats?: ReactNode
   folders?: ReactNode
@@ -107,7 +109,7 @@ export interface AffiliateFrameProps {
 }
 
 /** 5つのタブの共通の外側。題・説明・タブの段・閲覧のみの帯をここで持つ。 */
-export function AffiliateFrame({ actions, stats, folders, folderNav, toolbar, pagination, overlays, children }: AffiliateFrameProps) {
+export function AffiliateFrame({ help, actions, stats, folders, folderNav, toolbar, pagination, overlays, children }: AffiliateFrameProps) {
   const { tab, readonly, narrow, counts } = useAffiliateShell()
   const board = tab === 'affiliates' && narrow
     ? 'KdFRI'
@@ -116,10 +118,11 @@ export function AffiliateFrame({ actions, stats, folders, folderNav, toolbar, pa
       : AFFILIATE_TABS.find((item) => item.key === tab)?.board
   return (
     <ListPage
+      help={<>{"紹介してくれる人（アフィリエイター）と案件を登録し、成果を認めて報酬を払います。成果の数え方はコンバージョンで決めます。"}{help}</>}
       boardId={board}
       headingSize="regular"
       title="成果とアフィリエイト"
-      description="紹介してくれる人（アフィリエイター）と案件を登録し、成果を認めて報酬を払います。成果の数え方はコンバージョンで決めます。"
+
       actions={actions}
       tabs={
         <div className={styles.tabsBox}>

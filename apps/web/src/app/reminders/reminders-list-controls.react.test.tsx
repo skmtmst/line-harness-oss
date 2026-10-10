@@ -174,7 +174,7 @@ describe('一覧の操作が実クエリへつながる (N-072)', () => {
     })
     // useDeferredValue が追いつくまで描画を進める。
     for (let i = 0; i < 20; i++) {
-      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)) })
       if ((listCalls().at(-1) ?? '').includes(`q=${encodeURIComponent('持ち物')}`)) break
     }
     expect(listCalls().at(-1) ?? '').toContain('q=' + encodeURIComponent('持ち物'))
@@ -191,7 +191,7 @@ describe('一覧もフォルダも失敗したら読み直しは1枚だけ', () 
     })
     await act(async () => { root.render(<RemindersPage />) })
     for (let i = 0; i < 30; i++) {
-      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)) })
       if (host.textContent?.includes('読み込めませんでした')) break
     }
     expect(host.textContent ?? '').toContain('リマインダを読み込めませんでした')

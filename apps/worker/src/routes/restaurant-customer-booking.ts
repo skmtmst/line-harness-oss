@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import type { Env } from '../index.js';
 import {
@@ -150,7 +151,7 @@ restaurantCustomerBooking.get(
         );
   },
 );
-restaurantCustomerBooking.post('/api/liff/restaurant/holds', async (c) => {
+restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary(), async (c) => {
   const self = await identity(c);
   if (self instanceof Response) return self;
   const body = await c.req
@@ -167,7 +168,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', async (c) => {
     typeof body.requestId !== 'string' ||
     !/^[a-zA-Z0-9_-]{8,128}$/.test(body.requestId)
   )
-    return c.json({ success: false, error: 'invalid_hold' }, 400);
+    return inputError(c, { success: false, error: 'invalid_hold' }, 400, ["note","customerPhone","startsAt","guestCount","requestId"]);
   const store = await storeFor(c, self.accountId, body.storeId);
   if (!store) return c.json({ success: false, error: 'not_found' }, 404);
   const db = dbFor(c.env, store.id),
@@ -277,11 +278,8 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         !Number.isSafeInteger(b.expectedVersion) ||
         b.expectedVersion < 1
       )
-        return c.json(
-          { success: false, error: 'expected_version_required' },
-          400,
-        );
-      if (action === 'confirm' && !validCustomerDetails(b)) return c.json({success:false,error:'invalid_customer_details'},400);
+        return inputError(c, { success: false, error: 'expected_version_required' }, 400, ["expectedVersion"]);
+      if (action === 'confirm' && !validCustomerDetails(b)) return inputError(c, {success:false,error:'invalid_customer_details'}, 400, ["note","customerPhone"]);
       const db = dbFor(c.env),
         row = await db
           .prepare(
@@ -338,7 +336,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
           b.guestCount < 1 ||
           b.guestCount > 100
         )
-          return c.json({ success: false, error: 'invalid_change' }, 400);
+          return inputError(c, { success: false, error: 'invalid_change' }, 400, ["startsAt","guestCount"]);
         starts = new Date(b.startsAt).toISOString();
         count = b.guestCount;
         const available = await customerAvailability(

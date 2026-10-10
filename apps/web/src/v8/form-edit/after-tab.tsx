@@ -18,8 +18,9 @@ import Segmented from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import { ACTION_ADDERS, describeAfterAction, emptyAction } from './model'
 import styles from './edit.module.css'
+import { Field } from '@/components/shared/form-controls'
 
-const ADDER_ICON: Record<FormAction['kind'], typeof Tag> = {
+const ADDER_ICON: Record<Exclude<FormAction['kind'], 'research_action'>, typeof Tag> = {
   send_text: MessageSquare,
   send_template: FileText,
   tag: Tag,
@@ -29,6 +30,7 @@ const ADDER_ICON: Record<FormAction['kind'], typeof Tag> = {
 }
 
 type Props = {
+  readOnly?: boolean
   options: FormOptions
   refs: FormRefs
   onSubmitTagId: string
@@ -36,7 +38,7 @@ type Props = {
   onChangeSubmitTag: (id: string) => void
 }
 
-export function AfterTab({ options, refs, onSubmitTagId, onChangeOptions, onChangeSubmitTag }: Props) {
+export function AfterTab({ readOnly, options, refs, onSubmitTagId, onChangeOptions, onChangeSubmitTag }: Props) {
   const actions = options.afterActions ?? []
   /** 直している間の一覧（窓の中だけ。「この内容にする」で戻す）。 */
   const [editing, setEditing] = useState<FormAction[] | null>(null)
@@ -56,14 +58,27 @@ export function AfterTab({ options, refs, onSubmitTagId, onChangeOptions, onChan
     onReorder: ({ ids }) => setActions(ids.map((slot) => actions[Number(slot)])),
   })
 
+  if (readOnly) return <>
+    <section className={styles.card}>
+      <h2 className={styles.cardTitle}>答え終わったときの画面</h2>
+      <p>お礼の文：{options.thanksText || 'ご回答ありがとうございました。'}</p>
+      <p>終わったあと：{options.thanksUrl || 'お礼を出す'}</p>
+    </section>
+    <section className={styles.card}>
+      <h2 className={styles.cardTitle}>答え終わったら行うこと</h2>
+      {actions.length ? actions.map((action, index) => <p key={index}>{describeAfterAction(action, refs)}</p>) : <p>行うことはまだありません。</p>}
+    </section>
+    <section className={styles.card}>
+      <h2 className={styles.cardTitle}>回答したときに付けるタグ</h2>
+      <p>{refs.tags.find((tag) => tag.id === onSubmitTagId)?.name || (onSubmitTagId ? '登録済みのタグ' : '付けない')}</p>
+    </section>
+  </>
+
   return (
     <>
       <section className={styles.card} aria-labelledby="fe-thanks-title">
         <h2 id="fe-thanks-title" className={styles.cardTitle}>答え終わったときの画面</h2>
-        <div className={styles.field}>
-          <label className={styles.fieldLabel} htmlFor="fe-thanks-text">お礼の文</label>
-          <TextField id="fe-thanks-text" value={options.thanksText ?? ''} placeholder="ご回答ありがとうございました。" onChange={(e) => onChangeOptions({ thanksText: e.target.value })} />
-        </div>
+        <div className={styles.field}><Field label="お礼の文" htmlFor="fe-thanks-text"><TextField id="fe-thanks-text" value={options.thanksText ?? ''} placeholder="ご回答ありがとうございました。" onChange={(e) => onChangeOptions({ thanksText: e.target.value })} /></Field></div>
         <div className={styles.endingRow}>
           <span className={styles.endingLabel}>終わったあと</span>
           <Segmented
@@ -77,9 +92,7 @@ export function AfterTab({ options, refs, onSubmitTagId, onChangeOptions, onChan
           />
         </div>
         {ending === 'url' ? (
-          <div className={styles.field}>
-            <label className={styles.fieldLabel} htmlFor="fe-thanks-url">開くURL</label>
-            <TextField
+          <div className={styles.field}><Field label="開くURL" htmlFor="fe-thanks-url"><TextField
               id="fe-thanks-url"
               type="url"
               value={options.thanksUrl ?? ''}
@@ -88,8 +101,7 @@ export function AfterTab({ options, refs, onSubmitTagId, onChangeOptions, onChan
                 setUrlDraft(e.target.value)
                 onChangeOptions({ thanksUrl: e.target.value || 'https://' })
               }}
-            />
-          </div>
+            /></Field></div>
         ) : null}
       </section>
 
@@ -114,7 +126,7 @@ export function AfterTab({ options, refs, onSubmitTagId, onChangeOptions, onChan
                 {...reorder.handleProps(slot)}
               />
               <span className={styles.actionNum}>{position + 1}</span>
-              <button type="button" className={styles.actionText} title={text} onClick={() => setEditing(actions)}>{text}</button>
+              <button type="button" className={styles.actionText} title={text}  onClick={() => setEditing(actions)}>{text}</button>
               <RowActions
                 className={styles.more}
                 subjectName={`「${text}」`}

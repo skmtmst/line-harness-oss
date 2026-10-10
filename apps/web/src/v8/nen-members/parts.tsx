@@ -8,6 +8,8 @@
 import { formatNumber } from '@/lib/format'
 import type { NenRankSettingsData } from '@/lib/nen-ranks-api'
 import styles from './members.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 export type MemberTab = 'members' | 'ranks' | 'lifetime'
 export type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -70,22 +72,15 @@ export const RULE_LABELS = {
   countOrders: '入金済みの注文（キャンセル・返金は除く）',
 } as const
 
-const JST = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: false })
-const JST_TIME = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: 'numeric', minute: '2-digit', hour12: false })
+
+
 
 /** 「9/30 10:12」（日本時間）。 */
 export function shortDateTime(value: string | null | undefined): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = Object.fromEntries(JST.formatToParts(date).map((part) => [part.type, part.value]))
-  return `${parts.month}/${parts.day} ${parts.hour}:${parts.minute}`
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 /** 「14:02」（日本時間）。 */
 export function shortTime(value: string | null | undefined): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return JST_TIME.format(date)
+  return polishFormatDate(value, { style: 'time', fallback: '—' })
 }

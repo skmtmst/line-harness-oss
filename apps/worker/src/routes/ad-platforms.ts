@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { auditLog } from '../lib/audit-log.js';
 import {
@@ -122,7 +123,7 @@ adPlatforms.get('/api/ad-platforms', requireRole('owner', 'admin', 'staff'), asy
 });
 
 // POST /api/ad-platforms - create
-adPlatforms.post('/api/ad-platforms', requireRole('owner'), async (c) => {
+adPlatforms.post('/api/ad-platforms', requireRole('owner'), inputJsonBoundary({"name":["string"],"displayName":["string"],"config":["object"],"lineAccountId":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       name: string;
@@ -132,11 +133,11 @@ adPlatforms.post('/api/ad-platforms', requireRole('owner'), async (c) => {
     }>();
 
     if (!body.name || !body.config) {
-      return c.json({ success: false, error: 'name and config are required' }, 400);
+      return inputError(c, { success: false, error: 'name and config are required' }, 400, ["name","config"]);
     }
     // 帰属のない設定は送信対象にならないため、作成時に必須にする。
     if (!body.lineAccountId) {
-      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+      return inputError(c, { success: false, error: 'lineAccountId is required' }, 400, ["lineAccountId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -145,7 +146,7 @@ adPlatforms.post('/api/ad-platforms', requireRole('owner'), async (c) => {
     // 決められていない設定キーは受け付けない。秘密は暗号化して別保管にする。
     const configError = validateAdPlatformConfig(body.name, body.config);
     if (configError) {
-      return c.json({ success: false, error: configError }, 400);
+      return inputError(c, { success: false, error: configError }, 400, ["name","config"]);
     }
     const { publicConfig, secrets } = splitAdPlatformSecrets(body.config);
     let configEncrypted: string | null = null;
@@ -194,7 +195,7 @@ async function adPlatformWriteScope(
 }
 
 // 読み取り疎通確認を済ませた設定だけを接続する。外部応答・鍵は返さない。
-adPlatforms.post('/api/ad-platforms/:id/connect', requireRole('owner'), async c => {
+adPlatforms.post('/api/ad-platforms/:id/connect', requireRole('owner'), inputJsonBoundary(), async c => {
   const platform = await getAdPlatformById(c.env.DB, c.req.param('id'));
   if (!platform?.line_account_id || !await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[platform.line_account_id])) return c.json({success:false,error:'対象が見つかりません'},404);
   try { await verifyAdPlatformReadAccess(platform,c.env.LINE_CREDENTIAL_ENCRYPTION_KEY); }
@@ -207,7 +208,7 @@ adPlatforms.post('/api/ad-platforms/:id/connect', requireRole('owner'), async c 
 });
 
 // PUT /api/ad-platforms/:id - update
-adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
+adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), inputJsonBoundary({"name":["string"],"displayName":["null","string"],"config":["object"],"isActive":["boolean"],"lineAccountId":["null","string"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -220,7 +221,7 @@ adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
 
     // 帰属を空に戻す変更は受け付けない。
     if (body.lineAccountId !== undefined && !body.lineAccountId) {
-      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+      return inputError(c, { success: false, error: 'lineAccountId is required' }, 400, ["lineAccountId"]);
     }
     const existing = await getAdPlatformById(c.env.DB, id);
     if (!existing) {
@@ -236,10 +237,7 @@ adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
 
     // 疎通確認が済むまで有効化はできない。
     if (body.isActive === true && !existing.verified_at) {
-      return c.json(
-        { success: false, error: '接続確認（テスト送信）が済んでいません。先に接続確認をしてください' },
-        422,
-      );
+      return inputError(c, { success: false, error: '接続確認（テスト送信）が済んでいません。先に接続確認をしてください' }, 422, ["isActive"]);
     }
 
     // 設定の書き換え。秘密の指定がない鍵は今の値を残し、決められていない
@@ -250,7 +248,7 @@ adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
       const targetName = body.name ?? existing.name;
       const configError = validateAdPlatformConfig(targetName, body.config);
       if (configError) {
-        return c.json({ success: false, error: configError }, 400);
+        return inputError(c, { success: false, error: configError }, 400, ["name","config"]);
       }
       const stored = await resolveAdPlatformConfig(existing, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
       if (!stored && existing.config_encrypted) {
@@ -305,7 +303,7 @@ adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
 });
 
 // POST /api/ad-platforms/test - test conversion send (must be before :id routes)
-adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), async (c) => {
+adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), inputJsonBoundary({"platform":["string"],"eventName":["string"],"friendId":["string"],"lineAccountId":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       platform: string;
@@ -315,7 +313,7 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), async (c) => {
     }>();
 
     if (!body.platform || !body.eventName) {
-      return c.json({ success: false, error: 'platform and eventName are required' }, 400);
+      return inputError(c, { success: false, error: 'platform and eventName are required' }, 400, ["platform","eventName"]);
     }
 
     if (body.friendId) {
@@ -373,7 +371,7 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), async (c) => {
     // あるときの取り違えと、認可対象・実送信対象のずれを防ぐため。
     const lineAccountId = body.lineAccountId?.trim();
     if (!lineAccountId) {
-      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+      return inputError(c, { success: false, error: 'lineAccountId is required' }, 400, ["lineAccountId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -550,7 +548,7 @@ adPlatforms.get('/api/ad-platforms/:id/logs', requireRole('owner', 'admin', 'sta
 });
 
 /** F-22: 再送する内容や宛先は引数で受けず、保存済みの1件を使う。 */
-adPlatforms.post('/api/ad-platforms/logs/:id/retry', requireRole('owner'), async (c) => {
+adPlatforms.post('/api/ad-platforms/logs/:id/retry', requireRole('owner'), inputJsonBoundary(), async (c) => {
   try {
     const row = await getAdConversionRetrySource(c.env.DB, c.req.param('id'));
     if (!row?.line_account_id || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [row.line_account_id])) {
@@ -564,7 +562,7 @@ adPlatforms.post('/api/ad-platforms/logs/:id/retry', requireRole('owner'), async
     });
     return c.json({ success: true, data });
   } catch (error) {
-    if (error instanceof AdConversionRetryError) return c.json({ success: false, code: error.code, error: error.message }, error.status);
+    if (error instanceof AdConversionRetryError) return inputError(c, { success: false, code: error.code, error: error.message }, error.status, []);
     return c.json({ success: false, error: '広告への送信をやり直せませんでした' }, 500);
   }
 });

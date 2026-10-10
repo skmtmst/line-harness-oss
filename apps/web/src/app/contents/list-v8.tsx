@@ -62,6 +62,10 @@ import { MediaQuotaGuidance } from './media-quota-guidance'
 import MediaReplacementDialog from './media-replacement-dialog'
 import MediaUploadDialog from './media-upload-dialog'
 import styles from './list-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type MediaSort = 'newest' | 'oldest' | 'name' | 'size' | 'usage'
 const UNGROUPED = '__ungrouped__'
@@ -984,13 +988,13 @@ export default function MediaLibraryListV8() {
   const folderForbidden = folderFailure != null && classifyApiFailure(folderFailure) === 'forbidden'
 
   /* 数の帯の文言。失敗・未取得は「—」で出し、偽ゼロを置かない。 */
-  const kpiTotalText = !listKnown || loadFailed ? '—' : formatNumber(overallTotal ?? total)
+  const kpiTotalText = !listKnown || loadFailed ? emptyValue('unknown') : formatNumber(overallTotal ?? total)
   const kindBreakdown = KINDS
     .map((kind) => (kpis.kindTotals[kind.key] == null ? null : `${kind.label}${formatNumber(kpis.kindTotals[kind.key] as number)}`))
     .filter((text): text is string => text !== null)
     .join('・')
-  const unusedText = kpis.unusedTotal == null ? '—' : formatNumber(kpis.unusedTotal)
-  const archivedText = kpis.archivedTotal == null ? '—' : formatNumber(kpis.archivedTotal)
+  const unusedText = kpis.unusedTotal == null ? emptyValue('unknown') : formatNumber(kpis.unusedTotal)
+  const archivedText = kpis.archivedTotal == null ? emptyValue('unknown') : formatNumber(kpis.archivedTotal)
   const quotaPercent = quota && quota.limitBytes > 0
     ? Math.round((quota.usageBytes / quota.limitBytes) * 100)
     : null
@@ -1060,8 +1064,8 @@ export default function MediaLibraryListV8() {
     <div data-design-node="O7hUt7" className={styles.board}>
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>登録メディア一覧</h1>
-          <p className={styles.headDescription}>配信で使う画像・動画・音声・ファイルの置き場です。</p>
+          <PageHeading title="登録メディア一覧" help={<> 配信で使う画像・動画・音声・ファイルの置き場です。</>} />
+
         </div>
         <div className={styles.headActions}>
           <Button type="button" variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録する</Button>
@@ -1097,7 +1101,7 @@ export default function MediaLibraryListV8() {
             <span className={styles.kpiLabel}>使っている容量</span>
           </span>
           <span className={styles.kpiValue}>
-            {quota ? formatMediaSize(quota.usageBytes) : '—'}
+            {quota ? formatMediaSize(quota.usageBytes) : emptyValue('unknown')}
           </span>
           <span className={styles.kpiDetail}>
             {quota && quotaPercent != null ? `上限 ${formatMediaSize(quota.limitBytes)} の${quotaPercent}%` : '—（未取得）'}
@@ -1224,7 +1228,7 @@ export default function MediaLibraryListV8() {
           />
           <ListToolbar
             search={{
-              placeholder: 'ファイル名で検索',
+              placeholder: 'ファイル名で探す',
               value: query,
               onChange: (value) => {
                 setQuery(value)
@@ -1356,7 +1360,7 @@ export default function MediaLibraryListV8() {
               kind="error"
               title="表示できませんでした"
               description="再読み込みしても直らないときは、エラー報告へお知らせください。"
-              action={<Button variant="secondary" onClick={() => void load()}>もう一度読み込む</Button>}
+              onRetry={() => void load()}
             />
           ) : current.length === 0 ? (
             <div>
@@ -1657,17 +1661,14 @@ export default function MediaLibraryListV8() {
           </div>
         }
       >
-        <label>
-          <span>理由<RequiredBadge /><span>（あとから履歴で確認できます）</span></span>
-          <input
+        <Field label="理由（あとから履歴で確認できます）" required><input
             type="text"
             autoFocus
             value={archiveReason}
             onChange={(event) => setArchiveReason(event.target.value)}
             placeholder={archiveTarget?.mode === 'archive' ? '例：古いキャンペーンの素材のため' : '例：再び使うため'}
             aria-label="理由"
-          />
-        </label>
+          /></Field>
       </Dialog>
 
       {/*
@@ -1743,7 +1744,7 @@ export default function MediaLibraryListV8() {
           folder={editingFolder}
           accountId={selectedAccountId}
           note="メディアを分けてしまう箱です。削除しても、中のメディアは未分類に残ります。"
-          placeholder="例: 01_商品写真"
+          placeholder="例：01_商品写真"
           onClose={() => setEditingFolder(null)}
           onAdded={() => { setEditingFolder(null); void load() }}
         />
@@ -1923,8 +1924,8 @@ function MediaCardV8({
               <span className={styles.nameDot}>
                 <FolderDot folder={folder} />
               </span>
-              <span className={styles.fileName} title={item.filename}>
-                {item.filename}
+              <span className={styles.fileName} >
+                <TruncatedText value={String(item.filename ?? '')} />
               </span>
             </span>
             <p className={styles.meta}>

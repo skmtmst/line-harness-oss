@@ -23,6 +23,8 @@ import { ApiError, api, type MileageAdjustmentPolicy } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { mileageAdjustmentErrorMessage } from './mileage-adjustment-dialog'
 import styles from '../../mileage-v8.module.css'
+import NumberInput from '@/components/shared/number-field'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Direction = 'increase' | 'decrease' | 'zero'
 type ReasonCategory = 'customer_support' | 'order_correction' | 'grant_correction' | 'campaign' | 'other'
@@ -342,7 +344,7 @@ export default function V8MileageAdjustDialog({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <p className={styles.dlgLabel}>マイル数</p>
-              <input
+              <NumberInput numericText
                 className={styles.dlgInput}
                 inputMode="numeric"
                 value={zeroing ? String(currentBalance) : amountText}
@@ -408,7 +410,7 @@ export default function V8MileageAdjustDialog({
               <p className={styles.dlgPersonName}>高額調整の承認境界が未設定です</p>
               <p className={styles.dlgPersonSub}>この値以上は、この画面では実行せず、別のオーナー承認を必要とします。</p>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginTop: 8 }}>
-                <input
+                <NumberInput numericText
                   className={styles.dlgInput}
                   inputMode="numeric"
                   value={policyThresholdText}
@@ -429,12 +431,12 @@ export default function V8MileageAdjustDialog({
             <div className={styles.deltaCell}>
               <p className={styles.deltaLabel}>変更量</p>
               <p className={styles.deltaValue}>
-                {valid ? `${delta > 0 ? '+' : ''}${formatNumber(delta)}` : '—'}
+                {valid ? `${delta > 0 ? '+' : ''}${formatNumber(delta)}` : emptyValue('unknown')}
               </p>
             </div>
             <div className={styles.deltaCell}>
               <p className={styles.deltaLabel}>変更後の残高</p>
-              <p className={styles.deltaValue}>{valid ? formatNumber(balanceAfter) : '—'}</p>
+              <p className={styles.deltaValue}>{valid ? formatNumber(balanceAfter) : emptyValue('unknown')}</p>
             </div>
           </div>
 

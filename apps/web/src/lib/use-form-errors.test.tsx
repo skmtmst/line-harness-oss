@@ -130,4 +130,73 @@ describe('useFormErrors（★V7 sTJsh §6）', () => {
     await act(async () => { submit.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
     expect(captured).toEqual([])
   })
+
+  it('隠れたカードの欄は、そのカードを開いてから移り、札に赤い印を付ける（B-139）', async () => {
+    function CardsHarness() {
+      const [bodies, setBodies] = useState(['あ', ''])
+      const [active, setActive] = useState(0)
+      const fields = useFormErrors()
+      bodies.forEach((body, index) => fields.define(`card-${index}-body`, `カード${index + 1}の本文`, () => (body.trim() ? null : '本文を入れてください'), { reveal: () => setActive(index), group: `card-${index}` }))
+      return (
+        <div>
+          {bodies.map((_, index) => (
+            <button key={index} type="button" data-card-tab={index} onClick={() => setActive(index)}>
+              カード{index + 1}<span data-badge={index}>{fields.countIn(`card-${index}`) || ''}</span>
+            </button>
+          ))}
+          <textarea
+            key={active}
+            {...fields.bind(`card-${active}-body`)}
+            id="card-body"
+            aria-invalid={fields.invalid(`card-${active}-body`) || undefined}
+            value={bodies[active]}
+            onChange={(e) => setBodies((list) => list.map((b, i) => (i === active ? e.target.value : b)))}
+          />
+          {fields.error(`card-${active}-body`) ? <p data-field-error>{fields.error(`card-${active}-body`)}</p> : null}
+          <button type="button" data-action="submit" onClick={() => fields.submit()}>保存する</button>
+        </div>
+      )
+    }
+    await act(async () => { root.render(<CardsHarness />) })
+    expect(host.querySelector('[data-badge="1"]')?.textContent).toBe('')
+    const submit = host.querySelector('[data-action="submit"]')!
+    await act(async () => { submit.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    // 開く → 2コマ待つ → 移る
+    for (let i = 0; i < 4; i += 1) await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(host.querySelector('[data-badge="1"]')?.textContent).toBe('1')
+    expect(host.querySelector('[data-badge="0"]')?.textContent).toBe('')
+    const area = host.querySelector('#card-body') as HTMLTextAreaElement
+    expect(document.activeElement).toBe(area)
+    expect(area.value).toBe('')
+    expect(area.getAttribute('aria-invalid')).toBe('true')
+    expect(host.querySelector('[data-field-error]')?.textContent).toBe('本文を入れてください')
+  })
+
+  it('サーバーの欄の誤りを欄に出し、打ち直すと消える', async () => {
+    let api: ReturnType<typeof useFormErrors> | null = null
+    function ServerHarness() {
+      const [name, setName] = useState('重複')
+      const fields = useFormErrors()
+      api = fields
+      fields.define('name', '名前', () => (name.trim() ? null : '名前を入力してください'))
+      return (
+        <div>
+          <input {...fields.bind('name')} id="f-name" value={name} onChange={(e) => setName(e.target.value)} />
+          {fields.error('name') ? <p data-field-error="name">{fields.error('name')}</p> : null}
+          <div data-problems>{fields.listProblems().map((p) => p.label).join(',')}</div>
+        </div>
+      )
+    }
+    await act(async () => { root.render(<ServerHarness />) })
+    let shown = 0
+    await act(async () => { shown = api!.setServerErrors({ name: 'この名前はもう使われています', unknown: 'x' }) })
+    expect(shown).toBe(1)
+    expect(host.querySelector('[data-field-error="name"]')?.textContent).toBe('この名前はもう使われています')
+    expect(host.querySelector('[data-problems]')?.textContent).toBe('名前')
+    await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(document.activeElement).toBe(input('f-name'))
+    await type('f-name', '重複2')
+    expect(host.querySelector('[data-field-error="name"]')).toBeNull()
+    expect(host.querySelector('[data-problems]')?.textContent).toBe('')
+  })
 })

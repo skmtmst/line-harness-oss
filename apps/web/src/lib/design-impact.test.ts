@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
@@ -76,8 +76,6 @@ describe('共通部品の影響範囲', () => {
       'app/accounts/migration.tsx',
       // ★V8 LINEユーザーIDの移行（Z0jHp）。判断一覧は50件ずつのページ送り。
       'app/accounts/uid-migration-v8.tsx',
-      // 2026-09-04: 自動応答の実行結果が入った。表の下にページ送りがある。
-      'app/auto-replies/runs/page.tsx',
       // ★V8 自動応答の実行結果（app/auto-replies/runs/runs-v8.tsx）は描かれなくなった。入口は src/v8/auto-replies/runs.tsx（下）。
       'app/automations/page.tsx',
       // 2026-09-27 R24: 実行記録が先頭20件に固定で21件目以降へ届かなかった。
@@ -88,8 +86,6 @@ describe('共通部品の影響範囲', () => {
       'app/booking/menus/page.tsx',
       // #1145(★V8) の一斉配信の一覧（app/broadcasts/list-v8.tsx）は描かれなくなった。入口は src/v8/broadcasts/list.tsx（下）。
       'app/common-actions/page.tsx',
-      // N-193/N-205: 登録メディア選択窓。20件ずつのページ送りを共通へ寄せた。
-      'app/contents/media-picker-dialog.tsx',
       'app/contents/media-replacement-dialog.tsx',
       'app/contents/page.tsx',
       // #973: 共通情報の変更影響を1件ずつ確認する一覧にページ送りを追加した。
@@ -113,9 +109,8 @@ describe('共通部品の影響範囲', () => {
       // 取れていないときに「1 / 1」と出て、1ページぶんは取れたように見えていた。
       'app/events/bookings/page.tsx',
       'app/events/page.tsx',
-      // #543: 一覧の到達不能な回答表（M2削除）と共に共通Paginationの利用を外した。
       'app/form-submissions/responses/page.tsx',
-      'app/hq/account-browser-v8.tsx',
+      // 統括の入口は src/v8/hq/home.tsx に統一した。旧一覧は利用先に数えない。
       // IDEA-18 (#1036): 経路別の注文明細が増えても画面を重くしないよう
       // サーバが数えた総数でページ送りを出すため共通へ寄せた。
       'app/inflow-links/_components/ref-orders.tsx',
@@ -141,10 +136,7 @@ describe('共通部品の影響範囲', () => {
       'app/nen/pets/pets-tab.tsx',
       // ★V8-B マイペット一覧（wTIej）の古い pets-v8.tsx は描かれなくなった。入口は src/v8/nen-pets（ページ送りは型が持つ）。
       'app/ops/audit/page.tsx',
-      // 2026-09-04: 7-1-H 実行結果。友だち×通の実行が並ぶので、表の下にページ送りが要る。
-      'app/reminders/detail/page.tsx',
-      // ★V8 リマインダの登録者（担当 b の作り直し）。表の下に共通のページ送り。
-      'app/reminders/detail/registrants-panel.tsx',
+      // mainB: リマインダ詳細・登録者の旧本体は描かれなくなった。V8本体の利用先だけを下に残す。
       // ★V8 リマインダ一覧（apLqS）。表の下にページ送りを置く。
       'app/reminders/list-v8.tsx',
       // 2026-09-23: Googleビジネスの口コミ一覧（★V6 GB-2）。20件ずつのページ送り。
@@ -167,9 +159,11 @@ describe('共通部品の影響範囲', () => {
       'app/webinars/edit/participants-v8.tsx',
       'app/webinars/list-v8.tsx',
       'components/friend-fields/tags-page-v4.tsx',
-      'components/friends/friend-list-table.tsx',
+
       'components/line-notifications/notification-run-list.tsx',
       'components/ops/knowledge-list.tsx',
+      // N-193/N-205・B-128: 登録メディアから選ぶ窓。3つの写しを共通部品1つにまとめた。20件ずつのページ送り。
+      'components/shared/media-picker-dialog.tsx',
       'components/staff/login-audit.tsx',
       'components/support/pending-inbox-card.tsx',
       'components/users/users-table.tsx',
@@ -202,8 +196,6 @@ describe('共通部品の影響範囲', () => {
       'v8/friend-add-runs/runs.tsx',
       // ★V8 LINE通知の送れなかったもの・記録（DrwMm・PZBVb）。src/v8 に一から書いた表の下のページ送り。
       'v8/settings/line-notifications/runs-tab.tsx',
-      // ★V8 回答フォームの編集（m1cWEy ほか）。登録メディアから選ぶ窓の写しにページ送り。
-      'v8/form-edit/media-picker.tsx',
       // V8 のリッチメニュー一覧（src/v8 に一から書いた）。
       'v8/rich-menus/list.tsx',
       // ★V8 自動応答の一覧（uE9gf）。新しい置き場（src/v8）に一から書いた。
@@ -256,8 +248,6 @@ describe('共通部品の影響範囲', () => {
       // ★V8 運営の監査ログ（e7ljE）・ナレッジ（h114s）。src/v8/ops に一から書いた。
       'v8/ops/audit.tsx',
       'v8/ops/knowledge.tsx',
-      // ★V8 テンプレートのクーポンを作る（S6FEuB）。登録メディアの選ぶ窓を src/v8 に写した。
-      'v8/template-edit/media-picker.tsx',
       // ★V8 リマインダの詳細（rbAig・loVfW）。配信予定・実行結果・登録者の表の下にページ送り。
       'v8/reminders/detail.tsx',
       // ★V8 ウェビナーの参加者（uNsEy）。表の下にページ送りを置く。
@@ -271,6 +261,7 @@ describe('共通部品の影響範囲', () => {
       'v8/settings/staff/staff.tsx',
       // ★V8 設定のEC連携（GmVR5）・ファイルの検査（PfA4o）。src/v8/settings に一から書いた。表の下にページ送りを置く。
       'v8/settings/ec-commerce/screen.tsx',
+      'v8/settings/ec-commerce/subscriptions.tsx',
       'v8/settings/file-scan/screen.tsx',
       // ★V8 友だち（x6QsVz 一覧・ADjK8 統合ユーザー・hn6Y8 重複検出・Z0jHp UID移行）を src/v8/friends に一から書いた。
       'v8/friends/list/list.tsx',
@@ -292,6 +283,8 @@ describe('共通部品の影響範囲', () => {
       'v8/inflow-links/detail.tsx',
       'v8/inflow-links/ref-orders.tsx',
       'v8/inflow-links/ad-history.tsx',
+      // G-8 来店スタンプの記録。表の下に共通のページ送りを置く。
+      'v8/visit-stamps/visit-stamps.tsx',
     ].sort())
   })
 

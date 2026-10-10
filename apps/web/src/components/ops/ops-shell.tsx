@@ -147,7 +147,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
   if (loadError) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-canvas-sunken px-4">
-        <div className="w-full max-w-md rounded-card border border-hairline bg-canvas p-6 text-center shadow-card">
+        <div className="w-full max-w-md rounded-card border border-hairline bg-canvas p-6 text-center shadow-card-surface">
           <p role="alert" className="text-label font-medium text-danger">{loadError || '運営コンソールを読み込めませんでした'}</p>
           <div className="mt-4 flex justify-center gap-2">
             <Button variant="primary" onClick={() => { setChecked(false); setLoadError(''); void load() }}>もう一度試す</Button>

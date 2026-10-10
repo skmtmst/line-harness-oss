@@ -5,7 +5,7 @@
  * `?friend=` しか読まなかったため、対象が引き継がれず既定一覧へ
  * 着いていた。全導線が安全なURL状態で渡すことをここで固定する。
  */
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -25,9 +25,9 @@ describe('#673-送り 友だち詳細の全導線は受信箱の読む形で渡�
 
   // ★V7（2026-09-24）：操作節の「受信箱で開く」は右上と重なるので外した。残る8導線がすべてこの口を使う。
   // ★V7（m13g）：メニューの「受信箱で開く」も右上と重なるので外した。残る7導線がすべてこの口を使う。
-  it('7導線すべてがその口を使う（上ボタン・対応・名前・タグ・追加・メニュー1件・履歴のメッセージ元情報リンク）', () => {
+  it('V8の受信箱への3導線は共通の口を使う', () => {
     const uses = PAGE.split('inboxHrefForFriend(friendId)').length - 1
-    expect(uses).toBe(8)
+    expect(uses).toBe(3)
   })
 
   it('「受信箱で開く」の表示は残っている', () => {

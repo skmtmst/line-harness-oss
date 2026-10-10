@@ -60,6 +60,7 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
 })
 
 import HqBannersListV8 from './list'
+import { flushListUrlState } from '@/components/shared/list-url-state'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -78,6 +79,8 @@ const image = (n: number) => ({
 })
 
 beforeEach(() => {
+  flushListUrlState()
+  window.history.replaceState(null, '', '/hq/banners')
   document.documentElement.dataset.theme = 'v8'
   nav.query = ''
   roleBox.role = 'owner'
@@ -116,7 +119,7 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     expect(host.textContent).toContain('今月の残り')
     expect(host.textContent).toContain('上限 150枚')
     expect(host.textContent).toContain('秋のキャンペーン')
-    expect(host.textContent).toContain('3 枚 ・ 9/30 更新')
+    expect(host.textContent).toContain('3 枚 ・ 09/30 更新')
     expect(host.textContent).toContain('— ・ いま作成中')
     expect(host.querySelector('[aria-label="秋のキャンペーン を開く"]')).toBeTruthy()
   })
@@ -129,14 +132,14 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     const submit = buttonNamed('作って開く') as HTMLButtonElement
     expect(submit, '作って開くがありません').toBeTruthy()
     expect(submit.disabled).toBe(true)
-    const name = document.querySelector('input[placeholder="例: 春の感謝祭 2周年"]') as HTMLInputElement
+    const name = document.querySelector('input[placeholder="例：春の感謝祭 2周年"]') as HTMLInputElement
     fireEvent.change(name, { target: { value: '新しい案件' } })
     await flush()
     expect(submit.disabled).toBe(false)
     act(() => { submit.click() })
     await flush()
     expect(createProject).toHaveBeenCalledWith({ name: '新しい案件', description: null })
-    expect(push).toHaveBeenCalledWith('/hq/banners/project?id=p9')
+    expect(push).toHaveBeenCalledWith('/hq/banners?highlight=p9')
   })
 
   it('星を押すとお気に入りを切り替える', async () => {
@@ -147,6 +150,35 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     act(() => { star.click() })
     await flush()
     expect(updateProject).toHaveBeenCalledWith('p1', { isFavorite: false })
+  })
+
+  it('お気に入り・生成中・アーカイブは上の絞り込みの札。左のフォルダの列は「すべて」だけで、フォルダを追加は置かない（B-136）', async () => {
+    act(() => { root.render(<HqBannersListV8 />) })
+    await flush()
+    const nav = host.querySelector('nav[aria-label="フォルダ"]') as HTMLElement
+    expect([...nav.querySelectorAll('button[title]')].map((b) => b.getAttribute('title'))).toEqual(['すべて'])
+    expect(host.textContent).not.toContain('フォルダを追加')
+    const chips = host.querySelector('[role="group"][aria-label="見るもので絞り込む"]') as HTMLElement
+    expect(chips.textContent).toContain('お気に入り 1')
+    expect(chips.textContent).toContain('生成中 1')
+    act(() => { (Array.from(chips.querySelectorAll('button')).find((b) => b.textContent?.startsWith('お気に入り')) as HTMLButtonElement).click() })
+    await flush()
+    expect(host.textContent).toContain('秋のキャンペーン')
+    expect(host.textContent).not.toContain('2周年 春の感謝祭')
+    act(() => { (Array.from(chips.querySelectorAll('button')).find((b) => b.textContent?.startsWith('お気に入り')) as HTMLButtonElement).click() })
+    await flush()
+    expect(host.textContent).toContain('2周年 春の感謝祭')
+  })
+
+  it('ライブラリの配布済み・未使用も上の絞り込みの札で選ぶ', async () => {
+    nav.query = 'tab=library'
+    act(() => { root.render(<HqBannersListV8 />) })
+    await flush()
+    const chips = host.querySelector('[role="group"][aria-label="見るもので絞り込む"]') as HTMLElement
+    expect(chips.textContent).toContain('配布済み 9')
+    act(() => { (Array.from(chips.querySelectorAll('button')).find((b) => b.textContent?.startsWith('配布済み')) as HTMLButtonElement).click() })
+    await flush()
+    expect(listImages).toHaveBeenLastCalledWith(expect.objectContaining({ delivered: true }))
   })
 
   it('ライブラリは12枚ずつ・数は「見る」に出て、次の12件で続きを読む', async () => {

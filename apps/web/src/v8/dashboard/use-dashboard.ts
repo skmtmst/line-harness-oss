@@ -1,7 +1,9 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
+
 import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
 import { ApiError, api, bookingApi, type BookingRequest, type DashboardOverview } from '@/lib/api'
@@ -27,7 +29,7 @@ import {
  * 失敗の扱いをそのまま写した（src/v8 からは @/app を読めないため）。
  * 変えたのは見た目に関わらない2点だけ：
  * - 稼働（health）は板の頭の「動きの状態」に使うので、右の列のカードを
- *   隠していても読む（補足の口は v7 の V8 と同じく本文の段が見えてから）。
+ *   隠していても読む（補足の口も最初から読む）。
  * - 通知パネル（ベル）は共通のトップバーが持つので、ここは「最近の動き」
  *   に出す先頭の数件だけを読む。
  */
@@ -49,39 +51,13 @@ export function dashboardStorageKey(accountId: string | null): string {
 export function jstDay(iso: string | number | Date): string {
   const date = iso instanceof Date ? iso : new Date(iso)
   if (Number.isNaN(date.getTime())) return ''
-  return new Date(date.getTime() + 9 * 3600_000).toISOString().slice(0, 10)
+  return jstDate(date)
 }
 
 function monthKey(offset: number): string {
   const now = new Date(Date.now() + 9 * 3600_000)
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1))
   return d.toISOString().slice(0, 7)
-}
-
-/*
- * 本文の段が見えてから補足の口を叩く（v7 の V8 と同じ速さ対応）。
- * 起動時は概要・配置だけを先に取る。IntersectionObserver が無ければすぐ開ける。
- */
-function useSeenOnce(): { ref: RefObject<HTMLDivElement | null>; ready: boolean } {
-  const ref = useRef<HTMLDivElement | null>(null)
-  const [seen, setSeen] = useState(false)
-  useEffect(() => {
-    if (seen) return
-    const node = ref.current
-    if (!node || typeof IntersectionObserver === 'undefined') {
-      setSeen(true)
-      return
-    }
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        setSeen(true)
-        observer.disconnect()
-      }
-    })
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [seen])
-  return { ref, ready: seen }
 }
 
 export function useDashboard() {
@@ -183,7 +159,9 @@ export function useDashboard() {
   const needsBookings = visibleToday.some((item) => item.id === 'today-bookings')
     || visibleRight.some((item) => item.id === 'upcoming')
   const needsHealth = true
-  const { ref: bodyRef, ready: supplementGate } = useSeenOnce()
+  // V8 は右の列も初めから表示するため、補足も最初に読み始める。
+  const bodyRef = useRef<HTMLDivElement | null>(null)
+  const supplementGate = true
   const needsTwoFactor = visibleRight.some((item) => item.id === 'operational-alerts')
   const needsSupportMarks = visibleRight.some((item) => item.id === 'support-mark-status')
 
@@ -290,6 +268,13 @@ export function useDashboard() {
       preferenceSaveInFlight.current = false
       setPreferenceSaving(false)
     }
+  }
+
+  const comparePreferences = async (): Promise<DashboardPreferences | null> => {
+    const accountId = selectedAccountId
+    if (!accountId) return null
+    const response = await api.dashboard.preferences.get(accountId)
+    return response.success && selectedAccountIdRef.current === accountId ? normalizeDashboardPreferences(response.data.cards, V8_DASHBOARD_DEFAULT_VISIBILITY) : null
   }
 
   const reloadPreferences = async (): Promise<DashboardPreferences | null> => {
@@ -577,6 +562,7 @@ export function useDashboard() {
     applyPreferences,
     resetPreferences,
     reloadPreferences,
+    comparePreferences,
     visibleToday,
     visibleRight,
     handleShipmentSummary,

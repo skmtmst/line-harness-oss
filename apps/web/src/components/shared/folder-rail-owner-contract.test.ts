@@ -4,11 +4,8 @@ import { describe, expect, it } from 'vitest'
 
 const APP = resolve(import.meta.dirname, '../../app')
 const GRID_PAGES = [
-  'auto-replies/page.tsx',
-  'broadcasts/page.tsx',
   'contents/page.tsx',
   'contents/vars/page.tsx',
-  'friend-add-settings/page.tsx',
   'rich-menus/page.tsx',
 ]
 /* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る（幅は CSS の `.split` で付ける）。 */
@@ -24,6 +21,9 @@ const V8_FOLDER_PAGES = [
 const SRC_V8 = resolve(import.meta.dirname, '../../v8')
 const NEW_V8_FOLDER_PAGES = [
   'scenarios/list.tsx',
+  'auto-replies/list.tsx',
+  'broadcasts/list.tsx',
+  'friend-add/list.tsx',
   'forms/list.tsx',
 ]
 
@@ -40,20 +40,20 @@ describe('オーナー指示 #582 のフォルダ欄', () => {
     expect(page).toMatch(/<FolderPanel[\s\S]*?(onAddFolder|addFolderDisabled)/)
   })
 
-  it.each(V8_FOLDER_PAGES)('%s は共通の FolderPanel と追加操作を使う', (relativePath) => {
+  it.each(V8_FOLDER_PAGES)('%s は共通の FolderPanel（ManagedFolderPanel）と追加操作を使う', (relativePath) => {
     const page = readFileSync(resolve(APP, relativePath), 'utf8')
     const css = readFileSync(resolve(APP, relativePath.replace(/\.tsx$/, '.module.css')), 'utf8')
-    expect(page).toMatch(/<FolderPanel[\s\S]*?(onAddFolder|addFolderDisabled)/)
+    expect(page).toMatch(/<FolderPanel[\s\S]*?(onAddFolder|addFolderDisabled)|<ManagedFolderPanel[\s\S]*?canManage=/)
     expect(css).toMatch(/grid-template-columns:\s*200px minmax\(0, 1fr\)/)
     expect(css).toMatch(/@container[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s)
   })
 
-  it.each(NEW_V8_FOLDER_PAGES)('src/v8/%s は共通の FolderPanel と追加操作を型のフォルダの列へ渡す', (relativePath) => {
+  it.each(NEW_V8_FOLDER_PAGES)('src/v8/%s は共通の FolderPanel（ManagedFolderPanel）と追加操作を型のフォルダの列へ渡す', (relativePath) => {
     const page = readFileSync(resolve(SRC_V8, relativePath), 'utf8')
-    expect(page).toMatch(/<FolderPanel[\s\S]*?(onAddFolder|addFolderDisabled)/)
+    expect(page).toMatch(/<FolderPanel[\s\S]*?(onAddFolder|addFolderDisabled)|<ManagedFolderPanel[\s\S]*?canManage=/)
     expect(page).toMatch(/<ListPage[\s\S]*?folders=\{/)
     const templateCss = readFileSync(resolve(import.meta.dirname, '../templates/page-templates.module.css'), 'utf8')
-    expect(templateCss).toMatch(/\.folders \{ width: var\(--tpl-folder-width\)/)
+    expect(templateCss).toMatch(/\.folders \{[^}]*width: var\(--tpl-folder-width\)/)
   })
 
   it('テンプレートも同じ幅と欄内追加操作を使う', () => {
@@ -75,9 +75,8 @@ describe('オーナー指示 #582 のフォルダ欄', () => {
 
   it('V8のイベント一覧はイベント専用のフォルダを取得・作成する', () => {
     const events = readFileSync(resolve(APP, 'events/events-list-v8.tsx'), 'utf8')
-    expect(events).toContain('<FolderPanel')
+    // フォルダの列・追加の窓・「…」は共通の ManagedFolderPanel（kind="event"）が持ち、変えたら読み直す（B-136）。
     expect(events).toContain("api.folders.list('event', selectedAccountId)")
-    expect(events).toContain("api.folders.create({ kind: 'event'")
-    expect(events).toContain('onAddFolder=')
+    expect(events).toMatch(/<ManagedFolderPanel[\s\S]*?kind="event"[\s\S]*?onChanged=\{loadFolders\}[\s\S]*?canManage=/)
   })
 })

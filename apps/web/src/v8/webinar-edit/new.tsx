@@ -5,6 +5,7 @@
  * 下書きとして作り、「動画の設定へ」で編集の ②動画へ進む。
  * 口・確かめ・離れる前の確かめは app/webinars/new/new-v8.tsx と同じ（BEHAVIOR.md）。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight } from 'lucide-react'
@@ -21,6 +22,7 @@ import { describeSaveFailure, webinarApi, type WebinarFolder } from '@/lib/api'
 import { BackLink, WizardSteps } from './chrome'
 import { folderById, folderCreator } from '@/components/shared/folder-select'
 import { BasicForm, BasicPreview, SLUG_PATTERN, type BasicValues } from './basic-form'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 const FOLDERS_BLOCKED = 'フォルダを読み込めていないため、下書きを保存できません。フォルダをもう一度読み込んでください。'
 const TITLE_EMPTY = 'ウェビナー名を入力してください'
@@ -114,9 +116,9 @@ function NewInner() {
         viewingCondition: { kind: 'registered', label: '申込者向け' },
         publicDescription: values.description.trim() || undefined,
       })
-      router.push(next === 'video' ? `/webinars/edit?id=${created.data.id}&pane=video` : '/webinars')
+      router.push(next === 'video' ? `/webinars/edit?id=${created.data.id}&pane=video` : createPageReturnHref('/webinars', created.data.id))
     } catch (cause) {
-      setError(describeSaveFailure(cause))
+      setError(withPermissionFailure(cause, describeSaveFailure(cause), 'store'))
       savingRef.current = false
       setSaving(false)
     }
@@ -133,7 +135,7 @@ function NewInner() {
         title="ウェビナーを作る"
         identity={<BackLink />}
         steps={<WizardSteps current="basic" stateOf={(key) => (key === 'basic' ? 'current' : 'todo')} />}
-        description="管理名と公開ページの基本、開催形式を決めます。保存しても、まだ誰にも公開されません。"
+        help="管理名と公開ページの基本、開催形式を決めます。保存しても、まだ誰にも公開されません。"
         status="下書き（まだ誰にも公開されません）"
         footerActions={<>
           <Button href="/webinars">キャンセル</Button>
@@ -142,7 +144,7 @@ function NewInner() {
             <Button variant="primary" disabled={blocked} title={blockedReason} busy={saving === 'video'} onClick={() => void save('video')}><ArrowRight size={15} aria-hidden="true" />動画の設定へ</Button>
           </>}
         </>}
-        preview={<BasicPreview title={values.title} description={values.description} accountName={accountName} />}
+        preview={<BasicPreview title={values.title} description={values.description} accountName={accountName} />} dirty={false}
       >
         {readOnly ? <Notice tone="info">閲覧のみで見ています。ウェビナーを作るのはオーナーか管理者です。</Notice> : null}
         {error ? <Notice tone="danger">{error}</Notice> : null}

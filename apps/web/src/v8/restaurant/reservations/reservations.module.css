@@ -28,46 +28,12 @@
 }
 
 /* 見方の切り替え（薄い地に白い札） */
-.viewSwitch {
-  display: inline-flex;
-  flex: 0 0 auto;
-  gap: var(--tpl-rs-panel-head-text-gap);
-  padding: var(--tpl-rs-rsv-seg-pad);
-  border-radius: var(--radius-segment);
-  background: var(--color-surface-pearl);
-}
-
-.viewTab {
-  height: auto;
-  min-height: 0;
-  padding: var(--tpl-rs-rsv-seg-item-pad);
-  border: 0;
-  border-radius: var(--radius-mini);
-  background: transparent;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 500;
-  line-height: var(--tpl-rs-lh-12);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.viewTab[aria-selected='true'] {
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-weight: 700;
-}
 
 .dateBar {
   display: flex;
   align-items: center;
   gap: var(--tpl-rs-table-row-gap);
   min-width: 0;
-}
-
-.dateIcon {
-  width: var(--tpl-rs-icon-btn);
-  height: var(--tpl-rs-icon-btn);
 }
 
 .dateTitle {
@@ -113,75 +79,6 @@
   min-width: 0;
 }
 
-.calendar {
-  overflow: hidden;
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-}
-
-.calendar table {
-  width: auto;
-}
-
-.calendar tr.calHead {
-  height: var(--tpl-rs-rsv-cal-head-h);
-  border: 0;
-  background: var(--color-surface-pearl);
-}
-
-.calendar tr.calHead th.calTh {
-  width: var(--tpl-rs-rsv-cal-col-w);
-  height: auto;
-  padding: var(--tpl-rs-rsv-cal-head-pad);
-  border: 0;
-  box-shadow: var(--tpl-rs-line-left-bottom);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-micro);
-  font-weight: 600;
-  line-height: var(--tpl-rs-lh-11);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.calendar tr.calHead th.calTimeHead {
-  width: var(--tpl-rs-rsv-cal-time-w);
-  box-shadow: var(--tpl-rs-line-bottom);
-}
-
-.calendar tr.calRow {
-  height: var(--tpl-rs-rsv-cal-row-h);
-  background: var(--color-canvas);
-}
-
-.calendar tr.calRow th.calTime {
-  position: relative;
-  height: var(--tpl-rs-rsv-cal-row-h);
-  padding: var(--tpl-rs-rsv-cal-time-pad);
-  border: 0;
-  box-shadow: var(--tpl-rs-line-top);
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  font-weight: 400;
-  line-height: var(--tpl-rs-lh-11);
-  text-align: left;
-  vertical-align: top;
-}
-
-.calendar tbody tr:first-child th.calTime {
-  box-shadow: none;
-}
-
-.calendar tr.calRow td.calCell {
-  position: relative;
-  padding: 0;
-  border: 0;
-  box-shadow: var(--tpl-rs-line-left-top);
-  vertical-align: top;
-}
-
 .nowLine {
   position: absolute;
   top: var(--tpl-rs-rsv-now-early);
@@ -212,50 +109,17 @@
 }
 
 /* 予約の箱（行をまたぐ。上下2・左右3 の内側） */
-.block {
-  position: absolute;
-  inset: var(--tpl-rs-rsv-block-inset);
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--tpl-rs-panel-head-text-gap);
-  height: auto;
-  min-height: 0;
-  padding: var(--tpl-rs-rsv-block-pad);
-  overflow: hidden;
-  border: 0;
-  border-radius: var(--radius-segment);
-  text-align: left;
-  cursor: pointer;
-}
 
-.blockLine {
-  background: var(--color-accent-soft);
-  box-shadow: var(--tpl-rs-bar-line);
-}
 
-.blockMedia {
-  background: var(--tpl-rs-occupied-bg);
-  box-shadow: var(--tpl-rs-bar-media);
-}
 
-.blockPhone {
-  background: var(--tpl-rs-rsv-phone-bg);
-  box-shadow: var(--tpl-rs-bar-phone);
-}
 
-.blockPending {
-  background: var(--color-status-warn-soft);
-  outline: var(--tpl-rs-inv-cell-line) solid var(--color-warning);
-  outline-offset: calc(var(--tpl-rs-inv-cell-line) * -1);
-}
 
-.blockHold {
-  background: var(--tpl-rs-rsv-hold-bg);
-  outline: 1px solid var(--tpl-rs-rsv-hold-line);
-  outline-offset: -1px;
-}
+
+
+
+
+
+
 
 .blockName,
 .holdName {
@@ -312,31 +176,9 @@
 .srcPending { color: var(--color-warning); }
 
 /* 空いている枠の「＋ 予約を入れる」。指を乗せたとき・選んだときだけ見せる */
-.slotAdd {
-  position: absolute;
-  top: var(--tpl-rs-rsv-add-top);
-  left: var(--tpl-rs-rsv-add-side);
-  right: var(--tpl-rs-rsv-add-side);
-  height: var(--tpl-rs-rsv-add-h);
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-mini);
-  background: var(--color-canvas);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  color: var(--color-action);
-  font-size: var(--text-nano);
-  font-weight: 600;
-  line-height: var(--tpl-rs-lh-10);
-  opacity: 0;
-  cursor: pointer;
-}
 
-.calCell:hover .slotAdd,
-.slotAdd:focus-visible {
-  opacity: 1;
-}
+
+
 
 /* 右の4枚 */
 .side {
@@ -348,14 +190,7 @@
 }
 
 .sideCard {
-  display: flex;
-  flex-direction: column;
   gap: var(--tpl-rs-table-row-gap);
-  padding: var(--tpl-rs-stat-pad);
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
 }
 
 .sideTitle {
@@ -451,77 +286,11 @@
   display: flex;
   flex: 0 0 var(--tpl-rs-rsv-filter-w);
   flex-direction: column;
-  gap: var(--tpl-rs-stat-gap);
   width: var(--tpl-rs-rsv-filter-w);
 }
 
 .filterField :global(*) {
   max-width: 100%;
-}
-
-.filterLabel {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-micro);
-  font-weight: 600;
-  line-height: var(--tpl-rs-lh-11);
-}
-
-.emptyText {
-  margin: 0;
-  padding: var(--tpl-rs-state-pad);
-  color: var(--color-ink-faint);
-  font-size: var(--text-label);
-  text-align: center;
-}
-
-.listTable {
-  border: 0;
-  border-radius: var(--tpl-rs-radius-none);
-}
-
-.listTable tr.listHead {
-  height: auto;
-  border: 0;
-  background: var(--color-surface-pearl);
-}
-
-.listTable tr.listHead th.lth {
-  height: auto;
-  padding: var(--tpl-rs-th-pad-block) var(--tpl-rs-inv-col-gap) var(--tpl-rs-th-pad-block) 0;
-  border: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-micro);
-  font-weight: 600;
-  line-height: var(--tpl-rs-lh-11);
-}
-
-.listTable tr.listHead th.lth:first-child,
-.listTable tr.listRow td.ltd:first-child {
-  padding-left: var(--tpl-rs-cell-side);
-}
-
-.listTable tr.listHead th.lth.lcGuests,
-.listTable tr.listRow td.ltd:nth-child(4) {
-  padding-right: var(--tpl-rs-rsv-col-pad-num);
-}
-
-.listTable tr.listHead th.lth.lcOps,
-.listTable tr.listRow td.ltd:last-child {
-  padding-right: var(--tpl-rs-cell-side);
-}
-
-.listTable .listRow {
-  height: var(--tpl-rs-row-h);
-}
-
-.listTable tr.listRow td.ltd {
-  padding: 0 var(--tpl-rs-inv-col-gap) 0 0;
-  border-top: 0;
-  box-shadow: var(--tpl-rs-line-top);
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-rs-lh-12);
-  white-space: nowrap;
 }
 
 .lcTime { width: var(--tpl-rs-rsv-lc-time); }
@@ -533,25 +302,6 @@
 .lcNote { width: var(--tpl-rs-rsv-lc-note); }
 .lcStatus { width: var(--tpl-rs-rsv-lc-status); }
 .lcOps { width: var(--tpl-rs-rsv-lc-ops); }
-
-.sourcePill {
-  display: inline-block;
-  max-width: 100%;
-  overflow: hidden;
-  padding: var(--tpl-rs-rsv-pill-pad);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-micro);
-  font-weight: 600;
-  line-height: var(--tpl-rs-lh-11);
-  text-overflow: ellipsis;
-  vertical-align: middle;
-}
-
-.pillLine { background: var(--color-accent-soft); color: var(--color-accent-deep); }
-.pillMedia { background: var(--tpl-rs-occupied-bg); color: var(--tpl-rs-occupied-line); }
-.pillWarn { background: var(--color-status-warn-soft); color: var(--color-warning); }
-.pillInfo { background: var(--color-status-info-soft); color: var(--color-action); }
-.pillPhone { background: var(--color-surface-pearl); color: var(--color-ink-secondary); }
 
 .customerName {
   margin: 0;
@@ -596,25 +346,6 @@
   gap: var(--tpl-rs-row-actions-gap);
 }
 
-.dangerText {
-  color: var(--tpl-rs-occupied-line);
-}
-
-.pager {
-  display: flex;
-  justify-content: center;
-  padding: var(--tpl-rs-stat-pad);
-}
-
-.warnBand {
-  margin: 0;
-  padding: var(--tpl-rs-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-warn-soft);
-  color: var(--color-status-warn-deep);
-  font-size: var(--text-label);
-}
-
 /* その日の臨時休業・貸切（提案 E-10）：琥珀の帯＋右に休業日・貸切への行き先 */
 .closureBand {
   display: flex;
@@ -641,15 +372,9 @@
 }
 
 .karteCard {
-  display: flex;
   flex: 1 1 0;
-  flex-direction: column;
   gap: var(--tpl-rs-stat-gap);
   min-width: 0;
-  padding: var(--tpl-rs-rsv-stat-pad);
-  border-radius: var(--radius-segment);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
 }
 
 .karteName {
@@ -676,7 +401,8 @@
 
 /* 窓 */
 .pair {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--tpl-rs-pair-gap);
 }
 
@@ -693,18 +419,6 @@
 }
 
 /* 電話の予約を入れる（rm92Y） */
-.backLink {
-  height: auto;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-action);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-rs-lh-13);
-  cursor: pointer;
-}
 
 .phoneForm {
   display: flex;
@@ -714,15 +428,11 @@
 }
 
 .phoneCard {
-  display: flex;
-  flex-direction: column;
   gap: var(--tpl-rs-panel-head-gap);
-  padding: var(--tpl-rs-panel-body-pad);
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
+  min-width: 0;
 }
+
+.inlineControls { display: flex; align-self: flex-start; }
 
 .phoneCardHead {
   display: flex;
@@ -751,51 +461,10 @@
   gap: var(--tpl-rs-table-row-gap);
 }
 
-.whoTabs {
-  display: flex;
-  gap: var(--tpl-rs-table-row-gap);
-}
-
-.whoTab {
-  height: auto;
-  min-height: 0;
-  padding: var(--tpl-rs-rsv-who-pad);
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 400;
-  line-height: var(--tpl-rs-lh-12);
-  cursor: pointer;
-}
-
-.whoTab[aria-selected='true'] {
-  background: var(--color-accent-soft);
-  outline-color: transparent;
-  color: var(--color-accent-deep);
-  font-weight: 600;
-}
-
 .foundList {
   display: flex;
   flex-direction: column;
   gap: var(--tpl-rs-stat-gap);
-}
-
-.foundItem {
-  height: auto;
-  min-height: var(--tpl-rs-icon-btn);
-  padding: var(--tpl-rs-dlg-note-pad);
-  border: 0;
-  border-radius: var(--radius-segment);
-  background: var(--color-surface-pearl);
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  text-align: left;
-  cursor: pointer;
 }
 
 .personRow {
@@ -812,28 +481,6 @@
   font-size: var(--text-label);
   font-weight: 700;
   line-height: var(--tpl-rs-lh-13);
-}
-
-.personPill {
-  padding: var(--tpl-rs-chip-pad);
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas);
-  color: var(--color-accent-deep);
-  font-size: var(--text-nano);
-  line-height: var(--tpl-rs-lh-10);
-}
-
-.relink {
-  height: auto;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-action);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-rs-lh-12);
-  cursor: pointer;
 }
 
 .timeBlock {
@@ -854,34 +501,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--tpl-rs-table-row-gap);
-}
-
-.timeChip {
-  height: auto;
-  min-height: 0;
-  padding: var(--tpl-rs-rsv-time-pad);
-  border: 0;
-  border-radius: var(--radius-segment);
-  background: var(--color-canvas);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-rs-lh-12);
-  cursor: pointer;
-}
-
-.timeChip[aria-pressed='true'] {
-  background: var(--color-accent-deep);
-  outline-color: var(--color-accent-deep);
-  color: var(--color-on-accent);
-}
-
-.timeChip:disabled {
-  background: var(--color-surface-pearl);
-  color: var(--color-ink-faint);
-  cursor: not-allowed;
 }
 
 .phoneNote {
@@ -921,14 +540,7 @@
 }
 
 .phoneSideCard {
-  display: flex;
-  flex-direction: column;
   gap: var(--tpl-rs-table-row-gap);
-  padding: var(--tpl-rs-stat-pad);
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
 }
 
 .phoneTables {
@@ -937,35 +549,11 @@
   gap: var(--tpl-rs-row-actions-gap);
 }
 
-.phoneTable {
-  flex: 1 1 var(--tpl-rs-rsv-phone-table-basis);
-  height: var(--tpl-rs-rsv-phone-table-h);
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-segment);
-  background: var(--color-canvas);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  font-weight: 700;
-  line-height: var(--tpl-rs-lh-12);
-  cursor: pointer;
-}
 
-.phoneTableTaken {
-  background: var(--tpl-rs-occupied-bg);
-  outline-color: var(--tpl-rs-occupied-line);
-  cursor: not-allowed;
-}
 
-.phoneTableChosen {
-  background: var(--color-accent-soft);
-  outline: var(--tpl-rs-table-card-line) solid var(--color-accent-deep);
-  outline-offset: calc(var(--tpl-rs-table-card-line) * -1);
-  color: var(--color-accent-deep);
-}
+
+
+
 
 .phoneLegend {
   margin: 0;
@@ -1004,3 +592,5 @@
   font-size: var(--text-micro);
   line-height: var(--tpl-rs-lh-11);
 }
+
+.noteCell { display: block; min-height: calc(var(--tpl-rs-lh-12) + var(--tpl-rs-lh-11) + var(--tpl-rs-panel-head-text-gap)); }

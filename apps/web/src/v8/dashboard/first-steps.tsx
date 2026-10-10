@@ -81,7 +81,7 @@ async function fact(load: () => Promise<boolean>): Promise<boolean | null> {
 /** 今ある口から6つを判定する。 */
 export async function loadFirstStepFacts(accountId: string): Promise<FirstStepFacts> {
   const [connect, greeting, richMenu, broadcast, scenario, invite] = await Promise.all([
-    /* アカウントの接続状態：はじめの設定の段1（稼働中・Webhook が合っている・シークレットあり）。 */
+    /* アカウントの接続状態：はじめの設定の段1（有効・Webhook が合っている・シークレットあり）。 */
     fact(async () => {
       const res = await api.gettingStarted.get(accountId)
       if (!res.success) throw new Error(res.error)
@@ -107,7 +107,7 @@ export async function loadFirstStepFacts(accountId: string): Promise<FirstStepFa
       if (!res.success) throw new Error(res.error)
       return res.data.some((broadcast) => broadcast.status === 'sent')
     }),
-    /* 稼働中のシナリオがあるか。 */
+    /* 有効のシナリオがあるか。 */
     fact(async () => {
       const res = await api.scenarios.listPage({ accountId, active: 1, limit: 1 })
       if (!res.success) throw new Error(res.error)

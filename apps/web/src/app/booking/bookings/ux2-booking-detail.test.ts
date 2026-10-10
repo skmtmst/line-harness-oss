@@ -10,7 +10,7 @@ const PAGE = readFileSync(join(DIR, 'page.tsx'), 'utf8')
  * UX更新 C①・D・E（予約の一覧のV8画面）。
  * 行を押すと右から詳細パネル（URLに残す・↑↓で前・次）。
  * 共通 DetailPanel・useDetailPanelUrl・withViewTransition を使う。
- * 自前の窓・自前の動きは作らない。v7 は引き出しのまま。
+ * 自前の窓・自前の動きは作らない。V8 の詳細パネルを使う。
  */
 describe('UX予約2 C① 行の詳細パネル', () => {
   it('行を押すと右のパネル（URL付き・↑↓移動）', () => {
@@ -22,9 +22,9 @@ describe('UX予約2 C① 行の詳細パネル', () => {
     expect(PAGE).toContain('withViewTransition')
   })
 
-  it('V8だけが対象でv7は引き出しのまま', () => {
+  it('V8の詳細パネルを使い、旧テーマへ分岐しない', () => {
     expect(PAGE).toContain('BookingDetailPanel')
-    expect(PAGE).toContain(`adminTheme === 'v8'`)
+    expect(PAGE).not.toContain('useAdminTheme')
   })
 
   it('確認の窓（承認・拒否・取消）は残す', () => {

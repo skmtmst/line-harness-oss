@@ -9,20 +9,26 @@
  * 数の帯は共通の帯（板の端から端）、案内は青い帯、道具の段の右端に表示件数、
  * 表は板の端から端（行の右端は必ず「…」）、表の下に安全確認の段。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, CircleDot, Flag, GripVertical, History, Info, Loader } from 'lucide-react'
+import { AlertCircle, CircleDot, Flag, GripVertical, History, Info, Loader, Send } from 'lucide-react'
 import { api, ApiError, type ListStats, type SupportMarkArchiveImpact, type SupportMarkListItem } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
 import { ListPageBody } from '@/components/templates'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
+import { RowMenu, RowQuickAction } from '@/components/shared/row-actions'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import InlineEdit from '@/components/shared/inline-edit'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
+import StatusBadge from '@/components/shared/status-badge'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { useListUrlState } from '@/components/shared/list-url-state'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -39,12 +45,16 @@ import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorde
 import { ArchiveMarkDialog, autoRuleLabel, isUsed, usageLabel } from '@/components/friend-fields/mark-list'
 import styles from './list.module.css'
 
+import type { AttributeListHost } from './attribute-host'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 const PAGE_SIZES = [10, 20, 50]
 
-export default function MarksTab({ accountId, canEdit }: { accountId: string | null; canEdit: boolean }) {
+export default function MarksTab({ accountId, canEdit, host }: { accountId: string | null; canEdit: boolean; host?: AttributeListHost<MarkRow> }) {
   const router = useRouter()
   const [items, setItems] = useState<MarkRow[]>([])
   const [status, setStatus] = useState<LoadStatus>('loading')
@@ -54,10 +64,15 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
   const [retryOrder, setRetryOrder] = useState<MarkRow[] | null>(null)
   const [stats, setStats] = useState<ListStats | null>(null)
   const [statsStatus, setStatsStatus] = useState<LoadStatus>('loading')
-  const [query, setQuery] = useState('')
+  const [view, setView] = useListUrlState({ archived: '' })
+  const onlyArchived = !host && view.archived === '1'
+  const [restoreTarget, setRestoreTarget] = useState<MarkRow | null>(null)
+  const [restoring, setRestoring] = useState(false)
+  const [restoreError, setRestoreError] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [usage, setUsage] = useState<'all' | 'used' | 'unused'>('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<MarkRow | null>(null)
   const [archiveImpact, setArchiveImpact] = useState<SupportMarkArchiveImpact | null>(null)
@@ -68,7 +83,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。URL に ?mark=<id> を残す。 */
   const [activeMarkId, setActiveMarkId] = useDetailPanelUrl('mark')
-  const openMarkDetail = (id: string) => withViewTransition(() => setActiveMarkId(id))
+  const openMarkDetail = (id: string) => host ? (canEdit ? host.onEdit(id) : undefined) : withViewTransition(() => setActiveMarkId(id))
 
   /* アカウント切替のあとに届いた古い応答で一覧を上書きしない（ATTR-01）。 */
   const gateRef = useRef(createResponseGate())
@@ -77,6 +92,8 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
 
   useEffect(() => {
     gateRef.current.invalidate()
+    setRestoreTarget(null)
+    setRestoreError('')
     setPendingDelete(null)
     setArchiveImpact(null)
     setDragId(null)
@@ -89,6 +106,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
   }, [accountId])
 
   const load = useCallback(async () => {
+    if (host) { host.reload(); return }
     const account = accountId
     const token = gateRef.current.begin()
     if (!account) {
@@ -100,7 +118,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
     setStatus('loading')
     setError('')
     try {
-      const res = await api.supportMarks.list(account)
+      const res = await api.supportMarks.list(account, { includeArchived: true })
       if (!gateRef.current.current(token) || accountRef.current !== account) return
       if (!res.success) throw new Error(res.error)
       setItems(res.data)
@@ -109,11 +127,13 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
       if (!gateRef.current.current(token) || accountRef.current !== account) return
       setStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
-  }, [accountId])
-  useEffect(() => { void load() }, [load])
+  }, [accountId, host])
+  useEffect(() => { if (!host) void load() }, [load, host])
+  useEffect(() => { if (host) { setItems(host.items); setStatus(host.status); setError(host.error ?? '') } }, [host])
 
   /* 帯の人数は受信箱の集計（/api/list-stats）から。一覧とは別の要求。 */
   useEffect(() => {
+    if (host) return
     if (!accountId) {
       setStatsStatus('error')
       return
@@ -131,14 +151,16 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
       setStatsStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     })
     return () => { cancelled = true }
-  }, [accountId])
+  }, [accountId, host])
 
   const visible = useMemo(() => items.filter((mark) => {
+    if (!host && Boolean(mark.archivedAt) !== onlyArchived) return false
     if (query && !mark.name.toLocaleLowerCase('ja').includes(query.toLocaleLowerCase('ja'))) return false
-    if (usage === 'used' && !isUsed(mark)) return false
-    if (usage === 'unused' && isUsed(mark)) return false
+    if (host && usage !== 'all' && mark.friendCount == null) return false
+    if (usage === 'used' && !(host ? mark.friendCount > 0 : isUsed(mark))) return false
+    if (usage === 'unused' && (host ? mark.friendCount > 0 : isUsed(mark))) return false
     return true
-  }), [items, query, usage])
+  }), [items, query, usage, host, onlyArchived])
 
   const pages = Math.max(1, Math.ceil(visible.length / pageSize))
   const currentPage = Math.min(page, pages)
@@ -149,10 +171,11 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
   useFlipRows(bodyRef, liveOrder.shown.map((mark) => mark.id).join(','))
   const activeMark = items.find((mark) => mark.id === activeMarkId) ?? null
   const activeMarkIndex = pageItems.findIndex((mark) => mark.id === activeMarkId)
-  useEffect(() => setPage(1), [query, usage, pageSize])
+  useEffect(() => setPage(1), [query, usage, pageSize, onlyArchived])
 
   /* 並び替え：/api/support-marks/reorder へ「動かせる行だけの新しい順」を1回で渡す。共有マークは位置を保つ。 */
   const applyOrder = async (next: MarkRow[]) => {
+    if (host) { await host.onOrder(next.map((item) => item.id)); return }
     if (!accountId) return
     const previous = items
     setItems(next)
@@ -177,7 +200,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
   }
 
   const move = async (targetId: string) => {
-    if (!accountId || !dragId || dragId === targetId) return setDragId(null)
+    if ((!accountId && !host) || !dragId || dragId === targetId) return setDragId(null)
     const dragged = items.find((mark) => mark.id === dragId)
     const target = items.find((mark) => mark.id === targetId)
     if (dragged?.isInherited || target?.isInherited) {
@@ -256,11 +279,35 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
     }
   }
 
+  const confirmRestore = async () => {
+    if (!restoreTarget || !accountId || restoring) return
+    const mark = restoreTarget
+    const account = accountId
+    setRestoring(true)
+    setRestoreError('')
+    try {
+      const res = await api.supportMarks.restore(mark.id, account, mark.version ?? 1)
+      if (accountRef.current !== account) return
+      if (!res.success) throw new Error(res.error)
+      setRestoreTarget(null)
+      notifyToast(`「${mark.name}」を保管から戻しました`)
+      await load()
+    } catch (error) {
+      if (accountRef.current === account) setRestoreError(describeApiFailure(error, '保管から戻す操作', { forbidden: 'この操作はオーナーか管理者に頼んでください。' }))
+    } finally { setRestoring(false) }
+  }
+
   /* 行の「…」と右クリックは同じ操作。押せない理由もそのまま渡す。閲覧のみは押せない項目を出さない。 */
   const rowMenuItems = (mark: MarkRow): ActionMenuItem[] => {
+    if (host) return canEdit ? [
+      { id: 'edit', label: '編集', onSelect: () => host.onEdit(mark.id) },
+      { id: 'distribute', label: '配る', onSelect: () => host.onDistribute(mark.id) },
+      { id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, onSelect: () => host.onRemove(mark.id) },
+    ] : []
     if (!canEdit) return [{ id: 'open', label: '詳しく見る', onSelect: () => openMarkDetail(mark.id) }]
+    if (mark.archivedAt) return [{ id: 'restore', label: '保管から戻す', disabled: restoring, onSelect: () => { setRestoreError(''); setRestoreTarget(mark) } }]
     return [
-      { id: 'edit', label: '編集', external: true, onSelect: () => router.push(`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`) },
+      { id: 'edit', label: '編集', external: true, href: `/tags/marks/edit?id=${encodeURIComponent(mark.id)}`, onSelect: () => router.push(`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`) },
       {
         id: 'archive',
         label: '保管する',
@@ -312,33 +359,33 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
     { title: '過去7日の変更', icon: History, value: stats?.marks.changedLast7 ?? null, unit: '回', detail: statsReason ?? '手動・自動' },
   ]
 
-  const filterActive = Boolean(query || usage !== 'all')
+  const filterActive = Boolean(query || usage !== 'all' || onlyArchived)
 
   const table = status === 'forbidden' ? (
     <div className={styles.stateCard}>
       <AlertCircle className={styles.stateIconError} aria-hidden="true" />
       <p className={styles.stateTitle}>対応マークを見る権限がありません</p>
-      <p className={styles.stateDesc}>オーナーか管理者に確認してください。</p>
+      <p className={styles.stateDesc}>{permissionDeniedMessage('store')}</p>
     </div>
   ) : status === 'error' ? (
     <div className={styles.stateCard}>
       <AlertCircle className={styles.stateIconError} aria-hidden="true" />
       <p className={styles.stateTitle}>対応マークを読み込めませんでした</p>
       <p className={styles.stateDesc}>{error || '再読み込みしても直らない場合はエラー報告へ。'}</p>
-      <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+      <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
     </div>
   ) : listReady && items.length === 0 ? (
     <div className={styles.stateCard}>
       <Flag className={styles.stateIcon} aria-hidden="true" />
       <p className={styles.stateTitle}>まだ対応マークはありません</p>
       <p className={styles.stateDesc}>受信箱で、対応の進み具合を見分ける印です。</p>
-      {canEdit ? <Button href="/tags/marks/new" variant="primary">マークを作る</Button> : null}
+      {canEdit ? <Button href={host ? undefined : "/tags/marks/new"} onClick={host?.onCreate} variant="primary">マークを作る</Button> : null}
     </div>
   ) : listReady && visible.length === 0 ? (
     <div className={styles.stateCard}>
       <p className={styles.stateTitle}>条件に合うものはありません</p>
       <p className={styles.stateDesc}>検索や絞り込みを外すと、すべて出ます</p>
-      {filterActive ? <Button type="button" onClick={() => { setQuery(''); setUsage('all') }}>条件を外す</Button> : null}
+      {filterActive ? <Button type="button" onClick={() => { setQuery(''); setUsage('all'); setView({ archived: '' }) }}>条件を外す</Button> : null}
     </div>
   ) : (
     <DelayedSkeleton loading={!listReady} skeleton={<div className={styles.skeleton} aria-busy="true" />}>
@@ -351,13 +398,14 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
             <Th className={styles.markColDefault}>はじめの値</Th>
             <Th className={styles.markColAuto}>自動で変わる</Th>
             <Th className={styles.markColPlace}>出す場所</Th>
+            {host && canEdit ? <Th className={styles.colDistribute}><span className="sr-only">配る</span></Th> : null}
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
         <tbody ref={bodyRef}>
           {liveOrder.shown.map((mark) => {
             const editHref = `/tags/marks/edit?id=${encodeURIComponent(mark.id)}`
-            const fixed = mark.isInherited || !canEdit
+            const fixed = mark.isInherited || !canEdit || Boolean(mark.archivedAt)
             return (
               <Tr
                 interactive
@@ -375,20 +423,20 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
                     event.preventDefault()
                     openMarkDetail(mark.id)
                   }
-                }}
+                }} data-row-id={mark.id}
               >
                 <Td className={styles.markColGrip} onClick={(event) => event.stopPropagation()}>
                   {canEdit ? (
                     <span
                       className={styles.gripBox}
-                      draggable={!mark.isInherited}
+                      draggable={!fixed}
                       title={mark.isInherited ? '共有マークは編集後に並び替えできます' : undefined}
                       onDragStart={() => setDragId(mark.id)}
                       onDragEnd={() => setDragId(null)}
                     >
                       <ReorderHandle
                         label={mark.name}
-                        disabledReason={fixed ? '共有マークは編集後に並び替えできます' : null}
+                        disabledReason={mark.archivedAt ? '保管から戻すと並び替えできます' : fixed ? '共有マークは編集後に並び替えできます' : null}
                         onMove={(direction) => void keyboardMove(mark.id, direction)}
                       >
                         <GripVertical className={styles.gripIcon} aria-hidden="true" />
@@ -398,31 +446,36 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
                 </Td>
                 <Td className={styles.markColName}>
                   <ContextMenu label={`対応マーク「${mark.name}」の操作`} items={markContextItems(mark)}>
-                    <Link
-                      href={editHref}
+                    {!canEdit || mark.archivedAt ? <span className={styles.markPill} style={{ '--mark-color': mark.color } as CSSProperties} title={mark.name}>
+                      <span className={styles.markPillDot} aria-hidden="true" />
+                      <span className={styles.truncate}>{mark.name}</span>
+                    </span> : <Link
+                      href={host ? "#" : editHref}
                       className={styles.markPill}
                       style={{ '--mark-color': mark.color } as CSSProperties}
                       title={mark.name}
-                      onClick={(event) => event.stopPropagation()}
+                      onClick={(event) => { event.stopPropagation(); if (host) { event.preventDefault(); if (canEdit) host.onEdit(mark.id) } }}
                     >
                       <span className={styles.markPillDot} aria-hidden="true" />
                       <span className={styles.truncate}>{mark.name}</span>
-                    </Link>
+                    </Link>}
                   </ContextMenu>
+                  {mark.archivedAt ? <StatusBadge size="annotation" dot={false}>保管</StatusBadge> : null}
                 </Td>
-                <Td className={styles.markColCount}><span className={styles.cellText}>{`${mark.friendCount}人`}</span></Td>
-                <Td className={styles.markColDefault}><span className={styles.cellText}>{mark.isDefault ? '新規の初期値' : '—'}</span></Td>
-                <Td className={styles.markColAuto}><span className={styles.cellText} title={autoRuleLabel(mark)}>{autoRuleLabel(mark)}</span></Td>
-                <Td className={styles.markColPlace}><span className={styles.cellText} title={usageLabel(mark)}>{usageLabel(mark)}</span></Td>
+                <Td className={styles.markColCount}><span className={styles.cellText}>{mark.friendCount == null ? emptyValue('unknown') : `${mark.friendCount}人`}</span></Td>
+                <Td className={styles.markColDefault}><span className={styles.cellText}>{mark.isDefault ? '新規の初期値' : emptyValue('unknown')}</span></Td>
+                <Td className={styles.markColAuto}><span className={styles.cellText} title={host ? (mark.autoOnInbound ? '受信時' : emptyValue('unknown')) : autoRuleLabel(mark)}>{host ? (mark.autoOnInbound ? '受信時' : emptyValue('unknown')) : autoRuleLabel(mark)}</span></Td>
+                <Td className={styles.markColPlace}><span className={styles.cellText} title={host ? undefined : usageLabel(mark)}>{host ? emptyValue('unknown') : usageLabel(mark)}</span></Td>
+                {host && canEdit ? <Td className={styles.colDistribute} onClick={(event) => event.stopPropagation()}><RowQuickAction label="配る" ariaLabel={`${mark.name}を配る`} icon={<Send />} disabled={host.busy} onClick={() => host.onDistribute(mark.id)} /></Td> : null}
                 <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.menuAnchor}>
-                    <RowMenu
-                      className={styles.menuButton}
+                    {(!host || canEdit) ? <RowMenu
+                      size="row"
                       label={`対応マーク「${mark.name}」の操作`}
                       items={rowMenuItems(mark)}
                       open={openMenuId === mark.id}
                       onOpenChange={(next) => setOpenMenuId(next ? mark.id : null)}
-                    />
+                    /> : null}
                   </span>
                 </Td>
               </Tr>
@@ -434,7 +487,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
       {pages > 1 ? (
         <div className={styles.pager}>
           <span className={styles.pagerCount}>
-            {`${visible.length}件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, visible.length)}件`}
+            {`${visible.length} 件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, visible.length)} 件`}
           </span>
           <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="対応マークのページ送り" />
         </div>
@@ -450,7 +503,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
 
   return (
     <>
-      <KpiBand data-design="KPIs" className={styles.kpis}>
+      {host?.kpis ?? <KpiBand data-design="KPIs" className={styles.kpis}>
         {kpis.map((kpi) => (
           <KpiCard
             key={kpi.title}
@@ -462,7 +515,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
             detail={kpi.detail}
           />
         ))}
-      </KpiBand>
+      </KpiBand>}
 
       <div className={styles.infoRow}>
         <p className={styles.readonlyBand}>
@@ -471,6 +524,10 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
         </p>
       </div>
 
+      <ConfirmDialog open={restoreTarget !== null} title={`「${restoreTarget?.name ?? ''}」を保管から戻しますか？`}
+        description="同じ対応マークを通常の一覧へ戻します。初期値や自動変更は再開せず、友だちの付け替えはそのまま残ります。"
+        confirmLabel="保管から戻す" busy={restoring} error={restoreError}
+        onConfirm={() => void confirmRestore()} onCancel={() => { if (!restoring) setRestoreTarget(null) }} />
       <ListPageBody
         toolbar={<>
           <span className={styles.search}>
@@ -493,6 +550,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
               { value: 'unused', label: '使っている：なし' },
             ]}
           />
+          {!host ? <FilterChip selected={onlyArchived} onChange={(next) => { setView({ archived: next ? '1' : '' }); setPage(1) }}>保管</FilterChip> : null}
           <span className={styles.toolbarSpacer} />
           <PageSizeSelect value={pageSize} onChange={(value) => setPageSize(value || 20)} options={PAGE_SIZES} label={null} />
         </>}
@@ -504,7 +562,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
             {retryOrder ? (
               <button type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</button>
             ) : (
-              <button type="button" onClick={() => { setActionError(''); void load() }}>読み直す</button>
+              <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
             )}
           </p>
         ) : null}
@@ -513,9 +571,9 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
 
       {/* 行の詳細パネル。名前はその場で直せる。 */}
       <DetailPanel
-        open={activeMark !== null}
+        open={!host && activeMark !== null}
         title={activeMark?.name ?? ''}
-        description={activeMark ? `${activeMark.friendCount}人・${autoRuleLabel(activeMark)}` : undefined}
+        description={activeMark ? `${activeMark.friendCount} 人・${autoRuleLabel(activeMark)}` : undefined}
         onClose={() => setActiveMarkId(null)}
         hasPrev={activeMarkIndex > 0}
         hasNext={activeMarkIndex >= 0 && activeMarkIndex < pageItems.length - 1}
@@ -552,7 +610,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
               </dd>
             </div>
             <div><dt>付いている人</dt><dd>{`${activeMark.friendCount}人`}</dd></div>
-            <div><dt>はじめの値</dt><dd>{activeMark.isDefault ? '新規の初期値' : '—'}</dd></div>
+            <div><dt>はじめの値</dt><dd>{activeMark.isDefault ? '新規の初期値' : emptyValue('unknown')}</dd></div>
             <div><dt>自動で変わる</dt><dd>{autoRuleLabel(activeMark)}</dd></div>
             <div><dt>出す場所</dt><dd>{usageLabel(activeMark)}</dd></div>
           </dl>
@@ -569,7 +627,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
           error={deleteError}
           onReplacement={setReplacementMarkId}
           onCancel={() => { if (!deleting) { setPendingDelete(null); setArchiveImpact(null) } }}
-          onConfirm={() => void confirmRemove(pendingDelete)}
+          onConfirm={() => confirmRemove(pendingDelete)}
         />
       ) : null}
     </>

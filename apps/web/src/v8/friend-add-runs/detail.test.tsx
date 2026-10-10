@@ -131,6 +131,7 @@ describe('実行の詳細の画面（N43uVX）', () => {
     await render()
     expect(host.querySelector('[data-design-node="N43uVX"]')).toBeTruthy()
     expect(host.textContent).toContain('山田 太郎さんの友だち追加')
+    await act(async () => { (host.querySelector('button[aria-label$="の説明"]') as HTMLButtonElement)?.click() })
     expect(host.textContent).toContain('9月7日（月）10:14 に追加・はじめて')
     expect(host.textContent).toContain('3つ目の処理を完了できませんでした')
     expect(host.textContent).toContain('シナリオを始めるところで止まりました。')

@@ -10,6 +10,9 @@
  * フォルダの列：案件をフォルダへ入れる口は無いので、成果が出たときの動き
  * （タグ・シナリオ・マイル）で分けた見え方の切り替えとして持つ（保存しない）。
  */
+import { useListUrlJsonValue } from '@/components/shared/list-url-state'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Banknote, CircleDot, Coins, Download, FilePen, Plus, Trophy, Briefcase } from 'lucide-react'
 import type { LineAccount, Scenario, Tag } from '@line-crm/shared'
@@ -18,9 +21,8 @@ import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel from '@/components/shared/folder-panel'
+import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
-import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -55,25 +57,26 @@ import {
   ToolbarNotices,
 } from './parts'
 import styles from './affiliates.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type FilterKey = 'open' | 'draft'
 type FolderKey = 'all' | 'tag' | 'scenario' | 'miles' | 'none'
 type LoadState = 'loading' | 'ready' | 'error'
 
-/* 色は行の名前の前の丸と左のフォルダの列で同じものを使う（絵 h7dmB）。動きが未設定は色の無い輪。 */
-const FOLDERS: Array<{ key: FolderKey; label: string; color?: string; match: (o: AffiliateOffer) => boolean }> = [
-  { key: 'all', label: 'すべて', match: () => true },
-  { key: 'tag', label: 'タグを付ける', color: FOLDER_COLORS[0], match: (o) => Boolean(o.tagId) },
-  { key: 'scenario', label: 'シナリオを始める', color: FOLDER_COLORS[1], match: (o) => !o.tagId && Boolean(o.scenarioId) },
-  { key: 'miles', label: 'マイルを渡す', color: FOLDER_COLORS[2], match: (o) => !o.tagId && !o.scenarioId && o.rewardMiles > 0 },
+/*
+ * 成果が出たときの動きで分けた見え方（保存しない）。作ったフォルダではないので、左のフォルダの列ではなく
+ * 上の絞り込み（「成果のときの動き」の選ぶ欄）に置く（B-136 2026-10-09）。
+ */
+const FOLDERS: Array<{ key: FolderKey; label: string; match: (o: AffiliateOffer) => boolean }> = [
+  { key: 'all', label: '動き：すべて', match: () => true },
+  { key: 'tag', label: 'タグを付ける', match: (o) => Boolean(o.tagId) },
+  { key: 'scenario', label: 'シナリオを始める', match: (o) => !o.tagId && Boolean(o.scenarioId) },
+  { key: 'miles', label: 'マイルを渡す', match: (o) => !o.tagId && !o.scenarioId && o.rewardMiles > 0 },
   { key: 'none', label: '動きが未設定', match: (o) => !o.tagId && !o.scenarioId && o.rewardMiles === 0 },
 ]
 
-/** 行の名前の前の丸に渡すフォルダ。動きが未設定は null（色の無い輪）。 */
-function folderDotOf(offer: AffiliateOffer): { name: string; color?: string } | null {
-  const item = FOLDERS.find((f) => f.key !== 'all' && f.match(offer))
-  return item && item.color ? { name: item.label, color: item.color } : null
-}
 
 const SAVED_VIEWS: Array<{ value: string; label: string; filters: FilterKey[]; sort: 'newest' | 'name' | 'reward'; folder?: FolderKey }> = [
   { value: '', label: 'よく使う絞り込み', filters: [], sort: 'newest' },
@@ -99,13 +102,13 @@ export default function OffersTab() {
   const [monthly, setMonthly] = useState<{ count: number; delta: number | null } | null>(null)
   const [monthlyState, setMonthlyState] = useState<LoadState>('loading')
 
-  const [query, setQuery] = useState('')
-  const [filters, setFilters] = useState<FilterKey[]>([])
-  const [folder, setFolder] = useState<FolderKey>('all')
-  const [sort, setSort] = useState<'newest' | 'name' | 'reward'>('newest')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filters, setFilters] = useListUrlJsonValue<FilterKey[]>('filters', [])
+  const [folder, setFolder] = useListUrlValue<FolderKey>('folder', 'all')
+  const [sort, setSort] = useListUrlValue<'newest' | 'name' | 'reward'>('sort', 'newest')
   const [saved, setSaved] = useState('')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
 
   const [formOpen, setFormOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<AffiliateOffer | null>(null)
@@ -327,7 +330,7 @@ export default function OffersTab() {
   }
 
   const exportCsv = () => {
-    downloadCsv(`affiliate-offers-${new Date().toISOString().slice(0, 10)}.csv`, [
+    downloadCsv(csvFileName("アフィリエイト案件"), [
       ['案件名', '説明', '報酬（円）', 'マイル', '対象アカウント', '成果時のタグ', '開始するシナリオ', '状態', '作成日'],
       ...shown.map((offer) => [
         offer.name,
@@ -370,7 +373,7 @@ export default function OffersTab() {
         title="平均報酬"
         icon={<Banknote size={14} aria-hidden="true" />}
         value={null}
-        valueText={approvalState === 'ready' && !approvalsTruncated && averageReward != null ? formatYen(averageReward) : '—'}
+        valueText={approvalState === 'ready' && !approvalsTruncated && averageReward != null ? formatYen(averageReward) : emptyValue('unknown')}
         unit=""
         detail={approvalState === 'ready'
           ? (approvalsTruncated ? '件数が多く、全部は数えられませんでした' : averageReward == null ? '今月はまだ認めた成果がありません' : '1件あたり')
@@ -393,22 +396,26 @@ export default function OffersTab() {
     </CreateButton>
   )
 
+  /* 左の列は共通の ManagedFolderPanel。案件をフォルダへ入れる口（API）がまだ無いので「すべて」だけ。 */
   const folderPanel = (
-    <FolderPanel
-      heading="フォルダ"
-      rows={FOLDERS.map((item) => ({ kind: item.label === 'すべて' ? 'all' as const : item.label === '未分類' ? 'unfiled' as const : 'folder' as const, id: item.key, label: item.label, count: ready ? offers.filter(item.match).length : null, color: item.color }))}
-      activeId={folder}
-      onSelect={(id) => resetPage(() => { setSaved(''); setFolder(id as FolderKey) })}
-      addFolderNote={<p className={styles.stateDesc}>成果が出たときの動きで分けた見え方です</p>}
+    <ManagedFolderPanel
+      kind={null}
+      folders={[]}
+      onChanged={() => undefined}
+      canManage={!readonly}
+      itemLabel="案件"
+      activeId="all"
+      onSelect={() => undefined}
+      allCount={ready ? offers.length : null}
     />
   )
 
   const folderSelect = (
     <div className={styles.narrowFolder}>
       <Select
-        aria-label="フォルダ"
+        aria-label="成果のときの動き"
         value={folder}
-        options={FOLDERS.map((item) => ({ value: item.key, label: `フォルダ：${item.label}` }))}
+        options={FOLDERS.map((item) => ({ value: item.key, label: item.key === 'all' || !ready ? item.label : `${item.label} ${offers.filter(item.match).length}` }))}
         onChange={(value) => resetPage(() => setFolder(value as FolderKey))}
       />
     </div>
@@ -450,7 +457,7 @@ export default function OffersTab() {
       narrow={narrow}
       notices={<ToolbarNotices info="アフィリエイターは「紹介する人」、案件は「何を紹介すると、いくら払うか」の決まりです。1人のアフィリエイターが、いくつもの案件を紹介できます。" />}
       search={{ placeholder: '案件名・説明で探す', value: query, onChange: (value) => resetPage(() => setQuery(value)) }}
-      chips={chips}
+      chips={narrow ? chips : <>{folderSelect}{chips}</>}
       trailing={trailing}
       narrowLead={<>{createButton(false)}{folderSelect}</>}
     />
@@ -473,14 +480,14 @@ export default function OffersTab() {
           {paged.map((offer) => {
             const stat = offerStats.get(offer.id)
             return (
-              <Tr key={offer.id} className={styles.row} data-table-layout="columns">
+              <Tr key={offer.id} className={styles.row} data-table-layout="columns" data-row-id={offer.id}>
                 <Td className={styles.colName}>
                   <span className={narrow ? styles.stack : `${styles.stack} ${styles.dotStack}`}>
-                    <FolderDotName folder={folderDotOf(offer)} dot={!narrow}>
+                    <FolderDotName folder={null} dot={!narrow}>
                       {readonly ? (
-                        <span className={styles.rowNameText} title={offer.name}>{offer.name}</span>
+                        <span className={styles.rowNameText} ><TruncatedText value={String(offer.name ?? '')} /></span>
                       ) : (
-                        <button type="button" className={styles.rowName} title={offer.name} onClick={() => { setEditTarget(offer); setFormOpen(true) }}>{offer.name}</button>
+                        <button type="button" className={styles.rowName} title={offer.name}  onClick={() => { setEditTarget(offer); setFormOpen(true) }}>{offer.name}</button>
                       )}
                     </FolderDotName>
                     <span className={styles.rowPlan} title={offer.description ?? undefined}>{offer.description ?? '説明はありません'}</span>
@@ -496,11 +503,11 @@ export default function OffersTab() {
                   <span className={styles.cellNum} title={actionText(offer)}>{actionText(offer)}</span>
                 </Td>
                 <Td className={`${styles.colOfferPeople} ${styles.num}`}>
-                  <span className={styles.cellNum}>{approvalState === 'ready' ? `${formatNumber(stat?.people.size ?? 0)}人${approvalsTruncated ? '以上' : ''}` : '—'}</span>
+                  <span className={styles.cellNum}>{approvalState === 'ready' ? `${formatNumber(stat?.people.size ?? 0)}人${approvalsTruncated ? '以上' : ''}` : emptyValue('unknown')}</span>
                 </Td>
                 <Td className={`${styles.colOfferConv} ${styles.num}`}>
                   <span className={styles.stackEnd}>
-                    <span className={styles.cellNum}>{approvalState === 'ready' ? (stat ? `${formatNumber(stat.conversions)}件${approvalsTruncated ? '以上' : ''}` : '—') : '—'}</span>
+                    <span className={styles.cellNum}>{approvalState === 'ready' ? (stat ? `${formatNumber(stat.conversions)}件${approvalsTruncated ? '以上' : ''}` : emptyValue('unknown')) : emptyValue('unknown')}</span>
                     {stat ? <span className={styles.rowPlan}>{`確定 ${formatYen(stat.reward)}`}</span> : null}
                   </span>
                 </Td>
@@ -549,24 +556,22 @@ export default function OffersTab() {
   ) : (
     <>
       {table}
-      <p className={styles.footNote}>
-        {readonly ? '行の「…」から 決まり（受付期間・上限・数える期間）を見る。' : '行の「…」から 編集・決まり・公開を止める・複製。'}
-      </p>
     </>
   )
 
   const pager = ready && shown.length > 0 && pageCount > 1 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{`${formatNumber(shown.length)}件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shown.length)}件`}</span>
+      <span className={styles.pagerCount}>{`${formatNumber(shown.length)} 件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shown.length)} 件`}</span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} />
     </ListPagePagination>
   ) : undefined
 
   return (
     <AffiliateFrame
-      actions={<Button onClick={exportCsv} disabled={shown.length === 0}><Download size={15} aria-hidden="true" /> CSV で書き出す</Button>}
+      help={readonly ? '行の「…」から 決まり（受付期間・上限・数える期間）を見る。' : '行の「…」から 編集・決まり・公開を止める・複製。'}
+      actions={<Button onClick={exportCsv} disabled={shown.length === 0}><Download size={15} aria-hidden="true" /> CSVで書き出す</Button>}
       stats={stats}
-      folderNav={{ rows: FOLDERS.map((item) => ({ id: item.key, label: item.label })), activeId: folder, onSelect: (id) => resetPage(() => { setSaved(''); setFolder(id as FolderKey) }), createAction: readonly ? undefined : createButton(false) }}
+      folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
       folders={narrow ? undefined : <>{createButton(true)}{folderPanel}</>}
       toolbar={toolbar}
       pagination={pager}

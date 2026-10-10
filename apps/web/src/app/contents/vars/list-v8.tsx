@@ -83,6 +83,11 @@ import {
 } from './list-model'
 import VarsExportPanel from './export-panel'
 import styles from './list-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -242,7 +247,7 @@ function CommonVarsListV8Inner() {
       if (accountAtRequest === latestAccountRef.current) {
         setListFailure(e)
         setError(e instanceof ApiError && e.status === 403
-          ? 'この一覧を見る権限がありません。管理者に権限を申請してください。'
+          ? permissionDeniedMessage('store')
           : '読み込みに失敗しました。接続を確かめて、もう一度お試しください。')
       }
     } finally {
@@ -903,7 +908,7 @@ function CommonVarsListV8Inner() {
 
   const folderOptions = [
     { value: '', label: listFailed ? 'すべて（—）' : `すべて（${items.length}件）` },
-    { value: UNGROUPED, label: `未分類（${unfiledCount === null ? '—' : `${unfiledCount}件`}）` },
+    { value: UNGROUPED, label: `未分類（${unfiledCount === null ? emptyValue('unknown') : `${unfiledCount}件`}）` },
     ...folders.map((folder) => ({
       value: folder.id,
       label: folder.itemCount === null || folder.itemCount === undefined
@@ -944,10 +949,10 @@ function CommonVarsListV8Inner() {
     <div data-design-node="FM94M XIzkJ" className={styles.board}>
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>共通情報</h1>
-          <p className={styles.headDescription}>
+          <PageHeading title="共通情報" help={<>
             会社名・営業時間・電話番号など、何度も使う文字をここで持ち、テンプレートや配信に差し込みます。ここを変えると、差し込んだ所がまとめて変わります。
-          </p>
+          </>} />
+
         </div>
         <div className={styles.headActions}>
           <VarsExportPanel
@@ -974,9 +979,9 @@ function CommonVarsListV8Inner() {
             <span className={styles.kpiLabel}>共通情報</span>
           </div>
           <p className={styles.kpiValue}>
-            {listFailed ? '—' : formatNumber(stats.total)}<span className={styles.kpiUnit}>件</span>
+            {listFailed ? emptyValue('unknown') : formatNumber(stats.total)}<span className={styles.kpiUnit}>件</span>
           </p>
-          <p className={styles.kpiDetail}>下書き {listFailed ? '—' : stats.draftCount}・止めた {listFailed ? '—' : stats.stoppedCount}</p>
+          <p className={styles.kpiDetail}>下書き {listFailed ? emptyValue('unknown') : stats.draftCount}・止めた {listFailed ? emptyValue('unknown') : stats.stoppedCount}</p>
         </div>
         <div className={styles.kpi}>
           <div className={styles.kpiHead}>
@@ -984,7 +989,7 @@ function CommonVarsListV8Inner() {
             <span className={styles.kpiLabel}>差し込んでいる所</span>
           </div>
           <p className={styles.kpiValue}>
-            {listFailed || stats.usageTotal === null ? '—' : formatNumber(stats.usageTotal)}<span className={styles.kpiUnit}>か所</span>
+            {listFailed || stats.usageTotal === null ? emptyValue('unknown') : formatNumber(stats.usageTotal)}<span className={styles.kpiUnit}>か所</span>
           </p>
           <p className={styles.kpiDetail}>テンプレート・配信など</p>
         </div>
@@ -994,7 +999,7 @@ function CommonVarsListV8Inner() {
             <span className={styles.kpiLabel}>空のまま使われている</span>
           </div>
           <p className={styles.kpiValue}>
-            {listFailed ? '—' : formatNumber(stats.emptyInUse.length)}<span className={styles.kpiUnit}>件</span>
+            {listFailed ? emptyValue('unknown') : formatNumber(stats.emptyInUse.length)}<span className={styles.kpiUnit}>件</span>
           </p>
           <p className={styles.kpiDetail}>空欄のまま送られます</p>
           {stats.emptyInUse.length > 0 && !listFailed ? (
@@ -1009,7 +1014,7 @@ function CommonVarsListV8Inner() {
             <span className={styles.kpiLabel}>期限が近い</span>
           </div>
           <p className={styles.kpiValue}>
-            {listFailed ? '—' : formatNumber(stats.expiringSoon)}<span className={styles.kpiUnit}>件</span>
+            {listFailed ? emptyValue('unknown') : formatNumber(stats.expiringSoon)}<span className={styles.kpiUnit}>件</span>
           </p>
           <p className={styles.kpiDetail}>7日以内に期限切れ</p>
         </div>
@@ -1303,10 +1308,10 @@ function CommonVarsListV8Inner() {
                             <td onClick={(event) => event.stopPropagation()}>
                               <Link
                                 href={`/contents/vars/edit?id=${item.id}`}
-                                title={item.name}
+
                                 className={styles.nameLink}
                               >
-                                {item.name}
+                                <TruncatedText value={String(item.name ?? '')} />
                               </Link>
                               <span className={styles.keyRow}>
                                 <code title={placeholderText(item.varKey)} className={styles.keyCode}>
@@ -1328,7 +1333,7 @@ function CommonVarsListV8Inner() {
                               {item.usageCount === undefined ? (
                                 <span className={styles.usageNone} title="使われている場所（未取得）">—（未取得）</span>
                               ) : item.usageCount === 0 ? (
-                                <span className={styles.usageNone}>なし</span>
+                                <span className={styles.usageNone}>{emptyValue('none')}</span>
                               ) : (
                                 <Link
                                   href={`/contents/vars/edit?id=${item.id}`}
@@ -1451,14 +1456,14 @@ function CommonVarsListV8Inner() {
                   </p>
                   <p className={styles.panelLabel}>状態</p>
                   <p className={styles.panelText}>
-                    {activeStopped ? '止めている' : (activeItem.status ?? 'active') === 'draft' ? '下書き' : '使用中'}
+                    {activeStopped ? '停止中' : (activeItem.status ?? 'active') === 'draft' ? '下書き' : '使用中'}
                   </p>
                   <p className={styles.panelLabel}>使っている所</p>
                   <p className={styles.panelText}>
                     {activeItem.usageCount === undefined
                       ? '—（未取得）'
                       : activeItem.usageCount === 0
-                        ? 'なし'
+                        ? emptyValue('none')
                         : `${formatNumber(activeItem.usageCount)}か所`}
                   </p>
                   {panelStatus && statusTarget?.id === activeItem.id ? (
@@ -1536,16 +1541,7 @@ function CommonVarsListV8Inner() {
         }
       >
         {statusTarget ? (
-          <div>
-            {statusAction === 'stop' && statusTarget.nextSchedule ? (
-              <p className={styles.dialogWarn} role="note">
-                <TriangleAlert size={14} aria-hidden="true" />
-                <span>
-                  決めた日時に変わる予約（{formatStamp(statusTarget.nextSchedule.effectiveFrom)}に「{statusTarget.nextSchedule.value || '（空）'}」へ）があります。止める前に予定も見直してください。
-                </span>
-              </p>
-            ) : null}
-            <label className={styles.dialogField}>
+          <div><Field label={<>
               <span className={styles.dialogLabel}>
                 {statusAction === 'stop' ? '止める理由（記録に残ります）' : '再開する理由（記録に残ります）'}
               </span>
@@ -1555,8 +1551,15 @@ function CommonVarsListV8Inner() {
                 placeholder={statusAction === 'stop' ? '例：キャンペーンが終わったため' : '例：新しい期間の案内を始めるため'}
                 className={styles.dialogInput}
               />
-            </label>
-            {statusAction === 'stop' && statusScheduled.length > 0 ? (
+            </>}>{statusAction === 'stop' && statusTarget.nextSchedule ? (
+              <p className={styles.dialogWarn} role="note">
+                <TriangleAlert size={14} aria-hidden="true" />
+                <span>
+                  決めた日時に変わる予約（{formatStamp(statusTarget.nextSchedule.effectiveFrom)}に「{statusTarget.nextSchedule.value || '（空）'}」へ）があります。止める前に予定も見直してください。
+                </span>
+              </p>
+            ) : null}
+{statusAction === 'stop' && statusScheduled.length > 0 ? (
               <p className={styles.dialogWarn} role="note">
                 <TriangleAlert size={14} aria-hidden="true" />
                 <span>
@@ -1564,8 +1567,7 @@ function CommonVarsListV8Inner() {
                   {statusScheduled.length > 1 ? `ほか${formatNumber(statusScheduled.length - 1)}件` : ''}
                 </span>
               </p>
-            ) : null}
-          </div>
+            ) : null}</Field></div>
         ) : null}
       </Dialog>
 
@@ -1640,15 +1642,25 @@ function CommonVarsListV8Inner() {
                 使用先を確認できませんでした。読み直してから、もう一度お試しください。
               </p>
             ) : deleteImpact ? (
-              <div>
-                <p className={deleteImpact.total > 0 ? styles.dialogError : styles.dialogLead}>
+              <div><Field note={<>
+                  {checkedAtText(deleteImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時・共通アクションの9種類を確認しました。
+                </>} label={<>
+                  <span className={styles.dialogLabel}>
+                    {deleteImpact.canDelete ? '消した理由（記録に残ります）' : '消した理由・止める理由（記録に残ります）'}
+                  </span>
+                  <input
+                    value={deleteReason}
+                    onChange={(e) => setDeleteReason(e.target.value)}
+                    placeholder="例：店舗情報の変更のため"
+                    className={styles.dialogInput}
+                  />
+                </>}><p className={deleteImpact.total > 0 ? styles.dialogError : styles.dialogLead}>
                   {usageText(deleteImpact)}
                 </p>
-                {consequenceText(deleteImpact) ? (
+{consequenceText(deleteImpact) ? (
                   <p className={styles.dialogLead}>{consequenceText(deleteImpact)}</p>
                 ) : null}
-
-                {(() => {
+{(() => {
                   const blocking = splitItems(deleteImpact.items).blocking
                   const visible = usageExpanded ? blocking : blocking.slice(0, 2)
                   return blocking.length > 0 ? (
@@ -1675,8 +1687,7 @@ function CommonVarsListV8Inner() {
                     </div>
                   ) : null
                 })()}
-
-                {!deleteImpact.canDelete ? (
+{!deleteImpact.canDelete ? (
                   <div>
                     <p className={styles.dialogLabel} style={{ marginTop: 12 }}>どうしますか</p>
                     <div
@@ -1696,9 +1707,7 @@ function CommonVarsListV8Inner() {
                       <p className={styles.choiceNote}>
                         {formatNumber(deleteImpact.blockingTotal)}か所の差し込みを、選んだ別のキーへ置き換えます。置き換え後は元の共通情報を履歴が残る形で保管します。
                       </p>
-                      <label className={styles.dialogField} onClick={(e) => e.stopPropagation()}>
-                        <span className={styles.dialogLabel}>差し替え先</span>
-                        <Select
+                      <Field label="差し替え先"><Select
                           size="full"
                           value={replacementId}
                           disabled={deleteBusy || replacementCandidates.length === 0}
@@ -1710,8 +1719,7 @@ function CommonVarsListV8Inner() {
                               label: `${placeholderText(candidate.varKey)} — ${candidate.value || '（空）'}`,
                             }))
                             : [{ value: '', label: replacementPhase === 'loading' ? '候補を読み込んでいます' : '差し替えられる候補がありません' }]}
-                        />
-                      </label>
+                        /></Field>
                       {replacementPhase === 'loading' ? (
                         <p className={styles.dialogHint}>差し替え後の影響を確認しています…</p>
                       ) : replacementPhase === 'error' ? (
@@ -1744,45 +1752,21 @@ function CommonVarsListV8Inner() {
                     </div>
                   </div>
                 ) : null}
-
-                {unavailableText(deleteImpact) ? (
+{unavailableText(deleteImpact) ? (
                   <p className={styles.dialogHint}>{unavailableText(deleteImpact)}</p>
                 ) : null}
-
-                <label className={styles.dialogField}>
-                  <span className={styles.dialogLabel}>
-                    {deleteImpact.canDelete ? '消した理由（記録に残ります）' : '消した理由・止める理由（記録に残ります）'}
-                  </span>
-                  <input
-                    value={deleteReason}
-                    onChange={(e) => setDeleteReason(e.target.value)}
-                    placeholder="例：店舗情報の変更のため"
-                    className={styles.dialogInput}
-                  />
-                </label>
-
-                {deleteImpact.canDelete ? (
-                  <label className={styles.dialogField}>
-                    <span className={styles.dialogLabel}>
-                      削除する場合は、差し込みキーを入力してください
-                    </span>
-                    <input
+{deleteImpact.canDelete ? (
+                  <Field label="削除する場合は、差し込みキーを入力してください"><input
                       value={typedKey}
                       onChange={(e) => setTypedKey(e.target.value)}
                       placeholder={placeholderText(deleteImpact.variable.varKey)}
                       className={styles.dialogInput}
-                    />
-                  </label>
+                    /></Field>
                 ) : null}
-
-                {deleteImpact.canDelete && blockedReason({ impact: deleteImpact, typedKey, reason: deleteReason }) ? (
+{deleteImpact.canDelete && blockedReason({ impact: deleteImpact, typedKey, reason: deleteReason }) ? (
                   <p className={styles.dialogHint}>{blockedReason({ impact: deleteImpact, typedKey, reason: deleteReason })}</p>
                 ) : null}
-
-                <p className={styles.dialogHint}>
-                  {checkedAtText(deleteImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時・共通アクションの9種類を確認しました。
-                </p>
-              </div>
+</Field></div>
             ) : null}
           </div>
         ) : null}
@@ -1810,17 +1794,12 @@ function CommonVarsListV8Inner() {
           setDeleteTargets([])
         }}
       >
-        <label className="block">
-          <span className="text-ink-secondary text-xs font-semibold">
-            消した理由 <span className="text-danger">必須</span>
-          </span>
-          <input
+        <Field label="消した理由" required><input
             value={batchReason}
             onChange={(e) => setBatchReason(e.target.value)}
             placeholder="例：店舗情報の変更のため"
             className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-3 py-2 text-sm"
-          />
-        </label>
+          /></Field>
       </ConfirmDialog>
 
       {editingFolder && (
@@ -1829,7 +1808,7 @@ function CommonVarsListV8Inner() {
           folder={editingFolder}
           accountId={selectedAccountId}
           note="共通情報を分けてしまう箱です。削除しても、入っていた共通情報は未分類として残ります。"
-          placeholder="例: 01_店舗案内"
+          placeholder="例：01_店舗案内"
           onClose={() => setEditingFolder(null)}
           onAdded={() => { setEditingFolder(null); void load() }}
         />

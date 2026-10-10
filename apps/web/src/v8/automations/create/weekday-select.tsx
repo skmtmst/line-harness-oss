@@ -20,10 +20,12 @@ export function WeekdaySelect({
   value,
   time,
   onChange,
+  error,
 }: {
   value: ReadonlyArray<number>
   time: string
   onChange: (days: number[]) => void
+  error?: string
 }) {
   const days = normalizeWeekdays(value)
   const next = nextWeeklyRunText(days, String(time ?? ''))
@@ -36,7 +38,7 @@ export function WeekdaySelect({
       <p id="au-weekdays-label" className="text-xs font-medium text-ink">
         動かす曜日<RequiredBadge />
       </p>
-      <div role="group" aria-labelledby="au-weekdays-label" className="mt-2 flex flex-wrap gap-2">
+      <div id="au-weekday-first" tabIndex={-1} role="group" aria-labelledby="au-weekdays-label" aria-describedby={error ? 'au-weekdays-error' : undefined} aria-invalid={Boolean(error) || undefined} className={`mt-2 flex flex-wrap gap-2${error ? ' rounded-control border border-danger' : ''}`}>
         {WEEKDAY_OPTIONS.map((option) => (
           <FilterChip
             key={option.value}
@@ -48,11 +50,12 @@ export function WeekdaySelect({
           </FilterChip>
         ))}
       </div>
-      <p className="mt-2 text-xs text-ink-secondary" role="status">
+      {error ? <p id="au-weekdays-error" className="mt-2 text-xs text-danger" role="alert">{error}</p> : null}
+      {!error ? <p className="mt-2 text-xs text-ink-secondary" role="status">
         {days.length === 0
           ? '曜日を1つ以上選んでください。'
           : `毎週 ${names} の ${String(time || '時刻未定')}（日本時間）に動きます。${next ? `次は ${next}` : '時刻を選ぶと次の日時が分かります。'}`}
-      </p>
+      </p> : null}
     </div>
   )
 }

@@ -57,7 +57,7 @@ describe('友だち一括操作の入口', () => {
     });
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ code: 'invalid_json' });
+    expect(await response.json()).toMatchObject({ code: 'INVALID_JSON' });
   });
 
   it('巨大な指定は読み口で止める', async () => {

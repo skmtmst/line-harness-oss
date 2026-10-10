@@ -345,3 +345,10 @@ describe('停止refの競合順序: 候補保存→停止→follow (N-244)', () 
     expect(preparedSql.some((sql) => sql.includes('SET ref_code = NULL'))).toBe(false);
   });
 });
+
+vi.mock('../services/line-webhook-events.js',async()=>{
+ const {unitLineEvents}=await import('../test-utils/workflow-unit.js');const ledger=await import('@line-crm/db');
+ const actual=await vi.importActual<typeof import('../services/line-webhook-events.js')>('../services/line-webhook-events.js');
+ return {...actual,processLineWebhookEvents:(input:any)=>unitLineEvents(input,ledger as any)};
+});
+vi.mock('../services/workflow-line-client.js',()=>({workflowLineClient:(client:any)=>client}));

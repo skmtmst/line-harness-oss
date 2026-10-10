@@ -169,3 +169,5 @@
   }
 }
 }
+
+[data-theme='v8'] .action[data-size='small'] { min-height: 0; width: var(--tpl-icon-btn-sm); height: var(--tpl-icon-btn-sm); }

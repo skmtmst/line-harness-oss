@@ -749,7 +749,7 @@ function AutomationsV7Page() {
           />
         </div>
       ) : (
-        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
+        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card-surface">
           <div style={{ paddingBlock: 13 }} className="grid grid-cols-6 gap-3 bg-table-head px-5 text-xs font-semibold text-ink-secondary">
             <span>きっかけ</span><span>だれに（条件）</span><span>すること</span><span>この30日</span><span>状態</span><span aria-hidden />
           </div>
