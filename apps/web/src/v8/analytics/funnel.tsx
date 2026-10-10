@@ -17,6 +17,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { notifyToast } from '@/components/shared/toast'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
 import SegmentedControl from '@/components/shared/segmented'
@@ -203,6 +204,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
       const res = await api.analytics.v6Funnels.setStatus(accountId, statusTarget.funnel.id, { status: statusTarget.to, expectedStatus: statusTarget.funnel.status })
       if (!res.success) { setRunError(explainStartError(res.error, '状態を変えられませんでした')); return }
       setStatusTarget(null)
+      notifyToast(statusTarget.to === 'archived' ? '計測の流れを削除しました。過去の結果は残ります。' : '状態を変更しました')
       await reloadFunnels()
     } catch { setRunError('状態を変えられませんでした') } finally { setStatusBusy(false) }
   }
@@ -370,11 +372,11 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
               {selectedFunnel.status === 'active' ? <>
                 <Button onClick={() => void startEdit()} disabled={editLoading || !selectedFunnel.currentVersion} variant="secondary" busy={editLoading} busyLabel="定義を読み込み中">定義を編集</Button>
                 <Button onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'stopped' })} variant="secondary">停止</Button>
-                <Button onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'archived' })} variant="secondary">保管</Button>
+                <Button onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'archived' })} variant="secondary">削除する</Button>
               </> : null}
               {selectedFunnel.status === 'stopped' ? <>
                 <Button onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'active' })} variant="secondary">再開</Button>
-                <Button onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'archived' })} variant="secondary">保管</Button>
+                <Button onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'archived' })} variant="secondary">削除する</Button>
               </> : null}
             </div> : null}
           </Disclosure>
@@ -397,7 +399,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
               <button type="button" className={styles.linkButton} onClick={() => setSelected(funnel.id)}>結果を見る</button>
               {canManage && funnel.status === 'stopped' ? <>
                 <Button onClick={() => setStatusTarget({ funnel, to: 'active' })} variant="secondary">再開</Button>
-                <Button onClick={() => setStatusTarget({ funnel, to: 'archived' })} variant="secondary">保管</Button>
+                <Button onClick={() => setStatusTarget({ funnel, to: 'archived' })} variant="secondary">削除する</Button>
               </> : null}
               {funnel.status === 'archived' ? <span className={styles.caption}>戻せません</span> : null}
             </div>)}
@@ -406,15 +408,16 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
     </div>
     <ConfirmDialog
       open={statusTarget !== null}
-      title={statusTarget?.to === 'stopped' ? 'ファネルを停止しますか' : statusTarget?.to === 'archived' ? 'ファネルを保管しますか' : 'ファネルを再開しますか'}
+      title={statusTarget?.to === 'stopped' ? 'ファネルを停止しますか' : statusTarget?.to === 'archived' ? `「${statusTarget.funnel.name}」を削除しますか？` : 'ファネルを再開しますか'}
       description={statusTarget?.to === 'stopped' ? `「${statusTarget.funnel.name}」の再集計と対象者づくりを止めます。過去の結果は残り、あとから再開できます。`
-        : statusTarget?.to === 'archived' ? `「${statusTarget.funnel.name}」を保管すると一覧から外れ、あとから戻せません。過去の結果は残ります。`
+        : statusTarget?.to === 'archived' ? `「${statusTarget.funnel.name}」を削除すると、選ぶ一覧から外れ、再集計と対象者づくりはできません。過去の結果は残ります。`
         : statusTarget ? `「${statusTarget.funnel.name}」を再開します。再集計と対象者づくりがまた使えます。` : ''}
-      confirmLabel={statusTarget?.to === 'stopped' ? '停止する' : statusTarget?.to === 'archived' ? '保管する' : '再開する'}
+      confirmLabel={statusTarget?.to === 'stopped' ? '停止する' : statusTarget?.to === 'archived' ? '削除する' : '再開する'}
       destructive={statusTarget?.to === 'archived'}
       busy={statusBusy}
+      error={runError}
       onConfirm={() => applyStatusChange()}
-      onCancel={() => setStatusTarget(null)}
+      onCancel={() => { if (!statusBusy) setStatusTarget(null) }}
     />
   </>
 }

@@ -3483,14 +3483,16 @@ booking.delete('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_K
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const id = c.req.param('id');
-  await c.env.DB
-    .prepare(
-      `UPDATE menus
-          SET deleted_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-        WHERE id = ? AND line_account_id = ?`,
-    )
-    .bind(id, accountId)
-    .run();
+  const menu = await c.env.DB.prepare('SELECT id FROM menus WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL')
+    .bind(id, accountId).first();
+  if (!menu) return c.json({ error: 'not_found' }, 404);
+  // 予約の履歴があるメニューは残す。同時に予約が付いてもUPDATEの条件で止める。
+  const result = await c.env.DB.prepare(`UPDATE menus
+    SET deleted_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+    WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL
+      AND NOT EXISTS (SELECT 1 FROM bookings WHERE menu_id = menus.id)`)
+    .bind(id, accountId).run();
+  if (!result.meta.changes) return c.json({ error: 'menu_has_bookings', code: 'menu_has_bookings' }, 409);
   return c.json({ ok: true });
 });
 

@@ -224,7 +224,7 @@ const FORM_LIST_PAGE_FALLBACK_LIMIT = 20;
 
 /** 一覧の絞り込み。知らない値は「すべて」へ落とす（画面と同じ規則）。 */
 function validFormListFilter(value: string | undefined): FormListFilter {
-  return value === 'published' || value === 'draft' || value === 'stored' || value === 'pending'
+  return value === 'published' || value === 'draft' || value === 'stored' || value === 'pending' || value === 'archived'
     ? value
     : 'all';
 }
@@ -805,7 +805,7 @@ forms.get('/api/forms', requireRole('owner', 'admin', 'staff'), async (c) => {
         folderScope = { folderId: folder.id };
       }
     }
-    const items = await getFormsWithStats(c.env.DB, { lineAccountIds: [accountId], ...folderScope });
+    const items = await getFormsWithStats(c.env.DB, { lineAccountIds: [accountId], status: c.req.query('filter') === 'archived' ? 'archived' : 'active', ...folderScope });
     const redactSecrets = c.get('staff')?.role === 'staff';
     const data = items.map((row) =>
       serializeForm(row, {

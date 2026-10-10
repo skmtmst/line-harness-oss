@@ -127,6 +127,9 @@ export default function AffiliatorsTab() {
 
   /* ===== 操作 ===== */
   const [archiveTarget, setArchiveTarget] = useState<{ id: string; name: string } | null>(null)
+  const [resumeTarget, setResumeTarget] = useState<{ id: string; name: string } | null>(null)
+  const [resuming, setResuming] = useState(false)
+  const [resumeError, setResumeError] = useState('')
   const [drawerId, setDrawerId] = useState<string | null>(null)
   const [drawerEdit, setDrawerEdit] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
@@ -559,7 +562,7 @@ export default function AffiliatorsTab() {
                       { id: 'copy', label: '紹介リンクをコピー', content: <CopyTextButton role="menuitem" label="紹介リンクをコピー" value={row.id} getValue={() => copyFirstLink(row)} aria-label="紹介リンクをコピー" />, onSelect: () => {} },
                       ...(readonly ? [] : [
                         { id: 'edit', label: '編集', onSelect: () => openDrawer(row.id, true) },
-                        ...(row.isActive ? [{ id: 'archive', label: '紹介を止める', tone: 'danger' as const, dividerBefore: true, onSelect: () => setArchiveTarget({ id: row.id, name: row.name }) }] : []),
+                        ...(row.isActive ? [{ id: 'archive', label: '紹介を止める', tone: 'danger' as const, dividerBefore: true, onSelect: () => setArchiveTarget({ id: row.id, name: row.name }) }] : [{ id: 'resume', label: '紹介を再開する', onSelect: () => { setResumeError(''); setResumeTarget({ id: row.id, name: row.name }) } }]),
                       ]),
                     ]}
                   />
@@ -611,6 +614,19 @@ export default function AffiliatorsTab() {
     </ListPagePagination>
   ) : undefined
 
+  async function resumeReferral() {
+    if (!resumeTarget || resuming || readonly) return
+    setResuming(true); setResumeError('')
+    try {
+      const result = await api.affiliates.update(resumeTarget.id, { isActive: true })
+      if (!result.success) throw new Error(result.error)
+      setResumeTarget(null)
+      notifyToast('紹介を再開しました')
+      await loadList()
+    } catch { setResumeError('紹介を再開できませんでした。状態を読み直してお試しください。') }
+    finally { setResuming(false) }
+  }
+
   function nameButton(row: { id: string; name: string }) {
     return (
       <button type="button" className={styles.rowName} title={row.name}  onClick={() => openDrawer(row.id, false)}>
@@ -633,6 +649,7 @@ export default function AffiliatorsTab() {
       toolbar={toolbar}
       pagination={pager}
       overlays={<>
+        <ConfirmDialog open={resumeTarget !== null} title={`「${resumeTarget?.name ?? ''}」の紹介を再開しますか？`} description="紹介リンクからの成果を再び数えます。" confirmLabel="紹介を再開する" busy={resuming} error={resumeError} onConfirm={() => void resumeReferral()} onCancel={() => { if (!resuming) setResumeTarget(null) }} />
         <AffiliateArchiveDialog
           target={archiveTarget}
           onClose={() => setArchiveTarget(null)}

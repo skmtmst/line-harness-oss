@@ -10896,12 +10896,14 @@ export const api = {
       accountId: string;
       status?: 'all' | 'draft' | 'published' | 'archived' | 'old_version' | 'unused';
       query?: string;
+      folderId?: string;
       limit?: number;
       offset?: number;
     }) => {
       const query = new URLSearchParams({ account_id: params.accountId });
       if (params.status && params.status !== 'all') query.set('status', params.status);
       if (params.query) query.set('query', params.query);
+      if (params.folderId) query.set('folder_id', params.folderId);
       if (params.limit !== undefined) query.set('limit', String(params.limit));
       if (params.offset !== undefined) query.set('offset', String(params.offset));
       return fetchApi<ApiResponse<CommonActionSummary[]> & {
@@ -11287,6 +11289,14 @@ export const api = {
    * 以後はこの V6 rules/runs 契約だけを使う。
    */
   friendAddRules: {
+    restore: (accountId: string, id: string, expectedVersion: number) => fetchApi<ApiResponse<{ id: string; status: 'draft'; version: number }>>(
+      `/api/friend-add-rules/${encodeURIComponent(id)}/unarchive?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'POST', body: JSON.stringify({ expectedVersion }) },
+    ),
+    duplicate: (accountId: string, id: string, expectedVersion: number, idempotencyKey: string) => fetchApi<ApiResponse<{ id: string; status: 'draft' }>>(
+      `/api/friend-add-rules/${encodeURIComponent(id)}/duplicate?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify({ expectedVersion }) },
+    ),
     list: (accountId: string, kind: FriendAddRuleKind, params?: {
       status?: FriendAddRuleStatus
       cursor?: string
@@ -11295,6 +11305,8 @@ export const api = {
       q?: string
       /** フォルダ名での絞り込み。未分類は '__uncategorized'。 */
       folder?: string
+      /** 複製直後の行を先頭へ。ページ送りにも同じ値を渡す。 */
+      highlightId?: string
     }) => {
       const query = new URLSearchParams({ account_id: accountId, kind })
       if (params?.status) query.set('status', params.status)
@@ -11302,6 +11314,7 @@ export const api = {
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       if (params?.q) query.set('q', params.q)
       if (params?.folder) query.set('folder', params.folder)
+      if (params?.highlightId) query.set('highlight', params.highlightId)
       return fetchApi<ApiResponse<FriendAddRuleListData>>(`/api/friend-add-rules?${query}`)
     },
     get: (accountId: string, ruleId: string) =>
@@ -15497,6 +15510,7 @@ export interface EventQuestion {
 }
 
 export interface EventDetail {
+  folderId?: string | null;
   venue_address?: string | null;
   id: string;
   name: string;
@@ -15818,6 +15832,10 @@ export interface EventLifecycleResult {
 }
 
 export const eventsApi = {
+  duplicate: (accountId: string, id: string, expectedVersion: number) => fetchApi<{ id: string; lifecycle_status: 'draft' }>(
+    withAccount(`/api/events/admin/events/${encodeURIComponent(id)}/duplicate`, accountId),
+    { method: 'POST', body: JSON.stringify({ expectedVersion }) },
+  ),
   applicationPreview: (accountId: string, body: Partial<EventDetail> & { slot: { starts_at: string; ends_at: string; capacity: number } }) =>
     fetchApi<import('@line-crm/shared').EventApplicationPreview>(withAccount('/api/events/admin/application-preview', accountId), { method: 'POST', body: JSON.stringify(body) }),
   listEvents: (
