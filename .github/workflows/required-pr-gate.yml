@@ -642,6 +642,12 @@ jobs:
       - name: No layout breaks at 1152, 1440 and 1920 (v7 and v8)
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout.json
+      - name: No large blank gaps on V8 at 1152 and 1440
+        if: steps.scope.outputs.run == 'true'
+        run: |
+          node --test apps/web/scripts/v8-guard/blank-gap.test.mjs
+          node apps/web/scripts/v8-guard/blank-gap.mjs --self-test
+          node apps/web/scripts/v8-guard/blank-gap.mjs http://127.0.0.1:4310 /tmp/v8-guard/blank-gap.json
       - name: All admin page titles are 22px / 700 / 32px at 1440
         if: steps.scope.outputs.run == 'true'
         run: node scripts/visual-qa/title-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/title-audit.tsv
@@ -676,7 +682,7 @@ jobs:
           node apps/web/scripts/v8-guard/shots.mjs http://127.0.0.1:4310 /tmp/v8-guard/head v7
           node apps/web/scripts/v8-guard/v7-pixel-diff.mjs /tmp/v8-guard/base /tmp/v8-guard/head /tmp/v8-guard/v7-diff
       - name: Upload V8 screen guard results
-        if: failure()
+        if: always() && steps.scope.outputs.run == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: v8-screen-guard
