@@ -892,6 +892,16 @@
  * CSS Modules の pure 検査に当たるので、型の module ではなくこの層（①）に置く。
  */
 [data-theme="v8"] {
+  /* 予約の頭・数の帯（O2Z8u・GcyTr）。広い板では右の内訳列を空ける。 */
+  --tpl-booking-aside-width: 300px;
+  --tpl-booking-kpi-label-lh: 18px;
+  --tpl-booking-kpi-height: 116px;
+  --tpl-booking-heading-gap: 12px;
+  --tpl-booking-button-pad: 16px;
+  --tpl-booking-seg-item-width: 65px;
+  --tpl-booking-seg-last-width: 56px;
+  --tpl-booking-head-pad-top: 24px;
+  --tpl-booking-narrow-head-pad: 16px;
   --tpl-head-pad-top: var(--polish-space-section); --tpl-head-pad-side: var(--polish-space-section); --tpl-head-pad-bottom: var(--polish-space-field);
   /* 成果とアフィリエイトの V8（nJlxX・KdFRI・v9JWQ・h7dmB・OylSV・aINnz・Eo56k・tnTn9）。表は絵の列の並び（見出し 13/20・欄の間16）。 */
   --tpl-af-col-gap: 16px; --tpl-af-head-h: var(--polish-table-head); --tpl-af-head-pad: 13px 20px; --tpl-af-row-h: var(--polish-table-row); --tpl-af-row-pad: 9px 20px;

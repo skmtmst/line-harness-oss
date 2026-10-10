@@ -147,3 +147,9 @@
 
 /* B-152⑨：切り替える各ボタンの角丸。 */
 html[data-theme='v8'] .root .item, html[data-theme='v8'] .root .thumb, html[data-theme='v8'] .root[data-size] .thumb { border-radius: var(--polish-radius-control); }
+
+/* 予約の表示切替。数は別の文字として添え、4つの項目を絵の幅へそろえる。 */
+[data-theme='v8'] .root[data-size='booking'] { padding: 0; gap: 0; }
+[data-theme='v8'] .root[data-size='booking'] .item { display: flex; align-items: center; justify-content: center; gap: var(--tpl-chip-gap); width: var(--tpl-booking-seg-item-width); height: var(--tpl-chip-h); padding: 0; white-space: nowrap; }
+[data-theme='v8'] .root[data-size='booking'] .item:last-child { width: var(--tpl-booking-seg-last-width); }
+[data-theme='v8'] .root[data-size='booking'] .count { font-size: var(--text-caption); }

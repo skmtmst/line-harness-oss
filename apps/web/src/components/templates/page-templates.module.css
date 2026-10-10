@@ -304,3 +304,15 @@
   :global([data-theme='v8']) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settings > .settingsNav { display: none; }
   :global([data-theme='v8']) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settingsContent { width: 100%; padding-left: var(--tpl-head-pad-side); align-self: stretch; }
 }
+
+/* O2Z8u・GcyTr：予約の主操作は題の行、数の帯はすぐ下。 */
+:global([data-theme='v8']) .bookingHeading,
+:global([data-theme='v8']) .bookingStats { min-width: 0; width: calc(100% - var(--tpl-booking-aside-width)); }
+:global([data-theme='v8']) .bookingHeading .actions { gap: var(--tpl-booking-heading-gap); }
+:global([data-theme='v8']) .bookingHeading .heading { padding-top: var(--tpl-booking-head-pad-top); }
+:global([data-theme='v8']) .bookingContent { min-width: 0; padding: var(--tpl-section-gap) var(--tpl-head-pad-side) var(--tpl-page-pad-block); }
+@container v8-page (width < 1100px) {
+  :global([data-theme='v8']) .bookingHeading,
+  :global([data-theme='v8']) .bookingStats { width: 100%; }
+  :global([data-theme='v8']) .bookingHeading .heading { padding-block: var(--tpl-booking-narrow-head-pad); }
+}
