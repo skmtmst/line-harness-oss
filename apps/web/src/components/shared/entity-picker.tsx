@@ -145,7 +145,7 @@ export function EntityPickerDialog({
   const previewNode = typeof preview === 'function' ? preview(picked) : preview
   const pickedText = picked ? `選んだもの：${picked.name}${picked.categoryLabel ? `（${picked.categoryLabel}）` : ''}` : '選んだもの：まだ選んでいません'
 
-  return <SelectionDialog title={title} description={description} busy={busy} error={error} designNode={designNode} onCancel={onCancel} initialFocusRef={searchRef}
+  return <SelectionDialog title={title} description={description} size="picker-narrow" busy={busy} error={error} designNode={designNode} onCancel={onCancel} initialFocusRef={searchRef}
     search={<SearchField ref={searchRef} aria-label={`${title}：${searchPlaceholder}`} placeholder={searchPlaceholder} value={query} onChange={setQuery} onClear={() => setQuery('')} />}
     footer={<>
       <CreateLink href={createHref} label={createLabel} />

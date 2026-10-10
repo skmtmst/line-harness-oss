@@ -441,3 +441,6 @@
 [data-theme='v8'] .table[data-table-presentation='connection-check'] td:last-child { width: var(--tpl-htn-result-badge-w); text-align: right; }
 
 [data-theme='v8'] .table.table[data-table-presentation='account-list'] :is(th, td):nth-child(4) { padding-right: var(--tpl-sa-acc-friends-pad); }
+.row[data-highlighted] {
+  background: var(--color-accent-soft);
+}

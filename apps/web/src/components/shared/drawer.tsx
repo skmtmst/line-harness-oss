@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
 import styles from './drawer.module.css'
+import { drawerWidth } from './destination-policy'
 
 export type DrawerDetail = { label: string; value: ReactNode }
 
@@ -61,6 +62,7 @@ export default function Drawer({
   toolbar,
   band,
 }: DrawerProps) {
+  const resolvedWidth = width === 'composer' ? 1160 : width === 'editor' ? 540 : drawerWidth(designWidth)
   const depth = useContext(OverlayDepthContext)
   const titleId = useId()
   const descriptionId = useId()
@@ -92,8 +94,8 @@ export default function Drawer({
       data-dirty={dirty || undefined}
       data-width={width}
       data-layout={layout}
-      data-design-width={designWidth ? '' : undefined}
-      style={designWidth ? { '--drawer-design-width': `${designWidth}px` } as CSSProperties : undefined}
+      data-design-width=""
+      style={{ '--drawer-design-width': `${resolvedWidth}px`, width: 'min(var(--drawer-design-width), 100%)' } as CSSProperties}
       tabIndex={-1}
       data-closing={leaving || undefined}
       data-design-part="drawer"

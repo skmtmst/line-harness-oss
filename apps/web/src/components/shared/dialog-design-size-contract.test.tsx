@@ -18,9 +18,9 @@ const render = (props: Partial<React.ComponentProps<typeof Dialog>>) => renderTo
 
 describe('V8 の窓：絵の幅を画面が渡せる', () => {
   it('designWidth を渡すと、面にその幅が乗る', () => {
-    const html = render({ designWidth: 600 })
+    const html = render({ designWidth: 720 })
     expect(html).toContain('data-design-width=""')
-    expect(html).toContain('--dialog-design-width:600px')
+    expect(html).toContain('--dialog-design-width:720px')
     expect(css).toMatch(/\[data-theme='v8'\] \.panel\[data-design-width\] \{\s*width: min\(var\(--dialog-design-width\), 100%\);/)
     // 層（@layer components）の外で、「幅 560」「大きい窓 800」の規則より後ろに置く（前に置くと負けて効かない）。
     expect(css.indexOf("[data-theme='v8'] .panel[data-design-width]")).toBeGreaterThan(css.indexOf("[data-theme='v8'] .panel[data-size='large']"))

@@ -350,7 +350,7 @@
   box-shadow: var(--v8-parts-dialog-shadow);
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
 }
-[data-theme='v8'] .panel[data-size='large'] { width: min(800px, 100%); }
+[data-theme='v8'] .panel[data-size='large'] { width: min(960px, 100%); }
 /* 絵の窓の幅・上からの位置を画面が渡したとき（designWidth・designTop）。狭い画面では画面の幅まで。
    層（@layer components）の中に置くと、この層の外の「幅 560」に負けて効かない。必ずこの後ろに置く。 */
 [data-theme='v8'] .panel[data-design-width] { width: min(var(--dialog-design-width), 100%); }

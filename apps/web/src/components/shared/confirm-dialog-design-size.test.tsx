@@ -19,14 +19,14 @@ const render = (props: Partial<React.ComponentProps<typeof ConfirmDialog>>) => r
 
 describe('確かめの窓：絵の幅と位置を渡せる', () => {
   it('designWidth・designTop を渡すと、共通の窓へそのまま届く', () => {
-    const html = render({ designWidth: 500, designTop: 380 })
-    expect(html).toContain('--dialog-design-width:500px')
+    const html = render({ designWidth: 720, designTop: 380 })
+    expect(html).toContain('--dialog-design-width:720px')
     expect(html).toContain('--dialog-design-top:380px')
   })
 
-  it('渡さなければ今までどおり', () => {
+  it('渡さなければ確かめの幅480', () => {
     const html = render({})
-    expect(html).not.toContain('--dialog-design-width')
+    expect(html).toContain('--dialog-design-width:480px')
     expect(html).not.toContain('--dialog-design-top')
   })
 })

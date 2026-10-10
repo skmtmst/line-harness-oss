@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, ArrowUpRight } from 'lucide-react'
 import styles from './text-link.module.css'
 
 /**
@@ -13,15 +13,17 @@ export default function TextLink({
   href,
   children,
   className,
+  external = false,
 }: {
   href: string
   children: React.ReactNode
   className?: string
+  external?: boolean
 }) {
   return (
-    <Link href={href} className={[styles.root, className].filter(Boolean).join(' ')}>
+    <Link href={href} target={external ? '_blank' : undefined} rel={external ? 'noreferrer' : undefined} className={[styles.root, className].filter(Boolean).join(' ')}>
       <span className={styles.label}>{children}</span>
-      <ArrowRight size={12} aria-hidden="true" className={styles.arrow} />
+      {external ? <ArrowUpRight size={12} aria-hidden="true" className={styles.arrow} /> : <ArrowRight size={12} aria-hidden="true" className={styles.arrow} />}
     </Link>
   )
 }

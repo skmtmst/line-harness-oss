@@ -8,6 +8,7 @@ import IconButton from './icon-button'
 import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
 import styles from './dialog.module.css'
 import { useStepMotion } from './use-step-motion'
+import { dialogWidth } from './destination-policy'
 
 export type DialogProps = {
   open: boolean
@@ -220,7 +221,7 @@ export default function Dialog({
       data-design-content-padding={designContentPadding ? '' : undefined}
       style={designWidth || designHeaderPadding || designHeaderHeight || designContentPadding || designFooterPadding || designFooterGap !== undefined ? ({
         ...(designFooterGap !== undefined ? { '--dialog-footer-gap': `${designFooterGap}px` } : {}),
-        ...(designWidth ? { '--dialog-design-width': `${designWidth}px` } : {}),
+        ...(designWidth ? { '--dialog-design-width': `${dialogWidth(designWidth)}px` } : {}),
         ...(designHeaderPadding ? { '--dialog-design-header-padding': designHeaderPadding } : {}),
         ...(designHeaderHeight ? { '--dialog-design-header-height': `${designHeaderHeight}px` } : {}),
         ...(designContentPadding ? { '--dialog-design-content-padding': designContentPadding } : {}),

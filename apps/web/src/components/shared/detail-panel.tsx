@@ -166,7 +166,7 @@ export function useDetailPanelUrl(key: string): [string | null, (id: string | nu
       const url = new URL(window.location.href)
       if (id === null) url.searchParams.delete(key)
       else url.searchParams.set(key, id)
-      window.history.replaceState(null, '', url)
+      window.history.replaceState(window.history.state, '', url)
       setCurrent(id)
     },
     [key],

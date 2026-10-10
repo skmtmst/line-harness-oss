@@ -6,6 +6,7 @@ import HelpTip from './help-tip'
 import { FailureTitle, RetryLabel } from './retry-label'
 import styles from './table.module.css'
 import presentationStyles from './table-presentation.module.css'
+import { isRowControl } from './destination-policy'
 
 type TableHeadRowProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
   children: ReactNode
@@ -166,6 +167,9 @@ export type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'cl
   selected?: boolean
   /** ★V7：指を乗せた行に薄い地を敷く。押せる行・選べる行だけに付ける。 */
   interactive?: boolean
+  /** 行の余白からも開く。名前は通常の Link のままにする。 */
+  href?: string
+  onOpen?: () => void
   /** ★V7：行の高さ。`comfortable` は64px。未指定は58pxのまま。 */
   density?: 'standard' | 'comfortable' | 'template'
   /**
@@ -174,15 +178,22 @@ export type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'cl
    * 渡さなければ何も変わらない。
    */
   leaving?: boolean
+  highlighted?: boolean
 }
 
 /** 標準一覧の高さ58pxの行。 */
-export function Tr({ children, className, selected, interactive, density, leaving, ...rowProps }: TrProps) {
+export function Tr({ children, className, selected, interactive, href, onOpen, density, leaving, highlighted, onClick, onKeyDown, ...rowProps }: TrProps) {
+  const canOpen = Boolean(href || onOpen || onClick)
+  const openLink = (newTab: boolean) => {
+    if (!href) return
+    if (newTab) window.open(href, '_blank', 'noreferrer')
+    else window.location.assign(href)
+  }
   const classes = [
     shell.row,
     density === 'comfortable' && shell.rowComfortable,
     density === 'template' && shell.rowTemplate,
-    interactive && shell.rowInteractive,
+    interactive !== false && canOpen && shell.rowInteractive,
     selected && shell.rowSelected,
     className,
   ]
@@ -193,7 +204,24 @@ export function Tr({ children, className, selected, interactive, density, leavin
       className={classes}
       aria-selected={selected === undefined ? undefined : selected}
       data-leaving={leaving || undefined}
+      data-highlighted={highlighted || undefined}
       {...rowProps}
+      tabIndex={rowProps.tabIndex ?? (canOpen ? 0 : undefined)}
+      onClick={canOpen ? (event) => {
+        if (event.defaultPrevented || isRowControl(event.target, event.currentTarget) || window.getSelection()?.toString()) return
+        if (href && (event.metaKey || event.ctrlKey || event.shiftKey)) { openLink(true); return }
+        if (onOpen) onOpen()
+        else if (onClick) onClick(event)
+        else openLink(false)
+      } : undefined}
+      onKeyDown={(event) => {
+        onKeyDown?.(event)
+        if (event.defaultPrevented || event.target !== event.currentTarget || !canOpen || event.key !== 'Enter') return
+        event.preventDefault()
+        if (onOpen) onOpen()
+        else if (href) openLink(event.metaKey || event.ctrlKey)
+        else event.currentTarget.click()
+      }}
     >
       {children}
     </tr>

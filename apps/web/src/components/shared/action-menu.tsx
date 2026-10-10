@@ -19,10 +19,10 @@ export type ActionMenuItem = {
   description?: string
   tone?: 'default' | 'danger'
   /**
-   * 別画面へ行く項目（★V7）。右端に ↗ を出す。
-   * 同じ画面の中の操作（モーダル・タブ切替）には付けない。
+   * 新しいタブで開くリンクだけに ↗ を出す（B-177）。href と組にする。
    */
   external?: boolean
+  href?: string
   disabled?: boolean
   /**
    * #985 LAY-18: 押せない理由（使用中・公開中など）。無効な項目の下に
@@ -40,7 +40,7 @@ export type ActionMenuItem = {
    * 印にする。1画面に1つだけ。
    */
   qaOpen?: string
-  onSelect: () => void
+  onSelect?: () => void
 }
 
 export type ActionMenuProps = {
@@ -122,7 +122,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
     let frame = 0
     let tries = 0
     const focusFirst = () => {
-      const first = menuRef.current?.querySelector<HTMLButtonElement>('button:not([disabled])')
+      const first = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled]):not([aria-disabled="true"])')
       const host = menuRef.current?.closest<HTMLElement>('[data-menu-portal]')
       const hidden = !first || (host && host.style.visibility === 'hidden')
       if (!hidden && first) {
@@ -151,7 +151,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
       return
     }
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
-    const buttons = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('button:not([disabled])') ?? [])
+    const buttons = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled]):not([aria-disabled="true"])') ?? [])
     if (buttons.length === 0) return
     event.preventDefault()
     const current = buttons.indexOf(document.activeElement as HTMLButtonElement)
@@ -178,7 +178,9 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
       data-design-part="action-menu"
       data-design-node="xifuV"
     >
-      {items.map((item) => (
+      {items.map((item) => {
+        const Item = item.href && !item.disabled ? 'a' : 'button'
+        return (
         <div key={item.id}>
           {item.dividerBefore ? <hr className={styles.divider} /> : null}
           {item.sectionBefore ? (
@@ -186,7 +188,10 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
               {item.sectionBefore}
             </p>
           ) : null}
-          <button
+          <Item
+            href={Item === 'a' ? item.href : undefined}
+            target={Item === 'a' && item.external ? '_blank' : undefined}
+            rel={Item === 'a' && item.external ? 'noreferrer' : undefined}
             type="button"
             role="menuitem"
             className={`${styles.item} ${item.description || (item.disabled && item.disabledReason) ? styles.itemTall : ''} ${item.tone === 'danger' ? styles.danger : ''}`}
@@ -198,7 +203,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
               // 先に開いたボタンへ戻しておく。項目が窓を開くと、窓はこのボタンを
               // 「開く前の場所」として覚え、閉じた後にここへ戻す（消えた項目へは戻れない）。
               if (!inline) getFocusTarget()?.focus({ preventScroll: true })
-              item.onSelect()
+              item.onSelect?.()
               onClose()
             }}
           >
@@ -212,12 +217,12 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
                 <span className={styles.reason}>{item.disabledReason}</span>
               ) : null}
             </span>
-            {item.external ? (
+            {Item === 'a' && item.external ? (
               <ArrowUpRight size={14} aria-hidden="true" className={styles.externalIcon} />
             ) : null}
-          </button>
+          </Item>
         </div>
-      ))}
+      )})}
       {note ? <p className={styles.note}>{note}</p> : null}
     </div>
   )

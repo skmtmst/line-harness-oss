@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { LinkProps } from 'next/link'
-import { Check, LoaderCircle } from 'lucide-react'
+import { ArrowUpRight, Check, LoaderCircle } from 'lucide-react'
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type {
   AnchorHTMLAttributes,
@@ -60,6 +60,7 @@ type NativeButtonProps = CommonProps &
 type LinkButtonProps = CommonProps &
   Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'aria-disabled' | 'children' | 'className' | 'disabled' | 'href'> & {
     href: LinkProps['href']
+    external?: boolean
     disabled?: never
     'aria-disabled'?: never
   }
@@ -82,10 +83,12 @@ export default function Button(props: ButtonProps) {
   const classes = [styles.button, styles[variant], styles[size], props.textTone === 'ink' ? styles.textInk : null, props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, className: _className, href, size: _size, variant: _variant, align, textTone: _textTone, presentation, ...linkProps } = props
+    const { children, className: _className, href, size: _size, variant: _variant, align, textTone: _textTone, presentation, external, ...linkProps } = props
+    const newTab = external || linkProps.target === '_blank'
     return (
-      <Link href={href} className={classes} data-align={align} data-presentation={presentation} {...linkProps}>
+      <Link href={href} className={classes} data-align={align} data-presentation={presentation} {...linkProps} target={newTab ? '_blank' : linkProps.target} rel={newTab ? 'noreferrer' : linkProps.rel}>
         {children}
+        {newTab ? <ArrowUpRight size={14} aria-hidden="true" /> : null}
       </Link>
     )
   }

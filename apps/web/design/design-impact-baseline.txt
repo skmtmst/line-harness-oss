@@ -748,3 +748,7 @@ shared-button-importer v8/settings/ec-commerce/subscriptions.tsx
 shared-button-importer components/shared/message-composer.tsx
 shared-button-importer components/shared/message-composer-media.tsx
 shared-button-importer v8/template-edit/frame.tsx
+# B-177：項目内の設定と、作る・編集に共通の箱。実利用先も照合。
+shared-button-importer components/shared/editor-surface.tsx
+shared-button-importer components/shared/inline-settings.tsx
+shared-button-importer v8/hq-templates/distribution-result-dialog.tsx

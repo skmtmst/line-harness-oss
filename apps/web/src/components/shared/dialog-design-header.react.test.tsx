@@ -29,7 +29,7 @@ describe('窓の頭の余白・高さを絵から渡す', () => {
     expect(panel.hasAttribute('data-design-header-padding')).toBe(true)
     expect(panel.style.getPropertyValue('--dialog-design-header-padding')).toBe('20px 20px 0')
     expect(panel.style.getPropertyValue('--dialog-design-header-height')).toBe('44px')
-    expect(panel.style.getPropertyValue('--dialog-design-width')).toBe('520px')
+    expect(panel.style.getPropertyValue('--dialog-design-width')).toBe('480px')
   })
 
   it('ConfirmDialog も同じ口を素通しする', () => {
