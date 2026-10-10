@@ -2789,3 +2789,17 @@ select:not([multiple]):not(.appearance-none) {
   --tpl-wh-narrow-column-pad: 9px var(--tpl-af2-wh-narrow-pad);
 }
 [data-theme='v8'] { --shadow-wh-kpi-top: inset 0 1px 0 var(--tpl-band-line); }
+
+/* B-178：一覧の骨組み（v19Ivv）。画面の寸法ではなく部品の値。 */
+[data-theme='v8'] {
+  --tpl-list-row-h: 60px;
+  --tpl-list-head-h: 40px;
+  --tpl-list-search-w: 240px;
+  --tpl-list-search-min: 120px;
+  --tpl-list-band-h: 116px;
+  --tpl-list-band-pad: 16px 24px;
+  --tpl-list-gap: 8px;
+  --tpl-list-cell-side: 16px;
+}
+
+[data-theme='v8'] { --tpl-image-frame-w: 160px; --tpl-image-frame-h: 106px; }

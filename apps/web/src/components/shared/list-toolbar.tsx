@@ -1,7 +1,7 @@
 'use client'
 import type React from 'react'
 
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode, type HTMLAttributes } from 'react'
 import SearchField from './search-field'
 import styles from './list-toolbar.module.css'
 
@@ -41,18 +41,24 @@ export type ListToolbarSearch = {
  */
 export default function ListToolbar({
   search,
+  searchSlot,
   actions,
   filters,
   trailing,
+  secondary,
   layout = 'band',
 }: {
-  search: ListToolbarSearch
+  search?: ListToolbarSearch
+  /** 既存の検索フォームの動きを保って共通の段へ移す口。 */
+  searchSlot?: ReactNode
   /** 1行目。検索の右に置く、動くものだけ（保存した検索・この条件を保存）。 */
   actions?: ReactNode
   /** 2行目・左。札・日付などの絞り込み。 */
   filters?: ReactNode
   /** 2行目・右端。並び順と表示件数。 */
   trailing?: ReactNode
+  /** 友だち・一斉配信の状態など、足してよい2段目。 */
+  secondary?: ReactNode
   /**
    * 並べ方。既定 'band' は1本の帯（c4n9Kr）。
    * 'stacked' は2段（acRIl 予約管理：1段目＝探す・担当・経路・CSV、
@@ -60,21 +66,19 @@ export default function ListToolbar({
    */
   layout?: 'band' | 'stacked'
 }) {
-  const label = search.label ?? search.placeholder
   return (
-    <div className={styles.toolbar} data-list-toolbar data-toolbar-layout={layout} style={search.width ? ({ '--list-search-width': `${search.width}px` } as React.CSSProperties) : undefined}>
+    <div className={styles.toolbar} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout} style={search?.width ? ({ '--list-search-width': `${search.width}px` } as React.CSSProperties) : undefined}>
       <div className={styles.row1} data-toolbar-tools>
-        <SearchField
+        {search ? <div className={styles.search} data-toolbar-search><SearchField
           placeholder={search.placeholder}
-          aria-label={label}
+          aria-label={search.label ?? search.placeholder}
           value={search.value}
           onChange={search.onChange}
           onClear={() => search.onChange('')}
           maxLength={search.maxLength}
           loading={search.loading}
           shortcut={search.shortcut}
-          className={styles.search}
-        />
+        /></div> : searchSlot ? <div className={styles.search} data-toolbar-search>{searchSlot}</div> : null}
         {actions}
       </div>
       {filters || trailing ? (
@@ -83,8 +87,26 @@ export default function ListToolbar({
           {trailing ? <div className={styles.trailing} data-toolbar-tools>{trailing}</div> : null}
         </div>
       ) : null}
+      {secondary ? <div className={styles.secondary} data-toolbar-secondary>{secondary}</div> : null}
     </div>
   )
+}
+
+/** 検索の送信・保存条件などを持つ一覧でも、段の見た目を画面に持たせない。 */
+export function ListToolbarFrame({ children, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div {...props} className={styles.slots} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout="slots">{children}</div>
+}
+
+export function ListToolbarRow({ children, as: Tag = 'div', ...props }: HTMLAttributes<HTMLElement> & { as?: 'div' | 'form' }) {
+  return <Tag {...props} className={styles.slotsRow} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout="slots-row" data-toolbar-tools>{children}</Tag>
+}
+
+export function ListToolbarSearchSlot({ children }: { children: ReactNode }) {
+  return <div className={styles.searchSlot} data-toolbar-search>{children}</div>
+}
+
+export function ListToolbarEnd({ children, ...props }: HTMLAttributes<HTMLSpanElement>) {
+  return <span {...props} className={styles.slotsEnd}>{children}</span>
 }
 
 /** 優先度の低い道具。帯に入らないときだけ「…」から同じ操作へ到達する。 */

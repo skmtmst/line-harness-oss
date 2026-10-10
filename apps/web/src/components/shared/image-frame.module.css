@@ -1,0 +1,5 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.frame { width: var(--tpl-image-frame-w); max-width: 100%; min-width: 0; }
+.frame.frame :global([data-size='compact']) { min-height: var(--tpl-image-frame-h); border-radius: var(--radius-control); }
+}

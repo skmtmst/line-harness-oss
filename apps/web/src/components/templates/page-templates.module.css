@@ -302,3 +302,15 @@
   :global([data-theme='v8']) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settings > .settingsNav { display: none; }
   :global([data-theme='v8']) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settingsContent { width: 100%; padding-left: var(--tpl-head-pad-side); align-self: stretch; }
 }
+
+/* B-178：フォルダの列は余白込み200、ページ送りは右寄せ。 */
+:global([data-theme='v8']) [data-list-skeleton] .folders { box-sizing: border-box; width: var(--tpl-folder-width); }
+:global([data-theme='v8']) [data-list-skeleton] .paginationRow { justify-content: flex-end; gap: var(--space-16); }
+
+:global([data-theme='v8']) [data-list-skeleton] .pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-16); }
+
+/* ページ送りを別の子で組む一覧でも、型の余白を二重に足さない。 */
+:global([data-theme='v8']) [data-list-skeleton] .pagination .pagination { padding: 0; }
+
+/* 道具の段の左右・上下の余白は型が一度だけ持つ。 */
+:global([data-theme='v8']) [data-list-skeleton] .toolbar :global([data-list-toolbar]) { padding: 0; }

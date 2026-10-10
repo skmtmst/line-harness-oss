@@ -23,6 +23,8 @@ export interface ListFolderNav {
   width?: number
 }
 export interface ListPageBodyProps {
+  /** B-178：テンプレート一覧を基準にした段・寸法。窓や設定内の一覧は対象外。 */
+  skeleton?: boolean
   stats?: ReactNode
   folders?: ReactNode
   /** 狭い板でも同じフォルダ選択・作る操作へ到達できる口。渡すと folderNav より優先する。 */
@@ -55,15 +57,15 @@ export interface ListPageProps extends PageHeadingProps, ListPageBodyProps {
   tabs?: ReactNode
 }
 /** 状態・取得処理を持つ子コンポーネントから使う、一覧型の本文。 */
-export function ListPageBody({ stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, fillWidth, dialogLayout, toolbar, listHelp, children, pagination, overlays }: ListPageBodyProps) {
+export function ListPageBody({ skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, fillWidth, dialogLayout, toolbar, listHelp, children, pagination, overlays }: ListPageBodyProps) {
   const navs = folderNav ? (Array.isArray(folderNav) ? folderNav : [folderNav]) : []
   const collapsed = collapsedFolders ?? (folders && navs.length > 0 ? navs.map((nav, index) => <CollapsedFolderNav key={nav.label ?? index} {...nav} />) : null)
-  return <div className={styles.listBody} data-dialog-layout={dialogLayout || undefined} style={fillWidth ? { width: '100%' } : undefined}>
+  return <div className={styles.listBody} data-list-skeleton={skeleton ? 'templates' : undefined} data-dialog-layout={dialogLayout || undefined} style={fillWidth ? { width: '100%' } : undefined}>
     {stats ? <div className={styles.stats} data-template-region="stats">{stats}</div> : null}
     <div className={styles.split} data-template-region="body">
-      {folders ? <aside className={styles.folders} data-template-region="folders" data-folder-inset={folderInset || undefined} data-folder-width={folderWidth ? true : undefined} style={folderWidth ? { width: folderWidth, boxSizing: 'border-box' } : undefined}>{folders}</aside> : null}
+      {folders ? <aside className={styles.folders} data-template-region="folders" data-shared-part="folder-column" data-folder-inset={folderInset || undefined} data-folder-width={folderWidth ? true : undefined} style={folderWidth ? { width: folderWidth, boxSizing: 'border-box' } : undefined}>{folders}</aside> : null}
       <div className={styles.main}>
-        {toolbar || collapsed || listHelp ? <div className={styles.toolbar} data-template-region="toolbar" data-collapsed-only={toolbar || listHelp ? undefined : ''}>
+        {toolbar || collapsed || listHelp ? <div className={styles.toolbar} data-template-region="toolbar" data-list-toolbar={skeleton || undefined} data-collapsed-only={toolbar || listHelp ? undefined : ''}>
           {collapsed ? <div className={styles.collapsedFolders} data-template-region="collapsed-folders">{collapsed}</div> : null}{toolbar}
           {listHelp ? <HelpTip label="一覧の操作の説明">{listHelp}</HelpTip> : null}
         </div> : null}
@@ -85,8 +87,9 @@ function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = '�
   </>
 }
 export function ListPage({ boardId, standalone, tabs, title, description, help, identity, actions, crumbs, steps, headingSize, ...body }: ListPageProps) {
-  return <PageFrame kind="list" boardId={boardId} standalone={standalone}>
-    <PageHeading {...{ title, description, help, identity, actions, crumbs, steps, headingSize }} />
+  const pageHelp = body.skeleton && description ? <>{help}{description}</> : help
+  return <PageFrame kind="list" boardId={boardId} standalone={standalone} skeleton={body.skeleton}>
+    <PageHeading {...{ title, identity, actions, crumbs, steps, headingSize }} description={body.skeleton ? undefined : description} help={pageHelp} />
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     <ListPageBody {...body} />
   </PageFrame>
@@ -95,4 +98,9 @@ export function ListPage({ boardId, standalone, tabs, title, description, help, 
 /** 読込・空・失敗の条件を画面側に残したままページ送りの余白を型へ寄せる。 */
 export function ListPagePagination({ children }: { children: ReactNode }) {
   return <div className={styles.pagination} data-template-region="pagination"><div className={styles.paginationRow}>{children}</div></div>
+}
+
+/** B-178：件数とページ送りを右へそろえる。外側の余白は型の段が持つ。 */
+export function ListPager({ children }: { children: ReactNode }) {
+  return <div className={styles.paginationRow} data-list-pager>{children}</div>
 }

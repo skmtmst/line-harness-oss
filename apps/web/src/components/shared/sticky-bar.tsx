@@ -72,23 +72,25 @@ export default function StickyBar({
   className?: string
 }) {
   if (presentation) return (
-    <div className={[styles.inlineBar, className].filter(Boolean).join(' ')} data-presentation={presentation}>
+    <div data-shared-part="sticky-bar" className={[styles.inlineBar, className].filter(Boolean).join(' ')} data-presentation={presentation}>
       {status}
       {actions}
     </div>
   )
   if (split) return (
-    <div className={[styles.bar, styles.splitBar, outlined ? styles.outlined : null, className].filter(Boolean).join(' ')}
+    <div data-shared-part="sticky-bar" className={[styles.bar, styles.splitBar, outlined ? styles.outlined : null, className].filter(Boolean).join(' ')}
       style={{ '--sticky-trailing-width': split.trailingWidth } as CSSProperties}>
       <div className={styles.splitLead}>{split.lead}</div>
       <div className={styles.splitTrailing}>
         {info ? <div className={styles.info}>{info}</div> : null}
-        <div className={styles.actions}>{actions}</div>
+        <div className={styles.actions} data-sticky-actions>{actions}</div>
       </div>
     </div>
   )
   return (
     <div
+      data-shared-part="sticky-bar"
+      data-sticky-layout={info ? undefined : "center"}
       className={[
         styles.bar,
         info ? styles.withInfo : null,
@@ -98,12 +100,12 @@ export default function StickyBar({
         .filter(Boolean)
         .join(' ')}
     >
-      <div className={styles.lead}>
+      <div className={styles.lead} data-sticky-lead>
         {destructive}
         {status ? <p className={styles.status}>{status}</p> : null}
       </div>
       {info ? <div className={styles.info}>{info}</div> : null}
-      <div className={styles.actions}>{actions}</div>
+      <div className={styles.actions} data-sticky-actions>{actions}</div>
       {/*
        * 右端は空ける。ここに何か置くと中央が中央でなくなる。
        * ただし一言を渡した画面は、承認済み ★BG-B `X2oLn` の右の列

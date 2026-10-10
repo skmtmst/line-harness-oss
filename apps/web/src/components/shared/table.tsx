@@ -25,9 +25,9 @@ export function TableHeadRow({
     .filter(Boolean)
     .join(' ')
   return (
-    <React.Fragment>{as === 'div' ? <div role="row" className={classes} data-table-layout="columns" data-presentation={presentation} {...rowProps as HTMLAttributes<HTMLDivElement>}>
+    <React.Fragment>{as === 'div' ? <div data-shared-part="list-head" role="row" className={classes} data-table-layout="columns" data-presentation={presentation} {...rowProps as HTMLAttributes<HTMLDivElement>}>
       {children}
-    </div> : <tr className={classes} data-presentation={presentation} {...rowProps}>
+    </div> : <tr data-shared-part="list-head" className={classes} data-presentation={presentation} {...rowProps}>
       {children}
     </tr>}</React.Fragment>
   )
@@ -138,7 +138,7 @@ export function DataTable({
   const tableDensity = density === 'compact' || density === 'records' ? density : undefined
   const rowDensity = tableDensity ? undefined : density
   return (
-    <div className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
+    <div data-shared-part="list-table" className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
       ...(columns ? { '--table-columns': columns } : {}),
       ...(columnLayout ? {
         '--table-head-height': columnLayout.headHeight, '--table-row-height': columnLayout.rowHeight,
@@ -191,6 +191,7 @@ export function Tr({ children, className, selected, interactive, density, leavin
     .join(' ')
   return (
     <tr
+      data-shared-part="list-row"
       className={classes}
       aria-selected={selected === undefined ? undefined : selected}
       data-leaving={leaving || undefined}

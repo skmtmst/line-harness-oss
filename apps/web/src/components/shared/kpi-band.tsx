@@ -36,6 +36,7 @@ export default function KpiBand({
       className={`${kpiStyles.strip} ${gridClassName}${className ? ` ${className}` : ''}`}
       data-kpi-border={border}
       data-kpi-density={density}
+      data-shared-part="kpi-band"
       data-kpi-strip
       data-kpi-presentation={presentation}
       {...rest}
