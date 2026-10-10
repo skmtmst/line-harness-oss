@@ -20,7 +20,7 @@ describe('テンプレートの残りの板ID', () => {
 
   it('見るだけの人に hEDTK の帯が出る', () => {
     expect(LIST).toMatch(/(?:data-design-node|boardId)="hEDTK"/)
-    expect(LIST).toContain('閲覧のみで見ています')
+    expect(LIST).toContain('<ReadOnlyNotice')
     expect(LIST).toMatch(/!canMutateTemplates[\s\S]*?data-design-node="hEDTK"/)
   })
 

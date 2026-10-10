@@ -1,33 +1,52 @@
 'use client'
 
-import { formatDate as polishFormatDate } from '@/lib/format'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { fetchApi } from '@/lib/api'
-import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
-import ListState from '@/components/shared/list-state'
-import NoteBar from '@/components/shared/note-bar'
-import Select from '@/components/shared/select'
-import StatusBadge from '@/components/shared/status-badge'
-import { TextField } from '@/components/shared/text-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
-import Toggle from '@/components/shared/toggle'
-import { notifyToast } from '@/components/shared/toast'
-import { describeApiFailure } from '@/components/shared/api-error-message'
-import {
-  bookingChannelsApi,
-  type BookingChannel,
-  type BookingChannelStaff,
-  type BookingChannelsData,
-  type BookingConflict,
-} from './lib/booking-channels'
-import type { BookingStaff } from '@/lib/api'
-import styles from './settings.module.css'
-import ch from './channels.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { formatDate as polishFormatDate } from "@/lib/format"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { fetchApi } from "@/lib/api"
+import Button from "@/components/shared/button"
+import Dialog from "@/components/shared/dialog"
+import ListState from "@/components/shared/list-state"
+import NoteBar from "@/components/shared/note-bar"
+import Select from "@/components/shared/select"
+import StatusBadge from "@/components/shared/status-badge"
+import { TextField } from "@/components/shared/text-field"
+import { SettingCheckbox } from "@/components/shared/checkbox"
+import Toggle from "@/components/shared/toggle"
+import { notifyToast } from "@/components/shared/toast"
+import { describeApiFailure } from "@/components/shared/api-error-message"
+import { bookingChannelsApi, type BookingChannel, type BookingChannelStaff, type BookingChannelsData, type BookingConflict } from "./lib/booking-channels"
+import type { BookingStaff } from "@/lib/api"
+import styles from "./settings.module.css"
+import ch from "./channels.module.css"
+import TruncatedText from "@/components/shared/truncated-text"
+import { emptyValue } from "@/components/shared/empty-value"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -469,7 +488,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
             <span className={ch.cardDesc}>{data.autoAssign ? 'オン' : 'オフ'}</span>
           </p>
         )}
-        {assignError ? <p role="alert" className={ch.cardDesc}>{assignError}</p> : null}
+        {assignError ? <Notice tone="danger" className={ch.cardDescNoticePlacement} >{assignError}</Notice> : null}
       </section>
 
       {detailTarget ? (

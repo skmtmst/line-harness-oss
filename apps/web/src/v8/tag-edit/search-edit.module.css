@@ -11,7 +11,7 @@
 .loading { margin: 0; padding: var(--tpl-eds-loading-pad); color: var(--color-ink-faint); font-size: var(--text-label); }
 .backLink { display: inline-flex; align-items: center; gap: var(--tpl-eds-back-gap); color: var(--color-action); font-size: var(--text-label); font-weight: 600; text-decoration: none; }
 .backLink:hover { text-decoration: underline; }
-.errorText { margin: 0; color: var(--color-danger); font-size: var(--text-caption); }
+
 .hint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-eds-hint-lh); }
 
 /* カード：枠1本・角12・余白20・間14。 */

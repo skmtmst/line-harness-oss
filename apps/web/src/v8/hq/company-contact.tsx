@@ -1,17 +1,32 @@
 'use client'
 
-import { notifySaved } from '@/components/shared/toast'
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
-import { Check, Search } from 'lucide-react'
-import { COMPANY_CONTACT_FIELDS, parseTenantCompanyContact, type TenantCompanyContact } from '@line-crm/shared'
-import Button from '@/components/shared/button'
-import { Field } from '@/components/shared/form-controls'
-import { TextField } from '@/components/shared/text-field'
-import { SettingsFormCard, SettingsFormRow } from '@/components/shared/settings-form-card'
-import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
-import { api } from '@/lib/api'
-import styles from './settings.module.css'
-import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { notifySaved } from "@/components/shared/toast"
+import { useEffect, useId, useRef, useState, type FormEvent } from "react"
+import { Check, Search } from "lucide-react"
+import { COMPANY_CONTACT_FIELDS, parseTenantCompanyContact, type TenantCompanyContact } from "@line-crm/shared"
+import Button from "@/components/shared/button"
+import { Field } from "@/components/shared/form-controls"
+import { TextField } from "@/components/shared/text-field"
+import { SettingsFormCard, SettingsFormRow } from "@/components/shared/settings-form-card"
+import { describeApiFailure, japaneseDetailOf } from "@/components/shared/api-error-message"
+import { api } from "@/lib/api"
+import styles from "./settings.module.css"
+import { SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 const EMPTY: TenantCompanyContact = {
   legalCompanyName: null, postalCode: null, address: null, building: null,
@@ -155,8 +170,8 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
     <SettingsFormRow>{field('phone')}{field('contactName')}</SettingsFormRow>
     <SettingsFormRow>{field('contactEmail')}{field('invoiceAddressee')}</SettingsFormRow>
     {loading ? <p role="status" className={styles.hint}>読み込んでいます…</p> : null}
-    {error ? <p role="alert" className={styles.error}>{error}</p> : null}
-    {!loading && revision === null && canEdit ? <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button> : null}
+    {error ? <Notice tone="danger" >{error}</Notice> : null}
+    {!loading && revision === null && canEdit ? <Button type="button" onClick={() => void load()}>もう一度読み込む</Button> : null}
     {null}
   </SettingsFormCard></SaveErrorScope>
 }

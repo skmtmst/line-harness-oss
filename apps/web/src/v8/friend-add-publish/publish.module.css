@@ -3,15 +3,7 @@
  * 枠・頭・手順の輪・右の列・下の帯は型（CreatePage / PageHeading）が持つ。ここは段（カード）の中身だけ。
  */
 
-.viewerBand {
-  margin: 0;
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
+.viewerBand { margin: 0; }
 
 /* 段（カード）：枠1・角12・余白20・中の間14。共通カードの枠（1）は内側に入るので、余白は 20−1。 */
 .card {

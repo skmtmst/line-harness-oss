@@ -1,25 +1,47 @@
 'use client'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Bookmark, Download, FilePen, History, Mail, Plus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { RowMenu } from '@/components/shared/row-actions'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import ListState from '@/components/shared/list-state'
-import SearchField from '@/components/shared/search-field'
-import { api, type AnalyticsReportRun, type AnalyticsReportSchedule, type RecentOneTimeReport, type SavedAnalyticsSnapshot, type SavedAnalyticsSummary } from '@/lib/api'
-import { formatNumber } from '@/lib/format'
-import { StatePill, shortDateTime, shortDay } from './common'
-import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, useRegisterExport } from './parts'
-import styles from './analytics.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
-import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+import { useListUrlValue } from "@/components/shared/list-url-state"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { AlertTriangle, Bookmark, Download, FilePen, History, Mail, Plus } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { RowMenu } from "@/components/shared/row-actions"
+import KpiBand from "@/components/shared/kpi-band"
+import KpiCard from "@/components/shared/kpi-card"
+import Button from "@/components/shared/button"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import Dialog from "@/components/shared/dialog"
+import ListState from "@/components/shared/list-state"
+import SearchField from "@/components/shared/search-field"
+import { api, type AnalyticsReportRun, type AnalyticsReportSchedule, type RecentOneTimeReport, type SavedAnalyticsSnapshot, type SavedAnalyticsSummary } from "@/lib/api"
+import { formatNumber } from "@/lib/format"
+import { StatePill, shortDateTime, shortDay } from "./common"
+import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, useRegisterExport } from "./parts"
+import styles from "./analytics.module.css"
+import TruncatedText from "@/components/shared/truncated-text"
+import { csvFileName } from "@/lib/csv-file-name"
+import { emptyValue } from "@/components/shared/empty-value"
+import { useSaveFormErrors, SaveErrorScope } from "@/components/shared/save-form-errors"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -28,6 +50,8 @@ import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form
  * → 定期レポート（作る・止める・また送る・しまう）→ 1回だけ送った結果。
  * 呼ぶ口・世代の守り・失敗の言い分け・CSV は今の画面（SavedAnalyticsTab）と同じ。
  */
+
+
 
 const SAVED_STATE_LABELS: Record<SavedAnalyticsSnapshot['state'], string> = { available: '利用可能', partial: '一部集計', unavailable: '未取得', failed: '失敗' }
 const REPORT_STATUS_LABELS: Record<AnalyticsReportSchedule['status'], string> = { active: '有効', paused: '停止中', archived: 'アーカイブ' }
@@ -274,7 +298,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
           <section className={styles.historyCard} aria-labelledby="saved-history-title">
             <h2 id="saved-history-title" className={styles.hoursTitle} title={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? emptyValue('unknown') : `${schedules.filter((schedule) => schedule.savedAnalysisIds.includes(selected.id)).length}件`}` : undefined}>{selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'}</h2>
             {/* 履歴だけ取れないときは、その場所に小さく1行。一覧の失敗とは分ける。 */}
-            {snapshotError ? <p className={styles.caption} role="alert">結果の履歴を読み込めませんでした。<button type="button" className={styles.linkButton} onClick={() => setSnapshotReload((n) => n + 1)}>もう一度</button></p> : null}
+            {snapshotError ? <Notice tone="danger" className={styles.captionNoticePlacement} >結果の履歴を読み込めませんでした。<button type="button" className={styles.linkButton} onClick={() => setSnapshotReload((n) => n + 1)}>もう一度</button></Notice> : null}
             {snapshotLoading ? <p className={styles.caption}>結果を読み込んでいます</p>
               : !selected ? <p className={styles.caption}>一覧から分析を選んでください</p>
               : snapshots.length === 0 ? <p className={styles.caption}>保存された結果はありません</p>
@@ -307,9 +331,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
         {schedulesLoading ? <span className={styles.caption}>確認中</span> : null}
         {canManage ? <Button href="/analytics/reports/new" variant="secondary"><Plus size={15} aria-hidden="true" />定期レポートを作る</Button> : null}
       </div>
-      {schedulesError ? <div className={styles.inlineError} role="alert"><span>{schedulesError}</span>
-        {/* 版ずれの通知は reloadSchedules で消さない。消すのは手でやり直したこの入口だけ。 */}
-        <Button variant="secondary" disabled={schedulesLoading} onClick={() => { setSchedulesError(''); reloadSchedules() }}>もう一度確認</Button></div> : null}
+      {schedulesError ? <Notice tone="danger" ><span>{schedulesError}</span>{/* 版ずれの通知は reloadSchedules で消さない。消すのは手でやり直したこの入口だけ。 */}<Button variant="secondary" disabled={schedulesLoading} onClick={() => { setSchedulesError(''); reloadSchedules() }}>もう一度確認</Button></Notice> : null}
       {schedulesLoading ? null : schedules.length === 0 ? (schedulesError ? null : <ListState kind="empty" title="定期レポートはまだありません" description="決まった曜日や日に、集計結果をメールやLINEへ届けられます。" />)
         : <div className={styles.table} role="table" aria-label="定期レポート">
           <div className={styles.thead} role="row">

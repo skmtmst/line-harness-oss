@@ -21,6 +21,7 @@ import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { HealthPanelV8 } from './health'
 import UpdateHistoryV8 from './history'
 import styles from './screen.module.css'
+import Notice from '@/components/shared/notice'
 
 /** 板 Y4LkX1 の並び。健全性チェック・更新履歴・緊急コントロール。 */
 const TABS = [
@@ -100,10 +101,7 @@ export default function EmergencyScreen({
     >
       <Tabs size="compact" spacing="settings" label="運用状態の中の切り替え" items={TABS.map((item) => ({ label: item.label, href: TAB_HREF[item.key], current: tab === item.key }))} />
       {accountsFailed ? (
-        <div className={styles.warnBand} role="alert">
-          <p>アカウント一覧を読み込めませんでした。個別のアカウントを選べず、全体が対象になります。</p>
-          <button type="button" onClick={() => loadAccounts()} className={styles.inlineLink}>もう一度読み込む</button>
-        </div>
+        <Notice tone="danger" action={<> <button type="button" onClick={() => loadAccounts()} className={styles.inlineLink}>もう一度読み込む</button> </>} >アカウント一覧を読み込めませんでした。個別のアカウントを選べず、全体が対象になります。</Notice>
       ) : null}
       {tab === 'health' ? (
         <HealthPanelV8

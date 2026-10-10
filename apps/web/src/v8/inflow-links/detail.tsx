@@ -1,45 +1,85 @@
 'use client'
 
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import CopyTextButton from '@/components/shared/copy-text-button'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Copy, Eye, Info, Pause, Pencil, QrCode } from 'lucide-react'
-import type { ApiResponse, EntryRoute, EntryRouteFunnel, Scenario, Tag, TrafficPool } from '@line-crm/shared'
-import { ApiError, api, fetchApi } from '@/lib/api'
-import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { canEditFeature } from '@/lib/staff-capability'
-import { formatNumber } from '@/lib/format'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { DetailPage } from '@/components/templates'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
-import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
-import Pagination from '@/components/shared/pagination'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import SearchField from '@/components/shared/search-field'
-import Select from '@/components/shared/select'
-import StatusBadge from '@/components/shared/status-badge'
-import TargetMissing from '@/components/shared/target-missing'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import EditRouteModal from './edit-route-dialog'
-import QrDialog from './qr-dialog'
-import RefOrdersPanel, { type RefOrdersResult } from './ref-orders'
-import styles from './detail.module.css'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
-import { DetailLoading } from '@/components/templates/detail-page'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { useListUrlValue } from "@/components/shared/list-url-state"
+import CopyTextButton from "@/components/shared/copy-text-button"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Suspense, useEffect, useMemo, useState } from "react"
+import { ArrowLeft, Info, Pause, Pencil, QrCode } from "lucide-react"
+import type { ApiResponse, EntryRoute, EntryRouteFunnel, Scenario, Tag, TrafficPool } from "@line-crm/shared"
+import { ApiError, api, fetchApi } from "@/lib/api"
+import { isPoolsFeatureAvailable } from "@/lib/pools-availability"
+import { canManageRole, useStaffRole } from "@/lib/staff-role"
+import { canEditFeature } from "@/lib/staff-capability"
+import { formatNumber } from "@/lib/format"
+import { useAccount } from "@/contexts/account-context"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import { DetailPage } from "@/components/templates"
+import { type ActionMenuItem } from "@/components/shared/action-menu"
+import { RowMenu } from "@/components/shared/row-actions"
+import Button from "@/components/shared/button"
+import Dialog from "@/components/shared/dialog"
+import KpiBand from "@/components/shared/kpi-band"
+import KpiCard from "@/components/shared/kpi-card"
+import ListState from "@/components/shared/list-state"
+import Notice from "@/components/shared/notice"
+import Pagination from "@/components/shared/pagination"
+import RadioCard, { RadioCardGroup } from "@/components/shared/radio-card"
+import SearchField from "@/components/shared/search-field"
+import Select from "@/components/shared/select"
+import StatusBadge from "@/components/shared/status-badge"
+import TargetMissing from "@/components/shared/target-missing"
+import { DataTable, TableHeadRow, Td, Th, Tr } from "@/components/shared/table"
+import EditRouteModal from "./edit-route-dialog"
+import QrDialog from "./qr-dialog"
+import RefOrdersPanel, { type RefOrdersResult } from "./ref-orders"
+import styles from "./detail.module.css"
+import { emptyValue } from "@/components/shared/empty-value"
+import { DetailLoading } from "@/components/templates/detail-page"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+import { PAGE_SIZE_SELECT_OPTIONS } from "@/components/shared/page-size-select"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8 流入と計測の詳細（Pencil `Q5le3`）。
@@ -52,6 +92,9 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * - 受付を止める・別リンクへ送る・削除するは「その後」の段の右上の「…」から（今は段の題の右）
  * - 閲覧のみ（owner・admin 以外）には、リンクを編集・止める・することを変える・「…」を出さず、閲覧のみの帯を出す
  */
+
+
+
 
 interface MessageTemplate {
   id: string
@@ -80,7 +123,7 @@ const PERIOD_OPTIONS: Array<{ value: FriendPeriod; label: string }> = [
   { value: 'this', label: '今月' },
   { value: 'last', label: '先月' },
 ]
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n} 件表示` }))
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 const DELETE_CHOICES: ReadonlyArray<readonly [DeleteChoice, string, string]> = [
   ['stop', '新しい人を受けるのをやめる（おすすめ）', 'URLは残し、「受付を終了しました」と表示します。'],
@@ -446,7 +489,7 @@ function InflowDetailContent() {
       ) : undefined}
     >
       {readonly ? (
-        <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       ) : null}
       {copyFailed && url ? (
         <div role="alert" className={styles.copyFallback}>

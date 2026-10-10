@@ -1,58 +1,83 @@
 'use client'
-import { useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import CopyTextButton from "@/components/shared/copy-text-button"
+import { useSearchParams } from "next/navigation"
+import { LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical, Inbox } from "lucide-react"
+import type { IncomingWebhook } from "@line-crm/shared"
+import { api, ApiError, type IncomingWebhookDetail as DetailType, type IncomingWebhookTestResult, type IncomingWebhookUnmatchedItem } from "@/lib/api"
+import { useAccount } from "@/contexts/account-context"
+import { useOnAccountSwitch } from "@/components/shared/list-url-state"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import { useStaffRole } from "@/lib/staff-role"
+import { ListPage } from "@/components/templates"
+import Button from "@/components/shared/button"
+import StatusBadge from "@/components/shared/status-badge"
+import Card from "@/components/shared/card"
+import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
+import { TextField, TextArea } from "@/components/shared/text-field"
+import { Field } from "@/components/shared/form-controls"
+import EmptyList from "@/components/shared/empty-list"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import Dialog from "@/components/shared/dialog"
+import ListState from "@/components/shared/list-state"
+import AccountRequiredState from "@/components/shared/account-required-state"
+import Notice from "@/components/shared/notice"
+import Select from "@/components/shared/select"
+import Toggle from "@/components/shared/toggle"
+import InlineEdit from "@/components/shared/inline-edit"
+import { DelayedSkeleton, Skeleton } from "@/components/shared/skeleton"
+import { notifyToast } from "@/components/shared/toast"
+import { withViewTransition } from "@/components/shared/view-transition"
+import { describeApiFailure, permissionDeniedMessage } from "@/components/shared/api-error-message"
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from "@/components/step-up-prompt"
+import { MANAGE_REASON, ViewerBand, WEBHOOKS_DESCRIPTION, WebhookBand, WebhookTabs, overviewBandCells, useWebhookOverview } from "./shell"
+import { MIN_SECRET_LENGTH, generateSecret } from "./secret"
+import { shortDateTime } from "./words"
+import styles from "./incoming.module.css"
+import TruncatedText from "@/components/shared/truncated-text"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import IncomingActions from "./incoming-actions"
 
-import CopyTextButton from '@/components/shared/copy-text-button'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { Copy, LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical, Inbox } from 'lucide-react'
-import type { IncomingWebhook } from '@line-crm/shared'
-import {
-  api,
-  ApiError,
-  type IncomingWebhookDetail as DetailType,
-  type IncomingWebhookTestResult,
-  type IncomingWebhookUnmatchedItem,
-} from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { useOnAccountSwitch } from '@/components/shared/list-url-state'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
-import { ListPage } from '@/components/templates'
-import Button from '@/components/shared/button'
-import StatusBadge from '@/components/shared/status-badge'
-import Card from '@/components/shared/card'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { TextField, TextArea } from '@/components/shared/text-field'
-import { Field } from '@/components/shared/form-controls'
-import EmptyList from '@/components/shared/empty-list'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
-import InlineEdit from '@/components/shared/inline-edit'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import { notifyToast } from '@/components/shared/toast'
-import { withViewTransition } from '@/components/shared/view-transition'
-import { describeApiFailure } from '@/components/shared/api-error-message'
-import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
-import {
-  MANAGE_REASON,
-  ViewerBand,
-  WEBHOOKS_DESCRIPTION,
-  WebhookBand,
-  WebhookTabs,
-  overviewBandCells,
-  useWebhookOverview,
-} from './shell'
-import { MIN_SECRET_LENGTH, generateSecret } from './secret'
-import { shortDateTime } from './words'
-import styles from './incoming.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import IncomingActions from './incoming-actions'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8 外部連携「こちらで受け取る」タブ（Pencil `gW0F2`、作る窓 `H031gC`）。
@@ -647,7 +672,7 @@ export default function WebhooksIncomingV8() {
   /* ===== 右の設定 ===== */
   let rightColumn
   if (!selectedAccountId) {
-    rightColumn = <ListState kind="empty" title={accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'} />
+    rightColumn = <AccountRequiredState hasAccounts={accounts.length > 0} />
   } else if (incomingStatus === 'ready' && !selected) {
     /* 修正案 D-2：空の一覧。 */
     rightColumn = (
@@ -805,7 +830,7 @@ export default function WebhooksIncomingV8() {
                         )
                       ) : null}
                     {unmatchedActionError && unmatchedActionError.id === item.id ? (
-                      <p role="alert" className={styles.fieldError}>{unmatchedActionError.message}</p>
+                      <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >{unmatchedActionError.message}</Notice>
                     ) : null}
                     </Td>
                   </Tr>
@@ -943,7 +968,7 @@ export default function WebhooksIncomingV8() {
           confirmLabel="試す"
         >
           <Field label="届いたつもりのJSON"><SaveErrorField names={["testJson","test_json"]}><TextArea value={testJson} onChange={(event) => setTestJson(event.target.value)} placeholder='{"friendId": "…"}' /></SaveErrorField></Field>
-          {testError ? <p className={styles.fieldError} role="alert">{testError}</p> : null}
+          {testError ? <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >{testError}</Notice> : null}
           {testResult ? (
             <div className={styles.form}>
               <span className={styles.fieldLabel}>だれに届くか</span>

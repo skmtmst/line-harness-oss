@@ -1,24 +1,45 @@
 'use client'
-import { createPageReturnHref } from '@/components/shared/create-page'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { ArrowRight } from 'lucide-react'
-import { CreatePage } from '@/components/templates'
-import Button from '@/components/shared/button'
-import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useAccount } from '@/contexts/account-context'
-import { useStaffRole } from '@/lib/staff-role'
-import { describeSaveFailure, webinarApi, type WebinarFolder } from '@/lib/api'
-import { BackLink, WizardSteps } from './chrome'
-import { folderById, folderCreator } from '@/components/shared/folder-select'
-import { BasicForm, BasicPreview, SLUG_PATTERN, type BasicValues } from './basic-form'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
-import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { createPageReturnHref } from "@/components/shared/create-page"
+import { useFeatureAccess } from "@/lib/use-feature-access"
+import { Suspense, useCallback, useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
+import { ArrowRight } from "lucide-react"
+import { CreatePage } from "@/components/templates"
+import Button from "@/components/shared/button"
+import ListState from "@/components/shared/list-state"
+import Notice from "@/components/shared/notice"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import { useAccount } from "@/contexts/account-context"
+import { useStaffRole } from "@/lib/staff-role"
+import { describeSaveFailure, webinarApi, type WebinarFolder } from "@/lib/api"
+import { BackLink, WizardSteps } from "./chrome"
+import { folderById, folderCreator } from "@/components/shared/folder-select"
+import { BasicForm, BasicPreview, SLUG_PATTERN, type BasicValues } from "./basic-form"
+import { withPermissionFailure } from "@/components/shared/api-error-message"
+import { SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -26,6 +47,8 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
  * 下書きとして作り、「動画の設定へ」で編集の ②動画へ進む。
  * 口・確かめ・離れる前の確かめは app/webinars/new/new-v8.tsx と同じ（BEHAVIOR.md）。
  */
+
+
 
 const FOLDERS_BLOCKED = 'フォルダを読み込めていないため、下書きを保存できません。フォルダをもう一度読み込んでください。'
 const TITLE_EMPTY = 'ウェビナー名を入力してください'
@@ -158,7 +181,7 @@ function NewInner() {
         </>}
         preview={<BasicPreview title={values.title} description={values.description} accountName={accountName} />} dirty={false}
       >
-        {readOnly ? <Notice tone="info">閲覧のみで見ています。ウェビナーを作るのはオーナーか管理者です。</Notice> : null}
+        {readOnly ? <ReadOnlyNotice >閲覧のみで見ています。ウェビナーを作るのはオーナーか管理者です。</ReadOnlyNotice> : null}
         {error ? <Notice tone="danger">{error}</Notice> : null}
         {/* 閲覧のみと分かったら、押せない入力の欄は置かず閲覧のみの帯だけを出す（作る画面なので見せる中身は無い。2026-10-06 オーナー決定）。 */}
         {readOnly ? null : <BasicForm

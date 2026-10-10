@@ -1,50 +1,71 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, Check, Copy, Plus, RefreshCw, TriangleAlert, Users, X } from 'lucide-react'
-import {
-  isSavedSearchOpAllowed,
-  isSavedSearchValueOptionalOp,
-} from '@line-crm/shared'
-import type {
-  FriendField,
-  SavedSearch,
-  SavedSearchCondition,
-  SavedSearchConditionKind,
-  SavedSearchConditions,
-  Scenario,
-  SupportMark,
-  Tag,
-} from '@line-crm/shared'
-import { api, ApiError, type SavedSearchDetail, type SavedSearchMatchPreview } from '@/lib/api'
-import { createResponseGate } from '@/lib/latest-request'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { CreatePage } from '@/components/templates'
-import TargetMissing from '@/components/shared/target-missing'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { TextField } from '@/components/shared/text-field'
-import { Field } from '@/components/shared/form-controls'
-import DateField from '@/components/shared/date-field'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import Button from '@/components/shared/button'
-import HelpTip from '@/components/shared/help-tip'
-import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
-import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { savedSearchSummary, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
-import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
-import { formatDateTime } from '@/lib/format'
-import { optionsWithCurrent, usageRowsOf, headUsageText } from './search-model'
-import styles from './search-edit.module.css'
-import { formatNumber as polishFormatNumber } from '@/lib/format'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
+import { ArrowLeft, Check, Copy, Plus, RefreshCw, TriangleAlert, Users, X } from "lucide-react"
+import { isSavedSearchOpAllowed, isSavedSearchValueOptionalOp } from "@line-crm/shared"
+import type { FriendField, SavedSearch, SavedSearchCondition, SavedSearchConditionKind, SavedSearchConditions, Scenario, SupportMark, Tag } from "@line-crm/shared"
+import { api, ApiError, type SavedSearchDetail, type SavedSearchMatchPreview } from "@/lib/api"
+import { createResponseGate } from "@/lib/latest-request"
+import { useAccount } from "@/contexts/account-context"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import { CreatePage } from "@/components/templates"
+import TargetMissing from "@/components/shared/target-missing"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import { TextField } from "@/components/shared/text-field"
+import { Field } from "@/components/shared/form-controls"
+import DateField from "@/components/shared/date-field"
+import { canManageRole, useStaffRole } from "@/lib/staff-role"
+import Button from "@/components/shared/button"
+import HelpTip from "@/components/shared/help-tip"
+import Notice from "@/components/shared/notice"
+import Select from "@/components/shared/select"
+import { EntityKindField } from "@/components/shared/entity-picker-sources"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import { savedSearchSummary, type SavedSearchConditionLabels } from "@/components/friends/saved-search-utils"
+import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from "@/components/friend-fields/attribute-kind-guide"
+import { formatDateTime, formatNumber as polishFormatNumber } from "@/lib/format"
+import { optionsWithCurrent, usageRowsOf, headUsageText } from "./search-model"
+import styles from "./search-edit.module.css"
+import { emptyValue } from "@/components/shared/empty-value"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8 タグ：保存した検索の編集（一から書いた画面・2026-10-07）。Pencil `AqDWN`。
@@ -54,6 +75,8 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * 動き（読み込み・切り替え時の捨て方・人数の数え直し・保存前の検査・複製・削除・未保存の確認）は
  * 今の画面（app/tags/search-editor-v8）と同じ。条件の部品と検査はそこから写した。
  */
+
+
 
 /*
  * R185: 友だち画面で作れる条件はここでも編集できるようにする。実行側
@@ -203,7 +226,7 @@ function DateRangeEditor({
           </>
         ) : null}
       </div>
-      {reversed ? <p role="alert" className={styles.errorText}>開始日が終了日より後になっています。入れ替えてください。</p> : null}
+      {reversed ? <Notice tone="danger" >開始日が終了日より後になっています。入れ替えてください。</Notice> : null}
     </div>
   )
 }
@@ -856,7 +879,7 @@ export default function SavedSearchEditV8() {
         {previewCount === null ? <span className={styles.countNum}>{emptyValue('unknown')}</span> : <span className={styles.countNum}>{polishFormatNumber(previewCount)}</span>}
         <span className={styles.countUnit}>人</span>
       </p>
-      {previewError ? <p role="alert" className={styles.errorText}>{previewError}</p> : null}
+      {previewError ? <Notice tone="danger" >{previewError}</Notice> : null}
       {previewStale ? (
         <div className={styles.staleBox} role="status">
           <p className={styles.staleTitle}>条件を変えました。上の人数は変える前の条件のもので、変えたあとの条件はまだ数えていません。</p>
@@ -887,7 +910,7 @@ export default function SavedSearchEditV8() {
     </div>
   )
 
-  if (!canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></SaveErrorScope>
+  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></SaveErrorScope>
 
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.page}>

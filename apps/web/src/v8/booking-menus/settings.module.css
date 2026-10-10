@@ -246,7 +246,6 @@
   display: flex;
   align-items: center;
   gap: var(--tpl-bm-10);
-  margin: 0;
   padding: var(--tpl-bm-10) var(--tpl-bm-14);
   border-radius: var(--radius-control);
   background: var(--color-status-warn-soft);
@@ -1854,3 +1853,5 @@
   color: var(--color-ink);
   box-shadow: var(--shadow-segment-thumb);
 }
+
+.warnBand, .warnBandNoticePlacement { margin: 0; flex-shrink: 0; }

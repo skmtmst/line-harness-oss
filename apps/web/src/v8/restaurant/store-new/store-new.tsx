@@ -8,26 +8,49 @@
  * → 下の線の下にキャンセル・次へ（中央）。口と決まりは今の画面（app/restaurant-test/stores/new）と同じ。
  * 動きは BEHAVIOR.md。
  */
-import { useRouter } from 'next/navigation'
-import { cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { ArrowRight, BookOpen, CircleCheck, ExternalLink } from 'lucide-react'
-import { useAccount } from '@/contexts/account-context'
-import { TERMS_DOCUMENT } from '@/content/terms/musubo-terms'
-import { MANUAL_LINKS } from '@/lib/manual-links'
-import { restaurantTestApi } from '@/lib/restaurant-test-api'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import { Steps } from '@/components/templates/steps'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
-import { Field as SharedField } from '@/components/shared/form-controls'
-import { TextField } from '@/components/shared/text-field'
-import TermsBody from './terms-body'
-import { canSubmitTerms, formatAgreedAt, hasReadTerms, initialWizardStep, STEP } from './terms-state'
-import styles from './store-new.module.css'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { useRouter } from "next/navigation"
+import { cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react"
+import { ArrowRight, BookOpen, CircleCheck } from "lucide-react"
+import { useAccount } from "@/contexts/account-context"
+import { TERMS_DOCUMENT } from "@/content/terms/musubo-terms"
+import { MANUAL_LINKS } from "@/lib/manual-links"
+import { restaurantTestApi } from "@/lib/restaurant-test-api"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import { PageFrame, PageHeading } from "@/components/templates/page-frame"
+import { Steps } from "@/components/templates/steps"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import Button from "@/components/shared/button"
+import Checkbox from "@/components/shared/checkbox"
+import { Field as SharedField } from "@/components/shared/form-controls"
+import { TextField } from "@/components/shared/text-field"
+import TermsBody from "./terms-body"
+import { canSubmitTerms, formatAgreedAt, hasReadTerms, initialWizardStep, STEP } from "./terms-state"
+import styles from "./store-new.module.css"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 const STEPS = [
   ['利用規約への同意', 'musubo の利用規約と、個人情報の取扱いをご確認ください。'],
@@ -279,7 +302,7 @@ export default function StoreNewV8() {
                   <Button external href="/restaurant-test/terms">利用規約を別画面で読む</Button>
                 </div>
                 <SaveErrorField names={["termsChecked"]}><Checkbox checked={termsChecked} disabled={!readToEnd || agreeing} onCheckedChange={setTermsChecked}>上記の利用規約および個人情報の取扱いに同意します</Checkbox></SaveErrorField>
-                {agreeError ? <p role="alert" className={styles.error}>{agreeError}</p> : null}
+                {agreeError ? <Notice tone="danger" >{agreeError}</Notice> : null}
               </>
             ) : null}
 
@@ -325,7 +348,7 @@ export default function StoreNewV8() {
                     <p className={styles.doneTitle}>接続できました</p>
                     <p className={styles.cardText}>{`「${created.storeName}」とLINE公式アカウント「${created.lineAccountName}」を登録しました。`}</p>
                   </div>
-                  {connectionError ? <p role="alert" className={styles.errorBox}>{connectionError}</p> : null}
+                  {connectionError ? <Notice tone="danger" className={styles.errorBoxNoticePlacement} >{connectionError}</Notice> : null}
                 </>
               ) : (
                 <>
@@ -337,7 +360,7 @@ export default function StoreNewV8() {
                       <div><dt className={styles.help}>店舗の略称</dt><dd className={styles.summaryValue}>{alias || name}</dd></div>
                     </dl>
                   </div>
-                  {connectionError ? <p role="alert" className={styles.errorBox}>{connectionError}</p> : null}
+                  {connectionError ? <Notice tone="danger" className={styles.errorBoxNoticePlacement} >{connectionError}</Notice> : null}
                 </>
               )
             ) : null}

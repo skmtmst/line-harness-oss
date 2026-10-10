@@ -11,14 +11,24 @@
  * データ（読み込み・絞り込み・続き・差し込みの解決）は components/chats/template-picker の今の処理を使い、
  * ここは見た目だけを受け持つ。
  */
-import type { RefObject } from 'react'
-import { CornerDownLeft, FolderOpen, Send } from 'lucide-react'
-import { EntityPickerDialog } from '@/components/shared/entity-picker'
-import Button from '@/components/shared/button'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import Toggle from '@/components/shared/toggle'
-import SearchField from '@/components/shared/search-field'
-import styles from '@/components/shared/entity-picker.module.css'
+import type { RefObject } from "react"
+import { CornerDownLeft, FolderOpen, Send } from "lucide-react"
+import { EntityPickerDialog } from "@/components/shared/entity-picker"
+import Button from "@/components/shared/button"
+import FolderPanel, { type FolderPanelRow } from "@/components/shared/folder-panel"
+import Toggle from "@/components/shared/toggle"
+import SearchField from "@/components/shared/search-field"
+import styles from "@/components/shared/entity-picker.module.css"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
 
 export type TemplatePickerSideKey = 'frequent' | 'all' | 'none' | `folder:${string}`
 

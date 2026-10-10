@@ -1,52 +1,104 @@
 'use client'
 
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useFolderMove } from '@/components/shared/use-folder-move'
-import { moveEventToFolder } from '@/lib/move-to-folder'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Bookmark, CalendarClock, CalendarX, Eye, Hourglass, Plus, TrendingDown, TriangleAlert, Users } from 'lucide-react'
-import type { Folder } from '@line-crm/shared'
-import { api, ApiError, eventsApi, fetchApi, type EventListItem, type EventListSummary } from '@/lib/api'
-import { clampSearchQuery, SEARCH_QUERY_MAX_LENGTH } from '@/lib/search-query'
-import { withRequestTimeout } from '@/lib/request-timeout'
-import { useAccount } from '@/contexts/account-context'
-import { useStaffRole } from '@/lib/staff-role'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { ListPage } from '@/components/templates'
-import Button from '@/components/shared/button'
-import EmptyList from '@/components/shared/empty-list'
-import TagPill from '@/components/shared/tag-pill'
-import Select from '@/components/shared/select'
-import ListToolbar from '@/components/shared/list-toolbar'
-import FilterChip from '@/components/shared/filter-chip'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import Notice from '@/components/shared/notice'
-import HelpTip from '@/components/shared/help-tip'
-import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
-import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
-import { FolderDotName } from '@/components/shared/folder-dot'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import DetailPanel from '@/components/shared/detail-panel'
-import InlineEdit from '@/components/shared/inline-edit'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { notifyToast } from '@/components/shared/toast'
-import { RowMenu } from '@/components/shared/row-actions'
-import { withViewTransition } from '@/components/shared/view-transition'
-import Pagination from '@/components/shared/pagination'
-import ListRange from '@/components/ui/list-range'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import { daysUntilIso, eventRowState, isLowApplication, summarizeEventAttention, type EventRowState } from './attention'
-import { jstDay, jstTime } from './shared'
-import styles from './list.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
-import StatusBadge from '@/components/shared/status-badge'
+import { useListUrlValue } from "@/components/shared/list-url-state"
+import { useFolderMove } from "@/components/shared/use-folder-move"
+import { moveEventToFolder } from "@/lib/move-to-folder"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Bookmark, CalendarClock, CalendarX, Eye, Hourglass, Plus, TrendingDown, TriangleAlert, Users } from "lucide-react"
+import type { Folder } from "@line-crm/shared"
+import { api, ApiError, eventsApi, fetchApi, type EventListItem, type EventListSummary } from "@/lib/api"
+import { clampSearchQuery, SEARCH_QUERY_MAX_LENGTH } from "@/lib/search-query"
+import { withRequestTimeout } from "@/lib/request-timeout"
+import { useAccount } from "@/contexts/account-context"
+import { useStaffRole } from "@/lib/staff-role"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import { ListPage } from "@/components/templates"
+import Button from "@/components/shared/button"
+import EmptyList from "@/components/shared/empty-list"
+import TagPill from "@/components/shared/tag-pill"
+import Select from "@/components/shared/select"
+import ListToolbar from "@/components/shared/list-toolbar"
+import FilterChip from "@/components/shared/filter-chip"
+import KpiBand from "@/components/shared/kpi-band"
+import KpiCard from "@/components/shared/kpi-card"
+import Notice from "@/components/shared/notice"
+import HelpTip from "@/components/shared/help-tip"
+import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from "@/components/shared/table"
+import ManagedFolderPanel, { managedFolderNavRows } from "@/components/shared/managed-folder-panel"
+import { FolderDotName } from "@/components/shared/folder-dot"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import DetailPanel from "@/components/shared/detail-panel"
+import InlineEdit from "@/components/shared/inline-edit"
+import ContextMenu, { type ContextMenuItem } from "@/components/shared/context-menu"
+import { type ActionMenuItem } from "@/components/shared/action-menu"
+import { notifyToast } from "@/components/shared/toast"
+import { RowMenu } from "@/components/shared/row-actions"
+import { withViewTransition } from "@/components/shared/view-transition"
+import Pagination from "@/components/shared/pagination"
+import ListRange from "@/components/ui/list-range"
+import { DelayedSkeleton, Skeleton } from "@/components/shared/skeleton"
+import { daysUntilIso, eventRowState, isLowApplication, summarizeEventAttention, type EventRowState } from "./attention"
+import { jstDay, jstTime } from "./shared"
+import styles from "./list.module.css"
+import TruncatedText from "@/components/shared/truncated-text"
+import { emptyValue } from "@/components/shared/empty-value"
+import { SaveErrorField } from "@/components/shared/save-form-errors"
+import StatusBadge from "@/components/shared/status-badge"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+import ListState from "@/components/shared/list-state"
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from "@/components/shared/page-size-select"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8 イベント予約の一覧（Pencil `e2ekFu`）。
@@ -57,11 +109,15 @@ import StatusBadge from '@/components/shared/status-badge'
  * （src/app/events/events-list-v8.tsx）と同じ。行の名前の前にフォルダの色の丸（2026-10-07 オーナー）。
  */
 
+
+
+
+
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /** 未分類を表す印。裏側（events.ts）が `__ungrouped__` で受ける。 */
 const UNFILED = '__ungrouped__'
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 const VIEWER_NOTE = '閲覧のみで見ています。イベントを作る・直す・消す操作はオーナーか管理者に頼んでください。'
 
 /*
@@ -364,10 +420,8 @@ export default function EventsListV8() {
       placeholder="例：教室"
     >
       {foldersError ? (
-        <p role="alert" className={styles.folderNote}>
-          フォルダを読み込めませんでした。
-          <button type="button" onClick={() => void loadFolders()} className={styles.textButton}>もう一度</button>
-        </p>
+        <Notice tone="danger" className={styles.folderNoteNoticePlacement} >フォルダを読み込めませんでした。
+          <button type="button" onClick={() => void loadFolders()} className={styles.textButton}>もう一度</button></Notice>
       ) : null}
     </ManagedFolderPanel>
   )
@@ -463,12 +517,7 @@ export default function EventsListV8() {
   )
 
   const stateCard = (icon: ReactNode, title: string, desc: string, action?: ReactNode, error = false) => (
-    <div className={styles.stateCard}>
-      <span className={styles.stateIcon} data-tone={error ? 'error' : undefined}>{icon}</span>
-      <p className={styles.stateTitle}>{title}</p>
-      <p className={styles.stateDesc}>{desc}</p>
-      {action}
-    </div>
+    <ListState kind={error ? 'error' : 'empty'} title={title} description={desc} icon={icon} action={<>{action}</>} />
   )
 
   let listBody: ReactNode
@@ -675,10 +724,7 @@ export default function EventsListV8() {
       folderWidth={200}
 
       tabs={!canEdit ? (
-        <div className={styles.viewerBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>{VIEWER_NOTE}</span>
-        </div>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div>
       ) : undefined}
       stats={(
         <KpiBand data-design="KPIs">

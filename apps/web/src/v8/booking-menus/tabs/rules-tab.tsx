@@ -1,35 +1,51 @@
 'use client'
-import { notifySaved } from '@/components/shared/toast'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import Button from '@/components/shared/button'
-import Select from '@/components/shared/select'
-import { TextField } from '@/components/shared/text-field'
-import { TimeField } from '@/components/shared/date-time-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
-import Disclosure from '@/components/shared/disclosure'
-import HelpTip from '@/components/shared/help-tip'
-import { notifyToast } from '@/components/shared/toast'
-import { bookingApi, type BookingSettings, type BookingStaff } from '@/lib/api'
-import { formatHoursBeforeHint, formatMinutesLengthHint } from '@/lib/format-duration'
-import { bookingWindowEnd } from '../lib/format-time'
-import { BEFORE_MINUTE_CHOICES, MAX_ACTIVE_CHOICES, WINDOW_DAY_CHOICES, beforeLabel, withCurrent } from '../lib/rule-choices'
-import { bookingRulesErrorMessage } from '../lib/menu-validation'
-import {
-  AccountIcon,
-  Band,
-  StateCard,
-  SkeletonRows,
-  useV8TabEdit,
-  type LoadStatus,
-} from './shared'
-import styles from '../settings.module.css'
-import { Field } from '@/components/shared/form-controls'
-import { emptyValue } from '@/components/shared/empty-value'
-import NumberInput from '@/components/shared/number-field'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { notifySaved } from "@/components/shared/toast"
+import { useEffect, useMemo, useRef, useState } from "react"
+import Button from "@/components/shared/button"
+import Select from "@/components/shared/select"
+import { TextField } from "@/components/shared/text-field"
+import { TimeField } from "@/components/shared/date-time-field"
+import { SettingCheckbox } from "@/components/shared/checkbox"
+import Disclosure from "@/components/shared/disclosure"
+import HelpTip from "@/components/shared/help-tip"
+import { bookingApi, type BookingSettings, type BookingStaff } from "@/lib/api"
+import { formatHoursBeforeHint, formatMinutesLengthHint } from "@/lib/format-duration"
+import { bookingWindowEnd } from "../lib/format-time"
+import { BEFORE_MINUTE_CHOICES, MAX_ACTIVE_CHOICES, WINDOW_DAY_CHOICES, beforeLabel, withCurrent } from "../lib/rule-choices"
+import { bookingRulesErrorMessage } from "../lib/menu-validation"
+import { AccountIcon, Band, StateCard, SkeletonRows, useV8TabEdit, type LoadStatus } from "./shared"
+import styles from "../settings.module.css"
+import { Field } from "@/components/shared/form-controls"
+import { emptyValue } from "@/components/shared/empty-value"
+import NumberInput from "@/components/shared/number-field"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /* ④ 予約のルール（x1OZS6）。絵に無い設定は「ほかの設定」で開く。 */
+
+
 
 /* 候補は v7（/booking/menus の BookingRulesEditor）と同じ。 */
 const TIME_ZONE_CHOICES = [
@@ -412,12 +428,10 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
         </Disclosure>
 
         {saveError ? (
-          <p className="text-danger text-sm" role="alert">
-            {saveError}
+          <Notice tone="danger" >{saveError}
             {saveError.includes('先に保存') ? (
               <button type="button" className="text-action ml-2 font-semibold underline" onClick={onReload}>最新の内容を読み直す</button>
-            ) : null}
-          </p>
+            ) : null}</Notice>
         ) : null}
       </div>
     </div></SaveErrorScope>

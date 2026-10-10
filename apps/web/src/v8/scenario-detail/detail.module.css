@@ -216,11 +216,6 @@
   line-height: var(--tpl-sd-band-lh);
 }
 
-.viewerBand {
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-}
-
 .startedBand {
   outline: 1px solid var(--color-hairline);
   outline-offset: -1px;

@@ -1,54 +1,103 @@
 'use client'
-import Toggle from '@/components/shared/toggle';
+import Toggle from "@/components/shared/toggle"
+import { canManageRole, useStaffRole } from "@/lib/staff-role"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+import { createPageReturnHref } from "@/components/shared/create-page"
+import { notifySaved } from "@/components/shared/toast"
+import { useFeatureAccess } from "@/lib/use-feature-access"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
+import { GripVertical, Plus, Send, X } from "lucide-react"
+import { tapExtrasError, type TapExtras, type Folder, type MediaItem } from "@line-crm/shared"
+import { tapExtraSaveError } from "@/lib/tap-actions"
+import { api } from "@/lib/api"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import { useAccount } from "@/contexts/account-context"
+import { usePageTitle } from "@/components/shell/page-chrome"
+import TapExtrasField from "@/components/shared/tap-extras-field"
+import Button from "@/components/shared/button"
+import Notice from "@/components/shared/notice"
+import Card from "@/components/shared/card"
+import Dialog from "@/components/shared/dialog"
+import ActionMenu from "@/components/shared/action-menu"
+import ReorderHandle, { useReorder } from "@/components/shared/reorder-handle"
+import Combobox from "@/components/shared/combobox"
+import DateTimeField from "@/components/shared/date-time-field"
+import LinePreview from "@/components/shared/line-preview"
+import SegmentedControl from "@/components/shared/segmented"
+import Select from "@/components/shared/select"
+import FolderSelect, { folderByName, folderCreator, hostFolderCreate } from "@/components/shared/folder-select"
+import { TextField } from "@/components/shared/text-field"
+import { SettingCheckbox } from "@/components/shared/checkbox"
+import InlineActionRowsV8 from "@/components/auto-replies/inline-action-rows-v8"
+import { useActionOptions } from "@/components/auto-replies/inline-action-list"
+import { readInlineActions, toActionPayload, type InlineAction } from "@/components/auto-replies/draft-fields"
+import { TemplateEditFrame } from "./frame"
+import type { TemplateEditHost } from "./host"
+import MediaPickerDialog from "@/components/shared/media-picker-dialog"
+import MediaSlot from "@/components/shared/media-slot"
+import { FieldError, Field } from "@/components/shared/form-controls"
+import { useFormErrors } from "@/lib/use-form-errors"
+import { uploadToMediaLibrary } from "@/components/shared/media-library-upload"
+import styles from "./edit.module.css"
+import { emptyValue } from "@/components/shared/empty-value"
+import NumberInput from "@/components/shared/number-field"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import ImageFrame from "@/components/shared/image-frame"
+import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
 
-import { canManageRole } from '@/lib/staff-role';
-import { createPageReturnHref } from '@/components/shared/create-page'
-import { notifySaved } from '@/components/shared/toast'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { GripVertical, Plus, Send, X } from 'lucide-react'
-import { tapExtrasError, type TapExtras, type Folder, type MediaItem } from '@line-crm/shared'
-import { tapExtraSaveError } from '@/lib/tap-actions'
-import { api } from '@/lib/api'
-import { useStaffRole } from '@/lib/staff-role'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { useAccount } from '@/contexts/account-context'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import TapExtrasField from '@/components/shared/tap-extras-field'
-import Button from '@/components/shared/button'
-import Notice from '@/components/shared/notice'
-import Card from '@/components/shared/card'
-import Dialog from '@/components/shared/dialog'
-import ActionMenu from '@/components/shared/action-menu'
-import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
-import Combobox from '@/components/shared/combobox'
-import DateTimeField from '@/components/shared/date-time-field'
-import LinePreview from '@/components/shared/line-preview'
-import SegmentedControl from '@/components/shared/segmented'
-import Select from '@/components/shared/select'
-import FolderSelect, { folderByName, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
-import { TextField } from '@/components/shared/text-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
-import { notifyToast } from '@/components/shared/toast'
-import InlineActionRowsV8 from '@/components/auto-replies/inline-action-rows-v8'
-import { useActionOptions } from '@/components/auto-replies/inline-action-list'
-import { readInlineActions, toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
-import { TemplateEditFrame } from './frame'
-import type { TemplateEditHost } from './host'
-import MediaPickerDialog from '@/components/shared/media-picker-dialog'
-import MediaSlot from '@/components/shared/media-slot'
-import { FieldError } from '@/components/shared/form-controls'
-import { useFormErrors } from '@/lib/use-form-errors'
-import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
-import styles from './edit.module.css'
-import { Field } from '@/components/shared/form-controls'
-import { emptyValue } from '@/components/shared/empty-value'
-import NumberInput from '@/components/shared/number-field'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import ImageFrame from '@/components/shared/image-frame'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8「クーポンを作る」（絵 S6FEuB）・「リサーチを作る」（絵 EsYo4）。
@@ -418,7 +467,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         boardId={meta.board}
         title={meta.heading}
         description={meta.lead}
-        band={<p className={styles.readonly} role="status">閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</p>}
+        band={<ReadOnlyNotice>閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</ReadOnlyNotice>}
         side={sideCard}
       >
         <Card padding="none" layout="vertical" className={styles.card}>
@@ -483,7 +532,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         )}
       >
         {host?.notice}
-        {error ? <p role="alert" className={styles.error}>{error}</p> : null}
+        {error ? <Notice tone="danger" >{error}</Notice> : null}
         {null}
         {nameCard}
 

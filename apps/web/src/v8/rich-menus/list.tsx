@@ -1,88 +1,116 @@
 'use client'
 
-import { canManageRole } from '@/lib/staff-role';
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
-import { formatDate as polishFormatDate } from '@/lib/format'
-import { ListToolbarSort } from '@/components/shared/list-toolbar'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
-import { useListUrlValue, useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import {
-  ArrowDownUp,
-  CalendarClock,
-  CircleCheck,
-  CloudDownload,
-  CloudOff,
-  Eye,
-  FilePen,
-  Hand,
-  Image as ImageIcon,
-  ListOrdered,
-  Plus,
-  Split,
-  TriangleAlert,
-  Trophy,
-} from 'lucide-react'
-import type { Folder } from '@line-crm/shared'
-import { api, ApiError, type RichMenuDeleteImpact, type RichMenuGroupListItem, type RichMenuTapStats } from '@/lib/api'
-import { clampSearchQuery } from '@/lib/search-query'
-import type { SegmentCondition } from '@/lib/segment-condition'
-import { describeCondition } from '@/components/scenarios/scenario-dialogs'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { useRowLeaving } from '@/lib/use-row-leaving'
-import { formatDay, formatNumber } from '@/lib/format'
-import { runOptimistic } from '@/lib/undoable'
-import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
-import { ListPage } from '@/components/templates'
-import ListToolbar from '@/components/shared/list-toolbar'
-import SearchField from '@/components/shared/search-field'
-import DetailPanel from '@/components/shared/detail-panel'
-import Button from '@/components/shared/button'
-import EmptyList from '@/components/shared/empty-list'
-import Select from '@/components/shared/select'
-import FilterChip from '@/components/shared/filter-chip'
-import Notice from '@/components/shared/notice'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
-import { FolderDotName } from '@/components/shared/folder-dot'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
-import Pagination from '@/components/shared/pagination'
-import { DelayedSkeleton } from '@/components/shared/skeleton'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import ReorderHandle from '@/components/shared/reorder-handle'
-import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
-import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
-import {
-  audienceReason,
-  audienceText,
-  blockerTexts,
-  canDelete as canDeleteImpact,
-  impactFromError,
-  impactMatchesRequest,
-  nextDisplayText,
-  referenceKindText,
-  sameDeleteImpactRequest,
-  type DeleteImpactRequest,
-} from './delete-impact'
-import { moveTargetingGroup, orderTargetingGroups, withNormalizedPriority } from './targeting-order'
-import { ExternalImportWorkspace, type LineMenu } from './external-import'
-import { richMenuError, richMenuErrorAll } from './errors'
-import BlockedDeleteDialog, { type BlockedRow } from './blocked-dialog'
-import styles from './list.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
-import { notifyToast } from '@/components/shared/toast'
+import { canManageRole, useStaffRole } from "@/lib/staff-role"
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from "@/components/shared/list-toolbar"
+import { formatDate as polishFormatDate, formatDay, formatNumber } from "@/lib/format"
+import { useFeatureAccess } from "@/lib/use-feature-access"
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react"
+import { useListUrlValue, useListScrollMemory, useListUrlState, useOnAccountSwitch } from "@/components/shared/list-url-state"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { ArrowDownUp, CalendarClock, CircleCheck, CloudDownload, CloudOff, FilePen, Hand, Image as ImageIcon, ListOrdered, Plus, Split, TriangleAlert, Trophy } from "lucide-react"
+import type { Folder } from "@line-crm/shared"
+import { api, ApiError, type RichMenuDeleteImpact, type RichMenuGroupListItem, type RichMenuTapStats } from "@/lib/api"
+import { clampSearchQuery } from "@/lib/search-query"
+import type { SegmentCondition } from "@/lib/segment-condition"
+import { describeCondition } from "@/components/scenarios/scenario-dialogs"
+import { useAccount } from "@/contexts/account-context"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import { useNarrowViewport } from "@/lib/use-narrow-viewport"
+import { useRowLeaving } from "@/lib/use-row-leaving"
+import { runOptimistic } from "@/lib/undoable"
+import { isForbiddenOrRateLimited, loadFailureCopy } from "@/components/shared/api-error-message"
+import { ListPage } from "@/components/templates"
+import SearchField from "@/components/shared/search-field"
+import DetailPanel from "@/components/shared/detail-panel"
+import Button from "@/components/shared/button"
+import EmptyList from "@/components/shared/empty-list"
+import Select from "@/components/shared/select"
+import FilterChip from "@/components/shared/filter-chip"
+import Notice from "@/components/shared/notice"
+import KpiBand from "@/components/shared/kpi-band"
+import KpiCard from "@/components/shared/kpi-card"
+import ManagedFolderPanel, { managedFolderNavRows } from "@/components/shared/managed-folder-panel"
+import { FolderDotName } from "@/components/shared/folder-dot"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import { type ActionMenuItem } from "@/components/shared/action-menu"
+import { RowMenu } from "@/components/shared/row-actions"
+import Pagination from "@/components/shared/pagination"
+import { DelayedSkeleton } from "@/components/shared/skeleton"
+import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
+import ReorderHandle from "@/components/shared/reorder-handle"
+import { useFlipRows, useLiveReorder } from "@/lib/use-live-reorder"
+import { ApplyToTagModal } from "@/components/rich-menus/apply-to-tag-modal"
+import { audienceReason, audienceText, blockerTexts, canDelete as canDeleteImpact, impactFromError, impactMatchesRequest, nextDisplayText, referenceKindText, sameDeleteImpactRequest, type DeleteImpactRequest } from "./delete-impact"
+import { moveTargetingGroup, orderTargetingGroups, withNormalizedPriority } from "./targeting-order"
+import { ExternalImportWorkspace, type LineMenu } from "./external-import"
+import { richMenuError, richMenuErrorAll } from "./errors"
+import BlockedDeleteDialog, { type BlockedRow } from "./blocked-dialog"
+import styles from "./list.module.css"
+import TruncatedText from "@/components/shared/truncated-text"
+import { emptyValue } from "@/components/shared/empty-value"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import { useDuplicateFeedback } from "@/components/shared/use-duplicate-feedback"
+import { notifyToast } from "@/components/shared/toast"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+import ListState from "@/components/shared/list-state"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8 リッチメニューの一覧（Pencil「★V8 画面の地図」のリッチメニューの行：
@@ -92,6 +120,9 @@ import { notifyToast } from '@/components/shared/toast'
  * 直さず、型（ListPage）と共通部品で一から書いた。データの口・権限・失敗時の
  * 扱いは古い一覧と同じ（BEHAVIOR.md）。
  */
+
+
+
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
 const UNFILED = '__unfiled__'
@@ -1017,12 +1048,7 @@ export default function RichMenusListV8() {
   )
 
   const stateCard = (icon: React.ReactNode, title: string, desc: string, action: React.ReactNode, tone?: 'error') => (
-    <div className={styles.stateCard}>
-      <span className={tone === 'error' ? `${styles.stateIcon} ${styles.stateIconError}` : styles.stateIcon}>{icon}</span>
-      <p className={styles.stateTitle}>{title}</p>
-      <p className={styles.stateDesc}>{desc}</p>
-      {action}
-    </div>
+    <ListState kind={tone === 'error' ? 'error' : 'empty'} title={title} description={desc} icon={icon} action={<>{action}</>} />
   )
 
   const listBody = !selectedAccount ? (
@@ -1295,7 +1321,7 @@ export default function RichMenusListV8() {
           {impactPhase === 'loading' ? (
             <p className={styles.impactFaint}>消したときの影響を確認しています…</p>
           ) : impactPhase === 'error' ? (
-            <p className={styles.impactDanger} role="alert">消したときの影響を確認できませんでした。読み直してから、もう一度お試しください。</p>
+            <Notice tone="danger" >消したときの影響を確認できませんでした。読み直してから、もう一度お試しください。</Notice>
           ) : impact ? (
             <div className={styles.impactDetail}>
               <p>
@@ -1350,10 +1376,7 @@ export default function RichMenusListV8() {
       stats={<>
         {/* 見るだけの人への帯（ZoKow）。数の帯の上。 */}
         {!canEdit ? (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
         <KpiBand data-design="KPIs" className={styles.kpis}>
           <KpiCard
@@ -1469,10 +1492,7 @@ export default function RichMenusListV8() {
     </>}
     >
       {actionError ? (
-        <p className={styles.errorBand} role="alert">
-          {actionError}
-          <button type="button" onClick={() => void reload()}>もう一度読み込む</button>
-        </p>
+        <Notice tone="danger" >{actionError}<button type="button" onClick={() => void reload()}>もう一度読み込む</button></Notice>
       ) : null}
       {listBody}
     </ListPage></SaveErrorScope>

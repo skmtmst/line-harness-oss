@@ -1,31 +1,57 @@
 'use client'
 
-import { createPageReturnHref } from '@/components/shared/create-page'
-import { Suspense, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronDown, ChevronUp, Inbox, RefreshCw, Send } from 'lucide-react'
-import { EC_EVENT_TYPES, ecEventLabel } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { CreatePage } from '@/components/templates'
-import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
-import { TextField } from '@/components/shared/text-field'
-import { Field } from '@/components/shared/form-controls'
-import Checkbox from '@/components/shared/checkbox'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
-import { isStepUpRequired, useStepUpGate } from '@/components/step-up-prompt'
-import { MIN_SECRET_LENGTH, generateSecret } from './secret'
-import styles from './create.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { createPageReturnHref } from "@/components/shared/create-page"
+import { Suspense, useEffect, useRef, useState } from "react"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
+import { ChevronDown, ChevronUp, Inbox, RefreshCw, Send } from "lucide-react"
+import { EC_EVENT_TYPES, ecEventLabel } from "@line-crm/shared"
+import { api, ApiError } from "@/lib/api"
+import { useAccount } from "@/contexts/account-context"
+import { usePageTitle } from "@/components/shell/page-chrome"
+import { useStaffRole } from "@/lib/staff-role"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import { CreatePage } from "@/components/templates"
+import Button from "@/components/shared/button"
+import Card from "@/components/shared/card"
+import { TextField } from "@/components/shared/text-field"
+import { Field } from "@/components/shared/form-controls"
+import Checkbox from "@/components/shared/checkbox"
+import RadioCard, { RadioCardGroup } from "@/components/shared/radio-card"
+import Notice from "@/components/shared/notice"
+import Select from "@/components/shared/select"
+import { isStepUpRequired, useStepUpGate } from "@/components/step-up-prompt"
+import { MIN_SECRET_LENGTH, generateSecret } from "./secret"
+import styles from "./create.module.css"
+import { permissionDeniedMessage } from "@/components/shared/api-error-message"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8 外部連携「送り先を作る」（Pencil `hsD8e`、競合 `NGh7b`）。

@@ -16,7 +16,7 @@ import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
-import { Field, OptionalBadge } from '@/components/shared/form-controls'
+import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import BranchEditors, { newBranchStep, updateBranchStep, type BranchPatch } from './branch-editor'
@@ -283,10 +283,7 @@ export function CommonActionNew() {
         </div>
         {resourcesLoading ? <ListState kind="loading" title="選択肢を読み込んでいます" /> : null}
         {!resourcesLoading && resourcesFailed ? (
-          <div className={styles.errorBand} role="alert">
-            <p>{`${resourcesError} 入力した名前や処理はそのままです。`}</p>
-            <Button onClick={() => setResourcesReloadKey((key) => key + 1)}>選択肢をもう一度読み込む</Button>
-          </div>
+          <Notice tone="danger" ><p>{`${resourcesError} 入力した名前や処理はそのままです。`}</p><Button onClick={() => setResourcesReloadKey((key) => key + 1)}>選択肢をもう一度読み込む</Button></Notice>
         ) : null}
             <ActionList value={actions} onChange={setActions} idOf={step =>step.id} addId="ca-add-step"
           choices={[...commonActionChoices(resources), { id: 'branch', label: '条件で分ける', make: newBranchStep}]}

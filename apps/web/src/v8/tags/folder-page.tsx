@@ -1,21 +1,38 @@
 'use client'
-import { Suspense, useEffect, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { FolderCheck, FolderPlus, Trash2 } from 'lucide-react'
-import { ApiError, api } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import Notice from '@/components/shared/notice'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
-import ListState from '@/components/shared/list-state'
-import TagsList from './list'
-import styles from './create.module.css'
-import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { Suspense, useEffect, useRef, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { FolderCheck, FolderPlus, Trash2 } from "lucide-react"
+import { ApiError, api } from "@/lib/api"
+import { useAccount } from "@/contexts/account-context"
+import Button from "@/components/shared/button"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import FolderEditorDialog from "@/components/shared/folder-editor-dialog"
+import { canManageRole, useStaffRole } from "@/lib/staff-role"
+import { folderDisplayColor } from "@/components/shared/folder-dot"
+import ListState from "@/components/shared/list-state"
+import TagsList from "./list"
+import styles from "./create.module.css"
+import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from "./folder-colors"
+import { permissionDeniedMessage } from "@/components/shared/api-error-message"
+import { SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -28,6 +45,8 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
  */
 
 /* 絵の9色。保存する値は色コード、読み上げと見出しは名前。既定は緑（基調色）。 */
+
+
 
 
 export { TAG_FOLDER_COLORS } from './folder-colors'
@@ -174,7 +193,7 @@ function TagFolderPage() {
     }
   }
 
-  if (!canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></SaveErrorScope>
+  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></SaveErrorScope>
 
   /* 止まっている理由は押せない見た目だけにせず、ボタンの title と本文に出す。 */
   const blockedReason =

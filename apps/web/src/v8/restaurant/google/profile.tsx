@@ -1,22 +1,41 @@
 'use client'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { CalendarDays, CalendarX, Clock, GitCompare, History, Pencil, RefreshCw, Timer } from 'lucide-react'
-import Card from '@/components/shared/card'
-import SectionHeader from '@/components/shared/section-header'
-import Button from '@/components/shared/button'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import HelpTip from '@/components/shared/help-tip'
-import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
-import StatusBadge from '@/components/shared/status-badge'
-import { restaurantGoogleApi, type GoogleHoursProposal, type GoogleProfileAddress, type GoogleProfileData } from '@/lib/restaurant-google-api'
-import { errorMessage, formatPeriods, formatStampFull, formatYmdShort, summarizeWeekly, TIME_OPTIONS } from './format'
-import type { GoogleNav } from './google'
-import styles from './google.module.css'
-import TextLink from '@/components/shared/text-link'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { useCallback, useEffect, useRef, useState } from "react"
+import { CalendarDays, CalendarX, Clock, GitCompare, History, Pencil, RefreshCw, Timer } from "lucide-react"
+import Card from "@/components/shared/card"
+import SectionHeader from "@/components/shared/section-header"
+import Button from "@/components/shared/button"
+import { canManageRole, useStaffRole } from "@/lib/staff-role"
+import HelpTip from "@/components/shared/help-tip"
+import ListState from "@/components/shared/list-state"
+import Notice from "@/components/shared/notice"
+import Select from "@/components/shared/select"
+import StatusBadge from "@/components/shared/status-badge"
+import { restaurantGoogleApi, type GoogleHoursProposal, type GoogleProfileAddress, type GoogleProfileData } from "@/lib/restaurant-google-api"
+import { errorMessage, formatPeriods, formatStampFull, formatYmdShort, summarizeWeekly, TIME_OPTIONS } from "./format"
+import type { GoogleNav } from "./google"
+import styles from "./google.module.css"
+import TextLink from "@/components/shared/text-link"
+import { emptyValue } from "@/components/shared/empty-value"
+import { SaveErrorField } from "@/components/shared/save-form-errors"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -25,6 +44,8 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
  * 口は今の画面と同じ。営業時間の変更・変更の確認・変更履歴・プロフィールの編集は
  * ?tab=profile&view=hours|confirm|history|edit へ移り、入口の page.tsx が今の画面で出す。
  */
+
+
 
 function addressText(a: GoogleProfileAddress | null | undefined): string {
   if (!a) return '—'
@@ -112,7 +133,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
 
   return (
     <>
-      {!canManageRole(role) ? <Notice tone="info">閲覧のみです。営業時間と店舗情報を確認できます。</Notice> : null}
+      {role !== null && !canManageRole(role) ? <ReadOnlyNotice>閲覧のみです。営業時間と店舗情報を確認できます。</ReadOnlyNotice> : null}
       {data.stale ? <Notice tone="warn" action={<Button variant="text" onClick={() => void load(true)} busy={syncing} busyLabel="取得中…">もう一度取得</Button>}>{`Googleから最新の情報を読み込めませんでした。前回取得した内容（${formatStampFull(data.fetchedAt)}）を表示しています。`}</Notice> : null}
       {!data.stale && data.closed ? <Notice tone="danger">Google側で「臨時休業」または「閉業」になっています。営業時間の変更はGoogleビジネスプロフィールで営業状態を戻してから行ってください。</Notice> : null}
       {!data.stale && !data.closed && data.pendingChangeCount > 0 ? <Notice tone="info" action={<Button variant="text" onClick={() => go({ tab: 'profile', view: 'history', result: 'pending' })}>状態を確認</Button>}>{`Googleに変更を送信しました。反映を確認できるまで「反映確認中」と表示します（${data.pendingChangeCount} 件）。`}</Notice> : null}

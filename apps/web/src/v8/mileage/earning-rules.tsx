@@ -1,56 +1,81 @@
 'use client'
 
-import { jstDateOffset } from '@/lib/jst-datetime'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { jstDate } from '@/lib/jst-datetime'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { ArrowDown, ArrowUp, Bookmark, CircleDot, Clock3, Coins, Download, Gift, ListOrdered, Plus, Wallet } from 'lucide-react'
-import { useAccount } from '@/contexts/account-context'
-import { adminSessionHeaders } from '@/lib/admin-session'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import {
-  api,
-  type MileageAdminHistory,
-  type MileageEarningRuleTestResult,
-  type MileageEarningRuleV6,
-  type MileageEarningRulesV6Overview,
-} from '@/lib/api'
-import { RowMenu } from '@/components/shared/row-actions'
-import Button from '@/components/shared/button'
-import EmptyList from '@/components/shared/empty-list'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import FilterChip from '@/components/shared/filter-chip'
-import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
-import IconButton from '@/components/shared/icon-button'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import ListState from '@/components/shared/list-state'
-import ListToolbar from '@/components/shared/list-toolbar'
-import Notice from '@/components/shared/notice'
-import Pagination from '@/components/shared/pagination'
-import SearchField from '@/components/shared/search-field'
-import Select from '@/components/shared/select'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { FolderDotName } from '@/components/shared/folder-dot'
-import { ListPagePagination } from '@/components/templates'
-import {
-  describeMileageCsvExportFailure,
-  formatMileageDate,
-  formatMileageMonthDay,
-  formatMileageNumber,
-  isMileageFriendsV6Overview,
-  ruleEventLabel,
-} from './display'
-import { CreateButton, MileageFrame, useMileageShell } from './frame'
-import { notifyToast } from '@/components/shared/toast'
-import styles from './mileage.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { jstDateOffset } from "@/lib/jst-datetime"
+import { useListUrlValue } from "@/components/shared/list-url-state"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
+import { ArrowDown, ArrowUp, Bookmark, CircleDot, Clock3, Coins, Download, Gift, ListOrdered, Plus, Wallet } from "lucide-react"
+import { useAccount } from "@/contexts/account-context"
+import { adminSessionHeaders } from "@/lib/admin-session"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import { api, type MileageAdminHistory, type MileageEarningRuleTestResult, type MileageEarningRuleV6, type MileageEarningRulesV6Overview } from "@/lib/api"
+import { RowMenu } from "@/components/shared/row-actions"
+import Button from "@/components/shared/button"
+import EmptyList from "@/components/shared/empty-list"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import Dialog from "@/components/shared/dialog"
+import FilterChip from "@/components/shared/filter-chip"
+import ManagedFolderPanel from "@/components/shared/managed-folder-panel"
+import IconButton from "@/components/shared/icon-button"
+import KpiBand from "@/components/shared/kpi-band"
+import KpiCard from "@/components/shared/kpi-card"
+import ListState from "@/components/shared/list-state"
+import ListToolbar from "@/components/shared/list-toolbar"
+import Notice from "@/components/shared/notice"
+import Pagination from "@/components/shared/pagination"
+import SearchField from "@/components/shared/search-field"
+import Select from "@/components/shared/select"
+import { DataTable, TableHeadRow, Td, Th, Tr } from "@/components/shared/table"
+import { FolderDotName } from "@/components/shared/folder-dot"
+import { ListPagePagination } from "@/components/templates"
+import { describeMileageCsvExportFailure, formatMileageDate, formatMileageMonthDay, formatMileageNumber, isMileageFriendsV6Overview, ruleEventLabel } from "./display"
+import { CreateButton, MileageFrame, useMileageShell } from "./frame"
+import { notifyToast } from "@/components/shared/toast"
+import styles from "./mileage.module.css"
+import TruncatedText from "@/components/shared/truncated-text"
+import { csvFileName } from "@/lib/csv-file-name"
+import { emptyValue } from "@/components/shared/empty-value"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import { PAGE_SIZE_SELECT_OPTIONS } from "@/components/shared/page-size-select"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8 マイル「たまる決めごと」（板 `OC0gy`・1152 `ZJIyl`・閲覧のみ `E2Any`、
@@ -63,6 +88,8 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * フォルダの列に割り当てる API は無いので、きっかけの種類で分けた
  * 見え方の切り替えとして持つ（保存はしない）。
  */
+
+
 
 const EVENT_LABELS: Record<string, string> = {
   friend_added: '友だち追加',
@@ -161,7 +188,7 @@ const PRESETS: Array<{ value: string; label: string; active: boolean; pending: b
   { value: 'pending', label: '確定待ちありのみ', active: false, pending: true, stopped: false, sort: 'order' },
 ]
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((size) => ({ value: String(size), label: `${size} 件表示` }))
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 export default function EarningRulesTab() {
   const saveErrors = useSaveFormErrors()

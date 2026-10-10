@@ -1,42 +1,82 @@
 'use client'
-import { createPageReturnHref } from '@/components/shared/create-page'
-import { notifySaved } from '@/components/shared/toast'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { CircleSlash, Send } from 'lucide-react'
-import { type TapExtras, type Folder, type MediaItem, type TemplateImagemapUpload } from '@line-crm/shared'
-import { api } from '@/lib/api'
-import { useStaffRole } from '@/lib/staff-role'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { useAccount } from '@/contexts/account-context'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
-import LayoutPicker from '@/components/shared/layout-picker'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import LinePreview from '@/components/shared/line-preview'
-import TapAreaEditor from '@/components/shared/tap-area-editor'
-import FolderSelect, { folderByName, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
-import { TextField } from '@/components/shared/text-field'
-import { notifyToast } from '@/components/shared/toast'
-import { japaneseDetailOf } from '@/components/shared/api-error-message'
-import TapActionField from '@/components/shared/tap-action-field'
-import { FieldError } from '@/components/shared/form-controls'
-import { useFormErrors } from '@/lib/use-form-errors'
-import { useTapActionSources } from '@/components/shared/use-tap-action-sources'
-import { TAP_ACTION_KINDS, tapActionDef, tapActionFromSavedUri, tapActionLiffUrl, tapActionNeedsLiff, tapActionProblem, tapExtraSaveError, type TapActionKind } from '@/lib/tap-actions'
-import { TemplateEditFrame } from './frame'
-import MediaPickerDialog from '@/components/shared/media-picker-dialog'
-import MediaSlot from '@/components/shared/media-slot'
-import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
-import type { TemplateEditHost } from './host'
-import styles from './edit.module.css'
-import rich from './rich.module.css'
-import { Field } from '@/components/shared/form-controls'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+import { createPageReturnHref } from "@/components/shared/create-page"
+import { notifySaved } from "@/components/shared/toast"
+import { useFeatureAccess } from "@/lib/use-feature-access"
+import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
+import { CircleSlash, Send } from "lucide-react"
+import { type TapExtras, type Folder, type MediaItem, type TemplateImagemapUpload } from "@line-crm/shared"
+import { api } from "@/lib/api"
+import { useStaffRole } from "@/lib/staff-role"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import { useAccount } from "@/contexts/account-context"
+import { usePageTitle } from "@/components/shell/page-chrome"
+import Button from "@/components/shared/button"
+import Card from "@/components/shared/card"
+import LayoutPicker from "@/components/shared/layout-picker"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import Dialog from "@/components/shared/dialog"
+import LinePreview from "@/components/shared/line-preview"
+import TapAreaEditor from "@/components/shared/tap-area-editor"
+import FolderSelect, { folderByName, folderCreator, hostFolderCreate } from "@/components/shared/folder-select"
+import { TextField } from "@/components/shared/text-field"
+import { japaneseDetailOf } from "@/components/shared/api-error-message"
+import TapActionField from "@/components/shared/tap-action-field"
+import { FieldError, Field } from "@/components/shared/form-controls"
+import { useFormErrors } from "@/lib/use-form-errors"
+import { useTapActionSources } from "@/components/shared/use-tap-action-sources"
+import { TAP_ACTION_KINDS, tapActionDef, tapActionFromSavedUri, tapActionLiffUrl, tapActionNeedsLiff, tapActionProblem, tapExtraSaveError, type TapActionKind } from "@/lib/tap-actions"
+import { TemplateEditFrame } from "./frame"
+import MediaPickerDialog from "@/components/shared/media-picker-dialog"
+import MediaSlot from "@/components/shared/media-slot"
+import { uploadToMediaLibrary } from "@/components/shared/media-library-upload"
+import type { TemplateEditHost } from "./host"
+import styles from "./edit.module.css"
+import rich from "./rich.module.css"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -48,6 +88,8 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * 形・面の座標・動きの組み立ては template-asset-editor.tsx から写した（src/v8 は @/app を読めない）。
  * 外枠・名前とフォルダの箱・右の列はクーポン・リサーチ（asset.tsx）と同じ。動きは BEHAVIOR.md。
  */
+
+
 
 /* ── 形と面（template-asset-editor.tsx と同じ値） ── */
 export interface RichArea { label: string; x: number; y: number; width: number; height: number }
@@ -431,7 +473,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         boardId="EFV8l"
         title="リッチメッセージを作る"
         description="1枚の画像を面に分けて、押した面ごとに動く"
-        band={<p className={styles.readonly} role="status">閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</p>}
+        band={<ReadOnlyNotice>閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</ReadOnlyNotice>}
         side={sideCard}
       >
         <Card padding="none" layout="vertical" className={styles.card}>
@@ -473,7 +515,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         )}
       >
         {host?.notice}
-        {error ? <p role="alert" className={styles.error}>{error}</p> : null}
+        {error ? <Notice tone="danger" >{error}</Notice> : null}
         {null}
 
         {host?.composer ? null : <Card padding="none" layout="vertical" className={styles.card}>

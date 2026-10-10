@@ -1,49 +1,79 @@
 'use client'
-import { notifySaved } from '@/components/shared/toast'
-import { SaveConflictBand } from '@/components/shared/save-conflict'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Plus } from 'lucide-react'
-import {
-  api,
-  ApiError,
-  type ConversionDeduplicationMode,
-  type ConversionDefinitionPreview,
-  type ConversionDefinitionUsageKind,
-  type ConversionReversalPolicy,
-  type ConversionValueMode,
-} from '@/lib/api'
-import type { ConversionPoint } from '@line-crm/shared'
-import { CreatePage } from '@/components/templates'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
-import { canEditFeature } from '@/lib/staff-capability'
-import { formatNumber } from '@/lib/format'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
-import Dialog from '@/components/shared/dialog'
-import Disclosure from '@/components/shared/disclosure'
-import HelpTip from '@/components/shared/help-tip'
-import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import { TextField } from '@/components/shared/text-field'
-import { Field } from '@/components/shared/form-controls'
-import Card from '@/components/shared/card'
-import { focusConversionField, type ConversionFieldIssue } from './field-issue'
-import ConditionBuilder, { findConditionDraftIssue, isEmptyCondition, pruneCondition } from '@/components/shared/condition-builder'
-import type { SegmentCondition } from '@/lib/segment-condition'
-import { originInfoOf } from './origin-labels'
-import { createLatestPreviewRequestGate, type LatestPreviewRequest } from './latest-preview-request'
-import styles from './create.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
-import NumberInput from '@/components/shared/number-field'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { notifySaved } from "@/components/shared/toast"
+import { SaveConflictBand } from "@/components/shared/save-conflict"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Check, Plus } from "lucide-react"
+import { api, ApiError, type ConversionDeduplicationMode, type ConversionDefinitionPreview, type ConversionDefinitionUsageKind, type ConversionReversalPolicy, type ConversionValueMode } from "@/lib/api"
+import type { ConversionPoint } from "@line-crm/shared"
+import { CreatePage } from "@/components/templates"
+import { useAccount } from "@/contexts/account-context"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import { useStaffRole } from "@/lib/staff-role"
+import { canEditFeature } from "@/lib/staff-capability"
+import { formatNumber } from "@/lib/format"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import Button from "@/components/shared/button"
+import Checkbox from "@/components/shared/checkbox"
+import Dialog from "@/components/shared/dialog"
+import Disclosure from "@/components/shared/disclosure"
+import HelpTip from "@/components/shared/help-tip"
+import ListState from "@/components/shared/list-state"
+import Notice from "@/components/shared/notice"
+import Select from "@/components/shared/select"
+import RadioCard, { RadioCardGroup } from "@/components/shared/radio-card"
+import { TextField } from "@/components/shared/text-field"
+import { Field } from "@/components/shared/form-controls"
+import Card from "@/components/shared/card"
+import { focusConversionField, type ConversionFieldIssue } from "./field-issue"
+import ConditionBuilder, { findConditionDraftIssue, isEmptyCondition, pruneCondition } from "@/components/shared/condition-builder"
+import type { SegmentCondition } from "@/lib/segment-condition"
+import { originInfoOf } from "./origin-labels"
+import { createLatestPreviewRequestGate, type LatestPreviewRequest } from "./latest-preview-request"
+import styles from "./create.module.css"
+import { permissionDeniedMessage } from "@/components/shared/api-error-message"
+import { emptyValue } from "@/components/shared/empty-value"
+import NumberInput from "@/components/shared/number-field"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -58,6 +88,8 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * - 競合（cXqlS）：同じ名前の成果地点がすでにある（入力中に見つかった／保存したら先に作られていた 409）とき、
  *   板の頭の下に帯を出し、主ボタンは「比べてから保存」になる
  */
+
+
 
 /* 数えるきっかけ6種（今の作る画面と同じ中身）。 */
 type TriggerKind = 'order' | 'form' | 'booking' | 'page' | 'video' | 'tag'
@@ -563,7 +595,7 @@ function ConversionCreate() {
       footerActions={footerActions} dirty={false}
     >
       {viewerOnly ? (
-        <div className={styles.viewerBand} role="status">閲覧のみで見ています。作る操作はオーナーか管理者に頼んでください。</div>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>
       ) : null}
       {savedNotice ? <Notice tone="success">{savedNotice}</Notice> : null}
       {saveError ? <Notice tone="danger">{saveError}</Notice> : null}
@@ -586,7 +618,7 @@ function ConversionCreate() {
         </Field>
         {pointsFailed ? (
           <div className={styles.inlineRetry}>
-            <p className={styles.fieldNote} role="alert">同じ名前があるか確認できませんでした。同じ意味の成果地点があるかもしれません。</p>
+            <Notice tone="danger" className={styles.fieldNoteNoticePlacement} >同じ名前があるか確認できませんでした。同じ意味の成果地点があるかもしれません。</Notice>
             <Button variant="text" onClick={() => requestPoints()}>同名の確認を再読み込み</Button>
           </div>
         ) : null}

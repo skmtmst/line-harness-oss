@@ -1,25 +1,46 @@
 'use client'
-import { notifySaved } from '@/components/shared/toast'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import type { Tag, TagGroup } from '@line-crm/shared'
-import { api, ApiError, describeSaveFailure, type TagDefinition, type TagDependencies } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Notice from '@/components/shared/notice'
-import { folderCreateResult } from '@/components/shared/folder-select'
-import TargetMissing from '@/components/shared/target-missing'
-import { notifyToast } from '@/components/shared/toast'
-import { ArchivedTagEditor, DeleteDialog } from '@/components/friend-fields/edit-tag-page-v4'
-import { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
-import { describeTagDiff } from './conflict-diff'
-import styles from './edit.module.css'
-import { TagEditForm } from './edit-form'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
-import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { notifySaved, notifyToast } from "@/components/shared/toast"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import type { Tag, TagGroup } from "@line-crm/shared"
+import { api, ApiError, describeSaveFailure, type TagDefinition, type TagDependencies } from "@/lib/api"
+import { useAccount } from "@/contexts/account-context"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import { useStaffRole, canManageRole } from "@/lib/staff-role"
+import { IdempotencyKeyStore } from "@/lib/idempotency-key-store"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import Notice from "@/components/shared/notice"
+import { folderCreateResult } from "@/components/shared/folder-select"
+import TargetMissing from "@/components/shared/target-missing"
+import { ArchivedTagEditor, DeleteDialog } from "@/components/friend-fields/edit-tag-page-v4"
+import { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from "@/components/friend-fields/tag-editor-v4"
+import { describeTagDiff } from "./conflict-diff"
+import styles from "./edit.module.css"
+import { TagEditForm } from "./edit-form"
+import { withPermissionFailure } from "@/components/shared/api-error-message"
+import { SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -31,6 +52,27 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
  * 「タグ連動」「マイル」は畳んで1行の要約を出し、「開く」で中身を出す（絵どおり）。
  * 動き（読み込み・保存・さかのぼり反映の確認・競合・削除・アーカイブ）は今の画面（app/tags/edit-tag-page-v8）と同じ。
  */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 export default function TagEditV8() {
   const saveErrors = useSaveFormErrors()
@@ -234,7 +276,7 @@ export default function TagEditV8() {
   }
   // アーカイブのタグは通常の編集を出さない（#710）。
   if (tag.status === 'archived') {
-    if (!canEdit) return <SaveErrorScope errors={saveErrors}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></SaveErrorScope>
+    if (!canEdit) return <SaveErrorScope errors={saveErrors}><ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></SaveErrorScope>
     return <SaveErrorScope errors={saveErrors}><ArchivedTagEditor tag={tag} accountId={selectedAccountId} onCancel={() => router.push('/tags')} onSaved={(updated) => { if (targetRef.current === targetKey && targetGenerationRef.current === targetGeneration) setTag((current) => (current ? { ...current, ...updated } : current)) }} /></SaveErrorScope>
   }
 

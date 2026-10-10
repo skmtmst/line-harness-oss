@@ -1,6 +1,6 @@
 'use client'
 
-import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+import { LineChart, FunnelChart } from '@/components/shared/charts'
 
 /*
  * ★V8 ウェビナーの分析（Pencil z2dgw）。
@@ -19,7 +19,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import { TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { ApiError, downloadApiFile, webinarApi, type WebinarAnalytics, type WebinarUserComment } from '@/lib/api'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import { formatNumber } from '@/lib/format'
 import { DetailHead } from './chrome'
 import { fmtSec, percent, thisMonthReservations } from './helpers'
 import type { DetailChrome, EditContext } from './types'
@@ -245,7 +245,7 @@ function ViewerComments({ webinarId }: { webinarId: string }) {
   }, [webinarId, attempt])
   return (
     <Disclosure size="compact" title="視聴者コメント" hint={comments ? `${comments.length}件` : emptyValue('unknown')}>
-      {error ? <div role="alert" className={styles.cardText}>{error}<Button size="compact" onClick={() => setAttempt((count) => count + 1)}>もう一度読み込む</Button></div>
+      {error ? <Notice tone="danger" action={<> <Button size="compact" onClick={() => setAttempt((count) => count + 1)}>もう一度読み込む</Button> </>} >{error}</Notice>
         : comments === null ? <p role="status" className={styles.cardText}>コメントを読み込んでいます…</p>
           : comments.length === 0 ? <p className={styles.cardText}>まだコメントはありません。</p>
             : (

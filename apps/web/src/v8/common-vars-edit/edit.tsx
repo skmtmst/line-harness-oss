@@ -1,82 +1,83 @@
 'use client'
-import { jstDate } from '@/lib/jst-datetime'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { notifySaved } from '@/components/shared/toast'
-import { SaveConflictBand } from '@/components/shared/save-conflict'
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  ChevronDown,
-  ChevronUp,
-  CircleCheck,
-  Download,
-  Eye,
-  GitCompare,
-  Pause,
-  Play,
-  Plus,
-  Smartphone,
-  X,
-} from 'lucide-react'
-import type {
-  CommonVar,
-  CommonVarChangeImpact,
-  CommonVarDeleteImpact,
-  CommonVarSchedule,
-  Folder,
-} from '@line-crm/shared'
-import { CreatePage } from '@/components/templates'
-import DateField from '@/components/shared/date-field'
-import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
-import Select from '@/components/shared/select'
-import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
-import { api, ApiError, type CommonVarDetail } from '@/lib/api'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { useAccount } from '@/contexts/account-context'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import LinePreview from '@/components/shared/line-preview'
-import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
-import TargetMissing from '@/components/shared/target-missing'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { NOT_AVAILABLE, STATE_TEXT } from '@/components/shared/not-connected'
-import { VAR_TYPE_LABELS, commonVarValueError, isSecretLikeVarValue, COMMON_VAR_STATE_LABELS } from '@/lib/common-vars'
-import {
-  blockingErrors,
-  checkedAtText,
-  historicalText,
-  isChangeItem,
-  placeholderText,
-  reflectionScopeText,
-  reflectionTimingText,
-  reviewWarnings,
-  hiddenText,
-  immediateItems,
-  impactCsv,
-  impactStateFromError,
-  impactStateText,
-  saveErrorText,
-  scheduleErrorText,
-  type ChangeImpactState,
-} from './impact'
-import { formatNumber } from '@/lib/format'
-import styles from './edit.module.css'
-import { focusFieldById } from '@/lib/use-form-errors'
-import { formatDate as polishFormatDate } from '@/lib/format'
-import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { jstDate } from "@/lib/jst-datetime"
+import { useFeatureAccess } from "@/lib/use-feature-access"
+import { notifySaved } from "@/components/shared/toast"
+import { SaveConflictBand } from "@/components/shared/save-conflict"
+import { Suspense, useCallback, useEffect, useRef, useState } from "react"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
+import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, CircleCheck, Download, GitCompare, Pause, Play, Plus, Smartphone, X } from "lucide-react"
+import type { CommonVar, CommonVarChangeImpact, CommonVarDeleteImpact, CommonVarSchedule, Folder } from "@line-crm/shared"
+import { CreatePage } from "@/components/templates"
+import DateField from "@/components/shared/date-field"
+import DateTimeField, { TimeField } from "@/components/shared/date-time-field"
+import Select from "@/components/shared/select"
+import FolderSelect, { folderById, folderCreator } from "@/components/shared/folder-select"
+import { api, ApiError, type CommonVarDetail } from "@/lib/api"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { useAccount } from "@/contexts/account-context"
+import { useNarrowViewport } from "@/lib/use-narrow-viewport"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import Button from "@/components/shared/button"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import Dialog from "@/components/shared/dialog"
+import LinePreview from "@/components/shared/line-preview"
+import ListState from "@/components/shared/list-state"
+import Notice from "@/components/shared/notice"
+import TargetMissing from "@/components/shared/target-missing"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import { NOT_AVAILABLE, STATE_TEXT } from "@/components/shared/not-connected"
+import { VAR_TYPE_LABELS, commonVarValueError, isSecretLikeVarValue, COMMON_VAR_STATE_LABELS } from "@/lib/common-vars"
+import { blockingErrors, checkedAtText, historicalText, isChangeItem, placeholderText, reflectionScopeText, reflectionTimingText, reviewWarnings, hiddenText, immediateItems, impactCsv, impactStateFromError, impactStateText, saveErrorText, scheduleErrorText, type ChangeImpactState } from "./impact"
+import { formatNumber, formatDate as polishFormatDate } from "@/lib/format"
+import styles from "./edit.module.css"
+import { focusFieldById } from "@/lib/use-form-errors"
+import TruncatedText from "@/components/shared/truncated-text"
+import { Field } from "@/components/shared/form-controls"
+import { csvFileName } from "@/lib/csv-file-name"
+import { emptyValue } from "@/components/shared/empty-value"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8 共通情報の編集（板 `AYc6O`、編集（1152）`C67dE`、競合 `piWhz`）。
@@ -89,6 +90,8 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * データの口・影響確認・保存・予約・削除・状態切替は `app/contents/vars/edit/edit-v8.tsx` から
  * 写した（import はしない）。動きの一覧は同じ場所の BEHAVIOR.md。
  */
+
+
 
 /** 予定の日時（`YYYY-MM-DDTHH:mm`・日本時間）を「10/1 0:00」の形にする。 */
 export function scheduleStamp(value: string): string {
@@ -1163,10 +1166,7 @@ function EditCommonVarV8Inner() {
       )} dirty={false}
     >
       {canWrite ? null : (
-        <div className={styles.roBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-        </div>
+        <div className={styles.roBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       )}
 
       {error && item ? (
@@ -1333,9 +1333,7 @@ function EditCommonVarV8Inner() {
           {deletePhase === 'loading' ? (
             <p className={styles.fieldHint}>使われている場所を読み込んでいます</p>
           ) : deletePhase === 'error' ? (
-            <p className={styles.fieldError} role="alert">
-              使用先を読み込めませんでした。読み直してから、もう一度お試しください。
-            </p>
+            <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >使用先を読み込めませんでした。読み直してから、もう一度お試しください。</Notice>
           ) : deleteImpact ? (
             <>
               <p className={deleteImpact.blockingTotal > 0 ? styles.fieldError : styles.fieldHint}>

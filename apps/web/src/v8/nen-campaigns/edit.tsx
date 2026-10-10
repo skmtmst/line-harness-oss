@@ -1,40 +1,75 @@
 'use client'
 
-import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
-import { notifySaved } from '@/components/shared/toast'
-import { useEffect, useRef, useState } from 'react'
-import { CalendarClock, ClipboardList, Coins, Eye, Package, Save, Send } from 'lucide-react'
-import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared'
-import { ApiError, api, describeSaveFailure, type NenCampaignAfterAction, type NenCampaignSetting } from '@/lib/api'
-import { CreatePage } from '@/components/templates'
-import Card from '@/components/shared/card'
-import Button from '@/components/shared/button'
-import Drawer from '@/components/shared/drawer'
-import Checkbox from '@/components/shared/checkbox'
-import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
-import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
-import Radio from '@/components/shared/radio'
-import SearchField from '@/components/shared/search-field'
-import Select from '@/components/shared/select'
-import TimeField from '@/components/shared/time-field-v8'
-import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import InsertToolbar from '@/components/scenarios/insert-toolbar'
-import { useAccount } from '@/contexts/account-context'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { formatNumber } from '@/lib/format'
-import { formatCampaignTiming } from './display'
-import styles from './form.module.css'
-import { FieldError } from '@/components/shared/form-controls'
-import { useFieldValidation } from '@/lib/use-field-validation'
-import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
-import { tapActionLiffUrl } from '@/lib/tap-actions'
-import { Field } from '@/components/shared/form-controls'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from "@/components/shared/save-conflict"
+import { notifySaved } from "@/components/shared/toast"
+import { useEffect, useRef, useState } from "react"
+import { CalendarClock, ClipboardList, Coins, Package, Save, Send } from "lucide-react"
+import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from "@line-crm/shared"
+import { ApiError, api, describeSaveFailure, type NenCampaignAfterAction, type NenCampaignSetting } from "@/lib/api"
+import { CreatePage } from "@/components/templates"
+import Card from "@/components/shared/card"
+import Button from "@/components/shared/button"
+import Drawer from "@/components/shared/drawer"
+import Checkbox from "@/components/shared/checkbox"
+import LinePreview, { LinePreviewMessage } from "@/components/shared/line-preview"
+import ListState from "@/components/shared/list-state"
+import Notice from "@/components/shared/notice"
+import Radio from "@/components/shared/radio"
+import SearchField from "@/components/shared/search-field"
+import Select from "@/components/shared/select"
+import TimeField from "@/components/shared/time-field-v8"
+import { EntityKindField } from "@/components/shared/entity-picker-sources"
+import InsertToolbar from "@/components/scenarios/insert-toolbar"
+import { useAccount } from "@/contexts/account-context"
+import { useStaffRole, canManageRole } from "@/lib/staff-role"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { formatNumber } from "@/lib/format"
+import { formatCampaignTiming } from "./display"
+import styles from "./form.module.css"
+import { FieldError, Field } from "@/components/shared/form-controls"
+import { useFieldValidation } from "@/lib/use-field-validation"
+import InsertTextField, { type InsertTextFieldHandle } from "@/components/shared/insert-text-field"
+import { tapActionLiffUrl } from "@/lib/tap-actions"
+import { withPermissionFailure } from "@/components/shared/api-error-message"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8-B 配信を直す（`w5pwG`、例：口コミのお願い）。
@@ -47,6 +82,8 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * ・右に LINE での見え方・気をつけること・この画面でできないこと・自分にテストを送る。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+
+
 
 /** きっかけの短い言い方（配信フローの札・日数の選ぶ欄）。 */
 const TRIGGER_SHORT: Record<string, string> = {
@@ -430,7 +467,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       ) : <></>} dirty={false}
     >
       {!canEdit ? (
-        <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。配信を直すのは管理者に頼んでください。" />
+        <ReadOnlyNotice role="status">閲覧のみで見ています。配信を直すのは管理者に頼んでください。</ReadOnlyNotice>
       ) : null}
       {saveConflict.conflict ? <SaveConflictBand title="ほかの担当者が先に保存しました" onCompare={() => void saveConflict.compare()} compareBusy={saveConflict.compareBusy} onReload={() => void saveConflict.reloadLatest()} /> : null}
       <SaveConflictCompareDialog open={saveConflict.compareOpen} busy={saveConflict.compareBusy} error={saveConflict.compareError} onCancel={saveConflict.closeCompare} onReload={() => void saveConflict.reloadLatest()} lines={saveConflict.latest ? Object.entries(withoutVersion(merged) ?? {}).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify((saveConflict.latest as unknown as Record<string, unknown>)[key])).map(([key, value]) => ({ text: `${key === 'bodyText' ? '本文' : key === 'title' ? 'タイトル' : key === 'deliveryTime' ? '配信時刻' : '設定'}：入力 ${typeof value === 'string' ? value : JSON.stringify(value)} ／ 最新 ${JSON.stringify((saveConflict.latest as unknown as Record<string, unknown>)[key])}`, kind: 'change' as const })) : null} />
@@ -572,7 +609,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
                 value={formAction?.formId ?? ''}
                 onChange={chooseForm}
               /></SaveErrorField>
-              {formIssueMessage ? <p className={styles.error} role="alert">{formIssueMessage}</p> : null}
+              {formIssueMessage ? <Notice tone="danger" >{formIssueMessage}</Notice> : null}
             </>}
             {formIssueBanner && !formIssueMessage ? <p className={styles.muted}>{formIssueBanner}</p> : null}
           </div>

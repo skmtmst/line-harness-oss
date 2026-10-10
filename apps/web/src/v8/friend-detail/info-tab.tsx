@@ -1,20 +1,37 @@
 'use client'
-import Link from 'next/link'
-import { Lock } from 'lucide-react'
-import type { FriendField } from '@line-crm/shared'
-import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
-import DateField from '@/components/shared/date-field'
-import Select from '@/components/shared/select'
-import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
-import { TextArea, TextField } from '@/components/shared/text-field'
-import type { FriendDetailState } from './use-friend-detail'
-import type { FriendDetailPermissions } from './permissions'
-import { fixedFieldValue } from '@/components/shared/fixed-friend-field-values'
-import styles from './detail.module.css'
-import { emptyValue } from '@/components/shared/empty-value'
-import { DetailLoading } from '@/components/templates/detail-page'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Link from "next/link"
+import { Lock } from "lucide-react"
+import type { FriendField } from "@line-crm/shared"
+import Button from "@/components/shared/button"
+import Checkbox from "@/components/shared/checkbox"
+import DateField from "@/components/shared/date-field"
+import Select from "@/components/shared/select"
+import { FIELD_TYPE_LABELS } from "@/components/friend-fields/field-list"
+import { TextArea, TextField } from "@/components/shared/text-field"
+import type { FriendDetailState } from "./use-friend-detail"
+import type { FriendDetailPermissions } from "./permissions"
+import { fixedFieldValue } from "@/components/shared/fixed-friend-field-values"
+import styles from "./detail.module.css"
+import { emptyValue } from "@/components/shared/empty-value"
+import { DetailLoading } from "@/components/templates/detail-page"
+import { SaveErrorField } from "@/components/shared/save-form-errors"
+import ListState from "@/components/shared/list-state"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -22,6 +39,8 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
  * 分類（すべて・基本・フォルダ）は URL の group で選ぶ（FRIEND-21・今と同じ指定）。
  * 権限が無い人は欄を読み取りだけにし、保存ボタンを置かずに理由だけ出す（N-045）。
  */
+
+
 
 /** 種類の名前は絵では出さない。ラベルの title で読めるようにする。 */
 export const BASIC_GROUP = 'basic'
@@ -90,10 +109,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
   }
   if (fieldsStatus === 'error') {
     return (
-      <div className={`${styles.pane} ${styles.centered}`} role="alert">
-        <p className={styles.paneNote}>情報欄を読み込めませんでした。</p>
-        <Button onClick={() => data.loadFields()} busyLabel="処理中…">もう一度読み込む</Button>
-      </div>
+      <ListState kind="error" title="情報欄を読み込めませんでした。" description="" action={<><Button onClick={() => void data.loadFields()}>もう一度読み込む</Button></>} />
     )
   }
 

@@ -13,7 +13,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { AlertCircle, CheckCircle2, Clock, MessageCircle, RotateCcw, Settings2, XCircle } from 'lucide-react'
+import { CheckCircle2, Clock, MessageCircle, RotateCcw, Settings2, XCircle } from 'lucide-react'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -29,6 +29,7 @@ import { DELIVERY_UNKNOWN_CODE, jstClock, jstShortDateTime, jstTitleDate, routin
 import styles from './detail.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import Notice from '@/components/shared/notice'
 
 type ActionRun = FriendAddRunDetail['actionRuns'][number]
 
@@ -266,13 +267,7 @@ function FriendAddRunDetailInner() {
       <div className={styles.split}>
         <div className={styles.main}>
           {failedActions.length > 0 || runFailed || deliveryUnknown ? (
-            <div className={styles.failBand} role="alert">
-              <AlertCircle size={18} className={styles.failIcon} aria-hidden="true" />
-              <div className={styles.failText}>
-                <p className={styles.failTitle}>{bandTitle}</p>
-                <p className={styles.failNote}>{bandNote}</p>
-              </div>
-              {canManage && !deliveryUnknown && (failedActions.length > 0 || runFailed) ? (
+            <Notice tone="danger" heading={<> {bandTitle} </>} action={<> {canManage && !deliveryUnknown && (failedActions.length > 0 || runFailed) ? (
                 <Button
                   variant="primary"
                   disabled={retrying}
@@ -282,8 +277,7 @@ function FriendAddRunDetailInner() {
                 >
                   <RotateCcw size={14} aria-hidden="true" />失敗した処理をもう一度
                 </Button>
-              ) : null}
-            </div>
+              ) : null} </>} >{bandNote}</Notice>
           ) : null}
 
           <section className={styles.card} aria-labelledby="friend-add-run-steps">

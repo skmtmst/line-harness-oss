@@ -1,14 +1,26 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import Button from '@/components/shared/button'
-import { RequiredBadge } from '@/components/shared/form-controls'
-import { TextField } from '@/components/shared/text-field'
-import { api } from '@/lib/api'
-import { FRIEND_SELECT_LIMIT, normalizeFriendIds } from './trigger-helpers'
-import TruncatedText from '@/components/shared/truncated-text'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
-import FriendPickerField from '@/components/shared/friend-picker-field'
+import { useEffect, useState } from "react"
+import Button from "@/components/shared/button"
+import { RequiredBadge } from "@/components/shared/form-controls"
+import { TextField } from "@/components/shared/text-field"
+import { api } from "@/lib/api"
+import { FRIEND_SELECT_LIMIT, normalizeFriendIds } from "./trigger-helpers"
+import TruncatedText from "@/components/shared/truncated-text"
+import { SaveErrorField } from "@/components/shared/save-form-errors"
+import FriendPickerField from "@/components/shared/friend-picker-field"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
 
 export function FriendMultiSelect({
   accountId,

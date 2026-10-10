@@ -1,29 +1,56 @@
 'use client'
 
-import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
-import { ArrowDownRight, CalendarClock, Flag, LogIn, Plus, RefreshCw, Send, Users } from 'lucide-react'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { notifyToast } from '@/components/shared/toast'
-import Disclosure from '@/components/shared/disclosure'
-import ListState from '@/components/shared/list-state'
-import SegmentedControl from '@/components/shared/segmented'
-import Select from '@/components/shared/select'
-import { api, type AnalyticsFunnelRunResult } from '@/lib/api'
-import { formatNumber } from '@/lib/format'
-import { RangePickerV8, StatePill } from './common'
-import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, rangeFor, useRegisterExport } from './parts'
-import styles from './analytics.module.css'
-import { useReportPeriod } from '@/components/shared/period-picker'
-import { Field } from '@/components/shared/form-controls'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { ValueBarChart, LineChart, FunnelChart } from "@/components/shared/charts"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { useRouter } from "next/navigation"
+import { ArrowDownRight, CalendarClock, Flag, LogIn, Plus, RefreshCw, Send, Users } from "lucide-react"
+import KpiBand from "@/components/shared/kpi-band"
+import KpiCard from "@/components/shared/kpi-card"
+import Button from "@/components/shared/button"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import { notifyToast } from "@/components/shared/toast"
+import Disclosure from "@/components/shared/disclosure"
+import ListState from "@/components/shared/list-state"
+import SegmentedControl from "@/components/shared/segmented"
+import Select from "@/components/shared/select"
+import { api, type AnalyticsFunnelRunResult } from "@/lib/api"
+import { formatNumber } from "@/lib/format"
+import { RangePickerV8, StatePill } from "./common"
+import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, rangeFor, useRegisterExport } from "./parts"
+import styles from "./analytics.module.css"
+import { useReportPeriod } from "@/components/shared/period-picker"
+import { Field } from "@/components/shared/form-controls"
+import { csvFileName } from "@/lib/csv-file-name"
+import { emptyValue } from "@/components/shared/empty-value"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8 分析「ファネル」（Pencil `DkRDE`）。
@@ -33,6 +60,8 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * 作る／編集のフォームと保存の欄は、入口（app/analytics/page.tsx）が今の部品を渡す。
  * 呼ぶ口・世代の守り・判定不能の扱い・CSV は今の画面（FunnelTab）と同じ。
  */
+
+
 
 type FunnelStatus = 'active' | 'stopped' | 'archived'
 type FunnelSummary = { id: string; name: string; windowDays: number; createdAt: string; status: FunnelStatus; currentVersion: { id: string; versionNumber: number; createdAt: string } | null; migrationState: 'ready' | 'needs_migration' }
@@ -330,7 +359,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
             {canManage ? <Button variant="secondary" onClick={() => setCreating(true)}><Plus size={15} aria-hidden="true" />ファネルを作る</Button> : null}
             <Button variant="secondary" disabled={running} onClick={() => setRunReload((n) => n + 1)}><RefreshCw size={15} aria-hidden="true" />最新の結果をもう一度読む</Button>
           </div>
-          {runError ? <p className={styles.inlineError} role="alert">{runError}</p> : null}
+          {runError ? <Notice tone="danger" >{runError}</Notice> : null}
           {noRun && !run ? <p className={styles.caption}>{`まだ集計がありません。下の「定義の操作と集計の詳細」から「この${funnelDays}日を再集計」を押してください`}</p> : null}
           {usageNotice ? <p className={styles.warnText} role="status">{usageNotice}</p> : null}
           {run && !measurable ? <p className={styles.warnText} role="status">{`${STATE_LABELS[run.state]}のため、この結果は判定不能です。人数や割合は実測値ではありません。${run.stateReason ? ` ${run.stateReason}` : ''}`}</p> : null}

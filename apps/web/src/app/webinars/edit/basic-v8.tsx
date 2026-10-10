@@ -1,18 +1,33 @@
 'use client'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import HelpTip from '@/components/shared/help-tip'
-import LinePreview from '@/components/shared/line-preview'
-import Notice from '@/components/shared/notice'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Select from '@/components/shared/select'
-import { RequiredBadge } from '@/components/shared/form-controls'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { webinarApi, describeSaveFailure, type Webinar, type WebinarEditor, type WebinarFolder } from '@/lib/api'
-import './basic-v8.css'
-import { Field } from '@/components/shared/form-controls'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { useCallback, useEffect, useRef, useState } from "react"
+import Button from "@/components/shared/button"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import HelpTip from "@/components/shared/help-tip"
+import LinePreview from "@/components/shared/line-preview"
+import Notice from "@/components/shared/notice"
+import RadioCard, { RadioCardGroup } from "@/components/shared/radio-card"
+import Select from "@/components/shared/select"
+import { canManageRole, useStaffRole } from "@/lib/staff-role"
+import { webinarApi, describeSaveFailure, type Webinar, type WebinarEditor, type WebinarFolder } from "@/lib/api"
+import { Field } from "@/components/shared/form-controls"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /** 基本設定の編集も j7PP04 の並び。動画・公開操作は動画と確認の段に残す。 */
 export default function BasicV8({ webinar, editor, onWebinarSaved, onEditorChange, onDirtyChange, registerSave }: {
@@ -189,7 +204,7 @@ export default function BasicV8({ webinar, editor, onWebinarSaved, onEditorChang
             <p className="text-ink text-sm">{editor.viewingCondition.label}</p>
           </section>
           {error ? <Notice tone="info">{error}</Notice> : null}
-          {!canEdit ? <Notice tone="info">閲覧のみで見ています。変更はオーナーか管理者に依頼してください。</Notice> : null}
+          {!canEdit ? <ReadOnlyNotice >閲覧のみで見ています。変更はオーナーか管理者に依頼してください。</ReadOnlyNotice> : null}
         </fieldset>
         <aside className="wb-basic-previewCol" aria-label="LINEでの見え方">
           <h2 className="wb-basic-previewTitle">LINE での見え方</h2>

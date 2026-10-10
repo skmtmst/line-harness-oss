@@ -73,7 +73,7 @@ describe('V6 流入経路一覧の契約', () => {
     expect(PAGE).toContain("import SearchField from '@/components/shared/search-field'")
     expect(PAGE).toContain('<SearchField')
     expect(PAGE).toContain("import Select from '@/components/shared/select'")
-    expect(PAGE).toContain("import PageSizeSelect from '@/components/ui/page-size-select'")
+    expect(PAGE).toContain("import PageSizeSelect from '@/components/shared/page-size-select'")
     expect(PAGE).toContain('const [sort, setSort] = useState<RouteSort>')
     expect(PAGE).toContain('const [pageSize, setPageSize] = useState(20)')
     // 並び順はどれも読み込んだ行から数えられるものだけ。

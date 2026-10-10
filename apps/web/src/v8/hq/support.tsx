@@ -1,42 +1,58 @@
 'use client'
-import { Field as SharedField } from '@/components/shared/form-controls'
-import StatusPill from '@/components/shared/status-pill'
-import { CheckCircle2, Plus, X } from 'lucide-react'
-import Link from 'next/link'
-import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
-import { ListPage } from '@/components/templates'
-import Button from '@/components/shared/button'
-import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
-import Dialog from '@/components/shared/dialog'
-import Select from '@/components/shared/select'
-import { HqAccountSelectField } from '@/components/shared/hq-account-picker'
-import { TextArea, TextField } from '@/components/shared/text-field'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useTenantStatus } from '@/components/tenant-access-context'
-import { api } from '@/lib/api'
-import { readFileAsBase64 } from '@/lib/hq-banners'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import {
-  EMPTY_SUPPORT_INPUT,
-  SUPPORT_ATTACHMENT_MAX,
-  SUPPORT_BODY_MAX,
-  SUPPORT_SUBJECT_MAX,
-  validateSupportAttachment,
-  validateSupportInput,
-  type HqSupportContext,
-  type HqSupportInput,
-  type HqSupportKind,
-  type HqSupportRequest,
-} from '@/lib/hq-support'
-import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
-import NoticeLineDialogV8 from './notice-line-dialog'
-import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
-import styles from './support.module.css'
-import ImageFrame from '@/components/shared/image-frame'
+import { Field as SharedField } from "@/components/shared/form-controls"
+import StatusPill from "@/components/shared/status-pill"
+import { CheckCircle2, Plus, X } from "lucide-react"
+import Link from "next/link"
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react"
+import { ListPage } from "@/components/templates"
+import Button from "@/components/shared/button"
+import { describeApiFailure, japaneseDetailOf } from "@/components/shared/api-error-message"
+import Dialog from "@/components/shared/dialog"
+import Select from "@/components/shared/select"
+import { HqAccountSelectField } from "@/components/shared/hq-account-picker"
+import { TextArea, TextField } from "@/components/shared/text-field"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import { useTenantStatus } from "@/components/tenant-access-context"
+import { api } from "@/lib/api"
+import { readFileAsBase64 } from "@/lib/hq-banners"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import { EMPTY_SUPPORT_INPUT, SUPPORT_ATTACHMENT_MAX, SUPPORT_BODY_MAX, SUPPORT_SUBJECT_MAX, validateSupportAttachment, validateSupportInput, type HqSupportContext, type HqSupportInput, type HqSupportKind, type HqSupportRequest } from "@/lib/hq-support"
+import HqSettingsNavV8, { useHqSettingsFolderNav } from "./settings-nav"
+import NoticeLineDialogV8 from "./notice-line-dialog"
+import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from "./support-words"
+import styles from "./support.module.css"
+import ImageFrame from "@/components/shared/image-frame"
+import { emptyValue } from "@/components/shared/empty-value"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import Notice from "@/components/shared/notice"
 
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -46,6 +62,8 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左の「統括の設定」の列
  * （型のフォルダの列）・問い合わせのカード・これまでの問い合わせの表。
  */
+
+
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -317,8 +335,8 @@ export default function HqSupportV8() {
             ) : null}
           </div>
 
-          {error ? <p className={styles.error} role="alert">{error}</p> : null}
-          {blocked && (input.subject || input.body || input.kind) ? <p className={styles.warn} role="alert">{blocked}</p> : null}
+          {error ? <Notice tone="danger" >{error}</Notice> : null}
+          {blocked && (input.subject || input.body || input.kind) ? <Notice tone="danger" className={styles.warnNoticePlacement} >{blocked}</Notice> : null}
 
           <div className={styles.actions}>
             <Button onClick={clear} disabled={sending}>内容をクリア</Button>

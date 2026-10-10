@@ -4,18 +4,6 @@
  */
 .backLink { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); font-size: var(--text-label); text-decoration: none; }
 
-.roBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-info-bg);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-ro-band-lh);
-}
-
 /* カード：枠1本・角12・余白20・間14。題 15/700・説明 12。 */
 .card {
   display: flex;
@@ -61,7 +49,7 @@
 .fieldInput[aria-invalid='true'],
 .fieldArea[aria-invalid='true'] { outline-color: var(--color-danger); }
 .fieldHint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-text-sm-lh); }
-.fieldError { margin: 0; color: var(--color-danger); font-size: var(--text-caption); }
+.fieldError { color: var(--color-danger); font-size: var(--text-caption); }
 .selectBox { min-width: 0; }
 .selectBox :global(*) { max-width: 100%; }
 .selectBox :global(button) { width: 100%; }
@@ -250,3 +238,8 @@
 .compareBox { margin: 0; padding: var(--tpl-ar-cv-impact-pad); border-radius: var(--tpl-ar-cv-impact-radius); color: var(--color-ink); font-size: var(--text-label); white-space: pre-wrap; }
 .compareServer { background: var(--color-surface-pearl); }
 .compareMine { background: var(--color-success-bg); }
+
+/* 共通部品を包む位置だけの口。見た目は shared が持つ。 */
+.roBand { }
+
+.fieldError, .fieldErrorNoticePlacement { margin: 0; }

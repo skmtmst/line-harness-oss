@@ -9,18 +9,33 @@
  * 「配信に使う」は行ごとのスイッチで即保存（expectedRevision つき）。
  * 見るだけの担当者（staff）は変更口を隠さず押せない形にする（SXCb3）。
  */
-import { PencilLine, Unlink } from 'lucide-react'
-import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
-import { RequiredBadge } from '@/components/shared/form-controls'
-import ListState from '@/components/shared/list-state'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { formatDateTime } from '@/lib/format'
-import MergedDeliveryDialog from './merged-delivery-dialog'
-import MergedProfileDialog from './merged-profile-dialog'
-import { useMergedPerson } from './use-merged-person'
-import styles from '@/app/friends/friends-v8.module.css'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { PencilLine, Unlink } from "lucide-react"
+import Button from "@/components/shared/button"
+import Dialog from "@/components/shared/dialog"
+import { RequiredBadge } from "@/components/shared/form-controls"
+import ListState from "@/components/shared/list-state"
+import { useStaffRole, canManageRole } from "@/lib/staff-role"
+import { formatDateTime } from "@/lib/format"
+import MergedDeliveryDialog from "./merged-delivery-dialog"
+import MergedProfileDialog from "./merged-profile-dialog"
+import { useMergedPerson } from "./use-merged-person"
+import styles from "@/app/friends/friends-v8.module.css"
+import { SaveErrorField } from "@/components/shared/save-form-errors"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function shortDate(iso: string): string {
   const d = new Date(iso)
@@ -93,12 +108,10 @@ export default function MergedPersonDetailViewV8({
 
       {/* 版競合や保存失敗は面の上に残す（窓を閉じても消えない）。 */}
       {m.saveError ? (
-        <p className={styles.errorBand} role="alert">
-          {m.saveError}{' '}
+        <Notice tone="danger" className={styles.errorBandNoticePlacement} >{m.saveError}{' '}
           <button type="button" className={styles.infoBandRetry} onClick={m.reload}>
             読み直す
-          </button>
-        </p>
+          </button></Notice>
       ) : null}
 
       <div className={styles.detailGrid}>

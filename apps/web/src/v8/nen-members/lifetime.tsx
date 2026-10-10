@@ -1,27 +1,50 @@
 'use client'
-import { notifySaved } from '@/components/shared/toast'
-import { useEffect, useState } from 'react'
-import { Check } from 'lucide-react'
-import Card from '@/components/shared/card'
-import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
-import ListState from '@/components/shared/list-state'
-import { SettingCheckbox } from '@/components/shared/checkbox'
-import { RowActions } from '@/components/shared/row-actions'
-import { TextField } from '@/components/shared/text-field'
-import { FieldError } from '@/components/shared/form-controls'
-import { useFieldValidation } from '@/lib/use-field-validation'
-import { describeApiFailure } from '@/components/shared/api-error-message'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { formatNumber } from '@/lib/format'
-import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
-import { parseYen, yen, type LoadStatus, type SavedHandler } from './parts'
-import styles from './members.module.css'
-import { Field } from '@/components/shared/form-controls'
-import { emptyValue } from '@/components/shared/empty-value'
-import NumberInput from '@/components/shared/number-field'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { notifySaved } from "@/components/shared/toast"
+import { useEffect, useState } from "react"
+import { Check } from "lucide-react"
+import Card from "@/components/shared/card"
+import Button from "@/components/shared/button"
+import Dialog from "@/components/shared/dialog"
+import ListState from "@/components/shared/list-state"
+import { SettingCheckbox } from "@/components/shared/checkbox"
+import { RowActions } from "@/components/shared/row-actions"
+import { TextField } from "@/components/shared/text-field"
+import { FieldError, Field } from "@/components/shared/form-controls"
+import { useFieldValidation } from "@/lib/use-field-validation"
+import { describeApiFailure } from "@/components/shared/api-error-message"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { formatNumber } from "@/lib/format"
+import { nenRanksApi, type NenRankSettingsData } from "@/lib/nen-ranks-api"
+import { parseYen, yen, type LoadStatus, type SavedHandler } from "./parts"
+import styles from "./members.module.css"
+import { emptyValue } from "@/components/shared/empty-value"
+import NumberInput from "@/components/shared/number-field"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -31,6 +54,8 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * （節目（累計）・称号・特典・到達した人・到達時の LINE 通知・行の「…」）。
  * 行の中身は「…」の「編集する」で開く窓で直し、下の中央の「保存して EC へ同期する」でまとめて保存する。
  */
+
+
 
 type MilestoneDraft = { id: string | null; threshold: number; title: string; benefit: string | null; notify: boolean; reachedCount: number }
 
@@ -145,7 +170,7 @@ export default function LifetimeV8({
       {notice || error ? (
         <div className={styles.messages}>
           {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-          {error ? <p className={styles.errorText} role="alert">{error}</p> : null}
+          {error ? <Notice tone="danger" >{error}</Notice> : null}
         </div>
       ) : null}
 

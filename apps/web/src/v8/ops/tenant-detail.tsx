@@ -1,31 +1,60 @@
 'use client'
-import { useUrlTab } from '@/lib/use-url-tab'
-import { ChevronLeft, LogIn } from 'lucide-react'
-import { useSearchParams } from 'next/navigation'
-import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
-import { api, type OpsTenantDetail } from '@/lib/api'
-import { AUDIT_ACTION_LABEL, PLAN_STATUS_LABEL, ROLE_LABEL, formatDate, formatDateTime, planLabel, opsCall } from '@/components/ops/ops-ui'
-import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
-import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import ListState from '@/components/shared/list-state'
-import StatusBadge from '@/components/shared/status-badge'
-import TargetMissing from '@/components/shared/target-missing'
-import { Tabs } from '@/components/shared/tabs'
-import { TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
-import { formatNumber } from '@/lib/format'
-import { OpsHead } from './shell'
-import { useOpsReadOnly } from './use-ops-read-only'
-import parts from './parts.module.css'
-import styles from './tenant-detail.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
-import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls'
-import { emptyValue } from '@/components/shared/empty-value'
-import { DetailLoading } from '@/components/templates/detail-page'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { useUrlTab } from "@/lib/use-url-tab"
+import { ChevronLeft, LogIn } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import { Suspense, useCallback, useEffect, useState, type ReactNode } from "react"
+import { api, type OpsTenantDetail } from "@/lib/api"
+import { AUDIT_ACTION_LABEL, PLAN_STATUS_LABEL, ROLE_LABEL, formatDate, formatDateTime, planLabel, opsCall } from "@/components/ops/ops-ui"
+import { opsEnvironmentLabel } from "@/components/ops/ops-env-bar"
+import Button from "@/components/shared/button"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import Dialog from "@/components/shared/dialog"
+import ListState from "@/components/shared/list-state"
+import StatusBadge from "@/components/shared/status-badge"
+import TargetMissing from "@/components/shared/target-missing"
+import { Tabs } from "@/components/shared/tabs"
+import { TextField } from "@/components/shared/text-field"
+import Toggle from "@/components/shared/toggle"
+import { formatNumber, formatDate as polishFormatDate } from "@/lib/format"
+import { OpsHead } from "./shell"
+import { useOpsReadOnly } from "./use-ops-read-only"
+import parts from "./parts.module.css"
+import styles from "./tenant-detail.module.css"
+import TruncatedText from "@/components/shared/truncated-text"
+import { Field } from "@/components/shared/form-controls"
+import { emptyValue } from "@/components/shared/empty-value"
+import { DetailLoading } from "@/components/templates/detail-page"
+import { SaveErrorField } from "@/components/shared/save-form-errors"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /**
  * 運営の契約先の詳細 V8（絵 `Oub6x`・停止の窓 `okXoi`）。
@@ -153,7 +182,7 @@ function DetailContent() {
         )}
       />
       <div className={parts.stack}>
-        {error ? <p role="alert" className={parts.alert}>{error}</p> : null}
+        {error ? <Notice tone="danger" className={parts.alertNoticePlacement} >{error}</Notice> : null}
         <div className={parts.tabs}>
           <Tabs
             label="契約先の中身"

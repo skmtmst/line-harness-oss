@@ -1,32 +1,59 @@
 'use client'
-import { notifySaved } from '@/components/shared/toast'
-import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { Check } from 'lucide-react'
-import type { Scenario, Tag } from '@line-crm/shared'
-import { api } from '@/lib/api'
-import { formatNumber } from '@/lib/format'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { CreatePage } from '@/components/templates'
-import Button from '@/components/shared/button'
-import HelpTip from '@/components/shared/help-tip'
-import Select from '@/components/shared/select'
-import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import { TextField } from '@/components/shared/text-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
-import { useFormErrors } from '@/lib/use-form-errors'
-import ValidationSummary from '@/components/shared/validation-summary'
-import { FieldError } from '@/components/shared/form-controls'
-import styles from './create.module.css'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import NumberInput from '@/components/shared/number-field'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { notifySaved } from "@/components/shared/toast"
+import { useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
+import { Check } from "lucide-react"
+import type { Scenario, Tag } from "@line-crm/shared"
+import { api } from "@/lib/api"
+import { formatNumber } from "@/lib/format"
+import { canManageRole, useStaffRole } from "@/lib/staff-role"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import { useAccount } from "@/contexts/account-context"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import { CreatePage } from "@/components/templates"
+import Button from "@/components/shared/button"
+import HelpTip from "@/components/shared/help-tip"
+import Select from "@/components/shared/select"
+import { EntityKindField } from "@/components/shared/entity-picker-sources"
+import { TextField } from "@/components/shared/text-field"
+import { SettingCheckbox } from "@/components/shared/checkbox"
+import { useFormErrors } from "@/lib/use-form-errors"
+import ValidationSummary from "@/components/shared/validation-summary"
+import { FieldError, Field } from "@/components/shared/form-controls"
+import styles from "./create.module.css"
+import NumberInput from "@/components/shared/number-field"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -37,6 +64,9 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * 聞く項目・保存の口・送る形・入力の断り方は今の画面（app/affiliate-offers/new-offer-v8.tsx）から写した。
  * 成果地点を案件につなぐ口がまだ無い（F-23）ので、成果地点の欄は押せない形で置く（BEHAVIOR.md）。
  */
+
+
+
 
 const OFFER_LIST_PATH = '/conversions?tab=offers'
 
@@ -229,7 +259,7 @@ export default function AffiliateOfferCreateV8() {
 
   const retry = (what: string) => (
     <div className={styles.retry}>
-      <p className={styles.error} role="alert">{`${what}の候補を読み込めませんでした。`}</p>
+      <Notice tone="danger" >{`${what}の候補を読み込めませんでした。`}</Notice>
       <Button type="button" variant="secondary" size="compact" onClick={() => setCandidateSeq((n) => n + 1)}>もう一度読み込む</Button>
     </div>
   )
@@ -258,7 +288,7 @@ export default function AffiliateOfferCreateV8() {
   return (
     <SaveErrorScope errors={saveErrors}><CreatePage
       boardId="Td4TN"
-      identity={<></>}
+
       title="案件を作る"
       help="「何を紹介すると、いくら払うか」を決めます。公開すると、アフィリエイターの画面に出ます。"
       preview={preview}
@@ -279,8 +309,8 @@ export default function AffiliateOfferCreateV8() {
         </>
       )} dirty={false}
     >
-      {canEdit ? null : <p className={styles.viewerBand} role="status">閲覧のみで見ています。案件を作るのはオーナーか管理者に頼んでください。</p>}
-      {saveError ? <p className={styles.error} role="alert">{saveError}</p> : null}
+      {canEdit ? null : <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。案件を作るのはオーナーか管理者に頼んでください。</ReadOnlyNotice></div>}
+      {saveError ? <Notice tone="danger" >{saveError}</Notice> : null}
       {saveNote ? <p className={styles.note} role="status">{saveNote}</p> : null}
       <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
 

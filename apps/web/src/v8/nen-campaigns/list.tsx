@@ -1,87 +1,96 @@
 'use client'
 
-import Toggle from '@/components/shared/toggle';
-import { FolderDotName } from '@/components/shared/folder-dot'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { jstDate } from '@/lib/jst-datetime'
-import { useRouter } from 'next/navigation'
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
-import {
-  Bookmark,
-  CalendarDays,
-  CircleHelp,
-  Columns2,
-  Copy,
-  Download,
-  Eye,
-  History,
-  PenLine,
-  Send,
-  Undo2,
-} from 'lucide-react'
-import type {
-  NenCampaignSetting,
-  NenColumn,
-  NenColumnMetrics,
-  NenDeliveryDetail,
-  NenDeliveryList,
-  NenFlowMetrics,
-} from '@/lib/api'
-import { ListPage } from '@/components/templates'
-import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Drawer from '@/components/shared/drawer'
-import FilterChip from '@/components/shared/filter-chip'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import ListState from '@/components/shared/list-state'
-import ListToolbar from '@/components/shared/list-toolbar'
-import Notice from '@/components/shared/notice'
-import Pagination from '@/components/shared/pagination'
-import Radio from '@/components/shared/radio'
-import Select from '@/components/shared/select'
-import { SettingCheckbox } from '@/components/shared/checkbox'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { Tabs } from '@/components/shared/tabs'
-import { TextArea, TextField } from '@/components/shared/text-field'
-import { Field, FieldError } from '@/components/shared/form-controls'
-import { useFieldValidation } from '@/lib/use-field-validation'
-import DateTimeField from '@/components/shared/date-time-field'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { csvCell } from '@/lib/presentation'
-import { formatNumber } from '@/lib/format'
-import {
-  canRetryDelivery,
-  deliveryTriggerLabel,
-  formatCampaignAudience,
-  formatCampaignTiming,
-  isPastScheduledAt,
-  jstDateTime,
-  jstMonthDay,
-  num,
-  publishedAtIso,
-  skippedNoRetryNote,
-  statusLabel,
-  type ColumnDeliveryPlan,
-  type FriendOption,
-  type NenCoupon,
-  type NenKpis,
-  type NenTab,
-} from './display'
-import StatusBadge from '@/components/shared/status-badge'
-import styles from './list.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
-import { formatYen as polishFormatYen } from '@/lib/format'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
-import NumberInput from '@/components/shared/number-field'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Toggle from "@/components/shared/toggle"
+import { FolderDotName } from "@/components/shared/folder-dot"
+import { useListUrlValue } from "@/components/shared/list-url-state"
+import { useRouter } from "next/navigation"
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import Link from "next/link"
+import { Bookmark, CalendarDays, CircleHelp, Columns2, Copy, Download, History, PenLine, Send, Undo2 } from "lucide-react"
+import type { NenCampaignSetting, NenColumn, NenColumnMetrics, NenDeliveryDetail, NenDeliveryList, NenFlowMetrics } from "@/lib/api"
+import { ListPage } from "@/components/templates"
+import Button from "@/components/shared/button"
+import Card from "@/components/shared/card"
+import ActionMenu, { type ActionMenuItem } from "@/components/shared/action-menu"
+import { RowMenu as SharedRowMenu } from "@/components/shared/row-actions"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import Drawer from "@/components/shared/drawer"
+import FilterChip from "@/components/shared/filter-chip"
+import KpiBand from "@/components/shared/kpi-band"
+import KpiCard from "@/components/shared/kpi-card"
+import ListState from "@/components/shared/list-state"
+import ListToolbar from "@/components/shared/list-toolbar"
+import Notice from "@/components/shared/notice"
+import Pagination from "@/components/shared/pagination"
+import Radio from "@/components/shared/radio"
+import Select from "@/components/shared/select"
+import { SettingCheckbox } from "@/components/shared/checkbox"
+import { DataTable, TableHeadRow, Td, Th, Tr } from "@/components/shared/table"
+import { Tabs } from "@/components/shared/tabs"
+import { TextArea, TextField } from "@/components/shared/text-field"
+import { Field, FieldError } from "@/components/shared/form-controls"
+import { useFieldValidation } from "@/lib/use-field-validation"
+import DateTimeField from "@/components/shared/date-time-field"
+import { useStaffRole, canManageRole } from "@/lib/staff-role"
+import { csvCell } from "@/lib/presentation"
+import { formatNumber, formatYen as polishFormatYen } from "@/lib/format"
+import { canRetryDelivery, deliveryTriggerLabel, formatCampaignAudience, formatCampaignTiming, isPastScheduledAt, jstDateTime, jstMonthDay, num, publishedAtIso, skippedNoRetryNote, statusLabel, type ColumnDeliveryPlan, type FriendOption, type NenCoupon, type NenKpis, type NenTab } from "./display"
+import StatusBadge from "@/components/shared/status-badge"
+import styles from "./list.module.css"
+import TruncatedText from "@/components/shared/truncated-text"
+import { csvFileName } from "@/lib/csv-file-name"
+import { emptyValue } from "@/components/shared/empty-value"
+import NumberInput from "@/components/shared/number-field"
+import { SaveErrorField } from "@/components/shared/save-form-errors"
+import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from "@/components/shared/page-size-select"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8-B NEN配信の一覧（Pencil「★V8-B 画面の地図」専用機能の組）。
@@ -92,6 +101,9 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * 表は「見出し 36・行 56」の同じ物差しで並べる（タブを替えても表の頭が動かない）。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+
+
+
 
 export type { NenTab } from './display'
 
@@ -150,7 +162,7 @@ export type NenCampaignsListProps = {
 }
 
 const BOARD: Record<NenTab, string> = { auto: 'MuhWR', paused: 'MuhWR', columns: 'Jxmqh', history: 'Tj7n4' }
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 const NO_MANAGE_NOTE = '閲覧のみのため変えられません。変える操作はオーナーか管理者に頼んでください。'
 
 /* 自動配信の CSV（一覧に出ている決めごとをそのまま出す）。 */
@@ -261,7 +273,7 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
   const stats = (
     <>
       {!canEdit ? (
-        <div className={styles.viewerBand}><Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></div>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></div>
       ) : null}
       <KpiBand data-design="KPIs">
         <KpiCard presentation="band" title="自動配信" icon={<History size={13} aria-hidden="true" />} help="注文・発送・誕生日などのきっかけで送る配信の数です。" value={settings.length === 0 && loading ? null : autoSettings.length} unit="件" detail={settings.length === 0 && loading ? kpiMissing : `動いている ${enabledCount}・止めている ${pausedCount}`} />

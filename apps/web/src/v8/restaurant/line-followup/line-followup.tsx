@@ -1,19 +1,37 @@
 'use client'
-import { useRef, useState } from 'react'
-import KpiCard from '@/components/shared/kpi-card'
-import { Eye, Utensils } from 'lucide-react'
-import Button from '@/components/shared/button'
-import StatusBadge from '@/components/shared/status-badge'
-import { TextField } from '@/components/shared/text-field'
-import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { restaurantTestApi, type RestaurantLineFlow, type RestaurantStore } from '@/lib/restaurant-test-api'
-import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
-import { Panel, StatRow } from '../common-a/parts'
-import styles from './line-followup.module.css'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+import { useRef, useState } from "react"
+import KpiCard from "@/components/shared/kpi-card"
+import { Eye, Utensils } from "lucide-react"
+import Button from "@/components/shared/button"
+import StatusBadge from "@/components/shared/status-badge"
+import { TextField } from "@/components/shared/text-field"
+import { useAccount } from "@/contexts/account-context"
+import { canManageRole, useStaffRole } from "@/lib/staff-role"
+import { restaurantTestApi, type RestaurantLineFlow, type RestaurantStore } from "@/lib/restaurant-test-api"
+import RestaurantFrame, { type RestaurantContext } from "../common-a/frame"
+import { Panel, StatRow } from "../common-a/parts"
+import styles from "./line-followup.module.css"
+import { Field } from "@/components/shared/form-controls"
+import { permissionDeniedMessage } from "@/components/shared/api-error-message"
+import { SaveErrorField } from "@/components/shared/save-form-errors"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -117,7 +135,7 @@ function LineFollowupBoard({ ctx }: { ctx: RestaurantContext }) {
         <span>いまは「確認用」です。保存しても、お客さまへはまだ送りません。本当に送るのは、本送信の準備ができてから（司令塔の確認のあと）切り替えます。</span>
       </div>
       {readOnly ? (
-        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.cautionIcon} /><span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span></div>
+        <ReadOnlyNotice role="note" />
       ) : null}
       <StatRow>
         <KpiCard density="compact" title="フロー" valueText={`${flows.length}`} detail="カードテンプレート" icon={null} presentation="band" value={null} unit="" />

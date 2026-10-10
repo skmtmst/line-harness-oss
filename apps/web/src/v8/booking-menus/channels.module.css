@@ -35,7 +35,6 @@
 }
 
 .cardDesc {
-  margin: 0;
   color: var(--color-ink-secondary);
   font-size: var(--tpl-bm-11);
   line-height: var(--tpl-bm-17);
@@ -190,3 +189,5 @@
   font-size: var(--tpl-bm-13);
   font-weight: 600;
 }
+
+.cardDesc, .cardDescNoticePlacement { margin: 0; }

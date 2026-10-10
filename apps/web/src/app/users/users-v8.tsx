@@ -1,26 +1,48 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { CircleAlert, RotateCw, SearchX, UserPlus } from 'lucide-react'
-import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
-import HelpTip from '@/components/shared/help-tip'
-import Pagination from '@/components/shared/pagination'
-import SearchField from '@/components/shared/search-field'
-import Select from '@/components/shared/select'
-import StatusBadge from '@/components/shared/status-badge'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import MergedPersonDetailViewV8 from '@/components/merged-person/merged-person-detail-v8'
-import { mergedPersonIdOf } from '@/components/merged-person/merged-person-view'
-import { FriendsManageNavV8 } from '@/app/friends/friends-nav-v8'
-import { api } from '@/lib/api'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
-import { useMergedUsers, USERS_PAGE_SIZE } from './use-merged-users'
-import styles from '@/app/friends/friends-v8.module.css'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { useCallback, useEffect, useState } from "react"
+import { CircleAlert, RotateCw, SearchX, UserPlus } from "lucide-react"
+import Button from "@/components/shared/button"
+import Checkbox from "@/components/shared/checkbox"
+import HelpTip from "@/components/shared/help-tip"
+import Pagination from "@/components/shared/pagination"
+import SearchField from "@/components/shared/search-field"
+import Select from "@/components/shared/select"
+import StatusBadge from "@/components/shared/status-badge"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import MergedPersonDetailViewV8 from "@/components/merged-person/merged-person-detail-v8"
+import { mergedPersonIdOf } from "@/components/merged-person/merged-person-view"
+import { FriendsManageNavV8 } from "@/app/friends/friends-nav-v8"
+import { api } from "@/lib/api"
+import { useStaffRole, canManageRole } from "@/lib/staff-role"
+import { formatDateTime, formatDay, formatNumber } from "@/lib/format"
+import { useMergedUsers, USERS_PAGE_SIZE } from "./use-merged-users"
+import styles from "@/app/friends/friends-v8.module.css"
+import { emptyValue } from "@/components/shared/empty-value"
+import { SaveErrorField } from "@/components/shared/save-form-errors"
+import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8 統合ユーザー（Pencil `ADjK8`、採用版の流れは `sdbsQ` 板3、状態 `SXCb3`）。
@@ -32,6 +54,8 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * 板にある「配信に使うアカウント」の列は /api/users-grouped の行に無いので
  * 出さない（DEVIN-QUESTIONS に未接続として記録）。
  */
+
+
 
 const UID_STATUS = {
   url_token: '要確認',
@@ -210,7 +234,7 @@ export default function UsersV8() {
       </div>
 
       {u.exportError ? (
-        <p className={styles.errorBand} role="alert">{u.exportError}</p>
+        <Notice tone="danger" className={styles.errorBandNoticePlacement} >{u.exportError}</Notice>
       ) : null}
 
       {/* 一覧。状態は SXCb3：骨格・0件・失敗をこの場所で出す。 */}

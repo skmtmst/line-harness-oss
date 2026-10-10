@@ -15,7 +15,7 @@ import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ListRange from '@/components/ui/list-range'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import SortSelect from '@/components/ui/sort-select'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
@@ -25,7 +25,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+
 import { runUndoable } from '@/lib/undoable'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -483,7 +483,7 @@ export async function requestWebinarListV8(args: {
 }
 
 export function WebinarListErrorNotice({ failure, onRetry }: { failure: WebinarLoadFailure; onRetry: () => void }) {
-  return <div role="alert" className="border-hairline border-b px-4 py-3"><p className="text-ink text-sm font-semibold">{failure.title}</p><p className="text-ink-secondary mt-1 text-xs">{failure.description}</p>{failure.retryable ? <Button onClick={onRetry}>もう一度読み込む</Button> : null}</div>
+  return <Notice tone="danger" heading={failure.title} action={failure.retryable ? <Button onClick={onRetry}>もう一度読み込む</Button> : null}>{failure.description}</Notice>
 }
 
 export function WebinarListContent({ accountLoading, loading, selectedAccountId, accountsCount, loadFailure, visibleItems, panelGrand, refreshing, onRetry, onArchive, canEdit = true, readonlyReason = '', onClearFilters = () => undefined, onOpenDetail = () => undefined }: {

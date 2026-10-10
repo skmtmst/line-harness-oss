@@ -1,45 +1,86 @@
 'use client'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { CircleDot, Inbox, LogIn, Plus, RotateCcw, Settings, Star, MessageCircle } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { ListPage } from '@/components/templates'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import Button from '@/components/shared/button'
-import { FolderDot, FolderDotName } from '@/components/shared/folder-dot'
-import { brandInitial } from '@/components/layout/brand-initial'
-import EmptyList from '@/components/shared/empty-list'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
-import Pagination from '@/components/shared/pagination'
-import SearchField from '@/components/shared/search-field'
-import SegmentedControl from '@/components/shared/segmented'
-import Select from '@/components/shared/select'
-import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
-import { classifyApiFailure, loadFailureNotice } from '@/components/shared/api-error-message'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import AccountEditModal from '@/components/accounts/account-edit-modal'
-import PlatformNotices from '@/components/hq/platform-notices'
-import { api, fetchApi } from '@/lib/api'
-import { FOLDER_SELECT_COLORS, type Folder } from '@line-crm/shared'
-import { resolveStoreReturnPath } from '@/lib/hq-navigation'
-import { formatNumber } from '@/lib/format'
-import { useStaffRole } from '@/lib/staff-role'
-import { readSessionSnapshot } from '@/lib/session-snapshot'
-import { useAccount, type AccountWithStats } from '@/contexts/account-context'
-import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8, accountHandle } from './account-dialogs'
-import { connectionReasonLine } from './connection-reasons'
-import styles from './home.module.css'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
-import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/folder-colors'
-import StatusPill from '@/components/shared/status-pill'
-import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { useListUrlValue } from "@/components/shared/list-url-state"
+import { CircleDot, Inbox, LogIn, Plus, RotateCcw, Settings, Star, MessageCircle } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
+import { ListPage } from "@/components/templates"
+import KpiBand from "@/components/shared/kpi-band"
+import KpiCard from "@/components/shared/kpi-card"
+import Button from "@/components/shared/button"
+import { FolderDot, FolderDotName, folderDisplayColor } from "@/components/shared/folder-dot"
+import { brandInitial } from "@/components/layout/brand-initial"
+import EmptyList from "@/components/shared/empty-list"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import FilterChip from "@/components/shared/filter-chip"
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from "@/components/shared/folder-panel"
+import ListState from "@/components/shared/list-state"
+import Notice from "@/components/shared/notice"
+import Pagination from "@/components/shared/pagination"
+import SearchField from "@/components/shared/search-field"
+import SegmentedControl from "@/components/shared/segmented"
+import Select from "@/components/shared/select"
+import FolderEditorDialog from "@/components/shared/folder-editor-dialog"
+import { classifyApiFailure, loadFailureNotice } from "@/components/shared/api-error-message"
+import { usePageTitle } from "@/components/shell/page-chrome"
+import AccountEditModal from "@/components/accounts/account-edit-modal"
+import PlatformNotices from "@/components/hq/platform-notices"
+import { api, fetchApi } from "@/lib/api"
+import { FOLDER_SELECT_COLORS, type Folder } from "@line-crm/shared"
+import { resolveStoreReturnPath } from "@/lib/hq-navigation"
+import { formatNumber } from "@/lib/format"
+import { useStaffRole } from "@/lib/staff-role"
+import { readSessionSnapshot } from "@/lib/session-snapshot"
+import { useAccount, type AccountWithStats } from "@/contexts/account-context"
+import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8, accountHandle } from "./account-dialogs"
+import { connectionReasonLine } from "./connection-reasons"
+import styles from "./home.module.css"
+import { DEFAULT_TAG_FOLDER_COLOR } from "@/v8/tags/folder-colors"
+import StatusPill from "@/components/shared/status-pill"
+import TruncatedText from "@/components/shared/truncated-text"
+import { emptyValue } from "@/components/shared/empty-value"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from "@/components/shared/page-size-select"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -49,6 +90,8 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左のフォルダの列（型のフォルダの列＋共通 FolderPanel。2026-10-08 タグ→フォルダ・API-17）・
  * 数のカード4枚・探す欄と状態の札・カード／表の切り替え・並び・件数・アカウントのカード・件数と注。
  */
+
+
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 type View = 'cards' | 'table'
@@ -70,7 +113,7 @@ const SORT_OPTIONS = [
   { value: 'display', label: '並び：登録順' },
 ]
 
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 
 function isArchived(account: AccountWithStats) {
   return Boolean(account.archivedAt)
@@ -383,7 +426,7 @@ export default function HqHomeV8() {
     <div className={styles.folderBox}>
       <FolderPanel
         /* 閲覧のみで登録ボタンを隠したときも、その場所は空けておく（下のフォルダの列が上へ詰まらない。絵 VtJQ6）。 */
-        createAction={createAccount ?? <span className={styles.createSpace} aria-hidden="true" />}
+        createAction={createAccount}
         heading="フォルダ"
         rows={folderRows}
         activeId={folder}
@@ -391,7 +434,7 @@ export default function HqHomeV8() {
         onAddFolder={canManage ? () => openFolderDialog(null) : undefined}
         addFolderLabel="フォルダを追加"
       >
-        <p className={styles.folderNote}>フォルダを消しても、アカウントは消えません</p>
+        <FolderPanelNote>フォルダを消しても、アカウントは消えません</FolderPanelNote>
       </FolderPanel>
     </div>
   )

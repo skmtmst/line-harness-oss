@@ -1,59 +1,105 @@
 'use client'
 
-import Toggle from '@/components/shared/toggle';
-import { flushListUrlState, useListUrlValue } from '@/components/shared/list-url-state'
-import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
-import { notifySaved } from '@/components/shared/toast'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Gift, ImageIcon, Minus, Plus, Stamp } from 'lucide-react'
-import { VISIT_STAMP_DEFAULT_COLOR, visitStampDarkInk } from '@line-crm/shared'
-import type { VisitStampCard, VisitStampEntryPage, VisitStampMultiplier, VisitStampReward, VisitStampSettings } from '@line-crm/shared'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import { DetailColumns } from '@/components/templates/detail-columns'
-import tpl from '@/components/templates/page-templates.module.css'
-import Button from '@/components/shared/button'
-import MediaSlot from '@/components/shared/media-slot'
-import ColorWell from '@/components/shared/color-well'
-import Combobox from '@/components/shared/combobox'
-import HelpTip from '@/components/shared/help-tip'
-import { FieldError } from '@/components/shared/form-controls'
-import IconButton from '@/components/shared/icon-button'
-import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
-import Pagination from '@/components/shared/pagination'
-import Radio from '@/components/shared/radio'
-import { RowActions } from '@/components/shared/row-actions'
-import Select from '@/components/shared/select'
-import StatusBadge from '@/components/shared/status-badge'
-import StickyBar from '@/components/shared/sticky-bar'
-import { Tabs } from '@/components/shared/tabs'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { TextArea, TextField } from '@/components/shared/text-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
-import { notifyToast } from '@/components/shared/toast'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { useAccount } from '@/contexts/account-context'
-import { api, describeSaveFailure } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { visitStampsApi } from '@/lib/visit-stamps-api'
-import {
-  MANUAL_REASONS, STACKING_ORDERS, type ManualReason, defaultSettings, previewExpiry, friendLabel, friendNames, historyRows, manualReasonText,
-  multiplierDetail, multiplierName, previewSlots, rankDetail, rewardNote, settingsIssue, type StampSettingField, shortDateTime, slotCount, sortedRewards, stackedCap, withSlotCount,
-} from './display'
-import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, ReasonDialog, RewardDialog, StoresDialog } from './dialogs'
-import styles from './visit-stamps.module.css'
-import { formatNumber as polishFormatNumber } from '@/lib/format'
-import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
-import NumberInput from '@/components/shared/number-field'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import ImageFrame from '@/components/shared/image-frame'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Toggle from "@/components/shared/toggle"
+import { flushListUrlState, useListUrlValue } from "@/components/shared/list-url-state"
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from "@/components/shared/save-conflict"
+import { notifySaved, notifyToast } from "@/components/shared/toast"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Check, Gift, ImageIcon, Minus, Plus, Stamp } from "lucide-react"
+import { VISIT_STAMP_DEFAULT_COLOR, visitStampDarkInk } from "@line-crm/shared"
+import type { VisitStampCard, VisitStampEntryPage, VisitStampMultiplier, VisitStampReward, VisitStampSettings } from "@line-crm/shared"
+import { PageFrame, PageHeading } from "@/components/templates/page-frame"
+import { DetailColumns } from "@/components/templates/detail-columns"
+import tpl from "@/components/templates/page-templates.module.css"
+import Button from "@/components/shared/button"
+import MediaSlot from "@/components/shared/media-slot"
+import ColorWell from "@/components/shared/color-well"
+import Combobox from "@/components/shared/combobox"
+import HelpTip from "@/components/shared/help-tip"
+import { FieldError, Field } from "@/components/shared/form-controls"
+import IconButton from "@/components/shared/icon-button"
+import ListState from "@/components/shared/list-state"
+import Pagination from "@/components/shared/pagination"
+import Radio from "@/components/shared/radio"
+import { RowActions } from "@/components/shared/row-actions"
+import Select from "@/components/shared/select"
+import StatusBadge from "@/components/shared/status-badge"
+import StickyBar from "@/components/shared/sticky-bar"
+import { Tabs } from "@/components/shared/tabs"
+import { DataTable, TableHeadRow, Td, Th, Tr } from "@/components/shared/table"
+import { TextArea, TextField } from "@/components/shared/text-field"
+import { SettingCheckbox } from "@/components/shared/checkbox"
+import { usePageTitle } from "@/components/shell/page-chrome"
+import { useAccount } from "@/contexts/account-context"
+import { api, describeSaveFailure } from "@/lib/api"
+import { canManageRole, useStaffRole } from "@/lib/staff-role"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import { visitStampsApi } from "@/lib/visit-stamps-api"
+import { MANUAL_REASONS, STACKING_ORDERS, type ManualReason, defaultSettings, previewExpiry, friendLabel, friendNames, historyRows, manualReasonText, multiplierDetail, multiplierName, previewSlots, rankDetail, rewardNote, settingsIssue, type StampSettingField, shortDateTime, slotCount, sortedRewards, stackedCap, withSlotCount } from "./display"
+import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, ReasonDialog, RewardDialog, StoresDialog } from "./dialogs"
+import styles from "./visit-stamps.module.css"
+import { formatNumber as polishFormatNumber } from "@/lib/format"
+import TruncatedText from "@/components/shared/truncated-text"
+import { withPermissionFailure } from "@/components/shared/api-error-message"
+import { emptyValue } from "@/components/shared/empty-value"
+import NumberInput from "@/components/shared/number-field"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import ImageFrame from "@/components/shared/image-frame"
+import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8 来店スタンプ（G-8a〜a3）。マイル（オンライン・特定の動き）とは別のスタンプカード。
@@ -63,6 +109,8 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * ①② は下書きで、下の帯の［保存する］でまとめて保存する。③・店で手入力・④の取り消しは、その場で口を呼ぶ。
  * 呼ぶ口は visit-stamps-api（Codex の API-7）だけ。動き・権限は BEHAVIOR.md。
  */
+
+
 
 type PaperRow = { id: string; card_id?: string; friend_id: string; photo_url: string; stamps: number; status: string; created_at?: string }
 type FriendLite = { id: string; displayName?: string | null; metadata?: Record<string, unknown> | null }
@@ -465,7 +513,7 @@ function VisitStampsScreen() {
           onClick: () => selectTab(item.key),
         }))} />
       </div>
-      {role === 'viewer' ? <div className={tpl.notice}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></div> : null}
+      {role === 'viewer' ? <div className={tpl.notice}><ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></div> : null}
       <div className={tpl.split} data-template-region="body" role="tabpanel" id={`visit-stamp-panel-${tab}`} aria-labelledby={`visit-stamp-tab-${tab}`}>
         <div className={styles.body}>
           {tab === 'settings' ? (

@@ -280,7 +280,7 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
           {detailTarget.stateReason ? (
             <Notice tone="warn" message={detailTarget.stateReason} />
           ) : null}
-          {ingestError ? <p className="text-danger text-sm" role="alert">{ingestError}</p> : null}
+          {ingestError ? <Notice tone="danger" >{ingestError}</Notice> : null}
           {/*
            * IDEA-19: 「購入」「相談完了」など成果1件ずつの記録。
            * 検知は受信履歴、ここは数えた成果の状態(確定・確認待ち・却下・取消)

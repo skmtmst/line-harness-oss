@@ -1,31 +1,59 @@
 'use client'
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Check, ClipboardList, Link2, Plus, Workflow } from 'lucide-react'
-import type { TagGroup } from '@line-crm/shared'
-import { api, type TagDefinition } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { CreatePage } from '@/components/templates'
-import Button from '@/components/shared/button'
-import TagPill from '@/components/shared/tag-pill'
-import Notice from '@/components/shared/notice'
-import FolderSelect, { folderCreateResult } from '@/components/shared/folder-select'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { SettingCheckbox } from '@/components/shared/checkbox'
-import { TextField } from '@/components/shared/text-field'
-import ListState from '@/components/shared/list-state'
-import { notifyToast } from '@/components/shared/toast'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
-import { definitionsForSave, linkedActionFromDefinition } from '@/components/friend-fields/tag-editor-v4'
-import styles from './create.module.css'
-import { tagNameProblem } from './tag-name'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
-import { Field } from '@/components/shared/form-controls'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { Suspense, useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Check, ClipboardList, Link2, Plus, Workflow } from "lucide-react"
+import type { TagGroup } from "@line-crm/shared"
+import { api, type TagDefinition } from "@/lib/api"
+import { useAccount } from "@/contexts/account-context"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import { CreatePage } from "@/components/templates"
+import Button from "@/components/shared/button"
+import TagPill from "@/components/shared/tag-pill"
+import Notice from "@/components/shared/notice"
+import FolderSelect, { folderCreateResult } from "@/components/shared/folder-select"
+import { useStaffRole, canManageRole } from "@/lib/staff-role"
+import { SettingCheckbox } from "@/components/shared/checkbox"
+import { TextField } from "@/components/shared/text-field"
+import ListState from "@/components/shared/list-state"
+import { notifyToast } from "@/components/shared/toast"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import { DuplicateNameNote, findDuplicateNames } from "@/components/friend-fields/attribute-kind-guide"
+import { definitionsForSave, linkedActionFromDefinition } from "@/components/friend-fields/tag-editor-v4"
+import styles from "./create.module.css"
+import { tagNameProblem } from "./tag-name"
+import { folderDisplayColor } from "@/components/shared/folder-dot"
+import { Field } from "@/components/shared/form-controls"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -37,6 +65,8 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * 違うのは見せ方：タグ連動（付いたときの動き）は絵のとおり「作ったあとの編集で足す」。
  * 複製して作る（?copy=）ときは、複製元の連動の中身は画面に出さずにそのまま写して作る。
  */
+
+
 
 export { tagNameProblem } from './tag-name'
 
@@ -197,7 +227,7 @@ function TagCreate() {
 
   if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="複製元を読み込んでいます…" /></SaveErrorScope>
 
-  if (!canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></SaveErrorScope>
+  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></SaveErrorScope>
 
   const back = <></>
   const groupFolders = groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))
@@ -256,7 +286,7 @@ function TagCreate() {
             </span>
             {foldersFailed ? (
               <div className={styles.inlineRetry}>
-                <p className={styles.fieldError} role="alert">フォルダを読み込めませんでした。未分類のまま作れます。</p>
+                <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >フォルダを読み込めませんでした。未分類のまま作れます。</Notice>
                 <Button type="button" variant="text" onClick={() => setFoldersReloadKey((key) => key + 1)}>フォルダを読み直す</Button>
               </div>
             ) : null}

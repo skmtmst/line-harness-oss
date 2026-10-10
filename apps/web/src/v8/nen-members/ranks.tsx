@@ -1,31 +1,58 @@
 'use client'
 
-import { SaveConflictBand } from '@/components/shared/save-conflict'
-import { useEffect, useState, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
-import { Check, GitCompareArrows, Plus, RefreshCw, TriangleAlert } from 'lucide-react'
-import Card from '@/components/shared/card'
-import Button from '@/components/shared/button'
-import { RowActions } from '@/components/shared/row-actions'
-import Dialog from '@/components/shared/dialog'
-import ListState from '@/components/shared/list-state'
-import Select from '@/components/shared/select'
-import StatusBadge from '@/components/shared/status-badge'
-import { TextField } from '@/components/shared/text-field'
-import { FieldError } from '@/components/shared/form-controls'
-import { useFieldValidation } from '@/lib/use-field-validation'
-import { describeApiFailure } from '@/components/shared/api-error-message'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { ApiError } from '@/lib/api'
-import { formatNumber } from '@/lib/format'
-import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
-import { RULE_LABELS, parsePercent, parseYen, shortDateTime, shortTime, yen, type LoadStatus, type SavedHandler } from './parts'
-import styles from './members.module.css'
-import { emptyValue } from '@/components/shared/empty-value'
-import NumberInput from '@/components/shared/number-field'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { SaveConflictBand } from "@/components/shared/save-conflict"
+import { useEffect, useState, type ReactNode } from "react"
+import { useRouter } from "next/navigation"
+import { Check, Plus, RefreshCw } from "lucide-react"
+import Card from "@/components/shared/card"
+import Button from "@/components/shared/button"
+import { RowActions } from "@/components/shared/row-actions"
+import Dialog from "@/components/shared/dialog"
+import ListState from "@/components/shared/list-state"
+import Select from "@/components/shared/select"
+import StatusBadge from "@/components/shared/status-badge"
+import { TextField } from "@/components/shared/text-field"
+import { FieldError } from "@/components/shared/form-controls"
+import { useFieldValidation } from "@/lib/use-field-validation"
+import { describeApiFailure } from "@/components/shared/api-error-message"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { ApiError } from "@/lib/api"
+import { formatNumber } from "@/lib/format"
+import { nenRanksApi, type NenRankSettingsData } from "@/lib/nen-ranks-api"
+import { RULE_LABELS, parsePercent, parseYen, shortDateTime, shortTime, yen, type LoadStatus, type SavedHandler } from "./parts"
+import styles from "./members.module.css"
+import { emptyValue } from "@/components/shared/empty-value"
+import NumberInput from "@/components/shared/number-field"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8-B 会員 › ランク設定（fb9NJ）・ランクを消す（確認）（dEv6G）・競合（e5yBLx）。
@@ -34,6 +61,8 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * 下の中央に キャンセル・保存して EC へ同期。
  * 競合の帯はタブの下・数の帯の上（型の tabs の段）に出すので、外枠へ渡す（onTopBand）。
  */
+
+
 
 type RankDraft = { id: string | null; name: string; threshold: string; rate: string; tagId: string | null; tagName: string | null; memberCount: number }
 
@@ -292,7 +321,7 @@ export default function RankSettingsV8({
       {notice || error ? (
         <div className={styles.messages}>
           {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-          {error ? <p className={styles.errorText} role="alert">{error}</p> : null}
+          {error ? <Notice tone="danger" >{error}</Notice> : null}
         </div>
       ) : null}
 

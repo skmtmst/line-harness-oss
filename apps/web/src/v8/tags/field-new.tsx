@@ -1,17 +1,30 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import type { FriendField, Folder } from '@line-crm/shared'
-import { api, describeSaveFailure } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import Notice from '@/components/shared/notice'
-import ListState from '@/components/shared/list-state'
-import { notifyToast } from '@/components/shared/toast'
-import { folderById, folderCreator } from '@/components/shared/folder-select'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import FieldEditor, { type FieldEditorValues } from './field-editor'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
-import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { useCallback, useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import type { FriendField, Folder } from "@line-crm/shared"
+import { api, describeSaveFailure } from "@/lib/api"
+import { useAccount } from "@/contexts/account-context"
+import ListState from "@/components/shared/list-state"
+import { notifyToast } from "@/components/shared/toast"
+import { folderById, folderCreator } from "@/components/shared/folder-select"
+import { useStaffRole, canManageRole } from "@/lib/staff-role"
+import FieldEditor, { type FieldEditorValues } from "./field-editor"
+import { withPermissionFailure } from "@/components/shared/api-error-message"
+import { SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -20,6 +33,8 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
  * 読み込み・重複確認・冪等キー・保存の動きは今の入口（app/tags/new-field-page-v8.tsx）と同じ。
  * 中身は src/v8 の FieldEditor。受け付ける URL：`/tags/fields/new`・`?back=<戻り先>`。
  */
+
+
 
 export default function FieldNew() {
   const saveErrors = useSaveFormErrors()
@@ -117,7 +132,7 @@ export default function FieldNew() {
     }
   }
 
-  if (!canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></SaveErrorScope>
+  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></SaveErrorScope>
 
   return (
     <SaveErrorScope errors={saveErrors}><FieldEditor

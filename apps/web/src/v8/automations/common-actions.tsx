@@ -31,7 +31,7 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import { type FolderPanelRow } from '@/components/shared/folder-panel'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
@@ -459,11 +459,9 @@ export default function CommonActionsV8() {
           onConfirm={() => confirmArchive()}
         >
           {archiving?.mode === 'archive' && archiving.item.bindingCount > 0 ? (
-            <p className={styles.dialogWarn} role="alert">
-              利用中のため保管できません（{archiving.item.bindingCount}か所）。先に利用先を外してください。
-            </p>
+            <Notice tone="danger" className={styles.dialogWarnNoticePlacement} >利用中のため保管できません（{archiving.item.bindingCount}か所）。先に利用先を外してください。</Notice>
           ) : null}
-          {archiveError ? <p className={styles.dialogError} role="alert">{archiveError}</p> : null}
+          {archiveError ? <Notice tone="danger" >{archiveError}</Notice> : null}
         </Dialog>
       </>}
     >

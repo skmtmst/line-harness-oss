@@ -12,7 +12,7 @@
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Copy, Info, Plus } from 'lucide-react'
+import { Info, Plus } from 'lucide-react'
 import type { LineAccount, PoolAccount, TrafficPool } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
@@ -34,7 +34,8 @@ import frame from '../sa-frame.module.css'
 import styles from './pools.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value'
+
+import Notice from '@/components/shared/notice'
 
 type AccountWithStats = LineAccount & { stats?: { friendCount: number } }
 
@@ -227,7 +228,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
         <span className={styles.url} ><TruncatedText value={String(publicUrl ?? '')} url /></span>
         <CopyTextButton value={publicUrl} aria-label="公開URLをコピー"  />
       </div>
-      {copyError ? <p role="alert" className={styles.inlineError}>{copyError}</p> : null}
+      {copyError ? <Notice tone="danger" >{copyError}</Notice> : null}
       <PoolMembers poolId={pool.id} accounts={accounts} canManage={canManage} onChange={onChange} />
 
       <SaveErrorScope errors={saveErrors}><Dialog open={editing} title="プールを編集" designWidth={560} busy={editBusy} error={editError} onCancel={closeEdit} onConfirm={() => void saveEdit()} confirmLabel="保存する">
@@ -341,10 +342,7 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
         {members.length === 0 && !listError ? <li className={styles.empty}>所属アカウントなし</li> : null}
       </ul>
       {listError ? (
-        <p role="alert" className={styles.inlineError}>
-          {listError}{' '}
-          <button type="button" className={styles.textButton} onClick={() => void reload()}>もう一度読み込む</button>
-        </p>
+        <Notice tone="danger" >{listError}{' '}<button type="button" className={styles.textButton} onClick={() => void reload()}>もう一度読み込む</button></Notice>
       ) : null}
       {canManage && candidates.length > 0 ? (
         <div className={styles.menuBox}>

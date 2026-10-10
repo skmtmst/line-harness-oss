@@ -1,83 +1,144 @@
 'use client'
 
-import { canManageRole } from '@/lib/staff-role';
-import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { notifySaved } from '@/components/shared/toast'
-import { useTenantWideAccess } from '@/lib/staff-role'
-import { useEffect, useRef, useState, type ComponentType } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAccount } from '@/contexts/account-context'
-import { ArrowLeft, Check, Plus, Search, Send } from 'lucide-react'
-import { templateKind, type HqTemplateFolder, type HqTemplateListStats, type HqTemplateReceivedVersion, type HqTemplateVersionDisplay, type TemplateKind } from '@line-crm/shared'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import { ListPageBody } from '@/components/templates/list-page'
-import { FolderDotName } from '@/components/shared/folder-dot'
-import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import StatusBadge from '@/components/shared/status-badge'
-import Notice from '@/components/shared/notice'
-import TagPill from '@/components/shared/tag-pill'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
-import Select from '@/components/shared/select'
-import FolderSelect from '@/components/shared/folder-select'
-import { Th } from '@/components/shared/table'
-import { useStaffRole } from '@/lib/staff-role'
-import { formatNumber } from '@/lib/format'
-import { freshDefinition } from '@/lib/hq-template-authoring'
-import { clearCreationAttempt, loadCreationAttempt, persistCreationAttempt, sameCreationScope, type CreationAttempt, type CreationScope } from '@/lib/hq-template-create-attempt'
-import {
-  hqTemplatesApi, type DistributionMode, type DistributionResult, type HqAccount, type HqTemplate, type HqTemplateListItem, type MessageTemplateDefinition,
-  type Preflight, type TemplateDefinition, type FormDefinition, type TemplateDetail, type TemplateInput, type TemplateType,
-} from '@/lib/hq-templates-api'
-import {
-  choiceKey, contentSummary, definitionError, definitionForName, definitionName, failedStores, referenceCount, resolvedItems,
-  uploadedKeysIn, type TemplateMedia,
-} from './definition'
-import MessageForm from './message-form'
-import { useFormErrors } from '@/lib/use-form-errors'
-import TemplateMessageEditor from '@/v8/template-edit/message'
-import TemplateAssetEditor from '@/v8/template-edit/asset'
-import TemplateRichEditor from '@/v8/template-edit/rich'
-import TemplateRichVideoEditor from '@/v8/template-edit/rich-video'
-import { hqMediaApi } from '@/lib/api-hq-media'
-import CarouselV8 from '@/v8/templates/carousel'
-import QuestionNewV8 from '@/v8/templates/question-new'
-import type { TemplateEditHost, TemplateHostContent } from '@/v8/template-edit/host'
-import FormEditV8 from '@/v8/form-edit/edit'
-import type { FormEditHost } from '@/v8/form-edit/host'
-import { hqFormDefinitionToEditor, hqFormEditorToDefinition } from '@/components/forms/hq-form-definition-adapter'
-import Card from '@/components/shared/card'
-import { japaneseDetailOf } from '@/components/shared/api-error-message'
-import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
-import { HqRichMenuCompatibilityError, hqRichMenuDefinitionFromSeed, hqRichMenuSeedFromDefinition } from '@/lib/hq-rich-menu-create'
-import type { RichMenuDefinition, TagDefinition } from '@/lib/hq-templates-api'
-import HqAccountPicker from './account-picker'
-import FolderDistributionDialog from './folder-distribution-dialog'
-import DistributionResultDialog from './distribution-result-dialog'
-import FolderDistributionResult from './folder-distribution-result'
-import { assertTargets, distributeFolder, settledResult, folderResultRows, failedStatus, type FolderRun } from './folder-distribution'
-import SavedDistributionDialog from './saved-distribution-dialog'
-import { accountsInFolder, distributionFolderRows, DistributionFolderPanel, useDistributionFolders, ALL_ACCOUNTS } from './distribution-accounts'
-import HqAttributes from './attributes'
-import { useAttributeTab } from './attribute-tabs'
-import HqStoreList from './store-list'
-import HqTagEditorV8 from './tag-editor'
-import HqTemplateDetail, { inUseVersionOf } from './detail'
-import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
-import styles from './console.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { DistributionPage } from '@/components/templates/distribution-page'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import { DistributionTable, DistributionProgress, DistributionAccountName, DistributionToolbar } from '@/components/shared/distribution-table'
+import { canManageRole, useTenantWideAccess, useStaffRole } from "@/lib/staff-role"
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from "@/components/shared/save-conflict"
+import { useListUrlValue } from "@/components/shared/list-url-state"
+import { notifySaved } from "@/components/shared/toast"
+import { useEffect, useRef, useState, type ComponentType } from "react"
+import { useRouter } from "next/navigation"
+import { useAccount } from "@/contexts/account-context"
+import { ArrowLeft, Check, Plus, Search, Send } from "lucide-react"
+import { templateKind, type HqTemplateFolder, type HqTemplateListStats, type HqTemplateReceivedVersion, type HqTemplateVersionDisplay, type TemplateKind } from "@line-crm/shared"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import { PageFrame, PageHeading } from "@/components/templates/page-frame"
+import { ListPageBody } from "@/components/templates/list-page"
+import { FolderDotName, folderDisplayColor } from "@/components/shared/folder-dot"
+import Button from "@/components/shared/button"
+import Checkbox from "@/components/shared/checkbox"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import Notice from "@/components/shared/notice"
+import TagPill from "@/components/shared/tag-pill"
+import Select from "@/components/shared/select"
+import FolderSelect from "@/components/shared/folder-select"
+import { Th } from "@/components/shared/table"
+import { formatNumber } from "@/lib/format"
+import { freshDefinition } from "@/lib/hq-template-authoring"
+import { clearCreationAttempt, loadCreationAttempt, persistCreationAttempt, sameCreationScope, type CreationAttempt, type CreationScope } from "@/lib/hq-template-create-attempt"
+import { hqTemplatesApi, type DistributionMode, type DistributionResult, type HqAccount, type HqTemplate, type HqTemplateListItem, type MessageTemplateDefinition, type Preflight, type TemplateDefinition, type FormDefinition, type TemplateDetail, type TemplateInput, type TemplateType } from "@/lib/hq-templates-api"
+import { choiceKey, contentSummary, definitionError, definitionForName, definitionName, failedStores, referenceCount, resolvedItems, uploadedKeysIn, type TemplateMedia } from "./definition"
+import MessageForm from "./message-form"
+import { useFormErrors } from "@/lib/use-form-errors"
+import TemplateMessageEditor from "@/v8/template-edit/message"
+import TemplateAssetEditor from "@/v8/template-edit/asset"
+import TemplateRichEditor from "@/v8/template-edit/rich"
+import TemplateRichVideoEditor from "@/v8/template-edit/rich-video"
+import { hqMediaApi } from "@/lib/api-hq-media"
+import CarouselV8 from "@/v8/templates/carousel"
+import QuestionNewV8 from "@/v8/templates/question-new"
+import type { TemplateEditHost, TemplateHostContent } from "@/v8/template-edit/host"
+import FormEditV8 from "@/v8/form-edit/edit"
+import type { FormEditHost } from "@/v8/form-edit/host"
+import { hqFormDefinitionToEditor, hqFormEditorToDefinition } from "@/components/forms/hq-form-definition-adapter"
+import Card from "@/components/shared/card"
+import { japaneseDetailOf } from "@/components/shared/api-error-message"
+import type { RichMenuCreateHost } from "@/lib/rich-menu-create-host"
+import { HqRichMenuCompatibilityError, hqRichMenuDefinitionFromSeed, hqRichMenuSeedFromDefinition } from "@/lib/hq-rich-menu-create"
+import type { RichMenuDefinition, TagDefinition } from "@/lib/hq-templates-api"
+import HqAccountPicker from "./account-picker"
+import FolderDistributionDialog from "./folder-distribution-dialog"
+import DistributionResultDialog from "./distribution-result-dialog"
+import FolderDistributionResult from "./folder-distribution-result"
+import { assertTargets, distributeFolder, settledResult, folderResultRows, failedStatus, type FolderRun } from "./folder-distribution"
+import SavedDistributionDialog from "./saved-distribution-dialog"
+import { accountsInFolder, distributionFolderRows, DistributionFolderPanel, useDistributionFolders, ALL_ACCOUNTS } from "./distribution-accounts"
+import HqAttributes from "./attributes"
+import { useAttributeTab } from "./attribute-tabs"
+import HqStoreList from "./store-list"
+import HqTagEditorV8 from "./tag-editor"
+import HqTemplateDetail, { inUseVersionOf } from "./detail"
+import { FormLeaveGuard } from "@/components/shared/form-leave-guard"
+import styles from "./console.module.css"
+import TruncatedText from "@/components/shared/truncated-text"
+import { Field } from "@/components/shared/form-controls"
+import { emptyValue } from "@/components/shared/empty-value"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import { DistributionPage } from "@/components/templates/distribution-page"
+import KpiBand from "@/components/shared/kpi-band"
+import KpiCard from "@/components/shared/kpi-card"
+import { DistributionTable, DistributionProgress, DistributionAccountName, DistributionToolbar } from "@/components/shared/distribution-table"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8-B 統括のテンプレート（一覧 LRc93・メッセージのひな形を作る X4JcOf・アカウントへ配る meBRB）。
@@ -92,6 +153,8 @@ import { DistributionTable, DistributionProgress, DistributionAccountName, Distr
  * タグ・リッチメニュー・回答フォーム・シナリオのひな形の中身は、入口（app/hq/templates/page.tsx）
  * が今の編集部品を `DefinitionEditor` として渡す（src/v8 から @/app を読まないため）。
  */
+
+
 
 const PAGE_TITLES: Record<TemplateType, string> = { tag: 'タグ', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }
 /** 一覧の段の住所（上の帯のパンくずの行き先）。シナリオのひな形はテンプレートの住所の中にある。 */
@@ -662,7 +725,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   </> : null
 
   const notices = <>
-    {!canEdit && stage === 'list' ? <p className={styles.readonlyBand} role="note">閲覧のみで見ています。変える操作は統括の管理者に頼んでください。</p> : null}
+    {!canEdit && stage === 'list' ? <div className={styles.readonlyBand}><ReadOnlyNotice role="note">閲覧のみで見ています。変える操作は統括の管理者に頼んでください。</ReadOnlyNotice></div> : null}
     {conflictNotice}
     {error && !conflictNotice && stage !== 'saved' ? <Notice tone="danger" message={error} /> : null}
     {message ? <Notice tone="success" message={message} onClose={() => setMessage('')} /> : null}
@@ -1067,7 +1130,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                   richMenuReferences={{ tags: referenceOptions('tag'), templates: referenceOptions('template'), forms: referenceOptions('form') }}
                   formReferences={{ tags: referenceOptions('tag'), friendFields: [], scenarios: [], reminders: [], templates: [] }}
                 />
-              ) : <p role="alert">この種類のひな形は、ここでは編集できません。</p>}
+              ) : <Notice tone="danger" >この種類のひな形は、ここでは編集できません。</Notice>}
               {!canonicalEditorOwnsSave ? uncertainNotice : null}
               {!canonicalEditorOwnsSave ? <p className={styles.note}>{`参照先 ${referenceCount(type, definition)} 件を含めて配布します。`}</p> : null}
             </section>

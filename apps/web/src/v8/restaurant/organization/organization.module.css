@@ -2,24 +2,7 @@
  * ★V8 組織・権限（bSp4h）。値は globals.css の `--tpl-rt-*`。
  * 左の組織階層は幅280、右は段の間16。
  */
-.readOnly {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
 
-.readOnlyIcon {
-  width: var(--tpl-rt-icon-16);
-  height: var(--tpl-rt-icon-16);
-  flex-shrink: 0;
-  color: var(--color-action);
-}
 
 .layout {
   display: flex;
@@ -191,7 +174,6 @@
 }
 
 .intakeError {
-  margin: 0;
   color: var(--color-danger);
   font-size: var(--text-caption);
   font-weight: 600;
@@ -427,3 +409,4 @@
   .treeCollapsed { display: block; }
   .main { width: 100%; }
 }
+.intakeError, .intakeErrorNoticePlacement { margin: 0; }

@@ -1,40 +1,60 @@
 'use client'
 
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { Eye, PauseCircle, ShieldCheck, Tag, Timer } from 'lucide-react'
-import type { LineAccount } from '@line-crm/shared'
-import {
-  api,
-  ApiError,
-  type OperationCapability,
-  type OperationControl,
-  type OperationHistoryEntry,
-  type OperationImpactPreview,
-  type OperationRestoreDrift,
-} from '@/lib/api'
-import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
-import { formatOperationDate } from '@/lib/operation-status'
-import { formatMinutesRough } from '@/lib/format-duration'
-import { formatNumber } from '@/lib/format'
-import { readSessionSnapshot } from '@/lib/session-snapshot'
-import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
-import Dialog from '@/components/shared/dialog'
-import ListState from '@/components/shared/list-state'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import Select from '@/components/shared/select'
-import OtpInput from '@/components/shared/otp-input'
-import StepUpDialog from '@/components/shared/step-up-dialog'
-import SaveConflictBar from '@/components/shared/save-conflict-bar'
-import { CAPABILITY_LABEL, describeRestoreBlockers, describeRestoreDrift, describeRestoreResult } from './restore-drift'
-import { SendPathCoveragePanel } from './send-path-coverage-panel'
-import releaseLog from '@/generated/release-log-summary.json'
-import type { UpdateRelease } from './update-history'
-import styles from './control-v8.module.css'
-import { emptyValue } from '@/components/shared/empty-value'
-import { Field } from '@/components/shared/form-controls'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react"
+import { PauseCircle, ShieldCheck, Tag, Timer } from "lucide-react"
+import type { LineAccount } from "@line-crm/shared"
+import { api, ApiError, type OperationCapability, type OperationControl, type OperationHistoryEntry, type OperationImpactPreview, type OperationRestoreDrift } from "@/lib/api"
+import { operationImpactText, type EmergencyStopTarget } from "@/lib/operation-impact"
+import { formatOperationDate } from "@/lib/operation-status"
+import { formatMinutesRough } from "@/lib/format-duration"
+import { formatNumber } from "@/lib/format"
+import { readSessionSnapshot } from "@/lib/session-snapshot"
+import Button from "@/components/shared/button"
+import Checkbox from "@/components/shared/checkbox"
+import Dialog from "@/components/shared/dialog"
+import ListState from "@/components/shared/list-state"
+import { DelayedSkeleton, Skeleton } from "@/components/shared/skeleton"
+import Select from "@/components/shared/select"
+import OtpInput from "@/components/shared/otp-input"
+import StepUpDialog from "@/components/shared/step-up-dialog"
+import SaveConflictBar from "@/components/shared/save-conflict-bar"
+import { CAPABILITY_LABEL, describeRestoreBlockers, describeRestoreDrift, describeRestoreResult } from "./restore-drift"
+import { SendPathCoveragePanel } from "./send-path-coverage-panel"
+import releaseLog from "@/generated/release-log-summary.json"
+import type { UpdateRelease } from "./update-history"
+import styles from "./control-v8.module.css"
+import { emptyValue } from "@/components/shared/empty-value"
+import { Field } from "@/components/shared/form-controls"
+import { SaveErrorField } from "@/components/shared/save-form-errors"
+import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8-B 運用状態の緊急コントロール（板 `OHwbU`）。
@@ -47,6 +67,8 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * 止めたあとにすること、止めた・戻した記録の表。
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8-B 完成までの二重管理）。
  */
+
+
 
 type StopTarget = 'broadcasts' | 'scenarios' | 'reminders' | 'automations'
 
@@ -508,10 +530,7 @@ const EmergencyControlV8 = (
     <div data-design-node="OHwbU" className={styles.board}>
       {/* 権限が無い人には閲覧のみの帯。操作は出さず、記録は読める。 */}
       {previewSettled && !canControl ? (
-        <div className={styles.roBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。止める・戻す操作はオーナーか許可された人に頼んでください。</span>
-        </div>
+        <div className={styles.roBand}><ReadOnlyNotice role="status">閲覧のみで見ています。止める・戻す操作はオーナーか許可された人に頼んでください。</ReadOnlyNotice></div>
       ) : null}
 
       {needsReload ? (

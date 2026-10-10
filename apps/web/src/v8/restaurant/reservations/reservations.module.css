@@ -528,7 +528,6 @@
 }
 
 .formError {
-  margin: 0;
   color: var(--color-danger);
   font-size: var(--text-caption);
 }
@@ -595,3 +594,5 @@
 }
 
 .noteCell { display: block; min-height: calc(var(--tpl-rs-lh-12) + var(--tpl-rs-lh-11) + var(--tpl-rs-panel-head-text-gap)); }
+
+.formError, .formErrorNoticePlacement { margin: 0; }

@@ -1,27 +1,50 @@
 'use client'
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { CircleHelp, Link2, UserX } from 'lucide-react'
-import type { IdentityCandidateDecision } from '@line-crm/shared'
-import type { IdentityCandidateWithProfiles } from '@/lib/api'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { PageFrame } from '@/components/templates/page-frame'
-import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
-import Radio from '@/components/shared/radio'
-import Select from '@/components/shared/select'
-import { TextField } from '@/components/shared/text-field'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import ListState from '@/components/shared/list-state'
-import { IdentityStateBlock } from '@/components/identity/identity-state'
-import { useIdentityReview } from '@/components/identity/identity-review'
-import { canSubmitDecision } from '@/components/identity/identity-view'
-import { CONFIDENCE_WORD, STATUS_WORD, slashDateTime } from '../duplicates/words'
-import styles from './compare.module.css'
-import { PageHeading } from '@/components/templates/page-frame'
-import { Field } from '@/components/shared/form-controls'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { Suspense, useEffect, useMemo, useRef, useState } from "react"
+import { useSearchParams } from "next/navigation"
+import { CircleHelp, Link2, UserX } from "lucide-react"
+import type { IdentityCandidateDecision } from "@line-crm/shared"
+import type { IdentityCandidateWithProfiles } from "@/lib/api"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import { PageFrame, PageHeading } from "@/components/templates/page-frame"
+import Button from "@/components/shared/button"
+import Checkbox from "@/components/shared/checkbox"
+import Radio from "@/components/shared/radio"
+import Select from "@/components/shared/select"
+import { TextField } from "@/components/shared/text-field"
+import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
+import ListState from "@/components/shared/list-state"
+import { IdentityStateBlock } from "@/components/identity/identity-state"
+import { useIdentityReview } from "@/components/identity/identity-review"
+import { canSubmitDecision } from "@/components/identity/identity-view"
+import { CONFIDENCE_WORD, STATUS_WORD, slashDateTime } from "../duplicates/words"
+import styles from "./compare.module.css"
+import { Field } from "@/components/shared/form-controls"
+import { emptyValue } from "@/components/shared/empty-value"
+import { SaveErrorField } from "@/components/shared/save-form-errors"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -35,6 +58,8 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
  * - 採用する値は表の「使う値」で選ぶ（小窓はその要約）
  * - 判定の履歴は小窓の右に出す
  */
+
+
 
 const STRENGTH_WORD = { strong: '決め手', medium: '手がかり', weak: '参考' } as const
 const ATTRIBUTE_WORD: Record<string, string> = { メールアドレス: 'メール', 電話番号: '電話' }
@@ -230,7 +255,7 @@ function CompareInner() {
                       onChange={(event) => setReason(event.target.value)}
                       placeholder={decisive ? `${decisive.label}` : '何を見てそう判断したか'}
                     /></SaveErrorField>
-{review.decideError ? <p className={styles.error} role="alert">{review.decideError}</p> : null}
+{review.decideError ? <Notice tone="danger" >{review.decideError}</Notice> : null}
 {!ready && reason.trim() !== '' && decision === 'linked' && !linkedReady ? (
                       <p className={styles.note} role="status">3つの確認をそろえると判定できます。</p>
                     ) : null}

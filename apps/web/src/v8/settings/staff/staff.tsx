@@ -1,70 +1,115 @@
 'use client'
 
-import { useOverlayFocus } from '@/components/shared/overlay-utils';
-import { formatDate as polishFormatDate } from '@/lib/format'
-import SegmentedControl from '@/components/shared/segmented'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { notifySaved } from '@/components/shared/toast'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Eye, UserPlus, X } from 'lucide-react'
-import Link from 'next/link'
-import { useMergedTab } from '@/components/layout/merged-tabs'
-import LoginAudit from '@/components/staff/login-audit'
-import Button from '@/components/shared/button'
-import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/components/shared/grid-table'
-import Checkbox from '@/components/shared/checkbox'
-import { Field } from '@/components/shared/form-controls'
-import { TextField } from '@/components/shared/text-field'
-import Select from '@/components/shared/select'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import SearchField from '@/components/shared/search-field'
-import FilterChip from '@/components/shared/filter-chip'
-import { Tabs } from '@/components/shared/tabs'
-import Pagination from '@/components/shared/pagination'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import Notice from '@/components/shared/notice'
-import { notifyToast } from '@/components/shared/toast'
-import StepUpPrompt, { isStepUpRequired, type StepUpRequest as SharedStepUpRequest } from '@/components/step-up-prompt'
-import NotificationSwitch from '@/components/ui/notification-switch'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import SettingsInnerNav from '@/components/layout/settings-inner-nav'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
-import styles from './staff.module.css'
-import StatusBadge from '@/components/shared/status-badge'
-import { useAccount } from '@/contexts/account-context'
-import {
-  ApiError,
-  api,
-  describeSaveFailure,
-  fetchApi,
-  type AccessRoleBundle,
-  type AccessRoleItem,
-  type AccessUserItem,
-  type AccessUserSummary,
-  type AuditEventItem,
-} from '@/lib/api'
-import type { StaffMember } from '@line-crm/shared'
-import { SCOPE_ITEMS, BUNDLE_PRESETS, BROADCAST_EDIT_OPERATION_KEYS, type FeatureAccessLevel, type ScopeLevels } from '@line-crm/shared'
-import { csvCell } from '@/lib/presentation'
-import { qrToDataURL } from '@/lib/qr-image'
-import { isActiveAdministrator, matchStaffMember, staffActionPolicy } from './staff-actions'
-import { applyScopeRowChange, findPartialScopeRows, restoreSavedLevels, scopePiiToEmailMask } from './staff-scope-draft'
-import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from './permission-labels'
-import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
-import { formatDateTime } from '@/lib/format'
-import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import EditorSurface from '@/components/shared/editor-surface'
-import ListState from '@/components/shared/list-state'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useOverlayFocus } from "@/components/shared/overlay-utils"
+import { formatDate as polishFormatDate, formatDateTime } from "@/lib/format"
+import SegmentedControl from "@/components/shared/segmented"
+import { useListUrlValue } from "@/components/shared/list-url-state"
+import { notifySaved, notifyToast } from "@/components/shared/toast"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { UserPlus } from "lucide-react"
+import Link from "next/link"
+import { useMergedTab } from "@/components/layout/merged-tabs"
+import LoginAudit from "@/components/staff/login-audit"
+import Button from "@/components/shared/button"
+import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from "@/components/shared/grid-table"
+import Checkbox from "@/components/shared/checkbox"
+import { Field } from "@/components/shared/form-controls"
+import { TextField } from "@/components/shared/text-field"
+import Select from "@/components/shared/select"
+import { DelayedSkeleton, Skeleton } from "@/components/shared/skeleton"
+import SearchField from "@/components/shared/search-field"
+import FilterChip from "@/components/shared/filter-chip"
+import { Tabs } from "@/components/shared/tabs"
+import Pagination from "@/components/shared/pagination"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import Dialog from "@/components/shared/dialog"
+import Notice from "@/components/shared/notice"
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest as SharedStepUpRequest } from "@/components/step-up-prompt"
+import NotificationSwitch from "@/components/ui/notification-switch"
+import { usePageTitle } from "@/components/shell/page-chrome"
+import { PageFrame, PageHeading } from "@/components/templates/page-frame"
+import SettingsInnerNav from "@/components/layout/settings-inner-nav"
+import { type ActionMenuItem } from "@/components/shared/action-menu"
+import { RowMenu } from "@/components/shared/row-actions"
+import styles from "./staff.module.css"
+import StatusBadge from "@/components/shared/status-badge"
+import { useAccount } from "@/contexts/account-context"
+import { ApiError, api, describeSaveFailure, fetchApi, type AccessRoleBundle, type AccessRoleItem, type AccessUserItem, type AccessUserSummary, type AuditEventItem } from "@/lib/api"
+import type { StaffMember } from "@line-crm/shared"
+import { SCOPE_ITEMS, BUNDLE_PRESETS, BROADCAST_EDIT_OPERATION_KEYS, type FeatureAccessLevel, type ScopeLevels } from "@line-crm/shared"
+import { csvCell } from "@/lib/presentation"
+import { qrToDataURL } from "@/lib/qr-image"
+import { isActiveAdministrator, matchStaffMember, staffActionPolicy } from "./staff-actions"
+import { applyScopeRowChange, findPartialScopeRows, restoreSavedLevels, scopePiiToEmailMask } from "./staff-scope-draft"
+import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from "./permission-labels"
+import OtpInput, { otpFailureMessage } from "@/components/shared/otp-input"
+import TruncatedText from "@/components/shared/truncated-text"
+import { withPermissionFailure } from "@/components/shared/api-error-message"
+import { csvFileName } from "@/lib/csv-file-name"
+import { emptyValue } from "@/components/shared/empty-value"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
+import EditorSurface from "@/components/shared/editor-surface"
+import ListState from "@/components/shared/list-state"
+import { useRouter, useSearchParams } from "next/navigation"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 type Channel = { email: boolean; line: boolean }
 type CopyableAccessUser = AccessUserItem & { roleBundle: Exclude<AccessRoleBundle, 'custom'> }
@@ -1104,7 +1149,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
           <GridCell className={styles.colMenu} role="columnheader"><span className={styles.srOnly}>操作</span></GridCell>
         </GridHeadRow>
         {loading ? <p className={styles.stateRow} role="status">ログインユーザーを読み込んでいます…</p>
-          : error ? <div className={styles.stateRow} role="alert"><p>ログインユーザーを読み込めませんでした。登録した内容は消えていません。</p><Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></div>
+          : error ? <ListState kind="error" title="ログインユーザーを読み込めませんでした。登録した内容は消えていません。" description="" action={<><Button onClick={() => void load()}>もう一度読み込む</Button></>} />
           : shown.length === 0 ? <p className={styles.stateRow}>条件に合うログインユーザーはいません。条件を変えてお試しください。</p>
           : shown.map((user) => {
             const member = memberById.get(user.id)
@@ -1139,7 +1184,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
       />
       {viewer ? (
         <div className={styles.viewerBandRow}>
-          <Notice tone="info" icon={<Eye size={16} aria-hidden="true" />}>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</Notice>
+          <ReadOnlyNotice ></ReadOnlyNotice>
         </div>
       ) : null}
       <div className={styles.body}>
@@ -1187,7 +1232,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                   {usersTotal > accessUsers.length ? (
                     <Button variant="secondary" size="compact" onClick={() => void loadMoreUsers()} disabled={moreUsersBusy} busy={moreUsersBusy}>続きを読み込む</Button>
                   ) : null}
-                  {moreUsersError ? <p role="alert">{moreUsersError}</p> : null}
+                  {moreUsersError ? <Notice tone="danger" >{moreUsersError}</Notice> : null}
                   <Pagination page={userPage} pageCount={pageCount} onPageChange={setUserPage} />
                 </div>
               ) : null}

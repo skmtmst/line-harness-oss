@@ -1,75 +1,100 @@
 'use client'
 
-import { FolderDotName } from '@/components/shared/folder-dot'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import {
-  AlertCircle,
-  Bookmark,
-  Check,
-  CircleDashed,
-  Folder,
-  FolderOpen,
-  GripVertical,
-  Inbox,
-  Plus,
-  Sparkles,
-  Tag as TagIcon,
-  Users,
-} from 'lucide-react'
-import type { Tag, TagGroup } from '@line-crm/shared'
-import { api, ApiError, type ListStats } from '@/lib/api'
-import { useRowLeaving } from '@/lib/use-row-leaving'
-import { RovingTbody } from '@/components/shared/row-roving'
-import { ListPageBody } from '@/components/templates'
-import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors'
-import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
-import StatusBadge from '@/components/shared/status-badge'
-import FilterChip from '@/components/shared/filter-chip'
-import { RowMenu } from '@/components/shared/row-actions'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import { withViewTransition } from '@/components/shared/view-transition'
-import { notifyToast } from '@/components/shared/toast'
-import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-error-message'
-import Button from '@/components/shared/button'
-import EmptyList from '@/components/shared/empty-list'
-import Select from '@/components/shared/select'
-import Pagination from '@/components/shared/pagination'
-import SearchField from '@/components/shared/search-field'
-import KpiCard from '@/components/shared/kpi-card'
-import KpiBand from '@/components/shared/kpi-band'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import TagPill from '@/components/shared/tag-pill'
-import { DelayedSkeleton } from '@/components/shared/skeleton'
-import PageSizeSelect from '@/components/ui/page-size-select'
-import ReorderHandle from '@/components/shared/reorder-handle'
-import { useLiveReorder } from '@/lib/use-live-reorder'
-import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils'
-import TagCsvImportDialog from '@/components/friend-fields/tag-csv-import-dialog'
-import { isCurrentTagListRequest, type TagListRequestKey } from '@/components/friend-fields/tag-list-state'
-import {
-  DeleteTagDialog,
-  QUICK_FILTERS,
-  UNGROUPED,
-  cleanupKnown,
-  formatDate,
-  hasLinkedActions,
-  isThisMonth,
-  isUnused,
-  usageLabel,
-} from '@/components/friend-fields/tags-page-v4'
-import styles from './list.module.css'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
-import { ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
-import { ListPager } from '@/components/templates/list-page'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { FolderDotName, folderDisplayColor } from "@/components/shared/folder-dot"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from "@/components/shared/list-url-state"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { Bookmark, Check, CircleDashed, Folder, FolderOpen, GripVertical, Inbox, Plus, Sparkles, Tag as TagIcon, Users } from "lucide-react"
+import type { Tag, TagGroup } from "@line-crm/shared"
+import { api, ApiError, type ListStats } from "@/lib/api"
+import { useRowLeaving } from "@/lib/use-row-leaving"
+import { RovingTbody } from "@/components/shared/row-roving"
+import { ListPageBody } from "@/components/templates"
+import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from "./folder-colors"
+import FolderEditorDialog from "@/components/shared/folder-editor-dialog"
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from "@/components/shared/folder-panel"
+import ActionMenu, { type ActionMenuItem } from "@/components/shared/action-menu"
+import StatusBadge from "@/components/shared/status-badge"
+import FilterChip from "@/components/shared/filter-chip"
+import { RowMenu } from "@/components/shared/row-actions"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import DetailPanel, { useDetailPanelUrl } from "@/components/shared/detail-panel"
+import ContextMenu, { type ContextMenuItem } from "@/components/shared/context-menu"
+import { withViewTransition } from "@/components/shared/view-transition"
+import { notifyToast } from "@/components/shared/toast"
+import { japaneseDetailOf, describeApiFailure } from "@/components/shared/api-error-message"
+import Button from "@/components/shared/button"
+import EmptyList from "@/components/shared/empty-list"
+import Select from "@/components/shared/select"
+import Pagination from "@/components/shared/pagination"
+import SearchField from "@/components/shared/search-field"
+import KpiCard from "@/components/shared/kpi-card"
+import KpiBand from "@/components/shared/kpi-band"
+import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
+import TagPill from "@/components/shared/tag-pill"
+import { DelayedSkeleton } from "@/components/shared/skeleton"
+import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from "@/components/shared/page-size-select"
+import ReorderHandle from "@/components/shared/reorder-handle"
+import { useLiveReorder } from "@/lib/use-live-reorder"
+import { mergeVisibleOrder } from "@/components/friend-fields/reorder-utils"
+import TagCsvImportDialog from "@/components/friend-fields/tag-csv-import-dialog"
+import { isCurrentTagListRequest, type TagListRequestKey } from "@/components/friend-fields/tag-list-state"
+import { DeleteTagDialog, QUICK_FILTERS, UNGROUPED, cleanupKnown, formatDate, hasLinkedActions, isThisMonth, isUnused, usageLabel } from "@/components/friend-fields/tags-page-v4"
+import styles from "./list.module.css"
+import { ListToolbarRow, ListToolbarSearchSlot } from "@/components/shared/list-toolbar"
+import { ListPager } from "@/components/templates/list-page"
+import { emptyValue } from "@/components/shared/empty-value"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import ListState from "@/components/shared/list-state"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8 タグ「タグ」タブ（Pencil `I1E7Bt`・1152 `aPeD8`・閲覧のみ `fkGUR`、
@@ -80,6 +105,10 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * 今の V8 タブ（app/tags/tags-tab-v8.tsx）から写した。数え方・判定は v7 と同じ関数
  * （components/friend-fields/tags-page-v4）を使う。見た目だけを型と絵に合わせた。
  */
+
+
+
+
 
 /** 付け方の呼び名（絵 I1E7Bt の「EC 連携・LINE ログイン・EC 購入・誕生日のきまり」）。v7 の呼び名（tags-page-v4）は触らない。 */
 const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
@@ -94,7 +123,7 @@ const sourceLabel = (tag: Tag): string => (tag.assignSource ? SOURCE_LABELS[tag.
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 
 /** 連動の文（絵の「本人+10・1.2倍 他1」）。マイル以外の連動は「他N」。0件は「—」。 */
 /**
@@ -673,29 +702,18 @@ export default function TagsTab({
   const folderNote = (
     <>
       {canEdit ? null : <span className={styles.viewerFolderAddSpace} aria-hidden="true" />}
-      <p className={styles.folderNote}>フォルダを消しても、中のタグは未分類に残ります</p>
+      <FolderPanelNote>フォルダを消しても、中のタグは未分類に残ります</FolderPanelNote>
       {folderError ? (
-        <p role="alert" className={styles.folderNote}>
-          {folderError}
-          <button type="button" onClick={() => void load()} className={styles.inlineRetry}>もう一度</button>
-        </p>
+        <Notice tone="danger" className={styles.folderNoteNoticePlacement} >{folderError}
+          <button type="button" onClick={() => void load()} className={styles.inlineRetry}>もう一度</button></Notice>
       ) : null}
     </>
   )
 
   const table = status === 'forbidden' ? (
-    <div className={styles.stateCard}>
-      <AlertCircle className={styles.stateIconError} aria-hidden="true" />
-      <p className={styles.stateTitle}>タグを見る権限がありません</p>
-      <p className={styles.stateDesc}>タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。</p>
-    </div>
+    <ListState kind="error" title="タグを見る権限がありません" description="タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。"  />
   ) : status === 'error' ? (
-    <div className={styles.stateCard} data-design-node="U0aKD">
-      <AlertCircle className={styles.stateIconError} aria-hidden="true" />
-      <p className={styles.stateTitle}>タグを読み込めませんでした</p>
-      <p className={styles.stateDesc}>再読み込みしても直らない場合はエラー報告へ。</p>
-      <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
-    </div>
+    <ListState kind="error" title="タグを読み込めませんでした" description="再読み込みしても直らない場合はエラー報告へ。" data-design-node="U0aKD" action={<><Button type="button" onClick={() => void load()}>もう一度読み込む</Button></>} />
   ) : ready && visible.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
     <EmptyList
@@ -854,8 +872,9 @@ export default function TagsTab({
       <ListPageBody
         skeleton
         folders={<>
-          {createButton(true) ?? (status === 'forbidden' ? null : <span className={styles.viewerCreateSpace} aria-hidden="true" />)}
           <FolderPanel
+            createAction={createButton(true)}
+            reserveCreateSpace={status !== 'forbidden'}
             activeId={folder}
             onSelect={setFolder}
             onAddFolder={canEdit ? () => setFolderDialog('new') : undefined}
@@ -891,11 +910,7 @@ export default function TagsTab({
         </>}
       >
         {actionError ? (
-          <p role="alert" className={styles.errorBand}>
-            <AlertCircle className={styles.errorIcon} aria-hidden="true" />
-            {actionError}
-            <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
-          </p>
+          <Notice tone="danger" >{actionError}<button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button></Notice>
         ) : null}
         {table}
       </ListPageBody>

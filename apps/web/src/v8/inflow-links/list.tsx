@@ -1,85 +1,111 @@
 'use client'
 
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
-import { ListToolbarSort } from '@/components/shared/list-toolbar'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import CopyTextButton from '@/components/shared/copy-text-button'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import {
-  Bookmark,
-  CircleAlert,
-  Code,
-  Eye,
-  Inbox,
-  Link2,
-  Megaphone,
-  Plus,
-  UserPlus,
-  Users,
-} from 'lucide-react'
-import type { ApiResponse, EntryRoute, EntryRouteGenre, Scenario, Tag, TrafficPool } from '@line-crm/shared'
-import { ApiError, api, fetchApi } from '@/lib/api'
-import { formatNumber } from '@/lib/format'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { canEditFeature } from '@/lib/staff-capability'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { useFeatureVisibility } from '@/lib/use-feature-visibility'
-import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
-import type { FeatureKey } from '@/lib/feature-settings'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { ListPage, ListPagePagination } from '@/components/templates'
-import ListToolbar from '@/components/shared/list-toolbar'
-import SearchField from '@/components/shared/search-field'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Button from '@/components/shared/button'
-import EmptyList from '@/components/shared/empty-list'
-import Checkbox from '@/components/shared/checkbox'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import Notice from '@/components/shared/notice'
-import FilterChip from '@/components/shared/filter-chip'
-import Select from '@/components/shared/select'
-import PageSizeSelect from '@/components/ui/page-size-select'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import { FolderDotName } from '@/components/shared/folder-dot'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
-import BulkBar from '@/components/shared/bulk-bar'
-import ListState from '@/components/shared/list-state'
-import Pagination from '@/components/shared/pagination'
-import { loadFailureCopy } from '@/components/shared/api-error-message'
-import { notifyToast } from '@/components/shared/toast'
-import EditRouteDialog from './edit-route-dialog'
-import GenreDialog from './genre-dialog'
-import BulkDialog, { type BulkRouteAction } from './bulk-dialog'
-import StatusBadge from '@/components/shared/status-badge'
-import QrDialog, { referralUrl, type QrRoute } from './qr-dialog'
-import {
-  becameLines,
-  buildRows,
-  formatLatest,
-  isRefSummaryData,
-  isUnconfigured,
-  matchesFilter,
-  routeStatus,
-  shouldShowRow,
-  sortRows,
-  type RefSummaryData,
-  type RouteFilter,
-  type RouteRow,
-  type RouteSort,
-  type TrackedLinkRow,
-} from './rows'
-import styles from './list.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from "@/components/shared/list-toolbar"
+import { useListUrlValue } from "@/components/shared/list-url-state"
+import CopyTextButton from "@/components/shared/copy-text-button"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import type { ReactNode } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { Bookmark, CircleAlert, Code, Inbox, Link2, Megaphone, Plus, UserPlus, Users } from "lucide-react"
+import type { ApiResponse, EntryRoute, EntryRouteGenre, Scenario, Tag, TrafficPool } from "@line-crm/shared"
+import { ApiError, api, fetchApi } from "@/lib/api"
+import { formatNumber } from "@/lib/format"
+import { canManageRole, useStaffRole } from "@/lib/staff-role"
+import { canEditFeature } from "@/lib/staff-capability"
+import { useNarrowViewport } from "@/lib/use-narrow-viewport"
+import { useFeatureVisibility } from "@/lib/use-feature-visibility"
+import { isPoolsFeatureAvailable } from "@/lib/pools-availability"
+import type { FeatureKey } from "@/lib/feature-settings"
+import { useAccount } from "@/contexts/account-context"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import { ListPage, ListPagePagination } from "@/components/templates"
+import SearchField from "@/components/shared/search-field"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import Button from "@/components/shared/button"
+import EmptyList from "@/components/shared/empty-list"
+import Checkbox from "@/components/shared/checkbox"
+import KpiBand from "@/components/shared/kpi-band"
+import KpiCard from "@/components/shared/kpi-card"
+import Notice from "@/components/shared/notice"
+import FilterChip from "@/components/shared/filter-chip"
+import Select from "@/components/shared/select"
+import PageSizeSelect from "@/components/shared/page-size-select"
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from "@/components/shared/folder-panel"
+import { FolderDotName } from "@/components/shared/folder-dot"
+import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
+import { type ActionMenuItem } from "@/components/shared/action-menu"
+import { RowMenu } from "@/components/shared/row-actions"
+import BulkBar from "@/components/shared/bulk-bar"
+import ListState from "@/components/shared/list-state"
+import Pagination from "@/components/shared/pagination"
+import { loadFailureCopy, permissionDeniedMessage } from "@/components/shared/api-error-message"
+import { notifyToast } from "@/components/shared/toast"
+import EditRouteDialog from "./edit-route-dialog"
+import GenreDialog from "./genre-dialog"
+import BulkDialog, { type BulkRouteAction } from "./bulk-dialog"
+import StatusBadge from "@/components/shared/status-badge"
+import QrDialog, { referralUrl, type QrRoute } from "./qr-dialog"
+import { becameLines, buildRows, formatLatest, isRefSummaryData, isUnconfigured, matchesFilter, routeStatus, shouldShowRow, sortRows, type RefSummaryData, type RouteFilter, type RouteRow, type RouteSort, type TrackedLinkRow } from "./rows"
+import styles from "./list.module.css"
+import TruncatedText from "@/components/shared/truncated-text"
+import { emptyValue } from "@/components/shared/empty-value"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8-B 流入と計測の一覧（Pencil「★V8-B 画面の地図」：
@@ -90,6 +116,8 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * データの口と判断は今の一覧（app/inflow-links/page.tsx の InflowLinksPageInner）と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+
+
 
 interface MessageTemplate {
   id: string
@@ -900,10 +928,7 @@ export default function InflowListV8({
       </div>}
       stats={<>
         {readonly ? (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
         <KpiBand>
           <KpiCard
@@ -970,16 +995,15 @@ export default function InflowListV8({
         </KpiBand>
       </>}
       folders={<>
-        {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
-        {createButton ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
         <FolderPanel
+          createAction={createButton}
           activeId={selectedGenre}
           onSelect={selectGenre}
           onAddFolder={canManageFolders ? () => setEditingGenre('new') : undefined}
           addFolderLabel="フォルダを追加"
           rows={folderRows}
         >
-          <p className={styles.folderNote}>フォルダを消しても、中の経路は未分類に残ります</p>
+          <FolderPanelNote>フォルダを消しても、中の経路は未分類に残ります</FolderPanelNote>
         </FolderPanel>
       </>}
       collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}

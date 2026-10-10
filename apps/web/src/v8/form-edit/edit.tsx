@@ -1,71 +1,91 @@
 'use client'
-import CopyTextButton from '@/components/shared/copy-text-button'
-import { notifySaved } from '@/components/shared/toast'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
-import { Copy, FlaskConical, Smartphone, Upload } from 'lucide-react'
-import {
-  emptyLayout,
-  formThemeContrastError,
-  newBlockId,
-  normalizeFormTheme,
-  validateFormForPublish,
-  type FormBlock,
-  type FormLayout,
-  type FormOptions,
-  type FormSection,
-} from '@line-crm/shared'
-import { CreatePage } from '@/components/templates'
-import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
-import Notice from '@/components/shared/notice'
-import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
-import ListState from '@/components/shared/list-state'
-import TargetMissing from '@/components/shared/target-missing'
-import { Tabs } from '@/components/shared/tabs'
-import { notifyToast } from '@/components/shared/toast'
-import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
-import { validateFormLayoutForSave } from '@/components/forms/form-definition-validation'
-import { normalizeSectionName } from '@/components/forms/section-name'
-import { takenFormAnswerNames, uniqueFormCopyName } from '@/components/forms/form-definition-operations'
-import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
-import { api, ApiError, bookingApi, fetchApi } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
-import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
-import { requestUnsavedAction } from '@/lib/unsaved-action'
-import { hqFormPortableReferenceError } from '@/components/forms/hq-form-definition-adapter'
-import type { FormEditHost } from './host'
-import {
-  conflictMessage,
-  conflictTitle,
-  describeConflictDiff,
-  describePublishChanges,
-  firstInputBlockId,
-  formSavedContentMatches,
-  ogImageUrlError,
-  readPage,
-  readTab,
-  type ConflictSide,
-  type EditTab,
-  type FormSavedContent,
-} from './model'
-import { ContentTab } from './content-tab'
-import { AfterTab } from './after-tab'
-import { AppearanceTab } from './appearance-tab'
-import { FormEditAttemptContext } from './field-issues'
-import { focusFieldById } from '@/lib/use-form-errors'
-import { FormPhone } from './phone'
-import styles from './edit.module.css'
-import { formatNumber as polishFormatNumber } from '@/lib/format'
-import TextLink from '@/components/shared/text-link'
-import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import CopyTextButton from "@/components/shared/copy-text-button"
+import { notifySaved } from "@/components/shared/toast"
+import { useFeatureAccess } from "@/lib/use-feature-access"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useSearchParams } from "next/navigation"
+import { FlaskConical, Smartphone, Upload } from "lucide-react"
+import { emptyLayout, formThemeContrastError, newBlockId, normalizeFormTheme, validateFormForPublish, type FormBlock, type FormLayout, type FormOptions, type FormSection } from "@line-crm/shared"
+import { CreatePage } from "@/components/templates"
+import Button from "@/components/shared/button"
+import Dialog from "@/components/shared/dialog"
+import Notice from "@/components/shared/notice"
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from "@/components/shared/save-conflict"
+import ListState from "@/components/shared/list-state"
+import TargetMissing from "@/components/shared/target-missing"
+import { Tabs } from "@/components/shared/tabs"
+import { classifyApiFailure, describeApiFailure } from "@/components/shared/api-error-message"
+import { validateFormLayoutForSave } from "@/components/forms/form-definition-validation"
+import { normalizeSectionName } from "@/components/forms/section-name"
+import { takenFormAnswerNames, uniqueFormCopyName } from "@/components/forms/form-definition-operations"
+import { EMPTY_REFS, type FormRefs } from "@/components/forms/form-refs"
+import { api, ApiError, bookingApi, fetchApi } from "@/lib/api"
+import { useAccount } from "@/contexts/account-context"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { useNarrowViewport } from "@/lib/use-narrow-viewport"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import { usePageTitle } from "@/components/shell/page-chrome"
+import { useStaffRole } from "@/lib/staff-role"
+import { useDraftAutosave } from "@/v8/autosave/use-draft-autosave"
+import { requestUnsavedAction } from "@/lib/unsaved-action"
+import { hqFormPortableReferenceError } from "@/components/forms/hq-form-definition-adapter"
+import type { FormEditHost } from "./host"
+import { conflictMessage, conflictTitle, describeConflictDiff, describePublishChanges, firstInputBlockId, formSavedContentMatches, ogImageUrlError, readPage, readTab, type ConflictSide, type EditTab, type FormSavedContent } from "./model"
+import { ContentTab } from "./content-tab"
+import { AfterTab } from "./after-tab"
+import { AppearanceTab } from "./appearance-tab"
+import { FormEditAttemptContext } from "./field-issues"
+import { focusFieldById } from "@/lib/use-form-errors"
+import { FormPhone } from "./phone"
+import styles from "./edit.module.css"
+import { formatNumber as polishFormatNumber } from "@/lib/format"
+import TextLink from "@/components/shared/text-link"
+import { SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -77,6 +97,8 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
  * 競合・試しのURLは今までの画面（app/form-submissions/edit/page.tsx）と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+
+
 
 const TAB_ITEMS: { key: EditTab; label: string }[] = [
   { key: 'content', label: '中身' },
@@ -853,7 +875,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
                 </Button>
               </div>
             ) : null}
-            {testError ? <p role="alert" className={styles.urlError}>{testError}</p> : null}
+            {testError ? <Notice tone="danger" className={styles.urlErrorNoticePlacement} >{testError}</Notice> : null}
             {testUrl ? (
               <TextLink external href={testUrl}   className={styles.urlLink}>試しのURLを開く</TextLink>
             ) : null}
@@ -922,14 +944,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     <SaveErrorScope errors={saveErrors}><CreatePage
       boardId={narrow ? 'ITBAB' : conflict ? 'J1pdB' : TAB_NODE[editTab]}
       title={name || 'フォーム名未設定'}
-      identity={(
-        /* 絵は矢印も文字の1つ（「← 回答フォームへ」）。 */
-        host ? (
-          <></>
-        ) : (
-          <></>
-        )
-      )}
+
       steps={(
         <div className={styles.tabs}>
           {/* 型は説明をタブの下へ置くので、絵どおり題の下・タブの上に出すためここに置く。 */}
@@ -937,7 +952,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           <Tabs label="編集する内容" items={TAB_ITEMS.map((t) => ({ label: t.label, current: editTab === t.key, errorCount: tabErrors[t.key], onClick: () => changeTab(t.key) }))} />
         </div>
       )}
-      notice={readOnly ? <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /> : undefined}
+      notice={readOnly ? <ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice> : undefined}
       preview={preview}
       previewToggle={conflictBand}
       footerActions={footerActions}

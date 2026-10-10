@@ -1,19 +1,35 @@
 'use client'
-import Notice from '@/components/shared/notice'
-import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
-import { notifySaved } from '@/components/shared/toast'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import type { FriendField, Folder } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
-import { isSameFieldContent, type SentFieldContent } from './field-model'
-import { useAccount } from '@/contexts/account-context'
-import ListState from '@/components/shared/list-state'
-import TargetMissing from '@/components/shared/target-missing'
-import { folderById, folderCreator } from '@/components/shared/folder-select'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import FieldEditor, { type FieldEditorValues } from './field-editor'
-import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from "@/components/shared/notice"
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from "@/components/shared/save-conflict"
+import { notifySaved } from "@/components/shared/toast"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import type { FriendField, Folder } from "@line-crm/shared"
+import { api, ApiError } from "@/lib/api"
+import { isSameFieldContent, type SentFieldContent } from "./field-model"
+import { useAccount } from "@/contexts/account-context"
+import ListState from "@/components/shared/list-state"
+import TargetMissing from "@/components/shared/target-missing"
+import { folderById, folderCreator } from "@/components/shared/folder-select"
+import { useStaffRole, canManageRole } from "@/lib/staff-role"
+import FieldEditor, { type FieldEditorValues } from "./field-editor"
+import { SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -22,6 +38,8 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
  * 読み込み・版の衝突（R517）・共通項目の保護・保存の動きは今の入口（app/tags/edit-field-page-v8.tsx）と同じ。
  * 中身は src/v8 の FieldEditor。受け付ける URL：`/tags/fields/edit?id=<項目>`。
  */
+
+
 
 export default function FieldEdit() {
   const saveErrors = useSaveFormErrors()
@@ -244,7 +262,7 @@ export default function FieldEdit() {
     )
   }
 
-  if (!canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></SaveErrorScope>
+  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></SaveErrorScope>
 
   const notices = (
     <>

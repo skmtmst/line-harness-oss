@@ -17,7 +17,7 @@
  *   node scripts/visual-qa/mock-api.mjs            # 既定 8788番
  *   PORT=9000 node scripts/visual-qa/mock-api.mjs
  */
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { createRequire } from 'node:module'

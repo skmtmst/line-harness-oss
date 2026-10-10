@@ -1,32 +1,58 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
-import { ArrowRight, TriangleAlert } from 'lucide-react'
-import type { FriendField, FriendFieldType } from '@line-crm/shared'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { CreatePage } from '@/components/templates'
-import Button from '@/components/shared/button'
-import Notice from '@/components/shared/notice'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import ListState from '@/components/shared/list-state'
-import TargetMissing from '@/components/shared/target-missing'
-import Select from '@/components/shared/select'
-import SegmentedControl from '@/components/shared/segmented'
-import { ApiError, api, describeSaveFailure } from '@/lib/api'
-import type { FriendFieldMigrationPreview, FriendFieldMigrationRun } from '@/lib/api'
-import { createResponseGate } from '@/lib/latest-request'
-import { FIELD_TYPE_HINTS } from '@/components/friend-fields/field-list'
-import { formatDateTime, formatNumber } from '@/lib/format'
-import { FIELD_TYPE_WORDS } from './field-editor'
-import styles from './create.module.css'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { Suspense, useEffect, useMemo, useRef, useState } from "react"
+import { useSearchParams } from "next/navigation"
+import { ArrowRight, TriangleAlert } from "lucide-react"
+import type { FriendField, FriendFieldType } from "@line-crm/shared"
+import { useAccount } from "@/contexts/account-context"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import { CreatePage } from "@/components/templates"
+import Button from "@/components/shared/button"
+import Notice from "@/components/shared/notice"
+import { canManageRole, useStaffRole } from "@/lib/staff-role"
+import ListState from "@/components/shared/list-state"
+import TargetMissing from "@/components/shared/target-missing"
+import Select from "@/components/shared/select"
+import SegmentedControl from "@/components/shared/segmented"
+import { ApiError, api, describeSaveFailure } from "@/lib/api"
+import type { FriendFieldMigrationPreview, FriendFieldMigrationRun } from "@/lib/api"
+import { createResponseGate } from "@/lib/latest-request"
+import { FIELD_TYPE_HINTS } from "@/components/friend-fields/field-list"
+import { formatDateTime, formatNumber } from "@/lib/format"
+import { FIELD_TYPE_WORDS } from "./field-editor"
+import styles from "./create.module.css"
+import { Field } from "@/components/shared/form-controls"
+import { permissionDeniedMessage, withPermissionFailure } from "@/components/shared/api-error-message"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8 友だち情報欄の移行（種類を変える。Pencil `GobMd`）。
@@ -38,6 +64,8 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * 事前確認したあとは、結果・切り替わる使用先・実行の結果の段を足す。
  * 受け付ける URL：`/tags/fields/migrate?id=<移行元の項目>`。
  */
+
+
 
 const TYPES = Object.keys(FIELD_TYPE_WORDS) as FriendFieldType[]
 
@@ -493,7 +521,7 @@ function FieldMigrate() {
   const back = <></>
   const rows = sample ? sampleRows(sample) : []
 
-  if (!canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></SaveErrorScope>
+  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></SaveErrorScope>
 
   return (
     <SaveErrorScope errors={saveErrors}><CreatePage

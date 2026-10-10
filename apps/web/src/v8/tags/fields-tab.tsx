@@ -1,48 +1,92 @@
 'use client'
 
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { AlertCircle, ClipboardList, FileText, GripVertical, Info, PenLine, Plus, Send, Users } from 'lucide-react'
-import type { Folder, FriendField, FriendFieldListSummary, FriendFieldType } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
-import { createResponseGate } from '@/lib/latest-request'
-import { useRowLeaving } from '@/lib/use-row-leaving'
-import { ListPageBody } from '@/components/templates'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import { FolderDotName } from '@/components/shared/folder-dot'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import ListState from '@/components/shared/list-state'
-import { RowMenu, RowQuickAction } from '@/components/shared/row-actions'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import InlineEdit from '@/components/shared/inline-edit'
-import { withViewTransition } from '@/components/shared/view-transition'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Button from '@/components/shared/button'
-import Select from '@/components/shared/select'
-import Pagination from '@/components/shared/pagination'
-import SearchField from '@/components/shared/search-field'
-import KpiCard from '@/components/shared/kpi-card'
-import KpiBand from '@/components/shared/kpi-band'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { DelayedSkeleton } from '@/components/shared/skeleton'
-import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
-import { notifyToast } from '@/components/shared/toast'
-import PageSizeSelect from '@/components/ui/page-size-select'
-import ReorderHandle from '@/components/shared/reorder-handle'
-import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
-import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils'
-import { FIELD_TYPE_LABELS, destinationLabel, fieldDeletionBlockedReason, knownUsageCount } from '@/components/friend-fields/field-list'
-import styles from './list.module.css'
-import type { AttributeListHost } from './attribute-host'
-import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
-import { ListPager } from '@/components/templates/list-page'
-import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+import { useListUrlValue } from "@/components/shared/list-url-state"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { ClipboardList, FileText, GripVertical, Info, PenLine, Plus, Send, Users } from "lucide-react"
+import type { Folder, FriendField, FriendFieldListSummary, FriendFieldType } from "@line-crm/shared"
+import { api, ApiError } from "@/lib/api"
+import { createResponseGate } from "@/lib/latest-request"
+import { useRowLeaving } from "@/lib/use-row-leaving"
+import { ListPageBody } from "@/components/templates"
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from "@/components/shared/folder-panel"
+import FolderAddDialog from "@/components/shared/folder-add-dialog"
+import { FolderDotName } from "@/components/shared/folder-dot"
+import { type ActionMenuItem } from "@/components/shared/action-menu"
+import ListState from "@/components/shared/list-state"
+import { RowMenu, RowQuickAction } from "@/components/shared/row-actions"
+import DetailPanel, { useDetailPanelUrl } from "@/components/shared/detail-panel"
+import ContextMenu, { type ContextMenuItem } from "@/components/shared/context-menu"
+import InlineEdit from "@/components/shared/inline-edit"
+import { withViewTransition } from "@/components/shared/view-transition"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import Button from "@/components/shared/button"
+import Select from "@/components/shared/select"
+import Pagination from "@/components/shared/pagination"
+import SearchField from "@/components/shared/search-field"
+import KpiCard from "@/components/shared/kpi-card"
+import KpiBand from "@/components/shared/kpi-band"
+import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
+import { DelayedSkeleton } from "@/components/shared/skeleton"
+import { STATE_TEXT, notConnectedText } from "@/components/shared/not-connected"
+import { notifyToast } from "@/components/shared/toast"
+import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from "@/components/shared/page-size-select"
+import ReorderHandle from "@/components/shared/reorder-handle"
+import { useFlipRows, useLiveReorder } from "@/lib/use-live-reorder"
+import { mergeVisibleOrder, movableIds } from "@/components/friend-fields/reorder-utils"
+import { FIELD_TYPE_LABELS, destinationLabel, fieldDeletionBlockedReason, knownUsageCount } from "@/components/friend-fields/field-list"
+import styles from "./list.module.css"
+import type { AttributeListHost } from "./attribute-host"
+import TruncatedText from "@/components/shared/truncated-text"
+import { emptyValue } from "@/components/shared/empty-value"
+import { SaveErrorField } from "@/components/shared/save-form-errors"
+import { ListPager } from "@/components/templates/list-page"
+import { ListToolbarSearchSlot } from "@/components/shared/list-toolbar"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8 タグ「友だち情報欄」タブ（Pencil `q5gbcM`）。
@@ -54,11 +98,14 @@ import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
  * 表の下に操作の説明。
  */
 
+
+
+
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /** 未分類の印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 
 /** 種類の言葉（絵：選ぶ種類は「1つ選ぶ」「いくつも選ぶ」）。ほかは今の言葉。 */
 export function fieldTypeWord(type: FriendFieldType): string {
@@ -504,20 +551,18 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
         skeleton
         listHelp={canEdit ? `行の「…」に：編集・${host ? '配る' : '移行（種類を変える）'}・削除。並べ替えはつまんで上下（キーボードは上下キー）` : '行から中身を見られます。'}
         folders={<>
-          {createButton(true)}
           <FolderPanel
+            createAction={createButton(true)}
             activeId={folderFilter}
             onSelect={setFolderFilter}
             onAddFolder={canEdit ? () => host ? host.onAddFolder?.() : setFolderDialog('new') : undefined}
             addFolderLabel="フォルダを追加"
             rows={folderRows}
           >
-            <p className={styles.folderNote}>フォルダを消しても、中の項目は未分類に残ります</p>
+            <FolderPanelNote>フォルダを消しても、中の項目は未分類に残ります</FolderPanelNote>
             {folderError ? (
-              <p role="alert" className={styles.folderNote}>
-                {folderError}
-                <button type="button" onClick={() => void loadFolders()} className={styles.inlineRetry}>もう一度</button>
-              </p>
+              <Notice tone="danger" className={styles.folderNoteNoticePlacement} >{folderError}
+                <button type="button" onClick={() => void loadFolders()} className={styles.inlineRetry}>もう一度</button></Notice>
             ) : null}
           </FolderPanel>
         </>}
@@ -549,15 +594,11 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
         </>}
       >
         {actionError ? (
-          <p role="alert" className={styles.errorBand}>
-            <AlertCircle className={styles.errorIcon} aria-hidden="true" />
-            {actionError}
-            {retryOrder ? (
+          <Notice tone="danger" >{actionError}{retryOrder ? (
               <button type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</button>
             ) : (
               <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
-            )}
-          </p>
+            )}</Notice>
         ) : null}
         {table}
       </ListPageBody>

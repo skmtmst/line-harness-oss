@@ -1,53 +1,74 @@
 'use client'
-import SegmentedControl from '@/components/shared/segmented';
+import SegmentedControl from "@/components/shared/segmented"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+import dynamic from "next/dynamic"
+import { useRouter } from "next/navigation"
+import { Fragment, useState, type ReactNode } from "react"
+import { Calendar, Image as ImageIcon, Inbox, Package, Plus, SlidersHorizontal } from "lucide-react"
+import type { DashboardCardId } from "@line-crm/shared"
+import { DashboardColumns, DashboardPage, DashboardRow } from "@/components/templates/dashboard-page"
+import Button from "@/components/shared/button"
+import { type ActionMenuItem } from "@/components/shared/action-menu"
+import { RowMenu } from "@/components/shared/row-actions"
+import KpiBand from "@/components/shared/kpi-band"
+import KpiCard from "@/components/shared/kpi-card"
+import SectionHeader from "./head"
+import PeriodPicker from "@/components/shared/period-picker"
+import { STATE_TEXT } from "@/components/shared/not-connected"
+import ShipmentPanel from "@/components/dashboard/shipment-panel"
+import { dashboardPeriodLabel, formatDashboardAsOf } from "@/components/dashboard/freshness"
+import { canManageRole, useStaffRole } from "@/lib/staff-role"
+import { useAccount } from "@/contexts/account-context"
+import Notice from "@/components/shared/notice"
+import { partialFailureLabels, partialFailuresWithoutCard } from "@/components/dashboard/partial-failure-labels"
+import { formatWaitRough } from "@/lib/format-duration"
+import { formatNumber, formatTime } from "@/lib/format"
+import { PERIODS, jstDay, useDashboard, type PeriodKey } from "./use-dashboard"
+import { FirstStepsCard, useFirstSteps } from "./first-steps"
+import { FriendTrend, trendRangeNote } from "./trend"
+import { InboxSection } from "./inbox"
+import { FriendAddLink } from "./friend-add"
+import { ConnectionStatus, DeliveryFailures, FriendStatus, Loading, Metric, MonthlyDelivery, OperationalAlerts, RecentActivity, RecentResults, SendQuota, SupportStatus, Tag, Unavailable, Upcoming } from "./sections"
+import { RetryLabel } from "@/components/shared/retry-label"
+import styles from "./dashboard.module.css"
+import { permissionDeniedMessage } from "@/components/shared/api-error-message"
+import { emptyValue } from "@/components/shared/empty-value"
 
-import dynamic from 'next/dynamic'
-import { useRouter } from 'next/navigation'
-import { Fragment, useState, type ReactNode } from 'react'
-import { Calendar, Eye, Image as ImageIcon, Inbox, Package, Plus, SlidersHorizontal } from 'lucide-react'
-import type { DashboardCardId } from '@line-crm/shared'
-import { DashboardColumns, DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
-import Button from '@/components/shared/button'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import SectionHeader from './head'
-import PeriodPicker from '@/components/shared/period-picker'
-import { STATE_TEXT } from '@/components/shared/not-connected'
-import ShipmentPanel from '@/components/dashboard/shipment-panel'
-import { dashboardPeriodLabel, formatDashboardAsOf } from '@/components/dashboard/freshness'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { useAccount } from '@/contexts/account-context'
-import Notice from '@/components/shared/notice'
-import { partialFailureLabels, partialFailuresWithoutCard } from '@/components/dashboard/partial-failure-labels'
-import { formatWaitRough } from '@/lib/format-duration'
-import { formatNumber, formatTime } from '@/lib/format'
-import { PERIODS, jstDay, useDashboard, type PeriodKey } from './use-dashboard'
-import { FirstStepsCard, useFirstSteps } from './first-steps'
-import { FriendTrend, trendRangeNote } from './trend'
-import { InboxSection } from './inbox'
-import { FriendAddLink } from './friend-add'
-import {
-  ConnectionStatus,
-  DeliveryFailures,
-  FriendStatus,
-  Loading,
-  Metric,
-  MonthlyDelivery,
-  OperationalAlerts,
-  RecentActivity,
-  RecentResults,
-  SendQuota,
-  SupportStatus,
-  Tag,
-  Unavailable,
-  Upcoming,
-} from './sections'
-import { RetryLabel } from '@/components/shared/retry-label'
-import styles from './dashboard.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* 編集の引き出し（mcOqK・dnd-kit を含む重い部品）は開くまで読まない。V8 だけの作り（v7 の部品は使わない）。 */
 const DashboardEditor = dynamic(() => import('./dashboard-editor').then((module) => module.default), {
@@ -352,17 +373,11 @@ export default function DashboardV8() {
   const notice = start.summary || viewer || d.error || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
-        <div className={styles.viewerBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-        </div>
+        <ReadOnlyNotice />
       ) : null}
       {start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} /> : null}
       {d.error ? (
-        <div className={styles.errorBand} role="alert">
-          <span>{d.error}</span>
-          <Button type="button" onClick={() => d.load()} busyLabel="処理中…"><RetryLabel /></Button>
-        </div>
+        <Notice tone="danger" role="alert" action={<Button type="button" onClick={() => void d.load()}><RetryLabel /></Button>}>{d.error}</Notice>
       ) : null}
       {looseFailures.length ? (
         <Notice

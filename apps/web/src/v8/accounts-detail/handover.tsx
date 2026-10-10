@@ -1,40 +1,75 @@
 'use client'
 
-import { FolderDotName } from '@/components/shared/folder-dot'
-import CopyTextButton from '@/components/shared/copy-text-button'
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { Eye, Play, RotateCcw } from 'lucide-react'
-import type { LineAccount } from '@line-crm/shared'
-import { api, ApiError, type AccountHandover, type AccountHandoverDecision } from '@/lib/api'
-import { formatDateTime, formatNumber } from '@/lib/format'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { SettingsPage } from '@/components/templates'
-import { Steps } from '@/components/templates/steps'
-import SettingsInnerNav from '@/components/layout/settings-inner-nav'
-import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
-import StickyBar from '@/components/shared/sticky-bar'
-import { DataTable, TableHeadRow, Th, Tr, Td, TableStateRow } from '@/components/shared/table'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
-import TargetMissing from '@/components/shared/target-missing'
-import { TextField } from '@/components/shared/text-field'
-import { notifyToast } from '@/components/shared/toast'
-import { useStepUpGate } from '@/components/step-up-prompt'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { DIFFERENT_PROVIDER_DETAIL, DIFFERENT_PROVIDER_LEAD, HANDOVER_PILLS, countsLine, decisionLabel, handoverPill, totalsMatch } from './handover-view'
-import styles from './handover.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls'
-import { emptyValue } from '@/components/shared/empty-value'
-import NumberInput from '@/components/shared/number-field'
-import { DetailLoading } from '@/components/templates/detail-page'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { FolderDotName } from "@/components/shared/folder-dot"
+import CopyTextButton from "@/components/shared/copy-text-button"
+import { useCallback, useEffect, useState, type ReactNode } from "react"
+import { useSearchParams } from "next/navigation"
+import { Play, RotateCcw } from "lucide-react"
+import type { LineAccount } from "@line-crm/shared"
+import { api, ApiError, type AccountHandover, type AccountHandoverDecision } from "@/lib/api"
+import { formatDateTime, formatNumber } from "@/lib/format"
+import { canManageRole, useStaffRole } from "@/lib/staff-role"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import { SettingsPage } from "@/components/templates"
+import { Steps } from "@/components/templates/steps"
+import SettingsInnerNav from "@/components/layout/settings-inner-nav"
+import Button from "@/components/shared/button"
+import Card from "@/components/shared/card"
+import StickyBar from "@/components/shared/sticky-bar"
+import { DataTable, TableHeadRow, Th, Tr, Td, TableStateRow } from "@/components/shared/table"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import Notice from "@/components/shared/notice"
+import Select from "@/components/shared/select"
+import TargetMissing from "@/components/shared/target-missing"
+import { TextField } from "@/components/shared/text-field"
+import { notifyToast } from "@/components/shared/toast"
+import { useStepUpGate } from "@/components/step-up-prompt"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import { DIFFERENT_PROVIDER_DETAIL, DIFFERENT_PROVIDER_LEAD, HANDOVER_PILLS, countsLine, decisionLabel, handoverPill, totalsMatch } from "./handover-view"
+import styles from "./handover.module.css"
+import TruncatedText from "@/components/shared/truncated-text"
+import { Field } from "@/components/shared/form-controls"
+import { emptyValue } from "@/components/shared/empty-value"
+import NumberInput from "@/components/shared/number-field"
+import { DetailLoading } from "@/components/templates/detail-page"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8 LINEアカウントの乗り換え（Pencil `x2dSNv`）。
@@ -45,6 +80,8 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * データの口・守り（確認の窓・本人確認・二重押し防止・閲覧のみ・切り戻し）は今の画面
  * （app/accounts/handover の page.tsx・handover-v8.tsx）と同じ。動きの一覧は BEHAVIOR.md。
  */
+
+
 
 type HandoverDecisionView = AccountHandoverDecision & {
   sourceName?: string
@@ -396,7 +433,7 @@ export default function AccountHandoverV8() {
   }
 
   const viewerBand = !canManage ? (
-    <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />}>{NO_MANAGE_NOTE}</Notice>
+    <ReadOnlyNotice role="status">{NO_MANAGE_NOTE}</ReadOnlyNotice>
   ) : null
 
   // 段1・段2の入口。出す側と受け取る側の両方の口を出す。
@@ -423,7 +460,7 @@ export default function AccountHandoverV8() {
                 <Button type="button" variant="primary" disabled={linking || !linkCode.trim()} busy={linking} busyLabel="確認中…" onClick={() => void submitLinkCode()}>コードを読む</Button>
               </div>
             ) : null}
-            {linkError ? <p role="alert" className={styles.error}>{linkError}</p> : null}
+            {linkError ? <Notice tone="danger" >{linkError}</Notice> : null}
           </Card>
         </div>
       </>
@@ -544,7 +581,7 @@ export default function AccountHandoverV8() {
       {canManage && (editCount > 0 || decisionError) ? (
         <div className={styles.pendingBand}>
           {decisionError
-            ? <p role="alert" className={styles.pendingText}>{decisionError}</p>
+            ? <Notice tone="danger" className={styles.pendingTextNoticePlacement} >{decisionError}</Notice>
             : <p className={styles.pendingText}>{editCount} 件の書き換えをまだ保存していません。保存するまで本実行へ進めません。</p>}
           <Button type="button" disabled={refreshing || !countsAreComplete} busy={refreshing} busyLabel="確認中…" onClick={() => void rerunPreview()}>
             <RotateCcw size={14} aria-hidden="true" />事前確認をやり直す

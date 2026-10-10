@@ -1,36 +1,56 @@
 'use client'
-import StatusPill from '@/components/shared/status-pill'
-import { Paperclip, Send, X } from 'lucide-react'
-import Link from 'next/link'
-import { Suspense, useCallback, useEffect, useId, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import type { StaffMember } from '@line-crm/shared'
-import { ListPage } from '@/components/templates'
-import Button from '@/components/shared/button'
-import TargetMissing from '@/components/shared/target-missing'
-import { TextArea } from '@/components/shared/text-field'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { api, ApiError } from '@/lib/api'
-import { readFileAsBase64 } from '@/lib/hq-banners'
-import {
-  SUPPORT_ATTACHMENT_MAX,
-  SUPPORT_BODY_MAX,
-  validateSupportAttachment,
-  type HqSupportDetail,
-  type HqSupportRequest,
-} from '@/lib/hq-support'
-import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
-import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
-import styles from './support-detail.module.css'
-import ImageFrame from '@/components/shared/image-frame'
+import StatusPill from "@/components/shared/status-pill"
+import { Paperclip, Send, X } from "lucide-react"
+import Link from "next/link"
+import { Suspense, useCallback, useEffect, useId, useState } from "react"
+import { useSearchParams } from "next/navigation"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import type { StaffMember } from "@line-crm/shared"
+import { ListPage } from "@/components/templates"
+import Button from "@/components/shared/button"
+import TargetMissing from "@/components/shared/target-missing"
+import { TextArea } from "@/components/shared/text-field"
+import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
+import { api, ApiError } from "@/lib/api"
+import { readFileAsBase64 } from "@/lib/hq-banners"
+import { SUPPORT_ATTACHMENT_MAX, SUPPORT_BODY_MAX, validateSupportAttachment, type HqSupportDetail, type HqSupportRequest } from "@/lib/hq-support"
+import HqSettingsNavV8, { useHqSettingsFolderNav } from "./settings-nav"
+import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from "./support-words"
+import styles from "./support-detail.module.css"
+import ImageFrame from "@/components/shared/image-frame"
+import { Field } from "@/components/shared/form-controls"
+import TextLink from "@/components/shared/text-link"
+import { emptyValue } from "@/components/shared/empty-value"
+import { DetailLoading } from "@/components/templates/detail-page"
+import { SaveErrorField } from "@/components/shared/save-form-errors"
+import Notice from "@/components/shared/notice"
 
-import { Field } from '@/components/shared/form-controls'
-import TextLink from '@/components/shared/text-link'
-import { emptyValue } from '@/components/shared/empty-value'
-import { DetailLoading } from '@/components/templates/detail-page'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -42,6 +62,8 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
  * 続きを送るカード・右に送信者とこれまでの問い合わせ。
  * 静的書き出しのため動的セグメントは使わず `?id=` で受ける（v7 と同じ）。
  */
+
+
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -261,7 +283,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                   </Button>
                 </div>
 {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-{error ? <p className={styles.error} role="alert">{error}</p> : null}</Field></div>
+{error ? <Notice tone="danger" >{error}</Notice> : null}</Field></div>
             </>
           )}
         </div>

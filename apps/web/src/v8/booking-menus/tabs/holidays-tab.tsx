@@ -1,28 +1,35 @@
 'use client'
 import { jstDate } from "@/lib/jst-datetime"
-import { closedOn, closedRanges } from '../lib/closed-ranges'
-import { useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
-import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import DateField from '@/components/shared/date-field'
-import { ApiError, bookingApi, type BookingException, type BookingSettings } from '@/lib/api'
-import {
-  AccountIcon,
-  JST_OFFSET_MS,
-  StateCard,
-  SkeletonRows,
-  WEEKDAY_JP,
-  addDaysStr,
-  useV8TabEdit,
-  type LoadStatus,
-} from './shared'
-import styles from '../settings.module.css'
-import { Field } from '@/components/shared/form-controls'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { closedOn, closedRanges } from "../lib/closed-ranges"
+import { useMemo, useRef, useState } from "react"
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
+import Button from "@/components/shared/button"
+import ConfirmDialog from "@/components/shared/confirm-dialog"
+import Dialog from "@/components/shared/dialog"
+import DateField from "@/components/shared/date-field"
+import { ApiError, bookingApi, type BookingException, type BookingSettings } from "@/lib/api"
+import { AccountIcon, StateCard, SkeletonRows, WEEKDAY_JP, addDaysStr, useV8TabEdit, type LoadStatus } from "./shared"
+import styles from "../settings.module.css"
+import { Field } from "@/components/shared/form-controls"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* ③ 休業日（KRgTQ）（settings-v8.tsx から分割。見た目・動きは変えない） */
+
+
 
 function monthWeeks(month: string): string[][] {
   const first = new Date(`${month}-01T00:00:00Z`)
@@ -309,7 +316,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
           <Field label="開始日"><SaveErrorField names={["editFrom","dateFrom","edit_from"]}><DateField aria-label="休業の開始日" value={editFrom} onChange={setEditFrom} disabled={busy} className="mt-1" /></SaveErrorField></Field>
           <Field label="終了日"><SaveErrorField names={["editTo","dateTo","edit_to"]}><DateField aria-label="休業の終了日" value={editTo} onChange={setEditTo} disabled={busy} className="mt-1" /></SaveErrorField></Field>
           <Field label="理由"><SaveErrorField names={["editReason","reason","edit_reason"]}><input aria-label="休業の理由" value={editReason} onChange={(event) => setEditReason(event.target.value)} disabled={busy} placeholder="例：お盆・店舗の改装" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></SaveErrorField></Field>
-          {editError ? <p className="text-danger text-xs" role="alert">{editError}</p> : null}
+          {editError ? <Notice tone="danger" >{editError}</Notice> : null}
           <div className="flex justify-end gap-2">
             <Button onClick={() => { if (!busy) setEditing(null) }} disabled={busy}>キャンセル</Button>
             <Button variant="primary" onClick={() => void save()} disabled={busy} busy={busy}>休業日を保存する</Button>

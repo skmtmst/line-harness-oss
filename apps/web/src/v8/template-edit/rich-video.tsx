@@ -1,40 +1,79 @@
 'use client'
-import { canManageRole } from '@/lib/staff-role';
+import { canManageRole, useStaffRole } from "@/lib/staff-role"
+import ReadOnlyNotice from "@/components/shared/read-only-notice"
+import { notifySaved } from "@/components/shared/toast"
+import { createPageReturnHref } from "@/components/shared/create-page"
+import { useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
+import { Play } from "lucide-react"
+import { validateImagemapMessage, type Folder, type MessageTemplateMediaDefinition } from "@line-crm/shared"
+import { api } from "@/lib/api"
+import { japaneseDetailOf, permissionDeniedMessage } from "@/components/shared/api-error-message"
+import { useFeatureAccess } from "@/lib/use-feature-access"
+import { useAccount } from "@/contexts/account-context"
+import { usePageTitle, usePageCrumbs } from "@/components/shell/page-chrome"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import Button from "@/components/shared/button"
+import Card from "@/components/shared/card"
+import Dialog from "@/components/shared/dialog"
+import { AttachmentRow } from "@/components/shared/file-drop"
+import MediaSlot from "@/components/shared/media-slot"
+import FolderSelect, { folderById, hostFolderCreate } from "@/components/shared/folder-select"
+import HelpTip from "@/components/shared/help-tip"
+import LinePreview from "@/components/shared/line-preview"
+import Select from "@/components/shared/select"
+import { SettingCheckbox } from "@/components/shared/checkbox"
+import { TextField } from "@/components/shared/text-field"
+import { TemplateEditFrame } from "./frame"
+import type { TemplateEditHost } from "./host"
+import { RICH_VIDEO_BUTTON_LABELS, richVideoContent, richVideoDraftIssue, videoPreviewFile, type RichVideoDraft, type RichVideoIssue } from "./rich-video-core"
+import styles from "./edit.module.css"
+import videoStyles from "./rich-video.module.css"
+import { Field } from "@/components/shared/form-controls"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import ImageFrame from "@/components/shared/image-frame"
+import Notice from "@/components/shared/notice"
 
-import { notifySaved } from '@/components/shared/toast'
-import { createPageReturnHref } from '@/components/shared/create-page'
-import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Play } from 'lucide-react'
-import { validateImagemapMessage, type Folder, type MessageTemplateMediaDefinition } from '@line-crm/shared'
-import { api } from '@/lib/api'
-import { japaneseDetailOf } from '@/components/shared/api-error-message'
-import { useStaffRole } from '@/lib/staff-role'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { useAccount } from '@/contexts/account-context'
-import { usePageTitle, usePageCrumbs } from '@/components/shell/page-chrome'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
-import Dialog from '@/components/shared/dialog'
-import { AttachmentRow } from '@/components/shared/file-drop'
-import MediaSlot from '@/components/shared/media-slot'
-import FolderSelect, { folderById, hostFolderCreate } from '@/components/shared/folder-select'
-import HelpTip from '@/components/shared/help-tip'
-import LinePreview from '@/components/shared/line-preview'
-import Select from '@/components/shared/select'
-import { SettingCheckbox } from '@/components/shared/checkbox'
-import { TextField } from '@/components/shared/text-field'
-import { TemplateEditFrame } from './frame'
-import type { TemplateEditHost } from './host'
-import { RICH_VIDEO_BUTTON_LABELS, richVideoContent, richVideoDraftIssue, videoPreviewFile, type RichVideoDraft, type RichVideoIssue } from './rich-video-core'
-import styles from './edit.module.css'
-import videoStyles from './rich-video.module.css'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import ImageFrame from '@/components/shared/image-frame'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 const emptyDraft: RichVideoDraft = {name:'',folderId:'',originalContentUrl:'',previewImageUrl:'',height:1040,buttonEnabled:true,actionLabel:'詳しく見る',actionUrl:'',altText:''}
 
@@ -240,11 +279,11 @@ setError(cause instanceof Error?cause.message:'保存できませんでした。
   const side=<><div className={styles.previewToggle}><Button onClick={()=>setPreviewOpen(true)}>LINEでの見え方を見る</Button></div><section className={styles.sideCard}><h2 className={styles.sideTitle}>リッチメッセージとの違い</h2><p className={styles.sideText}>リッチビデオはトークで自動で流れる動画です。画像を面に分けて押した所ごとに動かしたいときは、リッチメッセージを使います。</p></section><h2 className={styles.previewHead}>届き方</h2><div className={styles.phone}>{phone}</div></>
   return <SaveErrorScope errors={saveErrors}><>
     <TemplateEditFrame composerHost={host ? { ...host, busy: busy || loading || Boolean(host.busy), onCancel: () => guarded(host.onCancel) } : undefined} onComposerInsert={(alsoSave)=>void save(alsoSave)} boardId={hqHost?'Ni0V8':'oIFk7'} title={id?'リッチビデオを編集':'リッチビデオを作る'} description={host?.description ?? 'トーク画面で自動で流れる動画。見終わったらボタンで案内'} side={side}
-      band={!canMutate && role ? <p className={styles.readonly} role="status">閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>:undefined}
+      band={!canMutate && role ? <ReadOnlyNotice />:undefined}
       footerActions={canMutate?<>{hqHost && host ? <Button disabled={busy} onClick={()=>guarded(host.onCancel)}>キャンセル</Button> : <Button href="/templates">キャンセル</Button>}{hqHost?<Button onClick={()=>void save(false,false)} disabled={busy||loading||loadFailed}>下書きを保存</Button>:null}<Button variant="primary" onClick={()=>void save()} disabled={busy||loading||loadFailed||mismatch||(!hqHost&&!selectedAccountId)} busy={busy} busyLabel="保存中…">{hqHost?host?.primaryLabel??'保存して配る':'保存する'}</Button></>:undefined}>
       {host?.notice}
-      {error?<p className={styles.error} role="alert">{error}</p>:null}
-      {mismatch?<p className={styles.readonly} role="status">このテンプレートのLINEアカウントに切り替えてから保存してください。</p>:null}
+      {error?<Notice tone="danger" >{error}</Notice>:null}
+      {mismatch?<Notice tone="info" role="status">このテンプレートのLINEアカウントに切り替えてから保存してください。</Notice>:null}
       {loading?<p role="status">読み込み中…</p>:null}
       <Card padding="none" layout="vertical" className={styles.card}><h2 className={styles.cardTitle}>名前とフォルダ</h2><div className={styles.pair}><div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="rv-name"><SaveErrorField names={["name","draft.name"]}><TextField id="rv-name" invalid={issue?.field==='name'} aria-describedby={issue?.field==='name'?'rv-name-error':undefined} value={draft.name} onChange={e=>patch({name:e.target.value})} disabled={!canMutate||busy||loading||loadFailed}/></SaveErrorField>{fieldError('name')}</Field></div><div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="rv-folder">{canMutate?<SaveErrorField names={["folderId","draft.folderId","folder_id","draft.folder_id"]}><FolderSelect size="full" id="rv-folder" aria-label="フォルダ" value={hqHost?host!.folder:draft.folderId} onChange={hqHost?host!.onFolderChange:value=>patch({folderId:value})} folders={hqHost?host!.folders:folders.map(folderById)} onCreate={hqHost?hostFolderCreate(host!):undefined} disabled={busy||loading||loadFailed}/></SaveErrorField>:<span>{hqHost?host!.folders.find(f=>f.value===host!.folder)?.label??'未分類':folders.find(f=>f.id===draft.folderId)?.name??'未分類'}</span>}</Field></div></div></Card>
       <Card padding="none" layout="vertical" className={styles.card}><div className={styles.cardHead}><h2 className={styles.cardTitle}>動画</h2><p className={styles.cardNote}>縦長・横長・正方形のどれでも。トーク画面では自動で流れます</p></div>

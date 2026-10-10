@@ -1,23 +1,42 @@
 'use client'
 
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
-import { Check } from 'lucide-react'
-import type { LineAccount } from '@line-crm/shared'
-import Button from '@/components/shared/button'
-import Select from '@/components/shared/select'
-import { TextField } from '@/components/shared/text-field'
-import { Field } from '@/components/shared/form-controls'
-import { createPageErrorMessage, createPageReturnHref } from '@/components/shared/create-page'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { api } from '@/lib/api'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { SbSettingsScreen } from '../sb-frame/settings-screen'
-import styles from './create.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { useCallback, useEffect, useState, type FormEvent } from "react"
+import { useRouter } from "next/navigation"
+import { Check } from "lucide-react"
+import type { LineAccount } from "@line-crm/shared"
+import Button from "@/components/shared/button"
+import Select from "@/components/shared/select"
+import { TextField } from "@/components/shared/text-field"
+import { Field } from "@/components/shared/form-controls"
+import { createPageErrorMessage, createPageReturnHref } from "@/components/shared/create-page"
+import { usePageTitle } from "@/components/shell/page-chrome"
+import { api } from "@/lib/api"
+import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
+import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
+import { SbSettingsScreen } from "../sb-frame/settings-screen"
+import styles from "./create.module.css"
+import TruncatedText from "@/components/shared/truncated-text"
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
+import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
+import Notice from "@/components/shared/notice"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * ★V8-B プール管理「プールを作る」（Pencil `D0AOyx`・/pools/new）。
@@ -28,6 +47,8 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * 受け入れ先は複数・1件以上、URLに使う名前は半角英小文字・数字・ハイフンの2〜32文字、
  * 全部の受け入れ先を1回の保存で登録（落ちたらプールも所属も作られない・入力は残す）、作れたら一覧へ（作った行を目立たせる）。
  */
+
+
 
 /** slug は URL に出る。日本語や記号を許すと /pool/xxx が壊れる。 */
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{1,31}$/
@@ -156,7 +177,7 @@ export default function PoolCreateV8() {
     >
       <form id="pool-create-form" className={styles.columns} onSubmit={(event) => void save(event)} noValidate>
         <div className={styles.main}>
-          {error ? <p role="alert" className={styles.error}>{error}</p> : null}
+          {error ? <Notice tone="danger" >{error}</Notice> : null}
           <section className={styles.card} aria-labelledby="pool-create-what">
             <h2 id="pool-create-what" className={styles.cardTitle}>1. どのプールか</h2>
             <Field label="プール名" htmlFor="pl-name" error={inputError?.target === 'pl-name' ? inputError.message : undefined}>
@@ -206,10 +227,7 @@ export default function PoolCreateV8() {
             )}
             {inputError?.target === 'pl-add-account' ? <p className={styles.error} role="alert">{inputError.message}</p> : null}
             {accountsError ? (
-              <p role="alert" className={styles.error}>
-                {accountsError}{' '}
-                <button type="button" className={styles.retry} onClick={() => void loadAccounts()}>もう一度読み込む</button>
-              </p>
+              <Notice tone="danger" >{accountsError}{' '}<button type="button" className={styles.retry} onClick={() => void loadAccounts()}>もう一度読み込む</button></Notice>
             ) : null}
           </section>
         </div>
