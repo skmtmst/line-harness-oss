@@ -34,6 +34,7 @@ const SCREENS = [
 ] as const
 
 function read(path: string): string {
+  if (path === 'mileage/friends/detail/page.tsx') return readFileSync(new URL('../v8/mileage/friend-detail.tsx', import.meta.url), 'utf8')
   if (['contents/media-detail-dialog.tsx', 'contents/media-replacement-dialog.tsx'].includes(path)) return readFileSync(new URL('../v8/' + path, import.meta.url), 'utf8')
   return readFileSync(new URL(`./${path}`, import.meta.url), 'utf8')
 }
@@ -209,10 +210,11 @@ describe('マイルの発生元 MvZm5 / HIU5O', () => {
   it('マイル明細の発生元も同じ言い方にする', () => {
     const CELL = between(
       read('mileage/friends/detail/page.tsx'),
-      '{mileageSourceLabel(item.source)}',
-      '</Td>',
+      'const note = mileageSourceNoteText(',
+      '<Td className={styles.colKind}>',
     )
-    expect(CELL).toContain('mileageSourceNoteText({')
+    expect(CELL).toContain('mileageDetailHasSourceEvent(item)')
+    expect(CELL).toContain('title={`${note}・${mileageStatusLabel(item.status)}`}')
     expect(CELL).not.toContain('調整元ID')
     expect(CELL).not.toContain('title={item.sourceReferenceId')
   })

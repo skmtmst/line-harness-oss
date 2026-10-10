@@ -25,11 +25,11 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(LEGACY_NEW).toContain("permanentRedirect('/mileage/earning-rules/new')")
   })
 
-  it('履歴と友だち別明細をV6の実Nodeへ接続する', () => {
+  it('履歴と友だち別明細を現役の画面とAPIへ接続する', () => {
     expect(HISTORY).toMatch(/(?:data-design-node|boardId)="MvZm5"/)
     expect(HISTORY).toContain('api.mileage.history')
     expect(HISTORY).toContain("kind=\"error\"")
-    expect(FRIEND_DETAIL).toMatch(/(?:data-design-node|boardId)="HIU5O"/)
+    expect(FRIEND_DETAIL).toMatch(/(?:data-design-node|boardId)="R6kIG"/)
     expect(FRIEND_DETAIL).toContain('api.friends.mileage')
     expect(FRIEND_DETAIL).toContain('api.mileage.friendsV6')
     expect(FRIEND_DETAIL).toContain('api.mileage.history')
@@ -49,7 +49,7 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(FRIEND_DETAIL).toContain('rankUnpublished')
     expect(FRIEND_DETAIL).toContain('使い道・ランクを作る')
     expect(FRIEND_DETAIL).toContain("href=\"/mileage?tab=rewards\"")
-    expect(FRIEND_DETAIL).toContain('いちばん上のランクです')
+    expect(readFileSync(new URL('../../v8/mileage/display.ts', import.meta.url), 'utf8')).toContain('いちばん上のランクです')
   })
 
   it('APIの入れ子が欠けても画面を落とさず、0件とも書かない', () => {
@@ -131,7 +131,7 @@ describe('V6 マイルの正本URLと概念分離', () => {
   })
 
   it('手動増減はV6実Node・確認段階・冪等キーを通して追記する', () => {
-    expect(FRIEND_DETAIL).toContain('<MileageAdjustmentDialog')
+    expect(FRIEND_DETAIL).toContain('<MileageAdjustDialog')
     expect(ADJUSTMENT).toContain('designNode="vz0Ji"')
     expect(ADJUSTMENT).toContain("useState<'input' | 'confirm' | 'requested' | 'completed'>('input')")
     expect(ADJUSTMENT).toContain('変更前')

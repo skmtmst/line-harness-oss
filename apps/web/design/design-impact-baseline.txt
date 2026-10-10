@@ -118,7 +118,6 @@ shared-button-importer app/mileage/action-score-tab.tsx
 shared-button-importer app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx
 shared-button-importer app/mileage/earning-rules/new/v8-earning-rule-new.tsx
 shared-button-importer app/mileage/friends/detail/mileage-adjustment-dialog.tsx
-shared-button-importer app/mileage/friends/detail/page.tsx
 shared-button-importer app/mileage/friends/detail/v8-friend-detail.tsx
 shared-button-importer app/mileage/friends/detail/v8-mileage-adjust-dialog.tsx
 shared-button-importer app/mileage/mileage-history-tab.tsx

@@ -3,7 +3,7 @@
 入口：
 - `app/mileage/page.tsx`：`src/v8/mileage/mileage.tsx` へ固定（旧画面の分岐は削除）。
 - `app/mileage/rewards/edit/page.tsx`：`src/v8/mileage/reward-edit.tsx`（この入口はもとから V8 の画面だけを出している）。
-- `app/mileage/friends/detail/page.tsx`：V8 のときだけ `src/v8/mileage/friend-detail.tsx`。
+- `app/mileage/friends/detail/page.tsx`：`src/v8/mileage/friend-detail.tsx` へ固定。
 
 絵：たまる決めごと `OC0gy`・1152 `ZJIyl`・閲覧のみ `E2Any`・使い道 `S35pO`・友だちの残高 `CJlf4`・履歴 `oRbJi`・
 行動スコア `IRPw8`・点数を手で直す `Nv7An`・点数の変化の明細 `R8NNi`・使い道を作る `L2Bzp`・友だちのマイル詳細 `R6kIG`・

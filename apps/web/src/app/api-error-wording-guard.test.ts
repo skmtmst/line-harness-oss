@@ -79,7 +79,6 @@ const BASELINE: Record<string, number> = {
   'app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx': 1,
   'app/mileage/earning-rules/new/v8-earning-rule-new.tsx': 2,
   'app/mileage/friends/detail/mileage-adjustment-dialog.tsx': 1,
-  'app/mileage/friends/detail/page.tsx': 2,
   'app/mileage/friends/detail/v8-friend-detail.tsx': 2,
   'app/mileage/friends/detail/v8-mileage-adjust-dialog.tsx': 1,
   'app/mileage/mileage-history-tab.tsx': 1,
