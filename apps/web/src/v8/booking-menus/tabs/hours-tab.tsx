@@ -9,6 +9,7 @@ import Dialog from '@/components/shared/dialog'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import DateField from '@/components/shared/date-field'
 import HelpTip from '@/components/shared/help-tip'
+import TextLink from '@/components/shared/text-link'
 import { TimeField } from '@/components/shared/date-time-field'
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -632,7 +633,7 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
       {/* 絵 yRPxl は題だけ。説明の1行は行を高くするので「？」の中へ。 */}
       <div className={styles.innerTitleRow}>
         <h3 id="hours-check-title" className={styles.sectionTitle}>空きを確かめる</h3>
-        <HelpTip label="空きを確かめるの説明">お客さまの画面と同じ条件で、その日時に受けられるか確かめます。確かめても予約は作られません。</HelpTip>
+        <HelpTip label="空きを確かめるの説明">お客さまの画面と同じ条件で、その日時に受けられるか確かめます。確かめても予約は作られません。<TextLink href="/booking/staff">予約の担当者</TextLink>・<TextLink href="/staff">ログインユーザー</TextLink>の設定も確かめられます。</HelpTip>
       </div>
       <div className={styles.checkGrid}>
         <SaveErrorField names={["menuId"]}><EntityKindField

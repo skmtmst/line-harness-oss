@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 
 import { describe, expect, it } from 'vitest'
 
@@ -109,7 +110,7 @@ describe('画面名は上部バーだけが持つ', () => {
       'booking/staff/shifts/page.tsx',
     ]
     for (const rel of moved) {
-      const src = fs.readFileSync(path.join(APP, rel), 'utf8')
+      const src = readUiSource(path.join(APP, rel), 'utf8')
       expect(src, rel + ' が上部バーへ名前を渡していない').toContain('usePageTitle(')
     }
   })
@@ -124,7 +125,7 @@ describe('画面名は上部バーだけが持つ', () => {
       ['webinars/edit/page.tsx', 'ウェビナー編集'],
     ]
     for (const [rel, title] of cleaned) {
-      const src = fs.readFileSync(path.join(APP, rel), 'utf8')
+      const src = readUiSource(path.join(APP, rel), 'utf8')
       expect(src, rel + ' に単独の二重見出しが戻っている').not.toContain(
         '<Header title="' + title + '" />',
       )

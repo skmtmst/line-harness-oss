@@ -35,7 +35,6 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a' }),
 }))
 
-vi.mock('./staff-detail', () => ({ default: () => <div>担当者別</div> }))
 
 vi.mock('@/lib/api', () => {
   class ApiError extends Error {
@@ -77,6 +76,8 @@ beforeEach(() => {
   memStorage.setItem('lh_staff_role', 'staff')
   fixture.listMyStaff = async () => ({ staff: [] })
   fixture.replace.mockClear()
+  window.history.replaceState({}, '', '/booking/staff/shifts')
+  window.dispatchEvent(new PopStateEvent('popstate'))
 })
 
 afterEach(() => {
@@ -91,7 +92,7 @@ describe('R579 本人勤務の取得失敗と紐づけ無しを言い分ける',
     render(<StaffShiftsPage />)
 
     expect(await screen.findByText('自分の勤務を読み込めませんでした')).toBeTruthy()
-    expect(screen.queryByText('紐づく予約スタッフがありません')).toBeNull()
+    expect(screen.queryByText('ひも付いた予約スタッフがありません')).toBeNull()
     expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
     expect(fixture.replace).not.toHaveBeenCalled()
   })
@@ -100,7 +101,7 @@ describe('R579 本人勤務の取得失敗と紐づけ無しを言い分ける',
     fixture.listMyStaff = async () => ({ staff: [] })
     render(<StaffShiftsPage />)
 
-    expect(await screen.findByText('紐づく予約スタッフがありません')).toBeTruthy()
+    expect(await screen.findByText('ひも付いた予約スタッフがありません')).toBeTruthy()
     expect(screen.queryByText('自分の勤務を読み込めませんでした')).toBeNull()
     expect(screen.queryByRole('button', { name: 'もう一度読み込む' })).toBeNull()
   })
@@ -118,7 +119,7 @@ describe('R579 本人勤務の取得失敗と紐づけ無しを言い分ける',
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
 
     await waitFor(() => {
-      expect(fixture.replace).toHaveBeenCalledWith('/booking/staff/shifts?staff_id=staff-1')
+      expect(window.location.pathname + window.location.search).toBe('/booking/staff/shifts?staff_id=staff-1')
     })
   })
 })

@@ -46,7 +46,6 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
 }))
 vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => useControllableAccount() }))
-vi.mock('./staff-detail', () => ({ default: () => <div>担当者別</div> }))
 
 /*
  * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
@@ -156,7 +155,7 @@ async function pickTimeByLabel(label: string, hhmm: string) {
 }
 import BookingSettingsV8 from '@/v8/booking-menus/settings'
 function StaffShiftsPage() { const { selectedAccountId } = useControllableAccount(); return <BookingSettingsV8 accountId={selectedAccountId} /> }
-import { slotReasonLabel } from './slot-reason'
+import { slotReasonLabel } from '@/v8/booking-menus/lib/slot-reason'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 

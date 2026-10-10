@@ -38,7 +38,6 @@ const GUARDED = [
   'app/booking/menus/new/page.tsx',
   'app/booking/menus/staff/page.tsx',
   'app/booking/staff/new/page.tsx',
-  'app/booking/staff/shifts/page.tsx',
   'app/contents/vars/edit/page.tsx',
   'app/contents/vars/new/page.tsx',
   'app/conversions/new/page.tsx',
