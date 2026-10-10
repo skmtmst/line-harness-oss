@@ -110,6 +110,7 @@ vi.mock('@/lib/api', () => {
   return {
     ApiError,
     api: {
+      staff: { me: async () => ({ success: true, data: { role: window.localStorage.getItem('lh_staff_role') ?? 'owner', permissionKeys: [] } }) },
       tags: { list: (...args: unknown[]) => fixture.tagsList!(...(args as [])) },
     },
     bookingApi: {

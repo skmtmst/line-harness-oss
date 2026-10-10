@@ -1,5 +1,6 @@
 'use client'
 
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import { Th } from '@/components/shared/table'
 
 /*
@@ -29,7 +30,6 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { notifyToast } from '@/components/shared/toast'
 import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 import { useAccount } from '@/contexts/account-context'
-import { canEditFeature } from '@/lib/staff-capability'
 import { describeSaveFailure } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import {
@@ -117,8 +117,7 @@ export default function AssignMatrixV8() {
   const [loadError, setLoadError] = useState<unknown>(null)
   /** 升を押したあと、時間・料金を変える段が対象にする升。 */
   const [selected, setSelected] = useState<SelectedCell | null>(null)
-  const [canEditMenus] = useState(() =>
-    typeof window === 'undefined' ? true : canEditFeature('/booking/menus'))
+  const canEditMenus = usePermissionAccess('/booking/menus')
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return

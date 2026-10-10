@@ -11,6 +11,7 @@
  * データの口・下書き保存・公開・テスト送信・版の守り・未保存の番兵は、今の画面
  * （app/line-notifications/operator/new/operator-new-v8.tsx）から写した。動きは BEHAVIOR.md。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useRef, useState } from 'react'
@@ -29,7 +30,6 @@ import FormSection from '@/components/shared/form-section'
 import ListState from '@/components/shared/list-state'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { ApiError, api, type OperatorRecipientPreview } from '@/lib/api'
 import {
   describeApiFailure,
@@ -74,8 +74,7 @@ function OperatorEditInner() {
    * お知らせの口はすべて owner・admin だけ。staff には閲覧のみの帯を出し、
    * 変える操作のボタンは置かずに隠す（2026-10-06 オーナー決定）。
    */
-  const [canWrite] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canWrite = useFeatureAccess('lineNotifications')
 
   const [eventType, setEventType] = useState(DEFAULT_EVENT_TYPE)
   const [threshold, setThreshold] = useState('one')

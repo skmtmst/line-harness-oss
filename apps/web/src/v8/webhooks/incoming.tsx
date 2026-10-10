@@ -127,8 +127,8 @@ export default function WebhooksIncomingV8() {
   if (accountScopeRef.current.accountId !== selectedAccountId) accountScopeRef.current = { accountId: selectedAccountId }
   const staffRole = useStaffRole()
   /* 受け取り口の変更は統括だけ（R32）。届物の結び付けは管理者も使える。 */
-  const canManage = staffRole === null || staffRole === 'owner'
-  const canResolveUnmatched = staffRole === null || staffRole === 'owner' || staffRole === 'admin'
+  const canManage = staffRole === 'owner'
+  const canResolveUnmatched = staffRole === 'owner' || staffRole === 'admin'
   const searchParams = useSearchParams()
 
   const overview = useWebhookOverview()

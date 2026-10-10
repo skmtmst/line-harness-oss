@@ -12,6 +12,7 @@
  * データの口・保存の口・権限・失敗の扱いは app/webinars/list-v8.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import type { ReactNode } from 'react'
@@ -60,7 +61,7 @@ import { withViewTransition } from '@/components/shared/view-transition'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { runUndoable } from '@/lib/undoable'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -368,7 +369,8 @@ function WebinarList() {
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   // jiNg0「閲覧のみ」：押せない形にする（隠さない）。
   const role = useStaffRole()
-  const canEdit = canManageRole(role)
+  const featureAccess = useFeatureAccess('webinars')
+  const canEdit = featureAccess
 
   const requestGeneration = useRef(0)
   const overviewGeneration = useRef(0)

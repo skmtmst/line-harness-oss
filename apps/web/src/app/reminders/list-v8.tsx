@@ -1,6 +1,7 @@
 'use client'
 
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
@@ -55,7 +56,7 @@ import { useOffsetServerList, type ServerListResponse } from '@/lib/use-server-l
 import { clampSearchQuery } from '@/lib/search-query'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
@@ -187,7 +188,7 @@ export default function RemindersListV8() {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
-  const canEdit = canManageRole(role)
+  const canEdit = useFeatureAccess('reminders')
   const readonlyReason = 'この操作にはオーナーか管理者の権限が要ります'
   // 1152の板（`Iffil`）。折り畳みはCSSのコンテナ問い合わせが担い、
   // ここでは板IDだけを切り替える。

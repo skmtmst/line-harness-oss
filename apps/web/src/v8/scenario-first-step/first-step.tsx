@@ -11,6 +11,7 @@
  * 1通目は飛ばせる。書かせないと進めない形にすると、あとで考えたい人が
  * 適当な本文を入れて先へ進む。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -58,7 +59,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import ListState from '@/components/shared/list-state'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { restoreFirstStep, scheduleToPayload } from './first-step-form'
@@ -96,7 +97,8 @@ export default function ScenarioFirstStepV8() {
   const narrow = useNarrowViewport()
   const role = useStaffRole()
   // 役割が読めるまでは今までどおり出す。staff と分かったら変える操作を隠す（最後の守りはサーバ）。
-  const canEdit = role === null || canManageRole(role)
+  const featureAccess = useFeatureAccess('scenarios')
+  const canEdit = featureAccess
   const { accounts, selectedAccountId } = useAccount()
 
   const [scenario, setScenario] = useState<(Scenario & { steps: ScenarioStep[] }) | null>(null)

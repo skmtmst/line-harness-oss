@@ -13,6 +13,7 @@
  * /booking/staff/new と同じ。テーマが v7 のときはこのファイルは読まれず、
  * 従来の見た目が出る。
  */
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -27,7 +28,6 @@ import Toggle from '@/components/shared/toggle'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
-import { canEditFeature } from '@/lib/staff-capability'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { createPageReturnHref } from '@/components/shared/create-page'
 /* R309: メニュー候補の料金は一覧・割当表と同じ共通表示にする。 */
@@ -169,8 +169,7 @@ export default function StaffNewV8() {
   }
 
   // N-411: 予約スタッフ登録は 'booking.settings' の実効permission必須。
-  const [canManageStaff] = useState(() =>
-    typeof window === 'undefined' ? true : canEditFeature('booking.settings'))
+  const canManageStaff = usePermissionAccess('booking.settings')
 
   /*
    * 登録途中の離脱確認。名前・表示名・肩書き・写真・紹介文・メニュー割当・

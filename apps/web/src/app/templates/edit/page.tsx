@@ -1,11 +1,11 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import Select from '@/components/shared/select'
 import React, { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import type { Folder } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
 import Button from '@/components/shared/button'
@@ -57,8 +57,7 @@ function TemplateEditInner() {
    * staff が URL 直打ちで来てもフォームを出さず、保存まで辿り着けない
    * ようにする。一覧の閲覧は /templates に残る。
    */
-  const [canMutateTemplates] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canMutateTemplates = useFeatureAccess('templates')
   const params = useSearchParams()
   const id = params.get('id')
   const assetKind = params.get('kind')

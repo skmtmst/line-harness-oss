@@ -1,5 +1,6 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Th } from '@/components/shared/table'
 
 /*
@@ -28,7 +29,6 @@ import {
 } from '@/lib/api'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -157,8 +157,7 @@ function CommonVarsListV8Inner() {
    * 押しても 403 になるだけなので、閲覧のみの帯を出して操作ごと出さない
    * （板 `OxSw8`）。一覧・CSVで書き出す・差し込み名のコピーは使える。
    */
-  const [canWrite] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canWrite = useFeatureAccess('commonVars')
 
   const [items, setItems] = useState<CommonVar[]>([])
   const [folders, setFolders] = useState<Folder[]>([])

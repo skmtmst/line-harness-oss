@@ -95,7 +95,7 @@ export default function WebhooksOutgoingV8() {
    * 送り先の変更（作る・動かす/止める・直す・合言葉・削除）は統括だけ（R32）。
    * 試し送信は管理者も使える。見るだけの担当者は中身の確認と検索だけ（l5SRfT）。
    */
-  const canManage = staffRole === null || staffRole === 'owner'
+  const canManage = staffRole === 'owner'
   const canTest = canManage || staffRole === 'admin'
 
   const overview = useWebhookOverview()

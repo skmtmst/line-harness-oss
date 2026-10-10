@@ -162,7 +162,7 @@ function TagFolderPage() {
     }
   }
 
-  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+  if (!canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
 
   /* 止まっている理由は押せない見た目だけにせず、ボタンの title と本文に出す。 */
   const blockedReason =

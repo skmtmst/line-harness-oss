@@ -434,7 +434,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
   const autosave = useDraftAutosave({
     fingerprint: JSON.stringify(v8stage === 'basics' ? basics : settings),
     dirty,
-    active: role === null || canManageRole(role),
+    active: canManageRole(role),
     enabled: !loading && !conflict && draft !== null && settings !== null
       && (v8stage !== 'basics' || Boolean(basics?.name.trim())),
     paused: leaveTarget !== null || busy,

@@ -9,12 +9,13 @@
  * 形・面の座標・動きの組み立ては template-asset-editor.tsx から写した（src/v8 は @/app を読めない）。
  * 外枠・名前とフォルダの箱・右の列はクーポン・リサーチ（asset.tsx）と同じ。動きは BEHAVIOR.md。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CircleSlash, Send } from 'lucide-react'
 import type { Folder, MediaItem, TemplateImagemapUpload } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
@@ -177,7 +178,8 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   const router = useRouter()
   const role = useStaffRole()
   const hqHost = Boolean(host && !host.composer?.accountId)
-  const canMutate = host ? !host.readOnly : role === null || canManageRole(role)
+  const featureAccess = useFeatureAccess('templates')
+  const canMutate = host ? !host.readOnly : featureAccess
   const { selectedAccountId, accounts } = useAccount()
   usePageTitle(host?.composer ? null : host ? 'テンプレート' : 'リッチメッセージを作る', !host?.composer)
   /*

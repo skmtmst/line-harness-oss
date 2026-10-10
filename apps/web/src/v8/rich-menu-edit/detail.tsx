@@ -1,5 +1,8 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useStaffRole } from '@/lib/staff-role'
+
 /*
  * ★V8 リッチメニューの詳細（公開した・公開の進み）`hKr8f`。一から書いた画面（2026-10-07）。
  *
@@ -47,8 +50,8 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading')
   usePageTitle(group?.name ?? 'リッチメニュー')
 
-  const [role, setRole] = useState<string | null>(null)
-  const canOperate = role === 'owner' || role === 'admin'
+  const role = useStaffRole()
+  const canOperate = useFeatureAccess('richMenus')
 
   const [progress, setProgress] = useState<{ steps: ProgressStep[]; message: string | null; failed: boolean } | null>(null)
   const [progressError, setProgressError] = useState(false)
@@ -139,7 +142,6 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
     void loadProgress()
     void loadRuns()
     void check()
-    void api.staff.me().then((res) => { if (res.success) setRole(res.data.role) }).catch(() => {})
   }, [loadState, loadProgress, loadRuns, check])
   useEffect(() => {
     if (!group) return

@@ -64,7 +64,7 @@ export default function SnsSettingsPage() {
   const searchParams = useSearchParams()
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
-  const canManage = role === null || canManageRole(role)
+  const canManage = canManageRole(role)
 
   const [google, setGoogle] = useState<GoogleConnectionData | null>(null)
   const [googleError, setGoogleError] = useState<unknown>(null)

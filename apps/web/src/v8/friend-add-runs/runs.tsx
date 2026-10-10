@@ -1,5 +1,7 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
+
 /*
  * ★V8 友だち追加時の配信の実行結果（Pencil `REIxB`）。
  *
@@ -36,7 +38,7 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { api, type FriendAddRunList } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
 import { describeFriendAddFailure } from '@/v8/friend-add/failure'
 import { useCursorStack } from '@/v8/friend-add/use-cursor-stack'
@@ -109,7 +111,7 @@ function FriendAddRunsInner() {
   usePageTitle('実行結果：友だち追加時の配信')
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   const role = useStaffRole()
-  const canManage = role === null || canManageRole(role)
+  const canManage = useFeatureAccess('friendAdd')
   const searchParams = useSearchParams()
   const router = useRouter()
   const samePageUrl = useSamePageUrl()

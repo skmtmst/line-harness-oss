@@ -59,6 +59,7 @@ beforeEach(() => {
   })
   vi.stubGlobal('fetch', async (input: string | URL | Request) => {
     const path = String(input)
+    if (path.includes('/api/staff/me')) return response({ success: true, data: { role: 'owner' } })
     if (path.includes('/api/settings/features')) {
       return response({
         success: true,

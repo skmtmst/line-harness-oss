@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * テンプレート詳細の形の違う応答（D008）を、実際に mount して確かめる。
  *
@@ -127,6 +129,7 @@ const validDetail = {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   routing.pushed = []
   calls.templatesGet.mockReset()
   const store = new Map<string, string>([['lh_staff_role', 'owner']])

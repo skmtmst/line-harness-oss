@@ -6,7 +6,7 @@ import AttributeDistribution from './attribute-distribution'
 import { fieldDefinition, fieldOf } from './attribute-model'
 import type { HqFriendAttributeDetail } from '@line-crm/shared'
 const mocks = vi.hoisted(() => ({ role: 'owner', list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), folders: vi.fn(), createFolder: vi.fn(), updateFolder: vi.fn(), stats: vi.fn(), accounts: vi.fn(), received: vi.fn(), preflight: vi.fn(), distribute: vi.fn(), result: vi.fn(), context: vi.fn() }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => mocks.role, canManageRole: (role: string) => ['owner', 'admin'].includes(role) }))
+vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => ['owner', 'admin'].includes(mocks.role), useStaffRole: () => mocks.role, canManageRole: (role: string) => ['owner', 'admin'].includes(role) }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/hq/friend-attributes' }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))

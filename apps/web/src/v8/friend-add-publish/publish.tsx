@@ -12,6 +12,7 @@
  * 2つの面（確認・完了）は同じ流れの前後なので1つのファイル。完了は読み直さず、
  * 公開したときの数をそのまま出す。`?done=1` は作る⑤（編集画面）から有効にして来たとき。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CircleAlert, CircleCheck, Power, Send, Smartphone } from 'lucide-react'
@@ -31,7 +32,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError, type FriendAddRule } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { resendSuppressionText } from '@/v8/friend-add/text'
 import { actionSummaryText, blockedReason, canPublish, firstSendText, idempotencyKeyFor, PUBLISH_STEPS, editStepHref } from './flow'
@@ -68,7 +69,7 @@ function FriendAddPublish() {
   const accountName = accounts.find((account) => account.id === selectedAccountId)?.name ?? '公式アカウント'
   const role = useStaffRole()
   // 役割が読めるまでは今までどおり出す。staff と分かったら変える操作を隠す（最後の守りはサーバ）。
-  const canEdit = role === null || canManageRole(role)
+  const canEdit = useFeatureAccess('friendAdd')
   const narrow = useNarrowViewport()
   const [me, setMe] = useState<string | null>(null)
   const [phase, setPhase] = useState<Phase>('loading')

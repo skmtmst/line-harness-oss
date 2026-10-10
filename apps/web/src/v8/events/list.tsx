@@ -94,7 +94,7 @@ export default function EventsListV8() {
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
   /* 作る・名前の変更・削除・フォルダの追加は統括と管理者だけ（Worker も同じ権限）。 */
-  const canEdit = role === null || role === 'owner' || role === 'admin'
+  const canEdit = role === 'owner' || role === 'admin'
   const [items, setItems] = useState<EventListItem[]>([])
   const [listTotal, setListTotal] = useState(0)
   const [summary, setSummary] = useState<EventListSummary | null>(null)

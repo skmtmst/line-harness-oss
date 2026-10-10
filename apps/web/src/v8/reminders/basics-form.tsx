@@ -172,7 +172,7 @@ export function ReminderBasicsFormV8({
 }) {
   const { selectedAccountId } = useAccount()
   const staffRole = useStaffRole()
-  const canCreateFolder = staffRole === null || canManageRole(staffRole)
+  const canCreateFolder = canManageRole(staffRole)
   const [dateFields, setDateFields] = useState<FriendField[]>([])
   const [fieldsLoadState, setFieldsLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [events, setEvents] = useState<EventListItem[]>([])

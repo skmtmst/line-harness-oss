@@ -8,6 +8,7 @@
  * 直さず、型（ListPage）と共通部品で一から書いた。データの口・権限・失敗時の
  * 扱いは古い一覧と同じ（BEHAVIOR.md）。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
@@ -35,7 +36,7 @@ import type { SegmentCondition } from '@/lib/segment-condition'
 import { describeCondition } from '@/components/scenarios/scenario-dialogs'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { useRowLeaving } from '@/lib/use-row-leaving'
 import { formatDay, formatNumber } from '@/lib/format'
@@ -205,7 +206,8 @@ export default function RichMenusListV8() {
    * 役割はサーバ（/api/staff/me）から読む。読めるまでは今までどおり操作を出す。
    */
   const role = useStaffRole()
-  const canEdit = role === null ? true : canManageRole(role)
+  const featureAccess = useFeatureAccess('richMenus')
+  const canEdit = featureAccess
 
   const [showExternal, setShowExternal] = useState(false)
   const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)

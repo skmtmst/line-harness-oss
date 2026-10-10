@@ -668,7 +668,7 @@ export default function BroadcastForm({
   const [folders, setFolders] = useState<Array<{ id: string; name: string; color?: string | null }>>([])
   // フォルダを選ぶ欄からその場で作る（dLffh）。一覧の左の列の「フォルダを追加」と同じ口・同じ権限。
   const staffRoleForFolders = useStaffRole()
-  const canCreateFolder = staffRoleForFolders === null || canEditFeature('broadcast.definition.edit')
+  const canCreateFolder = canEditFeature('broadcast.definition.edit', staffRoleForFolders)
   const createFolder = folderCreator(
     (name, color) => api.folders.create({ kind: 'broadcast', name, color }),
     folderById,

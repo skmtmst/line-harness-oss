@@ -6,6 +6,7 @@
  * 型（DetailPage）の頭とタブに、左の本文（まとめ／表）と右の列（フォームを編集・CSV・絞り込み・回答の詳細）をはめる。
  * 読み込み・検索・CSV・後処理のやり直しは今の作り（src/app/form-submissions/responses/page.tsx）と同じ口と同じ文。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -15,8 +16,7 @@ import { fetchApi, ApiError } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
+import { useStaffRole } from '@/lib/staff-role'
 import Notice from '@/components/shared/notice'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { DetailPage, DetailColumns } from '@/components/templates'
@@ -133,7 +133,7 @@ export default function FormResponsesV8() {
 
 function Responses() {
   const role = useStaffRole()
-  const canEditForm = role ? canManageRole(role) || (role === 'staff' && !isOwnerOrAdmin() && canEditFeature('/form-submissions')) : canEditFeature('/form-submissions')
+  const canEditForm = useFeatureAccess('forms')
   const canRetry = canEditForm
   const searchParams = useSearchParams()
   const formId = searchParams.get('id') ?? ''

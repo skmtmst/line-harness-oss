@@ -58,7 +58,7 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePa
 
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
-  return { ...actual, useStaffRole: () => roleBox.role }
+  return { ...actual, useTenantWideAccess: () => ['owner', 'admin'].includes(roleBox.role), useStaffRole: () => roleBox.role }
 })
 
 import HqBannerProjectV8 from './project'

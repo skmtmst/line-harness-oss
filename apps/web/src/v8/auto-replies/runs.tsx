@@ -150,7 +150,7 @@ export default function AutoReplyRunsV8() {
   const searchParams = useSearchParams()
   const requestedRuleId = searchParams.get('id') ?? ''
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || canManageRole(staffRole)
+  const canManage = canManageRole(staffRole)
   const [period, setPeriod] = useState<PeriodKey>('month')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')

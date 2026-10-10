@@ -1,5 +1,7 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
+
 /*
  * ★V8 一斉配信の詳細（2026-10-06 一から書き直し）。
  * 絵：下書き `cgiGB`（再撮 `dK1aE`）・承認待ち `pNiUk`（`wfHIE`）・送った後 `F3X1Mo`（`tPm3e`）・
@@ -159,6 +161,8 @@ export default function BroadcastDetail({
   conflict = false,
   onConflictReload,
 }: BroadcastDetailProps) {
+  const canTestSend = useFeatureAccess('broadcasts', 'test')
+  const canExport = useFeatureAccess('broadcasts', 'export')
   const router = useRouter()
   const { status: displayStatus, label: statusLabel } = displayStatusOf(broadcast)
   const isDraft = broadcast.status === 'draft'
@@ -193,6 +197,7 @@ export default function BroadcastDetail({
   }
 
   const sendTest = async () => {
+    if (!canTestSend) return
     if (testing) return
     setTesting(true)
     try {
@@ -281,12 +286,12 @@ export default function BroadcastDetail({
               />
             </>
           ) : null}
-          {/* CSV は見るだけの操作。閲覧のみにも出す。 */}
-          <Button size="field" onClick={onExportCsv}>
+          {/* CSVは閲覧権限に加えて書き出しの鍵が要る。 */}
+          {canExport ? <Button size="field" onClick={onExportCsv}>
             <Download aria-hidden="true" />
             CSVで書き出す
-          </Button>
-          {canEdit && !isSent && broadcast.status !== 'sending' ? (
+          </Button> : null}
+          {canTestSend && !isSent && broadcast.status !== 'sending' ? (
             <Button size="field" onClick={() => void sendTest()} disabled={testing} busy={testing} busyLabel="テスト送信中…">
               <Send aria-hidden="true" />
               テストを送る

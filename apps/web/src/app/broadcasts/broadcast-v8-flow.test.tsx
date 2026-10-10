@@ -80,7 +80,6 @@ vi.mock('next/link', () => ({
 }))
 
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin', canManageRole: (role: string | null | undefined) => role === 'owner' || role === 'admin' }))
-vi.mock('@/lib/staff-capability', () => ({ canEditFeature: () => true }))
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: mocks.accountId, selectedAccount: null, loading: false }),

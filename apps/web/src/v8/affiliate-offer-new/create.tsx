@@ -56,7 +56,7 @@ export default function AffiliateOfferCreateV8() {
   usePageCrumbs([{ label: '成果とアフィリエイト', href: '/affiliates' }])
   const router = useRouter()
   const role = useStaffRole()
-  const canEdit = !role || canManageRole(role)
+  const canEdit = canManageRole(role)
   const { selectedAccountId, selectedAccount } = useAccount()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')

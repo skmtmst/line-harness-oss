@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { Play } from 'lucide-react'
 import { validateImagemapMessage, type Folder } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle, usePageCrumbs } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -33,7 +34,8 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
   const router = useRouter()
   const { selectedAccountId, accounts } = useAccount()
   const role = useStaffRole()
-  const canMutate = canManageRole(role)
+  const featureAccess = useFeatureAccess('templates')
+  const canMutate = host ? !host.readOnly : featureAccess
   usePageTitle(host?.composer ? null : id ? 'リッチビデオを編集' : 'リッチビデオを作る', !host?.composer)
   usePageCrumbs([{label:'ホーム',href:'/'},{label:'テンプレート',href:'/templates'}], !host)
   const [draft,setDraft] = useState<RichVideoDraft>(() => visual ? {...emptyDraft,name:'新メニュー紹介の動画',actionUrl:'https://nen-petfood.jp/new-menu',altText:'新メニューの動画が届きました'} : emptyDraft)

@@ -14,6 +14,7 @@
  * 409 は板 v5L19Z の帯を出し、「違いを比べる」「最新を読み込んで続ける」
  * 「比べてから保存」で扱う（いきなり上書きしない）。
  */
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -30,7 +31,6 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { notifyToast } from '@/components/shared/toast'
 import { useAccount } from '@/contexts/account-context'
-import { canEditFeature } from '@/lib/staff-capability'
 import { classifyApiFailure } from '@/components/shared/api-error-message'
 import { formatNumber } from '@/lib/format'
 import {
@@ -126,8 +126,7 @@ export default function MenuFormV8() {
     ? `${workerBase}/o?liffId=${encodeURIComponent(selectedAccount.liffId)}&page=salon-book`
     : null
 
-  const [canEdit] = useState(() =>
-    typeof window === 'undefined' ? true : canEditFeature('/booking/menus'))
+  const canEdit = usePermissionAccess('/booking/menus')
 
   /* ---- 読み込むデータ ---- */
   const [menus, setMenus] = useState<BookingMenu[]>([])

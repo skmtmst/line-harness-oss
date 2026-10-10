@@ -10,6 +10,7 @@
  * 保存の2段階（作成→postback埋め直し）・再試行・離脱番兵の判断は
  * v7（carousel/page.tsx）と同じ関数を使う。ここにあるのは置き場と見え方だけ。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -27,7 +28,6 @@ import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared
 import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { readInlineActions } from '@/components/auto-replies/draft-fields'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import MediaPickerDialog from '@/app/contents/media-picker-dialog'
 import EditorV8, { EditorCard } from '../editor-v8'
 import styles from '../editor-v8.module.css'
@@ -74,8 +74,7 @@ function CarouselEditorV8Inner() {
   /** 「保存して公開」の使用先確認窓。 */
   const [publishCheck, setPublishCheck] = useState<{ id: string; usageCount: number } | null>(null)
   const [publishError, setPublishError] = useState('')
-  const [canMutateTemplates] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canMutateTemplates = useFeatureAccess('templates')
   const actionOptions = useActionOptions()
 
   const folderAccountId = id ? templateAccountId : selectedAccountId

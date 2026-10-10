@@ -44,3 +44,5 @@ test('初めの読み込みに失敗してやり直したら、保存済みの�
   await act(async () => { retry.click() })
   await waitFor(() => expect((screen.getByPlaceholderText('例：要確認') as HTMLInputElement).value).toBe('至急'))
 })
+
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))

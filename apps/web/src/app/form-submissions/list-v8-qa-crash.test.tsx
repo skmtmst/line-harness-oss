@@ -93,7 +93,7 @@ vi.mock('next/navigation', async importOriginal => ({
  */
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
-  return { ...actual, useStaffRole: () => null }
+  return { ...actual, useStaffRole: () => 'owner' }
 })
 vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a> }))
 

@@ -11,6 +11,7 @@
  * `id` なしで開いたときはまだ行を作らない。方式の確定か
  * 「あとで決める」ではじめて作成する（N-055）。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -40,7 +41,7 @@ import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/a
 import TargetMissing from '@/components/shared/target-missing'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import styles from './create.module.css'
 import DeliveryModeDiagram from './delivery-mode-diagram'
@@ -54,7 +55,8 @@ export default function ScenarioCreateV8() {
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
   // 役割が読めるまでは出す（最後の守りはサーバー）。閲覧のみと分かったら作る操作を隠す。
-  const canEdit = role === null || canManageRole(role)
+  const featureAccess = useFeatureAccess('scenarios')
+  const canEdit = featureAccess
   const [scenario, setScenario] = useState<Scenario | null>(null)
   // id なしは「これから作る」。読み込む行が無いので最初から入力できる。
   const [scenarioState, setScenarioState] = useState<'loading' | 'ready' | 'error'>(

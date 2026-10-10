@@ -4,6 +4,8 @@
  * 概要が出る・閲覧のみは変える操作を置かない・鍵のある運用担当は対応を変えられる・
  * 履歴の切り替えと続き・情報欄は変えた欄だけ送る・404 と 403 を分ける。
  */
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -132,6 +134,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  forgetStaffIdentity();
   document.documentElement.dataset.theme = 'v8'
   role.current = 'owner'
   store.clear()
@@ -196,6 +199,7 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
   it("'/chats' の鍵を持つ運用担当は対応・タグ・メモを編集でき、帯は出ない", async () => {
     role.current = 'staff'
     store.set('lh_staff_permissions', JSON.stringify(['/chats']))
+    rememberStaffIdentity({ role: 'staff', permissionKeys: ['/chats'] } as StaffMember)
     await render()
     expect(host.textContent).not.toContain('閲覧のみで見ています')
     expect(links('編集').length).toBeGreaterThanOrEqual(3)

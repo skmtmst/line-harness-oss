@@ -1,6 +1,8 @@
 'use client'
 
 /* ★V8-B ウェビナー作成（j7PP04）。下書きを保存して次の段へ進む。 */
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -17,7 +19,6 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { webinarApi, describeSaveFailure, type WebinarFolder } from '@/lib/api'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { STEPS } from '@/app/webinars/edit/edit-steps'
 import styles from './new-v8.module.css'
 
@@ -87,8 +88,7 @@ function NewWebinarV8Inner() {
   /* 欄を離れたときに出す直し方（保存を押す前から1欄ずつ確かめる）。 */
   const [fieldErrors, setFieldErrors] = useState<{ title?: string; slug?: string }>({})
   const [foldersState, setFoldersState] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [canCreateWebinar] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canCreateWebinar = useFeatureAccess('webinars')
 
   const dirty = title.trim() !== '' || slug.trim() !== '' || description.trim() !== '' || deliveryKind !== 'on-demand' || folderId !== ''
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })

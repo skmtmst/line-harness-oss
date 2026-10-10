@@ -60,6 +60,7 @@ beforeEach(() => {
   root = createRoot(host)
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    if (url.endsWith('/api/staff/me')) return json({ success: true, data: { role: 'admin' } })
     if (url.includes('recipients-preview')) return json({ success: true, data: recipients })
     if (url.includes('/api/notifications/teams')) return json({ success: true, data: [] })
     if (url.includes('/operator-rules/rule-9')) return json({ success: true, data: rule })

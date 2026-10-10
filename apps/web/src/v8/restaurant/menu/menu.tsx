@@ -60,7 +60,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
   /* 閲覧のみの人には、追加・変更・停止・再開のボタンを置かない（2026-10-06 オーナー）。 */
-  const canEdit = role === null || canManageRole(role)
+  const canEdit = canManageRole(role)
   const rows = store ? data.menuItems.filter((row) => row.store_id === store.id) : data.menuItems
   const pendingApprovals = data.approvals.filter((item) => item.kind === 'menu_change' && item.status === 'pending')
   /* 窓：'new' は追加、品目の id は変更。 */

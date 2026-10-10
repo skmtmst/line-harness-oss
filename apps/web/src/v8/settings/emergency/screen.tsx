@@ -46,7 +46,7 @@ export default function EmergencyScreen({
   const tab = useMergedTab(TABS)
   const { selectedAccountId } = useAccount()
   const staffRole = useStaffRole()
-  const canManage = staffRole ? canManageRole(staffRole) : true
+  const canManage = canManageRole(staffRole)
   const [, setSeverity] = useState<OperationSeverity>('unknown')
   const [manualRunRequest, setManualRunRequest] = useState(0)
   /* 手動確認の連打・同時実行を止める（N-458）。終わったら外す。 */

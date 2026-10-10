@@ -27,7 +27,7 @@ export default function FieldNew() {
   const [folders, setFolders] = useState<Folder[]>([])
   // その場でフォルダを作れるのは、左の列の「フォルダを追加」と同じ人（閲覧のみは作れない）。
   const staffRole = useStaffRole()
-  const canCreateFolder = staffRole === null || canManageRole(staffRole)
+  const canCreateFolder = canManageRole(staffRole)
   const [foldersState, setFoldersState] = useState<'loading' | 'ready' | 'error'>('loading')
   /* R514: 既存項目が取れていないのに空一覧として扱わない。 */
   const [existing, setExisting] = useState<FriendField[]>([])
@@ -102,7 +102,7 @@ export default function FieldNew() {
     }
   }
 
-  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+  if (!canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
 
   return (
     <FieldEditor

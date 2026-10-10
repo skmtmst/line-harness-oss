@@ -5,6 +5,7 @@
  * 下書きとして作り、「動画の設定へ」で編集の ②動画へ進む。
  * 口・確かめ・離れる前の確かめは app/webinars/new/new-v8.tsx と同じ（BEHAVIOR.md）。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight } from 'lucide-react'
@@ -16,7 +17,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { describeSaveFailure, webinarApi, type WebinarFolder } from '@/lib/api'
 import { BackLink, WizardSteps } from './chrome'
 import { folderById, folderCreator } from '@/components/shared/folder-select'
@@ -49,7 +50,7 @@ function NewInner() {
   const router = useRouter()
   const { selectedAccountId, selectedAccount } = useAccount()
   const role = useStaffRole()
-  const readOnly = role !== null && !canManageRole(role)
+  const readOnly = !useFeatureAccess('webinars')
   const [values, setValues] = useState<BasicValues>({ title: '', slug: '', folderId: '', description: '', deliveryKind: 'on_demand' })
   const [folders, setFolders] = useState<WebinarFolder[]>([])
   const [folderState, setFolderState] = useState<'loading' | 'ready' | 'error'>('loading')

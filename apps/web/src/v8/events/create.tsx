@@ -66,7 +66,7 @@ function EventsCreateV8Inner() {
   const searchParams = useSearchParams()
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
-  const canEdit = role === null || role === 'owner' || role === 'admin'
+  const canEdit = role === 'owner' || role === 'admin'
 
   /*
    * 今の作りは ①を保存すると /events/new?id=…&step=2 で続きを開く。

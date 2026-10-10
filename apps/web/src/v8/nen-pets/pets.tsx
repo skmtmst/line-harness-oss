@@ -42,7 +42,7 @@ export default function PetsV8({
   const role = useStaffRole()
   /* 役割が読めるまでは閲覧のみとして扱い、押せないボタンを先に出さない。 */
   const canEdit = role !== null && canManageRole(role)
-  const readonly = role !== null && !canManageRole(role)
+  const readonly = !canManageRole(role)
 
   const [kpis, setKpis] = useState<NenPetKpis | null>(null)
   const [kpisFailed, setKpisFailed] = useState(false)

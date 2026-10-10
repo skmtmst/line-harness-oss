@@ -7,6 +7,7 @@
  * 型（ListPage）と共通部品で一から組み直した。データの口・保存先は今と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
@@ -37,7 +38,7 @@ import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type Broadcast
 import { loadFailureNotice } from '@/components/shared/api-error-message'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
@@ -190,7 +191,7 @@ export default function BroadcastListV8() {
    * 役割が読めていない間は今までどおり出す（最後の守りはサーバの 403）。
    * 管理者・オーナーと、配信の編集キーを持つ運用担当が変えられる（役割はサーバの答え）。
    */
-  const canEdit = staffRole === null || canManageRole(staffRole) || hasStaffEditKey(EDIT_KEY)
+  const canEdit = useFeatureAccess('broadcasts')
 
   const [broadcasts, setBroadcasts] = useState<ApiBroadcast[]>([])
   const [listKpis, setListKpis] = useState<BroadcastListKpis | null | undefined>(undefined)

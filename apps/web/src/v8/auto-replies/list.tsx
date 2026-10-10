@@ -1,6 +1,7 @@
 'use client'
 
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar, { ListToolbarOptional } from '@/components/shared/list-toolbar'
@@ -49,7 +50,7 @@ import { api, ApiError } from '@/lib/api'
 import { clampSearchQuery } from '@/lib/search-query'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
@@ -246,7 +247,8 @@ export default function AutoRepliesListV8() {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const featureAccess = useFeatureAccess('autoReplies')
+  const canEdit = featureAccess
   // 1152の板（`WPrd5`）。折り畳みはCSSのコンテナ問い合わせが担い、
   // ここでは板IDだけを切り替える。
   const narrow = useNarrowViewport()

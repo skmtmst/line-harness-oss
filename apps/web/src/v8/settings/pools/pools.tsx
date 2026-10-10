@@ -45,7 +45,7 @@ export default function PoolsV8() {
   usePageTitle(TITLE)
   const role = useStaffRole()
   // 役割が読めるまでは今までどおり出し、見るだけと分かったら操作を隠す（最後の守りはサーバの 403）。
-  const canManage = role === null || canManageRole(role)
+  const canManage = canManageRole(role)
   const [pools, setPools] = useState<TrafficPool[]>([])
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [loading, setLoading] = useState(true)

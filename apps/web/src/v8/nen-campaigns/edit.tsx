@@ -115,7 +115,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const bodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   const { selectedAccountId, selectedAccount } = useAccount()
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const canEdit = canManageRole(staffRole)
 
   useEffect(() => {
     if (!selectedAccountId) {

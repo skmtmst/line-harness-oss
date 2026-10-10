@@ -58,7 +58,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
   /* 閲覧のみの人には、追加・変更・停止・再開・並べ替えを置かない（2026-10-06 オーナー）。 */
-  const canEdit = role === null || canManageRole(role)
+  const canEdit = canManageRole(role)
   const rows = useMemo(() => (store ? data.tables.filter((row) => row.store_id === store.id) : data.tables), [data.tables, store])
   const placed = useMemo(
     () => [...rows].sort((a, b) => a.floor_y - b.floor_y || a.floor_x - b.floor_x || a.code.localeCompare(b.code)),

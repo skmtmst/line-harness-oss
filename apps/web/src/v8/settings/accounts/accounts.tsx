@@ -55,7 +55,7 @@ export default function AccountsV8() {
   const router = useRouter()
   const role = useStaffRole()
   // 役割が読めるまでは今までどおり出し、見るだけと分かったら変える操作を隠す（最後の守りはサーバ）。
-  const canManage = role === null || canManageRole(role)
+  const canManage = canManageRole(role)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [query, setQuery] = useState('')

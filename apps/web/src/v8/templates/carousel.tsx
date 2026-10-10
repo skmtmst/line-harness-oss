@@ -14,6 +14,7 @@
  * 統括（host）は URLを開く・テキストを送るだけ（配った先で LIFF ID・回答フォームの ID を付け替える口がまだ無いため）。
  * 受け付ける URL：`/templates/carousel`・`?id=<テンプレート>`・`?visual=1`（見本の3枚で開く。撮影用）。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -39,7 +40,6 @@ import { TAP_ACTION_KINDS, isTapActionKind, tapActionDef, type TapActionKind } f
 import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { TemplateEditFrame } from '../template-edit/frame'
@@ -187,7 +187,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [publishCheck, setPublishCheck] = useState<{ id: string; usageCount: number } | null>(null)
   const [publishError, setPublishError] = useState('')
-  const [canMutate] = useState(() => (typeof window === 'undefined' ? true : isOwnerOrAdmin()))
+  const canMutate = useFeatureAccess('templates')
   const actionOptions = useActionOptions()
 
   const folderAccountId = host?.composer?.accountId ?? (id ? templateAccountId : selectedAccountId)

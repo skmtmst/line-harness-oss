@@ -47,7 +47,7 @@ function handler(url: URL, init?: RequestInit) {
   if (url.pathname === '/api/scenarios') {
     return response({ success: true, data: { items: [row('s1', '一つ目'), row('s2', '二つ目')], total: 2, limit: 50, sort: [] } })
   }
-  if (url.pathname === '/api/staff/me') return response({ success: false, error: 'not needed' })
+  if (url.pathname === '/api/staff/me') return response({ success: true, data: { role: 'owner' } })
   if (url.pathname === '/api/folders') return response({ success: true, data: [], unfiledCount: 0 })
   if (url.pathname === '/api/list-stats') return response({ success: false, error: 'not needed' })
   return response({ success: true, data: {} })

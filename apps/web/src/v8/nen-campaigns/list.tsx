@@ -205,7 +205,7 @@ function Pager({ total, page, size, onPage }: { total: number; page: number; siz
 export default function NenCampaignsList(props: NenCampaignsListProps) {
   const { tab, settings, columns, kpis, loading } = props
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const canEdit = canManageRole(staffRole)
 
   // コラムは自分のタブを持つので、自動配信の表には出さない。
   const autoSettings = useMemo(() => settings.filter((setting) => setting.category !== 'column'), [settings])

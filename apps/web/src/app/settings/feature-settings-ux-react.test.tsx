@@ -61,6 +61,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
     if (fixture.hang) return new Promise<Response>(() => {})
     const path = String(input)
+    if (path.includes('/api/staff/me')) return Promise.resolve(response({ success: true, data: { role: 'owner' } }))
     if (path.includes('/api/settings/features/impact')) {
       return response({ success: true, data: { requiresConfirmation: false } })
     }

@@ -9,6 +9,7 @@
  * 競合・試しのURLは今までの画面（app/form-submissions/edit/page.tsx）と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -44,7 +45,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { hqFormPortableReferenceError } from '@/components/forms/hq-form-definition-adapter'
@@ -100,8 +101,9 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const { selectedAccount, selectedAccountId } = useAccount()
   const narrow = useNarrowViewport()
   const role = useStaffRole()
-  const canEdit = host ? !host.readOnly : canManageRole(role)
-  const readOnly = host ? Boolean(host.readOnly) : role !== null && !canEdit
+  const featureAccess = useFeatureAccess('forms')
+  const canEdit = host ? !host.readOnly : featureAccess
+  const readOnly = host ? Boolean(host.readOnly) : !canEdit
 
   /* 友だちに配るURL。LIFF のURLにパスを足すと、LIFFアプリの同じパスへ転送される。 */
   const liffId = selectedAccount?.liffId ?? null

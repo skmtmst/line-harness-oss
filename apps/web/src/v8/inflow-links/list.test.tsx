@@ -4,6 +4,8 @@
  * 行の「…」から QR コードの小窓（GtI4Y）が開く・停止中の行は URL を出さない・
  * 閲覧のみは作る／編集を出さない・未登録 ref は「登録する」・数の帯の未設定の数。
  */
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -65,6 +67,7 @@ let root: Root
 let host: HTMLDivElement
 
 beforeEach(() => {
+  forgetStaffIdentity();
   role.value = 'owner'
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
@@ -145,6 +148,7 @@ describe('V8 流入と計測の一覧', () => {
   // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
   it('閲覧のみ（staff）は帯を出し、作る・編集・チェックを出さない', async () => {
     role.value = 'staff'
+    rememberStaffIdentity({ role: 'staff', permissionKeys: [] } as StaffMember)
     await render()
     expect(host.textContent).toContain('閲覧のみで見ています')
     const create = [...host.querySelectorAll('button')].filter((button) => button.textContent?.includes('流入リンクを作る'))
@@ -190,6 +194,7 @@ describe('V8 流入と計測の一覧', () => {
 
   it('WEB034: 「流入」を任された staff には作る・編集を出し、フォルダの作成は出さない', async () => {
     role.value = 'staff'
+    rememberStaffIdentity({ role: 'staff', permissionKeys: ['/inflow-links'] } as StaffMember)
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => (key === 'lh_staff_permissions' ? JSON.stringify(['/inflow-links']) : key === 'lh_staff_role' ? 'staff' : null),
       setItem: () => undefined,

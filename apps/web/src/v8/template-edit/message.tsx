@@ -8,13 +8,14 @@
  * 下の帯：キャンセル／下書きを保存／保存して公開。
  * 動き（読み込み・保存・公開・409・利用先の確認）は BEHAVIOR.md。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { CircleAlert, GitCompare, Link2, RotateCcw, Send } from 'lucide-react'
 import { validateFlexContent, type Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -79,7 +80,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const router = useRouter()
   const role = useStaffRole()
   // 役割の確認が済むまでは操作を出す（最後の守りはサーバの 403）。staff と分かったら隠す。
-  const canMutate = host ? !host.readOnly : role === null || canManageRole(role)
+  const featureAccess = useFeatureAccess('templates')
+  const canMutate = host ? !host.readOnly : featureAccess
   const narrow = useNarrowViewport(1351)
   const { accounts, selectedAccountId } = useAccount()
 

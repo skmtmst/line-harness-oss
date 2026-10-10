@@ -39,7 +39,7 @@ export default function UsersV8() {
   usePageTitle('統合ユーザー')
   const u = useMergedUsers()
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || canManageRole(staffRole)
+  const canManage = canManageRole(staffRole)
   const [openedPersonId, setOpenedPersonId] = useState<string | null>(null)
   /*
    * 人の詳細は同じ URL のまま開くので、上の帯のパンくずの「統合ユーザー」で一覧へ戻す

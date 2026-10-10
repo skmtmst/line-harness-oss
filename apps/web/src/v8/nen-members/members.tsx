@@ -56,7 +56,7 @@ export default function MembersV8({
   onChangeTab: (next: MemberTab) => void
 }) {
   const role = useStaffRole()
-  const readonly = role !== null && !canManageRole(role)
+  const readonly = !canManageRole(role)
   /* ★V8 の上の帯は「ホーム › 会員」。画面名は枠が付ける。 */
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
 

@@ -44,7 +44,7 @@ function InventoryTabs({ ctx, tab, onTab, dialog, onDialog }: {
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
   /* 閲覧のみの人には、保存・時間帯の足し引き・発行などの押せないボタンを置かない（2026-10-06 オーナー）。 */
-  const canEdit = role === null || canManageRole(role)
+  const canEdit = canManageRole(role)
   const today = todayIn(ctx.store?.timezone)
   const tabs = (
     <Tabs
@@ -73,7 +73,7 @@ function InventoryTabs({ ctx, tab, onTab, dialog, onDialog }: {
         accountId={selectedAccountId}
         today={today}
         canWrite={canWriteRole(role)}
-        canGoogle={role === null || canManageRole(role)}
+        canGoogle={canManageRole(role)}
         dialog={dialog}
         onDialog={onDialog}
       />

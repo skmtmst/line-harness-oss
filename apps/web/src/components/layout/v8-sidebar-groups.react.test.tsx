@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * ★V8（夕44-A・部品 T7XSI6）：左メニューの組の開閉と「設定」の入口。
  *
@@ -80,6 +82,7 @@ async function renderSidebar(props: { friendAttributesV2Mode?: boolean } = {}) {
 
 describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
   beforeEach(() => {
+    forgetStaffIdentity()
     clearFeatureVisibilityCache()
     fixture.visibility.mockReset()
     fixture.get.mockReset()
@@ -92,6 +95,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     document.documentElement.dataset.theme = 'v8'
     window.localStorage.clear()
     window.localStorage.setItem('lh_staff_role', 'owner')
+    rememberStaffIdentity({ role: 'owner' } as StaffMember)
     /*
      * 画面幅 1280 未満では畳んだ形で開く既定がある（テスト環境の幅は
      * happy-dom の小さい値）。組の出し分けを見るので、ここでは
@@ -169,6 +173,8 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     cleanup()
 
     window.localStorage.setItem('lh_staff_role', 'staff')
+
+    rememberStaffIdentity({ role: 'staff' } as StaffMember)
     const staffView = await renderSidebar()
     expect(staffView.queryAllByRole('link', { name: '設定' })).toHaveLength(0)
   })
@@ -219,6 +225,7 @@ describe('★V8 統括の左メニュー（絵 V8-B/JKjsE・オーナー 2026-10
     fixture.pathname = '/hq'
     window.localStorage.clear()
     window.localStorage.setItem('lh_staff_role', 'owner')
+    rememberStaffIdentity({ role: 'owner' } as StaffMember)
     window.localStorage.setItem('lh-sidebar-collapsed', '0')
   })
 

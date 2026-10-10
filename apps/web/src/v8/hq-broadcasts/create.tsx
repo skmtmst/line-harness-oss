@@ -12,6 +12,7 @@
  * 除くタグ・詳細条件）は統括の口に無いので出さない（BEHAVIOR.md の「今の口で出せないもの」）。
  */
 import BroadcastAccountPicker, { type BroadcastAccount } from './account-picker'
+import { useTenantWideAccess } from '@/lib/staff-role'
 import { EntityPickerField, EntityPickerSummary } from '@/components/shared/entity-picker'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Steps } from '@/components/templates/steps'
@@ -55,7 +56,7 @@ import { bubbleLegacyMessage } from '@/lib/broadcast-template'
 import { formatNumber, formatRelative } from '@/lib/format'
 import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
 import { hqTemplatesApi, type HqTemplateListItem } from '@/lib/hq-templates-api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import RowMenu from './row-menu'
@@ -172,7 +173,7 @@ export default function HqBroadcastCreate() {
   const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
   const role = useStaffRole()
-  const canManage = role === null || canManageRole(role)
+  const canManage = useTenantWideAccess()
 
   /* 段は ?step=（店の一斉配信と同じ名前・同じ値）。押した段はすぐ出し、URL は履歴を積まずに書き換える。 */
   const urlStep = params.get('step')

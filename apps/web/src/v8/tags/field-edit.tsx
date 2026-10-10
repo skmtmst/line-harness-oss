@@ -31,7 +31,7 @@ export default function FieldEdit() {
   const [folders, setFolders] = useState<Folder[]>([])
   // その場でフォルダを作れるのは、左の列の「フォルダを追加」と同じ人（閲覧のみは作れない）。
   const staffRole = useStaffRole()
-  const canCreateFolder = staffRole === null || canManageRole(staffRole)
+  const canCreateFolder = canManageRole(staffRole)
   const [foldersState, setFoldersState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [foldersReloading, setFoldersReloading] = useState(false)
   /* R517: 版の衝突で返ってきた最新の内容。 */
@@ -213,7 +213,7 @@ export default function FieldEdit() {
     )
   }
 
-  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+  if (!canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
 
   const notices = (
     <>

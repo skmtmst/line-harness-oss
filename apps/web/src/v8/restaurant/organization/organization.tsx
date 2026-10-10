@@ -314,7 +314,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
   const { data, store, selectedStoreId, busy, mutate } = ctx
   const { accounts, selectedAccountId } = useAccount()
   const role = useStaffRole()
-  const readOnly = role !== null && !canManageRole(role)
+  const readOnly = !canManageRole(role)
   const members = selectedStoreId ? data.memberships.filter((m) => !m.store_id || m.store_id === selectedStoreId) : data.memberships
   const [showStoreForm, setShowStoreForm] = useState(false)
   const [editingStoreId, setEditingStoreId] = useState('')

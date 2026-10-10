@@ -56,6 +56,8 @@ vi.mock('@/lib/use-narrow-viewport', () => ({
   useNarrowViewport: () => narrow.value,
 }))
 
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import FormsListV8 from './list'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -93,6 +95,7 @@ async function mount() {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity()
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -187,7 +190,7 @@ describe('V8 回答フォーム一覧', () => {
   it('フォームの編集権限がある staff は変更でき、フォルダの管理だけは出さない', async () => {
     role.value = 'staff'
     window.localStorage.setItem('lh_staff_role', 'staff')
-    window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/form-submissions']))
+    rememberStaffIdentity({ role: 'staff', permissionKeys: ['/form-submissions'] } as StaffMember)
     await mount()
     expect(screen.getAllByRole('button', { name: /フォームを作る/ }).length).toBeGreaterThan(0)
     expect(screen.queryByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeNull()

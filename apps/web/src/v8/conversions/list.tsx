@@ -62,7 +62,8 @@ import { findConditionDraftIssue, pruneCondition } from '@/components/shared/con
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
+import { canEditFeature } from '@/lib/staff-capability'
 import { formatNumber } from '@/lib/format'
 import {
   api,
@@ -322,9 +323,10 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   const [reversalReason, setReversalReason] = useState('')
   const [reversalBusy, setReversalBusy] = useState(false)
   const [reversalError, setReversalError] = useState('')
-  /* 変える操作は owner/admin だけ（役割は /api/staff/me から読む。手元の保存値は使わない）。 */
+  /* APIと同じ機能鍵・操作鍵を本人APIの応答で確認する。 */
   const role = useStaffRole()
-  const canEdit = canManageRole(role)
+  const canEdit = canEditFeature('/conversions', role) && canEditFeature('conversion.definition.edit', role)
+  const canExport = canEditFeature('/conversions', role) && canEditFeature('conversion.report.export', role)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [actionNotice, setActionNotice] = useState('')
@@ -882,7 +884,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       <ListToolbar
         search={{ placeholder: '成果地点の名前で探す', label: '成果地点の名前で探す', width: 240, value: query, onChange: setQuery }}
         filters={filterChips}
-        trailing={<>{savedBox}{canEdit || role === null ? sortBox : null}{perPageBox}</>}
+        trailing={<>{savedBox}{canEdit ? sortBox : null}{perPageBox}</>}
       />
     </div>
   )
@@ -1150,10 +1152,10 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       headingSize="regular"
       title="コンバージョン"
       description="成果として数えるできごと（成果地点）を決めます。配信・流入・アフィリエイトの成果は、ここの数え方で集計します。"
-      actions={
+      actions={canExport ?
         <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
           <Download size={15} aria-hidden="true" />CSV で書き出す
-        </Button>
+        </Button> : null
       }
       stats={<>
         {!canEdit && role !== null ? (

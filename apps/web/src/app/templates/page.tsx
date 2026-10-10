@@ -1,5 +1,6 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import Select from '@/components/shared/select'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -36,7 +37,6 @@ import { templateDeleteDescription } from './template-delete-message'
 import { messageTypeText } from './template-message-type'
 import styles from './templates-v6.module.css'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import TemplatesListV8 from '@/v8/templates/list'
 import { ArrowRight, Bot, MessageCircle, Star, TriangleAlert, Workflow, X } from 'lucide-react'
@@ -152,8 +152,7 @@ function TemplatesPageV7() {
    * 'admin') で閉じている。staff へ操作を見せると押しても 403 になるだけ
    * なので、ここで操作ごと出さない。閲覧（一覧・詳細の閲覧）は残す。
    */
-  const [canMutateTemplates] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canMutateTemplates = useFeatureAccess('templates')
   const activeAccountRef = useRef<string | null>(selectedAccountId)
   const [activeSection, setActiveSection] = useState<'message' | BroadcastAssetKind>('message')
   const [templates, setTemplates] = useState<Template[]>([])

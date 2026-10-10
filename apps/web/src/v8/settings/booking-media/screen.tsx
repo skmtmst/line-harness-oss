@@ -139,7 +139,7 @@ export default function BookingMediaPage() {
   useHideSettingsNav()
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
-  const canManage = role === null || canManageRole(role)
+  const canManage = canManageRole(role)
 
   const [stores, setStores] = useState<RestaurantStore[]>([])
   const [storeId, setStoreId] = useState('')

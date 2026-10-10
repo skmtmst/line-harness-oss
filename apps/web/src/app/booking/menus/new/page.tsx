@@ -1,5 +1,6 @@
 'use client'
 
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import { Suspense, useEffect, useState } from 'react'
 import { api, ApiError, bookingApi, type BookingSettings, type BookingStaff } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
@@ -17,7 +18,6 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import { canEditFeature } from '@/lib/staff-capability'
 import { classifyApiFailure } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -47,8 +47,7 @@ export default function NewBookingMenuPage() {
 function NewBookingMenuPageV7() {
   // N-411: メニュー作成は '/booking/menus' の実効permission必須。
   // 鍵の無い人がフォームを埋めて保存時403になるのを防ぐ。
-  const [canEditMenus] = useState(() =>
-    typeof window === 'undefined' ? true : canEditFeature('/booking/menus'))
+  const canEditMenus = usePermissionAccess('/booking/menus')
   usePageTitle('予約メニューをつくる')
   const { selectedAccountId } = useAccount()
   const [name, setName] = useState('')

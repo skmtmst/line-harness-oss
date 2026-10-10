@@ -16,6 +16,7 @@ import KpiCard from '@/components/shared/kpi-card'
  * 閲覧のみの人には、変える操作のボタンを置かない（オーナー決定 2026-10-06）。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -47,7 +48,7 @@ import LinePreview from '@/components/shared/line-preview'
 import Dialog from '@/components/shared/dialog'
 import VersionCompare from '@/components/shared/version-compare'
 import { TextField, TextArea } from '@/components/shared/text-field'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { startChecklist } from './start-checklist'
 import styles from './detail.module.css'
 import { PageFrame } from '@/components/templates/page-frame'
@@ -473,7 +474,9 @@ export default function ScenarioDetailV8({
    * 今までどおり押せる見た目（最後の守りはサーバの 403）。
    */
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const featureAccess = useFeatureAccess('scenarios')
+  const canEdit = featureAccess
+  const canTestSend = useFeatureAccess('scenarios', 'test')
   const readonlyReason = '閲覧のみのため、この操作はできません'
 
   /* --- ★V8 だけの状態 --- */
@@ -2355,7 +2358,7 @@ export default function ScenarioDetailV8({
             <Eye aria-hidden />
             まとめて下見
           </Button>
-          {canEdit ? (
+          {canTestSend ? (
             <Button
               variant="secondary"
               onClick={() => setTestSend({ stepId: null, label: 'すべての通' })}
@@ -2676,11 +2679,11 @@ export default function ScenarioDetailV8({
                               items={[
                                 { id: 'edit', label: '編集', onSelect: () => openEditStep(step) },
                                 { id: 'preview', label: 'プレビュー', onSelect: () => setSelectedStepId(step.id) },
-                                {
+                                ...(canTestSend ? [{
                                   id: 'test',
                                   label: 'テスト',
                                   onSelect: () => setTestSend({ stepId: step.id, label: `${step.stepOrder}通目` }),
-                                },
+                                }] : []),
                                 /* この通を送ったあとに動かすアクション。件数を出すのは、設定済みを忘れて二重に足すのを防ぐため。 */
                                 {
                                   id: 'action',
@@ -3340,7 +3343,7 @@ export default function ScenarioDetailV8({
       )}
 
       {/* テスト送信 */}
-      {testSend && (
+      {canTestSend && testSend && (
         <TestSendDialog
           scenarioId={id}
           lineAccountId={scenario?.lineAccountId ?? null}

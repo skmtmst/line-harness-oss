@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * 予約メニューの作成・編集（V8）の「その場で確かめる入力」。
  * 名前・かかる時間・後の空き時間の欄を離れたとき（blur）に直し方を
@@ -94,6 +96,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 import NewBookingMenuPage from './page'
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   fixture.push = vi.fn()
   fixture.tagsList = async () => ({ success: true, data: TAGS })
   fixture.listMenus = async () => ({ menus: [] })

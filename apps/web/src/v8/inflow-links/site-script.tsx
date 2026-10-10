@@ -66,7 +66,7 @@ export default function SiteScriptV8() {
   usePageTitle('サイトスクリプト')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '流入と計測', href: '/inflow-links' }])
   const role = useStaffRole()
-  const readonly = role !== null && !canManageRole(role)
+  const readonly = !canManageRole(role)
   const { selectedAccountId } = useAccount()
   const [pages, setPages] = useState<PageRow[]>([])
   const [summary, setSummary] = useState<TrackingSummary | null>(null)

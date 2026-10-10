@@ -9,6 +9,7 @@
  * （app/templates/list-v8.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import { runOptimistic } from '@/lib/undoable'
@@ -44,8 +45,7 @@ import { api, ApiError, type BroadcastAssetKind, type TemplateQuestion } from '@
 import { clampSearchQuery } from '@/lib/search-query'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { contentExcerpt } from '@/lib/broadcast-summary'
@@ -219,11 +219,10 @@ export default function TemplatesListV8() {
    * 作成・編集・公開・削除は API が owner/admin で閉じている。
    * それ以外の人には押せない形で出す（閲覧は残す）。
    */
-  const [localCanMutate] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
   /* 役割はサーバ（/api/staff/me）で確かめる。答えが来るまでは手元の値で決める。 */
   const staffRole = useStaffRole()
-  const canMutateTemplates = staffRole === null ? localCanMutate : canManageRole(staffRole)
+  const featureAccess = useFeatureAccess('templates')
+  const canMutateTemplates = featureAccess
   /* 1152 の板（`L7zA7C`）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
 

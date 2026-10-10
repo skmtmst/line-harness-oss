@@ -1,5 +1,7 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useStaffRole } from '@/lib/staff-role'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
@@ -546,7 +548,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [forms, setForms] = useState<Array<{ id: string; name: string }>>([])
   const [trackedLinks, setTrackedLinks] = useState<Array<{ id: string; name: string }>>([])
   const [otherMenus, setOtherMenus] = useState<RichMenuGroupListItem[]>([])
-  const [staffRole, setStaffRole] = useState<string | null>(null)
+  const staffRole = useStaffRole()
   const [loadError, setLoadError] = useState<unknown>(null)
   const [loadFailedKinds, setLoadFailedKinds] = useState<string[]>([])
 
@@ -569,7 +571,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
   const accountId = selectedAccount?.id ?? null
   const aggregateOnly = staffRole === 'staff' || staffRole === 'viewer'
-  const canOperate = staffRole === 'owner' || staffRole === 'admin'
+  const storeCanOperate = useFeatureAccess('richMenus')
+  const canOperate = host ? host.canOperate : storeCanOperate
 
   /* ---------- 署名（未保存の検知） ---------- */
 
@@ -656,10 +659,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       setForms(host.references.forms)
       setTrackedLinks([])
       setOtherMenus([])
-      setStaffRole(host.canOperate ? 'owner' : 'viewer')
       return
     }
-    const [folderRes, tagRes, templateRes, formRes, linkRes, menuRes, staffRes] =
+    const [folderRes, tagRes, templateRes, formRes, linkRes, menuRes] =
       await Promise.allSettled([
         api.folders.list('rich_menu'),
         api.tags.list(accountId ? { accountId } : undefined),
@@ -667,7 +669,6 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         accountId ? api.forms.list(accountId) : Promise.resolve({ success: true as const, data: [] }),
         api.trackedLinks.list(),
         accountId ? api.richMenuGroups.list(accountId) : Promise.resolve({ success: true as const, data: [] }),
-        api.staff.me(),
       ])
     const failed: string[] = []
     let firstError: unknown = null
@@ -696,7 +697,6 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     else noteFailure('計測リンク', linkRes)
     if (menuRes.status === 'fulfilled' && menuRes.value.success) setOtherMenus(menuRes.value.data)
     else noteFailure('メニュー一覧', menuRes)
-    if (staffRes.status === 'fulfilled' && staffRes.value.success) setStaffRole(staffRes.value.data.role)
     if (failed.length > 0) {
       const caught = firstError
       setLoadError(caught)

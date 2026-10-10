@@ -18,6 +18,8 @@
  * v7 の /booking/staff/shifts と同じ。テーマが v7 のときはこのファイルは
  * 読まれず、従来の見た目が出る。
  */
+import { useStaffRole } from '@/lib/staff-role'
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -33,7 +35,7 @@ import {
   type BookingStaff,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
+import { canViewFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
@@ -128,17 +130,15 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
   // N-411 本人勤務: staff ロールは自分に紐づく予約スタッフだけを対象にする。
   // 他人の staff_id を直指定しても Worker 側が 403 で拒否するが、
   // 画面側でも「見せない」に揃える。
-  const [isStaffRole] = useState(() =>
-    typeof window !== 'undefined' && window.localStorage.getItem('lh_staff_role') === 'staff')
+  const verifiedRole = useStaffRole()
+  const isStaffRole = verifiedRole === 'staff'
   const [ownStaffId, setOwnStaffId] = useState<string | null>(null)
-  const [canEditOwn] = useState(() =>
-    typeof window === 'undefined' ? true : canEditFeature('booking.staff.own'))
+  const canEditOwn = usePermissionAccess('booking.staff.own')
   /*
    * 「この日だけの休み」は例外日の口（booking.settings 権限）。
    * 権限が無い人には選ばせない（選んでも 403 で止まる）。
    */
-  const [canEditExceptions] = useState(() =>
-    typeof window === 'undefined' ? true : canEditFeature('booking.settings'))
+  const canEditExceptions = usePermissionAccess('booking.settings')
   const [timeZone, setTimeZone] = useState('Asia/Tokyo')
   const [storeExceptions, setStoreExceptions] = useState<Array<{ dateFrom: string; dateTo: string; kind: string }>>([])
   const [staffExceptions, setStaffExceptions] = useState<BookingException[]>([])
@@ -1367,6 +1367,7 @@ function TrashIcon() {
  * （動きは v7 の OwnShiftEntry と同じ。R579 の再試行も同じ。）
  */
 export function OwnShiftEntryV8() {
+  const verifiedRole = useStaffRole()
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [resolved, setResolved] = useState<'loading' | 'store' | 'missing' | 'error'>('loading')
@@ -1403,13 +1404,13 @@ export function OwnShiftEntryV8() {
         setResolved('error')
         return
       }
-      const canSeeStore = canViewFeature('/booking/bookings')
-        || canViewFeature('booking.settings')
-        || canViewFeature('/booking/menus')
+      const canSeeStore = canViewFeature('/booking/bookings', verifiedRole)
+        || canViewFeature('booking.settings', verifiedRole)
+        || canViewFeature('/booking/menus', verifiedRole)
       setResolved(canSeeStore ? 'store' : 'missing')
     })()
     return () => { cancelled = true }
-  }, [router, selectedAccountId, attempt])
+  }, [router, selectedAccountId, attempt, verifiedRole])
 
   // 店舗の受付枠を見られる権限がある人は、★V8 では予約設定の「受付枠」タブが同じ中身。
   useEffect(() => {

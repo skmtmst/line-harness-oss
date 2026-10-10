@@ -53,3 +53,5 @@ it('フォルダ名の未入力は欄で知らせ、そこに戻して作成し�
  expect(scroll).toHaveBeenCalledWith({ block: 'center' })
  scroll.mockRestore()
 })
+
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))

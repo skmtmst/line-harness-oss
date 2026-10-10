@@ -9,6 +9,7 @@
  *   - 結果の列はアカウントの合計（届いた人数・失敗したアカウント）
  * 1行＝1回の一括配信。行を押すと詳細（送った結果）へ。動きは BEHAVIOR.md。
  */
+import { useTenantWideAccess } from '@/lib/staff-role'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -39,7 +40,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { formatNumber } from '@/lib/format'
 import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { failedCount, jpDateTime, runBadge, sendTotals } from './model'
 import styles from '../broadcasts/list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
@@ -84,7 +85,7 @@ export default function HqBroadcastList() {
   const router = useRouter()
   usePageTitle('一括配信')
   const role = useStaffRole()
-  const canManage = role === null || canManageRole(role)
+  const canManage = useTenantWideAccess()
   const [runs, setRuns] = useState<HqBroadcastRun[] | null>(null)
   const [error, setError] = useState<unknown>(null)
   const [query, setQuery] = useState('')

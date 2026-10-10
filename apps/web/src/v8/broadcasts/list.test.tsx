@@ -68,6 +68,8 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
   return { ...actual, useStaffRole: () => role.current }
 })
 
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import BroadcastListV8 from './list'
 import { flushListUrlState } from '@/components/shared/list-url-state'
 
@@ -106,6 +108,7 @@ const base = {
 const rowB = { ...base, id: 'bc-2', title: '未購入者フォロー', messageContent: 'まだお買い物していない方へ', status: 'draft', displayStatus: 'draft', displayStatusLabel: '下書き', scheduledAt: null }
 
 beforeEach(() => {
+  forgetStaffIdentity()
   document.documentElement.dataset.theme = 'v8'
   role.current = 'owner'
   store.clear()
@@ -191,7 +194,7 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
 
   it('編集キーを持つ運用担当は作れる', async () => {
     role.current = 'staff'
-    window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['broadcast.definition.edit']))
+    rememberStaffIdentity({ role: 'staff', permissionKeys: ['/broadcasts', 'broadcast.definition.edit'] } as StaffMember)
     act(() => { root.render(<BroadcastListV8 />) })
     await flush()
     expect(host.textContent).not.toContain('閲覧のみで見ています')

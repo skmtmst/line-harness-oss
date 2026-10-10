@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Eye } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { readStaffIdentity } from '@/lib/staff-identity-state'
 import { useStaffRole } from '@/lib/staff-role'
 import {
   canExportAutomationRuns,
@@ -32,33 +33,27 @@ export const AUTOMATIONS_DESCRIPTION = '「〇〇したら △△する」を決
 export const READONLY_REASON = '閲覧のみのため、この操作はできません'
 
 function readPermissionKeys(): string[] {
-  try {
-    const raw = window.localStorage.getItem('lh_staff_permissions')
-    const parsed = raw ? JSON.parse(raw) : []
-    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : []
-  } catch {
-    return []
-  }
+  return readStaffIdentity()?.permissionKeys ?? []
 }
 
 /*
  * ルールを変えられるか。役割はサーバ（/api/staff/me）から読む（手元の保存値は書き換えられる）。
  * staff は権限キー `/automations` を持つときだけ変えられる（サーバの requireAutomationPermission と同じ条件）。
- * 役割が読めるまでは null（呼ぶ側は今までどおり操作を出す。最後の守りはサーバの 403）。
+ * 役割が読めるまでは false（操作を隠す。最後の守りはサーバの 403）。
  */
 export function useAutomationManage(): boolean | null {
   const role = useStaffRole()
-  if (role === null) return null
+  if (role === null) return false
   return canManageAutomationRole(role, typeof window === 'undefined' ? [] : readPermissionKeys())
 }
 
 /*
  * 動いた記録の操作（もう一度やる・取りやめる＝automation.run.retry、CSV＝automation.run.export）。
- * 役割はサーバから読む。読めるまでは null（今までどおり出す）。
+ * 役割はサーバから読む。読めるまでは 操作を隠す。
  */
 export function useAutomationRunManage(): { canOperate: boolean; canExport: boolean } | null {
   const role = useStaffRole()
-  if (role === null) return null
+  if (role === null) return { canOperate: false, canExport: false }
   const keys = typeof window === 'undefined' ? [] : readPermissionKeys()
   return { canOperate: canOperateAutomationRun(role, keys), canExport: canExportAutomationRuns(role, keys) }
 }

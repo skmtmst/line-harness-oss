@@ -7,12 +7,13 @@
  * 同じ口（POST /api/broadcast-message-assets）・同じ形の payload。違いは置き場と
  * 見せ方だけ（BEHAVIOR.md）。リッチメッセージは今の画面のまま（入口が渡す）。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { GripVertical, Plus, Send, X } from 'lucide-react'
 import type { Folder, MediaItem } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
@@ -113,7 +114,8 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   const meta = META[kind]
   const router = useRouter()
   const role = useStaffRole()
-  const canMutate = host ? !host.readOnly : role === null || canManageRole(role)
+  const featureAccess = useFeatureAccess('templates')
+  const canMutate = host ? !host.readOnly : featureAccess
   const { selectedAccountId, accounts } = useAccount()
   usePageTitle(host ? 'テンプレート' : meta.heading)
   const actionOptions = useActionOptions()

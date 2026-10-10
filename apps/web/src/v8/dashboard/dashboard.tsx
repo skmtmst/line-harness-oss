@@ -98,7 +98,7 @@ export default function DashboardV8() {
   const role = useStaffRole()
   const { refreshAccounts } = useAccount()
   /* 役割が読めるまでは出し、閲覧のみと分かったら隠す（サーバの 403 が最後の守り）。 */
-  const canManage = role === null || canManageRole(role)
+  const canManage = canManageRole(role)
   const canEditLayout = canEditDashboardLayout(role)
   /* 修正案 D-3：はじめにやること（今の「はじめの設定」の帯の場所に置き換える）。 */
   const start = useFirstSteps(d.selectedAccountId, role)
@@ -339,7 +339,7 @@ export default function DashboardV8() {
     return <><SectionHeader title="友だち数の推移" /><Unavailable section={data?.sections?.trend} onRetry={() => void d.load()} /></>
   }
 
-  const viewer = role !== null && !canManageRole(role)
+  const viewer = !canManageRole(role)
   /* 部品の中で自分のエラーを出すものは帯に重ねない。出し先の無いものだけ日本語の名前で帯に出す。 */
   const shownCardIds = new Set<string>([
     ...d.preferences.main.filter((item) => item.visible).map((item) => item.id),

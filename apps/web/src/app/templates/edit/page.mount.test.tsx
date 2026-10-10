@@ -178,6 +178,7 @@ async function fakeApi(input: string, init?: RequestInit): Promise<Response> {
 
   await held.get(path)?.promise
 
+  if (path === '/api/staff/me') return jsonResponse({ success: true, data: { role: 'owner', permissionKeys: [], accountScope: 'all' } })
   if (path === '/api/line-accounts') {
     return jsonResponse({ success: true, data: [
       lineAccount('account-a', 'A店'),

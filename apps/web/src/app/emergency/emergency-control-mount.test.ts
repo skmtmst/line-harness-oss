@@ -105,6 +105,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     ...actual,
     api: {
       ...actual.api,
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: 'owner' } }) },
       operations: {
         ...actual.api.operations,
         preview: (accountId: string | null) => {

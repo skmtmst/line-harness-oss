@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -196,6 +198,7 @@ let FriendDetailPage: typeof import('./page').default
 const storage = new Map<string, string>()
 
 function setRole(role: string | null, permissions: string[] = [], viewPermissions: string[] = []) {
+  forgetStaffIdentity(); if (role) rememberStaffIdentity({ role, permissionKeys: permissions, permissionViewKeys: viewPermissions } as StaffMember)
   if (role === null) storage.delete('lh_staff_role')
   else storage.set('lh_staff_role', role)
   storage.set('lh_staff_permissions', JSON.stringify(permissions))
@@ -203,6 +206,7 @@ function setRole(role: string | null, permissions: string[] = [], viewPermission
 }
 
 beforeEach(async () => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   net.calls.length = 0
   state.fieldItems = [fixtures.textField]
