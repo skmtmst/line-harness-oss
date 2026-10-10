@@ -1,3 +1,4 @@
+import { useUrlStep } from '../lib/use-url-step.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { VISIT_STAMP_DEFAULT_COLOR, visitStampDarkInk } from '@line-crm/shared';
 import stampStyles from './VisitStamps.module.css';
@@ -127,7 +128,7 @@ export default function VisitStamps() {
   const [shopName, setShopName] = useState('');
   const [entry, setEntry] = useState<Entry | null>(null);
   const [state, setState] = useState<'loading' | 'error' | 'empty' | 'ready'>('loading');
-  const [view, setView] = useState<View>('card');
+  const [view, setView] = useUrlStep<View>('card');
   const [picked, setPicked] = useState<string>('');
   const [redemption, setRedemption] = useState<(VisitStampRedemption & { shownAt: Date }) | null>(null);
   const [used, setUsed] = useState<{ at: Date; balance: number; staffName: string } | null>(null);

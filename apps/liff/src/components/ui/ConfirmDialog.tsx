@@ -33,8 +33,12 @@ export default function ConfirmDialog({
   designNode,
   onConfirm,
   onCancel,
+  surface = 'dialog',
+  footer,
 }: {
   open: boolean;
+  surface?: 'dialog' | 'sheet';
+  footer?: ReactNode;
   title: string;
   description: string;
   confirmLabel?: string;
@@ -73,7 +77,7 @@ export default function ConfirmDialog({
     if (!open) return;
     openerRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    cancelRef.current?.focus();
+    (cancelRef.current ?? panelRef.current?.querySelector<HTMLElement>('button:not([disabled]), [href]') ?? panelRef.current)?.focus();
     return () => {
       const opener = openerRef.current;
       openerRef.current = null;
@@ -109,7 +113,7 @@ export default function ConfirmDialog({
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-6"
+      className={surface === 'sheet' ? "fixed inset-0 z-50 flex items-end justify-center bg-ink/60" : "fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-6"}
       role="presentation"
       onMouseDown={(event) => {
         if (!busy && event.target === event.currentTarget) onCancel();
@@ -117,13 +121,15 @@ export default function ConfirmDialog({
     >
       <div
         ref={panelRef}
+        tabIndex={-1}
         data-design-node={designNode}
         role={destructive ? 'alertdialog' : 'dialog'}
         aria-modal="true"
         aria-label={title}
         onKeyDown={trapTab}
-        className="w-full max-w-xs rounded-xl border border-hairline bg-canvas p-5"
+        className={surface === 'sheet' ? "max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-hairline bg-canvas p-5 pb-[max(20px,env(safe-area-inset-bottom))]" : "w-full max-w-xs rounded-xl border border-hairline bg-canvas p-5"}
       >
+        {surface === 'sheet' ? <div aria-hidden="true" className="mx-auto mb-4 h-1 w-10 rounded-full bg-hairline" /> : null}
         <div className="flex items-start gap-2">
           {destructive ? (
             <span className="shrink-0 text-danger" aria-hidden="true">
@@ -143,7 +149,7 @@ export default function ConfirmDialog({
             {error}
           </p>
         )}
-        <div className="mt-4 flex gap-2">
+        {footer ?? <div className="mt-4 flex gap-2">
           <Button variant="secondary" ref={cancelRef} onClick={onCancel} disabled={busy}>
             {cancelLabel}
           </Button>
@@ -152,7 +158,7 @@ export default function ConfirmDialog({
               {busy ? '処理中…' : confirmLabel}
             </Button>
           ) : null}
-        </div>
+        </div>}
       </div>
     </div>
   );
