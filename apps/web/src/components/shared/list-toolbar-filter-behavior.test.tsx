@@ -6,10 +6,10 @@ import FilterChip from './filter-chip'
 import { ResponsiveFilterChips } from './list-toolbar'
 
 afterEach(cleanup)
-function Harness({ multiple = false }: { multiple?: boolean }) {
+function Harness({ multiple = false, withAll = false }: { multiple?: boolean; withAll?: boolean }) {
   const [chosen, setChosen] = useState<string[]>(multiple ? ['有効', '停止中'] : [])
   return <><output aria-label="適用する条件">{chosen.join(',') || 'all'}</output><ResponsiveFilterChips>
-    {['有効', '停止中'].map(name => <FilterChip key={name} selected={chosen.includes(name)} onChange={checked => setChosen(old => checked ? multiple ? [...old, name] : [name] : old.filter(value => value !== name))}>{name}</FilterChip>)}
+    {(withAll ? ['すべて', '有効', '停止中'] : ['有効', '停止中']).map(name => <FilterChip key={name} selected={chosen.includes(name)} onChange={checked => setChosen(old => checked ? multiple ? [...old, name] : [name] : old.filter(value => value !== name))}>{name}</FilterChip>)}
   </ResponsiveFilterChips></>
 }
 function choose(name: RegExp) {
@@ -25,6 +25,11 @@ describe('狭い欄の状態の選択', () => {
     expect(screen.getByLabelText('適用する条件').textContent).toBe('有効')
     choose(/すべて/)
     expect(screen.getByLabelText('適用する条件').textContent).toBe('all')
+  })
+  it('元の札にすべてがあるとき、同じ選択肢を増やさない', () => {
+    render(<Harness withAll />)
+    fireEvent.click(screen.getByRole('button', { name: '状態' }))
+    expect(screen.getAllByRole('option', { name: /すべて/ })).toHaveLength(1)
   })
   it('複数選んだ条件を隠さず、1つ外してもほかの条件は残す', () => {
     render(<Harness multiple />)

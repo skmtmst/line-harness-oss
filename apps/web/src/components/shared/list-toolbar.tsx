@@ -159,11 +159,12 @@ export function ResponsiveFilterChips({ children, label = '状態' }: { children
   const chips = Children.toArray(children).filter(isValidElement<React.ComponentProps<typeof FilterChip>>)
   const text = (node: ReactNode): string => Children.toArray(node).map(child => isValidElement<{ children?: ReactNode }>(child) ? text(child.props.children) : String(child)).join('')
   const selected = chips.map((child,index) => child.props.selected ? index : -1).filter(index => index >= 0)
-  const current = selected.length > 1 ? 'multiple' : selected.length === 1 ? String(selected[0]) : 'all'
+  const allIndex = chips.findIndex(child => /^すべて(?:$|\s|[\d（(])/.test(text(child.props.children)))
+  const current = selected.length > 1 ? 'multiple' : selected.length === 1 ? String(selected[0]) : allIndex >= 0 ? String(allIndex) : 'all'
   return <span className={styles.filterChoices}>
     <span className={styles.filterWide}>{children}</span>
     <span className={styles.filterNarrow}><Select label={label} aria-label={label} value={current}
-      options={[{ value: 'all', label: 'すべて', disabled: selected.length > 1 }, ...(selected.length > 1 ? [{ value: 'multiple', label: `${selected.length}件の条件`, disabled: true }] : []), ...chips.map((child,index) => ({ value: String(index), label: text(child.props.children), disabled: child.props.disabled }))]}
+      options={[...(allIndex >= 0 ? [] : [{ value: 'all', label: 'すべて', disabled: selected.length > 1 }]), ...(selected.length > 1 ? [{ value: 'multiple', label: `${selected.length}件の条件`, disabled: true }] : []), ...chips.map((child,index) => ({ value: String(index), label: text(child.props.children), disabled: child.props.disabled }))]}
       onChange={next => { if (next === 'all') { if (selected.length === 1) chips[selected[0]].props.onChange(false) } else { const chip = chips[Number(next)]; chip?.props.onChange(!chip.props.selected) } }} /></span>
   </span>
 }

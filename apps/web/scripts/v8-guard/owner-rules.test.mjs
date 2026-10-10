@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -84,4 +84,17 @@ test('新規の故障をCLIが非0で止める。理由なしの除外は使え�
   const allowances=record([f],'/friends',1152,'固定Penと照合済みの既存箇所')
   assert.equal(assess([{...f,measure:{deficit:9}}],'/friends',1152,allowances).failures.length,1)
   assert.throws(()=>assess([f],'/friends',1152,[{...allowances[0],reason:''}]))
+})
+
+test('一覧の判定を足しても、既存GridTableの幅による畳み方を失わない', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const css = readFileSync(new URL('../../src/components/shared/data-table.module.css', import.meta.url), 'utf8')
+    await page.setContent(shell(`<style>${css}[data-grid-probe]{color:rgb(9,9,9)}@container shared-grid-table (max-width:800px){[data-grid-probe]{color:rgb(1,2,3)}}</style><div class="frame" data-shared-part="list-table" data-grid-table style="width:500px"><span data-grid-probe>補助列</span></div>`))
+    await page.evaluate(() => { document.documentElement.dataset.theme = 'v8' })
+    assert.equal(await page.locator('[data-grid-probe]').evaluate(el => getComputedStyle(el).color), 'rgb(1, 2, 3)')
+    await page.locator('.frame').evaluate(el => { el.style.width = '900px' })
+    assert.equal(await page.locator('[data-grid-probe]').evaluate(el => getComputedStyle(el).color), 'rgb(9, 9, 9)')
+  } finally { await browser.close() }
 })
