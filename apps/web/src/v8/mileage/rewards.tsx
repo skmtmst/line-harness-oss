@@ -1,5 +1,6 @@
 'use client'
 
+import { createAccountTracker, createMileageRewardsFetchGuards, createSingleFlightLock } from './redemption-request-guard'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -173,12 +174,25 @@ export default function RewardsTab() {
   const [preset, setPreset] = useState('default')
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [page, setPage] = useListUrlValue('page', 1)
-  const requestRef = useRef(0)
+  const [fetchGuards] = useState(createMileageRewardsFetchGuards)
+  const { overview: overviewGuard, redemptions: redemptionsGuard } = fetchGuards
+  const [accountTracker] = useState(createAccountTracker)
+  const [retryLock] = useState(createSingleFlightLock)
+  const redemptionsPageRef = useRef(1)
+  useEffect(() => { redemptionsPageRef.current = redemptionsPage }, [redemptionsPage])
+  useEffect(() => {
+    accountTracker.track(accountId)
+    retryLock.reset()
+    setRetryingId(null)
+    setRetryError('')
+    setRetryNotice('')
+    setRedemptionsPage(1)
+  }, [accountId, accountTracker, retryLock])
 
   const load = useCallback(async () => {
-    const request = ++requestRef.current
+    const requestId = overviewGuard.issue()
     if (!accountId) {
-      if (request !== requestRef.current) return
+      if (!overviewGuard.isCurrent(requestId)) return
       setRewards([])
       setStatus('ready')
       return
@@ -186,7 +200,7 @@ export default function RewardsTab() {
     setStatus('loading')
     try {
       const response = await api.mileage.rewards(accountId)
-      if (request !== requestRef.current) return
+      if (!overviewGuard.isCurrent(requestId)) return
       if (!response.success) throw new Error(response.error)
       if (!Array.isArray(response.data?.rewards)) throw new Error('malformed')
       const list = response.data.rewards
@@ -202,13 +216,13 @@ export default function RewardsTab() {
       setLoadedAccountId(accountId)
       setStatus('ready')
     } catch (reason) {
-      if (request !== requestRef.current) return
+      if (!overviewGuard.isCurrent(requestId)) return
       saveErrors.capture(reason)
       setRewards([]);
 
       setStatus(reason instanceof Error && reason.message === 'forbidden' ? 'forbidden' : 'error')
     }
-  }, [accountId, saveErrors])
+  }, [accountId, saveErrors, overviewGuard])
 
   useEffect(() => {
     if (accountLoading) return
@@ -216,7 +230,9 @@ export default function RewardsTab() {
   }, [accountLoading, load])
 
   const loadFailed = useCallback(async (pageNumber: number) => {
+    const requestId = redemptionsGuard.issue()
     if (!accountId) {
+      if (!redemptionsGuard.isCurrent(requestId)) return
       setFailed([])
       setRedemptionsVisible(false)
       setRedemptionsLoad('loading')
@@ -230,6 +246,7 @@ export default function RewardsTab() {
         `/api/mileage/redemptions?accountId=${encodeURIComponent(accountId)}`
         + `&limit=${REDEMPTIONS_PAGE_SIZE}&offset=${offset}`,
       )
+      if (!redemptionsGuard.isCurrent(requestId)) return
       if (!response.success) throw new Error(response.error)
       if (!Array.isArray(response.data?.items)) throw new Error('malformed')
       setFailed(response.data.items.filter(
@@ -243,6 +260,7 @@ export default function RewardsTab() {
       setRedemptionsVisible(true)
       setRedemptionsLoad('ready')
     } catch (reason) {
+      if (!redemptionsGuard.isCurrent(requestId)) return
       saveErrors.capture(reason)
       setFailed([])
       setRedemptionsVisible(true)
@@ -251,7 +269,7 @@ export default function RewardsTab() {
       const forbidden = reason instanceof ApiError && (reason.status === 403 || reason.code === 'forbidden')
       setRedemptionsLoad(forbidden ? 'forbidden' : 'error')
     }
-  }, [accountId, saveErrors])
+  }, [accountId, saveErrors, redemptionsGuard])
 
   useEffect(() => {
     void loadFailed(redemptionsPage)
@@ -267,14 +285,23 @@ export default function RewardsTab() {
 
   const retryRedemption = async (item: FailedRedemption) => {
     if (!accountId || retryingId) return
+    if (!retryLock.acquire(item.id)) return
+    const startedAccountId = accountId
+    const operation = accountTracker.track(startedAccountId)
     setRetryingId(item.id)
     setRetryError('')
     setRetryNotice('')
+    const reloadLists = async () => {
+      await loadFailed(redemptionsPageRef.current)
+      if (!accountTracker.isCurrent(operation)) return
+      await load()
+    }
     try {
       const response = await fetchApi<{ success: boolean; data?: { message?: string | null; redemption?: { status?: string } }; error?: string }>(
         `/api/mileage/redemptions/${encodeURIComponent(item.id)}/retry-fulfillment`,
-        { method: 'POST', body: JSON.stringify({ accountId }) },
+        { method: 'POST', body: JSON.stringify({ accountId: startedAccountId }) },
       )
+      if (!accountTracker.isCurrent(operation)) return
       const redemptionStatus = response.data?.redemption?.status
       const serverMessage = typeof response.data?.message === 'string' && response.data.message.trim()
         ? response.data.message
@@ -286,16 +313,17 @@ export default function RewardsTab() {
       } else if (!response.success) {
         throw new Error(response.error)
       }
-      await loadFailed(redemptionsPage)
-      await load()
+      await reloadLists()
     } catch (saveFailure) {
+      if (!accountTracker.isCurrent(operation)) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setRetryError('やり直せませんでした。時間をおいてもう一度お試しください。') }
-      await loadFailed(redemptionsPage)
+      await loadFailed(redemptionsPageRef.current)
     } finally {
-      setRetryingId(null)
+      retryLock.release(item.id)
+      if (accountTracker.isCurrent(operation)) setRetryingId(null)
     }
   }
 
@@ -881,6 +909,7 @@ export default function RewardsTab() {
       pagination={pager}
     >
       {body}
+      {!failedSection && retryNotice ? <Notice tone="success" message={retryNotice} /> : null}
       {failedSection}
     </MileageFrame></SaveErrorScope>
   )

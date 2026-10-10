@@ -14,8 +14,11 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import MileageRewardsTab from './mileage-rewards-tab'
+import MileageRewardsTab from '@/v8/mileage/rewards'
 
+let currentAccount: string | null = null
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: currentAccount, loading: false }) }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('next/link', () => ({ default: () => null }))
 
 const overview = {
@@ -132,6 +135,8 @@ function installWebStorage(): void {
 
 beforeEach(() => {
   installWebStorage()
+  window.history.replaceState(null, '', '/mileage?tab=rewards')
+  window.dispatchEvent(new Event('popstate'))
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -145,8 +150,9 @@ afterEach(async () => {
 })
 
 async function render(accountId: string | null) {
+  currentAccount = accountId
   await act(async () => {
-    root.render(<MileageRewardsTab accountId={accountId} />)
+    root.render(<MileageRewardsTab />)
   })
   // 使い道と交換の2本の取得が落ち着くまで回す。
   await act(async () => { await Promise.resolve() })
@@ -168,7 +174,7 @@ describe('届かなかった交換の欄(本物のReact)', () => {
     const text = section()?.textContent ?? ''
     expect(text).toContain('500円引き')
     expect(text).toContain('特典を渡せませんでした')
-    expect(text).toContain('3回')
+    expect(text).toContain('3 回')
     // 最終日時は日本時間で出す。UTCの01:02は10:02。
     expect(text).toContain('9月9日（水）10:02')
     expect(text).toContain('もう一度届ける')
@@ -306,6 +312,46 @@ describe('届かなかった交換の欄(本物のReact)', () => {
     expect(net.lists()).toHaveLength(0)
   })
 
+  it('前の店の遅い一覧の返事が、切り替えた店の交換を上書きしない', async () => {
+    let finish!: (response: Response) => void
+    const delayed = new Promise<Response>((done) => { finish = done })
+    stubFetch({
+      itemsByAccount: { 'account-2': [failedRow({ rewardName: 'Bの交換' })] },
+      onList: (count) => count === 1 ? delayed : null,
+    })
+    await render('account-1')
+    await render('account-2')
+    expect(section()?.textContent).toContain('Bの交換')
+    await act(async () => {
+      finish(new Response(JSON.stringify({ success: true, data: { items: [failedRow({ rewardName: 'Aの古い交換' })], pagination: { total: 1, limit: 20, offset: 0 } } }), { status: 200 }))
+      await Promise.resolve()
+    })
+    expect(section()?.textContent).toContain('Bの交換')
+    expect(section()?.textContent).not.toContain('Aの古い交換')
+  })
+
+  it.each([200, 500])('前の店の再送のHTTP %iが後着しても、その店を読み直したり切替後に失敗を出したりしない', async (status) => {
+    let finish!: (response: Response) => void
+    const delayed = new Promise<Response>((done) => { finish = done })
+    const net = stubFetch({
+      itemsByAccount: { 'account-1': [failedRow({ rewardName: 'Aの交換' })], 'account-2': [failedRow({ rewardName: 'Bの交換' })] },
+      onRetry: () => delayed,
+    })
+    await render('account-1')
+    await act(async () => { retryButtons()[0].click() })
+    await render('account-2')
+    const listCount = net.lists().length
+    expect(section()?.textContent).toContain('Bの交換')
+    expect(retryButtons().every((button) => !button.disabled)).toBe(true)
+    await act(async () => {
+      finish(new Response(JSON.stringify({ success: status === 200, data: {}, error: '古い失敗' }), { status }))
+      await Promise.resolve()
+    })
+    expect(net.lists()).toHaveLength(listCount)
+    expect(section()?.textContent).toContain('Bの交換')
+    expect(container.textContent).not.toContain('やり直せませんでした')
+  })
+
   it('25件あれば残りをページ送りで出せる', async () => {
     const items = Array.from({ length: 25 }, (_, index) => failedRow({
       id: `redemption-${index + 1}`,
@@ -320,7 +366,7 @@ describe('届かなかった交換の欄(本物のReact)', () => {
     const first = section()?.textContent ?? ''
     expect(first).toContain('最初の交換')
     expect(first).not.toContain('21件目の交換')
-    expect(first).toContain('25つ中')
+    expect(first).toContain('要対応の交換 25 件')
     expect(first).not.toContain('すべて表示')
 
     // 2ページ目へ進むと残りが出る。
@@ -331,7 +377,7 @@ describe('届かなかった交換の欄(本物のReact)', () => {
     await act(async () => { await Promise.resolve() })
     const second = section()?.textContent ?? ''
     expect(second).toContain('21件目の交換')
-    expect(second).toContain('25つ中')
+    expect(second).toContain('要対応の交換 25 件')
   })
 
   it('読み込み失敗は0件と区別し、再読み込みできる', async () => {
