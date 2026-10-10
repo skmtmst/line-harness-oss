@@ -1,5 +1,5 @@
 'use client'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { CircleAlert, Info, RotateCw, SearchX } from 'lucide-react'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'

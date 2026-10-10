@@ -8,7 +8,7 @@ vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentP
 afterEach(cleanup)
 test('名前以外を押しても同じ詳細リンクを開き、チェック操作は移動しない', () => {
   const navigate = vi.fn(), toggle = vi.fn()
-  render(<table><tbody><Tr><Td><a href="/detail?id=1" onClick={e => { e.preventDefault(); navigate() }}>名前</a></Td><Td>ほかの欄</Td><Td><button onClick={toggle}>選ぶ</button></Td></Tr></tbody></table>)
+  render(<table><tbody><Tr><Td><a data-row-link href="/detail?id=1" onClick={e => { e.preventDefault(); navigate() }}>名前</a></Td><Td>ほかの欄</Td><Td><button onClick={toggle}>選ぶ</button></Td></Tr></tbody></table>)
   fireEvent.click(screen.getByText('ほかの欄'))
   expect(navigate).toHaveBeenCalledTimes(1)
   fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))

@@ -1,11 +1,13 @@
 'use client'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
+import { RowNameLink } from '@/components/shared/table'
 import { useFolderMove } from '@/components/shared/use-folder-move'
 import { moveEventToFolder } from '@/lib/move-to-folder'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Bookmark, CalendarClock, CalendarX, Eye, Hourglass, Plus, TrendingDown, TriangleAlert, Users } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, eventsApi, fetchApi, type EventListItem, type EventListSummary } from '@/lib/api'
@@ -29,7 +31,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shar
 import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import DetailPanel from '@/components/shared/detail-panel'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import InlineEdit from '@/components/shared/inline-edit'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -128,7 +130,7 @@ export default function EventsListV8() {
   const [foldersError, setFoldersError] = useState(false)
   const [pendingTotal, setPendingTotal] = useState<number | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [activeId, setActiveId] = useDetailPanelUrl('event')
   const [deleteTarget, setDeleteTarget] = useState<EventListItem | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -307,7 +309,7 @@ export default function EventsListV8() {
 
   const activeIndex = items.findIndex((e) => e.id === activeId)
   const active = activeIndex >= 0 ? items[activeIndex] : null
-  const openDetail = (id: string) => withViewTransition(() => setActiveId(id))
+  const openDetail = (id: string) => withViewTransition(() => setActiveId(activeId === id ? null : id))
   const closeDetail = () => withViewTransition(() => setActiveId(null))
   const goDetail = (direction: -1 | 1) => {
     const next = items[activeIndex + direction]
@@ -530,18 +532,18 @@ export default function EventsListV8() {
               const low = state === 'open' && isLowApplication(e)
               const when = whenText(e.next_slot_starts_at)
               return (
-                <Tr key={e.id} data-row-id={e.id} selected={highlightedId === e.id}>
+                <Tr key={e.id} data-row-id={e.id} selected={highlightedId === e.id} detailKey="event" onOpen={() => openDetail(e.id)}>
                   <NameCell name={(
                       <ContextMenu label={`「${e.name}」の操作`} items={toContextMenuItems(menuItems)}>
                         <>{folderMove.checkbox(e)}
-                          <Link
+                          <RowNameLink
                             href={`/events/edit?id=${encodeURIComponent(e.id)}`}
                             title={`${e.name}の詳細を見る`}
                             aria-label={`「${e.name}」の詳細を見る`}
                             className={styles.nameButton}
                           >
                             {e.name}
-                          </Link>
+                          </RowNameLink>
                         </>
                       </ContextMenu>
                     )} folder={folderDotOf(e.folderId)}

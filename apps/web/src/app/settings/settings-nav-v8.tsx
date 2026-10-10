@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, type ReactNode } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { usePathname } from 'next/navigation'
 import { api } from '@/lib/api'
 import { canEditTable } from './manual-links/manual-link-view'

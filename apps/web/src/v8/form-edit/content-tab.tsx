@@ -3,7 +3,7 @@ import Toggle from '@/components/shared/toggle';
 
 import { Field } from '@/components/shared/form-controls'
 import { useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import {
   AlignLeft,
   CalendarCheck,

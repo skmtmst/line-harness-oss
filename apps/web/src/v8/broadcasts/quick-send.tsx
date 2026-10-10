@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { ListOrdered, Send, Users } from 'lucide-react'
 import type { Tag } from '@line-crm/shared'
 import { api, type BroadcastApprovalCandidate } from '@/lib/api'

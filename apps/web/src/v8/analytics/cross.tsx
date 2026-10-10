@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Grid2x2, HelpCircle, Send, Square, Users } from 'lucide-react'
 import type { FriendField } from '@line-crm/shared'
 import KpiBand from '@/components/shared/kpi-band'

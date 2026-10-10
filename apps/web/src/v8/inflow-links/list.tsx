@@ -1,25 +1,29 @@
 'use client'
 
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar'
-import { useListUrlValue } from '@/components/shared/list-url-state'
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+
+import { RowNameLink } from '@/components/shared/table';
+
+import { useListUrlValue } from '@/components/shared/list-url-state';
 import CopyTextButton from '@/components/shared/copy-text-button'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { Bookmark, CircleAlert, Code, Inbox, Link2, Megaphone, Plus, UserPlus, Users } from 'lucide-react'
-import type { ApiResponse, EntryRoute, EntryRouteGenre, Scenario, Tag, TrafficPool } from '@line-crm/shared'
-import { ApiError, api, fetchApi } from '@/lib/api'
-import { formatNumber } from '@/lib/format'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { canEditFeature } from '@/lib/staff-capability'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { useFeatureVisibility } from '@/lib/use-feature-visibility'
-import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
-import type { FeatureKey } from '@/lib/feature-settings'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { ListPage, ListPagePagination } from '@/components/templates'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { Bookmark, CircleAlert, Code, Inbox, Link2, Megaphone, Plus, UserPlus, Users } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { Eye } from 'lucide-react';
+import type { ApiResponse, EntryRoute, EntryRouteGenre, Scenario, Tag, TrafficPool } from '@line-crm/shared';
+import { ApiError, api, fetchApi } from '@/lib/api';
+import { formatNumber } from '@/lib/format';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import { canEditFeature } from '@/lib/staff-capability';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { useFeatureVisibility } from '@/lib/use-feature-visibility';
+import { isPoolsFeatureAvailable } from '@/lib/pools-availability';
+import type { FeatureKey } from '@/lib/feature-settings';
+import { useAccount } from '@/contexts/account-context';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { ListPage, ListPagePagination } from '@/components/templates';
 import SearchField from '@/components/shared/search-field'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
@@ -31,26 +35,26 @@ import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
-import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
-import { FolderDotName } from '@/components/shared/folder-dot'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
+import { FolderDotName } from '@/components/shared/folder-dot';
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu } from '@/components/shared/row-actions';
 import BulkBar from '@/components/shared/bulk-bar'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
-import { loadFailureCopy, permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { notifyToast } from '@/components/shared/toast'
+import { loadFailureCopy, permissionDeniedMessage } from '@/components/shared/api-error-message';
+import { notifyToast } from '@/components/shared/toast';
 import EditRouteDialog from './edit-route-dialog'
 import GenreDialog from './genre-dialog'
-import BulkDialog, { type BulkRouteAction } from './bulk-dialog'
+import BulkDialog, { type BulkRouteAction } from './bulk-dialog';
 import StatusBadge from '@/components/shared/status-badge'
-import QrDialog, { referralUrl, type QrRoute } from './qr-dialog'
-import { becameLines, buildRows, formatLatest, isRefSummaryData, isUnconfigured, matchesFilter, routeStatus, shouldShowRow, sortRows, type RefSummaryData, type RouteFilter, type RouteRow, type RouteSort, type TrackedLinkRow } from './rows'
+import QrDialog, { referralUrl, type QrRoute } from './qr-dialog';
+import { becameLines, buildRows, formatLatest, isRefSummaryData, isUnconfigured, matchesFilter, routeStatus, shouldShowRow, sortRows, type RefSummaryData, type RouteFilter, type RouteRow, type RouteSort, type TrackedLinkRow } from './rows';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
@@ -698,9 +702,9 @@ export default function InflowListV8({
                 const menuItems = rowMenuItems(r)
                 const menuLabel = `「${r.name}」の操作`
                 const nameNode = r.source === 'entry_route' && r.entryRouteId ? (
-                  <Link href={`/inflow-links/detail?id=${r.entryRouteId}`} className={styles.nameLink} >
+                  <RowNameLink href={`/inflow-links/detail?id=${r.entryRouteId}`} className={styles.nameLink} >
                     <TruncatedText value={String(r.name ?? '')} />
-                  </Link>
+                  </RowNameLink>
                 ) : (
                   <span className={styles.nameText} ><TruncatedText value={String(r.name ?? '')} /></span>
                 )

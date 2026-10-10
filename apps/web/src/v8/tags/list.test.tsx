@@ -57,6 +57,7 @@ async function render(node: React.ReactElement) {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/tags')
   role.value = 'owner'
   narrow.value = false
   replaceMock.mockReset()

@@ -1,27 +1,28 @@
 'use client'
 import ReservationBoard from '@/components/shared/reservation-board'
-import {allBoardPages,reservationBoardApi} from '@/lib/api-reservation-board'
-import {useAccount} from '@/contexts/account-context'
-import {dayRange,toYmd} from '../reservations/format'
-import {seatBoardEntry,type RestaurantFloor,type ReservationAxis} from '@line-crm/shared'
+import { allBoardPages, reservationBoardApi } from '@/lib/api-reservation-board';
+import { useAccount } from '@/contexts/account-context';
+import { dayRange, toYmd } from '../reservations/format';
+import { seatBoardEntry, type RestaurantFloor, type ReservationAxis } from '@line-crm/shared';
 
-import { FolderDotName } from '@/components/shared/folder-dot'
-import { formatDate as polishFormatDate } from '@/lib/format'
-import { useRouter } from 'next/navigation'
-import { Check,ArrowRight } from 'lucide-react'
+import { FolderDotName } from '@/components/shared/folder-dot';
+import { formatDate as polishFormatDate } from '@/lib/format';
+import { Check, ArrowRight } from 'lucide-react';
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import SectionHeader from '@/components/shared/section-header'
 import StatusBadge from '@/components/shared/status-badge'
-import { RowActions } from '@/components/shared/row-actions'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import {useEffect,useState} from 'react'
+import { RowActions } from '@/components/shared/row-actions';
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table';
+import { useEffect, useState } from 'react';
 import Card from '@/components/shared/card'
-import type { RestaurantReservation,RestaurantTable } from '@/lib/restaurant-test-api'
-import { pad2 } from '../front-desk/slots'
-import { isWalkIn } from '../front-desk/walk-in'
-import { sourceName } from '../reservations/format'
-import { canMarkVisited, visitState } from './summarize'
+import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api';
+import { pad2 } from '../front-desk/slots';
+import { isWalkIn } from '../front-desk/walk-in';
+import { sourceName } from '../reservations/format';
+import { canMarkVisited, visitState } from './summarize';
 import styles from './dashboard.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 

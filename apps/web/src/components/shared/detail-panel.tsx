@@ -1,5 +1,9 @@
 'use client'
 
+import { useContext } from 'react'
+import { ListNavigationAccount } from './list-navigation'
+import { flushListUrlState, notifyListLocation, useListLocation, useOnAccountSwitch } from './list-url-state'
+
 import { createPortal } from 'react-dom'
 import React, { useCallback, useEffect, useId, useRef, type ReactNode } from 'react'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
@@ -149,28 +153,34 @@ export default function DetailPanel({
  * `?key=id` を読み、変えると置き換える（履歴は増やさない）。
  * 戻る・進むでは `popstate` で追う。サーバ描画では読まない。
  */
-export function useDetailPanelUrl(key: string): [string | null, (id: string | null) => void] {
+export function useDetailPanelUrl(key: string): [string | null, React.Dispatch<React.SetStateAction<string | null>>] {
   const read = useCallback((): string | null => {
-    if (typeof window === 'undefined') return null
+    if (typeof window === 'undefined' || !window.location) return null
     return new URLSearchParams(window.location.search).get(key)
   }, [key])
+  const location = useListLocation()
   const [current, setCurrent] = React.useState<string | null>(null)
   useEffect(() => {
     setCurrent(read())
     const onPopState = () => setCurrent(read())
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [read])
+  }, [read, location])
   const change = useCallback(
-    (id: string | null) => {
-      if (typeof window === 'undefined') return
+    (value: React.SetStateAction<string | null>) => {
+      if (typeof window === 'undefined' || !window.location?.href) return
+      flushListUrlState()
       const url = new URL(window.location.href)
+      const id = typeof value === 'function' ? value(url.searchParams.get(key)) : value
       if (id === null) url.searchParams.delete(key)
       else url.searchParams.set(key, id)
       window.history.replaceState(window.history.state, '', url)
+      notifyListLocation()
       setCurrent(id)
     },
     [key],
   )
+  const account = useContext(ListNavigationAccount)
+  useOnAccountSwitch(account, () => change(null))
   return [current, change]
 }

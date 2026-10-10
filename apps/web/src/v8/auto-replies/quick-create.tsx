@@ -1,6 +1,6 @@
 'use client'
 import { useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { HelpCircle, ListOrdered, Send, X } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'

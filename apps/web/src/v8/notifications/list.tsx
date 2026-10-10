@@ -7,10 +7,11 @@
  * 今の画面（app/notifications/page.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { CheckCheck, Sparkles, TriangleAlert } from 'lucide-react'
 import type { NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
 import { api } from '@/lib/api'

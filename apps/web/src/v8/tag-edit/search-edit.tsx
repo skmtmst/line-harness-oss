@@ -1,8 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ArrowLeft, Check, Copy, Plus, RefreshCw, TriangleAlert, Users, X } from 'lucide-react'
 import { isSavedSearchOpAllowed, isSavedSearchValueOptionalOp } from '@line-crm/shared'
 import type { FriendField, SavedSearch, SavedSearchCondition, SavedSearchConditionKind, SavedSearchConditions, Scenario, SupportMark, Tag } from '@line-crm/shared'

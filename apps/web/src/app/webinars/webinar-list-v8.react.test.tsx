@@ -89,6 +89,7 @@ const json = (data: unknown, status = 200) => new Response(
 let fetchCalls: string[] = []
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/webinars')
   listItems = [webinar()]
   staffRole = 'admin'
   fetchCalls = []
@@ -177,19 +178,19 @@ test('v8 の閲覧のみ（jiNg0）は作る・編集を出さず、閲覧のみ
 
 /* V8「サクサク感」C①・D・E：行→詳細パネル・右クリック・つながる移り変わり。
  * 共通パネルは最上層へ描画されるため、パネル内の操作は文書全体から探す。 */
-function detailButton(title: string): HTMLButtonElement {
-  const found = [...host.querySelectorAll('button')].find(
+function detailButton(title: string): HTMLAnchorElement {
+  const found = [...host.querySelectorAll('a')].find(
     (button) => button.getAttribute('aria-label') === `「${title}」の詳細を見る`,
   )
   if (!found) throw new Error(`detail button not found: ${title}`)
-  return found as HTMLButtonElement
+  return found as HTMLAnchorElement
 }
 
 test('v8 で行を押すと右の詳細パネルが開き↑↓で次の行へ移る', async () => {
   listItems = [webinar(), webinar({ id: 'webinar-2', title: '2つ目のセミナー', slug: 'second' })]
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
-  await act(async () => { detailButton('NEN活用スタートセミナー').click() })
+  await act(async () => { (detailButton('NEN活用スタートセミナー').closest('tr') as HTMLElement).click() })
   const panel = document.querySelector('[data-design-part="detail-panel"]')
   expect(panel).not.toBeNull()
   expect(panel?.textContent).toContain('NEN活用スタートセミナー')
@@ -217,7 +218,7 @@ test('v8 で行を右クリックすると「…」と同じ操作が出る', as
 test('v8 で詳細パネルの名前をその場で変えると保存口へ届く', async () => {
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
-  await act(async () => { detailButton('NEN活用スタートセミナー').click() })
+  await act(async () => { (detailButton('NEN活用スタートセミナー').closest('tr') as HTMLElement).click() })
   const panel = document.querySelector('[data-design-part="detail-panel"]')
   const edit = [...panel!.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'ウェビナー名を変更する')
   expect(edit).toBeTruthy()

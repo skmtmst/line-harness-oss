@@ -5,7 +5,7 @@ import { useFolderMove } from '@/components/shared/use-folder-move'
 import { moveCommonActionToFolder } from '@/lib/move-to-folder'
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   Activity,
   Archive,

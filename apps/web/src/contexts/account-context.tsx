@@ -1,5 +1,6 @@
 'use client'
 
+import { ListNavigationAccount, ListReturnAccountGuard } from '@/components/shared/list-navigation'
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import type { ReactNode } from 'react'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
@@ -170,11 +171,12 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) ?? null
 
   return (
-    <AccountContext.Provider
+    <ListNavigationAccount.Provider value={selectedAccountId}><AccountContext.Provider
       value={{ accounts, selectedAccountId, selectedAccount, setSelectedAccountId, clearSelectedAccountId, refreshAccounts, loading, error, refreshing }}
     >
+      <ListReturnAccountGuard accountId={selectedAccountId} />
       {children}
-    </AccountContext.Provider>
+    </AccountContext.Provider></ListNavigationAccount.Provider>
   )
 }
 

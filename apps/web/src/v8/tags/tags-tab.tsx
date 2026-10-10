@@ -1,29 +1,31 @@
 'use client'
 
-import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { Bookmark, Check, CircleDashed, Folder, FolderOpen, GripVertical, Inbox, Plus, Sparkles, Tag as TagIcon, Users } from 'lucide-react'
-import type { Tag, TagGroup } from '@line-crm/shared'
-import { api, ApiError, type ListStats } from '@/lib/api'
-import { useRowLeaving } from '@/lib/use-row-leaving'
-import { RovingTbody } from '@/components/shared/row-roving'
-import { ListPageBody } from '@/components/templates'
-import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors'
+import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
+import { Bookmark, Check, CircleDashed, Folder, FolderOpen, GripVertical, Inbox, Plus, Sparkles, Tag as TagIcon, Users } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+import { RowNameLink } from '@/components/shared/table';
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { AlertCircle } from 'lucide-react';
+import type { Tag, TagGroup } from '@line-crm/shared';
+import { api, ApiError, type ListStats } from '@/lib/api';
+import { useRowLeaving } from '@/lib/use-row-leaving';
+import { RovingTbody } from '@/components/shared/row-roving';
+import { ListPageBody } from '@/components/templates';
+import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors';
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
-import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
 import StatusBadge from '@/components/shared/status-badge'
 import FilterChip from '@/components/shared/filter-chip'
-import { RowMenu } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import { withViewTransition } from '@/components/shared/view-transition'
-import { notifyToast } from '@/components/shared/toast'
-import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-error-message'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
+import { withViewTransition } from '@/components/shared/view-transition';
+import { notifyToast } from '@/components/shared/toast';
+import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-error-message';
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
@@ -31,21 +33,21 @@ import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import TagPill from '@/components/shared/tag-pill'
-import { DelayedSkeleton } from '@/components/shared/skeleton'
-import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
+import { DelayedSkeleton } from '@/components/shared/skeleton';
+import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
 import ReorderHandle from '@/components/shared/reorder-handle'
-import { useLiveReorder } from '@/lib/use-live-reorder'
-import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils'
+import { useLiveReorder } from '@/lib/use-live-reorder';
+import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils';
 import TagCsvImportDialog from '@/components/friend-fields/tag-csv-import-dialog'
-import { isCurrentTagListRequest, type TagListRequestKey } from '@/components/friend-fields/tag-list-state'
-import { DeleteTagDialog, QUICK_FILTERS, UNGROUPED, cleanupKnown, formatDate, hasLinkedActions, isThisMonth, isUnused, usageLabel } from '@/components/friend-fields/tags-page-v4'
+import { isCurrentTagListRequest, type TagListRequestKey } from '@/components/friend-fields/tag-list-state';
+import { DeleteTagDialog, QUICK_FILTERS, UNGROUPED, cleanupKnown, formatDate, hasLinkedActions, isThisMonth, isUnused, usageLabel } from '@/components/friend-fields/tags-page-v4';
 import styles from './list.module.css'
-import { ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
-import { ListPager } from '@/components/templates/list-page'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { ListPager } from '@/components/templates/list-page';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 
@@ -232,7 +234,7 @@ export default function TagsTab({
   const [menuMoveFor, setMenuMoveFor] = useState<string | null>(null)
   /* 行の詳細パネル。URL に ?tag=<id> を残す。 */
   const [activeTagId, setActiveTagId] = useDetailPanelUrl('tag')
-  const openTagDetail = (id: string) => withViewTransition(() => setActiveTagId(id))
+  const openTagDetail = (id: string) => withViewTransition(() => setActiveTagId(activeTagId === id ? null : id))
   const loadRequestRef = useRef<TagListRequestKey>({ accountId, generation: 0 })
 
   const load = useCallback(async () => {
@@ -707,14 +709,8 @@ export default function TagsTab({
                 className={styles.row}
                 leaving={leavingId === tag.id}
                 tabIndex={0}
-                onClick={() => openTagDetail(tag.id)}
-                onKeyDown={(event) => {
-                  if (event.target !== event.currentTarget) return
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    openTagDetail(tag.id)
-                  }
-                }} data-row-id={tag.id}
+                detailKey="tag" onOpen={() => openTagDetail(tag.id)}
+                data-row-id={tag.id}
               >
                 <Td className={styles.colName}>
                   <ContextMenu label={`タグ「${tag.name}」の操作`} items={tagContextItems(tag)}>
@@ -736,7 +732,7 @@ export default function TagsTab({
                         )}
                       </span>
                       <FolderDotName folder={group}>
-                        {canEdit ? <Link href={editHref} title={tag.name} className={styles.name}>{tag.name}</Link> : <span title={tag.name}>{tag.name}</span>}
+                        {canEdit ? <RowNameLink href={editHref} title={tag.name} className={styles.name}>{tag.name}</RowNameLink> : <span title={tag.name}>{tag.name}</span>}
                       </FolderDotName>
                       </div>
 
@@ -759,7 +755,7 @@ export default function TagsTab({
                   </Td>
                 ) : null}
                 {/* 人数は、そのタグで絞った友だち一覧へのリンク。 */}
-                <Td className={styles.colCount} onClick={(event) => event.stopPropagation()}>
+                <Td className={styles.colCount}>
                   <Link href={`/friends?tag=${encodeURIComponent(tag.id)}`} className={styles.countLink} title={`「${tag.name}」が付いている友だちを見る`}>
                     {tag.friendCount ?? 0} 人
                   </Link>
@@ -767,7 +763,7 @@ export default function TagsTab({
                 <Td className={styles.colSource}><span className={styles.cellText} title={sourceLabel(tag)}>{sourceLabel(tag)}</span></Td>
                 <Td className={styles.colLink}><span className={styles.cellText} title={tagLinkText(tag)}>{tagLinkText(tag)}</span></Td>
                 <Td className={styles.colUsage}><span className={styles.cellText} title={usageLabel(tag)}>{usageLabel(tag)}</span></Td>
-                <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
+                <Td className={styles.colMenu}>
                   {/* 閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す） */}
                   {canEdit ? <span className={styles.menuAnchor}>
                     <RowMenu

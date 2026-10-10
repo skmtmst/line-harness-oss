@@ -1,25 +1,27 @@
 'use client'
 
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { ClipboardList, FileText, GripVertical, Info, PenLine, Plus, Send, Users } from 'lucide-react'
-import type { Folder, FriendField, FriendFieldListSummary, FriendFieldType } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
-import { createResponseGate } from '@/lib/latest-request'
-import { useRowLeaving } from '@/lib/use-row-leaving'
-import { ListPageBody } from '@/components/templates'
-import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
+import { useListUrlValue } from '@/components/shared/list-url-state';
+import { RowNameLink } from '@/components/shared/table';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ClipboardList, FileText, GripVertical, Info, PenLine, Plus, Send, Users } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { AlertCircle } from 'lucide-react';
+import type { Folder, FriendField, FriendFieldListSummary, FriendFieldType } from '@line-crm/shared';
+import { api, ApiError } from '@/lib/api';
+import { createResponseGate } from '@/lib/latest-request';
+import { useRowLeaving } from '@/lib/use-row-leaving';
+import { ListPageBody } from '@/components/templates';
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import { FolderDotName } from '@/components/shared/folder-dot'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { FolderDotName } from '@/components/shared/folder-dot';
+import { type ActionMenuItem } from '@/components/shared/action-menu';
 import ListState from '@/components/shared/list-state'
-import { RowMenu, RowQuickAction } from '@/components/shared/row-actions'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { RowMenu, RowQuickAction } from '@/components/shared/row-actions';
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import InlineEdit from '@/components/shared/inline-edit'
-import { withViewTransition } from '@/components/shared/view-transition'
+import { withViewTransition } from '@/components/shared/view-transition';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
@@ -27,22 +29,22 @@ import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { DelayedSkeleton } from '@/components/shared/skeleton'
-import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
-import { notifyToast } from '@/components/shared/toast'
-import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { DelayedSkeleton } from '@/components/shared/skeleton';
+import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected';
+import { notifyToast } from '@/components/shared/toast';
+import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
 import ReorderHandle from '@/components/shared/reorder-handle'
-import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
-import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils'
-import { FIELD_TYPE_LABELS, destinationLabel, fieldDeletionBlockedReason, knownUsageCount } from '@/components/friend-fields/field-list'
+import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder';
+import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils';
+import { FIELD_TYPE_LABELS, destinationLabel, fieldDeletionBlockedReason, knownUsageCount } from '@/components/friend-fields/field-list';
 import styles from './list.module.css'
-import type { AttributeListHost } from './attribute-host'
+import type { AttributeListHost } from './attribute-host';
 import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
-import { ListPager } from '@/components/templates/list-page'
-import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField } from '@/components/shared/save-form-errors';
+import { ListPager } from '@/components/templates/list-page';
+import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import Notice from '@/components/shared/notice'
 
 /*
@@ -95,7 +97,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。URL に ?field=<id> を残す。 */
   const [activeFieldId, setActiveFieldId] = useDetailPanelUrl('field')
-  const openFieldDetail = (id: string) => host ? (canEdit ? host.onEdit(id) : undefined) : withViewTransition(() => setActiveFieldId(id))
+  const openFieldDetail = (id: string) => host ? (canEdit ? host.onEdit(id) : undefined) : withViewTransition(() => setActiveFieldId(current => current === id ? null : id))
 
   /* アカウント切替のあとに届いた古い応答で一覧を上書きしない（ATTR-01）。 */
   const gateRef = useRef(createResponseGate())
@@ -407,16 +409,10 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
                 className={`${styles.row} ${styles.fieldRow}`}
                 leaving={leavingId === field.id}
                 tabIndex={0}
-                onClick={() => openFieldDetail(field.id)}
-                onKeyDown={(event) => {
-                  if (event.target !== event.currentTarget) return
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    openFieldDetail(field.id)
-                  }
-                }} data-row-id={field.id}
+                detailKey="field" onOpen={() => openFieldDetail(field.id)}
+                 data-row-id={field.id}
               >
-                <Td className={styles.markColGrip} onClick={(event) => event.stopPropagation()}>
+                <Td className={styles.markColGrip}>
                   {canEdit ? (
                     <span
                       className={styles.gripBox}
@@ -440,8 +436,8 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
                     <div className={styles.nameRow}>
                       <FolderDotName folder={folderDotOf(field.folderId)}>
                         {canEdit && !host ? (
-                          <Link href={`/tags/fields/edit?id=${encodeURIComponent(field.id)}`} className={styles.name}  onClick={(event) => event.stopPropagation()}><TruncatedText value={String(field.name ?? '')} /></Link>
-                        ) : host && canEdit ? <Link href="#" className={styles.name}  onClick={(event) => { event.preventDefault(); event.stopPropagation(); host.onEdit(field.id) }}><TruncatedText value={String(field.name ?? '')} /></Link> : <span className={styles.name} ><TruncatedText value={String(field.name ?? '')} /></span>}
+                          <RowNameLink href={`/tags/fields/edit?id=${encodeURIComponent(field.id)}`} className={styles.name}  onClick={(event) => event.stopPropagation()}><TruncatedText value={String(field.name ?? '')} /></RowNameLink>
+                        ) : host && canEdit ? <RowNameLink href="#" className={styles.name}  onClick={(event) => { event.preventDefault(); event.stopPropagation(); host.onEdit(field.id) }}><TruncatedText value={String(field.name ?? '')} /></RowNameLink> : <span className={styles.name} ><TruncatedText value={String(field.name ?? '')} /></span>}
                       </FolderDotName>
                     </div>
 
@@ -455,8 +451,8 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
                   </span>
                 </Td>
                 <Td className={styles.fieldColPlace}><span className={styles.cellText} title={host ? undefined : destinationLabel(field)}>{host ? emptyValue('unknown') : destinationLabel(field)}</span></Td>
-                {host && canEdit ? <Td className={styles.colDistribute} onClick={(event) => event.stopPropagation()}><RowQuickAction label="配る" ariaLabel={`${field.name}を配る`} icon={<Send />} disabled={host.busy} onClick={() => host.onDistribute(field.id)} /></Td> : null}
-                <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
+                {host && canEdit ? <Td className={styles.colDistribute}><RowQuickAction label="配る" ariaLabel={`${field.name}を配る`} icon={<Send />} disabled={host.busy} onClick={() => host.onDistribute(field.id)} /></Td> : null}
+                <Td className={styles.colMenu}>
                   <span className={styles.menuAnchor}>
                     {(!host || canEdit) ? <RowMenu
                       size="row"

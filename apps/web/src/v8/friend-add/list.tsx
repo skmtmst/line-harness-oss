@@ -1,22 +1,26 @@
 'use client'
 
 import SharedStatusPill from '@/components/shared/status-pill'
-import { useListUrlValue, writeListUrlParam } from '@/components/shared/list-url-state'
-import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Activity, CircleCheck, CircleHelp, FilePen, Link2, Lock, MessageSquareMore, Pause, Pencil, Plus, Route, Send, UserPlus } from 'lucide-react'
-import type { FriendAddRule, FriendAddRuleKind, FriendAddRuleListData, FriendAddRuleStatus } from '@/lib/api'
-import { api } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { ListPage, ListPagePagination } from '@/components/templates'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { formatNumber } from '@/lib/format'
+import { RowNameLink } from '@/components/shared/table';
+import { useListUrlValue, writeListUrlParam } from '@/components/shared/list-url-state';
+import { useSamePageUrl } from '@/lib/use-same-page-url';
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Activity, CircleCheck, CircleHelp, FilePen, Link2, Lock, MessageSquareMore, Pause, Pencil, Plus, Route, Send, UserPlus } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { AlertCircle, Eye, Users } from 'lucide-react';
+import type { FriendAddRule, FriendAddRuleKind, FriendAddRuleListData, FriendAddRuleStatus } from '@/lib/api';
+import { api } from '@/lib/api';
+import { useAccount } from '@/contexts/account-context';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { ListPage, ListPagePagination } from '@/components/templates';
+import { useStaffRole, canManageRole } from '@/lib/staff-role';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { formatNumber } from '@/lib/format';
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -24,29 +28,29 @@ import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import AccountRequiredState from '@/components/shared/account-required-state'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
-import { FOLDER_SELECT_COLORS, type FriendAddRuleFolder } from '@line-crm/shared'
-import FolderPanel, { FolderPanelNote } from '@/components/shared/folder-panel'
-import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
+import { FOLDER_SELECT_COLORS, type FriendAddRuleFolder } from '@line-crm/shared';
+import FolderPanel, { FolderPanelNote } from '@/components/shared/folder-panel';
+import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import { Tabs } from '@/components/shared/tabs'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { notifyToast } from '@/components/shared/toast'
-import { RowMenu } from '@/components/shared/row-actions'
+import { Tabs } from '@/components/shared/tabs';
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import { notifyToast } from '@/components/shared/toast';
+import { RowMenu } from '@/components/shared/row-actions';
 import PageSizeSelect from '@/components/shared/page-size-select'
 import ReorderHandle from '@/components/shared/reorder-handle'
-import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
-import { describeFriendAddFailure } from './failure'
-import { useCursorStack } from './use-cursor-stack'
+import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder';
+import { describeFriendAddFailure } from './failure';
+import { useCursorStack } from './use-cursor-stack';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import { ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
@@ -791,7 +795,7 @@ function FriendAddList() {
                   </Td>
                   <Td className={styles.colName}>
                     <FolderDotName folder={folderDotOf(rule.folderName)}>
-                      <Link href={editHref(rule.id)} title={rule.name} className={styles.name}><TruncatedText value={String(rule.name ?? '')} /></Link>
+                      <RowNameLink href={editHref(rule.id)} title={rule.name} className={styles.name}><TruncatedText value={String(rule.name ?? '')} /></RowNameLink>
                     </FolderDotName>
 
                   </Td>
@@ -812,7 +816,7 @@ function FriendAddList() {
                   </Td>
                   <Td className={styles.colName}>
                     <FolderDotName folder={folderDotOf(sinkRule.folderName)}>
-                      <Link href={editHref(sinkRule.id)}  className={styles.name}><TruncatedText value={String(sinkRule.name ?? '')} /></Link>
+                      <RowNameLink href={editHref(sinkRule.id)}  className={styles.name}><TruncatedText value={String(sinkRule.name ?? '')} /></RowNameLink>
                     </FolderDotName>
 
                   </Td>

@@ -1,7 +1,7 @@
 'use client'
 import StatusPill from '@/components/shared/status-pill'
 import { Paperclip, Send, X } from 'lucide-react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { Suspense, useCallback, useEffect, useId, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'

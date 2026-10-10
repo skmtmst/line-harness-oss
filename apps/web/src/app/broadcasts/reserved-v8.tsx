@@ -8,7 +8,7 @@
  * 作った5手順（全部済み・押すとその手順へ）→ 左「できた」の箱（真ん中の
  * ボタン）＋送る前の注意 → 右の欄（次にできること → スマホの見本）。
  */
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { ArrowLeft, CalendarCheck2, Copy, Eye, List, Send, TriangleAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'

@@ -1,29 +1,31 @@
 'use client'
 
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional } from '@/components/shared/list-toolbar'
-import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
-import { runOptimistic } from '@/lib/undoable'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { Bookmark, Braces, ClipboardList, Copy, FileText, Folder as FolderIcon, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Layers, Link2, List, Mail, MessageSquare, Plus, Send, SquareArrowOutUpRight, Ticket, Trash2, Unlink, Video } from 'lucide-react'
-import type { Folder } from '@line-crm/shared'
-import { api, ApiError, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
-import { clampSearchQuery } from '@/lib/search-query'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { formatNumber, formatDate as polishFormatDate, formatListDateTime as polishFormatListDateTime } from '@/lib/format'
-import { contentExcerpt } from '@/lib/broadcast-summary'
-import { ListPage } from '@/components/templates'
-import { notifyToast } from '@/components/shared/toast'
+import { isOwnerOrAdmin } from '@/lib/staff-capability';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional } from '@/components/shared/list-toolbar';
+import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar';
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
+import { runOptimistic } from '@/lib/undoable';
+import { Bookmark, Braces, ClipboardList, Copy, FileText, Folder as FolderIcon, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Layers, Link2, List, Mail, MessageSquare, Plus, Send, SquareArrowOutUpRight, Ticket, Trash2, Unlink, Video } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+import { RowNameLink } from '@/components/shared/table';
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { Eye, TriangleAlert } from 'lucide-react';
+import type { Folder } from '@line-crm/shared';
+import { api, ApiError, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api';
+import { clampSearchQuery } from '@/lib/search-query';
+import { useAccount } from '@/contexts/account-context';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { formatNumber, formatDate as polishFormatDate, formatListDateTime as polishFormatListDateTime } from '@/lib/format';
+import { contentExcerpt } from '@/lib/broadcast-summary';
+import { ListPage } from '@/components/templates';
+import { notifyToast } from '@/components/shared/toast';
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import { RowMenu } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions';
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
@@ -31,30 +33,30 @@ import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
-import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
+import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table';
+import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel';
+import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot';
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import { exampleHref, loadTemplateExamples, type TemplateExample } from './examples'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { exampleHref, loadTemplateExamples, type TemplateExample } from './examples';
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
 import Pagination from '@/components/shared/pagination'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import InlineEdit from '@/components/shared/inline-edit'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import { withViewTransition } from '@/components/shared/view-transition'
-import { Tabs } from '@/components/shared/tabs'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
+import { withViewTransition } from '@/components/shared/view-transition';
+import { Tabs } from '@/components/shared/tabs';
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
 import StaffAssetList from './staff-asset-list'
-import { RovingTbody } from '@/components/shared/row-roving'
-import { DELETE_UNUSED_DESCRIPTION, blockedDeleteDescription, createBlockedReason, failureOf, failureOfResponse, listView, messageTypeText, usageRows, type TemplatesFailure, type UsageDetail } from './words'
+import { RovingTbody } from '@/components/shared/row-roving';
+import { DELETE_UNUSED_DESCRIPTION, blockedDeleteDescription, createBlockedReason, failureOf, failureOfResponse, listView, messageTypeText, usageRows, type TemplatesFailure, type UsageDetail } from './words';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
 import AccountRequiredState from '@/components/shared/account-required-state'
@@ -1118,18 +1120,11 @@ export default function TemplatesListV8() {
                     data-row-id={t.id}
                     className={styles.rowClick}
                     tabIndex={0}
-                    onClick={() => setActiveId(t.id)}
+                    detailKey="row" onOpen={() => setActiveId(activeId === t.id ? null : t.id)}
                     onContextMenuCapture={() => setContextId(t.id)}
-                    onKeyDown={(event) => {
-                      // 行内のリンク・ボタンにフォーカスがあるときは行を開かない。
-                      if (event.target !== event.currentTarget) return
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        setActiveId(t.id)
-                      }
-                    }}
+
                   >
-                    <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.selectCell}>
                       {canMutateTemplates ? (
                         <SaveErrorField names={[`shownItems.${saveFieldIndex}.id`,"id","t.id"]}><Checkbox
                           checked={selectedIds.has(t.id)}
@@ -1141,9 +1136,9 @@ export default function TemplatesListV8() {
                     <NameCell name={
                         <div className={styles.dotLine}>
                           <>
-                            <Link href={detailHref(t)} title={t.name} className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
+                            <RowNameLink href={detailHref(t)} title={t.name} className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
                               <TruncatedText value={String(t.name ?? '')} />
-                            </Link>
+                            </RowNameLink>
                           </>
                         </div>
                       } folder={folderDotOf(t)}
@@ -1183,7 +1178,7 @@ export default function TemplatesListV8() {
                         {formatMonthDay(t.updatedAt)}
                       </Td>
                     )}
-                    <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.menuCell}>
                       {/* 横並びにして、メニューの位置の目印が行を1段増やさないようにする。 */}
                       <div className={styles.menuBox}>
                         <RowMenu

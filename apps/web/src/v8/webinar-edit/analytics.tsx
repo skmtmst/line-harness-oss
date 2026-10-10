@@ -9,7 +9,7 @@ import { LineChart, FunnelChart } from '@/components/shared/charts'
  * 口・権限・失敗の扱いは app/webinars/edit/analytics-v8.tsx と同じ（BEHAVIOR.md）。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { CircleCheck, Download, History, LogIn, Send } from 'lucide-react'
 import { PageFrame } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'

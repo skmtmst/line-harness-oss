@@ -1,53 +1,56 @@
 'use client'
 
 import Toggle from '@/components/shared/toggle'
-import { flushListUrlState, useListUrlValue } from '@/components/shared/list-url-state'
-import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
-import { notifySaved, notifyToast } from '@/components/shared/toast'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Gift, ImageIcon, Minus, Plus, Stamp } from 'lucide-react'
-import { VISIT_STAMP_DEFAULT_COLOR, visitStampDarkInk } from '@line-crm/shared'
-import type { VisitStampCard, VisitStampEntryPage, VisitStampMultiplier, VisitStampReward, VisitStampSettings } from '@line-crm/shared'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import { DetailColumns } from '@/components/templates/detail-columns'
+import { flushListUrlState, useListUrlValue } from '@/components/shared/list-url-state';
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict';
+import { notifySaved, notifyToast } from '@/components/shared/toast';
+import { useSearchParams } from 'next/navigation';
+
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Check, Gift, ImageIcon, Minus, Plus, Stamp } from 'lucide-react';
+import { VISIT_STAMP_DEFAULT_COLOR, visitStampDarkInk } from '@line-crm/shared';
+import type { VisitStampCard, VisitStampEntryPage, VisitStampMultiplier, VisitStampReward, VisitStampSettings } from '@line-crm/shared';
+import { PageFrame, PageHeading } from '@/components/templates/page-frame';
+import { DetailColumns } from '@/components/templates/detail-columns';
 import tpl from '@/components/templates/page-templates.module.css'
 import Button from '@/components/shared/button'
 import MediaSlot from '@/components/shared/media-slot'
 import ColorWell from '@/components/shared/color-well'
 import Combobox from '@/components/shared/combobox'
 import HelpTip from '@/components/shared/help-tip'
-import { FieldError, Field } from '@/components/shared/form-controls'
+import { FieldError, Field } from '@/components/shared/form-controls';
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import Radio from '@/components/shared/radio'
-import { RowActions } from '@/components/shared/row-actions'
+import { RowActions } from '@/components/shared/row-actions';
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
-import { Tabs } from '@/components/shared/tabs'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { TextArea, TextField } from '@/components/shared/text-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { useAccount } from '@/contexts/account-context'
-import { api, describeSaveFailure } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { visitStampsApi } from '@/lib/visit-stamps-api'
-import { MANUAL_REASONS, STACKING_ORDERS, type ManualReason, defaultSettings, previewExpiry, friendLabel, friendNames, historyRows, manualReasonText, multiplierDetail, multiplierName, previewSlots, rankDetail, rewardNote, settingsIssue, type StampSettingField, shortDateTime, slotCount, sortedRewards, stackedCap, withSlotCount } from './display'
-import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, ReasonDialog, RewardDialog, StoresDialog } from './dialogs'
+import { Tabs } from '@/components/shared/tabs';
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table';
+import { TextArea, TextField } from '@/components/shared/text-field';
+import { SettingCheckbox } from '@/components/shared/checkbox';
+import { usePageTitle } from '@/components/shell/page-chrome';
+import { useAccount } from '@/contexts/account-context';
+import { api, describeSaveFailure } from '@/lib/api';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
+import { visitStampsApi } from '@/lib/visit-stamps-api';
+import { MANUAL_REASONS, STACKING_ORDERS, type ManualReason, defaultSettings, previewExpiry, friendLabel, friendNames, historyRows, manualReasonText, multiplierDetail, multiplierName, previewSlots, rankDetail, rewardNote, settingsIssue, type StampSettingField, shortDateTime, slotCount, sortedRewards, stackedCap, withSlotCount } from './display';
+import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, ReasonDialog, RewardDialog, StoresDialog } from './dialogs';
 import styles from './visit-stamps.module.css'
-import { formatNumber as polishFormatNumber } from '@/lib/format'
+import { formatNumber as polishFormatNumber } from '@/lib/format';
 import TruncatedText from '@/components/shared/truncated-text'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
+import { withPermissionFailure } from '@/components/shared/api-error-message';
+import { emptyValue } from '@/components/shared/empty-value';
 import NumberInput from '@/components/shared/number-field'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ImageFrame from '@/components/shared/image-frame'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*

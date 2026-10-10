@@ -7,7 +7,7 @@
  * 読み・再試行・戻り先の引き継ぎは同じ（R268・M010・M011 を変えない）。
  * 違いは置き場と見せ方——失敗の帯・行ったことの段・右の「この追加について」。
  */
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, Check, MessageCircle, RotateCcw, Settings2, XCircle } from 'lucide-react'

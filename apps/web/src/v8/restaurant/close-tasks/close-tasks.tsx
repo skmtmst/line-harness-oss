@@ -2,7 +2,7 @@
 
 import { useUrlTab } from '@/lib/use-url-tab'
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check } from 'lucide-react'
 import type { RestaurantChannelCloseTask } from '@line-crm/shared'

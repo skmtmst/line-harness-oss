@@ -8,8 +8,9 @@
  * 変えない）。違いは置き場と見せ方——数の帯・失敗の帯・札の道具の段・
  * 表（日時・友だち・来た経路・結果・行ったこと・時間）・下の2枚。
  */
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   FriendAddEventAttributionStatus,

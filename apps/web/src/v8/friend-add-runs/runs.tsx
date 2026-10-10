@@ -1,40 +1,47 @@
 'use client'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+
+import { RowNameLink } from '@/components/shared/table';
+
 import SegmentedControl from '@/components/shared/segmented'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import type { FriendAddEventAttributionStatus, FriendAddEventKind, FriendAddEventRoutingStatus } from '@line-crm/shared'
-import { Download, FileText, MessageCircle, Pause, Pencil, RotateCcw } from 'lucide-react'
-import { DetailPage } from '@/components/templates'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { useListUrlValue } from '@/components/shared/list-url-state';
+import { useSamePageUrl } from '@/lib/use-same-page-url';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import type { FriendAddEventAttributionStatus, FriendAddEventKind, FriendAddEventRoutingStatus } from '@line-crm/shared';
+import { Download, FileText, MessageCircle, Pause, Pencil, RotateCcw } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+
+import { TriangleAlert } from 'lucide-react';
+import { DetailPage } from '@/components/templates';
+import { usePageTitle } from '@/components/shell/page-chrome';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu } from '@/components/shared/row-actions';
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
-import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { useAccount } from '@/contexts/account-context'
-import { api, type FriendAddRunList } from '@/lib/api'
-import { formatNumber } from '@/lib/format'
-import { describeFriendAddFailure } from '@/v8/friend-add/failure'
-import { useCursorStack } from '@/v8/friend-add/use-cursor-stack'
-import { csvCell, elapsedText, formatJstDateTime, jstTime, routingAction, routingLabel } from './status'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge';
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { useAccount } from '@/contexts/account-context';
+import { api, type FriendAddRunList } from '@/lib/api';
+import { formatNumber } from '@/lib/format';
+import { describeFriendAddFailure } from '@/v8/friend-add/failure';
+import { useCursorStack } from '@/v8/friend-add/use-cursor-stack';
+import { csvCell, elapsedText, formatJstDateTime, jstTime, routingAction, routingLabel } from './status';
 import styles from './runs.module.css'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { csvFileName } from '@/lib/csv-file-name';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select';
 import Notice from '@/components/shared/notice'
 
 /*
@@ -545,7 +552,7 @@ function FriendAddRunsInner() {
                     </Td>
                     <Td className={styles.colFriend}>
                       <span className={styles.face} aria-hidden="true">{initialOf(name)}</span>
-                      <Link className={styles.friendName} href={detailHref(item.id)} title={`${name}（${kindLabel}）`}>{name}</Link>
+                      <RowNameLink className={styles.friendName} href={detailHref(item.id)} title={`${name}（${kindLabel}）`}>{name}</RowNameLink>
                     </Td>
                     <Td className={styles.colRoute}><span className={styles.route} title={route}>{route}</span></Td>
                     <Td className={styles.colResult}><StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge></Td>

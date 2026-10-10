@@ -1,32 +1,39 @@
 'use client'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+
+import { RowNameLink } from '@/components/shared/table';
+
+
+
 import SharedStatusBadge from '@/components/shared/status-badge'
 import SharedStatusPill from '@/components/shared/status-pill'
-import { useListUrlValue, useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { RovingTbody } from '@/components/shared/row-roving'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { AlertCircle, Bookmark, CalendarClock, CalendarDays, ChevronDown, Copy, FilePen, FileText, Gauge, List as ListIcon, Lock, MailOpen, Plus, Send, SendHorizontal, UserCheck } from 'lucide-react'
-import type { Folder, Tag } from '@line-crm/shared'
-import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastListKpis, type BroadcastSavedView } from '@/lib/api'
-import { loadFailureNotice, permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { ListPage, ListPagePagination } from '@/components/templates'
+import { useListUrlValue, useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state';
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { RovingTbody } from '@/components/shared/row-roving';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AlertCircle, Bookmark, CalendarClock, CalendarDays, ChevronDown, Copy, FilePen, FileText, Gauge, List as ListIcon, Lock, MailOpen, Plus, Send, SendHorizontal, UserCheck } from 'lucide-react';
+
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { ArrowUpDown, Eye } from 'lucide-react';
+import type { Folder, Tag } from '@line-crm/shared';
+import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastListKpis, type BroadcastSavedView } from '@/lib/api';
+import { loadFailureNotice, permissionDeniedMessage } from '@/components/shared/api-error-message';
+import { useAccount } from '@/contexts/account-context';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { ListPage, ListPagePagination } from '@/components/templates';
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
-import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
-import { FolderDotName } from '@/components/shared/folder-dot'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
+import { FolderDotName } from '@/components/shared/folder-dot';
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import { withViewTransition } from '@/components/shared/view-transition'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu } from '@/components/shared/row-actions';
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
+import { withViewTransition } from '@/components/shared/view-transition';
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
@@ -36,15 +43,15 @@ import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Pagination from '@/components/shared/pagination'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
-import { runOptimistic } from '@/lib/undoable'
-import { formatDateTime, formatNumber, formatListDateTime as polishFormatListDateTime } from '@/lib/format'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
+import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary';
+import { runOptimistic } from '@/lib/undoable';
+import { formatDateTime, formatNumber, formatListDateTime as polishFormatListDateTime } from '@/lib/format';
 import QuickSendV8 from './quick-send'
 import styles from './list.module.css'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -1026,19 +1033,17 @@ export default function BroadcastListV8() {
           const detailHref = `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`
           const menuLabel = `配信「${broadcast.title}」の操作`
           const titleLink = (
-            <Link
+            <RowNameLink
               href={detailHref}
               className={styles.cellTitle}
               title={broadcast.title}
               onClick={(event) => {
                 event.stopPropagation()
-                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
-                event.preventDefault()
-                goDetail(broadcast.id)
+
               }}
             >
               {broadcast.title}
-            </Link>
+            </RowNameLink>
           )
           return (
             <Tr
@@ -1046,14 +1051,8 @@ export default function BroadcastListV8() {
               className={styles.row}
               interactive
               tabIndex={0}
-              onClick={() => setPanelId(broadcast.id)}
-              onKeyDown={(event) => {
-                if (event.target !== event.currentTarget) return
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  setPanelId(broadcast.id)
-                }
-              }} data-row-id={broadcast.id}
+              detailKey="broadcast" onOpen={() => setPanelId(panelId === broadcast.id ? null : broadcast.id)}
+               data-row-id={broadcast.id}
             >
               <Td>
                 <FolderDotName folder={folderDotOf(broadcast.folderId)}>{titleLink}</FolderDotName>
@@ -1087,7 +1086,7 @@ export default function BroadcastListV8() {
                   </>
                 )}
               </Td>
-              <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
+              <Td className={styles.colMenu}>
                 {/* 閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す） */}
                 {canEdit ? <div className={styles.menuBox}>
                   <ContextMenu label={menuLabel} items={rowContextItems(broadcast)}>

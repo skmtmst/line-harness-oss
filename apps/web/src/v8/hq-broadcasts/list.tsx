@@ -1,46 +1,48 @@
 'use client'
 
 import { canManageRole } from '@/lib/staff-role';
+import { RowNameLink } from '@/components/shared/table';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
-import { ListToolbarSort } from '@/components/shared/list-toolbar'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useTenantWideAccess } from '@/lib/staff-role'
-import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
-import { AlertCircle, CalendarClock, FilePen, Inbox, List, MailOpen, Plus, Send } from 'lucide-react'
-import type { HqBroadcastRun } from '@line-crm/shared'
-import { ListPage, ListPagePagination } from '@/components/templates/list-page'
+import { ListToolbarSort } from '@/components/shared/list-toolbar';
+import { useListUrlValue } from '@/components/shared/list-url-state';
+import { useTenantWideAccess } from '@/lib/staff-role';
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertCircle, CalendarClock, FilePen, Inbox, List, MailOpen, Plus, Send } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+import { ArrowUpDown } from 'lucide-react';
+import type { HqBroadcastRun } from '@line-crm/shared';
+import { ListPage, ListPagePagination } from '@/components/templates/list-page';
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel, { FolderPanelNote } from '@/components/shared/folder-panel'
+import FolderPanel, { FolderPanelNote } from '@/components/shared/folder-panel';
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
-import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
-import { FolderDotName } from '@/components/shared/folder-dot'
-import { deleteFolderDescription } from '@/components/shared/folder-row-actions'
-import { describeFolderFailure } from '@/components/shared/folder-failure'
-import { notifyToast } from '@/components/shared/toast'
-import type { FolderPanelRow } from '@/components/shared/folder-panel'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared';
+import { FolderDotName } from '@/components/shared/folder-dot';
+import { deleteFolderDescription } from '@/components/shared/folder-row-actions';
+import { describeFolderFailure } from '@/components/shared/folder-failure';
+import { notifyToast } from '@/components/shared/toast';
+import type { FolderPanelRow } from '@/components/shared/folder-panel';
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
-import { RowActions } from '@/components/shared/row-actions'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { formatNumber } from '@/lib/format'
-import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
-import { useStaffRole } from '@/lib/staff-role'
-import { failedCount, jpDateTime, runBadge, sendTotals } from './model'
+import { RowActions } from '@/components/shared/row-actions';
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table';
+import { usePageTitle } from '@/components/shell/page-chrome';
+import { formatNumber } from '@/lib/format';
+import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api';
+import { useStaffRole } from '@/lib/staff-role';
+import { failedCount, jpDateTime, runBadge, sendTotals } from './model';
 import styles from '../broadcasts/list.module.css'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { folderDisplayColor } from '@/components/shared/folder-dot';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 
 /*
  * ★V8 統括 一括配信の一覧（絵 U4Eep0・V8.pen の行「統括」。2026-10-08 オーナー：店の一斉配信とほぼ同じ画面）。
@@ -333,7 +335,7 @@ export default function HqBroadcastList() {
                 <Td>
                   <div className={styles.titleLine}>
                     <FolderDotName folder={(() => { const folder = (folders ?? []).find((f) => f.id === folderIdOf(run)); return folder ? { name: folder.name, color: folder.color } : null })()}>
-                      <Link href={href} className={styles.cellTitle} title={run.title}>{run.title}</Link>
+                      <RowNameLink href={href} className={styles.cellTitle} title={run.title}>{run.title}</RowNameLink>
                     </FolderDotName>
                   </div>
 
