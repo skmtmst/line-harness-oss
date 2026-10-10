@@ -16,7 +16,6 @@ import { describe, expect, it } from 'vitest'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)))
 const EXCEPTIONS = new Set([
-  'app/scenarios/mode-v8.tsx',
   /*
    * リマインダV8の選ぶカード（ChoiceCardV8）は共通 RadioCard が持たない
    * 「アイコン左上・丸右上」の形。丸は本物の input[type=radio] で、

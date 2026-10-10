@@ -5,8 +5,8 @@
 `start-checklist.ts`・`scenario-reach-display.ts`・`scenario-step-audience.ts`・`scenario-simulation-refresh.ts` は `app/scenarios` からの写し（src/v8 は @/app を読めない）。
 
 ## 入口
-- `app/scenarios/detail/page.tsx` が `theme === 'v8'` のときだけこの画面を出す。v7 は今までどおり `scenario-detail-client.tsx`。
-- 古い V8 の `app/scenarios/detail/detail-v8.tsx` は消していない（契約試験が読んでいるため。切り替えの日に v7 と一緒に片づける）。
+- `app/scenarios/detail/page.tsx` はこの画面に固定。
+- 古いV8の写しは2026-10-11に削除。旧詳細の試験の移行状況は `docs/v7-removal-1011.md` に記録する。
 
 ## 受け付ける URL と指定
 - `?id=<シナリオ>`（無ければ入口が「見るシナリオが指定されていません」）。

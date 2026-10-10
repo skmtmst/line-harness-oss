@@ -18,7 +18,7 @@ const SCREENS: Array<[string, string]> = [
   ['app/auto-replies/edit/wizard-v8.tsx', 'UGrd2'],
   ['v8/friend-add/editor.tsx', 'h5rm8t'],
   ['app/rich-menus/new/create-v8.tsx', 'r8dGXT'],
-  ['app/scenarios/detail/detail-v8.tsx', 'kz2B6'],
+  ['v8/scenario-detail/detail.tsx', 'kz2B6'],
   ['v8/common-vars-edit/edit.tsx', 'piWhz'],
   ['v8/conversions/create.tsx', 'cXqlS'],
 ]
