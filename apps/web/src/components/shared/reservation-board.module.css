@@ -34,3 +34,6 @@
 @media print{.print td{white-space:normal;overflow-wrap:anywhere;}.print .board{overflow:visible;}}
 
 @media print{.print>div:has(>table){overflow:visible;}.print table{break-inside:auto;}}
+
+/* 印刷開始直後でも、行の登場アニメーションで予約を透明にしない。 */
+@media print{.print tr{animation:none!important;transition:none!important;opacity:1!important;transform:none!important;}}
