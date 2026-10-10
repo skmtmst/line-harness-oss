@@ -258,12 +258,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Guard shared pattern ownership (B-172)
+        env:
+          PATTERN_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$PATTERN_BASE_SHA" ]; then
+            node scripts/visual-qa/v8-pattern-audit.mjs \
+              --code . --base "$PATTERN_BASE_SHA" --out "$RUNNER_TEMP/pattern-ownership"
+          else
+            node scripts/visual-qa/v8-pattern-audit.mjs \
+              --code . --out "$RUNNER_TEMP/pattern-ownership"
+          fi
       - name: Build shared packages
         run: >-
           pnpm
