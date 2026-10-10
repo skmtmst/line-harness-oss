@@ -157,6 +157,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   const elementRef = useRef<HTMLButtonElement | null>(null)
   const v8 = useAdminTheme() === 'v8'
   const idleWidthRef = useRef(0)
+  const measuredLabelRef = useRef<string | null>(null)
   useLayoutEffect(() => {
     const el = elementRef.current
     if (!el || !stateful) return
@@ -164,6 +165,10 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
       if (idleWidthRef.current > 0) el.style.minWidth = `${idleWidthRef.current}px`
       return
     }
+    // 親の再描画でラベルが変わらなければ、複製・挿入・幅取得を繰り返さない。
+    const measurementKey = JSON.stringify([classes, el.innerHTML, busyLabel, doneLabel, v8, presentation, buttonProps.style, buttonProps.hidden])
+    if (measuredLabelRef.current === measurementKey) return
+    measuredLabelRef.current = measurementKey
     el.style.minWidth = ''
     idleWidthRef.current = el.offsetWidth
     if (!v8) return
