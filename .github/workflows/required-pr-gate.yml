@@ -657,8 +657,8 @@ jobs:
       # B-191/192 と B-187 はここに一本化。blank-gap.mjs を別ステップで重ねない。
       - name: Broken fixtures must fail the V8 layout guard
         if: steps.scope.outputs.run == 'true'
-        run: node --test apps/web/scripts/v8-guard/layout-defects.test.mjs
-      - name: No new overlap, wrap, squash, clipping, touching or blank space on V8
+        run: node --test --test-concurrency=1 apps/web/scripts/v8-guard/layout-defects.test.mjs apps/web/scripts/v8-guard/owner-rules.test.mjs
+      - name: No new V8 layout or owner-rule defects (B-191 through B-218)
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json
       - name: List row rules (B-190/193/194/195/198, with negative controls)
