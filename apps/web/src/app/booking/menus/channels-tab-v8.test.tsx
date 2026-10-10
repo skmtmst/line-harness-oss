@@ -15,10 +15,10 @@ const api = vi.hoisted(() => ({
   reassign: vi.fn(),
 }))
 
-vi.mock('../lib/booking-channels', () => ({ bookingChannelsApi: api }))
+vi.mock('@/v8/booking-menus/lib/booking-channels', () => ({ bookingChannelsApi: api }))
 vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
 
-import ChannelsTabV8, { ConflictDialog } from './channels-tab-v8'
+import ChannelsTabV8, { ConflictDialog } from '@/v8/booking-menus/channels-tab'
 
 const flush = () => act(async () => { await Promise.resolve() })
 

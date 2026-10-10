@@ -99,6 +99,7 @@ const V8_COPY: Record<string, Record<string, string>> = {
 // V8へ移った画面には旧JSONの節・語を要求しない。
 // 見た目は★V8との画像照合、動きは各V8本体の試験が守る。ここは入口と描く本体の接続を守る。
 const MAINB_V8_SCREENS = [
+  ['/booking/menus', '@/v8/booking-menus/settings', 'v8/booking-menus/settings.tsx', '<PageHeading'],
   ['/booking/menus/new', '@/v8/booking-menus/menu-form', 'v8/booking-menus/menu-form.tsx', '<PageHeading'],
   ['/booking/staff/new', '@/v8/booking-staff/staff-new', 'v8/booking-staff/staff-new.tsx', '<PageHeading'],
   ['/booking/menus/staff', '@/v8/booking-menus/assign', 'v8/booking-menus/assign.tsx', '<PageHeading'],

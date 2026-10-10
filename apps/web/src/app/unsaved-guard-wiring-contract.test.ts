@@ -36,8 +36,6 @@ const GUARDED = [
   'app/analytics/reports/new/page.tsx',
   'app/auto-replies/edit/wizard-v8.tsx',
   'app/booking/menus/new/page.tsx',
-  'app/booking/menus/payment-tab-v8.tsx',
-  'app/booking/menus/settings-v8.tsx',
   'app/booking/menus/staff/page.tsx',
   'app/booking/staff/new/page.tsx',
   'app/booking/staff/shifts/page.tsx',
@@ -204,10 +202,6 @@ const COVERED_BY_PARENT: Record<string, string> = {
   'app/settings/file-scan/file-scan-v8.tsx': 'app/settings/file-scan/page.tsx',
   // 予約設定V8のタブ分割。書きかけは V8TabEditContext で親へ報告し、
   // 番兵（useUnsavedGuard＋離脱確認）は殻の settings-v8.tsx が持つ。
-  'app/booking/menus/settings-tabs/shared.tsx': 'app/booking/menus/settings-v8.tsx',
-  'app/booking/menus/settings-tabs/hours-tab.tsx': 'app/booking/menus/settings-v8.tsx',
-  'app/booking/menus/settings-tabs/holidays-tab.tsx': 'app/booking/menus/settings-v8.tsx',
-  'app/booking/menus/settings-tabs/rules-tab.tsx': 'app/booking/menus/settings-v8.tsx',
   // ★V8 予約設定（src/v8/booking-menus）のタブ。書きかけは V8TabEditContext で殻の settings.tsx へ報告し、番兵は殻が持つ。
   'v8/booking-menus/tabs/shared.tsx': 'v8/booking-menus/settings.tsx',
   'v8/booking-menus/tabs/hours-tab.tsx': 'v8/booking-menus/settings.tsx',
@@ -326,10 +320,6 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8 の保存した検索一覧。詳細パネルの検索名はその場書き換えでEnter確定の即時保存、削除は確認窓で確定し、画面に残る下書きを持たない',
   'app/tags/fields-tab-v8.tsx':
     '★V8 の友だち情報欄一覧。詳細パネルの項目名はその場書き換えでEnter確定の即時保存、削除・フォルダ操作は確認窓か即時保存で確定し、画面に残る下書きを持たない',
-  'app/booking/menus/page.tsx':
-    '予約メニュー編集窓（Dialog）内の dirty。×・Esc・背景・キャンセルは窓内の破棄確認に集め、閉じると入力は戻る仕様で画面離脱ガードの対象外',
-  'app/booking/staff/shifts/staff-detail-v8.tsx':
-    '★V8 の勤務とシフト（d5fmnM・E3YDK・wvGke）。各段がそれぞれの「保存」「作る」「足す」でその場で確定し、画面に残る下書きを持たない。v7 の staff-detail.tsx と同じ構造（番兵は shifts/page.tsx 側の GUARDED 行が担保）',
   'components/inflow-links/site-script.tsx':
     'サイトの追加・編集・停止理由の入力はすべてDialog内。閉じると入力は戻る仕様で、画面離脱ガードの対象外',
   'app/restaurant-test/v8/organization.tsx':
