@@ -7,14 +7,16 @@ export function scanListSkeleton() {
     return box.width > 1 && box.height > 1 && css.display !== 'none' && css.visibility !== 'hidden' && !el.closest('[aria-hidden="true"], [inert], [role="dialog"]')
   }
   const near = (value, expected) => Math.abs(value - expected) <= 1
-  const examples = []
+  const examples = [], coverage = { heads: 0, rows: 0 }
   const fail = (rule, element) => { failures.push(rule); if (examples.length < 15) examples.push({ rule, text: element.textContent.trim().slice(0, 50), height: element.getBoundingClientRect().height }) }
   for (const root of roots) {
     const width = root.closest('[data-page-template]')?.getBoundingClientRect().width ?? root.getBoundingClientRect().width
     for (const head of root.querySelectorAll('[data-shared-part="list-head"], [data-shared-part="list-table"] thead > tr')) {
+      if (visible(head)) coverage.heads++
       if (visible(head) && !near(head.getBoundingClientRect().height, 40)) fail('B-178 見出し40', head)
     }
     for (const row of root.querySelectorAll('[data-shared-part="list-row"], [data-shared-part="list-table"] tbody > tr')) {
+      if (visible(row) && !row.querySelector('[colspan]')) coverage.rows++
       if (visible(row) && !row.querySelector('[colspan]') && !near(row.getBoundingClientRect().height, 60)) fail('B-178 行60', row)
     }
     for (const cell of root.querySelectorAll('[data-kpi-strip]:not([data-kpi-density="compact"]) > [data-design-version]')) {
@@ -36,7 +38,7 @@ export function scanListSkeleton() {
     }
     if (root.scrollWidth > root.clientWidth + 1) fail('B-178 一覧のはみ出し', root)
   }
-  return { scopes: roots.length, failures: [...new Set(failures)], examples }
+  return { scopes: roots.length, coverage, failures: [...new Set(failures)], examples }
 }
 
 /** 一覧に出ない3部品も、実際の作る画面で測る。 */

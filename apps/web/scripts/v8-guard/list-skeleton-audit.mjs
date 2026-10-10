@@ -18,6 +18,8 @@ try {
       await page.locator('[data-list-skeleton]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {})
       const result = await page.evaluate(scanListSkeleton)
       if (!result.scopes) result.failures.push('B-178 一覧の型なし')
+      const expectsTable = registry.boards.some((board) => board.url === route && board.layout !== 'cards')
+      if (expectsTable && (!result.coverage.heads || !result.coverage.rows)) result.failures.push('B-178 表の見張り対象なし')
       failed ||= result.failures.length > 0
       results.push({ width, route, ...result })
       console.log(`${width} ${route}: ${result.failures.join('・') || '合格'}`)

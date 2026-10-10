@@ -50,7 +50,8 @@
     {
       "id": "B9ZAr",
       "source": "v8/hq-banners/list.tsx",
-      "url": "/hq/banners"
+      "url": "/hq/banners",
+      "layout": "cards"
     },
     {
       "id": "Jxmqh",
@@ -85,7 +86,8 @@
     {
       "id": "O7hUt7",
       "source": "v8/contents/list.tsx",
-      "url": "/contents"
+      "url": "/contents",
+      "layout": "cards"
     },
     {
       "id": "xbHxg",
