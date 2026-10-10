@@ -247,12 +247,13 @@ function EventsCreateV8Inner() {
       footerActions={(
         <>
           <Button href="/events">キャンセル</Button>
-          <Button disabled={saving} busy={saving} onClick={() => void save(false)}>下書きを保存</Button>
-          <Button variant="primary" disabled={saving} busy={saving} onClick={() => void save(true)}><Globe size={15} aria-hidden="true" />公開する</Button>
+          <Button disabled={saving || !selectedAccountId} busy={saving} onClick={() => void save(false)}>下書きを保存</Button>
+          <Button variant="primary" disabled={saving || !selectedAccountId} busy={saving} onClick={() => void save(true)}><Globe size={15} aria-hidden="true" />公開する</Button>
         </>
       )} dirty={false}
     >
       {error ? <Notice tone="danger">{error}</Notice> : null}
+      {!selectedAccountId ? <Notice tone="info">上のバーでLINE公式アカウントを選んでください</Notice> : null}
 
       <section className={styles.card} aria-labelledby="ev-new-body">
         <h2 className={styles.cardTitle} id="ev-new-body">イベントの中身</h2>

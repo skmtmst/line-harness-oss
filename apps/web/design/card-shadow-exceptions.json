@@ -505,11 +505,6 @@
     "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
   },
   {
-    "file": "app/events/new/events-new-v8.tsx",
-    "selector": "className=\"bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm\"",
-    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
-  },
-  {
     "file": "app/nen/health/summary-drawer.tsx",
     "selector": "className=\"rounded-card border border-hairline bg-canvas p-3\"",
     "reason": "数の帯のマス。B-153に従い線で区切る。"
@@ -638,21 +633,6 @@
     "file": "components/dashboard/dashboard-editor.tsx",
     "selector": "className=\"border-hairline bg-canvas-sunken rounded-card border p-3\"",
     "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
-  },
-  {
-    "file": "components/events/event-wizard.tsx",
-    "selector": "className=\"bg-canvas rounded-card border-hairline border p-12 text-center text-sm text-ink-faint\"",
-    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
-  },
-  {
-    "file": "components/events/event-wizard.tsx",
-    "selector": "className=\"bg-canvas rounded-card border-hairline mb-4 flex flex-col gap-2 border p-4 sm:flex-row\"",
-    "reason": "絞り込み・段の切り替え・選択の枠。中身のカードではない。"
-  },
-  {
-    "file": "components/events/event-wizard.tsx",
-    "selector": "className=\"text-ink-faint border-hairline rounded-card border border-dashed p-6 text-center text-sm\"",
-    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
   },
   {
     "file": "components/forms/block-editor.tsx",

@@ -99,11 +99,6 @@
     "height": 4,
     "font": 10
   },
-  "app/events/new/events-new-v8.module.css": {
-    "spacing": 2,
-    "height": 2,
-    "font": 3
-  },
   "app/friend-add-settings/publish/done-v8.module.css": {
     "spacing": 11,
     "height": 5,
