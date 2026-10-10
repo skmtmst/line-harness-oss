@@ -5,6 +5,8 @@ import styles from './page-templates.module.css'
 export interface DashboardPageProps extends PageHeadingProps {
   boardId?: string
   standalone?: boolean
+  /** 飲食の融合板の見出しと本文の寸法。 */
+  layout?: 'restaurant'
   /** 板の頭のすぐ下に置くタブの段（E-1 hKRRF の店のタブ）。省くと段を作らない。 */
   tabs?: ReactNode
   notice?: ReactNode
@@ -12,8 +14,8 @@ export interface DashboardPageProps extends PageHeadingProps {
   children: ReactNode
   overlays?: ReactNode
 }
-export function DashboardPage({ boardId, standalone, tabs, notice, stats, children, overlays, ...heading }: DashboardPageProps) {
-  return <PageFrame kind="dashboard" boardId={boardId} standalone={standalone}>
+export function DashboardPage({ boardId, standalone, layout, tabs, notice, stats, children, overlays, ...heading }: DashboardPageProps) {
+  return <PageFrame kind="dashboard" layout={layout} boardId={boardId} standalone={standalone}>
     <PageHeading {...heading} />
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     {notice ? <div className={styles.notice} data-template-region="notice">{notice}</div> : null}

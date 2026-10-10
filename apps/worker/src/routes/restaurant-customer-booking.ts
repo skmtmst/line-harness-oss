@@ -367,7 +367,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
           if (
             !(await db
               .prepare(
-                `SELECT 1 FROM rt_reservations WHERE store_id=? AND id<>? AND table_id=? AND status NOT IN ('cancelled','no_show') AND (status<>'pending' OR hold_expires_at IS NULL OR julianday(hold_expires_at)>julianday('now')) AND julianday(starts_at)<julianday(?) AND julianday(ends_at)>julianday(?) UNION ALL SELECT 1 FROM rt_seat_waitlist WHERE store_id=? AND table_id=? AND status='invited' AND julianday(hold_expires_at)>julianday('now') AND julianday(starts_at)<julianday(?) AND julianday(ends_at)>julianday(?)`,
+                `SELECT 1 FROM rt_reservations WHERE store_id=? AND id<>? AND table_id=? AND departed_at IS NULL AND status NOT IN ('cancelled','no_show') AND (status<>'pending' OR hold_expires_at IS NULL OR julianday(hold_expires_at)>julianday('now')) AND julianday(starts_at)<julianday(?) AND julianday(ends_at)>julianday(?) UNION ALL SELECT 1 FROM rt_seat_waitlist WHERE store_id=? AND table_id=? AND status='invited' AND julianday(hold_expires_at)>julianday('now') AND julianday(starts_at)<julianday(?) AND julianday(ends_at)>julianday(?)`,
               )
               .bind(
                 store.id,

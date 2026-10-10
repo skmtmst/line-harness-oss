@@ -68,6 +68,12 @@ function firedEventTypes(): Set<string> {
     }
     if (source.includes("'ec.order.confirmed'") && source.includes('EVENT_TRIGGER_TYPES')) fired.add('ec.order.confirmed')
   }
+  // 飲食は同じトランザクションでoutboxへ書き、共通配送からfireEventへ渡す。
+  const restaurantDelivery=readFileSync(join(root,'services/restaurant-events.ts'),'utf8')
+  if(restaurantDelivery.includes('fireEvent(owned,e.event_type')) {
+    const migration=readFileSync(join(REPO,'packages/db/migrations/629_restaurant_reservation_events.sql'),'utf8')
+    for(const m of migration.matchAll(/'(restaurant\.[a-z_.]+)'/g))fired.add(m[1])
+  }
   return fired
 }
 

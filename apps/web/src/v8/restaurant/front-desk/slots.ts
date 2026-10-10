@@ -37,7 +37,7 @@ export function byCode(a: RestaurantTable, b: RestaurantTable): number {
 /** [start, end) とその卓の予約が重なるか。取消・無断と期限切れの押さえは数えない。 */
 export function tableBusy(tableId: string, start: number, end: number, rows: RestaurantReservation[], now = Date.now()): boolean {
   return rows.some((r) => {
-    if (!seatBoardEntry(r as unknown as Record<string,unknown>).resourceIds.includes(tableId) || INACTIVE.includes(r.status)) return false
+    if (r.departed_at || !seatBoardEntry(r as unknown as Record<string,unknown>).resourceIds.includes(tableId) || INACTIVE.includes(r.status)) return false
     if (r.status === 'pending' && r.hold_expires_at && Date.parse(r.hold_expires_at) <= now) return false
     return Date.parse(r.starts_at) < end && Date.parse(r.ends_at) > start
   })

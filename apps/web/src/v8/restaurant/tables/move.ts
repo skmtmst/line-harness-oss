@@ -25,7 +25,7 @@ export function pickMoveTarget(
 ): RestaurantTable | null {
   const fits = candidates
     .filter((table) => table.is_active && table.max_capacity >= reservation.guest_count && table.min_capacity <= reservation.guest_count)
-    .filter((table) => !taken.some((item) => seatBoardEntry(item as unknown as Record<string,unknown>).resourceIds.includes(table.id) && item.id !== reservation.id && reservationOccupies(item.status,item.hold_expires_at??null) && overlaps(item, reservation)))
+    .filter((table) => !taken.some((item) => seatBoardEntry(item as unknown as Record<string,unknown>).resourceIds.includes(table.id) && item.id !== reservation.id && reservationOccupies(item.status,item.hold_expires_at??null,Date.now(),item.departed_at??null) && overlaps(item, reservation)))
     .sort((a, b) => (a.max_capacity - reservation.guest_count) - (b.max_capacity - reservation.guest_count) || a.code.localeCompare(b.code))
   return fits[0] ?? null
 }

@@ -69,7 +69,7 @@ describe('hKRRF 今日のお店', () => {
     expect(screen.getByRole('menuitem', { name: 'ホットペッパーの店舗ページ' }).getAttribute('href')).toBe('https://hotpepper.jp/x/')
     expect(screen.getByRole('button', { name: /電話予約/ })).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '鈴木 美咲さんを来店にする' }))
-    await waitFor(() => expect(api.postSeatVisitMark).toHaveBeenCalledWith('account-1', 'r1', { kind: 'visited' }))
+    await waitFor(() => expect(api.postSeatVisitMark).toHaveBeenCalledWith('account-1', 'r1', expect.objectContaining({ kind: 'visited',expectedVersion:1,requestId:expect.any(String) })))
     /* 来店済みの行には［来店］を出さない。 */
     expect(screen.queryByRole('button', { name: '佐藤 健二さんを来店にする' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'ホットペッパーの枠を閉じた' }))
