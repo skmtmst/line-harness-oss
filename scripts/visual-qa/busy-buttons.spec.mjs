@@ -3,6 +3,7 @@
  * 実Googleへは送らない。VISUAL_QA_BASEはローカルでビルドした画面だけを指定する。
  */
 import { test, expect } from '@playwright/test'
+import scanLayoutDefects from '../../apps/web/scripts/v8-guard/layout-defects-browser.mjs'
 
 const base = process.env.VISUAL_QA_BASE ?? 'http://127.0.0.1:3101'
 if (!['127.0.0.1', 'localhost', '::1'].includes(new URL(base).hostname)) throw new Error('処理中ボタンの試験はローカル画面専用です')
@@ -101,6 +102,34 @@ for (const width of [1152, 1440, 1920]) {
         await expect(page.locator('main')).toBeVisible()
         await expect(page.getByText('LINEでログイン', { exact: true })).toHaveCount(0)
         await page.waitForLoadState('networkidle')
+        if (route === '/restaurant-test/organization') {
+          const hierarchy = page.locator('details').filter({ has: page.locator('summary', { hasText: '組織階層' }) })
+          if (width === 1152) {
+            await expect(hierarchy).toBeVisible()
+            await hierarchy.locator('summary').click()
+            await expect(hierarchy).toHaveAttribute('open', '')
+            await fits(page)
+            await hierarchy.locator('summary').click()
+          } else await expect(hierarchy).toBeHidden()
+          const accounts = page.getByRole('table', { name: 'アカウント一覧' })
+          const rows = accounts.getByRole('row').filter({ has: page.getByRole('button', { name: '変更', exact: true }) })
+          await expect(rows).toHaveCount(3)
+          for (const row of await rows.all()) {
+            await expect(row.getByRole('button')).toHaveCount(2)
+            await expect(row.getByRole('button', { name: /その他操作$/ })).toBeVisible()
+            await expect(row.getByRole('button', { name: '停止', exact: true })).toHaveCount(0)
+          }
+          await rows.first().getByRole('button', { name: /その他操作$/ }).click()
+          await fits(page)
+          await page.getByRole('menuitem', { name: '停止', exact: true }).click()
+          await expect(page.getByRole('dialog')).toBeVisible()
+          await page.getByRole('button', { name: 'キャンセル', exact: true }).click()
+          await expect(page.getByRole('dialog')).toHaveCount(0)
+          // 変更したアカウント表を同じCI検査で測る（折り返し・潰れ・切れ・重なり）。
+          // 店舗一覧の隣り合う行の境界は、この表の検査対象に含めない。
+          const defects = await page.evaluate(scanLayoutDefects)
+          expect(defects.filter((finding) => finding.target.includes('.organization_table'))).toEqual([])
+        }
         await info.attach(`画面-${width}`, { body: await page.screenshot(), contentType: 'image/png' })
         await fits(page)
         expect(errors).toEqual([])
