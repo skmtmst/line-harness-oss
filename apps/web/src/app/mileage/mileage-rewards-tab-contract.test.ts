@@ -12,7 +12,7 @@ import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mj
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const TAB = readFileSync(join(__dirname, 'mileage-rewards-tab.tsx'), 'utf8')
+const TAB = readFileSync(join(__dirname, '../../v8/mileage/rewards.tsx'), 'utf8')
 const PAGE = readFileSync(join(__dirname, 'page.tsx'), 'utf8')
 
 /** 説明の文は「そう書いてある」だけで通ってしまうので、判定の前に落とす。 */
@@ -35,7 +35,8 @@ describe('マイルの使い道', () => {
 
   it('引換コードの残りを 0 で埋めない', () => {
     expect(code).not.toMatch(/availableCodeCount\s*\?\?\s*0/)
-    expect(code).toMatch(/availableCodeCount\s*===\s*null/)
+    expect(code).toContain('reward.availableCodeCount != null')
+    expect(code).toContain('残り数は取れていません')
   })
 
   it('内部の記号をそのまま画面に出さない', () => {
@@ -103,7 +104,7 @@ describe('届かなかった交換', () => {
     // 0件を「0件」と書くと、届いていない交換が無いことになる。
     // 取れないのに欄ごと消すと、見えていない失敗を対応不要と誤認する（R366）。
     expect(code).toMatch(/setRedemptionsVisible\(false\)/)
-    expect(code).toMatch(/failedRedemptions\.length > 0 \|\| redemptionsLoad === 'error'/)
+    expect(code).toMatch(/failed\.length > 0 \|\| redemptionsLoad === 'error'/)
     expect(code).toMatch(/kind=\{redemptionsLoad\}/)
     expect(code).toMatch(/onRetry/)
   })
@@ -116,7 +117,8 @@ describe('届かなかった交換', () => {
   it('21件以上あっても残りを出せる', () => {
     // 最後まで読んでいないのに「すべて」と言わない（R365）。
     expect(code).toMatch(/<Pagination/)
-    expect(code).toMatch(/つ中.*を表示/)
+    expect(code).toContain('要対応の交換 ${formatNumber(redemptionsTotal)} 件')
+    expect(code).toContain('pageCount={Math.ceil(redemptionsTotal / REDEMPTIONS_PAGE_SIZE)}')
     expect(code).not.toMatch(/failedRedemptions\.length\}つをすべて表示/)
   })
 
@@ -124,7 +126,7 @@ describe('届かなかった交換', () => {
     // 返却済みなのに「やり直せませんでした」と未返却の説明を残さない（R367）。
     expect(code).toMatch(/redemption\?\.status/)
     expect(code).toMatch(/'refunded'/)
-    expect(code).toMatch(/setRedemptionsNotice/)
+    expect(code).toMatch(/setRetryNotice/)
   })
 
   it('やり直しは失敗中の口へ店と一緒に送る', () => {
@@ -136,7 +138,7 @@ describe('届かなかった交換', () => {
     // 先に立てた旗でボタンも関数も止める。
     expect(code).toMatch(/disabled=\{retryingId !== null\}/)
     expect(code).toMatch(/if\s*\(!accountId \|\| retryingId\) return/)
-    expect(code).toMatch(/setRetryingId\(redemption\.id\)/)
+    expect(code).toMatch(/setRetryingId\(item\.id\)/)
   })
 
   it('同時押しは描画の外の旗で止める', () => {
@@ -146,13 +148,13 @@ describe('届かなかった交換', () => {
      * 実挙動は mileage-retry-react.test.tsx が当てる。ここは口の形だけ見る。
      */
     expect(code).toMatch(/createSingleFlightLock/)
-    expect(code).toMatch(/if \(!retryLock\.acquire\(redemption\.id\)\) return/)
-    expect(code).toMatch(/retryLock\.release\(redemption\.id\)/)
+    expect(code).toMatch(/if \(!retryLock\.acquire\(item\.id\)\) return/)
+    expect(code).toMatch(/retryLock\.release\(item\.id\)/)
     expect(code).toMatch(/retryLock\.reset\(\)/)
   })
 
   it('やり直しのあとは一覧を読み直す', () => {
-    expect(code).toMatch(/await loadFailedRedemptions\(redemptionsPageRef\.current\)/)
+    expect(code).toMatch(/await loadFailed\(redemptionsPageRef\.current\)/)
   })
 
   it('店切替で古い応答が後着しない', () => {
@@ -185,7 +187,7 @@ describe('届かなかった交換', () => {
 
   it('再取得のたびに店の世代を確かめる', () => {
     // 1つ目の再取得待ちにBへ切り替わると、2つ目がBを上書きする。
-    expect(code).toMatch(/await loadFailedRedemptions\(redemptionsPageRef\.current\)[\s\S]*?if \(!accountTracker\.isCurrent\(operation\)\) return[\s\S]*?await load\(\)/)
+    expect(code).toMatch(/await loadFailed\(redemptionsPageRef\.current\)[\s\S]*?if \(!accountTracker\.isCurrent\(operation\)\) return[\s\S]*?await load\(\)/)
   })
 })
 
@@ -194,12 +196,12 @@ describe('いちばん使われた', () => {
 
   it('1回も交換されていないときは名指ししない', () => {
     // 名前を出すと「これがよく使われている」と読め、伸ばす先を取り違える。
-    expect(code).toMatch(/mostRedeemedRewardCount\s*\?\s*summary\.mostRedeemedRewardName/)
+    expect(code).toMatch(/redeemedCount\s*\?\s*\(overviewSummary\?\.mostRedeemedRewardName/)
     expect(code).toContain('まだ交換されていません')
   })
 
   it('数えられないときと0回を、同じ文にしない', () => {
-    expect(code).toMatch(/mostRedeemedRewardCount\s*==\s*null/)
-    expect(code).toMatch(/mostRedeemedRewardCount\s*===\s*0/)
+    expect(code).toMatch(/popularCount\s*==\s*null/)
+    expect(code).toMatch(/popularCount\s*===\s*0/)
   })
 })

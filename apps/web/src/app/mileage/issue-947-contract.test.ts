@@ -7,7 +7,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const SCORE_RULES = readFileSync(join(HERE, 'score-rules', 'page.tsx'), 'utf8')
 // R296: きっかけの一覧は作成・編集で共用の rule-fields.ts にまとめた。
 const EARNING_RULES = readFileSync(join(HERE, 'earning-rules', 'rule-fields.ts'), 'utf8')
-const REWARDS_TAB = readFileSync(join(HERE, 'mileage-rewards-tab.tsx'), 'utf8')
+const REWARDS_TAB = readFileSync(join(HERE, '../../v8/mileage/rewards.tsx'), 'utf8')
 const SCORE_TAB = readFileSync(join(HERE, 'action-score-tab.tsx'), 'utf8')
 const SCORE_DIALOG = readFileSync(join(HERE, 'action-score-adjustment-dialog.tsx'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')

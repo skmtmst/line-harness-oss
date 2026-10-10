@@ -16,7 +16,7 @@ const PAGE = RAW_PAGE
   .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/^\s*\/\/.*$/gm, '')
-const LIST = readFileSync(join(__dirname, '..', '..', 'mileage-rewards-tab.tsx'), 'utf8')
+const LIST = readFileSync(join(__dirname, '../../../../v8/mileage/rewards.tsx'), 'utf8')
 
 const base: FormState = {
   name: '送料無料クーポン',
@@ -142,8 +142,8 @@ describe('V6 17-1-G の配線', () => {
 
   it('一覧から行き止まりを作らない', () => {
     expect(LIST).toContain('href="/mileage/rewards/edit"')
-    expect(LIST).toContain('使い道をつくる')
-    expect(LIST).toContain('内容を編集')
+    expect(LIST).toContain('使い道を作る')
+    expect(LIST).toContain("label: readonly ? '中身を見る' : '編集'")
   })
 
   it('内部の記号を画面に出さない', () => {

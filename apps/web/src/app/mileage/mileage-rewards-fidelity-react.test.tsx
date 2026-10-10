@@ -62,6 +62,7 @@ function rewardFixture(id: string, name: string, status: 'published' | 'draft') 
 
 const createdRewards: Array<unknown> = []
 const testedRewards: string[] = []
+let reportSummary: { publishedCount: number; redeemedMilesThisMonth: number; neverRedeemedFriendCount: number | null; mostRedeemedRewardName: string | null; mostRedeemedRewardCount: number | null } | undefined
 
 function stubFetch() {
   globalThis.fetch = (async (input: unknown, init?: { method?: string; body?: string }) => {
@@ -82,6 +83,7 @@ function stubFetch() {
       return new Response(JSON.stringify({
         success: true,
         data: {
+          summary: reportSummary,
           rewards: [
             rewardFixture('reward-1', '送料無料クーポン', 'published'),
             rewardFixture('reward-2', '冬の限定ギフト', 'draft'),
@@ -140,6 +142,7 @@ beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
   createdRewards.length = 0
   testedRewards.length = 0
+  reportSummary = undefined
   stubFetch()
   container = document.createElement('div')
   document.body.appendChild(container)
@@ -195,6 +198,18 @@ describe('使い道の絵合わせ（板 `S35pO`）', () => {
     expect(body).toContain('残り 制限なし')
     expect(body).toContain('10/31 まで')
     expect(body).not.toContain('残り制限なし')
+    expect(container.querySelector('[title="1回も使っていない人の数は未取得"]')).not.toBeNull()
+    expect(body).toContain('交換の回数は未取得')
+  })
+
+  it('0人と0回は未取得と区別し、0回の使い道を人気として名指ししない', async () => {
+    reportSummary = { publishedCount: 1, redeemedMilesThisMonth: 0, neverRedeemedFriendCount: 0, mostRedeemedRewardName: '交換されていない使い道', mostRedeemedRewardCount: 0 }
+    await renderTab()
+    await waitForRows()
+    expect(container.querySelector('[title="1回も使っていない人 0 人"]')).not.toBeNull()
+    expect(container.textContent).toContain('まだ交換されていません')
+    expect(container.textContent).not.toContain('交換の回数は未取得')
+    expect(container.textContent).not.toContain('交換されていない使い道')
   })
 
   it('現役のフォルダはすべてだけを出し、行の操作を説明する', async () => {
