@@ -80,7 +80,6 @@ import type {
   ConversionPoint,
   ConversionMeasureMethod,
   Affiliate,
-  Template,
   Automation,
   AutomationLog,
   Chat,
@@ -13521,7 +13520,7 @@ export const api = {
   // 同ページから参照する。Worker の applyRefAttribution は entry_routes → tracked_links
   // の順でフォールバックするので、tracked_links 登録済み ref は実際にはシナリオ発火している。
   trackedLinks: {
-    list: () =>
+    list: (accountId?: string) =>
       fetchApi<
         ApiResponse<
           Array<{
@@ -13539,7 +13538,7 @@ export const api = {
             updatedAt: string
           }>
         >
-      >('/api/tracked-links'),
+      >(`/api/tracked-links${accountId ? `?lineAccountId=${encodeURIComponent(accountId)}` : ''}`),
   },
   pools: {
     list: (options?: FetchApiOptions) =>
