@@ -35,7 +35,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * ★V8 ウェビナーの ②動画と公開期間（Pencil：オンデマンド VWNaA・日時指定と開催回 LPOe7）。
  * 動画（差し替える・準備の段）→ 公開期間（オンデマンド）／開催回（日時指定）→ 配信枠 → 視聴の数え方。
  * 右は公開ページでの見え方。
- * 口・保存の決まりは app/webinars/edit/video-v8.tsx・video-stages.tsx・scheduled-session-row.tsx と同じ（BEHAVIOR.md）。
+ * 口・保存の決まりは BEHAVIOR.md に記録。
  */
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']

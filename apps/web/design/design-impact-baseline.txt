@@ -206,9 +206,6 @@ shared-button-importer app/templates/questions/new/page.tsx
 shared-button-importer app/templates/template-asset-editor.tsx
 shared-button-importer app/users/users-v8.tsx
 shared-button-importer app/webhooks/edit/page.tsx
-shared-button-importer app/webinars/edit/scheduled-session-row.tsx
-shared-button-importer app/webinars/edit/video-stages.tsx
-shared-button-importer app/webinars/edit/video-v8.tsx
 shared-button-importer app/webinars/edit/webinar-edit-compare-dialog.tsx
 shared-button-importer app/webinars/edit/webinar-edit-conflict-band.tsx
 shared-button-importer app/webinars/published/page.tsx
@@ -660,3 +657,4 @@ shared-button-importer v8/booking-bookings/visit-actions.tsx
 shared-button-importer app/emergency/control-feedback-v8.tsx
 shared-button-importer v8/settings/emergency/history-details.tsx
 shared-button-importer test-utils/webinar-notifications.tsx
+shared-button-importer test-utils/webinar-video.tsx
