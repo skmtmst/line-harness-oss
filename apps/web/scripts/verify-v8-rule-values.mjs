@@ -56,8 +56,61 @@ export function verifyRuleValues(css, expected = RULE_VALUES) {
   })
 }
 
+// 値だけ正しくても、部品が旧い直書きを読んでいたら落とす。
+export const RULE_BINDINGS = [
+  ['button', ".field", 'height', '--tpl-button-h'],
+  ['button', ".button", 'padding', '0 var(--tpl-button-pad-side)'],
+  ['folder-panel', ".panel .add", 'height', '--tpl-button-h'],
+  ['folder-panel', ".panel .add", 'padding', '0 var(--tpl-button-pad-side)'],
+  ['tabs', ".list .tab.tab", 'height', '--tpl-tabs-h'],
+  ['tabs', ".list .tab.tab", 'font-weight', '--tpl-tabs-weight'],
+  ['tabs', ".list .current.current", 'font-weight', '--tpl-tabs-current-weight'],
+  ['status-badge', ".badge", 'height', '--tpl-badge-h'],
+  ['tag-pill', ".pill[data-size]", 'height', '--tpl-tag-pill-h'],
+  ['dialog', ".title", 'font-size', '--tpl-dialog-title-size'],
+  ['dialog', ".title", 'font-weight', '--tpl-dialog-title-weight'],
+  ['dialog', ".panel", 'box-shadow', '--shadow-controls-pop'],
+  ['drawer', ".panel.panel .title", 'font-size', '--tpl-dialog-title-size'],
+  ['drawer', ".panel.panel .title", 'font-weight', '--tpl-dialog-title-weight'],
+  ['folder-editor-dialog', ".label", 'font-size', '--tpl-field-label-size'],
+  ['folder-editor-dialog', ".label", 'font-weight', '--tpl-field-label-weight'],
+  ['form-controls', ".label", 'font-size', '--tpl-field-label-size'],
+  ['form-controls', ".label", 'font-weight', '--tpl-field-label-weight'],
+  ['card', ".header .title", 'font-size', '--tpl-section-title-size'],
+  ['card', ".header .title", 'font-weight', '--tpl-section-title-weight'],
+  ['line-preview', ".phoneTitle", 'font-size', '--tpl-section-title-size'],
+  ['line-preview', ".phoneTitle", 'font-weight', '--tpl-section-title-weight'],
+  ['../templates/create-parts', ".summaryTitle", 'font-size', '--tpl-section-title-size'],
+  ['../templates/create-parts', ".summaryTitle", 'font-weight', '--tpl-section-title-weight'],
+  ['section-header', ".title", 'font-size', '--tpl-section-title-size'],
+  ['section-header', ".title", 'font-weight', '--tpl-section-title-weight'],
+]
+
+export function verifyRuleBindings(readCss) {
+  const normalize = selector => selector.trim().replaceAll('"', "'").replace(/\s+/g, ' ')
+  return RULE_BINDINGS.flatMap(([file, selector, prop, token]) => {
+    const target = normalize(`[data-theme='v8'] ${selector}`)
+    let actual
+    const root = postcss.parse(readCss(file))
+    root.walkRules(rule => {
+      if (!rule.selectors.some(s => normalize(s) === target)) return
+      for (const node of rule.nodes) if (node.type === 'decl' && node.prop === prop) actual = node.value
+    })
+    // SectionHeader の基本の.titleはV8用の部品なので、テーマ限定がなければ基本を読む。
+    if (actual === undefined && file === 'section-header') root.walkRules(rule => {
+      if (rule.selector !== selector) return
+      for (const node of rule.nodes) if (node.type === 'decl' && node.prop === prop) actual = node.value
+    })
+    const expected = token.startsWith('--') ? `var(${token})` : token
+    return actual === expected ? [] : [`${file} ${selector} ${prop}: 決まり ${expected} / 実際 ${actual ?? '未定義'}`]
+  })
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const errors = verifyRuleValues(readFileSync(new URL('../src/app/globals.css', import.meta.url), 'utf8'))
+  const errors = [
+    ...verifyRuleValues(readFileSync(new URL('../src/app/globals.css', import.meta.url), 'utf8')),
+    ...verifyRuleBindings(file => readFileSync(new URL(`../src/components/shared/${file}.module.css`, import.meta.url), 'utf8')),
+  ]
   if (errors.length) { console.error(errors.join('\n')); process.exitCode = 1 }
-  else console.log(`V8 の決まりの値: ${Object.keys(RULE_VALUES).length} 件一致（B-159/161/180）`)
+  else console.log(`V8 の決まりの値: ${Object.keys(RULE_VALUES).length} 件・部品の参照 ${RULE_BINDINGS.length} 件一致（B-159/161/180）`)
 }
