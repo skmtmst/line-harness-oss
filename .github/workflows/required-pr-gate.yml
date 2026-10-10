@@ -667,6 +667,12 @@ jobs:
             echo "基準表の更新があるため、JS 超過は通す（理由は PR に書くこと）。"
           fi
           ALLOW_JS_BASELINE_UPDATE="$allow_js" node apps/web/scripts/v8-guard/speed-budget.mjs http://127.0.0.1:4310 /tmp/v8-guard/speed.json
+      - name: 2000 friends meet absolute speed targets
+        if: steps.scope.outputs.run == 'true'
+        run: node apps/web/scripts/v8-guard/stress-targets.mjs /tmp/v8-guard/speed.json
+      - name: Virtual table selection, keyboard and layout
+        if: steps.scope.outputs.run == 'true'
+        run: node scripts/visual-qa/friends-table.browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stress-table
       - name: v7 screens are pixel-identical to the base
         # オーナー決定（V8 へ完全切替）：共通部品が V8 になったので v7 の画素は変わる。比べた結果は残すが止めない。
         continue-on-error: true
