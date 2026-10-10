@@ -226,7 +226,6 @@ shared-button-importer app/rich-menus/external-import.tsx
 shared-button-importer app/rich-menus/new/create-v8.tsx
 shared-button-importer app/rich-menus/new/page.tsx
 shared-button-importer app/rich-menus/page.tsx
-shared-button-importer app/search-console/page.tsx
 shared-button-importer app/settings/feature-settings-v8.tsx
 shared-button-importer app/settings/file-scan/file-scan-v8.tsx
 shared-button-importer app/settings/manual-links/manual-links-v8.tsx
