@@ -69,6 +69,7 @@ function apiCall(path: string, options?: RequestInit): Promise<Response> {
 function getPage(): string | null {
   const path = window.location.pathname.replace(/^\/+/, '');
   if (path === 'book') return 'book';
+  if (/^restaurant\/reserve\/[^/]+$/.test(path)) return 'restaurant';
   const params = new URLSearchParams(window.location.search);
   return params.get('page');
 }
@@ -356,7 +357,9 @@ async function linkAndAddFlow() {
 
 // ─── Salon Booking (React, dynamic-imported) ─────────────
 
-async function initSalonBooking(page: 'salon-book' | 'visit-stamps' | 'entry-coupon' = 'salon-book'): Promise<void> {
+export async function initRestaurantForm(): Promise<void> { await initSalonBooking('form'); }
+
+async function initSalonBooking(page: 'salon-book' | 'visit-stamps' | 'entry-coupon' | 'restaurant' | 'form' = 'salon-book'): Promise<void> {
   // 既存 linkAndAddFlow と同じ初期化シーケンスを踏む:
   //   ① profile + idToken + friendFlag を並列取得
   //   ② /api/liff/link で UUID 確定 (ref/ig 含む) — booking エンドポイントが
@@ -427,6 +430,12 @@ async function initSalonBooking(page: 'salon-book' | 'visit-stamps' | 'entry-cou
   const container = document.getElementById('app');
   if (!container) {
     showError('mount target #app が見つかりません');
+    return;
+  }
+  if (page === 'restaurant' || page === 'form') {
+    if (!await linked) { showError('画面を開けませんでした。もう一度お試しください。'); return; }
+    const { mountRestaurant } = await import('./restaurant/main.js');
+    mountRestaurant(container,{liffId:LIFF_ID,lineUserId:profile.userId,idToken,sdk:liff},page);
     return;
   }
   if (page === 'entry-coupon') {
@@ -748,6 +757,8 @@ async function main() {
       await initSalonBooking('entry-coupon');
     } else if (page === 'book') {
       await initBooking();
+    } else if (page === 'restaurant') {
+      await initSalonBooking('restaurant');
     } else if (page === 'salon-book') {
       await initSalonBooking();
     } else if (page === 'visit-stamps') {
@@ -765,9 +776,7 @@ async function main() {
     } else if (page === 'nen-member') {
       await initNenMember();
     } else if (page === 'form') {
-      const params = new URLSearchParams(window.location.search);
-      const formId = params.get('id');
-      await initForm(formId);
+      await initForm(new URLSearchParams(window.location.search).get('id'));
     } else if (!page) {
       await linkAndAddFlow();
     } else {

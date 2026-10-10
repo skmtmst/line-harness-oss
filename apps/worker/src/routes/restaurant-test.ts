@@ -2767,3 +2767,46 @@ restaurantTest.get('/api/restaurant-test/reservations/:id',requireRole('owner','
  const entry=seatBoardEntry(row);
  return c.json({success:true,data:{reservation:entry,courseAllergens:entry.dining?.courseAllergens??null,allergensSource:'registered_at_booking'}});
 });
+
+// 系列への案内を許可する操作。店舗やアカウントの閲覧権限は広げない。
+restaurantTest.get('/api/restaurant-test/store-groups',requireRole('owner','admin','staff'),async c=>{
+ if(!hasOrganizationSelector(c))return requiredAccount(c);
+ const org=await organizationFor(c,{ignoreSession:true});if(!org)return c.json({success:false,error:'not_found'},404);
+ const rows=await dbFor(c.env).prepare('SELECT * FROM rt_store_groups WHERE organization_id=?').bind(org.id).all<{id:string}>();
+ const result=[];
+ for(const g of rows.results){
+  const members=await dbFor(c.env).prepare('SELECT m.* FROM rt_store_group_members m WHERE m.group_id=?').bind(g.id).all<{store_id:string}>();
+  if(!(await Promise.all(members.results.map(m=>storeBelongsTo(c,org.id,m.store_id)))).every(Boolean))continue;
+  result.push({...g,members:members.results});
+ }
+ return c.json({success:true,data:result});
+});
+restaurantTest.post('/api/restaurant-test/store-groups',requireRole('owner','admin'),inputJsonBoundary(),async c=>{
+ if(!hasOrganizationSelector(c))return requiredAccount(c);
+ const org=await organizationFor(c,{ignoreSession:true});if(!org)return c.json({success:false,error:'not_found'},404);
+ const b=await c.req.json<{name:string;members:Array<{storeId:string;referralEnabled:boolean;maxDistance:number}>}>();
+ if(!b||typeof b.name!=='string'||!b.name.trim()||b.name.length>100||!Array.isArray(b.members)||b.members.length<2||b.members.length>50||b.members.some(m=>!m||typeof m!=='object'||Array.isArray(m)||typeof m.storeId!=='string'||!m.storeId)||new Set(b.members.map(m=>m.storeId)).size!==b.members.length)return inputError(c,{success:false,error:'invalid_group'},400,['name','members']);
+ for(const m of b.members){
+  if(typeof m.referralEnabled!=='boolean'||!Number.isFinite(m.maxDistance)||m.maxDistance<0||m.maxDistance>1000)return inputError(c,{success:false,error:'invalid_member'},400,['members']);
+  if(!await storeBelongsTo(c,org.id,m.storeId))return c.json({success:false,error:'not_found'},404);
+ }
+ const id=crypto.randomUUID(),db=dbFor(c.env);
+ await db.batch([db.prepare('INSERT INTO rt_store_groups(id,organization_id,name) VALUES(?,?,?)').bind(id,org.id,b.name.trim()),...b.members.map(m=>db.prepare('INSERT INTO rt_store_group_members(group_id,store_id,referral_enabled,max_distance) VALUES(?,?,?,?)').bind(id,m.storeId,m.referralEnabled?1:0,m.maxDistance))]);
+ return c.json({success:true,data:{id}},201);
+});
+restaurantTest.patch('/api/restaurant-test/store-groups/:id/members/:storeId',requireRole('owner','admin'),inputJsonBoundary(),async c=>{
+ if(!hasOrganizationSelector(c))return requiredAccount(c);
+ const org=await organizationFor(c,{ignoreSession:true});if(!org||!await storeBelongsTo(c,org.id,c.req.param('storeId')))return c.json({success:false,error:'not_found'},404);
+ const b=await c.req.json<{referralEnabled:boolean;maxDistance:number}>();
+ if(!b||typeof b.referralEnabled!=='boolean'||!Number.isFinite(b.maxDistance)||b.maxDistance<0||b.maxDistance>1000)return inputError(c,{success:false,error:'invalid_member'},400,['referralEnabled','maxDistance']);
+ const r=await dbFor(c.env).prepare('UPDATE rt_store_group_members SET referral_enabled=?,max_distance=? WHERE group_id=? AND store_id=? AND EXISTS(SELECT 1 FROM rt_store_groups WHERE id=? AND organization_id=?)').bind(b.referralEnabled?1:0,b.maxDistance,c.req.param('id'),c.req.param('storeId'),c.req.param('id'),org.id).run();
+ return r.meta.changes?c.json({success:true,data:{updated:true}}):c.json({success:false,error:'not_found'},404);
+});
+restaurantTest.put('/api/restaurant-test/stores/:id/referral-location',requireRole('owner','admin'),inputJsonBoundary(),async c=>{
+ if(!hasOrganizationSelector(c))return requiredAccount(c);
+ const org=await organizationFor(c);if(!org||!await storeBelongsTo(c,org.id,c.req.param('id')))return c.json({success:false,error:'not_found'},404);
+ const b=await c.req.json<{latitude:number;longitude:number;confirmed:boolean}>();
+ if(!b||b.confirmed!==true||!Number.isFinite(b.latitude)||!Number.isFinite(b.longitude)||Math.abs(b.latitude)>90||Math.abs(b.longitude)>180)return inputError(c,{success:false,error:'confirmed_location_required'},400,['latitude','longitude','confirmed']);
+ await dbFor(c.env).prepare("UPDATE rt_stores SET latitude=?,longitude=?,updated_at=datetime('now') WHERE id=?").bind(b.latitude,b.longitude,c.req.param('id')).run();
+ return c.json({success:true,data:{updated:true}});
+});

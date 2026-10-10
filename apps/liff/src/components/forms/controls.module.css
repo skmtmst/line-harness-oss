@@ -72,3 +72,13 @@
 .fileName { display: block; padding-right: 32px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
 .fileSlot:focus-visible, .fileRemove:focus-visible { outline: 2px solid var(--color-liff-primary, var(--color-accent)); outline-offset: 2px; }
 .input[aria-invalid="true"] { border-color: var(--color-danger); outline: 1px solid var(--color-danger); }
+
+.choiceInput[type="radio"] { appearance: none; border: 1px solid var(--color-liff-line-strong, var(--color-border)); border-radius: 50%; background: var(--color-canvas); }
+.choiceInput[type="radio"]:checked { border-color: var(--color-liff-primary, var(--color-accent)); background: radial-gradient(circle, var(--color-liff-primary, var(--color-accent)) 0 4px, var(--color-canvas) 4.5px); }
+.choiceInput:focus-visible { outline: 2px solid var(--color-liff-primary, var(--color-accent)); outline-offset: 2px; }
+
+.formLabel { font-size: 15px; line-height: 22px; }
+.days .day { border: 0; outline: 1px solid var(--color-liff-line, var(--color-border)); outline-offset: -0.5px; font-family: Inter, system-ui, sans-serif; line-height: normal; }
+.days .weekday { font-family: "Noto Sans JP", system-ui, sans-serif; line-height: normal; }
+.times .time { min-height: 42px; font-family: Inter, system-ui, sans-serif; font-size: 12px; line-height: normal; font-weight: 500; }
+.times .time[aria-pressed='true'] { font-size: 15px; font-weight: 700; }

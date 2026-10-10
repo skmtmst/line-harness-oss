@@ -46,6 +46,10 @@ export default function App() {
     return <Navigate to={{ pathname: `/research/${encodeURIComponent(search.get('researchId')!)}`, search: location.search }} replace />;
   }
 
+  if (location.pathname === '/' && search.get('page') === 'restaurant' && search.get('token')) {
+    return <Navigate to={{ pathname: `/restaurant/reserve/${encodeURIComponent(search.get('token')!)}`, search: location.search }} replace />;
+  }
+
   const action = liffActionFromUrl(`https://liff.line.me/entry/${location.search}`);
   if (location.pathname === '/' && action) {
     const pathname = action.kind === 'visit_stamp' ? '/visit-stamps'
