@@ -5,16 +5,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), createTable: vi.fn(), updateTable: vi.fn(), updateReservation: vi.fn(), saveTableLayout: vi.fn() }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
+const floorApi = vi.hoisted(() => ({ floors: vi.fn() }))
 
 vi.mock('next/navigation',()=>({useRouter:()=>({push(){},replace(){},back(){}}),usePathname:()=>'/restaurant-test/tables',useSearchParams:()=>new URLSearchParams()}))
-vi.mock('@/lib/api-reservation-board',()=>({reservationBoardApi:{floors:async()=>({success:true,data:[]})}}))
+vi.mock('@/lib/api-reservation-board',()=>({reservationBoardApi:floorApi}))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
 
 import TablesPage from './tables'
 import { pickMoveTarget } from './move'
-import { at, reservation, snapshotOf, tables } from '../booking-kit/test-data'
+import { at, reservation, snapshotOf, store, tables } from '../booking-kit/test-data'
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 
 /* T3 に先の予約が2件：1件目は T4 が空いている、2件目は同じ時間の T4・個室A が埋まっている（4名は入る卓が無い）。 */
 const upcoming = [
@@ -26,6 +28,7 @@ const upcoming = [
 
 beforeEach(() => {
   role.value = 'owner'
+  floorApi.floors.mockResolvedValue({ success: true, data: [] })
   fixture.snapshot.mockResolvedValue({ data: snapshotOf({ reservations: upcoming }) })
   for (const fn of [fixture.createTable, fixture.updateTable, fixture.updateReservation, fixture.saveTableLayout]) fn.mockResolvedValue({ success: true })
 })
@@ -62,6 +65,40 @@ describe('BERxg 座席・卓管理', () => {
     fireEvent.change(screen.getByLabelText('表示名'), { target: { value: '窓側2人卓' } })
     fireEvent.click(screen.getByRole('button', { name: /^追加する$/ }))
     await waitFor(() => expect(fixture.createTable).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', code: 'T5', label: '窓側2人卓', minCapacity: 1, maxCapacity: 2 })))
+  })
+
+  it('店舗の窓は確定してから切り替え、選んだ店舗で卓を追加する', async () => {
+    fixture.snapshot.mockResolvedValue({ data: snapshotOf({ stores: [store, { ...store, id: 'store-2', name: '新宿店' }] }) })
+    render(<TablesPage />)
+    await screen.findByText('卓の詳細')
+    fireEvent.click(screen.getByRole('button', { name: '店舗' }))
+    const picker = screen.getByRole('dialog', { name: '店舗を選ぶ' })
+    fireEvent.click(within(picker).getByRole('radio', { name: '新宿店' }))
+    fireEvent.click(within(picker).getByRole('button', { name: 'キャンセル' }))
+    expect(screen.getByRole('button', { name: '店舗' }).parentElement?.textContent).toContain('渋谷店')
+    await pickEntity('店舗', '新宿店')
+    fireEvent.click(screen.getByRole('button', { name: /卓を追加する/ }))
+    fireEvent.change(screen.getByLabelText('卓番'), { target: { value: 'S1' } })
+    fireEvent.change(screen.getByLabelText('表示名'), { target: { value: '新宿2人卓' } })
+    fireEvent.click(screen.getByRole('button', { name: /^追加する$/ }))
+    await waitFor(() => expect(fixture.createTable).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-2', code: 'S1' })))
+  })
+
+  it('階・エリアの窓で選んだ階とその版を卓の保存へ渡す', async () => {
+    const floor = { storeId: 'store-1', width: 560, height: 320, outline: [], fixtures: [], tables: [] }
+    floorApi.floors.mockResolvedValue({ success: true, data: [
+      { ...floor, id: 'floor-1', name: '1階', version: 1 },
+      { ...floor, id: 'floor-2', name: '2階', version: 7 },
+    ] })
+    render(<TablesPage />)
+    await screen.findByRole('group', { name: '1階の座席表' })
+    fireEvent.click(screen.getByRole('button', { name: /卓を追加する/ }))
+    fireEvent.change(screen.getByLabelText('卓番'), { target: { value: 'T5' } })
+    fireEvent.change(screen.getByLabelText('表示名'), { target: { value: '2階2人卓' } })
+    fireEvent.click(screen.getByRole('button', { name: '配置・結合グループ' }))
+    await pickEntity('階・エリア', '2階')
+    fireEvent.click(screen.getByRole('button', { name: /^追加する$/ }))
+    await waitFor(() => expect(fixture.createTable).toHaveBeenCalledWith('account-1', expect.objectContaining({ floorId: 'floor-2', expectedTargetVersion: 7 })))
   })
 
   it('空の卓番で保存すると欄に理由を出して移動し、APIへ送らない', async () => {
