@@ -1,5 +1,5 @@
+import BookingIntake from './BookingIntake.js';
 import { bookingPriceText } from '../lib/booking-price.js';
-import { TextArea, FieldLabel } from './forms/controls.js';
 import { useState } from 'react';
 import { api, type CreateBookingResponse, type MenuItem, type StaffItem } from '../lib/api.js';
 import { addMinutesHm, formatJpLong, slotStartsAtIso } from '../lib/datetime.js';
@@ -97,15 +97,7 @@ export default function Confirm({
           value={`${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・お店で払う）`}
         />
       </dl>
-      <div className="space-y-1.5">
-        <FieldLabel htmlFor="booking-note">{menu.intake_question?.trim() || 'ご要望'}</FieldLabel>
-        <TextArea
-          id="booking-note" value={note}
-          onChange={(e) => setNote(e.target.value)}
-          rows={3}
-          placeholder={menu.intake_question?.trim() ? undefined : '例：前髪は短めにしたい'}
-        />
-      </div>
+      <BookingIntake question={menu.intake_question} value={note} onChange={setNote} />
       {error && (
         <p role="alert" className="text-[13px] leading-6 text-danger">
           {error}

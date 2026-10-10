@@ -1,107 +1,13 @@
 @import "tailwindcss";
-/* Workerの公開入口から共用するときもLIFFの共通部品のクラスを生成する。 */
-@source "./";
-
 /* ─── LIFF ★V7 デザイントークン ─────────────────────────────
  * 値は Pencil「★V7 LIFF 主要画面」の決まり (0-rules.png) から。
  * 画面・部品はここの var() から生まれるクラス (text-ink など) だけを使い、
  * 素の Tailwind 色・16進数は書かない。主ボタンの濃い緑は
  * --color-accent-deep (#087a3e)。LINE の明るい緑はボタンの地に使わない。
  */
-@theme {
-  --color-ink: #1d1d1f;
-  --color-ink-secondary: #4a5565;
-  --color-ink-faint: #626a73;
-  --color-canvas: #ffffff;
-  --color-ground: #f5f5f7;
-  --color-hairline: #dadde2;
-  --color-accent-deep: #087a3e;
-  --color-ok-bg: #e8f8ee;
-  --color-ok-ink: #047833;
-  --color-wait-bg: #fdf3e1;
-  --color-wait-ink: #94600a;
-  --color-info-bg: #e9f1ff;
-  --color-info-link: #0b63ce;
-  --color-danger: #b3261e;
-  --color-skeleton: #e9ebef;
-  --color-state-mark: #ebedf1;
-  /* ── ★V8 LIFF (specs/pages/14-liff.md)。値は板の書き出しから。
-   * 管理画面 V8 の濃い緑 (#087a3e) とは別物。LINE の #06c755 は
-   * LINE ログインボタン専用で、ここには使わない。 ── */
-  --color-liff-primary: #03873a;
-  --color-liff-soft: #f0fbf4;
-  --color-liff-sub: #5f6670;
-  --color-liff-idle: #b8bec6;
-  --color-liff-line: #e6e9ed;
-  --color-liff-divider: #eef0f2;
-  --color-liff-chip: #f1f3f5;
-  --color-liff-off-bg: #f7f8f9;
-  --color-liff-off-ink: #c3c8cf;
-  --color-liff-line-strong: #dfe3e8;
-  --color-liff-photo: #e9e2d4;
-  --color-liff-photo-ink: #6b5b3e;
-  --color-liff-note: #f2f6fe;
-  /* 必須の札の地 (B8rCt・g9osGN。文字は --color-liff-sun)。 */
-  --color-liff-required-bg: #fdecec;
-  /* 5段階評価の塗った星 (F-11・m1cWEy のスマホ見本の星色)。 */
-  --color-liff-star: #f5a623;
-  /* マイルの貯まった箱の深い緑 (S3uBl)。主の緑より濃い。 */
-  --color-liff-deep: #0f3d24;
-  /* 深い緑の箱の上の小さな字 (S3uBl の「使えるマイル」「マイル」)。 */
-  --color-liff-deep-sub: #d7dbe0;
-  --color-liff-wait-bg: #fff6e5;
-  --color-liff-wait-ink: #b26b00;
-  --color-liff-ok-bg: #e8f8ee;
-  --color-liff-ok-ink: #0a7a3e;
-  --color-liff-sun: #e5484d;
-  --color-liff-sat: #2f6fde;
-  /* ── ウェビナーの暗い地 (7-webinar。値は liff-v7.html の書き出しから) ── */
-  --color-night: #15181d;
-  --color-night-soft: #23272e;
-  --color-night-line: #2c3038;
-  --color-night-faint: #aab1bb;
-  /* 暗い地での会話の名前。ほか・自分を文字色で分ける */
-  --color-night-name: #8fb8ff;
-  --color-night-mine: #7ee2a8;
-  /* ── ウェビナー配信中 (RpW2h。値は板の書き出しから) ── */
-  --color-night-body: #e6e8eb;
-  --color-night-dim: #8a9098;
-  /* ── ウェビナー配信中 ★V8 (RpW2h) の地・動画の枠・副の字・途中のボタン。
-   * 途中のボタン (個別相談を申し込む) は板どおり LINE の緑。ここだけで使う。 ── */
-  --color-night-deep: #111214;
-  --color-night-panel: #2a2c30;
-  --color-night-sub: #a8adb4;
-  --color-night-cta: #06c755;
-  /* 押せない枠の地。設計の満席の枠 (2-event.png の 14:00〜15:00) の灰色。 */
-  --color-shell-gray: #ebedf1;
-  /* 空きの点の金 (残りわずか)。型ごとに替える。 */
-  --color-liff-dot-few: #b26b00;
-  /* 満席の字。今は押せない薄字と同じ。型ごとに替える。 */
-  --color-liff-full: #c3c8cf;
-  /* 行の高さ。板 (Pencil) の文字はすべて line-height: normal (Noto Sans JP の字の高さ)。
-   * Tailwind の text-xs〜text-4xl が持つ行の高さを板に合わせる。 */
-  --text-xs--line-height: normal;
-  --text-sm--line-height: normal;
-  --text-base--line-height: normal;
-  --text-lg--line-height: normal;
-  --text-xl--line-height: normal;
-  --text-2xl--line-height: normal;
-  --text-3xl--line-height: normal;
-  --text-4xl--line-height: normal;
-}
-
-/* 角丸の素。今の値 (10・箱は14) を既定にし、型ごとに替える。 */
-:root {
-  /* 上の LIFF の帯の中の高さ (下の線 1px を足して 44)。 */
-  --liff-header-h: 43px;
-  --liff-radius: 10px;
-  --liff-radius-lg: 14px;
-}
-
-/* 主の色の上の字。店の色で上書きする (見やすさの計算で白か濃字か)。 */
-:root {
-  --liff-on-primary: #ffffff;
-}
+@import "./tokens.css";
+/* Workerの公開入口から共用するときもLIFFの共通部品のクラスを生成する。 */
+@source "./";
 
 body {
   margin: 0;

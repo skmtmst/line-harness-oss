@@ -133,6 +133,8 @@ const ALLOWLIST_MAX = 771;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/traffic-pools/{id}',
+  'PUT /api/traffic-pools/{id}',
   'GET /api/booking/admin/board',
   'PATCH /api/booking/admin/board/{id}',
   'POST /api/tags/{id}/restore',
@@ -1558,7 +1560,6 @@ const ALLOWLIST = new Set<string>([
   'GET /api/traffic-pools/{id}/accounts',
   'POST /api/traffic-pools',
   'POST /api/traffic-pools/{id}/accounts',
-  'PUT /api/traffic-pools/{id}',
   'PUT /api/traffic-pools/{id}/accounts/{accountId}',
 
   // system：署名検証する外部受信経路（OpenAPI未記載・順次記載）（9件）
