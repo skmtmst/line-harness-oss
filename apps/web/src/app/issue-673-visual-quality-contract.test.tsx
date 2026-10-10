@@ -47,7 +47,7 @@ describe('#673 A. カード・パネルの立体感', () => {
     const migrated = [
       ['components/chats/template-picker.tsx', 'shadow-card'],
       ['components/dashboard/qr-dialog.tsx', 'shadow-float'],
-      ['components/dashboard/dashboard-editor.tsx', 'shadow-card'],
+      ['v8/dashboard/dashboard-editor.module.css', 'var(--shadow-card)'],
       ['app/chats/page.tsx', 'shadow-card'],
       ['app/duplicates/page.tsx', 'shadow-card-surface'],
     ] as const
@@ -57,8 +57,10 @@ describe('#673 A. カード・パネルの立体感', () => {
       expect(source, `${file} に旧カード影が残っている`).not.toContain('shadow-[1px_1px_2px')
     }
     // ダッシュボード編集の引き出しは方向付きの直書きをやめ、浮く面の影へ。
-    const editor = readFileSync(join(SRC, 'components/dashboard/dashboard-editor.tsx'), 'utf8')
-    expect(editor).toContain('shadow-float')
+    const editor = readFileSync(join(SRC, 'v8/dashboard/dashboard-editor.tsx'), 'utf8')
+    const drawer = readFileSync(join(SRC, 'components/shared/drawer.module.css'), 'utf8')
+    expect(editor).toContain('width="editor"')
+    expect(drawer).toContain('box-shadow: var(--shadow-overlay)')
   })
 })
 

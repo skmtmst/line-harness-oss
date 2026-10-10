@@ -71,7 +71,7 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
       'components/friends/single-friend-actions.tsx',
       'components/friends/advanced-search-dialog.tsx',
       'components/dashboard/side-cards.tsx',
-      'components/dashboard/dashboard-editor.tsx',
+      'v8/dashboard/dashboard-editor.tsx',
     ]
     for (const rel of FIXED_STATE) {
       const f = FILES.find((x) => x.p === rel)

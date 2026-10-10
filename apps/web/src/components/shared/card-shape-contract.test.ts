@@ -130,7 +130,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/broadcasts/broadcast-form.tsx", "className=\"border-hairline bg-canvas-sunken text-ink-secondary mt-3 rounded-card border px-4 py-2 text-xs\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["components/broadcasts/broadcast-step-rail.tsx", "className=\"border-hairline bg-canvas rounded-card mb-4 border p-4 sm:hidden\"", "絞り込み・段の切り替え・選択の枠。中身のカードではない。"],
   ["components/broadcasts/segment-preset-controls.tsx", "className=\"divide-y divide-hairline rounded-card border border-hairline bg-canvas\"", "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"],
-  ["components/dashboard/dashboard-editor.tsx", "className=\"border-hairline bg-canvas-sunken rounded-card border p-3\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["components/events/event-wizard.tsx", "className=\"bg-canvas rounded-card border-hairline border p-12 text-center text-sm text-ink-faint\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["components/events/event-wizard.tsx", "className=\"bg-canvas rounded-card border-hairline mb-4 flex flex-col gap-2 border p-4 sm:flex-row\"", "絞り込み・段の切り替え・選択の枠。中身のカードではない。"],
   ["components/events/event-wizard.tsx", "className=\"text-ink-faint border-hairline rounded-card border border-dashed p-6 text-center text-sm\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
