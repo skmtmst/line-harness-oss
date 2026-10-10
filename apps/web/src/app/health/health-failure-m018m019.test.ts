@@ -26,7 +26,7 @@ describe('M018/M019 監視の失敗表示', () => {
   })
 
   it('移行ボタンは押せる役割のときだけ出す（M019）', () => {
-    expect(PAGE).toContain("localStorage.getItem('lh_staff_role')")
+    expect(PAGE).toContain('useStaffRole()')
     expect(PAGE).toContain('友だちの移行はオーナーだけができます')
   })
 })

@@ -634,7 +634,7 @@ export function verify() {
     const want = normalize(t.status === 'active' ? t.resolved : t.source)
     let got = null
     if (t.status === 'active') {
-      got = name.slice(2) in builtVars ? builtVars[name.slice(2)] : null
+      got = name.slice(2) in builtVars ? resolveVars(builtVars[name.slice(2)], builtVars) : null
       if (got === null) {
         failures.push(`配信漏れ: ${name} がビルド後CSSに見つかりません（${t.pencil}）`)
         lines.push(`  ${pad(name, 24)}${pad(t.pencil, 18)}${pad(want, 24)}★配信漏れ`)

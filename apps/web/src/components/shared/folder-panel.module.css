@@ -12,7 +12,7 @@
 [data-theme='v8'] .heading > p { font-size: 12px; font-weight: 600; line-height: normal; color: var(--color-ink-faint); }
 [data-theme='v8'] .rows { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 0; }
 [data-theme='v8'] .select:focus-visible,
-[data-theme='v8'] .add:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+[data-theme='v8'] .add:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 [data-theme='v8'] .select {
   padding: 7px 10px; gap: 8px; border-radius: var(--polish-radius-control);
   font-size: 13px; font-weight: 500; line-height: normal; color: var(--color-ink-secondary);
@@ -30,12 +30,10 @@
 }
 [data-theme='v8'] .footer { font-size: 11px; line-height: 17px; color: var(--color-ink-faint); }
 
-
 [data-theme='v8'] .panel .add { height: auto; padding: 6px 10px; box-shadow: none; }
 /* B-151：主ボタンの縁と影は Button が持つ。 */
 [data-theme='v8'] .label { min-width: 0; }
 [data-theme='v8'] .row[data-active] .label { font-weight: 600; }
-
 
 [data-theme='v8'] .panel { max-width: 100%; min-width: 0; }
 [data-theme='v8'] .row { padding: 7px 10px; gap: 8px; border-radius: var(--polish-radius-control); }

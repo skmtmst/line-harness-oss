@@ -13,6 +13,7 @@
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
 import SharedStatusPill from '@/components/shared/status-pill'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import type { ReactNode } from 'react'
@@ -36,6 +37,8 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
+import { notifyToast } from '@/components/shared/toast'
+import { useSearchParams } from 'next/navigation'
 import { RowMenu } from '@/components/shared/row-actions'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -61,7 +64,7 @@ import { withViewTransition } from '@/components/shared/view-transition'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { runUndoable } from '@/lib/undoable'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -178,9 +181,12 @@ function rowMenuItems(
   canEdit: boolean,
   go: (href: string) => void,
   onArchive: (target: WebinarListItem) => void,
+  onDuplicate: (target: WebinarListItem) => void,
+  duplicating: boolean,
 ): ActionMenuItem[] {
   const id = encodeURIComponent(w.id)
   return [
+    ...(canEdit ? [{ id: 'duplicate', label: '複製する', disabled: duplicating, onSelect: () => onDuplicate(w) }] : []),
     { id: 'participants', label: '参加者を見る', onSelect: () => go(`/webinars/edit?id=${id}&pane=participants`) },
     { id: 'analytics', label: '分析を見る', onSelect: () => go(`/webinars/edit?id=${id}&pane=analytics`) },
     { id: 'comments', label: 'コメント演出を開く', onSelect: () => go(`/webinars/edit?id=${id}&pane=comments`) },
@@ -370,7 +376,8 @@ function WebinarList() {
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   // jiNg0「閲覧のみ」：押せない形にする（隠さない）。
   const role = useStaffRole()
-  const canEdit = canManageRole(role)
+  const featureAccess = useFeatureAccess('webinars')
+  const canEdit = featureAccess
 
   const requestGeneration = useRef(0)
   const overviewGeneration = useRef(0)
@@ -408,6 +415,9 @@ function WebinarList() {
   const [refreshing, setRefreshing] = useState(false)
   const [loadFailure, setLoadFailure] = useState<WebinarLoadFailure | null>(null)
   const snapshotRef = useRef<ListSnapshot>({ items: [], total: 0, loadedAccountId: null })
+  const [highlightedId, setHighlightedId] = useState<string | null>(useSearchParams().get('highlight'))
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+  const [duplicateError, setDuplicateError] = useState('')
   const [activeId, setActiveId] = useState<string | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<WebinarListItem | null>(null)
@@ -656,6 +666,24 @@ function WebinarList() {
     setArchiveTarget(target)
   }, [])
 
+  const duplicateWebinar = async (item: WebinarListItem) => {
+    if (!canEdit || duplicatingId || !selectedAccountId) return
+    const accountId = selectedAccountId
+    setDuplicatingId(item.id); setDuplicateError('')
+    try {
+      const editor = await webinarApi.editor(item.id)
+      const copied = await webinarApi.duplicate(item.id, editor.data.version)
+      if (snapshotRef.current.loadedAccountId !== accountId) return
+      setHighlightedId(copied.data.id)
+      setQuery(''); setView({ q: '', status: 'draft', page: '1', sort: 'updated' })
+      setTotal((current) => current + 1)
+      setItems((current) => [{ ...copied.data, folderName: item.folderName, registrationCount: 0, viewerCount: 0 }, ...current])
+      notifyToast('複製した下書きを追加しました')
+      void refreshFolders()
+    } catch { setDuplicateError('複製できませんでした。一覧を読み直してお試しください。') }
+    finally { setDuplicatingId(null) }
+  }
+
   const archiveSelected = async () => {
     if (!archiveTarget || archiving) return
     setArchiving(true)
@@ -881,13 +909,14 @@ function WebinarList() {
             <TableHead />
             <tbody>
               {visibleItems.map((w) => {
-                const menuItems = rowMenuItems(w, canEdit, go, openArchive)
+                const menuItems = [...(canEdit ? [{ id: 'edit', label: '編集する', onSelect: () => go(`/webinars/edit?id=${w.id}`) }] : []), ...rowMenuItems(w, canEdit, go, openArchive, (item) => void duplicateWebinar(item), duplicatingId !== null)]
                 const counts = showsCounts(w)
                 const period = periodSummary(w)
                 const menuLabel = `ウェビナー「${w.title}」の操作`
                 return (
                   <Tr
                     key={w.id}
+                    selected={highlightedId === w.id}
                     interactive
                     className={styles.row}
                     data-table-layout="columns"
@@ -908,7 +937,7 @@ function WebinarList() {
                           </button>
                         </FolderDotName>
                       </ContextMenu>
-                      <span className={styles.slug} ><TruncatedText value={String(publicPath(w) ?? '')} /></span>
+
                     </Td>
                     <Td className={styles.colStatus}><StatusPill webinar={w} /></Td>
                     <Td className={styles.colCount}>
@@ -929,7 +958,7 @@ function WebinarList() {
                     <Td className={styles.colPeriod}><span className={styles.period} title={period}>{period}</span></Td>
                     <Td className={styles.colOps} onClick={(event) => event.stopPropagation()}>
                       <div className={styles.opsBox}>
-                        {canEdit ? <Button href={`/webinars/edit?id=${w.id}`}>編集</Button> : null}
+
                         <RowMenu
                           label={menuLabel}
                           open={openMenuId === w.id}
@@ -1021,7 +1050,7 @@ function WebinarList() {
         </FolderPanel>
       </>}
       collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}
-      toolbar={narrow ? narrowToolbar : wideToolbar}
+      toolbar={<>{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}{narrow ? narrowToolbar : wideToolbar}</>}
       pagination={pager}
       overlays={<>
         {archiveTarget ? (

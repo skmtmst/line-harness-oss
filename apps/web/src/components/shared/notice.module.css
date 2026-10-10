@@ -116,7 +116,7 @@
   line-height: 20px;
 }
 [data-theme='v8'] .info { background: var(--color-status-info-soft); }
-[data-theme='v8'] .info .icon { color: var(--color-action); }
+[data-theme='v8'] .info .icon { color: var(--color-status-info); }
 .infoIconV8 { display: none; }
 [data-theme='v8'] .infoIconV8 { display: block; }
 [data-theme='v8'] .infoIconV7 { display: none; }

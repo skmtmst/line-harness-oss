@@ -47,7 +47,7 @@ export default function EditTagPageV8() {
    * 押せる見た目にしておく（最後の守りはサーバの 403）。
    */
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const canEdit = canManageRole(staffRole)
   /*
    * 編集の競合（`xn95q`）。入力は捨てず、比べる・読み込むを
    * 選んでもらう（reminders の k32cn と同じ形）。

@@ -126,8 +126,6 @@ const SORT_OPTIONS: Array<{ value: RouteSort; label: string }> = [
   { value: 'name', label: '流入元名順' },
 ]
 
-
-
 /*
   **タブの件数は直書きしない（#980）。**
   設計が描いた「24」「3」「5」は作り物の数で、一覧が0件のアカウントでも
@@ -1068,7 +1066,6 @@ function InflowLinksPageInner({
             </div>
           </div>
 
-
       {loading ? (
         <ListState kind="loading" title="流入経路を読み込んでいます" />
       ) : loadFailed ? (
@@ -1188,34 +1185,8 @@ function InflowLinksPageInner({
                           {r.name}
                         </span>
                       )}
-                      <span className={styles.refCode} title={r.refCode}>
-                        {r.refCode}
-                      </span>
-                      {status === 'measured' ? (
-                        <span
-                          className={`${styles.statusChip} ${styles.statusMeasured}`}
-                          title={r.source === 'tracked_link'
-                            ? 'クリック計測とシナリオ起動が設定されています。追加先の振り分けは全体設定に従います。'
-                            : '流入の計測ができています。'}
-                        >
-                          計測済
-                        </span>
-                      ) : status === 'unregistered' ? (
-                        <span
-                          className={`${styles.statusChip} ${styles.statusUnregistered}`}
-                          title="外部で発行されたREFです。流入実績だけを集計しています。"
-                        >
-                          未登録
-                        </span>
-                      ) : status === 'stopped' ? (
-                        <span
-                          className={`${styles.statusChip} ${styles.statusStopped}`}
-                          title="受付を止めています。このURLを開いても友だち追加できません。"
-                        >
-                          停止中
-                        </span>
-                      ) : null}
-                    </td>
+
+                      </td>
                     <td className="px-5 py-[9px] text-ink-secondary">
                       {pool ? (
                         <span className="block truncate whitespace-nowrap" title={pool.name}>{pool.name}</span>
@@ -1311,15 +1282,32 @@ function InflowLinksPageInner({
                       )}
                     </td>
                     {readonly ? null : (
-                      <td className="py-3 pr-5 pl-2 text-right">
+                      <td className="py-3 pr-5 pl-2 text-right">{status === 'measured' ? (
+                        <span
+                          className={`${styles.statusChip} ${styles.statusMeasured}`}
+                          title={r.source === 'tracked_link'
+                            ? 'クリック計測とシナリオ起動が設定されています。追加先の振り分けは全体設定に従います。'
+                            : '流入の計測ができています。'}
+                        >
+                          計測済
+                        </span>
+                      ) : status === 'unregistered' ? (
+                        <span
+                          className={`${styles.statusChip} ${styles.statusUnregistered}`}
+                          title="外部で発行されたREFです。流入実績だけを集計しています。"
+                        >
+                          未登録
+                        </span>
+                      ) : status === 'stopped' ? (
+                        <span
+                          className={`${styles.statusChip} ${styles.statusStopped}`}
+                          title="受付を止めています。このURLを開いても友だち追加できません。"
+                        >
+                          停止中
+                        </span>
+                      ) : null}
                         {editTarget ? (
-                          <Button
-                            variant="secondary"
-                            onClick={() => setEditing(editTarget)}
-                            aria-label={`${r.name}のリンクを編集`}
-                          >
-                            編集
-                          </Button>
+                          null
                         ) : r.source === 'tracked_link' ? (
                           // tracked_links は別管理 (Web app に編集 UI 未提供)。
                           // entry_routes への "昇格登録" は worker 優先順位的に

@@ -123,8 +123,8 @@ describe('KdFRI アフィリエイタータブの実入口の集計・権限・�
     await waitFor(() => {
       expect(screen.getAllByRole('button', { name: '成果を見る' }).length).toBe(3)
     })
-    expect(screen.getByText('売上の 10%')).toBeTruthy()
-    expect(screen.getByText('報酬なし（計測のみ）')).toBeTruthy()
+    expect(document.querySelector('[data-list-name]')?.textContent).not.toContain('売上の 10%')
+    expect(document.querySelector('[data-list-name]')?.textContent).not.toContain('報酬なし（計測のみ）')
     expect(screen.getAllByText('計測中').length).toBeGreaterThan(0)
     expect(screen.getByText('停止中')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '田中 明の操作' }))

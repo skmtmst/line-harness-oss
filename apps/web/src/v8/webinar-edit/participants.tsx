@@ -1,11 +1,14 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 ウェビナーの参加者（Pencil uNsEy）。
  * 頭（戻る・題・説明・CSV）→ タブ → 数の帯 → 案内の帯 → 道具の段 → 表 → ページ送り。
  * 口・権限・失敗の扱いは app/webinars/edit/participants-v8.tsx と同じ（BEHAVIOR.md）。
  */
 import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bookmark, CircleCheck, CircleSlash, Download, History, LogOut, Undo2 } from 'lucide-react'
@@ -70,6 +73,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   const [filter, setFilter] = useListUrlValue<'' | WebinarParticipantClassification>('filter', '')
   const [rule, setRule] = useState<WebinarParticipantPage['rule'] | null>(null)
   const [measurement, setMeasurement] = useState<WebinarParticipantPage['measurement'] | null>(null)
+  const canExport = useFeatureAccess('webinars', 'export')
   const [csvBusy, setCsvBusy] = useState(false)
   const [csvError, setCsvError] = useState('')
   const [query, setQuery] = useListUrlValue('q', '')
@@ -80,7 +84,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   const moreLock = useRef(false)
 
   const downloadCsv = useCallback(() => {
-    if (csvLock.current) return
+    if (!canExport || csvLock.current) return
     csvLock.current = true
     const request = generation.current
     setCsvBusy(true)
@@ -88,7 +92,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
     void downloadApiFile(webinarApi.participantsCsvUrl(webinar.id, filter || undefined), csvFileName("動画セミナー参加者"))
       .catch(() => { if (request === generation.current) setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') })
       .finally(() => { csvLock.current = false; setCsvBusy(false) })
-  }, [webinar.id, filter])
+  }, [webinar.id, filter, canExport])
 
   useEffect(() => {
     let cancelled = false
@@ -199,11 +203,11 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
             const rate = Math.min(100, Math.round((participant.maxWatchedSeconds / Math.max(1, webinar.durationSeconds)) * 100))
             const badge = actionBadge(participant)
             return (
-              <Tr key={participant.friendId} className={styles.row} data-table-layout="columns" data-row-id={participant.friendId}>
-                <Td className={styles.colName}>
-                  <Link href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`}  className={styles.name}><TruncatedText value={String(name ?? '')} /></Link>
-                  <span className={styles.sub}>{`${joinNote(participant)}${joinKindLabel(participant)}`}</span>
-                </Td>
+              <Tr data-row-id={participant.friendId} key={participant.friendId} className={styles.row} data-table-layout="columns">
+                <Td className={styles.colName}><FolderDotName>
+                  <Link href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`} title={name} className={styles.name}>{name}</Link>
+
+                </FolderDotName></Td>
                 <Td className={styles.colWhen}><span className={styles.main}>{shortDateTime(participant.latestJoinedAt)}</span></Td>
                 <Td className={styles.colWatch}>
                   <span className={styles.main}>{participant.maxWatchedSeconds > 0 ? `${fmtJaDuration(participant.maxWatchedSeconds)}（${rate}%）` : emptyValue('unknown')}</span>
@@ -226,7 +230,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
     )
   }
 
-  const csvButton = state === 'ready'
+  const csvButton = canExport && state === 'ready'
     ? <Button onClick={downloadCsv} disabled={csvBusy} busy={csvBusy} busyLabel="書き出しています…"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
     : null
 

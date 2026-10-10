@@ -53,7 +53,7 @@ function TagCreate() {
   const params = useSearchParams()
   const { selectedAccountId } = useAccount()
   const staffRole = useStaffRole()
-  const canEditFolders = staffRole === null || canManageRole(staffRole)
+  const canEditFolders = canManageRole(staffRole)
   const copyId = params.get('copy') ?? ''
   /* 直前に作ったタグの名前。URL に残すので再読み込みでも消えない。 */
   const createdName = params.get('created') ?? ''
@@ -190,7 +190,7 @@ function TagCreate() {
 
   if (loading) return <ListState kind="loading" title="複製元を読み込んでいます…" />
 
-  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+  if (!canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
 
   const back = <Link href="/tags" className={styles.backLink}>← タグへ</Link>
   const groupFolders = groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))

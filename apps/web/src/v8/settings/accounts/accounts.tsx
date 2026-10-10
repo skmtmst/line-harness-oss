@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 LINEアカウント（Pencil `V7vn3`）。
  *
@@ -62,7 +64,7 @@ export default function AccountsV8() {
   const router = useRouter()
   const role = useStaffRole()
   // 役割が読めるまでは今までどおり出し、見るだけと分かったら変える操作を隠す（最後の守りはサーバ）。
-  const canManage = role === null || canManageRole(role)
+  const canManage = canManageRole(role)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [query, setQuery] = useListUrlValue('q', '')
@@ -254,11 +256,11 @@ export default function AccountsV8() {
               const archived = Boolean(account.archivedAt)
               const friends = archived || account.stats?.friendCount == null ? '—' : polishFormatNumber(account.stats.friendCount)
               return (
-                <Tr key={account.id} interactive data-row-id={account.id}>
-                  <Td className={styles.colName}><div className={styles.nameStack}>
-                    <span className={styles.name} ><TruncatedText value={String(account.name ?? '')} /></span>
-                    <span className={styles.sub}>{`チャネル ${account.channelId}`}</span>
-                  </div></Td>
+                <Tr data-row-id={account.id} key={account.id} interactive>
+                  <Td className={styles.colName}><FolderDotName><div className={styles.nameStack}>
+                    <span className={styles.name} title={account.name}>{account.name}</span>
+
+                  </div></FolderDotName></Td>
                   <Td className={styles.colConn}><StatusBadge tone={connection.tone}>{connection.label}</StatusBadge></Td>
                   <Td className={styles.colHook}>
                     {archived ? <span className={styles.faint}>{emptyValue('unknown')}</span> : <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>}

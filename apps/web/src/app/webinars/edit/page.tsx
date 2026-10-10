@@ -62,7 +62,7 @@ function fmtSession(epoch: number): string {
 }
 
 const inputClass =
-  'w-full border border-hairline rounded-control px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-action'
+  'w-full border border-hairline rounded-control px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-focus-ring'
 
 function webinarStatusLabel(status: Webinar['status']): string {
   if (status === 'active') return '公開中'

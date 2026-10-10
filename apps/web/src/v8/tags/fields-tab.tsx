@@ -440,7 +440,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
                         ) : host && canEdit ? <Link href="#" className={styles.name}  onClick={(event) => { event.preventDefault(); event.stopPropagation(); host.onEdit(field.id) }}><TruncatedText value={String(field.name ?? '')} /></Link> : <span className={styles.name} ><TruncatedText value={String(field.name ?? '')} /></span>}
                       </FolderDotName>
                     </div>
-                    <p className={`${styles.sub} ${styles.fieldKey}`} ><TruncatedText value={String(key ?? '')} /></p>
+
                   </ContextMenu>
                 </Td>
                 <Td className={styles.fieldColType}><span className={styles.cellText}>{fieldTypeWord(field.type)}</span></Td>
@@ -477,7 +477,6 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
           <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="友だち情報欄のページ送り" />
         </div>
       ) : null}
-
 
     </DelayedSkeleton>
   )

@@ -3,6 +3,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 
 import { formatDate as polishFormatDate } from '@/lib/format'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { RovingTbody } from '@/components/shared/row-roving'
 import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import { collectListRows } from '@/components/shared/collect-list-rows'
@@ -57,7 +58,7 @@ import { useOffsetServerList, type ServerListResponse } from '@/lib/use-server-l
 import { clampSearchQuery } from '@/lib/search-query'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
@@ -176,7 +177,7 @@ export default function RemindersListV8() {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
-  const canEdit = canManageRole(role)
+  const canEdit = useFeatureAccess('reminders')
   const readonlyReason = 'この操作にはオーナーか管理者の権限が要ります'
   // 1152の板（`Iffil`）。折り畳みはCSSのコンテナ問い合わせが担い、
   // ここでは板IDだけを切り替える。
@@ -906,9 +907,8 @@ export default function RemindersListV8() {
                         <span aria-hidden>⠿</span>
                       </ReorderHandle>
                     </Td>
-                    <NameCell
-                      name={<div className={styles.nameRow}>
-                        <FolderDotName folder={folderDotOf(row)}>
+                    <NameCell name={<div className={styles.nameRow}>
+                        <>
                           <Link
                             href={detailHref(row.id)}
 
@@ -922,7 +922,19 @@ export default function RemindersListV8() {
                           >
                             <TruncatedText value={String(row.name ?? '')} />
                           </Link>
-                        </FolderDotName>
+                        </>
+
+                      </div>} folder={folderDotOf(row)}
+                    />
+                    <Td>
+                      <span
+                        className={`${styles.statePill} ${
+                          view.status === 'active' ? styles.statePillActive : styles.statePillStopped
+                        }`}
+                      >
+                        <span className={styles.stateDot} aria-hidden="true" />
+                        {view.status === 'active' ? '有効' : view.status === 'draft' ? '下書き' : '停止中'}
+                      </span>
                         {row.hasFailure || (row.failedCount ?? 0) > 0 ? (
                           <button
                             type="button"
@@ -937,21 +949,6 @@ export default function RemindersListV8() {
                             失敗{row.failedCount != null && row.failedCount > 0 ? ` ${row.failedCount}` : ''}
                           </button>
                         ) : null}
-                      </div>}
-                      sub={<span className={styles.dotIndent} title={view.subtitle}>
-                        <Calendar size={11} aria-hidden="true" className={styles.cellSubIcon} />
-                        {view.subtitle}
-                      </span>}
-                    />
-                    <Td>
-                      <span
-                        className={`${styles.statePill} ${
-                          view.status === 'active' ? styles.statePillActive : styles.statePillStopped
-                        }`}
-                      >
-                        <span className={styles.stateDot} aria-hidden="true" />
-                        {view.status === 'active' ? '有効' : view.status === 'draft' ? '下書き' : '停止中'}
-                      </span>
                     </Td>
                     <Td className={styles.countCell}>
                       <div className={styles.countMain}>{planned}</div>

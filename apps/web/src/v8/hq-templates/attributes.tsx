@@ -1,12 +1,13 @@
 'use client'
 
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { useTenantWideAccess } from '@/lib/staff-role'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FriendField, Folder, HqFriendAttributeDetail, HqFriendAttributeInput, HqFriendAttributeTemplate, HqFriendAttributeType, HqFriendAttributeListStats, HqTemplateFolder, HqMarkDefinition } from '@line-crm/shared'
 import { ClipboardList, FileText, Flag, History, Loader, Users, CircleDot, PenLine, Plus } from 'lucide-react'
 import { hqFriendAttributesApi as api } from '@/lib/hq-friend-attributes-api'
 import { hqTemplatesApi } from '@/lib/hq-templates-api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -40,7 +41,7 @@ const errorText = (cause: unknown) => (cause && typeof cause === 'object' && 'st
 
 export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttributeType; tab: 'fields' | 'marks'; onTab: (tab: AttributeTabKey) => void }) {
   const role = useStaffRole()
-  const canEdit = role !== null && canManageRole(role)
+  const canEdit = useTenantWideAccess()
   const [entries, setEntries] = useState<Entry[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
   const [folders, setFolders] = useState<HqTemplateFolder[]>([])

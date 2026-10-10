@@ -69,7 +69,7 @@ export default function TagEditV8() {
   usePageTitle(tag?.name ?? 'タグを編集')
   /* 閲覧のみ（fkGUR）：役割が取れるまでは押せる形（最後の守りはサーバの 403）。 */
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const canEdit = canManageRole(staffRole)
   /* 競合（xn95q）：入力は捨てず、比べる・読み込むを選んでもらう。 */
   const [conflictValues, setConflictValues] = useState<TagEditorValues | null>(null)
   const [compareTarget, setCompareTarget] = useState<TagDefinition | null>(null)

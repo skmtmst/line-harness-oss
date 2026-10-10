@@ -132,7 +132,7 @@
 }
 
 .friendPick {
-  color: var(--color-status-info);
+  color: var(--color-action);
 }
 
 /* 人数の −/＋ */

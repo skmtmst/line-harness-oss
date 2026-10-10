@@ -105,6 +105,18 @@ type ListBody = {
 
 const ids = (body: ListBody) => body.data.items.map((item) => item.id);
 
+it('アーカイブ絞り込みは対象アカウントだけを返し、通常一覧には混ぜない', async () => {
+  const { db, raw } = createTestD1();
+  seed(raw);
+  raw.exec("UPDATE forms SET status='archived',is_active=0 WHERE id='form-beta'");
+  raw.exec("INSERT INTO forms (id,name,fields,status) VALUES ('foreign','他店','[]','archived')");
+  const archived = await list(db, '&filter=archived&limit=20');
+  expect(archived.status).toBe(200);
+  expect(ids(await archived.json() as ListBody)).toEqual(['form-beta']);
+  const normal = await list(db);
+  expect(ids(await normal.json() as ListBody)).not.toContain('form-beta');
+});
+
 describe('#1060 GET /api/forms のサーバーページング', () => {
   it('limit 未指定は従来どおり全件を返す（既定は回答が新しい順）', async () => {
     const { db, raw } = createTestD1();

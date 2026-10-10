@@ -12,6 +12,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
+  role: 'owner',
   update: vi.fn(),
   get: vi.fn(),
   addTag: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('@/lib/api', async () => {
   return {
     ...actual,
     api: {
+      staff: { me: async () => ({ success: true, data: { role: mocks.role, permissionViewKeys: ['/chats', '/friends'] } }) },
       friends: {
         get: (id: string) => ok({
           id, originalId: 'friend-0', displayName: 'Kyohei Yamamoto', pictureUrl: null, isFollowing: true, metadata: {},
@@ -98,8 +100,9 @@ async function renderPanel(notes: string | null = '前のメモ', friendId = 'fr
 }
 
 beforeEach(() => {
+  mocks.role = 'owner'
   clearToastsForTest()
-  Object.values(mocks).forEach((m) => m.mockReset())
+  Object.values(mocks).forEach((m) => { if (typeof m !== 'string') m.mockReset() })
   mocks.orders.mockResolvedValue({ success: true, data: { items: [] } })
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   const values = new Map<string, string>()
@@ -296,6 +299,7 @@ describe('購入のAPIの形と宛先（WEB242）', () => {
 
 
 it('閲覧のみでは対応・担当・メモ・タグを変える操作を隠す', async () => {
+  mocks.role = 'staff'
   window.localStorage.setItem('lh_staff_role', 'staff')
   window.localStorage.setItem('lh_staff_view_permissions', '["/chats","/friends"]')
   await renderPanel()

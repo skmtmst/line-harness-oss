@@ -1085,3 +1085,79 @@ describe('GET /api/forms の件数つき応答（#578 L5）', () => {
     expect(Array.isArray(body.data)).toBe(true);
   });
 });
+
+// T12-F1: 最終413だけでなく、実ルートが読む順番と量を確かめる。
+describe('保管の本文境界の順番', () => {
+  test.each(['archive', 'unarchive'])('%s: 宣言上限を超えるJSONはcloneも本文読み込みもせず413', async operation => {
+    const { bindings } = env();
+    const request = new Request(`http://fixture.test/api/forms/form-1/${operation}?account_id=account-a`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': '131107' },
+      body: JSON.stringify({ expectedRevision: 4, padding: 'x'.repeat(128 * 1024) }),
+    });
+    const clone = vi.spyOn(request, 'clone');
+    const getReader = vi.spyOn(request.body!, 'getReader');
+    const response = await app(true).fetch(request, bindings);
+    expect(response.status).toBe(413);
+    expect(clone).not.toHaveBeenCalled();
+    expect(getReader).not.toHaveBeenCalled();
+    expect(mocks.archiveFormAtRevision).not.toHaveBeenCalled();
+    expect(mocks.getFormDeleteImpact).not.toHaveBeenCalled();
+  });
+
+  test.each(['archive', 'unarchive'])('%s: 権限なしは壊れた大本文を読まず403', async operation => {
+    const { bindings } = env();
+    const request = new Request(`http://fixture.test/api/forms/form-1/${operation}?account_id=account-a`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{'.repeat(128 * 1024),
+    });
+    const clone = vi.spyOn(request, 'clone');
+    const getReader = vi.spyOn(request.body!, 'getReader');
+    const response = await app().fetch(request, bindings);
+    expect(response.status).toBe(403);
+    expect(clone).not.toHaveBeenCalled();
+    expect(getReader).not.toHaveBeenCalled();
+    expect(mocks.archiveFormAtRevision).not.toHaveBeenCalled();
+  });
+
+  test.each(['archive', 'unarchive'])('%s: 長さの申告なしでも超過後は残りを読まない', async operation => {
+    const { bindings } = env();
+    let reads = 0;
+    const cancel = vi.fn();
+    const stream = new ReadableStream({
+      pull(controller) { if (reads === 32) { controller.close(); return; } reads++; controller.enqueue(new Uint8Array(8192).fill(32)); },
+      cancel,
+    }, { highWaterMark: 0 });
+    const request = new Request(`http://fixture.test/api/forms/form-1/${operation}?account_id=account-a`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': '1' },
+      body: stream, duplex: 'half',
+    } as RequestInit);
+    const clone = vi.spyOn(request, 'clone');
+    const response = await app(true).fetch(request, bindings);
+    expect(response.status).toBe(413);
+    expect(reads).toBe(3);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(clone).not.toHaveBeenCalled();
+    expect(mocks.archiveFormAtRevision).not.toHaveBeenCalled();
+  });
+});
+
+test.each(['archive', 'unarchive'])('%s: 全利用先の権限確認も本文より先に行う', async operation => {
+  mocks.canAccessAllLineAccounts.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+  const { bindings } = env();
+  const request = new Request(`http://fixture.test/api/forms/form-1/${operation}?account_id=account-a`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{',
+  });
+  const getReader = vi.spyOn(request.body!, 'getReader');
+  const response = await app(true).fetch(request, bindings);
+  expect(response.status).toBe(403);
+  expect(getReader).not.toHaveBeenCalled();
+  expect(mocks.getFormDeleteImpact).not.toHaveBeenCalled();
+});
+
+test('Content-Typeの申告なしでも保管本文の上限を守る', async () => {
+  const { bindings } = env();
+  const response = await app(true).request('/api/forms/form-1/archive?account_id=account-a', {
+    method: 'POST', body: JSON.stringify({ expectedRevision: 4, padding: 'x'.repeat(17 * 1024) }),
+  }, bindings);
+  expect(response.status).toBe(413);
+  expect(mocks.archiveFormAtRevision).not.toHaveBeenCalled();
+});

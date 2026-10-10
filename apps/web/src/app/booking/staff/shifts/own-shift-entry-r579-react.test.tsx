@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * R579: 本人勤務の担当者取得の失敗と「紐づけ無し」を言い分ける。
  *
@@ -70,6 +72,7 @@ const memStorage = vi.hoisted(() => {
 vi.stubGlobal('localStorage', memStorage)
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'staff' } as StaffMember);
   // staff ロールで店舗の閲覧権限なし。本人解決だけが頼りになる条件。
   memStorage.setItem('lh_staff_role', 'staff')
   fixture.listMyStaff = async () => ({ staff: [] })

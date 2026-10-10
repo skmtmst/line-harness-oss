@@ -12,6 +12,7 @@
  */
 import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -345,7 +346,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       <DataTable className={styles.table}>
         <thead>
           <TableHeadRow>
-            <Th className={styles.searchColName}>条件名・内容</Th>
+            <Th className={styles.searchColName}>条件名・内容</Th><Th>状態</Th>
             <Th className={styles.searchColCount}>該当</Th>
             <Th className={styles.searchColShare}>共有</Th>
             <Th className={styles.searchColUsage}>使っている所</Th>
@@ -374,7 +375,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                   }
                 }} data-row-id={search.id}
               >
-                <Td className={styles.searchColName}>
+                <Td className={styles.searchColName}><FolderDotName>
                   <ContextMenu label={`保存した検索「${search.name}」の操作`} items={searchContextItems(search)}>
                     <div className={styles.nameRow}>
                       {editHref ? (
@@ -384,13 +385,13 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                       ) : (
                         <span className={styles.name} ><TruncatedText value={String(search.name ?? '')} /></span>
                       )}
-                      {!search.lineAccountId ? (
-                        <StatusBadge tone="warning" size="annotation" dot={false}>対象アカウント未割り当て</StatusBadge>
-                      ) : null}
                     </div>
-                    <p className={styles.sub} title={summaryText}>{summaryText}</p>
+
                   </ContextMenu>
-                </Td>
+                </FolderDotName></Td>
+                <Td>{!search.lineAccountId ? (
+                        <StatusBadge tone="warning" size="annotation" dot={false}>対象アカウント未割り当て</StatusBadge>
+                      ) : null}</Td>
                 <Td className={styles.searchColCount} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.cellText} title={search.matchCountError ?? undefined}>
                     {search.matchCount !== null && search.matchCount !== undefined ? `${formatNumber(search.matchCount)}人` : emptyValue('unknown')}
@@ -431,7 +432,6 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
           <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="保存した検索のページ送り" />
         </div>
       ) : null}
-
 
     </DelayedSkeleton>
   )

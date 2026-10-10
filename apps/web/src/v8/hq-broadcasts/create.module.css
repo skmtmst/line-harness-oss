@@ -220,7 +220,7 @@
 }
 
 .pickerRow:focus-visible {
-  outline: var(--tpl-e49-focus-ring) solid var(--color-action);
+  outline: var(--tpl-e49-focus-ring) solid var(--color-focus-ring);
   outline-offset: calc(var(--tpl-e49-focus-ring) * -1);
 }
 

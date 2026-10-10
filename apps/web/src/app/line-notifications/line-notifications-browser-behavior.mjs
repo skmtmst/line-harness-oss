@@ -212,6 +212,9 @@ async function openHarness(browser) {
     if (path === '/api/auth/session') {
       return json({ success: true, data: { name: 'owner利用者', role: 'owner', permissionKeys: [] }, csrfToken: 'test-csrf' })
     }
+    if (path === '/api/staff/me') {
+      return json({ success: true, data: { id: 'staff-me', name: 'owner利用者', role: 'owner', permissions: [], viewPermissions: [] } })
+    }
     if (path === '/api/line-accounts') return json({ success: true, data: accounts })
     if (path === '/api/settings/features') {
       return json({ success: true, data: { features: {}, sidebarOrder: null, sidebarItemOrder: null, parentChildMode: false, specializedFeatureKeys: [], version: 1 } })
@@ -542,7 +545,7 @@ try {
     await nameLink.waitFor({ timeout: 15_000 })
     // タブは #708 で role="tab" へ変わった（nav>button ではなく tablist/tab）。
     await page.getByRole('tab', { name: /顧客へのお知らせ/ }).first().click()
-    const customerRow = page.getByRole('row').filter({ has: page.getByRole('cell', { name: '注文が確定したとき', exact: true }) })
+    const customerRow = page.getByRole('row').filter({ hasText: '注文が確定したとき' })
     await customerRow.getByRole('button', { name: /の内容を編集$/ }).waitFor({ timeout: 15_000 })
     await context.close()
     console.log('NOTIFY-04（一覧の名前から編集画面へ戻る）: PASS')

@@ -14,6 +14,7 @@
  * API待ち。DEVIN-QUESTIONS.md に記録済み。
  */
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -31,7 +32,6 @@ import { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/lin
 import { validateFlexContent } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { formatDateTime } from '@/lib/format'
 import { templateDeleteDescription } from '../template-delete-message'
 import { messageTypeText } from '../template-message-type'
@@ -220,8 +220,7 @@ export default function TemplateDetailV8() {
    * N-144: 編集・公開・削除APIは owner/admin だけ。staff へは閲覧だけ残し、
    * 押すと 403 になる口は出さない。
    */
-  const [canMutateTemplates] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canMutateTemplates = useFeatureAccess('templates')
   usePageTitle(template?.name ?? null)
 
   const loadVersions = useCallback(async () => {

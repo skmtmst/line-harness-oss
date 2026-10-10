@@ -1,6 +1,10 @@
 'use client'
 
 import { formAnswerText } from '@/lib/form-answer'
+import { useStaffRole } from '@/lib/staff-role'
+import { usePermissionAccess } from '@/lib/use-feature-access'
+import TagOverflow from '@/components/shared/tag-overflow'
+
 import { DragHandle } from '@/components/shared/row-actions'
 
 import Link from 'next/link'
@@ -24,7 +28,7 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import InlineEdit from '@/components/shared/inline-edit'
 import { runOptimisticWithUndo } from '@/lib/undoable'
 import PrepayBadgeV8 from '@/app/booking/prepay-badge-v8'
-import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
+import { canEditFeature } from '@/lib/staff-capability'
 import { X } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
@@ -231,7 +235,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   /* 前払いのみの印を外せるのは店の管理者だけ（友だち詳細と同じ決まり）。 */
-  const [canClearPrepay] = useState(() => typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canClearPrepay = usePermissionAccess('administrator')
   // A-2: その場で直したときの画面側の持ち直し（楽観更新）。親の chatDetail とは別に、
   // このパネル内での見た目だけを先に変える。保存が失敗したら戻す。
   const [localStatus, setLocalStatus] = useState<ChatStatusInfo['status'] | undefined>(undefined)
@@ -556,8 +560,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
    * 成功は白い知らせに「元に戻す」、失敗は戻して「もう一度」。
    * 知らせは notifyToast の白い板（黒にしない。オーナー決定 2026-10-04）。
    */
-  const canEditChat = Boolean(chatId) && canEditFeature('/chats')
-  const canEditFriend = Boolean(friendId) && canEditFeature('/friends')
+  const staffRole = useStaffRole()
+  const canEditChat = Boolean(chatId) && canEditFeature('/chats', staffRole)
+  const canEditFriend = Boolean(friendId) && canEditFeature('/friends', staffRole)
   const statusButtonRef = useRef<HTMLDivElement | null>(null)
   const tagSearchRef = useRef<HTMLInputElement | null>(null)
   const [tagPickerOpen, setTagPickerOpen] = useState(false)
@@ -1126,7 +1131,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                 </a>}
               </div>
               <div className="flex flex-wrap gap-1">
-                {(effectiveTags ?? []).map((tag) => isV8 ? (
+                <TagOverflow>{(effectiveTags ?? []).map((tag) => isV8 ? (
                   <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs"
                     onRemove={canEditFriend && friendId ? () => setTagToRemove({ id: tag.id, name: tag.name, friendId }) : undefined} />
                 ) : (
@@ -1150,7 +1155,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                       </button>
                     ) : null}
                   </span>
-                ))}
+                ))}</TagOverflow>
               </div>
               {(effectiveTags ?? []).length === 0 ? (
                 <p className="text-micro text-ink-faint italic mt-1.5">タグなし</p>
@@ -1722,7 +1727,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   <div className={v8.summaryRow}>
                     <dt>タグ</dt>
                     <dd title={(effectiveTags ?? []).map((t) => t.name).join('・')}>
-                      {(effectiveTags ?? []).length > 0 ? (effectiveTags ?? []).map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />) : <span className={v8.empty}>なし</span>}
+                      {(effectiveTags ?? []).length > 0 ? <TagOverflow>{(effectiveTags ?? []).map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />)}</TagOverflow> : <span className={v8.empty}>なし</span>}
                     </dd>
                   </div>
                   <div className={v8.summaryRow}>
@@ -1761,13 +1766,13 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   fields={friendFields.kind === 'data' ? friendFields.items : []}
                   state={friendFields.kind === 'data' ? 'ready' : friendFields.kind}
                   onRetry={() => setFieldsRetry(key => key + 1)}
-                  canEdit={isOwnerOrAdmin() || canEditFeature('attribute.personal_info.edit')}
+                  canEdit={canEditFeature('attribute.personal_info.edit', staffRole)}
                   hiddenPersonalCount={friendFields.kind === 'data' ? friendFields.hiddenPersonalCount : 0}
                   sections={[
                     { key: 'support', label: '対応', content: sectionBody(renderSupport(friend)).filter(child => !(isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo'])) },
                     { key: 'tags', label: 'タグ', content: sectionBody(renderTags(friend)) },
                     { key: 'mileage', label: 'マイル', content: sectionBody(renderMileage(friend)) },
-                    { key: 'richMenu', label: 'リッチメニュー', action: isOwnerOrAdmin() ? <Link href="/rich-menus">編集する</Link> : null, content: sectionBody(renderRichMenu(friend)) },
+                    { key: 'richMenu', label: 'リッチメニュー', action: canEditFeature('/rich-menus', staffRole) ? <Link href="/rich-menus">編集する</Link> : null, content: sectionBody(renderRichMenu(friend)) },
                     { key: 'memo', label: 'メモ', content: sectionBody(renderSupport(friend)).filter(child => isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo']) },
                   ]}
                   extraSections={Children.toArray(renderDetailSections(friend).props.children).flatMap(child => {

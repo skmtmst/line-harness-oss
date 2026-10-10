@@ -85,7 +85,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
   usePageTitle('友だち')
   const u = useMergedUsers()
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || canManageRole(staffRole)
+  const canManage = canManageRole(staffRole)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [menuFor, setMenuFor] = useState<string | null>(null)
 

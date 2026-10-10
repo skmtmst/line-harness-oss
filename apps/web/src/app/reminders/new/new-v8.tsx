@@ -286,7 +286,7 @@ export default function NewReminderV8() {
   const autosave = useDraftAutosave({
     fingerprint,
     dirty: unsaved,
-    active: role === null || canManageRole(role),
+    active: canManageRole(role),
     enabled: validate() === null && !candidatesPending && !saveConflict.conflict,
     paused: leaveTarget !== null || saving === 'saving' || pendingTemplate !== null,
     save: async () => (await save({ silent: true })) !== null,

@@ -83,7 +83,7 @@
   font-family: var(--font-mono);
   font-size: var(--text-label);
 }
-.keyBox:focus-within { outline: var(--tpl-fm-focus-ring) solid var(--color-action); }
+.keyBox:focus-within { outline: var(--tpl-fm-focus-ring) solid var(--color-focus-ring); }
 .keyMark { flex-shrink: 0; color: var(--color-ink-faint); }
 .keyInput {
   min-width: 0;

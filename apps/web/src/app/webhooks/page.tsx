@@ -159,7 +159,7 @@ function WebhookSamples() {
       .catch(() => {})
     return () => { cancelled = true }
   }, [])
-  const canCreateSamples = staffRole === null || staffRole === 'owner'
+  const canCreateSamples = staffRole === 'owner'
   return (
     <div>
       <Notice tone="info" className="mb-4">
@@ -719,7 +719,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
    * 作成の操作は統括だけに出す（R32）。役割の確認が終わるまでは
    * 今までどおり出し、統括でないと分かったら案内に替える。
    */
-  const canCreate = staffRole === null || staffRole === 'owner'
+  const canCreate = staffRole === 'owner'
   const createGuidance = tab === 'incoming'
     ? '受け取り口の作成は統括だけができます。必要なときは統括に頼んでください。'
     : '送り先の作成は統括だけができます。必要なときは統括に頼んでください。'
@@ -1035,7 +1035,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           lineAccountId={selectedAccountId}
           endpointUrl={endpointUrl}
           canManage={canCreate}
-          canResolveUnmatched={staffRole === null || staffRole === 'owner' || staffRole === 'admin'}
+          canResolveUnmatched={staffRole === 'owner' || staffRole === 'admin'}
           onReload={() => void load()}
           onToggle={handleToggleIncoming}
           togglingIds={togglingIdsOf('incoming')}

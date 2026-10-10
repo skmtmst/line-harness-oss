@@ -38,7 +38,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [{ id: 'account-a', name: '然 - NEN -' }], loading: false }),
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
-vi.mock('@/lib/staff-capability', () => ({ isOwnerOrAdmin: () => true }))
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
 vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => false }))
 
 import QuestionNewV8 from './question-new'

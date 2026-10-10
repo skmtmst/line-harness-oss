@@ -312,7 +312,7 @@ export default function FeatureSettingsScreen() {
 
   /* 変えられるのはオーナー・管理者だけ（サーバの PUT と同じ境目）。役割が分かるまでは今までどおり出す。 */
   const staffRole = useStaffRole()
-  const canManage = staffRole ? canManageRole(staffRole) : true
+  const canManage = canManageRole(staffRole)
 
   const [query, setQuery] = useListUrlValue('q', '')
   const [compareOpen, setCompareOpen] = useState(false)

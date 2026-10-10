@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 メニュー管理（板 `MJoJR`・停止の確認 `MV5Os`・追加と変更 `NkmwU`）。
  *
@@ -64,7 +66,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
   /* 閲覧のみの人には、追加・変更・停止・再開のボタンを置かない（2026-10-06 オーナー）。 */
-  const canEdit = role === null || canManageRole(role)
+  const canEdit = canManageRole(role)
   const rows = store ? data.menuItems.filter((row) => row.store_id === store.id) : data.menuItems
   const pendingApprovals = data.approvals.filter((item) => item.kind === 'menu_change' && item.status === 'pending')
   /* 窓：'new' は追加、品目の id は変更。 */
@@ -164,12 +166,12 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
               const pending = item.pendingPrice != null
               const allergens = safeArray(item.allergens_json)
               return (
-                <Tr key={item.id} className={styles.row} data-row-id={item.id}>
-                  <Td className={`${styles.td} ${styles.colName}`}>
+                <Tr data-row-id={item.id} key={item.id} className={styles.row}>
+                  <Td className={`${styles.td} ${styles.colName}`}><FolderDotName>
                     {canEdit ? (
                       <button type="button" className={styles.name} title={item.name} onClick={() => openEdit(item)}>{item.name}</button>
-                    ) : <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>}
-                  </Td>
+                    ) : <span className={styles.name} title={item.name}>{item.name}</span>}
+                  </FolderDotName></Td>
                   <Td className={styles.td}>{item.kind === 'course' ? 'コース' : '単品'}</Td>
                   <Td className={`${styles.td} ${styles.colPrice}`} align="right">{formatYen(item.price)}</Td>
                   <Td className={styles.td}>{periodLabel(safeArray(item.service_periods_json))}</Td>

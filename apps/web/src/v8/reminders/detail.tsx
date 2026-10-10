@@ -10,6 +10,7 @@ import { scheduledJstIso } from '@/lib/jst-datetime'
  */
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
@@ -39,7 +40,7 @@ import {
   type ReminderRegistrant,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { csvCell } from '@/lib/presentation'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -206,7 +207,8 @@ function ReminderDetailV8() {
   const runsStatusParam = searchParams.get('runStatus')
   const { selectedAccount, selectedAccountId } = useAccount()
   const staffRole = useStaffRole()
-  const canManage = canManageRole(staffRole)
+  const featureAccess = useFeatureAccess('reminders')
+  const canManage = featureAccess
 
   const [data, setData] = useState<ReminderDeliveryRunsResponse | null>(null)
   const [reminder, setReminder] = useState<(Reminder & { steps?: ReminderStep[] }) | null>(null)

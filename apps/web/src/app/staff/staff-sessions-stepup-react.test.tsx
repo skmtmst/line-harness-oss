@@ -186,10 +186,11 @@ describe('ログイン中の端末 (N-427)', () => {
 describe('権限変更の直前再認証 (N-427)', () => {
   async function openEditModal() {
     await mount()
-    // ★V7: 変更するは行に直接出す（「…」メニューはやめた）。
+    // B-193: 変更するは行の「…」から開く。
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '変更する' }))
+      fireEvent.click(screen.getByRole('button', { name: /のその他操作$/ }))
     })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '変更する' })) })
     await screen.findByText('見せる範囲を決める')
   }
 

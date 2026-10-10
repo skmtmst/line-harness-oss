@@ -26,7 +26,7 @@
 .image[data-image] .area { border-color: color-mix(in srgb, var(--color-canvas) 67%, transparent); }
 .area:hover { background: color-mix(in srgb, var(--color-canvas) 20%, transparent); }
 .area[data-selected] { border: 3px solid var(--color-accent-deep); background: color-mix(in srgb, var(--color-canvas) 33%, transparent); color: var(--color-accent-deep); }
-.area:focus-visible { outline: 2px solid var(--color-action); outline-offset: -2px; }
+.area:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: -2px; }
 .areaLetter { font-size: 13px; font-weight: 600; line-height: 19px; text-shadow: 0 0 3px var(--color-canvas), 0 0 3px var(--color-canvas); pointer-events: none; }
 
 /* 面の一覧（Z0uO6）：記号は 22px・角丸 6・未選択は薄い地＋灰色の字。選んだ行は薄い緑・記号は濃い緑。 */
@@ -36,7 +36,7 @@
 }
 .row:hover { background: var(--color-canvas-sunken); }
 .row[data-selected], .row[data-selected]:hover { background: var(--color-accent-soft); }
-.row:focus-visible { outline: 2px solid var(--color-action); outline-offset: -2px; }
+.row:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: -2px; }
 .letter {
   flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
   border-radius: var(--radius-mini, 6px); background: var(--color-surface-pearl); color: var(--color-ink-secondary); font-size: 11px; font-weight: 700;

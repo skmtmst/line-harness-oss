@@ -5,6 +5,8 @@ import { LOAD_FAILED_MESSAGE, SUBMIT_FAILED_MESSAGE, logFailure } from '../lib/u
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
 import HelpTip from '../components/HelpTip.js';
+import MileageRewards from '../components/MileageRewards.js';
+import AffiliatePayments from '../components/AffiliatePayments.js';
 import Button from '../components/ui/Button.js';
 import Card from '../components/ui/Card.js';
 import Badge from '../components/ui/Badge.js';
@@ -961,6 +963,7 @@ export default function Affiliate() {
               {registerBusy ? '登録中…' : '紹介者になる'}
             </Button>
           </Card>
+          {wallet && <MileageRewards onChanged={async () => setWallet(await fetchMileage())} />}
           {wallet && <MileageHistory wallet={wallet} />}
         </div>
       </div>
@@ -1024,9 +1027,12 @@ export default function Affiliate() {
           onEnrolled={handleOfferEnrolled}
         />
 
+        {wallet && <MileageRewards onChanged={async () => setWallet(await fetchMileage())} />}
         {wallet && <MileageHistory wallet={wallet} />}
 
         {wallet && <MileageOpportunities items={wallet.opportunities} />}
+
+        <AffiliatePayments editable={state.affiliate.isActive} />
 
         {enrolledOffers.length > 0 && (
           <section aria-label="参加中の案件" className="space-y-3">

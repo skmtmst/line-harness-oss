@@ -20,7 +20,7 @@ export default function StatusPill({ children, tone = 'neutral', color, ...props
   tone?: StatusBadgeTone
   color?: string | null
 }) {
-  return <span className={styles.pill} {...props} data-tone={tone}>
+  return <span className={styles.pill} {...props} data-status-pill="" data-tone={tone}>
     <StatusDot tone={tone} color={color} />
     {typeof children === 'string' ? <TruncatedText className={styles.name} value={statusLabel(children)} /> : <span className={styles.name}>{children}</span>}
   </span>

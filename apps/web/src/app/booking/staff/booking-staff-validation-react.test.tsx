@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -105,6 +107,7 @@ function fillRequired() {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   fixture.selectedAccountId = 'account-a'
   fixture.listStaff.mockReset().mockResolvedValue({ staff: [] })
   fixture.createStaff.mockReset().mockResolvedValue({ id: 'new-staff' })
@@ -117,7 +120,7 @@ beforeEach(() => {
   fixture.routerPush.mockReset()
   // N-411: 画面側の権限制御は localStorage の権限表を読む。
   // 既定は owner（全通過）にし、権限試験では個別に上書きする。
-  storage.setItem('lh_staff_role', 'owner')
+  storage.setItem('lh_staff_role', 'owner'); rememberStaffIdentity({ role: 'owner' } as StaffMember)
   storage.setItem('lh_staff_permissions', '[]')
   storage.setItem('lh_staff_view_permissions', '[]')
 })
@@ -238,6 +241,7 @@ describe('N-411 項目別権限と画面の一致（実React）', () => {
   }
 
   function asStaff(editKeys: string[] = [], viewKeys: string[] = []) {
+    rememberStaffIdentity({ role: 'staff', permissionKeys: editKeys, permissionViewKeys: viewKeys } as StaffMember)
     storage.setItem('lh_staff_role', 'staff')
     storage.setItem('lh_staff_permissions', JSON.stringify(editKeys))
     storage.setItem('lh_staff_view_permissions', JSON.stringify(viewKeys))
@@ -262,7 +266,7 @@ describe('N-411 項目別権限と画面の一致（実React）', () => {
     render(<BookingStaffPage />)
     await screen.findByText('佐藤')
     expect((screen.getByRole('button', { name: '＋ スタッフを作る' }) as HTMLButtonElement).disabled).toBe(false)
-    expect(screen.getByText('編集')).toBeTruthy()
+    expect(screen.queryByText('編集')).toBeNull()
     // 削除は行に直に置かず、…メニューの中の危ない操作にある。
     expect(screen.queryByRole('menuitem', { name: '削除する' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '佐藤のその他操作' }))
@@ -287,7 +291,8 @@ describe('N-411 項目別権限と画面の一致（実React）', () => {
     fixture.listStaff.mockResolvedValue({ staff: [STAFF_ROW] })
     render(<BookingStaffPage />)
     await screen.findByText('佐藤')
-    fireEvent.click(screen.getByText('編集'))
+    fireEvent.click(screen.getByRole('button', { name: '佐藤のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '編集する' }))
     await screen.findByText('スタッフ編集')
     // 共有 Select（button + listbox）。開いて選択肢のボタンを押す。
     fireEvent.click(await screen.findByRole('button', { name: 'ログインユーザーとの紐づけ' }))

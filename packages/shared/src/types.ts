@@ -1912,6 +1912,8 @@ export interface AutomationLog {
 // -----------------------------------------------------------------------------
 export interface StaffMember {
   id: string;
+  /** 本人APIが返す実効的な閲覧専用状態（代理ログインも含む）。 */
+  readOnly?: boolean;
   /** 認証済み本人APIが返すテナント識別子。古いAPI応答との互換のため任意。 */
   tenantId?: string;
   name: string;

@@ -22,7 +22,7 @@ import {
   type CommonVarExportJobMeta,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireRole, requireDeliveryAccess } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 
@@ -176,7 +176,7 @@ commonVarExports.get('/api/common-vars/exports', requireRole('owner', 'admin', '
   }
 });
 
-commonVarExports.post('/api/common-vars/exports', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"folderId":["null","string"],"ungrouped":["boolean"]}), async (c) => {
+commonVarExports.post('/api/common-vars/exports', requireDeliveryAccess('commonVars', 'export'), inputJsonBoundary({"accountId":["string"],"folderId":["null","string"],"ungrouped":["boolean"]}), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: string; folderId?: string | null; ungrouped?: boolean }>();
     const accountId = body.accountId?.trim();
@@ -240,7 +240,7 @@ commonVarExports.get('/api/common-vars/exports/:id', requireRole('owner', 'admin
   }
 });
 
-commonVarExports.get('/api/common-vars/exports/:id/download', requireRole('owner', 'admin'), async (c) => {
+commonVarExports.get('/api/common-vars/exports/:id/download', requireDeliveryAccess('commonVars', 'export'), async (c) => {
   const job = await accessibleExportJob(c.env.DB, c.get('staff'), c.req.param('id'));
   if (!job) {
     auditLog(c, 'common_var_export.download', { kind: 'common_var_export', id: c.req.param('id') }, { result: 'denied' });
@@ -272,7 +272,7 @@ commonVarExports.get('/api/common-vars/exports/:id/download', requireRole('owner
   });
 });
 
-commonVarExports.post('/api/common-vars/exports/:id/regenerate', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+commonVarExports.post('/api/common-vars/exports/:id/regenerate', requireDeliveryAccess('commonVars', 'export'), inputJsonBoundary(), async (c) => {
   try {
     const job = await accessibleExportJob(c.env.DB, c.get('staff'), c.req.param('id'));
     if (!job) return c.json({ success: false, error: 'Not found' }, 404);

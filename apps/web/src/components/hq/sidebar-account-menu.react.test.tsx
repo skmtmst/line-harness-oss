@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * ★V8 左下の自分とメニュー（オーナー 2026-10-07・絵 V8.pen `zUg8S/T7XSI6/shBJJ`・`ZBjxY/Xn3xt`）。
  *
@@ -77,6 +79,7 @@ function itemNames(menu: HTMLElement) {
 
 describe('★V8 左下の自分とメニュー', () => {
   beforeEach(() => {
+    forgetStaffIdentity()
     fixture.pathname = '/friends'
     fixture.push.mockReset()
     fixture.clearSelectedAccountId.mockReset()
@@ -86,6 +89,7 @@ describe('★V8 左下の自分とメニュー', () => {
     localStorageValues.clear()
     window.localStorage.setItem('lh_staff_name', 'Kenta Kawano')
     window.localStorage.setItem('lh_staff_role', 'owner')
+    rememberStaffIdentity({ role: 'owner' } as StaffMember)
   })
 
   afterEach(() => {
@@ -119,6 +123,7 @@ describe('★V8 左下の自分とメニュー', () => {
 
   it('店の画面・管理者にも統括に戻るを出す（上の帯の切り替えと同じ判定）', async () => {
     window.localStorage.setItem('lh_staff_role', 'admin')
+    rememberStaffIdentity({ role: 'admin' } as StaffMember)
     const view = await renderMenu()
     const menu = await openMenu(view)
     expect(itemNames(menu)).toEqual(['統括に戻る', 'メンバー', '請求', 'お問い合わせ', 'ログアウト'])
@@ -165,6 +170,7 @@ describe('★V8 左下の自分とメニュー', () => {
   it('統括の画面・担当者には請求を出さない', async () => {
     fixture.pathname = '/hq'
     window.localStorage.setItem('lh_staff_role', 'staff')
+    rememberStaffIdentity({ role: 'staff' } as StaffMember)
     const view = await renderMenu({ hq: true })
     const menu = await openMenu(view)
     expect(itemNames(menu)).toEqual(['メンバー', 'お問い合わせ', 'ログアウト'])
@@ -172,6 +178,7 @@ describe('★V8 左下の自分とメニュー', () => {
 
   it.each([['staff', 'スタッフ'], ['viewer', '閲覧のみ']])('店の画面・%s：お問い合わせ／ログアウトだけ。プランは取りに行かない', async (role, label) => {
     window.localStorage.setItem('lh_staff_role', role)
+    rememberStaffIdentity({ role: role } as StaffMember)
     const view = await renderMenu()
     const menu = await openMenu(view)
     expect(itemNames(menu)).toEqual(['お問い合わせ', 'ログアウト'])

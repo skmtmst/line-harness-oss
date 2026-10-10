@@ -5,7 +5,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, screen, within, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -13,6 +13,7 @@ vi.hoisted(() => {
 })
 
 const role = vi.hoisted(() => ({ manage: true }))
+const updateAffiliate = vi.hoisted(() => vi.fn())
 const affiliatesList = vi.hoisted(() => vi.fn())
 const allReport = vi.hoisted(() => vi.fn())
 const settlementPreview = vi.hoisted(() => vi.fn())
@@ -25,7 +26,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
-      affiliates: { ...actual.api.affiliates, list: affiliatesList, allReport, settlementPreview },
+      affiliates: { ...actual.api.affiliates, list: affiliatesList, allReport, settlementPreview, update: updateAffiliate },
       affiliateOffers: { ...actual.api.affiliateOffers, list: offersList },
       conversionApprovals: { ...actual.api.conversionApprovals, list: approvalsList },
       accountSettings: { ...actual.api.accountSettings, getLinkBaseUrl: async () => ({ success: true, data: null }) },
@@ -75,6 +76,7 @@ async function render() {
 }
 
 beforeEach(() => {
+  updateAffiliate.mockReset().mockResolvedValue({ success: true })
   role.manage = true
   affiliatesList.mockResolvedValue({ success: true, data: affiliates })
   allReport.mockResolvedValue({ success: true, data: report })
@@ -112,4 +114,17 @@ describe('V8 アフィリエイター', () => {
     expect(document.body.textContent).toContain('紹介リンクをコピー')
     expect(document.body.textContent).not.toContain('紹介を止める')
   })
+})
+
+
+it('止めた紹介者は確認後に再開し、失敗した理由を窓に残す', async () => {
+  affiliatesList.mockResolvedValue({ success: true, data: [{ ...affiliates[0], isActive: false }] })
+  updateAffiliate.mockRejectedValue(new Error('offline'))
+  await render()
+  fireEvent.click(screen.getByRole('button', { name: /少ない人.*操作/ }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '紹介を再開する' }))
+  expect(updateAffiliate).not.toHaveBeenCalled()
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '紹介を再開する', exact: true }))
+  await waitFor(() => expect(updateAffiliate).toHaveBeenCalledWith('af-1', { isActive: true }))
+  await waitFor(() => expect(screen.getByRole('dialog').textContent).toContain('紹介を再開できませんでした'))
 })

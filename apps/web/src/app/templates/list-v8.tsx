@@ -14,6 +14,7 @@
  * 移る（v7 の引き出しは V8 の詳細画面に置き換わる）。
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
@@ -48,7 +49,6 @@ import { api, ApiError, type BroadcastAssetKind, type TemplateQuestion } from '@
 import { clampSearchQuery } from '@/lib/search-query'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import { notifyToast } from '@/components/shared/toast'
@@ -321,8 +321,7 @@ export default function TemplatesListV8() {
    * 閉じている。staff へ操作を見せると押しても 403 になるだけなので、
    * 押せない形で出す（閲覧は残す）。
    */
-  const [canMutateTemplates] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canMutateTemplates = useFeatureAccess('templates')
   // 1152の板（`L7zA7C`）。折り畳みはCSSのコンテナ問い合わせが担い、
   // ここでは板IDだけを切り替える。
   const narrow = useNarrowViewport()

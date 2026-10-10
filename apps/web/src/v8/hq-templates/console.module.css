@@ -99,7 +99,7 @@
 }
 .input { height: var(--tpl-htn-input-h); padding: var(--tpl-htn-input-pad); }
 .textarea { height: var(--tpl-htn-textarea-h); padding: var(--tpl-htn-textarea-pad); resize: vertical; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); }
-.input:focus-visible, .textarea:focus-visible { outline: var(--tpl-htn-line-2) solid var(--color-action); outline-offset: -1px; }
+.input:focus-visible, .textarea:focus-visible { outline: var(--tpl-htn-line-2) solid var(--color-focus-ring); outline-offset: -1px; }
 .formatRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-panel-gap); height: var(--tpl-htn-seg-h); }
 .folderPick { width: var(--tpl-htn-bulk-w); }
 .folderPick :global(*) { max-width: 100%; }

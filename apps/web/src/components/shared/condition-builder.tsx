@@ -16,6 +16,7 @@
  * 運用で実際に要る形に絞ったほうが間違えにくい。
  */
 
+import TagOverflow from './tag-overflow'
 import { useEffect, useState } from 'react'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { TagToggle } from './tag-pill'
@@ -447,7 +448,6 @@ function TagPicker({
   onToggle: (id: string) => void
 }) {
   const [query, setQuery] = useState('')
-  const [showAll, setShowAll] = useState(false)
 
   const isV8 = useAdminTheme() === 'v8'
   if (tags.length === 0) {
@@ -458,10 +458,7 @@ function TagPicker({
   const rest = tags.filter(
     (t) => !selected.includes(t.id) && (query === '' || t.name.includes(query)),
   )
-  // 打っていないときだけ畳む。絞り込んだ結果を隠すと、探しているものが出ない。
   const LIMIT = 24
-  const collapsed = query === '' && !showAll && rest.length > LIMIT
-  const shown = collapsed ? rest.slice(0, LIMIT) : rest
 
   const chip = (tag: Option, on: boolean) => isV8 ? (
     <TagToggle key={tag.id} name={tag.name} color={tag.color} selected={on} onToggle={() => onToggle(tag.id)} />
@@ -482,18 +479,12 @@ function TagPicker({
           onChange={(e) => setQuery(e.target.value)}
           placeholder={`タグ名で絞り込む（${tags.length}件）`}
           aria-label="タグ名で絞り込む"
-          className="border-hairline rounded-control h-9 w-full border px-3 text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:max-w-xs"
+          className="border-hairline rounded-control h-9 w-full border px-3 text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring sm:max-w-xs"
         />
       )}
       <div className="flex flex-wrap gap-1.5">
-        {chosen.map((tag) => chip(tag, true))}
-        {shown.map((tag) => chip(tag, false))}
+        <TagOverflow label="すべてのタグ">{chosen.map((tag) => chip(tag, true))}{rest.map((tag) => chip(tag, false))}</TagOverflow>
       </div>
-      {collapsed && (
-        <Button variant="secondary" className="text-ink-secondary v7:h-8 px-3 text-xs whitespace-normal" type="button" onClick={() => setShowAll(true)}>
-          残り {rest.length - LIMIT} 件を表示
-        </Button>
-      )}
       {query !== '' && rest.length === 0 && chosen.length === 0 && (
         <p className="text-ink-faint text-xs">「{query}」に当てはまるタグがありません</p>
       )}

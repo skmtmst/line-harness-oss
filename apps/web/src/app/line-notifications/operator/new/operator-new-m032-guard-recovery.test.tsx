@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * M032 追加残差: 宛先の回復で保存ガード由来の古い文言を消す。
  *
@@ -34,7 +36,6 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
 }))
-vi.mock('@/lib/staff-capability', () => ({ isOwnerOrAdmin: () => true }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined, useSettingsNavInline: () => undefined }))
 
 vi.mock('@/lib/api', async (importOriginal) => {
@@ -69,6 +70,7 @@ const STAFF = {
 const GUARD = '取り直してから保存してください'
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   vi.clearAllMocks()
   fixture.previewRecipients.mockResolvedValue(STAFF)
   fixture.create.mockResolvedValue({ success: true, data: { id: 'rule-1' } })

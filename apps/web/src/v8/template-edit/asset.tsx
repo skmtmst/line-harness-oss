@@ -9,13 +9,14 @@
  */
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved } from '@/components/shared/toast'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { GripVertical, Plus, Send, X } from 'lucide-react'
 import { tapExtrasError, type TapExtras, type Folder, type MediaItem } from '@line-crm/shared'
 import { tapExtraSaveError } from '@/lib/tap-actions'
 import { api } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
@@ -122,7 +123,8 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   const meta = META[kind]
   const router = useRouter()
   const role = useStaffRole()
-  const canMutate = host ? !host.readOnly : role === null || canManageRole(role)
+  const featureAccess = useFeatureAccess('templates')
+  const canMutate = host ? !host.readOnly : featureAccess
   const { selectedAccountId, accounts } = useAccount()
   usePageTitle(host ? 'テンプレート' : meta.heading)
   const actionOptions = useActionOptions()

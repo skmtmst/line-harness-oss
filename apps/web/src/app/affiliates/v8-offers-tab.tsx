@@ -449,15 +449,7 @@ export default function OffersTabV8({
                         </td>
                         <td>
                           <div className="af-list-rowActions">
-                            <Button
-                              type="button"
-                              size="compact"
-                              onClick={() => { setEditTarget(offer); setFormOpen(true) }}
-                              disabled={!canEdit}
-                              title={!canEdit ? '閲覧のみのため変更できません' : undefined}
-                            >
-                              編集
-                            </Button>
+
                             <span className={`af-list-statusBadge ${offer.isActive ? 'af-list-statusOk' : 'af-list-statusNeutral'}`}>
                               <span className="af-list-statusDot" aria-hidden="true" />
                               {offer.isActive ? '公開中' : '下書き'}
@@ -473,13 +465,13 @@ export default function OffersTabV8({
                                 ariaLabel={`${offer.name}の操作`}
                                 onClose={() => setRowMenuId(null)}
                                 items={([
-                                  {
+                                  ...(canEdit ? [{
                                     id: 'edit',
                                     label: '編集',
                                     onSelect: () => { setEditTarget(offer); setFormOpen(true) },
                                     disabled: !canEdit,
                                     disabledReason: !canEdit ? '閲覧のみのため変更できません' : undefined,
-                                  },
+                                  }] : []),
                                   {
                                     id: 'terms',
                                     label: '決まり',

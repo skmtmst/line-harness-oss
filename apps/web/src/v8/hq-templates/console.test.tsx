@@ -26,7 +26,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
   usePathname: () => '/hq/templates',
 }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => true, useStaffRole: () => 'owner', canManageRole: () => true }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [], selectedAccountId: null, selectedAccount: null, setSelectedAccountId: selectAccount, loading: false }) }))
 const chrome = vi.hoisted(() => ({ crumbs: null as Array<{ label: string; href?: string; onSelect?: () => void }> | null }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: (crumbs: typeof chrome.crumbs) => { chrome.crumbs = crumbs } }))
@@ -573,7 +573,9 @@ describe('統括タグの札は詳細から配布結果まで同じ色を保つ'
     expect((within(folderDialog).getByRole('checkbox', { name: 'タグ「VIP」' }) as HTMLInputElement).checked).toBe(true)
     expect(within(folderDialog).getByRole('group', { name: 'タグ「VIP」' }).querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)
     fireEvent.click(within(folderDialog).getByRole('button', { name: 'キャンセル' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'タグ「VIP」', exact: true }))
+    const listName = await screen.findByRole('button', { name: 'VIP', exact: true })
+    expect(listName.closest('[data-list-name]')?.querySelector('[data-folder-dot]')?.getAttribute('style')).toContain(expectedColor)
+    fireEvent.click(listName)
     const body = await screen.findByRole('region', { name: '本文' })
     const pill = within(body).getByRole('group', { name: 'タグ「VIP」' })
     expect(pill.querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)

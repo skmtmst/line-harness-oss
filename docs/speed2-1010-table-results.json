@@ -1,0 +1,176 @@
+[
+  {
+    "width": 1440,
+    "initial": {
+      "rows": 2000,
+      "height": 118000,
+      "rendered": 13
+    },
+    "counts": [
+      {
+        "label": "top",
+        "height": 118000,
+        "rendered": 20,
+        "tableRight": 1428,
+        "mainRight": 1428,
+        "missingNames": 0,
+        "rowHeights": [
+          59
+        ],
+        "pageX": false,
+        "tableX": false,
+        "outside": 0
+      },
+      {
+        "label": "middle",
+        "height": 118000,
+        "rendered": 25,
+        "tableRight": 1428,
+        "mainRight": 1428,
+        "missingNames": 0,
+        "rowHeights": [
+          59
+        ],
+        "pageX": false,
+        "tableX": false,
+        "outside": 0
+      },
+      {
+        "label": "bottom",
+        "height": 118000,
+        "rendered": 19,
+        "tableRight": 1428,
+        "mainRight": 1428,
+        "missingNames": 0,
+        "rowHeights": [
+          59
+        ],
+        "pageX": false,
+        "tableX": false,
+        "outside": 0
+      }
+    ],
+    "selection": true,
+    "selectionAfterUnmount": true,
+    "keyboard": true,
+    "keyboardAcrossWindow": true,
+    "menu": true,
+    "focusRetained": true
+  },
+  {
+    "width": 1152,
+    "initial": {
+      "rows": 2000,
+      "height": 118000,
+      "rendered": 13
+    },
+    "counts": [
+      {
+        "label": "top",
+        "height": 118000,
+        "rendered": 20,
+        "tableRight": 1140,
+        "mainRight": 1140,
+        "missingNames": 0,
+        "rowHeights": [
+          59
+        ],
+        "pageX": false,
+        "tableX": false,
+        "outside": 0
+      },
+      {
+        "label": "middle",
+        "height": 118000,
+        "rendered": 25,
+        "tableRight": 1140,
+        "mainRight": 1140,
+        "missingNames": 0,
+        "rowHeights": [
+          59
+        ],
+        "pageX": false,
+        "tableX": false,
+        "outside": 0
+      },
+      {
+        "label": "bottom",
+        "height": 118000,
+        "rendered": 19,
+        "tableRight": 1140,
+        "mainRight": 1140,
+        "missingNames": 0,
+        "rowHeights": [
+          59
+        ],
+        "pageX": false,
+        "tableX": false,
+        "outside": 0
+      }
+    ],
+    "selection": true,
+    "selectionAfterUnmount": true,
+    "keyboard": true,
+    "keyboardAcrossWindow": true,
+    "menu": true,
+    "focusRetained": true
+  },
+  {
+    "width": 1920,
+    "initial": {
+      "rows": 2000,
+      "height": 118000,
+      "rendered": 13
+    },
+    "counts": [
+      {
+        "label": "top",
+        "height": 118000,
+        "rendered": 20,
+        "tableRight": 1906,
+        "mainRight": 1908,
+        "missingNames": 0,
+        "rowHeights": [
+          59
+        ],
+        "pageX": false,
+        "tableX": false,
+        "outside": 0
+      },
+      {
+        "label": "middle",
+        "height": 118000,
+        "rendered": 25,
+        "tableRight": 1906,
+        "mainRight": 1908,
+        "missingNames": 0,
+        "rowHeights": [
+          59
+        ],
+        "pageX": false,
+        "tableX": false,
+        "outside": 0
+      },
+      {
+        "label": "bottom",
+        "height": 118000,
+        "rendered": 19,
+        "tableRight": 1906,
+        "mainRight": 1908,
+        "missingNames": 0,
+        "rowHeights": [
+          59
+        ],
+        "pageX": false,
+        "tableX": false,
+        "outside": 0
+      }
+    ],
+    "selection": true,
+    "selectionAfterUnmount": true,
+    "keyboard": true,
+    "keyboardAcrossWindow": true,
+    "menu": true,
+    "focusRetained": true
+  }
+]

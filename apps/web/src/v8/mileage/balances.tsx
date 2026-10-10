@@ -1,6 +1,7 @@
 'use client'
 
 import { jstDateOffset } from '@/lib/jst-datetime'
+import { FolderDotName } from '@/components/shared/folder-dot'
 
 /*
  * ★V8 マイル「友だちの残高」（板 `CJlf4`、状態は見本帳 `zaqP9`）。
@@ -470,11 +471,11 @@ export default function BalancesTab() {
                   router.push(href)
                 }} data-row-id={member.friendId}
               >
-                <Td className={styles.colName}>
+                <Td className={styles.colName}><FolderDotName>
                   <span className={styles.rowName} title={member.displayName}>{member.displayName}</span>
-                  <span className={styles.rowSub} ><TruncatedText value={String(member.lineAccount.name ?? '')} /></span>
-                </Td>
-                <Td className={styles.colRank}><span className={styles.cellMain} title={member.rankReason}>{rankLabel(member.rank) ?? emptyValue('unknown')}</span></Td>
+
+                </FolderDotName></Td>
+                <Td className={styles.colRank}><span className={styles.cellMain} title={member.rankReason}>{rankLabel(member.rank) ?? '—'}</span></Td>
                 <Td className={`${styles.colBalance} ${styles.num}`}>
                   <span className={styles.cellMain}>{formatMileageNumber(member.available)}</span>
                   {member.pending > 0 ? <span className={styles.cellSub}>{`保留 ${formatMileageNumber(member.pending)}`}</span> : null}

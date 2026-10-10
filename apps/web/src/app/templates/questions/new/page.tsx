@@ -1,5 +1,6 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -23,7 +24,6 @@ import { Field } from '@/components/shared/form-controls'
 import type { Folder } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import QuestionTemplateV8 from '@/v8/templates/question-new'
 
@@ -86,8 +86,7 @@ function QuestionTemplatePageInner() {
   const [error, setError] = useState('')
   // N-144: 質問テンプレートの作成・編集APIも owner/admin だけ。staff へは
   // フォームを出さず、保存まで辿り着けないようにする。
-  const [canMutateTemplates] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canMutateTemplates = useFeatureAccess('templates')
   usePageTitle(canMutateTemplates ? '質問を作る' : '質問テンプレート')
 
   // 置き場は「編集しているテンプレートのアカウント」のものだけを出す。

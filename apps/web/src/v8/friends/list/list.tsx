@@ -1,5 +1,8 @@
 'use client'
 
+import TagOverflow from '@/components/shared/tag-overflow'
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 友だち一覧（Pencil `x6QsVz`：閲覧のみ。いつもの形は同じ板からボタンを出したもの）。
  *
@@ -60,6 +63,7 @@ import MenuPortal from '@/components/shared/menu-portal'
 import BulkBar from '@/components/shared/bulk-bar'
 import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
+import { TableBody } from '@/components/shared/table-body'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
@@ -135,7 +139,7 @@ export default function FriendsListV8() {
    */
   const [keys, setKeys] = useState({ friends: false, chats: false })
   useEffect(() => { setKeys({ friends: hasEditKey('/friends'), chats: hasEditKey('/chats') }) }, [])
-  const manager = staffRole === null || canManageRole(staffRole)
+  const manager = canManageRole(staffRole)
   const canEditFriends = manager || keys.friends
   const canEditChats = manager || keys.chats
   const readOnly = !canEditFriends && !canEditChats
@@ -774,10 +778,10 @@ export default function FriendsListV8() {
           <col className={styles.colStar} />
           <col />
           {visible.has('support') ? <col className={styles.colSupport} /> : null}
-          {visible.has('scenario') ? <col className={styles.colScenario} /> : null}
+          {visible.has('scenario') ? <col className={styles.colScenario} data-cell-collapse="narrow" /> : null}
           {visible.has('latest') ? <col className={styles.colLatest} /> : null}
           {visible.has('tags') ? <col className={styles.colTags} /> : null}
-          {visible.has('source') ? <col className={styles.colSource} /> : null}
+          {visible.has('source') ? <col className={styles.colSource} data-cell-collapse="narrow" /> : null}
           {visible.has('last') ? <col className={styles.colLast} /> : null}
           <col className={styles.colMenu} />
         </colgroup>
@@ -795,12 +799,103 @@ export default function FriendsListV8() {
               <span className={styles.thFriendInner}><Star size={14} aria-label="注目" className={styles.thStar} />友だち</span>
             </Th>
             {COLUMNS.filter((column) => visible.has(column.key)).map((column) => (
-              <Th key={column.key} className={styles.th}>{column.label}</Th>
+              <Th key={column.key} className={styles.th} collapseAt={column.key === 'scenario' || column.key === 'source' ? 'narrow' : undefined}>{column.label}</Th>
             ))}
             <Th className={styles.thMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
-        <tbody>
+        <TableBody
+          items={loadStatus === 'ready' ? friends : []}
+          itemKey={(friend) => friend.id}
+          colSpan={colCount}
+          renderRow={(friend) => {
+            const status = statusOf(friend.chatStatus)
+            const latest = friend.latestIncomingMessage
+            const lastContact = lastContactOf(friend)
+            const attention = String(friend.metadata?.__attention ?? '') === '1'
+            const tags = splitTags(friend.tags)
+            return (
+              <Tr key={friend.id} interactive selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row data-row-id={friend.id}>
+                <Td className={styles.tdCheck} onClick={(event) => event.stopPropagation()}>
+                  <Checkbox checked={selectedIds.has(friend.id)} onCheckedChange={() => toggleSelect(friend.id)} aria-label={`${friend.displayName}を選ぶ`} />
+                </Td>
+                <Td className={styles.tdStar}>
+                  {rowCanEdit ? (
+                    <button
+                      type="button"
+                      className={attention ? `${styles.star} ${styles.starOn}` : styles.star}
+                      aria-pressed={attention}
+                      aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
+                      onClick={() => void toggleAttention(friend)}
+                    >
+                      <Star size={16} aria-hidden="true" />
+                    </button>
+                  ) : (
+                    /* 閲覧のみは押せない星を置かない。注目の印だけ見せる。 */
+                    <span className={attention ? `${styles.star} ${styles.starOn}` : styles.star} title={attention ? '注目' : undefined}>
+                      <Star size={16} aria-hidden="true" />
+                    </span>
+                  )}
+                </Td>
+                <Td className={styles.td}>
+                  <FolderDotName><Link href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</Link></FolderDotName>
+                </Td>
+                {visible.has('support') ? (
+                  <Td className={styles.td}>
+                    <div className={styles.supportCell}>
+                      <span className={styles.statusRow}>
+                        <StatusPill tone={SUPPORT_STATUS_TONES[friend.chatStatus ?? 'resolved']}>{status.label}</StatusPill>
+                        {friend.supportMark ? <span className={styles.mark} title={`対応マーク：${friend.supportMark.name}`}>{friend.supportMark.name}</span> : null}
+                      </span>
+                      <span className={styles.sub}>{`担当：${friend.operator?.name ?? '担当なし'}`}</span>
+                    </div>
+                  </Td>
+                ) : null}
+                {visible.has('scenario') ? (
+                  <Td className={`${styles.td} ${styles.fixedContent}`} collapseAt="narrow"><span className={styles.cellText} title={friend.activeScenario?.name}>{friend.activeScenario?.name ?? emptyValue('none')}</span></Td>
+                ) : null}
+                {visible.has('latest') ? (
+                  <Td className={styles.td}>
+                    {latest ? (
+                      <div className={styles.twoLine}>
+                        <span className={styles.cellText} title={latest.content}>{messageWord(latest)}</span>
+                        <span className={styles.sub}>{monthDayTime(latest.createdAt)}</span>
+                      </div>
+                    ) : <span className={styles.cellText}>受信なし</span>}
+                  </Td>
+                ) : null}
+                {visible.has('tags') ? (
+                  <Td className={`${styles.td} ${styles.fixedContent}`}>
+                    <div className={styles.tags} title={friend.tags.map((tag) => tag.name).join('・') || undefined}>
+                      <TagOverflow>{friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="sm" />)}</TagOverflow>
+
+                      {friend.tags.length === 0 ? <span className={styles.faint}>—</span> : null}
+                    </div>
+                  </Td>
+                ) : null}
+                {visible.has('source') ? (
+                  <Td className={`${styles.td} ${styles.fixedContent}`} collapseAt="narrow"><span className={styles.cellText} title={friend.firstTrackedLinkName || '不明'}>{friend.firstTrackedLinkName || '不明'}</span></Td>
+                ) : null}
+                {visible.has('last') ? (
+                  <Td className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={monthDayTime(lastContact)}>{monthDay(lastContact)}</span></Td>
+                ) : null}
+                <Td className={styles.tdMenu}>
+                  <div className={styles.menuBox}>
+                    <FriendRowMenu
+                      friendId={friend.id}
+                      friendName={friend.displayName}
+                      attention={attention}
+                      canEdit={rowCanEdit}
+                      allowedActions={allowedActions}
+                      onAction={(action) => setRowAction({ friend, action })}
+                      onToggleAttention={() => void toggleAttention(friend)}
+                    />
+                  </div>
+                </Td>
+              </Tr>
+            )
+          }}
+        >
           {loadStatus === 'loading' ? (
             <tr>
               <td colSpan={colCount}>
@@ -834,100 +929,8 @@ export default function FriendsListV8() {
                 <ListState kind="empty" title={emptyMessage.title} description={emptyMessage.description} />
               </td>
             </tr>
-          ) : friends.map((friend) => {
-            const status = statusOf(friend.chatStatus)
-            const latest = friend.latestIncomingMessage
-            const lastContact = lastContactOf(friend)
-            const attention = String(friend.metadata?.__attention ?? '') === '1'
-            const tags = splitTags(friend.tags)
-            return (
-              <Tr key={friend.id} interactive selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row data-row-id={friend.id}>
-                <Td className={styles.tdCheck} onClick={(event) => event.stopPropagation()}>
-                  <Checkbox checked={selectedIds.has(friend.id)} onCheckedChange={() => toggleSelect(friend.id)} aria-label={`${friend.displayName}を選ぶ`} />
-                </Td>
-                <Td className={styles.tdStar}>
-                  {rowCanEdit ? (
-                    <button
-                      type="button"
-                      className={attention ? `${styles.star} ${styles.starOn}` : styles.star}
-                      aria-pressed={attention}
-                      aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
-                      onClick={() => void toggleAttention(friend)}
-                    >
-                      <Star size={16} aria-hidden="true" />
-                    </button>
-                  ) : (
-                    /* 閲覧のみは押せない星を置かない。注目の印だけ見せる。 */
-                    <span className={attention ? `${styles.star} ${styles.starOn}` : styles.star} title={attention ? '注目' : undefined}>
-                      <Star size={16} aria-hidden="true" />
-                    </span>
-                  )}
-                </Td>
-                <Td className={styles.td}>
-                  <div className={styles.friendCell}>
-                    <Avatar name={friend.displayName} src={friend.pictureUrl} size={32} />
-                    <div className={styles.friendText}>
-                      <Link href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</Link>
-                      <span className={styles.sub}>{monthDay(friend.createdAt)}に登録</span>
-                    </div>
-                  </div>
-                </Td>
-                {visible.has('support') ? (
-                  <Td className={styles.td}>
-                    <div className={styles.supportCell}>
-                      <span className={styles.statusRow}>
-                        <StatusPill tone={SUPPORT_STATUS_TONES[friend.chatStatus ?? 'resolved']}>{status.label}</StatusPill>
-                        {friend.supportMark ? <span className={styles.mark} title={`対応マーク：${friend.supportMark.name}`}>{friend.supportMark.name}</span> : null}
-                      </span>
-                      <span className={styles.sub}>{`担当：${friend.operator?.name ?? '担当なし'}`}</span>
-                    </div>
-                  </Td>
-                ) : null}
-                {visible.has('scenario') ? (
-                  <Td className={styles.td}><span className={styles.cellText} title={friend.activeScenario?.name}>{friend.activeScenario?.name ?? emptyValue('none')}</span></Td>
-                ) : null}
-                {visible.has('latest') ? (
-                  <Td className={styles.td}>
-                    {latest ? (
-                      <div className={styles.twoLine}>
-                        <span className={styles.cellText} title={latest.content}>{messageWord(latest)}</span>
-                        <span className={styles.sub}>{monthDayTime(latest.createdAt)}</span>
-                      </div>
-                    ) : <span className={styles.cellText}>受信なし</span>}
-                  </Td>
-                ) : null}
-                {visible.has('tags') ? (
-                  <Td className={styles.td}>
-                    <div className={styles.tags} title={friend.tags.map((tag) => tag.name).join('・') || undefined}>
-                      {tags.shown.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="sm" />)}
-                      {tags.rest > 0 ? <span className={styles.tagRest}>+{tags.rest}</span> : null}
-                      {friend.tags.length === 0 ? <span className={styles.faint}>{emptyValue('unknown')}</span> : null}
-                    </div>
-                  </Td>
-                ) : null}
-                {visible.has('source') ? (
-                  <Td className={styles.td}><span className={styles.cellText} title={friend.firstTrackedLinkName || '不明'}>{friend.firstTrackedLinkName || '不明'}</span></Td>
-                ) : null}
-                {visible.has('last') ? (
-                  <Td className={styles.td}><span className={styles.cellText} title={monthDayTime(lastContact)}>{monthDay(lastContact)}</span></Td>
-                ) : null}
-                <Td className={styles.tdMenu}>
-                  <div className={styles.menuBox}>
-                    <FriendRowMenu
-                      friendId={friend.id}
-                      friendName={friend.displayName}
-                      attention={attention}
-                      canEdit={rowCanEdit}
-                      allowedActions={allowedActions}
-                      onAction={(action) => setRowAction({ friend, action })}
-                      onToggleAttention={() => void toggleAttention(friend)}
-                    />
-                  </div>
-                </Td>
-              </Tr>
-            )
-          })}
-        </tbody>
+          ) : null}
+        </TableBody>
       </DataTable>
     </div>
   )

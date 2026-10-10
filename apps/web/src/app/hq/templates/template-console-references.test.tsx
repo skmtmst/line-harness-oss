@@ -126,6 +126,6 @@ describe('R119 参照候補の目録', () => {
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [], selectedAccountId: null, selectedAccount: null, setSelectedAccountId: vi.fn(), loading: false }) }))
 
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => true, useStaffRole: () => 'owner', canManageRole: () => true }))
 
 vi.mock('@/v8/form-edit/edit', () => ({ default: ({ host }: { host: { refs: { tags: { id: string; name: string }[] }; notice: React.ReactNode } }) => <div data-testid="reference-probe">{host.notice}{host.refs.tags.map(t => <span key={t.id} data-testid={`form-tag-${t.id}`}>{t.name}</span>)}</div> }))

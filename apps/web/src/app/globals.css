@@ -77,9 +77,10 @@
   --color-on-accent: #ffffff;
 
   /* 操作。LINEの状態色とは分け、設定画面のリンクと主要ボタンに使う。 */
-  --color-action: #2563eb;
-  --color-action-hover: #0957b7;
-  --color-action-soft: #eaf4ff;
+  --color-action: var(--color-accent-deep);
+  --color-focus-ring: #2563eb;
+  --color-action-hover: var(--color-action);
+  --color-action-soft: var(--color-accent-soft);
   --color-on-action: #ffffff;
 
   /*
@@ -135,7 +136,8 @@
   --color-info-bg: #e2f2f5;
 
   /* Pencilの状態バッジ。既存画面の状態色は移行時にこの語彙へ寄せる。 */
-  --color-status-info: #1d4ed8;
+  --color-status-info: var(--color-focus-ring);
+  --color-status-info-deep: #1d4ed8; /* §6.5-4 案内の文字は濃い青 */
   --color-status-info-soft: #2563eb1a;
   --color-status-warn: #f5c56b;
   --color-status-warn-soft: #f973161a;
@@ -892,6 +894,16 @@
  * CSS Modules の pure 検査に当たるので、型の module ではなくこの層（①）に置く。
  */
 [data-theme="v8"] {
+  /* 予約の頭・数の帯（O2Z8u・GcyTr）。広い板では右の内訳列を空ける。 */
+  --tpl-booking-aside-width: 300px;
+  --tpl-booking-kpi-label-lh: 18px;
+  --tpl-booking-kpi-height: 116px;
+  --tpl-booking-heading-gap: 12px;
+  --tpl-booking-button-pad: 16px;
+  --tpl-booking-seg-item-width: 65px;
+  --tpl-booking-seg-last-width: 56px;
+  --tpl-booking-head-pad-top: 24px;
+  --tpl-booking-narrow-head-pad: 16px;
   --tpl-head-pad-top: var(--polish-space-section); --tpl-head-pad-side: var(--polish-space-section); --tpl-head-pad-bottom: var(--polish-space-field);
   /* 成果とアフィリエイトの V8（nJlxX・KdFRI・v9JWQ・h7dmB・OylSV・aINnz・Eo56k・tnTn9）。表は絵の列の並び（見出し 13/20・欄の間16）。 */
   --tpl-af-col-gap: 16px; --tpl-af-head-h: var(--polish-table-head); --tpl-af-head-pad: 13px 20px; --tpl-af-row-h: var(--polish-table-row); --tpl-af-row-pad: 9px 20px;
@@ -1068,7 +1080,7 @@
   --tpl-htn-radius-m: var(--polish-radius-control); --tpl-htn-radius-l: var(--polish-radius-card); --tpl-htn-radius-pill: var(--polish-radius-pill); --tpl-htn-line-2: 2px; --tpl-htn-soft-bg: #fafafc;
   --tpl-htn-text-11: 11px; --tpl-htn-text-12: 12px; --tpl-htn-text-13: 13px; --tpl-htn-text-14: 14px; --tpl-htn-lh-16: 16px; --tpl-htn-lh-17: 17px; --tpl-htn-lh-18: 18px; --tpl-htn-lh-19: 19px; --tpl-htn-lh-20: 20px; --tpl-htn-lh-21: 21px;
   --tpl-htn-panel-pad: var(--polish-space-section); --tpl-htn-panel-gap: 12px; --tpl-htn-aside-w: 340px; --tpl-htn-aside-pad: var(--polish-space-card); --tpl-htn-aside-gap: 10px; --tpl-htn-note-pad: 14px;
-  --tpl-htn-radio-gap: 24px; --tpl-htn-ring: inset 0 0 0 1px var(--color-hairline); --tpl-htn-ring-control: inset 0 0 0 1px var(--color-control-border); --tpl-htn-ring-accent: inset 0 0 0 2px var(--color-accent-deep); --tpl-htn-ring-focus: inset 0 0 0 2px var(--color-action); --tpl-htn-line-top: inset 0 1px 0 var(--color-hairline); --tpl-htn-line-bottom: inset 0 -1px 0 var(--color-hairline); --tpl-htn-input-h: 36px; --tpl-htn-input-pad: 0 12px;
+  --tpl-htn-radio-gap: 24px; --tpl-htn-ring: inset 0 0 0 1px var(--color-hairline); --tpl-htn-ring-control: inset 0 0 0 1px var(--color-control-border); --tpl-htn-ring-accent: inset 0 0 0 2px var(--color-accent-deep); --tpl-htn-ring-focus: inset 0 0 0 2px var(--color-focus-ring); --tpl-htn-line-top: inset 0 1px 0 var(--color-hairline); --tpl-htn-line-bottom: inset 0 -1px 0 var(--color-hairline); --tpl-htn-input-h: 36px; --tpl-htn-input-pad: 0 12px;
   --tpl-htn-chip-pad: 0 10px; --tpl-htn-chip-gap: 6px; --tpl-htn-tag-input-w: 320px; --tpl-htn-info-pad: 10px 12px; --tpl-htn-endpoint-pad: 8px 10px; --tpl-htn-basic-pad-bottom: 44px;
   --tpl-htn-check-row-h: var(--polish-table-row); --tpl-htn-check-pad: 0 16px; --tpl-htn-import-pad: 16px 16px 12px; --tpl-htn-import-gap: 2px; --tpl-htn-done-gap: 14px; --tpl-htn-progress-h: 6px;
   --tpl-htn-footer-pad: 14px 0 0; --tpl-htn-result-gap: 12px; --tpl-htn-result-row-h: var(--polish-table-row); --tpl-htn-result-label-w: 208px; --tpl-htn-result-badge-w: 120px; --tpl-htn-ack-pad: 4px 0 0; --tpl-htn-result-pull-top: -14px; --tpl-htn-result-pull-bottom: -15px; --tpl-htn-dialog-footer-pad: 14px 24px;
@@ -1655,7 +1667,7 @@
   --tpl-rt-stat-value-sm: 20px; --tpl-rt-caution-bg: #fff4e0; --tpl-rt-caution-ink: #8a3c00; --tpl-rt-flow-head-pad: 12px 16px; --tpl-rt-flow-head-line: inset 0 -1px 0 var(--tpl-rt-band-line);
   --tpl-rt-tab-gap: 20px; --tpl-rt-tab-lh: 18px; --tpl-rt-tab-pad: 10px; --tpl-rt-tab-pad-wide: 12px; --tpl-rt-icon-13: 13px; --tpl-rt-search-w: 240px; --tpl-rt-section-gap: var(--polish-space-field); --tpl-rt-fact-pad: 6px 0; --tpl-rt-fact-key-w: 160px; --tpl-rt-gray-note-pad: 10px 12px;
   --tpl-rt-terms-lh: 22px; --tpl-rt-terms-indent: 20px; --tpl-rt-terms-cell-pad: 6px 10px; --tpl-rt-terms-box-h: 220px; --tpl-rt-terms-box-pad: 14px 16px; --tpl-rt-toc-w: 260px; --tpl-rt-toc-lh: 23px; --tpl-rt-toc-h: 115px; --tpl-rt-terms-card-pad: var(--polish-space-card);
-  --tpl-rt-step-strip-pad: 4px 0 8px; --tpl-rt-step-pad: 8px 12px; --tpl-rt-step-dot: 22px; --tpl-rt-step-current: 2px solid var(--color-accent-deep); --tpl-rt-wizard-title-size: var(--polish-text-section); --tpl-rt-help-pad: 18px; --tpl-rt-footer-pad-top: 14px; --tpl-rt-check-icon: 14px; --tpl-rt-kind-lh: 18px; --tpl-rt-focus-ring: 2px solid var(--color-action); --tpl-rt-focus-ring-accent: 2px solid var(--color-accent);
+  --tpl-rt-step-strip-pad: 4px 0 8px; --tpl-rt-step-pad: 8px 12px; --tpl-rt-step-dot: 22px; --tpl-rt-step-current: 2px solid var(--color-accent-deep); --tpl-rt-wizard-title-size: var(--polish-text-section); --tpl-rt-help-pad: 18px; --tpl-rt-footer-pad-top: 14px; --tpl-rt-check-icon: 14px; --tpl-rt-kind-lh: 18px; --tpl-rt-focus-ring: 2px solid var(--color-focus-ring); --tpl-rt-focus-ring-accent: 2px solid var(--color-accent);
   --tpl-rt-card-head-radius: var(--polish-radius-card) var(--polish-radius-card) 0 0; --tpl-rt-review-row-pad: 12px 20px; --tpl-rt-col-96: 96px; --tpl-rt-col-160: 160px; --tpl-rt-star: #c9a24b; --tpl-rt-star-small: #d4a017; --tpl-rt-side-w: 340px; --tpl-rt-draft-h: 120px; --tpl-rt-draft-lh: 19px;
   --tpl-rt-post-row-pad: 8px 0; --tpl-rt-chip-pad: 2px 8px; --tpl-rt-kind-offer-bg: #e6f4ea; --tpl-rt-kind-offer-ink: #1f7a3a; --tpl-rt-kind-event-ink: #8a5a00; --tpl-rt-kind-std-bg: #eef0f3; --tpl-rt-kind-std-ink: #4b5563;
   --tpl-rt-summary-h: 96px; /* ★V8-B `U1X7T2`（2026-10-07 承認）Instagram 同時投稿の区画：余白12・行の間10。 */ --tpl-rt-ig-pad: 12px; --tpl-rt-ig-gap: 10px; --tpl-rt-picker-size: 100px; --tpl-rt-seg-gap: 2px; --tpl-rt-seg-pad: 6px 12px; --tpl-rt-metric-menu: 24px; --tpl-rt-metric-num-trim: -5px; --tpl-rt-chart-h: 160px; --tpl-rt-inline-pad: 12px 16px;
@@ -2609,7 +2621,7 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
   input:focus-visible,
   select:focus-visible,
   textarea:focus-visible {
-    outline: 2px solid var(--color-action);
+    outline: 2px solid var(--color-focus-ring);
     outline-offset: 2px;
   }
 }
@@ -2897,7 +2909,13 @@ select:not([multiple]):not(.appearance-none) {
 }
 [data-theme="v8"] { --tpl-hq-attribute-distribute-col: 76px; }
 
-[data-theme='v8'] { --tpl-wh-narrow-column-pad: 9px var(--tpl-af2-wh-narrow-pad); }
+[data-theme='v8'] {
+  /* B-190: タグの1行表示と「+N」の共通寸法。 */
+  --tpl-tag-overflow-max: 112px;
+  --tpl-tag-overflow-gap: 8px;
+  --tpl-tag-overflow-pad: 4px 8px;
+  --tpl-wh-narrow-column-pad: 9px var(--tpl-af2-wh-narrow-pad);
+}
 [data-theme='v8'] { --shadow-wh-kpi-top: inset 0 1px 0 var(--tpl-band-line); }
 
 /* B-152：V8の本文。数字の大きさ・数の帯は別の値を保つ。 */

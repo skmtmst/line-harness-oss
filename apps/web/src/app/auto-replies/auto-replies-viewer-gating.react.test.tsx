@@ -163,12 +163,12 @@ describe('R527 一覧の出し分け契約', () => {
   it('変更の可否は共通の出し分けで決め、手元の保存値で決めない', () => {
     expect(PAGE).toContain("from '@/lib/staff-role'")
     expect(PAGE).toContain('useStaffRole')
-    expect(PAGE).toContain('canManageRole')
+    expect(PAGE).toContain("useFeatureAccess('autoReplies')")
     expect(PAGE).not.toContain("localStorage.getItem('lh_staff_role')")
   })
 
   it('作成・フォルダ追加・行の変更操作を権限で守る', () => {
-    expect(PAGE).toContain('canManageRole(staffRole)')
+    expect(PAGE).toContain("useFeatureAccess('autoReplies')")
     // フォルダ追加と「…」は共通のフォルダの列が canManage で出し分ける（B-136）。
     expect(PAGE).toMatch(/<ManagedFolderPanel[\s\S]*?canManage=\{canEdit\}/)
     expect(PAGE).toContain('canEdit && <CreateRuleButton')

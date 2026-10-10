@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 外部連携「やり取りの記録」タブ（Pencil `Uv9AA`、中身は `DA0Ag`）。
  *
@@ -112,8 +114,8 @@ export default function WebhooksInteractionsV8() {
   const generationRef = useRef(0)
   const staffRole = useStaffRole()
   /* 送り直しは統括と管理者（v7 と同じ）。確認が終わるまでは出す。 */
-  const canRetry = staffRole === null || staffRole === 'owner' || staffRole === 'admin'
-  const isOwner = staffRole === null || staffRole === 'owner'
+  const canRetry = staffRole === 'owner' || staffRole === 'admin'
+  const isOwner = staffRole === 'owner'
   const overview = useWebhookOverview()
 
   const [data, setData] = useState<WebhookInteractionList>(EMPTY)
@@ -357,9 +359,9 @@ export default function WebhooksInteractionsV8() {
                     <span className={styles.main}>{shortDateTime(item.startedAt)}</span>
                     <span className={styles.sub}>{item.direction === 'outgoing' ? '送る' : '受け取る'}</span>
                   </Td>
-                  <Td grow className={styles.colName}>
+                  <Td grow className={styles.colName}><FolderDotName>
                     <span className={styles.main} title={`${item.webhookName}（${triggerWord(item)}）`}>{item.webhookName}</span>
-                  </Td>
+                  </FolderDotName></Td>
                   <Td className={styles.colBody}>
                     <span className={styles.main} title={item.triggerSummary}>{lines.main}</span>
                     {lines.sub ? <span className={styles.sub} title={lines.sub}>{lines.sub}</span> : null}

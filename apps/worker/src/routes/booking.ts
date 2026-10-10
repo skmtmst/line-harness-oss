@@ -762,6 +762,7 @@ booking.get('/api/liff/booking/settings', async (c) => {
       Number.isInteger(windowDays) && windowDays >= 1 && windowDays <= 365 ? windowDays : 60,
     // 予約のルール「お店が承認してから確定する」。automatic だけ承認なし確定。
     approval_mode: row?.approval_mode === 'automatic' ? 'automatic' : 'manual',
+    cancel_deadline_minutes_before: Number(row?.cancel_deadline_minutes_before ?? 1440),
   });
 });
 
@@ -1786,10 +1787,12 @@ booking.get('/api/liff/booking/me', async (c) => {
       `SELECT b.id, b.starts_at, b.status, b.customer_note,
               b.lock_version, b.menu_id, b.staff_id,
               m.name AS menu_name,
+              COALESCE(m.cancel_deadline_hours_before * 60, bs.cancel_deadline_minutes_before, 1440) AS cancel_deadline_minutes_before,
               s.display_name AS staff_name, s.profile_image_url
          FROM bookings b
          INNER JOIN menus m ON m.id = b.menu_id
          INNER JOIN staff s ON s.id = b.staff_id
+         LEFT JOIN booking_settings bs ON bs.line_account_id = b.line_account_id
         WHERE b.friend_id = ? AND b.line_account_id = ?
           AND b.status IN ('requested','confirmed')
           AND b.starts_at >= ?
@@ -1814,7 +1817,7 @@ booking.get('/api/liff/booking/me', async (c) => {
     .bind(friendId, accountId, new Date().toISOString())
     .all<BookingHistoryItem>();
 
-  return c.json({ upcoming: upcoming.results, past: past.results } satisfies BookingHistoryResponse);
+  return c.json({ upcoming: upcoming.results.map(row => ({ ...row, cancel_deadline_at: new Date(new Date(row.starts_at).getTime() - Number(row.cancel_deadline_minutes_before) * 60_000).toISOString() })), past: past.results } satisfies BookingHistoryResponse);
 });
 
 // ================================================================
@@ -3480,14 +3483,16 @@ booking.delete('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_K
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const id = c.req.param('id');
-  await c.env.DB
-    .prepare(
-      `UPDATE menus
-          SET deleted_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-        WHERE id = ? AND line_account_id = ?`,
-    )
-    .bind(id, accountId)
-    .run();
+  const menu = await c.env.DB.prepare('SELECT id FROM menus WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL')
+    .bind(id, accountId).first();
+  if (!menu) return c.json({ error: 'not_found' }, 404);
+  // 予約の履歴があるメニューは残す。同時に予約が付いてもUPDATEの条件で止める。
+  const result = await c.env.DB.prepare(`UPDATE menus
+    SET deleted_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+    WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL
+      AND NOT EXISTS (SELECT 1 FROM bookings WHERE menu_id = menus.id)`)
+    .bind(id, accountId).run();
+  if (!result.meta.changes) return c.json({ error: 'menu_has_bookings', code: 'menu_has_bookings' }, 409);
   return c.json({ ok: true });
 });
 

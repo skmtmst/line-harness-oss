@@ -36,7 +36,7 @@ export default function MergedPersonDetailViewV8({
 }) {
   const m = useMergedPerson(personId)
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || canManageRole(staffRole)
+  const canManage = canManageRole(staffRole)
 
   if (m.phase === 'loading') return <ListState kind="loading" />
   if (m.phase === 'forbidden') {

@@ -71,7 +71,7 @@ export default function TagsList({
    * （最後の守りはサーバの 403）。
    */
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const canEdit = canManageRole(staffRole)
   const readOnly = staffRole !== null && !canEdit
   const narrow = useNarrowViewport()
 

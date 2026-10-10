@@ -11,19 +11,22 @@
  * 読み込み・失敗の分け方・段の行き来（URL の pane）・離れる前の確かめ・
  * 1本の保存の帯は app/webinars/edit/page.tsx と同じ（BEHAVIOR.md）。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ArrowRight } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { notifyToast } from '@/components/shared/toast'
 import { RowMenu } from '@/components/shared/row-actions'
 import TargetMissing from '@/components/shared/target-missing'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import {
   ApiError,
   webinarApi,
@@ -82,6 +85,7 @@ function normalizePane(value: string | null): PaneKey {
 }
 
 function EditInner() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const id = searchParams.get('id')
@@ -90,12 +94,15 @@ function EditInner() {
   const { accounts, loading: accountsLoading } = useAccount()
   const role = useStaffRole()
   /* 役割の確認が済むまでは今までどおり出し、staff と分かったら変える操作を隠す（最後の守りはサーバの 403）。 */
-  const readOnly = role !== null && !canManageRole(role)
+  const featureAccess = useFeatureAccess('webinars')
+  const readOnly = !featureAccess
 
   const [loaded, setLoaded] = useState<{ id: string; webinar: Webinar; editor: WebinarEditor } | null>(null)
   const [loadFailure, setLoadFailure] = useState<{ id: string; failure: WebinarLoadFailure } | null>(null)
   const [loadMissing, setLoadMissing] = useState<{ id: string } | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [duplicating, setDuplicating] = useState(false)
+  const [duplicateError, setDuplicateError] = useState('')
   const [pauseVersion, setPauseVersion] = useState<number | null>(null)
   const [pausing, setPausing] = useState(false)
   const [pauseError, setPauseError] = useState('')
@@ -171,9 +178,9 @@ function EditInner() {
     return registrar
   }
 
-  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({
+  const { leaveTarget, confirmLeave, cancelLeave, disarm, guarded } = useUnsavedGuard({
     dirty: unsaved.size > 0,
-    busy: savingForNav !== false,
+    busy: savingForNav !== false || duplicating,
     samePage: (destination) => destination.pathname === pathname && destination.searchParams.get('id') === id,
   })
   const leaveDialog = <UnsavedLeaveDialog open={leaveTarget !== null} subject="ウェビナーの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
@@ -357,7 +364,20 @@ function EditInner() {
     } catch (error) { setPauseError(japaneseDetailOf(error) || '停止できませんでした。もう一度お試しください。') }
     finally { setPausing(false) }
   }
-  const menuActions = !readOnly && webinar.status === 'active' ? <RowMenu label="ウェビナーの操作" triggerProps={{ disabled: pausing || savingForNav !== false }} items={[{ id: 'pause', label: '停止', onSelect: () => { setPauseError(''); setPauseVersion(editor.version) } }]} /> : null
+  const duplicateSaved = async () => {
+    if (!id || !editor || duplicating || readOnly) return
+    setDuplicating(true); setDuplicateError('')
+    try {
+      const copied = await webinarApi.duplicate(id, editor.version)
+      notifyToast('複製した下書きを追加しました')
+      router.push(`/webinars?status=draft&highlight=${encodeURIComponent(copied.data.id)}`)
+    } catch { setDuplicateError('複製できませんでした。保存済みの内容を読み直してお試しください。') }
+    finally { setDuplicating(false) }
+  }
+  const menuActions = !readOnly ? <><RowMenu label="ウェビナーの操作" triggerProps={{ disabled: pausing || savingForNav !== false || duplicating }} items={[
+    { id: 'duplicate', label: '複製する', onSelect: () => guarded(() => void duplicateSaved()) },
+    ...(webinar.status === 'active' ? [{ id: 'pause', label: '停止', onSelect: () => { setPauseError(''); setPauseVersion(editor.version) } }] : []),
+  ]} />{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}</> : null
 
   const wizardChrome = (key: StepKey, primary?: ReactNode): WizardChrome => {
     const nextLabel = NEXT_LABEL[key]

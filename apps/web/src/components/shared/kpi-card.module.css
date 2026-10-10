@@ -323,3 +323,9 @@
 [data-theme='v8'] .strip[data-kpi-presentation='band'][data-kpi-border='inset-top'] {
   border-block-width: 0; box-shadow: var(--shadow-wh-kpi-top);
 }
+
+/* 予約の帯（O2Z8u・GcyTr）：短い3段、詳しい説明は「？」へ。 */
+[data-theme='v8'] .strip[data-kpi-layout='booking'] .label { font-size: var(--text-caption); line-height: var(--tpl-booking-kpi-label-lh); }
+[data-theme='v8'] .strip[data-kpi-layout='booking'] .labelText { flex: 0 1 auto; }
+[data-theme='v8'] .strip[data-kpi-layout='booking'] .detailText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-theme='v8'] .strip[data-kpi-layout='booking'] .card { min-height: var(--tpl-booking-kpi-height); }

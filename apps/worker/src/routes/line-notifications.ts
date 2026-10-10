@@ -32,7 +32,7 @@ import {
   type NotificationDeliveryAttemptRow,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
 import {
@@ -192,7 +192,7 @@ lineNotifications.get(
 
 lineNotifications.post(
   '/api/line-notifications/customer-definitions',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('lineNotifications'),
   inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
@@ -230,7 +230,7 @@ lineNotifications.post(
 
 lineNotifications.patch(
   '/api/line-notifications/customer-definitions/:id/draft',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('lineNotifications'),
   inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
@@ -269,7 +269,7 @@ lineNotifications.patch(
 
 lineNotifications.post(
   '/api/line-notifications/customer-definitions/:id/publish',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('lineNotifications'),
   inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
@@ -307,7 +307,7 @@ lineNotifications.post(
 
 lineNotifications.post(
   '/api/line-notifications/customer-definitions/:id/stop',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('lineNotifications'),
   inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
@@ -632,7 +632,7 @@ function lineErrorStatus(error: unknown): number | null {
 
 lineNotifications.post(
   '/api/line-notifications/deliveries/:id/retry',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('lineNotifications'),
   inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
@@ -828,7 +828,7 @@ lineNotifications.get(
  */
 lineNotifications.post(
   '/api/line-notifications/deliveries/:id/resend',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('lineNotifications'),
   inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
@@ -981,7 +981,7 @@ const CUSTOMER_TEST_SEND_NOTICE =
  */
 lineNotifications.post(
   '/api/line-notifications/customer-definitions/:id/test',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('lineNotifications'),
   inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);

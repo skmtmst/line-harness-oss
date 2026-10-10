@@ -149,7 +149,7 @@ function TagFolderDialog({
             if (event.key === 'Enter' && name.trim()) void save()
           }}
           placeholder="例：VIP"
-          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
+          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
         /></Field>
       <div className="mt-3">
         <span className="text-ink-secondary mb-1 block text-xs font-medium">色</span>

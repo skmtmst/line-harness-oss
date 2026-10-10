@@ -9,7 +9,7 @@ describe('V6 予約管理の時間台帳', () => {
   test('今日・今週・今月・一覧を実際に切り替えられる', () => {
     expect(PAGE).toContain("useState<'day' | 'week' | 'month' | 'list'>('day')")
     for (const label of ['今日', '今週', '今月', '一覧']) expect(PAGE).toContain(label)
-    expect(PAGE).toContain('onClick={() => setView(key)}')
+    expect(PAGE).toContain('onChange={setView}')
   })
 
   test('今日を時間×担当、今週を時間×曜日の格子で表示する', () => {

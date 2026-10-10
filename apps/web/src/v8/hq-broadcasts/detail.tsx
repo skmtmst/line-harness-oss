@@ -7,6 +7,7 @@
  * 送る前（下書き）・予約中は取り消す（cancel）。下書きは店ごとの確かめを見て、そのまま送れる（send）。
  * 送った LINE は取り消せない。動きは BEHAVIOR.md。
  */
+import { useTenantWideAccess } from '@/lib/staff-role'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -31,7 +32,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ApiError, describeSaveFailure } from '@/lib/api'
 import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { type ResultTarget, canRetry, failedCount, failureLines, fromApiContent, jpDateTime, preflightBadge, previewText, resultBadge, runBadge, sendTotals } from './model'
 import styles from './detail.module.css'
 import detailStyles from '../broadcast-detail/detail.module.css'
@@ -373,7 +374,7 @@ export default function HqBroadcastDetail() {
     samePageUrl.replace(`/hq/broadcasts/detail?${q.toString()}`)
   }
   const role = useStaffRole()
-  const canManage = role === null || canManageRole(role)
+  const canManage = useTenantWideAccess()
   const [run, setRun] = useState<HqBroadcastRun | null>(null)
   const [testOpen, setTestOpen] = useState(false)
   const [requestOpen, setRequestOpen] = useState(false)

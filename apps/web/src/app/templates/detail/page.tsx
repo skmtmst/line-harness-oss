@@ -1,5 +1,6 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -17,7 +18,6 @@ import FlexPreviewComponent from '@/components/flex-preview'
 import { validateFlexContent } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import TemplateDetailV8 from '@/v8/template-detail/detail'
 import { templateDeleteDescription } from '../template-delete-message'
 import { messageTypeText } from '../template-message-type'
@@ -103,8 +103,7 @@ function TemplateDetailInner() {
    * N-144: 編集・削除APIは owner/admin だけ。staff へは閲覧だけ残し、
    * 押すと 403 になる口は出さない。
    */
-  const [canMutateTemplates] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canMutateTemplates = useFeatureAccess('templates')
   usePageTitle(template?.name ?? null)
 
   const reload = useCallback(async () => {

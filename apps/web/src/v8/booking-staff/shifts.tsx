@@ -8,11 +8,13 @@
  * （左＝担当者の切り替え／ひも付けの帯・いつもの勤務時間・休憩・この日だけ・
  * 何週分かのシフト・Google カレンダー、右＝LIFF の日時選択の見本）。
  *
- * 役割はサーバー（/api/staff/me）から読む。読めないときだけ手元の保存値に戻す。
+ * 役割はサーバー（/api/staff/me）から読む。確認中と読めないときは操作を隠す。
  * 動き（読み込み・保存・版の競合・権限・失敗時の扱い）は今までの
  * app/booking/staff/shifts/staff-detail-v8.tsx から写した。BEHAVIOR.md を参照。
  */
 import { jstDate } from '@/lib/jst-datetime'
+import { usePermissionAccess } from '@/lib/use-feature-access'
+import { useStaffRole } from '@/lib/staff-role'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
@@ -31,7 +33,7 @@ import {
   type BookingStaff,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
+import { canViewFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
@@ -68,29 +70,9 @@ const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
 
 /**
  * 役割（サーバーの /api/staff/me）。確認中は null。
- * 読めなかったときは手元の保存値（lh_staff_role）に戻す（今までの判定と同じ）。
+ * 確認中と読めなかったときは変更操作を隠す。
  */
-export function useServerStaffRole(): string | null {
-  const [role, setRole] = useState<string | null>(null)
-  useEffect(() => {
-    let active = true
-    const fallback = () => {
-      if (!active) return
-      let local = ''
-      try { local = window.localStorage.getItem('lh_staff_role') ?? '' } catch { /* 読めない環境は空 */ }
-      setRole(local || 'unknown')
-    }
-    void api.staff.me()
-      .then((res) => {
-        if (!active) return
-        if (res.success && res.data?.role) setRole(res.data.role)
-        else fallback()
-      })
-      .catch(fallback)
-    return () => { active = false }
-  }, [])
-  return role
-}
+export const useServerStaffRole = useStaffRole
 
 /** 店舗の時間帯での「今日」(YYYY-MM-DD)。枠の範囲決めだけに使う。 */
 function todayKey(timeZone: string): string {
@@ -252,6 +234,7 @@ function PageState({ node, self, title, desc, icon, actions, head }: {
  * ひも付けが無ければ板 wvGke の案内。R579：2経路とも通信失敗なら「無い」と言わず再試行の口。
  */
 function OwnShiftEntry() {
+  const role = useStaffRole()
   const samePageUrl = useSamePageUrl()
   const { selectedAccountId } = useAccount()
   const [resolved, setResolved] = useState<'loading' | 'missing' | 'error'>('loading')
@@ -316,7 +299,7 @@ function OwnShiftEntry() {
   }
   if (resolved === 'missing') {
     // 店の受付枠を見られる人には、今までの「受付枠へ自動で移る」の代わりに入口を出す。
-    const canSeeStore = canViewFeature('/booking/bookings') || canViewFeature('booking.settings') || canViewFeature('/booking/menus')
+    const canSeeStore = canViewFeature('/booking/bookings', role) || canViewFeature('booking.settings', role) || canViewFeature('/booking/menus', role)
     return (
       <PageState
         node="wvGke"
@@ -344,9 +327,9 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   const [staffMissing, setStaffMissing] = useState(false)
   const [ownStaffId, setOwnStaffId] = useState<string | null>(null)
   // N-411 本人勤務：変える権限が無い人は入力を止め、押せないボタンは置かない。
-  const [canEdit] = useState(() => (typeof window === 'undefined' ? true : canEditFeature('booking.staff.own')))
+  const canEdit = usePermissionAccess('booking.staff.own')
   // 「この日だけの休み」は例外日の口（booking.settings 権限）。権限が無い人には選ばせない。
-  const [canEditExceptions] = useState(() => (typeof window === 'undefined' ? true : canEditFeature('booking.settings')))
+  const canEditExceptions = usePermissionAccess('booking.settings')
   const [timeZone, setTimeZone] = useState('Asia/Tokyo')
   const [storeExceptions, setStoreExceptions] = useState<Array<{ dateFrom: string; dateTo: string; kind: string }>>([])
   const [staffExceptions, setStaffExceptions] = useState<BookingException[]>([])

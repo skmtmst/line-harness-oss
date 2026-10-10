@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * 予約メニューの作成・編集（V8）の「サクサク感」。
  * A: 候補の読み込み中は目に見える「読み込み中…」を置かず、骨組みの入れ物が読み込み中と伝える。
@@ -102,6 +104,7 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   fixture.push = vi.fn()
   fixture.tagsList = async () => ({ success: true, data: TAGS })
   fixture.listMenus = async () => ({ menus: [] })

@@ -468,7 +468,7 @@ function FieldMigrate() {
   const back = <Link href="/tags?tab=fields" className={styles.backLink}>← 友だち情報欄へ</Link>
   const rows = sample ? sampleRows(sample) : []
 
-  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+  if (!canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
 
   return (
     <CreatePage

@@ -76,7 +76,7 @@
 
 .viewerIcon {
   flex-shrink: 0;
-  color: var(--color-status-info);
+  color: var(--color-action);
 }
 
 /* 本体：設定の中のメニュー｜一覧｜右の補足。 */

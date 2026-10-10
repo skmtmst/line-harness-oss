@@ -43,6 +43,7 @@ vi.mock('@/contexts/account-context', () => ({
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
   api: {
+    staff: { me: async () => ({ success: true, data: { role: 'owner' } }) },
     templates: {
       list: fixture.templatesList,
       get: (id: string) => Promise.resolve({

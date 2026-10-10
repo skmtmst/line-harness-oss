@@ -1,5 +1,7 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
+
 /*
  * ★V8 友だち追加時の配信の実行の詳細（Pencil `N43uVX`・失敗あり）。
  *
@@ -20,7 +22,7 @@ import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import { useAccount } from '@/contexts/account-context'
 import { api, type FriendAddRunDetail } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { describeFriendAddFailure } from '@/v8/friend-add/failure'
 import { MESSAGE_TYPE_LABEL } from '@/v8/friend-add/flow'
 import { DELIVERY_UNKNOWN_CODE, jstClock, jstShortDateTime, jstTitleDate, routingAction } from './status'
@@ -111,7 +113,7 @@ function FriendAddRunDetailInner() {
   usePageCrumbs([{ label: '友だち追加時の配信', href: '/friend-add-settings' }, { label: '実行結果', href: listHref }])
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const role = useStaffRole()
-  const canManage = role === null || canManageRole(role)
+  const canManage = useFeatureAccess('friendAdd')
   const [detail, setDetail] = useState<FriendAddRunDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')

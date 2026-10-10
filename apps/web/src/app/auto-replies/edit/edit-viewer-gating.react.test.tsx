@@ -101,7 +101,7 @@ describe('R527 編集URLの出し分け契約', () => {
   it('変更の可否は共通の出し分けで決める', () => {
     expect(PAGE).toContain("from '@/lib/staff-role'")
     expect(PAGE).toContain('useStaffRole')
-    expect(PAGE).toContain('canManageRole')
+    expect(PAGE).toContain("useFeatureAccess('autoReplies')")
   })
 
   it('手順と編集窓が canManage で守られている', () => {

@@ -61,6 +61,7 @@ beforeEach(() => {
   })
   vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
     const path = String(input)
+    if (path.includes('/api/staff/me')) return Promise.resolve(response({ success: true, data: { role: 'owner' } }))
     if (path.includes('/api/settings/features') && (init?.method ?? 'GET') === 'GET') {
       if (fixture.mode === 'forbidden') return response({ success: false, error: 'forbidden' }, 403)
       if (fixture.mode === 'down') throw new TypeError('Failed to fetch')

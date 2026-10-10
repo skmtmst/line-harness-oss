@@ -74,7 +74,7 @@
 }
 .insertChip:hover:not(:disabled) { background: var(--color-canvas-sunken); }
 .insertChip:disabled { cursor: not-allowed; opacity: 0.5; }
-.insertChip:focus-visible { outline: var(--tpl-te-focus) solid var(--color-action); outline-offset: calc(var(--tpl-te-focus) * -1); }
+.insertChip:focus-visible { outline: var(--tpl-te-focus) solid var(--color-focus-ring); outline-offset: calc(var(--tpl-te-focus) * -1); }
 .counter { margin-left: auto; color: var(--color-ink-faint); font-size: var(--text-micro); white-space: nowrap; }
 .counter[data-over] { color: var(--color-danger); }
 
@@ -91,6 +91,7 @@
 
 /* 右の列（作る型の右の列と同じ寸法）：幅380・余白24・左の線。左右は別々に縦へ送る。 */
 .side {
+  align-self: flex-start; position: sticky; top: 0; max-height: 100%;
   display: flex; flex-direction: column; align-items: center; flex-shrink: 0;
   width: var(--tpl-te-side-w); min-height: 0; overflow-x: hidden; overflow-y: auto;
   padding: var(--tpl-preview-pad);
@@ -119,10 +120,9 @@
 .previewToggle > * { width: 100%; }
 .previewDialog { display: flex; justify-content: center; }
 
-
 /* 1152 の板（a1k3d）：右の列は余白16・中の幅いっぱい。スマホは窓で開く。 */
 @container v8-page (max-width: 1099px) {
-  .side { width: var(--tpl-preview-narrow-width); padding: var(--tpl-te-narrow-side-pad); }
+  .side { width: var(--tpl-preview-narrow-width); padding: var(--tpl-te-narrow-side-pad); background: transparent; border-left: 0; }
   .sideContent { width: 100%; }
   .previewToggle { display: block; }
   .phone, .previewHead { display: none; }
@@ -177,7 +177,7 @@
 }
 .grip { display: inline-flex; align-items: center; padding: 0; border: 0; background: transparent; color: var(--color-ink-faint); cursor: pointer; }
 .grip:disabled { cursor: default; opacity: 0.5; }
-.grip:focus-visible { outline: var(--tpl-te-focus) solid var(--color-action); outline-offset: var(--tpl-te-focus); }
+.grip:focus-visible { outline: var(--tpl-te-focus) solid var(--color-focus-ring); outline-offset: var(--tpl-te-focus); }
 .questionNo { color: var(--color-ink); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-text-sm-lh); }
 .formatField { width: var(--tpl-te-format-w); flex-shrink: 0; }
 .formatField :global(*) { max-width: 100%; }

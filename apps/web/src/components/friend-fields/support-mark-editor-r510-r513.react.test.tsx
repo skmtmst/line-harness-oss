@@ -3,6 +3,7 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const identity = vi.hoisted(() => ({ role: 'owner' }))
 const fixture = vi.hoisted(() => ({
   routerPush: vi.fn(),
   marksList: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 vi.mock('@/lib/api', () => ({
   api: {
+    staff: { me: async () => ({ success: true, data: { role: identity.role } }) },
     supportMarks: {
       list: fixture.marksList,
       create: fixture.marksCreate,
@@ -55,6 +57,7 @@ function createButton(): HTMLButtonElement {
 }
 
 beforeEach(() => {
+  identity.role = 'owner'
   const store = new Map<string, string>()
   Object.defineProperty(window, 'localStorage', {
     value: {
@@ -108,6 +111,7 @@ describe('R511 権限のない担当者に作成を案内しない', () => {
   })
 
   it('役割がstaffと分かっているときも作成を案内しない', async () => {
+    identity.role = 'staff'
     window.localStorage.setItem('lh_staff_role', 'staff')
     render(<SupportMarkEditor />)
     await screen.findByText('この操作の権限がありません。オーナーか管理者に頼んでください。')

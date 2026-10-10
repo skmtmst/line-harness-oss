@@ -124,17 +124,17 @@ beforeEach(async () => {
 });
 
 describe('ウェビナー個人視聴履歴の owner/admin 境界 (N-118)', () => {
-  test('staff は participants JSON を開けない (403)', async () => {
+  test('閲覧権限があるstaffは参加者を見られる', async () => {
     const res = await get(`/api/webinars/${WEBINAR_A}/participants`, KEY_STAFF_A);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
   });
 
-  test('staff は participants CSV を書き出せない (403)', async () => {
+  test('staffは参加者CSVを書き出せない', async () => {
     const res = await get(`/api/webinars/${WEBINAR_A}/participants.csv`, KEY_STAFF_A);
     expect(res.status).toBe(403);
   });
 
-  test('staff の analytics は集計を返すが個人履歴を含まない', async () => {
+  test('staffのanalyticsは集計を返し個人履歴を含まない', async () => {
     const res = await get(`/api/webinars/${WEBINAR_A}/analytics`, KEY_STAFF_A);
     expect(res.status).toBe(200);
     const body = await res.json() as {
@@ -145,7 +145,7 @@ describe('ウェビナー個人視聴履歴の owner/admin 境界 (N-118)', () =
     };
     // 集計（視聴者数・離脱など）は従来どおり見られる。
     expect(body.data.summary.viewers).toBe(1);
-    // 個人の配列は空。友だち名が応答本文へ一切出ないことも確認する。
+    // 担当アカウントの個人履歴を返す。
     expect(body.data.participants).toEqual([]);
     expect(JSON.stringify(body)).not.toContain(FRIEND_NAME_A);
   });

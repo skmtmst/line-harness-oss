@@ -10,6 +10,8 @@
  */
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useFolderMove } from '@/components/shared/use-folder-move'
+import { moveAutomationToFolder } from '@/lib/move-to-folder'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -128,11 +130,11 @@ function monthDay(iso: string): string {
   return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
 }
 
-function TableHead() {
+function TableHead({ selection }: { selection?: ReactNode } = {}) {
   return (
     <thead>
       <TableHeadRow className={styles.headRow} data-table-layout="columns">
-        <Th className={styles.colName}>ルール</Th>
+        <Th className={styles.colName}>{selection}ルール</Th>
         <Th className={styles.colTrigger}>きっかけ</Th>
         <Th className={styles.colWho}>だれに（条件）</Th>
         <Th className={styles.colDo}>すること</Th>
@@ -227,7 +229,6 @@ export default function AutomationListV8() {
     }
   }, [selectedAccountId])
 
-
   useEffect(() => {
     if (accountLoading) return
     void load()
@@ -246,8 +247,8 @@ export default function AutomationListV8() {
   const visible = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('ja')
     const filtered = items.filter((item) => {
-      // ルールを入れる口がまだ無いので、フォルダを選ぶと「未分類」以外は0件。
-      if (folderFilter && folderFilter !== UNFILED) return false
+      // 分類先のIDで絞り、未分類にはフォルダのない行だけを出す。
+      if (folderFilter === UNFILED ? Boolean(item.folderId) : folderFilter !== '' && item.folderId !== folderFilter) return false
       if ((item.status === 'archived') !== onlyArchived) return false
       if (onlyActive && !item.isActive) return false
       if (onlyStopped && item.isActive) return false
@@ -270,6 +271,12 @@ export default function AutomationListV8() {
   const current = Math.min(Math.max(1, page), pageCount)
   const paged = visible.slice((current - 1) * pageSize, current * pageSize)
   useEffect(() => { setPage(1) }, [search, folderFilter, onlyActive, onlyStopped, onlyArchived, saved, sort, pageSize, selectedAccountId])
+
+  const folderMove = useFolderMove({
+    accountId: selectedAccountId, canEdit: canEdit, items: paged, folders,
+    move: (item, folderId) => moveAutomationToFolder(item.id, selectedAccountId!, folderId),
+    onChanged: async () => { await load(); await loadFolders() },
+  })
 
   const runRowAction = async (fn: () => Promise<void>, id: string) => {
     if (rowBusyId) return
@@ -355,6 +362,7 @@ export default function AutomationListV8() {
     if (!canEdit) return [runs]
     if (item.status === 'archived') return [runs, { id: 'restore', label: '保管から戻す', disabled: busy, onSelect: () => { setActionError(''); setPending({ kind: 'restore', item }) } }]
     return [
+      { id: 'move', label: 'フォルダへ移す', onSelect: () => folderMove.open(item) },
       { id: 'edit', label: '編集する', disabled: busy, onSelect: () => void openEditor(item.id, false) },
       { id: 'duplicate', label: '複製する', disabled: busy, onSelect: () => void openEditor(item.id, true) },
       {
@@ -500,7 +508,7 @@ export default function AutomationListV8() {
         {actionError ? <div className={styles.errorRow}><Notice tone="danger">{actionError}</Notice></div> : null}
         <div className={narrow ? `${styles.tableWrap} ${styles.narrowTable}` : styles.tableWrap}>
           <DataTable className={styles.table}>
-            <TableHead />
+            <TableHead selection={folderMove.pageCheckbox} />
             <tbody>
               {paged.map((item) => {
                 const action = actionSummary(item)
@@ -511,7 +519,7 @@ export default function AutomationListV8() {
                 return (
                   <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colName}>
-                      <FolderDotName folder={null}>
+                      <FolderDotName folder={folders.find((folder) => folder.id === item.folderId) ?? null}>{folderMove.checkbox(item)}
                         <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
                       </FolderDotName>
                     </Td>
@@ -535,9 +543,7 @@ export default function AutomationListV8() {
                     </Td>
                     <Td className={styles.colOps}>
                       <div className={styles.opsBox}>
-                        {canEdit && item.status !== 'archived'
-                          ? <Button onClick={() => void openEditor(item.id, false)} disabled={busy}>編集する</Button>
-                          : <span className={styles.editSpace} aria-hidden="true" />}
+
                         <RowMenu
                           label={menuLabel}
                           open={openMenuId === item.id}
@@ -598,15 +604,16 @@ export default function AutomationListV8() {
           allId=""
           unfiledId={UNFILED}
           allCount={ready ? items.length : null}
-          unfiledCount={ready ? items.length : null}
-          countOf={() => null}
-          placeholder="例：予約・購入"
+          unfiledCount={ready ? items.filter((item) => !item.folderId).length : null}
+          countOf={(folder) => folder.itemCount ?? null}
+          placeholder="例： 予約・購入"
         />
       </>}
       collapsedFolders={narrow ? undefined : <>{createButton(false)}{folderSelect}</>}
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={pager}
       overlays={<>
+        {folderMove.overlays}
         <ConfirmDialog
           open={pending !== null}
           title={pending ? `「${pending.item.name}」を${pending.kind === 'restore' ? '保管から戻し' : pending.kind === 'archive' ? '保管し' : pending.item.isActive ? '止め' : '動か'}ますか？` : ''}

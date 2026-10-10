@@ -1,5 +1,6 @@
 'use client'
 
+import { useStaffRole } from '@/lib/staff-role'
 import { Building2, ChevronsUpDown, CreditCard, LifeBuoy, LogOut, MessageCircleQuestion, Users } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -266,7 +267,7 @@ export function SidebarAccountMenu({ hq, collapsed = false }: SidebarAccountMenu
   const { clearSelectedAccountId } = useAccount()
   const menuId = useId()
   const [name, setName] = useState('')
-  const [role, setRole] = useState('')
+  const role = useStaffRole()
   const [billing, setBilling] = useState<BillingSummary | null>(null)
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -276,7 +277,6 @@ export function SidebarAccountMenu({ hq, collapsed = false }: SidebarAccountMenu
   useEffect(() => {
     try {
       setName(localStorage.getItem('lh_staff_name') ?? '')
-      setRole(localStorage.getItem('lh_staff_role') ?? '')
     } catch {
       // ストレージが使えなくても、名前が空になるだけ
     }
@@ -318,7 +318,7 @@ export function SidebarAccountMenu({ hq, collapsed = false }: SidebarAccountMenu
   }, [open])
 
   const canReturnToHq = canReturnToHqFrom(role, pathname, hq)
-  const rows = sidebarAccountRows({ hq, role, canReturnToHq })
+  const rows = sidebarAccountRows({ hq, role: role ?? '', canReturnToHq })
   const roleLabel = role ? ROLE_LABELS[role] ?? role : ''
   const chip = seesBilling && billing ? billingChip(billing) : null
   const daysLeft = seesBilling && billing ? trialDaysLabel(billing) : null

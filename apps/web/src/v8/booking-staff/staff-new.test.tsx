@@ -22,7 +22,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
     ...actual,
-    api: { staff: { list: async () => ({ success: true, data: [] }) } },
+    api: { staff: { me: async () => ({ success: true, data: { role: 'owner' } }), list: async () => ({ success: true, data: [] }) } },
     bookingApi: {
       listMenus: async () => ({ menus: MENUS }),
       listStaff: async () => ({ staff: fixture.staff }),

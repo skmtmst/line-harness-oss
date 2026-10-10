@@ -1,5 +1,6 @@
 'use client'
 
+import { useStaffRole } from '@/lib/staff-role'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -96,7 +97,7 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
   useSettingsNavInline(inline)
   const pathname = usePathname() ?? ''
   const { selectedAccountId } = useAccount()
-  const [staffRole, setStaffRole] = useState<string | null>(null)
+  const staffRole = useStaffRole()
   const [staffPermissions, setStaffPermissions] = useState<string[]>([])
   const [staffViewPermissions, setStaffViewPermissions] = useState<string[]>([])
   const [visibility, setVisibility] = useState<Record<string, boolean> | null>(null)
@@ -115,7 +116,6 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
   }, [selectedAccountId])
 
   useEffect(() => {
-    setStaffRole(localStorage.getItem('lh_staff_role'))
     try { setStaffPermissions(JSON.parse(localStorage.getItem('lh_staff_permissions') || '[]')) } catch { setStaffPermissions([]) }
     try { setStaffViewPermissions(JSON.parse(localStorage.getItem('lh_staff_view_permissions') || '[]')) } catch { setStaffViewPermissions([]) }
   }, [])

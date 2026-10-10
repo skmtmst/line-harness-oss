@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * R309/R310: スタッフ追加を実物の React で描いて確かめる。
  *
@@ -91,6 +93,7 @@ const MENUS = [
 ]
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   memStorage.setItem('lh_staff_role', 'owner')
   fixture.listMenus = async () => ({ menus: MENUS })
   fixture.createStaff = vi.fn(async () => ({ id: 'staff-new-1' }))

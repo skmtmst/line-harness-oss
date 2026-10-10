@@ -1,5 +1,7 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
+
 import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -48,7 +50,7 @@ import type {
 } from '@line-crm/shared'
 import { validateFlexContent } from '@line-crm/shared'
 import { ApiError, api, describeSaveFailure, type FriendListItem } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -430,7 +432,7 @@ function AutoReplyWizardV8Inner() {
   const router = useRouter()
   const params = useSearchParams()
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || canManageRole(staffRole)
+  const canManage = useFeatureAccess('autoReplies')
   const { selectedAccountId, accounts } = useAccount()
 
   const initialId = params.get('id')

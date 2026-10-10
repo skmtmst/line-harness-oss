@@ -128,8 +128,8 @@ export default function InflowListV8({
    * owner/admin に加えて「流入」を任された staff にも許している。画面も同じ条件で出す。
    * フォルダの作成・名前の変更は口が owner/admin だけなので、別に分ける。
    */
-  const readonly = role !== null && !canManageRole(role) && !canEditFeature(INFLOW_LINKS_EDIT_KEY)
-  const canManageFolders = role === null || canManageRole(role)
+  const readonly = !canManageRole(role) && !canEditFeature(INFLOW_LINKS_EDIT_KEY, role)
+  const canManageFolders = canManageRole(role)
 
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
@@ -693,7 +693,7 @@ export default function InflowListV8({
                 <Th className={styles.colClicks}>クリック</Th>
                 <Th className={styles.colLatest}>最新追加</Th>
                 <Th className={styles.colUrl}>発行URL</Th>
-                <Th className={styles.colOps}>操作</Th>
+                <Th className={styles.colOps}>状態</Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -736,31 +736,7 @@ export default function InflowListV8({
                       )}
                     </Td>
                     <Td className={styles.colName}>
-                      {/* 名前の前にフォルダの色の丸（2026-10-07 オーナー決定・絵 xbHxg「フォルダの丸」）。
-                          流入のフォルダには色の値が無いので、丸は薄い灰（未分類は輪）。1152（y1ztx）はフォルダの列が無いので出さない。 */}
-                      {narrow ? nameNode : (
-                        <div className={styles.nameLine}>
-                          <FolderDotName folder={r.genre ? { name: r.genre } : null}>{nameNode}</FolderDotName>
-                        </div>
-                      )}
-                      <span className={narrow ? styles.refCode : `${styles.refCode} ${styles.dotIndentPad}`} ><TruncatedText value={String(r.refCode ?? '')} /></span>
-                      {routes.find((route) => route.id === r.entryRouteId)?.couponEnabled ? <StatusBadge tone="warning" dot={false} size="compact">クーポン付き</StatusBadge> : null}
-                      {status ? (
-                        <span
-                          className={narrow ? styles.pill : `${styles.pill} ${styles.dotIndentMargin}`}
-                          data-tone={status}
-                          title={status === 'measured'
-                            ? (r.source === 'tracked_link'
-                              ? 'クリック計測とシナリオ起動が設定されています。追加先の振り分けは全体設定に従います。'
-                              : '流入の計測ができています。')
-                            : status === 'unregistered'
-                              ? '外部で発行されたREFです。流入実績だけを集計しています。'
-                              : '受付を止めています。このURLを開いても友だち追加できません。'}
-                        >
-                          <span className={styles.pillDot} aria-hidden="true" />
-                          {status === 'measured' ? '計測済' : status === 'unregistered' ? emptyValue('unconfigured') : '停止中'}
-                        </span>
-                      ) : null}
+                      <FolderDotName folder={r.genre ? { name: r.genre } : null}>{nameNode}</FolderDotName>
                     </Td>
                     <Td className={styles.colPool}>
                       {pool ? (
@@ -805,15 +781,26 @@ export default function InflowListV8({
                       </div>
                     </Td>
                     <Td className={styles.colOps}>
+                      {status ? (
+                        <span
+                          className={styles.pill}
+                          data-tone={status}
+                          title={status === 'measured'
+                            ? (r.source === 'tracked_link'
+                              ? 'クリック計測とシナリオ起動が設定されています。追加先の振り分けは全体設定に従います。'
+                              : '流入の計測ができています。')
+                            : status === 'unregistered'
+                              ? '外部で発行されたREFです。流入実績だけを集計しています。'
+                              : '受付を止めています。このURLを開いても友だち追加できません。'}
+                        >
+                          <span className={styles.pillDot} aria-hidden="true" />
+                          {status === 'measured' ? '計測済' : status === 'unregistered' ? '未登録' : '停止中'}
+                        </span>
+                      ) : null}
                       <div className={styles.opsBox}>
                         {/* 閲覧のみ：編集・登録するは置かない（列の幅は残す） */}
                         {readonly ? null : editTarget ? (
-                          <Button
-                            onClick={() => setEditing(editTarget)}
-                            aria-label={`${r.name}のリンクを編集`}
-                          >
-                            編集
-                          </Button>
+                          null
                         ) : r.source === 'tracked_link' ? (
                           // tracked_links は別管理（画面に編集の口が無い）。昇格登録は上書きになるので出さない。
                           <span className={styles.cellMain} title="この経路は別の仕組み（クリック計測）で管理しています">{emptyValue('unknown')}</span>

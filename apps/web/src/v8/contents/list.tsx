@@ -1,5 +1,7 @@
 'use client'
 
+import { hasDeliveryAccess } from '@line-crm/shared'
+
 /*
  * ★V8 登録メディア一覧（Pencil `O7hUt7`）。
  *
@@ -303,7 +305,7 @@ export default function MediaLibraryListV8() {
         return
       }
       setMediaManagementPermission(
-        response.data.role === 'owner' || response.data.role === 'admin' ? 'allowed' : 'denied',
+        hasDeliveryAccess(response.data, 'contents', 'edit') ? 'allowed' : 'denied',
       )
     }).catch(() => {
       if (active) setMediaManagementPermission('error')

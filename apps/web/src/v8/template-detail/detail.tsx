@@ -10,6 +10,7 @@
  * 受け付ける指定・呼ぶ API は BEHAVIOR.md。
  */
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -17,7 +18,6 @@ import { ArrowLeft, CircleAlert, Copy, ExternalLink, GitCompare, List, Pencil, R
 import { validateFlexContent } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -90,7 +90,7 @@ export default function TemplateDetailV8() {
   const usageRef = useRef<HTMLElement>(null)
 
   /* N-144：編集・公開・削除の口は owner/admin だけ。閲覧のみには押せない操作を置かない（隠す）。 */
-  const [canMutate] = useState(() => (typeof window === 'undefined' ? true : isOwnerOrAdmin()))
+  const canMutate = useFeatureAccess('templates')
   usePageTitle(template?.name ?? null)
 
   const loadVersions = useCallback(async () => {

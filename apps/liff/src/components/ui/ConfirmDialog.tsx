@@ -122,7 +122,7 @@ export default function ConfirmDialog({
         aria-modal="true"
         aria-label={title}
         onKeyDown={trapTab}
-        className="w-full max-w-xs rounded-xl border border-hairline bg-canvas p-5"
+        className="w-full max-w-[480px] rounded-xl border border-hairline bg-canvas p-5"
       >
         <div className="flex items-start gap-2">
           {destructive ? (

@@ -179,11 +179,11 @@
     },
     "--color-status-info": {
       "pencil": "$status-info",
-      "source": "#1d4ed8",
-      "resolved": "#1d4ed8",
+      "source": "var(--color-focus-ring)",
+      "resolved": "#2563eb",
       "status": "active",
-      "note": "状態バッジの情報色｜2026-10-09 V8 の値へ（§6.5-4 案内＝青の文字・Pen ekmYd）。旧 #175cd3",
-      "lastCheckedAt": "2026-10-09"
+      "note": "B-198: 案内の札の青。文字リンクの緑と分ける",
+      "lastCheckedAt": "2026-10-10"
     },
     "--color-status-info-soft": {
       "pencil": "$status-info-soft",
@@ -2089,7 +2089,7 @@
           "class": "info",
           "prop": "color",
           "source": "var(--color-status-info)",
-          "resolved": "#1d4ed8"
+          "resolved": "#2563eb"
         },
         {
           "pencil": "warning fill: $status-warn-soft → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-4 地は色の10%・ii85L（旧 #fff7e6）",
