@@ -113,7 +113,6 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
     'app/inflow-links/ad-integration.tsx',
     'app/line-notifications/customer-kpis.ts',
     'app/line-notifications/page.tsx',
-    'app/mileage/earning-rules/new/v8-earning-rule-new.tsx',
     'app/mileage/page.tsx',
     'app/mileage/v8-balances-tab.tsx',
     'app/mileage/v8-earning-rules-tab.tsx',
