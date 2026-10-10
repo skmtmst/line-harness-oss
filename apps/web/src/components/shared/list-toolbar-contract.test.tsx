@@ -113,6 +113,14 @@ describe('ListToolbar 一覧の上の道具の並び（★V7 Xn1Mz）', () => {
     expect(css).toMatch(/\[data-theme='v8'\]\s*\.toolbar\s*{[^}]*flex-wrap:\s*nowrap/s)
   })
 
+  it('畳む道具がないV8一覧では実際の空き幅に合わせて折り返す', () => {
+    const css = read('list-toolbar.module.css')
+    expect(css).toMatch(/\[data-theme='v8'\]\s*\.toolbar:not\(:has\(\.optional\)\)\s*{[^}]*flex-wrap:\s*wrap/s)
+    // 「…」へ畳む一覧と、段を明示する一覧の指定は残す。
+    expect(css).toContain('.optional[data-collapsed] > summary')
+    expect(css).toContain(".toolbar[data-toolbar-layout='stacked']")
+  })
+
   it('日付の範囲の入力はListToolbarの中で狭くそろえる（1440で2行目に収める）', () => {
     /*
      * 一斉配信の2行目で日付2つが各208px（w-52）あり、1440pxで
