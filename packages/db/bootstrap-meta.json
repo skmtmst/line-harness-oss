@@ -568,7 +568,8 @@
     "623_form_fixed_friend_fields.sql",
     "624_entry_route_coupons.sql",
     "626_restaurant_floor_layout.sql",
-    "627_restaurant_dining_fields.sql"
+    "627_restaurant_dining_fields.sql",
+    "633_restaurant_external_links.sql"
   ],
-  "migrationCount": 569
+  "migrationCount": 570
 }
