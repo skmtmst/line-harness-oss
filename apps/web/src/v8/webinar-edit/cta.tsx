@@ -17,6 +17,7 @@ import TapActionField from '@/components/shared/tap-action-field'
 import type { TapActionKind } from '@/lib/tap-actions'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { ApiError, fetchApi, webinarApi, type WebinarCtaCard, type WebinarEditor } from '@/lib/api'
+import { buildCompareRows } from './cta-compare'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { ErrorCountBadge } from '@/components/shared/error-count-badge'
 import ValidationSummary from '@/components/shared/validation-summary'
@@ -46,7 +47,7 @@ type FormCandidates = { state: 'idle' | 'loading' | 'ready' | 'error' | 'forbidd
 const WEBINAR_CTA_KINDS: readonly TapActionKind[] = ['uri', 'form']
 const EMPTY_CARD = (atSeconds: number): WebinarCtaCard => ({ atSeconds, kind: 'form', title: '', body: null, buttonLabel: '', autoOpen: false, formId: null, url: null })
 
-function isConflict(cause: unknown): boolean {
+export function isConflict(cause: unknown): boolean {
   return cause instanceof ApiError && cause.status === 409 && (!cause.code || /version_conflict/i.test(cause.code))
 }
 
@@ -390,13 +391,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
           <DataTable className={styles.compare}>
             <thead><TableHeadRow><Th>項目</Th><Th>この画面</Th><Th>最新</Th></TableHeadRow></thead>
             <tbody>
-              <Tr><Td>申込フォーム</Td><Td>{formName(registrationFormId)}</Td><Td>{latest.editor.publicPage.form?.name ?? formName(latest.editor.registrationFormId)}</Td></Tr>
-              {Array.from({ length: Math.max(ctas?.length ?? 0, latest.ctas?.length ?? 0) }, (_, i) => {
-                const mine = ctas?.[i]
-                const theirs = latest.ctas?.[i]
-                const describe = (card: WebinarCtaCard | undefined, time?: string) => (card ? `「${card.title || '（見出しなし）'}」／${time ?? fmtMinSec(card.atSeconds)}から` : '（なし）')
-                return <Tr key={i}><Td>{`カード${i + 1}`}</Td><Td>{describe(mine, times[i])}</Td><Td>{latest.ctas ? describe(theirs) : emptyValue('unknown')}</Td></Tr>
-              })}
+              {buildCompareRows({ formName: formName(registrationFormId), cards: ctas ?? [], times }, latest.editor.publicPage.form?.name ?? formName(latest.editor.registrationFormId), latest.ctas).map(row => <Tr key={row.key}><Td>{row.label}</Td><Td>{row.mine}</Td><Td>{row.theirs}</Td></Tr>)}
             </tbody>
           </DataTable>
         </Dialog>

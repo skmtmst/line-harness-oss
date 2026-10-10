@@ -206,8 +206,6 @@ shared-button-importer app/templates/questions/new/page.tsx
 shared-button-importer app/templates/template-asset-editor.tsx
 shared-button-importer app/users/users-v8.tsx
 shared-button-importer app/webhooks/edit/page.tsx
-shared-button-importer app/webinars/edit/webinar-edit-compare-dialog.tsx
-shared-button-importer app/webinars/edit/webinar-edit-conflict-band.tsx
 shared-button-importer app/webinars/published/page.tsx
 shared-button-importer components/accounts/account-edit-modal.tsx
 shared-button-importer components/accounts/account-ordering.tsx
