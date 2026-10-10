@@ -14,6 +14,7 @@ vi.mock('@/lib/api', async (original) => ({
 }))
 import { MileageShell } from '@/v8/mileage/frame'
 import V8HistoryTab from '@/v8/mileage/history'
+import { ApiError } from '@/lib/api'
 
 function Screen() {
   return <MileageShell.Provider value={{ tab: 'history', readonly: true, narrow: false, counts: {}, setCount: () => {} }}><V8HistoryTab /></MileageShell.Provider>
@@ -88,4 +89,48 @@ test('保存に失敗しても履歴を残し、再試行できる', async () =>
   expect(download).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'CSVで書き出す' }))
   expect(download).toHaveBeenCalledOnce()
+})
+
+test('逆転した期間では取得せず、実際の暦で直して種類・状態・方法と一緒に取得する', async () => {
+  window.history.replaceState(null, '', '/mileage?from=2026-10-20&to=2026-10-01&entryType=expiration&status=pending&mode=manual')
+  mocks.history.mockResolvedValue(result('条件に合う会員'))
+  render(<Screen />)
+  await screen.findByText('日付の条件を確認してください')
+  expect(mocks.history).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByLabelText('よく使う絞り込み'))
+  fireEvent.click(await screen.findByRole('button', { name: '日付・種類・状態を指定' }))
+  await screen.findByRole('dialog', { name: '履歴の条件を指定' })
+  fireEvent.click(screen.getByLabelText('終了日'))
+  const grid = await screen.findByRole('grid')
+  fireEvent.keyDown(grid, { key: 'PageDown' })
+  const november = await screen.findByRole('grid', { name: '2026年11月' })
+  fireEvent.keyDown(november, { key: 'Enter' })
+  fireEvent.click(screen.getByRole('button', { name: 'この条件で絞る' }))
+  await screen.findByText('条件に合う会員')
+  expect(mocks.history.mock.calls.find(([query]) => query.limit === 20)?.[0]).toMatchObject({
+    accountId: 'A', from: '2026-10-20', to: '2026-11-01', entryType: 'expiration', status: 'pending', mode: 'manual', offset: 0,
+  })
+})
+
+test('期間が逆転したまま確定しても取得せず、両方の日付欄のそばに理由を残す', async () => {
+  window.history.replaceState(null, '', '/mileage?from=2026-10-20&to=2026-10-01')
+  render(<Screen />)
+  await screen.findByText('日付の条件を確認してください')
+  fireEvent.click(screen.getByLabelText('よく使う絞り込み'))
+  fireEvent.click(await screen.findByRole('button', { name: '日付・種類・状態を指定' }))
+  await screen.findByRole('dialog', { name: '履歴の条件を指定' })
+  fireEvent.click(screen.getByRole('button', { name: 'この条件で絞る' }))
+  expect(mocks.history).not.toHaveBeenCalled()
+  expect(screen.getByLabelText('開始日').getAttribute('aria-invalid')).toBe('true')
+  expect(screen.getByLabelText('終了日').getAttribute('aria-invalid')).toBe('true')
+  expect(screen.getByRole('alert').textContent).toBe('開始日は終了日より前の日付を入力してください')
+})
+
+test('APIの400は再読み込みの通信障害にせず、日付条件の直し方を知らせる', async () => {
+  mocks.history.mockImplementation((query) => query.limit === 1 ? Promise.resolve(result('集計')) : Promise.reject(new ApiError(400, 'invalid')))
+  render(<Screen />)
+  await screen.findByText('日付の条件を確認してください')
+  expect(screen.getByText('入力した条件を確認してください。開始日は終了日より前の日付を入力してください。')).toBeTruthy()
+  expect(screen.queryByText('マイルの履歴を読み込めませんでした')).toBeNull()
+  expect(screen.getByRole('button', { name: 'CSVで書き出す' }).hasAttribute('disabled')).toBe(true)
 })

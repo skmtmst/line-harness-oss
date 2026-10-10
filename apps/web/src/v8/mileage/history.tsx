@@ -1,6 +1,9 @@
 'use client'
 
 import { jstDateOffset, jstDate } from '@/lib/jst-datetime'
+import { validateHistoryPeriod } from './history-period'
+import DateField from '@/components/shared/date-field'
+import Select from '@/components/shared/select'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -68,6 +71,7 @@ const PRESETS: Array<{ value: string; label: string }> = [
   { value: 'manual', label: '手で動かした分のみ' },
   { value: 'month', label: '今月のみ' },
   { value: 'week', label: '過去7日のみ' },
+  { value: 'custom', label: '日付・種類・状態を指定' },
 ]
 
 function monthStart(): string {
@@ -96,6 +100,15 @@ export default function HistoryTab() {
   const [grantedOnly, setGrantedOnly] = useListUrlValue('grantedOnly', false)
   const [spentOnly, setSpentOnly] = useListUrlValue('spentOnly', false)
   const [preset, setPreset] = useState('all')
+  const [customFrom, setCustomFrom] = useListUrlValue('from', '')
+  const [to, setTo] = useListUrlValue('to', '')
+  const [customEntryType, setCustomEntryType] = useListUrlValue<MileageHistoryItem['entryType'] | ''>('entryType', '')
+  const [customStatus, setCustomStatus] = useListUrlValue<MileageHistoryItem['status'] | ''>('status', '')
+  const [customMode, setCustomMode] = useListUrlValue<'automatic' | 'manual' | ''>('mode', '')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [filterDraft, setFilterDraft] = useState({ from: '', to: '', entryType: '', status: '', mode: '' })
+  const [filterError, setFilterError] = useState<string | null>(null)
+  const [inputRejected, setInputRejected] = useState<string | null>(null)
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [page, setPage] = useListUrlValue('page', 1)
   const [menuId, setMenuId] = useState<string | null>(null)
@@ -103,31 +116,47 @@ export default function HistoryTab() {
   const [error, setError] = useState(false)
 
   const applyPreset = (value: string) => {
+    if (value === 'custom') {
+      setFilterDraft({ from: customFrom, to, entryType: customEntryType, status: customStatus, mode: customMode })
+      setFilterError(null)
+      setFilterOpen(true)
+      return
+    }
+    setCustomFrom(''); setTo(''); setCustomEntryType(''); setCustomStatus(''); setCustomMode('')
     setPreset(value)
     setPage(1)
     setGrantedOnly(value === 'granted')
     setSpentOnly(value === 'spent')
   }
-  const presetValue = preset === 'all' && !grantedOnly && !spentOnly ? 'all'
+  const presetValue = customFrom || to || customEntryType || customStatus || customMode ? 'custom'
+    : preset === 'all' && !grantedOnly && !spentOnly ? 'all'
     : preset !== 'all' ? preset
       : grantedOnly ? 'granted' : 'spent'
 
-  const from = preset === 'month' ? monthStart() : preset === 'week' ? daysAgo(6) : undefined
-  const modeFilter: 'automatic' | 'manual' | undefined = preset === 'manual' ? 'manual' : undefined
-  const entryTypeFilter: MileageHistoryItem['entryType'] | undefined = grantedOnly ? 'grant' : undefined
+  const from = preset === 'month' ? monthStart() : preset === 'week' ? daysAgo(6) : customFrom
+  const periodError = validateHistoryPeriod(from, to)
+  const modeFilter: 'automatic' | 'manual' | undefined = preset === 'manual' ? 'manual' : customMode || undefined
+  const entryTypeFilter: MileageHistoryItem['entryType'] | undefined = grantedOnly ? 'grant' : customEntryType || undefined
 
   const load = useCallback(async () => {
     const request = ++requestRef.current
     setLoading(true)
     setError(false)
     setExportError('')
+    setInputRejected(null)
+    if (validateHistoryPeriod(from, to)) {
+      setResult(null); setPeriodResult(null); setLoading(false)
+      return
+    }
     try {
       const [response, period] = await Promise.all([api.mileage.history({
         accountId: selectedAccountId ?? '',
         search: search || undefined,
         entryType: entryTypeFilter,
         mode: modeFilter,
-        from,
+        from: from || undefined,
+        to: to || undefined,
+        status: customStatus || undefined,
         limit: pageSize,
         offset: (page - 1) * pageSize,
       }), api.mileage.history({ accountId: selectedAccountId ?? '', from: daysAgo(29), to: daysAgo(0), limit: 1, offset: 0 }).catch(() => null)])
@@ -143,11 +172,12 @@ export default function HistoryTab() {
     } catch (caught) {
       if (request !== requestRef.current) return
       setResult(null); setPeriodResult(null)
-      if (!(caught instanceof ApiError && caught.status === 400)) setError(true)
+      if (caught instanceof ApiError && caught.status === 400) setInputRejected('入力した条件を確認してください。開始日は終了日より前の日付を入力してください。')
+      else setError(true)
     } finally {
       if (request === requestRef.current) setLoading(false)
     }
-  }, [entryTypeFilter, from, modeFilter, page, pageSize, search, selectedAccountId, spentOnly])
+  }, [entryTypeFilter, from, modeFilter, page, pageSize, search, selectedAccountId, spentOnly, to, customStatus])
 
   useEffect(() => {
     if (accountLoading) return
@@ -231,8 +261,9 @@ export default function HistoryTab() {
     setPendingError('')
   }
 
-  const filtered = search.trim() || grantedOnly || spentOnly || preset !== 'all'
+  const filtered = search.trim() || grantedOnly || spentOnly || preset !== 'all' || customFrom || to || customEntryType || customStatus || customMode
   const resetAll = () => {
+    setCustomFrom(''); setTo(''); setCustomEntryType(''); setCustomStatus(''); setCustomMode('')
     setSearchInput('')
     setSearch('')
     setGrantedOnly(false)
@@ -412,6 +443,8 @@ export default function HistoryTab() {
 
   const body = loading ? (
     <ListState kind="loading" title="マイルの履歴を読み込んでいます" />
+  ) : (periodError ?? inputRejected) ? (
+    <StateCard title="日付の条件を確認してください" description={periodError ?? inputRejected ?? undefined} />
   ) : error ? (
     <StateCard tone="error" title="マイルの履歴を読み込めませんでした" description="数の帯は「—」にしています。道具はそのまま使えます。" action={<RetryButton onRetry={() => void load()} />} />
   ) : items.length === 0 ? (
@@ -461,6 +494,26 @@ export default function HistoryTab() {
       toolbar={toolbar}
       pagination={footer}
       overlays={
+        <>
+        <Dialog open={filterOpen} title="履歴の条件を指定" confirmLabel="この条件で絞る" onCancel={() => setFilterOpen(false)} onConfirm={() => {
+          const invalid = validateHistoryPeriod(filterDraft.from, filterDraft.to)
+          if (invalid) { setFilterError(invalid); return }
+          setPreset('all'); setGrantedOnly(false); setSpentOnly(false); setPage(1)
+          setCustomFrom(filterDraft.from); setTo(filterDraft.to)
+          setCustomEntryType(filterDraft.entryType as MileageHistoryItem['entryType'] | '')
+          setCustomStatus(filterDraft.status as MileageHistoryItem['status'] | '')
+          setCustomMode(filterDraft.mode as 'automatic' | 'manual' | '')
+          setFilterOpen(false)
+        }}>
+          <div className={styles.dlgBody}>
+            <Field label="開始日"><DateField aria-label="開始日" value={filterDraft.from} invalid={Boolean(filterError ?? periodError ?? inputRejected)} onChange={(value) => setFilterDraft((draft) => ({ ...draft, from: value }))} /></Field>
+            <Field label="終了日"><DateField aria-label="終了日" value={filterDraft.to} invalid={Boolean(filterError ?? periodError ?? inputRejected)} onChange={(value) => setFilterDraft((draft) => ({ ...draft, to: value }))} /></Field>
+            {(filterError ?? periodError ?? inputRejected) ? <p role="alert">{filterError ?? periodError ?? inputRejected}</p> : null}
+            <Select label="種類" aria-label="種類" value={filterDraft.entryType} options={[{ value: '', label: 'すべての種類' }, { value: 'grant', label: '付与' }, { value: 'reversal', label: '取消' }, { value: 'spend', label: '使用' }, { value: 'expiration', label: '失効' }, { value: 'adjustment', label: '手動調整' }]} onChange={(value) => setFilterDraft((draft) => ({ ...draft, entryType: value }))} />
+            <Select label="状態" aria-label="状態" value={filterDraft.status} options={[{ value: '', label: 'すべての状態' }, { value: 'available', label: '利用可能' }, { value: 'pending', label: '確定待ち' }, { value: 'void', label: '取消済み' }]} onChange={(value) => setFilterDraft((draft) => ({ ...draft, status: value }))} />
+            <Select label="動かした方法" aria-label="動かした方法" value={filterDraft.mode} options={[{ value: '', label: 'すべての方法' }, { value: 'automatic', label: '自動' }, { value: 'manual', label: '手動' }]} onChange={(value) => setFilterDraft((draft) => ({ ...draft, mode: value }))} />
+          </div>
+        </Dialog>
         <Dialog
           open={pendingAction !== null}
           title={pendingAction?.kind === 'confirm' ? 'このマイルを確定しますか？' : 'このマイルを取り消しますか？'}
@@ -482,6 +535,7 @@ export default function HistoryTab() {
               rows={3}
             /></SaveErrorField></Field>
         </Dialog>
+        </>
       }
     >
       {body}
