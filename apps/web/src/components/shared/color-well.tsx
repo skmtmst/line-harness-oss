@@ -5,6 +5,7 @@ import { ChevronDown, Pipette } from 'lucide-react'
 import styles from './color-well.module.css'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { isImeComposing } from './ime'
+import Notice from './notice'
 
 /** よく使う色の見本（8×3）。Pencil ★BG-2 `d6PU4a` の色グリッドと同じ並び。 */
 const DEFAULT_COLORS = [
@@ -130,7 +131,10 @@ export default function ColorWell({
   onSaveColor,
   block = false,
   fallback = '#ffffff',
+  retainInvalidInput = false,
 }: {
+  /** 書きかけを消さず、誤ったコードは直してから確定してもらう。 */
+  retainInvalidInput?: boolean
   /** 今の色（`#rrggbb`／半透明なら `#rrggbbaa`）。指定なしは null。 */
   value: string | null
   onChange: (color: string | null) => void
@@ -158,6 +162,7 @@ export default function ColorWell({
   const [hsv, setHsv] = useState<Hsv>(initial.hsv)
   const [alpha, setAlpha] = useState(initial.alpha)
   const [hexText, setHexText] = useState((value ?? fallback).replace(/^#/, '').slice(0, 6))
+  const [hexError, setHexError] = useState(false)
   const emitted = useRef<string | null>(value ?? null)
   const rootRef = useRef<HTMLSpanElement | null>(null)
   const [alignEnd, setAlignEnd] = useState(false)
@@ -213,10 +218,12 @@ export default function ColorWell({
   const applyHex = (input: string) => {
     const hex = normalizeHex(input)
     if (!hex) {
+      if (retainInvalidInput) { setHexError(true); return }
       setHexText(value ? value.slice(1, 7) : '')
       return
     }
     const rgb = hexToRgb(hex)
+    setHexError(false)
     if (!rgb) return
     const nextHsv = rgbToHsv(rgb.r, rgb.g, rgb.b)
     const nextAlpha = HEX8.test(hex) ? Math.round((Number.parseInt(hex.slice(7, 9), 16) / 255) * 100) : alpha
@@ -452,7 +459,8 @@ export default function ColorWell({
                 className={styles.hexInput}
                 value={theme === 'v8' ? hexText.toUpperCase() : hexText}
                 aria-label="色を十六進で入力"
-                onChange={(event) => setHexText(event.target.value.replace(/^#/, ''))}
+                aria-invalid={hexError || undefined}
+                onChange={(event) => { setHexText(event.target.value.replace(/^#/, '')); setHexError(false) }}
                 onKeyDown={(event) => {
                   if (event.key !== 'Enter' || isImeComposing(event)) return
                   event.preventDefault()
@@ -498,6 +506,7 @@ export default function ColorWell({
           {/* よく使う色 */}
           <div className={styles.group}>
             <span className={styles.headingText}>よく使う色</span>
+            {hexError ? <Notice tone="danger">6桁の16進数で色を入力してください。</Notice> : null}
             <div className={styles.grid} role="listbox" aria-label="よく使う色">
               {palette.map((color) => (
                 <button

@@ -9,11 +9,6 @@
     "radius": 0,
     "shadow": 0
   },
-  "app/form-submissions/edit/form-design-settings.tsx": {
-    "color": 1,
-    "radius": 0,
-    "shadow": 0
-  },
   "app/global-error.tsx": {
     "color": 3,
     "radius": 2,

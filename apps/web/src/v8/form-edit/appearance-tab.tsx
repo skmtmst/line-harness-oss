@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Sparkles, Link2 } from 'lucide-react'
 import {
   FORM_THEME_DEFAULT,
@@ -78,6 +78,7 @@ export function AppearanceTab(props: Props) {
   const patchTheme = (next: Partial<FormTheme>) => onChangeOptions({ theme: { ...theme, ...next } })
   const deadlineOn = options.deadline?.enabled ?? false
   const ogImageError = ogImageUrlError(props.ogImageUrl)
+  const initialAppearance = useRef({ theme: { ...theme }, ogTitle: props.ogTitle, ogDescription: props.ogDescription, ogImageUrl: props.ogImageUrl })
   const linkSummary = [props.ogTitle.trim() ? '見出し' : null, props.ogDescription.trim() ? '説明' : null, props.ogImageUrl.trim() ? '画像' : null].filter(Boolean).join('・') || '自動で作る'
 
   if (props.readOnly) {
@@ -164,11 +165,11 @@ export function AppearanceTab(props: Props) {
 
         <div className={styles.subBox}>
           <h3 className={styles.subTitle}>色と文字</h3>
-          <p className={styles.fieldLabelPlain}>色（5つの役割）</p>
+          <p className={styles.fieldLabelPlain} title="文字と背景の色の差は4.5:1以上にしてください。">色（5つの役割）</p>
           <div id="fe-colors" className={styles.wells}>
             {COLOR_ROLES.map((role) => (
               <span key={role.key} className={styles.well}>
-                <ColorWell value={theme[role.key]} allowAlpha={false} allowClear={false} label={`${role.label}の色`} onChange={(color) => color && patchTheme({ [role.key]: color.slice(0, 7).toLowerCase() })} />
+                <ColorWell value={theme[role.key]} allowAlpha={false} allowClear={false} retainInvalidInput label={`${role.label}の色`} onChange={(color) => color && patchTheme({ [role.key]: color.slice(0, 7).toLowerCase() })} />
                 <span className={styles.wellLabel}>{role.label}</span>
               </span>
             ))}
@@ -264,6 +265,16 @@ export function AppearanceTab(props: Props) {
               urlEntry={{ id: 'fe-og-image', value: props.ogImageUrl, onChange: props.onChangeOgImageUrl, label: 'カードの画像URL', placeholder: 'https://', open: Boolean(ogImageError) }}
             /></SaveErrorField>
           </div>
+        </div>
+        <div className={styles.tight}>
+          <Button onClick={() => {
+            const initial = initialAppearance.current
+            onChangeOptions({ theme: { ...initial.theme } })
+            props.onChangeOgTitle(initial.ogTitle)
+            props.onChangeOgDescription(initial.ogDescription)
+            props.onChangeOgImageUrl(initial.ogImageUrl)
+          }}>元に戻す</Button>
+          <Button onClick={() => onChangeOptions({ theme: { ...FORM_THEME_DEFAULT } })} title="色・書体・角の丸み・背景を初期設定に戻します">初期設定に戻す</Button>
         </div>
       </Dialog>
 

@@ -2,7 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import FormDesignSettings from './form-design-settings'
+import FormDesignSettings from '@/test-utils/form-appearance-harness'
 
 /*
  * #725: デザイン設定の「押しても何も起きない操作面」を残さない。
@@ -20,6 +20,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   router.replace.mockReset()
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   host = document.createElement('div')
@@ -30,6 +31,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => { root.unmount() })
   host.remove()
+  document.documentElement.dataset.theme = ''
   vi.restoreAllMocks()
 })
 
@@ -60,6 +62,10 @@ async function render(overrides: Partial<{ ogTitle: string; ogDescription: strin
       />,
     )
   })
+  const open = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('リンクの見え方：'))!
+  await act(async () => open.click())
+  const url = [...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'URL で入れる')
+  if (url) await act(async () => url.click())
   return handlers
 }
 
@@ -75,16 +81,16 @@ async function type(element: HTMLInputElement | HTMLTextAreaElement, text: strin
   })
 }
 
-const field = (id: string) => host.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#${id}`)
-const buttonTexts = () => Array.from(host.querySelectorAll('button')).map((b) => b.textContent?.trim() ?? '')
+const field = (id: string) => document.body.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#${id}`)
+const buttonTexts = () => Array.from(document.body.querySelectorAll('button')).map((b) => b.textContent?.trim() ?? '')
 
 describe('デザイン設定に無反応な操作面を残さない(#725)', () => {
   it('OGPの3欄が窓の中にあり、打った文字が親へ届く', async () => {
     const handlers = await render()
 
-    const title = field('form-og-title')
-    const description = field('form-og-description')
-    const imageUrl = field('form-og-image-url')
+    const title = field('fe-og-title')
+    const description = field('fe-og-desc')
+    const imageUrl = field('fe-og-image')
     expect(title).toBeTruthy()
     expect(description).toBeTruthy()
     expect(imageUrl).toBeTruthy()
@@ -104,9 +110,9 @@ describe('デザイン設定に無反応な操作面を残さない(#725)', () =
       ogDescription: '保存済みの説明',
       ogImageUrl: 'https://example.test/saved.png',
     })
-    expect(field('form-og-title')!.value).toBe('保存済みの見出し')
-    expect(field('form-og-description')!.value).toBe('保存済みの説明')
-    expect(field('form-og-image-url')!.value).toBe('https://example.test/saved.png')
+    expect(field('fe-og-title')!.value).toBe('保存済みの見出し')
+    expect(field('fe-og-desc')!.value).toBe('保存済みの説明')
+    expect(document.body.querySelector('img[alt="カードの画像"]')?.getAttribute('src')).toBe('https://example.test/saved.png')
   })
 
   it('窓の中に「保存する」を置かない（本物の保存は下部の追従帯だけ）', async () => {
@@ -114,13 +120,14 @@ describe('デザイン設定に無反応な操作面を残さない(#725)', () =
     expect(buttonTexts()).not.toContain('保存する')
     // 閉じる・元に戻すは残す。どちらも押すと反応がある。
     // UI-25: 「閉じる」は右上の×（aria-label）へ移った。
-    expect(host.querySelector('button[aria-label="閉じる"]')).toBeTruthy()
+    expect(document.body.querySelector('button[aria-label="閉じる"]')).toBeTruthy()
     expect(buttonTexts()).toContain('元に戻す')
   })
 
   it('押しても何も起きないボタンが1つも無い', async () => {
     await render()
-    const dead = Array.from(host.querySelectorAll('button')).filter((button) => {
+    const dead = Array.from(document.body.querySelectorAll('button')).filter((button) => {
+      if (button.disabled) return false
       const props = Object.keys(button).find((key) => key.startsWith('__reactProps$'))
       const onClick = props
         ? (button as unknown as Record<string, { onClick?: unknown }>)[props]?.onClick
@@ -135,8 +142,8 @@ describe('デザイン設定に無反応な操作面を残さない(#725)', () =
     // 「なし」一択だった頃は欄ごと消していた。選べる中身ができたので戻す。
     expect(host.textContent).toContain('登録メディアから選ぶ')
     // 選べる中身がある欄は残っている。
-    expect(host.querySelector('#form-theme-font')).toBeTruthy()
-    expect(host.querySelector('#form-theme-radius')).toBeTruthy()
+    expect(host.querySelector('[aria-label="書体"]')).toBeTruthy()
+    expect(host.querySelector('[aria-label="角の丸み"]')).toBeTruthy()
   })
 
   it('押せないタブを置かない（区分は見出しで並べる）', async () => {
@@ -148,8 +155,7 @@ describe('デザイン設定に無反応な操作面を残さない(#725)', () =
     // 区分そのものは見出しとして残っていて、中身は同時に見える。
     // 「色」の見出しには決まりの「？」が付くため、前方一致で見る。
     const headings = Array.from(host.querySelectorAll('h3')).map((h) => h.textContent?.trim() ?? '')
-    expect(headings.some((heading) => heading.startsWith('色'))).toBe(true)
-    expect(headings).toContain('文字と角の丸み')
-    expect(headings).toContain('リンクの見え方')
+    expect(headings).toContain('色と文字')
+    expect(headings).toContain('背景とリンクの見え方')
   })
 })
