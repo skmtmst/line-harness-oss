@@ -7,13 +7,15 @@
  *   - 項目を触ると「変更後の予定」と差分が出る
  *   - 「つながる先」はリンク（hrefを持つ）で、見た目だけの矢印ではない
  */
+import '@/test-utils/staff-location-reset'
 import React from 'react'
 import { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StaffMember } from '@line-crm/shared'
 
-vi.mock('next/navigation', () => ({
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => <nav aria-label="設定の中のメニュー" /> }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   usePathname: () => '/staff',
   useSearchParams: () => new URLSearchParams('tab=members'),
@@ -23,7 +25,7 @@ vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => <nav aria-label="ログインユーザーのタブ" />,
   useMergedTab: () => 'members',
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/components/staff/login-audit', () => ({ default: () => <div /> }))
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('') } }))
 
@@ -95,8 +97,8 @@ const { default: StaffPage } = await import('./page')
 
 async function openPermissionView() {
   await act(async () => { render(<StaffPage />) })
-  await waitFor(() => expect(screen.getByText('対象者')).toBeTruthy())
-  fireEvent.click(within(screen.getByText('対象者').closest('tr') as HTMLTableRowElement).getByRole('button', { name: '中身を見る' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '対象者の中身を見る' })).toBeTruthy())
+  fireEvent.click(within(screen.getByRole('button', { name: '対象者の中身を見る' }).closest('[role="row"]') as HTMLElement).getByRole('button', { name: /の中身を見る$/ }))
   await waitFor(() => expect(screen.getByText('この決め方で、この人にはこう見えます')).toBeTruthy())
 }
 
@@ -117,7 +119,7 @@ describe('権限詳細の説明欄は選択中の権限から生成する (#983)
 
     // かたまりの人数は固定文ではなく roleCounts（administrator=1）から出る
     const adminButton = screen.getAllByRole('button').find((button) => button.textContent?.includes('管理者'))
-    expect(adminButton?.textContent).toContain('1人')
+    expect(adminButton?.textContent).toContain('1 人')
 
     // 個人情報はプリセットの view（伏せて表示）と一致する
     expect(screen.getByText(/電話番号・住所・メールは伏せて表示します/)).toBeTruthy()

@@ -16,7 +16,7 @@ const fixture = vi.hoisted(() => ({
   selectedAccountId: 'acc-1' as string | null,
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))

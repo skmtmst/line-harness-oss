@@ -39,11 +39,6 @@
     "radius": 3,
     "shadow": 1
   },
-  "app/staff/page.tsx": {
-    "color": 2,
-    "radius": 0,
-    "shadow": 0
-  },
   "app/tags/folders/new/page.tsx": {
     "color": 8,
     "radius": 0,

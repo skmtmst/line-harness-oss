@@ -1060,7 +1060,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     if (editable && member) items.push({ id: 'edit', label: '役割を変える', qaOpen: 'EOTS4-edit', onSelect: () => { close(); router.push(`/staff/edit?id=${encodeURIComponent(member.id)}`) } })
     items.push({ id: 'scope', label: administrator ? '見える画面' : '見える画面を見る', onSelect: () => { close(); openPermissions(user) } })
     if (isSelf && member) items.push({ id: 'two-factor', label: member.twoFactorEnabled ? '2段階の確認を解除する' : '2段階の確認を設定する', onSelect: () => { close(); openTwoFactor(member) } })
-    if (resendable && member) items.push({ id: 'resend', label: 'もう一度送る', disabled: resendingId !== null, onSelect: () => { close(); void runResend(member) } })
+    if (resendable && member) items.push({ id: 'resend', label: resendingId === member.id ? '送信中…' : 'もう一度送る', disabled: resendingId !== null, onSelect: () => { close(); void runResend(member) } })
     if (administrator && member && !isSelf) {
       const policy = staffActionPolicy({ member, currentUserId: me?.id ?? null, administrator: true, activeAdministratorCount })
       items.push(member.isActive
@@ -1102,9 +1102,9 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
             const items = rowMenuItems(user)
             return (
               <GridRow key={user.id}>
-                <GridNameCell className={styles.colPerson} name={<button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={user.name}>{user.name}</button>} />
+                <GridNameCell className={styles.colPerson} name={<button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={member ? user.name : `${user.name}（要確認：ログイン情報との結び付けが未確認です）`}>{user.name}</button>} />
                 <GridCell className={styles.colScope} role="cell" title={accessScopeLabel(user, accountNames)}>{scopeShort(user, accountNames)}</GridCell>
-                <GridCell className={styles.colRole} role="cell" title={tab === 'invited' && member && member.inviteStatus !== 'active' ? `招待の期限：${formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}` : undefined}>{user.status === 'suspended' ? <span className={styles.roleChip} data-role="view_only">止めた</span> : <RoleChip role={roleOf(user)} />}</GridCell>
+                <GridCell className={styles.colRole} role="cell" title={tab === 'invited' && member && member.inviteStatus !== 'active' ? `招待の期限：${formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}` : twoFactorState(user).label}>{user.status === 'suspended' ? <span className={styles.roleChip} data-role="view_only">止めた</span> : <RoleChip role={roleOf(user)} />}</GridCell>
                 <GridCell className={styles.colLast} role="cell" title={user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : formatStaffDate(user.lastLoginAt ?? undefined)}>{shortWhen(user.lastLoginAt, nowMs)}</GridCell>
                 <GridCell className={`${styles.colMenu} ${styles.menuBox}`} role="cell">
                   <RowMenu size="row" label={`${user.name}の操作`} items={items} open={openMenuId === user.id} onOpenChange={(next) => setOpenMenuId(next ? user.id : null)} />

@@ -89,7 +89,6 @@ const BASELINE: Record<string, number> = {
   'app/scenarios/first-step/page.tsx': 1,
   'app/staff/email-change/page.tsx': 1,
   'app/staff/invite/page.tsx': 1,
-  'app/staff/page.tsx': 1,
   'app/tags/edit-field-page-v8.tsx': 2,
   'app/tags/edit-tag-page-v8.tsx': 1,
   'app/tags/field-migrate-v8.tsx': 3,

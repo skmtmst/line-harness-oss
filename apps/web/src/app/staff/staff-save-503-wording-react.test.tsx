@@ -8,6 +8,7 @@
  * その結果が確認窓と下の帯の両方に出て、生の API error:503 が出ない」
  * ことだけを守る。409/step-up/部分権限/idempotency/再試行は触らない。
  */
+import '@/test-utils/staff-location-reset'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
@@ -19,7 +20,8 @@ const fixture = vi.hoisted(() => ({
   helperCalls: [] as unknown[],
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => <nav aria-label="設定の中のメニュー" /> }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   usePathname: () => '/staff',
   useSearchParams: () => new URLSearchParams(`tab=${fixture.tab}`),
@@ -29,7 +31,7 @@ vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => <nav aria-label="ログインユーザーのタブ" />,
   useMergedTab: () => fixture.tab,
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/components/staff/login-audit', () => ({ default: () => <div /> }))
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('') } }))
 
@@ -126,10 +128,10 @@ describe('R497-SAVE-WORDING 保存503の配線', () => {
   test('503の保存失敗は確認窓と下の帯にヘルパーの案内を出し、生文を出さない', async () => {
     await act(async () => { render(<StaffPage />) })
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '中身を見る' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: /の中身を見る$/ })).toBeTruthy()
     })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '中身を見る' }))
+      fireEvent.click(screen.getByRole('button', { name: /の中身を見る$/ }))
     })
     await waitFor(() => {
       expect(screen.getByText('この決め方で、この人にはこう見えます')).toBeTruthy()

@@ -14,7 +14,7 @@ const QR_PAGES = [
   'components/dashboard/qr-dialog.tsx',
   'components/hq/notice-line-register-dialog.tsx',
   'app/ops/two-factor/page.tsx',
-  'app/staff/page.tsx',
+  'v8/settings/staff/staff.tsx',
   'app/login/two-factor/setup/page.tsx',
 ]
 

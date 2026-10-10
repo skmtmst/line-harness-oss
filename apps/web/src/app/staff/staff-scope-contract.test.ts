@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -13,7 +13,7 @@ describe('V6 30 見せる範囲の保存と名寄せ(#530)', () => {
     expect(staffSource).toContain('roleBundle: bundle')
     expect(staffSource).not.toContain('scopeBundleToStaffRole(bundle)')
     expect(staffSource).toContain('api.staff.update(memberId')
-    expect(staffSource).toContain('保存中…')
+    expect(staffSource).toContain('busy={saving}')
     expect(staffSource).toContain('setSaveError')
   })
 

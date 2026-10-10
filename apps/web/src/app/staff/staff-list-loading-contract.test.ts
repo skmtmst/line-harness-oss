@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -16,6 +16,6 @@ describe('V6 30 一覧の読み方(#572 #515中2)', () => {
 
   it('200件打ち切りは黙って切らず注記する', () => {
     expect(staffSource).toContain('setUsersTotal(usersResult.data.pagination?.total')
-    expect(staffSource).toContain('全${usersTotal}人中${accessUsers.length}人まで読み込み')
+    expect(staffSource).toContain('全${usersTotal} 人中${accessUsers.length} 人まで読み込み')
   })
 })
