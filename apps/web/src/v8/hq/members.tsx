@@ -16,11 +16,10 @@ import { canResendInvite, lastLoginShort, memberKpis, memberStatus, sortMembersB
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import MemberDialogV8, { MemberChangeConfirmV8, type MemberDialogValue } from './member-dialog'
 import styles from './members.module.css'
-import { formatNumber as polishFormatNumber } from '@/lib/format'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 統括のメンバー（Pencil `r4ARpV`。招待の窓 `yLKwV`・権限を変える窓 `BHEl9`・
@@ -224,9 +223,9 @@ function MembersInner() {
       folders={<HqSettingsNavV8 active="members" />} folderNav={settingsNav}
     >
       <div className={styles.body}>
-        {ready && !canManage ? <p className={styles.viewerBand} role="status">{VIEWER_NOTE}</p> : null}
+        {ready && !canManage ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div> : null}
         {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-        {actionError ? <p className={styles.error} role="alert">{actionError}</p> : null}
+        {actionError ? <Notice tone="danger" >{actionError}</Notice> : null}
 
         {status === 'loading' ? (
           <ListState permissionScope="hq" kind="loading" title="権限者を読み込んでいます" />
@@ -271,14 +270,14 @@ function MembersInner() {
                     <span role="cell" className={styles.cell}>{lastLoginShort(lastLogins[member.id])}</span>
                     <span role="cell" className={styles.actions}>
                       {canManage && canResendInvite(member) ? (
-                        <button
+                        <Button
                           type="button"
-                          className={styles.textButton}
+                          variant="text" size="inline"
                           disabled={resendingId === member.id}
                           onClick={() => void resend(member)}
-                        >
-                          {resendingId === member.id ? '送信中…' : '再送'}
-                        </button>
+                         busy={resendingId === member.id} busyLabel="送信中…">
+                          再送
+                        </Button>
                       ) : null}
                       {canManage ? (
                         <Button onClick={() => openChange(member)} aria-label={`${member.name}さんの権限を変更`}>変更</Button>

@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import type { Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Disclosure from '@/components/shared/disclosure'
@@ -147,7 +147,7 @@ export default function ColumnNewV8() {
       </div>
 
       {failure ? (
-        <p className={styles.errorText} role="alert" data-failure-kind={failure.kind}>{failure.message}</p>
+        <Notice tone="danger" className={styles.errorTextNoticePlacement} data-failure-kind={failure.kind}>{failure.message}</Notice>
       ) : null}
       {tagPruneNotice ? <Notice tone="warn" message={tagPruneNotice} onClose={() => setTagPruneNotice(null)} /> : null}
 

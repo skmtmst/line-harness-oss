@@ -1,45 +1,49 @@
 'use client'
 
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { AlertCircle, CircleDot, Flag, GripVertical, History, Info, Loader, Send } from 'lucide-react'
-import { api, ApiError, type ListStats, type SupportMarkArchiveImpact, type SupportMarkListItem } from '@/lib/api'
-import { createResponseGate } from '@/lib/latest-request'
-import { ListPageBody } from '@/components/templates'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu, RowQuickAction } from '@/components/shared/row-actions'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { useListUrlValue, useListUrlState } from '@/components/shared/list-url-state';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { CircleDot, Flag, GripVertical, History, Info, Loader, Send } from 'lucide-react';
+
+import { RowNameLink } from '@/components/shared/table';
+
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { AlertCircle } from 'lucide-react';
+import { api, ApiError, type ListStats, type SupportMarkArchiveImpact, type SupportMarkListItem } from '@/lib/api';
+import { createResponseGate } from '@/lib/latest-request';
+import { ListPageBody } from '@/components/templates';
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu, RowQuickAction } from '@/components/shared/row-actions';
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import InlineEdit from '@/components/shared/inline-edit'
-import { withViewTransition } from '@/components/shared/view-transition'
+import { withViewTransition } from '@/components/shared/view-transition';
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { describeApiFailure } from '@/components/shared/api-error-message'
-import { useListUrlState } from '@/components/shared/list-url-state'
+import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message';
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { DelayedSkeleton } from '@/components/shared/skeleton'
-import { STATE_TEXT } from '@/components/shared/not-connected'
-import { notifyToast } from '@/components/shared/toast'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { DelayedSkeleton } from '@/components/shared/skeleton';
+import { STATE_TEXT } from '@/components/shared/not-connected';
+import { notifyToast } from '@/components/shared/toast';
+import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
 import ReorderHandle from '@/components/shared/reorder-handle'
-import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
-import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils'
-import { ArchiveMarkDialog, autoRuleLabel, isUsed, usageLabel } from '@/components/friend-fields/mark-list'
+import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder';
+import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils';
+import { ArchiveMarkDialog, autoRuleLabel, isUsed, usageLabel } from '@/components/friend-fields/mark-list';
 import styles from './list.module.css'
-import type { AttributeListHost } from './attribute-host'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
-import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+import type { AttributeListHost } from './attribute-host';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField } from '@/components/shared/save-form-errors';
+import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 タグ「対応マーク」タブ（Pencil `vKDj5`）。
@@ -54,7 +58,7 @@ import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 
 export default function MarksTab({ accountId, canEdit, host }: { accountId: string | null; canEdit: boolean; host?: AttributeListHost<MarkRow> }) {
   const router = useRouter()
@@ -85,7 +89,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。URL に ?mark=<id> を残す。 */
   const [activeMarkId, setActiveMarkId] = useDetailPanelUrl('mark')
-  const openMarkDetail = (id: string) => host ? (canEdit ? host.onEdit(id) : undefined) : withViewTransition(() => setActiveMarkId(id))
+  const openMarkDetail = (id: string) => host ? (canEdit ? host.onEdit(id) : undefined) : withViewTransition(() => setActiveMarkId(current => current === id ? null : id))
 
   /* アカウント切替のあとに届いた古い応答で一覧を上書きしない（ATTR-01）。 */
   const gateRef = useRef(createResponseGate())
@@ -364,31 +368,13 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
   const filterActive = Boolean(query || usage !== 'all' || onlyArchived)
 
   const table = status === 'forbidden' ? (
-    <div className={styles.stateCard}>
-      <AlertCircle className={styles.stateIconError} aria-hidden="true" />
-      <p className={styles.stateTitle}>対応マークを見る権限がありません</p>
-      <p className={styles.stateDesc}>{permissionDeniedMessage('store')}</p>
-    </div>
+    <ListState kind="error" title="対応マークを見る権限がありません" description={permissionDeniedMessage('store')}  />
   ) : status === 'error' ? (
-    <div className={styles.stateCard}>
-      <AlertCircle className={styles.stateIconError} aria-hidden="true" />
-      <p className={styles.stateTitle}>対応マークを読み込めませんでした</p>
-      <p className={styles.stateDesc}>{error || '再読み込みしても直らない場合はエラー報告へ。'}</p>
-      <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
-    </div>
+    <ListState kind="error" title="対応マークを読み込めませんでした" description={error || '再読み込みしても直らない場合はエラー報告へ。'}  action={<><Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
   ) : listReady && items.length === 0 ? (
-    <div className={styles.stateCard}>
-      <Flag className={styles.stateIcon} aria-hidden="true" />
-      <p className={styles.stateTitle}>まだ対応マークはありません</p>
-      <p className={styles.stateDesc}>受信箱で、対応の進み具合を見分ける印です。</p>
-      {canEdit ? <Button href={host ? undefined : "/tags/marks/new"} onClick={host?.onCreate} variant="primary">マークを作る</Button> : null}
-    </div>
+    <ListState kind="empty" title="まだ対応マークはありません" description="受信箱で、対応の進み具合を見分ける印です。"  icon={<Flag className={styles.stateIcon} aria-hidden="true" />} action={<>{canEdit ? <Button href={host ? undefined : "/tags/marks/new"} onClick={host?.onCreate} variant="primary">マークを作る</Button> : null}</>} />
   ) : listReady && visible.length === 0 ? (
-    <div className={styles.stateCard}>
-      <p className={styles.stateTitle}>条件に合うものはありません</p>
-      <p className={styles.stateDesc}>検索や絞り込みを外すと、すべて出ます</p>
-      {filterActive ? <Button type="button" onClick={() => { setQuery(''); setUsage('all'); setView({ archived: '' }) }}>条件を外す</Button> : null}
-    </div>
+    <ListState kind="empty" title="条件に合うものはありません" description="検索や絞り込みを外すと、すべて出ます"  action={<>{filterActive ? <Button type="button" onClick={() => { setQuery(''); setUsage('all'); setView({ archived: '' }) }}>条件を外す</Button> : null}</>} />
   ) : (
     <DelayedSkeleton loading={!listReady} skeleton={<div className={styles.skeleton} aria-busy="true" />}>
       <DataTable className={styles.table}>
@@ -418,16 +404,10 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
                 onDrop={dragId ? () => void move(liveOrder.dropTarget(mark.id)) : undefined}
                 className={`${styles.row} ${styles.markRow}`}
                 tabIndex={0}
-                onClick={() => openMarkDetail(mark.id)}
-                onKeyDown={(event) => {
-                  if (event.target !== event.currentTarget) return
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    openMarkDetail(mark.id)
-                  }
-                }} data-row-id={mark.id}
+                detailKey="mark" onOpen={() => openMarkDetail(mark.id)}
+                 data-row-id={mark.id}
               >
-                <Td className={styles.markColGrip} onClick={(event) => event.stopPropagation()}>
+                <Td className={styles.markColGrip}>
                   {canEdit ? (
                     <span
                       className={styles.gripBox}
@@ -451,7 +431,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
                     {!canEdit || mark.archivedAt ? <span className={styles.markPill} style={{ '--mark-color': mark.color } as CSSProperties} title={mark.name}>
                       <span className={styles.markPillDot} aria-hidden="true" />
                       <span className={styles.truncate}>{mark.name}</span>
-                    </span> : <Link
+                    </span> : <RowNameLink
                       href={host ? "#" : editHref}
                       className={styles.markPill}
                       style={{ '--mark-color': mark.color } as CSSProperties}
@@ -460,7 +440,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
                     >
                       <span className={styles.markPillDot} aria-hidden="true" />
                       <span className={styles.truncate}>{mark.name}</span>
-                    </Link>}
+                    </RowNameLink>}
                   </ContextMenu>
                   {mark.archivedAt ? <StatusBadge size="annotation" dot={false}>保管</StatusBadge> : null}
                 </Td>
@@ -468,8 +448,8 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
                 <Td className={styles.markColDefault}><span className={styles.cellText}>{mark.isDefault ? '新規の初期値' : emptyValue('unknown')}</span></Td>
                 <Td className={styles.markColAuto}><span className={styles.cellText} title={host ? (mark.autoOnInbound ? '受信時' : emptyValue('unknown')) : autoRuleLabel(mark)}>{host ? (mark.autoOnInbound ? '受信時' : emptyValue('unknown')) : autoRuleLabel(mark)}</span></Td>
                 <Td className={styles.markColPlace}><span className={styles.cellText} title={host ? undefined : usageLabel(mark)}>{host ? emptyValue('unknown') : usageLabel(mark)}</span></Td>
-                {host && canEdit ? <Td className={styles.colDistribute} onClick={(event) => event.stopPropagation()}><RowQuickAction label="配る" ariaLabel={`${mark.name}を配る`} icon={<Send />} disabled={host.busy} onClick={() => host.onDistribute(mark.id)} /></Td> : null}
-                <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
+                {host && canEdit ? <Td className={styles.colDistribute}><RowQuickAction label="配る" ariaLabel={`${mark.name}を配る`} icon={<Send />} disabled={host.busy} onClick={() => host.onDistribute(mark.id)} /></Td> : null}
+                <Td className={styles.colMenu}>
                   <span className={styles.menuAnchor}>
                     {(!host || canEdit) ? <RowMenu
                       size="row"
@@ -559,15 +539,11 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
         </>}
       >
         {actionError ? (
-          <p role="alert" className={styles.errorBand}>
-            <AlertCircle className={styles.errorIcon} aria-hidden="true" />
-            {actionError}
-            {retryOrder ? (
+          <Notice tone="danger" >{actionError}{retryOrder ? (
               <button type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</button>
             ) : (
               <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
-            )}
-          </p>
+            )}</Notice>
         ) : null}
         {table}
       </ListPageBody>

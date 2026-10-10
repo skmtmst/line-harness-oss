@@ -17,6 +17,7 @@ import { accountsInFolder, distributionFolderRows, DistributionFolderPanel, useD
 import styles from './console.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 const choiceKey = (account: string, source: string) => JSON.stringify([account, source])
 const labels = { create: '新しく作る', overwrite: '上書き', alias: '別名で作る', skip: '配らない' }
@@ -95,7 +96,7 @@ export default function AttributeDistribution({ detail, saved = false, canEdit =
     }
   })
   const close = () => { if (busy) return; if (!pendingRun || result && result.status !== 'running') window.sessionStorage.removeItem(runKey(detail.template.id)); onClose() }
-  if (!canEdit) return <PageFrame kind="wizard"><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /><Button onClick={close}>一覧へ</Button></PageFrame>
+  if (!canEdit) return <PageFrame kind="wizard"><ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice><Button onClick={close}>一覧へ</Button></PageFrame>
   if (stage === 'saved') return <SavedDistributionDialog accounts={accounts ?? []} folders={folders} selected={selected} onChange={setSelected} filter={filter} onFilter={setFilter} search={search} onSearch={setSearch} received={received} receivedFailed={receivedFailed} busy={busy} error={error} onLater={close} onDistribute={() => void check(selected)} />
   const visible = accountsInFolder(accounts ?? [], filter, folders.membership).filter((account) => account.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
   const folderRows = distributionFolderRows({ accounts: accounts ?? [], ...folders, selected, onChange: setSelected, disabled: busy || stage !== 'accounts' })

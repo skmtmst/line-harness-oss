@@ -4,7 +4,7 @@ import Toggle from '@/components/shared/toggle';
 import { notifySaved } from '@/components/shared/toast'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Check, Link as LinkIcon } from 'lucide-react'
 import type { Friend } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -509,7 +509,7 @@ export default function CreateAffiliateV8() {
         </div>
       </section>
 
-      {saveError ? <p className={styles.errorText} role="alert">{saveError}</p> : null}
+      {saveError ? <Notice tone="danger" >{saveError}</Notice> : null}
       {saveNote ? <p className={styles.cardNote} role="status">{saveNote}</p> : null}
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したアフィリエイター" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage></SaveErrorScope>

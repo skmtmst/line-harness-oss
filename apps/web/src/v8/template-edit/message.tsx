@@ -1,12 +1,15 @@
 'use client'
+
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { createPageReturnHref } from '@/components/shared/create-page'
-import { notifySaved } from '@/components/shared/toast'
+import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import {  } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
-import { CircleAlert, GitCompare, Link2, RotateCcw, Send } from 'lucide-react'
+import { GitCompare, Link2, Send } from 'lucide-react'
 import { validateFlexContent, type Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
@@ -16,42 +19,19 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
 import { useFormErrors } from '@/lib/use-form-errors'
 import ValidationSummary from '@/components/shared/validation-summary'
-import { FieldError } from '@/components/shared/form-controls'
+import { FieldError, Field } from '@/components/shared/form-controls'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
+import LinePreview, { LinePreviewMessage, LinePreviewFlex as FlexPreview } from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
 import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
 import { SettingCheckbox } from '@/components/shared/checkbox'
-import { notifyToast } from '@/components/shared/toast'
-import { LinePreviewFlex as FlexPreview } from '@/components/shared/line-preview'
 import { buildTemplatePreview, extractMessageUrls, LEGACY_MESSAGE_NOTICE } from '@/components/templates/message-template-editor'
-import {
-  ACCOUNT_MISMATCH_MESSAGE,
-  EMPTY_REFERENCES,
-  TEMPLATE_LOAD_FAILED_MESSAGE,
-  conflictTime,
-  describeTemplateDiff,
-  draftFromDetail,
-  isTemplateDetailData,
-  loadTemplateReferences,
-  newTemplateEditorState,
-  requestTemplateReferences,
-  resolveEditorAccountId,
-  saveTemplateEdit,
-  validateTemplateSave,
-  templateAccountMismatch,
-  templateSaveGuard,
-  templateUsageEntries,
-  type TemplateDraft,
-  type TemplateEditorState,
-  type TemplateReferenceState,
-  type TemplateReferences,
-} from './core'
+import { ACCOUNT_MISMATCH_MESSAGE, EMPTY_REFERENCES, TEMPLATE_LOAD_FAILED_MESSAGE, conflictTime, describeTemplateDiff, draftFromDetail, isTemplateDetailData, loadTemplateReferences, newTemplateEditorState, requestTemplateReferences, resolveEditorAccountId, saveTemplateEdit, validateTemplateSave, templateAccountMismatch, templateSaveGuard, templateUsageEntries, type TemplateDraft, type TemplateEditorState, type TemplateReferenceState, type TemplateReferences } from './core'
 import { TemplateEditFrame } from './frame'
 import type { TemplateEditHost } from './host'
 import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
@@ -61,9 +41,7 @@ import { referenceTokenNames } from '@/components/shared/insert-tokens'
 import { loadTemplateExamples } from '@/v8/templates/examples'
 import styles from './edit.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8「メッセージを作る／編集」（絵 u5YC6・1152 は a1k3d・競合は NCbYn）。
@@ -459,7 +437,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         boardId={boardId}
         title={title}
         description={description}
-        band={<p className={styles.readonly} role="status">閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</p>}
+        band={<ReadOnlyNotice>閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</ReadOnlyNotice>}
         side={<SenderCard />}
       >
         <Card padding="none" layout="vertical" className={styles.card}>
@@ -486,7 +464,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     >
       {messageType === 'flex' ? (
         flexError ? (
-          <p role="alert" className={styles.error}>{flexError}このままでは保存できません。</p>
+          <Notice tone="danger" >{flexError}このままでは保存できません。</Notice>
         ) : !messageContent.trim() ? (
           <p className={styles.hint}>カードの内容を入力すると、ここに表示されます。</p>
         ) : (
@@ -498,7 +476,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         </LinePreviewMessage>
       )}
       {preview.unresolved.length > 0 ? (
-        <p role="alert" className={styles.error}>値を確認できない差し込みがあります：{preview.unresolved.map((key) => `{{${key}}}`).join('、')}</p>
+        <Notice tone="danger" >値を確認できない差し込みがあります：{preview.unresolved.map((key) => `{{${key}}}`).join('、')}</Notice>
       ) : null}
     </LinePreview>
   )
@@ -562,7 +540,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
           <>
             {host?.notice}
             {messageType === 'flex' || messageType === 'image' ? <Notice tone="warn" message={LEGACY_MESSAGE_NOTICE} /> : null}
-            {error || loadFailed ? <p role="alert" className={styles.error}>{loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error}</p> : null}
+            {error || loadFailed ? <Notice tone="danger" >{loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error}</Notice> : null}
             {exampleNote && !id ? <p role="status" className={styles.error}>{exampleNote}</p> : null}
             <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
             <Card padding="none" layout="vertical" className={styles.card}>
@@ -613,7 +591,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               </div>
               <FieldError id="te-content-error">{fields.error('content')}</FieldError>
               {messageType === 'flex' && flexError && messageContent.trim() && !fields.invalid('content') ? (
-                <p role="alert" className={styles.error}>{flexError}このままでは保存できません。</p>
+                <Notice tone="danger" >{flexError}このままでは保存できません。</Notice>
               ) : null}
               <p className={styles.hint}>
                 {messageType === 'flex'
@@ -621,13 +599,13 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                   : '名前と友だち情報は受け取る人ごと、共通情報と配信日は送る時点の値に置き換わります。回答フォームの答えは、答えを保存した友だち情報から差し込みます。'}
                 {messageContent.length > 4500 ? ' 約4,500文字を超えると複数のメッセージに分かれて届きます。' : ''}
               </p>
-              {referenceState === 'failed' ? <p role="alert" className={styles.error}>差し込み項目を読み込めませんでした。画面を再読み込みしてください。</p> : null}
+              {referenceState === 'failed' ? <Notice tone="danger" >差し込み項目を読み込めませんでした。画面を再読み込みしてください。</Notice> : null}
               {host ? <p className={styles.hint}>統括のテンプレートで差し込めるのは、名前・配信日・その他です（友だち情報・共通情報はアカウントごとに違うため）。</p>
                 : !editorAccountId && !loading ? <p className={styles.hint}>LINE公式アカウントを選ぶと、友だち情報と共通情報を選べます。</p> : null}
               {accountMismatch ? (
-                <div role="alert" className={styles.readonly}>
+                <Notice tone="warn" role="alert">
                   {ACCOUNT_MISMATCH_MESSAGE}（このテンプレートは「{accountName(editor.templateAccountId) ?? editor.templateAccountId}」のものです。差し込み候補もそのアカウントのまま出しています）
-                </div>
+                </Notice>
               ) : null}
             </Card>
 

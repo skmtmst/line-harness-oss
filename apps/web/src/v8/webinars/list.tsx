@@ -1,91 +1,61 @@
 'use client'
-import { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import { RowNameLink } from '@/components/shared/table';
 
-import { canManageRole } from '@/lib/staff-role';
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+
+
+
 import SharedStatusPill from '@/components/shared/status-pill'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
-import type { ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
-import {
-  Archive,
-  Bookmark,
-  CalendarClock,
-  Download,
-  Eye,
-  FilePen,
-  Inbox,
-  MousePointerClick,
-  Plus,
-  Radio,
-  Users,
-  Video,
-} from 'lucide-react'
-import { ListPage, ListPagePagination } from '@/components/templates'
-import ListToolbar from '@/components/shared/list-toolbar'
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
+import type { ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Archive, Bookmark, CalendarClock, Download, FilePen, Inbox, MousePointerClick, Plus, Radio, Users, Video } from 'lucide-react';
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { Eye } from 'lucide-react';
+import { ListPage, ListPagePagination } from '@/components/templates';
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import { notifyToast } from '@/components/shared/toast'
-import { useSearchParams } from 'next/navigation'
-import { RowMenu } from '@/components/shared/row-actions'
+import { notifyToast } from '@/components/shared/toast';
+import { RowMenu } from '@/components/shared/row-actions';
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
-import { ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
-import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import DetailPanel from '@/components/shared/detail-panel'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared';
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
+import { FolderDotName, type FolderDotFolder, folderDisplayColor } from '@/components/shared/folder-dot';
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import InlineEdit from '@/components/shared/inline-edit'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
 import Pagination from '@/components/shared/pagination'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import { withViewTransition } from '@/components/shared/view-transition'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { publicationStateLabel } from '@/components/webinars/publication-label'
-import { useAccount } from '@/contexts/account-context'
-import { useStaffRole } from '@/lib/staff-role'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { runUndoable } from '@/lib/undoable'
-import { formatDateTime, formatNumber } from '@/lib/format'
-import {
-  ApiError,
-  webinarApi,
-  type Webinar,
-  type WebinarFolder,
-  type WebinarListItem,
-  type WebinarListParams,
-  type WebinarOverview,
-  type WebinarOverviewMetric,
-} from '@/lib/api'
-import {
-  beforeStart,
-  publicPath,
-  showsCounts,
-  statusLabel,
-  statusTone,
-  webinarListCsv,
-  webinarLoadFailure,
-  type WebinarLoadFailure,
-} from './helpers'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
+import { withViewTransition } from '@/components/shared/view-transition';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { publicationStateLabel } from '@/components/webinars/publication-label';
+import { useAccount } from '@/contexts/account-context';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { runUndoable } from '@/lib/undoable';
+import { formatDateTime, formatNumber } from '@/lib/format';
+import { ApiError, webinarApi, type Webinar, type WebinarFolder, type WebinarListItem, type WebinarListParams, type WebinarOverview, type WebinarOverviewMetric } from '@/lib/api';
+import { beforeStart, publicPath, showsCounts, statusLabel, statusTone, webinarListCsv, webinarLoadFailure, type WebinarLoadFailure } from './helpers';
 import styles from './list.module.css'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { csvFileName } from '@/lib/csv-file-name';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 ウェビナーの一覧（Pencil：一覧 `UyUMw`・1152 `uBMuB`・閲覧のみ `jiNg0`・
@@ -663,7 +633,7 @@ function WebinarList() {
   /* 行 → 右の詳細パネル。開閉と↑↓の移動はつながる移り変わりで。 */
   const activeIndex = visibleItems.findIndex((w) => w.id === activeId)
   const active = activeIndex >= 0 ? visibleItems[activeIndex] : null
-  const openDetail = useCallback((id: string) => { withViewTransition(() => setActiveId(id)) }, [])
+  const openDetail = useCallback((id: string) => { withViewTransition(() => setActiveId(current => current === id ? null : id)) }, [setActiveId])
   const closeDetail = useCallback(() => { withViewTransition(() => setActiveId(null)) }, [])
   const goDetail = (direction: -1 | 1) => {
     const next = visibleItems[activeIndex + direction]
@@ -906,9 +876,9 @@ function WebinarList() {
   if (accountLoading || loading) {
     listBody = <ListSkeleton />
   } else if (!selectedAccountId) {
-    listBody = <ListState kind="empty" title={accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'} />
+    listBody = <AccountRequiredState hasAccounts={accounts.length > 0} />
   } else if (loadFailure && visibleItems.length === 0) {
-    listBody = <ListState kind={loadFailure.kind} title={loadFailure.title} description={loadFailure.description} action={loadFailure.retryable ? <Button onClick={() => void refresh()}>もう一度読み込む</Button> : undefined} />
+    listBody = <ListState kind={loadFailure.kind} title={loadFailure.title} description={loadFailure.description} action={loadFailure.retryable ? <Button onClick={() => refresh()} busyLabel="処理中…">もう一度読み込む</Button> : undefined} />
   } else if (visibleItems.length === 0) {
     /* 修正案 D-2：空の一覧。 */
     listBody = (
@@ -926,10 +896,7 @@ function WebinarList() {
     listBody = (
       <>
         {loadFailure ? (
-          <div role="alert" className={styles.errorBand}>
-            <span>{loadFailure.title}</span>
-            {loadFailure.retryable ? <Button onClick={() => void refresh()}>もう一度読み込む</Button> : null}
-          </div>
+          <Notice tone="danger" ><span>{loadFailure.title}</span>{loadFailure.retryable ? <Button onClick={() => refresh()} busyLabel="処理中…">もう一度読み込む</Button> : null}</Notice>
         ) : null}
         {refreshing ? <p role="status" className="sr-only">検索中…</p> : null}
         <div className={styles.tableWrap}>
@@ -949,20 +916,20 @@ function WebinarList() {
                     className={styles.row}
                     data-table-layout="columns"
                     data-row-id={w.id}
-                    onClick={() => openDetail(w.id)}
+                    detailKey="webinar" onOpen={() => openDetail(w.id)}
                   >
                     <Td className={styles.colName}>
                       <ContextMenu label={`「${w.title}」の操作`} items={toContextItems(menuItems)}>
                         <FolderDotName folder={folderDotOf(w)}>
-                          <button
-                            type="button"
+                          <RowNameLink
+                            href={`/webinars/edit?id=${encodeURIComponent(w.id)}`}
                             className={styles.nameButton}
                             title={w.title}
                             aria-label={`「${w.title}」の詳細を見る`}
-                            onClick={(event) => { event.stopPropagation(); openDetail(w.id) }}
+
                           >
                             {w.title}
-                          </button>
+                          </RowNameLink>
                         </FolderDotName>
                       </ContextMenu>
 
@@ -984,7 +951,7 @@ function WebinarList() {
                       )}
                     </Td>
                     <Td className={styles.colPeriod}><span className={styles.period} title={period}>{period}</span></Td>
-                    <Td className={styles.colOps} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.colOps}>
                       <div className={styles.opsBox}>
 
                         <RowMenu
@@ -1038,15 +1005,12 @@ function WebinarList() {
       stats={<>
         {/* 役割が取れるまで（null）は閲覧のみの帯を出さない。出してから消すと一覧が 64px 跳ねていた（動きの点検 8 番）。 */}
         {role !== null && !canEdit ? (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
         {csvError ? <div className={styles.statsNotice}><Notice tone="info">{csvError}</Notice></div> : null}
         {overviewFailure && !loadFailure ? (
           <div className={styles.statsNotice}>
-            <Notice tone="info" action={overviewFailure.retryable ? <Button onClick={() => void refreshOverview()}>集計を読み直す</Button> : undefined}>集計を表示できませんでした。</Notice>
+            <Notice tone="info" action={overviewFailure.retryable ? <Button onClick={() => refreshOverview()} busyLabel="処理中…">集計を読み直す</Button> : undefined}>集計を表示できませんでした。</Notice>
           </div>
         ) : null}
         <KpiBand>
@@ -1065,9 +1029,8 @@ function WebinarList() {
         </KpiBand>
       </>}
       folders={<>
-        {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
-        {createButton ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
         <FolderPanel
+          createAction={createButton}
           activeId={selectedFolder}
           onSelect={(id) => { setSelectedFolder(id); setPage(1) }}
           onAddFolder={canEdit ? () => { setFolderError(''); closeDetail(); setFolderFormOpen(true) } : undefined}
@@ -1075,7 +1038,7 @@ function WebinarList() {
           addFolderDisabled={!selectedAccountId}
           rows={folderRows}
         >
-          <p className={styles.folderNote}>フォルダを消しても、中のウェビナーは未分類に残ります</p>
+          <FolderPanelNote>フォルダを消しても、中のウェビナーは未分類に残ります</FolderPanelNote>
         </FolderPanel>
       </>}
       collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}

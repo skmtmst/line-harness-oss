@@ -1,11 +1,11 @@
 'use client'
-import { notifySaved } from '@/components/shared/toast'
+import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, Eye, Globe, HelpCircle, History, MoreHorizontal, Send, Undo2, X } from 'lucide-react'
+import { Check, Globe, HelpCircle, History, MoreHorizontal, Send, Undo2, X } from 'lucide-react'
 import type { ApiResponse } from '@line-crm/shared'
 import { ApiError, api, fetchApi, type PhotoBulkReviewResult, type PhotoReviewMetrics } from '@/lib/api'
 import { TextArea } from '@/components/shared/text-field'
-import { FieldError } from '@/components/shared/form-controls'
+import { FieldError, Field } from '@/components/shared/form-controls'
 import Radio from '@/components/shared/radio'
 import { focusFormField } from '@/lib/use-field-validation'
 import Button from '@/components/shared/button'
@@ -24,10 +24,9 @@ import { ListPage } from '@/components/templates'
 import Notice from '@/components/shared/notice'
 import SearchField from '@/components/shared/search-field'
 import SegmentedControl from '@/components/shared/segmented'
-import { notifyToast } from '@/components/shared/toast'
 import { Tabs } from '@/components/shared/tabs'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { formatNumber } from '@/lib/format'
+import { formatNumber, formatListDay as polishFormatListDay } from '@/lib/format'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { formatPhotoReceivedAt } from './time'
 import { safePhotoSrc } from './src'
@@ -39,13 +38,11 @@ import { mileStatusLabel, reviewVersionOf, text } from './text'
 import { PhotoReviewDetail } from './detail'
 import PhotoPolicyHistoryV8 from './policy-history'
 import styles from './review.module.css'
-import { formatListDay as polishFormatListDay } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /* Pencil の6枚のHTMLをもとにした投稿画面。既存の審査APIを接続する。 */
 
@@ -588,7 +585,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
         <>
           {!canEdit ? (
             <div className={styles.viewerRow}>
-              <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} data-design-node="photo-viewer-band" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+              <ReadOnlyNotice role="status" data-design-node="photo-viewer-band">閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice>
             </div>
           ) : null}
           <div className={styles.stats}>

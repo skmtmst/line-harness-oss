@@ -458,11 +458,7 @@
   outline-offset: calc(var(--tpl-bm-5) * -1);
 }
 
-.saveError {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--tpl-bm-13);
-}
+
 
 .saveNote {
   margin: 0;

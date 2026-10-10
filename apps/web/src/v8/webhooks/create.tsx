@@ -2,8 +2,9 @@
 
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { Suspense, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ChevronDown, ChevronUp, Inbox, RefreshCw, Send } from 'lucide-react'
 import { EC_EVENT_TYPES, ecEventLabel } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'

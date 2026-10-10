@@ -2,7 +2,7 @@
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeftRight, Check, Hourglass, RefreshCw, Share2, TriangleAlert, User, Zap } from 'lucide-react'
 import type { Tag } from '@line-crm/shared'

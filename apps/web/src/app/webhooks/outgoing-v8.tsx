@@ -1,6 +1,6 @@
 'use client'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Inbox, Link2, Send, Webhook } from 'lucide-react'
 import MergedTabs from '@/components/layout/merged-tabs'
 import { api, ApiError, type OutgoingWebhookOverview } from '@/lib/api'

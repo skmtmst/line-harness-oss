@@ -67,6 +67,8 @@ describe('BERxg 座席・卓管理のV8', () => {
     fireEvent.change(screen.getByDisplayValue('2人卓'), { target: { value: '奥の2人卓' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 't1', expect.objectContaining({ label: '奥の2人卓' })))
+    // API到達だけでは再取得が終わっていない。操作が再び可能になるまで待つ。
+    await waitFor(() => expect((within(detail).getAllByRole('button', { name: '停止' })[0] as HTMLButtonElement).disabled).toBe(false))
     fireEvent.click(within(detail).getAllByRole('button', { name: '停止' })[0])
     fireEvent.click(screen.getByRole('button', { name: '停止する' }))
     await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 't1', { isActive: false }))
@@ -106,7 +108,7 @@ it('ドラッグした配置をまとめて保存し、再取得した座標順�
  const dragged=screen.getByRole('button',{name:/T1 2人卓/})
  const target=screen.getByRole('button',{name:/T2 2人卓/})
  fireEvent.dragStart(dragged,{dataTransfer:{setData:vi.fn(),effectAllowed:''}});fireEvent.dragOver(target.closest('li')!);fireEvent.drop(target.closest('li')!)
- await waitFor(()=>expect(fixture.saveTableLayout).toHaveBeenCalledWith('account-1',{storeId:'store-1',tables:[{id:'t2',floorX:0,floorY:0,joinGroup:'A'},{id:'t1',floorX:1,floorY:0,joinGroup:null},{id:'t3',floorX:2,floorY:0,joinGroup:'A'},{id:'pb',floorX:0,floorY:1,joinGroup:null}]}))
+ await waitFor(()=>expect(fixture.saveTableLayout).toHaveBeenCalledWith('account-1',{storeId:'store-1',expectedVersion:1,tables:[{id:'t2',floorX:0,floorY:0,joinGroup:'A'},{id:'t1',floorX:1,floorY:0,joinGroup:null},{id:'t3',floorX:2,floorY:0,joinGroup:'A'},{id:'pb',floorX:0,floorY:1,joinGroup:null}]}))
  const map=(await screen.findByRole('heading',{name:'フロアマップ'})).closest('section')!
  await waitFor(()=>expect(within(map).getAllByRole('button')[0].textContent).toContain('T2'))
 })

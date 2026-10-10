@@ -3,6 +3,12 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// 日付の見本を作る前に日本時間で固定し、待ち合わせのタイマーは動かす。
+vi.hoisted(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
+})
+
 const fixture = vi.hoisted(() => ({
   snapshot: vi.fn(), closures: vi.fn(), openingHours: vi.fn(), channelCloseTasks: vi.fn(), mediaLinks: vi.fn(),
   previewClosure: vi.fn(), createClosure: vi.fn(), updateClosure: vi.fn(), deleteClosure: vi.fn(), completeChannelCloseTask: vi.fn(),
@@ -40,6 +46,8 @@ const task = (id: string, channel: string, status: string) => ({
 })
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
   role.value = 'owner'
   window.history.replaceState(null, '', '/restaurant-test/inventory?tab=closures')
   fixture.snapshot.mockResolvedValue({ data: snapshotOf() })
@@ -63,7 +71,7 @@ beforeEach(() => {
   google.profile.mockResolvedValue({ profile: { specialHours: [] } })
   google.proposeClosureHours.mockResolvedValue({ success: true, change: {} })
 })
-afterEach(() => { cleanup(); vi.clearAllMocks(); window.history.replaceState(null, '', '/') })
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks(); window.history.replaceState(null, '', '/') })
 
 describe('UVnvR 休業日・貸切', () => {
   it('?tab=closures で開き、頭の説明・カレンダーの札・定休・右の列・上の知らせを出す', async () => {

@@ -213,3 +213,7 @@
   font-size: var(--tpl-section-title-size);
   font-weight: var(--tpl-section-title-weight);
 }
+[data-theme='v8'] .headerRestaurant{min-height:58px;padding:20px 24px 15px;align-items:flex-start;}
+[data-theme='v8'] .headerRestaurant .titleGroup{flex-direction:column;gap:2px;}
+[data-theme='v8'] .headerRestaurant .title{font-size:15px;line-height:23px;}
+[data-theme='v8'] .headerRestaurant .meta{font-size:14px;line-height:21px;}

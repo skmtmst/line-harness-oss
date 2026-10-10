@@ -1,11 +1,13 @@
 'use client'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
+import { RowNameLink } from '@/components/shared/table'
 import CopyTextButton from '@/components/shared/copy-text-button'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Copy, Eye, Info, Pause, Pencil, QrCode } from 'lucide-react'
+import { ArrowLeft, Info, Pause, Pencil, QrCode } from 'lucide-react'
 import type { ApiResponse, EntryRoute, EntryRouteFunnel, Scenario, Tag, TrafficPool } from '@line-crm/shared'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
@@ -34,12 +36,12 @@ import EditRouteModal from './edit-route-dialog'
 import QrDialog from './qr-dialog'
 import RefOrdersPanel, { type RefOrdersResult } from './ref-orders'
 import styles from './detail.module.css'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
 /*
  * ★V8 流入と計測の詳細（Pencil `Q5le3`）。
@@ -80,7 +82,7 @@ const PERIOD_OPTIONS: Array<{ value: FriendPeriod; label: string }> = [
   { value: 'this', label: '今月' },
   { value: 'last', label: '先月' },
 ]
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n} 件表示` }))
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 const DELETE_CHOICES: ReadonlyArray<readonly [DeleteChoice, string, string]> = [
   ['stop', '新しい人を受けるのをやめる（おすすめ）', 'URLは残し、「受付を終了しました」と表示します。'],
@@ -446,7 +448,7 @@ function InflowDetailContent() {
       ) : undefined}
     >
       {readonly ? (
-        <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       ) : null}
       {copyFailed && url ? (
         <div role="alert" className={styles.copyFallback}>
@@ -579,7 +581,7 @@ function InflowDetailContent() {
             {route.isActive ? (
               <Button onClick={() => openDelete('stop')}><Pause size={15} aria-hidden="true" />止める</Button>
             ) : (
-              <Button onClick={() => void reopenRoute()}>受付を再開する</Button>
+              <Button onClick={() => reopenRoute()} busyLabel="処理中…">受付を再開する</Button>
             )}
             <Button variant="primary" onClick={() => setEditingRoute(true)}>
               <Pencil size={15} aria-hidden="true" />{happenParts.length > 0 ? 'することを変える' : 'することを決める'}
@@ -674,9 +676,9 @@ function InflowDetailContent() {
                       </Td>
                       <Td className={styles.colFriend}>
                         <span className={styles.face} aria-hidden="true">{friend.displayName.slice(0, 1)}</span>
-                        <Link className={styles.friendName} href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} title={friend.displayName}>
+                        <RowNameLink className={styles.friendName} href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} title={friend.displayName}>
                           {friend.displayName}
-                        </Link>
+                        </RowNameLink>
                       </Td>
                       <Td className={styles.colAccount}><span className={styles.cellText} title={accountName}>{accountName}</span></Td>
                       <Td className={styles.colState}>

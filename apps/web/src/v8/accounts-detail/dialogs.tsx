@@ -78,7 +78,7 @@ function useInvalidFocus(errors: Record<string, string>, ids: Record<string, str
 }
 
 function ErrorLine({ message }: { message: string }) {
-  return message ? <p role="alert" className={styles.error}>{message}</p> : null
+  return message ? <Notice tone="danger" >{message}</Notice> : null
 }
 
 /* ------------------------------------------------------------------ */

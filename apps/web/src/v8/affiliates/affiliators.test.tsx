@@ -35,7 +35,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 
 vi.mock('next/link', () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) => React.createElement('a', { href }, children),
+  default: ({ children, ...props }: React.ComponentProps<'a'>) => React.createElement('a', props, children),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -96,7 +96,7 @@ afterEach(() => {
 describe('V8 アフィリエイター', () => {
   it('成果が多い順に並べ、作るボタンと選ぶチェックを出す', async () => {
     await render()
-    const names = [...host.querySelectorAll('tbody tr')].map((row) => row.querySelector('button')?.textContent)
+    const names = [...host.querySelectorAll('tbody tr')].map((row) => row.querySelector('a[data-row-link]')?.textContent)
     expect(names).toEqual(['多い人', '少ない人'])
     expect(host.textContent).toContain('アフィリエイターを作る')
     expect(host.querySelector('[aria-label="多い人を選ぶ"]')).not.toBeNull()

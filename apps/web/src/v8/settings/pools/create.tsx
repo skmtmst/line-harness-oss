@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Check } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import Button from '@/components/shared/button'
@@ -18,6 +18,7 @@ import styles from './create.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8-B プール管理「プールを作る」（Pencil `D0AOyx`・/pools/new）。
@@ -156,7 +157,7 @@ export default function PoolCreateV8() {
     >
       <form id="pool-create-form" className={styles.columns} onSubmit={(event) => void save(event)} noValidate>
         <div className={styles.main}>
-          {error ? <p role="alert" className={styles.error}>{error}</p> : null}
+          {error ? <Notice tone="danger" >{error}</Notice> : null}
           <section className={styles.card} aria-labelledby="pool-create-what">
             <h2 id="pool-create-what" className={styles.cardTitle}>1. どのプールか</h2>
             <Field label="プール名" htmlFor="pl-name" error={inputError?.target === 'pl-name' ? inputError.message : undefined}>
@@ -206,10 +207,7 @@ export default function PoolCreateV8() {
             )}
             {inputError?.target === 'pl-add-account' ? <p className={styles.error} role="alert">{inputError.message}</p> : null}
             {accountsError ? (
-              <p role="alert" className={styles.error}>
-                {accountsError}{' '}
-                <button type="button" className={styles.retry} onClick={() => void loadAccounts()}>もう一度読み込む</button>
-              </p>
+              <Notice tone="danger" >{accountsError}{' '}<button type="button" className={styles.retry} onClick={() => void loadAccounts()}>もう一度読み込む</button></Notice>
             ) : null}
           </section>
         </div>

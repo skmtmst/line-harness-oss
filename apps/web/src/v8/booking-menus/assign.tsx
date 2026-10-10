@@ -1,5 +1,5 @@
 'use client'
-import { notifySaved } from '@/components/shared/toast'
+import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { Th } from '@/components/shared/table'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -10,29 +10,22 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { notifyToast } from '@/components/shared/toast'
-import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
+import { isForbiddenOrRateLimited, loadFailureCopy, withPermissionFailure } from '@/components/shared/api-error-message'
 import { useAccount } from '@/contexts/account-context'
 import { useBookingEdit } from './lib/edit-permission'
 import StickyBar from '@/components/shared/sticky-bar'
 import { Check } from 'lucide-react'
-import { describeSaveFailure } from '@/lib/api'
+import { describeSaveFailure, bookingApi, type BookingMenu, type BookingStaff, type StaffMenuMatrix } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
-import {
-  bookingApi,
-  type BookingMenu,
-  type BookingStaff,
-  type StaffMenuMatrix,
-} from '@/lib/api'
 import { menuPriceLabel } from './lib/menu-price'
 import shell from './settings.module.css'
 import styles from './assign.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8「担当メニューをまとめて決める」（板 ooufy）。
@@ -383,7 +376,7 @@ export default function AssignMatrixV8() {
               <p className={shell.stateDesc}>{loadFailure?.description ?? error}</p>
               {loadFailure?.retryable ? (
                 <div className={shell.stateActions}>
-                  <Button onClick={() => void load()}>もう一度読み込む</Button>
+                  <Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
                 </div>
               ) : null}
             </div>
@@ -398,7 +391,7 @@ export default function AssignMatrixV8() {
           ) : (
             <>
               {error && !loadFailed ? (
-                <p className={shell.warnBand} role="alert">{error}</p>
+                <Notice tone="danger" className={shell.warnBandNoticePlacement} >{error}</Notice>
               ) : null}
 
               <section className={shell.section} data-design="Table">
@@ -540,21 +533,14 @@ export default function AssignMatrixV8() {
                 ) : null}
 
                 {orphans.length > 0 ? (
-                  <div className={shell.warnBand} data-design="Warn" role="alert">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                  </svg>
-                  <span>
+                  <Notice tone="warn" role="alert" data-design="Warn"><span>
                     {unassigned.length > 0
                       ? `「${unassigned.map((m) => m.name).join('」「')}」は担当が0人です。出しても予約は入りません。`
                       : null}
                     {inactiveOnly.length > 0
                       ? `${unassigned.length > 0 ? ' ' : ''}「${inactiveOnly.map((m) => m.name).join('」「')}」は受付を止めている担当しかいません。`
                       : null}
-                  </span>
-                  </div>
+                  </span></Notice>
                 ) : null}
               </section>
             </>

@@ -1,41 +1,24 @@
 'use client'
 
-import Toggle from '@/components/shared/toggle';
-import { notifySaved } from '@/components/shared/toast'
-import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { SaveConflictBand } from '@/components/shared/save-conflict'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Dispatch, SetStateAction } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  ArrowRight,
-  Ban,
-  Braces,
-  CircleAlert,
-  CircleCheck,
-  FileText,
-  IdCard,
-  ListChecks,
-  Pencil,
-  Plus,
-  Power,
-  Route,
-  Search,
-  Smartphone,
-  User,
-  UserPlus,
-  UserRound,
-  Workflow,
-} from 'lucide-react'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { RowMenu } from '@/components/shared/row-actions'
-import { notifyToast } from '@/components/shared/toast'
-import { CreatePage } from '@/components/templates'
-import { Steps } from '@/components/templates/steps'
-import { CreatePreviewNote, CreateSummaryCard } from '@/components/templates/create-parts'
-import type { StepperStep } from '@/components/shared/stepper'
+import Toggle from '@/components/shared/toggle'
+import { notifySaved, notifyToast } from '@/components/shared/toast';
+import { useSamePageUrl } from '@/lib/use-same-page-url';
+import { SaveConflictBand } from '@/components/shared/save-conflict';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { ArrowRight, Ban, Braces, CircleAlert, CircleCheck, FileText, IdCard, ListChecks, Pencil, Plus, Power, Route, Search, Smartphone, User, UserPlus, UserRound, Workflow } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+
+import { useAccount } from '@/contexts/account-context';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { RowMenu } from '@/components/shared/row-actions';
+import { CreatePage } from '@/components/templates';
+import { Steps } from '@/components/templates/steps';
+import { CreatePreviewNote, CreateSummaryCard } from '@/components/templates/create-parts';
+import type { StepperStep } from '@/components/shared/stepper';
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import CheckCard from '@/components/shared/check-card'
@@ -44,42 +27,36 @@ import ConditionBuilder from '@/components/shared/condition-builder'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import Select from '@/components/shared/select'
-import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import FolderSelect, { folderByName, folderCreator, type FolderSelectCreate } from '@/components/shared/folder-select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources';
+import FolderSelect, { folderByName, folderCreator, type FolderSelectCreate } from '@/components/shared/folder-select';
 import SegmentedControl from '@/components/shared/segmented'
-import { TextField } from '@/components/shared/text-field'
-import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
-import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import type { SegmentCondition } from '@/lib/segment-condition'
-import { pruneCondition } from '@/lib/segment-condition'
-import { ApiError, api, describeSaveFailure } from '@/lib/api'
-import type {
-  FriendAddRule,
-  FriendAddRuleAction,
-  FriendAddRuleDefinition,
-  FriendAddRuleKind,
-  FriendAddRuleOptions,
-} from '@/lib/api'
-import { formatNumber } from '@/lib/format'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { describeFriendAddFailure } from './failure'
-import { addTimeWindow, MESSAGE_TYPE_LABEL, removeTimeWindow, updateTimeWindow } from './flow'
-import { resendSuppressionText } from './text'
+import { TextField } from '@/components/shared/text-field';
+import DateTimeField, { TimeField } from '@/components/shared/date-time-field';
+import { SettingCheckbox } from '@/components/shared/checkbox';
+import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview';
+import { useStaffRole, canManageRole } from '@/lib/staff-role';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import type { SegmentCondition } from '@/lib/segment-condition';
+import { pruneCondition } from '@/lib/segment-condition';
+import { ApiError, api, describeSaveFailure } from '@/lib/api';
+import type { FriendAddRule, FriendAddRuleAction, FriendAddRuleDefinition, FriendAddRuleKind, FriendAddRuleOptions } from '@/lib/api';
+import { formatNumber } from '@/lib/format';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
+import { describeFriendAddFailure } from './failure';
+import { addTimeWindow, MESSAGE_TYPE_LABEL, removeTimeWindow, updateTimeWindow } from './flow';
+import { resendSuppressionText } from './text';
 import styles from './editor.module.css'
-import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field';
 import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { Field } from '@/components/shared/form-controls';
+import { withPermissionFailure } from '@/components/shared/api-error-message';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ActionList from '@/components/shared/action-list'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 友だち追加時の配信を作る・直す（Pencil：作る①基本設定 `wDzkc` → ②流入リンク `h8uNW`
@@ -780,7 +757,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       )} dirty={false}
     >
       {!canEdit ? (
-        <p className={styles.viewerBand} role="status">閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       ) : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}
@@ -1025,7 +1002,7 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
           /></SaveErrorField></Field></div>
       </div>
       {legacy ? (
-        <p className={styles.fieldError} role="alert">以前の形式の条件が入っているため、今は配信を止めています。下の条件を作り直してください。</p>
+        <Notice tone="warn" role="alert">以前の形式の条件が入っているため、今は配信を止めています。下の条件を作り直してください。</Notice>
       ) : null}
       <div className={styles.conditionRow}>
         {canEdit ? (

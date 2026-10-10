@@ -42,7 +42,9 @@ export default function TruncatedText({ value, url = false, className, ...props 
   const leave = () => { clear(); timer.current = setTimeout(close, 120) }
   useEffect(() => {
     const node = ref.current
-    if (!node) return
+    // These permanent, inert samples only supply widths to TagOverflow.
+    // Their visible copies own tooltip/focus behavior; measuring both duplicates table layout work.
+    if (!node || node.closest?.('[data-tag-overflow-measure]')) return
     const update = () => setClipped(node.scrollWidth > node.clientWidth || shown !== value)
     update()
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null

@@ -1,7 +1,6 @@
 'use client'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { jstDate } from '@/lib/jst-datetime'
 import { useMemo, useState } from 'react'
 import { Download, RotateCw } from 'lucide-react'
 import { api, type AdConversionLog } from '@/lib/api'
@@ -23,6 +22,7 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 広告への送信履歴（Pencil `p0kA3`・`/inflow-links?tab=connections&view=history`）。
@@ -195,7 +195,7 @@ export default function AdHistoryV8() {
           <span className={styles.toolsSpacer} aria-hidden="true" />
           <span className={styles.toolsCount}>{`${formatNumber(model.total)} 件中 ${formatNumber(visible.length)} 件`}</span>
         </div>
-        {retryError ? <p className={adsStyles.error} role="alert">{retryError}</p> : null}
+        {retryError ? <Notice tone="danger" className={adsStyles.errorNoticePlacement} >{retryError}</Notice> : null}
         {body}
         {pageCount > 1 ? (
           <div className={styles.pager}>

@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Download, RefreshCw, Users, PawPrint, ShoppingBag, Link2 } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -266,9 +266,9 @@ function CsvExportButton({ accountId }: { accountId: string }) {
 
   return (
     <span className={styles.csvWrap}>
-      <Button variant="secondary" onClick={() => void exportCsv()} disabled={busy}>
+      <Button variant="secondary" onClick={() => void exportCsv()} disabled={busy} busy={busy} busyLabel="書き出しています…">
         <Download aria-hidden="true" className="h-4 w-4" />
-        {busy ? '書き出しています…' : 'CSVで書き出す'}
+        CSVで書き出す
       </Button>
       {error ? <span className={styles.csvError} role="alert">{error}</span> : null}
     </span>

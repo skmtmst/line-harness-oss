@@ -2,7 +2,7 @@
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { CircleDot, Clock3, MessageCircle, Minus, Plus, Undo2 } from 'lucide-react'
 import { DetailPage } from '@/components/templates'
@@ -345,7 +345,7 @@ function FriendDetailInner() {
       const retrying = notificationRetryId === item.id
       items.push({
         id: 'retry',
-        label: retrying ? '通知を送り直しています…' : '通知を再送',
+        label: '通知を再送',
         disabled: retrying,
         disabledReason: '通知を送り直しています',
         onSelect: () => void retryNotification(item.id, item.lineAccountId ?? selectedAccountId ?? ''),

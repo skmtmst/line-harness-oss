@@ -5,18 +5,9 @@ import { notifySaved } from '@/components/shared/toast'
 import StatusPill from '@/components/shared/status-pill'
 import { Building2, Check, CircleDot, LogIn, Paperclip, Plus, RefreshCw, Send, Sparkles, Star } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  api,
-  type OpsKnowledgeReference,
-  type OpsSupportDetail,
-  type OpsSupportPriority,
-  type OpsSupportStage,
-  type OpsSupportSummary,
-  type OpsSupportTicket,
-  type OpsTenantRow,
-} from '@/lib/api'
+import { api, type OpsKnowledgeReference, type OpsSupportDetail, type OpsSupportPriority, type OpsSupportStage, type OpsSupportSummary, type OpsSupportTicket, type OpsTenantRow } from '@/lib/api'
 import { KnowledgeReferences, TicketKnowledge } from '@/components/ops/knowledge-ticket'
-import { formatDateTime, planLabel, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
+import { planLabel, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -29,15 +20,15 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import { OpsHead } from './shell'
 import { useOpsReadOnly } from './use-ops-read-only'
 import { useFormErrors } from '@/lib/use-form-errors'
-import { FieldError } from '@/components/shared/form-controls'
+import { FieldError, Field } from '@/components/shared/form-controls'
 import parts from './parts.module.css'
 import styles from './support.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-import { Field } from '@/components/shared/form-controls'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営のお問い合わせ V8（絵 `P0jhqO`・代わりに起票 `Izau1`）。
@@ -379,7 +370,7 @@ export default function OpsSupportV8() {
         )}
       />
       {notice ? <p role="status" className={`${parts.status} ${styles.notice}`}>{notice}</p> : null}
-      {error && !listFailed && !detailFailed ? <p role="alert" className={`${parts.alert} ${styles.notice}`}>{error}</p> : null}
+      {error && !listFailed && !detailFailed ? <Notice tone="danger" >{error}</Notice> : null}
 
       <div className={styles.columns}>
         <section aria-label="チケットの一覧" className={styles.list}>

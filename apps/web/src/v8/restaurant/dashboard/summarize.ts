@@ -11,7 +11,7 @@ const INACTIVE = ['cancelled', 'no_show']
 
 /** 予約の口は owner・admin・staff に開いている。それ以外（閲覧のみ）には押すボタンを置かない。 */
 export function canWriteRole(role: string | null): boolean {
-  return role === null || role === 'owner' || role === 'admin' || role === 'staff'
+  return role === 'owner' || role === 'admin' || role === 'staff'
 }
 
 export type TodaySummary = {
@@ -46,7 +46,7 @@ export function summarizeToday(rows: RestaurantReservation[], tables: Restaurant
   const phone = live.filter((r) => r.source === 'phone' || (r.source === 'manual' && !isWalkIn(r))).length
   const byHour = new Map<number, number>()
   for (const r of live) {
-    const hour = new Date(r.starts_at).getHours()
+    const hour = new Date(Date.parse(r.starts_at)+9*3600000).getUTCHours()
     byHour.set(hour, (byHour.get(hour) ?? 0) + r.guest_count)
   }
   let peak: TodaySummary['peak'] = null
@@ -70,6 +70,7 @@ export function summarizeToday(rows: RestaurantReservation[], tables: Restaurant
 
 /** 予約の状態の札：来店済み・予約中・取消・無断キャンセル。 */
 export function visitState(r: RestaurantReservation): { label: string; tone: 'success' | 'info' | 'neutral' | 'danger' | 'warning' } {
+  if (r.departed_at) return {label:'退店済み',tone:'neutral'}
   if (r.status === 'seated' || r.status === 'visited') return { label: '来店済み', tone: 'success' }
   if (r.status === 'cancelled') return { label: '取消', tone: 'neutral' }
   if (r.status === 'no_show') return { label: '無断キャンセル', tone: 'danger' }
@@ -138,9 +139,9 @@ export function openItems(group: CloseGroup): CloseGroup['items'] {
 
 /** 枠の日時「1/13（火）19:00」。 */
 export function slotTitle(iso: string): string {
-  const day = new Date(iso)
-  const week = '日月火水木金土'[day.getDay()]
-  return `${day.getMonth() + 1}/${day.getDate()}（${week}）${pad2(day.getHours())}:${pad2(day.getMinutes())}`
+  const day = new Date(Date.parse(iso)+9*3600000)
+  const week = '日月火水木金土'[day.getUTCDay()]
+  return `${day.getUTCMonth() + 1}/${day.getUTCDate()}（${week}）${pad2(day.getUTCHours())}:${pad2(day.getUTCMinutes())}`
 }
 
 export function reasonText(group: Pick<CloseGroup, 'reason' | 'remainingSeats'>): string {

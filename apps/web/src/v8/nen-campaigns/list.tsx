@@ -1,38 +1,28 @@
 'use client'
 
-import Toggle from '@/components/shared/toggle';
-import { FolderDotName } from '@/components/shared/folder-dot'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { jstDate } from '@/lib/jst-datetime'
-import { useRouter } from 'next/navigation'
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
-import {
-  Bookmark,
-  CalendarDays,
-  CircleHelp,
-  Columns2,
-  Copy,
-  Download,
-  Eye,
-  History,
-  PenLine,
-  Send,
-  Undo2,
-} from 'lucide-react'
-import type {
-  NenCampaignSetting,
-  NenColumn,
-  NenColumnMetrics,
-  NenDeliveryDetail,
-  NenDeliveryList,
-  NenFlowMetrics,
-} from '@/lib/api'
-import { ListPage } from '@/components/templates'
+import Toggle from '@/components/shared/toggle'
+import { FolderDotName } from '@/components/shared/folder-dot';
+import { useListUrlValue } from '@/components/shared/list-url-state';
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Bookmark, CalendarDays, CircleHelp, Columns2, Copy, Download, History, PenLine, Send, Undo2 } from 'lucide-react';
+import type { NenCampaignSetting, NenColumn, NenColumnMetrics, NenDeliveryDetail, NenDeliveryList, NenFlowMetrics } from '@/lib/api';
+import { useListItemHref } from '@/components/shared/list-navigation';
+
+
+import { RowNameLink } from '@/components/shared/table';
+
+
+import { jstDate } from '@/lib/jst-datetime';
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+
+import Link from '@/components/shared/list-navigation'
+import { Eye } from 'lucide-react';
+
+import { ListPage } from '@/components/templates';
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Drawer from '@/components/shared/drawer'
 import FilterChip from '@/components/shared/filter-chip'
@@ -44,44 +34,27 @@ import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import Radio from '@/components/shared/radio'
 import Select from '@/components/shared/select'
-import { SettingCheckbox } from '@/components/shared/checkbox'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { Tabs } from '@/components/shared/tabs'
-import { TextArea, TextField } from '@/components/shared/text-field'
-import { Field, FieldError } from '@/components/shared/form-controls'
-import { useFieldValidation } from '@/lib/use-field-validation'
+import { SettingCheckbox } from '@/components/shared/checkbox';
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table';
+import { Tabs } from '@/components/shared/tabs';
+import { TextArea, TextField } from '@/components/shared/text-field';
+import { Field, FieldError } from '@/components/shared/form-controls';
+import { useFieldValidation } from '@/lib/use-field-validation';
 import DateTimeField from '@/components/shared/date-time-field'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { csvCell } from '@/lib/presentation'
-import { formatNumber } from '@/lib/format'
-import {
-  canRetryDelivery,
-  deliveryTriggerLabel,
-  formatCampaignAudience,
-  formatCampaignTiming,
-  isPastScheduledAt,
-  jstDateTime,
-  jstMonthDay,
-  num,
-  publishedAtIso,
-  skippedNoRetryNote,
-  statusLabel,
-  type ColumnDeliveryPlan,
-  type FriendOption,
-  type NenCoupon,
-  type NenKpis,
-  type NenTab,
-} from './display'
+import { useStaffRole, canManageRole } from '@/lib/staff-role';
+import { csvCell } from '@/lib/presentation';
+import { formatNumber, formatYen as polishFormatYen } from '@/lib/format';
+import { canRetryDelivery, deliveryTriggerLabel, formatCampaignAudience, formatCampaignTiming, isPastScheduledAt, jstDateTime, jstMonthDay, num, publishedAtIso, skippedNoRetryNote, statusLabel, type ColumnDeliveryPlan, type FriendOption, type NenCoupon, type NenKpis, type NenTab } from './display';
 import StatusBadge from '@/components/shared/status-badge'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { formatYen as polishFormatYen } from '@/lib/format'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
+import { csvFileName } from '@/lib/csv-file-name';
+import { emptyValue } from '@/components/shared/empty-value';
 import NumberInput from '@/components/shared/number-field'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { SaveErrorField } from '@/components/shared/save-form-errors';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
 
 /*
  * ★V8-B NEN配信の一覧（Pencil「★V8-B 画面の地図」専用機能の組）。
@@ -150,7 +123,7 @@ export type NenCampaignsListProps = {
 }
 
 const BOARD: Record<NenTab, string> = { auto: 'MuhWR', paused: 'MuhWR', columns: 'Jxmqh', history: 'Tj7n4' }
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 const NO_MANAGE_NOTE = '閲覧のみのため変えられません。変える操作はオーナーか管理者に頼んでください。'
 
 /* 自動配信の CSV（一覧に出ている決めごとをそのまま出す）。 */
@@ -261,7 +234,7 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
   const stats = (
     <>
       {!canEdit ? (
-        <div className={styles.viewerBand}><Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></div>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></div>
       ) : null}
       <KpiBand data-design="KPIs">
         <KpiCard presentation="band" title="自動配信" icon={<History size={13} aria-hidden="true" />} help="注文・発送・誕生日などのきっかけで送る配信の数です。" value={settings.length === 0 && loading ? null : autoSettings.length} unit="件" detail={settings.length === 0 && loading ? kpiMissing : `動いている ${enabledCount}・止めている ${pausedCount}`} />
@@ -442,10 +415,10 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
                 const timing = formatCampaignTiming(setting)
                 const audience = formatCampaignAudience(setting)
                 return (
-                  <Tr data-row-id={setting.campaignKey} key={setting.campaignKey} className={styles.row} data-table-layout="columns" onOpen={() => props.onPreviewCampaign(setting.campaignKey)}>
+                  <Tr data-row-id={setting.campaignKey} key={setting.campaignKey} className={styles.row} data-table-layout="columns" detailKey="campaign" onOpen={() => props.onPreviewCampaign(props.previewCampaignKey === setting.campaignKey ? null : setting.campaignKey)}>
                     <Td className={styles.colName}><FolderDotName>
                       {canEdit ? (
-                        <Link href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className={styles.name} ><TruncatedText value={String(setting.label ?? '')} /></Link>
+                        <RowNameLink href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className={styles.name} ><TruncatedText value={String(setting.label ?? '')} /></RowNameLink>
                       ) : (
                         <button type="button" className={styles.name} title={setting.label}  onClick={() => props.onPreviewCampaign(setting.campaignKey)}>{setting.label}</button>
                       )}
@@ -620,6 +593,7 @@ function columnBadge(column: NenColumn, sent: number | null) {
 }
 
 function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
+  const itemHref = useListItemHref()
   const { columns, columnMetrics, canEdit } = props
   const tabError = props.tabError ?? ''
   const [query, setQuery] = useListUrlValue('q', '')
@@ -737,10 +711,10 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                 const views = metric?.articleOpened.value
                 const draft = column.publishedAt == null
                 return (
-                  <Tr data-row-id={column.id} key={column.id} className={styles.row} data-table-layout="columns" selected={props.selectedColumnId === column.id} onOpen={() => props.onSelectColumn(column.id)}>
+                  <Tr data-row-id={column.id} key={column.id} className={styles.row} data-table-layout="columns" selected={props.selectedColumnId === column.id} detailKey="column" onOpen={() => props.onSelectColumn(props.selectedColumnId === column.id ? null : column.id)}>
                     <Td className={styles.colName}><FolderDotName>
                       <span className={styles.nameStack}>
-                        <button type="button" className={styles.name} title={column.title} onClick={() => props.onSelectColumn(column.id)}>{column.title}</button>
+                        <RowNameLink onOpen={() => props.onSelectColumn(column.id)} href={itemHref('column', column.id, { tab: 'columns' })} className={styles.name} title={column.title}>{column.title}</RowNameLink>
 
                       </span>
                     </FolderDotName></Td>
@@ -815,7 +789,7 @@ function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
           {canEdit ? (
             <span className={styles.buttonRow}>
               <Button type="button" disabled={introDraft === selected.introText || props.savingColumnId === selected.id || !introDraft.trim()} busy={props.savingColumnId === selected.id} busyLabel="保存中…" onClick={() => props.onSaveIntro(selected)}>紹介文を保存する</Button>
-              <Button type="button" disabled={props.duplicatingColumnId === selected.id} onClick={() => props.onDuplicateColumn(selected)}><Copy size={15} aria-hidden="true" />{props.duplicatingColumnId === selected.id ? '複製しています' : '同じ形で書く'}</Button>
+              <Button type="button" disabled={props.duplicatingColumnId === selected.id} onClick={() => props.onDuplicateColumn(selected)} busy={props.duplicatingColumnId === selected.id} busyLabel="複製しています"><Copy size={15} aria-hidden="true" />同じ形で書く</Button>
               <span className={styles.muted}>{`${introDraft.length}／1500文字`}</span>
             </span>
           ) : null}

@@ -1,8 +1,9 @@
 'use client'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ChevronLeft, CircleAlert, ExternalLink, Send, UploadCloud } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -617,7 +618,7 @@ export default function TemplateDetailV8() {
                 ) : versionsError ? (
                   <div>
                     <p className="text-ink-secondary" style={{ fontSize: 13, margin: '8px 0' }}>{versionsError}</p>
-                    <Button variant="secondary" onClick={() => void loadVersions()}>もう一度読み込む</Button>
+                    <Button variant="secondary" onClick={() => loadVersions()} busyLabel="処理中…">もう一度読み込む</Button>
                   </div>
                 ) : (
                   <>

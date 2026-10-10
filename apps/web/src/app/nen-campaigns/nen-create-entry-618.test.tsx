@@ -217,7 +217,7 @@ describe('NEN新規作成入口（#618）', () => {
     await click(tab)
 
     // 何も選んでいない状態でもヘッダーに入口がある（監査の欠落点）。
-    const entry = container.querySelector('a[href="/nen-campaigns/columns/new"]')
+    const entry = container.querySelector('a[href^="/nen-campaigns/columns/new"]')
     expect(entry).not.toBeNull()
     expect(entry!.textContent).toContain('コラムを書く')
   })

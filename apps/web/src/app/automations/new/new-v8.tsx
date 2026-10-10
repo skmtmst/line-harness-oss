@@ -2,14 +2,14 @@
 import Select from '@/components/shared/select'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import type { Automation } from '@line-crm/shared'
 import { AUTOMATION_DRAFT_ACTION_OPTIONS, AUTOMATION_DRAFT_TRIGGER_OPTIONS } from '@line-crm/shared'
 import {
   api, ApiError, type AutomationDraftAction, type AutomationDraftCommonActionVersionDetail,
   type AutomationDraftDetail,
 } from '@/lib/api'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import StickyBar from '@/components/shared/sticky-bar'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -2234,7 +2234,7 @@ export function NewAutomationV8({
           <p className={styles.footnote}>このまま保存すると、相手の変更が消えます。先に内容を比べてください。</p>
           <div className={styles.toolbar}>
             <Button variant="secondary" size="compact" onClick={() => setCompareOpen(true)}>違いを比べる</Button>
-            <Button variant="secondary" size="compact" onClick={() => void reloadServerDraft()}>最新を読み込んで続ける</Button>
+            <Button variant="secondary" size="compact" onClick={() => reloadServerDraft()} busyLabel="処理中…">最新を読み込んで続ける</Button>
           </div>
         </div>
       ) : null}
@@ -2678,7 +2678,7 @@ export function NewAutomationV8({
                   setActivateConfirmOpen(true)
                 }}
               >
-                {saving ? '作成中...' : 'つくって動かす'}
+                つくって動かす
               </Button>
             )}
           </>

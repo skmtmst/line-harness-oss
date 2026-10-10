@@ -16,13 +16,12 @@ import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import ListState from '@/components/shared/list-state'
-import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import StoreTabs, { type StoreTabKey } from '../store-tabs/store-tabs'
 import styles from './shell.module.css'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import EntitySelect from '@/components/shared/entity-select'
 
 /*
  * ★V8 飲食店向け（テスト）の器 — 在庫・予約台帳・座席・メニューの4画面用。
@@ -81,12 +80,13 @@ export function BoundaryBanner() {
 }
 
 /** 数の並び。compact は予約台帳の今日（小さい帯・数字20）。 */
-export function StatRow({ children, compact = false }: { children: ReactNode; compact?: boolean }) {
-  return <KpiBand density={compact ? 'compact' : undefined}>{children}</KpiBand>
+export function StatRow({ children, compact = false, fusion = false }: { children: ReactNode; compact?: boolean; fusion?: boolean }) {
+  return <KpiBand data-restaurant-fusion={fusion||undefined} density={compact ? 'compact' : undefined}>{children}</KpiBand>
 }
 
 /** 白い枠。題・説明・右端の操作を持つ。 */
-export function Panel({ title, description, aside, flush = false, children }: {
+export function Panel({ title, description, aside, flush = false, children,fusion=false }: {
+  fusion?:boolean
   title: ReactNode
   description?: ReactNode
   aside?: ReactNode
@@ -96,8 +96,8 @@ export function Panel({ title, description, aside, flush = false, children }: {
 }) {
   return (
     <Card layout="vertical" surface="inset" overflow="hidden">
-      <CardHeader size="panel" title={title} meta={description} action={aside} />
-      {flush ? children : <div className={styles.panelBody}>{children}</div>}
+      <CardHeader size={fusion?'restaurant':'panel'} title={title} meta={description} action={aside} />
+      {flush ? children : <div className={fusion?styles.panelBodyFusion:styles.panelBody}>{children}</div>}
     </Card>
   )
 }
@@ -213,17 +213,7 @@ export default function RestaurantShell({ boardId, title, description, query, he
   ) : (
     children(ctx)
   )
-  const storePicker = snapshot && snapshot.stores.length > 0 ? (
-    <span>
-      <SaveErrorField names={["selectedStoreId","selected_store_id"]}><StoreFilterTabs
-
-
-        value={selectedStoreId}
-        onChange={setSelectedStoreId}
-        options={snapshot.stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}` }))}
-      /></SaveErrorField>
-    </span>
-  ) : null
+  const storePicker = snapshot && snapshot.stores.length > 0 ? templateHeading ? <span className={styles.fusionStore}><SaveErrorField names={["selectedStoreId","selected_store_id"]}><EntitySelect size="full" aria-label="店舗" noun="店舗" value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/></SaveErrorField></span> : <StoreFilterTabs value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/> : null
   const noticeBand = notice ? (
     <Notice role="status" tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />
   ) : null
@@ -238,11 +228,12 @@ export default function RestaurantShell({ boardId, title, description, query, he
   }
 
   const page = (
-    <div data-design-node={boardId} className={styles.page} data-list-skeleton={layout === 'ledger' ? 'templates' : undefined}>
+    <div data-design-node={boardId} data-restaurant-fusion={templateHeading||undefined} data-list-skeleton={layout === 'ledger' && !templateHeading ? 'templates' : undefined} className={styles.page}>
       {templateHeading ? <PageHeading
         inset="none"
         title={title}
-        help={typeof description === 'function' ? description(ctx) : description}
+        subtitle={typeof description === 'function' ? description(ctx) : ctx?.store?.name}
+        help={typeof description === 'function' ? '日付や店舗を選んで、予約と卓の状態を確認できます。' : description}
         actions={headAfter ? headAfter(ctx, storePicker) : storePicker}
       /> : (
       <div className={`${styles.head} ${layout === 'standard' ? '' : styles.headLedger}`}>

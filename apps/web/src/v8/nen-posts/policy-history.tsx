@@ -8,17 +8,17 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import VersionCompare from '@/components/shared/version-compare'
 import { TextField } from '@/components/shared/text-field'
-import { FieldError } from '@/components/shared/form-controls'
+import { FieldError, Field } from '@/components/shared/form-controls'
 import { useFieldValidation } from '@/lib/use-field-validation'
 import DateTimeField from '@/components/shared/date-time-field'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { formatPhotoReceivedAt } from './time'
 import styles from './review.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 const policyContent = (version: PhotoRewardPolicyVersion) => `採用 ${version.points}・公式サイト掲載 ${version.publicationPoints ? `さらに ${version.publicationPoints}` : emptyValue('none')}`
 
@@ -127,7 +127,7 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
 <FieldError id="photo-policy-publication-error">{fields.error('photo-policy-publication')}</FieldError></Field></div>
             <Field label="ひとこと（なぜ変えるか）"><SaveErrorField names={["summary"]}><TextField value={summary} maxLength={200} disabled={saving} onChange={(event) => setSummary(event.target.value)} /></SaveErrorField></Field>
             <div className={styles.inputLabel} title="日本時間。空ならすぐ使い始めます。"><span aria-hidden="true">使い始め</span><SaveErrorField names={["effective"]}><DateTimeField id="photo-policy-effective" aria-describedby={fields.error('photo-policy-effective') ? 'photo-policy-effective-error' : undefined} invalid={Boolean(fields.error('photo-policy-effective'))} aria-label="使い始め（日本時間・空ならすぐ）" placeholder="空ならすぐ" value={effective} disabled={saving} onChange={setEffective} /></SaveErrorField><FieldError id="photo-policy-effective-error">{fields.error('photo-policy-effective')}</FieldError></div>
-            {saveError ? <p role="alert" className={styles.errorText}>{saveError}</p> : null}
+            {saveError ? <Notice tone="danger" >{saveError}</Notice> : null}
             <div className={styles.historyActions}><Button variant="secondary" disabled={saving} onClick={() => { setPoints(''); setPublicationPoints('0'); setSummary(''); setEffective(''); setSaveError(''); fields.reset() }}>キャンセル</Button><Button type="submit" variant="primary" busy={saving} disabled={saving}>{effective ? '版を予約する' : '版を保存する'}</Button></div>
           </form> : null}
         </div>

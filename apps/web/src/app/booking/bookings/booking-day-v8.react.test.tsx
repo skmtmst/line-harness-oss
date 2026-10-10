@@ -2,6 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+vi.mock('next/navigation',()=>({useRouter:()=>({push:vi.fn()})}))
 import BookingDayTimeline from './booking-day-v8'
 import type { BookingTodayRow } from '@/lib/api'
 

@@ -11,6 +11,7 @@ export interface MenuItem {
   buffer_after_minutes: number;
   base_price: number;
   sort_order: number;
+  intake_question?: string | null;
 }
 
 export interface StaffItem {
@@ -37,6 +38,7 @@ export interface BookingHistoryItem {
   starts_at: string;
   status: string;
   customer_note?: string | null;
+  cancel_deadline_at?: string | null;
   menu_name: string;
   staff_name: string;
   profile_image_url: string | null;

@@ -15,6 +15,7 @@ const Webinar = lazy(() => import('./pages/Webinar.js'));
 const Research = lazy(() => import('./pages/Research.js'));
 const Form = lazy(() => import('./pages/Form.js'));
 const EventWaitlistOffer = lazy(() => import('./pages/EventWaitlistOffer.js'));
+const VisitStampQr = lazy(() => import('./pages/VisitStampQr.js'));
 const VisitStamps = lazy(() => import('./pages/VisitStamps.js'));
 const SeatReserve = lazy(() => import('./pages/seat/SeatReserve.js'));
 const EntryRouteCoupon = lazy(() => import('./pages/EntryRouteCoupon.js'));
@@ -63,6 +64,7 @@ export default function App() {
         <Route path="/events/:id/done" element={<EventDone />} />
         <Route path="/events/:id" element={<Event />} />
         <Route path="/affiliate" element={<Affiliate />} />
+        <Route path="/visit-stamps/qr" element={<VisitStampQr />} />
         <Route path="/visit-stamps" element={<VisitStamps />} />
         <Route path="/webinar/:slug" element={<Webinar />} />
         <Route path="/research/:id" element={<Research />} />

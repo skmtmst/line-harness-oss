@@ -12,6 +12,7 @@ import {
 import type { FormDeleteImpact } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { tapActionLiffUrl } from '@/lib/tap-actions'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
 export interface UsedByAccount {
   id: string
@@ -64,7 +65,7 @@ export type FormFilter = 'all' | 'published' | 'draft' | 'stored' | 'pending' | 
 export type FormSort = 'latest-answer' | 'answers' | 'updated' | 'name'
 
 /** 表示件数（決まり：ページ送りのある一覧は 10・20・50 件）。 */
-export const FORM_PAGE_SIZES = [10, 20, 50] as const
+export const FORM_PAGE_SIZES = STANDARD_PAGE_SIZES
 
 export const SORT_OPTIONS: Array<{ value: FormSort; label: string }> = [
   { value: 'latest-answer', label: '最新の回答順' },

@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { api, fetchApi, type AutomationTemplateSummary } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -179,7 +179,7 @@ export default function AutomationTemplatesV8() {
               </FilterChip>
             ))}
             <div className={styles.toolbarSpice}>
-              <Button variant="secondary" onClick={() => void load()}>見本を再読み込み</Button>
+              <Button variant="secondary" onClick={() => load()} busyLabel="処理中…">見本を再読み込み</Button>
             </div>
           </div>
 

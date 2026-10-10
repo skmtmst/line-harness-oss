@@ -7,7 +7,8 @@
  * v7（fields/edit/page.tsx）と同じ。中身の部品だけ `FieldEditorV8`。
  */
 import { useCallback, useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import type { FriendField, Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { isSameFieldContent, type SentFieldContent } from './fields/edit/field-edit-conflict'

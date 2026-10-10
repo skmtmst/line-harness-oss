@@ -104,7 +104,6 @@
 }
 
 .fieldError {
-  margin: 0;
   color: var(--color-danger);
   font-size: var(--text-caption);
   line-height: var(--tpl-cn-main-lh);
@@ -639,3 +638,5 @@ a.way:hover {
   gap: var(--tpl-tg2-option-gap);
   margin-left: auto;
 }
+
+.fieldError, .fieldErrorNoticePlacement { margin: 0; }

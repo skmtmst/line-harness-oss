@@ -62,3 +62,19 @@ describe('省略した文字の全文確認', () => {
     expect(compactUrl('通常の名前')).toBe('通常の名前')
   })
 })
+
+it('タグ幅専用の不可視コピーは測らず、表示する文字の全文確認を残す', () => {
+  const observe = vi.fn()
+  vi.stubGlobal('ResizeObserver', class { observe = observe; disconnect() {} })
+  vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(180)
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(80)
+  try {
+    render(<><span data-tag-overflow-measure="" aria-hidden="true" inert><TruncatedText value="不可視の名前" /></span><TruncatedText value="表示する長い名前" /></>)
+    expect(new Set(observe.mock.calls.map(([node]) => node))).toEqual(new Set([screen.getByText('表示する長い名前')]))
+    expect(screen.getByText('不可視の名前').hasAttribute('tabindex')).toBe(false)
+    const visible = screen.getByText('表示する長い名前')
+    expect(visible.tabIndex).toBe(0)
+    fireEvent.focus(visible)
+    expect(screen.getByRole('tooltip').textContent).toBe('表示する長い名前')
+  } finally { vi.unstubAllGlobals() }
+})

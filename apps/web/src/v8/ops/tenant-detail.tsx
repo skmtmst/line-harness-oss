@@ -15,17 +15,17 @@ import TargetMissing from '@/components/shared/target-missing'
 import { Tabs } from '@/components/shared/tabs'
 import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
-import { formatNumber } from '@/lib/format'
+import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
 import { OpsHead } from './shell'
 import { useOpsReadOnly } from './use-ops-read-only'
 import parts from './parts.module.css'
 import styles from './tenant-detail.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営の契約先の詳細 V8（絵 `Oub6x`・停止の窓 `okXoi`）。
@@ -153,7 +153,7 @@ function DetailContent() {
         )}
       />
       <div className={parts.stack}>
-        {error ? <p role="alert" className={parts.alert}>{error}</p> : null}
+        {error ? <Notice tone="danger" className={parts.alertNoticePlacement} >{error}</Notice> : null}
         <div className={parts.tabs}>
           <Tabs
             label="契約先の中身"

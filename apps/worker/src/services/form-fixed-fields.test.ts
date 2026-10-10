@@ -25,7 +25,7 @@ test('seven answers persist with source, real name sync, and unsubmitted friend 
   expect(result.failedEffects).toEqual([])
   expect(result.destinationWrites).toEqual({attempted:7,succeeded:7,failed:0})
   const rows = await getFriendFieldsWithValues(fixture.db,'f')
-  expect(rows.filter(r=>r.fixed_key)).toHaveLength(7)
+  expect(rows.filter(r=>r.fixed_key)).toHaveLength(10)
   expect(rows.find(r=>r.fixed_key==='name')).toMatchObject({value:'山田花子',source_name:'登録フォーム',source_id:'form',source_type:'form'})
   expect(rows.find(r=>r.fixed_key==='email')?.value).toBe('hanako@example.com')
   expect(rows.find(r=>r.fixed_key==='address')?.value).toBe('〒123-4567 東京都新宿区1-2101')

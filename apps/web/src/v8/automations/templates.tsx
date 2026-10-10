@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Activity, CircleDot, FileWarning, Filter, LayoutTemplate, ListChecks, RefreshCw, Star } from 'lucide-react'
 import { api, fetchApi, type AutomationListItem, type AutomationTemplateSummary } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -199,7 +199,7 @@ export default function AutomationTemplatesV8() {
             ))}
           </div>
           <span className={styles.spacer} aria-hidden="true" />
-          <Button variant="secondary" onClick={() => void load()}>
+          <Button variant="secondary" onClick={() => load()} busyLabel="処理中…">
             <RefreshCw size={15} aria-hidden="true" />見本を再読み込み
           </Button>
         </div>

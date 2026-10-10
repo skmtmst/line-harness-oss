@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 // 検証本体はNodeで直接実行する.mjs。公開型はこの回帰試験で固定する。
 // @ts-expect-error .mjs用の宣言ファイルは持たない
-import { builtRuleBody, normalize, resolveVars } from '../apps/web/scripts/verify-design-values.mjs'
+import { builtRuleBody, frozenSelectorBody, normalize, resolveVars } from '../apps/web/scripts/verify-design-values.mjs'
 
 describe('ビルド後CSSの設計照合', () => {
   it('最適化でカンマ結合された共通宣言も対象部品の宣言として読む', () => {
@@ -53,5 +53,21 @@ describe('未利用の部品のトークン照合', () => {
     expect(normalize(resolveVars(declaration, { 'color-hairline': '#1d1d1f12' }))).toBe(normalize(snapshot))
     expect(normalize(resolveVars(declaration, { 'color-hairline': '#dadde2' }))).not.toBe(normalize(snapshot))
     expect(resolveVars('var(--undefined)', {})).toBe('var(--undefined)')
+  })
+})
+
+describe('固定HTMLとV8の選択状態の照合', () => {
+  it('選択中の合成クラスを読み、hover・未選択・別テーマの色を混ぜない', () => {
+    const css = '.card{background:white}[data-theme="v8"] .checked{background:#e8f5ec}.checked:hover{background:black}[data-theme="v7"] .checked{background:blue}.parent .checked{background:red}'
+    const body = frozenSelectorBody(css, '.card.checked')
+    expect(body).toContain('background:#e8f5ec')
+    expect(body).not.toMatch(/black|blue|red/)
+  })
+
+  it('ラジオの通常枠と選択枠を区別し、狭い幅の上書きを混ぜない', () => {
+    const css = '.input{outline:1px solid gray}[data-theme="v8"] .input:checked{outline:1.5px solid green}.input:focus-visible{outline:2px solid blue}@media(max-width:600px){.input:checked{outline:5px solid red}}'
+    expect(frozenSelectorBody(css, '.input:checked')).toContain('outline:1.5px solid green')
+    expect(frozenSelectorBody(css, '.input')).not.toContain('solid green')
+    expect(frozenSelectorBody(css, '.input:checked')).not.toMatch(/blue|red/)
   })
 })

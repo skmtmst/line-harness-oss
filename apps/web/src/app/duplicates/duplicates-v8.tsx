@@ -1,5 +1,5 @@
 'use client'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { CircleAlert, Info, RotateCw, SearchX } from 'lucide-react'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
@@ -189,7 +189,7 @@ export default function DuplicatesV8() {
                       <CircleAlert size={20} aria-hidden="true" />
                     </span>
                     <p className={styles.stateTitle}>重複の候補を読み込めませんでした</p>
-                    <Button type="button" variant="primary" onClick={() => void d.loadCandidates()}>
+                    <Button type="button" variant="primary" onClick={() => d.loadCandidates()} busyLabel="処理中…">
                       もう一度試す
                     </Button>
                   </div>
@@ -272,7 +272,7 @@ export default function DuplicatesV8() {
                     ) : (
                       <>
                         <p className={styles.stateDesc}>同じ人が別の友だちとして登録されていそうなときに、ここに出ます。</p>
-                        <Button type="button" variant="secondary" onClick={() => void d.loadCandidates()}>
+                        <Button type="button" variant="secondary" onClick={() => d.loadCandidates()} busyLabel="処理中…">
                           もう一度見直す
                         </Button>
                       </>

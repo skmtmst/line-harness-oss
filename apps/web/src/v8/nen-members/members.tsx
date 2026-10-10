@@ -9,9 +9,9 @@
  * データの口（settings・members・saveRanks・saveMilestones・deleteRank・resync）は今の画面と同じ。
  * 動きの一覧は BEHAVIOR.md。
  */
-import { jstDate } from '@/lib/jst-datetime'
+
 import { useState, type ReactNode } from 'react'
-import { Download, Eye, History, CircleHelp, Undo2 } from 'lucide-react'
+import { Download, History, CircleHelp, Undo2 } from 'lucide-react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import KpiBand from '@/components/shared/kpi-band'
@@ -27,10 +27,11 @@ import MembersListV8 from './list'
 import RankSettingsV8 from './ranks'
 import LifetimeV8 from './lifetime'
 import { csvLine, yen, type LoadStatus, type MemberTab, type SavedHandler } from './parts'
-import Notice from '@/components/shared/notice'
+
 import styles from './members.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export type { LoadStatus, MemberTab } from './parts'
 
@@ -80,7 +81,7 @@ export default function MembersV8({
       ]}
     />
     {readonly ? (
-      <div className={styles.viewerBand}><Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。ランクや節目を変える操作は管理者に頼んでください。" /></div>
+      <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。ランクや節目を変える操作は管理者に頼んでください。</ReadOnlyNotice></div>
     ) : null}
     {tab === 'ranks' ? topBand : null}
   </>
@@ -196,9 +197,9 @@ function CsvExportButton({ accountId }: { accountId: string }) {
   const { exportCsv, busy, error } = useMembersCsv(accountId)
   return (
     <span className={styles.csvWrap}>
-      <Button variant="secondary" onClick={() => void exportCsv()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
+      <Button variant="secondary" onClick={() => void exportCsv()} disabled={busy} busy={Boolean(busy)} busyLabel="書き出しています…">
         <Download size={15} aria-hidden="true" />
-        {busy ? '書き出しています…' : 'CSVで書き出す'}
+        CSVで書き出す
       </Button>
       {error ? <span className={styles.csvError} role="alert">{error}</span> : null}
     </span>

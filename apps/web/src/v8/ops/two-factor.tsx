@@ -144,14 +144,14 @@ export default function OpsTwoFactorV8() {
         ) : (
           <form onSubmit={(event) => void submit(event)} noValidate className={styles.form}>
             {error ? <Notice tone="danger" message={error} /> : null}
-            {error && !uri ? <Button onClick={() => void load()} className={styles.wide}>もう一度読み込む</Button> : null}
+            {error && !uri ? <Button onClick={() => load()} className={styles.wide} busyLabel="処理中…">もう一度読み込む</Button> : null}
             <div className={styles.qrRow}>
               <div className={styles.qr}>
                 {qr ? (
                   // eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない
                   <img src={qr} alt="認証アプリ登録用のQRコード" />
                 ) : qrFailed ? (
-                  <p role="alert" className={styles.error}>QRコードを表示できませんでした</p>
+                  <Notice tone="danger" >QRコードを表示できませんでした</Notice>
                 ) : (
                   <DelayedSkeleton loading skeleton={<Skeleton className="block h-full w-full" />} />
                 )}

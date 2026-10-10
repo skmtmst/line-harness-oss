@@ -1,70 +1,57 @@
 'use client'
 
 import SharedStatusPill from '@/components/shared/status-pill'
-import { useListUrlValue, writeListUrlParam } from '@/components/shared/list-url-state'
-import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  Activity,
-  AlertCircle,
-  CircleCheck,
-  CircleHelp,
-  Eye,
-  FilePen,
-  Link2,
-  Lock,
-  MessageSquareMore,
-  Pause,
-  Pencil,
-  Plus,
-  Route,
-  Send,
-  UserPlus,
-  Users,
-} from 'lucide-react'
-import type { FriendAddRule, FriendAddRuleKind, FriendAddRuleListData, FriendAddRuleStatus } from '@/lib/api'
-import { api } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { ListPage, ListPagePagination } from '@/components/templates'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { formatNumber } from '@/lib/format'
+import { RowNameLink } from '@/components/shared/table';
+import { useListUrlValue, writeListUrlParam } from '@/components/shared/list-url-state';
+import { useSamePageUrl } from '@/lib/use-same-page-url';
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Activity, CircleCheck, CircleHelp, FilePen, Link2, Lock, MessageSquareMore, Pause, Pencil, Plus, Route, Send, UserPlus } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { AlertCircle, Eye, Users } from 'lucide-react';
+import type { FriendAddRule, FriendAddRuleKind, FriendAddRuleListData, FriendAddRuleStatus } from '@/lib/api';
+import { api } from '@/lib/api';
+import { useAccount } from '@/contexts/account-context';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { ListPage, ListPagePagination } from '@/components/templates';
+import { useStaffRole, canManageRole } from '@/lib/staff-role';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { formatNumber } from '@/lib/format';
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
-import { FOLDER_SELECT_COLORS, type FriendAddRuleFolder } from '@line-crm/shared'
-import FolderPanel from '@/components/shared/folder-panel'
-import { FolderDotName } from '@/components/shared/folder-dot'
+import { FOLDER_SELECT_COLORS, type FriendAddRuleFolder } from '@line-crm/shared';
+import FolderPanel, { FolderPanelNote } from '@/components/shared/folder-panel';
+import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import { Tabs } from '@/components/shared/tabs'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { notifyToast } from '@/components/shared/toast'
-import { RowMenu } from '@/components/shared/row-actions'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import { Tabs } from '@/components/shared/tabs';
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import { notifyToast } from '@/components/shared/toast';
+import { RowMenu } from '@/components/shared/row-actions';
+import PageSizeSelect from '@/components/shared/page-size-select'
 import ReorderHandle from '@/components/shared/reorder-handle'
-import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
-import { describeFriendAddFailure } from './failure'
-import { useCursorStack } from './use-cursor-stack'
+import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder';
+import { describeFriendAddFailure } from './failure';
+import { useCursorStack } from './use-cursor-stack';
 import styles from './list.module.css'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import { ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar';
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 友だち追加時の配信の一覧（Pencil：一覧 `MRhef`・閲覧のみ `LEwkJ`・1152 `P20kYU`・
@@ -659,10 +646,7 @@ function FriendAddList() {
     </div>
   )
   const errorBand = actionError ? (
-    <p className={styles.errorBand} role="alert">
-      {actionError}
-      <Button onClick={() => void load()}>もう一度読み込む</Button>
-    </p>
+    <Notice tone="danger" >{actionError}<Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></Notice>
   ) : null
   /* 1152 の板（P20kYU）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「状態の札」。 */
   const toolbar = narrow ? (
@@ -743,18 +727,11 @@ function FriendAddList() {
       </div>
     )
   } else if (!selectedAccountId) {
-    listBody = <ListState kind="empty" title={accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'} />
+    listBody = <AccountRequiredState hasAccounts={accounts.length > 0} />
   } else if (error) {
     /* 状態の板（kFz4b）：読めないときも道具はそのまま。数の帯は「—」。 */
     listBody = (
-      <div className={styles.stateCard}>
-        <span className={styles.stateIcon} data-tone="error"><AlertCircle size={18} aria-hidden="true" /></span>
-        <p className={styles.stateTitle}>設定を読み込めませんでした</p>
-        <p className={styles.stateDesc}>
-          {errorStatus === 403 ? error : '数の帯は「—」、道具はそのまま使えます。条件を変えてから試し直せます。'}
-        </p>
-        <Button onClick={() => void load()}>もう一度読み込む</Button>
-      </div>
+      <ListState kind="error" title="設定を読み込めませんでした" description={errorStatus === 403 ? error : '数の帯は「—」、道具はそのまま使えます。条件を変えてから試し直せます。'}  action={<><Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
     )
   } else if (items.length === 0) {
     /* 修正案 D-2：空の一覧。 */
@@ -818,7 +795,7 @@ function FriendAddList() {
                   </Td>
                   <Td className={styles.colName}>
                     <FolderDotName folder={folderDotOf(rule.folderName)}>
-                      <Link href={editHref(rule.id)} title={rule.name} className={styles.name}><TruncatedText value={String(rule.name ?? '')} /></Link>
+                      <RowNameLink href={editHref(rule.id)} title={rule.name} className={styles.name}><TruncatedText value={String(rule.name ?? '')} /></RowNameLink>
                     </FolderDotName>
 
                   </Td>
@@ -839,7 +816,7 @@ function FriendAddList() {
                   </Td>
                   <Td className={styles.colName}>
                     <FolderDotName folder={folderDotOf(sinkRule.folderName)}>
-                      <Link href={editHref(sinkRule.id)}  className={styles.name}><TruncatedText value={String(sinkRule.name ?? '')} /></Link>
+                      <RowNameLink href={editHref(sinkRule.id)}  className={styles.name}><TruncatedText value={String(sinkRule.name ?? '')} /></RowNameLink>
                     </FolderDotName>
 
                   </Td>
@@ -882,10 +859,7 @@ function FriendAddList() {
       tabs={<>
         {/* 役割が取れるまで（null）は閲覧のみの帯を出さない。出してから消すと一覧が 48px 跳ねていた（動きの点検 8 番）。 */}
         {role !== null && !canEdit ? (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
         <div className={styles.kindTabs} data-design="KindTabs">
           <Tabs
@@ -920,9 +894,8 @@ function FriendAddList() {
         </KpiBand>
       }
       folders={<>
-        {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ） */}
-        {createButton ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
         <FolderPanel
+          createAction={createButton}
           activeId={folder ?? ''}
           onSelect={(id) => selectFolder(id || null)}
           onAddFolder={canEdit ? () => { setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setEditingFolder(null); setFolderError(''); setFolderDialogOpen(true) } : undefined}
@@ -930,7 +903,7 @@ function FriendAddList() {
           addFolderDisabled={folderBusy}
           rows={folderRows}
         >
-          <p className={styles.folderNote}>フォルダを消しても、中の設定は未分類に残ります</p>
+          <FolderPanelNote>フォルダを消しても、中の設定は未分類に残ります</FolderPanelNote>
         </FolderPanel>
       </>}
       folderNav={narrow ? undefined : { rows: folderRows, activeId: folder ?? '', onSelect: (id) => selectFolder(id || null), createAction: createButton ?? undefined }}

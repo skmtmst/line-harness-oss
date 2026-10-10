@@ -1,13 +1,6 @@
 'use client'
 
 import { statusLabel } from '@/lib/status-labels'
-
-
-/*
- * 成果とアフィリエイトの各タブで同じ形の部品（道具の段・よく使う絞り込み・件数・
- * 状態の札・空と失敗の1枚・行の「…」）。形は一覧の型と共通部品に任せ、
- * ここは並べ方だけを持つ。
- */
 import SharedStatusPill from '@/components/shared/status-pill'
 import { type ReactNode } from 'react'
 import { Bookmark } from 'lucide-react'
@@ -21,8 +14,15 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import styles from './affiliates.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
-export const PAGE_SIZE_OPTIONS = [10, 20, 50].map((size) => ({ value: String(size), label: `${size} 件表示` }))
+/*
+ * 成果とアフィリエイトの各タブで同じ形の部品（道具の段・よく使う絞り込み・件数・
+ * 状態の札・空と失敗の1枚・行の「…」）。形は一覧の型と共通部品に任せ、
+ * ここは並べ方だけを持つ。
+ */
+
+export const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 /** 道具の段の右：「よく使う絞り込み」（左に印）。 */
 export function SavedSelect({

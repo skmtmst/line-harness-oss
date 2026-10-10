@@ -1,132 +1,69 @@
 'use client'
-import { canManageRole } from '@/lib/staff-role';
-
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import { DetailLoading } from '@/components/templates/detail-page'
-import { formatDate as polishFormatDate } from '@/lib/format'
-import { SaveConflictBand } from '@/components/shared/save-conflict'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import {
-  ArrowDown,
-  ArrowUp,
-  BarChart3,
-  Check,
-  CircleAlert,
-  CircleCheck,
-  Copy,
-  Eye,
-  FilePlus2,
-  GitBranch,
-  GitCompareArrows,
-  Pause,
-  Pencil,
-  Play,
-  Plus,
-  RefreshCw,
-  Send,
-  ShieldCheck,
-  SlidersHorizontal,
-} from 'lucide-react'
-import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared'
-import { api, ApiError, type ScenarioRuns, type ScenarioTriggerItem } from '@/lib/api'
+import { DetailLoading } from '@/components/templates/detail-page';
+import { formatDate as polishFormatDate, formatNumber } from '@/lib/format';
+import { SaveConflictBand } from '@/components/shared/save-conflict';
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { Fragment, useState, useEffect, useCallback, useRef } from 'react';
+import { ArrowDown, ArrowUp, BarChart3, Check, CircleCheck, Copy, Eye, FilePlus2, GitBranch, GitCompareArrows, Pause, Pencil, Play, Plus, Send, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { CircleAlert, RefreshCw } from 'lucide-react';
+import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared';
+import { api, ApiError, type ScenarioRuns, type ScenarioTriggerItem } from '@/lib/api';
 import StickyBar from '@/components/shared/sticky-bar'
-import LinePreview from '@/components/shared/line-preview'
+import LinePreview, { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview';
 import Dialog from '@/components/shared/dialog'
 import VersionCompare from '@/components/shared/version-compare'
-import { TextField, TextArea } from '@/components/shared/text-field'
-import { useStaffRole } from '@/lib/staff-role'
-import { startChecklist } from './start-checklist'
+import { TextField, TextArea } from '@/components/shared/text-field';
+import { startChecklist } from './start-checklist';
 import styles from './detail.module.css'
-import { PageFrame } from '@/components/templates/page-frame'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame';
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import TargetMissing from '@/components/shared/target-missing'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
 import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
 import CarouselPicker from '@/components/scenarios/carousel-picker'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
-import StepPreview, { previewOffsets, isDeliveryTimeSet } from '@/components/scenarios/step-preview'
-import type { StepMessageKind } from '@/components/scenarios/message-type-tabs'
-import MessageKindFields, {
-  emptyMessageKindState,
-  messageKindProblem,
-  parseMessageKind,
-  serializeMessageKind,
-  type MessageKind,
-  type MessageKindState,
-} from '@/components/scenarios/message-kind-fields'
-import QuestionEditor, {
-  deadAnswerSettings,
-  emptyQuestion,
-  isUriOnlyBehavior,
-  planChoiceActionRemap,
-  validateChoiceUris,
-  withChoiceKeys,
-  type ScenarioQuestion,
-} from '@/components/scenarios/question-editor'
-import {
-  ConditionDialog,
-  MoveReferrersNotice,
-  OnCompleteDialog,
-  TestSendDialog,
-  ON_COMPLETE_LABEL,
-  describeCondition,
-  type OnCompleteMode,
-} from '@/components/scenarios/scenario-dialogs'
-import { findInvalidRangeIssue, type SegmentCondition } from '@/components/shared/condition-builder'
-import ScheduleInput, {
-  emptySchedule,
-  buildSchedulePayload,
-  uiFromOffsetMinutes,
-  type ScheduleValue,
-} from '@/components/scenarios/schedule-input'
+import StepPreview, { previewOffsets, isDeliveryTimeSet } from '@/components/scenarios/step-preview';
+import type { StepMessageKind } from '@/components/scenarios/message-type-tabs';
+import MessageKindFields, { emptyMessageKindState, messageKindProblem, parseMessageKind, serializeMessageKind, type MessageKind, type MessageKindState } from '@/components/scenarios/message-kind-fields';
+import QuestionEditor, { deadAnswerSettings, emptyQuestion, isUriOnlyBehavior, planChoiceActionRemap, validateChoiceUris, withChoiceKeys, type ScenarioQuestion } from '@/components/scenarios/question-editor';
+import { ConditionDialog, MoveReferrersNotice, OnCompleteDialog, TestSendDialog, ON_COMPLETE_LABEL, describeCondition, type OnCompleteMode } from '@/components/scenarios/scenario-dialogs';
+import { findInvalidRangeIssue, type SegmentCondition } from '@/components/shared/condition-builder';
+import ScheduleInput, { emptySchedule, buildSchedulePayload, uiFromOffsetMinutes, type ScheduleValue } from '@/components/scenarios/schedule-input';
 import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
-import { RowMenu } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { notifyToast } from '@/components/shared/toast'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { notifyToast } from '@/components/shared/toast';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import StatusChip from '@/components/shared/status-chip'
 import Notice from '@/components/shared/notice'
-import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
-import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
-import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft'
+import { browserDraftKey } from '@/v8/autosave/use-browser-draft';
+import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice';
+import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft';
 import Select from '@/components/shared/select'
-import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
-import {
-  scenarioReachBarWidth,
-  scenarioReachCountLabel,
-  scenarioReachPercent,
-  scenarioReachPercentLabel,
-} from './scenario-reach-display'
-import { describeAfterSend, describeStepAudience, stepListTitle } from './scenario-step-audience'
-import {
-  scenarioSimulationKey,
-  simulationForKey,
-  type ScenarioSimulationResult,
-} from './scenario-simulation-refresh'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { useAccount } from '@/contexts/account-context'
-import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
-import { formatNumber } from '@/lib/format'
-import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
-import { useFormErrors } from '@/lib/use-form-errors'
-import { FieldError } from '@/components/shared/form-controls'
-import { PageHeading } from '@/components/templates/page-frame'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
+import { EntityKindField } from '@/components/shared/entity-picker-sources';
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select';
+import { scenarioReachBarWidth, scenarioReachCountLabel, scenarioReachPercent, scenarioReachPercentLabel } from './scenario-reach-display';
+import { describeAfterSend, describeStepAudience, stepListTitle } from './scenario-step-audience';
+import { scenarioSimulationKey, simulationForKey, type ScenarioSimulationResult } from './scenario-simulation-refresh';
+import { usePageTitle } from '@/components/shell/page-chrome';
+import { useAccount } from '@/contexts/account-context';
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data';
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field';
+import { useFormErrors } from '@/lib/use-form-errors';
+import { FieldError, Field } from '@/components/shared/form-controls';
+import { emptyValue } from '@/components/shared/empty-value';
 import NumberInput from '@/components/shared/number-field'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 シナリオ配信の編集（src/v8 に一から組み直した版）。
@@ -2381,7 +2318,7 @@ export default function ScenarioDetailV8({
                   {
                     id: 'duplicate',
                     /* 下の帯の「複製する」と同じ窓を開く。文言を変えるのは、撮影・試験が下の帯のボタンと取り違えないため。 */
-                    label: duplicating ? '複製中…' : 'このシナリオを複製',
+                    label: 'このシナリオを複製',
                     disabled: duplicating,
                     onSelect: openDuplicateDialog,
                   },
@@ -2412,10 +2349,7 @@ export default function ScenarioDetailV8({
       <div className={styles.body} data-design="Body" data-template-region="body">
         <div className={styles.left}>
           {!canEdit ? (
-            <div className={styles.viewerBand} role="status">
-              <Eye aria-hidden />
-              <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-            </div>
+            <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
           ) : null}
 
           {/* 始めた直後の知らせ（nMSiE）。始めた記録への行き先を添える。 */}
@@ -2442,9 +2376,9 @@ export default function ScenarioDetailV8({
                 続きからやり直すか、作りかけのコピーを削除してください。
               </p>
               <div className={styles.remainderActions}>
-                <button type="button" disabled={duplicating} onClick={() => void handleDuplicate()}>
-                  {duplicating ? '複製中…' : '続きからやり直す'}
-                </button>
+                <Button type="button" disabled={duplicating} onClick={() => void handleDuplicate()} variant="text" size="inline" busy={duplicating} busyLabel="複製中…">
+                  続きからやり直す
+                </Button>
                 <Link href={`/scenarios/detail?id=${duplicateRemainder.copyId}`}>コピーを確認する</Link>
                 <button
                   type="button"
@@ -2678,7 +2612,7 @@ export default function ScenarioDetailV8({
                                 },
                                 {
                                   id: 'duplicate',
-                                  label: duplicatingStepId === step.id ? '複製中…' : 'この通を複製',
+                                  label: 'この通を複製',
                                   disabled: duplicatingStepId === step.id,
                                   disabledReason: 'この通を複製しています',
                                   onSelect: () => {
@@ -2982,7 +2916,7 @@ export default function ScenarioDetailV8({
         cancelLabel="閉じる"
         onCancel={() => setCompareOpen(false)}
         footer={
-          <Button type="button" variant="primary" onClick={() => void acceptLatestAndContinue()}>
+          <Button type="button" variant="primary" onClick={() => acceptLatestAndContinue()} busyLabel="処理中…">
             最新を読み込んで続ける
           </Button>
         }

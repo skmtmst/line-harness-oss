@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Clock, Eye, History, RotateCw, Send, XCircle } from 'lucide-react'
+import { Clock, History, RotateCw, Send, XCircle } from 'lucide-react'
 import type { AdEventMapping } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -15,10 +15,10 @@ import { adMappingReturns, groupAdMappings, useAdLogs, type AdMappingRow } from 
 import adsStyles from './ads.module.css'
 import styles from './ad-pages.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 広告とのつなぎ（Pencil `FDBsG`・`/inflow-links?tab=connections`）。
@@ -190,7 +190,7 @@ export default function AdConnectionsV8() {
         actions={<><Button href="/inflow-links?tab=connections&view=history"><History size={15} aria-hidden="true" />送信履歴を見る</Button></>} />
       <div className={adsStyles.body}>
         {readonly ? (
-          <p className={adsStyles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
+          <div className={adsStyles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
         <h2 className={adsStyles.sectionTitle}>返すしくみ</h2>
         <ol className={styles.steps} aria-label="返すしくみ">
@@ -221,7 +221,7 @@ export default function AdConnectionsV8() {
           </KpiBand>
         )}
         <h2 className={adsStyles.sectionTitle}>成果地点と、広告に返す名前の対応</h2>
-        {saveError ? <p className={adsStyles.error} role="alert">{saveError}</p> : null}
+        {saveError ? <Notice tone="danger" className={adsStyles.errorNoticePlacement} >{saveError}</Notice> : null}
         {table}
         <p className={adsStyles.notice}>
           気をつけること：広告側で成果の名前を先に作ってから対応を決めてください。失敗した送信のやり直しは、送信履歴から行えます。

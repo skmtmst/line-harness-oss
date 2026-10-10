@@ -55,10 +55,10 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
 
   it('V8の専用失敗表示も、その場で一覧を読み直せる', () => {
     for (const [target, message, retry] of [
-      ['../v8/broadcasts/list.tsx', '一斉配信を読み込めませんでした', 'onClick={() => void loadList((page - 1) * pageSize)}'],
+      ['../v8/broadcasts/list.tsx', '一斉配信を読み込めませんでした', 'onClick={() => loadList((page - 1) * pageSize)}'],
       // 一斉配信・回答フォーム・シナリオは入口が src/v8 の新しい一覧を出す（古い list-v8.tsx はもう描かれない）。
-      ['../v8/forms/list.tsx', "loadFailureCopy(loadFailure, '回答フォーム')", 'onClick={() => void loadForms()}'],
-      ['../v8/auto-replies/list.tsx', "visibleLoadState === 'error' || visibleLoadState === 'forbidden'", 'onClick={() => void load()}'],
+      ['../v8/forms/list.tsx', "loadFailureCopy(loadFailure, '回答フォーム')", 'onClick={() => loadForms()}'],
+      ['../v8/auto-replies/list.tsx', "visibleLoadState === 'error' || visibleLoadState === 'forbidden'", 'onClick={() => load()}'],
       ['../v8/scenarios/list.tsx', 'シナリオを読み込めませんでした', 'onClick={() => void loadScenarios()}'],
       ['reminders/list-v8.tsx', 'リマインダを読み込めませんでした', 'onClick={reminderList.retry}'],
     ]) {

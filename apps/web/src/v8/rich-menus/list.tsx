@@ -1,47 +1,37 @@
 'use client'
 
-import { canManageRole } from '@/lib/staff-role';
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
-import { formatDate as polishFormatDate } from '@/lib/format'
-import { ListToolbarSort } from '@/components/shared/list-toolbar'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
-import { useListUrlValue, useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import {
-  ArrowDownUp,
-  CalendarClock,
-  CircleCheck,
-  CloudDownload,
-  CloudOff,
-  Eye,
-  FilePen,
-  Hand,
-  Image as ImageIcon,
-  ListOrdered,
-  Plus,
-  Split,
-  TriangleAlert,
-  Trophy,
-} from 'lucide-react'
-import type { Folder } from '@line-crm/shared'
-import { api, ApiError, type RichMenuDeleteImpact, type RichMenuGroupListItem, type RichMenuTapStats } from '@/lib/api'
-import { clampSearchQuery } from '@/lib/search-query'
-import type { SegmentCondition } from '@/lib/segment-condition'
-import { describeCondition } from '@/components/scenarios/scenario-dialogs'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { useRowLeaving } from '@/lib/use-row-leaving'
-import { formatDay, formatNumber } from '@/lib/format'
-import { runOptimistic } from '@/lib/undoable'
-import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
-import { ListPage } from '@/components/templates'
-import ListToolbar from '@/components/shared/list-toolbar'
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+import { formatDate as polishFormatDate, formatDay, formatNumber } from '@/lib/format';
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react';
+import { useListUrlValue, useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
+import { ArrowDownUp, CalendarClock, CircleCheck, CloudDownload, CloudOff, FilePen, Hand, Image as ImageIcon, ListOrdered, Plus, Split, TriangleAlert, Trophy } from 'lucide-react';
+
+import { RowNameLink } from '@/components/shared/table';
+
+
+
+
+
+
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { Eye } from 'lucide-react';
+import type { Folder } from '@line-crm/shared';
+import { api, ApiError, type RichMenuDeleteImpact, type RichMenuGroupListItem, type RichMenuTapStats } from '@/lib/api';
+import { clampSearchQuery } from '@/lib/search-query';
+import type { SegmentCondition } from '@/lib/segment-condition';
+import { describeCondition } from '@/components/scenarios/scenario-dialogs';
+import { useAccount } from '@/contexts/account-context';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { useRowLeaving } from '@/lib/use-row-leaving';
+import { runOptimistic } from '@/lib/undoable';
+import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message';
+import { ListPage } from '@/components/templates';
 import SearchField from '@/components/shared/search-field'
-import DetailPanel from '@/components/shared/detail-panel'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
@@ -49,40 +39,30 @@ import FilterChip from '@/components/shared/filter-chip'
 import Notice from '@/components/shared/notice'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
-import { FolderDotName } from '@/components/shared/folder-dot'
+import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel';
+import { FolderDotName } from '@/components/shared/folder-dot';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu } from '@/components/shared/row-actions';
 import Pagination from '@/components/shared/pagination'
-import { DelayedSkeleton } from '@/components/shared/skeleton'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { DelayedSkeleton } from '@/components/shared/skeleton';
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import ReorderHandle from '@/components/shared/reorder-handle'
-import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
-import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
-import {
-  audienceReason,
-  audienceText,
-  blockerTexts,
-  canDelete as canDeleteImpact,
-  impactFromError,
-  impactMatchesRequest,
-  nextDisplayText,
-  referenceKindText,
-  sameDeleteImpactRequest,
-  type DeleteImpactRequest,
-} from './delete-impact'
-import { moveTargetingGroup, orderTargetingGroups, withNormalizedPriority } from './targeting-order'
-import { ExternalImportWorkspace, type LineMenu } from './external-import'
-import { richMenuError, richMenuErrorAll } from './errors'
-import BlockedDeleteDialog, { type BlockedRow } from './blocked-dialog'
+import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder';
+import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal';
+import { audienceReason, audienceText, blockerTexts, canDelete as canDeleteImpact, impactFromError, impactMatchesRequest, nextDisplayText, referenceKindText, sameDeleteImpactRequest, type DeleteImpactRequest } from './delete-impact';
+import { moveTargetingGroup, orderTargetingGroups, withNormalizedPriority } from './targeting-order';
+import { ExternalImportWorkspace, type LineMenu } from './external-import';
+import { richMenuError, richMenuErrorAll } from './errors';
+import BlockedDeleteDialog, { type BlockedRow } from './blocked-dialog';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
-import { notifyToast } from '@/components/shared/toast'
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback';
+import { notifyToast } from '@/components/shared/toast';
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
 
 /*
  * ★V8 リッチメニューの一覧（Pencil「★V8 画面の地図」のリッチメニューの行：
@@ -224,7 +204,7 @@ export default function RichMenusListV8() {
   const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
   const importRequestGenerationRef = useRef(0)
   const externalLoadedRef = useRef(false)
-  const [detailId, setDetailId] = useState<string | null>(null)
+  const [detailId, setDetailId] = useDetailPanelUrl('menu')
   const [groups, setGroups] = useState<RichMenuGroupListItem[]>([])
   const [external, setExternal] = useState<{ currentDefault: string | null; lineMenus: LineMenu[] } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -1017,12 +997,7 @@ export default function RichMenusListV8() {
   )
 
   const stateCard = (icon: React.ReactNode, title: string, desc: string, action: React.ReactNode, tone?: 'error') => (
-    <div className={styles.stateCard}>
-      <span className={tone === 'error' ? `${styles.stateIcon} ${styles.stateIconError}` : styles.stateIcon}>{icon}</span>
-      <p className={styles.stateTitle}>{title}</p>
-      <p className={styles.stateDesc}>{desc}</p>
-      {action}
-    </div>
+    <ListState kind={tone === 'error' ? 'error' : 'empty'} title={title} description={desc} icon={icon} action={<>{action}</>} />
   )
 
   const listBody = !selectedAccount ? (
@@ -1038,7 +1013,7 @@ export default function RichMenusListV8() {
       loadFailure?.description
         ?? '登録したメニューは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。',
       loadFailure === null || loadFailure.retryable
-        ? <Button type="button" onClick={() => void reload()}>もう一度読み込む</Button>
+        ? <Button type="button" onClick={() => reload()} busyLabel="処理中…">もう一度読み込む</Button>
         : null,
       'error',
     )
@@ -1084,14 +1059,8 @@ export default function RichMenusListV8() {
                   className={styles.row}
                   leaving={leavingId === g.id}
                   tabIndex={0}
-                  onClick={() => setDetailId(g.id)}
-                  onKeyDown={(event) => {
-                    if (event.target !== event.currentTarget) return
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      setDetailId(g.id)
-                    }
-                  }} data-row-id={g.id}
+                  detailKey="menu" onOpen={() => setDetailId(detailId === g.id ? null : g.id)}
+ data-row-id={g.id}
                 >
                   <Td
                     className={styles.orderCell}
@@ -1129,14 +1098,13 @@ export default function RichMenusListV8() {
                   </Td>
                   <Td className={styles.nameCell}>
                     <FolderDotName folder={folderDotOf(g.folderId)}>
-                      <Link
+                      <RowNameLink
                         href={`/rich-menus/edit?id=${g.id}`}
 
                         className={styles.name}
-                        onClick={(event) => { event.stopPropagation(); if (!event.ctrlKey && !event.metaKey && !event.shiftKey) { event.preventDefault(); setDetailId(g.id) } }}
                       >
                         <TruncatedText value={String(g.name ?? '')} />
-                      </Link>
+                      </RowNameLink>
                     </FolderDotName>
 
                   </Td>
@@ -1165,7 +1133,7 @@ export default function RichMenusListV8() {
                     >
                       {taps == null ? emptyValue('unknown') : `${formatNumber(taps)}回`}
                     </Td>
-                  <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
+                  <Td className={styles.menuCell}>
                     <div className={styles.menuBox}>
                       <RowMenu
                         className={styles.menuBtn}
@@ -1295,7 +1263,7 @@ export default function RichMenusListV8() {
           {impactPhase === 'loading' ? (
             <p className={styles.impactFaint}>消したときの影響を確認しています…</p>
           ) : impactPhase === 'error' ? (
-            <p className={styles.impactDanger} role="alert">消したときの影響を確認できませんでした。読み直してから、もう一度お試しください。</p>
+            <Notice tone="danger" >消したときの影響を確認できませんでした。読み直してから、もう一度お試しください。</Notice>
           ) : impact ? (
             <div className={styles.impactDetail}>
               <p>
@@ -1350,10 +1318,7 @@ export default function RichMenusListV8() {
       stats={<>
         {/* 見るだけの人への帯（ZoKow）。数の帯の上。 */}
         {!canEdit ? (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
         <KpiBand data-design="KPIs" className={styles.kpis}>
           <KpiCard
@@ -1463,16 +1428,13 @@ export default function RichMenusListV8() {
 
         {blockedDialog}
         {deleteConfirm}
-        <DetailPanel open={detailId !== null} title={groups.find(group => group.id === detailId)?.name ?? 'リッチメニュー'} onClose={() => setDetailId(null)} footer={detailId ? <Button href={`/rich-menus/edit?id=${encodeURIComponent(detailId)}`}>{canEdit ? '編集する' : '詳しく見る'}</Button> : undefined}>
+        <DetailPanel open={detailId !== null && groups.some(group => group.id === detailId)} title={groups.find(group => group.id === detailId)?.name ?? 'リッチメニュー'} onClose={() => setDetailId(null)} footer={detailId ? <Button href={`/rich-menus/edit?id=${encodeURIComponent(detailId)}`}>{canEdit ? '編集する' : '詳しく見る'}</Button> : undefined}>
         <p>このリッチメニューの中身や設定は「{canEdit ? '編集する' : '詳しく見る'}」から確認できます。</p>
       </DetailPanel>
     </>}
     >
       {actionError ? (
-        <p className={styles.errorBand} role="alert">
-          {actionError}
-          <button type="button" onClick={() => void reload()}>もう一度読み込む</button>
-        </p>
+        <Notice tone="danger" >{actionError}<button type="button" onClick={() => void reload()}>もう一度読み込む</button></Notice>
       ) : null}
       {listBody}
     </ListPage></SaveErrorScope>

@@ -1,42 +1,30 @@
 'use client'
 
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+
+import { RowNameLink } from '@/components/shared/table';
 import TagOverflow from '@/components/shared/tag-overflow'
-import { FolderDotName } from '@/components/shared/folder-dot'
-import { collectListRows } from '@/components/shared/collect-list-rows'
-import { ListToolbarSort } from '@/components/shared/list-toolbar'
-import { useListUrlJsonValue, useListUrlValue } from '@/components/shared/list-url-state'
-import { jstDate } from '@/lib/jst-datetime'
-import StatusPill, { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  CircleDot,
-  Bookmark,
-  Columns3,
-  Download,
-  Eye,
-  Megaphone,
-  MessageSquare,
-  UserRoundX,
-  SlidersHorizontal,
-  Star,
-  TrendingUp,
-  Upload,
-  UserPlus,
-  Users,
-} from 'lucide-react'
-import type { Scenario, Tag } from '@line-crm/shared'
-import { api, ApiError, fetchApi, type FriendListItem, type FriendStats, type SupportMarkListItem } from '@/lib/api'
-import { formatNumber } from '@/lib/format'
-import { useAccount } from '@/contexts/account-context'
-import { useFeatureVisibility } from '@/lib/use-feature-visibility'
-import { loadOperators } from '@/lib/operators-cache'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { buildBroadcastHandoff } from '@/lib/friends-broadcast-condition'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { ListPage } from '@/components/templates'
+import { FolderDotName } from '@/components/shared/folder-dot';
+import { collectListRows } from '@/components/shared/collect-list-rows';
+import { useListUrlJsonValue, useListUrlValue, useListScrollMemory } from '@/components/shared/list-url-state';
+import StatusPill, { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { CircleDot, Bookmark, Columns3, Download, Megaphone, MessageSquare, UserRoundX, SlidersHorizontal, Star, TrendingUp, Upload, UserPlus, Users } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { Eye } from 'lucide-react';
+import type { Scenario, Tag } from '@line-crm/shared';
+import { api, ApiError, fetchApi, type FriendListItem, type FriendStats, type SupportMarkListItem } from '@/lib/api';
+import { formatNumber } from '@/lib/format';
+import { useAccount } from '@/contexts/account-context';
+import { useFeatureVisibility } from '@/lib/use-feature-visibility';
+import { loadOperators } from '@/lib/operators-cache';
+import { useStaffRole, canManageRole } from '@/lib/staff-role';
+import { buildBroadcastHandoff } from '@/lib/friends-broadcast-condition';
+import { usePageTitle } from '@/components/shell/page-chrome';
+import { ListPage } from '@/components/templates';
 import Button from '@/components/shared/button'
 import TagPill from '@/components/shared/tag-pill'
 import Checkbox from '@/components/shared/checkbox'
@@ -48,36 +36,36 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
-import { notifyToast } from '@/components/shared/toast'
-import { useListScrollMemory } from '@/components/shared/list-url-state'
+import { notifyToast } from '@/components/shared/toast';
 import MenuPortal from '@/components/shared/menu-portal'
 import BulkBar from '@/components/shared/bulk-bar'
 import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
-import { TableBody } from '@/components/shared/table-body'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
+import { TableBody } from '@/components/shared/table-body';
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
+import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog';
 import SavedSearchDialog from '@/components/friends/saved-search-dialog'
-import SingleFriendActions, { type FriendAction } from '@/components/friends/single-friend-actions'
+import SingleFriendActions, { type FriendAction } from '@/components/friends/single-friend-actions';
 import NoticeDialog from '@/components/friends/notice-dialog'
 import BulkRunDialog from '@/components/friends/bulk-run-dialog'
 import FriendRowMenu from '@/components/friends/friend-row-menu'
-import { canRunBulk } from '@/components/friends/bulk-run-view'
-import { conditionsToEditorState, savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
-import { hasEditKey } from '../shared/nav'
-import { FriendsTabs } from '../shared/head'
-import { emptyMessageOf } from './empty'
-import { csvExportLine } from './csv-export'
-import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
-import { lastContactOf, monthDay, monthDayTime, statusOf, messageWord, splitTags } from './words'
+import { canRunBulk } from '@/components/friends/bulk-run-view';
+import { conditionsToEditorState, savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils';
+import { hasEditKey } from '../shared/nav';
+import { FriendsTabs } from '../shared/head';
+import { emptyMessageOf } from './empty';
+import { csvExportLine } from './csv-export';
+import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state';
+import { lastContactOf, monthDay, monthDayTime, statusOf, messageWord, splitTags } from './words';
 import styles from './list.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
-import { ListPager } from '@/components/templates/list-page'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { csvFileName } from '@/lib/csv-file-name';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField } from '@/components/shared/save-form-errors';
+import { ListPager } from '@/components/templates/list-page';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
 
 /*
  * ★V8 友だち一覧（Pencil `x6QsVz`：閲覧のみ。いつもの形は同じ板からボタンを出したもの）。
@@ -89,7 +77,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * 表示項目・件数・並び）→ 表（□・☆・友だち・対応/担当・シナリオ・最新・タグ・流入元・最終接触・…）→ ページ送り。
  */
 
-const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
+const PAGE_SIZE_OPTIONS = STANDARD_PAGE_SIZES
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
 type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'
@@ -819,7 +807,7 @@ export default function FriendsListV8() {
             const tags = splitTags(friend.tags)
             return (
               <Tr key={friend.id} interactive selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row data-row-id={friend.id}>
-                <Td className={styles.tdCheck} onClick={(event) => event.stopPropagation()}>
+                <Td className={styles.tdCheck}>
                   <Checkbox checked={selectedIds.has(friend.id)} onCheckedChange={() => toggleSelect(friend.id)} aria-label={`${friend.displayName}を選ぶ`} />
                 </Td>
                 <Td className={styles.tdStar}>
@@ -841,7 +829,7 @@ export default function FriendsListV8() {
                   )}
                 </Td>
                 <Td className={styles.td}>
-                  <FolderDotName><Link href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</Link></FolderDotName>
+                  <FolderDotName><RowNameLink href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</RowNameLink></FolderDotName>
                 </Td>
                 {visible.has('support') ? (
                   <Td className={styles.td}>
@@ -958,10 +946,7 @@ export default function FriendsListV8() {
       tabs={(
         <>
           {readOnly ? (
-            <div className={styles.viewerBand} role="status">
-              <Eye size={16} aria-hidden="true" />
-              <span>{VIEWER_NOTE}</span>
-            </div>
+            <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div>
           ) : null}
           <FriendsTabs current="list" />
         </>

@@ -2,7 +2,7 @@
 
 import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ArrowDownRight, CalendarClock, Flag, LogIn, Plus, RefreshCw, Send, Users } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -24,6 +24,7 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 分析「ファネル」（Pencil `DkRDE`）。
@@ -330,7 +331,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
             {canManage ? <Button variant="secondary" onClick={() => setCreating(true)}><Plus size={15} aria-hidden="true" />ファネルを作る</Button> : null}
             <Button variant="secondary" disabled={running} onClick={() => setRunReload((n) => n + 1)}><RefreshCw size={15} aria-hidden="true" />最新の結果をもう一度読む</Button>
           </div>
-          {runError ? <p className={styles.inlineError} role="alert">{runError}</p> : null}
+          {runError ? <Notice tone="danger" >{runError}</Notice> : null}
           {noRun && !run ? <p className={styles.caption}>{`まだ集計がありません。下の「定義の操作と集計の詳細」から「この${funnelDays}日を再集計」を押してください`}</p> : null}
           {usageNotice ? <p className={styles.warnText} role="status">{usageNotice}</p> : null}
           {run && !measurable ? <p className={styles.warnText} role="status">{`${STATE_LABELS[run.state]}のため、この結果は判定不能です。人数や割合は実測値ではありません。${run.stateReason ? ` ${run.stateReason}` : ''}`}</p> : null}

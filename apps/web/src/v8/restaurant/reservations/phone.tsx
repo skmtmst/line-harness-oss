@@ -28,7 +28,7 @@ import StoreTabs from '../store-tabs/store-tabs'
 import type { PhonePreset } from './today'
 import { INACTIVE_STATUSES, dayTitle, floorOrder, slotLabel, toYmd } from './format'
 import styles from './reservations.module.css'
-import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 import { formatYen as polishFormatYen } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
@@ -57,11 +57,11 @@ function toMinutes(time: string): number {
 
 /** 希望の時間（2時間）とその卓の予約が重なるか。期限切れの押さえは数えない。 */
 function overlaps(day: string, time: string, tableId: string, rows: RestaurantReservation[]): boolean {
-  const start = new Date(`${day}T${time.padStart(5, '0')}:00`).getTime()
+  const start = new Date(`${day}T${time.padStart(5, '0')}:00+09:00`).getTime()
   if (!Number.isFinite(start)) return false
   const end = start + STAY_MINUTES * 60_000
   return rows.some((r) => {
-    if (r.table_id !== tableId || INACTIVE_STATUSES.includes(r.status)) return false
+    if (r.departed_at || r.table_id !== tableId || INACTIVE_STATUSES.includes(r.status)) return false
     if (r.status === 'pending' && r.hold_expires_at && Date.parse(r.hold_expires_at) <= Date.now()) return false
     const s = new Date(r.starts_at).getTime()
     const e = new Date(r.ends_at).getTime()
@@ -203,7 +203,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
   const lastVisit = history?.visits[0] ?? null
   const lastAllergy = history?.visits.find((v) => v.allergy_note)?.allergy_note ?? null
   const [yy, mm, dd] = date.split('-').map(Number)
-  const dayDate = yy && mm && dd ? new Date(yy, mm - 1, dd) : new Date()
+  const dayDate = yy && mm && dd ? new Date(`${date}T00:00:00+09:00`) : new Date()
 
   const save = (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault()
@@ -217,7 +217,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
       })
       return
     }
-    const startsAt = new Date(`${date}T${time.padStart(5, '0')}:00`).toISOString()
+    const startsAt = new Date(`${date}T${time.padStart(5, '0')}:00+09:00`).toISOString()
     const endsAtIso = new Date(new Date(startsAt).getTime() + STAY_MINUTES * 60_000).toISOString()
     void onSave({
       kind, holdMinutes: Number(holdMinutes), source: 'phone', storeId, customerName: name, customerPhone: phone || null, lineUid: lineUid || null,
@@ -331,7 +331,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
                   </Field>
                   {!person && search.trim().length >= 2 ? (
                     <div className={styles.foundList}>
-                      {searchError ? <p role="alert" className={styles.formError}>{searchError}</p> : null}
+                      {searchError ? <Notice tone="danger" className={styles.formErrorNoticePlacement} >{searchError}</Notice> : null}
                       {found.length === 0 && !searchError ? <p className={styles.sideText}>台帳に見つかりません。電話番号のタブから入れられます。</p> : null}
                       {found.map((c) => (
                         <Button key={`${c.lineUid || c.phone || c.name}`} type="button" onClick={() => { setPerson(c); setSearch('') }}>

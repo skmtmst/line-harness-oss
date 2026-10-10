@@ -1,48 +1,35 @@
 'use client'
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
-
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { createPageReturnHref } from '@/components/shared/create-page'
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { createPageReturnHref } from '@/components/shared/create-page';
 import CopyTextButton from '@/components/shared/copy-text-button'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import {
-  AlignLeft,
-  ArrowLeft,
-  CalendarClock,
-  CalendarDays,
-  Copy,
-  Eye,
-  Hash,
-  Image as ImageIcon,
-  Link2,
-  ToggleLeft,
-  Type,
-  Upload,
-} from 'lucide-react'
-import type { Folder } from '@line-crm/shared'
-import { api, ApiError, describeSaveFailure } from '@/lib/api'
-import { commonVarValueError, COMMON_VAR_VALUE_REQUIRED, isSecretLikeVarValue } from '@/lib/common-vars'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { CreatePage } from '@/components/templates'
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AlignLeft, ArrowLeft, CalendarClock, CalendarDays, Hash, Image as ImageIcon, Link2, ToggleLeft, Type, Upload } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { Copy, Eye } from 'lucide-react';
+import type { Folder } from '@line-crm/shared';
+import { api, ApiError, describeSaveFailure } from '@/lib/api';
+import { commonVarValueError, isSecretLikeVarValue } from '@/lib/common-vars';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import { useAccount } from '@/contexts/account-context';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
 import DateTimeField from '@/components/shared/date-time-field'
 import LinePreview from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
-import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select';
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import styles from './new.module.css'
-import { focusFieldById } from '@/lib/use-form-errors'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { focusFieldById } from '@/lib/use-form-errors';
+import { Field } from '@/components/shared/form-controls';
+import { withPermissionFailure } from '@/components/shared/api-error-message';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 共通情報を作る（板 `p82v9`）。
@@ -465,10 +452,7 @@ export default function NewCommonVarV8() {
       )} dirty={false}
     >
       {canWrite ? null : (
-        <div className={styles.roBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-        </div>
+        <div className={styles.roBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       )}
 
       {!accountLoading && !selectedAccountId && (
@@ -513,7 +497,7 @@ export default function NewCommonVarV8() {
 {foldersError ? (
               <div className={styles.folderError} data-folders-state="error">
                 <p className={styles.fieldHint}>フォルダの一覧を読み込めませんでした。未分類のまま登録できます。</p>
-                <Button type="button" onClick={() => void loadFolders()}>
+                <Button type="button" onClick={() => loadFolders()} busyLabel="処理中…">
                   再読み込み
                 </Button>
               </div>
@@ -708,7 +692,7 @@ export default function NewCommonVarV8() {
         </div>
       )}
 
-      {error && <p className={styles.formError} role="alert">{error}</p>}
+      {error && <Notice tone="danger" className={styles.formErrorNoticePlacement} >{error}</Notice>}
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した共通情報" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage></SaveErrorScope>

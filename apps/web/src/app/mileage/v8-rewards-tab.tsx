@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { AlertCircle, ArrowLeftRight, Download, Gift, Info, MoreHorizontal, Plus, Star } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import ActionMenu from '@/components/shared/action-menu'

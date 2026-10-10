@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { AlertCircle, Filter, ListChecks, MoreHorizontal, PhoneOutgoing, Users } from 'lucide-react'
 import type { SavedSearch, Tag } from '@line-crm/shared'
 import { api, ApiError, type SavedSearchSummary } from '@/lib/api'
@@ -345,7 +345,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
             </span>
             <p className={styles.stateTitle}>保存した検索を読み込めませんでした</p>
             <p className={styles.stateDesc}>{loadError}</p>
-            <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+            <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度試す</Button>
           </div>
         ) : items.length === 0 ? (
           <div className={styles.stateCard}>

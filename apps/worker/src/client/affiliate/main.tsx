@@ -11,6 +11,10 @@
 import React, { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import './styles.css';
+import '../../../../liff/src/embedded.css';
+import MileageRewards from '../../../../liff/src/components/MileageRewards.js';
+import AffiliatePayments from '../../../../liff/src/components/AffiliatePayments.js';
+import { setAffiliateAccessToken } from '../../../../liff/src/lib/affiliate-self-api.js';
 
 export interface AffiliateContext {
   liffId: string;
@@ -878,6 +882,8 @@ function App({ ctx }: { ctx: AffiliateContext }) {
 
       {wallet && <MileageOpportunities items={wallet.opportunities} />}
 
+      <MileageRewards onChanged={loadMe} />
+      <AffiliatePayments editable={state.affiliate.isActive} />
       <ReferralSummary links={links} />
 
       {/* 参加中の案件 — 案件ごとにリンクをまとめる */}
@@ -951,6 +957,7 @@ export function mountAffiliate(container: HTMLElement, ctx: AffiliateContext): v
   // body.af-active gates the namespaced preflight reset + #app inline override.
   // Add it synchronously before createRoot so the first paint isn't the browser
   // default (black button borders, list disc) — same rationale as salon-booking.
+  setAffiliateAccessToken(ctx.lineAccessToken);
   document.body.classList.add('af-active');
 
   if (_root) {
@@ -971,5 +978,6 @@ export function unmountAffiliate(): void {
     _root.unmount();
     _root = null;
   }
+  setAffiliateAccessToken(null);
   document.body.classList.remove('af-active');
 }

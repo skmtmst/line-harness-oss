@@ -1,3 +1,4 @@
+import FormReception, { choiceReceptionLabel } from '../components/FormReception.js';
 import { TextInput, ChoiceInput, FieldLabel, FieldCount } from '../components/forms/controls.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
@@ -643,11 +644,7 @@ export default function Form() {
             </p>
           )}
 
-          {firstPage && form.availability && <div className="space-y-1 text-xs text-ink-secondary" aria-label="回答の受付条件">
-            {form.availability.deadlineAt && <p>締め切り：{new Date(form.availability.deadlineAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</p>}
-            {form.availability.oncePerFriend && <p>回答はお一人さま1回までです</p>}
-            {form.availability.totalRemaining != null && <p>受付上限まで残り{form.availability.totalRemaining}件（送信時に確定します）</p>}
-          </div>}
+          {firstPage && <FormReception availability={form.availability} />}
           {bodyBlocks.map((block) => blockView(block))}
 
           {error && (
@@ -1177,7 +1174,7 @@ function BlockView({
               <option value="">選択してください</option>
               {(block.choices ?? []).map((choice) => (
                 <option key={choice.id} value={choice.label} disabled={choiceAvailability?.[choice.id]?.full}>
-                  {choice.label}{choiceAvailability?.[choice.id] ? `（${choiceAvailability[choice.id].full ? '受付終了' : `残り${choiceAvailability[choice.id].remaining}件`}）` : ''}
+                  {choice.label}{choiceReceptionLabel(choiceAvailability?.[choice.id])}
                 </option>
               ))}
             </FormSelectControl>
@@ -1208,7 +1205,7 @@ function BlockView({
                       disabled={choiceAvailability?.[choice.id]?.full}
                       onChange={() => onChange(block.name, choice.label)}
                     />
-                    {choice.label}{choiceAvailability?.[choice.id] ? `（${choiceAvailability[choice.id].full ? '受付終了' : `残り${choiceAvailability[choice.id].remaining}件`}）` : ''}
+                    {choice.label}{choiceReceptionLabel(choiceAvailability?.[choice.id])}
                   </FormChoiceRow>
                   {choice.isOther && checkedRadio && (
                     <OtherTextInput
@@ -1252,7 +1249,7 @@ function BlockView({
                         );
                       }}
                     />
-                    {choice.label}{choiceAvailability?.[choice.id] ? `（${choiceAvailability[choice.id].full ? '受付終了' : `残り${choiceAvailability[choice.id].remaining}件`}）` : ''}
+                    {choice.label}{choiceReceptionLabel(choiceAvailability?.[choice.id])}
                   </FormChoiceRow>
                   {choice.isOther && isChecked && (
                     <OtherTextInput

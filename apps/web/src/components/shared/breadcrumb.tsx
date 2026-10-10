@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { Fragment } from 'react'
 import styles from './breadcrumb.module.css'
 

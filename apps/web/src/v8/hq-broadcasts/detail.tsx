@@ -254,7 +254,7 @@ function RecipientsTab({ run }: { run: HqBroadcastRun }) {
         </DataTable>
       )}
       {state === 'loading' ? <DetailLoading /> : null}
-      {next && state === 'ready' ? <div><Button onClick={() => void load(Number(next), true)}>続きを読む</Button></div> : null}
+      {next && state === 'ready' ? <div><Button onClick={() => load(Number(next), true)} busyLabel="処理中…">続きを読む</Button></div> : null}
     </section>
   )
 }
@@ -303,7 +303,7 @@ function ActivityTab({ run, names }: { run: HqBroadcastRun; names: Map<string, s
         </DataTable>
       )}
       {state === 'loading' ? <DetailLoading /> : null}
-      {next && state === 'ready' ? <div><Button onClick={() => void load(Number(next), true)}>続きを読む</Button></div> : null}
+      {next && state === 'ready' ? <div><Button onClick={() => load(Number(next), true)} busyLabel="処理中…">続きを読む</Button></div> : null}
     </section>
   )
 }

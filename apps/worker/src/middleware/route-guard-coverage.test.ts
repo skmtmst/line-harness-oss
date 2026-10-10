@@ -340,6 +340,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/tenants/boundary-preview',
     'GET /api/tenants/me/company-contact',
     'GET /api/traffic-pools',
+    'GET /api/traffic-pools/:id', // 最新の比較も既存の一覧と同じowner/admin専用。
     'GET /api/traffic-pools/:id/accounts',
     'GET /api/traffic-pools/accounts',
     'GET /api/users',
@@ -484,6 +485,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/ops/support/tickets/:id/reply',
     'POST /api/recipes',
     'POST /api/recipes/:id/clone',
+    'POST /api/restaurant-test/floors',
     'POST /api/restaurant-test/gbp/posts',
     'POST /api/restaurant-test/google/changes/:id/send',
     'POST /api/restaurant-test/google/connect/select-location',
@@ -536,6 +538,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'PUT /api/ops/knowledge/:id',
     'PUT /api/ops/notice-line-account',
     'PUT /api/ops/support/tickets/:id/draft',
+    'PUT /api/restaurant-test/floors/:id',
     'PUT /api/restaurant-test/gbp/reviews/:id/draft',
     'PUT /api/restaurant-test/inventory/:id',
     'PUT /api/restaurant-test/inventory/allocation',

@@ -1,7 +1,7 @@
 'use client'
 import { Th } from '@/components/shared/table'
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ExternalLink, MoreHorizontal, RefreshCw } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { api, type CommonActionSummary } from '@/lib/api'
@@ -284,7 +284,7 @@ export function V8CommonActionsTab({
           onChange={(event) => { setQuery(event.target.value); setPage(1) }}
           className={styles.toolsSearch}
         /></SaveErrorField>
-        <Button onClick={() => void load()} variant="secondary" size="compact">
+        <Button onClick={() => load()} variant="secondary" size="compact" busyLabel="処理中…">
           <RefreshCw size={16} aria-hidden />
           一覧を更新する
         </Button>

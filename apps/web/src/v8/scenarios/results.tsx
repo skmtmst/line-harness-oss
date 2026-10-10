@@ -1,36 +1,36 @@
 'use client'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
-import { Download, Eye, PencilLine } from 'lucide-react'
-import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared'
-import { api, ApiError, type ScenarioRuns } from '@/lib/api'
-import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
-import { DetailPage } from '@/components/templates'
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from '@/components/shared/list-navigation'
+import { useSearchParams } from 'next/navigation';
+import { Download, Eye, PencilLine } from 'lucide-react';
+import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared';
+import { api, ApiError, type ScenarioRuns } from '@/lib/api';
+import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
+import { useAccount } from '@/contexts/account-context';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { useStaffRole } from '@/lib/staff-role';
+import { DetailPage } from '@/components/templates';
 import Button from '@/components/shared/button'
-import type { ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
+import type { ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu } from '@/components/shared/row-actions';
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
-import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import { EntityKindField } from '@/components/shared/entity-picker-sources';
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge';
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
-import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data';
+import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs';
+import { formatDateTime, formatNumber } from '@/lib/format';
 import styles from './results.module.css'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import { csvFileName } from '@/lib/csv-file-name';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField } from '@/components/shared/save-form-errors';
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 シナリオ配信の配信結果（Pencil `X4STXS`）。
@@ -433,7 +433,7 @@ export default function ScenarioResultsV8() {
   return (
     <DetailPage
       boardId="X4STXS"
-      identity={<></>}
+
       title={scenario ? `配信結果：${scenario.name}` : '配信結果'}
       help="始まった・読み終えた・どの通まで届いたかを見ます。"
       actions={(
@@ -597,7 +597,7 @@ export default function ScenarioResultsV8() {
                     if (sub.status === 'active') {
                       items.push({
                         id: 'pause',
-                        label: opBusy === `${sub.id}:pause` ? '止めています…' : '止める',
+                        label: '止める',
                         disabled: opBusy !== null,
                         onSelect: () => void runSubscriptionOp(sub, 'pause'),
                       })
@@ -605,14 +605,14 @@ export default function ScenarioResultsV8() {
                     if (sub.status === 'paused') {
                       items.push({
                         id: 'resume',
-                        label: opBusy === `${sub.id}:resume` ? '再開しています…' : '再開する',
+                        label: '再開する',
                         disabled: opBusy !== null,
                         onSelect: () => void runSubscriptionOp(sub, 'resume'),
                       })
                       if (pausedByFailure) {
                         items.push({
                           id: 'retry',
-                          label: opBusy === `${sub.id}:retry` ? '再送しています…' : '失敗を再送',
+                          label: '失敗を再送',
                           disabled: opBusy !== null,
                           onSelect: () => void runSubscriptionOp(sub, 'retry'),
                         })
@@ -662,10 +662,8 @@ export default function ScenarioResultsV8() {
                 </div>
                 {/* 続きを読めるかぎり読む。読み込み中の失敗は一覧を消さず、再試行口だけ出す。 */}
                 {runsMoreError ? (
-                  <p className={styles.moreError} role="alert">
-                    {runsMoreError}
-                    <button type="button" className={styles.sectionLink} onClick={loadMoreRuns}>もう一度読み込む</button>
-                  </p>
+                  <Notice tone="danger" className={styles.moreErrorNoticePlacement} >{runsMoreError}
+                    <button type="button" className={styles.sectionLink} onClick={loadMoreRuns}>もう一度読み込む</button></Notice>
                 ) : null}
                 {runs.pagination.nextCursor ? (
                   <div className={styles.more}>
@@ -714,12 +712,10 @@ export default function ScenarioResultsV8() {
       >
         {/* 候補の取得失敗は「移せるシナリオがありません」と分ける（SCENARIO-10 と同じ分け方）。 */}
         {moveOptionsError ? (
-          <p className={styles.moreError} role="alert">
-            移し先の候補を読み込めませんでした。
+          <Notice tone="danger" className={styles.moreErrorNoticePlacement} >移し先の候補を読み込めませんでした。
             <button type="button" className={styles.sectionLink} onClick={() => void loadMoveOptions()} disabled={opBusy !== null}>
               もう一度読み込む
-            </button>
-          </p>
+            </button></Notice>
         ) : (
           <SaveErrorField names={["moveScenarioId"]}><EntityKindField
             kind="scenario"

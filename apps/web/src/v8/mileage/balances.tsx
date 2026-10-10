@@ -5,7 +5,7 @@ import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Check, CircleDot, Clock3, Download, RefreshCw, TrendingDown, TrendingUp, Undo2, Users, Wallet } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -380,7 +380,7 @@ export default function BalancesTab() {
       <p className={styles.approvalTitle}>承認待ちのマイル変更</p>
       <p className={styles.approvalNote}>承認待ちを読み込めませんでした。依頼があるか分からない状態です。</p>
       <div>
-        <Button onClick={() => void loadApprovals()}>もう一度読み込む</Button>
+        <Button onClick={() => loadApprovals()} busyLabel="処理中…">もう一度読み込む</Button>
       </div>
     </section>
   ) : null

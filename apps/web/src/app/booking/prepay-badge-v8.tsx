@@ -2,13 +2,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
-import {
-  bookingApi,
-  type BookingPrepayDecision,
-} from '@/lib/api'
+import { bookingApi, type BookingPrepayDecision } from '@/lib/api'
 import styles from './prepay-badge-v8.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 function jstMonthDay(iso: string): string {
   const date = new Date(iso)

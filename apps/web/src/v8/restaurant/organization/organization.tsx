@@ -1,25 +1,24 @@
 'use client'
 
+
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { Field as SharedField } from '@/components/shared/form-controls'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
-import { Copy, Eye, MailPlus, Plus } from 'lucide-react'
+import { MailPlus, Plus } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import Disclosure from '@/components/shared/disclosure'
+import { RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import { useStepUpGate, isStepUpRequired } from '@/components/step-up-prompt'
 import type { RestaurantLoginMember } from '@line-crm/shared'
 import { ApiError } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import {
-  restaurantTestApi,
-  type RestaurantIntakeAddress,
-  type RestaurantMembership,
-  type RestaurantStore,
-} from '@/lib/restaurant-test-api'
+import { restaurantTestApi, type RestaurantIntakeAddress, type RestaurantMembership, type RestaurantStore } from '@/lib/restaurant-test-api'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
 import { formatStamp, Panel, StatRow, Status } from '../common-a/parts'
@@ -28,6 +27,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 組織・権限（Pencil `bSp4h`、店舗の窓 `vCEKM`、ユーザーの窓 `ou60i`、停止の確認 `bMpC5`、再発行の確認 `rSRFK`）。
@@ -186,7 +186,7 @@ function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: string;
       <div className={styles.intakeBody}>
       <p className={styles.intakeWarning}>このアドレスは予約メールの専用受信口です。第三者へ共有せず、予約媒体の通知設定だけに使用してください。</p>
       {notice ? <p className={styles.intakeNotice} role="status">{notice}</p> : null}
-      {actionError ? <p className={styles.intakeError} role="alert">{actionError}</p> : null}
+      {actionError ? <Notice tone="danger" className={styles.intakeErrorNoticePlacement} >{actionError}</Notice> : null}
       {!store ? (
         <p className={styles.muted}>上部の店舗選択から、設定する店舗を選んでください。</p>
       ) : loading ? (
@@ -213,8 +213,8 @@ function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: string;
       )}
       {store && !error && !readOnly ? (
         <div className={styles.intakeFoot}>
-          <Button disabled={issuing || loading} onClick={() => { if (addresses.length > 0) setReissueOpen(true); else void issue() }}>
-            <MailPlus aria-hidden className={styles.buttonIcon} />{issuing ? '発行中…' : 'アドレスを発行'}
+          <Button disabled={issuing || loading} onClick={() => { if (addresses.length > 0) setReissueOpen(true); else void issue() }} busy={issuing} busyLabel="発行中…">
+            <MailPlus aria-hidden className={styles.buttonIcon} />アドレスを発行
           </Button>
         </div>
       ) : null}
@@ -366,28 +366,37 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
     }
   }
 
+  const organizationTree = (
+    <div className={styles.treeBody}>
+      <p className={styles.treeTenant}>{`統括：${data.organization?.tenant_name || emptyValue('unconfigured')}`}</p>
+      <p className={styles.treeRoot}>{data.organization?.name}</p>
+      <div className={styles.treeChildren}>
+        {data.stores.map((s) => (
+          <div key={s.id} className={styles.treeStore}>
+            <span className={styles.treeStoreName}>{s.name}</span>
+            <span className={styles.spacer} aria-hidden="true" />
+            <Status value={s.status} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+
   return (
     <SaveErrorScope errors={saveErrors}><>
       {readOnly ? (
-        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.readOnlyIcon} /><span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span></div>
+        <ReadOnlyNotice role="note" />
       ) : null}
       <div className={styles.layout}>
         {prompt}
-        <Panel title="組織階層" narrow flush>
-          <div className={styles.treeBody}>
-          <p className={styles.treeTenant}>{`統括：${data.organization?.tenant_name || emptyValue('unconfigured')}`}</p>
-          <p className={styles.treeRoot}>{data.organization?.name}</p>
-          <div className={styles.treeChildren}>
-            {data.stores.map((s) => (
-              <div key={s.id} className={styles.treeStore}>
-                <span className={styles.treeStoreName}>{s.name}</span>
-                <span className={styles.spacer} aria-hidden="true" />
-                <Status value={s.status} />
-              </div>
-            ))}
+        <div className={styles.tree}>
+          <div className={styles.treeExpanded}>
+            <Panel title="組織階層" flush>{organizationTree}</Panel>
           </div>
-          </div>
-        </Panel>
+          <Disclosure className={styles.treeCollapsed} title="組織階層" hint={`${data.stores.length} 店舗`}>
+            {organizationTree}
+          </Disclosure>
+        </div>
         <div className={styles.main}>
           <Panel
             title="店舗管理"
@@ -458,14 +467,20 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
                   <span role="cell" className={`${styles.cell} ${styles.colState}`}><Status value={m.status} /></span>
                   <span role="cell" className={`${styles.cell} ${styles.colOps}`}>
                     {readOnly ? null : (
-                      <span className={styles.ops}>
-                        <Button disabled={busy} onClick={() => { setEditingMemberId(m.id); setShowMemberForm(false) }}>変更</Button>
-                        {m.status === 'suspended' ? (
-                          <Button disabled={busy} onClick={() => void mutate(() => updateMember(m.id, { status: 'active' }), '再開しました。')}>再開</Button>
-                        ) : (
-                          <Button disabled={busy} onClick={() => setStopId(m.id)}>停止</Button>
-                        )}
-                      </span>
+                      <RowActions
+                        subjectName={m.staff_name}
+                        detail={{ label: '変更', disabled: busy, onClick: () => { setEditingMemberId(m.id); setShowMemberForm(false) } }}
+                        menuButtonProps={{ disabled: busy }}
+                        menuItems={[m.status === 'suspended' ? {
+                          id: 'resume', label: '再開', disabled: busy,
+                          disabledReason: busy ? 'ほかの操作を反映しています' : undefined,
+                          onSelect: () => void mutate(() => updateMember(m.id, { status: 'active' }), '再開しました。'),
+                        } : {
+                          id: 'stop', label: '停止', tone: 'danger', disabled: busy,
+                          disabledReason: busy ? 'ほかの操作を反映しています' : undefined,
+                          onSelect: () => setStopId(m.id),
+                        }]}
+                      />
                     )}
                   </span>
                 </div>

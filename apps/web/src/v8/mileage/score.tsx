@@ -4,7 +4,7 @@ import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Activity, Bookmark, ChevronDown, ChevronUp, CircleMinus, CirclePlus, Download, Minus, Plus, Send, Settings2, Star, TrendingDown, Upload, UserRound } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import {

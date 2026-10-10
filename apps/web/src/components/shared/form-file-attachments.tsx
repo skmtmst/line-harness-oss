@@ -25,7 +25,9 @@ function Attachment({ file }: { file: FormFileAnswer }) {
   }, [file.fileId, file.state])
   if (file.state === 'expired') return <span>期限で消しました</span>
   if (file.state === 'restricted') return <span><Lock size={14} aria-hidden />見る権限がありません</span>
-  if (file.state !== 'ready') return <span>検査が終わるまで開けません</span>
+  if (file.state === 'quarantined') return <span>危ないファイルのため開けません</span>
+  if (file.state === 'rejected') return <span>安全を確認できませんでした。別のファイルを選んでください</span>
+  if (file.state !== 'ready') return <span>検査中です</span>
   const pdf = file.mimeType === 'application/pdf'
   return <>
     <Button size="compact" onClick={() => setOpen(true)} aria-label={`${file.filename || '書類'}を開く`}>

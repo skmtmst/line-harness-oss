@@ -1,37 +1,24 @@
 'use client'
-import { canEditFeature } from '@/lib/staff-capability';
-import Toggle from '@/components/shared/toggle';
-
+import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
+import Toggle from '@/components/shared/toggle'
 import { jstDate } from '@/lib/jst-datetime'
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import { useStaffRole } from '@/lib/staff-role'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { CalendarPlus, Plus, Smartphone, Trash2, UserX } from 'lucide-react'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import {
-  ApiError,
-  api,
-  bookingApi,
-  type BookingAvailabilitySlot,
-  type BookingBreakConflict,
-  type BookingException,
-  type BookingMenu,
-  type BookingShift,
-  type BookingStaff,
-} from '@/lib/api'
+import { ApiError, api, bookingApi, type BookingAvailabilitySlot, type BookingBreakConflict, type BookingException, type BookingMenu, type BookingShift, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { canViewFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { SettingCheckbox } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
-import { SettingCheckbox } from '@/components/shared/checkbox'
-import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import { isForbiddenOrRateLimited, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
 import { PhoneDatetimeStep } from './phone'
 import layout from './layout.module.css'
@@ -39,11 +26,11 @@ import styles from './shifts.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8「勤務とシフト」（板 d5fmnM・管理者）・「自分の勤務」（板 E3YDK・スタッフ本人）・
@@ -221,12 +208,7 @@ function PageState({ node, self, title, desc, icon, actions, head }: {
     <div className={layout.shell} data-design-node={node}>
       {head ?? <Head self={self} />}
       <div className={styles.stateBody}>
-        <div className={styles.stateCard} role={icon ? undefined : 'status'}>
-          {icon}
-          <p className={styles.stateTitle}>{title}</p>
-          <p className={styles.stateDesc}>{desc}</p>
-          {actions ? <div className={styles.stateActions}>{actions}</div> : null}
-        </div>
+        <ListState kind={title.includes('読み込み') ? 'loading' : icon ? 'error' : 'empty'} title={title} description={desc} icon={icon} action={actions} />
       </div>
     </div>
   )
@@ -1289,7 +1271,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                   </Button>
                 ) : null}
               </div>
-              {genError ? <p className={layout.fieldError} role="alert">{genError}</p> : null}
+              {genError ? <Notice tone="danger" className={layout.fieldErrorNoticePlacement} >{genError}</Notice> : null}
               {generatedCount !== null && !genError ? <p className={styles.savedNote} role="status">{generatedCount}日分作りました。</p> : null}
             </section> : null}
 

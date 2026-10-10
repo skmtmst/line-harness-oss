@@ -4,7 +4,7 @@ import { notifySaved } from '@/components/shared/toast'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { CircleDot, Plug, Star } from 'lucide-react'
 import { ecEventLabel, type ApiResponse } from '@line-crm/shared'
 import Button from '@/components/shared/button'
@@ -340,7 +340,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
       ...(canEdit && action.retryAvailable
         ? [{
             id: 'retry',
-            label: retryingId === action.id ? '戻しています…' : 'もう一度やる',
+            label: 'もう一度やる',
             disabled: retryingId === action.id,
             onSelect: () => void retry(action),
           }]
@@ -363,7 +363,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
           {overviewState === 'forbidden'
             ? permissionDeniedMessage('store')
             : '集計だけを読み込めませんでした。一覧は取得できた範囲で表示しています。'}
-          {overviewState === 'error' ? <Button variant="text" onClick={() => void loadOverview(false)}>集計をもう一度読む</Button> : null}
+          {overviewState === 'error' ? <Button variant="text" onClick={() => loadOverview(false)} busyLabel="処理中…">集計をもう一度読む</Button> : null}
         </p>
       ) : null}
       {notice ? <p className={notice.tone === 'success' ? styles.noticeGood : styles.noticeBad} role={notice.tone === 'success' ? 'status' : 'alert'}>{notice.text}</p> : null}

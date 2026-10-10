@@ -1,32 +1,23 @@
 'use client'
 
-import { canManageRole } from '@/lib/staff-role';
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useFolderMove } from '@/components/shared/use-folder-move'
-import { moveConversionToFolder } from '@/lib/move-to-folder'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  Banknote,
-  Bookmark,
-  CircleOff,
-  CirclePause,
-  Download,
-  Eye,
-  FilePen,
-  KeyRound,
-  Pause,
-  Play,
-  Plus,
-  Target,
-  TriangleAlert,
-  Trophy,
-  Unplug,
-} from 'lucide-react'
-import { ListPage, ListPagePagination } from '@/components/templates'
-import ListToolbar from '@/components/shared/list-toolbar'
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import { useListUrlValue, useListUrlParam } from '@/components/shared/list-url-state';
+import { useDetailPanelUrl } from '@/components/shared/detail-panel';
+
+
+
+
+import { useFolderMove } from '@/components/shared/use-folder-move';
+import { moveConversionToFolder } from '@/lib/move-to-folder';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Banknote, Bookmark, CircleOff, CirclePause, Download, FilePen, KeyRound, Pause, Play, Plus, Target, TriangleAlert, Trophy, Unplug } from 'lucide-react';
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { Eye } from 'lucide-react';
+import { ListPage, ListPagePagination } from '@/components/templates';
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
@@ -35,65 +26,41 @@ import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
-import { ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
-import PageSizeSelect from '@/components/ui/page-size-select'
-import ManagedFolderPanel, { folderDotFor, managedFolderOptions, useManagedFolders } from '@/components/shared/managed-folder-panel'
-import { useListUrlParam } from '@/components/shared/list-url-state'
-import { FolderDotName } from '@/components/shared/folder-dot'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import PageSizeSelect from '@/components/shared/page-size-select'
+import ManagedFolderPanel, { folderDotFor, managedFolderOptions, useManagedFolders } from '@/components/shared/managed-folder-panel';
+import { FolderDotName } from '@/components/shared/folder-dot';
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu } from '@/components/shared/row-actions';
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import Disclosure from '@/components/shared/disclosure'
-import { Field } from '@/components/shared/form-controls'
-import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls';
+import { TextField } from '@/components/shared/text-field';
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import Card from '@/components/shared/card'
 import Pagination from '@/components/shared/pagination'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import { findConditionDraftIssue, pruneCondition } from '@/components/shared/condition-builder'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useAccount } from '@/contexts/account-context'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { useStaffRole } from '@/lib/staff-role'
-import { canEditFeature } from '@/lib/staff-capability'
-import { formatNumber } from '@/lib/format'
-import {
-  api,
-  describeSaveFailure,
-  type ConversionDefinitionDeleteImpact,
-  type ConversionDefinitionEvent,
-  type ConversionDefinitionFilter,
-  type ConversionDefinitionList,
-  type ConversionDefinitionListItem,
-  type ConversionDefinitionReport,
-  type ConversionIngestionEvent,
-} from '@/lib/api'
-import { deduplicationLabel } from './dedup'
-import { originInfoOf } from './origin-labels'
-import { readExclusionCondition, readExclusionMemo } from './exclusion'
-import {
-  ConversionDetailDialog,
-  ConversionEditDialog,
-  ConversionReversalDialog,
-  EDIT_VALUE_MODE_LABELS,
-  STATE_LABELS,
-  sourceTriggerLabel,
-  usageLabel,
-  type ConversionStopAction,
-  type EditForm,
-} from './dialogs'
-import { notifyToast } from '@/components/shared/toast'
-import { focusConversionField, type ConversionFieldIssue } from './field-issue'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
+import { findConditionDraftIssue, pruneCondition } from '@/components/shared/condition-builder';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { useAccount } from '@/contexts/account-context';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { canEditFeature } from '@/lib/staff-capability';
+import { formatNumber, formatDate as polishFormatDate } from '@/lib/format';
+import { api, describeSaveFailure, type ConversionDefinitionDeleteImpact, type ConversionDefinitionEvent, type ConversionDefinitionFilter, type ConversionDefinitionList, type ConversionDefinitionListItem, type ConversionDefinitionReport, type ConversionIngestionEvent } from '@/lib/api';
+import { deduplicationLabel } from './dedup';
+import { originInfoOf } from './origin-labels';
+import { readExclusionCondition, readExclusionMemo } from './exclusion';
+import { ConversionDetailDialog, ConversionEditDialog, ConversionReversalDialog, EDIT_VALUE_MODE_LABELS, STATE_LABELS, sourceTriggerLabel, usageLabel, type ConversionStopAction, type EditForm } from './dialogs';
+import { notifyToast } from '@/components/shared/toast';
+import { focusConversionField, type ConversionFieldIssue } from './field-issue';
 import styles from './list.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { withPermissionFailure } from '@/components/shared/api-error-message';
+import { csvFileName } from '@/lib/csv-file-name';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 コンバージョンの一覧（Pencil：一覧 `r6dJFy`・1152 `BygrU`・閲覧のみ `WSGvo`・
@@ -306,7 +273,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   accountIdRef.current = accountId
 
   /* 表の下の詳細の小窓（行を押すと開く）と、止める小窓。 */
-  const [panelId, setPanelId] = useState<string | null>(null)
+  const [panelId, setPanelId] = useDetailPanelUrl('point')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [stopTarget, setStopTarget] = useState<ConversionDefinitionListItem | null>(null)
   const [stopImpact, setStopImpact] = useState<ConversionDefinitionDeleteImpact | null>(null)
@@ -979,7 +946,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       {issuedSecret && panelPoint.measureMethod === 'webhook' ? (
         <p className={styles.secretBox} role="status">{`発行した鍵（この表示でだけ見られます。連携先へ渡してください）：${issuedSecret}`}</p>
       ) : null}
-      {ingestError ? <p className={styles.errorText} role="alert">{ingestError}</p> : null}
+      {ingestError ? <Notice tone="danger" >{ingestError}</Notice> : null}
       <div className={styles.panelButtons}>
         {canEdit && panelPoint.measureMethod === 'webhook' && panelPoint.status !== 'stopped' ? (
           <Button onClick={() => void issueIngest(panelPoint)} disabled={ingestBusy !== ''} busy={ingestBusy === 'issue'} busyLabel="発行しています"><KeyRound size={15} aria-hidden="true" />鍵を発行する</Button>
@@ -991,8 +958,8 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       </div>
       {canEdit && panelPoint.status !== 'stopped' ? (
         <div className={styles.panelButtons}>
-          {panelPoint.state !== 'draft' ? <Button onClick={() => void openStop(panelPoint, 'stop')}><Pause size={15} aria-hidden="true" />止める</Button> : null}
-          <Button variant="danger" onClick={() => void openStop(panelPoint, 'delete')}>削除する</Button>
+          {panelPoint.state !== 'draft' ? <Button onClick={() => openStop(panelPoint, 'stop')} busyLabel="処理中…"><Pause size={15} aria-hidden="true" />止める</Button> : null}
+          <Button variant="danger" onClick={() => openStop(panelPoint, 'delete')} busyLabel="処理中…">削除する</Button>
         </div>
       ) : null}
     </Card>
@@ -1060,7 +1027,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           onChange={(event) => setStopReason(event.target.value)}
         /></SaveErrorField>
       </Field>
-      {stopError ? <p className={styles.errorText} role="alert">{stopError}</p> : null}
+      {stopError ? <Notice tone="danger" >{stopError}</Notice> : null}
       <div className={styles.panelActions}>
         <Button onClick={() => setStopTarget(null)} disabled={stopping}>キャンセル</Button>
         <Button
@@ -1132,7 +1099,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
                     className={styles.row}
                     data-table-layout="columns"
                     data-row-id={point.id}
-                    onClick={() => setPanelId((currentId) => (currentId === point.id ? null : point.id))}
+                    detailKey="point" onOpen={() => setPanelId((currentId) => (currentId === point.id ? null : point.id))}
                   >
                     <Td className={styles.colName}>
                       {/* 名前の前に左の列と同じフォルダの色の丸（未分類は色の無い輪）。札は名前の頭にそろえる。 */}
@@ -1163,7 +1130,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
                       <span className={styles.usageMain} title={usageLabel(point)}>{usage.main}</span>
                       {usage.sub ? <span className={styles.cellSub} title={usage.sub}>{usage.sub}</span> : null}
                     </Td>
-                    <Td className={styles.colOps} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.colOps}>
                       <div className={styles.opsBox}>
                         {canEdit
                           ? <Button href={addUsageHref(point)}>使う場所を足す</Button>
@@ -1246,10 +1213,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       }
       stats={<>
         {!canEdit && role !== null ? (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
         {exportError ? <div className={styles.statsNotice}><Notice tone="warn">{exportError}</Notice></div> : null}
         {actionError ? <div className={styles.statsNotice}><Notice tone="warn">{actionError}</Notice></div> : null}
@@ -1257,7 +1221,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
         {highlightedPoint ? <div className={styles.statsNotice}><Notice tone="success">{`「${highlightedPoint.name}」を保存しました。色の付いた行です。`}</Notice></div> : null}
         {reportFailed && !loadFailed ? (
           <div className={styles.statsNotice}>
-            <Notice tone="info" action={<Button onClick={() => void reloadReport()}>集計を読み直す</Button>}>集計を表示できませんでした。一覧はそのまま使えます。</Notice>
+            <Notice tone="info" action={<Button onClick={() => reloadReport()} busyLabel="処理中…">集計を読み直す</Button>}>集計を表示できませんでした。一覧はそのまま使えます。</Notice>
           </div>
         ) : null}
         <KpiBand>

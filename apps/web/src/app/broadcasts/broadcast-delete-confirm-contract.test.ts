@@ -104,8 +104,10 @@ describe('一斉配信一覧の削除確認', () => {
   })
 
   it('削除ボタンは窓を開くだけで、押した時点では消さない', () => {
-    // m13f：行を押すと詳細へ行くため、行の中の操作は行へ伝えない。開くだけの動きは同じ。
-    expect(PAGE).toContain('onClick={(event) => event.stopPropagation()}')
+    // 行内操作の独立は共通Trの動きの試験で守る。削除の入口は確認だけ。
     expect(PAGE).toContain("onSelect: () => requestDelete(broadcast)")
+    const body = fnBody(PAGE, 'const requestDelete = (broadcast: ApiBroadcast) =>')
+    expect(body).toContain('setDeleteTarget(broadcast)')
+    expect(body).not.toContain('api.broadcasts.delete')
   })
 })

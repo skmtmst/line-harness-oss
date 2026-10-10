@@ -250,22 +250,7 @@
 .spacer { flex: 1 1 0; }
 
 /* 閲覧のみの帯（数の帯の上）。薄い青の地・目の印・枠なし。 */
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  margin: var(--tpl-af-ro-before) var(--tpl-head-pad-side) var(--tpl-af-ro-after);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
-.viewerBand > svg {
-  flex-shrink: 0;
-  color: var(--color-action);
-}
+.viewerBand { margin: var(--tpl-af-ro-before) var(--tpl-head-pad-side) var(--tpl-af-ro-after); }
 /* 閲覧のみで隠した作るボタン（＋下の間）の場所だけ空ける。 */
 .viewerCreateSpace { display: block; height: var(--tpl-af-viewer-create-h); }
 

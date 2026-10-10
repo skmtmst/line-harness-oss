@@ -1,0 +1,2996 @@
+{
+  "version": "2026-10-09",
+  "doc": "docs/v8-pattern-catalog.md",
+  "note": "型の対応表の機械の表。人が読む説明は docs/v8-pattern-catalog.md。正規表現は JavaScript の書き方（JSON の文字列）。持ち主（owner）は B-172：形と値を持つ所は1つ。",
+  "global": {
+    "code": {
+      "excludeFiles": [
+        "\\.(test|spec)\\.(tsx?|mjs)$",
+        "\\.d\\.ts$",
+        "__mocks__|__tests__|\\/fixtures?\\/",
+        "apps\\/web\\/src\\/app\\/visual-qa\\/",
+        "apps\\/web\\/src\\/app\\/globals\\.css$",
+        "\\.stories\\.tsx$"
+      ],
+      "excludeLine": [
+        "^\\s*(\\/\\/|\\*)"
+      ],
+      "hardcodeExcludeFiles": [
+        "apps\\/web\\/src\\/app\\/globals\\.css$"
+      ]
+    },
+    "pen": {
+      "excludeBoards": [
+        "^components-",
+        "^(vfssS|GxpYg|DIHFx|FK5m7|POW0X|aHrwg|cnrwl|HkyJN|kzrjy)$"
+      ],
+      "ancestorNot": [
+        "^(左メニュー|トップバー|LINEの見え方|スマホの置き場|島|LIFFの帯|検証環境の帯)"
+      ],
+      "compareProps": [
+        "background-color",
+        "outline",
+        "box-shadow",
+        "border-radius"
+      ]
+    }
+  },
+  "patterns": [
+    {
+      "id": "card",
+      "name": "カード（中身のまとまりの箱）",
+      "role": "中身のまとまりを白地＋薄い縁＋影＋角丸12で1枚に見せる",
+      "rules": [
+        "§6.2",
+        "§6.18",
+        "B-137",
+        "B-148",
+        "B-168"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/card.tsx",
+            "apps/web/src/components/shared/card.module.css"
+          ],
+          "components": [
+            "Card",
+            "CardHeader"
+          ],
+          "vars": [
+            "--card-shadow",
+            "--card-edge",
+            "--radius-card"
+          ]
+        },
+        "pen": [],
+        "status": "Pen にカードの部品が無い（B-168「Pen もカードは部品のカードだけ」の部品を作る）"
+      },
+      "code": {
+        "selectorHint": "card|panel|box|tile|section\\b|sheet|block",
+        "overrideSelectors": [],
+        "signals": [
+          {
+            "id": "ring-card",
+            "css": {
+              "all": [
+                "border-radius:\\s*(12px|var\\(--radius-card\\))",
+                "box-shadow:\\s*var\\(--tpl-[\\w-]*ring\\)|border:\\s*1px solid var\\(--color-(hairline|divider|border[\\w-]*)\\)|outline:\\s*1px"
+              ],
+              "none": [
+                "--card-shadow"
+              ]
+            },
+            "why": "カードの角丸で線だけ（影なし）の箱（B-168）"
+          },
+          {
+            "id": "own-shadow-card",
+            "css": {
+              "all": [
+                "border-radius:\\s*(12px|var\\(--radius-card\\))",
+                "box-shadow:\\s*(0|[^;v]*rgba|var\\(--shadow-card)"
+              ],
+              "none": [
+                "--card-shadow"
+              ]
+            },
+            "why": "カードの角丸で別の影の箱"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "outline-card",
+            "why": "白地・角丸12・線だけで影なし（カードの部品を使わない手描き）",
+            "style": [
+              "border-radius: 12px",
+              "background-color: #ffffff",
+              "outline: 1px"
+            ],
+            "styleNot": [
+              "0px 1px 1px #1d1d1f29",
+              "0px 8px 24px"
+            ],
+            "nameNot": "^(知らせ|選ぶカード|選ぶ欄|ポップ|吹き出し|ダイアログ|窓)"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [],
+        "needed": "画面の .module.css に「角丸がカードの値・枠だけ・--card-shadow なし」の規則を新しく書いたら落ちる試験（例外は一覧に理由つき。B-168）"
+      }
+    },
+    {
+      "id": "kpi-band",
+      "name": "数の帯",
+      "role": "数（KPI）を線で区切った1本の帯で並べる",
+      "rules": [
+        "§6.7",
+        "§6.1",
+        "B-149",
+        "B-153",
+        "B-145"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/kpi-band.tsx",
+            "apps/web/src/components/shared/kpi-card.tsx",
+            "apps/web/src/components/shared/kpi-card.module.css",
+            "apps/web/src/components/shared/kpi-band-v8.css",
+            "apps/web/src/components/shared/list-kpis.tsx"
+          ],
+          "components": [
+            "KpiBand",
+            "KpiCard",
+            "ListKpis"
+          ],
+          "vars": [
+            "--color-hairline"
+          ]
+        },
+        "pen": [
+          {
+            "id": "Pp3nS",
+            "name": "数のマス"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "kpi|stat|metric|summary(Cell|Item)|count(Cell|Box)",
+        "overrideSelectors": [
+          "kpi|stat"
+        ],
+        "signals": [
+          {
+            "id": "own-stat",
+            "re": "\\b(function|const)\\s+(StatCard|Stat|MiniStat|Kpi|KpiMenu|StatTile|Metric|SummaryCard)\\b",
+            "why": "画面で数のマスを自作（KpiCard を使う）"
+          },
+          {
+            "id": "cards",
+            "re": "presentation=[\"']cards[\"']",
+            "why": "数の並びをカードにしている（B-153 は線の帯）"
+          },
+          {
+            "id": "kpi-class",
+            "re": "styles\\.(kpi|stat|stats|kpis|metric|metrics|summaryCards?)\\b",
+            "why": "数の帯を CSS で手書き",
+            "onlyWithoutCanonical": true
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "kpi-card",
+            "why": "数のカード（影の箱）で数を並べている",
+            "name": "数のカード|^数 ",
+            "style": [
+              "box-shadow: 0px 1px 1px #1d1d1f29"
+            ]
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/kpi-band-contract.test.tsx",
+          "apps/web/src/components/shared/kpi-card-migration-contract.test.tsx",
+          "apps/web/src/components/shared/list-kpis-contract.test.ts"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "page-head",
+      "name": "一覧・画面の頭",
+      "role": "板の題・「？」・右の主ボタンを1段で出す",
+      "rules": [
+        "§5",
+        "§6.12-2",
+        "B-158"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/templates/page-frame.tsx",
+            "apps/web/src/components/shared/page-header.tsx",
+            "apps/web/src/components/shared/help-tip.tsx"
+          ],
+          "components": [
+            "PageHeading",
+            "PageTitle",
+            "PageFrame",
+            "ListPage",
+            "CreatePage",
+            "DetailPage",
+            "DashboardPage",
+            "SettingsPage",
+            "AnalyticsPage",
+            "InboxPage"
+          ],
+          "vars": [
+            "--text-title"
+          ]
+        },
+        "pen": [
+          {
+            "id": "EnlYo",
+            "name": "板の頭"
+          },
+          {
+            "id": "KjC1z",
+            "name": "？"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "pageHead|heading|header\\b|title\\b|lead|subtitle|description",
+        "overrideSelectors": [
+          "heading|pageHead"
+        ],
+        "signals": [
+          {
+            "id": "raw-h1",
+            "re": "<h1\\b",
+            "why": "題を h1 で手書き（型の PageHeading を使う）",
+            "onlyWithoutCanonical": true
+          },
+          {
+            "id": "header-desc",
+            "re": "<PageHeader\\b(?:[^<>]|=>){0,400}?\\bdescription=",
+            "why": "頭の下の説明（B-158 の 2：説明は「？」へ）"
+          },
+          {
+            "id": "lead",
+            "re": "className=\\{styles\\.(lead|subtitle|pageDescription|headDescription|intro)\\}",
+            "why": "題の下の説明の行"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "desc-line",
+            "why": "頭の下の説明の行（「？」へ入れる）",
+            "name": "^説明の行$|^説明$",
+            "ancestor": "^板の頭|^頭$"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/page-header-enlyo-contract.test.ts",
+          "apps/web/src/components/templates/page-templates-head-contract.test.ts"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "toolbar",
+      "name": "一覧の道具の段",
+      "role": "検索→絞り込みの札→並び→右端に件数の切り替えを1段で並べる",
+      "rules": [
+        "§6.8",
+        "§6.11-12",
+        "B-143",
+        "B-122",
+        "B-157"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/list-toolbar.tsx",
+            "apps/web/src/components/shared/list-toolbar.module.css",
+            "apps/web/src/components/shared/search-field.tsx"
+          ],
+          "components": [
+            "ListToolbar",
+            "ListToolbarSearch",
+            "ListToolbarOptional"
+          ],
+          "vars": [
+            "--color-control-border",
+            "--control-shadow"
+          ]
+        },
+        "pen": [
+          {
+            "id": "c4n9Kr",
+            "name": "道具の1段"
+          },
+          {
+            "id": "TkVyB",
+            "name": "検索"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "toolbar|toolBar|controls\\b|filters?Row|searchRow",
+        "overrideSelectors": [
+          "toolbar"
+        ],
+        "signals": [
+          {
+            "id": "toolbar-class",
+            "re": "styles\\.(toolbar|toolBar|tools|controlsRow|filterBar|filtersRow|searchRow)\\b",
+            "why": "道具の段を CSS で手書き",
+            "onlyWithoutCanonical": true
+          },
+          {
+            "id": "search-alone",
+            "re": "<SearchField\\b",
+            "why": "検索欄を道具の段の外で置いている",
+            "onlyWithoutCanonical": true
+          },
+          {
+            "id": "sort-alone",
+            "re": "<SortSelect\\b",
+            "why": "並びの欄を道具の段の外で置いている",
+            "onlyWithoutCanonical": true
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-toolbar",
+            "why": "道具の段の手描き（部品「道具の1段」でない）",
+            "name": "^(道具|道具の段|検索の段|絞り込みの段)$"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/list-toolbar-contract.test.tsx",
+          "apps/web/src/components/ui/list-controls-contract.test.ts"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "filter",
+      "name": "絞り込み",
+      "role": "一覧を状態・種類などで絞る札。数が増える物は選ぶ窓で絞る",
+      "rules": [
+        "§6.17",
+        "B-164",
+        "B-163"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/filter-chip.tsx",
+            "apps/web/src/components/shared/filter-chip.css"
+          ],
+          "components": [
+            "FilterChip"
+          ],
+          "vars": [
+            "--color-control-border"
+          ]
+        },
+        "pen": [
+          {
+            "id": "XGJDa",
+            "name": "絞り込みの札/オン"
+          },
+          {
+            "id": "O2fCAt",
+            "name": "絞り込みの札/オフ"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "filter|chip",
+        "overrideSelectors": [
+          "filter|chip"
+        ],
+        "signals": [
+          {
+            "id": "growing-select",
+            "re": "<Select\\b(?:[^<>]|=>){0,400}?(label|aria-label|placeholder)=[\"'][^\"']*(店舗|タグ|シナリオ|担当者|所属アカウント|送信者|スタッフ|テンプレート)",
+            "why": "数が増える物の絞り込みをプルダウンで（B-164 は選ぶ窓）"
+          },
+          {
+            "id": "own-chip",
+            "re": "aria-pressed=\\{",
+            "why": "絞り込みの札を aria-pressed で自作",
+            "onlyWithoutCanonical": true
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-chip",
+            "why": "絞り込みの札の手描き",
+            "name": "^(札 すべて|絞り込み|札 絞り込み)",
+            "nameNot": "絞り込みの札|窓を開く"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/filter-chip.test.tsx"
+        ],
+        "needed": "道具の段の絞り込みで、作った物（店舗・タグ・シナリオ）を Select で並べたら落ちる試験"
+      }
+    },
+    {
+      "id": "folder-column",
+      "name": "フォルダの列",
+      "role": "一覧の左でフォルダを選び・作り・並べ替える",
+      "rules": [
+        "§2",
+        "§6.8",
+        "B-143",
+        "B-136",
+        "B-126",
+        "B-147"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/managed-folder-panel.tsx",
+            "apps/web/src/components/shared/managed-folder-panel.module.css",
+            "apps/web/src/components/shared/folder-panel.tsx",
+            "apps/web/src/components/shared/folder-panel.module.css",
+            "apps/web/src/components/shared/folder-row-actions.tsx",
+            "apps/web/src/components/shared/folder-add-dialog.tsx",
+            "apps/web/src/components/shared/folder-editor-dialog.tsx",
+            "apps/web/src/components/shared/folder-dot.tsx"
+          ],
+          "components": [
+            "ManagedFolderPanel",
+            "FolderPanel",
+            "FolderDot"
+          ],
+          "vars": [
+            "--color-hairline"
+          ]
+        },
+        "pen": [
+          {
+            "id": "faSbC",
+            "name": "フォルダの列"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "folder|rail",
+        "overrideSelectors": [
+          "folder|rail"
+        ],
+        "signals": [
+          {
+            "id": "raw-panel",
+            "re": "<FolderPanel\\b",
+            "why": "FolderPanel を直に使う（ManagedFolderPanel にする）",
+            "onlyWithoutCanonical": true
+          },
+          {
+            "id": "row-actions",
+            "re": "\\buseFolderRowActions\\(",
+            "why": "フォルダの行の「…」を画面で組む"
+          },
+          {
+            "id": "own-dialog",
+            "re": "<(FolderAddDialog|FolderEditorDialog)\\b",
+            "why": "フォルダの窓を画面で直に出す"
+          },
+          {
+            "id": "folder-words",
+            "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:フォルダを追加する|見る：|フォルダを消しても)",
+            "why": "フォルダの列の言葉が決まりと違う"
+          }
+        ],
+        "canonicalUse": "<ManagedFolderPanel\\b"
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-folders",
+            "why": "フォルダの列の手描き（部品 faSbC でない名前）",
+            "name": "^(フォルダ|フォルダの一覧|左の列|見る)$"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/folder-panel-contract.test.ts",
+          "apps/web/src/components/shared/managed-folder-panel.test.tsx",
+          "apps/web/src/components/shared/folder-rail-owner-contract.test.ts",
+          "apps/web/src/v8/folder-dot-1152-contract.test.ts"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "table",
+      "name": "表",
+      "role": "一覧の行を見出し40・行56・左右16・線は黒7%で並べる",
+      "rules": [
+        "§6.5-3",
+        "§6.1",
+        "B-152",
+        "B-160"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/table.tsx",
+            "apps/web/src/components/shared/table.module.css",
+            "apps/web/src/components/shared/grid-table.tsx",
+            "apps/web/src/components/shared/grid-table.module.css",
+            "apps/web/src/components/shared/data-table.module.css",
+            "apps/web/src/components/shared/table-presentation.module.css"
+          ],
+          "components": [
+            "DataTable",
+            "TableHeadRow",
+            "Th",
+            "Tr",
+            "Td",
+            "SortTh",
+            "GridTable",
+            "GridHeadRow",
+            "GridRow",
+            "GridCell"
+          ],
+          "vars": [
+            "--color-table-head",
+            "--color-hairline"
+          ]
+        },
+        "pen": [
+          {
+            "id": "ASVsl",
+            "name": "表の見出し"
+          },
+          {
+            "id": "JpOg0",
+            "name": "表の行"
+          },
+          {
+            "id": "TBCUY",
+            "name": "横に送れる表"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "table|row\\b|rows\\b|cell|thead|tbody|\\bth\\b|\\btd\\b|\\btr\\b",
+        "overrideSelectors": [
+          "\\b(table|thead|tbody|tr|th|td)\\b"
+        ],
+        "signals": [
+          {
+            "id": "raw-table",
+            "re": "<table\\b",
+            "why": "表を素の table で手書き"
+          },
+          {
+            "id": "raw-grid",
+            "re": "role=[\"'](grid|row|columnheader|rowheader)[\"']",
+            "why": "表を role で手書き"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-row",
+            "why": "表の行の手描き（部品「表の行」でない）",
+            "name": "^行 ",
+            "style": [
+              "height: 5\\d px|height: 5\\dpx|height: (52|54|56|60|61)px"
+            ]
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/table.test.tsx",
+          "apps/web/src/components/shared/v8-table-row-line-contract.test.ts",
+          "apps/web/src/components/shared/table-header-migration-contract.test.ts"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "row-menu",
+      "name": "行の右端「…」",
+      "role": "行の操作を右端の「…」1つにまとめる",
+      "rules": [
+        "§2",
+        "§6.8",
+        "B-143"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/row-actions.tsx",
+            "apps/web/src/components/shared/row-actions.module.css",
+            "apps/web/src/components/shared/action-menu.tsx",
+            "apps/web/src/components/shared/action-menu.module.css"
+          ],
+          "components": [
+            "RowMenu",
+            "MoreAction",
+            "RowActions",
+            "RowAction",
+            "RowQuickAction"
+          ],
+          "vars": []
+        },
+        "pen": [
+          {
+            "id": "hnuY9",
+            "name": "その他操作メニュー"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "rowMenu|rowAction|more\\b|kebab|ellipsis|rowButtons?",
+        "overrideSelectors": [
+          "rowMenu|rowAction|more"
+        ],
+        "signals": [
+          {
+            "id": "own-dots",
+            "re": ">\\s*(…|⋯|\\.\\.\\.)\\s*<",
+            "why": "「…」を手で描く"
+          },
+          {
+            "id": "dots-icon",
+            "re": "\\b(MoreHorizontal|MoreVertical|DotsHorizontal|EllipsisHorizontal|Ellipsis)\\b",
+            "why": "「…」の印を手で置く",
+            "onlyWithoutCanonical": true
+          },
+          {
+            "id": "row-buttons",
+            "re": "styles\\.(rowActions|rowButtons|actionsCell|rowOps)\\b",
+            "why": "行の右端にボタンを並べる",
+            "onlyWithoutCanonical": true
+          }
+        ]
+      },
+      "pen": {
+        "ancestorNot": [
+          "^その他の操作"
+        ],
+        "markers": [
+          {
+            "id": "hand-dots",
+            "why": "「…」の手描き（その他の操作の部品でない）",
+            "text": "^(…|⋯)$",
+            "ancestor": "^行|表の行"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/row-actions-contract.test.tsx",
+          "apps/web/src/v8/row-menu-contract.test.ts"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "pagination",
+      "name": "ページ送り",
+      "role": "ページを送り、10・20・50件を切り替える",
+      "rules": [
+        "§2",
+        "§6.8",
+        "B-143"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/pagination.tsx",
+            "apps/web/src/components/shared/pagination.module.css",
+            "apps/web/src/components/ui/page-size-select.tsx",
+            "apps/web/src/components/ui/list-range.tsx",
+            "apps/web/src/components/shared/page-size-select.tsx"
+          ],
+          "components": [
+            "Pagination",
+            "PageSizeSelect",
+            "ListPagePagination"
+          ],
+          "vars": []
+        },
+        "pen": [
+          {
+            "id": "jX2Uw",
+            "name": "ページ送り"
+          }
+        ],
+        "status": "PageSizeSelect は components/ui にあり shared に無い（B-143）"
+      },
+      "code": {
+        "selectorHint": "pagination|pager|pageSize|perPage",
+        "overrideSelectors": [
+          "pagination|pager"
+        ],
+        "signals": [
+          {
+            "id": "own-size",
+            "re": "\\b(const|let)\\s+\\w*(PAGE_SIZE|PAGE_SIZES|PER_PAGE|pageSizes|perPageOptions)\\w*\\s*=",
+            "why": "件数の定数を画面ごとに持つ"
+          },
+          {
+            "id": "size-100",
+            "re": "\\[\\s*20\\s*,\\s*50\\s*,\\s*100\\s*\\]",
+            "why": "件数が 20・50・100（決まりは 10・20・50）"
+          },
+          {
+            "id": "more",
+            "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:もっと読む|さらに読み込む|もっと見る)",
+            "why": "「もっと読む」（ページ送りにする）"
+          },
+          {
+            "id": "prev-next",
+            "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:前へ|次へ)",
+            "why": "前へ・次へを手で置く",
+            "onlyWithoutCanonical": true
+          }
+        ]
+      },
+      "pen": {
+        "ancestorNot": [
+          "^ページ送り"
+        ],
+        "markers": [
+          {
+            "id": "hand-pager",
+            "why": "ページ送りの手描き",
+            "text": "^(前へ|次へ|もっと読む|‹|›)$"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/ui/list-range-contract.test.ts"
+        ],
+        "needed": "ページ送りのある一覧で件数の切り替え（10・20・50）が無い・定数を画面で持つと落ちる試験"
+      }
+    },
+    {
+      "id": "detail-panel",
+      "name": "詳細のパネル・引き出し",
+      "role": "行の詳細は右の DetailPanel 360、編集は Drawer 480/540",
+      "rules": [
+        "§6.12-8",
+        "B-158",
+        "B-160"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/detail-panel.tsx",
+            "apps/web/src/components/shared/detail-panel.module.css",
+            "apps/web/src/components/shared/drawer.tsx",
+            "apps/web/src/components/shared/drawer.module.css",
+            "apps/web/src/components/shared/slide-panel.tsx"
+          ],
+          "components": [
+            "DetailPanel",
+            "Drawer"
+          ],
+          "vars": [
+            "--radius-panel",
+            "--shadow-float"
+          ]
+        },
+        "pen": [],
+        "status": "Pen の部品 ID が対応表に無い（ZBjxY の「引き出し」は板の中の名前だけ）"
+      },
+      "code": {
+        "selectorHint": "drawer|panel|aside|sidePane|sheet",
+        "overrideSelectors": [
+          "drawer|detailPanel"
+        ],
+        "signals": [
+          {
+            "id": "fixed-right",
+            "css": {
+              "all": [
+                "position:\\s*fixed",
+                "right:\\s*0",
+                "width:\\s*\\d{3}px|width:\\s*min\\("
+              ],
+              "none": []
+            },
+            "why": "右から出るパネルを CSS で手書き"
+          },
+          {
+            "id": "aside",
+            "re": "<aside\\b",
+            "why": "右のパネルを aside で手書き",
+            "onlyWithoutCanonical": true
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "odd-width",
+            "why": "段にない幅のパネル（360・480・540・320・1160 以外）",
+            "name": "引き出し|詳細パネル|右の欄",
+            "style": [
+              "width: \\d+px"
+            ],
+            "styleNot": [
+              "width: (360|480|540|320|1160)px"
+            ]
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/detail-panel.test.tsx"
+        ],
+        "needed": "Drawer の幅が 480/540 以外・手書きの固定パネルで落ちる試験"
+      }
+    },
+    {
+      "id": "dialog",
+      "name": "窓（確かめ・編集）",
+      "role": "確かめ・編集・選ぶを、頭・本文・下の帯を線で分けた窓で出す",
+      "rules": [
+        "§5",
+        "§6.8",
+        "§6.12-8",
+        "B-145",
+        "B-146"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/dialog.tsx",
+            "apps/web/src/components/shared/dialog.module.css",
+            "apps/web/src/components/shared/confirm-dialog.tsx",
+            "apps/web/src/components/shared/overlay-utils.ts"
+          ],
+          "components": [
+            "Dialog",
+            "ConfirmDialog",
+            "DialogSteps"
+          ],
+          "vars": [
+            "--radius-panel",
+            "--shadow-float",
+            "--card-edge"
+          ]
+        },
+        "pen": [
+          {
+            "id": "q3DPdz",
+            "name": "ダイアログ/中"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "dialog|modal|overlay|backdrop",
+        "overrideSelectors": [
+          "dialog|modal|\\[role=.?dialog|::backdrop"
+        ],
+        "signals": [
+          {
+            "id": "raw-dialog",
+            "re": "role=[\"']dialog[\"']|aria-modal=|<dialog\\b",
+            "why": "窓を手書き"
+          },
+          {
+            "id": "confirm",
+            "re": "\\bwindow\\.confirm\\(|(?<![\\w.])confirm\\(\\s*['\"`]",
+            "why": "ブラウザの confirm"
+          },
+          {
+            "id": "half-q",
+            "re": "title=[\"'][^\"']*\\?[\"']",
+            "why": "窓の題の「?」が半角（B-146 の 6）"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-dialog",
+            "why": "窓の手描き（部品「ダイアログ/中」でない）",
+            "name": "(の窓|窓$|小窓)",
+            "nameNot": "選ぶ窓|窓を開く|窓で選ぶ",
+            "style": [
+              "border-radius: 16px"
+            ]
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/dialog-design-size-contract.test.tsx",
+          "apps/web/src/components/shared/confirm-dialog-design-size.test.tsx",
+          "apps/web/src/components/shared/dialog-design-header.react.test.tsx"
+        ],
+        "needed": "窓の題の終わりが半角「?」・記号なしで落ちる試験"
+      }
+    },
+    {
+      "id": "picker-dialog",
+      "name": "選ぶ窓",
+      "role": "作ってある物を、フォルダ・探す・見本付きの窓で選ぶ（受信箱の「テンプレートを選ぶ」の形1つ）",
+      "rules": [
+        "§6.10",
+        "§6.17",
+        "B-155",
+        "B-163",
+        "B-165",
+        "B-133"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/entity-picker.tsx",
+            "apps/web/src/components/shared/entity-picker.module.css",
+            "apps/web/src/components/shared/entity-picker-sources.tsx",
+            "apps/web/src/components/shared/hq-account-picker.tsx"
+          ],
+          "components": [
+            "EntityPickerDialog",
+            "EntityMultiPickerDialog",
+            "HqAccountPickerDialog"
+          ],
+          "vars": []
+        },
+        "pen": [
+          {
+            "id": "S2Vgi",
+            "name": "選ぶ窓（正の形・B-165）"
+          },
+          {
+            "id": "A1eZS",
+            "name": "選ぶ窓（V8-B の写し）"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "picker|chooser",
+        "overrideSelectors": [
+          "picker"
+        ],
+        "signals": [
+          {
+            "id": "old-picker",
+            "re": "<(SourcePickerDialog|SelectionDialog)\\b",
+            "why": "古い選ぶ窓（EntityPickerDialog にする）"
+          },
+          {
+            "id": "own-picker",
+            "re": "\\b(function|const)\\s+\\w*(Picker|Chooser|Selector)(Dialog|Modal)\\b",
+            "why": "画面で選ぶ窓を自作"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "old-window",
+            "why": "正の形でない選ぶ窓（dJZ7Q など古い窓）",
+            "name": "選ぶ窓|を選ぶ窓|1つ選ぶ窓",
+            "nameNot": "B-165|^10\\. 選ぶ窓"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/entity-picker.test.tsx",
+          "apps/web/src/components/shared/select-window-react.test.tsx"
+        ],
+        "needed": "選ぶ窓を SourcePickerDialog・自作の窓で出すと落ちる試験"
+      }
+    },
+    {
+      "id": "picker-field",
+      "name": "選ぶ欄（選ぶ前・選んだ後）",
+      "role": "選ぶ前は「〇〇を選ぶ」の副ボタン、選んだ後は見本・札＋「変える」",
+      "rules": [
+        "§2",
+        "§6.10",
+        "§6.17",
+        "B-155",
+        "B-163"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/entity-picker.tsx"
+          ],
+          "components": [
+            "EntityPickerSummary",
+            "EntityPickerField",
+            "HqAccountPickerField",
+            "HqAccountSelectField"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "Pen の欄の部品 ID が無い（決まりの板 MqqcW・aXUuh は見本。板では「選んだもの（B-163 窓で選ぶ）」の名前）"
+      },
+      "code": {
+        "selectorHint": "pickerField|picked|chosen",
+        "overrideSelectors": [],
+        "signals": [
+          {
+            "id": "select-entity",
+            "re": "<(Select|Combobox|MultiSelect)\\b(?:[^<>]|=>){0,500}?(label|aria-label|placeholder)=[\"'][^\"']*(テンプレート|回答フォーム|タグ|シナリオ|リッチメニュー|予約メニュー|クーポン|スタンプカード|スタッフ|セグメント|アカウント|店舗|友だち情報)",
+            "why": "作ってある物をプルダウンで選ばせる（B-155・B-163）"
+          },
+          {
+            "id": "multi-select",
+            "re": "<(MultiSelect|EntityMultiSelect)\\b",
+            "why": "下に広がる複数選び（B-163 は窓）"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "dropdown-entity",
+            "why": "作ってある物を選ぶ欄がプルダウンの形",
+            "name": "^欄 (テンプレート|回答フォーム|タグ|シナリオ|リッチメニュー|予約メニュー|クーポン|スタッフ|店舗|アカウント)"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/entity-picker.test.tsx"
+        ],
+        "needed": "作ってある物（テンプレート・タグ…）の label の Select が出たら落ちる試験"
+      }
+    },
+    {
+      "id": "select",
+      "name": "プルダウン（許される範囲）",
+      "role": "数が決まっていて少ない選択（種類・並び・期間・件数・役割など7個まで）だけ",
+      "rules": [
+        "§2",
+        "§6.17",
+        "B-45",
+        "B-163"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/select.tsx",
+            "apps/web/src/components/shared/select.module.css",
+            "apps/web/src/components/shared/select-menu.tsx",
+            "apps/web/src/components/shared/select-menu.module.css",
+            "apps/web/src/components/shared/menu-portal.tsx"
+          ],
+          "components": [
+            "Select",
+            "SelectMenu"
+          ],
+          "vars": [
+            "--color-control-border",
+            "--radius-control"
+          ]
+        },
+        "pen": [
+          {
+            "id": "wMMk6",
+            "name": "選ぶ欄"
+          },
+          {
+            "id": "StFE7",
+            "name": "選ぶ欄/開いた"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "select|dropdown|listbox|menuList",
+        "overrideSelectors": [
+          "select|dropdown|listbox"
+        ],
+        "signals": [
+          {
+            "id": "raw-select",
+            "re": "<select\\b",
+            "why": "素の select"
+          },
+          {
+            "id": "own-listbox",
+            "re": "role=[\"'](listbox|option|menu|menuitem)[\"']",
+            "why": "開いた一覧を手書き"
+          },
+          {
+            "id": "head-prefix",
+            "re": "label:\\s*['\"`](並び|フォルダ|状態)：",
+            "why": "選択肢に「並び：」などの頭（B-45）"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-open",
+            "why": "開いた中身の手描き（StFE7 でない）",
+            "name": "^(開いた|メニュー|選択肢の一覧|候補)$"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/select-menu.react.test.tsx",
+          "apps/web/src/components/shared/select-width-text.test.tsx",
+          "apps/web/src/components/shared/menu-portal-rollout-contract.test.ts"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "tap-action",
+      "name": "押したら（TapActionField）",
+      "role": "ボタン・面を押したときの動き（URL・テキスト・予約・回答フォーム・予約履歴・来店スタンプ）を選ぶ",
+      "rules": [
+        "§6.13",
+        "B-129",
+        "B-135"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/tap-action-field.tsx",
+            "apps/web/src/components/shared/tap-action-field.module.css",
+            "apps/web/src/lib/tap-actions.ts",
+            "apps/web/src/components/shared/use-tap-action-sources.ts"
+          ],
+          "components": [
+            "TapActionField",
+            "TapTargetPicker"
+          ],
+          "vars": []
+        },
+        "pen": [
+          {
+            "id": "Vx8Ny",
+            "name": "押したら（TapActionField）/閉じた"
+          },
+          {
+            "id": "XVGg5",
+            "name": "押したら/開いた"
+          },
+          {
+            "id": "c1qBx",
+            "name": "押したら/選んだ後"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "tapAction|actionType|tapType",
+        "overrideSelectors": [
+          "tapAction"
+        ],
+        "signals": [
+          {
+            "id": "old-uri",
+            "re": "<UriTapActionField\\b",
+            "why": "古い押したらの欄"
+          },
+          {
+            "id": "own-types",
+            "re": "['\"](uri|postback|message|datetimepicker)['\"]\\s*[,:]",
+            "why": "押したらの種類を画面で並べる",
+            "onlyWithoutCanonical": true,
+            "files": "\\.tsx$"
+          },
+          {
+            "id": "own-label",
+            "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:押したときの動き|タップしたとき|押したら)",
+            "why": "押したらの欄を画面で組む",
+            "onlyWithoutCanonical": true
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-tap",
+            "why": "押したらの欄の手描き",
+            "name": "^(欄 )?(押したら|押した時の動き|ボタンの動き)$"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/tap-action-field.test.tsx",
+          "apps/web/src/lib/tap-actions.test.ts"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "tap-extra",
+      "name": "押されたときにあわせて行うこと",
+      "role": "押したらに付けて、タグを付ける・スコアを足す",
+      "rules": [
+        "§6.17",
+        "B-162",
+        "B-164"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/tap-action-field.tsx"
+          ],
+          "components": [
+            "TapActionField"
+          ],
+          "vars": []
+        },
+        "pen": [
+          {
+            "id": "A2gkiG",
+            "name": "あわせて行うこと/閉じた"
+          },
+          {
+            "id": "TPuCf",
+            "name": "あわせて行うこと/開いた"
+          },
+          {
+            "id": "b2hVaX",
+            "name": "あわせて行うこと/選んだ後"
+          }
+        ]
+      },
+      "code": {
+        "overrideSelectors": [],
+        "signals": [
+          {
+            "id": "own-extra",
+            "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:タグを付ける|スコアを足す|スコアを加算|タグを追加する)",
+            "why": "あわせて行うことを画面で組む",
+            "onlyWithoutCanonical": true
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-extra",
+            "why": "あわせて行うことの手描き",
+            "name": "押した人に|タグを付ける行"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/tap-action-field.test.tsx"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "action-list",
+      "name": "行うことを足す",
+      "role": "［＋ 行うことを足す］→種類→選ぶ窓→行で並べる（回答フォーム・カルーセル・質問・自動応答・友だち追加・リッチメニュー）",
+      "rules": [
+        "§6.19",
+        "B-169"
+      ],
+      "owner": {
+        "code": {
+          "files": [],
+          "components": [],
+          "vars": []
+        },
+        "pen": [],
+        "status": "未実装（B-169）。コードの部品も Pen の部品も無い。作ってから持ち主を書く"
+      },
+      "code": {
+        "selectorHint": "actions?List|actionRow|addAction",
+        "overrideSelectors": [],
+        "signals": [
+          {
+            "id": "words",
+            "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:行うことを足す|行うことを追加|アクションを追加|答え終わったら|回答したときに付けるタグ|使われたときに行うこと|答え終わったときに行うこと)",
+            "why": "「行うこと」を画面ごとに組んでいる"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-actions",
+            "why": "行うことの段の手描き（部品が無い）",
+            "name": "行うこと",
+            "nameNot": "押されたときに、あわせて行うこと"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [],
+        "needed": "共通部品を作ったら：回答フォーム・カルーセル・質問・自動応答・友だち追加・リッチメニューがその部品を読む試験"
+      }
+    },
+    {
+      "id": "media-slot",
+      "name": "画像の枠（MediaSlot）",
+      "role": "画像・動画・音声・ファイルを入れる所（真ん中に印・題「〇〇を追加」・ドラッグ・制限の文）",
+      "rules": [
+        "§6.12-9",
+        "§6.13",
+        "B-128",
+        "B-138",
+        "B-161"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/media-slot.tsx",
+            "apps/web/src/components/shared/media-slot.module.css",
+            "apps/web/src/components/shared/media-picker-dialog.tsx",
+            "apps/web/src/components/shared/media-library-upload.ts"
+          ],
+          "components": [
+            "MediaSlot",
+            "MediaPickerDialog"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "Pen の部品 ID が無い（Z7vd2 は見本で消した。板では「画像を追加 空・小・入った」の名前）"
+      },
+      "code": {
+        "selectorHint": "upload|dropzone|drop\\b|media|thumb|imageBox",
+        "overrideSelectors": [
+          "media|upload|drop"
+        ],
+        "signals": [
+          {
+            "id": "file-input",
+            "re": "type=[\"']file[\"']",
+            "why": "手書きの file 入力"
+          },
+          {
+            "id": "old-upload",
+            "re": "<(ImageUploader|FileDropzone)\\b",
+            "why": "古い取り込み部品"
+          },
+          {
+            "id": "limit-text",
+            "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:MB\\s*(以内|以下|まで)|JPG|jpg\\/)",
+            "why": "上限の文を画面で書く",
+            "onlyWithoutCanonical": true
+          },
+          {
+            "id": "dashed",
+            "css": {
+              "all": [
+                "border(-style)?:[^;]*dashed"
+              ],
+              "none": []
+            },
+            "why": "点線の箱"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "dashed-box",
+            "why": "点線の古い箱",
+            "style": [
+              "dashed"
+            ]
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/media-slot.test.tsx"
+        ],
+        "needed": "type=\"file\" を共通部品の外で書いたら落ちる試験"
+      }
+    },
+    {
+      "id": "field",
+      "name": "欄（Field・必須・任意・文字数）",
+      "role": "ラベル・必須/任意の札・文字数・補足 note を1つの形で出す",
+      "rules": [
+        "§6.12-4",
+        "§6.12-16",
+        "B-158"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/form-controls.tsx",
+            "apps/web/src/components/shared/form-controls.module.css",
+            "apps/web/src/components/shared/text-field.tsx",
+            "apps/web/src/components/shared/text-field.module.css",
+            "apps/web/src/components/shared/field-context.ts"
+          ],
+          "components": [
+            "Field",
+            "TextInput",
+            "TextArea",
+            "RequiredBadge",
+            "OptionalBadge",
+            "TextField"
+          ],
+          "vars": [
+            "--color-control-border",
+            "--radius-control"
+          ]
+        },
+        "pen": [
+          {
+            "id": "Ume2U",
+            "name": "入力欄"
+          },
+          {
+            "id": "i5BW8b",
+            "name": "入力欄/複数行"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "field|label|input|textarea|formRow|control\\b",
+        "overrideSelectors": [
+          "\\b(input|textarea|label)\\b|field"
+        ],
+        "signals": [
+          {
+            "id": "optional-paren",
+            "re": "（任意）|\\(任意\\)",
+            "why": "「（任意）」（札にする）"
+          },
+          {
+            "id": "asterisk",
+            "re": ">\\s*[＊*]\\s*<",
+            "why": "必須の「＊」"
+          },
+          {
+            "id": "own-count",
+            "re": "\\.length\\s*\\}?\\s*\\/\\s*\\{?\\s*\\w*(MAX|max|limit|Limit|\\d+)",
+            "why": "文字数を画面で数えて出す",
+            "files": "\\.tsx$"
+          },
+          {
+            "id": "half-ex",
+            "re": "['\">]例:\\s?",
+            "why": "入力例が半角「例:」"
+          },
+          {
+            "id": "raw-label",
+            "re": "<label\\b(?![^>]*className=\\{styles\\.(check|radio|toggle))",
+            "why": "ラベルを手書き",
+            "onlyWithoutCanonical": true
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "paren-optional",
+            "why": "「（任意）」の文字（札でない）",
+            "text": "（任意）"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/optional-badge.test.tsx",
+          "apps/web/src/components/shared/text-field-unified.react.test.tsx"
+        ],
+        "needed": "「（任意）」「＊」を書いたら落ちる試験"
+      }
+    },
+    {
+      "id": "field-error",
+      "name": "欄の赤表示",
+      "role": "誤りの欄を赤く・下に理由・最初の誤りへ移る。欄に結び付かない失敗だけ Notice danger",
+      "rules": [
+        "§6.9",
+        "B-154",
+        "B-139"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/lib/use-form-errors.ts",
+            "apps/web/src/components/shared/validation-summary.tsx",
+            "apps/web/src/components/shared/error-count-badge.tsx",
+            "apps/web/src/components/shared/form-controls.tsx"
+          ],
+          "components": [
+            "useFormErrors",
+            "Field",
+            "FormField",
+            "FieldError",
+            "ValidationSummary",
+            "ErrorCountBadge"
+          ],
+          "vars": [
+            "--color-danger"
+          ]
+        },
+        "pen": [
+          {
+            "id": "fDAyI",
+            "name": "入力欄/エラー"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "error|invalid|alert",
+        "overrideSelectors": [
+          "error|invalid"
+        ],
+        "signals": [
+          {
+            "id": "raw-alert",
+            "re": "role=[\"']alert[\"']",
+            "why": "手書きの role=\"alert\""
+          },
+          {
+            "id": "own-invalid",
+            "re": "aria-invalid=\\{",
+            "why": "欄の誤りを画面で組む",
+            "onlyWithoutCanonical": true
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "red-band-only",
+            "why": "上の赤い帯だけの誤り",
+            "name": "^帯 (エラー|誤り|失敗)"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/lib/use-form-errors.test.tsx",
+          "apps/web/src/components/shared/field-errors-controls.react.test.tsx"
+        ],
+        "needed": "作る・編集の画面が useFormErrors を読まないと落ちる試験"
+      }
+    },
+    {
+      "id": "sticky-bar",
+      "name": "作る・編集の下の帯",
+      "role": "画面の下に追従。キャンセル・保存は中央、削除は左端",
+      "rules": [
+        "§2",
+        "§6.8",
+        "B-143"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/sticky-bar.tsx",
+            "apps/web/src/components/shared/sticky-bar.module.css",
+            "apps/web/src/components/templates/create-page.tsx",
+            "apps/web/src/components/shared/create-page.tsx"
+          ],
+          "components": [
+            "StickyBar",
+            "CreatePage",
+            "PageFooter"
+          ],
+          "vars": [
+            "--shadow-bar-float"
+          ]
+        },
+        "pen": [],
+        "status": "Pen の部品 ID が無い（板では「下の帯（追従・常に画面の下）」の名前）"
+      },
+      "code": {
+        "selectorHint": "footer|bottomBar|stickyBar|actionBar|saveBar",
+        "overrideSelectors": [
+          "footer|sticky|bottomBar"
+        ],
+        "signals": [
+          {
+            "id": "sticky-bottom",
+            "css": {
+              "all": [
+                "position:\\s*(sticky|fixed)",
+                "bottom:\\s*0"
+              ],
+              "none": []
+            },
+            "why": "下の帯を CSS で手書き"
+          },
+          {
+            "id": "back-in-bar",
+            "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:一覧へ戻る|一覧に戻る)",
+            "why": "帯に「一覧へ戻る」"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "fixed-bar",
+            "why": "「固定」の下の帯（追従でない名前）",
+            "name": "^下の帯（固定）$"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/sticky-bar-contract.test.ts",
+          "apps/web/src/components/templates/create-page-spacing.test.tsx"
+        ],
+        "needed": "帯に「一覧へ戻る」・削除が左端でない形で落ちる試験"
+      }
+    },
+    {
+      "id": "tabs",
+      "name": "タブ",
+      "role": "中身を切り替える。?tab= と router.replace",
+      "rules": [
+        "§5",
+        "§6.12-3",
+        "B-158"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/tabs.tsx",
+            "apps/web/src/components/shared/tabs.module.css",
+            "apps/web/src/components/layout/scrollable-tabs.tsx",
+            "apps/web/src/components/layout/merged-tabs.tsx"
+          ],
+          "components": [
+            "Tabs",
+            "ScrollableTabs",
+            "MergedTabs"
+          ],
+          "vars": []
+        },
+        "pen": [
+          {
+            "id": "clV5c",
+            "name": "タブ"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "tab\\b|tabs\\b|tabList|tabBar",
+        "overrideSelectors": [
+          "tab|\\[role=.?tab"
+        ],
+        "signals": [
+          {
+            "id": "raw-tab",
+            "re": "role=[\"'](tab|tablist)[\"']",
+            "why": "タブを手書き"
+          },
+          {
+            "id": "push-tab",
+            "re": "router\\.push\\([^)]*tab=",
+            "why": "タブで履歴を積む（replace にする）"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-tab",
+            "why": "タブの段の手描き",
+            "name": "^(タブの段|種類のタブ)$"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/tabs-height-contract.test.ts",
+          "apps/web/src/components/shared/tabs-v8-indicator.react.test.tsx",
+          "apps/web/src/components/layout/scrollable-tabs-contract.test.ts"
+        ],
+        "needed": "role=\"tab\" を共通部品の外で書いたら落ちる試験"
+      }
+    },
+    {
+      "id": "status-badge",
+      "name": "状態の札",
+      "role": "丸い札・12/600・左に6pxの丸・5色。言葉は状態の表から",
+      "rules": [
+        "§6.5-4",
+        "§6.12-1",
+        "B-152",
+        "B-158",
+        "B-160"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/status-badge.tsx",
+            "apps/web/src/components/shared/status-badge.module.css"
+          ],
+          "components": [
+            "StatusBadge"
+          ],
+          "vars": [
+            "--radius-pill",
+            "--color-success",
+            "--color-danger",
+            "--color-warning",
+            "--color-info"
+          ]
+        },
+        "pen": [
+          {
+            "id": "mpVfY",
+            "name": "状態の札/送信済み・対応済み"
+          },
+          {
+            "id": "ekmYd",
+            "name": "状態の札/予約中・案内"
+          },
+          {
+            "id": "ii85L",
+            "name": "状態の札/対応中・注意"
+          },
+          {
+            "id": "XwfSH",
+            "name": "状態の札/未対応・失敗"
+          },
+          {
+            "id": "hQeAo",
+            "name": "状態の札/下書き・停止"
+          }
+        ],
+        "status": "状態の言葉の表は未実装（B-158 の 1）"
+      },
+      "code": {
+        "selectorHint": "badge|pill|status|state(Tag|Label)?\\b",
+        "overrideSelectors": [
+          "badge|pill|status|\\[data-tone"
+        ],
+        "signals": [
+          {
+            "id": "own-badge",
+            "re": "\\b(function|const)\\s+\\w*(StatusBadge|StatusPill|StatePill|StateBadge|Pill|Badge)\\b\\s*[=(]",
+            "why": "状態の札を自作"
+          },
+          {
+            "id": "old-pill",
+            "re": "<(StatusPill|StatusChip)\\b",
+            "why": "別の札の部品"
+          },
+          {
+            "id": "words",
+            "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:稼働中|一時停止|保管|アーカイブ済み|予約済み|送信完了)",
+            "why": "使わない状態の言葉（B-158 の 1）"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-badge",
+            "why": "状態の札の手描き（「状態の札/…」の部品でない）",
+            "name": "^札 (有効|公開中|下書き|停止中|予約中|送信済み|失敗|注意)"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/status-chip.test.tsx"
+        ],
+        "needed": "StatusBadge を自作・別の札で状態を出すと落ちる試験"
+      }
+    },
+    {
+      "id": "list-state",
+      "name": "空・読めない・読み込み中",
+      "role": "空・絞り込みで0件・読めなかった（もう一度読み込む）・骨組みを1つの形で出す",
+      "rules": [
+        "§6.5-8",
+        "§6.6-8",
+        "§6.11-11",
+        "§6.12-18",
+        "B-143",
+        "B-157"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/list-state.tsx",
+            "apps/web/src/components/shared/list-state.module.css",
+            "apps/web/src/components/shared/skeleton.tsx",
+            "apps/web/src/components/shared/skeleton.module.css",
+            "apps/web/src/components/shared/empty-list.tsx",
+            "apps/web/src/components/shared/retry-label.tsx",
+            "apps/web/src/components/shared/account-required-state.tsx"
+          ],
+          "components": [
+            "ListState",
+            "TableSkeleton",
+            "CardsSkeleton",
+            "Skeleton",
+            "DelayedSkeleton",
+            "EmptyList"
+          ],
+          "vars": [
+            "--radius-mini"
+          ]
+        },
+        "pen": [
+          {
+            "id": "hNXm7",
+            "name": "空の表示"
+          },
+          {
+            "id": "jr5Nl",
+            "name": "骨格の行"
+          },
+          {
+            "id": "Dr8Wr",
+            "name": "状態/検索結果0件"
+          },
+          {
+            "id": "deztM",
+            "name": "状態/取得失敗"
+          },
+          {
+            "id": "q0z77i",
+            "name": "状態/読み込み中"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "empty|stateCard|loading|skeleton|placeholder|error(State|Card)",
+        "overrideSelectors": [
+          "empty|skeleton|state"
+        ],
+        "signals": [
+          {
+            "id": "state-card",
+            "re": "styles\\.(stateCard|emptyState|empty|loading|errorState)\\b",
+            "why": "空・読めない表示を CSS で手書き"
+          },
+          {
+            "id": "own-state",
+            "re": "\\b(function|const)\\s+(StateCard|PageState|EmptyState|LoadingState|ErrorState)\\b",
+            "why": "状態の部品を自作"
+          },
+          {
+            "id": "retry-words",
+            "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:再読み込み|再試行|もう一度試す|リトライ)",
+            "why": "押し口の言葉が「もう一度読み込む」でない"
+          },
+          {
+            "id": "spinner",
+            "re": "animate-spin|<Spinner\\b",
+            "why": "回る印（保存中のボタンの中だけ）"
+          },
+          {
+            "id": "account-words",
+            "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:アカウントを選択してください|アカウントを選んでください)",
+            "why": "アカウント未選択の言葉（「LINE公式アカウントを選んでください」）"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-empty",
+            "why": "空の表示の手描き",
+            "name": "^(空|空の表示（まだ1件も無い）|まだ無い)$"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/list-state-contract.test.tsx",
+          "apps/web/src/components/shared/list-state-retry-contract.test.tsx",
+          "apps/web/src/components/shared/skeleton-contract.test.tsx"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "viewer-band",
+      "name": "閲覧のみの帯",
+      "role": "閲覧のみの人に「閲覧のみで見ています。…」の帯を出す（型に readOnly）",
+      "rules": [
+        "§2",
+        "§6.6-7",
+        "§6.8",
+        "B-146",
+        "B-159"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/read-only-notice.tsx",
+            "apps/web/src/components/shared/read-only-notice.module.css"
+          ],
+          "components": [
+            "ReadOnlyNotice"
+          ],
+          "vars": [
+            "--tpl-ro-band-pad",
+            "--tpl-ro-band-gap",
+            "--tpl-ro-band-radius",
+            "--color-status-info-soft"
+          ]
+        },
+        "pen": [],
+        "status": "コードの持ち主を共通化済み。Pen の部品 ID は司令塔の確定待ち"
+      },
+      "code": {
+        "selectorHint": "viewer|readOnly|readonly|roBand",
+        "overrideSelectors": [],
+        "signals": [
+          {
+            "id": "own-band",
+            "re": "\\b(ViewerBand|ReadOnlyBand|viewerBand|roBand|readonlyBand|readOnlyBand)\\b|(?:styles\\.|\\.)(?:readOnly|readonly)\\b",
+            "why": "閲覧のみの帯を画面ごとに作る"
+          },
+          {
+            "id": "words",
+            "re": "閲覧のみで(見て|ご覧)",
+            "why": "閲覧のみの文を画面で書く"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "other-words",
+            "why": "閲覧のみの帯の文が決まりと違う",
+            "text": "閲覧のみ",
+            "textNot": "^閲覧のみで見ています。変える操作は(オーナーか管理者|統括の管理者)に頼んでください。$|^閲覧のみ$"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/v8/viewer-hides-actions.test.ts"
+        ],
+        "needed": "共通部品を作ったら：閲覧のみの文を画面で書くと落ちる試験"
+      }
+    },
+    {
+      "id": "notice",
+      "name": "知らせ（トースト・Notice）",
+      "role": "保存できた＝トースト1つ。失敗は欄の赤か帯。種類は info・success・warn・danger",
+      "rules": [
+        "§6.11-6",
+        "§6.12-20",
+        "§6.15-1",
+        "B-157",
+        "B-158",
+        "B-160"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/toast.tsx",
+            "apps/web/src/components/shared/toast.module.css",
+            "apps/web/src/components/shared/notice.tsx",
+            "apps/web/src/components/shared/notice.module.css"
+          ],
+          "components": [
+            "Notice",
+            "notifyToast",
+            "Toast"
+          ],
+          "vars": []
+        },
+        "pen": [
+          {
+            "id": "Q6cQB",
+            "name": "知らせ/うまくいった"
+          },
+          {
+            "id": "tnWX9",
+            "name": "知らせ/できなかった"
+          },
+          {
+            "id": "ThDed",
+            "name": "帯/案内"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "notice|toast|banner|alertBox|message(Box|Bar)",
+        "overrideSelectors": [
+          "notice|toast"
+        ],
+        "signals": [
+          {
+            "id": "tone-error",
+            "re": "tone=[\"']error[\"']",
+            "why": "tone=\"error\"（danger にする）"
+          },
+          {
+            "id": "undo",
+            "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:元に戻す)",
+            "why": "知らせの「元に戻す」（B-160 の 1）"
+          },
+          {
+            "id": "alert",
+            "re": "(?<![\\w.])alert\\(",
+            "why": "ブラウザの alert"
+          },
+          {
+            "id": "note-bar",
+            "re": "<NoteBar\\b",
+            "why": "別の帯の部品"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-toast",
+            "why": "知らせの手描き（部品の知らせでない）",
+            "name": "^知らせ$"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/toast.test.tsx",
+          "apps/web/src/components/shared/notice-info-contract.test.ts",
+          "apps/web/src/components/shared/toast-stack.regression.test.tsx"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "save-conflict",
+      "name": "ぶつかりの帯",
+      "role": "ほかの人が先に保存したとき、入力を残して比べる・最新を読み込む",
+      "rules": [
+        "§6.11-9",
+        "B-157"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/save-conflict.tsx",
+            "apps/web/src/components/shared/save-conflict.module.css"
+          ],
+          "components": [
+            "useSaveConflict",
+            "SaveConflictBand",
+            "SaveConflictCompareDialog"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "Pen の部品 ID が無い（見本「ぶつかりの帯」は型の見本 aHrwg の中）"
+      },
+      "code": {
+        "selectorHint": "conflict",
+        "overrideSelectors": [
+          "conflict"
+        ],
+        "signals": [
+          {
+            "id": "own-409",
+            "re": "status\\s*===?\\s*409[\\s\\S]{0,300}?(conflict|Conflict|競合|revision|Revision|version|更新され|先に保存|ほかの人)",
+            "why": "保存のぶつかり（409）を画面で扱う",
+            "onlyWithoutCanonical": true
+          },
+          {
+            "id": "old-bar",
+            "re": "<SaveConflictBar\\b",
+            "why": "古いぶつかりの帯"
+          },
+          {
+            "id": "words",
+            "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:ほかの人が|他の人が|別の人が|他のユーザー)",
+            "why": "ぶつかりの文を画面で書く",
+            "onlyWithoutCanonical": true
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-conflict",
+            "why": "ぶつかりの帯の手描き",
+            "text": "ほかの人が先に|他の人が"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/save-conflict-wiring-contract.test.ts",
+          "apps/web/src/components/shared/save-conflict.react.test.tsx"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "customer-info",
+      "name": "顧客情報の欄",
+      "role": "受信箱の右の欄と友だちの詳細の概要の左を同じ部品で（段ごとの見出し＋編集する・決まった7つの欄・タグ・マイル…）",
+      "rules": [
+        "B-167",
+        "B-166"
+      ],
+      "owner": {
+        "code": {
+          "files": [],
+          "components": [],
+          "vars": []
+        },
+        "pen": [
+          {
+            "id": "GBTyR",
+            "name": "顧客情報の欄（B-167）"
+          }
+        ],
+        "status": "コードは未実装（受信箱 v8/inbox-chat/customer-panel と友だちの詳細 v8/friend-detail/overview-tab が別々）"
+      },
+      "code": {
+        "selectorHint": "customer|friendInfo|profile(Panel|Card)",
+        "overrideSelectors": [],
+        "signals": [
+          {
+            "id": "two-panels",
+            "re": "\\b(CustomerPanel|FriendInfoSidebar|OverviewTab|customerPanel|friendInfo)\\b",
+            "why": "顧客情報の欄を画面ごとに作る"
+          },
+          {
+            "id": "words",
+            "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:顧客情報をすべて表示|表示項目)",
+            "why": "顧客情報の欄の組み立て"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-customer",
+            "why": "顧客情報の欄の手描き（GBTyR でない）",
+            "name": "顧客(情報|カルテ)|右の列|概要の左",
+            "nameNot": "B-167"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [],
+        "needed": "部品を作ったら：受信箱と友だちの詳細が同じ部品を読む試験"
+      }
+    },
+    {
+      "id": "phone-preview",
+      "name": "スマホのプレビュー",
+      "role": "LINE のトークは LinePreview 1つ。LIFF の画面は LIFF のスマホ枠1つ",
+      "rules": [
+        "§6.12-10",
+        "B-158"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/line-preview.tsx",
+            "apps/web/src/components/shared/line-preview.module.css"
+          ],
+          "components": [
+            "LinePreview",
+            "LinePreviewMessage",
+            "LinePreviewCard"
+          ],
+          "vars": []
+        },
+        "pen": [
+          {
+            "id": "cfVyj",
+            "name": "LINEの見え方/スマホ"
+          }
+        ],
+        "status": "LIFF のスマホ枠は未実装（B-158 の 10）"
+      },
+      "code": {
+        "selectorHint": "phone|preview|bubble|talk",
+        "overrideSelectors": [
+          "phone|preview|bubble"
+        ],
+        "signals": [
+          {
+            "id": "own-phone",
+            "re": "\\b(function|const)\\s+\\w*(Phone|PhoneFrame|PhonePreview|Preview|MockPhone|Talk)\\b\\s*[=(]",
+            "why": "スマホの見本を自作"
+          },
+          {
+            "id": "phone-frame",
+            "css": {
+              "all": [
+                "border-radius:\\s*(3\\d|4\\d|5\\d)px"
+              ],
+              "none": []
+            },
+            "why": "スマホの外枠を CSS で描く"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-phone",
+            "why": "スマホの手描き（部品 cfVyj でない）",
+            "name": "^スマホ( |$)"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/line-preview.test.tsx",
+          "apps/web/src/components/shared/line-preview-bubble.test.ts"
+        ],
+        "needed": "トークの見本を LinePreview の外で描くと落ちる試験"
+      }
+    },
+    {
+      "id": "period",
+      "name": "期間の選択",
+      "role": "「過去7日／過去30日／過去90日／期間を指定」の1つの部品",
+      "rules": [
+        "§6.12-5",
+        "§6.15-7",
+        "B-158",
+        "B-160"
+      ],
+      "owner": {
+        "code": {
+          "files": [],
+          "components": [],
+          "vars": []
+        },
+        "pen": [],
+        "status": "未実装（B-158 の 5：部品を作る）"
+      },
+      "code": {
+        "selectorHint": "range|period|days",
+        "overrideSelectors": [],
+        "signals": [
+          {
+            "id": "days-list",
+            "re": "\\[\\s*['\"]?(7|28|30)['\"]?\\s*,\\s*['\"]?(28|30|90)['\"]?\\s*(,|\\])",
+            "why": "画面ごとの期間の並び"
+          },
+          {
+            "id": "words",
+            "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:直近\\s*\\d+\\s*日|この\\s*\\d+\\s*日|過去\\s*28\\s*日|28日間)",
+            "why": "期間の言葉が決まりと違う"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "other-period",
+            "why": "期間の言葉が決まりと違う",
+            "text": "直近\\s*\\d+日|この\\d+日|28日"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [],
+        "needed": "部品を作ったら：期間を画面で並べると落ちる試験"
+      }
+    },
+    {
+      "id": "chart",
+      "name": "グラフ",
+      "role": "棒・線・漏斗を共通部品で。色・吹き出し・軸は部品が持つ",
+      "rules": [
+        "§6.12-11",
+        "B-158"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/bar-chart.tsx",
+            "apps/web/src/components/shared/bar-chart.module.css"
+          ],
+          "components": [
+            "BarChart",
+            "BarChartEmpty"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "線・漏斗は未実装。Pen の部品 ID が無い"
+      },
+      "code": {
+        "selectorHint": "chart|graph|bar\\b|bars\\b|funnel|spark",
+        "overrideSelectors": [
+          "chart|graph"
+        ],
+        "signals": [
+          {
+            "id": "own-chart",
+            "re": "\\b(function|const)\\s+\\w*(Chart|Graph|Funnel|Sparkline|Bars)\\b\\s*[=(]",
+            "why": "グラフを自作"
+          },
+          {
+            "id": "svg-line",
+            "re": "<(polyline|path)\\b[^>]*\\b(points|d)=\\{",
+            "why": "SVG で線を手描き"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-chart",
+            "why": "グラフの手描き",
+            "name": "グラフ|棒$"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/bar-chart.test.tsx"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "external-link",
+      "name": "外へのリンク",
+      "role": "新しいタブ・↗ の印・rel=\"noreferrer\" を部品が付ける",
+      "rules": [
+        "§6.12-12",
+        "B-158"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/text-link.tsx",
+            "apps/web/src/components/shared/button.tsx"
+          ],
+          "components": [
+            "TextLink"
+          ],
+          "vars": []
+        },
+        "pen": [
+          {
+            "id": "g5Db8",
+            "name": "リンク"
+          }
+        ],
+        "status": "external は未実装（TextLink・Button に足す）"
+      },
+      "code": {
+        "selectorHint": "link|external",
+        "overrideSelectors": [],
+        "signals": [
+          {
+            "id": "blank",
+            "re": "target=[\"']_blank[\"']",
+            "why": "新しいタブを画面で指定"
+          },
+          {
+            "id": "open",
+            "re": "window\\.open\\(",
+            "why": "window.open"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "no-arrow",
+            "why": "外へ出る文に ↗ が無い",
+            "text": "(を開く|サイトへ|ページへ)$",
+            "textNot": "↗"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [],
+        "needed": "external を作ったら：target=\"_blank\" を画面で書くと落ちる試験"
+      }
+    },
+    {
+      "id": "csv",
+      "name": "CSV",
+      "role": "「CSVで書き出す」・ファイル名「機能名_YYYY-MM-DD.csv」（日本時間）を共通の関数で",
+      "rules": [
+        "§6.12-7",
+        "B-158"
+      ],
+      "owner": {
+        "code": {
+          "files": [],
+          "components": [],
+          "vars": []
+        },
+        "pen": [],
+        "status": "未実装（共通の関数を作る）"
+      },
+      "code": {
+        "overrideSelectors": [],
+        "signals": [
+          {
+            "id": "blob",
+            "re": "text\\/csv",
+            "why": "CSV を画面で組む"
+          },
+          {
+            "id": "name-utc",
+            "re": "toISOString\\(\\)\\.slice\\(0,\\s*10\\)[^\\n]{0,60}\\.csv|\\.csv[^\\n]{0,60}toISOString",
+            "why": "ファイル名の日付が世界時"
+          },
+          {
+            "id": "words",
+            "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:CSV ?出力|CSVダウンロード|CSVをダウンロード|CSV で書き出す|CSVエクスポート|エクスポート)",
+            "why": "ボタンの言葉が「CSVで書き出す」でない"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "space-words",
+            "why": "「CSV で書き出す」（空きあり。決まりは「CSVで書き出す」）",
+            "name": "^CSV で書き出す$"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [],
+        "needed": "関数を作ったら：text/csv を画面で書くと落ちる試験"
+      }
+    },
+    {
+      "id": "primary-button",
+      "name": "主ボタン・ボタン",
+      "role": "主＝文字の幅・高さ36・濃い緑の縁＋カードの影・角丸8。言葉は「〇〇を作る」「〜する」",
+      "rules": [
+        "§6.4",
+        "§6.6",
+        "B-151",
+        "B-146",
+        "B-159"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/button.tsx",
+            "apps/web/src/components/shared/button.module.css",
+            "apps/web/src/components/shared/icon-button.tsx",
+            "apps/web/src/components/shared/icon-button.module.css"
+          ],
+          "components": [
+            "Button",
+            "IconButton"
+          ],
+          "vars": [
+            "--card-shadow",
+            "--radius-control"
+          ]
+        },
+        "pen": [
+          {
+            "id": "doYdE",
+            "name": "ボタン/主"
+          },
+          {
+            "id": "u101P",
+            "name": "ボタン/副"
+          },
+          {
+            "id": "LrB2L",
+            "name": "ボタン/危険"
+          },
+          {
+            "id": "wDPmk",
+            "name": "ボタン/文字"
+          },
+          {
+            "id": "KspUx",
+            "name": "アイコンボタン"
+          }
+        ],
+        "status": "主ボタンの縁 #06612f・角丸8の変数は未実装（§6.4）"
+      },
+      "code": {
+        "selectorHint": "button|btn|primary|cta|action\\b",
+        "overrideSelectors": [
+          "\\bbutton\\b|btn|primary"
+        ],
+        "signals": [
+          {
+            "id": "green-fill",
+            "css": {
+              "all": [
+                "(button|btn|primary|cta|create|submit|save|action)[^{]*\\{",
+                "background(-color)?:\\s*(var\\(--color-(primary|accent|brand|action-primary)[\\w-]*\\)|#087a3e|#06c755)"
+              ],
+              "none": [
+                "hover|:disabled"
+              ]
+            },
+            "why": "緑の主ボタンを CSS で手書き"
+          },
+          {
+            "id": "words",
+            "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:新規作成|作成する|新しく作る|変更を保存(?!する)|コピーする)",
+            "why": "ボタンの言葉が決まりと違う（B-146）"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "green-hand",
+            "why": "緑の主ボタンの手描き（ボタン/主 でない）",
+            "style": [
+              "background-color: #087a3e",
+              "height: (32|36|40)px"
+            ],
+            "nameNot": "^(ボタン\\/主|印|字|丸|点)"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/primary-green-contract.test.ts",
+          "apps/web/src/components/shared/button-migration-contract.test.ts",
+          "apps/web/src/components/shared/control-dimensions-contract.test.ts"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "date-time",
+      "name": "日付・時刻の欄",
+      "role": "DateField・TimeField・DateTimeField。高さ36・日本時間",
+      "rules": [
+        "§2",
+        "§6.11-15",
+        "B-157"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/date-field.tsx",
+            "apps/web/src/components/shared/date-time-field.tsx",
+            "apps/web/src/components/shared/time-field-v8.tsx"
+          ],
+          "components": [
+            "DateField",
+            "DateTimeField",
+            "TimeField",
+            "TimeFieldV8"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "Pen の部品 ID が対応表に無い（YCOoR は提案の板）"
+      },
+      "code": {
+        "selectorHint": "date|time|calendar",
+        "overrideSelectors": [
+          "date|time"
+        ],
+        "signals": [
+          {
+            "id": "native",
+            "re": "type=[\"'](date|time|datetime-local)[\"']",
+            "why": "素の日付・時刻の入力"
+          },
+          {
+            "id": "utc-today",
+            "re": "new Date\\(\\)\\.toISOString\\(\\)\\.slice\\(0,\\s*10\\)",
+            "why": "「今日」を世界時で作る"
+          }
+        ]
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/date-field.test.tsx",
+          "apps/web/src/components/shared/time-field-v8.test.tsx",
+          "apps/web/src/components/shared/date-time-field-width-contract.test.ts"
+        ],
+        "needed": "type=\"date|time\" を画面で書くと落ちる試験"
+      }
+    },
+    {
+      "id": "toggle",
+      "name": "オン・オフ・選ぶ部品",
+      "role": "その場で効く＝Toggle、保存して効く＝Checkbox、3つ以上＝SegmentedControl か RadioCard",
+      "rules": [
+        "§6.12-14",
+        "B-158"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/toggle.tsx",
+            "apps/web/src/components/shared/checkbox.tsx",
+            "apps/web/src/components/shared/segmented.tsx",
+            "apps/web/src/components/shared/radio-card.tsx",
+            "apps/web/src/components/shared/radio.tsx",
+            "apps/web/src/components/shared/check-card.tsx"
+          ],
+          "components": [
+            "Toggle",
+            "Checkbox",
+            "SegmentedControl",
+            "RadioCard",
+            "RadioCardGroup",
+            "CheckCard"
+          ],
+          "vars": [
+            "--shadow-controls-toggle"
+          ]
+        },
+        "pen": [
+          {
+            "id": "bkjTv",
+            "name": "トグル/オン"
+          },
+          {
+            "id": "LxHpj",
+            "name": "トグル/オフ"
+          },
+          {
+            "id": "dQCCN",
+            "name": "チェック/オン"
+          },
+          {
+            "id": "S9U7v",
+            "name": "チェック/オフ"
+          },
+          {
+            "id": "dtJVi",
+            "name": "切り替え（3つ）"
+          },
+          {
+            "id": "fNPdg",
+            "name": "選ぶカード/オン"
+          },
+          {
+            "id": "r3xz1W",
+            "name": "選ぶカード/オフ"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "toggle|switch|segment|checkbox|radio",
+        "overrideSelectors": [
+          "toggle|switch|segment|checkbox|radio"
+        ],
+        "signals": [
+          {
+            "id": "pressed",
+            "re": "aria-pressed=",
+            "why": "aria-pressed の自作"
+          },
+          {
+            "id": "switch",
+            "re": "role=[\"'](switch|radio|radiogroup)[\"']",
+            "why": "オン・オフを手書き"
+          },
+          {
+            "id": "raw-check",
+            "re": "type=[\"'](checkbox|radio)[\"']",
+            "why": "素のチェック・ラジオ"
+          }
+        ]
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/checkbox.test.tsx",
+          "apps/web/src/components/shared/segmented-size.test.tsx",
+          "apps/web/src/components/shared/radio-card-contract.test.tsx"
+        ],
+        "needed": "aria-pressed を画面で書くと落ちる試験"
+      }
+    },
+    {
+      "id": "copy",
+      "name": "コピー",
+      "role": "ボタンの文字が「コピーしました」に1.5秒、失敗は「コピーできませんでした」",
+      "rules": [
+        "§6.11-13",
+        "B-157"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/copy-text-button.tsx",
+            "apps/web/src/components/ui/copy-text-button.tsx"
+          ],
+          "components": [
+            "CopyTextButton"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "Pen の部品 ID が無い"
+      },
+      "code": {
+        "selectorHint": "copy",
+        "overrideSelectors": [],
+        "signals": [
+          {
+            "id": "clipboard",
+            "re": "navigator\\.clipboard\\.writeText",
+            "why": "コピーを画面で組む"
+          }
+        ]
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/copy-feedback.regression.test.tsx"
+        ],
+        "needed": "navigator.clipboard を画面で書くと落ちる試験"
+      }
+    },
+    {
+      "id": "steps",
+      "name": "手順",
+      "role": "題のすぐ下・左寄せ・1行。済みの段だけ押して戻れる",
+      "rules": [
+        "§2",
+        "q1xNMz"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/templates/steps.tsx",
+            "apps/web/src/components/templates/steps.module.css"
+          ],
+          "components": [
+            "Steps"
+          ],
+          "vars": []
+        },
+        "pen": [
+          {
+            "id": "NUOgw",
+            "name": "手順"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "step|stepper|wizard",
+        "overrideSelectors": [
+          "step"
+        ],
+        "signals": [
+          {
+            "id": "old-stepper",
+            "re": "<(Stepper|DialogSteps)\\b",
+            "why": "別の手順の部品"
+          },
+          {
+            "id": "own-steps",
+            "re": "styles\\.(steps|stepper|wizard|stepList)\\b",
+            "why": "手順を CSS で手書き",
+            "onlyWithoutCanonical": true
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-steps",
+            "why": "手順の手描き（部品「手順」でない名前）",
+            "name": "^作る手順$"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/templates/steps.test.tsx",
+          "apps/web/src/components/shared/stepper-contract.test.ts"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "bulk-bar",
+      "name": "まとめて選ぶ（一括バー）",
+      "role": "下から出る白いバー：操作を選ぶ→確かめる→結果。「〇件すべてを選ぶ」",
+      "rules": [
+        "§2",
+        "§6.11-14",
+        "B-157"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/bulk-bar.tsx",
+            "apps/web/src/components/shared/bulk-bar.module.css"
+          ],
+          "components": [
+            "BulkBar"
+          ],
+          "vars": [
+            "--shadow-float"
+          ]
+        },
+        "pen": [
+          {
+            "id": "q1tCSK",
+            "name": "一括操作バー"
+          }
+        ]
+      },
+      "code": {
+        "selectorHint": "bulk|selection(Bar)?",
+        "overrideSelectors": [
+          "bulk"
+        ],
+        "signals": [
+          {
+            "id": "own-bulk",
+            "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:件を選択中|件選択中|件を選んでいます|件選択)",
+            "why": "一括の帯を自作",
+            "onlyWithoutCanonical": true
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "hand-bulk",
+            "why": "一括バーの手描き",
+            "name": "^一括バー$"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/bulk-bar.test.tsx",
+          "apps/web/src/components/shared/bulk-bar-sticky-contract.test.ts"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "back-link",
+      "name": "ページ内の戻る（置かない）",
+      "role": "戻るはパンくずと［キャンセル］だけ。「← 〇〇へ」を置かない",
+      "rules": [
+        "§2",
+        "§6.8",
+        "B-143"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/breadcrumb.tsx",
+            "apps/web/src/components/layout/breadcrumb.tsx"
+          ],
+          "components": [
+            "Breadcrumb"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "置かない型（持ち主はパンくず）。Pen の部品 ID は外側 zUg8S の中"
+      },
+      "code": {
+        "selectorHint": "back(Link)?\\b",
+        "overrideSelectors": [],
+        "signals": [
+          {
+            "id": "arrow-back",
+            "re": "['\"`>]\\s*←\\s*[^<'\"`]{1,24}(へ|に戻る)",
+            "why": "ページ内の「← 〇〇へ」"
+          }
+        ]
+      },
+      "pen": {
+        "markers": [
+          {
+            "id": "arrow-back",
+            "why": "ページ内の「← 〇〇へ」",
+            "text": "^←"
+          }
+        ]
+      },
+      "guard": {
+        "tests": [],
+        "needed": "「← 〇〇へ」を画面に書くと落ちる試験"
+      }
+    },
+    {
+      "id": "folder-select",
+      "name": "所属フォルダを選ぶ欄",
+      "role": "作る・直す画面の「どのフォルダに入れるか」。その場で作れる",
+      "rules": [
+        "§2",
+        "§6.13",
+        "B-127",
+        "B-147"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/folder-select.tsx",
+            "apps/web/src/components/shared/folder-select.module.css"
+          ],
+          "components": [
+            "FolderSelect"
+          ],
+          "vars": []
+        },
+        "pen": [
+          {
+            "id": "dLffh",
+            "name": "FolderSelect"
+          },
+          {
+            "id": "iBuZH",
+            "name": "新しいフォルダを作る"
+          }
+        ]
+      },
+      "code": {
+        "overrideSelectors": [],
+        "signals": [
+          {
+            "id": "select-folder",
+            "re": "<Select\\b(?:[^<>]|=>){0,400}?(label|aria-label)=[\"'][^\"']*フォルダ",
+            "why": "フォルダをプルダウンで選ぶ（FolderSelect にする）"
+          }
+        ]
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/folder-select.react.test.tsx",
+          "apps/web/src/components/shared/folder-select-rollout-contract.test.ts"
+        ],
+        "needed": ""
+      }
+    }
+  ]
+}

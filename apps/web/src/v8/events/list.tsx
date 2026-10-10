@@ -1,11 +1,13 @@
 'use client'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
+import { RowNameLink } from '@/components/shared/table'
 import { useFolderMove } from '@/components/shared/use-folder-move'
 import { moveEventToFolder } from '@/lib/move-to-folder'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Bookmark, CalendarClock, CalendarX, Eye, Hourglass, Plus, TrendingDown, TriangleAlert, Users } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, eventsApi, fetchApi, type EventListItem, type EventListSummary } from '@/lib/api'
@@ -29,7 +31,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shar
 import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import DetailPanel from '@/components/shared/detail-panel'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import InlineEdit from '@/components/shared/inline-edit'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -43,10 +45,12 @@ import { daysUntilIso, eventRowState, isLowApplication, summarizeEventAttention,
 import { jstDay, jstTime } from './shared'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import StatusBadge from '@/components/shared/status-badge'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
 /*
  * ★V8 イベント予約の一覧（Pencil `e2ekFu`）。
@@ -61,7 +65,7 @@ type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /** 未分類を表す印。裏側（events.ts）が `__ungrouped__` で受ける。 */
 const UNFILED = '__ungrouped__'
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 const VIEWER_NOTE = '閲覧のみで見ています。イベントを作る・直す・消す操作はオーナーか管理者に頼んでください。'
 
 /*
@@ -126,7 +130,7 @@ export default function EventsListV8() {
   const [foldersError, setFoldersError] = useState(false)
   const [pendingTotal, setPendingTotal] = useState<number | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [activeId, setActiveId] = useDetailPanelUrl('event')
   const [deleteTarget, setDeleteTarget] = useState<EventListItem | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -305,7 +309,7 @@ export default function EventsListV8() {
 
   const activeIndex = items.findIndex((e) => e.id === activeId)
   const active = activeIndex >= 0 ? items[activeIndex] : null
-  const openDetail = (id: string) => withViewTransition(() => setActiveId(id))
+  const openDetail = (id: string) => withViewTransition(() => setActiveId(activeId === id ? null : id))
   const closeDetail = () => withViewTransition(() => setActiveId(null))
   const goDetail = (direction: -1 | 1) => {
     const next = items[activeIndex + direction]
@@ -364,10 +368,8 @@ export default function EventsListV8() {
       placeholder="例：教室"
     >
       {foldersError ? (
-        <p role="alert" className={styles.folderNote}>
-          フォルダを読み込めませんでした。
-          <button type="button" onClick={() => void loadFolders()} className={styles.textButton}>もう一度</button>
-        </p>
+        <Notice tone="danger" className={styles.folderNoteNoticePlacement} >フォルダを読み込めませんでした。
+          <button type="button" onClick={() => void loadFolders()} className={styles.textButton}>もう一度</button></Notice>
       ) : null}
     </ManagedFolderPanel>
   )
@@ -463,12 +465,7 @@ export default function EventsListV8() {
   )
 
   const stateCard = (icon: ReactNode, title: string, desc: string, action?: ReactNode, error = false) => (
-    <div className={styles.stateCard}>
-      <span className={styles.stateIcon} data-tone={error ? 'error' : undefined}>{icon}</span>
-      <p className={styles.stateTitle}>{title}</p>
-      <p className={styles.stateDesc}>{desc}</p>
-      {action}
-    </div>
+    <ListState kind={error ? 'error' : 'empty'} title={title} description={desc} icon={icon} action={<>{action}</>} />
   )
 
   let listBody: ReactNode
@@ -501,13 +498,13 @@ export default function EventsListV8() {
       </div>
     )
   } else if (loadStatus === 'forbidden') {
-    listBody = stateCard(<TriangleAlert size={18} aria-hidden="true" />, 'イベントを見る権限がありません', '選んでいるアカウントでは見られません。管理者に権限を確かめてください。', <Button onClick={() => refresh()}>もう一度読み込む</Button>, true)
+    listBody = stateCard(<TriangleAlert size={18} aria-hidden="true" />, 'イベントを見る権限がありません', '選んでいるアカウントでは見られません。管理者に権限を確かめてください。', <Button onClick={() => refresh()} busyLabel="読み込み中…">もう一度読み込む</Button>, true)
   } else if (loadStatus === 'error') {
     listBody = stateCard(
       <TriangleAlert size={18} aria-hidden="true" />,
       'イベントを読み込めませんでした',
       '登録したイベントは消えていません。もう一度読み込んでも直らない場合はエラー報告へ。',
-      <Button onClick={() => void refresh()}>もう一度読み込む</Button>,
+      <Button onClick={() => refresh()} busyLabel="処理中…">もう一度読み込む</Button>,
       true,
     )
   } else if (items.length === 0) {
@@ -535,18 +532,18 @@ export default function EventsListV8() {
               const low = state === 'open' && isLowApplication(e)
               const when = whenText(e.next_slot_starts_at)
               return (
-                <Tr key={e.id} data-row-id={e.id} selected={highlightedId === e.id}>
+                <Tr key={e.id} data-row-id={e.id} selected={highlightedId === e.id} detailKey="event" onOpen={() => openDetail(e.id)}>
                   <NameCell name={(
                       <ContextMenu label={`「${e.name}」の操作`} items={toContextMenuItems(menuItems)}>
                         <>{folderMove.checkbox(e)}
-                          <Link
+                          <RowNameLink
                             href={`/events/edit?id=${encodeURIComponent(e.id)}`}
                             title={`${e.name}の詳細を見る`}
                             aria-label={`「${e.name}」の詳細を見る`}
                             className={styles.nameButton}
                           >
                             {e.name}
-                          </Link>
+                          </RowNameLink>
                         </>
                       </ContextMenu>
                     )} folder={folderDotOf(e.folderId)}
@@ -623,7 +620,7 @@ export default function EventsListV8() {
         footer={active ? (
           <div className={styles.panelActions}>
             <Button href={`/events/edit?id=${active.id}`}>中身を見る</Button>
-            {canEdit ? <Button variant="danger" onClick={() => { closeDetail(); requestDelete(active) }}>削除する</Button> : null}
+            {canEdit ? <Button variant="danger" onClick={() => { const transition = closeDetail(); requestDelete(active); return transition }} busyLabel="処理中…">削除する</Button> : null}
           </div>
         ) : undefined}
       >
@@ -675,10 +672,7 @@ export default function EventsListV8() {
       folderWidth={200}
 
       tabs={!canEdit ? (
-        <div className={styles.viewerBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>{VIEWER_NOTE}</span>
-        </div>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div>
       ) : undefined}
       stats={(
         <KpiBand data-design="KPIs">

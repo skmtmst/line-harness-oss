@@ -1,18 +1,11 @@
 'use client'
 import { notifySaved } from '@/components/shared/toast'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Plus } from 'lucide-react'
-import {
-  api,
-  ApiError,
-  type ConversionDeduplicationMode,
-  type ConversionDefinitionPreview,
-  type ConversionDefinitionUsageKind,
-  type ConversionReversalPolicy,
-  type ConversionValueMode,
-} from '@/lib/api'
+import { api, ApiError, type ConversionDeduplicationMode, type ConversionDefinitionPreview, type ConversionDefinitionUsageKind, type ConversionReversalPolicy, type ConversionValueMode } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
 import { CreatePage } from '@/components/templates'
 import { useAccount } from '@/contexts/account-context'
@@ -44,7 +37,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 成果地点を作る（Pencil：作る `j8p3yj`・競合 `cXqlS`）。
@@ -563,7 +556,7 @@ function ConversionCreate() {
       footerActions={footerActions} dirty={false}
     >
       {viewerOnly ? (
-        <div className={styles.viewerBand} role="status">閲覧のみで見ています。作る操作はオーナーか管理者に頼んでください。</div>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>
       ) : null}
       {savedNotice ? <Notice tone="success">{savedNotice}</Notice> : null}
       {saveError ? <Notice tone="danger">{saveError}</Notice> : null}
@@ -586,7 +579,7 @@ function ConversionCreate() {
         </Field>
         {pointsFailed ? (
           <div className={styles.inlineRetry}>
-            <p className={styles.fieldNote} role="alert">同じ名前があるか確認できませんでした。同じ意味の成果地点があるかもしれません。</p>
+            <Notice tone="danger" className={styles.fieldNoteNoticePlacement} >同じ名前があるか確認できませんでした。同じ意味の成果地点があるかもしれません。</Notice>
             <Button variant="text" onClick={() => requestPoints()}>同名の確認を再読み込み</Button>
           </div>
         ) : null}

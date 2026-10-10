@@ -6,7 +6,7 @@
  * 選択中の語が切れない幅の1形にそろえる。見るのはラベル、選択肢の
  * 書き方、幅の下限、操作できることの4点。
  */
-import React from 'react'
+
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
@@ -62,10 +62,11 @@ describe('PageSizeSelect（監査6 #668: 表示件数の統一）', () => {
     const listbox = screen.getByRole('listbox')
     expect(listbox.textContent).toContain('20件表示')
     expect(listbox.textContent).toContain('50件表示')
-    expect(listbox.textContent).toContain('100件表示')
+    expect(listbox.textContent).toContain('10件表示')
+    expect(listbox.textContent).not.toContain('100件表示')
   })
 
-  it('件数の選択肢は画面が渡すものを使う（既定は 20・50・100）', () => {
+  it('件数の選択肢は画面が渡すものを使う（既定は 10・20・50）', () => {
     render(<PageSizeSelect value={30} onChange={() => {}} options={[10, 30, 50]} />)
     // 開く前に掴む（開いた後は字ラベルとボタンの両方に当たることがある）。
     const select = screen.getByLabelText('表示件数')
@@ -82,8 +83,8 @@ describe('PageSizeSelect（監査6 #668: 表示件数の統一）', () => {
     const onChange = vi.fn()
     render(<PageSizeSelect value={20} onChange={onChange} />)
     fireEvent.click(screen.getByLabelText('表示件数'))
-    // 既定の選択肢は 20・50・100（[1] が 50）。
+    // 既定の選択肢は 10・20・50（[1] が 20）。
     fireEvent.click(screen.getByRole('listbox').querySelectorAll('button')[1])
-    expect(onChange).toHaveBeenCalledWith(50)
+    expect(onChange).toHaveBeenCalledWith(20)
   })
 })

@@ -20,8 +20,10 @@ export interface BankProfile extends Omit<BankInput, 'accountNumber'> {
 export interface Statement {
   id: string; totalAmount: number; createdAt: string; expiresAt: string | null;
 }
+let embeddedAccessToken: string | null = null;
+export function setAffiliateAccessToken(value: string | null): void { embeddedAccessToken = value; }
 function token() {
-  const value = liff.getAccessToken();
+  const value = embeddedAccessToken ?? liff.getAccessToken();
   if (!value) throw new Error('LINEで開き直してください');
   return value;
 }

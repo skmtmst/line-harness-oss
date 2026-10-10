@@ -1,69 +1,56 @@
 'use client'
-import { canManageRole } from '@/lib/staff-role';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import { jstDate } from '@/lib/jst-datetime';
+import { formatDate as polishFormatDate, formatNumber } from '@/lib/format';
+import { notifySaved } from '@/components/shared/toast';
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import Link from '@/components/shared/list-navigation'
 
-import { jstDate } from '@/lib/jst-datetime'
-import { formatDate as polishFormatDate } from '@/lib/format'
-import { notifySaved } from '@/components/shared/toast'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Filter, PencilLine, Smartphone, Tag as TagIcon, Users } from 'lucide-react'
-import {
-  countTemplateTextCharacters,
-  type DeliveryMode,
-  type Scenario,
-  type ScenarioStep,
-  type Tag,
-  type Template,
-} from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
-import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
-import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
-import { STEP_MESSAGE_KINDS, type StepMessageKind } from '@/components/scenarios/message-type-tabs'
-import MessageKindFields, {
-  emptyMessageKindState,
-  serializeMessageKind,
-  type MessageKind,
-  type MessageKindState,
-} from '@/components/scenarios/message-kind-fields'
-import QuestionEditor, { emptyQuestion, type ScenarioQuestion } from '@/components/scenarios/question-editor'
-import { ConditionDialog, describeCondition } from '@/components/scenarios/scenario-dialogs'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { Filter, PencilLine, Smartphone, Tag as TagIcon, Users } from 'lucide-react';
+import { countTemplateTextCharacters, type DeliveryMode, type Scenario, type ScenarioStep, type Tag, type Template } from '@line-crm/shared';
+import { api, ApiError } from '@/lib/api';
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data';
+import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader';
+import { STEP_MESSAGE_KINDS, type StepMessageKind } from '@/components/scenarios/message-type-tabs';
+import MessageKindFields, { emptyMessageKindState, serializeMessageKind, type MessageKind, type MessageKindState } from '@/components/scenarios/message-kind-fields';
+import QuestionEditor, { emptyQuestion, type ScenarioQuestion } from '@/components/scenarios/question-editor';
+import { ConditionDialog } from '@/components/scenarios/scenario-dialogs';
 import CarouselPicker from '@/components/scenarios/carousel-picker'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
-import { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scenarios/char-counter'
-import type { SegmentCondition } from '@/components/shared/condition-builder'
-import { pruneCondition } from '@/lib/segment-condition'
-import { CreatePage } from '@/components/templates'
-import { Steps } from '@/components/templates/steps'
+import { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scenarios/char-counter';
+import type { SegmentCondition } from '@/components/shared/condition-builder';
+import { pruneCondition } from '@/lib/segment-condition';
+import { CreatePage } from '@/components/templates';
+import { Steps } from '@/components/templates/steps';
 import Select from '@/components/shared/select'
-import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import { Field } from '@/components/shared/form-controls'
-import { TimeField } from '@/components/shared/date-time-field'
+import { EntityKindField } from '@/components/shared/entity-picker-sources';
+import { Field } from '@/components/shared/form-controls';
+import { TimeField } from '@/components/shared/date-time-field';
 import SegmentedControl from '@/components/shared/segmented'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
-import { notifyToast } from '@/components/shared/toast'
+import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview';
 import TargetMissing from '@/components/shared/target-missing'
 import ListState from '@/components/shared/list-state'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useAccount } from '@/contexts/account-context'
-import { useStaffRole } from '@/lib/staff-role'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { formatNumber } from '@/lib/format'
-import { restoreFirstStep, scheduleToPayload } from './first-step-form'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { useAccount } from '@/contexts/account-context';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { restoreFirstStep, scheduleToPayload } from './first-step-form';
 import styles from './first-step.module.css'
-import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
-import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
-import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft'
-import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { browserDraftKey } from '@/v8/autosave/use-browser-draft';
+import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice';
+import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft';
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field';
+import { permissionDeniedMessage } from '@/components/shared/api-error-message';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 シナリオを作る②：1通目を設定（Pencil `V6xAo`・1152 `U5rxyH`）。
@@ -587,7 +574,7 @@ export default function ScenarioFirstStepV8() {
     <SaveErrorScope errors={saveErrors}><CreatePage
       boardId={narrow ? 'U5rxyH' : 'V6xAo'}
       title="1通目を設定"
-      identity={<></>}
+
       steps={(
         <Steps
           label="シナリオ作成の進み方"
@@ -622,7 +609,7 @@ export default function ScenarioFirstStepV8() {
       )}
     >
       {!canEdit ? (
-        <p className={styles.viewerBand} role="status">閲覧のみで見ています。1通目を作る操作はオーナーか管理者に頼んでください。</p>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。1通目を作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>
       ) : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       <BrowserDraftNotice ago={browserDraft.pendingAgo} onRestore={restoreBrowserDraft} onDiscard={browserDraft.clear} />

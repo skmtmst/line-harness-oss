@@ -214,13 +214,15 @@ export function formFileKind(block: FormInputBlock): "image" | "pdf" | "identity
   return kinds.includes("identity") ? "identity" : kinds.includes("image") ? "image" : "pdf";
 }
 
+export const FORM_DOCUMENT_SCAN_NOTE = '危ないファイルの検査は内蔵の検査が標準です。外部の検査は設定した店だけで行います。';
+
 export interface FormFileAnswer {
   fileId: string;
   kind?: "image" | "pdf" | "identity";
   side?: "single" | "front" | "back";
   filename?: string;
   mimeType?: string;
-  state?: "ready" | "pending" | "restricted" | "expired";
+  state?: "ready" | "pending" | "quarantined" | "rejected" | "restricted" | "expired";
 }
 
 /** 既存のメール・電話・住所・本名のブロックも同じ基本欄へ保存する。 */

@@ -1,12 +1,8 @@
 'use client'
-import TagPill from '@/components/shared/tag-pill';
-
+import TagPill from '@/components/shared/tag-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useMemo, useState, type ReactNode } from 'react'
-import {
-  CircleDashed, ClipboardList, Copy, FileText, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Inbox, Link2,
-  MessageSquare, Pencil, Plus, Send, Sparkles, Ticket, Trash2, Unlink, Users,
-} from 'lucide-react'
+import { CircleDashed, ClipboardList, Copy, FileText, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Inbox, Link2, MessageSquare, Pencil, Plus, Send, Sparkles, Ticket, Trash2, Unlink, Users } from 'lucide-react'
 import type { HqTemplateFolder, HqTemplateListStats, TemplateKind } from '@line-crm/shared'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -18,7 +14,7 @@ import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import { FolderDotName } from '@/components/shared/folder-dot'
+import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
 import { deleteFolderDescription } from '@/components/shared/folder-row-actions'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -27,20 +23,19 @@ import Pagination from '@/components/shared/pagination'
 import { RowMenu, RowQuickAction } from '@/components/shared/row-actions'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Select from '@/components/shared/select'
-import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { RowNameLink, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
-import { formatNumber } from '@/lib/format'
+import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
 import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
 import { distributedAccountsLine, templateSubLine } from './list-row'
 import { AttributeTabs, OtherTabPanel, assignmentMethods, cleanupTagCount, matchesTagFilters, unusedTagCount, useAttributeTab, type TagUsageFilter } from './attribute-tabs'
 import storeStyles from '../templates/list.module.css'
 import hqStyles from './store-list.module.css'
 import attributeStyles from './attribute-tabs.module.css'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
-import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 統括のひな形の一覧を「店の同じ機能の一覧と同じ形」で出す（オーナー 2026-10-08・B-27〜B-29・B-34・B-36）。
@@ -134,6 +129,7 @@ export interface HqStoreListProps {
   onEdit: (row: HqTemplate) => void
   /** 名前を押したとき（詳細 pQ4fH）。無ければ編集を開く。 */
   onOpen?: (row: HqTemplate) => void
+  itemHref?: (row: HqTemplate) => string
   onDistributeFolder?: (id: string, name: string) => void
   /** 全種類を数える。種類タブや検索でフォルダの配布範囲を狭めない。 */
   folderContents?: HqTemplate[] | null
@@ -148,7 +144,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   const saveErrors = useSaveFormErrors()
   const {
     type, rows, ready, busy, canEdit, accountTotal, stats, kind, kindCounts, onKindChange, folders, folderLoadFailed, folderFilter, onFolderFilter,
-    onAddFolder, onRenameFolder, onDeleteFolder, onReloadFolders, onCreate, onEdit, onOpen, onDistribute, onDistributeFolder, folderContents, onDuplicate, onRemove, notices, overlays,
+    onAddFolder, onRenameFolder, onDeleteFolder, onReloadFolders, onCreate, onEdit, onOpen, itemHref, onDistribute, onDistributeFolder, folderContents, onDuplicate, onRemove, notices, overlays,
   } = props
   const words = WORDS[type]
   const [query, setQuery] = useListUrlValue('q', '')
@@ -266,19 +262,19 @@ export default function HqStoreList(props: HqStoreListProps) {
     { kind: 'unfiled' as const, id: 'none', label: '未分類', count: ready ? countIn('none') : null, leadingActions: leadingActions('none', '未分類') },
   ]
   const selectFolder = (id: string) => { onFolderFilter(id); setPage(1) }
-  const folderPanel = folderLoadFailed ? (
-    <p role="alert" className={storeStyles.folderNote}>フォルダを読み込めませんでした。ページを再読み込みしてください。</p>
-  ) : (
+  const folderPanel = (
     <FolderPanel
+      createAction={createButton(true)}
+      showHeading={!folderLoadFailed}
       activeId={folderFilter}
       onSelect={selectFolder}
-      onAddFolder={canEdit ? () => { setFolderError(''); setFolderNameError(''); setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setFolderDialog({ editing: null }) } : undefined}
+      onAddFolder={!folderLoadFailed && canEdit ? () => { setFolderError(''); setFolderNameError(''); setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setFolderDialog({ editing: null }) } : undefined}
       addFolderLabel="フォルダを追加"
-      rows={folderRows}
+      rows={folderLoadFailed ? [] : folderRows}
     >
-      <p className={storeStyles.folderNote}>
+      {folderLoadFailed ? <Notice tone="danger" className={storeStyles.folderNoteNoticePlacement}>フォルダを読み込めませんでした。ページを再読み込みしてください。</Notice> : <p className={storeStyles.folderNote}>
         {type === 'template' ? 'フォルダは種類のタブをまたいで使えます。消しても、中のテンプレートは未分類に残ります' : `フォルダを消しても、中の${words.item}は未分類に残ります`}
-      </p>
+      </p>}
     </FolderPanel>
   )
 
@@ -483,7 +479,7 @@ export default function HqStoreList(props: HqStoreListProps) {
                 {type === 'rich_menu' ? <Td className={storeStyles.cellPlain}>{rankOf.get(row.id) ?? emptyValue('unknown')}</Td> : null}
                 <NameCell name={(
                     <div className={storeStyles.dotLine}>
-                      {canEdit ? (
+                      {itemHref ? <RowNameLink href={itemHref(row)} className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name}>{row.name}</RowNameLink> : canEdit ? (
                         <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{row.name}</button>
                       ) : <span className={storeStyles.cellTitle} title={row.name}>{row.name}</span>}
                     </div>
@@ -537,7 +533,7 @@ export default function HqStoreList(props: HqStoreListProps) {
         </KpiBand>
       )}
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: selectFolder, createAction: createButton(false) ?? undefined }}
-      folders={<>{createButton(true) ?? <span className={storeStyles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
+      folders={folderPanel}
       toolbar={toolbar}
       pagination={pager}
       overlays={(

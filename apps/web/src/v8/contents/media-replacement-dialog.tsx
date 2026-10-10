@@ -13,6 +13,7 @@ import { checkedAtText, referenceKindText, referenceNameText } from './media-del
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /* ★V8 写し：src/app/contents/media-replacement-dialog.tsx から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
 
@@ -247,7 +248,7 @@ export default function MediaReplacementDialog({
         {phase === 'loading' ? (
           <p className="text-ink-faint text-xs">差し替わる場所を確認しています…</p>
         ) : phase === 'error' ? (
-          <p className="text-danger text-xs" role="alert">影響を確認できませんでした。読み直してから、もう一度お試しください。</p>
+          <Notice tone="danger" >影響を確認できませんでした。読み直してから、もう一度お試しください。</Notice>
         ) : impact ? (
           <div className="space-y-3">
             <div className={`rounded-control p-3 text-xs ${impact.canReplace ? 'bg-accent-soft text-accent-deep' : 'bg-danger-bg text-danger'}`}>

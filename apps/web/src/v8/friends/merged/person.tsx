@@ -1,26 +1,23 @@
 'use client'
 import { Unlink } from 'lucide-react'
-import { formatDateTime } from '@/lib/format'
+import { formatDateTime, formatDate as polishFormatDate } from '@/lib/format'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { PageFrame } from '@/components/templates/page-frame'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Toggle from '@/components/shared/toggle'
 import { TextArea } from '@/components/shared/text-field'
-import { RequiredBadge } from '@/components/shared/form-controls'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import MergedDeliveryDialog from '@/components/merged-person/merged-delivery-dialog'
 import MergedProfileDialog from '@/components/merged-person/merged-profile-dialog'
 import { useMergedPerson } from '@/components/merged-person/use-merged-person'
 import styles from './person.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
-import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 統合ユーザーの詳細（Pencil `Hn9eE`）。/friends?tab=merged&person=<id>（一覧の名前からも開く）。
@@ -78,10 +75,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
       <div className={styles.split}>
         <div className={styles.main}>
           {m.saveError ? (
-            <p className={styles.error} role="alert">
-              {m.saveError}
-              <button type="button" className={styles.link} onClick={m.reload}>もう一度読み込む</button>
-            </p>
+            <Notice tone="danger" >{m.saveError}<button type="button" className={styles.link} onClick={m.reload}>もう一度読み込む</button></Notice>
           ) : null}
 
           <section className={styles.card} aria-labelledby="mp-delivery">

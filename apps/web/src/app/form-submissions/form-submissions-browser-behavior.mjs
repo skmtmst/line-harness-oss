@@ -505,12 +505,21 @@ try {
       form(2, { id: 'sales-old', name: '古い営業フォーム', updatedAt: null, monthlySubmitCount: null, monthlyCompletionRate: null }),
     ]
     const { context, page } = await openHarness(browser, { formsByAccount: { 'account-a': forms } })
-    await openList(page)
+    await openList(page, `?q=${encodeURIComponent('営業')}`)
+    const listSource = new URL(page.url()).pathname + new URL(page.url()).search
 
     const newLink = page.getByRole('link', { name: '営業フォームの集まった回答を見る', exact: true })
     const oldLink = page.getByRole('link', { name: '古い営業フォームの集まった回答を見る', exact: true })
-    assert.equal(await newLink.getAttribute('href'), '/form-submissions/responses?id=sales-new')
-    assert.equal(await oldLink.getAttribute('href'), '/form-submissions/responses?id=sales-old')
+    for (const [link, id] of [[newLink, 'sales-new'], [oldLink, 'sales-old']]) {
+      const destination = new URL(await link.getAttribute('href'), baseUrl)
+      assert.equal(destination.pathname, '/form-submissions/responses')
+      assert.equal(destination.searchParams.get('id'), id, '回答はその行のフォームを指す')
+      const returnDestination = new URL(destination.searchParams.get('returnTo'), baseUrl)
+      assert.equal(returnDestination.pathname, '/form-submissions', '回答から同じ一覧へ戻れる')
+      assert.equal(returnDestination.searchParams.get('q'), '営業', '検索条件を持ち運ぶ')
+      assert.equal(returnDestination.searchParams.get('form'), id, '戻る対象を持ち運ぶ')
+      assert.equal(destination.searchParams.get('returnAccount'), 'account-a', '戻り先のアカウントを持ち運ぶ')
+    }
 
     const newRow = rows(page).filter({ has: newLink })
     // V8は更新日時の独立列を廃止し、回答数と今月の回答・完了率をまとめる。
@@ -520,7 +529,11 @@ try {
     // R27: 行の「編集」は質問の編集へ。「…」内の操作から対象を引き継ぐ。
     await newRow.getByRole('button', { name: /その他の操作/ }).click()
     await page.getByRole('menuitem', { name: '編集', exact: true }).click()
-    await page.waitForURL('**/form-submissions/edit?id=sales-new&tab=basic')
+    await page.waitForURL((url) => url.pathname === '/form-submissions/edit'
+      && url.searchParams.get('id') === 'sales-new' && url.searchParams.get('tab') === 'basic')
+    const editDestination = new URL(page.url())
+    assert.equal(editDestination.searchParams.get('returnTo'), listSource, '編集メニューも検索条件を持ち運ぶ')
+    assert.equal(editDestination.searchParams.get('returnAccount'), 'account-a')
     await context.close()
   }
 
@@ -597,7 +610,7 @@ try {
   {
     const { context, page, state } = await openHarness(browser, { fail: true })
     await openList(page)
-    await page.getByText('表示できませんでした', { exact: true }).waitFor()
+    await page.getByText('読み込めませんでした', { exact: true }).waitFor()
     assert.equal(await page.getByRole('button', { name: 'もう一度読み込む' }).count(), 1)
     assert.equal(await page.getByText('まだ回答フォームがありません', { exact: true }).count(), 0, '失敗を0件と言わない')
     state.fail = false

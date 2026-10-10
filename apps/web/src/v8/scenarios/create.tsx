@@ -1,41 +1,37 @@
 'use client'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { CalendarClock, Check, Timer } from 'lucide-react'
-import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
-import { ApiError, api } from '@/lib/api'
-import { CreatePage } from '@/components/templates'
-import { Steps } from '@/components/templates/steps'
-import { notifyToast } from '@/components/shared/toast'
-import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import Link from '@/components/shared/list-navigation'
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { CalendarClock, Check, Timer } from 'lucide-react';
+import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared';
+import { ApiError, api } from '@/lib/api';
+import { CreatePage } from '@/components/templates';
+import { Steps } from '@/components/templates/steps';
+import { notifyToast } from '@/components/shared/toast';
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select';
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
-import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
-import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
-import {
-  forgetNewScenarioDraftKey,
-  newScenarioDraftKey,
-  scenarioDraftKey,
-  useScenarioDraft,
-} from '@/v8/autosave/use-scenario-draft'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import { browserDraftKey } from '@/v8/autosave/use-browser-draft';
+import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice';
+import { forgetNewScenarioDraftKey, newScenarioDraftKey, scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft';
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import HelpTip from '@/components/shared/help-tip'
-import { TextField } from '@/components/shared/text-field'
-import { RequiredBadge } from '@/components/shared/form-controls'
-import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
+import { TextField } from '@/components/shared/text-field';
+import { RequiredBadge } from '@/components/shared/form-controls';
+import { isForbiddenOrRateLimited, loadFailureCopy, permissionDeniedMessage } from '@/components/shared/api-error-message';
 import TargetMissing from '@/components/shared/target-missing'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useAccount } from '@/contexts/account-context'
-import { useStaffRole } from '@/lib/staff-role'
-import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { useAccount } from '@/contexts/account-context';
+import { useStaffRole } from '@/lib/staff-role';
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data';
 import styles from './create.module.css'
 import DeliveryModeDiagram from './delivery-mode-diagram'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 シナリオを作る①：シナリオ情報・配信方式（Pencil `dnzqC`）。
@@ -380,7 +376,7 @@ export default function ScenarioCreateV8() {
       stepsSpacing="compact"
       boardId="dnzqC"
       title="シナリオを作る"
-      identity={<></>}
+
       steps={(
         <Steps
           label="シナリオ作成の進み方"
@@ -417,7 +413,7 @@ export default function ScenarioCreateV8() {
     >
       <div className={styles.notices} data-list-state={scenarioState} aria-busy={scenarioState === 'loading'}>
         {!canEdit ? (
-          <p className={styles.viewerBand} role="status">閲覧のみで見ています。シナリオを作る操作はオーナーか管理者に頼んでください。</p>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。シナリオを作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>
         ) : null}
         {scenarioState === 'loading' ? <Notice tone="info">シナリオを読み込んでいます。</Notice> : null}
         {scenarioState === 'ready' && scenario ? (

@@ -21,6 +21,7 @@ import styles from '@/app/friends/friends-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 統合ユーザー（Pencil `ADjK8`、採用版の流れは `sdbsQ` 板3、状態 `SXCb3`）。
@@ -210,7 +211,7 @@ export default function UsersV8() {
       </div>
 
       {u.exportError ? (
-        <p className={styles.errorBand} role="alert">{u.exportError}</p>
+        <Notice tone="danger" className={styles.errorBandNoticePlacement} >{u.exportError}</Notice>
       ) : null}
 
       {/* 一覧。状態は SXCb3：骨格・0件・失敗をこの場所で出す。 */}
@@ -234,7 +235,7 @@ export default function UsersV8() {
                       <CircleAlert size={20} aria-hidden="true" />
                     </span>
                     <p className={styles.stateTitle}>統合ユーザーを読み込めませんでした</p>
-                    <Button type="button" variant="primary" onClick={() => void u.load()}>
+                    <Button type="button" variant="primary" onClick={() => u.load()} busyLabel="処理中…">
                       もう一度試す
                     </Button>
                   </div>

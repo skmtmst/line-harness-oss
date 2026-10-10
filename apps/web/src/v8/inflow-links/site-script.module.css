@@ -4,18 +4,7 @@
  * 段はどれも 枠1・角12・余白16。
  */
 .body { display: flex; flex-direction: column; gap: var(--tpl-cn-card-gap); }
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  margin: 0;
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-info-bg);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-ro-band-lh);
-}
+.viewerBand { margin: 0; }
 
 .card,
 .panel {
@@ -34,7 +23,7 @@
 .cardTitle { margin: 0; color: var(--color-ink); font-size: var(--text-body); font-weight: 700; line-height: var(--tpl-rsa-ss-title-lh); }
 .sitesLead { display: flex; align-items: center; gap: var(--tpl-body-gap); }
 .lead { flex: 1 1 auto; min-width: 0; margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-rsa-after-note-lh); }
-.note { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-rsa-after-note-lh); }
+.note { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-rsa-after-note-lh); }
 .textLink { margin-left: var(--tpl-body-gap); padding: 0; border: 0; background: none; color: var(--color-action); font: inherit; cursor: pointer; }
 
 /* サイトの表：見出し 36.5（余白10/0・薄い地）・行 51.5（余白8/0）・欄の間12。行の間も12（段の間と同じ）。 */
@@ -138,3 +127,7 @@
 .dialogLabel { color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; }
 
 .fieldError { color: var(--color-danger); font-size: var(--text-caption); }
+
+.note, .noteNoticePlacement { margin: 0; }
+
+.small, .smallNoticePlacement { margin: 0; }

@@ -1,8 +1,9 @@
 'use client'
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -944,7 +945,7 @@ export default function MenuFormV8() {
                     : '担当を読み込めませんでした。入力はそのまま残っています。'}
                 </p>
                 {classifyApiFailure(staffError) !== 'forbidden' && selectedAccountId && (
-                  <Button variant="secondary" size="compact" onClick={() => void loadAll()}>
+                  <Button variant="secondary" size="compact" onClick={() => loadAll()} busyLabel="処理中…">
                     担当をもう一度読み込む
                   </Button>
                 )}

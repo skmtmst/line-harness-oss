@@ -1,42 +1,31 @@
 'use client'
 
-import { FolderDotName } from '@/components/shared/folder-dot'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import {
-  AlertCircle,
-  Bookmark,
-  Check,
-  CircleDashed,
-  Folder,
-  FolderOpen,
-  GripVertical,
-  Inbox,
-  Plus,
-  Sparkles,
-  Tag as TagIcon,
-  Users,
-} from 'lucide-react'
-import type { Tag, TagGroup } from '@line-crm/shared'
-import { api, ApiError, type ListStats } from '@/lib/api'
-import { useRowLeaving } from '@/lib/use-row-leaving'
-import { RovingTbody } from '@/components/shared/row-roving'
-import { ListPageBody } from '@/components/templates'
-import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors'
+import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
+import { Bookmark, Check, CircleDashed, Folder, FolderOpen, GripVertical, Inbox, Plus, Sparkles, Tag as TagIcon, Users } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+import { RowNameLink } from '@/components/shared/table';
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { AlertCircle } from 'lucide-react';
+import type { Tag, TagGroup } from '@line-crm/shared';
+import { api, ApiError, type ListStats } from '@/lib/api';
+import { useRowLeaving } from '@/lib/use-row-leaving';
+import { RovingTbody } from '@/components/shared/row-roving';
+import { ListPageBody } from '@/components/templates';
+import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors';
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
 import StatusBadge from '@/components/shared/status-badge'
 import FilterChip from '@/components/shared/filter-chip'
-import { RowMenu } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import { withViewTransition } from '@/components/shared/view-transition'
-import { notifyToast } from '@/components/shared/toast'
-import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-error-message'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
+import { withViewTransition } from '@/components/shared/view-transition';
+import { notifyToast } from '@/components/shared/toast';
+import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-error-message';
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
@@ -44,32 +33,23 @@ import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import TagPill from '@/components/shared/tag-pill'
-import { DelayedSkeleton } from '@/components/shared/skeleton'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import { DelayedSkeleton } from '@/components/shared/skeleton';
+import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
 import ReorderHandle from '@/components/shared/reorder-handle'
-import { useLiveReorder } from '@/lib/use-live-reorder'
-import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils'
+import { useLiveReorder } from '@/lib/use-live-reorder';
+import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils';
 import TagCsvImportDialog from '@/components/friend-fields/tag-csv-import-dialog'
-import { isCurrentTagListRequest, type TagListRequestKey } from '@/components/friend-fields/tag-list-state'
-import {
-  DeleteTagDialog,
-  QUICK_FILTERS,
-  UNGROUPED,
-  cleanupKnown,
-  formatDate,
-  hasLinkedActions,
-  isThisMonth,
-  isUnused,
-  usageLabel,
-} from '@/components/friend-fields/tags-page-v4'
+import { isCurrentTagListRequest, type TagListRequestKey } from '@/components/friend-fields/tag-list-state';
+import { DeleteTagDialog, QUICK_FILTERS, UNGROUPED, cleanupKnown, formatDate, hasLinkedActions, isThisMonth, isUnused, usageLabel } from '@/components/friend-fields/tags-page-v4';
 import styles from './list.module.css'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
-import { ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
-import { ListPager } from '@/components/templates/list-page'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { ListPager } from '@/components/templates/list-page';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 タグ「タグ」タブ（Pencil `I1E7Bt`・1152 `aPeD8`・閲覧のみ `fkGUR`、
@@ -94,7 +74,7 @@ const sourceLabel = (tag: Tag): string => (tag.assignSource ? SOURCE_LABELS[tag.
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 
 /** 連動の文（絵の「本人+10・1.2倍 他1」）。マイル以外の連動は「他N」。0件は「—」。 */
 /**
@@ -254,7 +234,7 @@ export default function TagsTab({
   const [menuMoveFor, setMenuMoveFor] = useState<string | null>(null)
   /* 行の詳細パネル。URL に ?tag=<id> を残す。 */
   const [activeTagId, setActiveTagId] = useDetailPanelUrl('tag')
-  const openTagDetail = (id: string) => withViewTransition(() => setActiveTagId(id))
+  const openTagDetail = (id: string) => withViewTransition(() => setActiveTagId(activeTagId === id ? null : id))
   const loadRequestRef = useRef<TagListRequestKey>({ accountId, generation: 0 })
 
   const load = useCallback(async () => {
@@ -673,29 +653,18 @@ export default function TagsTab({
   const folderNote = (
     <>
       {canEdit ? null : <span className={styles.viewerFolderAddSpace} aria-hidden="true" />}
-      <p className={styles.folderNote}>フォルダを消しても、中のタグは未分類に残ります</p>
+      <FolderPanelNote>フォルダを消しても、中のタグは未分類に残ります</FolderPanelNote>
       {folderError ? (
-        <p role="alert" className={styles.folderNote}>
-          {folderError}
-          <button type="button" onClick={() => void load()} className={styles.inlineRetry}>もう一度</button>
-        </p>
+        <Notice tone="danger" className={styles.folderNoteNoticePlacement} >{folderError}
+          <button type="button" onClick={() => void load()} className={styles.inlineRetry}>もう一度</button></Notice>
       ) : null}
     </>
   )
 
   const table = status === 'forbidden' ? (
-    <div className={styles.stateCard}>
-      <AlertCircle className={styles.stateIconError} aria-hidden="true" />
-      <p className={styles.stateTitle}>タグを見る権限がありません</p>
-      <p className={styles.stateDesc}>タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。</p>
-    </div>
+    <ListState kind="error" title="タグを見る権限がありません" description="タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。"  />
   ) : status === 'error' ? (
-    <div className={styles.stateCard} data-design-node="U0aKD">
-      <AlertCircle className={styles.stateIconError} aria-hidden="true" />
-      <p className={styles.stateTitle}>タグを読み込めませんでした</p>
-      <p className={styles.stateDesc}>再読み込みしても直らない場合はエラー報告へ。</p>
-      <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
-    </div>
+    <ListState kind="error" title="タグを読み込めませんでした" description="再読み込みしても直らない場合はエラー報告へ。" data-design-node="U0aKD" action={<><Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
   ) : ready && visible.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
     <EmptyList
@@ -740,14 +709,8 @@ export default function TagsTab({
                 className={styles.row}
                 leaving={leavingId === tag.id}
                 tabIndex={0}
-                onClick={() => openTagDetail(tag.id)}
-                onKeyDown={(event) => {
-                  if (event.target !== event.currentTarget) return
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    openTagDetail(tag.id)
-                  }
-                }} data-row-id={tag.id}
+                detailKey="tag" onOpen={() => openTagDetail(tag.id)}
+                data-row-id={tag.id}
               >
                 <Td className={styles.colName}>
                   <ContextMenu label={`タグ「${tag.name}」の操作`} items={tagContextItems(tag)}>
@@ -769,7 +732,7 @@ export default function TagsTab({
                         )}
                       </span>
                       <FolderDotName folder={group}>
-                        {canEdit ? <Link href={editHref} title={tag.name} className={styles.name}>{tag.name}</Link> : <span title={tag.name}>{tag.name}</span>}
+                        {canEdit ? <RowNameLink prefetch={false} href={editHref} title={tag.name} className={styles.name}>{tag.name}</RowNameLink> : <span title={tag.name}>{tag.name}</span>}
                       </FolderDotName>
                       </div>
 
@@ -792,15 +755,15 @@ export default function TagsTab({
                   </Td>
                 ) : null}
                 {/* 人数は、そのタグで絞った友だち一覧へのリンク。 */}
-                <Td className={styles.colCount} onClick={(event) => event.stopPropagation()}>
-                  <Link href={`/friends?tag=${encodeURIComponent(tag.id)}`} className={styles.countLink} title={`「${tag.name}」が付いている友だちを見る`}>
+                <Td className={styles.colCount}>
+                  <Link prefetch={false} href={`/friends?tag=${encodeURIComponent(tag.id)}`} className={styles.countLink} title={`「${tag.name}」が付いている友だちを見る`}>
                     {tag.friendCount ?? 0} 人
                   </Link>
                 </Td>
                 <Td className={styles.colSource}><span className={styles.cellText} title={sourceLabel(tag)}>{sourceLabel(tag)}</span></Td>
                 <Td className={styles.colLink}><span className={styles.cellText} title={tagLinkText(tag)}>{tagLinkText(tag)}</span></Td>
                 <Td className={styles.colUsage}><span className={styles.cellText} title={usageLabel(tag)}>{usageLabel(tag)}</span></Td>
-                <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
+                <Td className={styles.colMenu}>
                   {/* 閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す） */}
                   {canEdit ? <span className={styles.menuAnchor}>
                     <RowMenu
@@ -854,8 +817,9 @@ export default function TagsTab({
       <ListPageBody
         skeleton
         folders={<>
-          {createButton(true) ?? (status === 'forbidden' ? null : <span className={styles.viewerCreateSpace} aria-hidden="true" />)}
           <FolderPanel
+            createAction={createButton(true)}
+            reserveCreateSpace={status !== 'forbidden'}
             activeId={folder}
             onSelect={setFolder}
             onAddFolder={canEdit ? () => setFolderDialog('new') : undefined}
@@ -891,11 +855,7 @@ export default function TagsTab({
         </>}
       >
         {actionError ? (
-          <p role="alert" className={styles.errorBand}>
-            <AlertCircle className={styles.errorIcon} aria-hidden="true" />
-            {actionError}
-            <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
-          </p>
+          <Notice tone="danger" >{actionError}<button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button></Notice>
         ) : null}
         {table}
       </ListPageBody>

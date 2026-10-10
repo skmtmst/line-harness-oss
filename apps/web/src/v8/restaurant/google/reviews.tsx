@@ -4,7 +4,7 @@ import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import HelpTip from '@/components/shared/help-tip'
 import KpiCard from '@/components/shared/kpi-card'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useState } from 'react'
 import { RefreshCw, Sparkles } from 'lucide-react'
 import { ApiError } from '@/lib/api'
@@ -170,7 +170,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
       </div>
       {connection.status === 'expired' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で再接続</Link>}>Googleとの接続を確認してください（認可切れ）。前回取得した口コミを表示しています。</Notice> : null}
       {connection.status === 'no_permission' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で接続を確認</Link>}>この店舗を操作する権限がありません。</Notice> : null}
-      {syncError ? <Notice tone="warn" action={<Button variant="text" onClick={() => void sync()}>もう一度</Button>}>{syncError}</Notice> : null}
+      {syncError ? <Notice tone="warn" action={<Button variant="text" onClick={() => sync()} busy={syncing} busyLabel="取得中…">もう一度</Button>}>{syncError}</Notice> : null}
       {syncing && (list?.total ?? 0) === 0 ? <Notice tone="info">口コミを取得中… すべてのページを取得してから表示します。</Notice> : null}
       {listLoading && !list ? <div className={styles.stateBox}><ListState kind="loading" title="口コミを読み込んでいます" /></div> : null}
       {listError ? <div className={styles.stateBox}><ListState kind="error" title="口コミを表示できませんでした" description={listError} onRetry={() => void load()} /></div> : null}

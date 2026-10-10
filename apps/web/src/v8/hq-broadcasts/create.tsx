@@ -9,8 +9,9 @@ import { EntityPickerField, EntityPickerSummary } from '@/components/shared/enti
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Steps } from '@/components/templates/steps'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { AlertTriangle, ArrowDown, ArrowRight, Building2, CheckCircle2, Eye, Send, Tag as TagIcon, Workflow } from 'lucide-react'
 import type { Folder, HqBroadcastInput, HqBroadcastPreflight, HqBroadcastRun, MessageTemplateDefinition, SegmentCondition } from '@line-crm/shared'
 import ConditionBuilder from '@/components/shared/condition-builder'
@@ -925,7 +926,7 @@ export default function HqBroadcastCreate() {
                 {tagStatus === 'error' ? (
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-xs text-warning">タグを読み込めませんでした。通信を確かめて、もう一度お試しください。</p>
-                    <Button variant="secondary" size="compact" onClick={() => void loadTags()}>もう一度読み込む</Button>
+                    <Button variant="secondary" size="compact" onClick={() => loadTags()} busyLabel="処理中…">もう一度読み込む</Button>
                   </div>
                 ) : null}
                 {audience === 'scenario' ? (

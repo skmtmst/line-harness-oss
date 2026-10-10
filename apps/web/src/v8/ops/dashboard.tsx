@@ -1,8 +1,8 @@
 'use client'
 
-import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+import { ValueBarChart } from '@/components/shared/charts'
 
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { Banknote, Hourglass, Sparkles, Wallet } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsDashboard, type OpsDashboardPeriod, type OpsLineUnregistered } from '@/lib/api'
@@ -22,6 +22,7 @@ import { OpsHead } from './shell'
 import parts from './parts.module.css'
 import styles from './dashboard.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営ダッシュボード V8（絵 `CyW0E`）。
@@ -122,7 +123,7 @@ export default function OpsDashboardV8() {
         </div>
       ) : (
         <div className={parts.stack}>
-          {error ? <p role="alert" className={parts.alert}>{error}</p> : null}
+          {error ? <Notice tone="danger" className={parts.alertNoticePlacement} >{error}</Notice> : null}
           <div className={`${parts.kpis} ${kpiStyles.strip}`}>
             <KpiCard presentation="cell" icon={<Wallet size={13} aria-hidden="true" />} title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k && data ? `契約中 ${k.active}・決済失敗 ${data.alerts.pastDue}（トライアルは入れない）` : emptyValue('unknown')} loading={loading} />
             <KpiCard presentation="cell" icon={<Banknote size={13} aria-hidden="true" />} title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={data ? `決済失敗 ${data.alerts.pastDue} 社` : emptyValue('unknown')} loading={loading} />
@@ -157,7 +158,7 @@ export default function OpsDashboardV8() {
                 ) : null}
               </div>
               {billingSyncNotice ? <p role="status" className={parts.status}>{billingSyncNotice}</p> : null}
-              {billingSyncError ? <p role="alert" className={parts.alert}>{billingSyncError}</p> : null}
+              {billingSyncError ? <Notice tone="danger" className={parts.alertNoticePlacement} >{billingSyncError}</Notice> : null}
             </section>
           </div>
 

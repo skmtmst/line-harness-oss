@@ -3,7 +3,8 @@ import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Activity, Bookmark, Download, Filter, Layers, TriangleAlert } from 'lucide-react'
 import { api, ApiError, downloadApiFile, fetchApi, type AutomationRunDetail } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -15,11 +16,11 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
-import DetailPanel from '@/components/shared/detail-panel'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import {
@@ -185,7 +186,13 @@ export default function AutomationRunsV8() {
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [page, setPage] = useListUrlValue('page', 1)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const [selectedRun, setSelectedRun] = useState<AutomationRunRow | null>(null)
+  const [runId, setRunId] = useDetailPanelUrl('run')
+  const [selectedRun, setSelectedRunState] = useState<AutomationRunRow | null>(null)
+  const setSelectedRun = (run: AutomationRunRow | null | ((current: AutomationRunRow | null) => AutomationRunRow | null)) => {
+    if (typeof run === 'function') { setSelectedRunState(run); return }
+    setRunId(run?.id ?? null)
+    setSelectedRunState(run)
+  }
   const [selectedDetail, setSelectedDetail] = useState<AutomationRunDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<null | 'error' | 'forbidden'>(null)
@@ -222,7 +229,7 @@ export default function AutomationRunsV8() {
   useEffect(() => {
     loadGeneration.current += 1
     detailGeneration.current += 1
-    setSelectedRun(null)
+    setSelectedRunState(null)
     setSelectedDetail(null)
     setDetailError(null)
     setDeepLinkRunId(null)
@@ -377,8 +384,8 @@ export default function AutomationRunsV8() {
 
   /* ?run=<id> の直リンク：その記録の中身を開く。 */
   useEffect(() => {
-    const runId = new URLSearchParams(window.location.search).get('run')
-    if (!runId) return
+    if (!runId) { setSelectedRunState(null); setDeepLinkRunId(null); return }
+    if (selectedRun?.id === runId) return
     setDeepLinkRunId(runId)
     const accountAtStart = selectedAccountRef.current
     let cancelled = false
@@ -389,7 +396,7 @@ export default function AutomationRunsV8() {
         if (cancelled || selectedAccountRef.current !== accountAtStart) return
         if (!response.success) { setDeepLinkError('error'); return }
         const detail = response.data
-        setSelectedRun({
+        setSelectedRunState({
           id: detail.id,
           automationId: detail.automationId,
           occurredAt: detail.occurredAt,
@@ -417,7 +424,7 @@ export default function AutomationRunsV8() {
       })
       .finally(() => { if (!cancelled && selectedAccountRef.current === accountAtStart) setDeepLinkLoading(false) })
     return () => { cancelled = true }
-  }, [deepLinkReloadKey])
+  }, [runId, deepLinkReloadKey, selectedAccountId])
 
   /* 行の「…」：中身を見る・もう一度やる（やり直せる失敗のとき）・ルールを開く・トークを開く。 */
   const rowMenuItems = (run: AutomationRunRow): ActionMenuItem[] => [
@@ -512,7 +519,7 @@ export default function AutomationRunsV8() {
                 const versionLine = `v${run.versionNumber}${run.isTest ? '・テスト' : ''}`
                 const menuLabel = `記録「${run.subject ?? '友だち名なし'}・${run.automationName}」の操作`
                 return (
-                  <Tr key={run.id} className={styles.row} data-table-layout="columns" data-row-id={run.id} onOpen={() => setSelectedRun(run)}>
+                  <Tr key={run.id} className={styles.row} data-table-layout="columns" data-row-id={run.id} onOpen={() => setSelectedRun(selectedRun?.id === run.id ? null : run)}>
                     <Td className={styles.colWhen}>
                       <button type="button" className={styles.subject} onClick={() => setSelectedRun(run)}>
                         {run.subject ?? '友だち名なし'}
@@ -593,7 +600,7 @@ export default function AutomationRunsV8() {
       pagination={pager}
       overlays={<>
         {deepLinkMessage ? (
-          <DetailPanel open title="実行記録の中身" onClose={() => setDeepLinkRunId(null)}>
+          <DetailPanel open title="実行記録の中身" onClose={() => { setDeepLinkRunId(null); setRunId(null) }}>
             <p className={styles.panelText}>{deepLinkMessage}</p>
             {deepLinkError === 'error' ? <Button onClick={() => setDeepLinkReloadKey((key) => key + 1)}>もう一度読み込む</Button> : null}
           </DetailPanel>

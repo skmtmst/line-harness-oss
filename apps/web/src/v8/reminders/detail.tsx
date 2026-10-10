@@ -1,67 +1,47 @@
 'use client'
-import { scheduledJstIso } from '@/lib/jst-datetime'
+import { scheduledJstIso } from '@/lib/jst-datetime';
 import SharedStatusPill from '@/components/shared/status-pill'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  ArrowRight,
-  Check,
-  ChevronLeft,
-  CircleAlert,
-  Copy,
-  Download,
-  Info,
-  Pause,
-  Pencil,
-  Play,
-  RotateCcw,
-  Trash2,
-  X,
-} from 'lucide-react'
-import { describeReminderTiming, type Reminder, type ReminderStep } from '@line-crm/shared'
-import {
-  api,
-  ApiError,
-  type ReminderDeliveryRun,
-  type ReminderDeliveryRunsResponse,
-  type ReminderDeliveryRunStatus,
-  type ReminderRegistrant,
-} from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { useStaffRole } from '@/lib/staff-role'
-import { formatDateTime, formatNumber } from '@/lib/format'
-import { csvCell } from '@/lib/presentation'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { PageFrame } from '@/components/templates/page-frame'
-import { CreateSummaryCard } from '@/components/templates/create-parts'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
-import { TableHeadRow } from '@/components/shared/table'
+import { useListUrlValue } from '@/components/shared/list-url-state';
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { useSamePageUrl } from '@/lib/use-same-page-url';
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { ArrowRight, Check, Copy, Download, Info, Pause, Pencil, Play, RotateCcw, Trash2, X } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { ChevronLeft, CircleAlert } from 'lucide-react';
+import { describeReminderTiming, type Reminder, type ReminderStep } from '@line-crm/shared';
+import { api, ApiError, type ReminderDeliveryRun, type ReminderDeliveryRunsResponse, type ReminderDeliveryRunStatus, type ReminderRegistrant } from '@/lib/api';
+import { useAccount } from '@/contexts/account-context';
+import { useStaffRole, canManageRole } from '@/lib/staff-role';
+import { formatDateTime, formatNumber, formatDate as polishFormatDate } from '@/lib/format';
+import { csvCell } from '@/lib/presentation';
+import { usePageTitle } from '@/components/shell/page-chrome';
+import { PageFrame, PageHeading } from '@/components/templates/page-frame';
+import { CreateSummaryCard } from '@/components/templates/create-parts';
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu } from '@/components/shared/row-actions';
+import { TableHeadRow } from '@/components/shared/table';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateTimeField from '@/components/shared/date-time-field'
 import FilterChip from '@/components/shared/filter-chip'
-import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
+import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview';
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
-import { Tabs } from '@/components/shared/tabs'
-import PageSizeSelect from '@/components/ui/page-size-select'
-import { reminderTriggerLabel, reminderStopSummary, renderReminderBodySample } from '@/components/reminders/reminder-labels'
+import { Tabs } from '@/components/shared/tabs';
+import PageSizeSelect from '@/components/shared/page-size-select'
+import { reminderTriggerLabel, reminderStopSummary, renderReminderBodySample } from '@/components/reminders/reminder-labels';
 import SheetDialog from './sheet-dialog'
 import styles from './detail.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
-import { PageHeading } from '@/components/templates/page-frame'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
-import { DetailLoading } from '@/components/templates/detail-page'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { csvFileName } from '@/lib/csv-file-name';
+import { emptyValue } from '@/components/shared/empty-value';
+import { DetailLoading } from '@/components/templates/detail-page';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 
 /*
  * ★V8 リマインダの詳細（src/v8 に一から書いた版）。
@@ -549,7 +529,7 @@ function ReminderDetailV8() {
                   <Pause size={15} aria-hidden="true" />一時停止する
                 </Button>
               ) : (
-                <Button className={styles.sideAction} onClick={() => void setReminderActive(true)}>
+                <Button className={styles.sideAction} onClick={() => setReminderActive(true)} busyLabel="処理中…">
                   <Play size={15} aria-hidden="true" />再開する
                 </Button>
               )
@@ -659,16 +639,9 @@ function OverviewTab({
   return (
     <>
       {hasErrors ? (
-        <div className={styles.failBand} role="alert">
-          <CircleAlert size={18} className={styles.failIcon} aria-hidden="true" />
-          <div className={styles.failText}>
-            <p className={styles.failTitle}>送れなかった通知が {formatNumber(data.summary.errors)} 通あります</p>
-            <p className={styles.failNote}>友だちがブロックしていたか、LINE が受け付けませんでした。理由を見て、送り直せます。</p>
-          </div>
-          <Button onClick={onShowErrors}>
+        <Notice tone="danger" heading={<> 送れなかった通知が {formatNumber(data.summary.errors)}通あります </>} action={<> <Button onClick={onShowErrors}>
             <ArrowRight size={15} aria-hidden="true" />実行結果を見る
-          </Button>
-        </div>
+          </Button> </>} >友だちがブロックしていたか、LINE が受け付けませんでした。理由を見て、送り直せます。</Notice>
       ) : null}
 
       <section className={styles.card} aria-labelledby="rm-detail-steps">

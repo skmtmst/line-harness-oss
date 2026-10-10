@@ -1,7 +1,8 @@
 'use client'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { CircleAlert, CircleCheck, Power, Send, Smartphone } from 'lucide-react'
 import type { FriendAddRoutingValidation } from '@line-crm/shared'
 import { CreatePage } from '@/components/templates'
@@ -28,7 +29,7 @@ import styles from './publish.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 友だち追加時の配信 作る⑤ 確認（Pencil `U8Xm3X`）と、有効にしたあとの完了（`e0FD1J`）。
@@ -400,7 +401,7 @@ function FriendAddPublish() {
         <></>
       )}
     >
-      {!canEdit ? <p className={styles.viewerBand} role="status">閲覧のみで見ています。有効にする操作はオーナーか管理者に頼んでください。</p> : null}
+      {!canEdit ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。有効にする操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div> : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}
 
@@ -462,7 +463,7 @@ function FriendAddPublish() {
               {canEdit ? (
                 check.href
                   ? <Button href={check.href} variant="text">{check.action}</Button>
-                  : <Button type="button" variant="text" disabled={testing} onClick={() => void runTest()}>{check.action}</Button>
+                  : <Button type="button" variant="text" disabled={testing} onClick={() => void runTest()} busyLabel="判定中…">{check.action}</Button>
               ) : null}
             </li>
           ))}

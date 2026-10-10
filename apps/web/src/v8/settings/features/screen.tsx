@@ -2,7 +2,7 @@
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpDown, Check, ChevronDown, ChevronRight, Eye, GitCompare, Lock, RefreshCw, RotateCcw, Save, TriangleAlert } from 'lucide-react'
+import { ArrowUpDown, Check, ChevronDown, ChevronRight, GitCompare, Lock, RotateCcw, Save } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -17,27 +17,14 @@ import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import {
-  groupEnabledCount,
-  groupFeatureCount,
-  itemIsEnabled,
-  type FeatureGroup,
-  type FeatureItem,
-  type MenuItemOrder,
-} from '@/lib/feature-settings'
+import { groupEnabledCount, groupFeatureCount, itemIsEnabled, type FeatureGroup, type FeatureItem, type MenuItemOrder } from '@/lib/feature-settings'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { applyItemOrder, FEATURE_SETTINGS_CONFLICT_MESSAGE } from './feature-settings-view'
-import {
-  groupSummary,
-  shortUsageDate,
-  useFeatureSettings,
-  type FeatureUsage,
-  type UsageCategory,
-} from './use-feature-settings'
+import { groupSummary, shortUsageDate, useFeatureSettings, type FeatureUsage, type UsageCategory } from './use-feature-settings'
 import styles from './screen.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 機能設定（Pencil `ywFJT`・1152 `bKipf`・競合 `ziYCN`・状態の見本帳 `bR6a1`）。
@@ -436,10 +423,7 @@ export default function FeatureSettingsScreen() {
     >
       {conflictBand}
       {!canManage && (
-        <div className={styles.viewerBand} role="status">
-          <Eye className={styles.bandIcon} aria-hidden="true" />
-          <span>{VIEWER_NOTE}</span>
-        </div>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div>
       )}
       <Notice tone="info">公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順は「並びを変える」から入れ替えます。</Notice>
 

@@ -222,6 +222,7 @@ export const ADD_GROUPS: { title: string; cards: AddCard[] }[] = [
     { key: 'tel', label: '電話', hint: '番号の形をチェック', make: input('text', { label: '電話番号', fixedField: 'tel', placeholder: '例：090-1234-5678', limit: { format: 'tel' } }) },
     { key: 'address', label: '住所', hint: '郵便番号から自動で', make: input('address', { label: '住所', fixedField: 'address' }) },
   ] },
+  { title: '飲食の情報', cards: FIXED_FRIEND_FIELDS.filter(f=>['allergy','anniversary','seat_preference'].includes(f.key)).map(f=>({key:f.key,label:f.label,hint:'友だちの決まった欄に入る',make:input(f.type,{label:f.label,fixedField:f.key,limit:{format:f.format}})})) },
   { title: '日にち・予約', cards: [
     { key: 'date', label: '日付', hint: 'カレンダーで選ぶ', make: input('date', { label: '日付' }) },
     { key: 'time', label: '時刻', hint: '時計で選ぶ', make: input('text', { label: '時刻', limit: { format: 'time' } }) },

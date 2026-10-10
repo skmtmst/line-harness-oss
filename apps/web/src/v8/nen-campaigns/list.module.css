@@ -20,9 +20,7 @@
 
 /* 数の帯の境目は共通の型と帯に任せる。画面側で線・影を重ねない。 */
 /* 閲覧のみの帯（数の帯の上）。 */
-.viewerBand {
-  margin: var(--tpl-nc-viewer-margin);
-}
+.viewerBand { margin: var(--tpl-nc-viewer-margin); }
 
 /* コラム・送った履歴の板は、案内から下が左右にもう一段（24）入る。 */
 .inset {

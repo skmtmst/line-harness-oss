@@ -14,7 +14,7 @@
 
 .headControls {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   align-items: center;
   gap: var(--tpl-rs-head-gap);
   min-width: 0;
@@ -50,6 +50,7 @@
 }
 
 .dateNote {
+  display: block; padding: var(--polish-space-row) var(--polish-space-field); background: var(--color-status-warn-soft);
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   line-height: var(--tpl-rs-lh-11);
@@ -75,7 +76,7 @@
 }
 
 .calendarWrap {
-  flex: 0 0 auto;
+  flex: 1 1 0;
   min-width: 0;
 }
 
@@ -184,10 +185,10 @@
 /* 右の4枚 */
 .side {
   display: flex;
-  flex: 1 1 var(--tpl-rs-rsv-side-min);
+  flex: 0 0 var(--tpl-board-side-w);
   flex-direction: column;
   gap: var(--tpl-rs-panel-head-gap);
-  min-width: var(--tpl-rs-rsv-side-min);
+  min-width: var(--tpl-board-side-w);
 }
 
 .sideCard {
@@ -217,9 +218,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--tpl-rs-stat-gap);
-  padding: var(--tpl-rs-panel-head-gap);
+  padding: 0;
   border-radius: var(--radius-control);
-  background: var(--color-accent-soft);
+  background: var(--color-canvas);
 }
 
 .nextName {
@@ -269,9 +270,9 @@
 }
 
 .sideLink {
-  color: var(--color-action);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-rs-lh-11);
+  color: var(--color-accent-deep);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e1-lh-20);
   text-decoration: none;
 }
 
@@ -369,7 +370,7 @@
 /* 顧客カルテ（3枚） */
 .karte {
   display: flex;
-  gap: var(--tpl-rs-panel-head-gap);
+  gap: var(--tpl-rest1-restaurant-reservations-reservations-gap-1);
 }
 
 .karteCard {
@@ -474,7 +475,7 @@
   gap: var(--tpl-rs-table-row-gap);
   padding: var(--tpl-rs-dlg-note-pad);
   border-radius: var(--radius-segment);
-  background: var(--color-accent-soft);
+  background: var(--color-canvas);
 }
 
 .personName {
@@ -528,7 +529,6 @@
 }
 
 .formError {
-  margin: 0;
   color: var(--color-danger);
   font-size: var(--text-caption);
 }
@@ -567,7 +567,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--tpl-rs-stat-gap);
-  padding: var(--tpl-rs-panel-head-gap);
+  padding: 0;
   border-radius: var(--radius-control);
   background: var(--color-surface-pearl);
 }
@@ -595,3 +595,22 @@
 }
 
 .noteCell { display: block; min-height: calc(var(--tpl-rs-lh-12) + var(--tpl-rs-lh-11) + var(--tpl-rs-panel-head-text-gap)); }
+
+.formError, .formErrorNoticePlacement { margin: 0; }
+@container (max-width: 1100px) { .todayColumns > .side { display:none; } }
+
+.sourcePicker{margin-left:auto;}
+
+/* 融合の台帳：★V8 の右の段。 */
+.sideCard{gap: var(--tpl-rest1-restaurant-reservations-reservations-gap-2);}
+.sideText,.nextName,.nextMeta{font-size: var(--tpl-rest1-restaurant-reservations-reservations-font-size-1);line-height: var(--tpl-rest1-restaurant-reservations-reservations-line-height-1);}
+.nextName{font-size: var(--tpl-rest1-restaurant-reservations-reservations-font-size-2);line-height: var(--tpl-rest1-restaurant-reservations-reservations-line-height-2);}
+.nextBox{gap: var(--tpl-rest1-restaurant-reservations-reservations-gap-3);}
+.nextActions{justify-content:flex-end;}.nextActions>*{flex:0 0 auto;}
+.sideLink{font-size: var(--tpl-rest1-restaurant-reservations-reservations-font-size-1);line-height: var(--tpl-rest1-restaurant-reservations-reservations-line-height-1);}
+.sourcePicker{flex-basis: var(--tpl-rest1-restaurant-reservations-reservations-flex-basis-1);width: var(--tpl-rest1-restaurant-reservations-reservations-width-1);}
+
+.nextActions{align-items:center;justify-content:space-between;}.nextActions > *{flex:0 0 auto;}.nextBox{gap: var(--tpl-rest1-restaurant-reservations-reservations-gap-4);}.sideCard{gap: var(--tpl-rest1-restaurant-reservations-reservations-gap-1);}.sideLink{font-size: var(--tpl-rest1-restaurant-reservations-reservations-font-size-1);line-height: var(--tpl-rest1-restaurant-reservations-reservations-line-height-1);}
+
+.filterField[data-filter='period'] { --tpl-rs-rsv-filter-w: var(--tpl-rs-rsv-period-w); }
+.filterField[data-filter='status'] { --tpl-rs-rsv-filter-w: var(--tpl-rs-rsv-status-w); }

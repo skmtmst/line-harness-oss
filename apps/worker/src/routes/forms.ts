@@ -1,3 +1,4 @@
+import { customerDeletionPending, deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { uploadFormDocument } from './form-documents.js';
 import { hydrateDocumentAnswers, validateDocumentAnswers, attachDocumentAnswers, documentIds } from '../services/form-documents.js';
@@ -82,7 +83,7 @@ import type {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
-import { requireRole, requireDeliveryAccess } from '../middleware/role-guard.js';
+import { denyReadOnly, requireIrreversibleConfirmation, requireRole, requireDeliveryAccess } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundaries } from '../services/request-boundary.js';
 import { applyMileageRulesForEvent } from '@line-crm/db';
@@ -1608,6 +1609,29 @@ forms.delete('/api/forms/:id', async (c) => {
   }
 });
 
+// B-215: one answer and its private attachments; never the whole form.
+forms.delete('/api/forms/:id/submissions/:submissionId', requireRole('owner', 'admin'), denyReadOnly(), requireIrreversibleConfirmation('delete-form-response'), async c => {
+  const formId = c.req.param('id'), submissionId = c.req.param('submissionId');
+  try {
+    const accountId = c.req.query('account_id');
+    if (!accountId || !await canUseFormFromAccount(c, formId, accountId)) return c.json({ success: false, error: '回答が見つかりません' }, 404);
+    const journal = await deletionJournal(c.env.DB, 'form_response', submissionId);
+    if (journal && (journal.detail.accountId !== accountId || journal.detail.formId !== formId)) return c.json({ success: false, error: '回答が見つかりません' }, 404);
+    if (journal?.action === 'deleted') return c.json({ success: true, data: { deleted: true, replayed: true } });
+    const submission = await getFormSubmissionById(c.env.DB, submissionId);
+    if (!submission || submission.form_id !== formId) return c.json({ success: false, error: '回答が見つかりません' }, 404);
+    const friend = submission.friend_id ? await getFriendById(c.env.DB, submission.friend_id) : null;
+    if (!friend && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), await getFormAccountIds(c.env.DB, formId))) return c.json({ success: false, error: '回答が見つかりません' }, 404);
+    if (friend && ((friend as unknown as { line_account_id: string | null }).line_account_id !== accountId)) return c.json({ success: false, error: '回答が見つかりません' }, 404);
+    const data = await deleteCustomerData(c.env, { kind: 'form_response', id: submissionId, formId, friendId: submission.friend_id, accountId }, c.get('staff')!.id);
+    return c.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof DeletionFailure && error.code === 'deletion_schema_approval_required') return c.json({ success: false, code: error.code, error: '支払・監査の記録を残すため、データ構造の変更承認が必要です。オーナーか管理者に頼んでください。' }, 409);
+    if (error instanceof DeletionFailure) return c.json({ success: false, code: error.code, error: error.status === 409 ? '削除中です。少し待ってから、もう一度お試しください。' : '削除を完了できませんでした。同じ回答で、もう一度削除してください。' }, error.status);
+    return c.json({ success: false, code: 'deletion_retry_required', error: '削除を完了できませんでした。同じ回答で、もう一度削除してください。' }, 503);
+  }
+});
+
 // GET /api/forms/:id/submissions — list submissions
 forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
@@ -1713,6 +1737,7 @@ forms.post('/api/forms/:id/submissions/:submissionId/retry-effects', inputJsonBo
     if (!submission || submission.form_id !== formId || !submission.friend_id) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
+    if (await customerDeletionPending(c.env.DB, submission.friend_id, submissionId)) return c.json({ success: false, error: 'この回答は削除中です' }, 409);
     const claim = await getFormSubmitClaimBySubmissionId(c.env.DB, submissionId);
     if (!claim) {
       return c.json({
@@ -3195,6 +3220,9 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
     throw err;
   }
   } catch (err) {
+    if (err instanceof Error && ['document_attachment_failed', 'document_already_submitted', 'document_attachment_conflict'].includes(err.message)) {
+      return c.json({ success: false, code: 'document_attachment_failed', error: '書類を回答に付けられませんでした。書類をもう一度選んで、送信してください' }, 409);
+    }
     console.error('POST /api/forms/:id/submit error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }

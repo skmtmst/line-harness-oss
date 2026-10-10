@@ -1,12 +1,15 @@
 'use client'
 
 import { Suspense, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ArrowLeft, CircleCheck, Copy, List, MessageCircle, MessageSquare, Star, Workflow, Zap } from 'lucide-react'
 import Avatar from '@/components/shared/avatar'
 import Button from '@/components/shared/button'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useCustomerDeletion } from '@/lib/use-customer-deletion'
 import Notice from '@/components/shared/notice'
 import StatusPill from '@/components/shared/status-pill'
 import TargetMissing from '@/components/shared/target-missing'
@@ -37,6 +40,7 @@ import { PageHeading } from '@/components/templates/page-frame'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 
 /*
@@ -77,6 +81,7 @@ function FriendDetailV8Inner() {
   const data = useFriendDetail(friendId, selectedAccountId, tab)
   const perms = useFriendDetailPermissions()
   const { friend } = data
+  const deletion = useCustomerDeletion(() => { router.push('/friends') })
   usePageTitle(friend?.displayName ?? '友だち詳細')
   usePageCrumbs([{ label: '友だち', href: '/friends' }])
 
@@ -121,6 +126,7 @@ function FriendDetailV8Inner() {
     { id: 'reminders', label: 'リマインダ一覧を見る', icon: <List size={16} />, external: false, href: '/reminders', onSelect: () => router.push('/reminders') },
     { id: 'mileage', label: 'マイルを確認', icon: <Star size={16} />, external: false, href: '/mileage', onSelect: () => router.push('/mileage') },
     { id: 'duplicates', label: '重複候補を確認', icon: <Copy size={16} />, external: false, href: '/duplicates', onSelect: () => router.push('/duplicates') },
+    ...(perms.manage ? [{ id: 'delete-friend-data', label: '友だちのデータを削除する', tone: 'danger' as const, onSelect: () => deletion.open({ id: friendId, name: 'この友だちのデータ', kind: 'friend_data', path: `/api/friends/${encodeURIComponent(friendId)}/data` }) }] : []),
     { id: 'back-to-list', label: '友だち一覧へ戻る', icon: <ArrowLeft size={16} />, dividerBefore: true, onSelect: () => router.push('/friends') },
   ]
 
@@ -171,7 +177,7 @@ function FriendDetailV8Inner() {
 
       {perms.viewOnly ? (
         <div className={styles.band}>
-          <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+          <ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice>
         </div>
       ) : null}
 
@@ -233,6 +239,17 @@ function FriendDetailV8Inner() {
       {tab !== 'timeline' && scenarioNotice ? <div className={styles.notice}><Notice tone="success" message={scenarioNotice} onClose={() => setScenarioNotice('')} /></div> : null}
       {support.dialog}
       {scenario.dialog}
+      <ConfirmDialog open={deletion.target !== null} title="友だちのデータを削除しますか？" deleteName="この友だちのデータ"
+        description="お客さまから削除の依頼を受けた場合に実行してください。次の顧客データを削除します。元に戻せません。監査・支払・審査の記録と外部サービスのデータは残ります。"
+        destructive confirmDisabled={deletion.blocked} busy={deletion.busy} busyLabel="削除中…" error={deletion.error}
+        onConfirm={deletion.confirm} onCancel={deletion.close}>
+        <ul>
+          <li>プロフィール・情報欄・タグとの紐付け・メモ</li>
+          <li>トークと送信待ち・配信・予約などの顧客記録</li>
+          <li>回答と添付した写真・PDF・本人確認書類</li>
+          <li>未添付の書類・登録した写真など</li>
+        </ul>
+      </ConfirmDialog>
     </PageFrame>
   )
 }

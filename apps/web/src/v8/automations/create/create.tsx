@@ -1,27 +1,20 @@
 'use client'
 
-import { notifySaved } from '@/components/shared/toast'
+import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import type { Automation } from '@line-crm/shared'
 import { AUTOMATION_DRAFT_ACTION_OPTIONS, AUTOMATION_DRAFT_TRIGGER_OPTIONS } from '@line-crm/shared'
-import {
-  api, ApiError, type AutomationDraftAction, type AutomationDraftCommonActionVersionDetail,
-  type AutomationDraftDetail,
-} from '@/lib/api'
-import {
-  ArrowDown, ArrowLeftRight, ArrowUp, ChevronDown, FilePen, MessageCircle, Pencil, Play,
-  RefreshCw, Tag as TagIcon, Trash2, TriangleAlert, UserPlus, UserRound, Zap,
-} from 'lucide-react'
+import { api, ApiError, type AutomationDraftAction, type AutomationDraftCommonActionVersionDetail, type AutomationDraftDetail } from '@/lib/api'
+import { ArrowDown, ArrowLeftRight, ArrowUp, ChevronDown, FilePen, MessageCircle, Pencil, Play, Tag as TagIcon, Trash2, UserPlus, UserRound, Zap } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import Card from '@/components/shared/card'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
-import { notifyToast } from '@/components/shared/toast'
 import HelpTip from '@/components/shared/help-tip'
 import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -31,23 +24,12 @@ import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
 import { Field, RequiredBadge } from '@/components/shared/form-controls'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
-import ConditionBuilder, {
-  isEmptyCondition,
-  isRuleComplete,
-  pruneCondition,
-  type SegmentCondition,
-  type SegmentRule,
-} from '@/components/shared/condition-builder'
+import ConditionBuilder, { isEmptyCondition, isRuleComplete, pruneCondition, type SegmentCondition, type SegmentRule } from '@/components/shared/condition-builder'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import { isoToJstDatetimeLocal } from '@/components/automations/automation-datetime'
 import styles from './create.module.css'
 import Button from '@/components/shared/button'
-import {
-  friendNamesOf,
-  normalizeFriendIds,
-  normalizeWeekdays,
-  weekdayNames,
-} from './trigger-helpers'
+import { friendNamesOf, normalizeFriendIds, normalizeWeekdays, weekdayNames } from './trigger-helpers'
 import { WeekdaySelect } from './weekday-select'
 import { FriendMultiSelect } from './friend-multi-select'
 import { formatNumber, formatTime } from '@/lib/format'
@@ -59,6 +41,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import ActionList from '@/components/shared/action-list'
 import FriendPickerField from '@/components/shared/friend-picker-field'
 import EntityRemoteField from '@/components/shared/entity-remote-field'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * 「だれに」の条件は、一斉配信・シナリオと同じ共通部品で作る。
@@ -2544,7 +2527,7 @@ export function NewAutomationV8({
       )} dirty={false}
     >
       {canManage === false ? (
-        <p className={styles.viewerBand} role="status">閲覧のみで見ています。ルールを作る操作はオーナーか管理者に頼んでください。</p>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。ルールを作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>
       ) : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {resumeTarget && resumeStatus === 'failed' ? (
@@ -2668,16 +2651,10 @@ export function NewAutomationV8({
           <h2 className={styles.cardTitle}>だれに動かしますか</h2>
         </div>
         {conditionUnreadable ? (
-          <div className={styles.subBox} role="alert">
-            <p className={styles.subTitle}>保存されていた条件は読めませんでした</p>
-            <p className={styles.cardDesc}>
-              以前の画面が別の形で保存した条件です。このままでは人数を数えられないため、保存できません。
-              以前の条件を外してもよければ、下のボタンから付け直せます。
-            </p>
-            <div>
+          <Notice tone="danger" heading={<> 保存されていた条件は読めませんでした </>} action={<> <div>
               <Button id="v8-repair-condition" onClick={() => { setConditionUnreadable(false); setInputError(null) }}>以前の条件を外して付け直す</Button>
-            </div>
-          </div>
+            </div> </>} >以前の画面が別の形で保存した条件です。このままでは人数を数えられないため、保存できません。
+              以前の条件を外してもよければ、下のボタンから付け直せます。</Notice>
         ) : (
           <>
             <div className={styles.field}>

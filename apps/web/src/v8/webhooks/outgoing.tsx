@@ -1,11 +1,12 @@
 'use client'
 
 import { useFolderMove } from '@/components/shared/use-folder-move'
+import { RowNameLink } from '@/components/shared/table'
 import { moveOutgoingWebhookToFolder } from '@/lib/move-to-folder'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Bookmark, LayoutTemplate, Pause, Play, Plus, Send } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type OutgoingWebhookOverview } from '@/lib/api'
@@ -24,9 +25,10 @@ import { RowMenu } from '@/components/shared/row-actions'
 import EmptyList from '@/components/shared/empty-list'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
 import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import Pagination from '@/components/shared/pagination'
 import ManagedFolderPanel, { folderDotFor, managedFolderOptions } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
@@ -540,7 +542,7 @@ export default function WebhooksOutgoingV8() {
       </div>
     )
   } else if (!selectedAccountId) {
-    listBody = <ListState kind="empty" title={accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'} />
+    listBody = <AccountRequiredState hasAccounts={accounts.length > 0} />
   } else if (outgoingStatus === 'error') {
     listBody = (
       <ListState
@@ -622,7 +624,7 @@ export default function WebhooksOutgoingV8() {
                 const nameNode = (
                   <FolderDotName folder={folderDotFor(folders, item.folderId)}>{folderMove.checkbox(item)}
                     {canManage ? (
-                      <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></Link>
+                      <RowNameLink href={`/webhooks/edit?id=${item.id}`} className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></RowNameLink>
                     ) : (
                       <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
                     )}
@@ -671,7 +673,7 @@ export default function WebhooksOutgoingV8() {
                       {/* 名前の前に左の列と同じフォルダの色の丸（未分類は色の無い輪）。 */}
                       <FolderDotName folder={folderDotFor(folders, item.folderId)}>{folderMove.checkbox(item)}
                         {canManage ? (
-                          <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></Link>
+                          <RowNameLink href={`/webhooks/edit?id=${item.id}`} className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></RowNameLink>
                         ) : (
                           <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
                         )}

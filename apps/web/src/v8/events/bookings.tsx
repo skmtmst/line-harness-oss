@@ -1,16 +1,15 @@
 'use client'
-import { CalendarClock, Users, Armchair, CalendarX } from 'lucide-react';
-
+import { CalendarClock, Users, Armchair, CalendarX, Inbox, Check, Download, Send } from 'lucide-react'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Check, Download, Send } from 'lucide-react'
 import { api, eventsApi, type EventDetail, type EventOccurrenceApplicant, type EventOccurrenceApplicants, type EventSlot } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole } from '@/lib/staff-role'
 import { DetailPage } from '@/components/templates'
 import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -22,10 +21,10 @@ import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import KpiBand from '@/components/shared/kpi-band'
 import StatusBadge from '@/components/shared/status-badge'
 import { EventRosterCard, EventRosterTable, EventRosterRow, EventRosterActions, EventAttendanceSummary } from '@/components/shared/event-roster'
 import { TextField, TextArea } from '@/components/shared/text-field'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 イベント予約の「申込者」（Pencil `Mu8qW`）。
@@ -468,10 +467,10 @@ function Bookings({ eventId }: { eventId: string }) {
         <ListState
           kind="error"
           description="イベントは消えていません。開き直しても直らない場合はエラー報告へ。"
-          action={<Button onClick={() => void refreshEvent()}>開き直す</Button>}
+          action={<Button onClick={() => refreshEvent()} busyLabel="処理中…">開き直す</Button>}
         />
       ) : null}
-      {actionError ? <p className={styles.error} role="alert">{actionError}</p> : null}
+      {actionError ? <Notice tone="danger" >{actionError}</Notice> : null}
 
       {/* 数の帯。絵（Mu8qW）は4枚のカードなので、共通の KpiCard をカードの見せ方で並べる。 */}
       <KpiBand data-design="KPIs">
@@ -491,7 +490,7 @@ function Bookings({ eventId }: { eventId: string }) {
           <ListState
             kind="error"
             description="申込者は消えていません。開き直しても直らない場合はエラー報告へ。"
-            action={<Button onClick={() => void refreshApplicants()}>開き直す</Button>}
+            action={<Button onClick={() => refreshApplicants()} busyLabel="処理中…">開き直す</Button>}
           />
         ) : rows.length === 0 ? (
           <p className={styles.empty}>この開催回には申込者もキャンセル待ちもいません。</p>
@@ -629,11 +628,11 @@ function Bookings({ eventId }: { eventId: string }) {
                 onChange={(e) => setBroadcastMessage(e.target.value)}
                 placeholder="当日は動きやすい服装でお越しください"
               /></SaveErrorField>
-              <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} aria- busy={broadcastBusy || undefined}>
-                {broadcastBusy ? '確認中…' : '送る'}
+              <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} busy={broadcastBusy} busyLabel="確認中…">
+                送る
               </Button>
             </div></Field></div>
-          {broadcastError ? <p className={styles.error} role="alert">{broadcastError}</p> : null}
+          {broadcastError ? <Notice tone="danger" >{broadcastError}</Notice> : null}
         </EventRosterCard>
       ) : null}
       </div>

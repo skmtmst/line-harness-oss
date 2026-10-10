@@ -21,6 +21,7 @@ import MergedProfileDialog from './merged-profile-dialog'
 import { useMergedPerson } from './use-merged-person'
 import styles from '@/app/friends/friends-v8.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 function shortDate(iso: string): string {
   const d = new Date(iso)
@@ -93,12 +94,10 @@ export default function MergedPersonDetailViewV8({
 
       {/* 版競合や保存失敗は面の上に残す（窓を閉じても消えない）。 */}
       {m.saveError ? (
-        <p className={styles.errorBand} role="alert">
-          {m.saveError}{' '}
+        <Notice tone="danger" className={styles.errorBandNoticePlacement} >{m.saveError}{' '}
           <button type="button" className={styles.infoBandRetry} onClick={m.reload}>
             読み直す
-          </button>
-        </p>
+          </button></Notice>
       ) : null}
 
       <div className={styles.detailGrid}>

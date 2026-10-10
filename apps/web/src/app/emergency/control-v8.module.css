@@ -18,17 +18,7 @@
 }
 
 /* 閲覧のみの帯。数の帯の上。 */
-.roBand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border-radius: var(--radius-control, 8px);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: 13px;
-  line-height: 1.6;
-}
+.roBand { }
 
 /* 数の帯：4つのマスを区切り線で並べる。 */
 .kpis {

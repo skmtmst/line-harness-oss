@@ -10,7 +10,7 @@ import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
  * 呼ぶ口（成果レポート・CSV）は今の画面（app/analytics/conversion-report-v8.tsx）と同じ。
  */
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -18,11 +18,12 @@ import { api, type ConversionDefinitionReport } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { RoutesFrame } from './routes'
 import { useReportPeriod } from '@/components/shared/period-picker'
-import { analyticsWeekday } from './parts'
-import { shortDay } from './common'
+
+
 import styles from './analytics.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 type Point = ConversionDefinitionReport['byDefinition'][number]
 
@@ -79,7 +80,7 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
 
   return <RoutesFrame customRange={customRange} onRangeChange={(value) => { setRange(value); setPointId(null) }} accountId={accountId} days={days} onDaysChange={(value) => { setDays(value); setPointId(null) }} exportCsv={() => void exportCsv()} exportDisabled={!report || exporting}>
     {() => <div className={styles.reportStack}>
-      {exportError ? <p role="alert" className={styles.caption}>{exportError}</p> : null}
+      {exportError ? <Notice tone="danger" className={styles.captionNoticePlacement} >{exportError}</Notice> : null}
       {loading ? <ListState kind="loading" title="成果レポートを読み込んでいます" />
         : error ? <ListState kind="error" title={error} onRetry={() => setAttempt((value) => value + 1)} />
         : report ? <>

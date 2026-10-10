@@ -1,42 +1,31 @@
 'use client'
 
-import { canManageRole } from '@/lib/staff-role';
+import { canManageRole, useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
-import { useListUrlValue } from '@/components/shared/list-url-state'
+import { flushListUrlState, notifyListLocation, useListLocation, useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
-import { useTenantWideAccess } from '@/lib/staff-role'
 import { useEffect, useRef, useState, type ComponentType } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListReturnHref, useListNavigationHref, useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useAccount } from '@/contexts/account-context'
 import { ArrowLeft, Check, Plus, Search, Send } from 'lucide-react'
 import { templateKind, type HqTemplateFolder, type HqTemplateListStats, type HqTemplateReceivedVersion, type HqTemplateVersionDisplay, type TemplateKind } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { ListPageBody } from '@/components/templates/list-page'
-import { FolderDotName } from '@/components/shared/folder-dot'
+import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import StatusBadge from '@/components/shared/status-badge'
 import Notice from '@/components/shared/notice'
 import TagPill from '@/components/shared/tag-pill'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
 import Select from '@/components/shared/select'
 import FolderSelect from '@/components/shared/folder-select'
 import { Th } from '@/components/shared/table'
-import { useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
 import { freshDefinition } from '@/lib/hq-template-authoring'
 import { clearCreationAttempt, loadCreationAttempt, persistCreationAttempt, sameCreationScope, type CreationAttempt, type CreationScope } from '@/lib/hq-template-create-attempt'
-import {
-  hqTemplatesApi, type DistributionMode, type DistributionResult, type HqAccount, type HqTemplate, type HqTemplateListItem, type MessageTemplateDefinition,
-  type Preflight, type TemplateDefinition, type FormDefinition, type TemplateDetail, type TemplateInput, type TemplateType,
-} from '@/lib/hq-templates-api'
-import {
-  choiceKey, contentSummary, definitionError, definitionForName, definitionName, failedStores, referenceCount, resolvedItems,
-  uploadedKeysIn, type TemplateMedia,
-} from './definition'
+import { hqTemplatesApi, type DistributionMode, type DistributionResult, type HqAccount, type HqTemplate, type HqTemplateListItem, type MessageTemplateDefinition, type Preflight, type TemplateDefinition, type FormDefinition, type TemplateDetail, type TemplateInput, type TemplateType } from '@/lib/hq-templates-api'
+import { choiceKey, contentSummary, definitionError, definitionForName, definitionName, failedStores, referenceCount, resolvedItems, uploadedKeysIn, type TemplateMedia } from './definition'
 import MessageForm from './message-form'
 import { useFormErrors } from '@/lib/use-form-errors'
 import TemplateMessageEditor from '@/v8/template-edit/message'
@@ -71,13 +60,13 @@ import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import styles from './console.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { DistributionPage } from '@/components/templates/distribution-page'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { DistributionTable, DistributionProgress, DistributionAccountName, DistributionToolbar } from '@/components/shared/distribution-table'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8-B 統括のテンプレート（一覧 LRc93・メッセージのひな形を作る X4JcOf・アカウントへ配る meBRB）。
@@ -142,6 +131,12 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const canEdit = useTenantWideAccess()
   const router = useRouter()
   const { setSelectedAccountId } = useAccount()
+  const location = useListLocation()
+  const listPath = location.split('?')[0].split('#')[0] || ({ template: '/hq/templates', tag: '/hq/friend-attributes', form: '/hq/form-submissions', rich_menu: '/hq/rich-menus', scenario: '/hq/templates' }[type])
+  const destination = useListNavigationHref()
+  const returnHref = useListReturnHref(listPath)
+  const entryHandled = useRef('')
+  const entryHref = (id: string, mode: 'detail' | 'edit') => `${listPath}?item=${encodeURIComponent(id)}&mode=${mode}`
   const [folderDistribution, setFolderDistribution] = useState<{ name: string; templates: HqTemplate[] } | null>(null)
   const [folderBatch, setFolderBatch] = useState<{ name: string; runs: FolderRun[]; index: number; history: FolderRun[] } | null>(null)
   const folderBatchRef = useRef(folderBatch)
@@ -335,8 +330,11 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     setFolderBatch(null); setFolderDistribution(null)
     if (createUncertain) return
     reconcileSessionUploads(detail ? uploadedKeysIn(detail.definition) : [])
-    createAttempt.current = null; setStage('list'); setSearch(''); setPreflight(null); setChoices({}); setBulkMode(''); setPendingRun(null); setResult(null); setError(''); setConflict(false)
-    window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    createAttempt.current = null; setStage('list'); setPreflight(null); setChoices({}); setBulkMode(''); setPendingRun(null); setResult(null); setError(''); setConflict(false)
+    flushListUrlState()
+    entryHandled.current = ''
+    window.history.replaceState(window.history.state, '', returnHref)
+    notifyListLocation()
   }
   toListRef.current = toList
   const reloadCatalog = () => {
@@ -352,12 +350,33 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     editBaseline.current = JSON.stringify({ name: loaded.template.name, description: loaded.template.description ?? '', definition: loaded.definition, folderId: loaded.template.folder_id ?? null })
     setFolderId(loaded.template.folder_id ?? null); setDetail(loaded); setName(loaded.template.name); setDescription(loaded.template.description ?? ''); setDefinition(loaded.definition)
   }
-  const open = (id: string, next: Stage) => void perform(async () => {
-    sessionUploads.current = []
-    const loaded = await hqTemplatesApi.get(id)
-    if (!alive.current) return
-    loadDetailIntoForm(loaded); setSelected([]); setTextOverrides({}); setSearch(''); setAccountFolder(ALL_ACCOUNTS); setPreflight(null); setChoices({}); setBulkMode(''); setStage(next)
-  })
+  const open = (id: string, next: Stage) => {
+    const href = destination(entryHref(id, next === 'edit' ? 'edit' : 'detail'))
+    return void perform(async () => {
+      sessionUploads.current = []
+      const loaded = await hqTemplatesApi.get(id)
+      if (!alive.current) return
+      loadDetailIntoForm(loaded); setSelected([]); setTextOverrides({}); setSearch(''); setAccountFolder(ALL_ACCOUNTS); setPreflight(null); setChoices({}); setBulkMode(''); setStage(next)
+      if (next === 'detail' || next === 'edit') {
+        flushListUrlState()
+        entryHandled.current = `${id}:${next}`
+        window.history.replaceState(window.history.state, '', href)
+        notifyListLocation()
+      }
+    })
+  }
+  useEffect(() => {
+    if (!ready || busy || lock.current || !location) return
+    const params = new URLSearchParams(location.split('?')[1]?.split('#')[0] ?? '')
+    const id = params.get('item')
+    const next = params.get('mode') === 'edit' && canEdit ? 'edit' : 'detail'
+    const key = `${id}:${next}`
+    if (!id || entryHandled.current === key) return
+    entryHandled.current = key
+    open(id, next)
+    // 読み直し・別タブも、同じ既存の詳細・編集を開く。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, busy, location, canEdit])
   const startCreate = () => {
     createAttempt.current = null; sessionUploads.current = []; setMenuTargets([])
     const fresh = freshDefinition(type), nextFolder = folderFilter !== 'all' && folderFilter !== 'none' ? folderFilter : null
@@ -442,7 +461,14 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     }
     // R561: 「保存して続けて作る」は新規作成のときだけ、空の新規入力へ戻る。
     else if (andAnother && isNew) { setDetail(null); setFolderId(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setFormKey((current) => current + 1); setStage('edit') }
-    else setStage('list')
+    else if (isNew) setStage('list')
+    else {
+      setStage('edit')
+      flushListUrlState()
+      entryHandled.current = `${saved.template.id}:edit`
+      window.history.replaceState(window.history.state, '', destination(entryHref(saved.template.id, 'edit')))
+      notifyListLocation()
+    }
   }))
   const textMessage = type === 'template' && 'template' in definition && definition.template.messageType === 'text'
   const batchStorageKey = () => creationScope.current ? `hq-folder-distribution:${creationScope.current.tenantId}:${creationScope.current.actorId}:${type}` : null
@@ -662,7 +688,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   </> : null
 
   const notices = <>
-    {!canEdit && stage === 'list' ? <p className={styles.readonlyBand} role="note">閲覧のみで見ています。変える操作は統括の管理者に頼んでください。</p> : null}
+    {!canEdit && stage === 'list' ? <div className={styles.readonlyBand}><ReadOnlyNotice role="note">閲覧のみで見ています。変える操作は統括の管理者に頼んでください。</ReadOnlyNotice></div> : null}
     {conflictNotice}
     {error && !conflictNotice && stage !== 'saved' ? <Notice tone="danger" message={error} /> : null}
     {message ? <Notice tone="success" message={message} onClose={() => setMessage('')} /> : null}
@@ -707,6 +733,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         }}
         onCreate={startCreate}
         onEdit={(row) => open(row.id, 'edit')}
+        itemHref={(row) => entryHref(row.id, type === 'template' || type === 'tag' || !canEdit ? 'detail' : 'edit')}
         onOpen={type === 'template' || type === 'tag' ? (row) => open(row.id, 'detail') : undefined}
         folderContents={templates}
         onDistributeFolder={(id, folderName) => void perform(async () => {
@@ -781,7 +808,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           setMessage(`版${version}の内容で新しい版を作りました。配るまで、配った先は今の版のままです。`)
         }}
         onBack={toList}
-        onEdit={() => setStage('edit')}
+        onEdit={() => { if (detail) open(detail.template.id, 'edit') }}
         onDistribute={() => { setSelected([]); setTextOverrides({}); setSearch(''); setAccountFolder(ALL_ACCOUNTS); setPreflight(null); setChoices({}); setBulkMode(''); setStage('accounts') }}
         onDuplicate={() => void perform(async () => {
           const requestId = crypto.randomUUID()
@@ -1067,7 +1094,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                   richMenuReferences={{ tags: referenceOptions('tag'), templates: referenceOptions('template'), forms: referenceOptions('form') }}
                   formReferences={{ tags: referenceOptions('tag'), friendFields: [], scenarios: [], reminders: [], templates: [] }}
                 />
-              ) : <p role="alert">この種類のひな形は、ここでは編集できません。</p>}
+              ) : <Notice tone="danger" >この種類のひな形は、ここでは編集できません。</Notice>}
               {!canonicalEditorOwnsSave ? uncertainNotice : null}
               {!canonicalEditorOwnsSave ? <p className={styles.note}>{`参照先 ${referenceCount(type, definition)} 件を含めて配布します。`}</p> : null}
             </section>
@@ -1153,7 +1180,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           </> : <>
             <Button disabled={busy} onClick={toList}>{done ? 'ひな形一覧へ' : 'キャンセル'}</Button>
             {!done ? <Button variant="primary" disabled><Plus size={15} aria-hidden="true" />{`配っています（${finished}/${progressTotal}）`}</Button> : null}
-            {done || !result ? <Button disabled={busy} onClick={refreshResult}>結果を再確認</Button> : null}
+            {done || !result ? <Button disabled={busy} onClick={refreshResult } busyLabel = "処理中…">結果を再確認</Button> : null}
             {done && failures.length > 0 ? <Button variant="primary" disabled={busy} onClick={() => checkStores(failures.map((s) => s.accountId))}>{`失敗${failures.length}アカウントを再確認`}</Button> : null}
           </>}
       </>}

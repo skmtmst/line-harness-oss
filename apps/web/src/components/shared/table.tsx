@@ -13,6 +13,7 @@ import styles from './table.module.css'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { DelayedSkeleton, ListSkeleton } from './skeleton'
 import presentationStyles from './table-presentation.module.css'
+import PageLink, { RowNavigation, useListNavigationHref } from './list-navigation'
 import { isRowControl } from './destination-policy'
 
 type TableHeadRowProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
@@ -140,7 +141,7 @@ export function DataTable({
   /** フレックスで並ぶ一覧。既定の表の余白は変えず、指定した表だけに使う。 */
   columnLayout?: { headHeight: string; rowHeight: string; gap: string; padding: string; numberInset?: string; nameInset?: string; headPadding?: string; headRadius?: string; rowGap?: string; headTextSize?: string; bodyTextSize?: string }
   /** 列の寸法が板ごとに決まる設定一覧（LINE通知）。セル・線・枠は共通部品が持つ。 */
-  grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string }
+  grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string; gap?: string; rowHeight?:string }
 }) {
   const tableDensity = density === 'compact' || density === 'records' ? density : undefined
   const rowDensity = tableDensity ? undefined : density
@@ -161,6 +162,8 @@ export function DataTable({
         '--table-columns': grid.columns,
         '--table-compact-columns': grid.compactColumns ?? grid.columns,
         '--table-row-padding': grid.padding,
+        '--table-grid-gap':grid.gap,
+        '--table-grid-row-height':grid.rowHeight,
         '--table-head-padding': grid.headPadding,
       } as CSSProperties : undefined}>{children}</table>
     </div>
@@ -177,6 +180,8 @@ export type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'cl
   /** 行の余白からも開く。名前は通常の Link のままにする。 */
   href?: string
   onOpen?: () => void
+  /** パネルのURLの鍵。名前から移るときも対象を戻り先へ残す。 */
+  detailKey?: string
   /** ★V7：行の高さ。`comfortable` は64px。未指定は58pxのまま。 */
   density?: 'standard' | 'comfortable' | 'template'
   /**
@@ -189,19 +194,21 @@ export type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'cl
 }
 
 /** 標準一覧の高さ58pxの行。 */
-export function Tr({ children, className, selected, interactive, href, onOpen, density, leaving, highlighted, onClick, onKeyDown, ...rowProps }: TrProps) {
+export function Tr({ children, className, selected, interactive, href, onOpen, detailKey, density, leaving, highlighted, onClick, onKeyDown, ...rowProps }: TrProps) {
   const [listState] = useListUrlState({ highlight: '' })
   const createdHighlight = Boolean(listState.highlight && listState.highlight === (rowProps as Record<string, unknown>)['data-row-id'])
-  const hasLink = (nodes: ReactNode): boolean => React.Children.toArray(nodes).some(node => React.isValidElement<{ href?: string; children?: ReactNode }>(node) && (Boolean(node.props.href) || hasLink(node.props.children)))
+  const navigationHref = useListNavigationHref()
+  const hasLink = (nodes: ReactNode): boolean => React.Children.toArray(nodes).some(node => React.isValidElement<{ href?: string; children?: ReactNode; name?: ReactNode }>(node) && (node.type === RowNameLink || Boolean((node.props as Record<string, unknown>)['data-row-link']) || (node.type === NameCell && hasLink(node.props.name)) || hasLink(node.props.children)))
+  const rowId = (rowProps as Record<string, unknown>)['data-row-id']
   const canOpen = Boolean(href || onOpen || onClick || hasLink(children))
   const classes = [shell.row, density === 'comfortable' && shell.rowComfortable, density === 'template' && shell.rowTemplate,
     interactive !== false && canOpen && shell.rowInteractive, (selected || createdHighlight) && shell.rowSelected, className].filter(Boolean).join(' ')
   const openLink = (newTab: boolean) => {
     if (!href) return
-    if (newTab) window.open(href, '_blank', 'noopener,noreferrer')
-    else window.location.assign(href)
+    if (newTab) window.open(navigationHref(href), '_blank', 'noopener,noreferrer')
+    else window.location.assign(navigationHref(href))
   }
-  return <tr data-shared-part="list-row" className={classes} aria-selected={selected === undefined ? undefined : selected}
+  return <RowNavigation.Provider value={detailKey && rowId ? { key: detailKey, id: String(rowId) } : null}><tr data-shared-part="list-row" data-row-open={canOpen || undefined} className={classes} aria-selected={selected === undefined ? undefined : selected}
     data-created-highlight={createdHighlight || undefined} data-leaving={leaving || undefined} data-highlighted={highlighted || undefined}
     {...rowProps} tabIndex={rowProps.tabIndex ?? (canOpen ? 0 : undefined)}
     onClick={(event) => {
@@ -210,18 +217,28 @@ export function Tr({ children, className, selected, interactive, href, onOpen, d
       if (onOpen) { onOpen(); return }
       if (onClick) { onClick(event); return }
       if (href) { openLink(false); return }
-      const link = event.currentTarget.querySelector<HTMLAnchorElement>('a[data-row-link],a[href]')
+      const link = event.currentTarget.querySelector<HTMLAnchorElement>('a[data-row-link]')
       if (!link) return
       if (event.metaKey || event.ctrlKey || event.shiftKey) window.open(link.href, '_blank', 'noopener,noreferrer')
       else link.click()
     }} onKeyDown={(event) => {
       onKeyDown?.(event)
-      if (event.defaultPrevented || event.target !== event.currentTarget || !canOpen || event.key !== 'Enter') return
+      if (event.defaultPrevented || event.target !== event.currentTarget || !canOpen || !['Enter', ' '].includes(event.key)) return
       event.preventDefault()
       if (onOpen) onOpen()
       else if (href) openLink(event.metaKey || event.ctrlKey)
       else event.currentTarget.click()
-    }}>{children}</tr>
+    }}>{children}</tr></RowNavigation.Provider>
+}
+
+/** 名前はその物のページへ。件数等のリンクはこの印を付けない。 */
+export function RowNameLink({ onOpen, onClick, ...props }: React.ComponentProps<typeof PageLink> & { onOpen?: () => void }) {
+  return <PageLink {...props} data-row-link="" data-row-local-open={onOpen ? '' : undefined} onClick={event => {
+    onClick?.(event)
+    if (!onOpen || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
+    event.preventDefault()
+    onOpen()
+  }} />
 }
 
 export type TdProps = Omit<TdHTMLAttributes<HTMLTableCellElement>, 'align' | 'children' | 'className'> & {

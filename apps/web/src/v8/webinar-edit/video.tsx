@@ -15,24 +15,15 @@ import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
 import type { MediaItem } from '@line-crm/shared'
-import {
-  api,
-  describeSaveFailure,
-  webinarApi,
-  type WebinarScheduleRule,
-  type WebinarSessionCapacity,
-  type WebinarVideoAsset,
-} from '@/lib/api'
-import { formatNumber } from '@/lib/format'
+import { api, describeSaveFailure, webinarApi, type WebinarScheduleRule, type WebinarSessionCapacity, type WebinarVideoAsset } from '@/lib/api'
+import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
 import { fmtJaDuration } from './helpers'
-import { FieldError } from '@/components/shared/form-controls'
+import { FieldError, Field } from '@/components/shared/form-controls'
 import { focusFieldById } from '@/lib/use-form-errors'
 import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './video.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
-import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
@@ -333,7 +324,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
               : `準備が済むまで公開できません（いま「${STAGES.find((stage) => stage.key === asset.stage)?.label ?? asset.stageLabel}」を作っています）`}
           </p>
         </> : null}
-        {assetError ? <p className={styles.stageNote} role="alert">{assetError}<Button size="compact" onClick={() => void loadAsset()}>もう一度読み込む</Button></p> : null}
+        {assetError ? <Notice tone="danger" className={styles.stageNoteNoticePlacement} >{assetError}<Button size="compact" onClick={() => loadAsset()} busyLabel="処理中…">もう一度読み込む</Button></Notice> : null}
       </section>
 
       {scheduled ? null : (

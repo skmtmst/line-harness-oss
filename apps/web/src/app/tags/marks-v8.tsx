@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { AlertCircle, CircleDot, History, LockKeyhole, MoreHorizontal, Tag as TagIcon, UserCheck } from 'lucide-react'
 import { api, ApiError, type SupportMarkArchiveImpact, type SupportMarkListItem } from '@/lib/api'
 import type { ListStats } from '@/lib/api'
@@ -379,7 +379,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
             </span>
             <p className={styles.stateTitle}>対応マークを読み込めませんでした</p>
             <p className={styles.stateDesc}>{error || '再読み込みしてください。'}</p>
-            <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+            <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度試す</Button>
           </div>
         ) : items.length === 0 ? (
           <div className={styles.stateCard}>

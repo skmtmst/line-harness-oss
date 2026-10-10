@@ -3144,6 +3144,15 @@
       "column": "tenant_id"
     }
   },
+  "rt_reservation_external_links": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "reservation_id",
+      "parent": "rt_reservations",
+      "parentColumn": "id"
+    }
+  },
   "rt_reservations": {
     "category": "purge",
     "scope": {
@@ -3196,6 +3205,33 @@
       "by": "parent",
       "column": "store_id",
       "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_floors": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_reservation_table_links": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "reservation_id",
+      "parent": "rt_reservations",
+      "parentColumn": "id"
+    }
+  },
+  "rt_seat_waitlist_table_links": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "waitlist_id",
+      "parent": "rt_seat_waitlist",
       "parentColumn": "id"
     }
   },
@@ -4256,6 +4292,40 @@
     }
   },
   "form_submission_files": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "rt_reservation_departures": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "reservation_id",
+      "parent": "rt_reservations",
+      "parentColumn": "id"
+    }
+  },
+  "rt_reservation_event_receipts": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "event_id",
+      "parent": "rt_reservation_events",
+      "parentColumn": "id"
+    }
+  },
+  "rt_reservation_events": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "visit_stamp_qr_codes": {
     "category": "purge",
     "scope": {
       "by": "lineAccount",

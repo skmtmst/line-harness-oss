@@ -1,5 +1,5 @@
 
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import type { LinkProps } from 'next/link'
 import { Check, LoaderCircle, ArrowUpRight } from 'lucide-react'
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -28,7 +28,7 @@ type CommonProps = {
   /** 行内の時刻など、リンク色にしない文字操作。 */
   textTone?: 'action' | 'ink'
   /** 欄の横の小さな文字操作。指定した操作だけ詰め、既定のボタンは変えない。 */
-  presentation?: 'account-inline' | 'registration-inline'
+  presentation?: 'account-inline' | 'registration-inline' | 'restaurant'
   className?: string
   children: ReactNode
 }
@@ -142,7 +142,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   const [automaticBusy, setAutomaticBusy] = useState(false)
   const [automaticError, setAutomaticError] = useState('')
   const automaticLock = useRef(false)
-  const stateful = busy !== undefined || done !== undefined || automaticBusy
+  const stateful = busy !== undefined || done !== undefined || props.busyLabel !== undefined || automaticBusy
   const busyNow = busy === true || (busy === undefined && automaticBusy)
 
   /* done が true になったら 1.2 秒だけ ✓ を出して元の文字へ戻す。 */
@@ -163,7 +163,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   useLayoutEffect(() => {
     const el = elementRef.current
     if (!el || !stateful) return
-    if (busy === true || done === true) {
+    if (busyNow || done === true) {
       if (idleWidthRef.current > 0) el.style.minWidth = `${idleWidthRef.current}px`
       return
     }

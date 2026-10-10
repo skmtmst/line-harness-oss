@@ -11,19 +11,7 @@
 .kpis [data-kpi-number] { font-variant-numeric: proportional-nums; }
 
 /* 見るだけの人への帯（ZoKow）。数の帯の上。薄い青の地・目の印・枠なし。 */
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-rml-ro-gap);
-  margin: 0 var(--tpl-head-pad-side) var(--tpl-rml-ro-after);
-  padding: var(--tpl-rml-ro-pad);
-  border-radius: var(--tpl-rml-ro-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-rml-ro-lh);
-}
-.viewerBand > svg { flex-shrink: 0; color: var(--color-action); }
+.viewerBand { margin: 0 var(--tpl-head-pad-side) var(--tpl-rml-ro-after); }
 
 /* 道具の段：案内の帯は1行を取る。 */
 /* 案内の帯と道具の行の間は14（型の行の間8＋6）。 */
@@ -177,19 +165,7 @@
 }
 
 /* 操作の失敗の帯。 */
-.errorBand {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--tpl-cell-gap-half);
-  margin: 0 var(--tpl-toolbar-pad-side) var(--tpl-toolbar-gap);
-  padding: var(--tpl-rml-ro-pad);
-  border: 1px solid var(--color-danger);
-  border-radius: var(--radius-control);
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-}
+
 .errorBand button {
   padding: 0;
   border: 0;

@@ -17,7 +17,7 @@
  */
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchApi } from '@/lib/api'
 import ListState from '@/components/shared/list-state'

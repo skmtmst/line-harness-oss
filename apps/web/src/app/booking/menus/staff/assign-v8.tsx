@@ -2,7 +2,7 @@
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import { Th } from '@/components/shared/table'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -370,7 +370,7 @@ export default function AssignMatrixV8() {
               <p className={shell.stateDesc}>{loadFailure?.description ?? error}</p>
               {loadFailure?.retryable ? (
                 <div className={shell.stateActions}>
-                  <Button onClick={() => void load()}>読み直す</Button>
+                  <Button onClick={() => load()} busyLabel="処理中…">読み直す</Button>
                 </div>
               ) : null}
             </div>

@@ -10,7 +10,7 @@ import { Th } from '@/components/shared/table'
  * 変える操作は器の外（共通の部品・API）へ触らない。
  * v7 を直す必要が出たら versions/page.tsx 側も同じ判断を入れる。
  */
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'

@@ -10,10 +10,9 @@ import { folderById, folderCreator } from '@/components/shared/folder-select'
 import { BasicForm, BasicPreview, SLUG_PATTERN, type BasicValues } from './basic-form'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import styles from './form.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 ウェビナーの編集 ①基本設定（並びは作る j7PP04 と同じ）。
@@ -178,7 +177,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
         action={readOnly ? null : <div className={styles.previewActions}><Button disabled={saving || testing} onClick={() => setTestConfirm(true)}>テストを送る</Button></div>}
       />}
     >
-      {readOnly ? <Notice tone="info">閲覧のみで見ています。変えるときはオーナーか管理者に頼んでください。</Notice> : null}
+      {readOnly ? <ReadOnlyNotice >閲覧のみで見ています。変えるときはオーナーか管理者に頼んでください。</ReadOnlyNotice> : null}
       <BasicForm
         idPrefix="webinar-basic"
         values={values}

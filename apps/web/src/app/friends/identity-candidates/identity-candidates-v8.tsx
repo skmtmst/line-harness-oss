@@ -10,7 +10,7 @@
  * 判定窓を開く（理由はどの判定でも必須。Worker が必須にしている）。
  */
 import { Suspense, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import type { IdentityCandidateDecision } from '@line-crm/shared'

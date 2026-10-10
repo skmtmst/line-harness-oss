@@ -1,24 +1,22 @@
 'use client'
-import Toggle from '@/components/shared/toggle';
-import { canEditFeature } from '@/lib/staff-capability';
-
+import Toggle from '@/components/shared/toggle'
+import { canEditFeature } from '@/lib/staff-capability'
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import ImageUploader from '@/components/shared/image-uploader'
 import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Check, ChevronDown, Smartphone } from 'lucide-react'
 import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '@line-crm/shared'
 import { api, bookingApi, type BookingMenu, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { SettingCheckbox } from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Select from '@/components/shared/select'
-import { SettingCheckbox } from '@/components/shared/checkbox'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import { isForbiddenOrRateLimited, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { PhoneStaffStep, priceLabel } from './phone'
@@ -26,9 +24,9 @@ import layout from './layout.module.css'
 import styles from './staff-new.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8「予約スタッフを登録」（板 CcA4k）。
@@ -446,7 +444,7 @@ export default function StaffNewV8() {
           </section>
 
           {createdStaffId ? <p className={layout.warnBand} role="status">スタッフは登録済みです。担当メニューの設定が残っています。</p> : null}
-          {saveError ? <p className={layout.fieldError} role="alert">{saveError}</p> : null}
+          {saveError ? <Notice tone="danger" className={layout.fieldErrorNoticePlacement} >{saveError}</Notice> : null}
           <div className={layout.actions} data-design="Actions">
             <Button href="/booking/menus?tab=staff">キャンセル</Button>
             <Button variant="primary" onClick={() => void save()} disabled={saving} busy={saving} busyLabel="登録しています…">

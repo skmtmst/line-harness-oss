@@ -56,7 +56,7 @@
   line-height: var(--tpl-hq-small-lh);
 }
 
-.error { margin: 0; color: var(--color-danger); font-size: var(--text-label); }
+
 .saved { margin: 0; color: var(--color-accent-deep); font-size: var(--text-label); }
 
 .actions {
@@ -64,3 +64,5 @@
   align-items: center;
   justify-content: flex-end;
 }
+
+.error { margin: 0; color: var(--color-danger); font-size: var(--text-label); }

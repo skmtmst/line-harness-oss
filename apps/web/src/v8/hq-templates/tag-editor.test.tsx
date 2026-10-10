@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import React from 'react'
+
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TagDefinition } from '@/lib/hq-templates-api'
@@ -50,7 +50,7 @@ describe('統括の V8 タグ編集と保存先', () => {
     const view = render(<HqTagEditorV8 {...props} readOnly />)
     expect(screen.queryByRole('button', { name: 'タグを作る' })).toBeNull()
     expect(screen.queryByRole('switch', { name: 'タグ連動' })).toBeNull()
-    expect(screen.getByText('閲覧のみで見ています。変える操作は統括の管理者に頼んでください。').getAttribute('role')).toBe('note')
+    expect(screen.getByText('閲覧のみで見ています。変える操作は統括の管理者に頼んでください。').closest('[data-read-only-notice]')?.getAttribute('role')).toBe('note')
     view.rerender(<HqTagEditorV8 {...props} key="new" definition={{ ...definition, tag: { name: '' } }} />)
     expect(screen.getByRole('button', { name: 'タグを作る' }).hasAttribute('disabled')).toBe(true)
   })

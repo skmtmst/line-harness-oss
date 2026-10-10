@@ -8,6 +8,7 @@ import { SalonBookingProvider, type SalonBookingContext } from './lib/context.js
 import Booking from './pages/Booking.js';
 import BookingHistory from './pages/BookingHistory.js';
 import './styles.css';
+import '../../../../liff/src/embedded.css';
 
 let _root: Root | null = null;
 

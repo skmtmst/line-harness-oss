@@ -1,24 +1,25 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeftRight, ArrowRight, GitFork, Pencil, Plus, TriangleAlert } from 'lucide-react'
-import { api, ApiError, type RichMenuAreaResponse } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { CreatePage } from '@/components/templates'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import Link from '@/components/shared/list-navigation'
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { ArrowLeftRight, ArrowRight, GitFork, Pencil, Plus, TriangleAlert } from 'lucide-react';
+import { api, ApiError, type RichMenuAreaResponse } from '@/lib/api';
+import { useAccount } from '@/contexts/account-context';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { CreatePage } from '@/components/templates';
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
-import { formatNumber } from '@/lib/format'
-import { analyzeConnections, type ConnectionAnalysis, type ConnectionPage } from './connection-analysis'
+import { formatNumber } from '@/lib/format';
+import { analyzeConnections, type ConnectionAnalysis, type ConnectionPage } from './connection-analysis';
 import styles from './connections.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value'
-
+import { emptyValue } from '@/components/shared/empty-value';
 
 /*
  * ★V8 リッチメニュー「切替のつながり」（Pencil `wxIQ7`）。
@@ -196,7 +197,7 @@ function Connections() {
       boardId="wxIQ7"
       title={`切替のつながり：${group.name}`}
       help="タブで行き来できるメニューの関係"
-      identity={<></>}
+
       preview={aside}
       footerActions={<>
         <Button href="/rich-menus">メニュー一覧へ</Button>

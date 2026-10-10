@@ -1,5 +1,5 @@
 'use client'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Bell, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { RestaurantChannelCloseTask, RestaurantClosure, RestaurantOpeningDay } from '@line-crm/shared'
