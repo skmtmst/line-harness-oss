@@ -883,6 +883,7 @@ export default function InflowListV8({
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       help={readonly
             ? '行の「…」から QRコードを表示・URLをコピーできます。'
             : '行の「…」から QRコードを表示・URLをコピー・リンクを編集・止める。左のチェックで、まとめて操作できます。'}

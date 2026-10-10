@@ -666,6 +666,7 @@ export default function EventsListV8() {
 
   return (
     <ListPage
+      skeleton
       boardId="e2ekFu"
       headingSize="regular"
       title="イベント予約"

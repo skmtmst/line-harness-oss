@@ -82,7 +82,7 @@ export function ActionRow({ title, kind, icon: Icon = Zap, number, open, readOnl
   hint?: ReactNode
 }) {
   const [removing, setRemoving] = useState(false)
-  return <div className={styles.item} {...rowProps} data-action-row>
+  return <div className={styles.item} {...rowProps} data-action-row data-event-action-row>
     <div className={styles.row}>
       {readOnly ? null : handle}
       <span className={styles.icon}><Icon size={16} aria-hidden="true" /></span>
@@ -126,7 +126,7 @@ export default function ActionList<T>({ value, onChange, choices, idOf, titleOf,
   const slots = value.map((item, index) => ({ item, id: idOf(item, index) }))
   const reorder = useReorder({ items: slots, idOf: slot => slot.id,
     onReorder: ({ ids }) => { setEditing(null); onChange(ids.map(id => slots.find(slot => slot.id === id)!.item)) } })
-  return <div className={styles.list} data-action-list>
+  return <div className={styles.list} data-action-list data-shared-part="event-actions" data-event-actions>
     {value.length === 0 ? <p className={styles.empty}>行うことはまだありません。</p> : null}
     {reorder.shown.map(({ item, id }, index) => <ActionRow key={id} number={numberOf?.(item, index) ?? index + 1} title={titleOf(item)} kind={kindOf?.(item)} icon={iconOf?.(item)}
       readOnly={readOnly} open={editing === id} onToggle={() => setEditing(editing === id ? null : id)}
