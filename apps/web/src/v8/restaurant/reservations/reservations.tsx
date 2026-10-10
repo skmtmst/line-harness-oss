@@ -317,8 +317,7 @@ export default function ReservationsPage() {
     if (v === 'list' || v === 'week' || v === 'month') setView(v)
     const d = params.get('date')
     if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
-      const [y, m, dd] = d.split('-').map(Number)
-      setDay(new Date(y, m - 1, dd))
+      setDay(new Date(`${d}T00:00:00+09:00`))
     }
     const s = params.get('source')
     if (s) setSource(s)

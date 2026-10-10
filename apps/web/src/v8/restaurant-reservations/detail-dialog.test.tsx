@@ -16,9 +16,8 @@ vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
 
 import ReservationsPage from '../restaurant/reservations/reservations'
-import { at as localAt, reservation, snapshotOf } from '../restaurant/booking-kit/test-data'
+import { at, reservation, snapshotOf } from '../restaurant/booking-kit/test-data'
 
-const at=(day:number,hour:number,minute=0)=>{const d=new Date(localAt(day,hour,minute));return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00+09:00`}
 
 /* 鈴木（Hot Pepper・T4・秋の鹿肉コース・電話あり）と、押さえ（T1）。 */
 const reservationsToday = () => [
@@ -29,7 +28,8 @@ let today: ReturnType<typeof reservationsToday>
 
 beforeEach(() => {
   // 台帳の「今日」と「次の予約」、来店日の年比較を固定する。待ち合わせのタイマーは実時間のまま。
-  vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 10, 12) })
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
   today = reservationsToday()
   role.value = 'owner'
   fixture.snapshot.mockResolvedValue({ success: true, data: snapshotOf({ reservations: today, reservationTotal: 2 }) })

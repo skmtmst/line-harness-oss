@@ -1,4 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+// 日付の見本を作る前に日本時間で固定し、待ち合わせのタイマーは動かす。
+vi.hoisted(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
+})
 import type { RestaurantChannelCloseTask } from '@line-crm/shared'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
 import { reservation, tables } from '../booking-kit/test-data'
@@ -119,3 +125,9 @@ describe('枠の無い知らせ（予約・臨時休業から出たもの）', (
     expect(reasonText(groups[0])).toBe('LINE・電話で予約が入りました')
   })
 })
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
+})
+afterEach(() => vi.useRealTimers())
