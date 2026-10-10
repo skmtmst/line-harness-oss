@@ -54,7 +54,7 @@ vi.mock('next/link', () => ({
 }))
 
 const navigation = vi.hoisted(() => ({ query: 'id=var-1' }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(navigation.query),
 }))
@@ -113,18 +113,14 @@ function byId(id: string): HTMLInputElement | HTMLTextAreaElement | HTMLSelectEl
 }
 
 function byExactText(tag: string, text: string): HTMLElement {
-  const found = Array.from(document.querySelectorAll(tag)).find((el) => el.textContent?.trim() === text)
+  const found = Array.from(document.querySelectorAll(tag)).find((el) => (text === '共通情報を保存する' ? /^(?:\d+か所に反映して保存|保存する)$/.test(el.textContent?.trim() ?? '') : el.textContent?.trim() === text))
   if (!found) throw new Error(`見つかりません: <${tag}> "${text}"`)
   return found as HTMLElement
 }
 
-/** 編集画面の社内メモ欄。id/aria-labelを持たないためplaceholderで探す。 */
+/** V8の社内メモ欄を読む。 */
 function memoInput(): HTMLInputElement {
-  const found = Array.from(document.querySelectorAll('input')).find(
-    (el) => el.getAttribute('placeholder') === '運用上の注意や、この値の使い方を書きます',
-  )
-  if (!found) throw new Error('編集画面の社内メモ欄が見つかりません')
-  return found as HTMLInputElement
+  return byId('cv-memo') as HTMLInputElement
 }
 
 async function setValue(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
@@ -189,14 +185,9 @@ async function setDateTimeValue(id: string, iso: string) {
   await click(picker.querySelector('button[aria-label="日付"]') as HTMLElement)
   await pickCalendarDay(date)
   const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
-  await act(async () => {
-    const hourSelect = reopened.querySelector('select[aria-label="時"]') as HTMLSelectElement
-    hourSelect.value = hour
-    hourSelect.dispatchEvent(new Event('change', { bubbles: true }))
-    const minuteSelect = reopened.querySelector('select[aria-label="分"]') as HTMLSelectElement
-    minuteSelect.value = minute
-    minuteSelect.dispatchEvent(new Event('change', { bubbles: true }))
-  })
+  const timeInput = reopened.querySelector('input[inputmode="numeric"]') as HTMLInputElement
+  await setValue(timeInput, `${hour}:${minute}`)
+  await act(async () => { timeInput.dispatchEvent(new FocusEvent('blur', { bubbles: true })); timeInput.dispatchEvent(new FocusEvent('focusout', { bubbles: true })) })
   await closeDatePicker()
 }
 
@@ -209,13 +200,14 @@ async function clearPickerDate(id: string) {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   vi.clearAllMocks()
   navigation.query = 'id=var-1'
   api.foldersList.mockResolvedValue({ success: true, data: [] })
   api.create.mockResolvedValue({ success: true, data: { id: 'var-1' } })
   api.schedules.mockResolvedValue({ success: true, data: [] })
-  api.impactPreview.mockResolvedValue({ success: true, data: { impactProof: 'proof-1' } })
-  api.deleteImpact.mockResolvedValue({ success: true, data: { total: 0, blockingTotal: 0, byKind: {}, items: [], checkedAt: '2026-09-16T00:00:00Z' } })
+  api.impactPreview.mockResolvedValue({ success: true, data: { impactProof: 'proof-1', canSave: true, total: 0, blockingTotal: 0, byKind: {}, items: [], unavailableReferences: [], checkedAt: '2026-09-16T00:00:00Z' } })
+  api.deleteImpact.mockResolvedValue({ success: true, data: { total: 0, blockingTotal: 0, byKind: {}, items: [], unavailableReferences: [], checkedAt: '2026-09-16T00:00:00Z' } })
   api.update.mockResolvedValue({ success: true, data: { id: 'var-1' } })
 })
 
@@ -379,7 +371,7 @@ describe('共通情報の編集: 型別の入力エラー(VAR-06, 実React)', ()
 
     expect(api.update).not.toHaveBeenCalled()
     expect(host.textContent).toContain('http://')
-    const valueField = byId('cv-value').closest('div')
+    const valueField = byId('cv-value').closest('section')
     expect(valueField?.textContent).toContain('http://')
   })
 })

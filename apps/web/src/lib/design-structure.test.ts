@@ -99,6 +99,14 @@ const V8_COPY: Record<string, Record<string, string>> = {
 // V8へ移った画面には旧JSONの節・語を要求しない。
 // 見た目は★V8との画像照合、動きは各V8本体の試験が守る。ここは入口と描く本体の接続を守る。
 const MAINB_V8_SCREENS = [
+  ['/conversions', '@/v8/conversions/list', 'v8/conversions/list.tsx', '<ListPage'],
+  ['/conversions/new', '@/v8/conversions/create', 'v8/conversions/create.tsx', '<CreatePage'],
+  ['/webhooks', '@/v8/webhooks/outgoing', 'v8/webhooks/outgoing.tsx', '<ListPage'],
+  ['/webhooks/new', '@/v8/webhooks/create', 'v8/webhooks/create.tsx', '<CreatePage'],
+  ['/contents', '@/v8/contents/list', 'v8/contents/list.tsx', '<ListPage'],
+  ['/contents/vars', '@/v8/common-vars/list', 'v8/common-vars/list.tsx', '<ListPage'],
+  ['/pools/new', '@/v8/settings/pools/create', 'v8/settings/pools/create.tsx', '<SbSettingsScreen'],
+  ['/form-submissions/edit', '@/v8/form-edit/edit', 'v8/form-edit/edit.tsx', '<CreatePage'],
   ['/booking/staff/shifts', '@/v8/booking-staff/shifts', 'v8/booking-staff/shifts.tsx', '<PageHeading'],
   ['/booking/menus', '@/v8/booking-menus/settings', 'v8/booking-menus/settings.tsx', '<PageHeading'],
   ['/booking/menus/new', '@/v8/booking-menus/menu-form', 'v8/booking-menus/menu-form.tsx', '<PageHeading'],

@@ -1011,7 +1011,7 @@ function EditCommonVarV8Inner() {
             return (
               <li key={entry.id} className={styles.historyItem}>
                 <span className={styles.historyDate}>{historyStamp(entry.createdAt)}</span>
-                <span className={previous ? styles.historyText : styles.historyTextQuiet}>{what}</span>
+                <span className={previous ? styles.historyText : styles.historyTextQuiet} title={entry.changeReason || undefined}>{what}</span>
               </li>
             )
           })}
@@ -1168,6 +1168,7 @@ function EditCommonVarV8Inner() {
                   <SaveErrorField names={["value","saved"]}><input
                     id="cv-value"
                     type={item.type === 'number' ? 'number' : 'text'}
+                    maxLength={item.type === 'number' ? undefined : 200}
                     value={value}
                     onChange={(e) => { setSaved(false); setValue(e.target.value) }}
                     className={styles.fieldInput}
@@ -1195,7 +1196,7 @@ function EditCommonVarV8Inner() {
           <section className={styles.card} aria-labelledby="cv-edit-impact-heading">
             <div className={styles.cardHead}>
               <h2 id="cv-edit-impact-heading" className={styles.cardTitle}>変える前に影響を見る</h2>
-              <p className={styles.cardNote}>
+              <p className={styles.cardNote} title={impact ? [reflectionScopeText(impact), reflectionTimingText(impact), historicalText(impact)].filter(Boolean).join('\n') : undefined}>
                 {impactState === 'ready' && impact
                   ? `${formatNumber(impact.total)}か所。次に送る・動くときから新しい値が入ります。すでに届いた文は変わりません`
                   : '次に送る・動くときから新しい値が入ります。すでに届いた文は変わりません'}
@@ -1471,7 +1472,7 @@ function ImpactRows({
   return (
     <>
       {rows.length === 0 ? (
-        <p className={styles.cardNote}>使われている場所がないため、確かめる文はありません。</p>
+        <p className={styles.cardNote}>{impact.total === 0 ? '使われている場所がないため、確かめる文はありません。' : 'すぐ変わる使用先の文はありません。'}</p>
       ) : (
         <div className={styles.impactList}>
           {visible.map((row, index) => (
