@@ -1,5 +1,6 @@
 import React, { type HTMLAttributes, type ReactNode } from 'react'
 import HelpTip from './help-tip'
+import { normalizeStatusWord } from './status-words'
 import styles from './status-badge.module.css'
 
 export type StatusBadgeTone = 'neutral' | 'info' | 'warning' | 'success' | 'danger'
@@ -41,10 +42,11 @@ export default function StatusBadge({
     .filter(Boolean)
     .join(' ')
   const hasHelp = help !== undefined && help !== null
-  const heading = helpLabel ?? (typeof children === 'string' ? children : 'この状態')
+  const visibleChildren = typeof children === 'string' ? normalizeStatusWord(children) : children
+  const heading = helpLabel ? normalizeStatusWord(helpLabel) : (typeof visibleChildren === 'string' ? visibleChildren : 'この状態')
   return (
     <span className={classes} data-design-node="xRvDB" data-surface={surface} {...props}>
-      {children}
+      {visibleChildren}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>
           {help}
