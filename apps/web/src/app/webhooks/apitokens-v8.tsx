@@ -36,6 +36,7 @@ import {
   WebhooksV8Band, WebhooksV8Head, outgoingKpiCells, useV8BandData,
 } from './outgoing-v8'
 import styles from './apitokens-v8.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'disabled'
 
@@ -57,6 +58,8 @@ export default function ApiTokensV8Page() {
 }
 
 function ApiTokensV8Inner() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('外部連携')
   const { selectedAccountId } = useAccount()
   const selectedAccountIdRef = useRef(selectedAccountId)
@@ -119,7 +122,10 @@ function ApiTokensV8Inner() {
       setTokens(res.data)
       setStatus('ready')
     } catch (caught) {
+
+
       if (loadGenerationRef.current !== requestGeneration || selectedAccountIdRef.current !== requestAccountId) return
+      const fieldFailure = saveErrors.capture(caught)
       if (caught instanceof ApiError && caught.code === 'FEATURE_DISABLED') {
         setTokens([])
         setStatus('disabled')
@@ -131,9 +137,9 @@ function ApiTokensV8Inner() {
         return
       }
       setStatus('error')
-      setLoadError(describeApiFailure(caught, '読み込み'))
+      { if (!fieldFailure) setLoadError(describeApiFailure(caught, '読み込み')) }
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     void load()
@@ -176,14 +182,16 @@ function ApiTokensV8Inner() {
       setShowCreate(false)
       await load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (!stepUpToken && isStepUpRequired(caught)) {
         setStepUp({ purpose: 'webhook.api_token', action: 'API接続の鍵を発行する', retry: (token) => handleCreate(token) })
         return
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setActionError(describeApiFailure(caught, '発行', {
+      { if (!fieldFailure) setActionError(describeApiFailure(caught, '発行', {
         forbidden: '鍵の発行は統括だけができます。必要なときは統括に頼んでください。',
-      }))
+      })) }
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setCreating(false)
     }
@@ -206,6 +214,8 @@ function ApiTokensV8Inner() {
       setRotateTarget(null)
       await load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (!stepUpToken && isStepUpRequired(caught)) {
         const target = rotateTarget
         setStepUp({
@@ -218,13 +228,13 @@ function ApiTokensV8Inner() {
       if (selectedAccountIdRef.current !== requestAccountId) return
       if (caught instanceof ApiError && caught.code === 'TOKEN_ROTATE_CONFLICT') {
         setRotateTarget(null)
-        setActionError('ほかの操作が先にこの鍵を更新しました。一覧を読み直しました。最新の状態からもう一度お試しください')
+        { if (!fieldFailure) setActionError('ほかの操作が先にこの鍵を更新しました。一覧を読み直しました。最新の状態からもう一度お試しください') }
         await load()
         return
       }
-      setDialogError(describeApiFailure(caught, '入れ替え', {
+      { if (!fieldFailure) setDialogError(describeApiFailure(caught, '入れ替え', {
         forbidden: '鍵の入れ替えは統括だけができます。必要なときは統括に頼んでください。',
-      }))
+      })) }
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
     }
@@ -245,6 +255,8 @@ function ApiTokensV8Inner() {
       setRevokeTarget(null)
       await load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (!stepUpToken && isStepUpRequired(caught)) {
         const target = revokeTarget
         setStepUp({
@@ -255,9 +267,9 @@ function ApiTokensV8Inner() {
         return
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setDialogError(describeApiFailure(caught, '停止', {
+      { if (!fieldFailure) setDialogError(describeApiFailure(caught, '停止', {
         forbidden: '鍵の停止は統括だけができます。必要なときは統括に頼んでください。',
-      }))
+      })) }
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
     }
@@ -268,13 +280,15 @@ function ApiTokensV8Inner() {
     try {
       await navigator.clipboard.writeText(issued.token)
       setCopied(true)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       // 手で選んで写せるので、失敗しても文は出さない。
     }
   }
 
   return (
-    <div className={styles.board} data-design-node="ralAc">
+    <SaveErrorScope errors={saveErrors}><div className={styles.board} data-design-node="ralAc">
       <WebhooksV8Head
         activeTab="api-tokens"
         outgoingCount={band.outgoingItems === null ? null : band.outgoingItems.length}
@@ -315,23 +329,23 @@ function ApiTokensV8Inner() {
             <h2 className={styles.createTitle}>新しい鍵</h2>
             <div>
               <label className={styles.label} htmlFor="webhook-v8-token-name">名前</label>
-              <input
+              <SaveErrorField names={["name"]}><input
                 id="webhook-v8-token-name"
                 value={name}
                 maxLength={120}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="例：予約システム連携"
                 className={styles.input}
-              />
+              /></SaveErrorField>
               {nameError ? <p className={styles.fieldError} role="alert">{nameError}</p> : null}
             </div>
             <fieldset>
               <legend className={styles.label}>できること</legend>
               <div className={styles.checkRow}>
                 {['tags:read', 'tags:write'].map((scope) => (
-                  <Checkbox key={scope} checked={scopes.includes(scope)} onCheckedChange={() => toggleScope(scope)}>
+                  <SaveErrorField names={["scope"]} key={scope}><Checkbox key={scope} checked={scopes.includes(scope)} onCheckedChange={() => toggleScope(scope)}>
                     {scopeLabel(scope)}
-                  </Checkbox>
+                  </Checkbox></SaveErrorField>
                 ))}
               </div>
             </fieldset>
@@ -519,6 +533,6 @@ function ApiTokensV8Inner() {
         }}
       />
       {stepUp ? <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} /> : null}
-    </div>
+    </div></SaveErrorScope>
   )
 }

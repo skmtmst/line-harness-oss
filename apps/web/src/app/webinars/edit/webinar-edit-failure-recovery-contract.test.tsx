@@ -208,6 +208,14 @@ class FakeDocument extends FakeNode {
     this.defaultView = {}
   }
 
+  getElementById(id: string): FakeElement | null {
+    const find = (node: FakeNode): FakeElement | null => {
+      if (node instanceof FakeElement && node.getAttribute('id') === id) return node
+      for (const child of node.childNodes) { const hit = find(child); if (hit) return hit }
+      return null
+    }
+    return find(this.documentElement)
+  }
   createElement(tagName: string): FakeElement { return new FakeElement(tagName, this) }
   createElementNS(_namespace: string, tagName: string): FakeElement { return this.createElement(tagName) }
   createTextNode(value: string): FakeText { return new FakeText(value, this) }

@@ -12,6 +12,7 @@ import TagPill from '@/components/shared/tag-pill'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { HqAccountPickerField } from '@/components/shared/hq-account-picker'
 import styles from './folder-distribution-dialog.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export function distributionKind(row: HqTemplate) {
   if (row.template_type === 'template' && (row.kind ?? 'message') === 'message' && row.content_summary) return row.content_summary.replace(/\s+\d+$/u, '')
@@ -39,10 +40,10 @@ export default function FolderDistributionDialog({ name, templates, templateFold
       <section className={styles.section} aria-label="配るひな形">
         <div className={styles.heading}><strong>配るひな形</strong><span>{`${picked.length} / ${templates.length} 件を選択`}</span></div>
         <div className={styles.list}>
-          {templates.map((row) => {
+          {templates.map((row, saveFieldIndex) => {
             const folder = templateFolders.find((folder) => folder.id === row.folder_id)
             return <div className={styles.row} key={row.id}>
-            <Checkbox checked={picked.includes(row.id)} disabled={busy} onCheckedChange={(checked) => setPicked((ids) => checked ? [...ids, row.id] : ids.filter((id) => id !== row.id))}>{row.template_type === 'tag' ? <TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} size="sm" /> : row.name}</Checkbox>
+            <SaveErrorField names={[`templates.${saveFieldIndex}.id`,"id","row.id","picked"]}><Checkbox checked={picked.includes(row.id)} disabled={busy} onCheckedChange={(checked) => setPicked((ids) => checked ? [...ids, row.id] : ids.filter((id) => id !== row.id))}>{row.template_type === 'tag' ? <TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} size="sm" /> : row.name}</Checkbox></SaveErrorField>
             <StatusBadge size="compact" tone="neutral">{distributionKind(row)}</StatusBadge>
           </div>
           })}

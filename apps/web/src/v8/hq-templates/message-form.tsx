@@ -26,6 +26,7 @@ import { FieldError } from '@/components/shared/form-controls'
 import type { FormErrors } from '@/lib/use-form-errors'
 import { decodeImageSize, type TemplateMedia } from './definition'
 import styles from './console.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
  * ボタンの押したら（共通の欄 TapActionField・YPzmo・B-129）。保存の形（HqMessageCard の action・value）は今のまま。
@@ -127,17 +128,17 @@ export default function MessageForm({
         <div className={styles.twoCol}>
           <label className={styles.field}>
             <span className={styles.label}>ひな形の名前</span>
-            <input aria-label="ひな形の名前" {...bindField('name', 'hq-msg-name')} className={styles.input} value={name} maxLength={200} disabled={disabled} onChange={(event) => onNameChange(event.target.value)} />
+            <SaveErrorField names={["name"]}><input aria-label="ひな形の名前" {...bindField('name', 'hq-msg-name')} className={styles.input} value={name} maxLength={200} disabled={disabled} onChange={(event) => onNameChange(event.target.value)} /></SaveErrorField>
             <FieldError id="hq-msg-name-error">{fields?.error('name')}</FieldError>
           </label>
           <label className={styles.field}>
             <span className={styles.label}>分類 <small className={styles.optional}>任意</small></span>
-            <input aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={disabled} onChange={(event) => onChange({ ...value, template: { ...current, category: event.target.value } })} />
+            <SaveErrorField names={["category","current.category"]}><input aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={disabled} onChange={(event) => onChange({ ...value, template: { ...current, category: event.target.value } })} /></SaveErrorField>
           </label>
         </div>
         <div className={styles.field}>
           <span className={styles.folderPick}>
-            <FolderSelect aria-label="フォルダ" label="フォルダ" value={folderId ?? ''} disabled={disabled || folderLoadFailed} onChange={(next) => onFolderChange(next || null)} folders={folders.map((folder) => ({ value: folder.id, label: folder.name, color: folder.color }))} onCreate={onCreateFolder} />
+            <SaveErrorField names={["folderId","folder_id"]}><FolderSelect aria-label="フォルダ" label="フォルダ" value={folderId ?? ''} disabled={disabled || folderLoadFailed} onChange={(next) => onFolderChange(next || null)} folders={folders.map((folder) => ({ value: folder.id, label: folder.name, color: folder.color }))} onCreate={onCreateFolder} /></SaveErrorField>
           </span>
         </div>
 
@@ -158,11 +159,11 @@ export default function MessageForm({
           )}
           <label className={styles.field}>
             <span className={styles.label}>タイトル</span>
-            <input className={styles.input} aria-label="ひな形のタイトル" maxLength={200} value={card.title} disabled={disabled} onChange={(event) => updateCard({ ...card, title: event.target.value })} />
+            <SaveErrorField names={["title","card.title"]}><input className={styles.input} aria-label="ひな形のタイトル" maxLength={200} value={card.title} disabled={disabled} onChange={(event) => updateCard({ ...card, title: event.target.value })} /></SaveErrorField>
           </label>
           <label className={styles.field}>
             <span className={styles.smallLabel}>本文</span>
-            <textarea className={styles.textarea} aria-label="配信する本文" {...bindField('body', 'hq-msg-body')} maxLength={card.format === 'flex' ? 2000 : 5000} value={card.body} disabled={disabled} onChange={(event) => updateCard({ ...card, body: event.target.value })} />
+            <SaveErrorField names={["body","card.body"]}><textarea className={styles.textarea} aria-label="配信する本文" {...bindField('body', 'hq-msg-body')} maxLength={card.format === 'flex' ? 2000 : 5000} value={card.body} disabled={disabled} onChange={(event) => updateCard({ ...card, body: event.target.value })} /></SaveErrorField>
             <FieldError id="hq-msg-body-error">{fields?.error('body')}</FieldError>
           </label>
           {card.format === 'flex' && (
@@ -176,11 +177,11 @@ export default function MessageForm({
                       <span className={styles.label}>ボタンの文字</span>
                       {disabled ? null : <button type="button" className={styles.textButton} onClick={() => updateCard({ ...card, buttons: card.buttons.filter((row) => row.id !== button.id) })}>{`ボタン${index + 1}を外す`}</button>}
                     </span>
-                    <input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} />
+                    <SaveErrorField names={[`buttons.${index}.label`,"label","button.label"]}><input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} /></SaveErrorField>
                   </label>
                   <div className={styles.field}>
                     <span className={styles.smallLabel}>押したとき</span>
-                    <TapActionField
+                    <SaveErrorField names={["button"]}><TapActionField
                       name={`ボタン${index + 1}`}
                       kindLabel={`ボタン${index + 1}を押したとき`}
                       value={cardTapValue(button)}
@@ -198,7 +199,7 @@ export default function MessageForm({
                       sources={referenceError ? {} : { form: references.filter((row) => row.kind === 'form').map((row) => ({ id: row.id, name: `${row.name}（${row.accountName}）` })) }}
                       renderBody={(kind) => kind !== 'scenario' ? undefined : (
                         /* 統括の参照先はアカウントをまたぐので、店のフォルダは読まず行を直接渡す（選ぶ窓 dJZ7Q）。 */
-                        <EntityPickerField
+                        <SaveErrorField names={[`buttons.${index}.value`,"value","button.value"]}><EntityPickerField
                           label={`ボタン${index + 1}の参照先`}
                           noun={ENTITY_KINDS.scenario.noun}
                           icon={ENTITY_KINDS.scenario.icon}
@@ -206,9 +207,9 @@ export default function MessageForm({
                           items={references.filter((row) => row.kind === 'scenario').map((row) => ({ id: row.id, name: row.name, meta: row.accountName, keywords: row.accountName }))}
                           value={button.value}
                           onChange={(next) => updateButton(button.id, { value: next })}
-                        />
+                        /></SaveErrorField>
                       )}
-                    />
+                    /></SaveErrorField>
                   </div>
                   <FieldError id={`hq-msg-button-${button.id}-error`}>{fields?.error(`button-${button.id}`)}</FieldError>
                 </div>
@@ -292,7 +293,7 @@ function ImagePick({ value = null, disabled, onUploaded, onBusyChange, onReceipt
     }
   }
   return (
-    <MediaSlot
+    <SaveErrorField names={["value"]}><MediaSlot
       title="画像を追加"
       value={value}
       accept="image/png,image/jpeg"
@@ -302,6 +303,6 @@ function ImagePick({ value = null, disabled, onUploaded, onBusyChange, onReceipt
       disabled={disabled}
       onFile={(file) => void upload(file)}
       onRemove={onRemove}
-    />
+    /></SaveErrorField>
   )
 }

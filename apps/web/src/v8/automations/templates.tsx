@@ -30,6 +30,7 @@ import {
   type BandCell,
 } from './shell'
 import styles from './templates.module.css'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -58,6 +59,8 @@ export function templateTriggerChips(items: Pick<AutomationTemplateSummary, 'tri
 }
 
 export default function AutomationTemplatesV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('見本から作る')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -102,12 +105,13 @@ export default function AutomationTemplatesV8() {
       setSummary(listRes && listRes.success ? listRes.summary ?? null : null)
       setSkipped(runsRes && runsRes.success ? runsRes.data.summary.skipped : null)
       setStatus('ready')
-    } catch {
+    } catch (saveFailure) {
       if (requestId !== requestRef.current) return
+      saveErrors.capture(saveFailure)
       setItems([])
       setStatus('error')
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     if (accountLoading) return
@@ -135,8 +139,10 @@ export default function AutomationTemplatesV8() {
       if (!response.success) throw new Error(response.error)
       delete operationKeysRef.current[slot]
       router.push(`/automations/drafts?id=${encodeURIComponent(response.data.id)}`)
-    } catch {
-      setActionError('下書きを作れませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setActionError('下書きを作れませんでした。状態を読み直してから、もう一度お試しください。') }
       setCreating(null)
     }
   }
@@ -236,7 +242,7 @@ export default function AutomationTemplatesV8() {
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId="c7dxp"
       headingSize="regular"
       title="オートメーション"
@@ -251,6 +257,6 @@ export default function AutomationTemplatesV8() {
       </>}
     >
       <div className={styles.body}>{body}</div>
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

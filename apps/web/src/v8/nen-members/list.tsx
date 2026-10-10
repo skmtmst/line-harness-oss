@@ -27,6 +27,7 @@ import {
 } from '@/lib/nen-ranks-api'
 import { RankChip, yen } from './parts'
 import styles from './members.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -136,7 +137,7 @@ export default function MembersListV8({
           EC未連携
         </FilterChip>
         <span className={styles.toolbarRight}>
-          <Select
+          <SaveErrorField names={["rank"]}><Select
             aria-label="よく使う絞り込み"
             value={rank}
             onChange={(value) => { setRank(value); if (value) setChipTopRanks(false); setPage(1) }}
@@ -144,8 +145,8 @@ export default function MembersListV8({
               { value: '', label: 'よく使う絞り込み' },
               ...rankSource.map((item) => ({ value: item.key, label: `ランク：${item.name}` })),
             ]}
-          />
-          <Select
+          /></SaveErrorField>
+          <SaveErrorField names={["sort"]}><Select
             aria-label="並び順"
             value={sort}
             onChange={(value) => { setSort(value as NenMemberSort); setPage(1) }}
@@ -155,7 +156,7 @@ export default function MembersListV8({
               { value: 'balance_desc', label: 'マイル残高が多い順' },
               { value: 'recent', label: '最終購入が新しい順' },
             ]}
-          />
+          /></SaveErrorField>
           <PageSizeSelect value={pageSize} options={[10, 20, 50]} onChange={(value) => { setPageSize(value); setPage(1) }} />
         </span>
       </div>

@@ -37,6 +37,7 @@ import { FriendsSectionHead } from '../shared/head'
 import MergedPersonV8 from './person'
 import { useMergedUsers, USERS_PAGE_SIZES } from './use-merged-users'
 import styles from './merged.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /** 所属アカウントの選びの「複数アカウントのみ」（絞り込みの口は今と同じ onlyDups）。 */
 const MULTI_ACCOUNTS = '__multi'
@@ -157,7 +158,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
         </div>
 
         <div className={styles.filters}>
-          <Select
+          <SaveErrorField names={["uid","u.uid"]}><Select
             aria-label="UID連携で絞り込む"
             width={180}
             value={u.uid}
@@ -167,8 +168,8 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
               { value: 'linked', label: 'UID連携：連携済み' },
               { value: 'unlinked', label: 'UID連携：未連携・要確認' },
             ]}
-          />
-          <Select
+          /></SaveErrorField>
+          <SaveErrorField names={["MULTI_ACCOUNTS","account","u.account","_m_u_l_t_i__a_c_c_o_u_n_t_s"]}><Select
             aria-label="所属アカウントで絞り込む"
             width={200}
             value={u.onlyDups ? MULTI_ACCOUNTS : u.account}
@@ -186,7 +187,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
               ...u.accountOptions.map((a) => ({ value: a.id, label: `所属アカウント：${a.name}` })),
               { value: MULTI_ACCOUNTS, label: '所属アカウント：複数アカウントのみ' },
             ]}
-          />
+          /></SaveErrorField>
         </div>
 
         <div className={styles.listArea}>
@@ -194,13 +195,13 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
             <div className={styles.search}>
               <SearchField aria-label="統合ユーザーを探す" value={u.q} onChange={u.setQ} onClear={() => u.setQ('')} placeholder="名前・メール・電話で探す" />
             </div>
-            <Select
+            <SaveErrorField names={["pageSize","u.pageSize","page_size","u.page_size"]}><Select
               aria-label="表示件数"
               width={96}
               value={String(u.pageSize)}
               onChange={(value) => u.setPageSize(Number(value))}
               options={USERS_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
-            />
+            /></SaveErrorField>
           </div>
 
           <section className={styles.panel} aria-labelledby="merged-users-title">

@@ -49,6 +49,7 @@ import { WeightBars } from './health-tab'
 import { SummarySheet, SKIN_LABELS, TEAR_LABELS, countText, md } from './summary-drawer'
 import type { HealthTabKey } from './page'
 import styles from './health-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -251,12 +252,12 @@ function HealthListV8({
           className={styles.searchGrow}
           onSubmit={(event) => { event.preventDefault(); setQuery(draft.trim()); resetPage() }}
         >
-          <TextField
+          <SaveErrorField names={["draft"]}><TextField
             aria-label="ペットを探す"
             placeholder="ペットを探す"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-          />
+          /></SaveErrorField>
         </form>
         {concernOnly ? null : (
           <>
@@ -286,7 +287,7 @@ function HealthListV8({
           </>
         )}
         <span className={styles.toolsTail}>
-          <Select
+          <SaveErrorField names={["change"]}><Select
             aria-label="よく使う絞り込み"
             value={concernOnly ? 'concern' : change === 'silent' ? '' : change}
             onChange={(value) => { if (!concernOnly) { setChange(value === 'concern' || value === 'none' ? value : ''); resetPage() } }}
@@ -295,9 +296,9 @@ function HealthListV8({
               { value: 'concern', label: '気になる変化' },
               { value: 'none', label: '変化なし' },
             ]}
-          />
+          /></SaveErrorField>
           <span className={styles.rangeLabel}>{data ? headCountLabel(data.total, data.page, data.pageSize) : '—'}</span>
-          <Select
+          <SaveErrorField names={["sort"]}><Select
             aria-label="並び順"
             value={sort}
             onChange={(value) => { setSort(value as NenHealthSort); resetPage() }}
@@ -306,7 +307,7 @@ function HealthListV8({
               { value: 'recent', label: '並び：最終記録が新しい順' },
               { value: 'records_desc', label: '並び：30日の記録が多い順' },
             ]}
-          />
+          /></SaveErrorField>
         </span>
       </div>
 

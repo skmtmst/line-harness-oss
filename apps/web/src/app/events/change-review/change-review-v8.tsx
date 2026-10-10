@@ -26,6 +26,7 @@ import {
   useChangeReview,
 } from './change-review-model'
 import styles from './change-review-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /** datetime-local の入力値（壁時計）を見やすく出す。 */
 function formatLocalInput(local: string): string {
@@ -196,20 +197,20 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                     </TableHeadRow>
                   </thead>
                   <tbody>
-                    {slotList.map((slot) => {
+                    {slotList.map((slot, saveFieldIndex) => {
                       const edit = edits[slot.id]
                       const impact = impactBySlot.get(slot.id)
                       const receiving = edit ? edit.isActive : slot.is_active === 1
                       return (
                         <Tr key={slot.id} interactive={activeSlotId === slot.id}>
                           <Td>
-                            <input
+                            <SaveErrorField names={[`slotList.${saveFieldIndex}.id`,"change-review-slot","activeSlotId","id","slot.id","selectedSlotId","active_slot_id","selected_slot_id"]}><input
                               type="radio"
                               name="change-review-slot"
                               checked={activeSlotId === slot.id}
                               onChange={() => setSelectedSlotId(slot.id)}
                               aria-label={`${formatJp(slot.starts_at)}の回を選ぶ`}
-                            />
+                            /></SaveErrorField>
                           </Td>
                           <Td className="whitespace-nowrap text-sm tabular-nums">{formatJp(slot.starts_at)}</Td>
                           <Td align="right" className="tabular-nums">{slot.capacity ?? '—'}</Td>
@@ -237,27 +238,27 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                 <div className={`${styles.fieldGrid} mt-3`}>
                   <label className="grid gap-1 text-xs font-medium text-ink-secondary">
                     開始日時
-                    <input
+                    <SaveErrorField names={["startsAt","activeEdit?.startsAt","starts_at","active_edit?.starts_at"]}><input
                       type="datetime-local"
                       value={activeEdit?.startsAt ?? ''}
                       onChange={(e) => updateActiveEdit({ startsAt: e.target.value })}
                       aria-label="開始日時"
                       className="border-hairline rounded-control w-full border px-3 py-2 text-sm font-normal"
-                    />
+                    /></SaveErrorField>
                   </label>
                   <label className="grid gap-1 text-xs font-medium text-ink-secondary">
                     終了日時
-                    <input
+                    <SaveErrorField names={["endsAt","activeEdit?.endsAt","ends_at","active_edit?.ends_at"]}><input
                       type="datetime-local"
                       value={activeEdit?.endsAt ?? ''}
                       onChange={(e) => updateActiveEdit({ endsAt: e.target.value })}
                       aria-label="終了日時"
                       className="border-hairline rounded-control w-full border px-3 py-2 text-sm font-normal"
-                    />
+                    /></SaveErrorField>
                   </label>
                   <label className="grid gap-1 text-xs font-medium text-ink-secondary">
                     定員
-                    <input
+                    <SaveErrorField names={["capacity","activeEdit?.capacity","active_edit?.capacity"]}><input
                       type="number"
                       min={1}
                       value={activeEdit?.capacity ?? ''}
@@ -265,7 +266,7 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                       onChange={(e) => updateActiveEdit({ capacity: e.target.value })}
                       aria-label="定員"
                       className="border-hairline rounded-control w-full border px-3 py-2 text-sm font-normal"
-                    />
+                    /></SaveErrorField>
                   </label>
                   <div className="grid gap-1 text-xs font-medium text-ink-secondary">
                     受付の有無
@@ -283,7 +284,7 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <label className="grid gap-1 text-xs font-medium text-ink-secondary">
                     会場
-                    <input
+                    <SaveErrorField names={["venueName","venue_name"]}><input
                       value={venueName}
                       onChange={(e) => {
                         setVenueName(e.target.value)
@@ -291,11 +292,11 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                       }}
                       placeholder={event.venue_name ?? '未設定'}
                       className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
-                    />
+                    /></SaveErrorField>
                   </label>
                   <label className="grid gap-1 text-xs font-medium text-ink-secondary">
                     オンラインのURL（確定した申込にだけ見せます）
-                    <input
+                    <SaveErrorField names={["venueUrl","venue_url"]}><input
                       value={venueUrl}
                       onChange={(e) => {
                         setVenueUrl(e.target.value)
@@ -304,20 +305,20 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                       placeholder={event.venue_url ?? '未設定'}
                       inputMode="url"
                       className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
-                    />
+                    /></SaveErrorField>
                   </label>
                 </div>
                 <div className="mt-3">
                   <label className="grid gap-1 text-xs font-medium text-ink-secondary">
                     変える理由{isPublished ? '（必須）' : '（任意）'}
-                    <textarea
+                    <SaveErrorField names={["reason"]}><textarea
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
                       rows={2}
                       placeholder="例：会場の都合で時間を30分遅らせます"
                       aria-label="変える理由"
                       className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
-                    />
+                    /></SaveErrorField>
                   </label>
                   <p className="text-ink-faint mt-1 text-xs">理由は変更の記録に残ります。友だちには送りません。</p>
                 </div>

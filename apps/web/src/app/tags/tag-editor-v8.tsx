@@ -37,6 +37,7 @@ import {
   type TagEditorValues,
 } from '@/components/friend-fields/tag-editor-v4'
 import styles from './tag-editor-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /** 連動 OFF のときに出す「ON にすると何ができるか」（v7 と同じ内容）。 */
 const LINKED_PREVIEW = [
@@ -284,18 +285,18 @@ export default function TagEditorV8({
               <div className={styles.fieldGrid}>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>所属フォルダ</span>
-                  <Select
+                  <SaveErrorField names={["groupId","group_id"]}><Select
                     aria-label="所属フォルダ"
                     value={groupId}
                     onChange={setGroupId}
                     options={[{ value: '', label: '未分類' }, ...groups.map((group) => ({ value: group.id, label: group.name }))]}
                     size="full"
-                  />
+                  /></SaveErrorField>
                   <span className={styles.fieldHint}>フォルダの色がタグの印になります。未選択なら「未分類」です。</span>
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>タグ名 <RequiredBadge /></span>
-                  <input value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 定期購入者" className={styles.input} />
+                  <SaveErrorField names={["name"]}><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 定期購入者" className={styles.input} /></SaveErrorField>
                   <DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" />
                 </label>
               </div>
@@ -306,7 +307,7 @@ export default function TagEditorV8({
                 </div>
               ) : null}
               <AttributeKindGuide current="tag" />
-              <Checkbox checked={isStarred} onCheckedChange={setIsStarred} description="このスイッチ、またはタグ一覧の星をクリックして、友だち一覧への表示をON／OFFできます。">友だち一覧に表示する（★）</Checkbox>
+              <SaveErrorField names={["isStarred","is_starred"]}><Checkbox checked={isStarred} onCheckedChange={setIsStarred} description="このスイッチ、またはタグ一覧の星をクリックして、友だち一覧への表示をON／OFFできます。">友だち一覧に表示する（★）</Checkbox></SaveErrorField>
             </div>
           </section>
 
@@ -340,7 +341,7 @@ export default function TagEditorV8({
               side={(
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span className={`${styles.toggleState} ${linked ? styles.toggleStateOn : styles.toggleStateOff}`}>{linked ? 'ON' : 'OFF'}</span>
-                  <Toggle checked={linked} onChange={setLinked} label="タグ連動" />
+                  <SaveErrorField names={["linked"]}><Toggle checked={linked} onChange={setLinked} label="タグ連動" /></SaveErrorField>
                 </div>
               )}
             />
@@ -421,36 +422,36 @@ export default function TagEditorV8({
                 <div className={styles.fieldGrid2}>
                   <label className={styles.field}>
                     <span className={styles.fieldLabel}>本人へのマイル付与</span>
-                    <span className={styles.numberRow}><input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} /><span className={styles.unit}>mile</span></span>
+                    <span className={styles.numberRow}><SaveErrorField names={["reward"]}><input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} /></SaveErrorField><span className={styles.unit}>mile</span></span>
                     <span className={styles.fieldHint}>このタグが付いた本人へ、一度だけ積みます。</span>
                   </label>
                   <label className={styles.field}>
                     <span className={styles.fieldLabel}>紹介者へのマイル付与</span>
-                    <span className={styles.numberRow}><input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} /><span className={styles.unit}>mile</span></span>
+                    <span className={styles.numberRow}><SaveErrorField names={["referralReward","referral_reward"]}><input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} /></SaveErrorField><span className={styles.unit}>mile</span></span>
                     <span className={styles.fieldHint}>紹介経由の友だちなら、その紹介者にも積みます。</span>
                   </label>
                   <label className={styles.field}>
                     <span className={styles.fieldLabel}>今後のマイル倍率</span>
-                    <Select aria-label="今後のマイル倍率" value={multiplier} onChange={setMultiplier} options={MULTIPLIERS.map((option) => ({ value: option.value, label: option.label }))} size="full" />
+                    <SaveErrorField names={["multiplier"]}><Select aria-label="今後のマイル倍率" value={multiplier} onChange={setMultiplier} options={MULTIPLIERS.map((option) => ({ value: option.value, label: option.label }))} size="full" /></SaveErrorField>
                     <span className={styles.fieldHint}>このタグが付いている間、次回以降の付与倍率に使います。</span>
                   </label>
                   <label className={styles.field}>
                     <span className={styles.fieldLabel}>倍率の優先度</span>
-                    <Select aria-label="倍率の優先度" value={priority} onChange={setPriority} options={[0, 1, 2, 3, 4, 5].map((value) => ({ value: String(value), label: value === 0 ? '標準' : `優先度 ${value}` }))} size="full" />
+                    <SaveErrorField names={["priority"]}><Select aria-label="倍率の優先度" value={priority} onChange={setPriority} options={[0, 1, 2, 3, 4, 5].map((value) => ({ value: String(value), label: value === 0 ? '標準' : `優先度 ${value}` }))} size="full" /></SaveErrorField>
                     <span className={styles.fieldHint}>倍率タグが複数ある場合、数字が大きい設定を優先します。</span>
                   </label>
                 </div>
-                <RadioCardGroup legend="タグを外して付け直したときの扱い" legendVisible>
+                <SaveErrorField names={["reapplyMode"]}><RadioCardGroup legend="タグを外して付け直したときの扱い" legendVisible>
                   <RadioCard name="reapplyMode" value="once" checked={reapplyMode === 'once'} onChange={() => setReapplyMode('once')} title="最初の1回だけ積む" note="誤操作や付け直しで、同じマイルが重複しません。" />
                   <RadioCard name="reapplyMode" value="every" checked={reapplyMode === 'every'} onChange={() => setReapplyMode('every')} title="付け直すたびに積む" note="購入回数など、同じタグを繰り返し使う運用向けです。" />
-                </RadioCardGroup>
+                </RadioCardGroup></SaveErrorField>
                 {mode === 'edit' && (
                   <div className={styles.sectionHead} style={{ borderTop: '1px solid var(--color-hairline)', paddingTop: 14 }}>
                     <div>
                       <h3 className={styles.sectionTitle} style={{ fontSize: 14 }}>さかのぼって反映</h3>
                       <p className={styles.sectionDesc}>既存の友だちにも、今回のマイル設定をさかのぼって反映できます。保存すると確認画面が開きます。</p>
                     </div>
-                    <Toggle checked={applyToExisting} onChange={setApplyToExisting} label="さかのぼって反映" />
+                    <SaveErrorField names={["applyToExisting","apply_to_existing"]}><Toggle checked={applyToExisting} onChange={setApplyToExisting} label="さかのぼって反映" /></SaveErrorField>
                   </div>
                 )}
                 {mode === 'edit' && applyToExisting && (

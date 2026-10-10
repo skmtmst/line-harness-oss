@@ -46,6 +46,7 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { daysUntilIso, eventRowState, isLowApplication, summarizeEventAttention, type EventRowState } from './attention'
 import { jstDay, jstTime } from './shared'
 import styles from './list.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -361,7 +362,7 @@ export default function EventsListV8() {
         trailing={(
           <>
             <div className={styles.savedBox}>
-              <Select
+              <SaveErrorField names={["savedValue","filter","saved_value"]}><Select
                 aria-label="よく使う絞り込み"
                 icon={<Bookmark aria-hidden="true" />}
                 size="full"
@@ -378,16 +379,16 @@ export default function EventsListV8() {
                     if (filter === 'full') setFilter('all')
                   }
                 }}
-              />
+              /></SaveErrorField>
             </div>
             <div className={styles.perPageBox}>
-              <Select
+              <SaveErrorField names={["perPage","per_page"]}><Select
                 aria-label="表示件数"
                 size="page-size"
                 value={String(perPage)}
                 options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
                 onChange={(value) => setPerPage(Number(value))}
-              />
+              /></SaveErrorField>
             </div>
           </>
         )}

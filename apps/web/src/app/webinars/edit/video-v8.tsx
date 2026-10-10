@@ -20,6 +20,7 @@ import {
   type WebinarEditor,
   type WebinarScheduleRule,
 } from '@/lib/api'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -81,6 +82,8 @@ export default function VideoV8({
   registerSave?: (save: (() => Promise<boolean>) | null) => void
   onEditorChange?: (next: WebinarEditor) => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const canEdit = canManageRole(useStaffRole())
   const scheduled = editor.deliveryKind === 'scheduled'
   const detailsRoot = useRef<HTMLDivElement>(null)
@@ -147,7 +150,9 @@ export default function VideoV8({
       onWebinarSaved(res.data)
       return true
     } catch (cause) {
-      setError(describeSaveFailure(cause))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure) setError(describeSaveFailure(cause)) }
       return false
     } finally {
       setBusy(false)
@@ -220,7 +225,9 @@ export default function VideoV8({
       onWebinarSaved(res.data)
       return true
     } catch (cause) {
-      setPeriodError(describeSaveFailure(cause))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure) setPeriodError(describeSaveFailure(cause)) }
       return false
     } finally {
       setPeriodBusy(false)
@@ -238,8 +245,10 @@ export default function VideoV8({
         missingResultPolicy: next,
       })
       onEditorChange?.(response.data)
-    } catch {
-      setPolicyError('保存できませんでした。時間をおいてもう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setPolicyError('保存できませんでした。時間をおいてもう一度お試しください。') }
     } finally {
       setPolicyBusy(false)
     }
@@ -266,7 +275,7 @@ export default function VideoV8({
   }, [registerSave])
 
   return (
-    <div className="min-w-0" data-webinar-pane="video" data-design-node={scheduled ? 'LPOe7' : 'VWNaA'}>
+    <SaveErrorScope errors={saveErrors}><div className="min-w-0" data-webinar-pane="video" data-design-node={scheduled ? 'LPOe7' : 'VWNaA'}>
       <div className="min-w-0 flex-1 space-y-3">
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface" aria-label="動画">
           <h2 className="text-ink text-base font-bold">動画</h2>
@@ -295,30 +304,30 @@ export default function VideoV8({
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="block">
               <span className="text-ink-secondary mb-1 block text-xs font-medium">公開の開始</span>
-              <input
+              <SaveErrorField names={["startsAt","starts_at"]}><input
                 type="datetime-local"
                 disabled={!canEdit}
                 value={startsAt}
                 onChange={(e) => setStartsAt(e.target.value)}
                 placeholder={webinar.publicationStartsAt ? formatDateTime(webinar.publicationStartsAt) : '2026/10/01 10:00'}
                 className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-              />
+              /></SaveErrorField>
             </label>
             <div>
               <span className="text-ink-secondary mb-1 block text-xs font-medium">
                 公開の終了 <span className="text-ink-faint">任意</span>
               </span>
-              <input
+              <SaveErrorField names={["endsAt","ends_at"]}><input
                 type="datetime-local"
                 value={endsAt}
                 disabled={noEnd || !canEdit}
                 onChange={(e) => setEndsAt(e.target.value)}
                 placeholder={webinar.publicationEndsAt ? formatDateTime(webinar.publicationEndsAt) : 'なし（いつでも）'}
                 className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm disabled:opacity-50"
-              />
-              <Checkbox checked={noEnd} disabled={!canEdit} onCheckedChange={setNoEnd} className="mt-2 text-xs">
+              /></SaveErrorField>
+              <SaveErrorField names={["noEnd","publicationEndsAt","no_end"]}><Checkbox checked={noEnd} disabled={!canEdit} onCheckedChange={setNoEnd} className="mt-2 text-xs">
                 終わりを決めない（いつでも見られる）
-              </Checkbox>
+              </Checkbox></SaveErrorField>
             </div>
           </div>
           {periodError ? <Notice tone="error" title="公開期間を保存できませんでした">{periodError}</Notice> : null}
@@ -402,7 +411,7 @@ export default function VideoV8({
           ) : null}
           {adding ? (
             <div className="border-hairline mt-3 space-y-3 rounded-control border p-3">
-              <Select
+              <SaveErrorField names={["newKind","new_kind"]}><Select
                 label="枠の種類"
                 aria-label="枠の種類"
                 value={newKind}
@@ -412,7 +421,7 @@ export default function VideoV8({
                   { value: 'weekly', label: '毎週' },
                   { value: 'once', label: '単発' },
                 ]}
-              />
+              /></SaveErrorField>
               {newKind === 'weekly' ? (
                 <div>
                   <span className="text-ink-secondary mb-1 block text-xs font-medium">曜日</span>
@@ -438,22 +447,22 @@ export default function VideoV8({
               {newKind === 'once' ? (
                 <label className="block">
                   <span className="text-ink-secondary mb-1 block text-xs font-medium">日付</span>
-                  <input
+                  <SaveErrorField names={["newDate","new_date"]}><input
                     type="date"
                     value={newDate}
                     onChange={(e) => setNewDate(e.target.value)}
                     className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                  />
+                  /></SaveErrorField>
                 </label>
               ) : null}
               <label className="block">
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">時刻</span>
-                <input
+                <SaveErrorField names={["newTime","time","new_time"]}><input
                   type="time"
                   value={newTime}
                   onChange={(e) => setNewTime(e.target.value)}
                   className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                />
+                /></SaveErrorField>
               </label>
               <div className="flex flex-wrap gap-2">
                 <Button busy={busy} busyLabel="足しています…" onClick={addRule}>
@@ -471,30 +480,30 @@ export default function VideoV8({
               <div className="grid gap-3 sm:grid-cols-3">
                 <label className="block">
                   <span className="text-ink-secondary mb-1 block text-xs font-medium">始まり</span>
-                  <input
+                  <SaveErrorField names={["bulkFrom","bulk_from"]}><input
                     type="date"
                     value={bulkFrom}
                     onChange={(e) => setBulkFrom(e.target.value)}
                     className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                  />
+                  /></SaveErrorField>
                 </label>
                 <label className="block">
                   <span className="text-ink-secondary mb-1 block text-xs font-medium">終わり</span>
-                  <input
+                  <SaveErrorField names={["bulkTo","bulk_to"]}><input
                     type="date"
                     value={bulkTo}
                     onChange={(e) => setBulkTo(e.target.value)}
                     className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                  />
+                  /></SaveErrorField>
                 </label>
                 <label className="block">
                   <span className="text-ink-secondary mb-1 block text-xs font-medium">時刻</span>
-                  <input
+                  <SaveErrorField names={["bulkTime","bulk_time"]}><input
                     type="time"
                     value={bulkTime}
                     onChange={(e) => setBulkTime(e.target.value)}
                     className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                  />
+                  /></SaveErrorField>
                 </label>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -517,7 +526,7 @@ export default function VideoV8({
               <p className="text-ink text-sm">{completionLabel ?? '—'}</p>
             </div>
             <div>
-              <Select
+              <SaveErrorField names={["policy"]}><Select
                 label="結果が取れないとき"
                 aria-label="結果が取れないとき"
                 value={policy}
@@ -527,7 +536,7 @@ export default function VideoV8({
                   { value: 'retry_next_day', label: '翌日に取り直す' },
                   { value: 'escalate', label: '担当へ上げる' },
                 ]}
-              />
+              /></SaveErrorField>
               {policyError ? <p className="text-danger mt-1 text-xs" role="alert">{policyError}</p> : null}
             </div>
           </div>
@@ -583,6 +592,6 @@ export default function VideoV8({
           ) : null}
         </div>
       </aside>
-    </div>
+    </div></SaveErrorScope>
   )
 }

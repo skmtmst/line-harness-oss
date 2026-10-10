@@ -41,6 +41,7 @@ import { api, ApiError } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 import styles from './runs.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /* 再実行・一時停止は owner/admin だけ（R530・再実行POST・停止口の requireRole と同じ境目）。 */
 const NO_MANAGE_NOTE = '閲覧のみで見ています。再実行・一時停止はオーナーと管理者だけができます。実行結果の確認と書き出しはこのまま使えます。'
@@ -491,26 +492,26 @@ export default function AutoReplyRunsV8() {
           <span className={styles.toolsSpacer} aria-hidden="true" />
           {period === 'custom' ? (
             <>
-              <DateField value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} max={dateTo || undefined} aria-label="実行日（開始）" />
-              <DateField value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} min={dateFrom || undefined} aria-label="実行日（終了）" />
+              <SaveErrorField names={["dateFrom","from","date_from"]}><DateField value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} max={dateTo || undefined} aria-label="実行日（開始）" /></SaveErrorField>
+              <SaveErrorField names={["dateTo","to","date_to"]}><DateField value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} min={dateFrom || undefined} aria-label="実行日（終了）" /></SaveErrorField>
             </>
           ) : null}
           <div className={styles.periodBox}>
-            <Select
+            <SaveErrorField names={["period"]}><Select
               aria-label="期間"
               value={period}
               onChange={(value) => { setPeriod(value as PeriodKey); setPage(1) }}
               options={PERIOD_OPTIONS}
-            />
+            /></SaveErrorField>
           </div>
           <div className={styles.sizeBox}>
-            <Select
+            <SaveErrorField names={["pageSize","limit","page_size"]}><Select
               aria-label="1ページに出す件数"
               size="page-size"
               value={String(pageSize)}
               onChange={(value) => { setPageSize(Number(value)); setPage(1) }}
               options={PAGE_SIZE_OPTIONS}
-            />
+            /></SaveErrorField>
           </div>
         </div>
 
@@ -648,14 +649,14 @@ export default function AutoReplyRunsV8() {
         onConfirm={() => void stopRule()}
         onCancel={() => { if (!stopping) { setStopOpen(false); setStopReason('') } }}
       >
-        <input
+        <SaveErrorField names={["stopReason","reason","stop_reason"]}><input
           type="text"
           className={styles.stopReason}
           placeholder="止める理由（任意・記録に残ります）"
           aria-label="止める理由（任意）"
           value={stopReason}
           onChange={(e) => setStopReason(e.target.value)}
-        />
+        /></SaveErrorField>
       </ConfirmDialog>
     </DetailPage>
   )

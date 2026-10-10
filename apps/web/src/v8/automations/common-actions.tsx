@@ -58,6 +58,7 @@ import {
   type BandCell,
 } from './shell'
 import styles from './common-actions.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type Filter = 'all' | 'published' | 'draft' | 'old_version' | 'unused' | 'archived'
 type Summary = {
@@ -262,7 +263,7 @@ export default function CommonActionsV8() {
   const savedBox = (
     <div className={styles.savedBox}>
       <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-      <Select
+      <SaveErrorField names={["filter","status"]}><Select
         aria-label="よく使う絞り込み"
         value={filter === 'old_version' || filter === 'unused' ? filter : ''}
         onChange={(value) => setFilter((value || 'all') as Filter)}
@@ -271,7 +272,7 @@ export default function CommonActionsV8() {
           { value: 'old_version', label: '古い版のまま使われている' },
           { value: 'unused', label: 'どこからも呼ばれていない' },
         ]}
-      />
+      /></SaveErrorField>
     </div>
   )
   const toolbar = (

@@ -35,6 +35,7 @@ import styles from './create.module.css'
 
 import { tagNameProblem } from './tag-name'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 export { tagNameProblem } from './tag-name'
 
 export default function TagCreateV8() {
@@ -46,6 +47,8 @@ export default function TagCreateV8() {
 }
 
 function TagCreate() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('タグを作る')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }])
   const router = useRouter()
@@ -181,15 +184,17 @@ function TagCreate() {
         router.push(`/tags?highlight=${created.data.tag.id}`)
       }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure) setError(reason instanceof Error ? reason.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。') }
     } finally {
       setSaving(false)
     }
   }
 
-  if (loading) return <ListState kind="loading" title="複製元を読み込んでいます…" />
+  if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="複製元を読み込んでいます…" /></SaveErrorScope>
 
-  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></SaveErrorScope>
 
   const back = <Link href="/tags" className={styles.backLink}>← タグへ</Link>
   const groupFolders = groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))
@@ -202,7 +207,7 @@ function TagCreate() {
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <CreatePage
         boardId="d9xoI"
         title="タグを作る"
@@ -230,7 +235,7 @@ function TagCreate() {
           </div>
           <label className={styles.field}>
             <span className={styles.label}>タグ名</span>
-            <TextField
+            <SaveErrorField names={["name"]}><TextField
               ref={nameRef}
               aria-label="タグ名"
               invalid={Boolean(nameError)}
@@ -240,14 +245,14 @@ function TagCreate() {
               placeholder="例：定期購入者"
               aria-required="true"
               onChange={(event) => { setName(event.target.value); setNameError('') }}
-            />
+            /></SaveErrorField>
             {nameError ? <p id="tag-name-error" className={styles.fieldError} role="alert">{nameError}</p> : null}
             <DuplicateNameNote duplicates={duplicates} kindLabel="タグ" />
           </label>
           <div className={styles.field}>
             <span className={styles.label} id="tag-new-folder">所属フォルダ</span>
             <span className={styles.selectBox}>
-              <FolderSelect size="full" aria-label="所属フォルダ" value={groupId} onChange={setGroupId} folders={groupFolders} onCreate={canEditFolders && selectedAccountId ? createGroup : undefined} />
+              <SaveErrorField names={["groupId","group_id"]}><FolderSelect size="full" aria-label="所属フォルダ" value={groupId} onChange={setGroupId} folders={groupFolders} onCreate={canEditFolders && selectedAccountId ? createGroup : undefined} /></SaveErrorField>
             </span>
             {foldersFailed ? (
               <div className={styles.inlineRetry}>
@@ -261,7 +266,7 @@ function TagCreate() {
               <span className={styles.switchTitle}>友だち一覧に出す</span>
               <span className={styles.switchNote}>オンにすると、友だち一覧の名前の下にこのタグが出ます</span>
             </span>
-            <Toggle checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" />
+            <SaveErrorField names={["isStarred","is_starred"]}><Toggle checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" /></SaveErrorField>
           </div>
         </section>
 
@@ -290,6 +295,6 @@ function TagCreate() {
         </section>
       </CreatePage>
       <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="入力したタグ" onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }

@@ -68,6 +68,7 @@ import { describeFriendAddFailure } from './failure'
 import { useCursorStack } from './use-cursor-stack'
 import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const KIND_LABELS: Record<FriendAddRuleKind, string> = {
   first_time: 'はじめて友だち追加した人',
@@ -181,6 +182,8 @@ export default function FriendAddListV8() {
 }
 
 function FriendAddList() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('友だち追加時の配信')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -254,16 +257,19 @@ function FriendAddList() {
       }
       setData(response.data)
     } catch (caught) {
+
+
       if (requestId !== requestSequence.current) return
+      const fieldFailure = saveErrors.capture(caught)
       // 権限・対象なし・重複を「通信を確認して」にまとめない。
       const failure = describeFriendAddFailure(caught, '友だち追加時の配信', 'load')
-      setError(failure.message)
+      { if (!fieldFailure) setError(failure.message) }
       setErrorStatus(failure.status)
       setData(null)
     } finally {
       if (requestId === requestSequence.current) setLoading(false)
     }
-  }, [appliedSearch, cursor, folder, kind, perPage, selectedAccountId, statusFilter])
+  }, [appliedSearch, cursor, folder, kind, perPage, selectedAccountId, statusFilter, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -340,7 +346,9 @@ function FriendAddList() {
       setFolderDialogOpen(false)
       await load()
     } catch (caught) {
-      setFolderError(describeFriendAddFailure(caught, 'フォルダ', 'create').message)
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setFolderError(describeFriendAddFailure(caught, 'フォルダ', 'create').message) }
     } finally {
       setFolderBusy(false)
     }
@@ -373,11 +381,13 @@ function FriendAddList() {
       const res = await api.friendAddRules.reorder(selectedAccountId, kind, order)
       if (!res.success) throw new Error(res.error)
     } catch (caught) {
-      setActionError(
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setActionError(
         caught instanceof Error && caught.message
           ? `並び替えを保存できませんでした。${caught.message}`
           : '並び替えを保存できませんでした。状態を読み直してから、もう一度お試しください。',
-      )
+      ) }
     } finally {
       void load()
     }
@@ -430,8 +440,10 @@ function FriendAddList() {
       }
       setStopTarget(null)
       await load()
-    } catch {
-      setStopError('止められませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setStopError('止められませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setStopBusy(false)
     }
@@ -458,7 +470,9 @@ function FriendAddList() {
       if (requestedDeleteId) samePageUrl.replace(`/friend-add-settings?kind=${kind}`)
       await load()
     } catch (caught) {
-      setDeleteError(describeFriendAddFailure(caught, '設定', 'delete').message)
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setDeleteError(describeFriendAddFailure(caught, '設定', 'delete').message) }
     } finally {
       setDeleteBusy(false)
     }
@@ -550,7 +564,7 @@ function FriendAddList() {
   ) : null
   const folderSelect = (
     <div className={styles.folderSelect}>
-      <Select
+      <SaveErrorField names={["folder","activeId"]}><Select
         size="standard"
         aria-label="フォルダで絞り込む"
         value={folder ?? ''}
@@ -559,7 +573,7 @@ function FriendAddList() {
           { value: '', label: 'フォルダ：すべて' },
           ...folders.map((entry) => ({ value: entry.key, label: `フォルダ：${entry.name}` })),
         ]}
-      />
+      /></SaveErrorField>
     </div>
   )
   const searchBox = (
@@ -806,7 +820,7 @@ function FriendAddList() {
   ) : null
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       help={ORDER_NOTE}
       boardId={canEdit ? 'MRhef' : 'LEwkJ'}
       headingSize="regular"
@@ -934,6 +948,6 @@ function FriendAddList() {
       </>}
     >
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

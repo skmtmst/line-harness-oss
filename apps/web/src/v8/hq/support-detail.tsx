@@ -35,6 +35,7 @@ import {
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
 import styles from './support-detail.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -214,7 +215,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
 
               <div className={styles.compose}>
                 <label htmlFor={`${uid}-body`} className={styles.composeTitle}>続きを送る</label>
-                <TextArea
+                <SaveErrorField names={["body"]}><TextArea
                   id={`${uid}-body`}
                   value={body}
                   onChange={(event) => { setBody(event.target.value); setNotice('') }}
@@ -222,7 +223,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                   maxLength={SUPPORT_BODY_MAX}
                   disabled={sending}
                   className={styles.textarea}
-                />
+                /></SaveErrorField>
                 {attachments.length > 0 ? (
                   <ul className={styles.thumbs}>
                     {attachments.map((a, i) => (

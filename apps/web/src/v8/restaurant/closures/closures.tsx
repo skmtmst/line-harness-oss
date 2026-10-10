@@ -29,6 +29,7 @@ import {
   scopeText, shiftMonth, statusLine, tablesText, tasksFor, timeText, upcoming,
 } from './format'
 import styles from './closures.module.css'
+import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 
 type MediaLink = { code: string; name: string; loginUrl: string | null; closeOnBooking: boolean }
 
@@ -64,6 +65,8 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   dialog: ClosureDialogTarget | null
   onDialog: (target: ClosureDialogTarget | null) => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const store = ctx.store
   const storeId = ctx.selectedStoreId
@@ -180,7 +183,9 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
       await restaurantTestApi.completeChannelCloseTask(accountId, task.id)
       notifyToast(`${nameOf(task.channel)}の枠を閉じた印を付けました。`)
     } catch (caught) {
-      notifyToast(describeSaveFailure(caught), { tone: 'error' })
+      const fieldFailure = saveErrors.capture(caught)
+
+      if (!fieldFailure) { notifyToast(describeSaveFailure(caught), { tone: 'error' }) }
     } finally {
       await loadTasks()
       setBusy('')
@@ -234,14 +239,14 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   }
 
   if (loadError !== null && closures === null) {
-    return <div className={styles.state}><ListState kind="error" error={loadError} onRetry={() => void loadClosures()} /></div>
+    return <SaveErrorScope errors={saveErrors}><div className={styles.state}><ListState kind="error" error={loadError} onRetry={() => void loadClosures()} /></div></SaveErrorScope>
   }
 
   const weeks = monthWeeks(month)
   const closeMedia = media.filter((m) => m.closeOnBooking)
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       {first && firstItem ? (
         <div className={styles.bandRow}>
           <div className={styles.band} role="status" data-closure-band="">
@@ -430,6 +435,6 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
         onConfirm={() => void remove()}
         onCancel={() => setRemoving(null)}
       />
-    </>
+    </></SaveErrorScope>
   )
 }

@@ -18,6 +18,7 @@ import { TextField } from '@/components/shared/text-field'
 import { formatNumber } from '@/lib/format'
 import { Folder, LayoutGrid, List as ListIcon, LogIn, Plus, Settings } from 'lucide-react'
 import './readonly-v8.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 type TagFilter = string | null
@@ -96,6 +97,8 @@ export default function AccountBrowser({
   /** タグの追加・削除のあとに一覧を読み直す。 */
   onChanged: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [tag, setTag] = useState<TagFilter>(null)
@@ -172,7 +175,9 @@ export default function AccountBrowser({
       if (list.success) setTags(list.data)
       onChanged()
     } catch (caught) {
-      setTagError(caught instanceof Error ? caught.message : 'タグを追加できませんでした')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setTagError(caught instanceof Error ? caught.message : 'タグを追加できませんでした') }
     } finally {
       setTagSaving(false)
     }
@@ -190,7 +195,9 @@ export default function AccountBrowser({
       setDeleteTagId(null)
       onChanged()
     } catch (caught) {
-      setTagError(caught instanceof Error ? caught.message : 'タグを消せませんでした')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setTagError(caught instanceof Error ? caught.message : 'タグを消せませんでした') }
     } finally { setTagSaving(false) }
   }
 
@@ -224,7 +231,7 @@ export default function AccountBrowser({
   }
 
   return (
-    <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
+    <SaveErrorScope errors={saveErrors}><div className="flex flex-col gap-4 xl:flex-row xl:items-start">
       <div className="flex w-full shrink-0 flex-col gap-3 xl:w-56">
         <Button href="/accounts/new" variant="primary">
           <Plus aria-hidden="true" className="h-4 w-4" />アカウントを登録
@@ -296,7 +303,7 @@ export default function AccountBrowser({
               <ListIcon aria-hidden="true" className="h-4 w-4" />
             </button>
           </div>
-          <Select
+          <SaveErrorField names={["sort"]}><Select
             aria-label="アカウントの並び順"
             value={sort}
             onChange={(value) => { setSort(value); resetPage() }}
@@ -305,14 +312,14 @@ export default function AccountBrowser({
               { value: 'name', label: '並び：名前順' },
               { value: 'display', label: '並び：登録順' },
             ]}
-          />
-          <Select
+          /></SaveErrorField>
+          <SaveErrorField names={["size"]}><Select
             aria-label="アカウントの表示件数"
             value={String(size)}
             size="page-size"
             onChange={(value) => { setSize(Number(value)); resetPage() }}
             options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value}件表示` }))}
-          />
+          /></SaveErrorField>
         </div>
 
         {shown.length === 0 ? (
@@ -415,7 +422,7 @@ export default function AccountBrowser({
       >
         <div className="flex flex-col gap-1.5">
           <label htmlFor="hq-account-tag-name" className="text-label font-medium text-ink">タグの名前</label>
-          <TextField
+          <SaveErrorField names={["tagName","tag_name"]}><TextField
             id="hq-account-tag-name"
             value={tagName}
             maxLength={100}
@@ -423,13 +430,13 @@ export default function AccountBrowser({
             placeholder="例: 渋谷エリア"
             onChange={(event) => setTagName(event.target.value)}
             className="w-full"
-          />
-          <Select aria-label="タグの色" value={tagColor} onChange={setTagColor} disabled={tagSaving} options={[{value:'',label:'なし'},{value:'--color-status-info',label:'青'},{value:'--color-accent-deep',label:'緑'},{value:'--color-status-warn-deep',label:'橙'},{value:'--color-status-danger',label:'赤'},{value:'--color-chip-alt',label:'紫'}]} />
+          /></SaveErrorField>
+          <SaveErrorField names={["tagColor","tag_color"]}><Select aria-label="タグの色" value={tagColor} onChange={setTagColor} disabled={tagSaving} options={[{value:'',label:'なし'},{value:'--color-status-info',label:'青'},{value:'--color-accent-deep',label:'緑'},{value:'--color-status-warn-deep',label:'橙'},{value:'--color-status-danger',label:'赤'},{value:'--color-chip-alt',label:'紫'}]} /></SaveErrorField>
           {tags.map(item => <div key={item.id} className="flex items-center justify-between gap-2 text-label"><span>{item.name}</span>{deleteTagId === item.id ? <div className="flex gap-2"><span>消しますか？</span><Button size="compact" disabled={tagSaving} onClick={() => void removeTag(item.id)}>消す</Button><Button size="compact" onClick={() => setDeleteTagId(null)}>やめる</Button></div> : <Button size="compact" disabled={tagSaving} onClick={() => setDeleteTagId(item.id)}>削除</Button>}</div>)}
           {tagError ? <p className="text-label text-danger" role="alert">{tagError}</p> : null}
         </div>
       </Dialog>
-    </div>
+    </div></SaveErrorScope>
   )
 }
 

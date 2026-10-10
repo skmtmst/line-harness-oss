@@ -34,6 +34,7 @@ import { scenarioReferenceData } from '@/components/scenarios/scenario-reference
 import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs'
 import { shortDateTime } from '@/lib/hq-banners'
 import { formatNumber } from '@/lib/format'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -591,7 +592,7 @@ export default function ScenarioResultsV8() {
               手元の表示中ページだけを絞ると、総件数と食い違う。
             */}
             <div className={styles.filterRow}>
-              <Select
+              <SaveErrorField names={["subscriptionStatus","status","subscription_status"]}><Select
                 size="page-size"
                 value={subscriptionStatus}
                 onChange={(value) => setSubscriptionStatus(value)}
@@ -603,7 +604,7 @@ export default function ScenarioResultsV8() {
                   { value: 'paused', label: '停止中' },
                   { value: 'completed', label: '完了' },
                 ]}
-              />
+              /></SaveErrorField>
               {runs ? (
                 <span className="text-ink-faint text-xs tabular-nums">
                   {formatNumber(runs.subscriptions.length)} / {formatNumber(runs.pagination.total)}人
@@ -836,7 +837,7 @@ export default function ScenarioResultsV8() {
             </button>
           </p>
         ) : (
-          <Select
+          <SaveErrorField names={["moveScenarioId","move_scenario_id"]}><Select
             value={moveScenarioId}
             disabled={moveOptions === null || moveChoices.length === 0 || opBusy !== null}
             onChange={(value) => setMoveScenarioId(value)}
@@ -853,7 +854,7 @@ export default function ScenarioResultsV8() {
               },
               ...moveChoices.map((item) => ({ value: item.id, label: item.name })),
             ]}
-          />
+          /></SaveErrorField>
         )}
       </Dialog>
     </div>

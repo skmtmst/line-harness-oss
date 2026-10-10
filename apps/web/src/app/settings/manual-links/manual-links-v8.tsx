@@ -15,6 +15,7 @@ import {
 import { useManualLinks } from './use-manual-links'
 import { SettingsShellV8 } from '../settings-nav-v8'
 import styles from '../settings-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
  * マニュアルの正本表の V8 画面（★V8-B `cIdA2`）。
@@ -91,13 +92,13 @@ export function ManualLinksV8() {
 
       <div className={styles.toolbar}>
         <span className={styles.toolbarSearch}>
-          <input
+          <SaveErrorField names={["query"]}><input
             type="search"
             aria-label="画面ID・画面名で検索"
             placeholder="画面ID・画面名で検索"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-          />
+          /></SaveErrorField>
         </span>
         <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>
           すべて
@@ -169,12 +170,12 @@ export function ManualLinksV8() {
                     <Td><span className={styles.urlCell} title={row.name}>{row.name}</span></Td>
                     <Td>
                       {editing ? (
-                        <input
+                        <SaveErrorField names={["editingUrl","editing_url"]}><input
                           className={styles.editInput}
                           aria-label={`${row.name}の公式記事URL`}
                           value={editingUrl}
                           onChange={(event) => setEditingUrl(event.target.value)}
-                        />
+                        /></SaveErrorField>
                       ) : (
                         <span className={`${styles.urlCell} ${row.url ? '' : styles.urlEmpty}`} title={row.url || undefined}>
                           {urlLabel(row.url)}

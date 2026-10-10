@@ -21,6 +21,7 @@ import { describeSaveFailure, webinarApi, type WebinarFolder } from '@/lib/api'
 import { BackLink, WizardSteps } from './chrome'
 import { folderById, folderCreator } from '@/components/shared/folder-select'
 import { BasicForm, BasicPreview, SLUG_PATTERN, type BasicValues } from './basic-form'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const FOLDERS_BLOCKED = 'フォルダを読み込めていないため、下書きを保存できません。フォルダをもう一度読み込んでください。'
 const TITLE_EMPTY = 'ウェビナー名を入力してください'
@@ -44,6 +45,8 @@ export default function WebinarNewV8() {
 }
 
 function NewInner() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('ウェビナー')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -73,12 +76,13 @@ function NewInner() {
       setFolders(response.data)
       setFolderState('ready')
       setError((previous) => (previous === FOLDERS_BLOCKED ? null : previous))
-    } catch {
+    } catch (saveFailure) {
       if (request !== folderRequest.current) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       setFolders([])
-      setFolderState('error')
+      { if (!fieldFailure) setFolderState('error') }
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
   useEffect(() => {
     void loadFolders()
     return () => { folderRequest.current += 1 }
@@ -116,7 +120,9 @@ function NewInner() {
       })
       router.push(next === 'video' ? `/webinars/edit?id=${created.data.id}&pane=video` : '/webinars')
     } catch (cause) {
-      setError(describeSaveFailure(cause))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure) setError(describeSaveFailure(cause)) }
       savingRef.current = false
       setSaving(false)
     }
@@ -127,7 +133,7 @@ function NewInner() {
   const accountName = selectedAccount?.displayName ?? selectedAccount?.name ?? '公式アカウント'
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <CreatePage
         boardId="j7PP04"
         title="ウェビナーを作る"
@@ -169,6 +175,6 @@ function NewInner() {
         />}
       </CreatePage>
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }

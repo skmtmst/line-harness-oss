@@ -21,6 +21,7 @@ import { restaurantTestApi, type RestaurantLineFlow, type RestaurantStore } from
 import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
 import { Panel, StatRow } from '../common-a/parts'
 import styles from './line-followup.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /** 数の並びに出す4種（本物の flow_type）と、カードの頭の名前。 */
 const FLOW_KINDS: Record<string, { stat: string; note: string; title: string }> = {
@@ -60,13 +61,13 @@ function FlowCard({ flow, store, ctx, readOnly }: { flow: RestaurantLineFlow; st
         <div className={styles.form}>
           <label className={styles.field}>
             <span className={styles.label}>タイトル</span>
-            <TextField value={title} onChange={(event) => setTitle(event.target.value)} readOnly={readOnly} />
+            <SaveErrorField names={["title"]}><TextField value={title} onChange={(event) => setTitle(event.target.value)} readOnly={readOnly} /></SaveErrorField>
           </label>
           <label className={styles.field}>
             <span className={styles.label}>本文</span>
             {/* 絵の本文の枠は高さ56で文を上下の中央に置く。枠は外の箱が持ち、文の高さは中身なり。 */}
             <span className={styles.bodyBox} onClick={() => bodyRef.current?.focus()}>
-              <textarea ref={bodyRef} value={body} onChange={(event) => setBody(event.target.value)} rows={1} readOnly={readOnly} className={styles.bodyInput} />
+              <SaveErrorField names={["body"]}><textarea ref={bodyRef} value={body} onChange={(event) => setBody(event.target.value)} rows={1} readOnly={readOnly} className={styles.bodyInput} /></SaveErrorField>
             </span>
           </label>
           <div className={styles.flowFoot}>

@@ -37,6 +37,7 @@ import { resendSuppressionText } from '@/v8/friend-add/text'
 import { actionSummaryText, blockedReason, canPublish, firstSendText, idempotencyKeyFor, PUBLISH_STEPS, editStepHref } from './flow'
 import FriendAddDoneV8 from './done'
 import styles from './publish.module.css'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type Phase = 'loading' | 'ready' | 'empty' | 'error' | 'forbidden' | 'missing'
 type RuleDetail = {
@@ -59,6 +60,8 @@ function slackOf(detail: RuleDetail | null): boolean | null {
 }
 
 function FriendAddPublish() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('初回案内を作る')
   usePageCrumbs([{ label: '友だち追加時の配信', href: '/friend-add-settings' }])
   const router = useRouter()
@@ -156,20 +159,23 @@ function FriendAddPublish() {
         if (!isCurrent()) return
         setPhase('ready')
       } catch (caught) {
+
+
         if (!isCurrent()) return
+        const fieldFailure = saveErrors.capture(caught)
         // 404 は「確認する下書きがない」。失敗と混ぜない。
         if (caught instanceof ApiError && caught.status === 404) { setPhase('empty'); return }
         if (caught instanceof ApiError && caught.status === 403) {
-          setFailure({ title: 'この設定を公開する権限がありません', description: '見るには権限が要ります。オーナーか管理者に追加を依頼してください。' })
+          { if (!fieldFailure) setFailure({ title: 'この設定を公開する権限がありません', description: '見るには権限が要ります。オーナーか管理者に追加を依頼してください。' }) }
           setPhase('forbidden')
           return
         }
-        setFailure({ title: '下書きを読み込めませんでした', description: '時間をおいて読み直してください。' })
+        { if (!fieldFailure) setFailure({ title: '下書きを読み込めませんでした', description: '時間をおいて読み直してください。' }) }
         setPhase('error')
       }
     })()
     return () => { alive = false }
-  }, [ruleId, selectedAccountId, reloadKey, readChecks])
+  }, [ruleId, selectedAccountId, reloadKey, readChecks, saveErrors])
 
   /** テストする（送らずに判定）。本番の登録・タグ・マイルは変えない。終わったら確認を読み直す。 */
   const runTest = async () => {
@@ -198,8 +204,10 @@ function FriendAddPublish() {
         setDetail(next)
         await readChecks(at.accountId, next.rule, stillHere)
       }
-    } catch {
-      if (stillHere()) setError('テストを実行できませんでした。時間をおいて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      if (stillHere()) { if (!fieldFailure) setError('テストを実行できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       if (stillHere()) setTesting(false)
     }
@@ -219,10 +227,13 @@ function FriendAddPublish() {
       if (!res.success) throw new Error('failed')
       setPublished({ ruleName: rule.name, routeNames: rule.routeNames, priority: rule.priority, slackConnected: slackOf(detail) })
     } catch (caught) {
+
+
       if (!stillHere()) return
-      setError(caught instanceof ApiError && caught.status === 403
+      const fieldFailure = saveErrors.capture(caught)
+      { if (!fieldFailure) setError(caught instanceof ApiError && caught.status === 403
         ? 'この設定を公開する権限がありません。オーナーか管理者に依頼してください。'
-        : '有効化できませんでした。状態を読み直してから、もう一度お試しください。')
+        : '有効化できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       if (stillHere()) setBusy(false)
     }
@@ -234,31 +245,31 @@ function FriendAddPublish() {
     router.push('/friend-add-settings')
   }
 
-  if (phase === 'loading') return <ListState kind="loading" title="設定を読み込んでいます" />
+  if (phase === 'loading') return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="設定を読み込んでいます" /></SaveErrorScope>
   if (phase === 'forbidden') {
-    return <ListState kind="forbidden" title={failure?.title} description={failure?.description} action={<Button href="/friend-add-settings">設定へ戻る</Button>} />
+    return <SaveErrorScope errors={saveErrors}><ListState kind="forbidden" title={failure?.title} description={failure?.description} action={<Button href="/friend-add-settings">設定へ戻る</Button>} /></SaveErrorScope>
   }
   if (phase === 'missing') {
-    return <TargetMissing kind="unspecified" title="公開する下書きが指定されていません" description="一覧から、公開する下書きを選び直してください。" backHref="/friend-add-settings" backLabel="設定へ戻る" />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="unspecified" title="公開する下書きが指定されていません" description="一覧から、公開する下書きを選び直してください。" backHref="/friend-add-settings" backLabel="設定へ戻る" /></SaveErrorScope>
   }
   if (phase === 'empty') {
-    return <TargetMissing kind="not-found" title="確認する下書きがありません" description="友だち追加時の配信を作ってから、この画面で公開します。" backHref="/friend-add-settings" backLabel="設定へ戻る" />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="not-found" title="確認する下書きがありません" description="友だち追加時の配信を作ってから、この画面で公開します。" backHref="/friend-add-settings" backLabel="設定へ戻る" /></SaveErrorScope>
   }
   if (phase === 'error' || !detail) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="error"
         title={failure?.title ?? '下書きを読み込めませんでした'}
         description={failure?.description ?? '通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'}
         onRetry={() => setReloadKey((key) => key + 1)}
-      />
+      /></SaveErrorScope>
     )
   }
 
   /* 有効にしたあと（e0FD1J）。`?done=1` は作る⑤から有効にして来たとき（読み込んだ設定で出す）。 */
-  if (published) return <FriendAddDoneV8 {...published} ruleId={ruleId} />
+  if (published) return <SaveErrorScope errors={saveErrors}><FriendAddDoneV8 {...published} ruleId={ruleId} /></SaveErrorScope>
   if (searchParams.get('done') === '1' && detail.rule.status === 'published') {
-    return <FriendAddDoneV8 ruleId={ruleId} ruleName={detail.rule.name} routeNames={detail.rule.routeNames} priority={detail.rule.priority} slackConnected={slackOf(detail)} />
+    return <SaveErrorScope errors={saveErrors}><FriendAddDoneV8 ruleId={ruleId} ruleName={detail.rule.name} routeNames={detail.rule.routeNames} priority={detail.rule.priority} slackConnected={slackOf(detail)} /></SaveErrorScope>
   }
 
   const rule = detail.rule
@@ -348,7 +359,7 @@ function FriendAddPublish() {
   )
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       boardId="U8Xm3X"
       title="初回案内を作る"
       steps={(
@@ -467,6 +478,6 @@ function FriendAddPublish() {
       >
         {phone}
       </ConfirmDialog>
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }

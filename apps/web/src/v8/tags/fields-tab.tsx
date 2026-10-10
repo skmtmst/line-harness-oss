@@ -47,6 +47,7 @@ import { FIELD_TYPE_LABELS, destinationLabel, fieldDeletionBlockedReason, knownU
 import styles from './list.module.css'
 
 import type { AttributeListHost } from './attribute-host'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -517,7 +518,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
         </>}
         collapsedFolders={<>
           {createButton(false)}
-          <Select aria-label="フォルダ" width={150} value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} />
+          <SaveErrorField names={["folderFilter","folder_filter"]}><Select aria-label="フォルダ" width={150} value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} /></SaveErrorField>
         </>}
         toolbar={<>
           {/* 案内の帯は道具の段の上（絵：表の列の上だけにかかる）。 */}
@@ -528,7 +529,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
           <span className={narrow ? styles.searchNarrow : styles.search}>
             <SearchField aria-label="項目名で探す" placeholder="項目名で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
           </span>
-          <Select
+          <SaveErrorField names={["type"]}><Select
             aria-label="種類で絞り込む"
             width={119}
             value={type}
@@ -537,7 +538,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
               { value: 'all', label: '種類：すべて' },
               ...(Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]).map((value) => ({ value, label: `種類：${fieldTypeWord(value)}` })),
             ]}
-          />
+          /></SaveErrorField>
           <span className={styles.toolbarSpacer} />
           <PageSizeSelect value={pageSize} onChange={(value) => setPageSize(value || 20)} options={PAGE_SIZES} label={null} />
         </>}

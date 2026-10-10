@@ -35,6 +35,7 @@ import { restaurantTestApi, type RestaurantInventory } from '@/lib/restaurant-te
 import { formatYmdShort } from '../google/google-format'
 import RestaurantShell, { Panel, type RestaurantV8Context } from './shell'
 import styles from './inventory.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type Alloc = { ota: number; line: number; walkin: number }
 
@@ -63,6 +64,8 @@ function slotDateLabel(startsAt: string): string {
 }
 
 function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
+  const saveErrors = useSaveFormErrors()
+
   const { data, store, busy, mutate, reload } = ctx
   const { selectedAccountId } = useAccount()
   const tables = useMemo(
@@ -179,6 +182,8 @@ function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
       try {
         await restaurantTestApi.saveInventoryAllocation(selectedAccountId, { storeId: store!.id, slots: allocVersions || rows.map(r => ({ id: r.id, expectedVersion: r.version! })), otaCapacity: attempt.ota, lineCapacity: attempt.line, walkInCapacity: attempt.walkin })
       } catch (err) {
+        saveErrors.capture(err)
+
         if (err instanceof ApiError && err.status === 409) {
           await reload()
           setConflict({ rowId: null, attempted: attempt, scope: '全部の時間帯' })
@@ -196,6 +201,8 @@ function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
       try {
         await restaurantTestApi.updateInventory(selectedAccountId, selected.row.id, { otaCapacity: attempt.ota, lineCapacity: attempt.line, walkInCapacity: attempt.walkin, expectedVersion: slotVersion ?? selected.row.version })
       } catch (err) {
+        saveErrors.capture(err)
+
         if (err instanceof ApiError && err.status === 409) {
           await reload()
           setConflict({ rowId: selected.row.id, attempted: attempt, scope: `${selected.time}の時間帯` })
@@ -232,8 +239,8 @@ function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const bestTable = freeTables.slice().sort((a, b) => b.max_capacity - a.max_capacity)[0] ?? null
 
   return (
-    <>
-      <label className={styles.field}>在庫の日付<input type="date" aria-label="在庫の日付" value={date} disabled={busy} onChange={e => { setDate(e.target.value); setAllocOverride(null); setAllocVersions(null); setSlotAlloc(null); setSlotVersion(undefined) }} /></label>
+    <SaveErrorScope errors={saveErrors}><>
+      <label className={styles.field}>在庫の日付<SaveErrorField names={["date"]}><input type="date" aria-label="在庫の日付" value={date} disabled={busy} onChange={e => { setDate(e.target.value); setAllocOverride(null); setAllocVersions(null); setSlotAlloc(null); setSlotVersion(undefined) }} /></SaveErrorField></label>
       {loadError ? <Notice tone="warn">{loadError}<Button onClick={() => setRefresh(n=>n+1)}>再読込</Button></Notice> : null}
       <p className={styles.infoBand}>ここは「席（卓）」に対して受ける予約の枠です。担当スタッフなど「人」に対して受ける予約は、予約設定（メニュー・受付枠・担当スタッフ）で決めます。</p>
       {conflict ? (
@@ -280,13 +287,13 @@ function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
       >
         <p>閉じた媒体に印を付けてください。媒体への書き戻しはしていません（検証環境は受信専用）。閉じた記録はこの画面だけで残します。</p>
         {['Hot Pepper', '食べログ', 'ぐるなび'].map((channel) => (
-          <Checkbox
+          <SaveErrorField names={["channel","closedChannels","closed_channels"]} key={channel}><Checkbox
             key={channel}
             checked={closedChannels.includes(channel)}
             onCheckedChange={(checked) => setClosedChannels((current) => (checked ? [...current, channel] : current.filter((item) => item !== channel)))}
           >
             {channel}を閉じた
-          </Checkbox>
+          </Checkbox></SaveErrorField>
         ))}
       </Dialog>
       <Dialog
@@ -320,13 +327,13 @@ function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
             </div>
             <div className={styles.allocGrid}>
               <label className={styles.field}>OTA（予約媒体）
-                <input type="number" min={0} aria-label="OTA（予約媒体）" value={alloc.ota} onChange={(event) => updateAlloc({ ...alloc, ota: Number(event.target.value) })} className={styles.numberInput} />
+                <SaveErrorField names={["ota","alloc.ota","otaCapacity"]}><input type="number" min={0} aria-label="OTA（予約媒体）" value={alloc.ota} onChange={(event) => updateAlloc({ ...alloc, ota: Number(event.target.value) })} className={styles.numberInput} /></SaveErrorField>
               </label>
               <label className={styles.field}>LINE専用
-                <input type="number" min={0} aria-label="LINE専用" value={alloc.line} onChange={(event) => updateAlloc({ ...alloc, line: Number(event.target.value) })} className={styles.numberInput} />
+                <SaveErrorField names={["line","alloc.line","lineCapacity"]}><input type="number" min={0} aria-label="LINE専用" value={alloc.line} onChange={(event) => updateAlloc({ ...alloc, line: Number(event.target.value) })} className={styles.numberInput} /></SaveErrorField>
               </label>
               <label className={styles.field}>当日（ウォークイン）
-                <input type="number" min={0} aria-label="当日（ウォークイン）" value={alloc.walkin} onChange={(event) => updateAlloc({ ...alloc, walkin: Number(event.target.value) })} className={styles.numberInput} />
+                <SaveErrorField names={["walkin","alloc.walkin","walkInCapacity"]}><input type="number" min={0} aria-label="当日（ウォークイン）" value={alloc.walkin} onChange={(event) => updateAlloc({ ...alloc, walkin: Number(event.target.value) })} className={styles.numberInput} /></SaveErrorField>
               </label>
               <span className={styles.field}>店頭・電話
                 <span className={styles.remainder}>{remainder}（残り）</span>
@@ -338,8 +345,8 @@ function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
             {hoursDraft ? hoursDraft.map(day => <div key={day.weekday} className={styles.slotGrid}>
               <strong>{['日','月','火','水','木','金','土'][day.weekday]}</strong>
               {day.periods.map((period, index) => <div key={index}>
-                <input type="time" aria-label={`${day.weekday}曜日 ${index+1}開始`} value={period.opensAt} onChange={e => setHoursDraft(hoursDraft.map(d => d.weekday===day.weekday ? { ...d, periods:d.periods.map((p,i)=>i===index?{...p,opensAt:e.target.value}:p) }:d))} />
-                〜<input type="time" aria-label={`${day.weekday}曜日 ${index+1}終了`} value={period.closesAt} onChange={e => setHoursDraft(hoursDraft.map(d => d.weekday===day.weekday ? { ...d, periods:d.periods.map((p,i)=>i===index?{...p,closesAt:e.target.value}:p) }:d))} />
+                <SaveErrorField names={[`periods.${index}.opensAt`,`periods.${index}.opens_at`,"opensAt","period.opensAt","hoursDraft","opens_at","period.opens_at","hours","hours_draft"]}><input type="time" aria-label={`${day.weekday}曜日 ${index+1}開始`} value={period.opensAt} onChange={e => setHoursDraft(hoursDraft.map(d => d.weekday===day.weekday ? { ...d, periods:d.periods.map((p,i)=>i===index?{...p,opensAt:e.target.value}:p) }:d))} /></SaveErrorField>
+                〜<SaveErrorField names={[`periods.${index}.closesAt`,`periods.${index}.closes_at`,"closesAt","period.closesAt","hoursDraft","closes_at","period.closes_at","hours","hours_draft"]}><input type="time" aria-label={`${day.weekday}曜日 ${index+1}終了`} value={period.closesAt} onChange={e => setHoursDraft(hoursDraft.map(d => d.weekday===day.weekday ? { ...d, periods:d.periods.map((p,i)=>i===index?{...p,closesAt:e.target.value}:p) }:d))} /></SaveErrorField>
                 <Button size="compact" onClick={() => setHoursDraft(hoursDraft.map(d=>d.weekday===day.weekday?{...d,periods:d.periods.filter((_,i)=>i!==index)}:d))}>時間帯を外す</Button>
               </div>)}
               <Button size="compact" onClick={() => setHoursDraft(hoursDraft.map(d=>d.weekday===day.weekday?{...d,periods:[...d.periods,{opensAt:'17:00',closesAt:'22:00'}]}:d))}>時間帯を足す</Button>
@@ -350,7 +357,9 @@ function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
                 if (!selectedAccountId || !store || !hoursDraft) return
                 void mutate(async () => {
                   try { const res=await restaurantTestApi.saveOpeningHours(selectedAccountId,{storeId:store.id,hours:hoursDraft,expectedVersion:hoursVersion}); setHoursVersion(res.data.version); setOpening({...opening!,hours:hoursDraft,version:res.data.version}); setHoursError('') }
-                  catch(err) { if(err instanceof ApiError && err.status===409) setHoursError('ほかの担当者が先に営業時間を保存しました。最新と比べてから保存してください。'); throw err }
+                  catch(err) {
+                    const fieldFailure = saveErrors.capture(err)
+ if(err instanceof ApiError && err.status===409) { if (!fieldFailure) setHoursError('ほかの担当者が先に営業時間を保存しました。最新と比べてから保存してください。'); } throw err }
                 },'週の営業時間を保存しました。')
               }}>営業時間を保存</Button>
               <Button disabled={busy || !opening} onClick={() => {
@@ -396,13 +405,13 @@ function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
               <h2 className={styles.slotBoxTitle}>行を押したときと：{selected.time}の配分だけ直す</h2>
               <div className={styles.slotGrid}>
                 <label className={styles.field}>OTA（予約媒体）
-                  <input type="number" min={0} aria-label={`${selected.time}のOTA`} value={currentSlotAlloc.ota} onChange={(event) => updateSlot({ ...currentSlotAlloc, ota: Number(event.target.value) })} className={styles.numberInput} />
+                  <SaveErrorField names={["ota","currentSlotAlloc.ota","current_slot_alloc.ota"]}><input type="number" min={0} aria-label={`${selected.time}のOTA`} value={currentSlotAlloc.ota} onChange={(event) => updateSlot({ ...currentSlotAlloc, ota: Number(event.target.value) })} className={styles.numberInput} /></SaveErrorField>
                 </label>
                 <label className={styles.field}>LINE専用
-                  <input type="number" min={0} aria-label={`${selected.time}のLINE`} value={currentSlotAlloc.line} onChange={(event) => updateSlot({ ...currentSlotAlloc, line: Number(event.target.value) })} className={styles.numberInput} />
+                  <SaveErrorField names={["line","currentSlotAlloc.line","current_slot_alloc.line"]}><input type="number" min={0} aria-label={`${selected.time}のLINE`} value={currentSlotAlloc.line} onChange={(event) => updateSlot({ ...currentSlotAlloc, line: Number(event.target.value) })} className={styles.numberInput} /></SaveErrorField>
                 </label>
                 <label className={styles.field}>当日（ウォークイン）
-                  <input type="number" min={0} aria-label={`${selected.time}の当日`} value={currentSlotAlloc.walkin} onChange={(event) => updateSlot({ ...currentSlotAlloc, walkin: Number(event.target.value) })} className={styles.numberInput} />
+                  <SaveErrorField names={["walkin","currentSlotAlloc.walkin","current_slot_alloc.walkin"]}><input type="number" min={0} aria-label={`${selected.time}の当日`} value={currentSlotAlloc.walkin} onChange={(event) => updateSlot({ ...currentSlotAlloc, walkin: Number(event.target.value) })} className={styles.numberInput} /></SaveErrorField>
                 </label>
               </div>
               <div className={styles.slotActions}>
@@ -451,7 +460,7 @@ function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
       <StickyBar
         actions={<><Button onClick={resetAll}>キャンセル</Button><Button variant="primary" disabled={busy || allocInvalid || rows.length === 0} onClick={saveAll}>配分を保存</Button></>}
       />
-    </>
+    </></SaveErrorScope>
   )
 }
 

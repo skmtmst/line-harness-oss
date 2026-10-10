@@ -33,11 +33,14 @@ import { createPageReturnHref } from '@/components/shared/create-page'
 import { PhoneStaffStep, priceLabel } from './phone'
 import layout from './layout.module.css'
 import styles from './staff-new.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /** 一度に見せるメニューの数。残りは「ほかのメニュー」で開く（1行に収める）。 */
 const MENU_FOLD = 4
 
 export default function StaffNewV8() {
+  const saveErrors = useSaveFormErrors()
+
   const { selectedAccountId, selectedAccount } = useAccount()
   const router = useRouter()
   // /booking/staff/new はメニューの接頭辞に当たらず上部バーが空になるため、画面名を明示する。
@@ -252,8 +255,9 @@ export default function StaffNewV8() {
           staffId,
           menus.map((m) => ({ menu_id: m.id, is_offered: offered.has(m.id), override_duration_minutes: null, override_price: null })),
         )
-      } catch {
+      } catch (saveFailure) {
         if (!current()) return
+        saveErrors.capture(saveFailure)
         setCreatedStaffId(staffId)
         throw new Error('スタッフは登録できましたが、担当メニューの設定に失敗しました。入力は残っています。「割当をやり直す」を押してください。')
       }
@@ -262,10 +266,13 @@ export default function StaffNewV8() {
       createdInput.current = null
       router.push(createPageReturnHref('/booking/menus?tab=staff', staffId))
     } catch (e) {
+
+
       if (!current()) return
-      setSaveError(e instanceof Error && e.message && !/^API error: /.test(e.message)
+      const fieldFailure = saveErrors.capture(e)
+      { if (!fieldFailure) setSaveError(e instanceof Error && e.message && !/^API error: /.test(e.message)
         ? e.message
-        : 'スタッフを登録できませんでした。入力は残っています。もう一度お試しください。')
+        : 'スタッフを登録できませんでした。入力は残っています。もう一度お試しください。') }
     } finally {
       if (current()) setSaving(false)
     }
@@ -278,7 +285,7 @@ export default function StaffNewV8() {
 
   if (!canManageStaff) {
     return (
-      <div ref={formRef} className={layout.shell} data-design-node="CcA4k">
+      <SaveErrorScope errors={saveErrors}><div ref={formRef} className={layout.shell} data-design-node="CcA4k">
         <div className={styles.denied}>
           <ListState
             kind="error"
@@ -286,7 +293,7 @@ export default function StaffNewV8() {
             description="予約スタッフの登録は、予約設定の権限を持つログインユーザーだけが実行できます。管理者へ権限の確認を依頼してください。"
           />
         </div>
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
@@ -316,7 +323,7 @@ export default function StaffNewV8() {
   const memberLabel = (m: StaffMember) => `${m.name}${m.email ? `（${m.email}）` : ''}`
 
   return (
-    <div ref={formRef} className={layout.shell} data-design-node="CcA4k">
+    <SaveErrorScope errors={saveErrors}><div ref={formRef} className={layout.shell} data-design-node="CcA4k">
       <header className={layout.head} data-design="Head">
         <h1 className={layout.title}>予約スタッフを登録</h1>
         <p className={layout.desc}>お客さまが予約するときに指名できる担当者を登録します。</p>
@@ -331,7 +338,7 @@ export default function StaffNewV8() {
             <div className={styles.grid}>
               <div className={layout.field}>
                 <label htmlFor="bs-name" className={layout.label}>スタッフ名（管理画面での呼び名）</label>
-                <input
+                <SaveErrorField names={["name"]}><input
                   id="bs-name"
                   type="text"
                   value={name}
@@ -344,19 +351,19 @@ export default function StaffNewV8() {
                   placeholder="田中 美咲"
                   className={layout.input}
                   aria-invalid={fieldErrors.name !== undefined}
-                />
+                /></SaveErrorField>
                 {fieldErrors.name !== undefined ? <span className={layout.fieldError} role="alert">{fieldErrors.name}</span> : null}
               </div>
               <div className={layout.field}>
                 <label htmlFor="bs-display" className={layout.label}>お客さま向けの表示名（空欄なら上の名前）</label>
-                <input id="bs-display" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.displayName} placeholder="みさき" className={layout.input} />
+                <SaveErrorField names={["displayName","display_name"]}><input id="bs-display" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.displayName} placeholder="みさき" className={layout.input} /></SaveErrorField>
               </div>
               <div className={layout.field}>
                 <label htmlFor="bs-role" className={layout.label}>肩書き</label>
-                <input id="bs-role" type="text" value={role} onChange={(e) => setRole(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.role} placeholder="トリミング担当" className={layout.input} />
+                <SaveErrorField names={["role"]}><input id="bs-role" type="text" value={role} onChange={(e) => setRole(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.role} placeholder="トリミング担当" className={layout.input} /></SaveErrorField>
               </div>
               <div className={layout.field}>
-                <ImageUploader
+                <SaveErrorField names={["imageUrl"]}><ImageUploader
                   mode="url"
                   size="compact"
                   label="顔写真（正方形・1MB まで）"
@@ -364,13 +371,13 @@ export default function StaffNewV8() {
                   maxMB={1}
                   value={imageUrl ? { mode: 'url', url: imageUrl } : null}
                   onChange={(next) => setImageUrl(next?.mode === 'url' ? next.url.slice(0, BOOKING_STAFF_LIMITS.profileImageUrl) : '')}
-                />
+                /></SaveErrorField>
               </div>
             </div>
             <div className={layout.field}>
               <label htmlFor="bs-bio" className={layout.label}>紹介文</label>
               {/* 絵は1行の高さ。改行も書けるよう textarea のまま、下の角で広げられる。 */}
-              <textarea id="bs-bio" rows={1} value={bio} onChange={(e) => setBio(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.bio} placeholder="トリミング歴10年。小型犬が得意です。" className={`${layout.input} ${styles.bio}`} />
+              <SaveErrorField names={["bio"]}><textarea id="bs-bio" rows={1} value={bio} onChange={(e) => setBio(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.bio} placeholder="トリミング歴10年。小型犬が得意です。" className={`${layout.input} ${styles.bio}`} /></SaveErrorField>
             </div>
           </section>
 
@@ -395,9 +402,9 @@ export default function StaffNewV8() {
               <p className={layout.cardNote}>まだメニューがありません。先に予約設定の「メニュー」から登録してください。</p>
             ) : (
               <div className={styles.checkRow} role="group" aria-label="予約を受けられるメニュー" aria-invalid={!!fieldErrors.menus && offered.size === 0} tabIndex={-1}>
-                {shownMenus.map((m) => (
+                {shownMenus.map((m, saveFieldIndex) => (
                   <span key={m.id} className={styles.checkItem} title={`${m.name}（${m.duration_minutes}分・${priceLabel(m)}）`}>
-                    <Checkbox checked={offered.has(m.id)} onCheckedChange={() => toggle(m.id)} className={styles.check}>{m.name}</Checkbox>
+                    <SaveErrorField names={[`shownMenus.${saveFieldIndex}.id`,"id","m.id","menu_id"]}><Checkbox checked={offered.has(m.id)} onCheckedChange={() => toggle(m.id)} className={styles.check}>{m.name}</Checkbox></SaveErrorField>
                   </span>
                 ))}
                 {hiddenMenus > 0 ? (
@@ -419,11 +426,11 @@ export default function StaffNewV8() {
               <span className={styles.switchLabel}>店舗の営業時間に合わせる</span>
             </div>
             <div className={styles.switchRow}>
-              <Toggle label="「指名なし」の枠にも含める" checked={isDesignationOptional} onChange={setIsDesignationOptional} />
+              <SaveErrorField names={["isDesignationOptional","is_designation_optional"]}><Toggle label="「指名なし」の枠にも含める" checked={isDesignationOptional} onChange={setIsDesignationOptional} /></SaveErrorField>
               <span className={styles.switchLabel}>「指名なし」の枠にも含める（お客さまが担当者を選ばなかったときの割り当て先になる）</span>
             </div>
             <div className={styles.switchRow}>
-              <Toggle label="登録したらすぐ予約を受ける" checked={isActive} onChange={setIsActive} />
+              <SaveErrorField names={["isActive","is_active"]}><Toggle label="登録したらすぐ予約を受ける" checked={isActive} onChange={setIsActive} /></SaveErrorField>
               <span className={styles.switchLabel}>登録したらすぐ予約を受ける（オフにすると予約画面に出ません）</span>
             </div>
             <div className={styles.colorRow}>
@@ -459,14 +466,14 @@ export default function StaffNewV8() {
               <div className={layout.field}>
                 <span className={layout.smallLabel} id="bs-member-label">ログインユーザー</span>
                 <span className={styles.selectBox}>
-                  <Select
+                  <SaveErrorField names={["staffMemberId","staff_member_id"]}><Select
                     aria-label="ログインユーザーとの紐づけ"
                     id="bs-member"
                     size="full"
                     value={staffMemberId}
                     onChange={setStaffMemberId}
                     options={[{ value: '', label: '紐づけない' }, ...members.map((m) => ({ value: m.id, label: memberLabel(m) }))]}
-                  />
+                  /></SaveErrorField>
                 </span>
               </div>
             )}
@@ -507,6 +514,6 @@ export default function StaffNewV8() {
       </div>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したスタッフ" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div>
+    </div></SaveErrorScope>
   )
 }

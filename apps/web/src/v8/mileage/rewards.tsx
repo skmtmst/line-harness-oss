@@ -46,6 +46,7 @@ import { CreateButton, MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const KIND_LABEL: Record<MileageRewardKind, string> = {
   coupon: 'クーポン',
@@ -130,6 +131,8 @@ const PRESETS: Array<{ value: string; label: string }> = [
 ]
 
 export default function RewardsTab() {
+  const saveErrors = useSaveFormErrors()
+
   const { readonly, narrow, setCount } = useMileageShell()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const accountId = selectedAccountId
@@ -193,11 +196,14 @@ export default function RewardsTab() {
       setLoadedAccountId(accountId)
       setStatus('ready')
     } catch (reason) {
+
+
       if (request !== requestRef.current) return
+      saveErrors.capture(reason)
       setRewards([])
       setStatus(reason instanceof Error && reason.message === 'forbidden' ? 'forbidden' : 'error')
     }
-  }, [accountId])
+  }, [accountId, saveErrors])
 
   useEffect(() => {
     if (accountLoading) return
@@ -232,13 +238,15 @@ export default function RewardsTab() {
       setRedemptionsVisible(true)
       setRedemptionsLoad('ready')
     } catch (reason) {
+      saveErrors.capture(reason)
+
       setFailed([])
       setRedemptionsVisible(true)
       setRedemptionsTotal(0)
       const forbidden = reason instanceof ApiError && (reason.status === 403 || reason.code === 'forbidden')
       setRedemptionsLoad(forbidden ? 'forbidden' : 'error')
     }
-  }, [accountId])
+  }, [accountId, saveErrors])
 
   useEffect(() => {
     void loadFailed(redemptionsPage)
@@ -275,8 +283,10 @@ export default function RewardsTab() {
       }
       await loadFailed(redemptionsPage)
       await load()
-    } catch {
-      setRetryError('やり直せませんでした。時間をおいてもう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setRetryError('やり直せませんでした。時間をおいてもう一度お試しください。') }
       await loadFailed(redemptionsPage)
     } finally {
       setRetryingId(null)
@@ -308,15 +318,17 @@ export default function RewardsTab() {
         if (saved && typeof saved === 'object' && saved.id === reward.id) {
           setRewards((current) => current.map((item) => (item.id === reward.id ? { ...item, ...saved } : item)))
         }
-      } catch {
+      } catch (saveFailure) {
+        const fieldFailure = saveErrors.capture(saveFailure)
+
         setStatus(before)
-        notifyToast(before === 'published'
+        { if (!fieldFailure) notifyToast(before === 'published'
           ? `「${reward.name}」を止められませんでした。元に戻しました。`
           : `「${reward.name}」をまた出せませんでした。元に戻しました。`, {
           tone: 'error',
           actionLabel: 'もう一度',
           onAction: () => { void changeState({ ...reward, status: before }) },
-        })
+        }) }
       } finally {
         setBusyId(null)
       }
@@ -333,8 +345,10 @@ export default function RewardsTab() {
       )
       if (!response.success) throw new Error(response.error)
       await load()
-    } catch {
-      setActionError('使い道を公開できませんでした。内容を確認してもう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setActionError('使い道を公開できませんでした。内容を確認してもう一度お試しください。') }
     } finally {
       setBusyId(null)
     }
@@ -353,8 +367,10 @@ export default function RewardsTab() {
       setMenuNotice(response.data?.canDeliver
         ? 'この内容で交換できます。残高・在庫は動いていません。'
         : (warning || 'この内容では交換できません。内容を確認してください。'))
-    } catch {
-      setActionError('交換のテストができませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setActionError('交換のテストができませんでした。もう一度お試しください。') }
     } finally {
       setTestBusyId(null)
     }
@@ -391,8 +407,10 @@ export default function RewardsTab() {
       if (!response.success) throw new Error(response.error)
       setMenuNotice(`「${reward.name} のコピー」を下書きで作りました。`)
       await load()
-    } catch {
-      setActionError('複製できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setActionError('複製できませんでした。もう一度お試しください。') }
     } finally {
       setDuplicateId(null)
     }
@@ -471,10 +489,12 @@ export default function RewardsTab() {
       anchor.download = `mileage-rewards-${new Date().toISOString().slice(0, 10)}.csv`
       anchor.click()
       URL.revokeObjectURL(url)
-    } catch {
-      setActionError('CSVを書き出せませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setActionError('CSVを書き出せませんでした。もう一度お試しください。') }
     }
-  }, [canExport, shown])
+  }, [canExport, shown, saveErrors])
 
   const ready = status === 'ready'
   const failedReason = failed[0] ? (failed[0].failureMessage || failed[0].rewardName) : null
@@ -535,12 +555,12 @@ export default function RewardsTab() {
   )
   const kindSelect = (
     <div className={styles.narrowFolder}>
-      <Select
+      <SaveErrorField names={["folder","page"]}><Select
         aria-label="種類"
         value={folder}
         options={FOLDERS.map((key) => ({ value: key, label: key === 'すべて' ? '種類：すべて' : `${key === '未分類' ? 'そのほか' : key} ${formatMileageNumber(folderCounts.get(key) ?? 0)}` }))}
         onChange={(value) => { setPage(1); setFolder(value as Folder) }}
-      />
+      /></SaveErrorField>
     </div>
   )
 
@@ -837,7 +857,7 @@ export default function RewardsTab() {
   ) : undefined
 
   return (
-    <MileageFrame
+    <SaveErrorScope errors={saveErrors}><MileageFrame
       help="行の「…」から 編集・自分で交換をテスト・出すのを止める・複製。"
       actions={
         <Button variant="secondary" onClick={exportCsv} disabled={!canExport}>
@@ -852,6 +872,6 @@ export default function RewardsTab() {
     >
       {body}
       {failedSection}
-    </MileageFrame>
+    </MileageFrame></SaveErrorScope>
   )
 }

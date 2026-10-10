@@ -23,6 +23,7 @@ import {
   type AffiliateSettlementPreview,
 } from '@/lib/api'
 import { formatDay, formatNumber } from '@/lib/format'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type LoadPhase = 'loading' | 'ready' | 'empty' | 'error'
 
@@ -155,7 +156,7 @@ export function AffiliateArchiveDialog({
             </p>
           </section>
 
-          <RadioCardGroup legend="どうしますか？">
+          <SaveErrorField names={["archive-choice","value","choice"]}><RadioCardGroup legend="どうしますか？">
             {([
               ['pause', '紹介だけを止める（おすすめ）', 'あとから再開できます。過去の記録は残ります。'],
               ['pay_first', `先に ${yen(impact.unsettledReward)} を確定してから、また考える`, '支払いの画面へ移ります。アーカイブはしません。'],
@@ -163,17 +164,17 @@ export function AffiliateArchiveDialog({
             ] as const).map(([value, label, description]) => (
               <RadioCard key={value} name="archive-choice" value={value} checked={choice === value} onChange={() => setChoice(value)} title={label} note={description} />
             ))}
-          </RadioCardGroup>
+          </RadioCardGroup></SaveErrorField>
 
           <label className="text-ink block text-sm font-semibold">
               確認のため「{target?.name}」と打ってください
-              <input
+              <SaveErrorField names={["confirmationName","confirmation_name"]}><input
                 type="text"
                 value={confirmationName}
                 onChange={(event) => setConfirmationName(event.target.value)}
                 className="border-hairline rounded-control mt-2 w-full border px-3 py-2 font-normal"
                 autoComplete="off"
-              />
+              /></SaveErrorField>
           </label>
         </div>
       ) : (
@@ -198,6 +199,8 @@ export function AffiliatePaymentConfirmDialog({
   onClose: () => void
   onConfirmed: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [phase, setPhase] = useState<LoadPhase>('loading')
   const [preview, setPreview] = useState<AffiliateSettlementPreview | null>(null)
   const [busy, setBusy] = useState(false)
@@ -227,7 +230,9 @@ export function AffiliatePaymentConfirmDialog({
       if (!response.success) throw new Error(response.error)
       setPreview(response.data)
       setPhase(response.data.conversionCount === 0 ? 'empty' : 'ready')
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       setPhase('error')
       return
     }
@@ -238,10 +243,12 @@ export function AffiliatePaymentConfirmDialog({
         ? (detail.data as typeof detail.data & { friendId?: string | null })
         : null
       setContact(row ? { friendId: row.friendId ?? null, email: row.email ?? null } : null)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       setContact(null)
     }
-  }, [accountId, target])
+  }, [accountId, target, saveErrors])
 
   useEffect(() => {
     if (!target) return
@@ -274,16 +281,20 @@ export function AffiliatePaymentConfirmDialog({
             expectedVersion: 1,
           }, statementKey)
           if (!statement.success) throw new Error(statement.error)
-        } catch {
+        } catch (saveFailure) {
+          const fieldFailure = saveErrors.capture(saveFailure)
+
           onConfirmed()
-          setError('支払いは確定しましたが、支払明細とLINE通知を作れませんでした。同じ画面でもう一度お試しください。')
+          { if (!fieldFailure) setError('支払いは確定しましたが、支払明細とLINE通知を作れませんでした。同じ画面でもう一度お試しください。') }
           return
         }
       }
       onConfirmed()
       onClose()
-    } catch {
-      setError('支払いを確定できませんでした。内容を読み直してください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setError('支払いを確定できませんでした。内容を読み直してください。') }
     } finally {
       setBusy(false)
     }
@@ -297,7 +308,7 @@ export function AffiliatePaymentConfirmDialog({
   if (!target) return null
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center overflow-y-auto bg-ink/40 p-4" style={{ zIndex: 90 }} data-design-node="GqFTV">
+    <SaveErrorScope errors={saveErrors}><div className="fixed inset-0 flex items-center justify-center overflow-y-auto bg-ink/40 p-4" style={{ zIndex: 90 }} data-design-node="GqFTV">
       <section ref={panelRef} className="flex w-full flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-overlay" style={{ maxWidth: 800 }} role="dialog" aria-modal="true" aria-labelledby="affiliate-payment-title">
         <header className="flex items-center justify-between border-b border-hairline px-6 py-4.5">
           <div className="flex items-center gap-3">
@@ -395,11 +406,11 @@ export function AffiliatePaymentConfirmDialog({
             （OFFなのにONに見える見た目を残さない）。
           */}
           <div className="space-y-2">
-            <Checkbox
+            <SaveErrorField names={["issueStatement","issue_statement"]}><Checkbox
               checked={issueStatement}
               onCheckedChange={setIssueStatement}
               description={`内訳が入った明細を作り、「${dateLabel(preview.paymentDate)} に ${yen(preview.amount)} をお振込みします」と届きます。`}
-            >支払明細を作成して、この方のLINEに知らせる</Checkbox>
+            >支払明細を作成して、この方のLINEに知らせる</Checkbox></SaveErrorField>
           </div>
         </div>
       ) : null}
@@ -417,6 +428,6 @@ export function AffiliatePaymentConfirmDialog({
           </div>
         </footer>
       </section>
-    </div>
+    </div></SaveErrorScope>
   )
 }

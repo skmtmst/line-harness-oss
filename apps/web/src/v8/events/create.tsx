@@ -30,6 +30,7 @@ import { TimeField } from '@/components/shared/date-time-field'
 import ApplicationPreview from './application-preview'
 import { EVENT_DEFAULT_DRAFT, ENTRY_CUTOFF_OPTIONS, NONE, jstToUtcIso, todayJst } from './shared'
 import styles from './create.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const PER_FRIEND_OPTIONS = [
   { value: NONE, label: '制限なし' },
@@ -61,6 +62,8 @@ export default function EventsCreateV8() {
 }
 
 function EventsCreateV8Inner() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('イベントを作る')
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -123,7 +126,9 @@ function EventsCreateV8Inner() {
       try {
         const url = new URL(draft.venue_url)
         if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('protocol')
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
+
         errors['ev-new-url'] = 'http または https で始まる URL を入れてください'
       }
     }
@@ -167,12 +172,14 @@ function EventsCreateV8Inner() {
       initialRef.current = snapshot
       router.push(`/events?highlight=${encodeURIComponent(eventId)}`)
     } catch (cause) {
+      const fieldFailure = saveErrors.capture(cause)
+
       const reason = cause instanceof ApiError && cause.status === 403
         ? 'イベントを作れるのは統括と管理者だけです。'
         : cause instanceof Error ? cause.message : '保存できませんでした。もう一度お試しください。'
-      setError(eventId
+      { if (!fieldFailure) setError(eventId
         ? `イベントは下書きで作りましたが、最初の予約枠を作れませんでした。もう一度押すと続きから作ります。（${reason}）`
-        : reason)
+        : reason) }
       setSaving(false)
     }
   }
@@ -214,19 +221,19 @@ function EventsCreateV8Inner() {
 
   if (!canEdit) {
     return (
-      <CreatePage
+      <SaveErrorScope errors={saveErrors}><CreatePage
         boardId="d4adD4"
         title="イベントを作る"
         description="中身・回と定員・申し込みのきまりを決めます。下書きのあいだは、お客さまには見えません。"
         footerActions={<Button href="/events">一覧へ戻る</Button>}
       >
         <Notice tone="info">イベントを作れるのは統括と管理者だけです。必要なときは統括に頼んでください。</Notice>
-      </CreatePage>
+      </CreatePage></SaveErrorScope>
     )
   }
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       boardId="d4adD4"
       title="イベントを作る"
       description="中身・回と定員・申し込みのきまりを決めます。下書きのあいだは、お客さまには見えません。"
@@ -246,7 +253,7 @@ function EventsCreateV8Inner() {
         <h2 className={styles.cardTitle} id="ev-new-body">イベントの中身</h2>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="ev-new-name">イベント名</label>
-          <TextField
+          <SaveErrorField names={["name","draft.name"]}><TextField
             id="ev-new-name"
             value={draft.name}
             maxLength={255}
@@ -258,35 +265,35 @@ function EventsCreateV8Inner() {
               update('name', event.target.value)
               clearFieldError('ev-new-name')
             }}
-          />
+          /></SaveErrorField>
           {fieldErrors['ev-new-name'] ? <p id="ev-new-name-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-name']}</p> : null}
         </div>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="ev-new-desc">説明</label>
-          <TextField
+          <SaveErrorField names={["description","draft.description"]}><TextField
             id="ev-new-desc"
             value={draft.description ?? ''}
             maxLength={20000}
             placeholder="開催趣旨・注意事項・持ち物など"
             onChange={(event) => update('description', event.target.value || null)}
-          />
+          /></SaveErrorField>
         </div>
         <div className={styles.pair}>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="ev-new-venue">場所</label>
-            <TextField
+            <SaveErrorField names={["venue_name","draft.venue_name"]}><TextField
               id="ev-new-venue"
               value={draft.venue_name ?? ''}
               placeholder="渋谷ベース 3F"
               onChange={(event) => update('venue_name', event.target.value || null)}
-            />
+            /></SaveErrorField>
           </div>
           <div className={styles.field}>
             <span className={styles.labelRow}>
               <label className={styles.label} htmlFor="ev-new-url">オンラインの URL</label>
               <span className={styles.optional}>任意</span>
             </span>
-            <TextField
+            <SaveErrorField names={["venue_url","draft.venue_url"]}><TextField
               id="ev-new-url"
               type="url"
               value={draft.venue_url ?? ''}
@@ -294,7 +301,7 @@ function EventsCreateV8Inner() {
               aria-invalid={Boolean(fieldErrors['ev-new-url']) || undefined}
               aria-describedby={fieldErrors['ev-new-url'] ? 'ev-new-url-error' : undefined}
               onChange={(event) => { update('venue_url', event.target.value || null); clearFieldError('ev-new-url') }}
-            />
+            /></SaveErrorField>
             {fieldErrors['ev-new-url'] ? <p id="ev-new-url-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-url']}</p> : null}
           </div>
         </div>
@@ -302,7 +309,7 @@ function EventsCreateV8Inner() {
 
       <section className={styles.card} aria-labelledby="ev-new-target">
         <h2 className={styles.cardTitle} id="ev-new-target">公開対象</h2>
-        <RadioCardGroup legend="公開対象" className={styles.cardRow}>
+        <SaveErrorField names={["ev-new-target","target_type","draft.target_type"]}><RadioCardGroup legend="公開対象" className={styles.cardRow}>
           <RadioCard
             name="ev-new-target"
             value="single"
@@ -321,7 +328,7 @@ function EventsCreateV8Inner() {
             title="複数アカウント横断"
             note="同じ人に重ねて出しません"
           />
-        </RadioCardGroup>
+        </RadioCardGroup></SaveErrorField>
       </section>
 
       <section className={styles.card} aria-labelledby="ev-new-slot">
@@ -332,15 +339,15 @@ function EventsCreateV8Inner() {
         <div className={`${styles.pair} ${styles.datePair}`}>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="ev-new-date">日付</label>
-            <DateField id="ev-new-date" value={date} invalid={Boolean(fieldErrors['ev-new-date'])} aria-describedby={fieldErrors['ev-new-date'] ? 'ev-new-date-error' : undefined} onChange={(value) => { setDate(value); clearFieldError('ev-new-date') }} />
+            <SaveErrorField names={["date"]}><DateField id="ev-new-date" value={date} invalid={Boolean(fieldErrors['ev-new-date'])} aria-describedby={fieldErrors['ev-new-date'] ? 'ev-new-date-error' : undefined} onChange={(value) => { setDate(value); clearFieldError('ev-new-date') }} /></SaveErrorField>
             {fieldErrors['ev-new-date'] ? <p id="ev-new-date-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-date']}</p> : null}
           </div>
           <div className={styles.field}>
             <span className={styles.label} id="ev-new-time-label">開始</span>
             <div className={styles.timeRow} role="group" aria-labelledby="ev-new-time-label">
-              <TimeField id="ev-new-start" aria-label="開始の時刻" invalid={Boolean(fieldErrors['ev-new-start'])} aria-describedby={fieldErrors['ev-new-start'] ? 'ev-new-time-error' : undefined} value={startTime} onChange={(value) => { setStartTime(value); clearFieldError('ev-new-start'); clearFieldError('ev-new-end') }} />
+              <SaveErrorField names={["startTime","start_time"]}><TimeField id="ev-new-start" aria-label="開始の時刻" invalid={Boolean(fieldErrors['ev-new-start'])} aria-describedby={fieldErrors['ev-new-start'] ? 'ev-new-time-error' : undefined} value={startTime} onChange={(value) => { setStartTime(value); clearFieldError('ev-new-start'); clearFieldError('ev-new-end') }} /></SaveErrorField>
               <span className={styles.timeSep} aria-hidden="true">〜</span>
-              <TimeField id="ev-new-end" aria-label="終わりの時刻" invalid={Boolean(fieldErrors['ev-new-end'])} aria-describedby={fieldErrors['ev-new-end'] ? 'ev-new-time-error' : undefined} value={endTime} onChange={(value) => { setEndTime(value); clearFieldError('ev-new-end') }} />
+              <SaveErrorField names={["endTime","end_time"]}><TimeField id="ev-new-end" aria-label="終わりの時刻" invalid={Boolean(fieldErrors['ev-new-end'])} aria-describedby={fieldErrors['ev-new-end'] ? 'ev-new-time-error' : undefined} value={endTime} onChange={(value) => { setEndTime(value); clearFieldError('ev-new-end') }} /></SaveErrorField>
             </div>
             {fieldErrors['ev-new-start'] || fieldErrors['ev-new-end'] ? <p id="ev-new-time-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-start'] || fieldErrors['ev-new-end']}</p> : null}
           </div>
@@ -348,7 +355,7 @@ function EventsCreateV8Inner() {
         <div className={styles.pair}>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="ev-new-cap">定員</label>
-            <TextField
+            <SaveErrorField names={["capacity"]}><TextField
               id="ev-new-cap"
               inputMode="numeric"
               value={capacity}
@@ -356,18 +363,18 @@ function EventsCreateV8Inner() {
               aria-invalid={Boolean(fieldErrors['ev-new-cap']) || undefined}
               aria-describedby={fieldErrors['ev-new-cap'] ? 'ev-new-cap-error' : undefined}
               onChange={(event) => { setCapacity(event.target.value.replace(/[^0-9]/g, '')); clearFieldError('ev-new-cap') }}
-            />
+            /></SaveErrorField>
             {fieldErrors['ev-new-cap'] ? <p id="ev-new-cap-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-cap']}</p> : null}
           </div>
           <div className={styles.field}>
             <span className={styles.pickLabel}>1人あたりの予約回数</span>
-            <Select
+            <SaveErrorField names={["NONE","max_bookings_per_friend","draft.max_bookings_per_friend","_n_o_n_e"]}><Select
               aria-label="1人あたりの予約回数"
               size="full"
               value={draft.max_bookings_per_friend == null ? NONE : String(draft.max_bookings_per_friend)}
               onChange={(value) => update('max_bookings_per_friend', value === NONE ? null : Number(value))}
               options={PER_FRIEND_OPTIONS}
-            />
+            /></SaveErrorField>
           </div>
         </div>
       </section>
@@ -377,17 +384,17 @@ function EventsCreateV8Inner() {
         <div className={styles.pair}>
           <div className={styles.field}>
             <span className={styles.pickLabel}>申し込みの上限</span>
-            <Select
+            <SaveErrorField names={["NONE","entry_cutoff_hours_before","draft.entry_cutoff_hours_before","_n_o_n_e"]}><Select
               aria-label="申し込みの上限"
               size="full"
               value={draft.entry_cutoff_hours_before == null ? NONE : String(draft.entry_cutoff_hours_before)}
               onChange={(value) => update('entry_cutoff_hours_before', value === NONE ? null : Number(value))}
               options={ENTRY_CUTOFF_OPTIONS}
-            />
+            /></SaveErrorField>
           </div>
           <div className={styles.field}>
             <span className={styles.pickLabel}>承認</span>
-            <Select
+            <SaveErrorField names={["approval_deadline_hours","draft.approval_deadline_hours"]}><Select
               aria-label="承認"
               size="full"
               value={draft.requires_approval ? String(draft.approval_deadline_hours) : 'off'}
@@ -399,19 +406,19 @@ function EventsCreateV8Inner() {
                 }
               }}
               options={APPROVAL_OPTIONS}
-            />
+            /></SaveErrorField>
           </div>
         </div>
         <div className={styles.pair}>
           <div className={styles.field}>
             <span className={styles.pickLabel}>満席になったとき</span>
-            <Select
+            <SaveErrorField names={["waitlist_enabled","draft.waitlist_enabled"]}><Select
               aria-label="満席になったとき"
               size="full"
               value={String(draft.waitlist_enabled ?? 0)}
               onChange={(value) => update('waitlist_enabled', Number(value))}
               options={WAITLIST_OPTIONS}
-            />
+            /></SaveErrorField>
           </div>
           <span className={styles.field} aria-hidden="true" />
         </div>
@@ -440,14 +447,14 @@ function EventsCreateV8Inner() {
         )}
         {adding ? (
           <div className={styles.addRow}>
-            <TextField
+            <SaveErrorField names={["label","adding.label"]}><TextField
               aria-label="聞くこと"
               placeholder="例：ペットの名前と年齢"
               value={adding.label}
               maxLength={200}
               onChange={(event) => setAdding({ ...adding, label: event.target.value })}
-            />
-            <Checkbox checked={adding.required} onCheckedChange={(checked) => setAdding({ ...adding, required: checked })}>必須</Checkbox>
+            /></SaveErrorField>
+            <SaveErrorField names={["required","adding.required"]}><Checkbox checked={adding.required} onCheckedChange={(checked) => setAdding({ ...adding, required: checked })}>必須</Checkbox></SaveErrorField>
             <Button
               disabled={!adding.label.trim()}
               onClick={() => {
@@ -473,17 +480,17 @@ function EventsCreateV8Inner() {
             </Checkbox>
             <p className={styles.checkSub}>日時・場所が届きます</p>
           </div>
-          <Checkbox
+          <SaveErrorField names={["reminder_day_before_enabled","draft.reminder_day_before_enabled"]}><Checkbox
             checked={draft.reminder_day_before_enabled === 1}
             onCheckedChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)}
           >
             前日に思い出してもらう
-          </Checkbox>
+          </Checkbox></SaveErrorField>
         </div>
       </section>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したイベント" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }
 

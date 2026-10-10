@@ -20,6 +20,7 @@ import { useStaffRole } from '@/lib/staff-role'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import CompanyContactCard from './company-contact'
 import styles from './settings.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const TITLE = '統括の情報'
 const DESCRIPTION = '統括の名前です。各アカウントの画面の上と、メンバーへの招待メールに出ます。'
@@ -46,6 +47,8 @@ export default function HqSettingsV8() {
 
 /** 統括名のカード（角丸12・余白20・間12）。 */
 function TenantNameCard({ canEdit }: { canEdit: boolean }) {
+  const saveErrors = useSaveFormErrors()
+
   const uid = useId()
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(true)
@@ -90,10 +93,12 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
       setName(response.data.name ?? trimmed)
       setSaved(true)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       // M026：再試行の言葉がない代替文にしない。共通の状態別案内へ渡す。
-      setError(japaneseDetailOf(caught) || describeApiFailure(caught, '統括名の保存', {
+      { if (!fieldFailure) setError(japaneseDetailOf(caught) || describeApiFailure(caught, '統括名の保存', {
         forbidden: '統括名の変更は管理者だけができます。必要なときは管理者の方に操作してもらってください。',
-      }))
+      })) }
     } finally {
       setSaving(false)
     }
@@ -101,22 +106,22 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
 
   if (!canEdit) {
     return (
-      <section className={styles.card} aria-label="統括名">
+      <SaveErrorScope errors={saveErrors}><section className={styles.card} aria-label="統括名">
         <dl className={styles.field}>
           <dt className={styles.label}>統括名</dt>
           <dd className={styles.value}>{loading ? '読み込んでいます…' : error ? '読み込めませんでした' : name || '—'}</dd>
         </dl>
         {error ? <p role="alert" className={styles.error}>{error}</p> : null}
         <p className={styles.hint}>統括名の変更は管理者だけができます。</p>
-      </section>
+      </section></SaveErrorScope>
     )
   }
 
   return (
-    <form onSubmit={save} className={styles.card}>
+    <SaveErrorScope errors={saveErrors}><form onSubmit={save} className={styles.card}>
       <div className={styles.field}>
         <label htmlFor={`${uid}-name`} className={styles.label}>統括名</label>
-        <TextField
+        <SaveErrorField names={["name"]}><TextField
           id={`${uid}-name`}
           value={name}
           maxLength={100}
@@ -125,7 +130,7 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
           invalid={Boolean(nameError)}
           aria-describedby={nameError ? `${uid}-name-error` : undefined}
           className={styles.full}
-        />
+        /></SaveErrorField>
         {nameError ? <p id={`${uid}-name-error`} className={styles.error} role="alert">{nameError}</p> : null}
       </div>
       <p className={styles.hint}>会社名やブランド名など、メンバーが見てわかる名前にします</p>
@@ -134,6 +139,6 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
       <div className={styles.actions}>
         <Button variant="primary" type="submit" disabled={loading || saving} busy={saving}>統括名を保存する</Button>
       </div>
-    </form>
+    </form></SaveErrorScope>
   )
 }

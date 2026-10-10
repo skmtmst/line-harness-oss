@@ -27,6 +27,7 @@ import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import styles from './shell.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export interface RestaurantV8Context {
   data: RestaurantSnapshot
@@ -200,7 +201,7 @@ export default function RestaurantShell({ boardId, title, description, query, al
           <p className={styles.headDescription}>{description}</p>
         </div>
         {snapshot && snapshot.stores.length > 0 ? (
-          <Select
+          <SaveErrorField names={["selectedStoreId","selected_store_id"]}><Select
             aria-label="店舗を選ぶ"
             className={styles.storePicker}
             value={selectedStoreId}
@@ -209,7 +210,7 @@ export default function RestaurantShell({ boardId, title, description, query, al
               ...(allStores ? [{ value: '', label: '店舗：すべての店舗' }] : []),
               ...snapshot.stores.map((item) => ({ value: item.id, label: `店舗：${item.name}` })),
             ]}
-          />
+          /></SaveErrorField>
         ) : null}
       </div>
       <div className={styles.body}>

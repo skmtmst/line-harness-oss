@@ -17,6 +17,7 @@ import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { MEDIA_ACCEPT, extractMediaMetadata, putMediaFile, validateMediaFile } from './media-direct-upload'
 import { formatMediaSize } from './media-usage-display'
 import { formatNumber } from '@/lib/format'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type UploadState = 'ready' | 'preparing' | 'uploading' | 'verifying' | 'done' | 'error'
 
@@ -347,13 +348,13 @@ export default function MediaUploadDialog({
 
         <div>
           <label htmlFor={`${inputId}-folder`} className="text-ink-secondary mb-1 block text-xs font-semibold">入れるフォルダ</label>
-          <FolderSelect
+          <SaveErrorField names={["folderId","folder_id"]}><FolderSelect
             aria-label="入れるフォルダ"
             value={folderId}
             folders={folders.map(folderById)}
             onCreate={onCreateFolder}
             onChange={setFolderId}
-          />
+          /></SaveErrorField>
         </div>
         </div>
         {error ? <Notice tone="danger" message={error} className="mx-6 mb-4" /> : null}

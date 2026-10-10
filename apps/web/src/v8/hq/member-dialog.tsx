@@ -26,6 +26,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import head from './dialog-head.module.css'
 import styles from './member-dialog.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /** 絵 `yLKwV`・`BHEl9` の窓の幅と上からの位置（px）。 */
 const MEMBER_WIDTH = 620
@@ -203,16 +204,16 @@ export default function MemberDialogV8({
         {!member ? (
           <div className={styles.pair}>
             <FormField label="名前" htmlFor={`${uid}-name`} error={fieldErrors.name}>
-              <TextField id={`${uid}-name`} value={value.name} maxLength={100} disabled={busy} autoFocus invalid={Boolean(fieldErrors.name)} onChange={(e) => set('name', e.target.value)} className={styles.full} placeholder="例: 山田 太郎" />
+              <SaveErrorField names={["name","value.name"]}><TextField id={`${uid}-name`} value={value.name} maxLength={100} disabled={busy} autoFocus invalid={Boolean(fieldErrors.name)} onChange={(e) => set('name', e.target.value)} className={styles.full} placeholder="例: 山田 太郎" /></SaveErrorField>
             </FormField>
             <FormField label="メールアドレス" htmlFor={`${uid}-email`} error={fieldErrors.email}>
-              <TextField id={`${uid}-email`} type="email" value={value.email} disabled={busy} invalid={Boolean(fieldErrors.email)} onChange={(e) => set('email', e.target.value)} className={styles.full} placeholder="例: staff@example.com" />
+              <SaveErrorField names={["email","value.email"]}><TextField id={`${uid}-email`} type="email" value={value.email} disabled={busy} invalid={Boolean(fieldErrors.email)} onChange={(e) => set('email', e.target.value)} className={styles.full} placeholder="例: staff@example.com" /></SaveErrorField>
             </FormField>
           </div>
         ) : null}
 
         <Field label="役割" htmlFor={`${uid}-role`} note={isSelf ? '自分の役割は変えられません' : undefined}>
-          <Select
+          <SaveErrorField names={["role","value.role"]}><Select
             aria-label="役割"
             size="full"
             id={`${uid}-role`}
@@ -220,14 +221,14 @@ export default function MemberDialogV8({
             disabled={busy || isSelf}
             onChange={(next) => set('role', next as MemberRole)}
             options={roleOptions}
-          />
+          /></SaveErrorField>
         </Field>
 
         <div className={styles.group} role="group" aria-labelledby={`${uid}-scope-label`}>
           <span id={`${uid}-scope-label`} className={styles.label}>担当範囲</span>
           <div className={styles.radios}>
-            <Radio name={`${uid}-scope`} value="all" checked={value.accountScope === 'all'} disabled={busy} onChange={() => { set('accountScope', 'all'); set('scopedLineAccountIds', []) }}>全アカウント</Radio>
-            <Radio name={`${uid}-scope`} value="accounts" checked={value.accountScope === 'accounts'} disabled={busy} onChange={() => set('accountScope', 'accounts')}>指定したアカウントだけ</Radio>
+            <SaveErrorField names={["accountScope","value.accountScope"]}><Radio name={`${uid}-scope`} value="all" checked={value.accountScope === 'all'} disabled={busy} onChange={() => { set('accountScope', 'all'); set('scopedLineAccountIds', []) }}>全アカウント</Radio></SaveErrorField>
+            <SaveErrorField names={["accountScope","value.accountScope"]}><Radio name={`${uid}-scope`} value="accounts" checked={value.accountScope === 'accounts'} disabled={busy} onChange={() => set('accountScope', 'accounts')}>指定したアカウントだけ</Radio></SaveErrorField>
           </div>
           {value.accountScope === 'accounts' ? (
             <div id={`${uid}-scope`} className={styles.checks} role="group" aria-label="担当するアカウント" aria-describedby={fieldErrors.scope ? `${uid}-scope-error` : undefined}>
@@ -245,7 +246,7 @@ export default function MemberDialogV8({
         </div>
 
         <Field label="最初に表示するアカウント" htmlFor={`${uid}-assigned`}>
-          <Select
+          <SaveErrorField names={["assignedLineAccountId","value.assignedLineAccountId","assigned_line_account_id","value.assigned_line_account_id"]}><Select
             aria-label="最初に表示するアカウント"
             size="full"
             id={`${uid}-assigned`}
@@ -254,7 +255,7 @@ export default function MemberDialogV8({
             error={fieldErrors.assigned}
             onChange={(next) => set('assignedLineAccountId', next)}
             options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-          />
+          /></SaveErrorField>
           <FieldError id={`${uid}-assigned-error`}>{fieldErrors.assigned}</FieldError>
         </Field>
 
@@ -262,7 +263,7 @@ export default function MemberDialogV8({
           <div className={styles.group} role="radiogroup" aria-labelledby={`${uid}-active-label`}>
             <span id={`${uid}-active-label`} className={styles.label}>状態{isSelf ? <span className={styles.note}>自分の状態は変えられません</span> : null}</span>
             <div className={styles.radios}>
-              <Radio name={`${uid}-active`} value="active" checked={value.isActive} disabled={busy || isSelf} onChange={() => set('isActive', true)}>有効（ログインできる）</Radio>
+              <SaveErrorField names={["isActive","value.isActive"]}><Radio name={`${uid}-active`} value="active" checked={value.isActive} disabled={busy || isSelf} onChange={() => set('isActive', true)}>有効（ログインできる）</Radio></SaveErrorField>
               <Radio name={`${uid}-active`} value="inactive" checked={!value.isActive} disabled={busy || isSelf} onChange={() => set('isActive', false)}>無効（ログインできない）</Radio>
             </div>
           </div>

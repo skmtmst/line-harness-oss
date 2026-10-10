@@ -65,6 +65,7 @@ import {
   type BandCell,
 } from './shell'
 import styles from './list.module.css'
+import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -142,6 +143,8 @@ function TableHead() {
 }
 
 export default function AutomationListV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('オートメーション')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -298,12 +301,14 @@ export default function AutomationListV8() {
       if (!res.success) throw new Error(res.error)
       setPending(null)
       await load()
-    } catch {
-      setActionError(
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      if (!fieldFailure) { setActionError(
         pending.kind === 'archive'
           ? 'このルールを削除できませんでした。状態を読み直してから、もう一度お試しください。'
           : '稼働を切り替えられませんでした。状態を読み直してから、もう一度お試しください。',
-      )
+      ) }
     } finally {
       setWorking(false)
     }
@@ -369,12 +374,12 @@ export default function AutomationListV8() {
 
   /* ===== フォルダ ===== */
   const folderSelect = (
-    <Select
+    <SaveErrorField names={["folderFilter","folder_filter"]}><Select
       aria-label="フォルダ"
       value={folderFilter}
       onChange={setFolderFilter}
       options={managedFolderOptions('automation', folders, { allId: '', unfiledId: UNFILED })}
-    />
+    /></SaveErrorField>
   )
   /* 閲覧のみには押せない「ルールを作る」を置かない（場所だけ空ける）。 */
   const createButton = (full: boolean) => canEdit ? (
@@ -397,11 +402,11 @@ export default function AutomationListV8() {
   const savedBox = (
     <div className={styles.savedBox}>
       <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-      <Select aria-label="よく使う絞り込み" value={saved} onChange={(value) => {
+      <SaveErrorField names={["saved"]}><Select aria-label="よく使う絞り込み" value={saved} onChange={(value) => {
         setSaved(value as SavedKey)
         if (value === 'name' || value === 'runs') setSort(value)
         else setSort('updated')
-      }} options={SAVED_OPTIONS} />
+      }} options={SAVED_OPTIONS} /></SaveErrorField>
     </div>
   )
   const perPageBox = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
@@ -441,14 +446,14 @@ export default function AutomationListV8() {
       <ListToolbar
         search={{ placeholder: 'ルール名・きっかけで探す', label: 'ルールを検索', width: 240, value: search, onChange: setSearch }}
         filters={filterChips}
-        trailing={<>{savedBox}<Select aria-label="並び順" width={170} value={sort} onChange={(value) => {
+        trailing={<>{savedBox}<SaveErrorField names={["sort"]}><Select aria-label="並び順" width={170} value={sort} onChange={(value) => {
           setSort(value as 'updated' | 'runs' | 'name')
           if (saved === 'runs' || saved === 'name') setSaved('')
         }} options={[
           { value: 'updated', label: '並び：更新が新しい順' },
           { value: 'runs', label: '並び：動いた回数が多い順' },
           { value: 'name', label: '並び：名前順' },
-        ]} />{perPageBox}</>}
+        ]} /></SaveErrorField>{perPageBox}</>}
       />
     </>
   )
@@ -555,7 +560,7 @@ export default function AutomationListV8() {
   ) : null
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       help={canEdit
             ? '行の「…」から 編集・複製・1人で試す・止める・動いた記録を見る・削除。'
             : '行の「…」から 動いた記録を見る。'}
@@ -627,13 +632,13 @@ export default function AutomationListV8() {
           {testing ? (
             <div className={styles.testBody}>
               <Field label="試す友だちのID">
-                <TextField
+                <SaveErrorField names={["testFriendId","test_friend_id"]}><TextField
                   aria-label="試す友だちのID"
                   value={testFriendId}
                   onChange={(event) => setTestFriendId(event.target.value)}
                   placeholder="試す友だちID"
                   disabled={testBusy || testDone}
-                />
+                /></SaveErrorField>
               </Field>
               <p className={styles.testNote}>
                 すること：{testing.actions.map((action) => automationActionLabel(action.type)).join('・') || '登録した処理'}
@@ -646,6 +651,6 @@ export default function AutomationListV8() {
       </>}
     >
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

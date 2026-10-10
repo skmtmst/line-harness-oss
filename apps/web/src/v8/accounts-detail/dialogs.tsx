@@ -26,6 +26,7 @@ import StepUpPrompt, { isStepUpRequired, stepUpFailureMessage, type StepUpReques
 import TestRecipientsSetting from '@/components/accounts/test-recipients-setting'
 import { ARCHIVE_BLOCKER_MESSAGES, parseCount, type AccountDetailView } from './view'
 import styles from './dialogs.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /** 窓の枠。題・右上の×・中身・下の操作（右寄せ）。 */
 function Frame({ open, node, width, top, title, busy, onCancel, actions, children }: {
@@ -160,14 +161,14 @@ export function StopDialog({ account, onClose, onDone }: {
             : '再開の前にLINEとの接続を確かめます。止めているあいだに予約していた配信は、自動で送り直しません。'}
         </Notice>
         <Field label={stopping ? '止める理由（必須）' : '再開する理由（必須）'} htmlFor={inputId} error={fieldErrors.reason}>
-          <TextField
+          <SaveErrorField names={["reason"]}><TextField
             id={inputId}
             maxLength={500}
             placeholder={stopping ? '例: 乗り換えの準備のため' : '例: 接続を直したので再開する'}
             value={reason}
             onChange={(event) => { setReason(event.target.value); setFieldErrors({}) }}
             disabled={busy}
-          />
+          /></SaveErrorField>
         </Field>
         <ErrorLine message={error} />
       </Frame>
@@ -266,23 +267,23 @@ export function ArchiveDialog({ account, onClose, onDone }: {
     >
       <Notice tone="info" presentation="account-note" icon={null}>一覧から外します。送受信は止まり、友だちと履歴は残ります。</Notice>
       <Field label="アーカイブの理由（任意）" htmlFor={reasonId}>
-        <TextField
+        <SaveErrorField names={["reason"]}><TextField
           id={reasonId}
           maxLength={500}
           placeholder="例: 使わなくなったため"
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           disabled={busy}
-        />
+        /></SaveErrorField>
       </Field>
       {method === 'totp' ? (
         <div className={styles.verify}>
           <p className={styles.sub} id={secretId}>本人確認（認証アプリの6桁）</p>
-          <OtpInput value={secret} onChange={setSecret} onComplete={(entered) => void run(entered)} visualLabel="認証コード（6桁）" labelledBy={secretId} invalid={Boolean(error)} busy={busy} />
+          <SaveErrorField names={["secret"]}><OtpInput value={secret} onChange={setSecret} onComplete={(entered) => void run(entered)} visualLabel="認証コード（6桁）" labelledBy={secretId} invalid={Boolean(error)} busy={busy} /></SaveErrorField>
         </div>
       ) : method === 'password' ? (
         <Field label="本人確認（パスワード）" htmlFor={secretId}>
-          <TextField id={secretId} type="password" autoComplete="current-password" value={secret} onChange={(event) => setSecret(event.target.value)} disabled={busy} />
+          <SaveErrorField names={["secret"]}><TextField id={secretId} type="password" autoComplete="current-password" value={secret} onChange={(event) => setSecret(event.target.value)} disabled={busy} /></SaveErrorField>
         </Field>
       ) : (
         <Notice tone="info" presentation="account-note" icon={null}>本人確認の方法（2段階認証・パスワード）が登録されていません。そのままアーカイブします。</Notice>
@@ -374,6 +375,8 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
   onClose: () => void
   onSaved: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   // 保存中に対象が変わって中身が消えたら、A の結果で B の窓を閉じたり読み直したりしない。
   // 付くたびに true へ戻す。開発時の StrictMode は付ける→外す→付けるを1回ずつ多く回すので、
   // 外すときだけ false にすると、付いているのに false が残って保存の結果と「保存中」の解除を捨てる。
@@ -424,20 +427,23 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
       onSaved()
       onClose()
     } catch (caught) {
+
+
       if (!alive.current) return
+      const fieldFailure = saveErrors.capture(caught)
       // 接続情報の書き換えは大事な操作。本人確認を求められたら窓を立てる（V-1）。
       if (!stepUpToken && isStepUpRequired(caught)) {
         setStepUp({ purpose: 'line_account.credentials', action: '接続情報を変更する', retry: save })
         return
       }
-      setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      { if (!fieldFailure) setError('保存に失敗しました。通信を確かめて、もう一度お試しください。') }
     } finally {
       if (alive.current) setBusy(false)
     }
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <Frame
         open
         node="Msb1j"
@@ -455,18 +461,18 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
       >
         <p className={styles.sub}>{kind === 'messaging' ? 'Messaging API' : 'LINE Login'}</p>
         <Field label={kind === 'messaging' ? 'Channel Secret' : 'Login Channel Secret'} htmlFor={secretId} error={fieldErrors.secret}>
-          <TextField id={secretId} type="password" autoComplete="off" placeholder="••••••••••••（新しい値を貼る）" value={secret} onChange={(event) => { setSecret(event.target.value); setFieldErrors({}) }} disabled={busy} />
+          <SaveErrorField names={["secret"]}><TextField id={secretId} type="password" autoComplete="off" placeholder="••••••••••••（新しい値を貼る）" value={secret} onChange={(event) => { setSecret(event.target.value); setFieldErrors({}) }} disabled={busy} /></SaveErrorField>
         </Field>
         {kind === 'messaging' ? (
           <Field label="Channel Access Token" htmlFor={tokenId}>
-            <TextField id={tokenId} type="password" autoComplete="off" placeholder="••••••••••••（新しい値を貼る）" value={token} onChange={(event) => { setToken(event.target.value); setFieldErrors({}) }} disabled={busy} />
+            <SaveErrorField names={["token"]}><TextField id={tokenId} type="password" autoComplete="off" placeholder="••••••••••••（新しい値を貼る）" value={token} onChange={(event) => { setToken(event.target.value); setFieldErrors({}) }} disabled={busy} /></SaveErrorField>
           </Field>
         ) : null}
         <Notice tone="info" presentation="account-note" icon={null}>保存のときに本人確認が出ます。差し替えたあと、接続を確かめます。</Notice>
         <ErrorLine message={error} />
       </Frame>
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
-    </>
+    </></SaveErrorScope>
   )
 }
 
@@ -490,6 +496,8 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
   onClose: () => void
   onSaved: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const initialTimezone = account.timezone ?? 'Asia/Tokyo'
   const [name, setName] = useState(account.name)
   const [timezone, setTimezone] = useState(initialTimezone)
@@ -559,18 +567,20 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
       onSaved()
       onClose()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (!stepUpToken && isStepUpRequired(caught)) {
         setStepUp({ purpose: 'line_account.credentials', action: '接続情報を変更する', retry: save })
         return
       }
-      setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      { if (!fieldFailure) setError('保存に失敗しました。通信を確かめて、もう一度お試しください。') }
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <Frame
         open
         node="n9Z2P"
@@ -588,22 +598,22 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
       >
         <div className={styles.pair}>
           <Field label="アカウント名" htmlFor={ids.name} error={fields.error('name')}>
-            <TextField {...fieldProps('name')} id={ids.name} required maxLength={100} value={name} onChange={(event) => setName(event.target.value)} disabled={busy} />
+            <SaveErrorField names={["name"]}><TextField {...fieldProps('name')} id={ids.name} required maxLength={100} value={name} onChange={(event) => setName(event.target.value)} disabled={busy} /></SaveErrorField>
           </Field>
           {canEditTimezone ? (
             <div className={styles.narrow}>
               <Field label="タイムゾーン" htmlFor={ids.tz}>
-                <TextField id={ids.tz} value={timezone} onChange={(event) => setTimezone(event.target.value)} disabled={busy} />
+                <SaveErrorField names={["timezone"]}><TextField id={ids.tz} value={timezone} onChange={(event) => setTimezone(event.target.value)} disabled={busy} /></SaveErrorField>
               </Field>
             </div>
           ) : null}
         </div>
         <div className={styles.pair}>
           <Field label="LINE Login（任意）" htmlFor={ids.login}>
-            <TextField id={ids.login} placeholder="チャネル ID" value={loginChannelId} onChange={(event) => setLoginChannelId(event.target.value)} disabled={busy} />
+            <SaveErrorField names={["loginChannelId","login_channel_id"]}><TextField id={ids.login} placeholder="チャネル ID" value={loginChannelId} onChange={(event) => setLoginChannelId(event.target.value)} disabled={busy} /></SaveErrorField>
           </Field>
           <Field label="LIFF（任意）" htmlFor={ids.liff}>
-            <TextField id={ids.liff} placeholder="LIFF ID" value={liffId} onChange={(event) => setLiffId(event.target.value)} disabled={busy} />
+            <SaveErrorField names={["liffId","liff_id"]}><TextField id={ids.liff} placeholder="LIFF ID" value={liffId} onChange={(event) => setLiffId(event.target.value)} disabled={busy} /></SaveErrorField>
           </Field>
         </div>
         <div className={styles.field}>
@@ -613,14 +623,14 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
               {showOgMore ? '説明と画像を閉じる' : '説明と画像も変える'}
             </Button>
           </div>
-          <TextField id={ids.og} placeholder="共有したときに出る名前" value={ogSiteName} onChange={(event) => setOgSiteName(event.target.value)} disabled={busy} />
+          <SaveErrorField names={["ogSiteName","og_site_name"]}><TextField id={ids.og} placeholder="共有したときに出る名前" value={ogSiteName} onChange={(event) => setOgSiteName(event.target.value)} disabled={busy} /></SaveErrorField>
         </div>
         {showOgMore ? (
           <>
             <Field label="共有したときの説明" htmlFor={ids.ogDesc}>
-              <TextField id={ids.ogDesc} value={ogDescription} onChange={(event) => setOgDescription(event.target.value)} disabled={busy} />
+              <SaveErrorField names={["ogDescription","og_description"]}><TextField id={ids.ogDesc} value={ogDescription} onChange={(event) => setOgDescription(event.target.value)} disabled={busy} /></SaveErrorField>
             </Field>
-            <ImageUploader
+            <SaveErrorField names={["ogImageUrl"]}><ImageUploader
               mode="url"
               size="compact"
               label="共有したときの画像"
@@ -628,18 +638,18 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
               disabled={busy}
               value={ogImageUrl ? { mode: 'url', url: ogImageUrl } : null}
               onChange={(next) => setOgImageUrl(next?.mode === 'url' ? next.url : '')}
-            />
+            /></SaveErrorField>
           </>
         ) : null}
         <div className={styles.pair}>
           <Field label="友だちの上限" htmlFor={ids.cap} error={fields.error('cap')}>
-            <TextField {...fieldProps('cap')} id={ids.cap} inputMode="numeric" placeholder="管理しない" value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={busy} />
+            <SaveErrorField names={["capacity"]}><TextField {...fieldProps('cap')} id={ids.cap} inputMode="numeric" placeholder="管理しない" value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={busy} /></SaveErrorField>
           </Field>
           <Field label="警告を出す人数" htmlFor={ids.warn} error={fields.error('warn')}>
-            <TextField {...fieldProps('warn')} id={ids.warn} inputMode="numeric" placeholder="警告しない" value={warnAt} onChange={(event) => setWarnAt(event.target.value)} disabled={busy} />
+            <SaveErrorField names={["warnAt","warn_at"]}><TextField {...fieldProps('warn')} id={ids.warn} inputMode="numeric" placeholder="警告しない" value={warnAt} onChange={(event) => setWarnAt(event.target.value)} disabled={busy} /></SaveErrorField>
           </Field>
         </div>
-        <ImageUploader
+        <SaveErrorField names={["iconUrl"]}><ImageUploader
           mode="url"
           size="compact"
           label="アイコン"
@@ -647,11 +657,11 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
           disabled={busy}
           value={iconUrl ? { mode: 'url', url: iconUrl } : null}
           onChange={(next) => setIconUrl(next?.mode === 'url' ? next.url : '')}
-        />
+        /></SaveErrorField>
         <ErrorLine message={error} />
       </Frame>
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
-    </>
+    </></SaveErrorScope>
   )
 }
 

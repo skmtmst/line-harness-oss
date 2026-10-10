@@ -48,8 +48,11 @@ import {
 import { LineCard } from '../../line-preview'
 import { formatNumber } from '@/lib/format'
 import styles from './column-new-v8.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 export default function ColumnNewV8() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [draft, setDraft] = useState<ColumnDraft>(EMPTY_DRAFT)
@@ -86,11 +89,11 @@ export default function ColumnNewV8() {
 
   if (!selectedAccountId) {
     return (
-      <ListState
+      <SaveErrorScope errors={saveErrors}><ListState
         kind="empty"
         title="LINEアカウントが選ばれていません"
         description="コラムはアカウントごとに保存します。上のLINEアカウントを選んでください。"
-      />
+      /></SaveErrorScope>
     )
   }
 
@@ -107,9 +110,11 @@ export default function ColumnNewV8() {
       if (!res.success) throw new Error('failed')
       router.push('/nen-campaigns?tab=columns')
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e)
+
       const status = e instanceof ApiError ? e.status : undefined
       const code = e instanceof ApiError ? e.code : undefined
-      setFailure(failureOf({ status, code }))
+      { if (!fieldFailure) setFailure(failureOf({ status, code })) }
     } finally {
       setBusy(false)
     }
@@ -126,7 +131,7 @@ export default function ColumnNewV8() {
   }
 
   return (
-    <div data-design-node="yRDwW" className={styles.board}>
+    <SaveErrorScope errors={saveErrors}><div data-design-node="yRDwW" className={styles.board}>
       <div className={styles.head}>
         <nav className={styles.crumb} aria-label="パンくず">
           <Link href="/nen-campaigns">← NEN配信へ</Link>
@@ -146,13 +151,13 @@ export default function ColumnNewV8() {
             <h2 className={styles.cardTitle}>題名と分類</h2>
             <label className={styles.fieldLabel}>
               題名
-              <TextField aria-label="題名" value={draft.title} maxLength={120} onChange={(event) => set({ title: event.target.value })} />
+              <SaveErrorField names={["title","draft.title"]}><TextField aria-label="題名" value={draft.title} maxLength={120} onChange={(event) => set({ title: event.target.value })} /></SaveErrorField>
             </label>
             {touched && errorFor('title') ? <p className={styles.fieldError}>{errorFor('title')}</p> : <p className={styles.note}>{titleNotice(draft.title) ?? `題名はLINEの通知に${TITLE_NOTICE_LENGTH}文字まで出ます。`}</p>}
             <div className={styles.row2}>
               <label className={styles.fieldLabel}>
                 分類
-                <TextField aria-label="分類" value={draft.category} maxLength={CATEGORY_MAX} placeholder="例: 季節のこと" onChange={(event) => set({ category: event.target.value })} />
+                <SaveErrorField names={["category","draft.category"]}><TextField aria-label="分類" value={draft.category} maxLength={CATEGORY_MAX} placeholder="例: 季節のこと" onChange={(event) => set({ category: event.target.value })} /></SaveErrorField>
               </label>
               <div className={styles.fieldLabel}>
                 前のコラムを下敷きにする
@@ -161,7 +166,7 @@ export default function ColumnNewV8() {
             </div>
             <label className={styles.fieldLabel}>
               概要（LINE のカードに出る短い紹介文）
-              <TextField aria-label="概要" value={draft.excerpt} maxLength={EXCERPT_MAX} onChange={(event) => set({ excerpt: event.target.value })} />
+              <SaveErrorField names={["excerpt","draft.excerpt"]}><TextField aria-label="概要" value={draft.excerpt} maxLength={EXCERPT_MAX} onChange={(event) => set({ excerpt: event.target.value })} /></SaveErrorField>
             </label>
           </section>
 
@@ -169,23 +174,23 @@ export default function ColumnNewV8() {
             <h2 className={styles.cardTitle}>記事のリンク</h2>
             <label className={styles.fieldLabel}>
               記事の URL
-              <TextField aria-label="記事の URL" value={draft.articleUrl} placeholder="https://example.com/columns/..." onChange={(event) => set({ articleUrl: event.target.value })} />
+              <SaveErrorField names={["articleUrl","draft.articleUrl","article_url","draft.article_url"]}><TextField aria-label="記事の URL" value={draft.articleUrl} placeholder="https://example.com/columns/..." onChange={(event) => set({ articleUrl: event.target.value })} /></SaveErrorField>
             </label>
             {touched && errorFor('articleUrl') ? <p className={styles.fieldError}>{errorFor('articleUrl')}</p> : null}
             <label className={styles.fieldLabel}>
               画像の URL
-              <TextField aria-label="画像の URL" value={draft.imageUrl} placeholder="https://cdn.example.com/..." onChange={(event) => set({ imageUrl: event.target.value })} />
+              <SaveErrorField names={["imageUrl","draft.imageUrl","image_url","draft.image_url"]}><TextField aria-label="画像の URL" value={draft.imageUrl} placeholder="https://cdn.example.com/..." onChange={(event) => set({ imageUrl: event.target.value })} /></SaveErrorField>
             </label>
           </section>
 
           <section className={styles.card} aria-label="届く形">
             <h2 className={styles.cardTitle}>届く形</h2>
-            <RadioCardGroup legend="届く形" className={styles.row2}>
+            <SaveErrorField names={["column-kind"]}><RadioCardGroup legend="届く形" className={styles.row2}>
               <RadioCard name="column-kind" value="card" checked onChange={() => {}}
                 title="上の写真＋コラムを読む" note="写真の下に題名とボタン" />
               <RadioCard name="column-kind" value="text" checked={false} onChange={() => {}}
                 title="文字だけ" note="題名と概要とリンク" disabled disabledReason="この配信では選べません" />
-            </RadioCardGroup>
+            </RadioCardGroup></SaveErrorField>
           </section>
 
           <section className={styles.card} aria-label="いつ・だれに出しますか" data-nen-part="publish">
@@ -194,11 +199,11 @@ export default function ColumnNewV8() {
             <div className={styles.row2}>
               <div className={styles.fieldLabel}>
                 <label htmlFor="nen-schedule-v8">配信日時（日本時間）</label>
-                <DateTimeField id="nen-schedule-v8" aria-label="配信日時（日本時間）" value={draft.scheduledAt} invalid={Boolean(touched && errorFor('scheduledAt'))} onChange={(v) => set({ scheduledAt: v })} />
+                <SaveErrorField names={["scheduledAt","draft.scheduledAt","scheduled_at","draft.scheduled_at"]}><DateTimeField id="nen-schedule-v8" aria-label="配信日時（日本時間）" value={draft.scheduledAt} invalid={Boolean(touched && errorFor('scheduledAt'))} onChange={(v) => set({ scheduledAt: v })} /></SaveErrorField>
               </div>
               <label className={styles.fieldLabel}>
                 配信対象
-                <Select
+                <SaveErrorField names={["targetMode","draft.targetMode","target_mode","draft.target_mode"]}><Select
                   aria-label="配信対象"
                   value={draft.targetMode}
                   options={[
@@ -206,13 +211,13 @@ export default function ColumnNewV8() {
                     { value: 'tag', label: 'タグで絞る' },
                   ]}
                   onChange={(value) => set({ targetMode: value as 'all' | 'tag' })}
-                />
+                /></SaveErrorField>
               </label>
             </div>
             {draft.targetMode === 'tag' ? (
               <label className={styles.fieldLabel}>
                 対象タグ
-                <Select
+                <SaveErrorField names={["targetTagId","draft.targetTagId","target_tag_id","draft.target_tag_id"]}><Select
                   aria-label="対象タグ"
                   value={draft.targetTagId}
                   options={[
@@ -220,14 +225,14 @@ export default function ColumnNewV8() {
                     ...accountTags.map((tag) => ({ value: tag.id, label: tag.name })),
                   ]}
                   onChange={(value) => set({ targetTagId: value })}
-                />
+                /></SaveErrorField>
               </label>
             ) : null}
             <p className={styles.note}>この条件では {audienceCount == null ? '—' : formatNumber(audienceCount)}人に届きます。</p>
             <Disclosure title="公開日時も記録する（任意）" size="compact">
             <div className={styles.fieldLabel}>
               <label htmlFor="nen-publish-v8">公開日時（日本時間）</label>
-              <DateTimeField id="nen-publish-v8" aria-label="公開日時（日本時間）" value={draft.publishedAt} invalid={Boolean(touched && errorFor('publishedAt'))} onChange={(v) => set({ publishedAt: v })} />
+              <SaveErrorField names={["publishedAt","draft.publishedAt","published_at","draft.published_at"]}><DateTimeField id="nen-publish-v8" aria-label="公開日時（日本時間）" value={draft.publishedAt} invalid={Boolean(touched && errorFor('publishedAt'))} onChange={(v) => set({ publishedAt: v })} /></SaveErrorField>
             </div>
             <p className={styles.note}>空のままなら公開日時は入りません。日本時間で保存します。</p>
             </Disclosure>
@@ -238,11 +243,11 @@ export default function ColumnNewV8() {
             <div className={styles.row2}>
               <label className={styles.fieldLabel}>
                 読了イベント名
-                <TextField aria-label="読了イベント名" value={draft.completionEventName} placeholder="例: 秋の食事コラムを読了" onChange={(event) => set({ completionEventName: event.target.value })} />
+                <SaveErrorField names={["completionEventName","draft.completionEventName","completion_event_name","draft.completion_event_name"]}><TextField aria-label="読了イベント名" value={draft.completionEventName} placeholder="例: 秋の食事コラムを読了" onChange={(event) => set({ completionEventName: event.target.value })} /></SaveErrorField>
               </label>
               <label className={styles.fieldLabel}>
                 読了後に付けるタグ
-                <Select
+                <SaveErrorField names={["completionTagId","draft.completionTagId","completion_tag_id","draft.completion_tag_id"]}><Select
                   aria-label="読了後に付けるタグ"
                   value={draft.completionTagId}
                   options={[
@@ -250,7 +255,7 @@ export default function ColumnNewV8() {
                     ...accountTags.map((tag) => ({ value: tag.id, label: tag.name })),
                   ]}
                   onChange={(value) => set({ completionTagId: value })}
-                />
+                /></SaveErrorField>
               </label>
             </div>
           </section>
@@ -299,6 +304,6 @@ export default function ColumnNewV8() {
         )}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div>
+    </div></SaveErrorScope>
   )
 }

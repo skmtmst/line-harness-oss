@@ -35,8 +35,11 @@ import { menuPriceLabel } from '../../lib/menu-price'
 import { LiffPhoneStaffStep } from '../../menus/liff-phone-v8'
 import shell from '../../menus/settings-v8.module.css'
 import styles from './staff-new-v8.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 export default function StaffNewV8() {
+  const saveErrors = useSaveFormErrors()
+
   const { selectedAccountId, selectedAccount } = useAccount()
   const router = useRouter()
   // /booking/staff/new はメニューの接頭辞に当たらず上部バーが空になるため、画面名を明示する。
@@ -250,7 +253,9 @@ export default function StaffNewV8() {
             override_price: null,
           })),
         )
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
+
         // スタッフ自体は残っている。IDを控えて割当のやり直しに備える。
         setCreatedStaffId(staffId)
         throw new Error('スタッフは登録できましたが、担当メニューの設定に失敗しました。入力は残っています。「割当をやり直す」を押してください。')
@@ -258,9 +263,11 @@ export default function StaffNewV8() {
       setCreatedStaffId(null)
       router.push(createPageReturnHref('/booking/menus?tab=staff', staffId))
     } catch (e) {
-      setSaveError(e instanceof Error && e.message && !/^API error: /.test(e.message)
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure) setSaveError(e instanceof Error && e.message && !/^API error: /.test(e.message)
         ? e.message
-        : 'スタッフを登録できませんでした。入力は残っています。もう一度お試しください。')
+        : 'スタッフを登録できませんでした。入力は残っています。もう一度お試しください。') }
     } finally {
       setSaving(false)
     }
@@ -273,7 +280,7 @@ export default function StaffNewV8() {
 
   if (!canManageStaff) {
     return (
-      <div className={shell.shell} data-design-node="CcA4k">
+      <SaveErrorScope errors={saveErrors}><div className={shell.shell} data-design-node="CcA4k">
         <div className="mx-auto max-w-2xl p-6">
           <ListState
             kind="error"
@@ -281,7 +288,7 @@ export default function StaffNewV8() {
             description="予約スタッフの登録は、予約設定の権限を持つログインユーザーだけが実行できます。管理者へ権限の確認を依頼してください。"
           />
         </div>
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
@@ -306,7 +313,7 @@ export default function StaffNewV8() {
     ?? null
 
   return (
-    <div className={shell.shell} data-design-node="CcA4k">
+    <SaveErrorScope errors={saveErrors}><div className={shell.shell} data-design-node="CcA4k">
       <header className={shell.boardHead} data-design="Head">
         <Link href="/booking/menus?tab=staff" className={shell.backLink}>← 担当スタッフへ</Link>
         <h1 className={shell.headTitle}>予約スタッフを登録</h1>
@@ -323,7 +330,7 @@ export default function StaffNewV8() {
             <div className={styles.fieldGrid}>
               <label className={styles.field}>
                 <span className={styles.label}>スタッフ名（管理画面での呼び名）</span>
-                <input
+                <SaveErrorField names={["name"]}><input
                   id="bs-name"
                   type="text"
                   value={name}
@@ -340,14 +347,14 @@ export default function StaffNewV8() {
                   placeholder="例: 田中 美咲"
                   className={styles.input}
                   aria-invalid={fieldErrors.name !== undefined}
-                />
+                /></SaveErrorField>
                 {fieldErrors.name !== undefined ? (
                   <span className={styles.formError} role="alert">{fieldErrors.name}</span>
                 ) : null}
               </label>
               <label className={styles.field}>
                 <span className={styles.label}>お客さま向けの表示名（空欄なら上の名前）</span>
-                <input
+                <SaveErrorField names={["displayName","display_name"]}><input
                   id="bs-display"
                   type="text"
                   value={displayName}
@@ -355,11 +362,11 @@ export default function StaffNewV8() {
                   maxLength={BOOKING_STAFF_LIMITS.displayName}
                   placeholder="例: みさき"
                   className={styles.input}
-                />
+                /></SaveErrorField>
               </label>
               <label className={styles.field}>
                 <span className={styles.label}>肩書き</span>
-                <input
+                <SaveErrorField names={["role"]}><input
                   id="bs-role"
                   type="text"
                   value={role}
@@ -367,11 +374,11 @@ export default function StaffNewV8() {
                   maxLength={BOOKING_STAFF_LIMITS.role}
                   placeholder="例: トリミング担当"
                   className={styles.input}
-                />
+                /></SaveErrorField>
               </label>
               <label className={styles.field}>
                 <span className={styles.label}>顔写真（正方形・1MB まで）</span>
-                <input
+                <SaveErrorField names={["imageUrl","profile_image_url","image_url"]}><input
                   id="bs-image"
                   type="url"
                   value={imageUrl}
@@ -379,11 +386,11 @@ export default function StaffNewV8() {
                   maxLength={BOOKING_STAFF_LIMITS.profileImageUrl}
                   placeholder="https://…/misaki.jpg"
                   className={styles.input}
-                />
+                /></SaveErrorField>
               </label>
               <label className={`${styles.field} ${styles.fieldFull}`}>
                 <span className={styles.label}>紹介文</span>
-                <textarea
+                <SaveErrorField names={["bio"]}><textarea
                   id="bs-bio"
                   rows={3}
                   value={bio}
@@ -391,7 +398,7 @@ export default function StaffNewV8() {
                   maxLength={BOOKING_STAFF_LIMITS.bio}
                   placeholder="例: トリミング歴10年。小型犬が得意です。"
                   className={styles.input}
-                />
+                /></SaveErrorField>
               </label>
             </div>
           </section>
@@ -470,22 +477,22 @@ export default function StaffNewV8() {
                 </span>
               </div>
               <div className={styles.switchRow}>
-                <Toggle
+                <SaveErrorField names={["isDesignationOptional","is_designation_optional"]}><Toggle
                   label="「指名なし」の枠にも含める"
                   checked={isDesignationOptional}
                   onChange={setIsDesignationOptional}
-                />
+                /></SaveErrorField>
                 <span className={styles.switchLabel}>
                   「指名なし」の枠にも含める
                   <span className={styles.switchNote}>お客さまが担当者を選ばなかったときの割り当て先になります。</span>
                 </span>
               </div>
               <div className={styles.switchRow}>
-                <Toggle
+                <SaveErrorField names={["isActive","is_active"]}><Toggle
                   label="登録したらすぐ予約を受ける"
                   checked={isActive}
                   onChange={setIsActive}
-                />
+                /></SaveErrorField>
                 <span className={styles.switchLabel}>
                   登録したらすぐ予約を受ける
                   <span className={styles.switchNote}>オフにすると予約画面に出ません。</span>
@@ -528,7 +535,7 @@ export default function StaffNewV8() {
             ) : (
               <label className={styles.field}>
                 <span className={styles.label}>ログインユーザー</span>
-                <Select
+                <SaveErrorField names={["staffMemberId","staff_member_id"]}><Select
                   aria-label="ログインユーザーとの紐づけ"
                   id="bs-member"
                   size="full"
@@ -538,7 +545,7 @@ export default function StaffNewV8() {
                     { value: '', label: '紐づけない' },
                     ...members.map((m) => ({ value: m.id, label: `${m.name}${m.email ? `（${m.email}）` : ''}` })),
                   ]}
-                />
+                /></SaveErrorField>
               </label>
             )}
           </section>
@@ -587,6 +594,6 @@ export default function StaffNewV8() {
       </div>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したスタッフ" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div>
+    </div></SaveErrorScope>
   )
 }

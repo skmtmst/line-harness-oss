@@ -30,6 +30,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { Field } from '@/components/shared/form-controls'
 import StatusBadge from '@/components/shared/status-badge'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /* 絵の並び（注文完了・発送完了・入金確認完了・返金完了・注文キャンセル・ペット情報更新）。 */
 const CONNECTOR_EVENT_TYPES = [
@@ -85,6 +86,8 @@ function when(value: string | null | undefined): string {
 const READONLY_REASON = '見るだけの権限では設定を変えられません。変えるにはオーナーか管理者に頼んでください。'
 
 export default function EcConnector({ accountId, canEdit = true }: { accountId: string | null; canEdit?: boolean }) {
+  const saveErrors = useSaveFormErrors()
+
   const [data, setData] = useState<EcConnectorOverview | null>(null)
   const [form, setForm] = useState<Form>(EMPTY_FORM)
   const [state, setState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
@@ -120,10 +123,13 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
       setReplacingSecret(false)
       setState(response.data.configured ? 'ready' : 'empty')
     } catch (error) {
+
+
       if (!gate.current(token)) return
-      setState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
+      const fieldFailure = saveErrors.capture(error)
+      { if (!fieldFailure) setState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error') }
     }
-  }, [accountId, gate])
+  }, [accountId, gate, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -148,9 +154,12 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
       setNotice({ tone: 'success', text: 'つなぎ先の設定を保存しました。' })
       await load()
     } catch (error) {
+
+
       if (accountRef.current !== accountAtSave) return
+      const fieldFailure = saveErrors.capture(error)
       if (error instanceof ApiError && error.status === 409) await load()
-      setNotice({ tone: 'error', text: error instanceof ApiError && error.status === 409 ? 'ほかの担当者が先に変更しました。最新の内容を読み直しました。' : '設定を保存できませんでした。通信の状態を確認して、もう一度お試しください。' })
+      { if (!fieldFailure) setNotice({ tone: 'error', text: error instanceof ApiError && error.status === 409 ? 'ほかの担当者が先に変更しました。最新の内容を読み直しました。' : '設定を保存できませんでした。通信の状態を確認して、もう一度お試しください。' }) }
     } finally {
       setSaving(false)
     }
@@ -188,13 +197,13 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
   if (state !== 'ready') {
     return (
-      <ListState
+      <SaveErrorScope errors={saveErrors}><ListState
         kind={state}
         title={state === 'empty' ? accountId ? 'つなぎ先はまだありません' : 'LINEアカウントを選択してください' : undefined}
         description={state === 'empty' ? accountId ? 'ネットショップの種類・アドレス・鍵を登録すると、注文を取り込めます。' : 'LINEアカウントを選ぶ欄で、設定するアカウントを選びます。' : undefined}
         action={state === 'empty' && accountId && canEdit ? <Button type="button" variant="primary" onClick={() => setState('ready')}>つなぎ先を設定</Button> : undefined}
         onRetry={state === 'error' ? () => void load() : undefined}
-      />
+      /></SaveErrorScope>
     )
   }
 
@@ -204,7 +213,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
   const impactWords = (value: number | null | undefined) => (typeof value === 'number' ? `${value}件` : '未取得')
 
   return (
-    <div className={styles.board} data-design-node="iLJmw">
+    <SaveErrorScope errors={saveErrors}><div className={styles.board} data-design-node="iLJmw">
       {!canEdit ? <NoteBar tone="info">{READONLY_REASON}いまの設定はこのまま見られます。</NoteBar> : null}
       {notice ? <p className={notice.tone === 'success' ? styles.noticeGood : styles.noticeBad} role={notice.tone === 'success' ? 'status' : 'alert'}>{notice.text}</p> : null}
 
@@ -213,15 +222,15 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
           <h2 id="ec-connector-info" className={styles.cardTitle}>つなぎ先の情報</h2>
           <Field size="compact" label="ネットショップの種類" htmlFor="ec-connector-provider">
             {canEdit ? (
-              <Select id="ec-connector-provider" aria-label="ネットショップの種類" value={form.provider} onChange={(value) => setForm({ ...form, provider: value as Form['provider'] })} options={[{ value: 'shopify', label: 'Shopify' }, { value: 'ec_cube', label: 'EC-CUBE' }]} size="full" />
+              <SaveErrorField names={["provider","form.provider"]}><Select id="ec-connector-provider" aria-label="ネットショップの種類" value={form.provider} onChange={(value) => setForm({ ...form, provider: value as Form['provider'] })} options={[{ value: 'shopify', label: 'Shopify' }, { value: 'ec_cube', label: 'EC-CUBE' }]} size="full" /></SaveErrorField>
             ) : <TextField aria-label="ネットショップの種類" value={form.provider === 'ec_cube' ? 'EC-CUBE' : 'Shopify'} readOnly aria-readonly="true" />}
           </Field>
           <Field label="ショップのアドレス" htmlFor="ec-connector-domain" error={errors.domain}>
-            <TextField ref={domainRef} id="ec-connector-domain" value={form.shopDomain} onChange={(event) => setForm({ ...form, shopDomain: event.target.value })} placeholder="nen-store.myshopify.com" readOnly={!canEdit} />
+            <SaveErrorField names={["shopDomain","form.shopDomain","shop_domain","form.shop_domain"]}><TextField ref={domainRef} id="ec-connector-domain" value={form.shopDomain} onChange={(event) => setForm({ ...form, shopDomain: event.target.value })} placeholder="nen-store.myshopify.com" readOnly={!canEdit} /></SaveErrorField>
           </Field>
           <Field size="compact" label="つなぐための鍵" htmlFor="ec-connector-secret" error={errors.secret} note="鍵は保存後に読み戻せません。画面には最後の4文字だけを出します。">
             {showSecretInput ? (
-              <TextField ref={secretRef} id="ec-connector-secret" type="password" autoComplete="new-password" value={form.inboundSecret} onChange={(event) => setForm({ ...form, inboundSecret: event.target.value })} placeholder="32文字以上" />
+              <SaveErrorField names={["inboundSecret","form.inboundSecret","inbound_secret","form.inbound_secret"]}><TextField ref={secretRef} id="ec-connector-secret" type="password" autoComplete="new-password" value={form.inboundSecret} onChange={(event) => setForm({ ...form, inboundSecret: event.target.value })} placeholder="32文字以上" /></SaveErrorField>
             ) : (
               <div className={styles.keyRow}>
                 <span className={styles.keyMask} id="ec-connector-secret" title={connector?.secretUpdatedAt ? `${when(connector.secretUpdatedAt)} に更新` : undefined}>{connector?.secretConfigured ? `●●●●●●●●●●●●  ${connector.secretLastFour ?? '----'}` : '未設定'}</span>
@@ -267,7 +276,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
         <div className={styles.checks}>
           {/* 閲覧のみは押せるチェックを置かず、いまの選び方を文字で見せる。 */}
           {CONNECTOR_EVENT_TYPES.map((value) => canEdit
-            ? <Checkbox key={value} checked={form.eventTypes.includes(value)} onCheckedChange={() => toggle('eventTypes', value)}>{EC_EVENT_LABELS[value]}</Checkbox>
+            ? <SaveErrorField names={["value"]} key={value}><Checkbox key={value} checked={form.eventTypes.includes(value)} onCheckedChange={() => toggle('eventTypes', value)}>{EC_EVENT_LABELS[value]}</Checkbox></SaveErrorField>
             : <span key={value} className={styles.readValue}>{`${EC_EVENT_LABELS[value]}：${form.eventTypes.includes(value) ? '取り込む' : '取り込まない'}`}</span>)}
         </div>
         <p className={styles.note}>チェックを外すと、その出来事を起点にした配信や集計も止まります。</p>
@@ -280,7 +289,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
           {IDENTITY_RULES.map(([value, label, help], index) => (
             <span key={value} className={styles.rule} title={help}>
               {canEdit
-                ? <Checkbox checked={form.identityRules.includes(value)} onCheckedChange={() => toggle('identityRules', value)}>{`${index + 1}. ${label}`}</Checkbox>
+                ? <SaveErrorField names={["value"]}><Checkbox checked={form.identityRules.includes(value)} onCheckedChange={() => toggle('identityRules', value)}>{`${index + 1}. ${label}`}</Checkbox></SaveErrorField>
                 : <span className={styles.readValue}>{`${index + 1}. ${label}：${form.identityRules.includes(value) ? '使う' : '使わない'}`}</span>}
             </span>
           ))}
@@ -325,6 +334,6 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }

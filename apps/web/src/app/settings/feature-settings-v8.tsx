@@ -29,6 +29,7 @@ import {
   type UsageCategory,
 } from './use-feature-settings'
 import styles from './settings-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
  * 機能設定の V8 画面（★V8-B `ywFJT`）。
@@ -163,11 +164,11 @@ function FeatureRowV8({ item, features, usage, featureUsage, usageRetry, sharedS
             必須
           </span>
         ) : (
-          <Toggle
+          <SaveErrorField names={["enabled"]}><Toggle
             checked={enabled}
             label={`${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
             onChange={(next) => onToggle(item, next)}
-          />
+          /></SaveErrorField>
         )}
       </div>
     </li>
@@ -519,14 +520,14 @@ export function FeatureSettingsV8() {
             <label htmlFor="feature-settings-reason">
               変更理由（必須）
             </label>
-            <input
+            <SaveErrorField names={["reason"]}><input
               id="feature-settings-reason"
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder="例: マイルを使わないのでオフにする"
               maxLength={300}
               disabled={saving}
-            />
+            /></SaveErrorField>
             <p className={styles.reasonHint}>保存の記録に残ります。空のままでは保存できません。</p>
           </div>}
 

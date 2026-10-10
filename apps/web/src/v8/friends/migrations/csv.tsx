@@ -24,6 +24,7 @@ import { slashDateTime } from '../duplicates/words'
 import { csvExportLine } from '../list/csv-export'
 import { formatImportBytes, JOB_STATUS_LABELS, MANAGE_FORBIDDEN, useFriendMigrations } from './use-friend-migrations'
 import styles from './migrations.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const COLUMN_CHOICES = [
   ['basic', '基本（LINEユーザーID・表示名・本名・登録日）', false],
@@ -75,13 +76,13 @@ export default function CsvMigrationsV8() {
           <h3 id="csv-export-title" className={styles.cardTitle}>CSVで書き出す</h3>
           <div className={styles.field}>
             <span className={styles.fieldLabel}>アカウント</span>
-            <Select
+            <SaveErrorField names={["accountId","m.accountId","account_id","m.account_id"]}><Select
               aria-label="書き出すLINEアカウント"
               size="full"
               value={m.accountId}
               onChange={m.setAccountId}
               options={[{ value: '', label: 'アカウントを選択' }, ...m.accounts.map((account) => ({ value: account.id, label: account.name }))]}
-            />
+            /></SaveErrorField>
           </div>
           <fieldset className={styles.fieldset}>
             <legend className={styles.fieldLabel}>
@@ -89,9 +90,9 @@ export default function CsvMigrationsV8() {
               <HelpTip label="書き出す項目の説明">基本はLINEユーザーID・LINE表示名・本名・システム表示名・登録日の5列です。この5列はそのまま取り込めます。タグ・友だち情報、対応情報はまだ書き出せません。</HelpTip>
             </legend>
             {COLUMN_CHOICES.filter(([value]) => value !== 'support').map(([value, label, unavailable]) => (
-              <Checkbox key={value} checked={m.columns.includes(value)} onCheckedChange={() => m.toggleColumn(value)} disabled={unavailable}>
+              <SaveErrorField names={["value"]} key={value}><Checkbox key={value} checked={m.columns.includes(value)} onCheckedChange={() => m.toggleColumn(value)} disabled={unavailable}>
                 {label}
-              </Checkbox>
+              </Checkbox></SaveErrorField>
             ))}
           </fieldset>
           <p className={styles.small} title="Shift_JISの書き出しはまだ使えません">文字コード：UTF-8</p>

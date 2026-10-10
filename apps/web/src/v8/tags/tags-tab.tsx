@@ -74,6 +74,7 @@ import {
 } from '@/components/friend-fields/tags-page-v4'
 import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /** 付け方の呼び名（絵 I1E7Bt の「EC 連携・LINE ログイン・EC 購入・誕生日のきまり」）。v7 の呼び名（tags-page-v4）は触らない。 */
 const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
@@ -137,6 +138,8 @@ function TagFolderDialog({
   onClose: () => void
   onSaved: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [name, setName] = useState(group?.name ?? '')
   const [color, setColor] = useState<string | null>(group ? folderDisplayColor(group) : DEFAULT_TAG_FOLDER_COLOR)
   const [saving, setSaving] = useState(false)
@@ -157,22 +160,24 @@ function TagFolderDialog({
       }
       onSaved()
       onClose()
-    } catch {
-      setError(group ? 'フォルダを直せませんでした' : 'フォルダを追加できませんでした')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setError(group ? 'フォルダを直せませんでした' : 'フォルダを追加できませんでした') }
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <FolderEditorDialog open
+    <SaveErrorScope errors={saveErrors}><FolderEditorDialog open
       title={group ? 'フォルダを直す' : 'フォルダを追加'}
       description="タグを分けてしまう箱です。消しても、入っていたタグは未分類として残ります。"
       name={name} onNameChange={setName} color={color} onColorChange={setColor}
       colors={TAG_FOLDER_COLORS}
       placeholder="例: VIP" busy={saving} error={error || undefined}
       onCancel={onClose} onConfirm={() => void save()} confirmLabel={group ? '保存する' : 'フォルダを作る'}
-    />
+    /></SaveErrorScope>
   )
 }
 
@@ -191,6 +196,8 @@ export default function TagsTab({
   csvOpen: boolean
   onCsvClose: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const [items, setItems] = useState<Tag[]>(fixture?.items ?? [])
   const [groups, setGroups] = useState<TagGroup[]>(fixture?.groups ?? [])
@@ -257,10 +264,13 @@ export default function TagsTab({
       if (folders.success) setGroups(folders.data)
       setStatus('ready')
     } catch (reason) {
+
+
       if (!isCurrentTagListRequest(loadRequestRef.current, request)) return
+      saveErrors.capture(reason)
       setStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
-  }, [fixture, accountId])
+  }, [fixture, accountId, saveErrors])
   useEffect(() => { void load() }, [load])
 
   /* 数の帯のサーバー側の数。一覧とは別の要求なので、失敗しても一覧は止めない（「—」）。 */
@@ -341,6 +351,8 @@ export default function TagsTab({
       const result = await api.tags.reorder(order)
       if (!result.success) message = `並び順を保存できませんでした（${result.error}）`
     } catch (caught) {
+      saveErrors.capture(caught)
+
       const detail = japaneseDetailOf(caught)
       message = `並び順を保存できませんでした。${detail ? `${detail}。` : ''}通信を確かめて、もう一度お試しください。`
     }
@@ -396,9 +408,11 @@ export default function TagsTab({
         onAction: () => { void moveTagToGroup({ ...tag, groupId }, previous) },
       })
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
       setItems((current) => current.map((item) => item.id === tag.id ? { ...item, groupId: previous } : item))
       const message = reason instanceof ApiError ? reason.message : 'フォルダへ移せませんでした。'
-      setActionError(message)
+      { if (!fieldFailure) setActionError(message) }
       notifyToast(message, {
         tone: 'error',
         actionLabel: 'もう一度',
@@ -429,9 +443,11 @@ export default function TagsTab({
       if (!otherResult.success) throw new Error(otherResult.error)
       void load()
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
       setGroups(previous)
       const message = reason instanceof Error ? reason.message : '並び順を変更できませんでした'
-      setFolderError(message)
+      { if (!fieldFailure) setFolderError(message) }
       notifyToast(message, {
         tone: 'error',
         actionLabel: 'もう一度',
@@ -454,7 +470,9 @@ export default function TagsTab({
       setDeletingGroup(null)
       void load()
     } catch (reason) {
-      setFolderError(reason instanceof Error ? reason.message : 'フォルダを削除できませんでした')
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure) setFolderError(reason instanceof Error ? reason.message : 'フォルダを削除できませんでした') }
     } finally {
       setFolderBusy(false)
     }
@@ -581,7 +599,7 @@ export default function TagsTab({
     </span>
   )
   const usageSelect = (
-    <Select
+    <SaveErrorField names={["usageFilter","usage_filter"]}><Select
       aria-label="使用状態で絞り込む"
       width={145}
       value={usageFilter}
@@ -591,10 +609,10 @@ export default function TagsTab({
         { value: 'linked', label: '使用状態：連動あり' },
         { value: 'unused', label: '使用状態：未使用' },
       ]}
-    />
+    /></SaveErrorField>
   )
   const sourceSelect = (
-    <Select
+    <SaveErrorField names={["sourceFilter","source_filter"]}><Select
       aria-label="付け方で絞り込む"
       width={132}
       value={sourceFilter}
@@ -603,7 +621,7 @@ export default function TagsTab({
         { value: 'all', label: '付け方：すべて' },
         ...Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label: `付け方：${label}` })),
       ]}
-    />
+    /></SaveErrorField>
   )
   /* 「よく使う絞り込み」：重ねて絞れる4つ（星以外の QUICK_FILTERS）。開いたメニューで入れ切り。 */
   const quickItems: ActionMenuItem[] = [
@@ -799,7 +817,7 @@ export default function TagsTab({
   )
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       {/* 数の帯（絵の4つ）。並びと線は共有の帯に任せる。 */}
       <KpiBand data-design="KPIs" className={styles.kpis}>
         {kpis.map((kpi) => (
@@ -831,7 +849,7 @@ export default function TagsTab({
         </>}
         collapsedFolders={<>
           {createButton(false)}
-          <Select aria-label="フォルダ" width={150} value={folder} onChange={setFolder} options={folderSelectOptions} />
+          <SaveErrorField names={["folder"]}><Select aria-label="フォルダ" width={150} value={folder} onChange={setFolder} options={folderSelectOptions} /></SaveErrorField>
         </>}
         toolbar={narrow ? <>
           {/* 1152（aPeD8）：1段目＝作る・フォルダ・探す・使用状態、2段目＝付け方・よく使う・右端に表示件数。 */}
@@ -937,6 +955,6 @@ export default function TagsTab({
           }}
         />
       )}
-    </>
+    </></SaveErrorScope>
   )
 }

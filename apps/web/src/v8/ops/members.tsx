@@ -17,6 +17,7 @@ import { TextField } from '@/components/shared/text-field'
 import { OpsHead } from './shell'
 import parts from './parts.module.css'
 import styles from './members.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
  * 運営のメンバー管理 V8（絵 `FvbHW`・停止の窓 `VUyYu`）。
@@ -123,14 +124,14 @@ export default function OpsMembersV8() {
             {readOnly ? null : (
               <form onSubmit={(event) => void invite(event)} className={styles.invite}>
                 <div className={styles.inviteField}>
-                  <TextField
+                  <SaveErrorField names={["email"]}><TextField
                     type="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="招待する人のメールアドレス"
                     aria-label="招待する人のメールアドレス"
                     autoComplete="off"
-                  />
+                  /></SaveErrorField>
                 </div>
                 <Button type="submit" variant="primary" disabled={busy}>
                   <Send aria-hidden="true" />招待メールを送る

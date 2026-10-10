@@ -11,6 +11,7 @@ import { storeAdminSession, adminSessionHeaders } from '@/lib/admin-session'
 import { authRequest, emailError, internalAuthFailureCopy } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 import styles from './auth.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const LINE_LOGIN_FAILURE_CODES = new Set([
   'line_token_failed',
@@ -28,6 +29,8 @@ const LINE_LOGIN_FAILURE_CODES = new Set([
  * 2要素認証が要る人は /login/two-factor（設定がまだなら setup）へ送る。
  */
 export default function OpsLoginV8() {
+  const saveErrors = useSaveFormErrors()
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [emailMessage, setEmailMessage] = useState<string | null>(null)
@@ -79,7 +82,9 @@ export default function OpsLoginV8() {
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
     else if (res.csrfToken) {
-      try { localStorage.setItem('lh_csrf', res.csrfToken) } catch { /* Cookie のセッションで足りる */ }
+      try { localStorage.setItem('lh_csrf', res.csrfToken) } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
+ /* Cookie のセッションで足りる */ }
     }
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
@@ -95,8 +100,10 @@ export default function OpsLoginV8() {
         setBusy(null)
         return
       }
-    } catch {
-      setError('ログイン状態を確認できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setError('ログイン状態を確認できませんでした。もう一度お試しください。') }
       setBusy(null)
       return
     }
@@ -112,7 +119,7 @@ export default function OpsLoginV8() {
   }
 
   return (
-    <main className={styles.page} data-design-node="D9JALJ">
+    <SaveErrorScope errors={saveErrors}><main className={styles.page} data-design-node="D9JALJ">
       <div className={styles.brand}>
         <span className={styles.mark} aria-hidden="true">m</span>
         <span className={styles.brandText}>
@@ -126,7 +133,7 @@ export default function OpsLoginV8() {
           {error ? <Notice tone="danger" message={error} /> : null}
           <div className={styles.field}>
             <label htmlFor="ops-login-email" className={styles.label}>メールアドレス</label>
-            <TextField
+            <SaveErrorField names={["email"]}><TextField
               id="ops-login-email"
               type="email"
               value={email}
@@ -136,7 +143,7 @@ export default function OpsLoginV8() {
               autoComplete="email"
               inputMode="email"
               placeholder="you@example.com"
-            />
+            /></SaveErrorField>
             {emailMessage ? <p id="ops-login-email-error" className={styles.error}>{emailMessage}</p> : null}
           </div>
           <div className={styles.field}>
@@ -159,6 +166,6 @@ export default function OpsLoginV8() {
         <p className={styles.note}>運営メンバーの招待を受けた方は、招待メールのリンクから設定してください</p>
       </section>
       <p className={styles.foot}>この画面は運営メンバーだけが開けます。操作はすべて記録されます。</p>
-    </main>
+    </main></SaveErrorScope>
   )
 }

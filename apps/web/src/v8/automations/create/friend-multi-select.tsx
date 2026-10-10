@@ -6,6 +6,7 @@ import { RequiredBadge } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { api } from '@/lib/api'
 import { FRIEND_SELECT_LIMIT, normalizeFriendIds } from './trigger-helpers'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
  * 対象の友だちの複数選択（R22・設計G-2）。
@@ -108,7 +109,7 @@ export function FriendMultiSelect({
         </ul>
       ) : null}
       <div className="relative mt-2">
-        <TextField
+        <SaveErrorField names={["query","search"]}><TextField
           id="au-friend-search"
           invalid={Boolean(error)}
           aria-describedby={error ? 'au-friend-error' : undefined}
@@ -117,7 +118,7 @@ export function FriendMultiSelect({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           disabled={!accountId}
-        />
+        /></SaveErrorField>
         {query.trim() ? (
           <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-control border border-hairline bg-canvas shadow-card">
             {searching ? (

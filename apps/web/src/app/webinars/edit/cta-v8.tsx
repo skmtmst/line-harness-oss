@@ -15,6 +15,7 @@ import { ApiError, fetchApi, webinarApi, type WebinarCtaCard, type WebinarEditor
 import { ctaCardProblems } from './cta-card-validation'
 import { extractEditConflict } from './webinar-edit-conflict-band'
 import type { CompareMine } from './webinar-edit-compare-dialog'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /* 申込フォームの候補（編集画面の CtaDesignStep と同じ形）。 */
 type FormCandidates = {
@@ -67,6 +68,8 @@ export default function CtaV8({
   onDirtyChange?: (dirty: boolean) => void
   registerSave?: (save: (() => Promise<boolean>) | null) => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [ctas, setCtas] = useState<WebinarCtaCard[] | null>(null)
   const [times, setTimes] = useState<string[]>([])
   const [selected, setSelected] = useState(0)
@@ -103,12 +106,13 @@ export default function CtaV8({
       setSavedCards(JSON.stringify([res.data, res.data.map((c) => fmtMinSec(c.atSeconds))]))
       setSelected(0)
       onCtasReport?.(res.data)
-    } catch {
+    } catch (saveFailure) {
       if (id !== requestId.current) return
-      setMessage('CTAカードを読み込めませんでした。もう一度読み込んでください。読み込めるまで保存はできません。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure) setMessage('CTAカードを読み込めませんでした。もう一度読み込んでください。読み込めるまで保存はできません。') }
       onCtasReport?.(null)
     }
-  }, [webinarId, onCtasReport])
+  }, [webinarId, onCtasReport, saveErrors])
 
   useEffect(() => {
     void loadCtas()
@@ -179,8 +183,10 @@ export default function CtaV8({
       setMessage(null)
       onCtasReport?.(next)
       return true
-    } catch {
-      setMessage('CTAカードを保存できませんでした。入力は残っています。もう一度保存してください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setMessage('CTAカードを保存できませんでした。入力は残っています。もう一度保存してください。') }
       return false
     } finally {
       savingRef.current = false
@@ -212,14 +218,16 @@ export default function CtaV8({
       setRegistrationNotice('申込フォームを保存しました。公開前確認で申込フォームが公開中か確認してください。')
       return true
     } catch (cause) {
+      const fieldFailure = saveErrors.capture(cause)
+
       if (cause instanceof ApiError && (cause.code === 'version_conflict' || (cause.status === 409 && !cause.code))) {
         setConflict(true)
         setLatestEditor(null)
-        setRegistrationError('')
+        { if (!fieldFailure) setRegistrationError('') }
         return false
       }
       if (cause instanceof ApiError && ['form_inactive_or_missing', 'form_account_mismatch'].includes(cause.code ?? '')) loadForms()
-      setRegistrationError(webinarErrorText(cause, '申込フォームを保存できませんでした。入力は残っています。'))
+      { if (!fieldFailure) setRegistrationError(webinarErrorText(cause, '申込フォームを保存できませんでした。入力は残っています。')) }
       return false
     } finally {
       savingRef.current = false
@@ -237,8 +245,10 @@ export default function CtaV8({
       if (scope.current !== webinarId) return
       if (!Number.isInteger(response.data.version)) throw new Error('invalid_editor')
       setLatestEditor(response.data)
-    } catch {
-      if (scope.current === webinarId) setRegistrationError('最新版を読み込めませんでした。入力は残っています。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      if (scope.current === webinarId) { if (!fieldFailure) setRegistrationError('最新版を読み込めませんでした。入力は残っています。もう一度お試しください。') }
     } finally {
       savingRef.current = false
       if (scope.current === webinarId) setReadingLatest(false)
@@ -277,7 +287,7 @@ export default function CtaV8({
   }, [registerSave])
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       {conflict ? <div data-design-node="pvimJ"><Notice tone="warn" action={<Button disabled={readingLatest} busy={readingLatest} onClick={() => void compareLatest()}>違いを比べる</Button>}>別の画面でこのウェビナーが更新されました。申込フォームの入力は残しています。最新版を確認してから保存してください。</Notice>
         {latestEditor ? <div className="border-hairline mt-3 rounded-control border p-3 text-sm"><p>保存されている申込フォーム：{latestEditor.publicPage.form?.name ?? (latestEditor.registrationFormId ? publishedForms.find((form) => form.id === latestEditor.registrationFormId)?.name ?? '選択済みのフォーム' : '未設定')}</p><p className="mt-2">この画面の入力：{publishedForms.find((form) => form.id === selectedRegistrationFormId)?.name ?? (selectedRegistrationFormId ? '選択済みのフォーム' : '未設定')}</p><Button className="mt-3" onClick={() => setReplaceConfirm(true)}>最新を読み込んで続ける</Button></div> : null}
       </div> : null}
@@ -329,15 +339,15 @@ export default function CtaV8({
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="block">
                       <span className="text-ink-secondary mb-1 block text-xs font-medium">見出し</span>
-                      <input
+                      <SaveErrorField names={["title","current.title"]}><input
                         value={current.title}
                         onChange={(e) => update(currentIndex, { title: e.target.value })}
                         className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                      />
+                      /></SaveErrorField>
                     </label>
                     <label className="block">
                       <span className="text-ink-secondary mb-1 block text-xs font-medium">出す時刻（分:秒）</span>
-                      <input
+                      <SaveErrorField names={["times"]}><input
                         value={times[currentIndex] ?? ''}
                         onChange={(e) =>
                           setTimes((prev) => prev.map((t, j) => (j === currentIndex ? e.target.value : t)))
@@ -345,19 +355,19 @@ export default function CtaV8({
                         inputMode="numeric"
                         placeholder="12:00"
                         className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm tabular-nums"
-                      />
+                      /></SaveErrorField>
                     </label>
                   </div>
                   <label className="block">
                     <span className="text-ink-secondary mb-1 block text-xs font-medium">ボタンの言葉</span>
-                    <input
+                    <SaveErrorField names={["buttonLabel","current.buttonLabel","button_label","current.button_label"]}><input
                       value={current.buttonLabel}
                       onChange={(e) => update(currentIndex, { buttonLabel: e.target.value })}
                       className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                    />
+                    /></SaveErrorField>
                   </label>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <Select
+                    <SaveErrorField names={["kind","current.kind"]}><Select
                       label="リンクの種類"
                       aria-label="リンクの種類"
                       value={current.kind}
@@ -366,9 +376,9 @@ export default function CtaV8({
                         { value: 'form', label: '回答フォーム' },
                         { value: 'url', label: 'URL' },
                       ]}
-                    />
+                    /></SaveErrorField>
                     {current.kind === 'form' ? (
-                      <Select
+                      <SaveErrorField names={["formId","current.formId","form_id","current.form_id"]}><Select
                         label="使うフォーム"
                         aria-label="使うフォーム"
                         value={current.formId ?? ''}
@@ -377,26 +387,26 @@ export default function CtaV8({
                           { value: '', label: 'フォームを選ぶ' },
                           ...publishedForms.map((form) => ({ value: form.id, label: form.name })),
                         ]}
-                      />
+                      /></SaveErrorField>
                     ) : (
                       <label className="block">
                         <span className="text-ink-secondary mb-1 block text-xs font-medium">開くURL</span>
-                        <input
+                        <SaveErrorField names={["url","current.url"]}><input
                           value={current.url ?? ''}
                           onChange={(e) => update(currentIndex, { url: e.target.value })}
                           inputMode="url"
                           placeholder="https://"
                           className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                        />
+                        /></SaveErrorField>
                       </label>
                     )}
                   </div>
-                  <Checkbox
+                  <SaveErrorField names={["autoOpen","current.autoOpen","auto_open","current.auto_open"]}><Checkbox
                     checked={current.autoOpen}
                     onCheckedChange={(checked) => update(currentIndex, { autoOpen: checked })}
                   >
                     ボタンを押したら、フォームを自動で開く
-                  </Checkbox>
+                  </Checkbox></SaveErrorField>
                 </div>
               ) : null}
               <div className="mt-3">
@@ -416,7 +426,7 @@ export default function CtaV8({
           {formCandidates.state === 'error' ? <p className="text-ink-secondary mt-3 text-sm" role="alert">回答フォームを読み込めませんでした。候補が取れない間は種類をURLに切り替えて保存できます。 <Button onClick={loadForms}>もう一度読み込む</Button></p> : null}
           {formCandidates.state === 'forbidden' ? <p className="text-ink-secondary mt-3 text-sm">回答フォームを見る権限がありません。管理者に権限の確認を依頼してください。</p> : null}
           {formCandidates.state === 'ready' && publishedForms.length === 0 ? <p className="text-ink-faint mt-3 text-sm">公開中の回答フォームがありません。</p> : null}
-          {formCandidates.state === 'ready' && publishedForms.length > 0 ? <div className="mt-3"><Select label="申込フォーム" aria-label="申込に使う回答フォーム" value={selectedRegistrationFormId} onChange={setSelectedRegistrationFormId} options={[{ value: '', label: '申込フォームを選ぶ' }, ...publishedForms.map((form) => ({ value: form.id, label: form.name }))]} /></div> : null}
+          {formCandidates.state === 'ready' && publishedForms.length > 0 ? <div className="mt-3"><SaveErrorField names={["selectedRegistrationFormId","registrationFormId","selected_registration_form_id"]}><Select label="申込フォーム" aria-label="申込に使う回答フォーム" value={selectedRegistrationFormId} onChange={setSelectedRegistrationFormId} options={[{ value: '', label: '申込フォームを選ぶ' }, ...publishedForms.map((form) => ({ value: form.id, label: form.name }))]} /></SaveErrorField></div> : null}
           {formCandidates.state === 'ready' && selectedRegistrationFormId && !publishedForms.some((form) => form.id === selectedRegistrationFormId) ? <p role="alert" className="text-warning mt-2 text-sm">前に選んだフォームは使えなくなりました。公開中のフォームを選び直してください。</p> : null}
           {formCandidates.state === 'ready' && editor.registrationFormId && !publishedForms.some((form) => form.id === editor.registrationFormId) ? <p className="text-warning mt-2 text-sm">保存済みの申込フォームは公開中ではありません。</p> : null}
           {registrationError ? <p className="text-danger mt-2 text-xs" role="alert">{registrationError}</p> : null}
@@ -452,6 +462,6 @@ export default function CtaV8({
       </aside>
     </div>
     <ConfirmDialog open={replaceConfirm} title="最新の申込フォームを読み込みますか？" description="この画面で選んだ申込フォームを、保存されている最新版に置き換えます。CTAカードの入力は残します。" confirmLabel="最新を読み込んで続ける" onCancel={() => setReplaceConfirm(false)} onConfirm={acceptLatest} />
-    </>
+    </></SaveErrorScope>
   )
 }

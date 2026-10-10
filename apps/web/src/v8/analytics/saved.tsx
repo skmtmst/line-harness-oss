@@ -22,6 +22,7 @@ import { formatNumber } from '@/lib/format'
 import { StatePill, shortDateTime, shortDay } from './common'
 import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
+import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 
 const SAVED_STATE_LABELS: Record<SavedAnalyticsSnapshot['state'], string> = { available: '利用可能', partial: '一部集計', unavailable: '未取得', failed: '失敗' }
 const REPORT_STATUS_LABELS: Record<AnalyticsReportSchedule['status'], string> = { active: '動いている', paused: '止めている', archived: 'しまった' }
@@ -80,6 +81,8 @@ function ScheduleMenu({ schedule }: { schedule: AnalyticsReportSchedule }) {
 }
 
 export default function SavedV8({ accountId, onCountChange, canManage }: { accountId: string; onCountChange?: (count: number | null) => void; canManage: boolean }) {
+  const saveErrors = useSaveFormErrors()
+
   const [items, setItems] = useState<SavedAnalyticsSummary[]>([])
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState('')
@@ -169,7 +172,9 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
       setSchedules((current) => status === 'archived' ? current.filter((item) => item.id !== schedule.id) : current.map((item) => (item.id === schedule.id ? response.data : item)))
       setArchiveTarget(null)
     } catch (caught) {
-      setSchedulesError(caught instanceof Error ? caught.message : '定期レポートを更新できませんでした')
+      const fieldFailure = saveErrors.capture(caught)
+
+      if (!fieldFailure) { setSchedulesError(caught instanceof Error ? caught.message : '定期レポートを更新できませんでした') }
     } finally {
       setScheduleBusyId('')
     }
@@ -220,7 +225,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
   const failed = error ? '読み込めませんでした' : null
   const crossCount = items.filter((item) => item.kind === 'cross').length
 
-  return <>
+  return <SaveErrorScope errors={saveErrors}><>
     <KpiBand className={styles.band}>
       <KpiCard presentation="band" title="保存した分析" icon={<Bookmark size={13} aria-hidden="true" />} value={error ? null : items.length} unit="件" detail={failed ?? `クロス分析 ${crossCount}・ファネル ${items.length - crossCount}`} loading={loading} />
       <KpiCard presentation="band" title="保存結果数" icon={<History size={13} aria-hidden="true" />} value={error ? null : items.reduce((sum, item) => sum + item.snapshotCount, 0)} unit="件" detail={failed ?? '時点ごとに固定した結果'} loading={loading} />
@@ -350,5 +355,5 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
         </dl>
       })() : null}
     </Dialog>
-  </>
+  </></SaveErrorScope>
 }

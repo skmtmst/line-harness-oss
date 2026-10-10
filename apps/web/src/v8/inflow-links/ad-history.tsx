@@ -24,6 +24,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { AD_LOG_PAGE_SIZE, adDateTime, adLogStatus, adPlatformLabel, useAdLogs } from './ad-shared'
 import adsStyles from './ads.module.css'
 import styles from './ad-pages.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'すべての状態' },
@@ -183,10 +184,10 @@ export default function AdHistoryV8() {
             />
           </span>
           <span className={styles.selectBox}>
-            <Select aria-label="送信状態" value={status} onChange={(value) => { setStatus(value); setPage(1) }} options={STATUS_OPTIONS} width={160} />
+            <SaveErrorField names={["status"]}><Select aria-label="送信状態" value={status} onChange={(value) => { setStatus(value); setPage(1) }} options={STATUS_OPTIONS} width={160} /></SaveErrorField>
           </span>
           <span className={styles.selectBox}>
-            <Select aria-label="媒体" value={media} onChange={setMedia} options={mediaOptions} width={160} />
+            <SaveErrorField names={["media"]}><Select aria-label="媒体" value={media} onChange={setMedia} options={mediaOptions} width={160} /></SaveErrorField>
           </span>
           <span className={styles.toolsSpacer} aria-hidden="true" />
           <span className={styles.toolsCount}>{`${formatNumber(model.total)} 件中 ${formatNumber(visible.length)} 件`}</span>

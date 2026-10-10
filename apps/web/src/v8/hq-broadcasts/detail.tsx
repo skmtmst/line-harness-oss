@@ -37,6 +37,7 @@ import styles from './detail.module.css'
 import detailStyles from '../broadcast-detail/detail.module.css'
 import BroadcastPhone from '../broadcast-detail/phone'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const n = (value: number) => value.toLocaleString('ja-JP')
 /** 開いた・押した・反応（API-18）。店の計測がまだ取れていない（null）は「—」。 */
@@ -218,7 +219,7 @@ function RecipientsTab({ run }: { run: HqBroadcastRun }) {
           <p className={styles.cardSub}>{total == null ? 'アカウントを選ぶと、その店の宛先が出ます' : `${n(total)}人`}</p>
         </div>
         <span className={styles.accountPick}>
-          <Select aria-label="宛先を見るアカウント" size="full" value={accountId} onChange={setAccountId} options={sentTo.map((t) => ({ value: t.accountId, label: t.accountName }))} />
+          <SaveErrorField names={["accountId","account_id"]}><Select aria-label="宛先を見るアカウント" size="full" value={accountId} onChange={setAccountId} options={sentTo.map((t) => ({ value: t.accountId, label: t.accountName }))} /></SaveErrorField>
         </span>
       </div>
       {state === 'error' ? <ListState kind="error" error={new Error('宛先を読み込めませんでした')} onRetry={() => void load(0, false)} /> : (

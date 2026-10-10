@@ -43,6 +43,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { failedCount, jpDateTime, runBadge, sendTotals } from './model'
 import styles from '../broadcasts/list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type StatusKey = 'all' | 'scheduled' | 'draft' | 'sent' | 'error'
 const STATUS_CHIPS: { key: StatusKey; label: string; icon: typeof List }[] = [
@@ -81,6 +82,8 @@ function rateLine(targets: HqBroadcastRun['targets'], reached: number): string |
 type HqFolder = { id: string; name: string; revision: number; item_count: number; color?: string | null }
 
 export default function HqBroadcastList() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   usePageTitle('一括配信')
   const role = useStaffRole()
@@ -108,17 +111,21 @@ export default function HqBroadcastList() {
       const res = await hqBroadcastsApi.list()
       setRuns(res.data); setError(null)
     } catch (caught) {
-      setError(caught)
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setError(caught) }
     }
-  }, [])
+  }, [saveErrors])
   const loadFolders = useCallback(async () => {
     try {
       const res = await hqBroadcastsApi.folders()
       setFolders(res.data)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       setFolders(null)
     }
-  }, [])
+  }, [saveErrors])
   useEffect(() => { void load(); void loadFolders() }, [load, loadFolders])
 
   const all = useMemo(() => runs ?? [], [runs])
@@ -197,6 +204,8 @@ export default function HqBroadcastList() {
       await loadFolders()
       setFolderDialog(null)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       // 理由ごとに言い分ける（共通の describeFolderFailure）。入力した名前と色は残す。
       const failure = describeFolderFailure(caught, 'save')
       if (failure.kind === 'missing') {
@@ -206,8 +215,8 @@ export default function HqBroadcastList() {
         return
       }
       if (failure.kind === 'conflict') await loadFolders()
-      if (failure.nameError) setFolderNameError(failure.nameError)
-      else setFolderError(failure.message)
+      if (failure.nameError) { if (!fieldFailure) setFolderNameError(failure.nameError) }
+      else { if (!fieldFailure) setFolderError(failure.message) }
     } finally {
       setFolderBusy(false)
     }
@@ -220,6 +229,8 @@ export default function HqBroadcastList() {
       await loadFolders()
       setDeletingFolder(null); setFolderFilter('all')
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       const failure = describeFolderFailure(caught, 'delete')
       if (failure.kind === 'missing') {
         notifyToast(failure.message, { tone: 'error' })
@@ -228,7 +239,7 @@ export default function HqBroadcastList() {
         return
       }
       if (failure.kind === 'conflict') await loadFolders()
-      setFolderError(failure.message)
+      { if (!fieldFailure) setFolderError(failure.message) }
     } finally {
       setFolderBusy(false)
     }
@@ -251,13 +262,13 @@ export default function HqBroadcastList() {
         </div>
         <span className={styles.spacer} aria-hidden="true" />
         <div className={styles.pageSizeBox}>
-          <Select
+          <SaveErrorField names={["pageSize","page_size"]}><Select
             aria-label="表示件数"
             size="page-size"
             value={String(pageSize)}
             onChange={(value) => { setPageSize(Number(value) || 20); setPage(1) }}
             options={[{ value: '10', label: '10件表示' }, { value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }]}
-          />
+          /></SaveErrorField>
         </div>
         <button
           type="button"
@@ -362,7 +373,7 @@ export default function HqBroadcastList() {
   ) : null
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId="U4Eep0"
       headingSize="regular"
       title="一括配信"
@@ -421,6 +432,6 @@ export default function HqBroadcastList() {
       pagination={pager}
     >
       {content}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

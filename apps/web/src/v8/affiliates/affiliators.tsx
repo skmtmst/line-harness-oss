@@ -63,6 +63,7 @@ import {
   ToolbarNotices,
 } from './parts'
 import styles from './affiliates.module.css'
+import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 
 type FilterKey = 'active' | 'reward'
 type SortKey = 'conversions' | 'reward' | 'name' | 'newest'
@@ -93,6 +94,8 @@ const GROUPS: Array<{ key: GroupKey; label: string; match: (row: AffiliateListRo
 
 
 export default function AffiliatorsTab() {
+  const saveErrors = useSaveFormErrors()
+
   const samePageUrl = useSamePageUrl()
   const { readonly, narrow, accountId, setCount, focusAffiliateId } = useAffiliateShell()
   const settlementPeriod = useMemo(() => currentSettlementPeriod(), [])
@@ -207,13 +210,15 @@ export default function AffiliatorsTab() {
       }
       setPaymentTotal(res.data.totalAmount)
       setPaymentState('ready')
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       if (mounted.current) {
         setPaymentState('error')
         setPaymentTotal(null)
       }
     }
-  }, [accountId, settlementPeriod])
+  }, [accountId, settlementPeriod, saveErrors])
 
   const loadMonthly = useCallback(async () => {
     setMonthlyState('loading')
@@ -425,12 +430,12 @@ export default function AffiliatorsTab() {
 
   const folderSelect = (
     <div className={styles.narrowFolder}>
-      <Select
+      <SaveErrorField names={["group"]}><Select
         aria-label="報酬の決め方"
         value={group}
         options={GROUPS.map((item) => ({ value: item.key, label: item.key === 'all' || !ready ? item.label : `${item.label} ${groupCount(item.key)}` }))}
         onChange={(value) => resetPage(() => setGroup(value as GroupKey))}
-      />
+      /></SaveErrorField>
     </div>
   )
 
@@ -509,11 +514,11 @@ export default function AffiliatorsTab() {
           <TableHeadRow className={styles.headRow} data-table-layout="columns">
             <Th className={styles.colCheck}>
               {readonly ? null : (
-                <Checkbox
+                <SaveErrorField names={["allChecked","checked","all_checked"]}><Checkbox
                   aria-label="このページの全員を選ぶ"
                   checked={allChecked}
                   onCheckedChange={(checked) => setChecked(pagedRows.map((row) => row.id), checked)}
-                />
+                /></SaveErrorField>
               )}
             </Th>
             <Th className={styles.colName}>アフィリエイター</Th>
@@ -525,15 +530,15 @@ export default function AffiliatorsTab() {
           </TableHeadRow>
         </thead>
         <tbody>
-          {pagedRows.map((row) => (
+          {pagedRows.map((row, saveFieldIndex) => (
             <Tr key={row.id} className={styles.row} data-table-layout="columns">
               <Td className={styles.colCheck}>
                 {readonly ? null : (
-                  <Checkbox
+                  <SaveErrorField names={[`pagedRows.${saveFieldIndex}.id`,"id","row.id","checked"]}><Checkbox
                     aria-label={`${row.name}を選ぶ`}
                     checked={selected.has(row.id)}
                     onCheckedChange={(checked) => setChecked([row.id], checked)}
-                  />
+                  /></SaveErrorField>
                 )}
               </Td>
               <Td className={styles.colName}>
@@ -621,7 +626,7 @@ export default function AffiliatorsTab() {
   const drawerRow = drawerId ? rows.find((row) => row.id === drawerId) ?? null : null
 
   return (
-    <AffiliateFrame
+    <SaveErrorScope errors={saveErrors}><AffiliateFrame
       actions={
         <Button onClick={exportCsv} disabled={shownRows.length === 0}>
           <Download size={15} aria-hidden="true" /> CSV で書き出す
@@ -666,6 +671,6 @@ export default function AffiliatorsTab() {
       </>}
     >
       {body}
-    </AffiliateFrame>
+    </AffiliateFrame></SaveErrorScope>
   )
 }

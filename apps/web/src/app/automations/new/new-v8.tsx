@@ -48,6 +48,7 @@ import {
 import { WeekdaySelect } from './weekday-select'
 import { FriendMultiSelect } from './friend-multi-select'
 import { formatNumber, formatTime } from '@/lib/format'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /**
  * ルールを作る。Pencil ★V6 `Rv8Jv`（25-1-A つくる）。
@@ -732,7 +733,7 @@ function ResourcePickRow(props: {
         {title}<RequiredBadge />
       </label>
       <div className="space-y-2">
-        <Select
+        <SaveErrorField names={["value"]}><Select
           id={id}
           value={value}
           disabled={tagsLoading || tagsFailed}
@@ -743,7 +744,7 @@ function ResourcePickRow(props: {
             { value: '', label: '— 選んでください —' },
             ...options.map((option) => ({ value: option.value, label: option.label })),
           ]}
-        />
+        /></SaveErrorField>
         {tagsLoading ? <p className={styles.footnote}>読み込んでいます</p> : null}
         {tagsFailed ? (
           <p className={styles.footnote}>
@@ -775,6 +776,8 @@ export function NewAutomationV8({
   draftId?: string
   chrome: 'create' | 'draft'
 }) {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle(chrome === 'draft' ? '下書きを仕上げる' : 'ルールを作る')
   const router = useRouter()
   const { selectedAccountId } = useAccount()
@@ -1571,7 +1574,9 @@ export function NewAutomationV8({
         setPreviewCount(preview.data.matched)
         setPreviewFailed(false)
       }
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       const stashed = formStashRef.current[accountId]
       if (stashed) stashed.previewFailed = true
       if (selectedAccountRef.current === accountId) setPreviewFailed(true)
@@ -1591,7 +1596,9 @@ export function NewAutomationV8({
       if (!list.success) return false
       const found = list.data.find((item) => item.id === draftId)
       return !!found && (found.status === 'active' || found.status === 'stopped')
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       return false
     }
   }
@@ -1616,7 +1623,9 @@ export function NewAutomationV8({
         serverActionCount: server.data.actions.length,
       })
       return true
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       return false
     }
   }
@@ -1651,9 +1660,11 @@ export function NewAutomationV8({
       setSaveOutcome('saved')
       setError('')
       setNotice('最新の内容を読み込みました。表示は保存されている内容です。')
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
       if (selectedAccountRef.current === accountId) {
-        setError('最新の内容を読み込めませんでした。通信状態を確かめて、もう一度お試しください。')
+        { if (!fieldFailure) setError('最新の内容を読み込めませんでした。通信状態を確かめて、もう一度お試しください。') }
       }
     }
   }
@@ -1839,6 +1850,8 @@ export function NewAutomationV8({
         }
       }
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       /*
        * tJqST: 版の重なり（409）は帯で知らせる。結び付き・控えは捨てず、
        * 自分の入力のまま比べ直せるようにする。消えた下書き（404）だけ
@@ -1852,7 +1865,7 @@ export function NewAutomationV8({
         if (await recordConflict(draft.id, accountId)) {
           if (selectedAccountRef.current === accountId) {
             setSaveOutcome('failed')
-            setError('')
+            { if (!fieldFailure) setError('') }
           }
           return
         }
@@ -1885,7 +1898,7 @@ export function NewAutomationV8({
               setPublishedRuleId(draft.id)
               setResumeTarget(null)
               syncResumeUrl(null)
-              setNotice('すでに公開されています。一覧で確認できます。')
+              { if (!fieldFailure) setNotice('すでに公開されています。一覧で確認できます。') }
               router.push(`/automations?highlight=${draft.id}`)
             }
             saveRunningRef.current = false
@@ -1930,13 +1943,13 @@ export function NewAutomationV8({
          */
         if (activate && publishAttempted && publishDraftId
           && !(caught instanceof ApiError && (caught.status === 404 || caught.status === 409))) {
-          setError('通信が切れて結果が分かりませんでした。公開されているか一覧で確認してから、もう一度お試しください。')
+          { if (!fieldFailure) setError('通信が切れて結果が分かりませんでした。公開されているか一覧で確認してから、もう一度お試しください。') }
         } else {
-          setError(
+          { if (!fieldFailure) setError(
             caught instanceof ApiError || caught instanceof Error
               ? caught.message
               : '保存できませんでした',
-          )
+          ) }
         }
       }
     } finally {
@@ -2010,12 +2023,15 @@ export function NewAutomationV8({
         operationKey: newOperationKey(),
       })
     } catch (caught) {
+
+
       if (selectedAccountRef.current !== accountId) return
-      setError(
+      const fieldFailure = saveErrors.capture(caught)
+      { if (!fieldFailure) setError(
         caught instanceof ApiError || caught instanceof Error
           ? caught.message
           : '送る内容を確認できませんでした',
-      )
+      ) }
     } finally {
       prepareRunningRef.current = false
       setPreparingTest(false)
@@ -2047,7 +2063,9 @@ export function NewAutomationV8({
       setTestRun((current) => current && current.runId === record.runId ? next : current)
       const stashed = formStashRef.current[accountId]
       if (stashed?.testRun?.runId === record.runId) stashed.testRun = next
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       // 読み直しの失敗は黙る。古い状態のまま残し、押せばまた読める。
     }
   }
@@ -2120,8 +2138,11 @@ export function NewAutomationV8({
       if (stashed) stashed.testRun = record
       setNotice(`1人テストを受け付けました（${testRunStatusLabel(result.data.status)}）。結果は下の実行から確認できます。`)
     } catch (caught) {
+
+
       // 待っている間に店を替えたら、前の店の成否をこの画面へ書かない。
       if (!sameAccount()) return
+      const fieldFailure = saveErrors.capture(caught)
       // R485: 取りやめた後の失敗は出さない。送っていないので黙って閉じる。
       if (ticket !== testTicketRef.current) {
         setTestConfirmation(null)
@@ -2132,11 +2153,11 @@ export function NewAutomationV8({
       if (caught instanceof ApiError && (caught.status === 409 || caught.code === 'version_conflict')) {
         setTestConfirmation(null)
       }
-      setError(
+      { if (!fieldFailure) setError(
         caught instanceof ApiError || caught instanceof Error
           ? caught.message
           : '1人テストを実行できませんでした',
-      )
+      ) }
     } finally {
       testRunningRef.current = false
       setTesting(false)
@@ -2182,7 +2203,7 @@ export function NewAutomationV8({
     .map((row) => commonActions.find((item) => item.id === row.commonActionId)?.name ?? '選んだ共通アクション')
 
   return (
-    <div data-design-node={nodeId}>
+    <SaveErrorScope errors={saveErrors}><div data-design-node={nodeId}>
       <div className={styles.head}>
         <div className={styles.headText}>
           <Link href={backHref} className={styles.backLink}>{backLabel}</Link>
@@ -2228,26 +2249,26 @@ export function NewAutomationV8({
             <p className={styles.footnote}>一覧で見分けるための名前。お客さまには見えません</p>
             <label className={styles.fieldLabel} htmlFor="v8-rule-name">
               名前
-              <TextField
+              <SaveErrorField names={["name"]}><TextField
                 id="v8-rule-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="例：「予約」と送られたら担当へ知らせる"
                 maxLength={120}
-              />
+              /></SaveErrorField>
             </label>
           </section>
 
           <section className={styles.formCard} aria-label="どんなときに動かしますか">
             <h2 className={styles.formTitle}>{stepNo(2)}どんなときに動かしますか</h2>
             <div>
-              <TextField
+              <SaveErrorField names={["eventQuery","event_query"]}><TextField
                 aria-label="きっかけを探す"
                 type="search"
                 value={eventQuery}
                 onChange={(e) => setEventQuery(e.target.value)}
                 placeholder="きっかけを言葉で探す（例：予約・タグ・時刻）"
-              />
+              /></SaveErrorField>
             </div>
             {triggerEventGroups.map((group) => group.events.length === 0 ? null : (
               <div key={group.id}>
@@ -2283,14 +2304,14 @@ export function NewAutomationV8({
               <div className={styles.subBox}>
                 <p className={styles.groupLabel}>きっかけの詳しい設定</p>
                 <div className={styles.formGrid}>
-                  {eventType === 'tag_change' ? <Select aria-label="きっかけのタグ" value={String(triggerConfig.tagId ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, tagId: value })} options={[{ value: '', label: 'どのタグか選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} size="standard" /> : null}
-                  {eventType === 'tag_change' ? <Select aria-label="付いたとき・外れたとき" value={String(triggerConfig.action ?? 'add')} onChange={(value) => setTriggerConfig({ ...triggerConfig, action: value })} options={[{ value: 'add', label: '付いたとき' }, { value: 'remove', label: '外れたとき' }]} size="standard" /> : null}
-                  {eventType === 'form_submitted' ? <TextField aria-label="回答フォーム" placeholder="フォームID（空欄ならすべて）" value={String(triggerConfig.formId ?? '')} onChange={(e) => setTriggerConfig({ formId: e.target.value })} /> : null}
-                  {eventType === 'link_clicked' ? <TextField aria-label="計測リンク" placeholder="計測リンクID（空欄ならすべて）" value={String(triggerConfig.trackedLinkId ?? '')} onChange={(e) => setTriggerConfig({ trackedLinkId: e.target.value })} /> : null}
-                  {eventType === 'calendar_booked' ? <Select aria-label="予約の種類" value={String(triggerConfig.bookingType ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, bookingType: value })} options={[{ value: '', label: 'すべての予約' }, { value: 'salon', label: 'サロン予約' }, { value: 'event', label: 'イベント予約' }]} size="standard" /> : null}
-                  {eventType === 'calendar_booked' && triggerConfig.bookingType !== 'event' ? <TextField aria-label="予約メニュー" placeholder="メニューID（空欄ならすべて）" value={String(triggerConfig.menuId ?? '')} onChange={(e) => setTriggerConfig({ menuId: e.target.value })} /> : null}
-                  {eventType === 'calendar_booked' && triggerConfig.bookingType === 'event' ? <TextField aria-label="対象イベント" placeholder="イベントID（空欄ならすべて）" value={String(triggerConfig.eventId ?? '')} onChange={(e) => setTriggerConfig({ eventId: e.target.value })} /> : null}
-                  {eventType === 'datetime' ? <DateTimeField aria-label="実行日時" value={String(triggerConfig.at ?? '')} onChange={(v) => setTriggerConfig({ ...triggerConfig, at: v })} /> : null}
+                  {eventType === 'tag_change' ? <SaveErrorField names={["tagId","triggerConfig.tagId","tag_id","trigger_config.tag_id","trigger_config"]}><Select aria-label="きっかけのタグ" value={String(triggerConfig.tagId ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, tagId: value })} options={[{ value: '', label: 'どのタグか選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} size="standard" /></SaveErrorField> : null}
+                  {eventType === 'tag_change' ? <SaveErrorField names={["action","triggerConfig.action","trigger_config.action","trigger_config"]}><Select aria-label="付いたとき・外れたとき" value={String(triggerConfig.action ?? 'add')} onChange={(value) => setTriggerConfig({ ...triggerConfig, action: value })} options={[{ value: 'add', label: '付いたとき' }, { value: 'remove', label: '外れたとき' }]} size="standard" /></SaveErrorField> : null}
+                  {eventType === 'form_submitted' ? <SaveErrorField names={["formId","triggerConfig.formId","form_id","trigger_config.form_id","trigger_config"]}><TextField aria-label="回答フォーム" placeholder="フォームID（空欄ならすべて）" value={String(triggerConfig.formId ?? '')} onChange={(e) => setTriggerConfig({ formId: e.target.value })} /></SaveErrorField> : null}
+                  {eventType === 'link_clicked' ? <SaveErrorField names={["trackedLinkId","triggerConfig.trackedLinkId","tracked_link_id","trigger_config.tracked_link_id","trigger_config"]}><TextField aria-label="計測リンク" placeholder="計測リンクID（空欄ならすべて）" value={String(triggerConfig.trackedLinkId ?? '')} onChange={(e) => setTriggerConfig({ trackedLinkId: e.target.value })} /></SaveErrorField> : null}
+                  {eventType === 'calendar_booked' ? <SaveErrorField names={["bookingType","triggerConfig.bookingType","booking_type","trigger_config.booking_type","trigger_config"]}><Select aria-label="予約の種類" value={String(triggerConfig.bookingType ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, bookingType: value })} options={[{ value: '', label: 'すべての予約' }, { value: 'salon', label: 'サロン予約' }, { value: 'event', label: 'イベント予約' }]} size="standard" /></SaveErrorField> : null}
+                  {eventType === 'calendar_booked' && triggerConfig.bookingType !== 'event' ? <SaveErrorField names={["menuId","triggerConfig.menuId","menu_id","trigger_config.menu_id","trigger_config"]}><TextField aria-label="予約メニュー" placeholder="メニューID（空欄ならすべて）" value={String(triggerConfig.menuId ?? '')} onChange={(e) => setTriggerConfig({ menuId: e.target.value })} /></SaveErrorField> : null}
+                  {eventType === 'calendar_booked' && triggerConfig.bookingType === 'event' ? <SaveErrorField names={["eventId","triggerConfig.eventId","event_id","trigger_config.event_id","trigger_config"]}><TextField aria-label="対象イベント" placeholder="イベントID（空欄ならすべて）" value={String(triggerConfig.eventId ?? '')} onChange={(e) => setTriggerConfig({ eventId: e.target.value })} /></SaveErrorField> : null}
+                  {eventType === 'datetime' ? <SaveErrorField names={["at","triggerConfig.at","trigger_config.at","trigger_config"]}><DateTimeField aria-label="実行日時" value={String(triggerConfig.at ?? '')} onChange={(v) => setTriggerConfig({ ...triggerConfig, at: v })} /></SaveErrorField> : null}
                   {eventType === 'weekly' ? (
                     <WeekdaySelect
                       value={triggerConfig.weekdays as ReadonlyArray<number>}
@@ -2298,7 +2319,7 @@ export function NewAutomationV8({
                       onChange={(days) => setTriggerConfig({ ...triggerConfig, weekdays: days })}
                     />
                   ) : null}
-                  {eventType === 'daily' || eventType === 'weekly' ? <TimeField aria-label="実行時刻" step={300} value={String(triggerConfig.time ?? '')} onChange={(v) => setTriggerConfig({ ...triggerConfig, time: v })} /> : null}
+                  {eventType === 'daily' || eventType === 'weekly' ? <SaveErrorField names={["time","triggerConfig.time","trigger_config.time","trigger_config"]}><TimeField aria-label="実行時刻" step={300} value={String(triggerConfig.time ?? '')} onChange={(v) => setTriggerConfig({ ...triggerConfig, time: v })} /></SaveErrorField> : null}
                   {eventType === 'datetime' || eventType === 'daily' || eventType === 'weekly' ? (
                     <FriendMultiSelect
                       accountId={selectedAccountId ?? null}
@@ -2319,13 +2340,13 @@ export function NewAutomationV8({
             {usesKeyword ? (
               <label className={styles.fieldLabel} htmlFor="v8-rule-keyword">
                 含まれる言葉
-                <TextField
+                <SaveErrorField names={["keyword"]}><TextField
                   id="v8-rule-keyword"
                   value={keyword}
                   onChange={(event) => setKeyword(event.target.value)}
                   placeholder="例：予約"
                   maxLength={100}
-                />
+                /></SaveErrorField>
               </label>
             ) : null}
             {usesKeyword && keyword.trim() ? (
@@ -2378,14 +2399,14 @@ export function NewAutomationV8({
                   <div className={styles.actionBody}>
                     <label className={styles.fieldLabel} htmlFor={`v8-action-${row.key}`}>
                       {actionRowTitle(row.type)}
-                      <Select
+                      <SaveErrorField names={[`actions.${index}.type`,"type","row.type"]}><Select
                         id={`v8-action-${row.key}`}
                         aria-label="すること"
                         value={row.type}
                         onChange={(value) => updateAction(row.key, { type: value as ActionType })}
                         options={ACTIONS.map((action) => ({ value: action.value, label: action.label }))}
                         size="standard"
-                      />
+                      /></SaveErrorField>
                     </label>
                     {row.type === 'add_tag' ? (
                       <V8ResourcePickRow
@@ -2426,11 +2447,11 @@ export function NewAutomationV8({
                     ) : (
                       <label className={styles.fieldLabel} htmlFor={`v8-message-${row.key}`}>
                         送る文面
-                        <TextArea
+                        <SaveErrorField names={[`actions.${index}.message`,"message","row.message","content"]}><TextArea
                           id={`v8-message-${row.key}`}
                           value={row.message}
                           onChange={(event) => updateAction(row.key, { message: event.target.value })}
-                        />
+                        /></SaveErrorField>
                       </label>
                     )}
                     <p className={styles.footnote}>
@@ -2516,7 +2537,7 @@ export function NewAutomationV8({
               </div>
             ) : null}
             <div className={styles.formGrid}>
-              <TextField aria-label="1人テストの友だちID" value={testFriendId} onChange={(event) => setTestFriendId(event.target.value)} placeholder="試す友だちID" />
+              <SaveErrorField names={["testFriendId","test_friend_id"]}><TextField aria-label="1人テストの友だちID" value={testFriendId} onChange={(event) => setTestFriendId(event.target.value)} placeholder="試す友だちID" /></SaveErrorField>
               <div>
                 <Button
                   variant="secondary"
@@ -2757,7 +2778,7 @@ export function NewAutomationV8({
           </div>
         ) : null}
       </Dialog>
-    </div>
+    </div></SaveErrorScope>
   )
 }
 
@@ -2786,7 +2807,7 @@ function V8ResourcePickRow(props: {
     <div className={styles.formGrid}>
       <label className={styles.fieldLabel} htmlFor={id}>
         {title}
-        <Select
+        <SaveErrorField names={["value"]}><Select
           id={id}
           value={value}
           disabled={loading || failed}
@@ -2797,7 +2818,7 @@ function V8ResourcePickRow(props: {
             { value: '', label: '— 選んでください —' },
             ...options.map((option) => ({ value: option.value, label: option.label })),
           ]}
-        />
+        /></SaveErrorField>
       </label>
       {loading ? <p className={styles.footnote}>読み込んでいます</p> : null}
       {failed ? <p className={styles.footnote}>{failedNote}</p> : null}

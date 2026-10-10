@@ -44,6 +44,7 @@ import {
 } from './event-draft-shared'
 import { formatDay, formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /**
  * イベントを作る（設計 V2 8-3-2 / 8-3-3 / 8-3-4）。
@@ -116,6 +117,8 @@ function wizardSnapshot(draft: EventDetail, firstSlot: FirstSlotDraft): string {
 }
 
 export default function EventWizard({ accountId, eventId, step }: EventWizardProps) {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const [draft, setDraft] = useState<EventDetail>(DEFAULT_DRAFT)
   const [slots, setSlots] = useState<EventSlot[]>([])
@@ -198,7 +201,9 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
         // R161 監査：読み込んだ直後の姿を「保存済み」とし、変えた分だけ未保存にする。
         setSavedSnapshot(wizardSnapshot(loadedDraft, loadedFirstSlot ?? DEFAULT_FIRST_SLOT))
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+        const fieldFailure = saveErrors.capture(e)
+
+        if (!cancelled) { if (!fieldFailure) setError(e instanceof Error ? e.message : String(e)) }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -206,7 +211,7 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
     return () => {
       cancelled = true
     }
-  }, [accountId, eventId])
+  }, [accountId, eventId, saveErrors])
 
   function update<K extends keyof EventDetail>(key: K, value: EventDetail[K]) {
     setDraft((d) => ({ ...d, [key]: value }))
@@ -277,7 +282,9 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       try {
         slotPayload = firstSlotPayload(firstSlot)
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e))
+        const fieldFailure = saveErrors.capture(e)
+
+        { if (!fieldFailure) setError(e instanceof Error ? e.message : String(e)) }
         return
       }
     }
@@ -342,17 +349,19 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       }
       router.replace(`/events/new?step=${goto}&id=${id}`)
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e)
+
       const reason =
         e instanceof ApiError && e.status === 409 && e.code === 'version_conflict'
           ? '別の画面でイベントが更新されました。開き直してからもう一度保存してください。'
           : e instanceof Error ? e.message : String(e)
       // 部分成功のときは何が保存されたかを示し、同じボタンで再開できる
       // ことを伝える(DETAIL-08)。イベントIDはURLの ?id= に残っている。
-      setError(
+      { if (!fieldFailure) setError(
         eventSaved
           ? `イベント本体は保存しましたが、最初の予約枠を保存できませんでした。もう一度押すと続きから再開します。（${reason}）`
           : reason,
-      )
+      ) }
     } finally {
       setSaving(false)
     }
@@ -366,14 +375,14 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
 
   if (loading) {
     return (
-      <div className="bg-canvas rounded-card border-hairline border p-12 text-center text-sm text-ink-faint">
+      <SaveErrorScope errors={saveErrors}><div className="bg-canvas rounded-card border-hairline border p-12 text-center text-sm text-ink-faint">
         読み込み中…
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
   return (
-    <div>
+    <SaveErrorScope errors={saveErrors}><div>
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
         <Link href="/events" className="hover:underline">
           イベント予約
@@ -431,7 +440,7 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
           onPublish={() => persist(null)}
         />
       )}
-    </div>
+    </div></SaveErrorScope>
   )
 }
 
@@ -550,7 +559,7 @@ function OverviewStep({
       <FormSection step={1} label="イベントの中身" note="友だちの予約ページにそのまま出ます">
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label="イベント名" htmlFor="ev-name" required error={nameError}>
-            <input
+            <SaveErrorField names={["name","draft.name","nameError","name_error"]}><input
               id="ev-name"
               value={draft.name}
               onChange={(e) => {
@@ -562,27 +571,27 @@ function OverviewStep({
               placeholder="例：第1回 定期便のはじめ方 説明会"
               className={inputClass}
               aria-invalid={nameError !== null}
-            />
+            /></SaveErrorField>
           </Field>
           <Field label="開催場所" htmlFor="ev-venue">
-            <input
+            <SaveErrorField names={["venue_name","draft.venue_name"]}><input
               id="ev-venue"
               value={draft.venue_name ?? ''}
               onChange={(e) => update('venue_name', e.target.value || null)}
               placeholder="例：渋谷ベース 3F"
               className={inputClass}
-            />
+            /></SaveErrorField>
           </Field>
-          {theme === 'v8' && <Field label="会場の住所" htmlFor="ev-address"><input id="ev-address" className="w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink" value={draft.venue_address ?? ''} maxLength={1000} onChange={(e) => update('venue_address', e.target.value || null)} /></Field>}
+          {theme === 'v8' && <Field label="会場の住所" htmlFor="ev-address"><SaveErrorField names={["venue_address","draft.venue_address"]}><input id="ev-address" className="w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink" value={draft.venue_address ?? ''} maxLength={1000} onChange={(e) => update('venue_address', e.target.value || null)} /></SaveErrorField></Field>}
           <Field label="会場URL" htmlFor="ev-venue-url" note="オンライン開催の場合に入力します。">
-            <input
+            <SaveErrorField names={["venue_url","draft.venue_url"]}><input
               id="ev-venue-url"
               type="url"
               value={draft.venue_url ?? ''}
               onChange={(e) => update('venue_url', e.target.value || null)}
               placeholder="例：https://…"
               className={inputClass}
-            />
+            /></SaveErrorField>
           </Field>
         </div>
 
@@ -607,7 +616,7 @@ function OverviewStep({
               {formatNumber(descLen)} / 20,000
             </span>
           </div>
-          <textarea
+          <SaveErrorField names={["description","draft.description"]}><textarea
             id="ev-desc"
             value={draft.description ?? ''}
             onChange={(e) => update('description', e.target.value || null)}
@@ -615,14 +624,14 @@ function OverviewStep({
             rows={3}
             placeholder="例：開催趣旨、注意事項、持ち物などを記載…"
             className={inputClass}
-          />
-          <Checkbox
+          /></SaveErrorField>
+          <SaveErrorField names={["description_centered","draft.description_centered"]}><Checkbox
             className="mt-2"
             checked={draft.description_centered === 1}
             onCheckedChange={(checked) => update('description_centered', checked ? 1 : 0)}
           >
             詳細を中央揃えで表示する
-          </Checkbox>
+          </Checkbox></SaveErrorField>
         </div>
       </FormSection>
 
@@ -638,43 +647,43 @@ function OverviewStep({
         <div className="grid gap-3 sm:grid-cols-11">
           <div className="sm:col-span-4">
           <Field label="日付" htmlFor="first-slot-date" required>
-            <DateField
+            <SaveErrorField names={["date","firstSlot.date","first_slot.date","first_slot"]}><DateField
               id="first-slot-date"
               value={firstSlot.date}
               onChange={(v) => setFirstSlot({ ...firstSlot, date: v })}
-            />
+            /></SaveErrorField>
           </Field>
           </div>
           <div className="sm:col-span-3">
           <Field label="開始" htmlFor="first-slot-start" required>
-            <TimeField
+            <SaveErrorField names={["startTime","firstSlot.startTime","start_time","first_slot.start_time","first_slot"]}><TimeField
               id="first-slot-start"
               value={firstSlot.startTime}
               onChange={(v) => setFirstSlot({ ...firstSlot, startTime: v })}
-            />
+            /></SaveErrorField>
           </Field>
           </div>
           <div className="sm:col-span-2">
           <Field label="時間（分）" htmlFor="first-slot-duration" required>
-            <TextInput
+            <SaveErrorField names={["durationMinutes","firstSlot.durationMinutes","duration_minutes","first_slot.duration_minutes","first_slot"]}><TextInput
               id="first-slot-duration"
               type="number"
               min={15}
               step={15}
               value={firstSlot.durationMinutes}
               onChange={(event) => setFirstSlot({ ...firstSlot, durationMinutes: Number(event.target.value) })}
-            />
+            /></SaveErrorField>
           </Field>
           </div>
           <div className="sm:col-span-2">
           <Field label="定員" htmlFor="first-slot-capacity" required>
-            <TextInput
+            <SaveErrorField names={["capacity","firstSlot.capacity","first_slot.capacity","first_slot"]}><TextInput
               id="first-slot-capacity"
               type="number"
               min={1}
               value={firstSlot.capacity}
               onChange={(event) => setFirstSlot({ ...firstSlot, capacity: event.target.value })}
-            />
+            /></SaveErrorField>
           </Field>
           </div>
         </div>
@@ -687,7 +696,7 @@ function OverviewStep({
           htmlFor="ev-max"
           note="同じ友だちが何回まで申し込めるかを決めます。"
         >
-          <Select
+          <SaveErrorField names={["max_bookings_per_friend","draft.max_bookings_per_friend"]}><Select
             aria-label="1人あたりの予約回数"
             size="full"
             id="ev-max"
@@ -705,7 +714,7 @@ function OverviewStep({
               { value: '3', label: '3回まで' },
               { value: '5', label: '5回まで' },
             ]}
-          />
+          /></SaveErrorField>
         </Field>
       </FormSection>
 
@@ -750,13 +759,13 @@ function OverviewStep({
         label="満席になったとき"
         note="満席後も申し込みを受けるかを決めます。"
       >
-        <Checkbox
+        <SaveErrorField names={["waitlist_enabled","draft.waitlist_enabled"]}><Checkbox
           checked={draft.waitlist_enabled === 1}
           onCheckedChange={(checked) => update('waitlist_enabled', checked ? 1 : 0)}
           description="空きが出たら、申込者一覧で待っている方を順に確認できます。"
         >
           キャンセル待ちを受け付ける
-        </Checkbox>
+        </Checkbox></SaveErrorField>
       </FormSection>
 
       <FormSection
@@ -764,15 +773,15 @@ function OverviewStep({
         label="申し込んだ人にすること"
         note="受付と前日のお知らせを自動で行います。"
       >
-        <Checkbox
+        <SaveErrorField names={["requires_approval","draft.requires_approval"]}><Checkbox
           checked={draft.requires_approval === 1}
           onCheckedChange={(checked) => update('requires_approval', checked ? 1 : 0)}
           description="申し込み後、申込者一覧で承認するまで確定しません。承認待ちの分も残席を使います。"
         >
           承認してから予約を確定する
-        </Checkbox>
+        </Checkbox></SaveErrorField>
         <Field label="承認の期限" htmlFor="approval-deadline-hours">
-          <Select
+          <SaveErrorField names={["approval_deadline_hours","draft.approval_deadline_hours"]}><Select
             id="approval-deadline-hours"
             aria-label="承認の期限"
             value={String(draft.approval_deadline_hours)}
@@ -780,15 +789,15 @@ function OverviewStep({
             onChange={(value) => update('approval_deadline_hours', Number(value))}
             options={APPROVAL_DEADLINE_OPTIONS}
             size="full"
-          />
+          /></SaveErrorField>
         </Field>
-        <Checkbox
+        <SaveErrorField names={["reminder_day_before_enabled","draft.reminder_day_before_enabled"]}><Checkbox
           checked={draft.reminder_day_before_enabled === 1}
           onCheckedChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)}
           description="開催前日にLINEで自動のお知らせを送ります。"
         >
           前日に思い出してもらう
-        </Checkbox>
+        </Checkbox></SaveErrorField>
       </FormSection>
       </div>
 
@@ -864,6 +873,8 @@ function SlotsStep({
   onBack: () => void
   onNext: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -917,6 +928,8 @@ function SlotsStep({
       await eventsApi.createSlots(accountId, eventId, [{ starts_at: s, ends_at: e, capacity: cap }])
       await refreshSlots()
     } catch (e) {
+      saveErrors.capture(e)
+
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
@@ -963,6 +976,8 @@ function SlotsStep({
         })),
       })
     } catch (e) {
+      saveErrors.capture(e)
+
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
@@ -991,16 +1006,18 @@ function SlotsStep({
       setBulkDone(0)
       await refreshSlots()
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e)
+
       // 400件ずつ送るので、途中で切れると一部だけ作られたまま残る。
       // 作成が確認できた件数を数え、残りだけを次の送信対象にする。
       const completed = e instanceof EventSlotsPartialError ? e.completed.length : 0
       const done = bulkDone + completed
       setBulkDone(done)
-      setBulkError(
+      { if (!fieldFailure) setBulkError(
         done > 0
           ? `${done}件は追加済みです。残り${bulkPreview.slots.length - done}件は、もう一度「まとめて追加する」を押すと続きから再開します。`
           : '枠を作りきれませんでした。途中まで作られていることがあります。一覧を読み直して、足りない分だけ追加してください。',
-      )
+      ) }
       await refreshSlots()
     } finally {
       setBulkBusy(false)
@@ -1020,15 +1037,17 @@ function SlotsStep({
       await eventsApi.deleteSlot(accountId, eventId, removeTarget.id)
       setRemoveTarget(null)
       await refreshSlots()
-    } catch {
-      setRemoveError('枠を削除できませんでした。あとから申込が入った可能性があります。読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setRemoveError('枠を削除できませんでした。あとから申込が入った可能性があります。読み直してから、もう一度お試しください。') }
     } finally {
       setRemoving(false)
     }
   }
 
   return (
-    <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
+    <SaveErrorScope errors={saveErrors}><div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
       <div data-design="Left" className="bg-canvas rounded-card border-hairline min-w-0 flex-1 space-y-5 border p-6">
         <div>
           <h2 className="text-ink text-base font-semibold">予約枠を追加する</h2>
@@ -1042,35 +1061,35 @@ function SlotsStep({
         <FormSection step={1} label="枠を1つ追加する">
           <div className="grid gap-3 sm:grid-cols-4">
             <Field label="日付" htmlFor="slot-date">
-              <DateField
+              <SaveErrorField names={["date"]}><DateField
                 id="slot-date"
                 value={date}
                 onChange={setDate}
-              />
+              /></SaveErrorField>
             </Field>
             <Field label="開始" htmlFor="slot-start">
-              <TimeField
+              <SaveErrorField names={["startTime","start_time"]}><TimeField
                 id="slot-start"
                 value={startTime}
                 onChange={setStartTime}
-              />
+              /></SaveErrorField>
             </Field>
             <Field label="終了" htmlFor="slot-end">
-              <TimeField
+              <SaveErrorField names={["endTime","end_time"]}><TimeField
                 id="slot-end"
                 value={endTime}
                 onChange={setEndTime}
-              />
+              /></SaveErrorField>
             </Field>
             <Field label="定員" htmlFor="slot-cap">
-              <input
+              <SaveErrorField names={["capacity"]}><input
                 id="slot-cap"
                 inputMode="numeric"
                 value={capacity}
                 onChange={(e) => setCapacity(e.target.value)}
                 placeholder="例：20"
                 className={inputClass}
-              />
+              /></SaveErrorField>
             </Field>
           </div>
           <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={addOne} disabled={busy}>
@@ -1085,18 +1104,18 @@ function SlotsStep({
         >
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="開始日" htmlFor="bulk-start">
-              <DateField
+              <SaveErrorField names={["bulkStart","start_date","bulk_start"]}><DateField
                 id="bulk-start"
                 value={bulkStart}
                 onChange={setBulkStart}
-              />
+              /></SaveErrorField>
             </Field>
             <Field label="終了日" htmlFor="bulk-end">
-              <DateField
+              <SaveErrorField names={["bulkEnd","end_date","bulk_end"]}><DateField
                 id="bulk-end"
                 value={bulkEnd}
                 onChange={setBulkEnd}
-              />
+              /></SaveErrorField>
             </Field>
           </div>
 
@@ -1121,38 +1140,38 @@ function SlotsStep({
 
           <div className="grid gap-3 sm:grid-cols-4">
             <Field label="時間帯" htmlFor="band-start">
-              <TimeField
+              <SaveErrorField names={["bandStart","band_start"]}><TimeField
                 id="band-start"
                 value={bandStart}
                 onChange={setBandStart}
-              />
+              /></SaveErrorField>
             </Field>
             <Field label="　" htmlFor="band-end">
-              <TimeField
+              <SaveErrorField names={["bandEnd","band_end"]}><TimeField
                 id="band-end"
                 value={bandEnd}
                 onChange={setBandEnd}
-              />
+              /></SaveErrorField>
             </Field>
             <Field label="1枠の長さ" htmlFor="slot-min">
-              <Select
+              <SaveErrorField names={["slotMinutes","slot_minutes"]}><Select
                 aria-label="1枠の長さ"
                 size="full"
                 id="slot-min"
                 value={String(slotMinutes)}
                 onChange={(value) => setSlotMinutes(Number(value))}
                 options={[30, 45, 60, 90, 120].map((m) => ({ value: String(m), label: `${m}分` }))}
-              />
+              /></SaveErrorField>
             </Field>
             <Field label="各枠の定員" htmlFor="bulk-cap">
-              <input
+              <SaveErrorField names={["bulkCapacity","bulk_capacity"]}><input
                 id="bulk-cap"
                 inputMode="numeric"
                 value={bulkCapacity}
                 onChange={(e) => setBulkCapacity(e.target.value)}
                 placeholder="例：20"
                 className={inputClass}
-              />
+              /></SaveErrorField>
             </Field>
           </div>
           <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={addBulk} disabled={busy}>
@@ -1227,7 +1246,7 @@ function SlotsStep({
                 null=不可、0=開始直前まで、正数=開始N時間前。
                 選択肢は event-draft-shared で共有し、編集と食い違わせない。
               */}
-              <Select
+              <SaveErrorField names={["cancel_deadline_hours_before","draft.cancel_deadline_hours_before"]}><Select
                 aria-label="キャンセルできる期限"
                 size="full"
                 id="cancel-deadline"
@@ -1239,10 +1258,10 @@ function SlotsStep({
                   EVENT_CANCEL_DEADLINE_OPTIONS,
                   draft.cancel_deadline_hours_before,
                 )}
-              />
+              /></SaveErrorField>
             </Field>
             <Field label="開始前のお知らせ" htmlFor="reminder-hours">
-              <Select
+              <SaveErrorField names={["reminder_hours_before","draft.reminder_hours_before"]}><Select
                 aria-label="開始前のお知らせ"
                 size="full"
                 id="reminder-hours"
@@ -1259,15 +1278,15 @@ function SlotsStep({
                   { value: '2', label: '開始の2時間前に送る' },
                   { value: '3', label: '開始の3時間前に送る' },
                 ]}
-              />
+              /></SaveErrorField>
             </Field>
           </div>
-          <Checkbox
+          <SaveErrorField names={["reminder_day_before_enabled","draft.reminder_day_before_enabled"]}><Checkbox
             checked={draft.reminder_day_before_enabled === 1}
             onCheckedChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)}
           >
             前日にもお知らせを送る
-          </Checkbox>
+          </Checkbox></SaveErrorField>
         </FormSection>
 
         <StepFooter
@@ -1343,7 +1362,7 @@ function SlotsStep({
           setRemoveTarget(null)
         }}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }
 
@@ -1412,7 +1431,7 @@ function PublishStep({
             />
           </div>
           <Field label="承認の期限" htmlFor="publish-approval-deadline-hours">
-            <Select
+            <SaveErrorField names={["approval_deadline_hours","draft.approval_deadline_hours"]}><Select
               id="publish-approval-deadline-hours"
               aria-label="承認の期限"
               value={String(draft.approval_deadline_hours)}
@@ -1420,15 +1439,15 @@ function PublishStep({
               onChange={(value) => update('approval_deadline_hours', Number(value))}
               options={APPROVAL_DEADLINE_OPTIONS}
               size="full"
-            />
+            /></SaveErrorField>
           </Field>
-          <Checkbox
+          <SaveErrorField names={["waitlist_enabled","draft.waitlist_enabled"]}><Checkbox
             checked={draft.waitlist_enabled === 1}
             onCheckedChange={(checked) => update('waitlist_enabled', checked ? 1 : 0)}
             description="空きが出たら、待っている方に自動でお知らせします。"
           >
             定員に達したらキャンセル待ちを受け付ける
-          </Checkbox>
+          </Checkbox></SaveErrorField>
         </FormSection>
 
         <FormSection step={2} label="誰に見せるか">
@@ -1448,7 +1467,7 @@ function PublishStep({
           </div>
           {draft.visible_tag_id && (
             <Field label="対象のタグ" htmlFor="visible-tag">
-              <Select
+              <SaveErrorField names={["visible_tag_id","draft.visible_tag_id"]}><Select
                 aria-label="対象のタグ"
                 size="full"
                 id="visible-tag"
@@ -1458,7 +1477,7 @@ function PublishStep({
                   ...(tags.length === 0 ? [{ value: '', label: '（タグがありません）' }] : []),
                   ...tags.map((t) => ({ value: t.id, label: t.name })),
                 ]}
-              />
+              /></SaveErrorField>
             </Field>
           )}
         </FormSection>
@@ -1471,7 +1490,7 @@ function PublishStep({
                 無いときは「保存済み：…」として出し、先頭項目を選んだように
                 見せない。
               */}
-              <Select
+              <SaveErrorField names={["entry_cutoff_hours_before","draft.entry_cutoff_hours_before"]}><Select
                 aria-label="申込の締め切り"
                 size="full"
                 id="entry-cutoff"
@@ -1483,7 +1502,7 @@ function PublishStep({
                   EVENT_ENTRY_CUTOFF_OPTIONS,
                   draft.entry_cutoff_hours_before,
                 )}
-              />
+              /></SaveErrorField>
             </Field>
           </div>
         </FormSection>
@@ -1494,36 +1513,36 @@ function PublishStep({
           note="必ず入る予約内容に、前後の文章を足せます。"
         >
           <Field label="予約が確定したときに添える文章" htmlFor="msg-confirm">
-            <textarea
+            <SaveErrorField names={["confirmation_message_extra","draft.confirmation_message_extra"]}><textarea
               id="msg-confirm"
               rows={3}
               value={draft.confirmation_message_extra ?? ''}
               onChange={(e) => update('confirmation_message_extra', e.target.value || null)}
               placeholder="例：ご予約ありがとうございます。当日は10分前にお越しください。"
               className={inputClass}
-            />
+            /></SaveErrorField>
           </Field>
           <Field label="開始前のお知らせに添える文章" htmlFor="msg-reminder">
-            <textarea
+            <SaveErrorField names={["reminder_message_extra","draft.reminder_message_extra"]}><textarea
               id="msg-reminder"
               rows={3}
               value={draft.reminder_message_extra ?? ''}
               onChange={(e) => update('reminder_message_extra', e.target.value || null)}
               placeholder="例：お足元にお気をつけてお越しください。"
               className={inputClass}
-            />
+            /></SaveErrorField>
           </Field>
         </FormSection>
 
         <FormSection step={5} label="公開">
-          <Checkbox
+          <SaveErrorField names={["is_published","draft.is_published"]}><Checkbox
             checked={draft.is_published === 1}
             disabled={noSlots}
             onCheckedChange={(checked) => update('is_published', checked ? 1 : 0)}
             description="オフにすると下書きとして保存され、URLを開いても表示されません。"
           >
             保存したらすぐ公開する
-          </Checkbox>
+          </Checkbox></SaveErrorField>
           {/* 枠が0件のイベントは、公開しても friend 側に日時が1つも出ない。
               公開できてしまうと「公開したのに申し込めない」になる。 */}
           {noSlots && (

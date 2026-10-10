@@ -40,6 +40,7 @@ import {
   type BandCell,
 } from './shell'
 import styles from './runs.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type RunStatus = AutomationRunDetail['status']
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
@@ -451,7 +452,7 @@ export default function AutomationRunsV8() {
   const savedBox = (
     <div className={styles.savedBox}>
       <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-      <Select
+      <SaveErrorField names={["saved"]}><Select
         aria-label="よく使う絞り込み"
         value={saved}
         onChange={(value) => setSaved(value as SavedKey)}
@@ -459,7 +460,7 @@ export default function AutomationRunsV8() {
           { value: '', label: 'よく使う絞り込み' },
           { value: 'include-test', label: 'テスト実行も見る' },
         ]}
-      />
+      /></SaveErrorField>
     </div>
   )
   const toolbar = (

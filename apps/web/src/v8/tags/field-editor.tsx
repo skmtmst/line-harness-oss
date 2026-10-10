@@ -28,6 +28,7 @@ import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/com
 import DefaultValueInput from '@/components/friend-fields/default-value-input'
 import { sameLabels, storedDefaultLabels, suggestKey } from './field-model'
 import styles from './create.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /* よく使う 6 つは左の選ぶカード、残りは右の札。 */
 const PRIMARY_TYPES: FriendFieldType[] = ['text', 'textarea', 'select', 'multi_select', 'date', 'number']
@@ -289,7 +290,7 @@ export default function FieldEditor({
             {optionRows.map((value, index) => (
               <label key={index} className={styles.field}>
                 <span className={styles.label}>選択肢</span>
-                <TextField
+                <SaveErrorField names={["value","option"]}><TextField
                   ref={index === 0 ? (element) => { validationRefs.current.options = element } : undefined}
                   invalid={index === 0 && validationTarget === 'options' && Boolean(validationError)}
                   aria-describedby={index === 0 && validationTarget === 'options' && validationError ? 'ff-error-options' : undefined}
@@ -298,7 +299,7 @@ export default function FieldEditor({
                   aria-label={`選択肢 ${index + 1}`}
                   placeholder={OPTION_EXAMPLES[index] ?? undefined}
                   onChange={(event) => setOption(index, event.target.value)}
-                />
+                /></SaveErrorField>
               </label>
             ))}
             {fieldError('options')}
@@ -327,13 +328,13 @@ export default function FieldEditor({
 
         <section className={styles.sideCard} aria-labelledby="ff-options">
           <h2 className={styles.sideCardTitle} id="ff-options">オプション</h2>
-          <Checkbox checked={isPersonal} onCheckedChange={setIsPersonal} disabled={locked || saving}>個人情報として保護（画面で伏せる）</Checkbox>
-          <Checkbox checked={isStarred} onCheckedChange={setIsStarred} disabled={locked || saving}>友だち一覧の列に出す</Checkbox>
-          <Checkbox checked={ecIsMaster} onCheckedChange={setEcIsMaster} disabled={locked || saving}>EC側の値を正とする（EC連携で上書き）</Checkbox>
+          <SaveErrorField names={["isPersonal","is_personal"]}><Checkbox checked={isPersonal} onCheckedChange={setIsPersonal} disabled={locked || saving}>個人情報として保護（画面で伏せる）</Checkbox></SaveErrorField>
+          <SaveErrorField names={["isStarred","is_starred"]}><Checkbox checked={isStarred} onCheckedChange={setIsStarred} disabled={locked || saving}>友だち一覧の列に出す</Checkbox></SaveErrorField>
+          <SaveErrorField names={["ecIsMaster","ec_is_master"]}><Checkbox checked={ecIsMaster} onCheckedChange={setEcIsMaster} disabled={locked || saving}>EC側の値を正とする（EC連携で上書き）</Checkbox></SaveErrorField>
           {ecIsMaster ? (
             <label className={styles.field} data-field="ec">
               <span className={styles.label}>EC側の項目名</span>
-              <TextField ref={(element) => { validationRefs.current.ec = element }} invalid={validationTarget === 'ec' && Boolean(validationError)} aria-describedby={validationTarget === 'ec' && validationError ? 'ff-error-ec' : undefined} value={ecFieldPath} disabled={locked || saving} onChange={(event) => setEcFieldPath(event.target.value)} placeholder="customer.phone" />
+              <SaveErrorField names={["ecFieldPath","ec_field_path"]}><TextField ref={(element) => { validationRefs.current.ec = element }} invalid={validationTarget === 'ec' && Boolean(validationError)} aria-describedby={validationTarget === 'ec' && validationError ? 'ff-error-ec' : undefined} value={ecFieldPath} disabled={locked || saving} onChange={(event) => setEcFieldPath(event.target.value)} placeholder="customer.phone" /></SaveErrorField>
               {fieldError('ec')}
             </label>
           ) : null}
@@ -396,7 +397,7 @@ export default function FieldEditor({
           <div className={styles.cardHead}><h2 className={styles.cardTitle} id="ff-basic">基本</h2></div>
           <label className={styles.field} data-field="name">
             <span className={styles.label}>項目名</span>
-            <TextField
+            <SaveErrorField names={["name"]}><TextField
               ref={(element) => { validationRefs.current.name = element }}
               invalid={validationTarget === 'name' && Boolean(validationError)}
               aria-describedby={validationTarget === 'name' && validationError ? 'ff-error-name' : undefined}
@@ -405,7 +406,7 @@ export default function FieldEditor({
               aria-required="true"
               placeholder="例：愛犬のお名前"
               onChange={(event) => { setName(event.target.value); if (mode === 'create' && !keyTouched) setFieldKey(suggestKey(event.target.value)) }}
-            />
+            /></SaveErrorField>
             {fieldError('name')}
             <DuplicateNameNote duplicates={nameDuplicates} kindLabel="項目" />
           </label>
@@ -414,7 +415,7 @@ export default function FieldEditor({
             <span className={styles.keyRow}>
               <span className={styles.keyBrace}>{'{{field.'}</span>
               {mode === 'create' ? (
-                <TextField
+                <SaveErrorField names={["fieldKey","keyTouched","field_key","key_touched"]}><TextField
                   ref={(element) => { validationRefs.current.key = element }}
                   invalid={validationTarget === 'key' && Boolean(validationError)}
                   aria-describedby={validationTarget === 'key' && validationError ? 'ff-error-key' : undefined}
@@ -424,7 +425,7 @@ export default function FieldEditor({
                   aria-required="true"
                   placeholder="pet_name"
                   onChange={(event) => { setKeyTouched(true); setFieldKey(event.target.value) }}
-                />
+                /></SaveErrorField>
               ) : <span className={`${styles.input} ${styles.keyInput} ${styles.keyFixed}`}>{field?.fieldKey}</span>}
               <span className={styles.keyBrace}>{'}}'}</span>
             </span>
@@ -444,7 +445,7 @@ export default function FieldEditor({
               </div>
             ) : (
               <span className={styles.selectBox}>
-                <FolderSelect
+                <SaveErrorField names={["folderId","folder_id"]}><FolderSelect
                   aria-label="友だち情報欄のフォルダ"
                   value={folderId}
                   onChange={setFolderId}
@@ -452,7 +453,7 @@ export default function FieldEditor({
                   size="full"
                   folders={folders.map(folderById)}
                   onCreate={locked ? undefined : onCreateFolder}
-                />
+                /></SaveErrorField>
               </span>
             )}
           </div>

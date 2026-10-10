@@ -30,6 +30,7 @@ import BranchEditors, { newBranchStep, updateBranchStep, type BranchPatch } from
 import { stepNumbers } from './action-order'
 import { ACTION_LABELS } from './version-diff'
 import styles from './common-action-new.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const EMPTY_RESOURCES: CommonActionResources = {
   tags: [], scenarios: [], templates: [], webhooks: [], richMenus: [], commonActions: [],
@@ -84,6 +85,8 @@ export function stepSummary(step: CommonActionStep, resources: CommonActionResou
 }
 
 export function CommonActionNew() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('共通アクションを作る')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '共通アクション', href: '/common-actions' }])
   const canManage = useCanManageCommonActions()
@@ -168,7 +171,9 @@ export function CommonActionNew() {
       if (!response.success) throw new Error(response.error)
       router.push(`/common-actions/versions?id=${encodeURIComponent(response.data.id)}`)
     } catch (caught) {
-      setError(describeSaveFailure(caught))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setError(describeSaveFailure(caught)) }
     } finally {
       setSaving(false)
     }
@@ -212,17 +217,17 @@ export function CommonActionNew() {
     setActions((current) => current.map((step) => ({ ...step, onFailure: value })))
   }
 
-  if (canManage === null) return <ListState kind="loading" title="権限を確認しています" />
+  if (canManage === null) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="権限を確認しています" /></SaveErrorScope>
   if (!canManage) {
     return (
-      <div data-design-node="j2hfkS">
+      <SaveErrorScope errors={saveErrors}><div data-design-node="j2hfkS">
         <ListState
           kind="forbidden"
           title="共通アクションは閲覧のみです"
           description="作成するには、オーナーまたは管理者の権限が必要です。"
           action={<Button href="/common-actions">共通アクション一覧へ戻る</Button>}
         />
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
@@ -250,7 +255,7 @@ export function CommonActionNew() {
   )
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       boardId="j2hfkS"
       title="共通アクションを作る"
       description="いくつもの所から呼び出せる「処理のまとまり」を作ります。ここでは下書きを保存し、公開は版の画面から行います。使う所はいまの版のまま。使う所ごとに新しい版へ更新します。"
@@ -274,11 +279,11 @@ export function CommonActionNew() {
       <section className={styles.card} aria-labelledby="ca-what">
         <div className={styles.cardHead}><h2 className={styles.cardTitle} id="ca-what">どんなアクションか</h2></div>
         <Field label="名前" htmlFor="ca-name" error={inputError?.target === 'ca-name' ? inputError.message : undefined}>
-          <TextField id="ca-name" value={name} maxLength={120} placeholder="例：購入のお礼" onChange={(event) => { setName(event.target.value); if (inputError?.target === 'ca-name') setInputError(null) }} />
+          <SaveErrorField names={["name"]}><TextField id="ca-name" value={name} maxLength={120} placeholder="例：購入のお礼" onChange={(event) => { setName(event.target.value); if (inputError?.target === 'ca-name') setInputError(null) }} /></SaveErrorField>
         </Field>
         <label className={styles.field}>
           <span className={styles.label}>説明<OptionalBadge /></span>
-          <TextField value={description} maxLength={200} placeholder="使う場面や目的を書きます" onChange={(event) => setDescription(event.target.value)} />
+          <SaveErrorField names={["description"]}><TextField value={description} maxLength={200} placeholder="使う場面や目的を書きます" onChange={(event) => setDescription(event.target.value)} /></SaveErrorField>
         </label>
       </section>
 
@@ -343,7 +348,7 @@ export function CommonActionNew() {
           {resources.commonActions.length > 0 ? (
             exampleOpen ? (
               <span className={styles.exampleBox}>
-                <Select aria-label="見本から受け渡す" value={exampleId} onChange={(value) => { setExampleId(value); addExample(value) }} options={[{ value: '', label: '見本を選ぶ' }, ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` }))]} />
+                <SaveErrorField names={["exampleId","example_id"]}><Select aria-label="見本から受け渡す" value={exampleId} onChange={(value) => { setExampleId(value); addExample(value) }} options={[{ value: '', label: '見本を選ぶ' }, ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` }))]} /></SaveErrorField>
               </span>
             ) : <button type="button" className={styles.addLink} onClick={() => setExampleOpen(true)}>見本から受け渡す</button>
           ) : null}
@@ -358,15 +363,15 @@ export function CommonActionNew() {
         </div>
         <div className={styles.field}>
           <span className={styles.pickLabel} id="ca-failure-pick">失敗したときにすること</span>
-          <Select
+          <SaveErrorField names={["failureValue","allFailure","failure_value","all_failure"]}><Select
             size="full"
             aria-label="失敗したときにすること"
             value={failureValue}
             onChange={setAllFailure}
             options={failureValue === 'mixed' ? [{ value: 'mixed', label: '処理ごとに違う（行を開いて確かめる）' }, ...FAILURE_OPTIONS] : FAILURE_OPTIONS}
-          />
+          /></SaveErrorField>
         </div>
       </section>
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }

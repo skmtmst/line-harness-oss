@@ -32,6 +32,7 @@ import {
 } from '../../operator-event-options'
 import type { OperatorNotificationTeam } from '@line-crm/shared'
 import styles from './operator-new-v8.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const THRESHOLD_OPTIONS = [
   { value: 'one', label: '1件でも' },
@@ -90,6 +91,8 @@ function eventLabel(value: string): string {
 }
 
 function NewOperatorNotificationV8Inner() {
+  const saveErrors = useSaveFormErrors()
+
   const editId = useSearchParams().get('id')
   usePageTitle(editId ? '運用者へのお知らせをなおす' : '運用者へのお知らせを作る')
   usePageCrumbs([
@@ -151,7 +154,9 @@ function NewOperatorNotificationV8Inner() {
       if (!result.success) throw new Error(result.error)
       setTeams(current => [...current.filter(team => team.id !== result.data.id), result.data])
       setTeamId(result.data.id); setRecipientIds(result.data.staffIds)
-    } catch (caught) { if (generation === teamGeneration.current) setTeamError(caught instanceof Error ? caught.message : '保存できませんでした。') }
+    } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+ if (generation === teamGeneration.current) { if (!fieldFailure) setTeamError(caught instanceof Error ? caught.message : '保存できませんでした。') } }
     finally { setTeamBusy(false) }
   }
 
@@ -300,7 +305,7 @@ function NewOperatorNotificationV8Inner() {
       return null
     }
     if (!name.trim()) {
-      setError('お知らせの名前を入力してください。')
+      if (!saveErrors.fail("name", 'お知らせの名前を入力してください。')) setError('お知らせの名前を入力してください。')
       return null
     }
     if (recipientIds.length === 0) {
@@ -354,18 +359,20 @@ function NewOperatorNotificationV8Inner() {
       setError('')
       return result.data.id
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (caught instanceof ApiError && caught.status === 403) {
-        setError('このLINEアカウントのお知らせを変更する権限がありません。')
+        { if (!fieldFailure) setError('このLINEアカウントのお知らせを変更する権限がありません。') }
       } else if (caught instanceof ApiError && caught.status === 404) {
         // 一覧から開いたあとに消された等。新規作成へ逃がすと別物が増える。
-        setError('お知らせが見つかりません。一覧へ戻って開き直してください。')
+        { if (!fieldFailure) setError('お知らせが見つかりません。一覧へ戻って開き直してください。') }
       } else if (caught instanceof ApiError && caught.status === 409) {
         // 版の競合はサーバーが開き直しを案内する文を返す。そのまま出す。
-        setError(caught.message)
+        { if (!fieldFailure) setError(caught.message) }
       } else if (caught instanceof ApiError && caught.status === 400) {
-        setError(caught.message)
+        { if (!fieldFailure) setError(caught.message) }
       } else {
-        setError('下書きを保存できませんでした。時間をおいてもう一度お試しください。')
+        { if (!fieldFailure) setError('下書きを保存できませんでした。時間をおいてもう一度お試しください。') }
       }
       return null
     } finally {
@@ -395,9 +402,11 @@ function NewOperatorNotificationV8Inner() {
       await api.lineNotifications.operatorRules.publish(ruleId, selectedAccountId)
       router.push(`/line-notifications?tab=operator&highlight=${encodeURIComponent(ruleId)}`)
     } catch (caught) {
-      setError(describeApiFailure(caught, '公開', {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setError(describeApiFailure(caught, '公開', {
         forbidden: 'このLINEアカウントのお知らせを公開する権限がありません。',
-      }))
+      })) }
     } finally {
       setPublishing(false)
     }
@@ -414,9 +423,11 @@ function NewOperatorNotificationV8Inner() {
       // 成功は緑の枠で出す。赤い失敗枠には入れない。
       setNotice(result.data.accepted > 0 ? '自分へのテスト送信を受け付けました。' : '受け取れる通知方法がありません。受信設定を確認してください。')
     } catch (caught) {
-      setError(describeApiFailure(caught, 'テスト送信', {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setError(describeApiFailure(caught, 'テスト送信', {
         forbidden: 'このLINEアカウントのお知らせをテスト送信する権限がありません。',
-      }))
+      })) }
     } finally { setSaving(false) }
   }
 
@@ -426,7 +437,7 @@ function NewOperatorNotificationV8Inner() {
   const saveDisabled = saving || ruleLoading || publishing || !canWrite
 
   return (
-    <div data-design-node="gjUz3" className={styles.board}>
+    <SaveErrorScope errors={saveErrors}><div data-design-node="gjUz3" className={styles.board}>
       <div>
         <h1 className={styles.headTitle}>
           運用者へのお知らせを{editId ? 'なおす' : '作る'}
@@ -449,59 +460,59 @@ function NewOperatorNotificationV8Inner() {
             <h2 id="operator-when-heading" className={styles.cardTitle}>どんなときに知らせるか</h2>
             <div className={styles.fieldFull}>
               <label htmlFor="operator-name" className={styles.fieldLabel}>お知らせの名前</label>
-              <input
+              <SaveErrorField names={["name"]}><input
                 id="operator-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="新しい予約が入りました"
                 maxLength={80}
                 className={styles.fieldInput}
-              />
+              /></SaveErrorField>
             </div>
             <div className={styles.fieldGrid}>
               <div>
                 <label htmlFor="operator-event" className={styles.fieldLabel}>きっかけ</label>
-                <Select
+                <SaveErrorField names={["eventType","event_type"]}><Select
                   aria-label="きっかけ"
                   id="operator-event"
                   size="full"
                   value={eventType}
                   onChange={(value) => setEventType(value)}
                   options={[...OPERATOR_EVENT_OPTIONS]}
-                />
+                /></SaveErrorField>
               </div>
               <div>
                 <label htmlFor="operator-importance" className={styles.fieldLabel}>重要度</label>
-                <Select
+                <SaveErrorField names={["importance"]}><Select
                   aria-label="重要度"
                   id="operator-importance"
                   size="full"
                   value={importance}
                   onChange={(value) => setImportance(value)}
                   options={IMPORTANCE_OPTIONS}
-                />
+                /></SaveErrorField>
               </div>
               <div>
                 <label htmlFor="operator-threshold" className={styles.fieldLabel}>どれくらいたまったら</label>
-                <Select
+                <SaveErrorField names={["threshold"]}><Select
                   aria-label="どれくらいたまったら"
                   id="operator-threshold"
                   size="full"
                   value={threshold}
                   onChange={(value) => setThreshold(value)}
                   options={THRESHOLD_OPTIONS}
-                />
+                /></SaveErrorField>
               </div>
               <div>
                 <label htmlFor="operator-dedupe" className={styles.fieldLabel}>同じ知らせを重ねない</label>
-                <Select
+                <SaveErrorField names={["dedupeMinutes","dedupe_minutes"]}><Select
                   aria-label="同じ知らせを重ねない"
                   id="operator-dedupe"
                   size="full"
                   value={dedupeMinutes}
                   onChange={(value) => setDedupeMinutes(value)}
                   options={DEDUPE_OPTIONS}
-                />
+                /></SaveErrorField>
               </div>
             </div>
           </section>
@@ -523,7 +534,7 @@ function NewOperatorNotificationV8Inner() {
               </div>
               <div>
                 <label htmlFor="operator-recipient-team" className={styles.fieldLabel}>チーム</label>
-                <Select
+                <SaveErrorField names={["teamId","team_id"]}><Select
                   aria-label="チーム"
                   id="operator-recipient-team"
                   size="full"
@@ -535,12 +546,12 @@ function NewOperatorNotificationV8Inner() {
                     else setTeamName('')
                   }}
                   options={[{ value: '', label: 'スタッフを選んでチームを作る' }, ...teams.map(team => ({ value: team.id, label: `${team.name}（${team.staffIds.length}人）` }))]}
-                />
+                /></SaveErrorField>
               </div>
             </div>
             <div className={styles.fieldGrid}>
               <label className={styles.fieldLabel}>チーム名
-                <input aria-label="チーム名" value={teamName} maxLength={100} disabled={!canWrite || teamBusy} onChange={event => setTeamName(event.target.value)} className="w-full rounded-control border border-hairline px-3 py-2" />
+                <SaveErrorField names={["teamName","name","team_name"]}><input aria-label="チーム名" value={teamName} maxLength={100} disabled={!canWrite || teamBusy} onChange={event => setTeamName(event.target.value)} className="w-full rounded-control border border-hairline px-3 py-2" /></SaveErrorField>
               </label>
               <Button variant="secondary" disabled={!canWrite || teamBusy} onClick={() => void saveTeam()}>{teamId ? 'チームを更新する' : 'チームを作る'}</Button>
             </div>
@@ -557,7 +568,7 @@ function NewOperatorNotificationV8Inner() {
                 ) : recipients.items.map((recipient) => {
                   const selected = recipientIds.includes(recipient.id)
                   return (
-                    <Checkbox
+                    <SaveErrorField names={["selected","teamId","team_id"]} key={recipient.id}><Checkbox
                       key={recipient.id}
                       checked={selected}
                       onCheckedChange={(checked) => { setTeamId(''); setRecipientIds((current) => checked
@@ -565,7 +576,7 @@ function NewOperatorNotificationV8Inner() {
                         : current.filter((id) => id !== recipient.id)) }}
                     >
                       {recipient.name}{recipient.channels.line ? '' : '（LINE未連携）'}
-                    </Checkbox>
+                    </Checkbox></SaveErrorField>
                   )
                 }))
                 : recipientsError !== null
@@ -589,20 +600,20 @@ function NewOperatorNotificationV8Inner() {
               </p>
             ) : null}
             <div className={styles.checkRow}>
-              <Checkbox
+              <SaveErrorField names={["onlyAvailable","only_available"]}><Checkbox
                 checked={onlyAvailable}
                 onCheckedChange={setOnlyAvailable}
                 description="対応中の人には送りません。"
               >
                 手が空いている人だけに送る
-              </Checkbox>
-              <Checkbox
+              </Checkbox></SaveErrorField>
+              <SaveErrorField names={["emailFallback","email_fallback"]}><Checkbox
                 checked={emailFallback}
                 onCheckedChange={setEmailFallback}
                 description="LINE未ログインの人がいるとき"
               >
                 だれも受け取れないときはメールでも送る
-              </Checkbox>
+              </Checkbox></SaveErrorField>
             </div>
           </section>
 
@@ -610,14 +621,14 @@ function NewOperatorNotificationV8Inner() {
             <h2 id="operator-when-send-heading" className={styles.cardTitle}>いつ送るか・重ならないか</h2>
             <div className={styles.fieldFull}>
               <label htmlFor="operator-schedule" className={styles.fieldLabel}>送る時間</label>
-              <Select
+              <SaveErrorField names={["schedule"]}><Select
                 aria-label="送る時間"
                 id="operator-schedule"
                 size="full"
                 value={schedule}
                 onChange={(value) => setSchedule(value)}
                 options={SCHEDULE_OPTIONS}
-              />
+              /></SaveErrorField>
             </div>
             <p className={styles.fieldHint}>営業時間外のものは翌朝10:00にまとめて送ります。</p>
           </section>
@@ -746,7 +757,7 @@ function NewOperatorNotificationV8Inner() {
       </Dialog>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したお知らせ" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div>
+    </div></SaveErrorScope>
   )
 }
 

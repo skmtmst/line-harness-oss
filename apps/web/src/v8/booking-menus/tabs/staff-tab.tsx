@@ -22,6 +22,7 @@ import {
   type LoadStatus,
 } from './shared'
 import styles from '../settings.module.css'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const STAFF_PAGE_SIZE = 4
 
@@ -42,6 +43,8 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
   canEdit: boolean
   onReload: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [editing, setEditing] = useState<Partial<BookingStaff> | null>(null)
@@ -75,9 +78,11 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
       setPauseTarget(null)
       onReload()
     } catch (cause) {
-      setPauseError(cause instanceof ApiError && cause.status === 403
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure) setPauseError(cause instanceof ApiError && cause.status === 403
         ? 'スタッフの受付状態を変える権限がありません。'
-        : '変更できませんでした。もう一度お試しください。')
+        : '変更できませんでした。もう一度お試しください。') }
     } finally {
       setPausing(false)
     }
@@ -93,9 +98,11 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
       setRemoveTarget(null)
       onReload()
     } catch (cause) {
-      setRemoveError(cause instanceof ApiError && cause.status === 403
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure) setRemoveError(cause instanceof ApiError && cause.status === 403
         ? 'スタッフを消す権限がありません。'
-        : '消せませんでした。もう一度お試しください。')
+        : '消せませんでした。もう一度お試しください。') }
     } finally {
       setRemoving(false)
     }
@@ -109,20 +116,20 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
     return `${member.name}（${role}）`
   }
 
-  if (status === 'loading') return <SkeletonRows rows={4} />
+  if (status === 'loading') return <SaveErrorScope errors={saveErrors}><SkeletonRows rows={4} /></SaveErrorScope>
   if (status === 'error') {
     return (
-      <StateCard
+      <SaveErrorScope errors={saveErrors}><StateCard
         icon={<AccountIcon />}
         title="スタッフを読み込めませんでした"
         description={error ?? '通信状態を確認して、もう一度お試しください。'}
         action={<Button onClick={onReload}>読み直す</Button>}
-      />
+      /></SaveErrorScope>
     )
   }
 
   return (
-    <div className={styles.tabStack} data-design="Table">
+    <SaveErrorScope errors={saveErrors}><div className={styles.tabStack} data-design="Table">
       <div className={styles.staffHeadRow}>
         <h2 className={styles.staffHeadTitle}>{`担当スタッフ ${staff.length}人`}</h2>
         <div className={styles.staffHeadActions}>
@@ -283,6 +290,6 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
         onConfirm={() => void remove()}
       />
 
-    </div>
+    </div></SaveErrorScope>
   )
 }

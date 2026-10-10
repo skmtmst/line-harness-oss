@@ -14,6 +14,7 @@ import DateTimeField from '@/components/shared/date-time-field'
 import FilterChip from '@/components/shared/filter-chip'
 import { isNightJst, schedulePresets, shortJst } from './schedule-presets'
 import styles from './inbox-chat.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export type ScheduledRowView = {
   id: string
@@ -105,7 +106,7 @@ export default function ScheduleSendDialog({
       </div>
       <div className={styles.schGroup}>
         <label htmlFor="schedule-at" className={styles.schLabel}>日時を決める</label>
-        <DateTimeField id="schedule-at" value={value} onChange={onChange} className={styles.schField} />
+        <SaveErrorField names={["value"]}><DateTimeField id="schedule-at" value={value} onChange={onChange} className={styles.schField} /></SaveErrorField>
         <p className={styles.schNote}>日本時間です。相手が夜中（22時〜8時）になる日時は、選ぶと注意が出ます。</p>
         {night ? (
           <p className={styles.schWarn} role="status">相手が夜中の時間です。送ってよいか確かめてください。</p>

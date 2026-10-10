@@ -33,6 +33,7 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import { DetailPage } from '@/components/templates'
 import { focusField } from './focus-field'
 import styles from './site-script.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type PageRow = { host: string | null; path: string; views: number; visitors: number }
 type TrackingSummary = {
@@ -63,6 +64,8 @@ function formatShort(value: string | null | undefined): string | null {
 const parseDomains = (text: string) => text.split(/[\s,]+/).map((d) => d.trim()).filter(Boolean)
 
 export default function SiteScriptV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('サイトスクリプト')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '流入と計測', href: '/inflow-links' }])
   const role = useStaffRole()
@@ -199,7 +202,10 @@ export default function SiteScriptV8() {
       setSiteDialog(null)
       await load()
     } catch (err) {
+
+
       if (moved()) return
+      saveErrors.capture(err)
       const message = err instanceof Error ? err.message : '保存できませんでした'
       const field = err instanceof ApiError && err.status === 400
         ? message.includes('ドメイン') ? 'site-domains' : message.includes('サイトの名前') ? 'site-name' : null
@@ -236,7 +242,10 @@ export default function SiteScriptV8() {
       setSiteActionError('')
       await load()
     } catch (err) {
+
+
       if (moved()) return
+      saveErrors.capture(err)
       setStopDialog({ ...stopDialog, error: err instanceof Error ? err.message : '停止できませんでした' })
     } finally {
       setSiteBusy(false)
@@ -256,9 +265,12 @@ export default function SiteScriptV8() {
       setSiteActionError('')
       await load()
     } catch (err) {
+
+
       if (moved()) return
+      const fieldFailure = saveErrors.capture(err)
       setResumeTarget(null)
-      setSiteActionError(err instanceof Error ? err.message : '再開できませんでした')
+      { if (!fieldFailure) setSiteActionError(err instanceof Error ? err.message : '再開できませんでした') }
     } finally {
       setSiteBusy(false)
     }
@@ -271,7 +283,9 @@ export default function SiteScriptV8() {
       setCopied(true)
       setCopyFailed(false)
       setTimeout(() => setCopied(false), 2000)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       setCopyFailed(true)
     }
   }
@@ -285,7 +299,9 @@ export default function SiteScriptV8() {
       setMessageCopied(true)
       setCopyFailed(false)
       setTimeout(() => setMessageCopied(false), 2000)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       setCopyFailed(true)
     }
   }
@@ -367,7 +383,7 @@ export default function SiteScriptV8() {
   )
 
   return (
-    <DetailPage boardId="XjOte" title="サイトスクリプト" description="ホームページに1行貼ると、サイトを見た人と LINE の友だちを結びつけ、成果も数えられます。"
+    <SaveErrorScope errors={saveErrors}><DetailPage boardId="XjOte" title="サイトスクリプト" description="ホームページに1行貼ると、サイトを見た人と LINE の友だちを結びつけ、成果も数えられます。"
       contentPadding="var(--tpl-detail-head-pad-bottom) var(--tpl-head-pad-side)"
       actions={<Button onClick={() => setHelpOpen(true)}><CircleHelp size={15} aria-hidden="true" />貼りかたが分からないときは</Button>}>
       <div className={styles.body}>
@@ -529,12 +545,12 @@ export default function SiteScriptV8() {
           <div className={styles.dialogFields}>
             <label className={styles.dialogField}>
               <span className={styles.dialogLabel}>サイトの名前</span>
-              <TextField id="site-name" aria-invalid={Boolean(siteFieldErrors['site-name'])} aria-describedby={siteFieldErrors['site-name'] ? 'site-name-error' : undefined} value={siteDialog.label} maxLength={100} placeholder="例: 公式ショップ" onChange={(e) => { setSiteDialog({ ...siteDialog, label: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-name': '' })) }} />
+              <SaveErrorField names={["label","siteDialog.label","site_dialog.label","site_dialog"]}><TextField id="site-name" aria-invalid={Boolean(siteFieldErrors['site-name'])} aria-describedby={siteFieldErrors['site-name'] ? 'site-name-error' : undefined} value={siteDialog.label} maxLength={100} placeholder="例: 公式ショップ" onChange={(e) => { setSiteDialog({ ...siteDialog, label: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-name': '' })) }} /></SaveErrorField>
               {siteFieldErrors['site-name'] ? <span id="site-name-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-name']}</span> : null}
             </label>
             <label className={styles.dialogField}>
               <span className={styles.dialogLabel}>計測を許可するドメイン</span>
-              <TextArea id="site-domains" aria-invalid={Boolean(siteFieldErrors['site-domains'])} aria-describedby={siteFieldErrors['site-domains'] ? 'site-domains-error' : undefined} rows={4} value={siteDialog.domainsText} placeholder={'example.com\nshop.example.com'} onChange={(e) => { setSiteDialog({ ...siteDialog, domainsText: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-domains': '' })) }} />
+              <SaveErrorField names={["domainsText","siteDialog.domainsText","domains_text","site_dialog.domains_text","site_dialog"]}><TextArea id="site-domains" aria-invalid={Boolean(siteFieldErrors['site-domains'])} aria-describedby={siteFieldErrors['site-domains'] ? 'site-domains-error' : undefined} rows={4} value={siteDialog.domainsText} placeholder={'example.com\nshop.example.com'} onChange={(e) => { setSiteDialog({ ...siteDialog, domainsText: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-domains': '' })) }} /></SaveErrorField>
               {siteFieldErrors['site-domains'] ? <span id="site-domains-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-domains']}</span> : null}
             </label>
           </div>
@@ -556,7 +572,7 @@ export default function SiteScriptV8() {
             <p className={styles.small}>{`対象: ${stopDialog.site.label}`}</p>
             <label className={styles.dialogField}>
               <span className={styles.dialogLabel}>止める理由（必須）</span>
-              <TextField id="site-stop-reason" aria-invalid={Boolean(stopReasonError)} aria-describedby={stopReasonError ? 'site-stop-reason-error' : undefined} value={stopDialog.reason} maxLength={200} placeholder="例: サイトを閉じたため" onChange={(e) => { setStopDialog({ ...stopDialog, reason: e.target.value }); setStopReasonError('') }} />
+              <SaveErrorField names={["reason","stopDialog.reason","stop_dialog.reason","stop_dialog"]}><TextField id="site-stop-reason" aria-invalid={Boolean(stopReasonError)} aria-describedby={stopReasonError ? 'site-stop-reason-error' : undefined} value={stopDialog.reason} maxLength={200} placeholder="例: サイトを閉じたため" onChange={(e) => { setStopDialog({ ...stopDialog, reason: e.target.value }); setStopReasonError('') }} /></SaveErrorField>
               {stopReasonError ? <span id="site-stop-reason-error" className={styles.fieldError} role="alert">{stopReasonError}</span> : null}
             </label>
           </div>
@@ -572,6 +588,6 @@ export default function SiteScriptV8() {
         onConfirm={() => void resumeSite()}
         onCancel={() => { if (!siteBusy) setResumeTarget(null) }}
       />
-    </DetailPage>
+    </DetailPage></SaveErrorScope>
   )
 }

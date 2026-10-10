@@ -24,6 +24,7 @@ import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant
 import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import styles from './sns.module.css'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const GOOGLE_STATE: Record<string, string> = {
   connected: '接続しています',
@@ -57,6 +58,8 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function SnsSettingsPage() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('SNS 連携')
   usePageCrumbs([{ label: '設定', href: '/settings' }])
   useHideSettingsNav()
@@ -109,9 +112,11 @@ export default function SnsSettingsPage() {
       const res = await api.instagram.start(selectedAccountId)
       if (!res.success) throw new Error(res.error)
       window.location.href = res.data.url
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
       setBusy(false)
-      setActionError('Instagram のログイン画面を開けませんでした。もう一度お試しください。')
+      { if (!fieldFailure) setActionError('Instagram のログイン画面を開けませんでした。もう一度お試しください。') }
     }
   }
 
@@ -122,8 +127,10 @@ export default function SnsSettingsPage() {
     try {
       await api.instagram.refresh(selectedAccountId)
       await load()
-    } catch {
-      setActionError('接続を確かめられませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setActionError('接続を確かめられませんでした。もう一度お試しください。') }
     } finally {
       setBusy(false)
     }
@@ -141,17 +148,19 @@ export default function SnsSettingsPage() {
       }
       setConfirm(null)
       await load()
-    } catch {
-      setActionError(confirm === 'google'
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setActionError(confirm === 'google'
         ? 'Googleビジネスの接続を解除できませんでした。もう一度お試しください。'
-        : 'Instagram の接続を解除できませんでした。もう一度お試しください。')
+        : 'Instagram の接続を解除できませんでした。もう一度お試しください。') }
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <PageFrame kind="list" boardId="y3GGTs">
+    <SaveErrorScope errors={saveErrors}><PageFrame kind="list" boardId="y3GGTs">
       <PageHeading
         headingSize="compact"
         title="SNS 連携"
@@ -272,6 +281,6 @@ export default function SnsSettingsPage() {
         onConfirm={() => void runDisconnect()}
         onCancel={() => setConfirm(null)}
       />
-    </PageFrame>
+    </PageFrame></SaveErrorScope>
   )
 }

@@ -11,6 +11,7 @@ import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { webinarApi, type Webinar, type WebinarEditor, type WebinarPublishValidation } from '@/lib/api'
 import { reviewActionSummaryText, reviewMonitoringText, reviewTestSummaryBody } from './review-text'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const NOTIFICATION_FLAGS = ['registrationEnabled', 'dayBeforeEnabled', 'hourBeforeEnabled', 'startEnabled', 'missedEnabled', 'completedEnabled'] as const
 
@@ -27,6 +28,8 @@ export default function ReviewV8({ webinar, editor, registrations, ctaCount, onP
   canOpenPublicPage?: boolean
   publicPageReason?: string
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [validation, setValidation] = useState<WebinarPublishValidation | null>(null)
   const [validationState, setValidationState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [publishing, setPublishing] = useState(false)
@@ -85,7 +88,9 @@ export default function ReviewV8({ webinar, editor, registrations, ctaCount, onP
       setTestNotice(response.data.publicPage.test?.status === 'passed' ? '公開ページを確認しました。' : '公開ページに未設定があります。')
       loadValidation()
     } catch (cause) {
-      setTestNotice(webinarErrorText(cause, '公開ページを確認できませんでした。'))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure) setTestNotice(webinarErrorText(cause, '公開ページを確認できませんでした。')) }
     } finally {
       operationLock.current = false
       setTesting(false)
@@ -102,7 +107,9 @@ export default function ReviewV8({ webinar, editor, registrations, ctaCount, onP
       onPublished()
       window.location.assign(`/webinars/published?id=${encodeURIComponent(webinar.id)}`)
     } catch (cause) {
-      setPublishError(webinarErrorText(cause, '公開できませんでした'))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure) setPublishError(webinarErrorText(cause, '公開できませんでした')) }
       setPublishing(false)
       operationLock.current = false
     }
@@ -116,7 +123,7 @@ export default function ReviewV8({ webinar, editor, registrations, ctaCount, onP
     ['視聴後の動き', reviewActionSummaryText(validation)],
   ]
 
-  return <div data-webinar-pane="review" data-design-node="XCUNf">
+  return <SaveErrorScope errors={saveErrors}><div data-webinar-pane="review" data-design-node="XCUNf">
     <div className="space-y-3">
       <section className="border-hairline bg-canvas rounded-card border p-4" aria-label="公開前の確認">
         <div className="flex items-center gap-2"><h2 className="text-ink text-base font-semibold">公開前の確認</h2><HelpTip label="公開前の確認の説明">公開に必要な設定と、公開ページ・通知のテスト結果を確認します。公開すると、その時点の保存版を使います。</HelpTip>{validationState === 'ready' ? <span className="text-ink-secondary text-xs tabular-nums">{passed}/{total}</span> : null}</div>
@@ -140,5 +147,5 @@ export default function ReviewV8({ webinar, editor, registrations, ctaCount, onP
       {canOpenPublicPage && publicUrl ? <Button className="mt-3" href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <p className="text-ink-faint mt-3 text-xs">{publicPageReason || '公開すると、友だちが見るページを確認できます。'}</p>}
     </aside>
     <StickyBar actions={<><Button href="/webinars">キャンセル</Button>{onBack ? <Button onClick={onBack} disabled={publishing || testing}>通知へ戻る</Button> : null}<Button variant="primary" disabled={!canPublish} busy={publishing} busyLabel="公開中…" onClick={() => void publish()}>この版を公開</Button></>} />
-  </div>
+  </div></SaveErrorScope>
 }

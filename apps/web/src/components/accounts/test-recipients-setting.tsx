@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '@/lib/api'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 interface Friend {
   id: string
@@ -19,6 +20,8 @@ interface TestRecipientsSettingProps {
 }
 
 export default function TestRecipientsSetting({ accountId }: TestRecipientsSettingProps) {
+  const saveErrors = useSaveFormErrors()
+
   const [recipients, setRecipients] = useState<Friend[]>([])
   const [loginUsers, setLoginUsers] = useState<LoginUserCandidate[]>([])
   const [loading, setLoading] = useState(true)
@@ -93,11 +96,13 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
               .map((f: Friend) => ({ id: f.id, displayName: f.displayName, pictureUrl: f.pictureUrl }))
           )
         }
-      } catch { /* ignore */ }
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
+ /* ignore */ }
       finally { if (!cancelled) setSearching(false) }
     }, 300)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [search, accountId, recipients])
+  }, [search, accountId, recipients, saveErrors])
 
   const addRecipient = async (friend: Friend) => {
     const updated = [...recipients, friend]
@@ -109,10 +114,12 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
     try {
       const res = await api.accountSettings.updateTestRecipients(accountId, updated.map(r => r.id))
       if (!res.success) throw new Error('save failed')
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
       // 保存だけ失敗したのに一覧へ出続けると「入っている」と誤認させる。
       // 失敗を表示し、サーバの真値へ戻す。
-      setSaveError('テスト送信先を保存できませんでした。')
+      { if (!fieldFailure) setSaveError('テスト送信先を保存できませんでした。') }
       void load()
     } finally { setSaving(false) }
   }
@@ -125,21 +132,23 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
     try {
       const res = await api.accountSettings.updateTestRecipients(accountId, updated.map(r => r.id))
       if (!res.success) throw new Error('save failed')
-    } catch {
-      setSaveError('テスト送信先を保存できませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setSaveError('テスト送信先を保存できませんでした。') }
       void load()
     } finally { setSaving(false) }
   }
 
-  if (loading) return <p className="text-xs text-ink-faint">読み込み中...</p>
+  if (loading) return <SaveErrorScope errors={saveErrors}><p className="text-xs text-ink-faint">読み込み中...</p></SaveErrorScope>
   if (loadError) {
     return (
-      <div className="mt-3">
+      <SaveErrorScope errors={saveErrors}><div className="mt-3">
         <p className="text-danger text-xs">テスト送信先を読み込めませんでした。通信状態を確認してください。</p>
         <button type="button" onClick={() => void load()} className="text-action mt-1 text-xs hover:underline">
           再読み込み
         </button>
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
@@ -149,7 +158,7 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
   )
 
   return (
-    <div className="mt-3">
+    <SaveErrorScope errors={saveErrors}><div className="mt-3">
       {saveError ? <p className="text-danger mb-2 text-xs">{saveError}</p> : null}
 
       {/* Current recipients */}
@@ -193,13 +202,13 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
 
       {/* Search to add */}
       <div className="relative">
-        <input
+        <SaveErrorField names={["search"]}><input
           type="text"
           placeholder="友だちを検索して追加..."
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="w-full border border-hairline rounded-control px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-action"
-        />
+        /></SaveErrorField>
         {searching && <span className="absolute right-2 top-1.5 text-xs text-ink-faint">検索中...</span>}
         {saving && <span className="absolute right-2 top-1.5 text-xs text-success">保存中...</span>}
 
@@ -223,6 +232,6 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
           </ul>
         )}
       </div>
-    </div>
+    </div></SaveErrorScope>
   )
 }

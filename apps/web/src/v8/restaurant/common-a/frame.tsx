@@ -25,6 +25,7 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import styles from './frame.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export interface RestaurantContext {
   data: RestaurantSnapshot
@@ -138,7 +139,7 @@ export default function RestaurantFrame({
   )
 
   const picker = snapshot && snapshot.stores.length > 0 ? (
-    <Select
+    <SaveErrorField names={["selectedStoreId","selected_store_id"]}><Select
       aria-label="店舗を選ぶ"
       width={STORE_PICKER_WIDTH}
       value={selectedStoreId}
@@ -147,7 +148,7 @@ export default function RestaurantFrame({
         ...(allStores ? [{ value: '', label: '店舗：すべての店舗' }] : []),
         ...snapshot.stores.map((item) => ({ value: item.id, label: `店舗：${item.name}` })),
       ]}
-    />
+    /></SaveErrorField>
   ) : null
 
   return (

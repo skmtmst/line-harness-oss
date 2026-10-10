@@ -35,6 +35,7 @@ import {
   type AutoV8Model,
 } from '@/app/automations/automations-v8'
 import styles from '@/app/automations/automations-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type Filter = 'all' | 'published' | 'draft' | 'old_version' | 'unused' | 'archived'
 
@@ -275,27 +276,27 @@ export function V8CommonActionsTab({
       </div>
 
       <div className={styles.toolbar}>
-        <TextField
+        <SaveErrorField names={["query"]}><TextField
           aria-label="共通アクションを検索"
           placeholder="アクション名・中の処理で探す"
           value={query}
           onChange={(event) => { setQuery(event.target.value); setPage(1) }}
           className={styles.toolsSearch}
-        />
+        /></SaveErrorField>
         <Button onClick={() => void load()} variant="secondary" size="compact">
           <RefreshCw size={16} aria-hidden />
           一覧を更新する
         </Button>
-        <Select
+        <SaveErrorField names={["pageSize","limit","page_size"]}><Select
           aria-label="1ページに表示する件数"
           value={String(pageSize)}
           onChange={(value) => { setPageSize(Number(value)); setPage(1) }}
           options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
-        />
+        /></SaveErrorField>
       </div>
 
       <div className={styles.toolbar}>
-        <RadioCardGroup legend="状態で絞り込む">
+        <SaveErrorField names={["common-action-filter-v8","value","option.value","filter"]}><RadioCardGroup legend="状態で絞り込む">
           {FILTERS.map((option) => {
             const count = filterCount(option.value)
             return (
@@ -309,7 +310,7 @@ export function V8CommonActionsTab({
               />
             )
           })}
-        </RadioCardGroup>
+        </RadioCardGroup></SaveErrorField>
       </div>
 
       {items.length === 0 ? (

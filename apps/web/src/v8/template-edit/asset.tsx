@@ -42,6 +42,7 @@ import { FieldError } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import styles from './edit.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 export type AssetKind = 'coupon' | 'research'
 
@@ -110,6 +111,8 @@ export function couponPeriodLine(startsAt: string, endsAt: string, once: boolean
  * 店のアカウントに結びつく欄（登録メディア・行うこと・答えてもらう人）は出さない。
  */
 export default function TemplateAssetEditor({ kind, visual = false, host }: { kind: AssetKind; visual?: boolean; host?: TemplateEditHost }) {
+  const saveErrors = useSaveFormErrors()
+
   const meta = META[kind]
   const router = useRouter()
   const role = useStaffRole()
@@ -292,8 +295,10 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
       setSaved(true)
       setClean(snapshot)
       return true
-    } catch {
-      setError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setError('保存できませんでした。通信状態を確認して、もう一度お試しください。') }
       return false
     } finally {
       setSaving(false)
@@ -383,7 +388,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
 
   if (!canMutate) {
     return (
-      <TemplateEditFrame
+      <SaveErrorScope errors={saveErrors}><TemplateEditFrame
         boardId={meta.board}
         title={meta.heading}
         description={meta.lead}
@@ -393,7 +398,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         <Card padding="none" layout="vertical" className={styles.card}>
           <p className={styles.cardNote}>中身の確認は一覧の行を開くと読めます。</p>
         </Card>
-      </TemplateEditFrame>
+      </TemplateEditFrame></SaveErrorScope>
     )
   }
 
@@ -405,12 +410,12 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
       <div className={styles.pair}>
         <div className={`${styles.field} ${styles.grow}`}>
           <label htmlFor={`te-${kind}-name`} className={styles.label}>テンプレート名</label>
-          <TextField {...fieldProps('name', `te-${kind}-name`)} id={`te-${kind}-name`} value={name} onChange={(event) => setName(event.target.value)} placeholder={kind === 'coupon' ? '例：夏の20%オフ' : '例：定期便のご満足度'} aria-required="true" />
+          <SaveErrorField names={["name"]}><TextField {...fieldProps('name', `te-${kind}-name`)} id={`te-${kind}-name`} value={name} onChange={(event) => setName(event.target.value)} placeholder={kind === 'coupon' ? '例：夏の20%オフ' : '例：定期便のご満足度'} aria-required="true" /></SaveErrorField>
           <FieldError id={`te-${kind}-name-error`}>{fields.error('name')}</FieldError>
         </div>
         <div className={`${styles.field} ${styles.folderField}`}>
           <label htmlFor={`te-${kind}-folder`} className={styles.labelSmall}>フォルダ</label>
-          <FolderSelect
+          <SaveErrorField names={["folder","host.folder"]}><FolderSelect
             id={`te-${kind}-folder`}
             aria-label="フォルダ"
             value={host ? host.folder : folder}
@@ -422,14 +427,14 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               : canMutate && selectedAccountId
                 ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: selectedAccountId }), folderByName, (created) => setFolders((current) => [...current, created]))
                 : undefined}
-          />
+          /></SaveErrorField>
         </div>
       </div>
     </Card>
   )
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <TemplateEditFrame
         boardId={meta.board}
         title={meta.heading}
@@ -470,7 +475,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               </div>
               <div className={styles.couponRow}>
                 <div className={styles.couponImage}>
-                  <MediaSlot
+                  <SaveErrorField names={["imageUrl","image_url"]}><MediaSlot
                     size="compact"
                     title="画像を追加"
                     previewAlt="クーポンの画像"
@@ -485,17 +490,17 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                     onChange={(url) => { setImageUrl(url ?? ''); setPickedMedia(null) }}
                     onMediaPick={host ? undefined : () => setPickerOpen(true)}
                     urlEntry={{ value: imageUrl, onChange: (url) => { setImageUrl(url); setPickedMedia(null) }, label: 'クーポン画像のURL', placeholder: '画像URL' }}
-                  />
+                  /></SaveErrorField>
                   {pickedMedia ? <p className={styles.hint}>選択中：{pickedMedia.filename}</p> : null}
                 </div>
                 <div className={styles.couponFields}>
                   <div className={styles.field}>
                     <label htmlFor="te-coupon-title" className={styles.label}>クーポン名</label>
-                    <TextField id="te-coupon-title" value={couponTitle} onChange={(event) => setCouponTitle(event.target.value)} placeholder={name || '例：夏の20%オフ'} />
+                    <SaveErrorField names={["couponTitle","coupon_title"]}><TextField id="te-coupon-title" value={couponTitle} onChange={(event) => setCouponTitle(event.target.value)} placeholder={name || '例：夏の20%オフ'} /></SaveErrorField>
                   </div>
                   <div className={styles.field}>
                     <label htmlFor="te-coupon-desc" className={styles.label}>使うときの説明</label>
-                    <TextField id="te-coupon-desc" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：会計時にこの画面をご提示ください。" />
+                    <SaveErrorField names={["description"]}><TextField id="te-coupon-desc" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：会計時にこの画面をご提示ください。" /></SaveErrorField>
                   </div>
                 </div>
               </div>
@@ -509,33 +514,33 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               <div className={styles.pair}>
                 <div className={`${styles.field} ${styles.grow}`}>
                   <label htmlFor="te-coupon-start" className={styles.label}>開始</label>
-                  <span {...fields.bind('start')}><DateTimeField className={styles.dateBox} id="te-coupon-start" value={couponStartsAt} onChange={setCouponStartsAt} aria-label="使える期間の開始" required invalid={fields.invalid('start')} aria-describedby={fields.invalid('start') ? 'te-coupon-start-error' : undefined} /></span>
+                  <span {...fields.bind('start')}><SaveErrorField names={["couponStartsAt","startsAt","coupon_starts_at"]}><DateTimeField className={styles.dateBox} id="te-coupon-start" value={couponStartsAt} onChange={setCouponStartsAt} aria-label="使える期間の開始" required invalid={fields.invalid('start')} aria-describedby={fields.invalid('start') ? 'te-coupon-start-error' : undefined} /></SaveErrorField></span>
                   <FieldError id="te-coupon-start-error">{fields.error('start')}</FieldError>
                 </div>
                 <span className={styles.tilde} aria-hidden="true">〜</span>
                 <div className={`${styles.field} ${styles.grow}`}>
                   <label htmlFor="te-coupon-end" className={styles.label}>終了</label>
-                  <span {...fields.bind('end')}><DateTimeField className={styles.dateBox} id="te-coupon-end" value={couponEndsAt} onChange={setCouponEndsAt} aria-label="使える期間の終了" required invalid={fields.invalid('end')} aria-describedby={fields.invalid('end') ? 'te-coupon-end-error' : undefined} /></span>
+                  <span {...fields.bind('end')}><SaveErrorField names={["couponEndsAt","endsAt","coupon_ends_at"]}><DateTimeField className={styles.dateBox} id="te-coupon-end" value={couponEndsAt} onChange={setCouponEndsAt} aria-label="使える期間の終了" required invalid={fields.invalid('end')} aria-describedby={fields.invalid('end') ? 'te-coupon-end-error' : undefined} /></SaveErrorField></span>
                   <FieldError id="te-coupon-end-error">{fields.error('end')}</FieldError>
                 </div>
               </div>
               <div className={styles.typeRow}>
                 <span className={styles.labelSmall}>1人が使える回数</span>
-                <SegmentedControl
+                <SaveErrorField names={["couponOnce"]}><SegmentedControl
                   aria-label="1人が使える回数"
                   options={[{ value: 'once' as const, label: '1人1回だけ' }, { value: 'unlimited' as const, label: '期間中なら何回でも' }]}
                   value={couponOnce}
                   onChange={setCouponOnce}
-                />
+                /></SaveErrorField>
               </div>
               <div className={styles.typeRow}>
                 <span className={styles.labelSmall}>受け取れる人</span>
-                <SegmentedControl
+                <SaveErrorField names={["couponVisibility"]}><SegmentedControl
                   aria-label="受け取れる人"
                   options={[{ value: 'friends' as const, label: '友だちだけ' }, { value: 'link' as const, label: 'リンクを知っている人' }]}
                   value={couponVisibility}
                   onChange={setCouponVisibility}
-                />
+                /></SaveErrorField>
               </div>
             </Card>
 
@@ -546,18 +551,18 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               <div className={styles.toggleRow}>
                 <span className={styles.toggleLabel}>抽選する</span>
                 <span className={styles.spacer} />
-                <Toggle checked={lottery} label="抽選する" onChange={setLottery} />
+                <SaveErrorField names={["lottery"]}><Toggle checked={lottery} label="抽選する" onChange={setLottery} /></SaveErrorField>
               </div>
               {lottery ? (
                 <div className={styles.pair}>
                   <div className={`${styles.field} ${styles.grow}`}>
                     <label htmlFor="te-lottery-rate" className={styles.label}>当たる確率（%）</label>
-                    <TextField {...fieldProps('rate', 'te-lottery-rate')} id="te-lottery-rate" type="number" min={1} max={100} value={lotteryRate} onChange={(event) => setLotteryRate(event.target.value)} />
+                    <SaveErrorField names={["lotteryRate","lottery_rate"]}><TextField {...fieldProps('rate', 'te-lottery-rate')} id="te-lottery-rate" type="number" min={1} max={100} value={lotteryRate} onChange={(event) => setLotteryRate(event.target.value)} /></SaveErrorField>
                     <FieldError id="te-lottery-rate-error">{fields.error('rate')}</FieldError>
                   </div>
                   <div className={`${styles.field} ${styles.grow}`}>
                     <label htmlFor="te-winner-limit" className={styles.label}>当選人数の上限（人）</label>
-                    <TextField {...fieldProps('limit', 'te-winner-limit')} id="te-winner-limit" type="number" min={1} value={winnerLimit} onChange={(event) => setWinnerLimit(event.target.value)} />
+                    <SaveErrorField names={["winnerLimit","winner_limit"]}><TextField {...fieldProps('limit', 'te-winner-limit')} id="te-winner-limit" type="number" min={1} value={winnerLimit} onChange={(event) => setWinnerLimit(event.target.value)} /></SaveErrorField>
                     <FieldError id="te-winner-limit-error">{fields.error('limit')}</FieldError>
                   </div>
                 </div>
@@ -584,17 +589,17 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               <div className={styles.pair}>
                 <div className={`${styles.field} ${styles.grow}`}>
                   <label htmlFor="te-research-start" className={styles.label}>受付の開始</label>
-                  <DateTimeField className={styles.dateBox} id="te-research-start" value={researchStartsAt} onChange={setResearchStartsAt} aria-label="受付の開始" />
+                  <SaveErrorField names={["researchStartsAt","startsAt","research_starts_at"]}><DateTimeField className={styles.dateBox} id="te-research-start" value={researchStartsAt} onChange={setResearchStartsAt} aria-label="受付の開始" /></SaveErrorField>
                 </div>
                 <span className={styles.tilde} aria-hidden="true">〜</span>
                 <div className={`${styles.field} ${styles.grow}`}>
                   <label htmlFor="te-research-end" className={styles.label}>受付の終了</label>
-                  <DateTimeField className={styles.dateBox} id="te-research-end" value={researchEndsAt} onChange={setResearchEndsAt} aria-label="受付の終了" />
+                  <SaveErrorField names={["researchEndsAt","endsAt","research_ends_at"]}><DateTimeField className={styles.dateBox} id="te-research-end" value={researchEndsAt} onChange={setResearchEndsAt} aria-label="受付の終了" /></SaveErrorField>
                 </div>
               </div>
               <div className={styles.field}>
                 <label htmlFor="te-research-greeting" className={styles.label}>はじめのあいさつ</label>
-                <TextField id="te-research-greeting" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：いつもありがとうございます。3問だけ聞かせてください。" />
+                <SaveErrorField names={["description"]}><TextField id="te-research-greeting" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：いつもありがとうございます。3問だけ聞かせてください。" /></SaveErrorField>
               </div>
             </Card>
 
@@ -621,7 +626,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                     <span className={styles.questionNo}>問 {index + 1}</span>
                     <span className={styles.spacer} />
                     <span className={styles.toggleLabelSmall}>必ず答えてもらう</span>
-                    <Toggle checked={question.required} label={`問 ${index + 1} を必ず答えてもらう`} onChange={(checked) => updateQuestion(index, { required: checked })} />
+                    <SaveErrorField names={[`shown.${index}.required`,"required","question.required"]}><Toggle checked={question.required} label={`問 ${index + 1} を必ず答えてもらう`} onChange={(checked) => updateQuestion(index, { required: checked })} /></SaveErrorField>
                     <button
                       type="button"
                       className={`${styles.insertChip} ${styles.questionRemove}`}
@@ -636,12 +641,12 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                   <div className={styles.pair}>
                     <div className={`${styles.field} ${styles.grow}`}>
                       <label htmlFor={`te-q-${question.key}`} className={styles.label}>質問文</label>
-                      <TextField {...fieldProps(`q-${question.key}`, `te-q-${question.key}`)} id={`te-q-${question.key}`} value={question.text} onChange={(event) => updateQuestion(index, { text: event.target.value })} placeholder="例：来月も続けたいと思いますか？" aria-required="true" />
+                      <SaveErrorField names={[`shown.${index}.text`,"text","question.text"]}><TextField {...fieldProps(`q-${question.key}`, `te-q-${question.key}`)} id={`te-q-${question.key}`} value={question.text} onChange={(event) => updateQuestion(index, { text: event.target.value })} placeholder="例：来月も続けたいと思いますか？" aria-required="true" /></SaveErrorField>
                       <FieldError id={`te-q-${question.key}-error`}>{fields.error(`q-${question.key}`)}</FieldError>
                     </div>
                     <div className={`${styles.field} ${styles.formatField}`}>
                       <label htmlFor={`te-qf-${question.key}`} className={styles.labelSmall}>答え方</label>
-                      <Select id={`te-qf-${question.key}`} aria-label={`問 ${index + 1} の答え方`} value={question.format} onChange={(value) => updateQuestion(index, { format: value as ResearchFormat })} options={FORMAT_OPTIONS} />
+                      <SaveErrorField names={[`shown.${index}.format`,"format","question.format"]}><Select id={`te-qf-${question.key}`} aria-label={`問 ${index + 1} の答え方`} value={question.format} onChange={(value) => updateQuestion(index, { format: value as ResearchFormat })} options={FORMAT_OPTIONS} /></SaveErrorField>
                     </div>
                   </div>
                   {question.format !== 'free' ? (
@@ -649,13 +654,13 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                     <div className={styles.choiceRow} role="group" aria-label={`問 ${index + 1} の選択肢`} {...fields.bind(`qc-${question.key}`)} aria-describedby={fields.invalid(`qc-${question.key}`) ? `te-qc-${question.key}-error` : undefined}>
                       {question.choices.map((choice, choiceIndex) => (
                         <span key={choiceIndex} className={styles.choice}>
-                          <input
+                          <SaveErrorField names={["choice"]}><input
                             className={styles.choiceInput}
                             value={choice}
                             placeholder={`選択肢 ${choiceIndex + 1}`}
                             aria-label={`問 ${index + 1} の選択肢 ${choiceIndex + 1}`}
                             onChange={(event) => updateQuestion(index, { choices: question.choices.map((c, i) => (i === choiceIndex ? event.target.value : c)) })}
-                          />
+                          /></SaveErrorField>
                           {question.choices.length > 1 ? (
                             <button
                               type="button"
@@ -710,13 +715,13 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                 <h2 className={styles.cardTitle}>答えてもらう人</h2>
                 <p className={styles.cardNote}>タグで絞れます。選ばなければ全員が対象です。</p>
               </div>
-              <Combobox
+              <SaveErrorField names={["targetTagId","target_tag_id"]}><Combobox
                 aria-label="答えてもらう人"
                 placeholder="友だち全員"
                 value={targetTagId}
                 onChange={setTargetTagId}
                 options={actionOptions.tags.map((tag) => ({ value: tag.id, label: tag.name }))}
-              />
+              /></SaveErrorField>
             </Card>
             </>
             )}
@@ -745,6 +750,6 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
       />
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject={`${meta.title}の変更`} onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }

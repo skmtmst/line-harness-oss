@@ -10,6 +10,7 @@ import LinePreview from '@/components/shared/line-preview'
 import WebinarNotifications from '@/components/webinars/webinar-notifications'
 import { webinarApi, type WebinarAction, type WebinarEditor, type WebinarNotificationOverview, type WebinarNotificationSettings } from '@/lib/api'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const TRIGGER_LABEL: Record<WebinarAction['trigger'], string> = { completed: '視聴完了', cta_clicked: 'CTAクリック', unviewed: '未視聴' }
 const ACTION_LABEL: Record<WebinarAction['actionType'], string> = { add_tag: 'タグを付ける', remove_tag: 'タグを外す', start_scenario: 'シナリオを始める', stop_scenario: 'シナリオを止める', resume_scenario: 'シナリオを再開する', send_message: 'メッセージを送る', send_webhook: 'Webhookを送る', switch_rich_menu: 'リッチメニューを変える', remove_rich_menu: 'リッチメニューを外す' }
@@ -21,6 +22,8 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
   registerSave?: (save: (() => Promise<boolean>) | null) => void
   publicUrl?: string | null; canOpenPublicPage?: boolean; publicPageReason?: string
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [settingsReady, setSettingsReady] = useState(false)
   const [notificationDirty, setNotificationDirty] = useState(false)
   const notificationSave = useRef<(() => Promise<boolean>) | null>(null)
@@ -73,7 +76,9 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
       }
       return true
     } catch (cause) {
-      setError(webinarErrorText(cause, '保存できませんでした。入力を残しました。もう一度お試しください。'))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure) setError(webinarErrorText(cause, '保存できませんでした。入力を残しました。もう一度お試しください。')) }
       return false
     } finally { saveLock.current = false; setSaving(false) }
   }
@@ -94,7 +99,9 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
       setTestResult(`テスト送信しました。成功 ${res.data.sent}件・失敗 ${res.data.failed}件`)
       const refreshed = await webinarApi.editor(webinarId)
       onEditorChange?.(refreshed.data)
-    } catch (cause) { setTestResult(webinarErrorText(cause, 'テスト送信できませんでした。時間をおいてもう一度お試しください。')) }
+    } catch (cause) {
+      const fieldFailure = saveErrors.capture(cause)
+ { if (!fieldFailure) setTestResult(webinarErrorText(cause, 'テスト送信できませんでした。時間をおいてもう一度お試しください。')) } }
     finally { testLock.current = false; setTesting(false) }
   }
   const testDone = !dirty && editor.notificationTest?.status === 'passed'
@@ -102,7 +109,7 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
   const testButton = (label: string) => <Button onClick={() => setTestConfirmOpen(true)} disabled={testing || saving || testDone || !settingsReady} title={testDone ? 'テスト済みです' : !settingsReady ? '通知の設定を読み込んでから実行できます' : undefined} busy={testing} busyLabel="送信中…">{testDone ? 'テスト送信済み' : label}</Button>
 
   return (
-    <div data-design-node="E7iAYs" data-webinar-pane="notifications">
+    <SaveErrorScope errors={saveErrors}><div data-design-node="E7iAYs" data-webinar-pane="notifications">
       <div className="min-w-0 space-y-4">
         <section className="border-hairline bg-canvas rounded-card border p-5">
           <WebinarNotifications webinarId={webinarId} onLoaded={handleLoaded} onDirtyChange={setNotificationDirty} registerSave={registerNotificationSave} />
@@ -114,8 +121,8 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
             {(['completed', 'cta_clicked', 'unviewed'] as const).map((trigger) => <li key={trigger} className="flex items-center gap-4 py-3"><span className="text-ink w-24 shrink-0 text-sm font-semibold">{TRIGGER_LABEL[trigger]}</span><span className="text-ink-secondary min-w-0 flex-1 truncate text-sm" title={actions?.filter((a) => a.trigger === trigger).map((a) => ACTION_LABEL[a.actionType]).join('・')}>{actions === null ? '読み込んでいます' : actions.filter((a) => a.trigger === trigger).map((a) => ACTION_LABEL[a.actionType]).join('・') || 'まだ何もしない'}</span><Button size="compact" onClick={onOpenActions} aria-label={`${TRIGGER_LABEL[trigger]}の動きを変える`}>…</Button></li>)}
           </ul>}
           <label className="text-ink block text-xs font-semibold" htmlFor="webinar-action-message">視聴完了のメッセージ</label>
-          <textarea id="webinar-action-message" aria-label="視聴完了メッセージ本文" value={templateBody} onChange={(event) => setTemplateBody(event.target.value)} rows={2} className="border-hairline bg-canvas text-ink mt-2 w-full rounded-control border px-3 py-2 text-sm" />
-          <div className="mt-3"><label className="text-ink mb-2 block text-xs font-semibold">結果が取れないとき</label><Select aria-label="視聴結果を取得できない場合" value={policy} onChange={(value) => setPolicy(value as typeof policy)} options={[{ value: 'escalate', label: '要対応へ追加' }, { value: 'retry_next_day', label: '翌日に再取得' }]} /></div>
+          <SaveErrorField names={["templateBody","actionTemplateBody","template_body"]}><textarea id="webinar-action-message" aria-label="視聴完了メッセージ本文" value={templateBody} onChange={(event) => setTemplateBody(event.target.value)} rows={2} className="border-hairline bg-canvas text-ink mt-2 w-full rounded-control border px-3 py-2 text-sm" /></SaveErrorField>
+          <div className="mt-3"><label className="text-ink mb-2 block text-xs font-semibold">結果が取れないとき</label><SaveErrorField names={["policy","missingResultPolicy"]}><Select aria-label="視聴結果を取得できない場合" value={policy} onChange={(value) => setPolicy(value as typeof policy)} options={[{ value: 'escalate', label: '要対応へ追加' }, { value: 'retry_next_day', label: '翌日に再取得' }]} /></SaveErrorField></div>
           <div className="mt-3"><Button onClick={onOpenActions}>条件を足す</Button></div>
           {!registerSave ? <Button onClick={() => void save()} disabled={saving}>下書きを保存</Button> : null}
         </fieldset>
@@ -129,6 +136,6 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
         {publicPageReason && !canOpenPublicPage ? <p className="text-ink-faint mt-2 text-xs">{publicPageReason}</p> : null}
       </aside>
       <ConfirmDialog open={testConfirmOpen} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing} onCancel={() => { if (!testing) setTestConfirmOpen(false) }} onConfirm={() => void runTest()}><p className="text-ink-secondary text-xs">{dirty ? '未保存の設定を保存してから送ります。' : ''}対象：「{webinarTitle}」の有効な通知。本文は設定済みのものを送ります。</p></ConfirmDialog>
-    </div>
+    </div></SaveErrorScope>
   )
 }

@@ -143,6 +143,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       Promise.resolve({ success: true, data: { items: [], nextCursor: null } }),
     api: {
       ...actual.api,
+      // 役割は手元の保存値ではなく、サーバーの返事から読む。
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { id: 'tester', role: storage.get('lh_staff_role') ?? 'admin', permissions: JSON.parse(storage.get('lh_staff_permissions') ?? '[]'), viewPermissions: JSON.parse(storage.get('lh_staff_view_permissions') ?? '[]') } }) },
       friends: {
         ...actual.api.friends,
         get: () => Promise.resolve({ success: true, data: fixtures.friendDetail }),

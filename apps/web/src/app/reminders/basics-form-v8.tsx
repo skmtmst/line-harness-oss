@@ -14,6 +14,7 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import Card from '@/components/shared/card'
 import { ChoiceCardV8 } from './wizard-v8-ui'
 import styles from './wizard-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8 リマインダ手順1「基本設定」の入力部分（板 VE1u5）。
@@ -260,18 +261,18 @@ export function ReminderBasicsFormV8({
         <div className={styles.fieldGrid}>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="v8-reminder-name">リマインダ名（60文字まで）</label>
-            <TextField
+            <SaveErrorField names={["name","value.name"]}><TextField
               id="v8-reminder-name"
               value={value.name}
               maxLength={60}
               placeholder="例：予約前日のご案内"
               onChange={(event) => patch({ name: event.target.value })}
-            />
+            /></SaveErrorField>
           </div>
           <div className={styles.field}>
             <span className={styles.label}>フォルダ</span>
             <div className={styles.testRow}>
-              <FolderSelect
+              <SaveErrorField names={["folderId","value.folderId","folder_id","value.folder_id"]}><FolderSelect
                 value={value.folderId}
                 onChange={(next) => patch({ folderId: next })}
                 disabled={foldersLoadState !== 'ready'}
@@ -283,7 +284,7 @@ export function ReminderBasicsFormV8({
                 onCreate={canCreateFolder
                   ? folderCreator((name, color) => api.folders.create({ kind: 'reminder', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
                   : undefined}
-              />
+              /></SaveErrorField>
               {foldersLoadState === 'error' ? (
                 <Button onClick={() => setFoldersReloadToken((current) => current + 1)}>再読み込み</Button>
               ) : null}
@@ -294,11 +295,11 @@ export function ReminderBasicsFormV8({
               社内メモ <span className={styles.labelOptional}>任意</span>
             </label>
             {value.description.includes('\n') ? (
-              <TextArea id="v8-reminder-memo" rows={3} value={value.description}
-                placeholder="運用の目的や注意点" onChange={(event) => patch({ description: event.target.value })} />
+              <SaveErrorField names={["description","value.description"]}><TextArea id="v8-reminder-memo" rows={3} value={value.description}
+                placeholder="運用の目的や注意点" onChange={(event) => patch({ description: event.target.value })} /></SaveErrorField>
             ) : (
-              <TextField id="v8-reminder-memo" value={value.description}
-                placeholder="運用の目的や注意点" onChange={(event) => patch({ description: event.target.value })} />
+              <SaveErrorField names={["description","value.description"]}><TextField id="v8-reminder-memo" value={value.description}
+                placeholder="運用の目的や注意点" onChange={(event) => patch({ description: event.target.value })} /></SaveErrorField>
             )}
           </div>
         </div>
@@ -310,7 +311,7 @@ export function ReminderBasicsFormV8({
           <p className={styles.cardNote}>この日時の前や後に送ります</p>
         </div>
         <div className={styles.choiceGrid} role="radiogroup" aria-label="基準日">
-          <ChoiceCardV8
+          <SaveErrorField names={["reminder-v8-trigger","triggerType","value.triggerType"]}><ChoiceCardV8
             name="reminder-v8-trigger"
             value="booking"
             checked={value.triggerType === 'booking'}
@@ -318,8 +319,8 @@ export function ReminderBasicsFormV8({
             icon={<CalendarDays size={18} />}
             title="予約日時"
             note="予約・Google Meet の日時"
-          />
-          <ChoiceCardV8
+          /></SaveErrorField>
+          <SaveErrorField names={["reminder-v8-trigger","triggerType","value.triggerType"]}><ChoiceCardV8
             name="reminder-v8-trigger"
             value="friend_field"
             checked={value.triggerType === 'friend_field'}
@@ -327,8 +328,8 @@ export function ReminderBasicsFormV8({
             icon={<IdCard size={18} />}
             title="友だち情報欄の日付"
             note="誕生日・契約終了日など"
-          />
-          <ChoiceCardV8
+          /></SaveErrorField>
+          <SaveErrorField names={["reminder-v8-trigger","triggerType","value.triggerType"]}><ChoiceCardV8
             name="reminder-v8-trigger"
             value="event"
             checked={value.triggerType === 'event'}
@@ -336,14 +337,14 @@ export function ReminderBasicsFormV8({
             icon={<CalendarDays size={18} />}
             title="イベントの予約日時"
             note="イベントの開始日時"
-          />
+          /></SaveErrorField>
         </div>
 
         {value.triggerType === 'friend_field' ? (
           <div className={styles.field}>
             <span className={styles.label}>基準日に使う情報欄</span>
             <div className={styles.testRow}>
-              <Select
+              <SaveErrorField names={["triggerFieldId","value.triggerFieldId","trigger_field_id","value.trigger_field_id"]}><Select
                 value={value.triggerFieldId}
                 onChange={(next) => patch({ triggerFieldId: next })}
                 disabled={fieldsLoadState !== 'ready'}
@@ -353,20 +354,20 @@ export function ReminderBasicsFormV8({
                   { value: '', label: fieldsLoadState === 'loading' || fieldsLoadState === 'idle' ? '情報欄を読み込み中' : fieldsLoadState === 'error' ? '情報欄を読み込めませんでした' : '選んでください' },
                   ...dateFields.map((field) => ({ value: field.id, label: field.name })),
                 ]}
-              />
+              /></SaveErrorField>
               {fieldsLoadState === 'error' ? <Button onClick={() => setFieldsLoadState('idle')}>再読み込み</Button> : null}
             </div>
             {fieldsLoadState === 'ready' && dateFields.length === 0 ? (
               <p className={styles.fieldNote}>このアカウントに日付型の情報欄がまだありません。友だち情報欄から追加してください。</p>
             ) : null}
             <div className={styles.field}>
-              <Checkbox checked={value.repeatYearly} onCheckedChange={(next) => patch({ repeatYearly: next })} aria-label="毎年くり返す">
+              <SaveErrorField names={["repeatYearly","value.repeatYearly","repeat_yearly","value.repeat_yearly"]}><Checkbox checked={value.repeatYearly} onCheckedChange={(next) => patch({ repeatYearly: next })} aria-label="毎年くり返す">
                 毎年くり返す（誕生日・契約更新日など）
-              </Checkbox>
+              </Checkbox></SaveErrorField>
               {value.repeatYearly ? (
                 <div className={styles.field}>
                   <span className={styles.label}>2月29日が基準日のとき</span>
-                  <Select
+                  <SaveErrorField names={["leapYearPolicy","value.leapYearPolicy","leap_year_policy","value.leap_year_policy"]}><Select
                     value={value.leapYearPolicy}
                     onChange={(next) => patch({ leapYearPolicy: next as BasicsValue['leapYearPolicy'] })}
                     aria-label="2月29日が基準日のとき"
@@ -375,7 +376,7 @@ export function ReminderBasicsFormV8({
                       { value: 'mar1', label: '3月1日に届ける' },
                       { value: 'skip', label: 'その年は届けない' },
                     ]}
-                  />
+                  /></SaveErrorField>
                   <p className={styles.fieldNote}>うるう年は2月29日に届きます。平年の扱いを選んでください。</p>
                 </div>
               ) : null}
@@ -387,7 +388,7 @@ export function ReminderBasicsFormV8({
           <div className={styles.field}>
             <span className={styles.label}>基準日にするイベント</span>
             <div className={styles.testRow}>
-              <Select
+              <SaveErrorField names={["triggerEventId","value.triggerEventId","trigger_event_id","value.trigger_event_id"]}><Select
                 value={value.triggerEventId}
                 onChange={(next) => patch({ triggerEventId: next })}
                 disabled={eventsLoadState !== 'ready'}
@@ -397,7 +398,7 @@ export function ReminderBasicsFormV8({
                   { value: '', label: eventsLoadState === 'loading' || eventsLoadState === 'idle' ? 'イベントを読み込み中' : eventsLoadState === 'error' ? 'イベントを読み込めませんでした' : '選んでください' },
                   ...events.map((event) => ({ value: event.id, label: event.name })),
                 ]}
-              />
+              /></SaveErrorField>
               {eventsLoadState === 'error' ? <Button onClick={() => setEventsLoadState('idle')}>再読み込み</Button> : null}
             </div>
             <p className={styles.fieldNote}>このイベントへの予約の開始日時を起点にします</p>

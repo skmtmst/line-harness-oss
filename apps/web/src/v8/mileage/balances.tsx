@@ -42,6 +42,7 @@ import {
 import { MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './mileage.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 function dateOnlyDaysAgo(days: number) {
   const date = new Date()
@@ -554,13 +555,13 @@ export default function BalancesTab() {
         >
           <label className={styles.fieldLabel}>
             差し戻す理由
-            <textarea
+            <SaveErrorField names={["rejectReason","reject_reason"]}><textarea
               className={styles.textarea}
               value={rejectReason}
               onChange={(event) => setRejectReason(event.target.value)}
               placeholder="例：調整の根拠となる資料を確認できませんでした"
               rows={3}
-            />
+            /></SaveErrorField>
           </label>
         </Dialog>
       }

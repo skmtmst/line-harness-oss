@@ -24,6 +24,7 @@ import MergedDeliveryDialog from '@/components/merged-person/merged-delivery-dia
 import MergedProfileDialog from '@/components/merged-person/merged-profile-dialog'
 import { useMergedPerson } from '@/components/merged-person/use-merged-person'
 import styles from './person.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /** 9/30（日本時間）。 */
 function shortDate(iso: string): string {
@@ -117,7 +118,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
                     <Td className={styles.td}><span className={friend.isFollowing ? `${styles.pill} ${styles.pillOk}` : `${styles.pill} ${styles.pillMuted}`}>{friend.isFollowing ? '友だち' : 'ブロック・削除'}</span></Td>
                     <Td className={styles.td}>
                       {canManage ? (
-                        <Toggle checked={active} label={`${friend.lineAccountName} の配信に使う`} onChange={m.saving ? undefined : (next) => m.setDeliveryActive(friend.friendId, next)} />
+                        <SaveErrorField names={["active","deliveryActive","delivery_active"]}><Toggle checked={active} label={`${friend.lineAccountName} の配信に使う`} onChange={m.saving ? undefined : (next) => m.setDeliveryActive(friend.friendId, next)} /></SaveErrorField>
                       ) : <span className={styles.small}>{active ? '使う' : '使わない'}</span>}
                     </Td>
                   </Tr>
@@ -244,7 +245,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
         <p className={styles.small}>{`解除する友だち：${m.unlinkTarget?.displayName ?? ''}`}</p>
         <label className={styles.reasonLabel}>
           <span>解除する理由<RequiredBadge /></span>
-          <TextArea value={m.unlinkReason} onChange={(event) => m.setUnlinkReason(event.target.value)} placeholder="確認した根拠を書いてください" />
+          <SaveErrorField names={["unlinkReason","m.unlinkReason","unlink_reason","m.unlink_reason"]}><TextArea value={m.unlinkReason} onChange={(event) => m.setUnlinkReason(event.target.value)} placeholder="確認した根拠を書いてください" /></SaveErrorField>
         </label>
       </Dialog>
     </PageFrame>

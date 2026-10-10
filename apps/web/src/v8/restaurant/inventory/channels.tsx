@@ -25,6 +25,7 @@ import { Status } from '../booking-kit/shell'
 import { DialogNote, RsDialog } from '../booking-kit/parts'
 import { dayLabelParen, formatAt } from './format'
 import styles from './inventory.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export type RestaurantChannel = {
   id: string
@@ -311,14 +312,14 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
         <div ref={importRef} className={styles.manualFields}>
         {importError ? <Notice tone="danger" message={importError} /> : null}
         <Field label="お客さまのお名前" htmlFor="rs-import-name" error={fieldErrors.customerName}>
-          <TextField id="rs-import-name" required value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} />
+          <SaveErrorField names={["customerName","draft.customerName","customer_name","draft.customer_name"]}><TextField id="rs-import-name" required value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} /></SaveErrorField>
         </Field>
         <div className={styles.pair}>
           <Field label="人数" htmlFor="rs-import-guests" error={fieldErrors.guestCount}>
-            <TextField id="rs-import-guests" type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
+            <SaveErrorField names={["guestCount","draft.guestCount","guest_count","draft.guest_count"]}><TextField id="rs-import-guests" type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} /></SaveErrorField>
           </Field>
           <Field label="来店の日時" htmlFor="rs-import-at" error={fieldErrors.startsAt}>
-            <DateTimeField id="rs-import-at" invalid={Boolean(fieldErrors.startsAt)} required value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} />
+            <SaveErrorField names={["startsAt","draft.startsAt","starts_at","draft.starts_at"]}><DateTimeField id="rs-import-at" invalid={Boolean(fieldErrors.startsAt)} required value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} /></SaveErrorField>
           </Field>
         </div>
         </div>

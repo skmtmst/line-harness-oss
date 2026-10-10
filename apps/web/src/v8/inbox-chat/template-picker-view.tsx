@@ -19,6 +19,7 @@ import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-pan
 import Toggle from '@/components/shared/toggle'
 import SearchField from '@/components/shared/search-field'
 import styles from './inbox-chat.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export type TemplatePickerSideKey = 'frequent' | 'all' | 'none' | `folder:${string}`
 
@@ -153,7 +154,7 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
             <div className={styles.tpFootLead}>
               {props.canPack ? (
                 <>
-                  <Toggle checked={packMode} label="2通以上を続けて送る" onChange={props.onPackMode} />
+                  <SaveErrorField names={["packMode","pack_mode"]}><Toggle checked={packMode} label="2通以上を続けて送る" onChange={props.onPackMode} /></SaveErrorField>
                   <span className={styles.tpFootText}>
                     <span className={styles.tpFootTitle}>2通以上を続けて送る</span>
                     <span className={styles.tpFootSub}>最大5通・選んだ順に送る</span>

@@ -15,6 +15,7 @@ import ListRange from '@/components/ui/list-range'
 import { FILE_SCAN_PAGE_SIZE, useFileScan } from './use-file-scan'
 import { SettingsShellV8 } from '../settings-nav-v8'
 import styles from '../settings-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /* 板 `PfA4o` の札。`使えません`・`使えます` の絞り込みは v7 の画面に残す。 */
 const STATUS_CHIPS = [
@@ -96,12 +97,12 @@ export function FileScanV8() {
             <label htmlFor="file-scan-release-reason" className={styles.reasonHint}>
               理由（必須）
             </label>
-            <TextArea
+            <SaveErrorField names={["releaseReason","release_reason"]}><TextArea
               id="file-scan-release-reason"
               value={releaseReason}
               onChange={(event) => { setReleaseReason(event.target.value); setReleaseError('') }}
               placeholder="例：社内の画像と確認できたため"
-            />
+            /></SaveErrorField>
           </div>
         </ConfirmDialog>
       ) : null}
@@ -201,13 +202,13 @@ export function FileScanV8() {
           <span className={`${styles.statusChip} ${styles.statusWarn} ${styles.chipInline}`}>{total}件</span>
         </h2>
         <span className={styles.toolbarSearch}>
-          <input
+          <SaveErrorField names={["query"]}><input
             type="search"
             aria-label="ファイル名で探す"
             placeholder="ファイル名で探す"
             value={query}
             onChange={(event) => changeQuery(event.target.value)}
-          />
+          /></SaveErrorField>
         </span>
         {STATUS_CHIPS.map((chip) => (
           <FilterChip
@@ -319,30 +320,30 @@ export function FileScanV8() {
             <div className={styles.formNarrow}>
               <div>
                 <label htmlFor="file-scan-provider" className={styles.reasonHint}>提供元</label>
-                <TextField
+                <SaveErrorField names={["provider"]}><TextField
                   id="file-scan-provider"
                   value={provider}
                   onChange={(event) => setProvider(event.target.value)}
                   placeholder="例：example-scan"
-                />
+                /></SaveErrorField>
               </div>
               <div className={styles.fieldGap}>
                 <label htmlFor="file-scan-endpoint" className={styles.reasonHint}>送り先（https）</label>
-                <TextField
+                <SaveErrorField names={["endpoint"]}><TextField
                   id="file-scan-endpoint"
                   value={endpoint}
                   onChange={(event) => setEndpoint(event.target.value)}
                   placeholder="https://example.com/scan"
-                />
+                /></SaveErrorField>
               </div>
               <div className={styles.fieldGap}>
                 <label htmlFor="file-scan-secret-ref" className={styles.reasonHint}>鍵の名前</label>
-                <TextField
+                <SaveErrorField names={["secretRef","secret_ref"]}><TextField
                   id="file-scan-secret-ref"
                   value={secretRef}
                   onChange={(event) => setSecretRef(event.target.value)}
                   placeholder="例：FILE_SCAN_API_KEY"
-                />
+                /></SaveErrorField>
               </div>
               <div className={styles.formSubmit}>
                 <Button type="button" variant="primary" disabled={configBusy} onClick={() => void saveConfig()} busy={configBusy} busyLabel="保存しています…">

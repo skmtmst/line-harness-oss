@@ -73,6 +73,7 @@ import { csvExportLine } from './csv-export'
 import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
 import { lastContactOf, monthDay, monthDayTime, statusOf, messageWord, splitTags } from './words'
 import styles from './list.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
@@ -594,18 +595,18 @@ export default function FriendsListV8() {
           />
         </div>
         {/* 選んだ値は「タグ：すべて」の1つの文字で出す（絵どおり。部品の label は文字が2つに割れる）。 */}
-        <Select aria-label="タグで絞り込む" width={119} value={selectedTagId}
+        <SaveErrorField names={["selectedTagId","tagId","selected_tag_id"]}><Select aria-label="タグで絞り込む" width={119} value={selectedTagId}
           onChange={(value) => resetPageWith(() => setSelectedTagId(value))}
-          options={prefixed('タグ', [{ value: '', label: 'すべて' }, ...allTags.map((tag) => ({ value: tag.id, label: tag.name }))])} />
-        <Select aria-label="対応状況で絞り込む" width={119} value={responseFilter}
+          options={prefixed('タグ', [{ value: '', label: 'すべて' }, ...allTags.map((tag) => ({ value: tag.id, label: tag.name }))])} /></SaveErrorField>
+        <SaveErrorField names={["responseFilter","response_filter"]}><Select aria-label="対応状況で絞り込む" width={119} value={responseFilter}
           onChange={(value) => resetPageWith(() => setResponseFilter(value as ResponseFilter))}
-          options={prefixed('対応', [{ value: 'all', label: 'すべて' }, { value: 'unhandled', label: '未対応のみ' }])} />
-        <Select aria-label="担当で絞り込む" width={132} value={operatorId}
+          options={prefixed('対応', [{ value: 'all', label: 'すべて' }, { value: 'unhandled', label: '未対応のみ' }])} /></SaveErrorField>
+        <SaveErrorField names={["operatorId","operator_id"]}><Select aria-label="担当で絞り込む" width={132} value={operatorId}
           onChange={(value) => resetPageWith(() => setOperatorId(value))}
-          options={prefixed('担当者', [{ value: '', label: 'すべて' }, ...operators.map((operator) => ({ value: operator.id, label: operator.name }))])} />
-        <Select aria-label="シナリオで絞り込む" width={147} value={scenarioId}
+          options={prefixed('担当者', [{ value: '', label: 'すべて' }, ...operators.map((operator) => ({ value: operator.id, label: operator.name }))])} /></SaveErrorField>
+        <SaveErrorField names={["scenarioId","scenario_id"]}><Select aria-label="シナリオで絞り込む" width={147} value={scenarioId}
           onChange={(value) => resetPageWith(() => setScenarioId(value))}
-          options={prefixed('シナリオ', [{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))])} />
+          options={prefixed('シナリオ', [{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))])} /></SaveErrorField>
         <button
           type="button"
           aria-pressed={advanced !== null}
@@ -648,9 +649,9 @@ export default function FriendsListV8() {
           </button>
           <MenuPortal open={columnsOpen} align="end" getAnchor={() => columnsButtonRef.current} onClose={() => setColumnsOpen(false)}>
             <div className={styles.columnsMenu}>
-              {COLUMNS.map((column) => (
+              {COLUMNS.map((column, saveFieldIndex) => (
                 <div key={column.key} className={styles.columnsItem}>
-                  <Checkbox
+                  <SaveErrorField names={[`COLUMNS.${saveFieldIndex}.key`,"key","column.key","visible"]}><Checkbox
                     checked={visible.has(column.key)}
                     onCheckedChange={(checked) => setVisible((previous) => {
                       const next = new Set(previous)
@@ -660,27 +661,27 @@ export default function FriendsListV8() {
                     })}
                   >
                     {column.label}
-                  </Checkbox>
+                  </Checkbox></SaveErrorField>
                 </div>
               ))}
             </div>
           </MenuPortal>
         </span>
-        <Select
+        <SaveErrorField names={["pageSize","limit","page_size"]}><Select
           aria-label="表示件数"
           width={98}
           value={String(pageSize)}
           onChange={(value) => resetPageWith(() => setPageSize(Number(value) as PageSize))}
           options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size}件表示` }))}
-        />
-        <Select
+        /></SaveErrorField>
+        <SaveErrorField names={["sortMode","sort","sort_mode"]}><Select
           aria-label="並び順"
           treatment="text"
           width={171}
           value={sortMode}
           onChange={(value) => resetPageWith(() => setSortMode(value as SortMode))}
           options={[{ value: 'recent', label: '友だち追加の新しい順' }, { value: 'oldest', label: '友だち追加の古い順' }]}
-        />
+        /></SaveErrorField>
       </div>
       {advanced?.summary.length ? (
         <div className={styles.applied}>
@@ -728,12 +729,12 @@ export default function FriendsListV8() {
         <thead>
           <TableHeadRow>
             <Th className={styles.thCheck}>
-              <Checkbox
+              <SaveErrorField names={["allSelected","selectedIds","all_selected","selected_ids"]}><Checkbox
                 checked={allSelected}
                 indeterminate={selectedCount > 0 && !allSelected}
                 onCheckedChange={(checked) => setSelectedIds(checked ? new Set(friends.map((friend) => friend.id)) : new Set())}
                 aria-label="表示中の友だちをすべて選ぶ"
-              />
+              /></SaveErrorField>
             </Th>
             <Th colSpan={2} className={styles.thFriend}>
               <span className={styles.thFriendInner}><Star size={14} aria-label="注目" className={styles.thStar} />友だち</span>
@@ -778,7 +779,7 @@ export default function FriendsListV8() {
                 <ListState kind="empty" title={emptyMessage.title} description={emptyMessage.description} />
               </td>
             </tr>
-          ) : friends.map((friend) => {
+          ) : friends.map((friend, saveFieldIndex) => {
             const status = statusOf(friend.chatStatus)
             const latest = friend.latestIncomingMessage
             const lastContact = lastContactOf(friend)
@@ -787,7 +788,7 @@ export default function FriendsListV8() {
             return (
               <Tr key={friend.id} interactive selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row>
                 <Td className={styles.tdCheck} onClick={(event) => event.stopPropagation()}>
-                  <Checkbox checked={selectedIds.has(friend.id)} onCheckedChange={() => toggleSelect(friend.id)} aria-label={`${friend.displayName}を選ぶ`} />
+                  <SaveErrorField names={[`friends.${saveFieldIndex}.id`,"id","friend.id"]}><Checkbox checked={selectedIds.has(friend.id)} onCheckedChange={() => toggleSelect(friend.id)} aria-label={`${friend.displayName}を選ぶ`} /></SaveErrorField>
                 </Td>
                 <Td className={styles.tdStar}>
                   {rowCanEdit ? (

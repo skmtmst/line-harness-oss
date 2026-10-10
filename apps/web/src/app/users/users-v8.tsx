@@ -28,6 +28,7 @@ import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import { useMergedUsers, USERS_PAGE_SIZE } from './use-merged-users'
 import styles from '@/app/friends/friends-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const UID_STATUS = {
   url_token: '要確認',
@@ -153,7 +154,7 @@ export default function UsersV8() {
           />
         </div>
         <div className={styles.selectWrap}>
-          <Select
+          <SaveErrorField names={["uid","u.uid"]}><Select
             aria-label="UID連携で絞り込む"
             label="UID連携"
             size="full"
@@ -164,10 +165,10 @@ export default function UsersV8() {
               { value: 'linked', label: 'UID：連携済み' },
               { value: 'unlinked', label: 'UID：未連携・要確認' },
             ]}
-          />
+          /></SaveErrorField>
         </div>
         <div className={styles.selectWrap}>
-          <Select
+          <SaveErrorField names={["account","u.account"]}><Select
             aria-label="所属アカウントで絞り込む"
             label="所属アカウント"
             size="full"
@@ -177,15 +178,15 @@ export default function UsersV8() {
               { value: '', label: '所属：すべて' },
               ...u.accountOptions.map((a) => ({ value: a.id, label: a.name })),
             ]}
-          />
+          /></SaveErrorField>
         </div>
-        <Checkbox
+        <SaveErrorField names={["onlyDups","u.onlyDups","only_dups","u.only_dups"]}><Checkbox
           checked={u.onlyDups}
           onCheckedChange={u.setOnlyDups}
           className="whitespace-nowrap"
         >
           複数アカウントのみ
-        </Checkbox>
+        </Checkbox></SaveErrorField>
         <span className={styles.toolbarSpacer} />
         <span className={styles.toolbarCount}>
           {/* WEB322：読めなかったときは 0人と言わない。 */}

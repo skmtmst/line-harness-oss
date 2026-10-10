@@ -18,6 +18,7 @@ import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { formatNumber } from '@/lib/format'
 import '../affiliates/create-v8.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const OFFER_LIST_PATH = '/conversions?tab=offers'
 
@@ -35,6 +36,8 @@ function rewardIntegerError(value: string, kind: 'amount' | 'miles'): string | n
 }
 
 export function NewOfferV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('案件を作る')
   const router = useRouter()
   const { selectedAccountId, selectedAccount } = useAccount()
@@ -197,7 +200,9 @@ export function NewOfferV8() {
         setSaveNote('下書きに保存しました。続けて作れます。')
       }
     } catch (caught) {
-      setSaveError(caught instanceof Error ? caught.message : '保存できませんでした')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setSaveError(caught instanceof Error ? caught.message : '保存できませんでした') }
     } finally {
       setSaving(false)
     }
@@ -210,7 +215,7 @@ export function NewOfferV8() {
   const scenarioName = scenarios.find((item) => item.id === scenarioId)?.name ?? null
 
   return (
-    <div data-design-node="Td4TN" className="af-create-board">
+    <SaveErrorScope errors={saveErrors}><div data-design-node="Td4TN" className="af-create-board">
       <div className="af-create-head">
         <Link href="/affiliates" className="af-create-backLink">← 成果とアフィリエイトへ</Link>
         <h1 className="af-create-headTitle">案件を作る</h1>
@@ -224,23 +229,23 @@ export function NewOfferV8() {
             <p className="af-create-cardNote">アフィリエイターの画面に出ます</p>
             <label className="af-create-fieldLabel" htmlFor="of-name">
               案件名
-              <TextField
+              <SaveErrorField names={["name"]}><TextField
                 id="of-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="例：定期便の初回"
                 maxLength={120}
-              />
+              /></SaveErrorField>
             </label>
             <label className="af-create-fieldLabel" htmlFor="of-description">
               説明 任意
-              <TextArea
+              <SaveErrorField names={["description"]}><TextArea
                 id="of-description"
                 rows={3}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 placeholder="例：初回の定期便をお申し込みいただいた方が対象です。"
-              />
+              /></SaveErrorField>
             </label>
           </section>
 
@@ -273,7 +278,7 @@ export function NewOfferV8() {
             <div className="af-create-grid2">
               <label className="af-create-fieldLabel" htmlFor="of-amount">
                 報酬額（円）
-                <TextField
+                <SaveErrorField names={["rewardAmount","reward_amount"]}><TextField
                   id="of-amount"
                   type="number"
                   min={0}
@@ -281,11 +286,11 @@ export function NewOfferV8() {
                   value={rewardAmount}
                   onChange={(event) => setRewardAmount(event.target.value)}
                   placeholder="2000"
-                />
+                /></SaveErrorField>
               </label>
               <label className="af-create-fieldLabel" htmlFor="of-miles">
                 マイル（任意） 任意
-                <TextField
+                <SaveErrorField names={["rewardMiles","reward_miles"]}><TextField
                   id="of-miles"
                   type="number"
                   min={0}
@@ -293,7 +298,7 @@ export function NewOfferV8() {
                   value={rewardMiles}
                   onChange={(event) => setRewardMiles(event.target.value)}
                   placeholder="200"
-                />
+                /></SaveErrorField>
               </label>
             </div>
             <p className="af-create-footnote">現金とマイルは併用できます。マイルは標準プログラムで付けます。</p>
@@ -308,12 +313,12 @@ export function NewOfferV8() {
             <h2 className="af-create-cardTitle">成果を認めたときにすること</h2>
             <p className="af-create-cardNote">任意</p>
             <div className="af-create-switchRow">
-              <Toggle checked={tagEnabled} label="タグを付ける" onChange={(next) => { setTagEnabled(next); if (!next) setTagId('') }} />
+              <SaveErrorField names={["tagEnabled","tag_enabled"]}><Toggle checked={tagEnabled} label="タグを付ける" onChange={(next) => { setTagEnabled(next); if (!next) setTagId('') }} /></SaveErrorField>
               <div className="af-create-switchBody">
                 <p className="af-create-switchName">タグを付ける</p>
                 <p className="af-create-switchNote">{tagName ?? 'まだ決めていません'}</p>
                 {tagEnabled ? (
-                  <Select
+                  <SaveErrorField names={["tagId","tag_id"]}><Select
                     id="of-tag"
                     aria-label="付けるタグ"
                     value={tagId}
@@ -323,7 +328,7 @@ export function NewOfferV8() {
                       ...tags.filter((t) => (t.status ?? 'active') === 'active').map((t) => ({ value: t.id, label: t.name })),
                     ]}
                     size="standard"
-                  />
+                  /></SaveErrorField>
                 ) : null}
                 {tagsFetch === 'loading' ? <p className="af-create-footnote">タグの候補を読み込んでいます</p> : null}
                 {tagsFetch === 'failed' ? (
@@ -337,12 +342,12 @@ export function NewOfferV8() {
               </div>
             </div>
             <div className="af-create-switchRow">
-              <Toggle checked={scenarioEnabled} label="シナリオ配信を始める" onChange={(next) => { setScenarioEnabled(next); if (!next) setScenarioId('') }} />
+              <SaveErrorField names={["scenarioEnabled","scenario_enabled"]}><Toggle checked={scenarioEnabled} label="シナリオ配信を始める" onChange={(next) => { setScenarioEnabled(next); if (!next) setScenarioId('') }} /></SaveErrorField>
               <div className="af-create-switchBody">
                 <p className="af-create-switchName">シナリオ配信を始める</p>
                 <p className="af-create-switchNote">{scenarioName ?? 'まだ決めていません'}</p>
                 {scenarioEnabled ? (
-                  <Select
+                  <SaveErrorField names={["scenarioId","scenario_id"]}><Select
                     id="of-scenario"
                     aria-label="開始するシナリオ"
                     value={scenarioId}
@@ -352,7 +357,7 @@ export function NewOfferV8() {
                       ...scenarios.filter((s) => s.isActive !== false).map((s) => ({ value: s.id, label: s.name })),
                     ]}
                     size="standard"
-                  />
+                  /></SaveErrorField>
                 ) : null}
                 {scenariosFetch === 'loading' ? <p className="af-create-footnote">シナリオの候補を読み込んでいます</p> : null}
                 {scenariosFetch === 'failed' ? (
@@ -406,6 +411,6 @@ export function NewOfferV8() {
         )}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した案件" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div>
+    </div></SaveErrorScope>
   )
 }

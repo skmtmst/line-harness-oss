@@ -32,6 +32,7 @@ import { FIELD_TYPE_HINTS } from '@/components/friend-fields/field-list'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { FIELD_TYPE_WORDS } from './field-editor'
 import styles from './create.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const TYPES = Object.keys(FIELD_TYPE_WORDS) as FriendFieldType[]
 
@@ -72,6 +73,8 @@ export default function FieldMigrateV8() {
 }
 
 function FieldMigrate() {
+  const saveErrors = useSaveFormErrors()
+
   const staffRole = useStaffRole()
   usePageTitle('種類を変える')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }, { label: '友だち情報欄', href: '/tags?tab=fields' }])
@@ -230,6 +233,8 @@ function FieldMigrate() {
       setFields((current) => (current.some((item) => item.id === created.data.id) ? current : [...current, created.data]))
       return created.data
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
       try {
         const res = await api.friendFields.list(account)
         if (res.success) {
@@ -241,13 +246,15 @@ function FieldMigrate() {
             return existing
           }
         }
-      } catch { /* 取り直せないときは下の説明へ */ }
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
+ /* 取り直せないときは下の説明へ */ }
       if (!gateRef.current.current(token) || accountRef.current !== account) return null
       const status = (reason as { status?: number } | null)?.status
       if (status === 409) {
-        setError(`同じ差し込み名「${params.fieldKey}」の別の項目があります。一覧を確認してください`)
+        { if (!fieldFailure) setError(`同じ差し込み名「${params.fieldKey}」の別の項目があります。一覧を確認してください`) }
       } else {
-        setError(describeSaveFailure(reason))
+        { if (!fieldFailure) setError(describeSaveFailure(reason)) }
       }
       return null
     }
@@ -268,7 +275,7 @@ function FieldMigrate() {
         if (!targetField) return
       }
       if (!targetField) {
-        setError('移行先の項目を選んでください')
+        saveErrors.fail('existingTargetId', '移行先の項目を選んでください')
         return
       }
       const res = await api.friendFields.migrationPreview(source.id, account, { targetFieldId: targetField.id })
@@ -277,8 +284,11 @@ function FieldMigrate() {
       setPreview(res.data)
       setIdempotencyKey(crypto.randomUUID())
     } catch (reason) {
+
+
       if (!gateRef.current.current(token) || accountRef.current !== account) return
-      setError(reason instanceof ApiError ? reason.message : '事前確認を実行できませんでした')
+      const fieldFailure = saveErrors.capture(reason)
+      { if (!fieldFailure) setError(reason instanceof ApiError ? reason.message : '事前確認を実行できませんでした') }
     } finally {
       if (gateRef.current.current(token) && accountRef.current === account) setChecking(false)
     }
@@ -327,8 +337,11 @@ function FieldMigrate() {
       setExecutedRunId(res.data.runId)
       pollRun(res.data.runId, account, token, 0)
     } catch (reason) {
+
+
       if (!gateRef.current.current(token) || accountRef.current !== account) return
-      setError(reason instanceof ApiError ? reason.message : '移行を開始できませんでした。事前確認からやり直してください。')
+      const fieldFailure = saveErrors.capture(reason)
+      { if (!fieldFailure) setError(reason instanceof ApiError ? reason.message : '移行を開始できませんでした。事前確認からやり直してください。') }
     } finally {
       if (gateRef.current.current(token) && accountRef.current === account) setExecuting(false)
     }
@@ -358,17 +371,22 @@ function FieldMigrate() {
       setExecutedRunId(res.data.runId)
       pollRun(res.data.runId, account, token, 0)
     } catch (reason) {
+
+
       if (!gateRef.current.current(token) || accountRef.current !== account) return
+      const fieldFailure = saveErrors.capture(reason)
       try {
         const current = await api.friendFields.migrationRun(executedRunId, account)
         if (!gateRef.current.current(token) || accountRef.current !== account) return
         if (current.success) {
           setRun(current.data)
-          setPollProblem('')
+          { if (!fieldFailure) setPollProblem('') }
           return
         }
-      } catch { /* 下の説明へ */ }
-      setError(reason instanceof ApiError ? reason.message : '移行を再開できませんでした。事前確認からやり直してください。')
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
+ /* 下の説明へ */ }
+      { if (!fieldFailure) setError(reason instanceof ApiError ? reason.message : '移行を再開できませんでした。事前確認からやり直してください。') }
     } finally {
       if (gateRef.current.current(token) && accountRef.current === account) setExecuting(false)
     }
@@ -408,50 +426,50 @@ function FieldMigrate() {
       })
   }, [source, selectedAccountId, sampleType])
 
-  if (loading) return <ListState kind="loading" description="友だち情報欄を読み込んでいます" />
+  if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" description="友だち情報欄を読み込んでいます" /></SaveErrorScope>
   if (!sourceId) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="unspecified"
         title="移行する項目が指定されていません"
         description="一覧から移行する項目を選び直してください。"
         backHref="/tags?tab=fields"
         backLabel="友だち情報欄の一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
   if (!selectedAccountId) return (
-    <Notice tone="warn" action={<Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button>}>
+    <SaveErrorScope errors={saveErrors}><Notice tone="warn" action={<Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button>}>
       LINE公式アカウントを選んでください。
-    </Notice>
+    </Notice></SaveErrorScope>
   )
   /* 「読み込めなかった」と「移行元が無い」を分ける（ATTR-11）。 */
   if (loadForbidden) {
     return (
-      <ListState
+      <SaveErrorScope errors={saveErrors}><ListState
         kind="forbidden"
         title="友だち情報欄を見る権限がありません"
         description="オーナーか管理者に確認してください。"
         action={<Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button>}
-      />
+      /></SaveErrorScope>
     )
   }
   if (loadError) return (
-    <TargetMissing
+    <SaveErrorScope errors={saveErrors}><TargetMissing
       kind="error"
       title="項目を読み込めませんでした"
       description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
       onRetry={() => setReloadTick((tick) => tick + 1)}
-    />
+    /></SaveErrorScope>
   )
   if (!source) return (
-    <TargetMissing
+    <SaveErrorScope errors={saveErrors}><TargetMissing
       kind="not-found"
       title="移行元の項目が見つかりません"
       description="削除されたか、リンクが古くなっています。友だち情報欄の一覧から選び直してください。"
       backHref="/tags?tab=fields"
       backLabel="友だち情報欄の一覧へ戻る"
-    />
+    /></SaveErrorScope>
   )
 
   const confirmed = Boolean(preview?.previewToken)
@@ -465,10 +483,10 @@ function FieldMigrate() {
   const back = <Link href="/tags?tab=fields" className={styles.backLink}>← 友だち情報欄へ</Link>
   const rows = sample ? sampleRows(sample) : []
 
-  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></SaveErrorScope>
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       boardId="GobMd"
       title={`「${source.name}」の種類を変える`}
       description={`今の種類：${FIELD_TYPE_WORDS[source.type]}・${usage}`}
@@ -508,13 +526,13 @@ function FieldMigrate() {
           <div className={styles.field}>
             <span className={styles.labelStrong}>移行後の種類</span>
             <span className={styles.selectBox}>
-              <Select
+              <SaveErrorField names={["targetType","type","target_type"]}><Select
                 value={targetType}
                 onChange={(value) => { setTargetType(value as FriendFieldType); resetConfirmation() }}
                 aria-label="移行後の種類"
                 size="full"
                 options={TYPES.map((type) => ({ value: type, label: FIELD_TYPE_WORDS[type] }))}
-              />
+              /></SaveErrorField>
             </span>
           </div>
         ) : null}
@@ -547,28 +565,28 @@ function FieldMigrate() {
           </div>
         ) : (
           <>
-            <SegmentedControl
+            <SaveErrorField names={["targetMode"]}><SegmentedControl
               aria-label="移行先の決め方"
               options={[{ value: 'new' as const, label: '新しい項目を作る' }, { value: 'existing' as const, label: '今ある項目へ移す' }]}
               value={targetMode}
               onChange={(value) => { setTargetMode(value); resetConfirmation() }}
-            />
+            /></SaveErrorField>
             {targetMode === 'new' ? (
               <div className={styles.twoCols}>
                 <label className={styles.field}>
                   <span className={styles.label}>新しい項目の名前</span>
-                  <input className={styles.input} value={targetName} onChange={(event) => { setTargetName(event.target.value); resetConfirmation() }} />
+                  <SaveErrorField names={["targetName","name","target_name"]}><input className={styles.input} value={targetName} onChange={(event) => { setTargetName(event.target.value); resetConfirmation() }} /></SaveErrorField>
                 </label>
                 <label className={styles.field}>
                   <span className={styles.label}>差し込みの名前</span>
-                  <input className={styles.input} value={targetKey} onChange={(event) => { setTargetKey(event.target.value); resetConfirmation() }} />
+                  <SaveErrorField names={["targetKey","fieldKey","target_key"]}><input className={styles.input} value={targetKey} onChange={(event) => { setTargetKey(event.target.value); resetConfirmation() }} /></SaveErrorField>
                 </label>
               </div>
             ) : (
               <div className={styles.field}>
                 <span className={styles.label}>移行先</span>
                 <span className={styles.selectBox}>
-                  <Select
+                  <SaveErrorField names={["existingTargetId","targetFieldId","existing_target_id"]}><Select
                     value={existingTargetId}
                     onChange={(value) => { setExistingTargetId(value); resetConfirmation() }}
                     aria-label="移行先の既存項目"
@@ -577,7 +595,7 @@ function FieldMigrate() {
                       { value: '', label: '項目を選ぶ' },
                       ...fields.filter((field) => field.id !== source.id).map((field) => ({ value: field.id, label: `${field.name}（${FIELD_TYPE_WORDS[field.type]}）` })),
                     ]}
-                  />
+                  /></SaveErrorField>
                 </span>
               </div>
             )}
@@ -636,6 +654,6 @@ function FieldMigrate() {
           {run.rollbackDeadline ? <p className={styles.fieldNote}>{`元の項目の値は ${formatDateTime(run.rollbackDeadline)} まで残ります。元に戻す必要がある場合は、この期限前に運用へ相談してください。`}</p> : null}
         </section>
       ) : null}
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }

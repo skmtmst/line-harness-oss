@@ -39,6 +39,7 @@ import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './notifications.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const SETTINGS_KEYS = [
   'registrationEnabled', 'dayBeforeEnabled', 'dayBeforeTime',
@@ -87,6 +88,8 @@ function actionSummary(action: WebinarAction): string {
 }
 
 export default function NotificationsPane({ ctx, chrome, onDirtyChange, registerSave }: { ctx: EditContext; chrome: WizardChrome } & PaneSaveProps) {
+  const saveErrors = useSaveFormErrors()
+
   const { webinar, editor, readOnly } = ctx
   const webinarId = webinar.id
   const { accounts } = useAccount()
@@ -110,10 +113,12 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       setBaseline(res.data.settings)
       setOverview(res.data.overview ?? null)
       setLoadState('ready')
-    } catch {
-      if (request === generation.current) setLoadState('error')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      if (request === generation.current) { if (!fieldFailure) setLoadState('error') }
     }
-  }, [webinarId])
+  }, [webinarId, saveErrors])
   useEffect(() => { void load(); return () => { generation.current += 1 } }, [load])
   const patch = (next: Partial<WebinarNotificationSettingsInput>) => setSettings((prev) => (prev ? { ...prev, ...next } : prev))
   const notificationDirty = settings !== null && baseline !== null && (baseline.version === 0 || SETTINGS_KEYS.some((key) => settings[key] !== baseline[key]))
@@ -174,8 +179,10 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
           setSettings(res.data.settings)
           setBaseline(res.data.settings)
           notifyToast(`保存しました。${res.data.queued}件を予定に入れ、${res.data.cancelled}件を取り消しました。`)
-        } catch {
-          setError('通知の設定を保存できませんでした。入力を残しました。もう一度お試しください。')
+        } catch (saveFailure) {
+          const fieldFailure = saveErrors.capture(saveFailure)
+
+          { if (!fieldFailure) setError('通知の設定を保存できませんでした。入力を残しました。もう一度お試しください。') }
           return false
         }
         void load()
@@ -190,7 +197,9 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       }
       return true
     } catch (cause) {
-      setError(webinarErrorText(cause, '保存できませんでした。入力を残しました。もう一度お試しください。'))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure) setError(webinarErrorText(cause, '保存できませんでした。入力を残しました。もう一度お試しください。')) }
       return false
     } finally {
       saveLock.current = false
@@ -223,7 +232,9 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       const refreshed = await webinarApi.editor(webinarId)
       ctx.onEditorChange(refreshed.data)
     } catch (cause) {
-      setTestResult(webinarErrorText(cause, 'テスト送信できませんでした。時間をおいてもう一度お試しください。'))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure) setTestResult(webinarErrorText(cause, 'テスト送信できませんでした。時間をおいてもう一度お試しください。')) }
     } finally {
       testLock.current = false
       setTesting(false)
@@ -243,11 +254,11 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
 
   const timeBox = (value: string, label: string, onChange: (next: string) => void) => (readOnly
     ? <ReadValue compact label={label}>{value}</ReadValue>
-    : <TimeField className={styles.time} value={value} aria-label={label} disabled={saving} onChange={(next) => { if (next) onChange(next) }} />
+    : <SaveErrorField names={["value"]}><TimeField className={styles.time} value={value} aria-label={label} disabled={saving} onChange={(next) => { if (next) onChange(next) }} /></SaveErrorField>
   )
   const smallSelect = (value: string, label: string, options: Array<{ value: string; label: string }>, onChange: (next: string) => void) => (readOnly
     ? <ReadValue compact label={label}>{options.find((option) => option.value === value)?.label ?? value}</ReadValue>
-    : <div className={styles.small}><Select aria-label={label} size="full" value={value} disabled={saving} onChange={onChange} options={options} /></div>
+    : <div className={styles.small}><SaveErrorField names={["value"]}><Select aria-label={label} size="full" value={value} disabled={saving} onChange={onChange} options={options} /></SaveErrorField></div>
   )
 
   const rows: Array<{ key: RowKey; label: string; on: boolean; toggle: () => void; extra: ReactNode; caption: string }> = settings ? [
@@ -274,13 +285,13 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
         ))}
       </dl>
       <ul className={styles.rows}>
-        {rows.map((row) => (
+        {rows.map((row, saveFieldIndex) => (
           <li key={row.key} className={styles.row} data-selected={row.key === previewKey || undefined}>
             <button type="button" className={styles.rowLabel} onClick={() => setPreviewKey(row.key)} title="右の見え方に出す">{row.label}</button>
             <div className={styles.rowExtra}>{row.extra}</div>
             {readOnly
               ? <span className={styles.state}>{row.on ? '送る' : '送らない'}</span>
-              : <Toggle checked={row.on} onChange={row.toggle} label={row.label} />}
+              : <SaveErrorField names={[`rows.${saveFieldIndex}.on`,"on","row.on"]}><Toggle checked={row.on} onChange={row.toggle} label={row.label} /></SaveErrorField>}
           </li>
         ))}
       </ul>
@@ -296,7 +307,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
   }
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       boardId="E7iAYs"
       title={chrome.title}
       actions={chrome.actions}
@@ -359,14 +370,14 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
         )}
         <div className={form.field}>
           <label className={form.label} htmlFor="webinar-action-message">視聴完了のメッセージ</label>
-          <TextField id="webinar-action-message" aria-label="視聴完了メッセージ本文" value={templateBody} readOnly={readOnly} disabled={saving} onChange={(event) => setTemplateBody(event.target.value)} />
+          <SaveErrorField names={["templateBody","actionTemplateBody","template_body"]}><TextField id="webinar-action-message" aria-label="視聴完了メッセージ本文" value={templateBody} readOnly={readOnly} disabled={saving} onChange={(event) => setTemplateBody(event.target.value)} /></SaveErrorField>
         </div>
         <div className={form.field}>
           <label className={form.labelSmall} htmlFor="webinar-missing-policy">結果が取れないとき</label>
           <div className={styles.policy}>
             {readOnly
               ? <ReadValue label="視聴結果を取得できない場合">{policy === 'escalate' ? '要対応へ追加' : '翌日に取り直す'}</ReadValue>
-              : <Select id="webinar-missing-policy" aria-label="視聴結果を取得できない場合" size="full" value={policy} disabled={saving} onChange={(value) => setPolicy(value as typeof policy)} options={[{ value: 'escalate', label: '要対応へ追加' }, { value: 'retry_next_day', label: '翌日に取り直す' }]} />}
+              : <SaveErrorField names={["policy","missingResultPolicy"]}><Select id="webinar-missing-policy" aria-label="視聴結果を取得できない場合" size="full" value={policy} disabled={saving} onChange={(value) => setPolicy(value as typeof policy)} options={[{ value: 'escalate', label: '要対応へ追加' }, { value: 'retry_next_day', label: '翌日に取り直す' }]} /></SaveErrorField>}
           </div>
         </div>
         {readOnly ? null : <div><Button onClick={() => setActionsOpen('completed')}><Plus size={15} aria-hidden="true" />条件を足す</Button></div>}
@@ -386,7 +397,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
           onSaved={(next) => { setActions(next); setActionsOpen(null) }}
         />
       ) : null}
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }
 
@@ -398,6 +409,8 @@ function ActionsDialog({ webinarId, initialTrigger, actions, onClose, onSaved }:
   onClose: () => void
   onSaved: (next: WebinarAction[]) => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [draft, setDraft] = useState<WebinarAction[]>(actions)
   const [trigger, setTrigger] = useState(initialTrigger)
   const [saving, setSaving] = useState(false)
@@ -410,21 +423,23 @@ function ActionsDialog({ webinarId, initialTrigger, actions, onClose, onSaved }:
     try {
       const response = await webinarApi.saveActions(webinarId, draft)
       onSaved(response.data)
-    } catch {
-      setError('保存できませんでした。状態を読み直して、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setError('保存できませんでした。状態を読み直して、もう一度お試しください。') }
     } finally {
       setSaving(false)
     }
   }
   return (
-    <Dialog open title="視聴後の動きを変える" description="見終わった・CTA を押した・見ていない、の場合ごとに動きを決めます。" confirmLabel="保存する" busy={saving} error={error || undefined} onConfirm={() => void save()} onCancel={() => { if (!saving) onClose() }}>
+    <SaveErrorScope errors={saveErrors}><Dialog open title="視聴後の動きを変える" description="見終わった・CTA を押した・見ていない、の場合ごとに動きを決めます。" confirmLabel="保存する" busy={saving} error={error || undefined} onConfirm={() => void save()} onCancel={() => { if (!saving) onClose() }}>
       <div className={styles.dialogBody}>
-        <Select aria-label="どの場合か" size="full" value={trigger} onChange={(value) => setTrigger(value as WebinarAction['trigger'])} options={TRIGGERS.map((item) => ({ value: item.key, label: item.label }))} />
+        <SaveErrorField names={["trigger"]}><Select aria-label="どの場合か" size="full" value={trigger} onChange={(value) => setTrigger(value as WebinarAction['trigger'])} options={TRIGGERS.map((item) => ({ value: item.key, label: item.label }))} /></SaveErrorField>
         {visible.length === 0 ? <p className={form.cardNote}>この場合の動きはまだありません。</p> : visible.map((action, index) => {
           const key = referenceKey(action.actionType)
           return (
             <div key={action.id ?? `${trigger}-${index}`} className={styles.dialogRow}>
-              <Select aria-label="する動き" size="full" value={action.actionType} onChange={(value) => update(action, { actionType: value as WebinarAction['actionType'], config: {} })} options={Object.entries(ACTION_LABEL).map(([value, label]) => ({ value, label }))} />
+              <SaveErrorField names={[`visible.${index}.actionType`,`visible.${index}.action_type`,"actionType","action.actionType","action_type","action.action_type"]}><Select aria-label="する動き" size="full" value={action.actionType} onChange={(value) => update(action, { actionType: value as WebinarAction['actionType'], config: {} })} options={Object.entries(ACTION_LABEL).map(([value, label]) => ({ value, label }))} /></SaveErrorField>
               {key ? <TextField aria-label="対象（タグ・シナリオなどの名前やID）" value={String(action.config[key] ?? '')} onChange={(event) => update(action, { config: { [key]: event.target.value } })} placeholder="対象の名前・ID" /> : <span className={form.cardNote}>ほかに決めることはありません</span>}
               <Button onClick={() => setDraft((current) => current.filter((item) => item !== action))}>外す</Button>
             </div>
@@ -432,6 +447,6 @@ function ActionsDialog({ webinarId, initialTrigger, actions, onClose, onSaved }:
         })}
         <div><Button onClick={() => setDraft((current) => [...current, { trigger, actionType: 'add_tag', config: { tagId: '' } }])}><Plus size={15} aria-hidden="true" />動きを足す</Button></div>
       </div>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }

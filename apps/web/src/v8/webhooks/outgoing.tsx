@@ -60,6 +60,7 @@ import {
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import { eventLabel, isHttpsUrl, maskedUrl, payloadLabel, shortDateTime, urlHost } from './words'
 import styles from './outgoing.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type SavedFilter = '' | 'active' | 'paused' | 'failed'
 type SortKey = 'volume' | 'name'
@@ -80,6 +81,8 @@ function isFailing(item: OutgoingWebhookOverview): boolean {
 }
 
 export default function WebhooksOutgoingV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('外部連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -149,7 +152,9 @@ export default function WebhooksOutgoingV8() {
     try {
       const res = await api.folders.list('webhook', selectedAccountId ?? undefined)
       if (res.success) setFolders(res.data)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       // 箱が取れなくても一覧は出す。
     }
   }
@@ -236,7 +241,10 @@ export default function WebhooksOutgoingV8() {
         onAction: () => { if (isCurrent()) void handleToggle(item, !currentActive) },
       })
     } catch (caught) {
+
+
       if (!isCurrent()) return
+      saveErrors.capture(caught)
       const forbidden = caught instanceof ApiError && caught.status === 403
       if (!forbidden) await reload().catch(() => {})
       if (!isCurrent()) return
@@ -268,9 +276,10 @@ export default function WebhooksOutgoingV8() {
         const status = response.success ? response.data.responseStatus : null
         setTestNotice(`「${item.name}」への試し送信は届きませんでした${status === null ? '' : `(相手の応答 ${status})`}。「やり取りの記録」タブで詳しく確認できます。`)
       }
-    } catch {
+    } catch (saveFailure) {
       if (accountRef.current !== accountId) return
-      setTestNotice(`「${item.name}」への試し送信に失敗しました。「やり取りの記録」タブで詳しく確認できます。`)
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure) setTestNotice(`「${item.name}」への試し送信に失敗しました。「やり取りの記録」タブで詳しく確認できます。`) }
     } finally {
       setTestingId(null)
     }
@@ -302,11 +311,14 @@ export default function WebhooksOutgoingV8() {
       setDeleteTarget(null)
       await reload()
     } catch (caught) {
+
+
       if (accountRef.current !== accountId) return
+      const fieldFailure = saveErrors.capture(caught)
       const forbidden = caught instanceof ApiError && caught.status === 403
-      setDeleteError(forbidden
+      { if (!fieldFailure) setDeleteError(forbidden
         ? 'この送り先の削除は統括だけができます。必要なときは統括に頼んでください。'
-        : 'この送り先を削除できませんでした。状態を読み直してから、もう一度お試しください。')
+        : 'この送り先を削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
@@ -344,14 +356,16 @@ export default function WebhooksOutgoingV8() {
       setRotateSecret('')
       void reload()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (!stepUpToken && isStepUpRequired(caught)) {
         setStepUp({ purpose: 'webhook.secret', action: 'シークレットを更新する', retry: (token) => runRotate(token) })
         return
       }
       if (accountRef.current !== accountId) return
-      setRotateError(describeApiFailure(caught, 'シークレットの更新', {
+      { if (!fieldFailure) setRotateError(describeApiFailure(caught, 'シークレットの更新', {
         forbidden: '合言葉の更新は統括だけができます。必要なときは統括に頼んでください。',
-      }))
+      })) }
     } finally {
       setRotating(false)
     }
@@ -399,12 +413,12 @@ export default function WebhooksOutgoingV8() {
   /* 件数は読み込んだ送り先（全件）から数える。 */
   const folderCountOf = (folder: Folder) => (ready ? displayed.filter((item) => item.folderId === folder.id).length : null)
   const folderSelect = (
-    <Select
+    <SaveErrorField names={["folderFilter","folder_filter"]}><Select
       aria-label="フォルダ"
       value={folderFilter}
       onChange={(value) => setFolderFilter(value)}
       options={managedFolderOptions('webhook', folders, { allId: '', unfiledId: UNFILED })}
-    />
+    /></SaveErrorField>
   )
   /* 閲覧のみには押せない作るボタンを置かない（場所だけ空ける）。 */
   const createButton = canManage
@@ -426,7 +440,7 @@ export default function WebhooksOutgoingV8() {
   const savedBox = (
     <div className={styles.savedBox}>
       <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-      <Select
+      <SaveErrorField names={["chip","sortKey","sort_key"]}><Select
         aria-label="よく使う絞り込み"
         value={chip}
         onChange={(value) => {
@@ -441,7 +455,7 @@ export default function WebhooksOutgoingV8() {
           { value: 'failed', label: '失敗あり' },
           { value: sortKey === 'volume' ? 'sort-name' : 'sort-volume', label: sortKey === 'volume' ? '名前順に並べる' : '送った回数が多い順に並べる' },
         ]}
-      />
+      /></SaveErrorField>
     </div>
   )
   const perPage = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
@@ -715,7 +729,7 @@ export default function WebhooksOutgoingV8() {
   ) : null
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       help={narrow
           ? '行の「…」から 中身を見る・試しに送る・失敗をやり直す・鍵を作り直す・止める・削除。'
           : '行の「設定」から 直す・止める・鍵を作り直す・試しに送る・削除。「中身を見る」で送った中身と返事を見られます。'}
@@ -801,14 +815,14 @@ export default function WebhooksOutgoingV8() {
           confirmLabel="保存する"
         >
           <div className={styles.secretRow}>
-            <TextField
+            <SaveErrorField names={["rotateSecret","secret","rotate_secret"]}><TextField
               value={rotateSecret}
               onChange={(event) => setRotateSecret(event.target.value)}
               placeholder="ランダムな英数字32文字以上"
               aria-label="新しい鍵"
               minLength={MIN_SECRET_LENGTH}
               autoFocus
-            />
+            /></SaveErrorField>
             <Button type="button" onClick={() => setRotateSecret(generateSecret())}>自動生成</Button>
           </div>
         </Dialog>
@@ -818,6 +832,6 @@ export default function WebhooksOutgoingV8() {
       {error ? <div className={styles.errorRow}><Notice tone="danger" message={error} onClose={() => setError('')} /></div> : null}
       {testNotice ? <div className={styles.errorRow}><Notice tone="danger" message={testNotice} onClose={() => setTestNotice(null)} /></div> : null}
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

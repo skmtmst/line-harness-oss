@@ -17,8 +17,11 @@ import { notifyToast } from '@/components/shared/toast'
 import { folderById, folderCreator } from '@/components/shared/folder-select'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import FieldEditor, { type FieldEditorValues } from './field-editor'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 export default function FieldNew() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const params = useSearchParams()
   const back = params.get('back')
@@ -43,12 +46,14 @@ export default function FieldNew() {
       if (!res.success) throw new Error(res.error)
       setFolders(res.data)
       setFoldersState('ready')
-    } catch {
-      setFoldersState('error')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setFoldersState('error') }
     } finally {
       setReloading(false)
     }
-  }, [])
+  }, [saveErrors])
 
   const loadExisting = useCallback(async () => {
     const account = selectedAccountId
@@ -62,12 +67,14 @@ export default function FieldNew() {
       if (!res.success) throw new Error(res.error)
       setExisting(res.data)
       setExistingState('ready')
-    } catch {
-      setExistingState('error')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setExistingState('error') }
     } finally {
       setReloading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => { void loadFolders() }, [loadFolders])
   useEffect(() => { void loadExisting() }, [loadExisting])
@@ -96,16 +103,18 @@ export default function FieldNew() {
       notifyToast(`「${values.name.trim()}」を作りました`)
       router.push(back ?? `/tags?tab=fields&highlight=${res.data.id}`)
     } catch (reason) {
-      setError(describeSaveFailure(reason))
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure) setError(describeSaveFailure(reason)) }
     } finally {
       setSaving(false)
     }
   }
 
-  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></SaveErrorScope>
 
   return (
-    <FieldEditor
+    <SaveErrorScope errors={saveErrors}><FieldEditor
       mode="create"
       folders={folders}
       foldersState={foldersState}
@@ -131,6 +140,6 @@ export default function FieldNew() {
       ) : null}
       onCancel={() => router.push(back ?? '/tags?tab=fields')}
       onSubmit={(values, requestKey) => void save(values, requestKey)}
-    />
+    /></SaveErrorScope>
   )
 }

@@ -29,6 +29,7 @@ import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { type CloseGroup, canWriteRole, groupCloseTasks, openItems, reasonText, slotTitle } from '../dashboard/summarize'
 import { type StoreMedium, loadStoreMedia } from '../dashboard/use-store-today'
 import styles from './close-tasks.module.css'
+import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 
 type Tab = 'open' | 'done'
 
@@ -43,6 +44,8 @@ const STATE_BADGE: Record<CloseGroup['state'], { label: string; tone: 'danger' |
 }
 
 export default function CloseTasksPage() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   usePageTitle('枠を閉じる知らせ')
   usePageCrumbs([{ label: '店舗ダッシュボード', href: '/restaurant-test/dashboard' }])
@@ -83,9 +86,11 @@ export default function CloseTasksPage() {
       ])
       setTasks(list.data); setMedia(channels); setError(null)
     } catch (caught) {
-      setError(caught)
+      const fieldFailure = saveErrors.capture(caught)
+
+      if (!fieldFailure) { setError(caught) }
     }
-  }, [selectedAccountId, storeId])
+  }, [selectedAccountId, storeId, saveErrors])
   useEffect(() => { void load() }, [load])
 
   const groups = useMemo(() => groupCloseTasks(tasks ?? [], media), [tasks, media])
@@ -105,7 +110,9 @@ export default function CloseTasksPage() {
       await restaurantTestApi.completeChannelCloseTask(selectedAccountId, taskId)
       notifyToast(`${name}の枠を閉じた印を付けました。`)
     } catch (caught) {
-      notifyToast(caught instanceof Error && caught.message ? caught.message : '印を付けられませんでした。', { tone: 'error' })
+      const fieldFailure = saveErrors.capture(caught)
+
+      if (!fieldFailure) { notifyToast(caught instanceof Error && caught.message ? caught.message : '印を付けられませんでした。', { tone: 'error' }) }
     } finally {
       await load()
       setBusyId('')
@@ -186,7 +193,7 @@ export default function CloseTasksPage() {
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId="YMVFD"
       headingSize="compact"
       title="他のサイトの枠を閉じる知らせ"
@@ -205,16 +212,16 @@ export default function CloseTasksPage() {
           <span className={styles.search}>
             <SearchField aria-label="日時・媒体で探す" placeholder="日時・媒体で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
           </span>
-          <Select
+          <SaveErrorField names={["medium"]}><Select
             aria-label="媒体で絞る"
             value={medium}
             onChange={setMedium}
             options={[{ value: 'all', label: '媒体：すべて' }, ...mediaOptions.map(([code, name]) => ({ value: code, label: `媒体：${name}` }))]}
-          />
+          /></SaveErrorField>
         </>
       )}
     >
       {content}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

@@ -83,6 +83,7 @@ import { completeReorder } from '@/lib/complete-reorder'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import { formatTriggerOffset } from './reminder-timing'
 import styles from './list-v8.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -182,6 +183,8 @@ function formatNextSend(iso: string | null | undefined): string {
 const VIEW_ONLY_MENU_IDS = new Set(['detail', 'registrants', 'planned', 'runs'])
 
 export default function RemindersListV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('リマインダ')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -238,10 +241,12 @@ export default function RemindersListV8() {
       } else {
         setFoldersError(true)
       }
-    } catch {
-      setFoldersError(true)
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setFoldersError(true) }
     }
-  }, [])
+  }, [saveErrors])
 
   const loadStats = useCallback(async () => {
     setStatsFailed(false)
@@ -249,10 +254,12 @@ export default function RemindersListV8() {
       const res = await api.listStats.get(selectedAccountId ?? undefined)
       if (res.success) setStats(res.data)
       else setStatsFailed(true)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       setStatsFailed(true)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     void loadFolders()
@@ -419,8 +426,10 @@ export default function RemindersListV8() {
       })
       reminderList.retry()
       void loadStats()
-    } catch {
-      setDeleteError('このリマインダを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setDeleteError('このリマインダを削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
@@ -445,8 +454,10 @@ export default function RemindersListV8() {
       setDuplicateTarget(null)
       reminderList.retry()
       router.push(`/reminders/edit?id=${encodeURIComponent(newId)}&stage=target`)
-    } catch {
-      setDuplicateError('複製できませんでした。通信を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setDuplicateError('複製できませんでした。通信を確かめて、もう一度お試しください。') }
       reminderList.retry()
     } finally {
       setDuplicating(false)
@@ -479,7 +490,7 @@ export default function RemindersListV8() {
       message: folderId ? 'フォルダへ移しました' : 'フォルダから外しました',
       commit: async () => {
         const results = await Promise.all(
-          ids.map((id) => api.reminders.update(id, { folderId }).catch(() => null)),
+          ids.map((id) => api.reminders.update(id, { folderId }).catch((saveFailure) => { saveErrors.capture(saveFailure); return null })),
         )
         const failed = results.filter((res) => !res || !res.success).length
         if (failed > 0) throw new Error(`${failed}件のフォルダを移動できませんでした`)
@@ -543,7 +554,7 @@ export default function RemindersListV8() {
       message: next ? `${ids.length}件を再開しました` : `${ids.length}件を一時停止しました`,
       commit: async () => {
         const results = await Promise.all(
-          ids.map((id) => api.reminders.update(id, { isActive: next }).catch(() => null)),
+          ids.map((id) => api.reminders.update(id, { isActive: next }).catch((saveFailure) => { saveErrors.capture(saveFailure); return null })),
         )
         const failed = results.filter((res) => !res || !res.success).length
         if (failed > 0) throw new Error(`${failed}件の保存に失敗しました`)
@@ -872,19 +883,19 @@ export default function RemindersListV8() {
               <TableHeadRow>
                 {canEdit ? (
                   <Th className={styles.selectCell} aria-label="選択">
-                    <Checkbox
+                    <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
                       checked={allOnPageSelected}
                       indeterminate={!allOnPageSelected && selectedCount > 0}
                       onCheckedChange={toggleAllOnPage}
                       aria-label="このページのリマインダをすべて選択"
-                    />
+                    /></SaveErrorField>
                   </Th>
                 ) : <Th className={styles.selectCell}><span className="sr-only">選択できません</span></Th>}
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
             <RovingTbody reorderKey={reorder.shown.map((row) => row.id).join(',')}>
-              {reorder.shown.map((row) => {
+              {reorder.shown.map((row, saveFieldIndex) => {
                 const view = rowView(row)
                 const planned =
                   view.status === 'draft' || view.status === 'stopped'
@@ -911,11 +922,11 @@ export default function RemindersListV8() {
                   >
                     {canEdit ? (
                       <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
-                        <Checkbox
+                        <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","row.id"]}><Checkbox
                           checked={selectedIds.has(row.id)}
                           onCheckedChange={() => toggleOne(row.id)}
                           aria-label={`${row.name}を選択`}
-                        />
+                        /></SaveErrorField>
                       </Td>
                     ) : <Td className={styles.selectCell} />}
                     <Td
@@ -1141,12 +1152,12 @@ export default function RemindersListV8() {
     )
 
   const folderSelect = (
-    <Select
+    <SaveErrorField names={["folderFilter","folder","folder_filter"]}><Select
       aria-label="フォルダ"
       value={folderFilter}
       onChange={setFolderFilter}
       options={folderSelectOptions}
-    />
+    /></SaveErrorField>
   )
   const statusChips = (
     <div role="group" aria-label="状態で絞り込む">
@@ -1166,7 +1177,7 @@ export default function RemindersListV8() {
   const perPageSelect = <PageSizeSelect value={perPage} onChange={setPerPage} options={PER_PAGE_OPTIONS} label={null} />
 
   return (
-    <PageFrame kind="list" boardId={narrow ? 'Iffil' : 'apLqS'}>
+    <SaveErrorScope errors={saveErrors}><PageFrame kind="list" boardId={narrow ? 'Iffil' : 'apLqS'}>
       <PageHeading headingSize="regular" title={<>リマインダ</>} description={<>
             予約日時・誕生日・契約終了日などの「基準日」を決めて、その前や後に自動で送ります。
           </>}  />
@@ -1289,7 +1300,7 @@ export default function RemindersListV8() {
         <div className={styles.moveBody}>
           <label className="block">
             <span className={styles.moveLabel}>移動先のフォルダ</span>
-            <Select
+            <SaveErrorField names={["moveDraft","move_draft"]}><Select
               aria-label="移動先のフォルダ"
               size="full"
               value={moveDraft}
@@ -1298,7 +1309,7 @@ export default function RemindersListV8() {
                 { value: '', label: '未分類' },
                 ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
               ]}
-            />
+            /></SaveErrorField>
           </label>
         </div>
       </ConfirmDialog>
@@ -1406,6 +1417,6 @@ export default function RemindersListV8() {
 
           {table}
         </ListPageBody>
-    </PageFrame>
+    </PageFrame></SaveErrorScope>
   )
 }

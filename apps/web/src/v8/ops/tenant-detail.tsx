@@ -20,6 +20,7 @@ import { OpsHead } from './shell'
 import { useOpsReadOnly } from './use-ops-read-only'
 import parts from './parts.module.css'
 import styles from './tenant-detail.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
  * 運営の契約先の詳細 V8（絵 `Oub6x`・停止の窓 `okXoi`）。
@@ -184,7 +185,7 @@ function DetailContent() {
                   v={readOnly ? (restaurant ? '使う' : '使わない') : (
                     <span className={styles.toggleRow}>
                       <span>{restaurant ? '使う' : '使わない'}</span>
-                      <Toggle checked={restaurant} label={`飲食店機能を${restaurant ? 'オフ' : 'オン'}にする`} onChange={(next) => void toggleRestaurantFeature(next)} />
+                      <SaveErrorField names={["restaurant"]}><Toggle checked={restaurant} label={`飲食店機能を${restaurant ? 'オフ' : 'オン'}にする`} onChange={(next) => void toggleRestaurantFeature(next)} /></SaveErrorField>
                     </span>
                   )}
                 />
@@ -366,12 +367,12 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
         {needsName ? (
           <label className={styles.field}>
             <span className={styles.label}>確認のため、契約先の名前をそのまま入力</span>
-            <TextField value={confirmName} onChange={(event) => setConfirmName(event.target.value)} placeholder={tenantName} />
+            <SaveErrorField names={["confirmName","confirm_name"]}><TextField value={confirmName} onChange={(event) => setConfirmName(event.target.value)} placeholder={tenantName} /></SaveErrorField>
           </label>
         ) : null}
         <label className={styles.field}>
           <span className={styles.label}>理由（4文字以上）</span>
-          <TextField value={reason} onChange={(event) => setReason(event.target.value)} placeholder="支払いの遅れが3か月続いたため" aria-label="理由（4文字以上）" required />
+          <SaveErrorField names={["reason"]}><TextField value={reason} onChange={(event) => setReason(event.target.value)} placeholder="支払いの遅れが3か月続いたため" aria-label="理由（4文字以上）" required /></SaveErrorField>
         </label>
       </div>
     </Dialog>

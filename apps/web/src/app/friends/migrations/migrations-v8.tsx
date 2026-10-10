@@ -27,6 +27,7 @@ import {
   useFriendMigrations,
 } from './use-friend-migrations'
 import styles from '@/app/friends/friends-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export default function FriendMigrationsV8() {
   usePageTitle('CSVで書き出す・取り込む')
@@ -71,7 +72,7 @@ export default function FriendMigrationsV8() {
           <div className={styles.fieldStack}>
             <label className={styles.fieldLabel}>
               アカウント
-              <Select
+              <SaveErrorField names={["accountId","m.accountId","account_id","m.account_id"]}><Select
                 aria-label="書き出すLINEアカウント"
                 size="full"
                 value={m.accountId}
@@ -80,7 +81,7 @@ export default function FriendMigrationsV8() {
                   { value: '', label: 'アカウントを選択' },
                   ...m.accounts.map((account) => ({ value: account.id, label: account.name })),
                 ]}
-              />
+              /></SaveErrorField>
             </label>
             <fieldset className={styles.fieldStack} style={{ gap: 8 }}>
               <legend className={styles.fieldLabel}>
@@ -92,7 +93,7 @@ export default function FriendMigrationsV8() {
                 ['tags_fields', 'タグ・友だち情報', true],
                 ['support', '対応状況・対応マーク・担当者', true],
               ] as const).map(([value, label, unavailable]) => (
-                <Checkbox
+                <SaveErrorField names={["value"]} key={value}><Checkbox
                   key={value}
                   checked={m.columns.includes(value)}
                   onCheckedChange={() => m.toggleColumn(value)}
@@ -100,7 +101,7 @@ export default function FriendMigrationsV8() {
                   description={unavailable ? 'まだ書き出せません' : undefined}
                 >
                   {label}
-                </Checkbox>
+                </Checkbox></SaveErrorField>
               ))}
             </fieldset>
             <p className={styles.sectionDesc} style={{ margin: 0 }}>

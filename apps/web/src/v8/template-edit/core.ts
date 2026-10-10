@@ -7,6 +7,7 @@
  * 違いは1つだけ：保存の 409（ほかの人が先に保存した）を「競合」として返す
  * （絵 NCbYn の帯を出すため。今の画面は文だけを出していた）。
  */
+import { readSaveFieldErrors } from '@/lib/api-field-errors'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { validateFlexContent, type CommonVar, type FriendField } from '@line-crm/shared'
 
@@ -141,7 +142,7 @@ export function validateTemplateSave(input: TemplateSaveInput): string | null {
 
 export type TemplateSaveResult =
   | { ok: true; id: string }
-  | { ok: false; error: string; conflict?: boolean }
+  | { ok: false; error: string; conflict?: boolean; fields?: Record<string, string> }
 
 /** 保存する。断る条件に当たったら API を一度も呼ばない。409 は競合として返す。 */
 export async function saveTemplateEdit(input: TemplateSaveInput): Promise<TemplateSaveResult> {
@@ -161,7 +162,7 @@ export async function saveTemplateEdit(input: TemplateSaveInput): Promise<Templa
     return res.success ? { ok: true, id: res.data.id } : { ok: false, error: res.error }
   } catch (e) {
     if (e instanceof ApiError && e.status === 409) return { ok: false, error: describeSaveFailure(e), conflict: true }
-    return { ok: false, error: describeSaveFailure(e) }
+    return { ok: false, error: describeSaveFailure(e), fields: readSaveFieldErrors(e) }
   }
 }
 

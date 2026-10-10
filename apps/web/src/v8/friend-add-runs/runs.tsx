@@ -42,6 +42,7 @@ import { describeFriendAddFailure } from '@/v8/friend-add/failure'
 import { useCursorStack } from '@/v8/friend-add/use-cursor-stack'
 import { csvCell, elapsedText, formatJstDateTime, jstTime, routingAction, routingLabel } from './status'
 import styles from './runs.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type KindFilter = 'all' | FriendAddEventKind
 type AttributionFilter = 'all' | FriendAddEventAttributionStatus
@@ -507,13 +508,13 @@ function FriendAddRunsInner() {
           </div>
           <span className={styles.toolsSpacer} aria-hidden="true" />
           <div className={styles.sizeBox}>
-            <Select
+            <SaveErrorField names={["perPage","limit","per_page"]}><Select
               aria-label="1ページに出す件数"
               size="page-size"
               value={String(perPage)}
               onChange={(value) => { setPerPage(Number(value)); resetCursor() }}
               options={PAGE_SIZE_OPTIONS}
-            />
+            /></SaveErrorField>
           </div>
         </div>
 

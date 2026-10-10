@@ -51,6 +51,7 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import styles from './outgoing-v8.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type OutgoingFilter = 'all' | 'active' | 'paused' | 'failed'
@@ -267,6 +268,8 @@ export default function OutgoingV8Page() {
 }
 
 function OutgoingV8Inner() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('外部連携')
   const { selectedAccountId, accounts } = useAccount()
   const selectedAccountIdRef = useRef(selectedAccountId)
@@ -443,7 +446,10 @@ function OutgoingV8Inner() {
         onAction: () => { void handleToggle(id, !currentActive) },
       })
     } catch (caught) {
+
+
       if (selectedAccountIdRef.current !== requestAccountId) return
+      saveErrors.capture(caught)
       const forbidden = caught instanceof ApiError && caught.status === 403
       if (!forbidden) await load().catch(() => {})
       failMessage(forbidden
@@ -470,9 +476,10 @@ function OutgoingV8Inner() {
         const status = response.success ? response.data.responseStatus : null
         setTestNotice(`「${item.name}」への試し送信は届きませんでした${status === null ? '' : `(相手の応答 ${status})`}。「やり取りの記録」タブで詳しく確認できます。`)
       }
-    } catch {
+    } catch (saveFailure) {
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setTestNotice(`「${item.name}」への試し送信に失敗しました。「やり取りの記録」タブで詳しく確認できます。`)
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure) setTestNotice(`「${item.name}」への試し送信に失敗しました。「やり取りの記録」タブで詳しく確認できます。`) }
     } finally {
       setTestingId(null)
     }
@@ -503,11 +510,14 @@ function OutgoingV8Inner() {
       setDeleteTarget(null)
       await load()
     } catch (caught) {
+
+
       if (selectedAccountIdRef.current !== requestAccountId) return
+      const fieldFailure = saveErrors.capture(caught)
       const forbidden = caught instanceof ApiError && caught.status === 403
-      setDeleteError(forbidden
+      { if (!fieldFailure) setDeleteError(forbidden
         ? 'この送り先の削除は統括だけができます。必要なときは統括に頼んでください。'
-        : 'この送り先を削除できませんでした。状態を読み直してから、もう一度お試しください。')
+        : 'この送り先を削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
@@ -528,7 +538,7 @@ function OutgoingV8Inner() {
       return
     }
     if (rotateSecretValue.length < MIN_SECRET_LENGTH) {
-      setError(`シークレットは最低${MIN_SECRET_LENGTH}文字必要です`)
+      if (!saveErrors.fail("rotateSecretValue", `シークレットは最低${MIN_SECRET_LENGTH}文字必要です`)) setError(`シークレットは最低${MIN_SECRET_LENGTH}文字必要です`)
       return
     }
     try {
@@ -546,14 +556,16 @@ function OutgoingV8Inner() {
       setRotateSecretValue('')
       void load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (!stepUpToken && isStepUpRequired(caught)) {
         setStepUp({ purpose: 'webhook.secret', action: 'シークレットを更新する', retry: (token) => handleRotateSubmit(e, token) })
         return
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setError(describeApiFailure(caught, 'シークレットの更新', {
+      { if (!fieldFailure) setError(describeApiFailure(caught, 'シークレットの更新', {
         forbidden: '合言葉の更新は統括だけができます。必要なときは統括に頼んでください。',
-      }))
+      })) }
     }
   }
 
@@ -677,7 +689,7 @@ function OutgoingV8Inner() {
   })()
 
   return (
-    <div className={styles.board} data-design-node="ZSbFY">
+    <SaveErrorScope errors={saveErrors}><div className={styles.board} data-design-node="ZSbFY">
       <WebhooksV8Head activeTab="outgoing" outgoingCount={readyCounts ? outgoing.length : null} incomingCount={incomingCount} />
       <WebhooksV8Band cells={outgoingKpiCells({ items: outgoingStatus === 'ready' ? outgoing : null, incomingCount, summary: summaryStatus === 'ready' ? summary : null })} />
 
@@ -715,7 +727,7 @@ function OutgoingV8Inner() {
           <FilterChip selected={filter === 'active'} onChange={(next) => setFilter(next ? 'active' : 'all')}>動いている{readyCounts ? ` ${activeCount}` : ''}</FilterChip>
           <FilterChip selected={filter === 'paused'} onChange={(next) => setFilter(next ? 'paused' : 'all')}>止めている{readyCounts ? ` ${pausedCount}` : ''}</FilterChip>
           <span className={styles.toolbarRight}>
-            <Select
+            <SaveErrorField names={["filter"]}><Select
               aria-label="よく使う絞り込み"
               value={filter}
               onChange={(value) => { setFilter(value as OutgoingFilter); setPage(1) }}
@@ -725,7 +737,7 @@ function OutgoingV8Inner() {
                 { value: 'paused', label: '止めているのみ' },
                 { value: 'failed', label: '失敗あり' },
               ]}
-            />
+            /></SaveErrorField>
             <SortSelect
               value={sort}
               onChange={(value) => setSort(value as OutgoingSort)}
@@ -798,7 +810,7 @@ function OutgoingV8Inner() {
               保存後も前の合言葉は24時間だけ使えるので、相手側の切り替え中も送信は止まりません。
             </p>
             <div className="flex gap-2 mb-4">
-              <input
+              <SaveErrorField names={["rotateSecretValue","secret","rotate_secret_value"]}><input
                 value={rotateSecretValue}
                 onChange={(e) => setRotateSecretValue(e.target.value)}
                 className="flex-1 border border-hairline rounded-control px-3 py-2 text-sm font-mono"
@@ -806,7 +818,7 @@ function OutgoingV8Inner() {
                 required
                 minLength={MIN_SECRET_LENGTH}
                 autoFocus
-              />
+              /></SaveErrorField>
               <Button type="button" onClick={() => setRotateSecretValue(generateSecret())}>
                 自動生成
               </Button>
@@ -829,7 +841,7 @@ function OutgoingV8Inner() {
         </div>
       )}
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
-    </div>
+    </div></SaveErrorScope>
   )
 }
 

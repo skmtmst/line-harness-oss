@@ -30,6 +30,7 @@ import { csvExportLine } from '../list/csv-export'
 import { ExecuteConfirmDialog, MigrationItemDialog, RollbackConfirmDialog, runStatusView } from './uid-dialogs'
 import { classLabel, decisionLabel, formatMappingBytes, ITEM_PAGE_SIZE, MIGRATION_STEPS, useUidMigration, type ItemClassification } from './use-uid-migration'
 import styles from './migrations.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const PRE_EXECUTE = ['dry_run', 'review', 'ready']
 
@@ -107,16 +108,16 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
       <div className={styles.pair}>
         <div className={styles.field}>
           <span className={styles.fieldLabel}>移行元</span>
-          <Select aria-label="移行元アカウント" size="full" value={m.fromAccountId} onChange={m.setFromAccountId} options={[{ value: '', label: '移行元アカウントを選択' }, ...m.accounts.map((account) => ({ value: account.id, label: account.name }))]} />
+          <SaveErrorField names={["fromAccountId","m.fromAccountId","from_account_id","m.from_account_id"]}><Select aria-label="移行元アカウント" size="full" value={m.fromAccountId} onChange={m.setFromAccountId} options={[{ value: '', label: '移行元アカウントを選択' }, ...m.accounts.map((account) => ({ value: account.id, label: account.name }))]} /></SaveErrorField>
         </div>
         <div className={styles.field}>
           <span className={styles.fieldLabel}>移行先</span>
-          <Select aria-label="移行先アカウント" size="full" value={m.toAccountId} onChange={m.setToAccountId} options={[{ value: '', label: '移行先アカウントを選択' }, ...m.accounts.map((account) => ({ value: account.id, label: account.name }))]} />
+          <SaveErrorField names={["toAccountId","m.toAccountId","to_account_id","m.to_account_id"]}><Select aria-label="移行先アカウント" size="full" value={m.toAccountId} onChange={m.setToAccountId} options={[{ value: '', label: '移行先アカウントを選択' }, ...m.accounts.map((account) => ({ value: account.id, label: account.name }))]} /></SaveErrorField>
         </div>
       </div>
       <div className={styles.field}>
         <span className={styles.fieldLabel}>利用目的</span>
-        <TextField value={m.purpose} onChange={(event) => m.setPurpose(event.target.value)} aria-label="利用目的" />
+        <SaveErrorField names={["purpose","m.purpose"]}><TextField value={m.purpose} onChange={(event) => m.setPurpose(event.target.value)} aria-label="利用目的" /></SaveErrorField>
       </div>
       <FileDropzone title="対応表のCSVをここに置く" hint="old_uid・new_uid 列のCSVを選びます" accept=".csv,text/csv" chooseLabel="CSVをアップロード" onFiles={(files) => void m.onUidFile(files)} />
       {m.file ? (
@@ -216,7 +217,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                     </TableHeadRow>
                   </thead>
                   <tbody>
-                    {active.items?.map((item) => (
+                    {active.items?.map((item, saveFieldIndex) => (
                       <Tr key={item.id} className={`${styles.row} ${styles.rowTall}`}>
                         <Td className={styles.td}>
                           <button type="button" className={`${styles.mono} ${styles.uidButton}`} title={`${item.oldUid}（詳細を見る）`} onClick={() => { m.setDetailError(null); m.setDetailItem(item) }}>
@@ -235,7 +236,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                           {decisionsLocked || !canDecideItems ? (
                             <span className={styles.small}>{decisionLabel[item.decision]}</span>
                           ) : (
-                            <Select
+                            <SaveErrorField names={[`items.${saveFieldIndex}.decision`,"decision","item.decision"]}><Select
                               aria-label={`${item.oldUid} の引き継ぎ方`}
                               size="full"
                               disabled={m.busy || m.detailBusy}
@@ -246,7 +247,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                                 ...(item.newUid ? [{ value: 'link', label: '結び付ける' }, { value: 'create', label: '新しく作る' }] : []),
                                 { value: 'exclude', label: '除く' },
                               ]}
-                            />
+                            /></SaveErrorField>
                           )}
                         </Td>
                       </Tr>

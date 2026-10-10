@@ -28,6 +28,7 @@ import { formatNumber } from '@/lib/format'
 import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
 import { RULE_LABELS, parsePercent, parseYen, shortDateTime, shortTime, yen, type LoadStatus, type SavedHandler } from './parts'
 import styles from './members.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type RankDraft = { id: string | null; name: string; threshold: string; rate: string; tagId: string | null; tagName: string | null; memberCount: number }
 
@@ -66,6 +67,8 @@ export default function RankSettingsV8({
   /** 競合の帯を外枠（タブの下）へ置く。null で外す。 */
   onTopBand: (band: ReactNode) => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const [drafts, setDrafts] = useState<RankDraft[]>([])
   const [dirty, setDirty] = useState(false)
@@ -158,13 +161,15 @@ export default function RankSettingsV8({
         ? 'ランク設定を保存し、ECへ同期しました。タグも付け替えています。'
         : 'ランク設定を保存しました。ECへの同期は失敗したので、右の「もう一度同期」で送り直せます。')
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       /* 保存の口が版の違いを 409 で返したときも、競合の帯へ（e5yBLx）。 */
       if (caught instanceof ApiError && caught.status === 409) {
         await showConflict()
       } else {
-        setError(describeApiFailure(caught, 'ランク設定の保存', {
+        { if (!fieldFailure) setError(describeApiFailure(caught, 'ランク設定の保存', {
           forbidden: 'ランク設定を保存する権限がありません。権限を確認してください。',
-        }))
+        })) }
       }
     } finally {
       setBusy(false)
@@ -205,13 +210,15 @@ export default function RankSettingsV8({
       setNotice(res.data.ecSync === 'synced' ? 'ランクを削除し、会員を移し先へ反映しました。' : `ランクを削除しました。${res.data.message ?? ''}`)
       onRetry()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (caught instanceof ApiError && caught.status === 409) {
         setRemoveTarget(null)
         await showConflict()
       } else {
-        setError(describeApiFailure(caught, 'ランクの削除', {
+        { if (!fieldFailure) setError(describeApiFailure(caught, 'ランクの削除', {
           forbidden: 'ランクを削除する権限がありません。権限を確認してください。',
-        }))
+        })) }
       }
     } finally {
       setBusy(false)
@@ -238,9 +245,11 @@ export default function RankSettingsV8({
       onSaved(accountId, res.data)
       setNotice(res.data.sync?.status === 'synced' ? 'ECへ同期しました。' : `ECへの同期に失敗しました：${res.data.sync?.error ?? ''}`)
     } catch (caught) {
-      setError(describeApiFailure(caught, 'ECへの同期', {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setError(describeApiFailure(caught, 'ECへの同期', {
         forbidden: 'ECへ同期する権限がありません。権限を確認してください。',
-      }))
+      })) }
     } finally {
       setBusy(false)
     }
@@ -267,10 +276,10 @@ export default function RankSettingsV8({
   }, [conflict, conflictAt])
   useEffect(() => () => onTopBand(null), [onTopBand])
 
-  if (status === 'loading' && !settings) return <ListState kind="loading" title="ランク設定を読み込んでいます" />
-  if (status === 'forbidden') return <ListState kind="forbidden" />
-  if (status === 'error') return <ListState kind="error" title="ランク設定を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} />
-  if (!settings) return <ListState kind="loading" title="ランク設定を読み込んでいます" />
+  if (status === 'loading' && !settings) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="ランク設定を読み込んでいます" /></SaveErrorScope>
+  if (status === 'forbidden') return <SaveErrorScope errors={saveErrors}><ListState kind="forbidden" /></SaveErrorScope>
+  if (status === 'error') return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="ランク設定を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} /></SaveErrorScope>
+  if (!settings) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="ランク設定を読み込んでいます" /></SaveErrorScope>
 
   const rules = settings.rules
   const removeRow = removeTarget !== null ? drafts[removeTarget] : null
@@ -279,7 +288,7 @@ export default function RankSettingsV8({
   const moving = removeRow ? removeRow.memberCount : 0
 
   return (
-    <div className={styles.rankBody}>
+    <SaveErrorScope errors={saveErrors}><div className={styles.rankBody}>
       {notice || error ? (
         <div className={styles.messages}>
           {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
@@ -321,19 +330,19 @@ export default function RankSettingsV8({
               return (
                 <div key={row.id ?? `new-${index}`} className={styles.rankRow} title={row.tagName ? `タグ：${row.tagName}・会員 ${formatNumber(row.memberCount)} 人` : undefined}>
                   <div className={styles.rankColName}>
-                    <TextField {...fields.bind(`rank-name-${index}`)} aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} readOnly={readonly} onChange={(event) => update(index, { name: event.target.value })} />
+                    <SaveErrorField names={[`drafts.${index}.name`,"row.name"]}><TextField {...fields.bind(`rank-name-${index}`)} aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} readOnly={readonly} onChange={(event) => update(index, { name: event.target.value })} /></SaveErrorField>
                     <FieldError id={`rank-name-${index}-error`}>{fields.error(`rank-name-${index}`)}</FieldError>
                   </div>
                   <div className={styles.rankColThreshold}>
                     {isBase ? (
                       <span className={styles.fixedBox} title="いちばん下のランクは ¥0 から（変えられません）">¥0〜（固定）</span>
                     ) : (
-                      <TextField {...fields.bind(`rank-threshold-${index}`)} aria-label={`しきい値 ${index + 1}`} inputMode="numeric" placeholder="¥0〜" value={row.threshold} readOnly={readonly} onChange={(event) => update(index, { threshold: event.target.value })} />
+                      <SaveErrorField names={[`drafts.${index}.threshold`,"threshold","row.threshold"]}><TextField {...fields.bind(`rank-threshold-${index}`)} aria-label={`しきい値 ${index + 1}`} inputMode="numeric" placeholder="¥0〜" value={row.threshold} readOnly={readonly} onChange={(event) => update(index, { threshold: event.target.value })} /></SaveErrorField>
                     )}
                     <FieldError id={`rank-threshold-${index}-error`}>{fields.error(`rank-threshold-${index}`)}</FieldError>
                   </div>
                   <div className={styles.rankColRate}>
-                    <TextField {...fields.bind(`rank-rate-${index}`)} aria-label={`マイル還元 ${index + 1}`} inputMode="decimal" placeholder="0%" value={row.rate} readOnly={readonly} onChange={(event) => update(index, { rate: event.target.value })} />
+                    <SaveErrorField names={[`drafts.${index}.rate`,"rate","row.rate"]}><TextField {...fields.bind(`rank-rate-${index}`)} aria-label={`マイル還元 ${index + 1}`} inputMode="decimal" placeholder="0%" value={row.rate} readOnly={readonly} onChange={(event) => update(index, { rate: event.target.value })} /></SaveErrorField>
                     <FieldError id={`rank-rate-${index}-error`}>{fields.error(`rank-rate-${index}`)}</FieldError>
                   </div>
                   <div className={styles.rankColAction}>
@@ -425,7 +434,7 @@ export default function RankSettingsV8({
           {moving > 0 ? (<>
             <div className={styles.removeField}>
               <span className={styles.removeLabel} id="nen-rank-move-label">移す先のランク（必須）</span>
-              <Select
+              <SaveErrorField names={["replacement"]}><Select
                 aria-label="移す先のランク（必須）"
                 size="full"
                 value={replacement}
@@ -434,7 +443,7 @@ export default function RankSettingsV8({
                   { value: '', label: '移す先のランクを選ぶ' },
                   ...removeCandidates.map((row) => ({ value: row.id ?? '', label: row.name.trim() || '（名前なし）' })),
                 ]}
-              />
+              /></SaveErrorField>
             </div>
             <p className={styles.removeNote}>
               移し先のランクは、各会員のいまの有効期限まで使います。期限のあとは通常のランク判定に戻ります。ECへ反映したあと、次の購入から還元率が変わります。タグも付け替えます。
@@ -475,7 +484,7 @@ export default function RankSettingsV8({
           </div>
         ) : null}
       </Dialog>
-    </div>
+    </div></SaveErrorScope>
   )
 }
 

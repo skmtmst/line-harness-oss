@@ -39,6 +39,7 @@ import Select from '@/components/shared/select'
 import { api, fetchApi, type EcNotificationRun } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import styles from './screen.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const PAGE_SIZE = 20
 
@@ -198,14 +199,14 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
         <SearchField aria-label="お客様の名前・注文番号で検索" placeholder="お客様の名前・注文番号で検索" value={query} onChange={setQuery} onClear={() => setQuery('')} />
       </div>
       <div className={styles.runRecipient}>
-        <Select aria-label="対象を絞り込み" label="対象" value={recipientFilter} onChange={(value) => setRecipientFilter(value as RecipientFilter)} options={[
+        <SaveErrorField names={["recipientFilter","recipient","recipient_filter"]}><Select aria-label="対象を絞り込み" label="対象" value={recipientFilter} onChange={(value) => setRecipientFilter(value as RecipientFilter)} options={[
           { value: 'all', label: 'すべて' }, { value: 'customer', label: '顧客' }, { value: 'operator', label: '運用者' },
-        ]} />
+        ]} /></SaveErrorField>
       </div>
       <div className={styles.runPeriod}>
-        <Select aria-label="期間を絞り込み" value={periodFilter} onChange={(value) => setPeriodFilter(value as PeriodFilter)} options={[
+        <SaveErrorField names={["periodFilter","period","period_filter"]}><Select aria-label="期間を絞り込み" value={periodFilter} onChange={(value) => setPeriodFilter(value as PeriodFilter)} options={[
           { value: 'all', label: 'すべての期間' }, { value: '24h', label: '24時間以内' }, { value: '7d', label: '7日以内' }, { value: '30d', label: '30日以内' },
-        ]} />
+        ]} /></SaveErrorField>
       </div>
       {mode === 'history' ? <FilterChip selected={filter === 'clicked'} onChange={() => setFilter(filter === 'clicked' ? 'all' : 'clicked')}>クリック記録あり</FilterChip> : null}
       <span className={styles.runSpacer} />

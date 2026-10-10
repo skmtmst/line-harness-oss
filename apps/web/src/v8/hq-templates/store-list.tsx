@@ -47,6 +47,7 @@ import storeStyles from '../templates/list.module.css'
 import hqStyles from './store-list.module.css'
 import attributeStyles from './attribute-tabs.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /** 店のテンプレートと同じ6種類（上のタブ）。 */
 export const KIND_TABS: { kind: TemplateKind; label: string; icon: typeof MessageSquare }[] = [
@@ -140,6 +141,8 @@ export interface HqStoreListProps {
 }
 
 export default function HqStoreList(props: HqStoreListProps) {
+  const saveErrors = useSaveFormErrors()
+
   const {
     type, rows, ready, busy, canEdit, accountTotal, stats, kind, kindCounts, onKindChange, folders, folderLoadFailed, folderFilter, onFolderFilter,
     onAddFolder, onRenameFolder, onDeleteFolder, onReloadFolders, onCreate, onEdit, onOpen, onDistribute, onDistributeFolder, folderContents, onDuplicate, onRemove, notices, overlays,
@@ -287,6 +290,8 @@ export default function HqStoreList(props: HqStoreListProps) {
       else await onAddFolder(name, folderColor)
       setFolderDialog(null)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       // 理由ごとに言い分ける（共通の describeFolderFailure）。入力した名前と色は残す。
       const failure = describeFolderFailure(caught, 'save')
       if (failure.kind === 'missing') {
@@ -296,8 +301,8 @@ export default function HqStoreList(props: HqStoreListProps) {
         return
       }
       if (failure.kind === 'conflict') await onReloadFolders?.().catch(() => undefined)
-      if (failure.nameError) setFolderNameError(failure.nameError)
-      else setFolderError(failure.message)
+      if (failure.nameError) { if (!fieldFailure) setFolderNameError(failure.nameError) }
+      else { if (!fieldFailure) setFolderError(failure.message) }
     } finally {
       setFolderBusy(false)
     }
@@ -310,6 +315,8 @@ export default function HqStoreList(props: HqStoreListProps) {
       await onDeleteFolder(latestFolder(deletingFolder))
       setDeletingFolder(null)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       const failure = describeFolderFailure(caught, 'delete')
       if (failure.kind === 'missing') {
         notifyToast(failure.message, { tone: 'error' })
@@ -318,7 +325,7 @@ export default function HqStoreList(props: HqStoreListProps) {
         return
       }
       if (failure.kind === 'conflict') await onReloadFolders?.().catch(() => undefined)
-      setFolderError(failure.message)
+      { if (!fieldFailure) setFolderError(failure.message) }
     } finally {
       setFolderBusy(false)
     }
@@ -339,15 +346,15 @@ export default function HqStoreList(props: HqStoreListProps) {
           <>
           {type === 'tag' ? (
             <>
-              <Select aria-label="使用状態で絞り込む" width={145} value={tagUsage} onChange={(value) => { setTagUsage(value as TagUsageFilter); setPage(1) }} options={[
+              <SaveErrorField names={["tagUsage","tag_usage"]}><Select aria-label="使用状態で絞り込む" width={145} value={tagUsage} onChange={(value) => { setTagUsage(value as TagUsageFilter); setPage(1) }} options={[
                 { value: 'all', label: '使用状態：すべて' },
                 { value: 'used', label: '使用状態：付いている' },
                 { value: 'unused', label: '使用状態：未使用' },
-              ]} />
-              <Select aria-label="付け方で絞り込む" width={132} value={tagMethod} onChange={(value) => { setTagMethod(value); setPage(1) }} options={[
+              ]} /></SaveErrorField>
+              <SaveErrorField names={["tagMethod","tag_method"]}><Select aria-label="付け方で絞り込む" width={132} value={tagMethod} onChange={(value) => { setTagMethod(value); setPage(1) }} options={[
                 { value: 'all', label: '付け方：すべて' },
                 ...assignmentMethods(rows).map((method) => ({ value: method, label: `付け方：${method}` })),
-              ]} />
+              ]} /></SaveErrorField>
             </>
           ) : null}
           <div role="group" aria-label="配ったかで絞り込む" className={storeStyles.chipGroup}>
@@ -359,7 +366,7 @@ export default function HqStoreList(props: HqStoreListProps) {
         )}
         trailing={(
           <div className={storeStyles.perPageBox}>
-            <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZE_OPTIONS} />
+            <SaveErrorField names={["pageSize","page_size"]}><Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZE_OPTIONS} /></SaveErrorField>
           </div>
         )}
       />
@@ -514,11 +521,11 @@ export default function HqStoreList(props: HqStoreListProps) {
   ) : <p className={storeStyles.pagerSolo}>{summary}</p>
 
   if (type === 'tag' && attribute.tab !== 'tags') {
-    return <OtherTabPanel tab={attribute.tab} title={words.title} description={words.description} onSelect={(key) => { attribute.select(key); setPage(1) }} />
+    return <SaveErrorScope errors={saveErrors}><OtherTabPanel tab={attribute.tab} title={words.title} description={words.description} onSelect={(key) => { attribute.select(key); setPage(1) }} /></SaveErrorScope>
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId={type === 'template' ? 'i0Ao0R' : type === 'form' ? 'wZPua' : type === 'tag' ? 'DzdC3' : type === 'rich_menu' ? 'noVq4' : 'LRc93'}
       headingSize="regular"
       title={words.title}
@@ -568,6 +575,6 @@ export default function HqStoreList(props: HqStoreListProps) {
     >
       {notices}
       {body}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

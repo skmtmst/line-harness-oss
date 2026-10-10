@@ -54,6 +54,7 @@ import {
   usageLabel,
 } from '@/components/friend-fields/tags-page-v4'
 import styles from './list-v8.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -90,6 +91,8 @@ function TagFolderDialog({
   onClose: () => void
   onSaved: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [name, setName] = useState(group?.name ?? '')
   const [color, setColor] = useState(group ? folderDisplayColor(group) : FOLDER_COLORS[0])
   const [saving, setSaving] = useState(false)
@@ -110,15 +113,17 @@ function TagFolderDialog({
       }
       onSaved()
       onClose()
-    } catch {
-      setError(group ? 'フォルダを直せませんでした' : 'フォルダを追加できませんでした')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setError(group ? 'フォルダを直せませんでした' : 'フォルダを追加できませんでした') }
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <DetailPanel
+    <SaveErrorScope errors={saveErrors}><DetailPanel
       open
       title={group ? 'フォルダを直す' : 'フォルダを追加'}
       description="タグを分けてしまう箱です。消しても、入っていたタグは未分類として残ります。"
@@ -139,7 +144,7 @@ function TagFolderDialog({
         <span className="text-ink-secondary mb-1 block text-xs font-medium">
           フォルダ名 <span className="text-danger">*</span>
         </span>
-        <input
+        <SaveErrorField names={["name"]}><input
           type="text"
           autoFocus
           value={name}
@@ -149,7 +154,7 @@ function TagFolderDialog({
           }}
           placeholder="例: VIP"
           className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
-        />
+        /></SaveErrorField>
       </label>
       <div className="mt-3">
         <span className="text-ink-secondary mb-1 block text-xs font-medium">色</span>
@@ -168,7 +173,7 @@ function TagFolderDialog({
         </div>
       </div>
       {error ? <p className="text-danger mt-3 text-xs" role="alert">{error}</p> : null}
-    </DetailPanel>
+    </DetailPanel></SaveErrorScope>
   )
 }
 
@@ -185,6 +190,8 @@ export default function TagsTabV8({
   csvOpen: boolean
   onCsvClose: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const [items, setItems] = useState<Tag[]>(fixture?.items ?? [])
   const [groups, setGroups] = useState<TagGroup[]>(fixture?.groups ?? [])
@@ -238,10 +245,13 @@ export default function TagsTabV8({
       if (folders.success) setGroups(folders.data)
       setStatus('ready')
     } catch (reason) {
+
+
       if (!isCurrentTagListRequest(loadRequestRef.current, request)) return
+      saveErrors.capture(reason)
       setStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
-  }, [fixture, accountId])
+  }, [fixture, accountId, saveErrors])
   useEffect(() => { void load() }, [load])
 
   /*
@@ -386,9 +396,11 @@ export default function TagsTabV8({
         onAction: () => { void toggleStar({ ...tag, isStarred: next }) },
       })
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
       setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: tag.isStarred } : item))
       const message = reason instanceof ApiError ? reason.message : '表示の切り替えに失敗しました。通信を確かめて、もう一度お試しください。'
-      setActionError(message)
+      { if (!fieldFailure) setActionError(message) }
       notifyToast(message, {
         tone: 'error',
         actionLabel: 'もう一度',
@@ -418,9 +430,11 @@ export default function TagsTabV8({
         onAction: () => { void moveTagToGroup({ ...tag, groupId }, previous) },
       })
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
       setItems((current) => current.map((item) => item.id === tag.id ? { ...item, groupId: previous } : item))
       const message = reason instanceof ApiError ? reason.message : 'フォルダへ移せませんでした。'
-      setActionError(message)
+      { if (!fieldFailure) setActionError(message) }
       notifyToast(message, {
         tone: 'error',
         actionLabel: 'もう一度',
@@ -451,9 +465,11 @@ export default function TagsTabV8({
       if (!otherResult.success) throw new Error(otherResult.error)
       void load()
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
       setGroups(previous)
       const message = reason instanceof Error ? reason.message : '並び順を変更できませんでした'
-      setFolderError(message)
+      { if (!fieldFailure) setFolderError(message) }
       notifyToast(message, {
         tone: 'error',
         actionLabel: 'もう一度',
@@ -476,7 +492,9 @@ export default function TagsTabV8({
       setDeletingGroup(null)
       void load()
     } catch (reason) {
-      setFolderError(reason instanceof Error ? reason.message : 'フォルダを削除できませんでした')
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure) setFolderError(reason instanceof Error ? reason.message : 'フォルダを削除できませんでした') }
     } finally {
       setFolderBusy(false)
     }
@@ -581,7 +599,7 @@ export default function TagsTabV8({
   const filterActive = Boolean(query || folder || usageFilter !== 'all' || sourceFilter !== 'all' || quick.length)
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       {/* 数の帯（設計の4枚。「付けている友だち」「今月付けた回数」「整理の候補」）。 */}
       <div data-design="KPIs" className={styles.kpis}>
         {kpis.map((kpi) => (
@@ -634,12 +652,12 @@ export default function TagsTabV8({
               )
             )}
             <div className={styles.folderSelectWrap}>
-              <Select
+              <SaveErrorField names={["folder"]}><Select
                 aria-label="フォルダ"
                 value={folder}
                 onChange={setFolder}
                 options={folderSelectOptions}
-              />
+              /></SaveErrorField>
             </div>
             <div className={styles.searchWrap}>
               <SearchField
@@ -650,18 +668,18 @@ export default function TagsTabV8({
                 onClear={() => setQuery('')}
               />
             </div>
-            <Select
+            <SaveErrorField names={["usageFilter","usage_filter"]}><Select
               aria-label="使用状態で絞り込む"
               value={usageFilter}
               onChange={setUsageFilter}
               options={[{ value: 'all', label: '使用状態：すべて' }, { value: 'linked', label: '連動あり' }, { value: 'unused', label: '未使用' }]}
-            />
-            <Select
+            /></SaveErrorField>
+            <SaveErrorField names={["sourceFilter","source_filter"]}><Select
               aria-label="付与元で絞り込む"
               value={sourceFilter}
               onChange={setSourceFilter}
               options={[{ value: 'all', label: '付与元：すべて' }, ...Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label }))]}
-            />
+            /></SaveErrorField>
             <span className={styles.toolbarSpacer} />
             <span className={styles.quickWrap}>
               <MultiSelect
@@ -846,7 +864,7 @@ export default function TagsTabV8({
                   {filtered.length}件中 {filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}〜{Math.min(currentPage * pageSize, filtered.length)}件
                 </span>
                 <div className={styles.pagerRight}>
-                  <Select
+                  <SaveErrorField names={["pageSize","page_size"]}><Select
                     aria-label="表示件数"
                     size="page-size"
                     value={String(pageSize)}
@@ -858,7 +876,7 @@ export default function TagsTabV8({
                       { value: '50', label: '50件表示' },
                       { value: '100', label: '100件表示' },
                     ]}
-                  />
+                  /></SaveErrorField>
                   <Pagination
                     page={currentPage}
                     pageCount={pages}
@@ -970,6 +988,6 @@ export default function TagsTabV8({
           }}
         />
       )}
-    </>
+    </></SaveErrorScope>
   )
 }

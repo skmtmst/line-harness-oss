@@ -20,6 +20,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { isImeComposing } from '@/components/shared/ime'
 import styles from './quick-create.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /* 1欄ぶんの確かめ。文は「何をすれば直るか」を1文で書く。 */
 function validateKeywords(keywords: string[]): string | null {
@@ -49,6 +50,8 @@ export default function QuickCreateV8({
   /** 有効にしたら一覧を読み直す。 */
   onCreated: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [keywords, setKeywords] = useState<string[]>([])
   const [draft, setDraft] = useState('')
   const [reply, setReply] = useState('')
@@ -190,7 +193,9 @@ export default function QuickCreateV8({
       onCreated()
       onClose()
     } catch (cause) {
-      setSaveError(cause instanceof Error ? cause.message : describeSaveFailure(cause))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure) setSaveError(cause instanceof Error ? cause.message : describeSaveFailure(cause)) }
       setPhase(draftIdRef.current ? 'confirming' : 'editing')
     } finally {
       savingRef.current = false
@@ -198,7 +203,7 @@ export default function QuickCreateV8({
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
     <Dialog
       open
       confirmation
@@ -252,7 +257,7 @@ export default function QuickCreateV8({
                 </button>
               </span>
             ))}
-            <input
+            <SaveErrorField names={["draft","keyword"]}><input
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onBlur={blurKeywords}
@@ -273,13 +278,13 @@ export default function QuickCreateV8({
               placeholder="言葉を入れて Enter"
               aria-label="追加する言葉"
               className={styles.chipInput}
-            />
+            /></SaveErrorField>
           </div>
           {keywordError ? <p className={styles.fieldError} role="alert">{keywordError}</p> : null}
         </div>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="quick-create-reply">返す文</label>
-          <textarea
+          <SaveErrorField names={["reply"]}><textarea
             id="quick-create-reply"
             value={reply}
             onChange={(event) => {
@@ -291,7 +296,7 @@ export default function QuickCreateV8({
             placeholder="例：営業時間は10:00〜19:00です"
             className={styles.textarea}
             aria-invalid={replyError ? true : undefined}
-          />
+          /></SaveErrorField>
           {replyError ? <p className={styles.fieldError} role="alert">{replyError}</p> : null}
         </div>
         {overlaps.length > 0 ? (
@@ -303,6 +308,6 @@ export default function QuickCreateV8({
       </div>
     </Dialog>
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }

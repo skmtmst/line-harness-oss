@@ -23,6 +23,7 @@ import {
 } from './identity-view'
 import styles from './identity-review.module.css'
 import type { IdentityCandidateWithProfiles } from '@/lib/api'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const DECISIONS: IdentityCandidateDecision[] = ['linked', 'different', 'deferred']
 
@@ -125,7 +126,7 @@ export default function IdentityDecisionDialog({
       }
     >
       <div className={styles.dialogBody}>
-        <RadioCardGroup legend="判定" className={styles.choices}>
+        <SaveErrorField names={["identity-decision","item","decision"]}><RadioCardGroup legend="判定" className={styles.choices}>
           {DECISIONS.map((item) => (
             <RadioCard
               key={item}
@@ -137,21 +138,21 @@ export default function IdentityDecisionDialog({
               note={decisionNote(item)}
             />
           ))}
-        </RadioCardGroup>
+        </RadioCardGroup></SaveErrorField>
 
         {canReprocess ? (
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="identity-reprocess">
               過去の扱い
             </label>
-            <Select
+            <SaveErrorField names={["mode"]}><Select
               aria-label="過去の扱い"
               id="identity-reprocess"
               value={mode}
               onChange={(value) => setMode(value as IdentityReprocessMode)}
               options={REPROCESS_MODES.map((item) => ({ value: item, label: reprocessText(item) }))}
               size="full"
-            />
+            /></SaveErrorField>
           </div>
         ) : null}
 
@@ -161,7 +162,7 @@ export default function IdentityDecisionDialog({
             {profileCandidates.map((field) => (
               <label key={field.fieldKey} className={styles.fieldLabel}>
                 {field.fieldLabel}
-                <Select
+                <SaveErrorField names={["profileSelections","profile_selections"]}><Select
                   aria-label={field.fieldLabel}
                   value={profileSelections[field.fieldKey] ?? ''}
                   onChange={(value) => setProfileSelections((current) => ({ ...current, [field.fieldKey]: value }))}
@@ -170,7 +171,7 @@ export default function IdentityDecisionDialog({
                     label: `${option.sourceLabel}：${option.valuePreview ?? '未登録'}${option.verified ? '（確認済み）' : ''}`,
                   }))}
                   size="full"
-                />
+                /></SaveErrorField>
               </label>
             ))}
           </div>
@@ -184,11 +185,11 @@ export default function IdentityDecisionDialog({
               'プライバシーポリシーと利用規約に、この使い方が書いてある',
               'LINEの規約と、プロバイダーの決めごとに反していない',
             ].map((label, index) => (
-              <Checkbox
+              <SaveErrorField names={["consents"]} key={label}><Checkbox
                 key={label}
                 checked={consents[index]}
                 onCheckedChange={(checked) => setConsents((current) => current.map((value, itemIndex) => itemIndex === index ? checked : value))}
-              >{label}</Checkbox>
+              >{label}</Checkbox></SaveErrorField>
             ))}
           </div>
         ) : null}
@@ -197,13 +198,13 @@ export default function IdentityDecisionDialog({
           <label className={styles.fieldLabel} htmlFor="identity-reason">
             判定の理由<RequiredBadge />
           </label>
-          <textarea
+          <SaveErrorField names={["reason"]}><textarea
             id="identity-reason"
             className={styles.reason}
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             placeholder="何を見てそう判断したかを書いてください。"
-          />
+          /></SaveErrorField>
         </div>
 
         <p className={styles.confirmNote}>{UNDO_NOTE}</p>

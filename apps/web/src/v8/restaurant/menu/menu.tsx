@@ -24,6 +24,7 @@ import { restaurantTestApi, type RestaurantMenuItem } from '@/lib/restaurant-tes
 import RestaurantShell, { Panel, StatRow, Status, type RestaurantV8Context } from '../booking-kit/shell'
 import { DialogField, DialogNote, RowMore, RsDialog } from '../booking-kit/parts'
 import styles from './menu.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export function safeArray(value: string): string[] {
   try {
@@ -221,30 +222,30 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         )}
       >
         <DialogField label="種類" kind="select">
-          <Select aria-label="種類" size="full" value={draft.kind} onChange={(value) => setDraft({ ...draft, kind: value === 'a_la_carte' ? 'a_la_carte' : 'course' })} options={[{ value: 'course', label: 'コース' }, { value: 'a_la_carte', label: '単品' }]} />
+          <SaveErrorField names={["kind","draft.kind"]}><Select aria-label="種類" size="full" value={draft.kind} onChange={(value) => setDraft({ ...draft, kind: value === 'a_la_carte' ? 'a_la_carte' : 'course' })} options={[{ value: 'course', label: 'コース' }, { value: 'a_la_carte', label: '単品' }]} /></SaveErrorField>
         </DialogField>
         <DialogField label="メニュー名" htmlFor="rs-menu-name">
-          <TextField id="rs-menu-name" required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
+          <SaveErrorField names={["name","draft.name"]}><TextField id="rs-menu-name" required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></SaveErrorField>
         </DialogField>
         <div className={styles.pair}>
           <DialogField label="価格（税込）" htmlFor="rs-menu-price">
-            <TextField id="rs-menu-price" type="number" min={0} required value={draft.price} onChange={(event) => setDraft({ ...draft, price: event.target.value })} />
+            <SaveErrorField names={["price","draft.price"]}><TextField id="rs-menu-price" type="number" min={0} required value={draft.price} onChange={(event) => setDraft({ ...draft, price: event.target.value })} /></SaveErrorField>
           </DialogField>
           <DialogField label="提供時間" kind="select">
-            <Select
+            <SaveErrorField names={["period","draft.period"]}><Select
               aria-label="提供時間"
               size="full"
               value={draft.period}
               onChange={(value) => setDraft({ ...draft, period: value === 'lunch' ? 'lunch' : value === 'both' ? 'both' : 'dinner' })}
               options={[{ value: 'lunch', label: 'ランチ' }, { value: 'dinner', label: 'ディナー' }, { value: 'both', label: 'ランチ・ディナー' }]}
-            />
+            /></SaveErrorField>
           </DialogField>
         </div>
         <DialogField label={editing ? '新しい価格の開始日時' : '価格の開始日時'} htmlFor="rs-menu-effective">
-          <DateTimeField id="rs-menu-effective" value={draft.effectiveAt} onChange={(next) => setDraft({ ...draft, effectiveAt: next })} />
+          <SaveErrorField names={["effectiveAt","draft.effectiveAt","effective_at","draft.effective_at"]}><DateTimeField id="rs-menu-effective" value={draft.effectiveAt} onChange={(next) => setDraft({ ...draft, effectiveAt: next })} /></SaveErrorField>
         </DialogField>
         <DialogField label="アレルギー（カンマ区切り）" htmlFor="rs-menu-allergens">
-          <TextField id="rs-menu-allergens" value={draft.allergens} onChange={(event) => setDraft({ ...draft, allergens: event.target.value })} />
+          <SaveErrorField names={["allergens","draft.allergens"]}><TextField id="rs-menu-allergens" value={draft.allergens} onChange={(event) => setDraft({ ...draft, allergens: event.target.value })} /></SaveErrorField>
         </DialogField>
         <DialogNote>
           {editing

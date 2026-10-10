@@ -23,6 +23,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import { isoToLocalInput, localInputToIso, noticeMessage, previewErrorMessage, useChangeReview, type SlotEdit } from './change-review-model'
 import { jstDay, jstTime } from './shared'
 import styles from './change-review.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /** datetime-local（日本時間の壁時計）→「10:30」。 */
 function localTime(local: string): string {
@@ -284,19 +285,19 @@ function ChangeReview({ eventId }: { eventId: string }) {
           <div className={`${styles.pair} ${styles.datePair}`}>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="ev-cr-start">開始日時</label>
-              <DateTimeField size="compact" id="ev-cr-start" invalid={Boolean(startError)} aria-describedby={startError ? 'ev-cr-start-error' : undefined} value={activeEdit.startsAt} onChange={(next) => updateActive({ startsAt: next })} />
+              <SaveErrorField names={["startsAt","activeEdit.startsAt","starts_at","active_edit.starts_at"]}><DateTimeField size="compact" id="ev-cr-start" invalid={Boolean(startError)} aria-describedby={startError ? 'ev-cr-start-error' : undefined} value={activeEdit.startsAt} onChange={(next) => updateActive({ startsAt: next })} /></SaveErrorField>
               {startError ? <p id="ev-cr-start-error" className={styles.fieldError} role="alert">{startError}</p> : null}
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="ev-cr-end">終了日時</label>
-              <DateTimeField size="compact" id="ev-cr-end" invalid={Boolean(endError)} aria-describedby={endError ? 'ev-cr-end-error' : undefined} value={activeEdit.endsAt} onChange={(next) => updateActive({ endsAt: next })} />
+              <SaveErrorField names={["endsAt","activeEdit.endsAt","ends_at","active_edit.ends_at"]}><DateTimeField size="compact" id="ev-cr-end" invalid={Boolean(endError)} aria-describedby={endError ? 'ev-cr-end-error' : undefined} value={activeEdit.endsAt} onChange={(next) => updateActive({ endsAt: next })} /></SaveErrorField>
               {endError ? <p id="ev-cr-end-error" className={styles.fieldError} role="alert">{endError}</p> : null}
             </div>
           </div>
           <div className={styles.pair}>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="ev-cr-cap">定員</label>
-              <TextField
+              <SaveErrorField names={["capacity","activeEdit.capacity","active_edit.capacity"]}><TextField
                 id="ev-cr-cap"
                 inputMode="numeric"
                 aria-invalid={Boolean(capacityError) || undefined}
@@ -304,20 +305,20 @@ function ChangeReview({ eventId }: { eventId: string }) {
                 value={activeEdit.capacity}
                 placeholder="空欄で定員なし"
                 onChange={(e) => updateActive({ capacity: e.target.value.replace(/[^0-9]/g, '') })}
-              />
+              /></SaveErrorField>
               {capacityError ? <p id="ev-cr-cap-error" className={styles.fieldError} role="alert">{capacityError}</p> : null}
             </div>
             <div className={styles.field}>
               <span className={styles.pickLabel}>受付の有無</span>
-              <RadioCardGroup legend="受付の有無" className={styles.radioRow}>
+              <SaveErrorField names={["ev-cr-active","isActive","activeEdit.isActive"]}><RadioCardGroup legend="受付の有無" className={styles.radioRow}>
                 <RadioCard variant="row" name="ev-cr-active" value="on" checked={activeEdit.isActive} onChange={() => updateActive({ isActive: true })} title="受付する" />
                 <RadioCard variant="row" name="ev-cr-active" value="off" checked={!activeEdit.isActive} onChange={() => updateActive({ isActive: false })} title="止める" />
-              </RadioCardGroup>
+              </RadioCardGroup></SaveErrorField>
             </div>
           </div>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="ev-cr-reason">変える理由</label>
-            <TextField
+            <SaveErrorField names={["reason"]}><TextField
               id="ev-cr-reason"
               aria-invalid={Boolean(reasonError) || undefined}
               aria-describedby={reasonError ? 'ev-cr-reason-error' : undefined}
@@ -326,7 +327,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
               placeholder="例：会場の都合で時間を30分遅らせます"
               aria-required={isPublished || undefined}
               onChange={(e) => { setReason(e.target.value); setReasonError('') }}
-            />
+            /></SaveErrorField>
             {reasonError ? <p id="ev-cr-reason-error" className={styles.fieldError} role="alert">{reasonError}</p> : null}
           </div>
           <p className={styles.note}>
@@ -336,11 +337,11 @@ function ChangeReview({ eventId }: { eventId: string }) {
             <div className={styles.pair}>
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="ev-cr-venue">会場</label>
-                <TextField id="ev-cr-venue" value={venueName} placeholder="未設定" onChange={(e) => { setVenueName(e.target.value); touchEdits() }} />
+                <SaveErrorField names={["venueName","venue_name"]}><TextField id="ev-cr-venue" value={venueName} placeholder="未設定" onChange={(e) => { setVenueName(e.target.value); touchEdits() }} /></SaveErrorField>
               </div>
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="ev-cr-url">オンラインの URL（確定した申込にだけ見せます）</label>
-                <TextField id="ev-cr-url" type="url" value={venueUrl} placeholder="未設定" onChange={(e) => { setVenueUrl(e.target.value); touchEdits() }} />
+                <SaveErrorField names={["venueUrl","venue_url"]}><TextField id="ev-cr-url" type="url" value={venueUrl} placeholder="未設定" onChange={(e) => { setVenueUrl(e.target.value); touchEdits() }} /></SaveErrorField>
               </div>
             </div>
           ) : (

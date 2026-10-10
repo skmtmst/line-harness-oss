@@ -31,12 +31,15 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import BranchEditors, { newBranchStep, updateBranchStep, type BranchPatch } from './branch-editor'
 import { mergeOrderedActions, stepNumbers } from './action-order'
 import styles from '@/app/automations/automations-v8.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const EMPTY_RESOURCES: CommonActionResources = {
   tags: [], scenarios: [], templates: [], webhooks: [], richMenus: [], commonActions: [],
 }
 
 export function CommonActionNewV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('共通アクションを作る')
   const canManage = useCanManageCommonActions()
   const router = useRouter()
@@ -97,7 +100,7 @@ export function CommonActionNewV8() {
       return
     }
     if (!name.trim()) {
-      setError('共通アクション名を入力してください')
+      if (!saveErrors.fail("name", '共通アクション名を入力してください')) setError('共通アクション名を入力してください')
       return
     }
     if (actions.length === 0) {
@@ -116,7 +119,9 @@ export function CommonActionNewV8() {
       if (!response.success) throw new Error(response.error)
       router.push(`/common-actions/versions?id=${encodeURIComponent(response.data.id)}`)
     } catch (caught) {
-      setError(describeSaveFailure(caught))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setError(describeSaveFailure(caught)) }
     } finally {
       setSaving(false)
     }
@@ -137,24 +142,24 @@ export function CommonActionNewV8() {
   }
 
   if (canManage === null) {
-    return <ListState kind="loading" title="権限を確認しています" />
+    return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="権限を確認しています" /></SaveErrorScope>
   }
 
   if (!canManage) {
     return (
-      <div data-design-node="j2hfkS">
+      <SaveErrorScope errors={saveErrors}><div data-design-node="j2hfkS">
         <ListState
           kind="forbidden"
           title="共通アクションは閲覧のみです"
           description="作成するには、オーナーまたは管理者の権限が必要です。"
           action={<Button href="/common-actions">共通アクション一覧へ戻る</Button>}
         />
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
   return (
-    <div data-design-node="j2hfkS">
+    <SaveErrorScope errors={saveErrors}><div data-design-node="j2hfkS">
       <div className={styles.head}>
         <div className={styles.headText}>
           <Link href="/common-actions" className={styles.backLink}>← 共通アクションへ</Link>
@@ -172,23 +177,23 @@ export function CommonActionNewV8() {
             <div className={styles.formGrid}>
               <label className={styles.fieldLabel} htmlFor="v8-common-action-name">
                 名前
-                <TextField
+                <SaveErrorField names={["name"]}><TextField
                   id="v8-common-action-name"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   maxLength={120}
                   placeholder="例：購入のお礼"
-                />
+                /></SaveErrorField>
               </label>
               <label className={styles.fieldLabel} htmlFor="v8-common-action-description">
                 説明 <span className={styles.optional}>任意</span>
-                <TextField
+                <SaveErrorField names={["description"]}><TextField
                   id="v8-common-action-description"
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   maxLength={200}
                   placeholder="使う場面や目的を書きます"
-                />
+                /></SaveErrorField>
               </label>
             </div>
           </section>
@@ -223,7 +228,7 @@ export function CommonActionNewV8() {
               {resources.commonActions.length > 0 ? (
                 <label className={styles.inlineField}>
                   <span>見本から受け渡す</span>
-                  <Select aria-label="見本から受け渡す" value={exampleId} onChange={(value) => { setExampleId(value); addExample(value) }} options={[{ value: '', label: '選ぶ' }, ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` }))]} />
+                  <SaveErrorField names={["exampleId","example_id"]}><Select aria-label="見本から受け渡す" value={exampleId} onChange={(value) => { setExampleId(value); addExample(value) }} options={[{ value: '', label: '選ぶ' }, ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` }))]} /></SaveErrorField>
                 </label>
               ) : null}
             </div>
@@ -281,6 +286,6 @@ export function CommonActionNewV8() {
           </>
         )}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }

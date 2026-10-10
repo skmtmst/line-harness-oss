@@ -14,8 +14,11 @@ import { useAccount } from '@/contexts/account-context'
 import ListState from '@/components/shared/list-state'
 import { notifyToast } from '@/components/shared/toast'
 import FieldEditorV8, { type FieldEditorValues } from './field-editor-v8'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 export default function NewFieldPageV8() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const params = useSearchParams()
   const back = params.get('back')
@@ -37,12 +40,14 @@ export default function NewFieldPageV8() {
       if (!res.success) throw new Error(res.error)
       setFolders(res.data)
       setFoldersState('ready')
-    } catch {
-      setFoldersState('error')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setFoldersState('error') }
     } finally {
       setReloading(false)
     }
-  }, [])
+  }, [saveErrors])
 
   const loadExisting = useCallback(async () => {
     const account = selectedAccountId
@@ -56,12 +61,14 @@ export default function NewFieldPageV8() {
       if (!res.success) throw new Error(res.error)
       setExisting(res.data)
       setExistingState('ready')
-    } catch {
-      setExistingState('error')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setExistingState('error') }
     } finally {
       setReloading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => { void loadFolders() }, [loadFolders])
   useEffect(() => { void loadExisting() }, [loadExisting])
@@ -90,14 +97,16 @@ export default function NewFieldPageV8() {
       notifyToast(`「${values.name.trim()}」を作りました`)
       router.push(back ?? `/tags?tab=fields&highlight=${res.data.id}`)
     } catch (reason) {
-      setError(describeSaveFailure(reason))
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure) setError(describeSaveFailure(reason)) }
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div>
+    <SaveErrorScope errors={saveErrors}><div>
       {/* R514: 既存項目の取得失敗は隠さず、その場で再試行する。入力は残す。 */}
       {existingState === 'error' ? (
         <div className="mb-4">
@@ -123,6 +132,6 @@ export default function NewFieldPageV8() {
         onCancel={() => router.push(back ?? '/tags?tab=fields')}
         onSubmit={(values, requestKey) => void save(values, requestKey)}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }

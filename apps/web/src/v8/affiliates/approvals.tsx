@@ -53,6 +53,7 @@ import {
   ToolbarNotices,
 } from './parts'
 import styles from './affiliates.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 type BulkOutcome = 'approved' | 'rejected'
@@ -408,7 +409,7 @@ export default function ApprovalsTab() {
           <TableHeadRow className={styles.headRow} data-table-layout="columns">
             <Th className={styles.colCheck}>
               {canSelect ? (
-                <Checkbox
+                <SaveErrorField names={["allSafeSelected","selected","all_safe_selected"]}><Checkbox
                   aria-label="このページの確認不要な成果をすべて選ぶ"
                   checked={allSafeSelected}
                   onCheckedChange={(checked) => setSelected((current) => {
@@ -419,7 +420,7 @@ export default function ApprovalsTab() {
                     }
                     return next
                   })}
-                />
+                /></SaveErrorField>
               ) : null}
             </Th>
             <Th className={styles.colName}>友だちと、成果が出た時刻</Th>
@@ -432,7 +433,7 @@ export default function ApprovalsTab() {
           </TableHeadRow>
         </thead>
         <tbody>
-          {pagedItems.map((item) => {
+          {pagedItems.map((item, saveFieldIndex) => {
             const reasons = approvalReviewReasons(item)
             const needsReview = reasons.length > 0
             const pending = item.approvalStatus === 'pending'
@@ -440,7 +441,7 @@ export default function ApprovalsTab() {
               <Tr key={item.eventId} className={styles.row} data-table-layout="columns">
                 <Td className={styles.colCheck}>
                   {canSelect ? (
-                    <Checkbox
+                    <SaveErrorField names={[`pagedItems.${saveFieldIndex}.eventId`,`pagedItems.${saveFieldIndex}.event_id`,"eventId","item.eventId","selected","event_id","id","item.event_id"]}><Checkbox
                       aria-label={`${personName(item.friendName)}の成果を選ぶ`}
                       checked={selected.has(item.eventId)}
                       disabled={needsReview}
@@ -451,7 +452,7 @@ export default function ApprovalsTab() {
                         else next.delete(item.eventId)
                         return next
                       })}
-                    />
+                    /></SaveErrorField>
                   ) : null}
                 </Td>
                 <Td className={styles.colName}>

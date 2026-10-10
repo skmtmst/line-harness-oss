@@ -29,6 +29,7 @@ import ConditionBuilder, {
 } from '@/components/shared/condition-builder'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { formatDateTime } from '@/lib/format'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 function Shell({
   title,
@@ -128,6 +129,8 @@ export function ConditionDialog({
   onSave: (next: SegmentCondition | null) => Promise<void>
   onClose: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [draft, setDraft] = useState<SegmentCondition | null>(value)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -137,7 +140,7 @@ export function ConditionDialog({
   const [draftError, setDraftError] = useState('')
 
   return (
-    <Shell
+    <SaveErrorScope errors={saveErrors}><Shell
       title="配信条件を設定"
       description="外部サービスと同じ条件軸を組み合わせ、このメッセージを届ける友だちを決めます。"
       onClose={onClose}
@@ -175,12 +178,14 @@ export function ConditionDialog({
                 // 条件になって配信が黙って止まる。
                 await onSave(pruneCondition(draft))
                 onClose()
-              } catch {
+              } catch (saveFailure) {
+                const fieldFailure = saveErrors.capture(saveFailure)
+
                 /*
                  * 呼び出し側の保存が例外で落ちても「保存中」のままにしない
                  * （SCENARIO-05）。窓は開いたまま、下書きも残す。
                  */
-                setError('条件を保存できませんでした。通信状態を確認して、もう一度お試しください。')
+                { if (!fieldFailure) setError('条件を保存できませんでした。通信状態を確認して、もう一度お試しください。') }
               } finally {
                 setSaving(false)
               }
@@ -294,7 +299,7 @@ export function ConditionDialog({
       </section>
       <Notice tone="info" className="mt-5">複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。</Notice>
       <details className="mt-3"><summary className="text-action cursor-pointer text-xs">詳しい条件を編集</summary><div className="mt-3"><ConditionBuilder value={draft} onChange={setDraft} /></div></details>
-    </Shell>
+    </Shell></SaveErrorScope>
   )
 }
 
@@ -393,6 +398,8 @@ export function OnCompleteDialog({
   onOpenActions: () => void
   actionCount: number
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [draftMode, setDraftMode] = useState<OnCompleteMode>(mode)
   const [draftTarget, setDraftTarget] = useState<string | null>(targetScenarioId)
   /* R239: 移動先の未選択は入力不足として欄の下で案内し、通信失敗と分ける。 */
@@ -454,10 +461,12 @@ export function OnCompleteDialog({
         setSavedTargetName(saved?.success ? saved.data.name : null)
       }
       setCandidatesState('ready')
-    } catch {
-      if (!isStale()) setCandidatesState('error')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      if (!isStale()) { if (!fieldFailure) setCandidatesState('error') }
     }
-  }, [scenarioId, selectedAccountId, targetScenarioId])
+  }, [scenarioId, selectedAccountId, targetScenarioId, saveErrors])
 
   useEffect(() => {
     let stale = false
@@ -468,7 +477,7 @@ export function OnCompleteDialog({
   }, [loadCandidates])
 
   return (
-    <Shell
+    <SaveErrorScope errors={saveErrors}><Shell
       title="最終ステップ後の処理"
       description="最後の1通を配り終えた人をどうするか"
       onClose={onClose}
@@ -497,12 +506,14 @@ export function OnCompleteDialog({
                   return
                 }
                 onClose()
-              } catch {
+              } catch (saveFailure) {
+                const fieldFailure = saveErrors.capture(saveFailure)
+
                 /*
                  * onSave が業務失敗を返す形と、例外で落ちる形の両方がある。
                  * 例外でも「保存中」のままにしない（SCENARIO-05）。
                  */
-                setError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
+                { if (!fieldFailure) setError('保存できませんでした。通信状態を確認して、もう一度お試しください。') }
               } finally {
                 setSaving(false)
               }
@@ -513,7 +524,7 @@ export function OnCompleteDialog({
       }
     >
       {error && <Notice tone="danger" className="mb-4" message={error} />}
-      <RadioCardGroup legend="最後の1通を配り終えた人をどうするか" className="space-y-3">
+      <SaveErrorField names={["scenario-complete-action","value","opt.value","draftMode"]}><RadioCardGroup legend="最後の1通を配り終えた人をどうするか" className="space-y-3">
         {(
           [
             {
@@ -544,7 +555,7 @@ export function OnCompleteDialog({
             note={opt.hint}
           />
         ))}
-      </RadioCardGroup>
+      </RadioCardGroup></SaveErrorField>
 
       <div className="border-hairline mt-5 border-t pt-5">
         <p className="text-ink text-sm font-bold">その他のアクション</p>
@@ -579,7 +590,7 @@ export function OnCompleteDialog({
             </p>
           ) : (
             <>
-              <Select
+              <SaveErrorField names={["draftTarget","draft_target"]}><Select
                 aria-label="移動先のシナリオ"
                 id="on-complete-move-target"
                 value={draftTarget ?? ''}
@@ -602,7 +613,7 @@ export function OnCompleteDialog({
                 ]}
                 size="full"
                 className="mt-1.5"
-              />
+              /></SaveErrorField>
               {savedTargetMissing ? (
                 <p className="text-warning mt-1.5 text-xs">
                   保存されている移動先はこのアカウントの候補にありません（別アカウント・削除済み・権限外の可能性）。そのまま保存すると現在の値が維持されます。
@@ -622,7 +633,7 @@ export function OnCompleteDialog({
           )}
         </div>
       )}
-    </Shell>
+    </Shell></SaveErrorScope>
   )
 }
 
@@ -965,7 +976,7 @@ export function TestSendDialog({
           「戻る」「テスト送信を開始」へ必ず到達できるようにする。
         */}
         <div className="fixed inset-0 z-10 flex items-start justify-center overflow-y-auto px-6 pb-6" style={{ paddingTop: 'min(265px, 30vh)', background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }}>
-          <div ref={confirmPanelRef} role="dialog" aria-modal="true" aria-labelledby="test-send-confirm-title" className="w-full rounded-panel shadow-float" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 id="test-send-confirm-title" className="text-lg font-bold">選択した1名へ実際に送信しますか？</h2><p className="text-ink-secondary mt-1 text-sm">{friendName}さん（{recipientLabel}）へ{confirmSteps.length}通をテスト送信します。実際のLINEメッセージとして届きます。</p></div><div className="space-y-3 px-6 py-5 text-sm">{requiredConfirmations.map((label, index) => (<Checkbox key={label} checked={confirmChecks[index] === true} disabled={sending || result?.ok === true} onCheckedChange={(checked) => setConfirmChecks((prev) => prev.map((v, i) => (i === index ? checked : v)))}>{label}</Checkbox>))}<p className="text-ink-faint text-xs">購読の登録は増えません。配信予定も作りません。</p>
+          <div ref={confirmPanelRef} role="dialog" aria-modal="true" aria-labelledby="test-send-confirm-title" className="w-full rounded-panel shadow-float" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 id="test-send-confirm-title" className="text-lg font-bold">選択した1名へ実際に送信しますか？</h2><p className="text-ink-secondary mt-1 text-sm">{friendName}さん（{recipientLabel}）へ{confirmSteps.length}通をテスト送信します。実際のLINEメッセージとして届きます。</p></div><div className="space-y-3 px-6 py-5 text-sm">{requiredConfirmations.map((label, index) => (<SaveErrorField names={["confirmChecks","confirm_checks"]} key={label}><Checkbox key={label} checked={confirmChecks[index] === true} disabled={sending || result?.ok === true} onCheckedChange={(checked) => setConfirmChecks((prev) => prev.map((v, i) => (i === index ? checked : v)))}>{label}</Checkbox></SaveErrorField>))}<p className="text-ink-faint text-xs">購読の登録は増えません。配信予定も作りません。</p>
             {sending && <Notice tone="info">送信中です。完了までこの画面のまま待ってください。</Notice>}
             {result && (
               <Notice tone={result.ok ? 'success' : 'danger'}>
@@ -1049,12 +1060,12 @@ export function TestSendDialog({
         </div>
       )}
 
-      <input
+      <SaveErrorField names={["search"]}><input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="名前で探す"
         className="border-hairline rounded-control text-ink h-10 w-full border px-3 text-sm"
-      />
+      /></SaveErrorField>
       <div className="border-hairline rounded-panel mt-3 max-h-64 overflow-y-auto border">
         {friendsStatus === 'ready' && friends.map((friend) => (
           <button
@@ -1260,13 +1271,13 @@ export function FriendPlanDialog({
         </Notice>
       ) : null}
 
-      <input
+      <SaveErrorField names={["search"]}><input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="名前で探す"
         className="border-hairline rounded-control text-ink h-10 w-full border px-3 text-sm"
         aria-label="確認する友だちを名前で探す"
-      />
+      /></SaveErrorField>
       <div className="border-hairline divide-hairline rounded-panel mt-3 max-h-48 divide-y overflow-y-auto border">
         {friendsStatus === 'ready' && friends.map((friend) => (
           <button

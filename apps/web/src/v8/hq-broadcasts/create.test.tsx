@@ -226,15 +226,15 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     expect(hq.send).not.toHaveBeenCalled()
   })
 
-  it('入れていない所があると口を呼ばず、その欄のある段へ移るボタンを出す', async () => {
+  it('入れていない所があると口を呼ばず、欄の理由を出してその段へ移る', async () => {
     render(<HqBroadcastCreate />)
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     expect((await screen.findByRole('alert')).textContent).toContain('配信名を入れてください')
     fireEvent.change(screen.getByLabelText('配信名'), { target: { value: '告知' } })
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     expect((await screen.findByRole('alert')).textContent).toContain('送るアカウントを選んでください')
-    fireEvent.click(screen.getByRole('button', { name: '配信対象へ移動' }))
     expect(await screen.findByRole('heading', { name: '送るアカウント' })).toBeTruthy()
+    await waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('送るアカウント：選ぶ'))
     expect(hq.create).not.toHaveBeenCalled()
   })
 

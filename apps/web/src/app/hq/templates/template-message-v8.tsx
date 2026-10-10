@@ -11,6 +11,7 @@ import type { MessageTemplateDefinition } from '@/lib/hq-templates-api'
 import { withUploadedImage } from '@/lib/hq-template-authoring'
 import { CardEditor, ImageUpload } from './template-definition-editor'
 import styles from './template-console.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
  * 板 X4JcOf：メッセージのひな形を作る（V8だけ）。
@@ -97,11 +98,11 @@ export default function TemplateMessageFormV8({
               <h2>ひな形の中身</h2>
               <label className={styles.field}>
                 <span>ひな形の名前</span>
-                <input aria-label="ひな形の名前" className={styles.input} value={name} maxLength={200} disabled={disabled} onChange={(event) => onNameChange(event.target.value)} />
+                <SaveErrorField names={["name"]}><input aria-label="ひな形の名前" className={styles.input} value={name} maxLength={200} disabled={disabled} onChange={(event) => onNameChange(event.target.value)} /></SaveErrorField>
               </label>
               <label className={styles.field}>
                 <span>分類 <small className={styles.muted}>任意</small></span>
-                <input aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={disabled} onChange={(event) => onChange({ ...value, template: { ...current, category: event.target.value } })} />
+                <SaveErrorField names={["category","current.category"]}><input aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={disabled} onChange={(event) => onChange({ ...value, template: { ...current, category: event.target.value } })} /></SaveErrorField>
               </label>
             </>
           )}

@@ -18,6 +18,7 @@ import Segmented from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import { ACTION_ADDERS, describeAfterAction, emptyAction } from './model'
 import styles from './edit.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const ADDER_ICON: Record<FormAction['kind'], typeof Tag> = {
   send_text: MessageSquare,
@@ -79,7 +80,7 @@ export function AfterTab({ readOnly, options, refs, onSubmitTagId, onChangeOptio
         <h2 id="fe-thanks-title" className={styles.cardTitle}>答え終わったときの画面</h2>
         <div className={styles.field}>
           <label className={styles.fieldLabel} htmlFor="fe-thanks-text">お礼の文</label>
-          <TextField id="fe-thanks-text" value={options.thanksText ?? ''} placeholder="ご回答ありがとうございました。" onChange={(e) => onChangeOptions({ thanksText: e.target.value })} />
+          <SaveErrorField names={["thanksText","options.thanksText","thanks_text","options.thanks_text"]}><TextField id="fe-thanks-text" value={options.thanksText ?? ''} placeholder="ご回答ありがとうございました。" onChange={(e) => onChangeOptions({ thanksText: e.target.value })} /></SaveErrorField>
         </div>
         <div className={styles.endingRow}>
           <span className={styles.endingLabel}>終わったあと</span>
@@ -96,7 +97,7 @@ export function AfterTab({ readOnly, options, refs, onSubmitTagId, onChangeOptio
         {ending === 'url' ? (
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="fe-thanks-url">開くURL</label>
-            <TextField
+            <SaveErrorField names={["thanksUrl","options.thanksUrl","urlDraft","thanks_url","options.thanks_url","url_draft"]}><TextField
               id="fe-thanks-url"
               type="url"
               value={options.thanksUrl ?? ''}
@@ -105,7 +106,7 @@ export function AfterTab({ readOnly, options, refs, onSubmitTagId, onChangeOptio
                 setUrlDraft(e.target.value)
                 onChangeOptions({ thanksUrl: e.target.value || 'https://' })
               }}
-            />
+            /></SaveErrorField>
           </div>
         ) : null}
       </section>
@@ -161,12 +162,12 @@ export function AfterTab({ readOnly, options, refs, onSubmitTagId, onChangeOptio
         <h2 id="fe-tag-title" className={styles.cardTitle}>回答したときに付けるタグ</h2>
         <p className={styles.cardNote}>このフォームに答えた人を、あとから絞り込めます。</p>
         <span className={styles.saveSelect}>
-          <Select
+          <SaveErrorField names={["onSubmitTagId","on_submit_tag_id"]}><Select
             aria-label="回答したときに付けるタグ"
             value={onSubmitTagId}
             onChange={onChangeSubmitTag}
             options={[{ value: '', label: '付けない' }, ...refs.tags.map((t) => ({ value: t.id, label: t.name }))]}
-          />
+          /></SaveErrorField>
         </span>
       </section>
 

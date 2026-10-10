@@ -55,6 +55,7 @@ import {
 } from './carousel-core'
 import styles from './question-new.module.css'
 import own from './carousel.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /** 札の名前：タイトルの（）書きを外した短い名前（絵：「夏の定番セット（送料込み）」→「夏の定番セット」）。 */
 export function chipName(title: string): string {
@@ -148,6 +149,8 @@ function buttonProblem(a: Panel['actions'][number], liffId: string | null, hqHos
 }
 
 function Carousel({ host }: { host?: TemplateEditHost }) {
+  const saveErrors = useSaveFormErrors()
+
   const inline = Boolean(host?.composer)
   const hqHost = Boolean(host && !host.composer?.accountId)
   const router = useRouter()
@@ -223,13 +226,15 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         try {
           const loaded = panelsFromContent(res.data.messageContent, storedActions)
           if (loaded.length > 0) setPanels(loaded)
-        } catch {
-          setError('いまの中身を読み取れませんでした。保存すると上書きされます。')
+        } catch (saveFailure) {
+          const fieldFailure = saveErrors.capture(saveFailure)
+
+          { if (!fieldFailure) setError('いまの中身を読み取れませんでした。保存すると上書きされます。') }
         }
       })
       .catch((caught: unknown) => markLoadFailed(caught))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, saveErrors])
 
   useEffect(() => {
     if (loading || snapshotTaken) return
@@ -312,7 +317,9 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
       const res = await api.templates.publish(templateId, { expectedVersion: got.data.publishedVersion ?? 0, expectedDraftRevision: got.data.draftRevision ?? 0 })
       if (!res.success) { setPublishError(res.error || '公開できませんでした。もう一度お試しください。'); return false }
     } catch (caught) {
-      setPublishError(caught instanceof ApiError && caught.status === 409 ? '他の人が先に更新したため、公開を止めました。画面を読み直して、もう一度お試しください。' : '公開できませんでした。もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setPublishError(caught instanceof ApiError && caught.status === 409 ? '他の人が先に更新したため、公開を止めました。画面を読み直して、もう一度お試しください。' : '公開できませんでした。もう一度お試しください。') }
       return false
     }
     return true
@@ -360,10 +367,10 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
 
   if (host ? host.readOnly : !canMutate) {
     return (
-      <TemplateEditFrame boardId="J60utH" title="カルーセル" description="カルーセルの作成・変更はオーナーと管理者だけができます" side={null}>
+      <SaveErrorScope errors={saveErrors}><TemplateEditFrame boardId="J60utH" title="カルーセル" description="カルーセルの作成・変更はオーナーと管理者だけができます" side={null}>
         <p className={styles.note}>一覧で中身を確認できます。</p>
         <Link href="/templates" className={styles.back}>一覧へ戻る</Link>
-      </TemplateEditFrame>
+      </TemplateEditFrame></SaveErrorScope>
     )
   }
 
@@ -409,7 +416,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   )
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <TemplateEditFrame
         composerHost={host ? { ...host, busy, onCancel: () => guarded(host.onCancel) } : undefined}
         onComposerInsert={(alsoSave) => void hostSave(alsoSave)}
@@ -449,12 +456,12 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
               <div className={styles.row}>
                 <div className={`${styles.field} ${styles.grow}`}>
                   <label className={styles.label} htmlFor="cr-name-input">テンプレート名</label>
-                  <input {...fields.bind('name')} id="cr-name-input" className={styles.input} value={name} placeholder="例：夏の定番5点" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'cr-name-input-error' : undefined} onChange={(event) => setName(event.target.value)} />
+                  <SaveErrorField names={["name"]}><input {...fields.bind('name')} id="cr-name-input" className={styles.input} value={name} placeholder="例：夏の定番5点" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'cr-name-input-error' : undefined} onChange={(event) => setName(event.target.value)} /></SaveErrorField>
                   <FieldError id="cr-name-input-error">{fields.error('name')}</FieldError>
                 </div>
                 <div className={`${styles.field} ${styles.folder}`}>
                   <span className={styles.pickLabel}>フォルダ</span>
-                  <FolderSelect
+                  <SaveErrorField names={["folder","host.folder","folderId","folder_id"]}><FolderSelect
                     size="full"
                     aria-label="フォルダ"
                     value={host ? host.folder : folderId ?? ''}
@@ -466,7 +473,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                       : canMutate && folderAccountId
                         ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: folderAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
                         : undefined}
-                  />
+                  /></SaveErrorField>
                 </div>
               </div>
             </section>}
@@ -532,12 +539,12 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   <div className={own.textCol}>
                     <div className={styles.field}>
                       <label className={styles.label} htmlFor="cr-title">{`タイトル（${TITLE_MAX}文字まで）`}</label>
-                      <input {...fields.bind(`card-${selectedIndex}-title`)} id="cr-title" className={styles.input} value={panel.title} aria-invalid={fields.invalid(`card-${selectedIndex}-title`) || undefined} aria-describedby={fields.invalid(`card-${selectedIndex}-title`) ? 'cr-title-error' : undefined} onChange={(event) => update(selectedIndex, { title: event.target.value })} />
+                      <SaveErrorField names={["title","panel.title"]}><input {...fields.bind(`card-${selectedIndex}-title`)} id="cr-title" className={styles.input} value={panel.title} aria-invalid={fields.invalid(`card-${selectedIndex}-title`) || undefined} aria-describedby={fields.invalid(`card-${selectedIndex}-title`) ? 'cr-title-error' : undefined} onChange={(event) => update(selectedIndex, { title: event.target.value })} /></SaveErrorField>
                       <FieldError id="cr-title-error">{fields.error(`card-${selectedIndex}-title`)}</FieldError>
                     </div>
                     <div className={styles.field}>
                       <label className={styles.label} htmlFor="cr-text">{panel.title.trim() || panel.thumbnailImageUrl.trim() ? `本文（タイトルか画像があると${TEXT_MAX_WITH_IMAGE}文字まで）` : `本文（${TEXT_MAX_WITHOUT_IMAGE}文字まで）`}</label>
-                      <input {...fields.bind(`card-${selectedIndex}-text`)} id="cr-text" className={styles.input} value={panel.text} aria-invalid={fields.invalid(`card-${selectedIndex}-text`) || undefined} aria-describedby={fields.invalid(`card-${selectedIndex}-text`) ? 'cr-text-error' : undefined} onChange={(event) => update(selectedIndex, { text: event.target.value })} />
+                      <SaveErrorField names={["text","panel.text"]}><input {...fields.bind(`card-${selectedIndex}-text`)} id="cr-text" className={styles.input} value={panel.text} aria-invalid={fields.invalid(`card-${selectedIndex}-text`) || undefined} aria-describedby={fields.invalid(`card-${selectedIndex}-text`) ? 'cr-text-error' : undefined} onChange={(event) => update(selectedIndex, { text: event.target.value })} /></SaveErrorField>
                       <FieldError id="cr-text-error">{fields.error(`card-${selectedIndex}-text`)}</FieldError>
                     </div>
                     {[...panel.title].length > TITLE_MAX || [...panel.text].length > textMaxFor(panel) ? (
@@ -548,7 +555,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                 {urlOpen ? (
                   <label className={styles.field}>
                     <span className={styles.label}>画像の URL</span>
-                    <input className={styles.input} type="url" value={panel.thumbnailImageUrl} placeholder="https://example.com/a.png" onChange={(event) => update(selectedIndex, { thumbnailImageUrl: event.target.value })} />
+                    <SaveErrorField names={["thumbnailImageUrl","panel.thumbnailImageUrl","thumbnail_image_url","panel.thumbnail_image_url"]}><input className={styles.input} type="url" value={panel.thumbnailImageUrl} placeholder="https://example.com/a.png" onChange={(event) => update(selectedIndex, { thumbnailImageUrl: event.target.value })} /></SaveErrorField>
                   </label>
                 ) : null}
 
@@ -563,9 +570,9 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   return (
                     <div key={ai} className={own.buttonBlock}>
                     <div className={own.buttonRow} {...fields.bind(`card-${selectedIndex}-button-${ai}`)} aria-describedby={fields.invalid(`card-${selectedIndex}-button-${ai}`) ? `cr-button-${ai}-error` : undefined}>
-                      <input className={`${styles.input} ${own.colLabel}`} value={action.label} placeholder="ボタンの文字" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の文字`} onChange={(event) => setAction({ label: event.target.value })} />
+                      <SaveErrorField names={[`actions.${ai}.label`,"label","action.label"]}><input className={`${styles.input} ${own.colLabel}`} value={action.label} placeholder="ボタンの文字" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の文字`} onChange={(event) => setAction({ label: event.target.value })} /></SaveErrorField>
                       <div className={own.colTap}>
-                      <TapActionField
+                      <SaveErrorField names={["action"]}><TapActionField
                         name={`カード${selectedIndex + 1}のボタン${ai + 1}`}
                         kindLabel={`カード${selectedIndex + 1}のボタン${ai + 1}の動き`}
                         value={{ kind: action.kind, uri: action.uri, text: action.text, refId: action.formId }}
@@ -588,7 +595,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                         liffSettingsHref={folderAccountId ? `/accounts/detail?id=${encodeURIComponent(folderAccountId)}` : '/accounts'}
                         sources={tapSources}
                         textMax={MESSAGE_TEXT_MAX}
-                      />
+                      /></SaveErrorField>
                       </div>
                       {panel.actions.length > 1 ? (
                         <button type="button" className={own.iconButton} aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}を外す`} title="このボタンを外す" onClick={() => update(selectedIndex, { actions: panel.actions.filter((_, j) => j !== ai) })}>
@@ -623,7 +630,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
               {tapLimitMode === 'once' ? (
                 <label className={styles.field}>
                   <span className={styles.label}>2回目に押されたときの返事<span className={styles.optional}>空なら何も返さない</span></span>
-                  <input className={styles.input} value={tapLimitText} placeholder="例：こちらはすでに受け付けています。" onChange={(event) => setTapLimitText(event.target.value)} />
+                  <SaveErrorField names={["tapLimitText","tap_limit_text"]}><input className={styles.input} value={tapLimitText} placeholder="例：こちらはすでに受け付けています。" onChange={(event) => setTapLimitText(event.target.value)} /></SaveErrorField>
                 </label>
               ) : null}
             </section>}
@@ -672,7 +679,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         onSelect={(item: MediaItem) => { update(selectedIndex, { thumbnailImageUrl: item.url }); setPickerOpen(false) }}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="カルーセルの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }
 

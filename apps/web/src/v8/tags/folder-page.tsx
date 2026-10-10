@@ -25,6 +25,7 @@ import styles from './create.module.css'
 
 /* 絵の9色。保存する値は色コード、読み上げと見出しは名前。既定は緑（基調色）。 */
 import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 export { TAG_FOLDER_COLORS } from './folder-colors'
 const DEFAULT_COLOR = DEFAULT_TAG_FOLDER_COLOR
 
@@ -61,6 +62,8 @@ export default function TagFolderPageV8() {
 }
 
 function TagFolderPage() {
+  const saveErrors = useSaveFormErrors()
+
   const staffRole = useStaffRole()
   const router = useRouter()
   const params = useSearchParams()
@@ -136,8 +139,11 @@ function TagFolderPage() {
       if (!sameRequest(activeRef.current, request)) return
       close()
     } catch (reason) {
+
+
       if (!sameRequest(activeRef.current, request)) return
-      setError(folderSaveError(reason instanceof ApiError ? reason.status : undefined))
+      const fieldFailure = saveErrors.capture(reason)
+      { if (!fieldFailure) setError(folderSaveError(reason instanceof ApiError ? reason.status : undefined)) }
     } finally {
       if (sameRequest(activeRef.current, request)) setSaving(false)
     }
@@ -154,15 +160,18 @@ function TagFolderPage() {
       if (!sameRequest(activeRef.current, request)) return
       router.push('/tags')
     } catch (reason) {
+
+
       if (!sameRequest(activeRef.current, request)) return
+      const fieldFailure = saveErrors.capture(reason)
       setDeleteOpen(false)
-      setError(folderDeleteError(reason instanceof ApiError ? reason.status : undefined))
+      { if (!fieldFailure) setError(folderDeleteError(reason instanceof ApiError ? reason.status : undefined)) }
     } finally {
       if (sameRequest(activeRef.current, request)) setSaving(false)
     }
   }
 
-  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></SaveErrorScope>
 
   /* 止まっている理由は押せない見た目だけにせず、ボタンの title と本文に出す。 */
   const blockedReason =
@@ -173,7 +182,7 @@ function TagFolderPage() {
   const title = editId ? 'フォルダを直す' : scope === 'friend_field' ? '友だち情報欄のフォルダを追加する' : 'フォルダを追加する'
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <TagsList accountId={selectedAccountId} />
       <FolderEditorDialog
         open
@@ -224,6 +233,6 @@ function TagFolderPage() {
         onCancel={() => { if (!saving) setDeleteOpen(false) }}
         onConfirm={() => void remove()}
       />
-    </>
+    </></SaveErrorScope>
   )
 }

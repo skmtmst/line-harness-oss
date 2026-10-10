@@ -25,6 +25,7 @@ import { canResendInvite, lastLoginShort, memberKpis, memberStatus, sortMembersB
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import MemberDialogV8, { MemberChangeConfirmV8, type MemberDialogValue } from './member-dialog'
 import styles from './members.module.css'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -63,6 +64,8 @@ export default function HqMembersV8() {
 }
 
 function MembersInner() {
+  const saveErrors = useSaveFormErrors()
+
   // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」（絵 `V8-B/r4ARpV`）。
   usePageTitle('メンバー')
   usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
@@ -109,9 +112,11 @@ function MembersInner() {
       if (loginRes?.success) setLastLogins(loginRes.data)
       setStatus('ready')
     } catch (caught) {
+      saveErrors.capture(caught)
+
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
-  }, [])
+  }, [saveErrors])
 
   useEffect(() => {
     void load()
@@ -160,14 +165,16 @@ function MembersInner() {
       setDialog({ open: false, member: null })
       await load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (!stepUpToken && caught instanceof ApiError && caught.code === 'STEP_UP_REQUIRED') {
         setStepUp({ retry: (token) => submitDialog(value, token) })
         return
       }
       // M026：原文のまま出さず、共通の状態別案内へ渡す（本人確認の分岐は先に残す）。
-      setDialogError(japaneseDetailOf(caught) || describeApiFailure(caught, '保存', {
+      { if (!fieldFailure) setDialogError(japaneseDetailOf(caught) || describeApiFailure(caught, '保存', {
         forbidden: '権限者の招待・変更はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。',
-      }))
+      })) }
     } finally {
       setDialogBusy(false)
     }
@@ -182,10 +189,12 @@ function MembersInner() {
       if (!res.success) throw new Error(res.error)
       setNotice(`${member.email} へ招待メールを送り直しました。`)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       // M026：再試行の言葉がない代替文にしない。共通の状態別案内へ渡す。
-      setActionError(japaneseDetailOf(caught) || describeApiFailure(caught, '招待メールの再送', {
+      { if (!fieldFailure) setActionError(japaneseDetailOf(caught) || describeApiFailure(caught, '招待メールの再送', {
         forbidden: '招待メールの再送はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。',
-      }))
+      })) }
     } finally {
       setResendingId(null)
     }
@@ -196,7 +205,7 @@ function MembersInner() {
   const ready = status === 'ready' && !restricted
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId="r4ARpV"
       title="メンバー"
       description="統括の画面に入れる人です。役割と、見られるアカウント（担当範囲）を決めます。"
@@ -319,6 +328,6 @@ function MembersInner() {
           onClose={() => setStepUp(null)}
         />
       ) : null}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

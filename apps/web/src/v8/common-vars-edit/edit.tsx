@@ -80,6 +80,7 @@ import {
 import { formatNumber } from '@/lib/format'
 import styles from './edit.module.css'
 import { focusFieldById } from '@/lib/use-form-errors'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /** 予定の日時（`YYYY-MM-DDTHH:mm`・日本時間）を「10/1 0:00」の形にする。 */
 export function scheduleStamp(value: string): string {
@@ -138,6 +139,8 @@ function usageTone(status: string): 'warning' | 'neutral' | 'info' {
 }
 
 function EditCommonVarV8Inner() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('共通情報を編集')
   usePageCrumbs([
     { label: 'ホーム', href: '/' },
@@ -223,11 +226,14 @@ function EditCommonVarV8Inner() {
       setImpact(res.data)
       setImpactState('ready')
     } catch (e) {
+
+
       if (accountId !== latestAccountRef.current) return
+      const fieldFailure = saveErrors.capture(e)
       setImpact(null)
-      setImpactState(impactStateFromError(e))
+      { if (!fieldFailure) setImpactState(impactStateFromError(e)) }
     }
-  }, [])
+  }, [saveErrors])
 
   useEffect(() => {
     if (!item || !selectedAccountId) return
@@ -252,11 +258,12 @@ function EditCommonVarV8Inner() {
       } else {
         setFoldersError(true)
       }
-    } catch {
+    } catch (saveFailure) {
       if (accountId !== latestAccountRef.current) return
-      setFoldersError(true)
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure) setFoldersError(true) }
     }
-  }, [])
+  }, [saveErrors])
 
   const loadSchedules = useCallback(async (varId: string, accountId: string) => {
     try {
@@ -268,11 +275,12 @@ function EditCommonVarV8Inner() {
       } else {
         setSchedulesError(true)
       }
-    } catch {
+    } catch (saveFailure) {
       if (accountId !== latestAccountRef.current) return
-      setSchedulesError(true)
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure) setSchedulesError(true) }
     }
-  }, [])
+  }, [saveErrors])
 
   const applyDetail = useCallback((found: CommonVarDetail) => {
     setItem(found)
@@ -352,14 +360,15 @@ function EditCommonVarV8Inner() {
       }
       applyDetail(found)
       setConflict(null)
-    } catch {
+    } catch (saveFailure) {
       if (accountAtRequest !== latestAccountRef.current) return
-      setError('読み込みに失敗しました。もう一度読み込んでください。')
-      setLoadFailure('error')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure) setError('読み込みに失敗しました。もう一度読み込んでください。') }
+      { if (!fieldFailure) setLoadFailure('error') }
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
-  }, [accountLoading, applyDetail, id, selectedAccountId])
+  }, [accountLoading, applyDetail, id, selectedAccountId, saveErrors])
 
   useEffect(() => {
     void load()
@@ -389,7 +398,9 @@ function EditCommonVarV8Inner() {
         return detail.data
       }
       return null
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       return null
     } finally {
       await loadSchedules(varId, accountId)
@@ -417,21 +428,21 @@ function EditCommonVarV8Inner() {
     }
     if (isSecretLikeVarValue(value)) {
       const message = '鍵やトークンのような秘密の値は共通情報に保存できません'
-      setError(message)
+      if (!saveErrors.fail("value", message)) setError(message)
       setValueFieldError(message)
       document.getElementById('cv-value')?.focus()
       return
     }
     if (expiryBehavior === 'fallback' && isSecretLikeVarValue(fallbackValue)) {
       const message = '鍵やトークンのような秘密の値は代替値にも保存できません'
-      setError(message)
+      if (!saveErrors.fail("expiryBehavior", message)) setError(message)
       setFallbackFieldError(message)
       document.getElementById('cv-fallback-value')?.focus()
       return
     }
     if (!changeReason.trim()) {
       const message = '変える理由を入力してください'
-      setError(message)
+      if (!saveErrors.fail("changeReason", message)) setError(message)
       setReasonFieldError(message)
       document.getElementById('cv-change-reason')?.focus()
       return
@@ -443,7 +454,9 @@ function EditCommonVarV8Inner() {
       let preview: Awaited<ReturnType<typeof api.commonVars.impactPreview>> | null = null
       try {
         preview = await api.commonVars.impactPreview(item.id, accountAtRequest, value, item.version)
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
+
         preview = null
       }
       if (accountAtRequest !== latestAccountRef.current) return
@@ -477,10 +490,12 @@ function EditCommonVarV8Inner() {
       setCompareOpen(false)
       void load()
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e)
+
       if (e instanceof ApiError && (e.status === 428 || e.status === 409)) {
         if (accountAtRequest !== latestAccountRef.current) return
         // 409 は頭の下の帯（piWhz）が知らせるので、本文の上に同じ知らせを重ねない。
-        if (e.status === 428) setError(saveErrorText(e))
+        if (e.status === 428) { if (!fieldFailure) setError(saveErrorText(e)) }
         const fresh = await refreshBaseline(item.id, accountAtRequest, e)
         /*
          * 409は誰かが先に保存した。入力は残したまま、帯で誰の保存かを見せる
@@ -495,7 +510,7 @@ function EditCommonVarV8Inner() {
         }
         return
       }
-      setError(saveErrorText(e))
+      { if (!fieldFailure) setError(saveErrorText(e)) }
     } finally {
       setSaving(false)
     }
@@ -551,7 +566,9 @@ function EditCommonVarV8Inner() {
       if (!res.success) throw new Error(res.error)
       setDeleteImpact(res.data)
       setDeletePhase('ready')
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       setDeletePhase('error')
     }
   }
@@ -575,18 +592,22 @@ function EditCommonVarV8Inner() {
       if (!res.success) throw new Error(res.error)
       router.push('/contents/vars')
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e)
+
       if (e instanceof ApiError && e.status === 409) {
-        setDeleteError('いま使われ始めたため、削除できませんでした。使用先を読み直しました。')
+        { if (!fieldFailure) setDeleteError('いま使われ始めたため、削除できませんでした。使用先を読み直しました。') }
         try {
           const again = await api.commonVars.deleteImpact(deleteTarget.item.id, deleteTarget.accountId)
           if (again.success) setDeleteImpact(again.data)
           else setDeletePhase('error')
-        } catch {
+        } catch (saveFailure) {
+          saveErrors.capture(saveFailure)
+
           setDeletePhase('error')
         }
         return
       }
-      setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。')
+      { if (!fieldFailure) setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
@@ -622,7 +643,9 @@ function EditCommonVarV8Inner() {
       setDraft(null)
       await refreshBaseline(item.id, selectedAccountId)
     } catch (e) {
-      setError(scheduleErrorText(e))
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure) setError(scheduleErrorText(e)) }
     } finally {
       setAddingSchedule(false)
     }
@@ -634,8 +657,10 @@ function EditCommonVarV8Inner() {
     try {
       await api.commonVars.deleteSchedule(item.id, scheduleId, selectedAccountId)
       await refreshBaseline(item.id, selectedAccountId)
-    } catch {
-      setError('予約の削除に失敗しました。通信を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setError('予約の削除に失敗しました。通信を確かめて、もう一度お試しください。') }
     }
   }
 
@@ -649,8 +674,10 @@ function EditCommonVarV8Inner() {
       }
       setClearSchedulesOpen(false)
       await refreshBaseline(item.id, selectedAccountId)
-    } catch {
-      setClearSchedulesError('消せなかった予定があります。通信を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setClearSchedulesError('消せなかった予定があります。通信を確かめて、もう一度お試しください。') }
     } finally {
       setClearSchedulesBusy(false)
     }
@@ -697,11 +724,13 @@ function EditCommonVarV8Inner() {
       setStatusReason('')
       await load()
     } catch (e) {
-      setStatusError(
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure) setStatusError(
         e instanceof ApiError && e.status === 409
           ? '別の担当者が先に更新しました。最新内容を読み直してください。'
           : '状態を変えられませんでした。通信を確かめて、もう一度お試しください。',
-      )
+      ) }
     } finally {
       setStatusBusy(false)
     }
@@ -721,44 +750,44 @@ function EditCommonVarV8Inner() {
 
   if (!id) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="unspecified"
         title="編集する共通情報が指定されていません"
         description="一覧から編集する共通情報を選び直してください。"
         backHref="/contents/vars"
         backLabel="共通情報一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
   if (!accountLoading && !selectedAccountId) {
     return (
-      <ListState
+      <SaveErrorScope errors={saveErrors}><ListState
         kind="empty"
         title="LINEアカウントを選んでください"
         description="選ぶと共通情報を編集できます。"
         action={<Button href="/contents/vars">共通情報一覧へ戻る</Button>}
-      />
+      /></SaveErrorScope>
     )
   }
   if (!loading && loadFailure === 'missing') {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="not-found"
         title="この共通情報は見つかりません"
         description="削除されたか、リンクが古くなっています。一覧から選び直してください。"
         backHref="/contents/vars"
         backLabel="共通情報一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
   if (!loading && loadFailure === 'error') {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="error"
         title="共通情報を読み込めませんでした"
         description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
         onRetry={() => void load()}
-      />
+      /></SaveErrorScope>
     )
   }
 
@@ -800,7 +829,7 @@ function EditCommonVarV8Inner() {
         <div className={styles.sideFields}>
           <div className={styles.field}>
             <label htmlFor="cv-name" className={styles.fieldLabelStrong}>名前</label>
-            <input
+            <SaveErrorField names={["name","saved"]}><input
               id="cv-name"
               type="text"
               maxLength={200}
@@ -810,11 +839,11 @@ function EditCommonVarV8Inner() {
               readOnly={!canWrite}
               aria-invalid={nameFieldError ? true : undefined}
               aria-describedby={nameFieldError ? 'cv-name-error' : undefined}
-            />
+            /></SaveErrorField>
             {nameFieldError ? <p id="cv-name-error" className={styles.fieldError} role="alert">{nameFieldError}</p> : null}
           </div>
           {canWrite ? (
-            <FolderSelect
+            <SaveErrorField names={["folderId","saved","folder_id"]}><FolderSelect
               aria-label="フォルダ"
               label="フォルダ"
               id="cv-folder"
@@ -826,7 +855,7 @@ function EditCommonVarV8Inner() {
               onCreate={canWrite && selectedAccountId
                 ? folderCreator((name, color) => api.folders.create({ kind: 'common_var', name, color, accountId: selectedAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
                 : undefined}
-            />
+            /></SaveErrorField>
           ) : (
             // 閲覧のみ：選ぶ部品は置かず、選んでいるフォルダを文字で見せる。
             <ReadOnlyValue id="cv-folder" label="フォルダ" value={`フォルダ：${folders.find((folder) => folder.id === folderId)?.name ?? '未分類'}`} />
@@ -853,27 +882,27 @@ function EditCommonVarV8Inner() {
           <div className={styles.field}>
             <label htmlFor="cv-valid-from" className={styles.fieldLabelStrong}>始まり</label>
             {canWrite
-              ? <DateTimeField id="cv-valid-from" value={validFrom} placeholder="指定なし" invalid={Boolean(periodFieldError)} onChange={(v) => { setSaved(false); setValidFrom(v); setPeriodFieldError('') }} />
+              ? <SaveErrorField names={["validFrom","saved","valid_from"]}><DateTimeField id="cv-valid-from" value={validFrom} placeholder="指定なし" invalid={Boolean(periodFieldError)} onChange={(v) => { setSaved(false); setValidFrom(v); setPeriodFieldError('') }} /></SaveErrorField>
               : <ReadOnlyValue id="cv-valid-from" value={readOnlyDate(validFrom)} />}
           </div>
           <div className={styles.field}>
             <label htmlFor="cv-valid-until" className={styles.fieldLabelStrong}>終わり</label>
             {canWrite
-              ? <DateTimeField id="cv-valid-until" value={validUntil} placeholder="指定なし" invalid={Boolean(periodFieldError)} onChange={(v) => { setSaved(false); setValidUntil(v); setPeriodFieldError('') }} />
+              ? <SaveErrorField names={["validUntil","saved","valid_until"]}><DateTimeField id="cv-valid-until" value={validUntil} placeholder="指定なし" invalid={Boolean(periodFieldError)} onChange={(v) => { setSaved(false); setValidUntil(v); setPeriodFieldError('') }} /></SaveErrorField>
               : <ReadOnlyValue id="cv-valid-until" value={readOnlyDate(validUntil)} />}
             {periodFieldError ? <p className={styles.fieldError} role="alert">{periodFieldError}</p> : null}
           </div>
         </div>
         <div className={styles.sideFields}>
           {canWrite ? (
-            <Select
+            <SaveErrorField names={["expiryBehavior","saved","expiry_behavior"]}><Select
               size="full"
               aria-label="期間外の動き"
               id="cv-expiry-behavior"
               value={expiryBehavior}
               onChange={(next) => { setSaved(false); setExpiryBehavior(next as 'stop' | 'fallback') }}
               options={[{ value: 'stop', label: '期間外の動き：配信を止める' }, { value: 'fallback', label: '期間外の動き：代わりの値を出す' }]}
-            />
+            /></SaveErrorField>
           ) : (
             <ReadOnlyValue id="cv-expiry-behavior" label="期間外の動き" value={expiryBehavior === 'fallback' ? '期間外の動き：代わりの値を出す' : '期間外の動き：配信を止める'} />
           )}
@@ -883,19 +912,19 @@ function EditCommonVarV8Inner() {
               {!canWrite && (item.type === 'boolean' || (item.type as string) === 'date' || (item.type as string) === 'datetime') ? (
                 <ReadOnlyValue id="cv-fallback-value" label="代わりの値" value={(item.type as string) === 'boolean' ? (fallbackValue || '未選択') : readOnlyDate(fallbackValue)} />
               ) : item.type === 'boolean' ? (
-                <Select
+                <SaveErrorField names={["fallbackValue","saved","fallback_value"]}><Select
                   aria-label="代わりの値"
                   id="cv-fallback-value"
                   value={fallbackValue}
                   onChange={(next) => { setSaved(false); setFallbackValue(next) }}
                   options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]}
-                />
+                /></SaveErrorField>
               ) : (item.type as string) === 'date' ? (
-                <DateField id="cv-fallback-value" value={fallbackValue} onChange={(v) => { setSaved(false); setFallbackValue(v) }} />
+                <SaveErrorField names={["fallbackValue","saved","fallback_value"]}><DateField id="cv-fallback-value" value={fallbackValue} onChange={(v) => { setSaved(false); setFallbackValue(v) }} /></SaveErrorField>
               ) : (item.type as string) === 'datetime' ? (
-                <DateTimeField id="cv-fallback-value" value={fallbackValue} onChange={(v) => { setSaved(false); setFallbackValue(v) }} />
+                <SaveErrorField names={["fallbackValue","saved","fallback_value"]}><DateTimeField id="cv-fallback-value" value={fallbackValue} onChange={(v) => { setSaved(false); setFallbackValue(v) }} /></SaveErrorField>
               ) : (
-                <input
+                <SaveErrorField names={["fallbackValue","saved","fallback_value"]}><input
                   id="cv-fallback-value"
                   type={item.type === 'number' ? 'number' : 'text'}
                   value={fallbackValue}
@@ -903,7 +932,7 @@ function EditCommonVarV8Inner() {
                   placeholder="お問い合わせください"
                   className={styles.fieldInput}
                   readOnly={!canWrite}
-                />
+                /></SaveErrorField>
               )}
               {fallbackFieldError ? <p className={styles.fieldError} role="alert">{fallbackFieldError}</p> : null}
             </div>
@@ -915,7 +944,7 @@ function EditCommonVarV8Inner() {
         <h2 id="cv-edit-memo-heading" className={styles.sideTitle}>社内メモ</h2>
         <div className={styles.field}>
           <label htmlFor="cv-memo" className={styles.fieldLabelStrong}>メモ（お客さまには出ません）</label>
-          <input
+          <SaveErrorField names={["memo","saved"]}><input
             id="cv-memo"
             type="text"
             value={memo}
@@ -924,7 +953,7 @@ function EditCommonVarV8Inner() {
             placeholder="店舗ごとに違うときは店舗の共通情報へ"
             className={styles.fieldInput}
             readOnly={!canWrite}
-          />
+          /></SaveErrorField>
         </div>
       </section>
     </div>
@@ -1062,7 +1091,7 @@ function EditCommonVarV8Inner() {
   ) : undefined
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       boardId={narrow ? 'C67dE' : 'AYc6O'}
       title={item?.name ?? '共通情報を編集'}
       description={item ? (
@@ -1148,14 +1177,14 @@ function EditCommonVarV8Inner() {
             <div className={styles.valueRow}>
               <div className={styles.field}>
                 <label htmlFor="cv-current" className={styles.fieldLabelStrong}>いまの中身</label>
-                <input
+                <SaveErrorField names={["value","item.value"]}><input
                   id="cv-current"
                   type="text"
                   value={item.value || '（空）'}
                   readOnly
                   aria-readonly="true"
                   className={styles.fieldInput}
-                />
+                /></SaveErrorField>
               </div>
               <span className={styles.valueArrow} aria-hidden="true"><ArrowRight size={18} /></span>
               <div className={styles.field}>
@@ -1164,15 +1193,15 @@ function EditCommonVarV8Inner() {
                   // 閲覧のみ：選ぶ部品は置かず、中身を文字で見せる。
                   <ReadOnlyValue id="cv-value" label="新しい中身" value={item.type === 'boolean' ? value : readOnlyDate(value)} />
                 ) : item.type === 'boolean' ? (
-                  <Select size="full" aria-label="新しい中身" id="cv-value" value={value} onChange={(next) => { setSaved(false); setValue(next) }} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
+                  <SaveErrorField names={["value","saved"]}><Select size="full" aria-label="新しい中身" id="cv-value" value={value} onChange={(next) => { setSaved(false); setValue(next) }} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} /></SaveErrorField>
                 ) : (item.type as string) === 'long_text' ? (
-                  <textarea id="cv-value" value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className={styles.fieldArea} rows={2} readOnly={!canWrite} aria-invalid={valueFieldError ? true : undefined} />
+                  <SaveErrorField names={["value","saved"]}><textarea id="cv-value" value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className={styles.fieldArea} rows={2} readOnly={!canWrite} aria-invalid={valueFieldError ? true : undefined} /></SaveErrorField>
                 ) : (item.type as string) === 'date' ? (
-                  <DateField id="cv-value" invalid={Boolean(valueFieldError)} value={value} onChange={(v) => { setSaved(false); setValue(v) }} />
+                  <SaveErrorField names={["value","saved"]}><DateField id="cv-value" invalid={Boolean(valueFieldError)} value={value} onChange={(v) => { setSaved(false); setValue(v) }} /></SaveErrorField>
                 ) : (item.type as string) === 'datetime' ? (
-                  <DateTimeField id="cv-value" invalid={Boolean(valueFieldError)} value={value} onChange={(v) => { setSaved(false); setValue(v) }} />
+                  <SaveErrorField names={["value","saved"]}><DateTimeField id="cv-value" invalid={Boolean(valueFieldError)} value={value} onChange={(v) => { setSaved(false); setValue(v) }} /></SaveErrorField>
                 ) : (
-                  <input
+                  <SaveErrorField names={["value","saved"]}><input
                     id="cv-value"
                     type={item.type === 'number' ? 'number' : 'text'}
                     value={value}
@@ -1181,7 +1210,7 @@ function EditCommonVarV8Inner() {
                     aria-invalid={valueFieldError ? true : undefined}
                     aria-label="新しい中身"
                     readOnly={!canWrite}
-                  />
+                  /></SaveErrorField>
                 )}
               </div>
             </div>
@@ -1190,7 +1219,7 @@ function EditCommonVarV8Inner() {
               <label htmlFor="cv-change-reason" className={styles.fieldLabelStrong}>
                 変える理由（記録に残ります）
               </label>
-              <input
+              <SaveErrorField names={["changeReason","saved","change_reason"]}><input
                 id="cv-change-reason"
                 type="text"
                 value={changeReason}
@@ -1200,7 +1229,7 @@ function EditCommonVarV8Inner() {
                 className={styles.fieldInput}
                 aria-label="変える理由（記録に残ります）"
                 readOnly={!canWrite}
-              />
+              /></SaveErrorField>
               {reasonFieldError ? <p className={styles.fieldError} role="alert">{reasonFieldError}</p> : null}
             </div>
           </section>
@@ -1276,13 +1305,13 @@ function EditCommonVarV8Inner() {
               : statusAction === 'resume' ? '再開する理由（記録に残ります）'
                 : '公開する理由（記録に残ります）'}
           </span>
-          <input
+          <SaveErrorField names={["statusReason","statusError","changeReason","status_reason","status_error"]}><input
             value={statusReason}
             onChange={(e) => { setStatusError(''); setStatusReason(e.target.value) }}
             maxLength={200}
             placeholder={statusAction === 'stop' ? '例：キャンペーンが終わったため' : '例：新しい期間の案内を始めるため'}
             className={styles.fieldInput}
-          />
+          /></SaveErrorField>
         </label>
       </Dialog>
 
@@ -1325,12 +1354,12 @@ function EditCommonVarV8Inner() {
                 <span className={styles.fieldLabelStrong}>
                   消した理由 <span className={styles.required}>必須</span>
                 </span>
-                <input
+                <SaveErrorField names={["deleteReason","delete_reason"]}><input
                   value={deleteReason}
                   onChange={(event) => setDeleteReason(event.target.value)}
                   placeholder="例：店舗情報の変更のため"
                   className={styles.fieldInput}
-                />
+                /></SaveErrorField>
               </label>
             </>
           ) : null}
@@ -1361,41 +1390,41 @@ function EditCommonVarV8Inner() {
             <div className={styles.dialogPair}>
               <div className={styles.field}>
                 <label htmlFor="sc-date" className={styles.fieldLabelStrong}>開始日</label>
-                <DateField
+                <SaveErrorField names={["date","draft.date"]}><DateField
                   id="sc-date"
                   value={draft.date}
                   min={jstNowLocalInput().date}
                   invalid={Boolean(scheduleDateError)}
                   onChange={(v) => { setDraft({ ...draft, date: v }); setScheduleDateError('') }}
-                />
+                /></SaveErrorField>
                 {scheduleDateError ? <p className={styles.fieldError} role="alert">{scheduleDateError}</p> : null}
               </div>
               <div className={styles.field}>
                 <label htmlFor="sc-time" className={styles.fieldLabelStrong}>開始時刻</label>
-                <TimeField
+                <SaveErrorField names={["time","draft.time"]}><TimeField
                   id="sc-time"
                   size="field"
                   value={draft.time}
                   onChange={(v) => setDraft({ ...draft, time: v })}
-                />
+                /></SaveErrorField>
               </div>
             </div>
             <div className={styles.field}>
               <label htmlFor="sc-value" className={styles.fieldLabelStrong}>更新後の値</label>
               {item?.type === 'boolean' ? (
-                <Select size="full" aria-label="更新後の値" id="sc-value" value={draft.value} onChange={(v) => setDraft({ ...draft, value: v })} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
+                <SaveErrorField names={["value","draft.value"]}><Select size="full" aria-label="更新後の値" id="sc-value" value={draft.value} onChange={(v) => setDraft({ ...draft, value: v })} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} /></SaveErrorField>
               ) : (item?.type as string) === 'date' ? (
-                <DateField id="sc-value" value={draft.value} onChange={(v) => setDraft({ ...draft, value: v })} />
+                <SaveErrorField names={["value","draft.value"]}><DateField id="sc-value" value={draft.value} onChange={(v) => setDraft({ ...draft, value: v })} /></SaveErrorField>
               ) : (item?.type as string) === 'datetime' ? (
-                <DateTimeField id="sc-value" value={draft.value} onChange={(v) => setDraft({ ...draft, value: v })} />
+                <SaveErrorField names={["value","draft.value"]}><DateTimeField id="sc-value" value={draft.value} onChange={(v) => setDraft({ ...draft, value: v })} /></SaveErrorField>
               ) : (
-                <input
+                <SaveErrorField names={["value","draft.value"]}><input
                   id="sc-value"
                   type={item?.type === 'number' ? 'number' : 'text'}
                   value={draft.value}
                   onChange={(e) => setDraft({ ...draft, value: e.target.value })}
                   className={styles.fieldInput}
-                />
+                /></SaveErrorField>
               )}
               {scheduleFieldError ? <p className={styles.fieldError}>{scheduleFieldError}</p> : null}
             </div>
@@ -1478,7 +1507,7 @@ function EditCommonVarV8Inner() {
       </Dialog>
 
       {leaveConfirmDialog}
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }
 
@@ -1593,7 +1622,7 @@ function readOnlyDate(value: string): string {
 /** 閲覧のみ：選ぶ部品・日付の部品の代わりに、選んでいる値を読み取りだけの欄で見せる。 */
 function ReadOnlyValue({ id, label, value }: { id: string; label?: string; value: string }) {
   return (
-    <input
+    <SaveErrorField names={["value"]}><input
       id={id}
       type="text"
       value={value}
@@ -1601,6 +1630,6 @@ function ReadOnlyValue({ id, label, value }: { id: string; label?: string; value
       aria-readonly="true"
       aria-label={label}
       className={styles.fieldInput}
-    />
+    /></SaveErrorField>
   )
 }

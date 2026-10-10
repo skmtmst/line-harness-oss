@@ -44,6 +44,7 @@ import {
   type UsageRow,
 } from './model'
 import styles from './detail.module.css'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /** 表にまず見せる行数。残りは「ほか N か所を見る」で開く。 */
 const USAGE_VISIBLE = 4
@@ -52,6 +53,8 @@ const PUBLISH_VISIBLE = 4
 const BLOCKED_VISIBLE = 2
 
 export default function TemplateDetailV8() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -94,10 +97,12 @@ export default function TemplateDetailV8() {
       const res = await api.templates.versions(id)
       if (res.success) setVersions(res.data)
       else setVersionsError('版の履歴を読み込めませんでした。もう一度お試しください。')
-    } catch {
-      setVersionsError('版の履歴を読み込めませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setVersionsError('版の履歴を読み込めませんでした。もう一度お試しください。') }
     }
-  }, [id])
+  }, [id, saveErrors])
 
   const reload = useCallback(async () => {
     setMissing(false)
@@ -113,13 +118,15 @@ export default function TemplateDetailV8() {
       else if (!detail.success) setError('テンプレートを読み込めませんでした。もう一度お試しください。')
       else setMissing(true)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (caught instanceof ApiError && caught.status === 404) setMissing(true)
-      else setError('テンプレートを読み込めませんでした。もう一度お試しください。')
+      else { if (!fieldFailure) setError('テンプレートを読み込めませんでした。もう一度お試しください。') }
     } finally {
       setLoading(false)
     }
     void loadVersions()
-  }, [id, loadVersions])
+  }, [id, loadVersions, saveErrors])
 
   useEffect(() => {
     if (!id) {
@@ -174,16 +181,18 @@ export default function TemplateDetailV8() {
       setPublishOpen(false)
       await reload()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (caught instanceof ApiError && caught.status === 409) {
-        setPublishError('ほかの人が先に公開・編集しました。最新の状態を読み直したので、内容を確かめてからもう一度お試しください。')
+        { if (!fieldFailure) setPublishError('ほかの人が先に公開・編集しました。最新の状態を読み直したので、内容を確かめてからもう一度お試しください。') }
         void reload()
       } else {
-        setPublishError('公開できませんでした。状態を読み直してから、もう一度お試しください。')
+        { if (!fieldFailure) setPublishError('公開できませんでした。状態を読み直してから、もう一度お試しください。') }
       }
     } finally {
       setPublishing(false)
     }
-  }, [id, publishing, template, reload])
+  }, [id, publishing, template, reload, saveErrors])
 
   const doRevert = useCallback(async () => {
     if (reverting || revertTarget === null || !template) return
@@ -196,13 +205,15 @@ export default function TemplateDetailV8() {
       setCompareTarget(null)
       await reload()
     } catch (caught) {
-      setRevertError(caught instanceof ApiError && caught.status === 409
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setRevertError(caught instanceof ApiError && caught.status === 409
         ? 'ほかの人が先に公開しました。開き直して確認してください。'
-        : 'この版に戻せませんでした。状態を読み直してから、もう一度お試しください。')
+        : 'この版に戻せませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setReverting(false)
     }
-  }, [id, reverting, revertTarget, template, reload])
+  }, [id, reverting, revertTarget, template, reload, saveErrors])
 
   const remove = useCallback(async () => {
     if (deleting || usageCount > 0 || !template) return
@@ -213,12 +224,14 @@ export default function TemplateDetailV8() {
       if (!res.success) throw new Error(res.error)
       setDeleteOpen(false)
       router.push('/templates')
-    } catch {
-      setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
-  }, [deleting, usageCount, template, id, router])
+  }, [deleting, usageCount, template, id, router, saveErrors])
 
   /*
    * 複製：公開済みの版（いま使っている版）の中身で新しいテンプレートを作る。
@@ -243,12 +256,14 @@ export default function TemplateDetailV8() {
       })
       if (!res.success) throw new Error(res.error)
       router.push(`/templates/detail?id=${encodeURIComponent(res.data.id)}`)
-    } catch {
-      setDuplicateError('複製できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setDuplicateError('複製できませんでした。もう一度お試しください。') }
     } finally {
       setDuplicating(false)
     }
-  }, [duplicating, template, inUseVersion, selectedAccountId, router])
+  }, [duplicating, template, inUseVersion, selectedAccountId, router, saveErrors])
 
   const openDelete = useCallback(() => {
     setDeleteError('')
@@ -263,22 +278,22 @@ export default function TemplateDetailV8() {
   }, [])
 
   if (!id) {
-    return <TargetMissing kind="unspecified" title="見るテンプレートが指定されていません" description="一覧から、見たいテンプレートを選び直してください。" backHref="/templates" backLabel="テンプレートの一覧へ戻る" />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="unspecified" title="見るテンプレートが指定されていません" description="一覧から、見たいテンプレートを選び直してください。" backHref="/templates" backLabel="テンプレートの一覧へ戻る" /></SaveErrorScope>
   }
   if (missing || (!error && !loading && !template)) {
-    return <TargetMissing kind="not-found" title="このテンプレートは見つかりません" description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。" backHref="/templates" backLabel="テンプレートの一覧へ戻る" />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="not-found" title="このテンプレートは見つかりません" description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。" backHref="/templates" backLabel="テンプレートの一覧へ戻る" /></SaveErrorScope>
   }
   if (error || (!loading && !template)) {
-    return <TargetMissing kind="error" title="テンプレートを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void reload()} />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="error" title="テンプレートを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void reload()} /></SaveErrorScope>
   }
 
   const backLink = <Link href="/templates" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />テンプレートへ</Link>
   if (loading || !template) {
     return (
-      <div className={styles.page} data-design-node="UTbi1">
+      <SaveErrorScope errors={saveErrors}><div className={styles.page} data-design-node="UTbi1">
         <div className={styles.loadingHead}>{backLink}</div>
         <p className={styles.loading} role="status">読み込み中…</p>
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
@@ -381,7 +396,7 @@ export default function TemplateDetailV8() {
   )
 
   return (
-    <div className={styles.page} data-design-node="UTbi1">
+    <SaveErrorScope errors={saveErrors}><div className={styles.page} data-design-node="UTbi1">
       <DetailFrame
         title={template.name}
         identity={backLink}
@@ -611,7 +626,7 @@ export default function TemplateDetailV8() {
           setRevertError('')
         }}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }
 

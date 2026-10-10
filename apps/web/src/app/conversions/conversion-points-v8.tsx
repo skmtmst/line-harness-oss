@@ -48,6 +48,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { inputClass } from '@/components/shared/form-controls'
 import styles from './conversion-points-v8.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /** V8 の絞り込み。`all` を含む以外は v7 の `StatusFilter` と同じ。 */
 export type ConversionPointsV8Status = 'all' | ConversionDefinitionFilter
@@ -155,6 +156,8 @@ function rowSub(point: ConversionDefinitionListItem): string {
 const PAGE_SIZES = [20, 50, 100]
 
 export default function ConversionPointsV8({ model }: { model: ConversionPointsV8Model }) {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('コンバージョン')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const role = useStaffRole()
@@ -228,15 +231,17 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
       if (!res.success) throw new Error(res.error)
       setNotice(`「${point.name}」のコピーを作りました。使う場所は引き継がないので、要れば足してください。`)
       model.onReload()
-    } catch {
-      setActionError('コピーを作れませんでした。読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setActionError('コピーを作れませんでした。読み直してから、もう一度お試しください。') }
     } finally {
       setDuplicatingId(null)
     }
   }
 
   return (
-    <div className={styles.board} data-design-node="r6dJFy">
+    <SaveErrorScope errors={saveErrors}><div className={styles.board} data-design-node="r6dJFy">
       <div className={styles.head}>
         <div className={styles.headText}>
           <h1 className={styles.headTitle}>コンバージョン</h1>
@@ -368,12 +373,12 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
           </div>
           <div className={styles.toolbarSecond}>
             <span className={styles.pageSizeWrap}>
-              <Select
+              <SaveErrorField names={["pageSize","page_size"]}><Select
                 aria-label="1ページの件数"
                 value={String(pageSize)}
                 options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
                 onChange={(value) => setPageSize(Number(value))}
-              />
+              /></SaveErrorField>
             </span>
           </div>
 
@@ -682,7 +687,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                     ? `${model.stopImpact.stopImpact.affectedUsageCount}か所で使われています。どうしますか。`
                     : '利用先と影響を読み込めませんでした。'}
               </p>
-              <RadioCardGroup legend="どうしますか？" legendVisible>
+              <SaveErrorField names={["conversion-v8-stop-action","stopAction","model.stopAction"]}><RadioCardGroup legend="どうしますか？" legendVisible>
                 <RadioCard
                   name="conversion-v8-stop-action"
                   value="stop"
@@ -713,10 +718,10 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                     ? '成果0件・利用先0件のため、この成果地点だけを削除できます。'
                     : '成果または利用先があるため、物理削除は選べません。'}
                 />
-              </RadioCardGroup>
+              </RadioCardGroup></SaveErrorField>
               {model.stopAction === 'replace' ? (
                 <span className={styles.reasonField}>
-                  <Select
+                  <SaveErrorField names={["replacementId","model.replacementId","replacement_id","model.replacement_id"]}><Select
                     aria-label="差し替え先の成果地点"
                     value={model.replacementId}
                     options={[
@@ -724,19 +729,19 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                       ...(model.stopImpact?.replacementCandidates ?? []).map((item) => ({ value: item.id, label: item.name })),
                     ]}
                     onChange={model.onReplacementIdChange}
-                  />
+                  /></SaveErrorField>
                 </span>
               ) : null}
               <label className={styles.reasonField}>
                 <span className={styles.reasonLabel}>理由（必須）</span>
-                <input
+                <SaveErrorField names={["stopReason","model.stopReason","stop_reason","model.stop_reason"]}><input
                   aria-label="止める理由"
                   className={inputClass}
                   value={model.stopReason}
                   maxLength={500}
                   placeholder="計測の仕方を変えるため"
                   onChange={(event) => model.onStopReasonChange(event.target.value)}
-                />
+                /></SaveErrorField>
               </label>
               {model.stopError ? <p className={styles.panelError} role="alert">{model.stopError}</p> : null}
               <div className={styles.panelButtons}>
@@ -757,6 +762,6 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
           ) : null}
         </div>
       ) : null}
-    </div>
+    </div></SaveErrorScope>
   )
 }

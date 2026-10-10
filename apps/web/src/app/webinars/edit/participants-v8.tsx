@@ -27,6 +27,7 @@ import {
   percent,
   type ParticipantRow,
 } from './participants-shared'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export type ParticipantExport = { download: () => void; busy: boolean; available: boolean }
 
@@ -252,7 +253,7 @@ export default function ParticipantsV8({
       <Notice tone="info">「見ていない」は申込だけで入場の記録がない人です。「入場のみ」は入場したが再生を確かめられなかった人です。</Notice>
 
       <div className="flex flex-wrap items-center gap-2">
-        <input
+        <SaveErrorField names={["query"]}><input
           type="search"
           value={query}
           onChange={(e) => {
@@ -262,7 +263,7 @@ export default function ParticipantsV8({
           placeholder="友だちの名前で探す"
           aria-label="友だちの名前で探す"
           className="border-hairline bg-canvas text-ink w-52 rounded-control border px-3 py-2 text-sm"
-        />
+        /></SaveErrorField>
         {chips.map((chip) => {
           const active = filter === chip.key
           return (
@@ -270,14 +271,14 @@ export default function ParticipantsV8({
           )
         })}
         <span className="flex-1" />
-        <Select
+        <SaveErrorField names={["filter"]}><Select
           aria-label="参加者の分類で絞り込む"
           size="page-size"
           value={filter}
           onChange={(value) => setFilter(value as '' | WebinarParticipantClassification)}
           options={PARTICIPANT_FILTER_OPTIONS}
-        />
-        <Select
+        /></SaveErrorField>
+        <SaveErrorField names={["pageSize","page_size"]}><Select
           aria-label="1ページの件数"
           size="page-size"
           value={pageSize}
@@ -286,7 +287,7 @@ export default function ParticipantsV8({
             setPage(1)
           }}
           options={PAGE_SIZE_OPTIONS}
-        />
+        /></SaveErrorField>
       </div>
 
       <section aria-label="参加者一覧" data-participant-table="true">

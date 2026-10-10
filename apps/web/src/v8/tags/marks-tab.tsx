@@ -40,6 +40,7 @@ import { ArchiveMarkDialog, autoRuleLabel, isUsed, usageLabel } from '@/componen
 import styles from './list.module.css'
 
 import type { AttributeListHost } from './attribute-host'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -499,7 +500,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
               onClear={() => setQuery('')}
             />
           </span>
-          <Select
+          <SaveErrorField names={["usage"]}><Select
             aria-label="使っているかで絞り込む"
             width={157}
             value={usage}
@@ -509,7 +510,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
               { value: 'used', label: '使っている：あり' },
               { value: 'unused', label: '使っている：なし' },
             ]}
-          />
+          /></SaveErrorField>
           <span className={styles.toolbarSpacer} />
           <PageSizeSelect value={pageSize} onChange={(value) => setPageSize(value || 20)} options={PAGE_SIZES} label={null} />
         </>}

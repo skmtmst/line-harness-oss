@@ -33,6 +33,7 @@ import {
 import RestaurantShell, { Panel, Stat, Status, type RestaurantV8Context } from './shell'
 import ReservationPhone, { type PhonePreset } from './reservation-phone'
 import ledger from './reservations.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export type LedgerView = 'today' | 'week' | 'month' | 'list'
 
@@ -115,7 +116,7 @@ function FormSelect({ name, ariaLabel, defaultValue, options, onPick }: {
 }) {
   const [value, setValue] = useState(defaultValue)
   return (
-    <Select
+    <SaveErrorField names={["value"]}><Select
       name={name}
       aria-label={ariaLabel}
       value={value}
@@ -123,7 +124,7 @@ function FormSelect({ name, ariaLabel, defaultValue, options, onPick }: {
       size="full"
       className="mt-1"
       options={options}
-    />
+    /></SaveErrorField>
   )
 }
 
@@ -216,22 +217,22 @@ function ReservationEditPanel({ reservation, tables, courses, busy, onTouched, o
       <form key={reservation.id} onSubmit={submit} onChange={onTouched}>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <label className="text-xs font-medium text-ink-secondary">お客様名
-            <input name="customerName" defaultValue={reservation.customer_name} required aria-label="お客様名" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+            <SaveErrorField names={["customerName","customer_name"]}><input name="customerName" defaultValue={reservation.customer_name} required aria-label="お客様名" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></SaveErrorField>
           </label>
           <label className="text-xs font-medium text-ink-secondary">電話番号
-            <input name="customerPhone" defaultValue={reservation.customer_phone || ''} aria-label="電話番号" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+            <SaveErrorField names={["customerPhone","customer_phone"]}><input name="customerPhone" defaultValue={reservation.customer_phone || ''} aria-label="電話番号" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></SaveErrorField>
           </label>
           <label className="text-xs font-medium text-ink-secondary">人数
-            <input name="guestCount" type="number" min={1} max={100} defaultValue={String(reservation.guest_count)} required aria-label="人数" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+            <SaveErrorField names={["guestCount","guest_count"]}><input name="guestCount" type="number" min={1} max={100} defaultValue={String(reservation.guest_count)} required aria-label="人数" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></SaveErrorField>
           </label>
           <label className="text-xs font-medium text-ink-secondary">アレルギー・特記事項
-            <input name="allergyNote" defaultValue={reservation.allergy_note || ''} aria-label="アレルギー・特記事項" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+            <SaveErrorField names={["allergyNote","allergy_note"]}><input name="allergyNote" defaultValue={reservation.allergy_note || ''} aria-label="アレルギー・特記事項" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></SaveErrorField>
           </label>
           <label className="text-xs font-medium text-ink-secondary">開始日時
-            <input name="startsAt" type="datetime-local" defaultValue={toLocalInput(reservation.starts_at)} required aria-label="開始日時" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+            <SaveErrorField names={["startsAt","starts_at"]}><input name="startsAt" type="datetime-local" defaultValue={toLocalInput(reservation.starts_at)} required aria-label="開始日時" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></SaveErrorField>
           </label>
           <label className="text-xs font-medium text-ink-secondary">終了日時
-            <input name="endsAt" type="datetime-local" defaultValue={toLocalInput(reservation.ends_at)} required aria-label="終了日時" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+            <SaveErrorField names={["endsAt","ends_at"]}><input name="endsAt" type="datetime-local" defaultValue={toLocalInput(reservation.ends_at)} required aria-label="終了日時" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></SaveErrorField>
           </label>
           <label className="text-xs font-medium text-ink-secondary">卓
             <FormSelect name="tableId" ariaLabel="卓" defaultValue={reservation.table_id || ''} onPick={onTouched} options={[
@@ -282,16 +283,16 @@ function InboundTrialPanel({ storeId, busy, onClose, onSubmit }: {
             ]} />
           </label>
           <label className="text-xs font-medium text-ink-secondary">外部予約ID
-            <input name="externalId" defaultValue={`DEMO-${Date.now()}`} required aria-label="外部予約ID" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+            <SaveErrorField names={["externalId","external_id"]}><input name="externalId" defaultValue={`DEMO-${Date.now()}`} required aria-label="外部予約ID" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></SaveErrorField>
           </label>
           <label className="text-xs font-medium text-ink-secondary">お客様名
-            <input name="customerName" required aria-label="お客様名" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+            <SaveErrorField names={["customerName","customer_name"]}><input name="customerName" required aria-label="お客様名" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></SaveErrorField>
           </label>
           <label className="text-xs font-medium text-ink-secondary">人数
-            <input name="guestCount" type="number" min={1} max={100} defaultValue="2" required aria-label="人数" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+            <SaveErrorField names={["guestCount","guest_count"]}><input name="guestCount" type="number" min={1} max={100} defaultValue="2" required aria-label="人数" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></SaveErrorField>
           </label>
           <label className="text-xs font-medium text-ink-secondary">開始日時
-            <input name="startsAt" type="datetime-local" required aria-label="開始日時" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+            <SaveErrorField names={["startsAt","starts_at"]}><input name="startsAt" type="datetime-local" required aria-label="開始日時" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></SaveErrorField>
           </label>
         </div>
         <div className="mt-3 flex justify-end gap-2">
@@ -720,23 +721,23 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phoneOpen, p
               <Button size="compact" onClick={() => onDay(new Date())}>今日</Button>
             </div>
             <label className="text-xs font-medium text-ink-secondary">予約元
-              <Select aria-label="予約元" value={source} onChange={onSource} size="full" className="mt-1" options={[
+              <SaveErrorField names={["source"]}><Select aria-label="予約元" value={source} onChange={onSource} size="full" className="mt-1" options={[
                 { value: 'all', label: 'すべて' },
                 ...Object.entries(sourceLabel).map(([value, label]) => ({ value, label })),
-              ]} />
+              ]} /></SaveErrorField>
             </label>
           </>
         ) : (
           <>
             <label className="text-xs font-medium text-ink-secondary">期間
-              <Select aria-label="期間" value={period} onChange={onPeriod} size="full" className="mt-1" options={[
+              <SaveErrorField names={["period"]}><Select aria-label="期間" value={period} onChange={onPeriod} size="full" className="mt-1" options={[
                 { value: 'upcoming', label: '今後の予約' },
                 { value: 'all', label: 'すべての期間' },
                 { value: 'past', label: '過去の予約' },
-              ]} />
+              ]} /></SaveErrorField>
             </label>
             <label className="text-xs font-medium text-ink-secondary">状態
-              <Select aria-label="状態" value={status} onChange={onStatus} size="full" className="mt-1" options={LEDGER_STATUS_OPTIONS} />
+              <SaveErrorField names={["status"]}><Select aria-label="状態" value={status} onChange={onStatus} size="full" className="mt-1" options={LEDGER_STATUS_OPTIONS} /></SaveErrorField>
             </label>
           </>
         )}

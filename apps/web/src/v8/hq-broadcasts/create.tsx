@@ -71,6 +71,7 @@ import { hostDefinition } from '@/v8/hq-templates/console'
 import { freshDefinition } from '@/lib/hq-template-authoring'
 import styles from './create.module.css'
 import MessageComposer, { MessageComposerPage } from '@/components/shared/message-composer'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type Store = BroadcastAccount
 /** 配信対象（店の一斉配信と同じ4つ。名前は店の口と同じ：詳細条件は advanced）。 */
@@ -162,6 +163,8 @@ function audienceFromInput(saved: HqBroadcastInput): { audience: Audience; tagNa
 }
 
 export default function HqBroadcastCreate() {
+  const saveErrors = useSaveFormErrors()
+
   /* ③ でカルーセル・リッチメッセージをその場で作っている間は、店の作る部品（template-edit/host の口）を画面いっぱいに出す。 */
   const [composerBusy, setComposerBusy] = useState(false)
   const [composer, setComposer] = useState<null | 'carousel' | 'rich'>(null)
@@ -411,10 +414,12 @@ export default function HqBroadcastCreate() {
       setScenarioOptions(group(scenarioLists.map((res) => (res && res.success ? res.data.map((t) => t.name) : []))))
       setSavedOptions(group(savedLists.map((res) => (res && res.success ? res.data.map((t) => t.name) : []))))
       setTagStatus('ready')
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       setTagStatus('error')
     }
-  }, [chosen])
+  }, [chosen, saveErrors])
   const tagKey = chosen.map((s) => s.id).join(',')
   useEffect(() => {
     if (step !== 'audience' && audience === 'all') return
@@ -477,6 +482,12 @@ export default function HqBroadcastCreate() {
    * メッセージの段を開いて1つ目の吹き出しへ移る。配信名・送り先・日時は段の帯（［〇〇へ移動］つき）のまま。
    */
   const fields = useFormErrors()
+  fields.define('title', '配信名', () => !title.trim() ? '配信名を入れてください' : title.trim().length > TITLE_MAX ? `配信名は${TITLE_MAX}文字までです` : null, { reveal: () => changeStep('basic') })
+  fields.define('accountIds', '送るアカウント', () => chosen.length ? null : '送るアカウントを選んでください', { reveal: () => changeStep('audience') })
+  fields.define('tagName', '送る相手のタグ', () => audience === 'tag' && !tagName ? '送る相手のタグを選んでください' : null, { reveal: () => changeStep('audience') })
+  fields.define('target', '配信対象', () => audience === 'advanced' && !pruneCondition(condition) && !savedName ? '詳細条件を入力するか、保存した条件を選んでください' : null, { reveal: () => changeStep('audience') })
+  fields.define('scheduledAt', '送る日時', () => when === 'later' && !scheduledAt ? '送る日時を選んでください' : scheduledAt && Date.parse(scheduledAt) <= Date.now() ? '予約日時は今より後にしてください' : null, { reveal: () => changeStep('schedule') })
+
   bubbles.forEach((item, index) => {
     fields.define(`bubble-${index}`, `${index + 1}通目`, () => hqBubbleProblem(item) || null, {
       reveal: () => { if (step !== 'message') changeStep('message'); setOpenBubble(index) },
@@ -505,7 +516,7 @@ export default function HqBroadcastCreate() {
   const check = async (): Promise<{ run: HqBroadcastRun; checks: HqBroadcastPreflight[] } | null> => {
     const why = problem()
     if (why) {
-      if (why.step === 'message' && fields.submit().length > 0) { setError(''); setErrorStep(null); return null }
+      if (fields.submit().length > 0) { setError(''); setErrorStep(null); return null }
       setError(why.message); setErrorStep(why.step); return null
     }
     setChecking(true); setError(''); setErrorStep(null)
@@ -546,7 +557,9 @@ export default function HqBroadcastCreate() {
       setRun(current); setRunKey(key); setChecks(list); setSavedAt(new Date().toISOString())
       return { run: current, checks: list }
     } catch (caught) {
-      setError(errorText(caught, '送る前の確かめができませんでした。もう一度お試しください。'))
+      const fieldFailure = saveErrors.capture(caught, fields)
+
+      { if (!fieldFailure) setError(errorText(caught, '送る前の確かめができませんでした。もう一度お試しください。')) }
       return null
     } finally {
       setChecking(false)
@@ -566,7 +579,9 @@ export default function HqBroadcastCreate() {
       preparedKeyRef.current = { id: next.id, key: nextKey }
       setRunKey(nextKey)
     } catch (caught) {
-      setError(errorText(caught, 'アカウントを外せませんでした。もう一度お試しください。'))
+      const fieldFailure = saveErrors.capture(caught, fields)
+
+      { if (!fieldFailure) setError(errorText(caught, 'アカウントを外せませんでした。もう一度お試しください。')) }
     }
   }
 
@@ -584,7 +599,9 @@ export default function HqBroadcastCreate() {
     if (!result) return
     if (sendTotals(result.checks).sendStores === 0) { setError('送れるアカウントがありません。外したアカウントの問題を直すか、送るアカウントを変えてください。'); return }
     let state = approval.state
-    try { state = (await hqBroadcastsApi.approval(result.run.id)).data } catch { /* 読めなければ口が送るときに止める。 */ }
+    try { state = (await hqBroadcastsApi.approval(result.run.id)).data } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+ /* 読めなければ口が送るときに止める。 */ }
     const nextGate = approvalGate(state)
     approval.reload()
     if (nextGate === 'needsRequest') { setApprovalRequestOpen(true); return }
@@ -603,8 +620,10 @@ export default function HqBroadcastCreate() {
       setLeaving(true)
       router.push(`/hq/broadcasts/detail?id=${encodeURIComponent(run.id)}`)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught, fields)
+
       setConfirmOpen(false)
-      setError(errorText(caught, '送れませんでした。もう一度確かめてください。'))
+      { if (!fieldFailure) setError(errorText(caught, '送れませんでした。もう一度確かめてください。')) }
       setRunKey('')
     } finally {
       setSending(false)
@@ -624,6 +643,8 @@ export default function HqBroadcastCreate() {
       setError(''); setErrorStep(null)
       return null
     } catch (caught) {
+      saveErrors.capture(caught, fields)
+
       return errorText(caught, 'ひな形を読み込めませんでした。もう一度お試しください。')
     }
   }
@@ -638,7 +659,9 @@ export default function HqBroadcastCreate() {
       if ('error' in read || read.bubble.kind !== 'carousel') { setCarouselError('error' in read ? read.error : 'カルーセルのテンプレートを選んでください'); return }
       setContent(read.bubble.content, read.bubble.cardAsset)
     } catch (caught) {
-      setCarouselError(errorText(caught, 'カルーセルを読み込めませんでした。もう一度お試しください。'))
+      const fieldFailure = saveErrors.capture(caught, fields)
+
+      { if (!fieldFailure) setCarouselError(errorText(caught, 'カルーセルを読み込めませんでした。もう一度お試しください。')) }
     }
   }
   /** ③［テンプレートから選ぶ］：選んだひな形で開いている吹き出しを置き換える。読めない種類は窓の中に理由を出す。 */
@@ -652,6 +675,8 @@ export default function HqBroadcastCreate() {
       setCarouselError('')
       return null
     } catch (caught) {
+      saveErrors.capture(caught, fields)
+
       return errorText(caught, 'テンプレートを読み込めませんでした。もう一度お試しください。')
     }
   }
@@ -726,7 +751,9 @@ export default function HqBroadcastCreate() {
       setCarousels(null)
       notifyToast(`テンプレート「${name}」に保存しました`)
     } catch (caught) {
-      setSaveTplError(errorText(caught, 'テンプレートに保存できませんでした。もう一度お試しください。'))
+      const fieldFailure = saveErrors.capture(caught, fields)
+
+      { if (!fieldFailure) setSaveTplError(errorText(caught, 'テンプレートに保存できませんでした。もう一度お試しください。')) }
     } finally {
       setSaveTplBusy(false)
     }
@@ -747,7 +774,9 @@ export default function HqBroadcastCreate() {
       onSave: async (content, alsoSave) => {
         if (alsoSave) {
           setComposerBusy(true)
-          try { await hqTemplatesApi.create({ type: 'template', name: content.name, definition: hostDefinition(freshDefinition('template') as MessageTemplateDefinition, content) }, crypto.randomUUID()) } catch (caught) { setCarouselError(errorText(caught, 'テンプレートに保存できませんでした。')); return false } finally { setComposerBusy(false) }
+          try { await hqTemplatesApi.create({ type: 'template', name: content.name, definition: hostDefinition(freshDefinition('template') as MessageTemplateDefinition, content) }, crypto.randomUUID()) } catch (caught) {
+            const fieldFailure = saveErrors.capture(caught, fields)
+ { if (!fieldFailure) setCarouselError(errorText(caught, 'テンプレートに保存できませんでした。')); } return false } finally { setComposerBusy(false) }
         }
         const next = bubbleFromHostContent(content)
         if (next) { replaceActive({ ...next, content: { ...next.content, inline: true } }); setCarouselError('') }
@@ -765,7 +794,7 @@ export default function HqBroadcastCreate() {
 
   if (!canManage) {
     return (
-      <div className={formStyles.root}>
+      <SaveErrorScope errors={saveErrors}><SaveErrorScope errors={fields}><div className={formStyles.root}>
         <header className={formStyles.header}>
           <div className={formStyles.heading}>
             <h2>一括配信を作る</h2>
@@ -774,7 +803,7 @@ export default function HqBroadcastCreate() {
         <div className={formStyles.input}>
           <Notice tone="info">一括配信を作れるのは、統括全体の編集権限がある人（オーナー・管理者）だけです。</Notice>
         </div>
-      </div>
+      </div></SaveErrorScope></SaveErrorScope>
     )
   }
 
@@ -782,7 +811,7 @@ export default function HqBroadcastCreate() {
   const nextLabel = step === 'basic' ? '対象設定へ' : step === 'audience' ? 'メッセージ設定へ' : step === 'message' ? '送信設定へ' : '配信前チェックへ'
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><SaveErrorScope errors={fields}><>
       <MessageComposerPage active={step === 'message'}><div className={formStyles.root} data-step={step} data-hq-broadcast-create="">
         <header className={formStyles.header} data-steps-below="">
           <div className={formStyles.heading}>
@@ -818,7 +847,7 @@ export default function HqBroadcastCreate() {
             {shows('basic') ? (
               <section id="broadcast-step-basic" className={formStyles.section}>
                 <h3>配信方法</h3>
-                <RadioCardGroup legend="配信方法" className={formStyles.methodCards}>
+                <SaveErrorField names={["hq-broadcast-method","value","method"]}><RadioCardGroup legend="配信方法" className={formStyles.methodCards}>
                   {([
                     ['new', '新しいメッセージを作成', 'テキスト・画像・カルーセルなどを組み合わせて一から作ります。'],
                     ['template', 'テンプレートを選択', '統括のテンプレートを呼び出して手直しします。'],
@@ -826,7 +855,7 @@ export default function HqBroadcastCreate() {
                   ] as const).map(([value, label, note]) => (
                     <RadioCard key={value} name="hq-broadcast-method" value={value} checked={method === value} title={label} note={note} onChange={(next) => setMethod(next as Method)} />
                   ))}
-                </RadioCardGroup>
+                </RadioCardGroup></SaveErrorField>
                 {/* EpTBB：①は選ぶボタン／選んだ1行だけ。窓の仮選択は確定するまで反映しない。 */}
                 {method === 'template' ? selectedTemplate ? (
                   <SourcePickerSelection buttonRef={basicPickerTrigger} item={selectedTemplate.item} folders={selectedTemplate.folders} onChange={() => setBasicPicker('template')} />
@@ -836,13 +865,13 @@ export default function HqBroadcastCreate() {
                 ) : <Button ref={basicPickerTrigger} onClick={() => setBasicPicker('duplicate')}>過去の配信を選ぶ</Button> : null}
                 <label className={formStyles.nameField}>
                   <span className={formStyles.labelRow}><span className="text-ink text-sm font-bold">配信名<RequiredBadge /></span><span className="text-xs text-ink-faint">{title.trim().length} / {TITLE_MAX}文字</span></span>
-                  <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={formStyles.textInput} aria-label="配信名" maxLength={TITLE_MAX * 2} />
+                  <SaveErrorField names={["title"]}><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={formStyles.textInput} aria-label="配信名" maxLength={TITLE_MAX * 2} /></SaveErrorField>
                   <small>友だちには表示されません。一覧で見分けるための名前です</small>
                 </label>
                 {/* 店の一斉配信と同じフォルダ・社内メモ（統括の一括配信のフォルダ。API-18） */}
                 <div className={formStyles.basicFields}>
-                  <label><span className={formStyles.labelRow}>フォルダ</span><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={hqFolders.map((f) => ({ value: f.id, label: f.name, color: f.color }))} onCreate={canManage ? createHqFolder : undefined} size="full" /></label>
-                  <label><span className={formStyles.labelRow}>社内メモ <span className="text-ink-faint text-xs font-normal">任意</span><HelpTip label="社内メモの説明">友だちには表示されません。各アカウントの配信にも同じメモが残ります</HelpTip></span><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} maxLength={10000} className={formStyles.textInput} placeholder="友だちには表示されません" /></label>
+                  <label><span className={formStyles.labelRow}>フォルダ</span><SaveErrorField names={["folderId","folder_id"]}><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={hqFolders.map((f) => ({ value: f.id, label: f.name, color: f.color }))} onCreate={canManage ? createHqFolder : undefined} size="full" /></SaveErrorField></label>
+                  <label><span className={formStyles.labelRow}>社内メモ <span className="text-ink-faint text-xs font-normal">任意</span><HelpTip label="社内メモの説明">友だちには表示されません。各アカウントの配信にも同じメモが残ります</HelpTip></span><SaveErrorField names={["internalMemo","internal_memo"]}><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} maxLength={10000} className={formStyles.textInput} placeholder="友だちには表示されません" /></SaveErrorField></label>
                 </div>
                 <div className={formStyles.recentHeader}><h3>最近の配信</h3><Link href="/hq/broadcasts">一括配信の一覧を見る →</Link></div>
                 <div className={formStyles.recentList}>
@@ -867,14 +896,14 @@ export default function HqBroadcastCreate() {
                   <h3>送るアカウント</h3>
                   {loadError && !stores ? <ListState kind="error" error={loadError} onRetry={() => window.location.reload()} /> : !stores ? <ListState kind="loading" /> : (
                     <div className={styles.accountSelection} aria-live="polite">
-                      <EntityPickerSummary label="送るアカウント" noun="送るアカウント" icon={Building2} name={chosen.length ? `${formatNumber(chosen.length)} アカウント` : ''} meta={accountSummary}
-                        readOnly={!canManage} buttonRef={accountPickerTrigger} onOpen={() => setAccountPickerOpen(true)} />
+                      <SaveErrorField names={["accountIds"]}><EntityPickerSummary id="hq-send-accounts" label="送るアカウント" noun="送るアカウント" icon={Building2} name={chosen.length ? `${formatNumber(chosen.length)} アカウント` : ''} meta={accountSummary}
+                        readOnly={!canManage} buttonRef={accountPickerTrigger} onOpen={() => setAccountPickerOpen(true)} /></SaveErrorField>
                     </div>
                   )}
                 </div>
                 <h3>配信対象</h3>
                 {/* 店の一斉配信と同じ4つ。タグ・シナリオ・保存した条件は、各アカウントの同じ名前のものに直して送る（API-18）。 */}
-                <RadioCardGroup legend="配信対象" className={formStyles.audienceCards}>
+                <SaveErrorField names={["target"]}><RadioCardGroup id="hq-send-target" legend="配信対象" className={formStyles.audienceCards}>
                   {TARGET_MODES.map((mode) => (
                     <RadioCard
                       key={mode.value}
@@ -889,7 +918,7 @@ export default function HqBroadcastCreate() {
                       note={mode.value === 'tag' ? '選んだタグが付いている人' : mode.value === 'advanced' ? 'タグ・登録日・反応状態など' : mode.value === 'scenario' ? 'いまシナリオが流れている人' : mode.description}
                     />
                   ))}
-                </RadioCardGroup>
+                </RadioCardGroup></SaveErrorField>
                 {chosen.length === 0 && audience !== 'all' ? <p className="text-xs text-ink-faint">先に送るアカウントを選ぶと、タグ・シナリオ・保存した条件を選べます。</p> : null}
                 {tagStatus === 'loading' && audience !== 'all' ? <p className="text-xs text-ink-faint">選んだアカウントのタグ・シナリオを読み込んでいます…</p> : null}
                 {tagStatus === 'error' ? (
@@ -901,8 +930,8 @@ export default function HqBroadcastCreate() {
                 {audience === 'scenario' ? (
                   <div className="border-hairline border-t pt-4">
                     <p className="text-ink-secondary mb-1 block text-xs font-semibold">どのシナリオ</p>
-                    <EntityPickerField label="どのシナリオ" noun="シナリオ" icon={Workflow} items={byName(scenarioOptions)} value={scenarioName} onChange={setScenarioName}
-                      clearable placeholder="（すべてのシナリオ：どれか1つでも購読中）" disabled={tagStatus !== 'ready' || chosen.length === 0} />
+                    <SaveErrorField names={["scenarioName","scenario_name"]}><EntityPickerField label="どのシナリオ" noun="シナリオ" icon={Workflow} items={byName(scenarioOptions)} value={scenarioName} onChange={setScenarioName}
+                      clearable placeholder="（すべてのシナリオ：どれか1つでも購読中）" disabled={tagStatus !== 'ready' || chosen.length === 0} /></SaveErrorField>
                     {scenarioName && (scenarioOptions ?? []).some((t) => t.name === scenarioName && t.accounts < chosen.length) ? (
                       <p className="mt-1 text-xs text-warning">このシナリオが無いアカウントには送りません（最終確認で外します）。</p>
                     ) : null}
@@ -911,8 +940,8 @@ export default function HqBroadcastCreate() {
                 {audience === 'tag' ? (
                   <div className="border-hairline border-t pt-4">
                     <p className="text-ink-secondary mb-1 block text-xs font-semibold">含めるタグ</p>
-                    <EntityPickerField label="含めるタグ" noun="タグ" icon={TagIcon} items={byName(tagOptions)} value={tagName} onChange={setTagName}
-                      disabled={tagStatus !== 'ready' || chosen.length === 0} />
+                    <SaveErrorField names={["tagName","tag_name"]}><EntityPickerField label="含めるタグ" noun="タグ" icon={TagIcon} items={byName(tagOptions)} value={tagName} onChange={setTagName}
+                      disabled={tagStatus !== 'ready' || chosen.length === 0} /></SaveErrorField>
                     {tagStatus === 'ready' && chosen.length > 0 && (tagOptions ?? []).length === 0 ? <p className="mt-1 text-xs text-ink-faint">選んだアカウントにタグがありません。</p> : null}
                     {tagName && (tagOptions ?? []).some((t) => t.name === tagName && t.accounts < chosen.length) ? (
                       <p className="mt-1 text-xs text-warning">このタグが無いアカウントには送りません（最終確認で外します）。</p>
@@ -933,21 +962,21 @@ export default function HqBroadcastCreate() {
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-ink-faint text-xs">ブロック中の友だちを自動で除外しています</p>
                   <span className={formStyles.excludeTag}>
-                    <Select
+                    <SaveErrorField names={["savedName","savedSearchId","saved_name"]}><Select
                       aria-label="保存した条件から選ぶ"
                       value={savedName}
                       onChange={(value) => { setSavedName(value); if (value) setAudience('advanced') }}
                       disabled={tagStatus !== 'ready' || chosen.length === 0}
                       options={[{ value: '', label: '保存した条件から選ぶ' }, ...(savedOptions ?? []).map((t) => ({ value: t.name, label: `${t.name}（${t.accounts}/${chosen.length}アカウント）` }))]}
                       size="full"
-                    />
+                    /></SaveErrorField>
                   </span>
                 </div>
                 <div className={formStyles.exclusion}>
                   <Checkbox checked onCheckedChange={() => {}} disabled>ブロック中の人を除く</Checkbox>
                   <small>ブロック中・非表示・宛先不明の友だちには送りません</small>
                 </div>
-                <div className={formStyles.excludeTag}><span className={formStyles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><EntityPickerField label="除くタグ" noun="タグ" icon={TagIcon} items={byName(tagOptions)} value={excludeTag} onChange={setExcludeTag} clearable placeholder="（除外なし）" disabled={tagStatus !== 'ready' || chosen.length === 0} /></div>
+                <div className={formStyles.excludeTag}><span className={formStyles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><SaveErrorField names={["excludeTag","exclude_tag"]}><EntityPickerField label="除くタグ" noun="タグ" icon={TagIcon} items={byName(tagOptions)} value={excludeTag} onChange={setExcludeTag} clearable placeholder="（除外なし）" disabled={tagStatus !== 'ready' || chosen.length === 0} /></SaveErrorField></div>
                 <div className={formStyles.exclusion}>
                   <Checkbox checked={false} onCheckedChange={() => {}} disabled>この1週間に送った人を除く</Checkbox>
                   <small>最近送った人を除く機能は、まだ使えません</small>
@@ -977,7 +1006,7 @@ export default function HqBroadcastCreate() {
                   onPickTemplate={(index, kind) => { setPickerKind(kind); setOpenBubble(index); setPickerOpen(true) }}
                   onSaveTemplate={(index) => { setOpenBubble(index); setSaveTplName(String(bubbles[index].content.templateName ?? bubbles[index].content.assetName ?? '') || title.trim()); setSaveTplError(''); setSaveTplOpen(true) }}
                   onCompose={(index, kind) => { setOpenBubble(index); setCarouselError(''); setComposer(kind === 'carousel' ? 'carousel' : 'rich') }}
-                  extraFields={(index, item) => item.type === 'coupon' ? <Select aria-label="クーポンを選ぶ" value={String(item.content.assetId ?? '')} onChange={(id) => { const asset = (assets ?? []).find((a) => a.id === id); setBubbles((items) => items.map((current, i) => i === index ? { ...current, content: asset ? assetContent(asset) : {} } : current)) }} options={[{ value: '', label: '選んでください' }, ...(assets ?? []).filter((a) => a.kind === 'coupon').map((a) => ({ value: a.id, label: a.name }))]} size="full" /> : item.type === 'flex' ? <p>選んだテンプレートのカードをそのまま送ります。</p> : null}
+                  extraFields={(index, item) => item.type === 'coupon' ? <SaveErrorField names={["assetId","item.content.assetId","content.assetId","bubbles","asset_id","item.content.asset_id","content.asset_id"]}><Select aria-label="クーポンを選ぶ" value={String(item.content.assetId ?? '')} onChange={(id) => { const asset = (assets ?? []).find((a) => a.id === id); setBubbles((items) => items.map((current, i) => i === index ? { ...current, content: asset ? assetContent(asset) : {} } : current)) }} options={[{ value: '', label: '選んでください' }, ...(assets ?? []).filter((a) => a.kind === 'coupon').map((a) => ({ value: a.id, label: a.name }))]} size="full" /></SaveErrorField> : item.type === 'flex' ? <p>選んだテンプレートのカードをそのまま送ります。</p> : null}
                 />
               </section>
             ) : null}
@@ -986,19 +1015,19 @@ export default function HqBroadcastCreate() {
             {shows('schedule') ? (
               <section id="broadcast-step-schedule" className={formStyles.section}>
                 <h3>配信日</h3>
-                <RadioCardGroup legend="配信日" className={formStyles.methodCards}>
+                <SaveErrorField names={["hq-broadcast-send-mode","when"]}><RadioCardGroup legend="配信日" className={formStyles.methodCards}>
                   <RadioCard name="hq-broadcast-send-mode" value="now" checked={when === 'now'} onChange={() => setWhen('now')} title="今すぐ配信" note="⑤の確認で「今すぐ送る」を押すと、確認の小窓のあとすぐに送ります" />
                   <RadioCard name="hq-broadcast-send-mode" value="later" checked={when === 'later'} onChange={() => setWhen('later')} title="日時を指定して予約" note="決めた日時に、全アカウント同じ時刻で送ります" />
-                </RadioCardGroup>
+                </RadioCardGroup></SaveErrorField>
                 {when === 'later' ? (
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
                       <label htmlFor="hq-bc-date" className="text-ink-secondary mb-1 block text-xs font-medium">送る日</label>
-                      <DateField id="hq-bc-date" value={date} onChange={setDate} aria-label="送る日" />
+                      <SaveErrorField names={["date", "scheduledAt"]}><DateField id="hq-bc-date" value={date} onChange={setDate} aria-label="送る日" /></SaveErrorField>
                     </div>
                     <div>
                       <label htmlFor="hq-bc-time" className="text-ink-secondary mb-1 block text-xs font-medium">時刻（日本時間）</label>
-                      <TimeField id="hq-bc-time" size="field" value={time} onChange={setTime} aria-label="時刻（日本時間）" />
+                      <SaveErrorField names={["time", "scheduledAt"]}><TimeField id="hq-bc-time" size="field" value={time} onChange={setTime} aria-label="時刻（日本時間）" /></SaveErrorField>
                     </div>
                   </div>
                 ) : null}
@@ -1143,7 +1172,7 @@ export default function HqBroadcastCreate() {
               <Button type="button" disabled={checking || chosen.length === 0} title={chosen.length === 0 ? '先に送るアカウントを選んでください' : undefined} onClick={() => setTestOpen(true)}><Send size={14} aria-hidden /> テストを送る</Button>
               <Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button>
             </div>
-            <Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox>
+            <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
           </aside>
         </div>
 
@@ -1218,7 +1247,7 @@ export default function HqBroadcastCreate() {
       >
         <label className={formStyles.nameField}>
           <span className={formStyles.labelRow}>テンプレートの名前<RequiredBadge /></span>
-          <input value={saveTplName} onChange={(event) => setSaveTplName(event.target.value)} className={formStyles.textInput} aria-label="テンプレートの名前" maxLength={100} />
+          <SaveErrorField names={["saveTplName","save_tpl_name"]}><input value={saveTplName} onChange={(event) => setSaveTplName(event.target.value)} className={formStyles.textInput} aria-label="テンプレートの名前" maxLength={100} /></SaveErrorField>
         </label>
       </Dialog>
       <Dialog
@@ -1237,6 +1266,6 @@ export default function HqBroadcastCreate() {
           options={{ tags: (tagOptions ?? []).map((t) => ({ id: t.name, name: t.name })), scenarios: (scenarioOptions ?? []).map((t) => ({ id: t.name, name: t.name })), kinds: HQ_RULE_KINDS }}
         />
       </Dialog>
-    </>
+    </></SaveErrorScope></SaveErrorScope>
   )
 }

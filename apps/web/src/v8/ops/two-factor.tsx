@@ -14,6 +14,7 @@ import { logoutAndGoToLogin } from '@/lib/logout'
 import { qrToDataURL } from '@/lib/qr-image'
 import { opsCall } from '@/components/ops/ops-ui'
 import styles from './auth.module.css'
+import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 
 type Session = { id: string; name: string; platformAdmin?: boolean; platformAdminState?: string | null }
 
@@ -25,6 +26,8 @@ type Session = { id: string; name: string; platformAdmin?: boolean; platformAdmi
  * ログインを解除するので、ログインし直しを案内する。
  */
 export default function OpsTwoFactorV8() {
+  const saveErrors = useSaveFormErrors()
+
   const [session, setSession] = useState<Session | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'done' | 'denied'>('loading')
   const [uri, setUri] = useState('')
@@ -56,7 +59,9 @@ export default function OpsTwoFactorV8() {
       let setup: Awaited<ReturnType<typeof api.staff.beginTwoFactorSetup>> | null = null
       try {
         setup = await api.staff.beginTwoFactorSetup(body.data.id)
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
+
         setup = null
       }
       if (cancelledRef.current) return
@@ -68,10 +73,12 @@ export default function OpsTwoFactorV8() {
       setUri(setup.data.provisioningUri)
       setManualKey(setup.data.manualKey)
       setState('ready')
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       if (!cancelledRef.current) window.location.assign('/ops/login')
     }
-  }, [])
+  }, [saveErrors])
 
   useEffect(() => {
     cancelledRef.current = false
@@ -110,7 +117,7 @@ export default function OpsTwoFactorV8() {
   }
 
   return (
-    <main className={styles.page} data-design-node="qod6X">
+    <SaveErrorScope errors={saveErrors}><main className={styles.page} data-design-node="qod6X">
       <div className={styles.brand}>
         <span className={styles.mark} aria-hidden="true">m</span>
         <span className={styles.brandText}>
@@ -168,6 +175,6 @@ export default function OpsTwoFactorV8() {
         )}
       </section>
       <p className={styles.foot}>この画面は運営メンバーだけが開けます。操作はすべて記録されます。</p>
-    </main>
+    </main></SaveErrorScope>
   )
 }

@@ -29,6 +29,7 @@ import PerformanceBoard from './performance'
 import ProfileBoard from './profile'
 import SettingsBoard from './settings'
 import styles from './google.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 export type { MediaUploadHelpers } from './posts'
 
@@ -53,6 +54,8 @@ const RETURN_MESSAGES: Record<string, { tone: 'info' | 'warn' | 'danger'; text: 
 }
 
 function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('Googleビジネス')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const samePageUrl = useSamePageUrl()
@@ -76,14 +79,16 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
       setData(connection)
       setStores(snapshot?.data.stores ?? [])
     } catch (err) {
+      const fieldFailure = saveErrors.capture(err)
+
       setData(null)
-      setError(err instanceof ApiError && err.status === 404
+      { if (!fieldFailure) setError(err instanceof ApiError && err.status === 404
         ? 'このLINEアカウントには店舗が紐付いていません。先に店舗管理でLINEアカウントを割り当ててください。'
-        : errorMessage(err, 'Googleビジネスの状態を読み込めませんでした。'))
+        : errorMessage(err, 'Googleビジネスの状態を読み込めませんでした。')) }
     } finally {
       setLoading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -125,7 +130,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     ?? stores.find((item) => item.id === data?.store.id)?.id ?? '', [stores, selectedAccountId, data])
 
   const picker = stores.length > 0 ? (
-    <Select
+    <SaveErrorField names={["currentStoreId","selectedAccountId"]}><Select
       aria-label="店舗を選ぶ"
       width={STORE_PICKER_WIDTH}
       value={currentStoreId}
@@ -134,7 +139,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
         if (next?.line_account_id && next.line_account_id !== selectedAccountId) setSelectedAccountId(next.line_account_id)
       }}
       options={stores.map((item) => ({ value: item.id, label: `店舗：${item.name}`, disabled: !item.line_account_id }))}
-    />
+    /></SaveErrorField>
   ) : null
 
   const body = (() => {
@@ -185,7 +190,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
   })()
 
   return (
-    <RestaurantPage
+    <SaveErrorScope errors={saveErrors}><RestaurantPage
       boardId={boardId}
       title="Googleビジネス"
       description="Google の口コミ・投稿・営業時間を、店舗ごとに管理します。"
@@ -193,7 +198,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     >
       <BoundaryBanner note={boardId === 'j0Wcg' ? REVIEWS_BANNER_NOTE : undefined} />
       {body}
-    </RestaurantPage>
+    </RestaurantPage></SaveErrorScope>
   )
 }
 

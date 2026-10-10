@@ -20,6 +20,7 @@ import { webinarApi, describeSaveFailure, type WebinarFolder } from '@/lib/api'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { STEPS } from '@/app/webinars/edit/edit-steps'
 import styles from './new-v8.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type DeliveryKind = 'on-demand' | 'scheduled'
 
@@ -70,6 +71,8 @@ export default function NewWebinarV8() {
 }
 
 function NewWebinarV8Inner() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('ウェビナーを作る')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -109,12 +112,13 @@ function NewWebinarV8Inner() {
       setFolders(response.data)
       setFoldersState('ready')
       setError((previous) => (previous === FOLDERS_BLOCKED_MESSAGE ? null : previous))
-    } catch {
+    } catch (saveFailure) {
       if (request !== folderRequestRef.current) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       setFolders([])
-      setFoldersState('error')
+      { if (!fieldFailure) setFoldersState('error') }
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     void loadFolders()
@@ -168,7 +172,9 @@ function NewWebinarV8Inner() {
       })
       router.push(next === 'video' ? `/webinars/edit?id=${created.data.id}&pane=video` : '/webinars')
     } catch (cause) {
-      setError(describeSaveFailure(cause))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure) setError(describeSaveFailure(cause)) }
       savingRef.current = false
       setSaving(false)
     }
@@ -178,7 +184,7 @@ function NewWebinarV8Inner() {
   const bubbleBody = description.trim() || 'セミナーの案内文がここに出ます。'
 
   return (
-    <div className={styles.board} data-design-node="j7PP04">
+    <SaveErrorScope errors={saveErrors}><div className={styles.board} data-design-node="j7PP04">
       <nav data-design="Crumb" className={styles.crumb} aria-label="パンくず">
         <Link href="/webinars" className={styles.crumbLink}>← ウェビナーへ</Link>
       </nav>
@@ -197,7 +203,7 @@ function NewWebinarV8Inner() {
             <div className={styles.fieldGrid}>
               <div className={styles.fieldFull}>
                 <label className={styles.label} htmlFor="webinar-v8-title">名前 <RequiredBadge /></label>
-                <input
+                <SaveErrorField names={["title"]}><input
                   id="webinar-v8-title"
                   value={title}
                   onChange={(event) => {
@@ -213,14 +219,14 @@ function NewWebinarV8Inner() {
                   placeholder="NEN活用スタートセミナー"
                   className={styles.input}
                   aria-invalid={fieldErrors.title !== undefined}
-                />
+                /></SaveErrorField>
                 {fieldErrors.title !== undefined ? (
                   <p className={styles.fieldError} role="alert">{fieldErrors.title}</p>
                 ) : null}
               </div>
               <div>
                 <label className={styles.label} htmlFor="webinar-v8-slug">公開ページのURL</label>
-                <input
+                <SaveErrorField names={["slug"]}><input
                   id="webinar-v8-slug"
                   value={slug}
                   onChange={(event) => {
@@ -237,7 +243,7 @@ function NewWebinarV8Inner() {
                   inputMode="url"
                   className={styles.input}
                   aria-invalid={fieldErrors.slug !== undefined}
-                />
+                /></SaveErrorField>
                 {fieldErrors.slug !== undefined ? (
                   <p className={styles.fieldError} role="alert">{fieldErrors.slug}</p>
                 ) : null}
@@ -245,7 +251,7 @@ function NewWebinarV8Inner() {
               </div>
               <div>
                 <label className={styles.label} htmlFor="webinar-v8-folder">フォルダ</label>
-                <Select
+                <SaveErrorField names={["folderId","folder_id"]}><Select
                   id="webinar-v8-folder"
                   aria-label="フォルダ"
                   value={folderId}
@@ -255,7 +261,7 @@ function NewWebinarV8Inner() {
                     { value: '', label: '未分類' },
                     ...folders.map((folder) => ({ value: folder.id, label: `${folder.name}（${folder.count}件）` })),
                   ]}
-                />
+                /></SaveErrorField>
                 {foldersState === 'error' ? (
                   <p className={styles.fieldHelp}>
                     フォルダを読み込めませんでした。{' '}
@@ -267,13 +273,13 @@ function NewWebinarV8Inner() {
               </div>
               <div className={styles.fieldFull}>
                 <label className={styles.label} htmlFor="webinar-v8-description">案内文</label>
-                <input
+                <SaveErrorField names={["description","publicDescription"]}><input
                   id="webinar-v8-description"
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   placeholder="15分で NEN の使い方がわかる無料セミナーです"
                   className={styles.input}
-                />
+                /></SaveErrorField>
               </div>
             </div>
           </section>
@@ -281,7 +287,7 @@ function NewWebinarV8Inner() {
           <section className={styles.card} aria-labelledby="webinar-v8-kind">
             <h2 className={styles.cardTitle} id="webinar-v8-kind">開催形式</h2>
             <p className={styles.cardNote}>あとから動画の段でも変えられます</p>
-            <RadioCardGroup legend="開催形式" className={styles.radioRow}>
+            <SaveErrorField names={["webinar-v8-delivery-kind","deliveryKind"]}><RadioCardGroup legend="開催形式" className={styles.radioRow}>
               <RadioCard
                 name="webinar-v8-delivery-kind"
                 value="on-demand"
@@ -298,7 +304,7 @@ function NewWebinarV8Inner() {
                 title="日時指定配信"
                 note="指定日時に公開開始"
               />
-            </RadioCardGroup>
+            </RadioCardGroup></SaveErrorField>
           </section>
 
           <section className={styles.card} aria-labelledby="webinar-v8-audience">
@@ -364,6 +370,6 @@ function NewWebinarV8Inner() {
         )}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div>
+    </div></SaveErrorScope>
   )
 }

@@ -26,6 +26,7 @@ import { restaurantTestApi, type RestaurantMenuItem } from '@/lib/restaurant-tes
 import RestaurantShell, { Panel, Stat, Status, type RestaurantV8Context } from './shell'
 import shellStyles from './shell.module.css'
 import styles from './menu.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 function safeArray(value: string): string[] {
   try {
@@ -119,19 +120,19 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         <Panel title="新しいメニュー">
           <form onSubmit={submit} className={styles.formGrid}>
             <label className={styles.field}>種類
-              <select name="kind" aria-label="種類" defaultValue="course" className={styles.select}>
+              <SaveErrorField names={["kind"]}><select name="kind" aria-label="種類" defaultValue="course" className={styles.select}>
                 <option value="course">コース</option>
                 <option value="a_la_carte">単品</option>
-              </select>
+              </select></SaveErrorField>
             </label>
-            <label className={styles.field}>メニュー名<TextField name="name" required aria-label="メニュー名" /></label>
-            <label className={styles.field}>価格（税込）<input name="price" type="number" required aria-label="価格（税込）" className={styles.numberInput} /></label>
-            <label className={styles.field}>アレルギー（カンマ区切り）<TextField name="allergens" aria-label="アレルギー（カンマ区切り）" /></label>
+            <label className={styles.field}>メニュー名<SaveErrorField names={["name"]}><TextField name="name" required aria-label="メニュー名" /></SaveErrorField></label>
+            <label className={styles.field}>価格（税込）<SaveErrorField names={["price"]}><input name="price" type="number" required aria-label="価格（税込）" className={styles.numberInput} /></SaveErrorField></label>
+            <label className={styles.field}>アレルギー（カンマ区切り）<SaveErrorField names={["allergens"]}><TextField name="allergens" aria-label="アレルギー（カンマ区切り）" /></SaveErrorField></label>
             <label className={styles.field}>提供時間
-              <select name="period" aria-label="提供時間" defaultValue="lunch" className={styles.select}>
+              <SaveErrorField names={["period"]}><select name="period" aria-label="提供時間" defaultValue="lunch" className={styles.select}>
                 <option value="lunch">ランチ</option>
                 <option value="dinner">ディナー</option>
-              </select>
+              </select></SaveErrorField>
             </label>
             <div className={styles.formActions}>
               <Button type="submit" variant="primary" disabled={busy}>追加する</Button>
@@ -145,17 +146,17 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         <Panel title={`${editing.name}を変更`}>
           <form key={editing.id} onSubmit={(event) => void submitEdit(event)} className={styles.formGrid}>
             <label className={styles.field}>種類
-              <select name="kind" aria-label="種類" defaultValue={editing.kind} className={styles.select}>
+              <SaveErrorField names={["kind"]}><select name="kind" aria-label="種類" defaultValue={editing.kind} className={styles.select}>
                 <option value="course">コース</option>
                 <option value="a_la_carte">単品</option>
-              </select>
+              </select></SaveErrorField>
             </label>
-            <label className={styles.field}>メニュー名<TextField name="name" defaultValue={editing.name} required aria-label="メニュー名" /></label>
-            <label className={styles.field}>価格（税込）<input name="price" type="number" defaultValue={String(editing.price)} required aria-label="価格（税込）" className={styles.numberInput} /></label>
-            <label className={styles.field}>新価格の開始日時<input type="datetime-local" name="effectiveAt" aria-label="新価格の開始日時" className={styles.numberInput} /><span>空欄なら承認後すぐに反映します。</span></label>
-            <label className={styles.field}>アレルギー（カンマ区切り）<TextField name="allergens" defaultValue={safeArray(editing.allergens_json).join(', ')} aria-label="アレルギー（カンマ区切り）" /></label>
+            <label className={styles.field}>メニュー名<SaveErrorField names={["name"]}><TextField name="name" defaultValue={editing.name} required aria-label="メニュー名" /></SaveErrorField></label>
+            <label className={styles.field}>価格（税込）<SaveErrorField names={["price"]}><input name="price" type="number" defaultValue={String(editing.price)} required aria-label="価格（税込）" className={styles.numberInput} /></SaveErrorField></label>
+            <label className={styles.field}>新価格の開始日時<SaveErrorField names={["effectiveAt","effective_at"]}><input type="datetime-local" name="effectiveAt" aria-label="新価格の開始日時" className={styles.numberInput} /></SaveErrorField><span>空欄なら承認後すぐに反映します。</span></label>
+            <label className={styles.field}>アレルギー（カンマ区切り）<SaveErrorField names={["allergens"]}><TextField name="allergens" defaultValue={safeArray(editing.allergens_json).join(', ')} aria-label="アレルギー（カンマ区切り）" /></SaveErrorField></label>
             <label className={styles.field}>提供時間
-              <select
+              <SaveErrorField names={["period"]}><select
                 name="period"
                 aria-label="提供時間"
                 defaultValue={safeArray(editing.service_periods_json).length > 1 ? 'both' : safeArray(editing.service_periods_json)[0] || 'dinner'}
@@ -164,7 +165,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
                 <option value="lunch">ランチ</option>
                 <option value="dinner">ディナー</option>
                 <option value="both">ランチ・ディナー</option>
-              </select>
+              </select></SaveErrorField>
             </label>
             <div className={styles.formActions}>
               <Button type="button" onClick={() => setEditingId('')}>キャンセル</Button>

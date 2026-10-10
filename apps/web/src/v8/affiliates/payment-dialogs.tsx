@@ -22,6 +22,7 @@ import Dialog from '@/components/shared/dialog'
 import OtpInput from '@/components/shared/otp-input'
 import { formatDate, formatYen, periodText } from './display'
 import styles from './affiliates.module.css'
+import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 
 export function SettlementCloseDialog({
   preview,
@@ -34,6 +35,8 @@ export function SettlementCloseDialog({
   onClose: () => void
   onClosed: (result: AffiliateAccountSettlementResult) => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [idempotencyKey, setIdempotencyKey] = useState('')
@@ -62,14 +65,16 @@ export function SettlementCloseDialog({
       onClosed(response.data)
       onClose()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '締め処理を完了できませんでした')
+      const fieldFailure = saveErrors.capture(cause)
+
+      if (!fieldFailure) { setError(cause instanceof Error ? cause.message : '締め処理を完了できませんでした') }
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open={Boolean(preview)}
       designNode="usDpO"
       designWidth={520}
@@ -132,7 +137,7 @@ export function SettlementCloseDialog({
           </div>
         </div>
       ) : null}
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }
 
@@ -208,7 +213,7 @@ export function PayoutStepUpDialog({
         {usePassword ? (
           <label className={styles.stepField} htmlFor="affiliate-payout-step-up">
             パスワード
-            <input
+            <SaveErrorField names={["code"]}><input
               id="affiliate-payout-step-up"
               type="password"
               value={code}
@@ -216,10 +221,10 @@ export function PayoutStepUpDialog({
               autoFocus
               autoComplete="current-password"
               className={styles.stepInput}
-            />
+            /></SaveErrorField>
           </label>
         ) : stepUpMethod === 'totp' ? (
-          <OtpInput
+          <SaveErrorField names={["code"]}><OtpInput
             id="affiliate-payout-step-up"
             visualLabel="認証コード（6桁）"
             label="認証アプリの6桁コード"
@@ -228,7 +233,7 @@ export function PayoutStepUpDialog({
             invalid={Boolean(error)}
             disabled={busy}
             autoFocus
-          />
+          /></SaveErrorField>
         ) : null}
         {stepUpMethod === 'totp' ? (
           <p className={styles.stepSwitch}>

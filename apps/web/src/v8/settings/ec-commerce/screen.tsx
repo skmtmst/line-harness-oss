@@ -47,6 +47,7 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import OrderDrawer from './order-drawer'
 import styles from './screen.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export type EcTabKey = 'events' | 'identity' | 'subscriptions' | 'connector'
 
@@ -388,7 +389,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
         ))}
         <span className={styles.spacer} />
         <span className={styles.sortBox}>
-          <Select
+          <SaveErrorField names={["sort"]}><Select
             aria-label="取り込みの並び順"
             value={sort}
             onChange={(value) => setSort(value as typeof sort)}
@@ -396,7 +397,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
               { value: 'newest', label: '新しい順' },
               { value: 'oldest', label: '古い順' },
             ]}
-          />
+          /></SaveErrorField>
         </span>
       </div>
 

@@ -34,6 +34,7 @@ import AdConnectionDialog from './ad-connection-dialog'
 import { DetailPage } from '@/components/templates'
 import { focusField } from './focus-field'
 import styles from './ads.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const PROVIDERS = [
   { key: 'google', label: 'Google広告', icon: Search },
@@ -106,6 +107,8 @@ function platformLabel(platform: Pick<AdPlatform, 'name' | 'displayName'>): stri
 }
 
 export default function AdsV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('広告連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '流入と計測', href: '/inflow-links' }])
   const role = useStaffRole()
@@ -182,12 +185,14 @@ export default function AdsV8() {
         setConversionCost(null)
         setCostFailed(true)
       }
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       if (isCurrent()) setFailed(true)
     } finally {
       if (isCurrent()) setLoading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     setPlatforms([])
@@ -251,8 +256,10 @@ export default function AdsV8() {
       setManualDay('')
       setManualAmount('')
       void load()
-    } catch {
-      setManualError('記録できませんでした。通信状態を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setManualError('記録できませんでした。通信状態を確かめて、もう一度お試しください。') }
     } finally {
       setManualBusy(false)
     }
@@ -285,8 +292,10 @@ export default function AdsV8() {
       setCancelTarget(null)
       setSelectedEntryId(null)
       void load()
-    } catch {
-      setCancelError('取り消せませんでした。通信状態を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setCancelError('取り消せませんでした。通信状態を確かめて、もう一度お試しください。') }
     } finally {
       setCancelBusy(false)
     }
@@ -300,8 +309,10 @@ export default function AdsV8() {
       const res = await api.adPlatforms.importCost(platformId)
       if (!res.success) setImportError(res.error ?? '取り込めませんでした')
       void load()
-    } catch {
-      setImportError('取り込めませんでした。接続設定を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setImportError('取り込めませんでした。接続設定を確かめて、もう一度お試しください。') }
     } finally {
       setImportingId(null)
     }
@@ -328,11 +339,11 @@ export default function AdsV8() {
   const selectedEntry = manualEntries.find((entry) => entry.id === selectedEntryId) ?? null
 
   if (!selectedAccountId) {
-    return <ListState kind="empty" title="LINEアカウントを選択してください" description="選んだLINEアカウントの広告費だけを表示します。" />
+    return <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="LINEアカウントを選択してください" description="選んだLINEアカウントの広告費だけを表示します。" /></SaveErrorScope>
   }
 
   return (
-    <DetailPage boardId="qSTVR" title="広告連携" description="広告をつなぐと毎日自動で費用を取り込みます。取り込めない分（チラシや看板など）は「費用を手で入れる」から足せます。"
+    <SaveErrorScope errors={saveErrors}><DetailPage boardId="qSTVR" title="広告連携" description="広告をつなぐと毎日自動で費用を取り込みます。取り込めない分（チラシや看板など）は「費用を手で入れる」から足せます。"
       contentPadding="0 var(--tpl-head-pad-side)"
       actions={manage ? <Button onClick={openManualEntry}><Plus size={15} aria-hidden="true" />費用を手で入れる</Button> : null}>
       <div className={styles.body}>
@@ -525,12 +536,12 @@ export default function AdsV8() {
         <div className={styles.dialogBody}>
           <label className={styles.field}>
             <span className={styles.label}>流入元の名前</span>
-            <TextField id="ad-cost-name" aria-invalid={Boolean(manualFieldErrors['ad-cost-name'])} aria-describedby={manualFieldErrors['ad-cost-name'] ? 'ad-cost-name-error' : undefined} value={manualLabel} onChange={(event) => { setManualLabel(event.target.value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-name': '' })) }} placeholder="例: 駅前の看板" maxLength={100} title="同じ流入元・同じ日に入れ直すと上書きになります" />
+            <SaveErrorField names={["manualLabel","sourceLabel","manual_label"]}><TextField id="ad-cost-name" aria-invalid={Boolean(manualFieldErrors['ad-cost-name'])} aria-describedby={manualFieldErrors['ad-cost-name'] ? 'ad-cost-name-error' : undefined} value={manualLabel} onChange={(event) => { setManualLabel(event.target.value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-name': '' })) }} placeholder="例: 駅前の看板" maxLength={100} title="同じ流入元・同じ日に入れ直すと上書きになります" /></SaveErrorField>
             {manualFieldErrors['ad-cost-name'] ? <span id="ad-cost-name-error" className={styles.error} role="alert">{manualFieldErrors['ad-cost-name']}</span> : null}
           </label>
           <div className={styles.field}>
             <span className={styles.pickLabel}>計測リンク（分かれば）</span>
-            <Select
+            <SaveErrorField names={["manualRouteId","entryRouteId","manual_route_id"]}><Select
               aria-label="計測リンク（分かれば）"
               size="full"
               value={manualRouteId}
@@ -540,17 +551,17 @@ export default function AdsV8() {
                 if (route && !manualLabel.trim()) setManualLabel(route.name)
               }}
               options={[{ value: '', label: '結びつけない' }, ...entryRoutes.map((route) => ({ value: route.id, label: route.name }))]}
-            />
+            /></SaveErrorField>
           </div>
           <div className={styles.fieldRow}>
             <div className={styles.field}>
               <span className={styles.label}>費用の日付</span>
-              <DateField id="ad-cost-day" invalid={Boolean(manualFieldErrors['ad-cost-day'])} aria-describedby={manualFieldErrors['ad-cost-day'] ? 'ad-cost-day-error' : undefined} value={manualDay} onChange={(value) => { setManualDay(value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-day': '' })) }} aria-label="費用の日付" />
+              <SaveErrorField names={["manualDay","day","manual_day"]}><DateField id="ad-cost-day" invalid={Boolean(manualFieldErrors['ad-cost-day'])} aria-describedby={manualFieldErrors['ad-cost-day'] ? 'ad-cost-day-error' : undefined} value={manualDay} onChange={(value) => { setManualDay(value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-day': '' })) }} aria-label="費用の日付" /></SaveErrorField>
               {manualFieldErrors['ad-cost-day'] ? <span id="ad-cost-day-error" className={styles.error} role="alert">{manualFieldErrors['ad-cost-day']}</span> : null}
             </div>
             <label className={styles.field}>
               <span className={styles.label}>費用（円）</span>
-              <TextField id="ad-cost-amount" aria-invalid={Boolean(manualFieldErrors['ad-cost-amount'])} aria-describedby={manualFieldErrors['ad-cost-amount'] ? 'ad-cost-amount-error' : undefined} inputMode="numeric" value={manualAmount} onChange={(event) => { setManualAmount(event.target.value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-amount': '' })) }} placeholder="例: 30000" />
+              <SaveErrorField names={["manualAmount","manual_amount"]}><TextField id="ad-cost-amount" aria-invalid={Boolean(manualFieldErrors['ad-cost-amount'])} aria-describedby={manualFieldErrors['ad-cost-amount'] ? 'ad-cost-amount-error' : undefined} inputMode="numeric" value={manualAmount} onChange={(event) => { setManualAmount(event.target.value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-amount': '' })) }} placeholder="例: 30000" /></SaveErrorField>
               {manualFieldErrors['ad-cost-amount'] ? <span id="ad-cost-amount-error" className={styles.error} role="alert">{manualFieldErrors['ad-cost-amount']}</span> : null}
             </label>
           </div>
@@ -572,7 +583,7 @@ export default function AdsV8() {
             <p className={styles.dialogLead}>{`対象: ${cancelTarget.day} ／ ${cancelTarget.sourceLabel} ／ ${formatMinor(cancelTarget.amountMinor, cancelTarget.currency)}`}</p>
             <label className={styles.field}>
               <span className={styles.label}>取り消す理由（必須）</span>
-              <TextField id="ad-cancel-reason" aria-invalid={Boolean(cancelReasonError)} aria-describedby={cancelReasonError ? 'ad-cancel-reason-error' : undefined} value={cancelReason} onChange={(event) => { setCancelReason(event.target.value); setCancelReasonError('') }} placeholder="例: 金額を間違えた" maxLength={200} />
+              <SaveErrorField names={["cancelReason","cancel_reason"]}><TextField id="ad-cancel-reason" aria-invalid={Boolean(cancelReasonError)} aria-describedby={cancelReasonError ? 'ad-cancel-reason-error' : undefined} value={cancelReason} onChange={(event) => { setCancelReason(event.target.value); setCancelReasonError('') }} placeholder="例: 金額を間違えた" maxLength={200} /></SaveErrorField>
               {cancelReasonError ? <span id="ad-cancel-reason-error" className={styles.error} role="alert">{cancelReasonError}</span> : null}
             </label>
           </div>
@@ -589,6 +600,6 @@ export default function AdsV8() {
           onSaved={load}
         />
       ) : null}
-    </DetailPage>
+    </DetailPage></SaveErrorScope>
   )
 }

@@ -24,6 +24,7 @@ import { CANDIDATE_PAGE_SIZE, formatRelative, useDuplicatesData } from './use-du
 import DuplicatesStatsNotice from './duplicates-stats-notice'
 import { formatDateTime } from '@/lib/format'
 import styles from '@/app/friends/friends-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const CONFIDENCE_LABEL = { very_high: '最高', high: '高', medium: '中', low: '低' } as const
 
@@ -140,7 +141,7 @@ export default function DuplicatesV8() {
           />
         </div>
         <div className={styles.selectWrap}>
-          <Select
+          <SaveErrorField names={["status","d.status"]}><Select
             aria-label="状態で絞り込む"
             label="状態"
             size="full"
@@ -153,7 +154,7 @@ export default function DuplicatesV8() {
               { value: 'deferred', label: '保留' },
               { value: 'different', label: '別人' },
             ]}
-          />
+          /></SaveErrorField>
         </div>
         <span className={styles.toolbarSpacer} />
         {d.data?.computedAt ? (

@@ -6,6 +6,7 @@ import Dialog from '@/components/shared/dialog'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import { focusField } from './focus-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type ConfigField = {key: string; label: string; secret?: boolean}
 export const AD_CONNECTION_FIELDS: Record<string, ConfigField[]> = {
@@ -15,6 +16,8 @@ export const AD_CONNECTION_FIELDS: Record<string, ConfigField[]> = {
  x:[{key:'account_id',label:'広告アカウントID'},{key:'conversion_id',label:'コンバージョンID'},{key:'api_key',label:'APIキー',secret:true},{key:'api_secret',label:'APIシークレット',secret:true},{key:'x_oauth_token',label:'アクセストークン',secret:true},{key:'x_oauth_token_secret',label:'トークンシークレット',secret:true}],
 }
 export default function AdConnectionDialog({provider,platform,accountId,onClose,onSaved}:{provider:{key:string;label:string};platform?:AdPlatform;accountId:string;onClose:()=>void;onSaved:()=>Promise<void>}) {
+  const saveErrors = useSaveFormErrors()
+
  const [values,setValues]=useState<Record<string,string>>(()=>Object.fromEntries(AD_CONNECTION_FIELDS[provider.key].map(f=>[f.key,f.secret?'':String(platform?.config[f.key]??'')]))), [busy,setBusy]=useState(false),[error,setError]=useState('')
  const persisted=useRef(platform)
  const [fieldErrors,setFieldErrors]=useState<Record<string,string>>({})
@@ -40,12 +43,14 @@ export default function AdConnectionDialog({provider,platform,accountId,onClose,
    if(!result.success){setError('接続を確認できませんでした。入力した項目と広告側の権限を確認してください');return}
    await onSaved()
    onClose()
-  } catch {if(current.current)setError('接続できませんでした。入力と広告側の権限を確認して、もう一度お試しください')}
+  } catch (saveFailure) {
+    const fieldFailure = saveErrors.capture(saveFailure)
+if(current.current){ if (!fieldFailure) setError('接続できませんでした。入力と広告側の権限を確認して、もう一度お試しください') }}
   finally {if(current.current)setBusy(false)}
  }
- return <Dialog open busy={busy} title={`${provider.label}をつなぐ`} onCancel={()=>{if(!busy)onClose()}} footer={<><Button disabled={busy} onClick={onClose}>閉じる</Button><Button variant="primary" disabled={busy} onClick={()=>void connect()}>{busy?'確認しています…':'接続を確認してつなぐ'}</Button></>}>
+ return <SaveErrorScope errors={saveErrors}><Dialog open busy={busy} title={`${provider.label}をつなぐ`} onCancel={()=>{if(!busy)onClose()}} footer={<><Button disabled={busy} onClick={onClose}>閉じる</Button><Button variant="primary" disabled={busy} onClick={()=>void connect()}>{busy?'確認しています…':'接続を確認してつなぐ'}</Button></>}>
   <p className="mb-4 text-sm">広告側の費用を読み取って接続を確認します。鍵の値は再表示しません。</p>
-  <div className="space-y-3">{AD_CONNECTION_FIELDS[provider.key].map(field=><Field key={field.key} label={field.label} htmlFor={`ad-connect-${field.key}`} error={fieldErrors[field.key]}><TextField aria-label={field.label} type={field.secret?'password':'text'} value={values[field.key]??''} autoComplete={field.secret?'new-password':undefined} placeholder={field.secret&&platform?.secretKeys?.includes(field.key)?'保存済み（空欄なら保持）':''} onChange={e=>{setValues(v=>({...v,[field.key]:e.target.value}));setFieldErrors(v=>({...v,[field.key]:''}))}}/></Field>)}</div>
+  <div className="space-y-3">{AD_CONNECTION_FIELDS[provider.key].map(field=><Field key={field.key} label={field.label} htmlFor={`ad-connect-${field.key}`} error={fieldErrors[field.key]}><SaveErrorField names={["values"]}><TextField aria-label={field.label} type={field.secret?'password':'text'} value={values[field.key]??''} autoComplete={field.secret?'new-password':undefined} placeholder={field.secret&&platform?.secretKeys?.includes(field.key)?'保存済み（空欄なら保持）':''} onChange={e=>{setValues(v=>({...v,[field.key]:e.target.value}));setFieldErrors(v=>({...v,[field.key]:''}))}}/></SaveErrorField></Field>)}</div>
   {error&&<p role="alert" className="mt-3 text-sm text-status-danger">{error}</p>}
- </Dialog>
+ </Dialog></SaveErrorScope>
 }

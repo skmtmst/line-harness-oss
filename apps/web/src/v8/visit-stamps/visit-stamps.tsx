@@ -49,6 +49,7 @@ import {
 } from './display'
 import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, ReasonDialog, RewardDialog, StoresDialog } from './dialogs'
 import styles from './visit-stamps.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type PaperRow = { id: string; card_id?: string; friend_id: string; photo_url: string; stamps: number; status: string; created_at?: string }
 type FriendLite = { id: string; displayName?: string | null; metadata?: Record<string, unknown> | null }
@@ -112,6 +113,8 @@ function SectionTitle({ children, help, extra }: { children: string; help: strin
 }
 
 function VisitStampsScreen() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const params = useSearchParams()
   const rawTab = params.get('tab')
@@ -150,7 +153,9 @@ function VisitStampsScreen() {
     if (!['image/jpeg', 'image/png'].includes(file.type) || file.size > 3 * 1024 * 1024 || !file.size) { notifyToast('背景画像はJPG・PNG、3MBまでです。', { tone: 'error' }); return }
     setImageBusy(true)
     try { const res = await api.uploads.image(file); if (!res.success) throw new Error('背景画像を預けられませんでした。'); setSettings(s => ({ ...s, backgroundImageUrl: res.data.url })) }
-    catch (e) { notifyToast(message(e, '背景画像を預けられませんでした。'), { tone: 'error' }) }
+    catch (e) {
+      const fieldFailure = saveErrors.capture(e)
+ { if (!fieldFailure) notifyToast(message(e, '背景画像を預けられませんでした。'), { tone: 'error' }) } }
     finally { setImageBusy(false) }
   }
 
@@ -165,8 +170,10 @@ function VisitStampsScreen() {
     try {
       const res = await visitStampsApi.cards()
       setCards(res.data); setLoadError(null)
-    } catch (caught) { setLoadError(caught) }
-  }, [])
+    } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+ { if (!fieldFailure) setLoadError(caught) } }
+  }, [saveErrors])
   useEffect(() => { void loadCards() }, [loadCards])
   useEffect(() => { if (cards) resetDraft(card) }, [cards, card, resetDraft])
 
@@ -195,8 +202,10 @@ function VisitStampsScreen() {
       notifyToast('来店スタンプの設定を保存しました。')
       await loadCards()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       const conflict = (caught as { status?: number })?.status === 409
-      notifyToast(conflict ? 'ほかの人が先に保存しました。読み直してから、もう一度変えてください。' : message(caught, '保存できませんでした。'), { tone: 'error' })
+      { if (!fieldFailure) notifyToast(conflict ? 'ほかの人が先に保存しました。読み直してから、もう一度変えてください。' : message(caught, '保存できませんでした。'), { tone: 'error' }) }
     } finally { setSaving(false) }
   }
 
@@ -233,8 +242,10 @@ function VisitStampsScreen() {
       const res = await visitStampsApi.paperRequests(selectedAccountId)
       if (request !== paperRequest.current) return
       setPaper(res.data as PaperRow[]); setPaperError(null)
-    } catch (caught) { if (request === paperRequest.current) setPaperError(caught) }
-  }, [selectedAccountId])
+    } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+ if (request === paperRequest.current) { if (!fieldFailure) setPaperError(caught) } }
+  }, [selectedAccountId, saveErrors])
   useEffect(() => {
     void loadPaper()
     return () => { paperRequest.current++ }
@@ -257,8 +268,10 @@ function VisitStampsScreen() {
       const lastPage = Math.max(1, Math.ceil(res.data.total / logPageSize))
       if (logPage > lastPage) { setLogPage(lastPage); return }
       setLog(res.data); setLogError(null)
-    } catch (caught) { if (request === logRequest.current) setLogError(caught) }
-  }, [selectedAccountId, logPage, logPageSize])
+    } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+ if (request === logRequest.current) { if (!fieldFailure) setLogError(caught) } }
+  }, [selectedAccountId, logPage, logPageSize, saveErrors])
   useEffect(() => { setLogPage(1) }, [selectedAccountId])
   useEffect(() => {
     void loadLog()
@@ -291,8 +304,10 @@ function VisitStampsScreen() {
       await loadPaper()
       await loadLog()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       const text = message(caught, action === 'approve' ? '承認できませんでした。' : '却下できませんでした。')
-      if (action === 'reject') setDialogError(text); else notifyToast(text, { tone: 'error' })
+      if (action === 'reject') { if (!fieldFailure) setDialogError(text); } else notifyToast(text, { tone: 'error' })
       await loadPaper()
     } finally { setBusy('') }
   }
@@ -330,7 +345,9 @@ function VisitStampsScreen() {
       setCount(1); setMemo('')
       await loadLog()
     } catch (caught) {
-      notifyToast(message(caught, '押印を足せませんでした。'), { tone: 'error' })
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) notifyToast(message(caught, '押印を足せませんでした。'), { tone: 'error' }) }
     } finally { setBusy('') }
   }
 
@@ -344,7 +361,9 @@ function VisitStampsScreen() {
       notifyToast('記録を取り消しました。')
       setReversing(null)
       await loadLog()
-    } catch (caught) { setDialogError(message(caught, '取り消せませんでした。')) } finally { setBusy('') }
+    } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+ { if (!fieldFailure) setDialogError(message(caught, '取り消せませんでした。')) } } finally { setBusy('') }
   }
 
   /* ── 下書きを変える窓 ── */
@@ -364,16 +383,18 @@ function VisitStampsScreen() {
       await visitStampsApi.setPin(staffId, selectedAccountId, pin)
       notifyToast(`${staffName(staffId) ?? '店員'}さんの暗証番号を保存しました。`)
       setPinOpen(false)
-    } catch (caught) { setDialogError(message(caught, '暗証番号を保存できませんでした。')) } finally { setPinBusy(false) }
+    } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+ { if (!fieldFailure) setDialogError(message(caught, '暗証番号を保存できませんでした。')) } } finally { setPinBusy(false) }
   }
 
   const photoUrl = usePhotoUrl(selectedAccountId, photo?.photo_url)
 
   if (loadError && cards === null) {
-    return <PageFrame kind="visit-stamps" boardId={STAMP_TABS.find(t => t.key === tab)?.board}><PageHeading headingSize="regular" title="来店スタンプ" /><ListState kind="error" error={loadError} onRetry={() => void loadCards()} /></PageFrame>
+    return <SaveErrorScope errors={saveErrors}><PageFrame kind="visit-stamps" boardId={STAMP_TABS.find(t => t.key === tab)?.board}><PageHeading headingSize="regular" title="来店スタンプ" /><ListState kind="error" error={loadError} onRetry={() => void loadCards()} /></PageFrame></SaveErrorScope>
   }
   if (cards === null) {
-    return <PageFrame kind="visit-stamps" boardId={STAMP_TABS.find(t => t.key === tab)?.board}><PageHeading headingSize="regular" title="来店スタンプ" /><ListState kind="loading" /></PageFrame>
+    return <SaveErrorScope errors={saveErrors}><PageFrame kind="visit-stamps" boardId={STAMP_TABS.find(t => t.key === tab)?.board}><PageHeading headingSize="regular" title="来店スタンプ" /><ListState kind="loading" /></PageFrame></SaveErrorScope>
   }
 
   const ro = !canManage
@@ -389,7 +410,7 @@ function VisitStampsScreen() {
   const stampable = canStamp && !!card
 
   return (
-    <PageFrame kind="visit-stamps" boardId={STAMP_TABS.find(t => t.key === tab)?.board} hasFooter={canManage && tab === 'settings'}>
+    <SaveErrorScope errors={saveErrors}><PageFrame kind="visit-stamps" boardId={STAMP_TABS.find(t => t.key === tab)?.board} hasFooter={canManage && tab === 'settings'}>
       <PageHeading
         headingSize="regular"
         title="来店スタンプ"
@@ -419,14 +440,14 @@ function VisitStampsScreen() {
                 ]} /> : undefined} help="カードの名前・マスの数・期限と、何個で何を渡すか（特典）を決めます。マスの数と特典の個数は別々に決めます（特典はマスの数以下）。特典を使うと、その個数だけスタンプが減ります。">① カードの設定</SectionTitle>
                 <label className={styles.field}>
                   <span className={styles.label}>カードの名前</span>
-                  <TextField {...fieldProps('name')} value={name} onChange={(e) => { setIssue(null); setName(e.target.value) }} readOnly={ro} maxLength={100} />
+                  <SaveErrorField names={["name","issue"]}><TextField {...fieldProps('name')} value={name} onChange={(e) => { setIssue(null); setName(e.target.value) }} readOnly={ro} maxLength={100} /></SaveErrorField>
                   {fieldError('name')}
                 </label>
                 <div className={styles.field}>
                   <span className={styles.label}>カードの見た目 <HelpTip label="カードの見た目の説明">画像があるときは画像を使います。色は文字の下地です。</HelpTip></span>
                   <div className={styles.appearance}>
                     <div className={styles.imageSlot}>
-                      <MediaSlot
+                      <SaveErrorField names={["backgroundImageUrl","settings.backgroundImageUrl","background_image_url","settings.background_image_url"]}><MediaSlot
                         size="compact"
                         title="背景画像を追加"
                         previewAlt="背景画像"
@@ -437,7 +458,7 @@ function VisitStampsScreen() {
                         readOnly={ro}
                         onFile={(file) => void uploadImage(file)}
                         onRemove={() => set({ backgroundImageUrl: null })}
-                      />
+                      /></SaveErrorField>
                     </div>
                     <div className={styles.colorField}>
                       <span className={styles.label}>色</span>
@@ -448,26 +469,26 @@ function VisitStampsScreen() {
                 <div className={styles.expiryRow}>
                   <div className={styles.field}>
                     <span className={styles.label}>マスの数</span>
-                    <Select aria-label="マスの数" size="full" disabled={ro} value={String(slotCount(settings))} onChange={(v) => setSettings((s) => withSlotCount(s, Number(v)))}
-                      options={SLOT_OPTIONS.some((o) => o.value === String(slotCount(settings))) ? SLOT_OPTIONS : [...SLOT_OPTIONS, { value: String(slotCount(settings)), label: `${slotCount(settings)} 個` }]} />
+                    <SaveErrorField names={["settings"]}><Select aria-label="マスの数" size="full" disabled={ro} value={String(slotCount(settings))} onChange={(v) => setSettings((s) => withSlotCount(s, Number(v)))}
+                      options={SLOT_OPTIONS.some((o) => o.value === String(slotCount(settings))) ? SLOT_OPTIONS : [...SLOT_OPTIONS, { value: String(slotCount(settings)), label: `${slotCount(settings)} 個` }]} /></SaveErrorField>
                   </div>
                   <div className={`${styles.field} ${styles.fieldGrow}`}>
                     <span className={styles.label}>有効期限</span>
-                    <Select aria-label="有効期限の起点" size="full" disabled={ro} value={expiryBasis} onChange={v => set({ expiryBasis: v as VisitStampSettings['expiryBasis'], expiryMonths: v === 'none' ? null : settings.expiryMonths ?? 6 })}
-                      options={[{ value: 'last_visit', label: '最後の来店から' }, { value: 'first_visit', label: '最初の来店から' }, { value: 'none', label: '設定しない' }]} />
+                    <SaveErrorField names={["expiryBasis","expiry_basis"]}><Select aria-label="有効期限の起点" size="full" disabled={ro} value={expiryBasis} onChange={v => set({ expiryBasis: v as VisitStampSettings['expiryBasis'], expiryMonths: v === 'none' ? null : settings.expiryMonths ?? 6 })}
+                      options={[{ value: 'last_visit', label: '最後の来店から' }, { value: 'first_visit', label: '最初の来店から' }, { value: 'none', label: '設定しない' }]} /></SaveErrorField>
                   </div>
-                  {expiryBasis !== 'none' ? <div className={styles.expiryLength}><Select aria-label="有効期限の長さ" size="full" disabled={ro} value={String(settings.expiryMonths)} onChange={v => set({ expiryMonths: Number(v) })} options={EXPIRY_OPTIONS} /></div> : null}
+                  {expiryBasis !== 'none' ? <div className={styles.expiryLength}><SaveErrorField names={["expiryMonths","settings.expiryMonths","expiry_months","settings.expiry_months"]}><Select aria-label="有効期限の長さ" size="full" disabled={ro} value={String(settings.expiryMonths)} onChange={v => set({ expiryMonths: Number(v) })} options={EXPIRY_OPTIONS} /></SaveErrorField></div> : null}
                 </div>
                 <div className={styles.row2}>
                   <div className={styles.field}>
                     <span className={styles.label}>期限の前に知らせる <HelpTip label="期限のお知らせの説明">同じ期限のお知らせは1回だけLINEで送ります。</HelpTip></span>
-                    {expiryBasis === 'none' ? <span className={styles.sub}>期限を設定すると選べます</span> : <Select aria-label="期限の前に知らせる" size="full" disabled={ro} value={settings.expiryReminder ?? 'none'} onChange={v => set({ expiryReminder: v as VisitStampSettings['expiryReminder'] })} options={REMINDER_OPTIONS} />}
+                    {expiryBasis === 'none' ? <span className={styles.sub}>期限を設定すると選べます</span> : <SaveErrorField names={["expiryReminder","settings.expiryReminder","expiry_reminder","settings.expiry_reminder"]}><Select aria-label="期限の前に知らせる" size="full" disabled={ro} value={settings.expiryReminder ?? 'none'} onChange={v => set({ expiryReminder: v as VisitStampSettings['expiryReminder'] })} options={REMINDER_OPTIONS} /></SaveErrorField>}
                   </div>
                   <div className={styles.field}>
                     <span className={styles.label}>ゴールしたら <HelpTip label="ゴールしたらの説明">ゴールの特典を使うと、次のカードを受け取れます。</HelpTip></span>
-                    <Select id="stamp-nextCardId" error={issue?.field === 'nextCardId' ? issue.message : undefined} aria-label="ゴールしたら" size="full" disabled={ro} value={settings.completion === 'next_card' ? settings.nextCardId ?? 'repeat' : 'repeat'}
+                    <SaveErrorField names={["nextCardId","settings.nextCardId","next_card_id","settings.next_card_id"]}><Select id="stamp-nextCardId" error={issue?.field === 'nextCardId' ? issue.message : undefined} aria-label="ゴールしたら" size="full" disabled={ro} value={settings.completion === 'next_card' ? settings.nextCardId ?? 'repeat' : 'repeat'}
                       onChange={v => set({ completion: v === 'repeat' ? 'repeat' : 'next_card', nextCardId: v === 'repeat' ? null : v })}
-                      options={[{ value: 'repeat', label: '同じカードをもう一度' }, ...nextCards.map(c => ({ value: c.id, label: `次のカードへ：${c.name}` })), ...(settings.completion === 'next_card' && settings.nextCardId && !nextCards.some(c => c.id === settings.nextCardId) ? [{ value: settings.nextCardId, label: '次のカードを選び直してください', disabled: true }] : [])]} />
+                      options={[{ value: 'repeat', label: '同じカードをもう一度' }, ...nextCards.map(c => ({ value: c.id, label: `次のカードへ：${c.name}` })), ...(settings.completion === 'next_card' && settings.nextCardId && !nextCards.some(c => c.id === settings.nextCardId) ? [{ value: settings.nextCardId, label: '次のカードを選び直してください', disabled: true }] : [])]} /></SaveErrorField>
                   </div>
                 </div>
                 <span className={styles.label}>特典</span>
@@ -492,7 +513,7 @@ function VisitStampsScreen() {
                 )}
                 <label className={styles.field}>
                   <span className={styles.label}>使い方の説明（お客さまに見える）</span>
-                  <TextArea {...fieldProps('instructions')} compact aria-label="使い方の説明" rows={2} readOnly={ro} value={settings.instructions ?? ''} onChange={e => { if([...e.target.value].length <= 500) set({ instructions: e.target.value }) }} />
+                  <SaveErrorField names={["instructions","settings.instructions"]}><TextArea {...fieldProps('instructions')} compact aria-label="使い方の説明" rows={2} readOnly={ro} value={settings.instructions ?? ''} onChange={e => { if([...e.target.value].length <= 500) set({ instructions: e.target.value }) }} /></SaveErrorField>
                   {fieldError('instructions')}
                   <span className={styles.counter}>{`${[...(settings.instructions ?? '')].length} / 500`}</span>
                 </label>
@@ -520,8 +541,8 @@ function VisitStampsScreen() {
               <section className={`${styles.card} ${styles.cardTall} ${styles.cardRules}`} aria-label="② たまる決まり">
                 <SectionTitle help="来店1回ごとか、会計の金額ごとかを選びます。倍率は 曜日・時間・期間 で決め、いくつも当たるときはかけ合わせます。会員ランクは当たる中でいちばん高い倍率だけを使います。1回の上限は倍率の前、重ねたときの上限は倍率と初回ボーナスを重ねたあとにかかります。止めた倍率は使いません。">② たまる決まり</SectionTitle>
                 <div className={styles.radio} role="radiogroup" aria-label="たまり方">
-                  <Radio name="stamp-mode" checked={settings.mode === 'visit'} disabled={ro} onChange={() => set({ mode: 'visit' })}>来店 1回で 1個</Radio>
-                  <Radio name="stamp-mode" checked={settings.mode === 'amount'} disabled={ro} onChange={() => set({ mode: 'amount' })}>会計の金額で</Radio>
+                  <SaveErrorField names={["stamp-mode","mode","settings.mode"]}><Radio name="stamp-mode" checked={settings.mode === 'visit'} disabled={ro} onChange={() => set({ mode: 'visit' })}>来店 1回で 1個</Radio></SaveErrorField>
+                  <SaveErrorField names={["stamp-mode","mode","settings.mode"]}><Radio name="stamp-mode" checked={settings.mode === 'amount'} disabled={ro} onChange={() => set({ mode: 'amount' })}>会計の金額で</Radio></SaveErrorField>
                 </div>
                 {settings.mode === 'amount' ? (
                   <div className={`${styles.row2} ${styles.amount}`}>
@@ -542,21 +563,21 @@ function VisitStampsScreen() {
                 <div className={styles.field}>
                   <span className={styles.label}>たまる間隔の制限 <HelpTip label="たまる間隔の制限の説明">QRでも店で手入力でも同じ制限です。紙からの移行と取り消しにはかかりません。</HelpTip></span>
                   <div className={styles.radio} role="radiogroup" aria-label="たまる間隔の制限">
-                    <Radio name="stamp-interval" checked={interval.mode === 'same_day'} disabled={ro} onChange={() => set({ stampInterval: { mode: 'same_day' } })}>同じ日は1回まで（0時で戻る）</Radio>
+                    <SaveErrorField names={["stamp-interval","mode","interval.mode"]}><Radio name="stamp-interval" checked={interval.mode === 'same_day'} disabled={ro} onChange={() => set({ stampInterval: { mode: 'same_day' } })}>同じ日は1回まで（0時で戻る）</Radio></SaveErrorField>
                     <div className={styles.hoursRow}>
-                      <Radio name="stamp-interval" checked={interval.mode === 'hours'} disabled={ro} onChange={() => set({ stampInterval: { mode: 'hours', hours: interval.hours ?? 3 } })}>前の押印から</Radio>
-                      <TextField {...fieldProps('intervalHours')} aria-label="押印をあける時間" type="number" min={1} max={23} value={interval.hours ?? 3} readOnly={ro} onChange={e => set({ stampInterval: { mode: 'hours', hours: Number(e.target.value) } })} />
+                      <SaveErrorField names={["stamp-interval","mode","interval.mode"]}><Radio name="stamp-interval" checked={interval.mode === 'hours'} disabled={ro} onChange={() => set({ stampInterval: { mode: 'hours', hours: interval.hours ?? 3 } })}>前の押印から</Radio></SaveErrorField>
+                      <SaveErrorField names={["hours","interval.hours"]}><TextField {...fieldProps('intervalHours')} aria-label="押印をあける時間" type="number" min={1} max={23} value={interval.hours ?? 3} readOnly={ro} onChange={e => set({ stampInterval: { mode: 'hours', hours: Number(e.target.value) } })} /></SaveErrorField>
                       <span className={styles.plain}>時間あける（1〜23）</span>
                     </div>
                     {fieldError('intervalHours')}
-                    <Radio name="stamp-interval" checked={interval.mode === 'none'} disabled={ro} onChange={() => set({ stampInterval: { mode: 'none' } })}>制限しない</Radio>
+                    <SaveErrorField names={["stamp-interval","mode","interval.mode"]}><Radio name="stamp-interval" checked={interval.mode === 'none'} disabled={ro} onChange={() => set({ stampInterval: { mode: 'none' } })}>制限しない</Radio></SaveErrorField>
                   </div>
                 </div>
                 <span className={styles.label}>倍率・ボーナス</span>
                 {settings.multipliers.map((m, i) => (
                   <div key={i} className={styles.switchRow}>
                     {/* 切る＝止める（消さない）。消すのは「…」から。 */}
-                    <Toggle checked={m.active !== false} label={`${multiplierName(m)}を使う`} locked={ro} onChange={ro ? undefined : (on) => set({ multipliers: settings.multipliers.map((x, k) => (k === i ? { ...x, active: on } : x)) })} />
+                    <SaveErrorField names={[`multipliers.${i}.active`,"active","m.active"]}><Toggle checked={m.active !== false} label={`${multiplierName(m)}を使う`} locked={ro} onChange={ro ? undefined : (on) => set({ multipliers: settings.multipliers.map((x, k) => (k === i ? { ...x, active: on } : x)) })} /></SaveErrorField>
                     <span className={styles.texts}>
                       <span className={styles.name}>{multiplierName(m)}</span>
                       <span className={styles.sub} title={multiplierDetail(m)}>{m.active === false ? `止めています ・ ${multiplierDetail(m)}` : multiplierDetail(m)}</span>
@@ -566,7 +587,7 @@ function VisitStampsScreen() {
                   </div>
                 ))}
                 <div className={styles.switchRow}>
-                  <Toggle checked={settings.firstVisitBonus > 0} label="初回来店ボーナスを使う" locked={ro && settings.firstVisitBonus > 0} onChange={ro ? undefined : (on) => set({ firstVisitBonus: on ? 1 : 0 })} />
+                  <SaveErrorField names={["firstVisitBonus","settings.firstVisitBonus","first_visit_bonus","settings.first_visit_bonus"]}><Toggle checked={settings.firstVisitBonus > 0} label="初回来店ボーナスを使う" locked={ro && settings.firstVisitBonus > 0} onChange={ro ? undefined : (on) => set({ firstVisitBonus: on ? 1 : 0 })} /></SaveErrorField>
                   <span className={styles.texts}>
                     <span className={styles.name}>初回来店ボーナス</span>
                     <span className={styles.sub}>{settings.firstVisitBonus > 0 ? `はじめての来店で +${settings.firstVisitBonus}個` : 'はじめての来店で多めに押します'}</span>
@@ -574,7 +595,7 @@ function VisitStampsScreen() {
                   {ro ? null : <RowActions subjectName="初回来店ボーナス" menuItems={[{ id: 'edit', label: '個数を変える', onSelect: () => setBonusOpen(true) }]} />}
                 </div>
                 <div className={styles.switchRow}>
-                  <Toggle checked={settings.rankMultipliers.length > 0} label="会員ランクの倍率を使う" locked={ro && settings.rankMultipliers.length > 0} onChange={ro ? undefined : (on) => (on ? setRankOpen(true) : set({ rankMultipliers: [] }))} />
+                  <SaveErrorField names={["length","settings.rankMultipliers.length","rankMultipliers.length","rankOpen","settings.rank_multipliers.length","rank_multipliers.length","rank_open"]}><Toggle checked={settings.rankMultipliers.length > 0} label="会員ランクの倍率を使う" locked={ro && settings.rankMultipliers.length > 0} onChange={ro ? undefined : (on) => (on ? setRankOpen(true) : set({ rankMultipliers: [] }))} /></SaveErrorField>
                   <span className={styles.texts}>
                     <span className={styles.name}>会員ランクの倍率</span>
                     <span className={styles.sub} title={rankDetail(settings)}>{rankDetail(settings)}</span>
@@ -583,20 +604,20 @@ function VisitStampsScreen() {
                 </div>
                 <label className={styles.receiptRow}>
                   <span className={styles.texts}><span className={styles.name}>カードを受け取った時のボーナス</span><span className={styles.sub}>友だちがカードを受け取った時に押す数（0〜50）</span></span>
-                  <span>＋</span><TextField {...fieldProps('receiptBonus')} aria-label="カードを受け取った時のボーナス" type="number" min={0} max={50} readOnly={ro} value={settings.receiptBonus ?? 0} onChange={e => set({ receiptBonus: Number(e.target.value) })} /><span>個</span>
+                  <span>＋</span><SaveErrorField names={["receiptBonus","settings.receiptBonus","receipt_bonus","settings.receipt_bonus"]}><TextField {...fieldProps('receiptBonus')} aria-label="カードを受け取った時のボーナス" type="number" min={0} max={50} readOnly={ro} value={settings.receiptBonus ?? 0} onChange={e => set({ receiptBonus: Number(e.target.value) })} /></SaveErrorField><span>個</span>
                 </label>
                 {fieldError('receiptBonus')}
                 <div className={styles.row2}>
                   <div className={styles.field}>
                     <span className={styles.label}>重ねたときの順番</span>
                     {/* 初回ボーナスを倍率の前に足すか後に足すか（口の stackingOrder）。倍率どうしはかけ合わせ、ランクはいちばん高い倍率だけ。 */}
-                    <Select aria-label="重ねたときの順番" size="full" disabled={ro} value={settings.stackingOrder ?? 'bonus_then_multipliers'}
-                      onChange={(v) => set({ stackingOrder: v as VisitStampSettings['stackingOrder'] })} options={STACKING_ORDERS.map((o) => ({ value: o.value, label: o.label }))} />
+                    <SaveErrorField names={["stackingOrder","settings.stackingOrder","stacking_order","settings.stacking_order"]}><Select aria-label="重ねたときの順番" size="full" disabled={ro} value={settings.stackingOrder ?? 'bonus_then_multipliers'}
+                      onChange={(v) => set({ stackingOrder: v as VisitStampSettings['stackingOrder'] })} options={STACKING_ORDERS.map((o) => ({ value: o.value, label: o.label }))} /></SaveErrorField>
                   </div>
                   <div className={styles.field}>
                     <span className={styles.label}>重ねたときの上限</span>
-                    <Select aria-label="重ねたときの上限" size="full" disabled={ro} value={String(stackedCap(settings))} onChange={(v) => set({ maxStackedStamps: Number(v) })}
-                      options={CAP_OPTIONS.some((o) => o.value === String(stackedCap(settings))) ? CAP_OPTIONS : [...CAP_OPTIONS, { value: String(stackedCap(settings)), label: `1回 ${stackedCap(settings)}個まで` }]} />
+                    <SaveErrorField names={["settings"]}><Select aria-label="重ねたときの上限" size="full" disabled={ro} value={String(stackedCap(settings))} onChange={(v) => set({ maxStackedStamps: Number(v) })}
+                      options={CAP_OPTIONS.some((o) => o.value === String(stackedCap(settings))) ? CAP_OPTIONS : [...CAP_OPTIONS, { value: String(stackedCap(settings)), label: `1回 ${stackedCap(settings)}個まで` }]} /></SaveErrorField>
                   </div>
                 </div>
                 {ro || settings.multipliers.length >= 20 ? null : (
@@ -711,8 +732,8 @@ function VisitStampsScreen() {
                         )}
                 {log ? (
                   <div className={styles.historyFooter}>
-                    <Select aria-label="記録の表示件数" value={String(logPageSize)} onChange={v => { setLogPageSize(Number(v)); setLogPage(1) }}
-                      options={[10, 20, 50].map(n => ({ value: String(n), label: `${n}件ずつ` }))} />
+                    <SaveErrorField names={["logPageSize","pageSize","log_page_size"]}><Select aria-label="記録の表示件数" value={String(logPageSize)} onChange={v => { setLogPageSize(Number(v)); setLogPage(1) }}
+                      options={[10, 20, 50].map(n => ({ value: String(n), label: `${n}件ずつ` }))} /></SaveErrorField>
                     <span className={styles.sub}>{`${logTotal.toLocaleString('ja-JP')}件中 ${logTotal ? (logPage - 1) * logPageSize + 1 : 0}〜${Math.min(logPage * logPageSize, logTotal)}件`}</span>
                     <Pagination page={logPage} pageCount={logPages} onPageChange={setLogPage} ariaLabel="記録のページ送り" />
                   </div>
@@ -724,8 +745,8 @@ function VisitStampsScreen() {
                   {!card ? <p className={styles.sub}>カードを保存すると、店で押せるようになります。</p> : null}
                   <div className={styles.field}>
                     <span className={styles.label}>友だち</span>
-                    <Combobox key={selectedFriend ? `f-${friendId}` : 'none'} aria-label="友だちを探す" placeholder="名前で探す" value={friendId} onChange={(v) => { setFriendId(v) }} options={friendOptions}
-                      disabled={!card} emptyText={(q) => `「${q}」に合う友だちはいません`} />
+                    <SaveErrorField names={["friendId","friend_id"]} key={selectedFriend ? `f-${friendId}` : 'none'}><Combobox key={selectedFriend ? `f-${friendId}` : 'none'} aria-label="友だちを探す" placeholder="名前で探す" value={friendId} onChange={(v) => { setFriendId(v) }} options={friendOptions}
+                      disabled={!card} emptyText={(q) => `「${q}」に合う友だちはいません`} /></SaveErrorField>
                   </div>
                   {stampable ? (
                     <>
@@ -739,11 +760,11 @@ function VisitStampsScreen() {
                       </div>
                       <div className={styles.field}>
                         <span className={styles.label}>理由</span>
-                        <Select aria-label="理由" size="full" value={reason} onChange={(v) => setReason(v as ManualReason)} options={MANUAL_REASONS.map((r) => ({ value: r.value, label: r.label }))} />
+                        <SaveErrorField names={["reason"]}><Select aria-label="理由" size="full" value={reason} onChange={(v) => setReason(v as ManualReason)} options={MANUAL_REASONS.map((r) => ({ value: r.value, label: r.label }))} /></SaveErrorField>
                       </div>
                       <label className={styles.field}>
                         <span className={styles.label}>メモ<span className={styles.optional}>任意</span></span>
-                        <TextField value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={200} placeholder="例：レシートを確認済み" />
+                        <SaveErrorField names={["memo"]}><TextField value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={200} placeholder="例：レシートを確認済み" /></SaveErrorField>
                       </label>
                       <span className={styles.addLine}>
                         <Button disabled={!friendId || busy === 'grant'} onClick={() => void grant()} title={friendId ? undefined : '先に友だちを選んでください'}><Stamp size={15} aria-hidden="true" />押印を足す</Button>
@@ -784,7 +805,7 @@ function VisitStampsScreen() {
         onClose={() => setReversing(null)} onConfirm={(why) => { if (reversing) void reverse(reversing, why) }} />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="保存していないカードの設定" onConfirm={confirmLeave} onCancel={cancelLeave} />
       <PhotoDialog url={photoUrl} name={photo ? friendNames(friendById(photo.friend_id) ?? { displayName: '友だち' }).name : ''} onClose={() => setPhoto(null)} />
-    </PageFrame>
+    </PageFrame></SaveErrorScope>
   )
 }
 

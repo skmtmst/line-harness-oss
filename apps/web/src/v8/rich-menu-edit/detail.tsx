@@ -28,6 +28,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import { richMenuError, richMenuErrorAll } from '@/v8/rich-menus/errors'
 import { audienceOf, progressStatusText, runAudienceText, runStamp, type ProgressStep, type ReconcileDiff } from './model'
 import styles from './detail.module.css'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type Group = {
   id: string
@@ -40,6 +41,8 @@ type Group = {
 }
 
 export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const samePageUrl = useSamePageUrl()
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'リッチメニュー', href: '/rich-menus' }])
@@ -91,9 +94,11 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       setGroup(data)
       setLoadState('ready')
     } catch (caught) {
-      setLoadState(caught instanceof ApiError && caught.status === 404 ? 'missing' : 'error')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setLoadState(caught instanceof ApiError && caught.status === 404 ? 'missing' : 'error') }
     }
-  }, [groupId, samePageUrl])
+  }, [groupId, samePageUrl, saveErrors])
 
   const loadProgress = useCallback(async () => {
     try {
@@ -102,9 +107,11 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       setProgress({ steps: res.data.steps, message: res.data.message, failed: res.data.run?.status === 'failed' })
       setProgressError(false)
     } catch (caught) {
-      if (!(caught instanceof ApiError && caught.status === 403)) setProgressError(true)
+      const fieldFailure = saveErrors.capture(caught)
+
+      if (!(caught instanceof ApiError && caught.status === 403)) { if (!fieldFailure) setProgressError(true) }
     }
-  }, [groupId])
+  }, [groupId, saveErrors])
 
   const loadRuns = useCallback(async () => {
     try {
@@ -113,9 +120,11 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       setRuns(res.data.runs)
       setRunsError('')
     } catch (caught) {
-      setRunsError(caught instanceof ApiError && caught.status === 403 ? '公開の履歴を見る権限がありません。' : '公開の履歴を読み込めませんでした。')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setRunsError(caught instanceof ApiError && caught.status === 403 ? '公開の履歴を見る権限がありません。' : '公開の履歴を読み込めませんでした。') }
     }
-  }, [groupId])
+  }, [groupId, saveErrors])
 
   /* 照合：読むだけ（dryRun）。ずれを並べ、直すかは運用者が決める（K-2）。 */
   const check = useCallback(async () => {
@@ -126,12 +135,14 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       if (!res.success || !res.data || !Array.isArray(res.data.diffs)) throw new Error('reconcile')
       setDiffs(res.data.diffs)
       setCheckedAt(new Date())
-    } catch {
-      setCheckError('LINEとの照合ができませんでした。時間をおいてもう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setCheckError('LINEとの照合ができませんでした。時間をおいてもう一度お試しください。') }
     } finally {
       setChecking(false)
     }
-  }, [groupId])
+  }, [groupId, saveErrors])
 
   useEffect(() => { void loadGroup() }, [loadGroup])
   useEffect(() => {
@@ -170,9 +181,11 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       setNotice('もう一度公開しました。公開の進みを確かめてください。')
       await reloadAll()
     } catch (caught) {
-      setActionError(caught instanceof ApiError && caught.status === 409
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setActionError(caught instanceof ApiError && caught.status === 409
         ? 'ほかの人が先に公開・編集しました。読み直してから、もう一度お試しください。'
-        : '公開できませんでした。時間をおいてもう一度お試しください。')
+        : '公開できませんでした。時間をおいてもう一度お試しください。') }
     } finally {
       setRepublishing(false)
     }
@@ -190,9 +203,11 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       setNotice('失敗した公開をやり直しました。最新の状態を確かめてください。')
       await reloadAll()
     } catch (caught) {
-      setDialogError(caught instanceof ApiError && caught.status === 409
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setDialogError(caught instanceof ApiError && caught.status === 409
         ? 'すでにやり直されたか、新しい公開があります。読み直して確かめてください。'
-        : 'やり直せませんでした。時間をおいてもう一度お試しください。')
+        : 'やり直せませんでした。時間をおいてもう一度お試しください。') }
     } finally {
       setRetrying(false)
     }
@@ -210,8 +225,10 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       setNotice('LINEとのずれを直しました。')
       await check()
       await loadRuns()
-    } catch {
-      setDialogError('ずれを直せませんでした。時間をおいてもう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setDialogError('ずれを直せませんでした。時間をおいてもう一度お試しください。') }
     } finally {
       setFixing(false)
     }
@@ -227,7 +244,9 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       setUnpublishOpen(false)
       router.push('/rich-menus')
     } catch (caught) {
-      setDialogError(richMenuError(caught, 'unpublish'))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setDialogError(richMenuError(caught, 'unpublish')) }
     } finally {
       setUnpublishing(false)
     }
@@ -243,20 +262,22 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       setDuplicateOpen(false)
       router.push(`/rich-menus/edit?id=${encodeURIComponent(res.data.id)}&step=shape`)
     } catch (caught) {
-      setDialogError(richMenuErrorAll(caught, 'duplicate'))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setDialogError(richMenuErrorAll(caught, 'duplicate')) }
     } finally {
       setDuplicating(false)
     }
   }
 
   if (loadState === 'missing') {
-    return <TargetMissing kind="not-found" title="このリッチメニューは見つかりません" description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。" backHref="/rich-menus" backLabel="リッチメニュー一覧へ戻る" />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="not-found" title="このリッチメニューは見つかりません" description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。" backHref="/rich-menus" backLabel="リッチメニュー一覧へ戻る" /></SaveErrorScope>
   }
   if (loadState === 'error') {
-    return <TargetMissing kind="error" title="リッチメニューを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void loadGroup()} />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="error" title="リッチメニューを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void loadGroup()} /></SaveErrorScope>
   }
   const backLink = <Link href="/rich-menus" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />リッチメニューへ</Link>
-  if (!group) return <div className={styles.loadingHead}>{backLink}<p className={styles.loading} role="status">読み込み中…</p></div>
+  if (!group) return <SaveErrorScope errors={saveErrors}><div className={styles.loadingHead}>{backLink}<p className={styles.loading} role="status">読み込み中…</p></div></SaveErrorScope>
 
   const audience = audienceOf(group)
   const head = latestSucceeded ? `公開しました・${runStamp(latestSucceeded.updatedAt)}` : '公開中'
@@ -268,7 +289,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   ]
 
   return (
-    <div className={styles.page} data-design-node="hKr8f">
+    <SaveErrorScope errors={saveErrors}><div className={styles.page} data-design-node="hKr8f">
       <PageFrame kind="create">
         <PageHeading title={group.name} identity={backLink} description={head} />
         <div className={styles.split}>
@@ -425,6 +446,6 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         onConfirm={() => void duplicate()}
         onCancel={() => { if (!duplicating) setDuplicateOpen(false) }}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }

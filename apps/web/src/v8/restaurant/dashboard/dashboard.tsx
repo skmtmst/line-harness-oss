@@ -32,6 +32,7 @@ import { TodayTable } from './today-table'
 import { canWriteRole, groupCloseTasks, openItems, reasonText, slotTitle, summarizeToday } from './summarize'
 import { useStoreToday } from './use-store-today'
 import styles from './dashboard.module.css'
+import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 
 function daysAgo(iso: string, now: number): string {
   const days = Math.max(0, Math.floor((now - Date.parse(iso)) / 86_400_000))
@@ -58,6 +59,8 @@ export function sourceBreakdown(summary: Pick<ReturnType<typeof summarizeToday>,
 }
 
 function TodayStore() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('店舗ダッシュボード')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const { selectedAccountId } = useAccount()
@@ -114,7 +117,9 @@ function TodayStore() {
       await restaurantTestApi.completeChannelCloseTask(d.accountId, taskId)
       notifyToast(`${name}の枠を閉じた印を付けました。`)
     } catch (caught) {
-      notifyToast(caught instanceof Error && caught.message ? caught.message : '印を付けられませんでした。', { tone: 'error' })
+      const fieldFailure = saveErrors.capture(caught)
+
+      if (!fieldFailure) { notifyToast(caught instanceof Error && caught.message ? caught.message : '印を付けられませんでした。', { tone: 'error' }) }
     } finally {
       await d.reload()
       setBusyId('')
@@ -224,7 +229,7 @@ function TodayStore() {
   }
 
   return (
-    <DashboardPage
+    <SaveErrorScope errors={saveErrors}><DashboardPage
       boardId="hKRRF"
       headingSize="compact"
       title="今日のお店"
@@ -261,7 +266,7 @@ function TodayStore() {
           />
         </>
       ) : null}
-    </DashboardPage>
+    </DashboardPage></SaveErrorScope>
   )
 }
 

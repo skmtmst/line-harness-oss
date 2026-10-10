@@ -23,6 +23,7 @@ import type {
   BroadcastApprovalState,
 } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export type ApprovalStatus = NonNullable<ApiBroadcast['approvalStatus']>
 
@@ -108,7 +109,7 @@ export function ApprovalRequestFields({
           ) : candidatesState === 'error' ? (
             <p className="text-danger text-xs">承認できる人を読み込めませんでした。開き直してください。</p>
           ) : (
-            <Select
+            <SaveErrorField names={["approverId","approver_id"]}><Select
               aria-label="承認をお願いする人"
               size="full"
               id="approval-approver"
@@ -119,7 +120,7 @@ export function ApprovalRequestFields({
                 { value: '', label: candidates.length === 0 ? '承認できる人がいません' : '選んでください' },
                 ...candidates.map((item) => ({ value: item.id, label: item.name })),
               ]}
-            />
+            /></SaveErrorField>
           )}
           <p className="text-ink-faint mt-1 text-xs">
             送る相手 {formatCount(recipientCount)}。
@@ -129,14 +130,14 @@ export function ApprovalRequestFields({
           <label htmlFor="approval-note" className="text-ink mb-1 block text-xs font-semibold">
             ひとこと（任意）
           </label>
-          <TextArea
+          <SaveErrorField names={["note"]}><TextArea
             id="approval-note"
             rows={3}
             maxLength={500}
             value={note}
             onChange={(event) => onNoteChange(event.target.value)}
             placeholder="秋の案内です。10時までに見てください"
-          />
+          /></SaveErrorField>
         </div>
       </div>
     </div>
@@ -175,14 +176,14 @@ export function SingleOperatorFields({
           </label>
           <HelpTip label="人数の説明">送る相手の人数。送信の直前に数えた数。</HelpTip>
         </div>
-        <TextField
+        <SaveErrorField names={["value"]}><TextField
           id="approval-count"
           inputMode="numeric"
           autoComplete="off"
           value={value}
           onChange={(event) => onChange(event.target.value.replace(/[^0-9]/g, ''))}
           placeholder={String(recipientCount)}
-        />
+        /></SaveErrorField>
         {value.trim() !== '' ? (
           matched ? (
             <p className="text-success mt-1 text-xs">人数が合いました</p>
@@ -365,14 +366,14 @@ export function ApproverSection({
         <label htmlFor="approval-reject-reason" className="text-ink mb-1 block text-xs font-semibold">
           差し戻すときの理由（差し戻すときは必須）
         </label>
-        <TextArea
+        <SaveErrorField names={["rejectReason","reject_reason"]}><TextArea
           id="approval-reject-reason"
           rows={2}
           maxLength={1000}
           value={rejectReason}
           onChange={(event) => setRejectReason(event.target.value)}
           placeholder="理由を入れてください"
-        />
+        /></SaveErrorField>
       </div>
       {message ? <p className="text-danger mt-2 text-xs">{message}</p> : null}
       <div className="mt-3 flex flex-wrap gap-2">

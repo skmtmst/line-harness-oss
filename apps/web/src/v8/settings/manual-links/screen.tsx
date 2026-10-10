@@ -19,6 +19,7 @@ import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { LINK_STATUS_LABEL, checkedLabel, urlLabel } from './manual-link-view'
 import { useManualLinks } from './use-manual-links'
 import styles from './screen.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const TITLE = 'マニュアルの正本表'
 const DESCRIPTION = '画面の上の「マニュアル」が開く行き先を、画面ごとに決めます'
@@ -135,11 +136,11 @@ export default function ManualLinksScreen() {
                   <GridCell role="cell" className={`${styles.cell} ${styles.name}`} title={row.name}>{row.name}</GridCell>
                   <GridCell role="cell" className={styles.cell} title={urlLabel(row.url)}>
                     {editing ? (
-                      <TextField
+                      <SaveErrorField names={["editingUrl","editing_url"]}><TextField
                         aria-label={`${row.name}のマニュアルのURL`}
                         value={editingUrl}
                         onChange={(event) => setEditingUrl(event.target.value)}
-                      />
+                      /></SaveErrorField>
                     ) : (
                       <span className={row.url ? styles.url : styles.urlEmpty} title={row.url || undefined}>{urlLabel(row.url)}</span>
                     )}

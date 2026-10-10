@@ -36,6 +36,7 @@ import {
   type SubmissionPostActions,
 } from './summary'
 import styles from './responses.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type Submission = {
   id: string
@@ -433,13 +434,13 @@ function Responses() {
         <p className={styles.railNote}>{total === null ? '—' : `全 ${formatNumber(total)}件から、名前と答えで探します`}</p>
         <label className={styles.search}>
           <Search size={15} aria-hidden="true" />
-          <input
+          <SaveErrorField names={["query"]}><input
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="名前・答えで探す（全件から）"
             aria-label="名前・答えで探す（全件から）"
-          />
+          /></SaveErrorField>
         </label>
       </section>
     </div>

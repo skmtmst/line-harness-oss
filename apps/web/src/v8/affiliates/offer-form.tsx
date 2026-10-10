@@ -22,6 +22,7 @@ import {
   type OfferTermsFieldValues,
   type ParsedOfferTerms,
 } from './offer-terms'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 // ── Offer form modal ─────────────────────────────────────────────────────────
 
@@ -35,6 +36,8 @@ interface OfferFormProps {
 }
 
 export default function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }: OfferFormProps) {
+  const saveErrors = useSaveFormErrors()
+
   const isEdit = Boolean(initial)
   // R286: 読み上げの項目名。見えている項目名と入力欄を htmlFor・id で結ぶ。
   const fieldId = useId()
@@ -228,14 +231,16 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
       onSaved()
       onClose()
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure) setFormError(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。') }
     } finally {
       setSubmitting(false)
     }
-  }, [submitting, name, description, rewardAmount, rewardMiles, terms, termsLoaded, termsBase, lineAccountId, tagId, scenarioId, isActive, isEdit, initial, onSaved, onClose, showFieldError])
+  }, [submitting, name, description, rewardAmount, rewardMiles, terms, termsLoaded, termsBase, lineAccountId, tagId, scenarioId, isActive, isEdit, initial, onSaved, onClose, showFieldError, saveErrors])
 
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open
       title={isEdit ? '案件を編集' : '案件を新規作成'}
       busy={submitting}
@@ -247,16 +252,16 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
     >
       <div className="space-y-4" ref={formRef} onInput={() => setFieldErrors({})}>
         <Field label="案件名" htmlFor={nameId} error={fieldErrors.name} required>
-          <TextField id={nameId} value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 無料体験申込" />
+          <SaveErrorField names={["name"]}><TextField id={nameId} value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 無料体験申込" /></SaveErrorField>
         </Field>
         <Field label="説明" htmlFor={descriptionId}>
-          <TextArea id={descriptionId} value={description} onChange={(event) => setDescription(event.target.value)} rows={2} placeholder="案件の説明（任意）" />
+          <SaveErrorField names={["description"]}><TextArea id={descriptionId} value={description} onChange={(event) => setDescription(event.target.value)} rows={2} placeholder="案件の説明（任意）" /></SaveErrorField>
         </Field>
         <Field label="報酬額（円）" htmlFor={rewardAmountId} error={fieldErrors.rewardAmount}>
-          <TextField id={rewardAmountId} type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="例: 3000" />
+          <SaveErrorField names={["rewardAmount","reward_amount"]}><TextField id={rewardAmountId} type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="例: 3000" /></SaveErrorField>
         </Field>
         <Field label="成果承認時の付与マイル" htmlFor={rewardMilesId} error={fieldErrors.rewardMiles} note="承認された紹介1件ごとに紹介者へ付与します">
-          <TextField id={rewardMilesId} type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="例: 500" />
+          <SaveErrorField names={["rewardMiles","reward_miles"]}><TextField id={rewardMilesId} type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="例: 500" /></SaveErrorField>
         </Field>
 
         {isEdit && termsFailed ? (
@@ -269,19 +274,19 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
 
         <div>
           <label className="text-ink-secondary mb-1 block text-xs font-medium">誘導 LINE アカウント</label>
-          <Select
+          <SaveErrorField names={["lineAccountId","line_account_id"]}><Select
             aria-label="誘導 LINE アカウント"
             value={lineAccountId}
             onChange={(value) => setLineAccountId(value)}
             options={[{ value: '', label: '— 選択しない —' }, ...accounts.map((acc) => ({ value: acc.id, label: acc.name }))]}
             className="w-full"
             size="full"
-          />
+          /></SaveErrorField>
         </div>
 
         <div>
           <span className="text-ink-secondary mb-1 block text-xs font-medium">タグ</span>
-          <EntityKindField
+          <SaveErrorField names={["tagId"]}><EntityKindField
             kind="tag"
             label="タグ"
             accountId={lineAccountId || null}
@@ -293,12 +298,12 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
               ...accountTags,
               ...(tagIdStale ? [{ id: tagId, name: `${staleTagName ?? tagId}（このアカウントでは使えません）` }] : []),
             ]}
-          />
+          /></SaveErrorField>
         </div>
 
         <div>
           <span className="text-ink-secondary mb-1 block text-xs font-medium">シナリオ</span>
-          <EntityKindField
+          <SaveErrorField names={["scenarioId"]}><EntityKindField
             kind="scenario"
             label="シナリオ"
             accountId={lineAccountId || null}
@@ -310,17 +315,17 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
               ...accountScenarios,
               ...(scenarioIdStale ? [{ id: scenarioId, name: `${staleScenarioName ?? scenarioId}（このアカウントでは使えません）` }] : []),
             ]}
-          />
+          /></SaveErrorField>
         </div>
 
         {isEdit && (
-          <Toggle
+          <SaveErrorField names={["isActive","is_active"]}><Toggle
             checked={isActive}
             onChange={setIsActive}
             label={isActive ? '有効' : '無効'}
-          />
+          /></SaveErrorField>
         )}
       </div>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }

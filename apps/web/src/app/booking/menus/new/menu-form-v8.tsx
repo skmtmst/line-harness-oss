@@ -49,6 +49,7 @@ import MenuVersionHistory from '../menu-version-history'
 import { LiffPhoneMenuStep } from '../liff-phone-v8'
 import shell from '../settings-v8.module.css'
 import styles from './menu-form-v8.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -117,6 +118,8 @@ function cancelStoreLabel(settings: BookingSettings | null): string {
 }
 
 export default function MenuFormV8() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const searchParams = useSearchParams()
   const editId = searchParams.get('menu')
@@ -465,13 +468,17 @@ export default function MenuFormV8() {
     try {
       const bulk = await bookingApi.listStaffMenusBulk(selectedAccountId!)
       for (const entry of bulk.staff) matrixByStaff.set(entry.staff_id, entry.matrix)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       await Promise.all(
         staffIds.map(async (staffId) => {
           try {
             const { matrix } = await bookingApi.getStaffMenus(selectedAccountId!, staffId)
             matrixByStaff.set(staffId, matrix)
-          } catch {
+          } catch (saveFailure) {
+            saveErrors.capture(saveFailure)
+
             failed.push(staffId)
           }
         }),
@@ -495,7 +502,9 @@ export default function MenuFormV8() {
           if (!known) {
             /* 行列に無いメニュー行は Worker 側が足す。ここでは送るだけ。 */
           }
-        } catch {
+        } catch (saveFailure) {
+          saveErrors.capture(saveFailure)
+
           failed.push(staffId)
         }
       }),
@@ -521,7 +530,9 @@ export default function MenuFormV8() {
             override_price: row.override_price ?? null,
           })),
         )
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
+
         failed.push(staffId)
       }
     }))
@@ -577,7 +588,9 @@ export default function MenuFormV8() {
         at: latest?.at ?? null,
         version: latestMenu?.version ?? 0,
       })
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       setConflict({ name: name.trim() || 'メニュー', author: null, at: null, version: 0 })
     }
   }
@@ -618,6 +631,8 @@ export default function MenuFormV8() {
           const res = await bookingApi.updateMenu(selectedAccountId, menuId, expectedVersion, menuBody(editTarget?.is_active === 1))
           version = res.version
         } catch (e) {
+          saveErrors.capture(e)
+
           if (e instanceof ApiError && e.status === 409) {
             await openConflict(menuId)
             setSaving(null)
@@ -649,13 +664,17 @@ export default function MenuFormV8() {
           version = await writeResources(menuId, version)
           resourcesPending = false
         } catch (e) {
+          saveErrors.capture(e)
+
           if (e instanceof ApiError && e.status === 409) {
             const fresh = await bookingApi.listMenus(selectedAccountId)
             version = fresh.menus.find((menu) => menu.id === menuId)?.version ?? version
             try {
               version = await writeResources(menuId, version)
               resourcesPending = false
-            } catch {
+            } catch (saveFailure) {
+              saveErrors.capture(saveFailure)
+
               /* 残ったまま帯に出す */
             }
           }
@@ -670,16 +689,18 @@ export default function MenuFormV8() {
       notifyToast(editTarget ? 'メニューを保存しました' : publish ? 'メニューを公開しました' : '下書きを保存しました')
       router.push('/booking/menus')
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e)
+
       if (e instanceof ApiError && e.code === 'tag_not_found') {
-        setSaveError('選んだタグは削除されたため保存できませんでした。タグを選び直してください。')
+        { if (!fieldFailure) setSaveError('選んだタグは削除されたため保存できませんでした。タグを選び直してください。') }
       } else if (e instanceof ApiError && e.status === 409) {
         if (editTarget ?? createdMenuNeedingFollowUp) {
           await openConflict(editTarget?.id ?? createdMenuNeedingFollowUp!.menuId)
         } else {
-          setSaveError(bookingErrorText(e, '保存'))
+          { if (!fieldFailure) setSaveError(bookingErrorText(e, '保存')) }
         }
       } else {
-        setSaveError(e instanceof Error ? e.message : bookingErrorText(e, '保存'))
+        { if (!fieldFailure) setSaveError(e instanceof Error ? e.message : bookingErrorText(e, '保存')) }
       }
     } finally {
       setSaving(null)
@@ -706,13 +727,15 @@ export default function MenuFormV8() {
       setSaveError(null)
       notifyToast('最新の内容を読み込みました')
     } catch (e) {
-      setSaveError(bookingErrorText(e, '読み込み'))
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure) setSaveError(bookingErrorText(e, '読み込み')) }
     }
   }
 
   if (!canEdit) {
     return (
-      <div className={shell.shell} data-design-node="QqER7">
+      <SaveErrorScope errors={saveErrors}><div className={shell.shell} data-design-node="QqER7">
         <div className="mx-auto max-w-2xl p-6">
           <ListState
             kind="error"
@@ -720,25 +743,25 @@ export default function MenuFormV8() {
             description="メニューの作成・変更は、予約メニューの権限を持つログインユーザーだけが実行できます。管理者へ権限の確認を依頼してください。"
           />
         </div>
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
   if (editId && editStatus === 'loading') {
     return (
-      <div className={shell.shell} data-design-node="QqER7" aria-busy="true">
+      <SaveErrorScope errors={saveErrors}><div className={shell.shell} data-design-node="QqER7" aria-busy="true">
         <span className="sr-only" role="status">メニューを読み込んでいます</span>
         <DelayedSkeleton loading skeleton={<MenuFormSkeleton />} />
-      </div>
+      </div></SaveErrorScope>
     )
   }
   if (editId && editStatus === 'error') {
     return (
-      <div className={shell.shell} data-design-node="QqER7">
+      <SaveErrorScope errors={saveErrors}><div className={shell.shell} data-design-node="QqER7">
         <div className="p-10">
           <ListState kind="error" description={editError ?? '読み込めませんでした。'} onRetry={() => void loadAll()} />
         </div>
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
@@ -751,7 +774,7 @@ export default function MenuFormV8() {
         : '保存して公開'
 
   return (
-    <div className={shell.shell} data-design-node="QqER7">
+    <SaveErrorScope errors={saveErrors}><div className={shell.shell} data-design-node="QqER7">
       <header className={shell.boardHead} data-design="Head">
         <Link href="/booking/menus" className={shell.backLink}>← 予約へ</Link>
         <h1 className={shell.headTitle}>{editTarget ? '予約メニューを直す' : '予約メニューを作る'}</h1>
@@ -788,7 +811,7 @@ export default function MenuFormV8() {
             <div className={styles.fieldGrid}>
               <label className={styles.field}>
                 <span className={styles.label}>メニュー名</span>
-                <input
+                <SaveErrorField names={["name"]}><input
                   className={styles.input}
                   type="text"
                   value={name}
@@ -803,14 +826,14 @@ export default function MenuFormV8() {
                   }}
                   placeholder="例: トリミング（小型犬）"
                   aria-invalid={fieldErrors.name !== undefined}
-                />
+                /></SaveErrorField>
                 {fieldErrors.name !== undefined ? (
                   <span className="text-danger mt-1 text-xs" role="alert">{fieldErrors.name}</span>
                 ) : null}
               </label>
               <span className={styles.field}>
                 <span className={styles.label}>分類</span>
-                <Select
+                <SaveErrorField names={["categoryLabel","categoryPicking","category_label","category_picking"]}><Select
                   size="full"
                   aria-label="分類"
                   value={categoryPicking ? '__new__' : categoryLabel}
@@ -824,34 +847,34 @@ export default function MenuFormV8() {
                     }
                   }}
                   options={categoryOptions}
-                />
+                /></SaveErrorField>
                 {categoryPicking && (
-                  <input
+                  <SaveErrorField names={["categoryNew","category_new"]}><input
                     className={`${styles.input} mt-2`}
                     type="text"
                     value={categoryNew}
                     onChange={(e) => setCategoryNew(e.target.value)}
                     placeholder="新しい分類の名前（例: トリミング）"
                     aria-label="新しい分類の名前"
-                  />
+                  /></SaveErrorField>
                 )}
               </span>
               <label className={`${styles.field} ${styles.fieldFull}`}>
                 <span className={styles.label}>説明（お客さまに見えます）<span className={styles.optional}>任意</span></span>
-                <input
+                <SaveErrorField names={["description"]}><input
                   className={styles.input}
                   type="text"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="例: シャンプー・カット・爪切り"
-                />
+                /></SaveErrorField>
               </label>
             </div>
             <div className={`${styles.fieldGrid} ${styles.fieldGrid3}`}>
               <label className={styles.field}>
                 <span className={styles.label}>かかる時間</span>
                 <span className={styles.unitField}>
-                  <input
+                  <SaveErrorField names={["durationMinutes","duration_minutes"]}><input
                     type="number"
                     min={1}
                     value={durationMinutes}
@@ -866,7 +889,7 @@ export default function MenuFormV8() {
                     }}
                     aria-label="かかる時間（分）"
                     aria-invalid={fieldErrors.duration !== undefined}
-                  />
+                  /></SaveErrorField>
                   <span className={styles.unitSuffix}>分</span>
                 </span>
                 {fieldErrors.duration !== undefined ? (
@@ -877,20 +900,20 @@ export default function MenuFormV8() {
                 <span className={styles.label}>金額（空なら「お問い合わせ」）</span>
                 <span className={styles.unitField}>
                   <span className={styles.unitSuffix}>¥</span>
-                  <input
+                  <SaveErrorField names={["basePrice","base_price"]}><input
                     type="number"
                     min={0}
                     value={basePrice}
                     onChange={(e) => setBasePrice(e.target.value)}
                     placeholder="8,400"
                     aria-label="金額（円）"
-                  />
+                  /></SaveErrorField>
                 </span>
               </label>
               <span className={styles.field}>
                 <span className={styles.label}>予約したときのマイル</span>
                 <span className={styles.unitField}>
-                  <input
+                  <SaveErrorField names={["bookingMileage","booking_mileage"]}><input
                     type="text"
                     value={
                       mileageStatus === 'loading' ? '…'
@@ -900,7 +923,7 @@ export default function MenuFormV8() {
                     }
                     disabled
                     aria-label="予約したときのマイル（お店全体の設定）"
-                  />
+                  /></SaveErrorField>
                   <span className={styles.unitSuffix}>マイル</span>
                 </span>
               </span>
@@ -959,11 +982,11 @@ export default function MenuFormV8() {
                 </div>
                 <div className={`${shell.toggleRow} mt-3`}>
                   <span className={shell.toggleRowLabel}>「指名なし」でも受ける</span>
-                  <Toggle
+                  <SaveErrorField names={["noAssign","no_assign"]}><Toggle
                     label="「指名なし」でも受ける"
                     checked={noAssign}
                     onChange={toggleNoAssign}
-                  />
+                  /></SaveErrorField>
                 </div>
               </>
             )}
@@ -981,21 +1004,21 @@ export default function MenuFormV8() {
                   <div className={styles.ruleRow}>
                     <span className={styles.ruleLabel}>先の予約が取れる範囲</span>
                     <span className={`${styles.ruleValue} ${styles.ruleOwn}`}>
-                      <input type="number" min={1} value={windowDays} onChange={(e) => setWindowDays(e.target.value)} aria-label="先の予約が取れる範囲（日）" />
+                      <SaveErrorField names={["windowDays","window_days"]}><input type="number" min={1} value={windowDays} onChange={(e) => setWindowDays(e.target.value)} aria-label="先の予約が取れる範囲（日）" /></SaveErrorField>
                       <span className={styles.unitSuffix}>日先まで</span>
                     </span>
                   </div>
                   <div className={styles.ruleRow}>
                     <span className={styles.ruleLabel}>受付の締め切り</span>
                     <span className={`${styles.ruleValue} ${styles.ruleOwn}`}>
-                      <input type="number" min={1} value={cutoffHours} onChange={(e) => setCutoffHours(e.target.value)} aria-label="受付の締め切り（時間前）" />
+                      <SaveErrorField names={["cutoffHours","cutoff_hours"]}><input type="number" min={1} value={cutoffHours} onChange={(e) => setCutoffHours(e.target.value)} aria-label="受付の締め切り（時間前）" /></SaveErrorField>
                       <span className={styles.unitSuffix}>時間前</span>
                     </span>
                   </div>
                   <div className={styles.ruleRow}>
                     <span className={styles.ruleLabel}>キャンセルの期限</span>
                     <span className={`${styles.ruleValue} ${styles.ruleOwn}`}>
-                      <input type="number" min={1} value={cancelDeadlineHours} onChange={(e) => setCancelDeadlineHours(e.target.value)} aria-label="キャンセルの期限（時間前）" />
+                      <SaveErrorField names={["cancelDeadlineHours","cancel_deadline_hours"]}><input type="number" min={1} value={cancelDeadlineHours} onChange={(e) => setCancelDeadlineHours(e.target.value)} aria-label="キャンセルの期限（時間前）" /></SaveErrorField>
                       <span className={styles.unitSuffix}>時間前</span>
                     </span>
                   </div>
@@ -1035,20 +1058,20 @@ export default function MenuFormV8() {
               <label className={styles.field}>
                 <span className={styles.label}>同時に受けられる件数</span>
                 <span className={styles.unitField}>
-                  <input
+                  <SaveErrorField names={["concurrentCapacity","concurrent_capacity"]}><input
                     type="number"
                     min={1}
                     value={concurrentCapacity}
                     onChange={(e) => setConcurrentCapacity(e.target.value)}
                     aria-label="同時に受けられる件数"
-                  />
+                  /></SaveErrorField>
                   <span className={styles.unitSuffix}>件</span>
                 </span>
               </label>
               <label className={styles.field}>
                 <span className={styles.label}>後の空き時間（片付け・移動）</span>
                 <span className={styles.unitField}>
-                  <input
+                  <SaveErrorField names={["bufferAfterMinutes","buffer_after_minutes"]}><input
                     type="number"
                     min={0}
                     value={bufferAfterMinutes}
@@ -1063,7 +1086,7 @@ export default function MenuFormV8() {
                     }}
                     aria-label="後の空き時間（分）"
                     aria-invalid={fieldErrors.buffer !== undefined}
-                  />
+                  /></SaveErrorField>
                   <span className={styles.unitSuffix}>分</span>
                 </span>
                 {fieldErrors.buffer !== undefined ? (
@@ -1100,7 +1123,7 @@ export default function MenuFormV8() {
                       maxLength={100}
                       aria-label="タグを検索"
                     />
-                    <Select
+                    <SaveErrorField names={["autoTagId","auto_tag_id"]}><Select
                       size="full"
                       aria-label="予約後に付けるタグ"
                       value={autoTagId ?? ''}
@@ -1109,7 +1132,7 @@ export default function MenuFormV8() {
                         { value: '', label: '— なし —' },
                         ...visibleTagCandidates.map((tag) => ({ value: tag.id, label: tag.name })),
                       ]}
-                    />
+                    /></SaveErrorField>
                     {trimmedTagQuery !== '' && visibleTagCandidates.length === 0 && (
                       <p className="text-ink-faint text-xs">
                         「{trimmedTagQuery}」に合うタグがありません。
@@ -1120,23 +1143,23 @@ export default function MenuFormV8() {
               </span>
               <div className={shell.toggleRow}>
                 <span className={shell.toggleRowLabel}>予約するときに質問を出す</span>
-                <Toggle
+                <SaveErrorField names={["askQuestion","ask_question"]}><Toggle
                   label="予約するときに質問を出す"
                   checked={askQuestion}
                   onChange={setAskQuestion}
-                />
+                /></SaveErrorField>
               </div>
               {askQuestion && (
                 <label className={styles.field}>
                   <span className={styles.label}>質問文</span>
-                  <input
+                  <SaveErrorField names={["intakeQuestion","intake_question"]}><input
                     className={styles.input}
                     type="text"
                     value={intakeQuestion}
                     onChange={(e) => setIntakeQuestion(e.target.value)}
                     placeholder="例: 気になるところ・アレルギーがあれば教えてください"
                     maxLength={200}
-                  />
+                  /></SaveErrorField>
                 </label>
               )}
             </div>
@@ -1185,7 +1208,7 @@ export default function MenuFormV8() {
               <h2 className={shell.sectionTitle}>お支払い <StatusBadge tone="warning" size="compact" className="ml-1">お店で払うのみ</StatusBadge></h2>
               <span className={shell.sectionDesc}>決済サービスをつなぐと選べるようになります。いまは「お店で払う」だけです。</span>
             </div>
-            <RadioCardGroup legend="お支払い方法" className={`${styles.payRow} mt-3`}>
+            <SaveErrorField names={["menu-payment"]}><RadioCardGroup legend="お支払い方法" className={`${styles.payRow} mt-3`}>
               <RadioCard
                 name="menu-payment"
                 value="store"
@@ -1211,7 +1234,7 @@ export default function MenuFormV8() {
                 onChange={() => {}}
                 title="どちらでも"
               />
-            </RadioCardGroup>
+            </RadioCardGroup></SaveErrorField>
           </section>
 
           {saveError && (
@@ -1286,7 +1309,7 @@ export default function MenuFormV8() {
         />
       )}
       <UnsavedLeaveDialog open={leaveTarget !== null} subject={editTarget ? 'メニューの変更' : '入力したメニュー'} onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div>
+    </div></SaveErrorScope>
   )
 }
 

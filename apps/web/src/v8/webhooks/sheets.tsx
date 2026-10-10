@@ -37,6 +37,7 @@ import {
 } from './shell'
 import { shortDateTime } from './words'
 import styles from './sheets.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -94,6 +95,8 @@ export function syncResultProblem(data: { status: string; results?: Array<{ stat
 }
 
 export default function WebhooksSheetsV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('外部連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const { selectedAccountId, selectedAccount, accounts } = useAccount()
@@ -137,13 +140,14 @@ export default function WebhooksSheetsV8() {
       } else {
         setRunsError('同期の記録を読み込めませんでした。')
       }
-    } catch {
+    } catch (saveFailure) {
       if (runsGenerationRef.current !== generation || accountRef.current !== accountId) return
-      setRunsError('同期の記録を読み込めませんでした。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure) setRunsError('同期の記録を読み込めませんでした。') }
     } finally {
       if (runsGenerationRef.current === generation && accountRef.current === accountId) setRunsLoading(false)
     }
-  }, [])
+  }, [saveErrors])
 
   const load = useCallback(async () => {
     const generation = ++loadGenerationRef.current
@@ -211,9 +215,10 @@ export default function WebhooksSheetsV8() {
         return
       }
       window.location.assign(res.data.authorizeUrl)
-    } catch {
+    } catch (saveFailure) {
       if (accountRef.current !== accountId) return
-      setActionError('接続を始められませんでした。時間をおいて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure) setActionError('接続を始められませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       if (accountRef.current === accountId) setBusy(null)
     }
@@ -238,9 +243,10 @@ export default function WebhooksSheetsV8() {
       const loaded = await load()
       if (accountRef.current !== accountId) return
       if (!loaded) setSaveNotice('出力先を保存しましたが、最新の状態を読み込めませんでした。「もう一度読み込む」で状態を確かめてください。')
-    } catch {
+    } catch (saveFailure) {
       if (accountRef.current !== accountId) return
-      setActionError('出力先を保存できませんでした。通信を確かめて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure) setActionError('出力先を保存できませんでした。通信を確かめて、もう一度お試しください。') }
     } finally {
       if (accountRef.current === accountId) setBusy(null)
     }
@@ -262,9 +268,10 @@ export default function WebhooksSheetsV8() {
       await load()
       if (accountRef.current !== accountId) return
       if (problem) setActionError(problem)
-    } catch {
+    } catch (saveFailure) {
       if (accountRef.current !== accountId) return
-      setActionError('同期を始められませんでした。時間をおいて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure) setActionError('同期を始められませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       if (accountRef.current === accountId) setBusy(null)
     }
@@ -288,9 +295,10 @@ export default function WebhooksSheetsV8() {
         setDisconnectNotice('このアプリ側の連携は解除しましたが、Google側の許可の取り消しに失敗しました。Googleアカウントの「セキュリティ」設定から、このアプリへのアクセスを取り消してください。')
       }
       await load()
-    } catch {
+    } catch (saveFailure) {
       if (accountRef.current !== accountId) return
-      setActionError('接続を解除できませんでした。時間をおいて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure) setActionError('接続を解除できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       if (accountRef.current === accountId) setBusy(null)
     }
@@ -402,7 +410,7 @@ export default function WebhooksSheetsV8() {
               共有設定で「{connection?.googleAccountEmail ?? '接続したGoogleアカウント'}」に編集権限を付けたシートを指定してください。指定したシート内に「友だち」「フォーム回答」のタブを自動で作ります。
             </p>
             <div className={styles.targetRow}>
-              <TextField id="wh-sheets-target" value={targetInput} onChange={(event) => setTargetInput(event.target.value)}  placeholder="https://docs.google.com/spreadsheets/d/…" required />
+              <SaveErrorField names={["targetInput","target_input"]}><TextField id="wh-sheets-target" value={targetInput} onChange={(event) => setTargetInput(event.target.value)}  placeholder="https://docs.google.com/spreadsheets/d/…" required /></SaveErrorField>
               <Button type="submit" variant="primary" disabled={busy !== null} busy={busy === 'target'} busyLabel="確認しています…">保存する</Button>
             </div>
           </form>
@@ -494,7 +502,7 @@ export default function WebhooksSheetsV8() {
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId="DxAAA"
       headingSize="regular"
       title="外部連携"
@@ -550,6 +558,6 @@ export default function WebhooksSheetsV8() {
           </p>
         </Card>
       </div>
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

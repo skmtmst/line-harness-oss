@@ -16,8 +16,11 @@ import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import TagEditorV8 from './tag-editor-v8'
 import { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 export default function NewTagPageV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('タグを作る')
   const router = useRouter()
   const params = useSearchParams()
@@ -80,16 +83,16 @@ export default function NewTagPageV8() {
   const save = async (values: TagEditorValues, andAnother: boolean) => {
     if (saving) return
     if (!values.name) {
-      setError('タグ名を入力してください')
+      saveErrors.fail('name', 'タグ名を入力してください')
       return
     }
     // 旧画面にあった作る前の検査を、実際に表示するこの画面へ移した。
     if (values.name.trim().length > 80) {
-      setError('タグ名は80文字までで入力してください')
+      saveErrors.fail('name', 'タグ名は80文字までで入力してください')
       return
     }
     if ([...values.name].some((ch) => { const code = ch.charCodeAt(0); return code < 32 || code === 127 })) {
-      setError('タグ名に使えない文字が含まれています')
+      saveErrors.fail('name', 'タグ名に使えない文字が含まれています')
       return
     }
     if (!selectedAccountId) {
@@ -120,16 +123,18 @@ export default function NewTagPageV8() {
         router.push(`/tags?highlight=${created.data.tag.id}`)
       }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure) setError(reason instanceof Error ? reason.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。') }
     } finally {
       setSaving(false)
     }
   }
 
-  if (loading) return <p className="p-6 text-sm text-ink-faint">複製元を読み込んでいます…</p>
+  if (loading) return <SaveErrorScope errors={saveErrors}><p className="p-6 text-sm text-ink-faint">複製元を読み込んでいます…</p></SaveErrorScope>
 
   return (
-    <div>
+    <SaveErrorScope errors={saveErrors}><div>
       {createdName ? (
         <Notice tone="success" className="mb-4" message={`「${createdName}」を作成しました。続けて新しいタグを作れます。`} />
       ) : null}
@@ -163,6 +168,6 @@ export default function NewTagPageV8() {
         onCancel={() => router.push('/tags')}
         onSave={(values, andAnother) => save(values, andAnother)}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }

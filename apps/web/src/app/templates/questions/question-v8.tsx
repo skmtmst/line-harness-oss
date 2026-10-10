@@ -30,6 +30,7 @@ import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import EditorV8, { EditorCard } from '../editor-v8'
 import styles from '../editor-v8.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 function displayText(value: string): string {
   return value
@@ -67,6 +68,8 @@ function questionSummary(question: ScenarioQuestion): string[] {
 }
 
 function QuestionTemplateV8Inner() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const params = useSearchParams()
@@ -157,15 +160,15 @@ function QuestionTemplateV8Inner() {
       return false
     }
     if (!name.trim()) {
-      setError('テンプレート名を入力してください。')
+      if (!saveErrors.fail("name", 'テンプレート名を入力してください。')) setError('テンプレート名を入力してください。')
       return false
     }
     if (!question.text.trim()) {
-      setError('質問文を入力してください。')
+      saveErrors.fail('text', '質問文を入力してください。')
       return false
     }
     if (question.choices.length === 0 || question.choices.some((choice) => !choice.label.trim())) {
-      setError('すべての選択肢に文字を入力してください。')
+      saveErrors.fail('label', 'すべての選択肢に文字を入力してください。')
       return false
     }
     setSaving(true)
@@ -190,7 +193,9 @@ function QuestionTemplateV8Inner() {
       }
       return true
     } catch (caught) {
-      setError(describeApiFailure(caught, '保存', { forbidden: '質問テンプレートの作成・変更はオーナーと管理者だけができます。' }))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setError(describeApiFailure(caught, '保存', { forbidden: '質問テンプレートの作成・変更はオーナーと管理者だけができます。' })) }
       return false
     } finally {
       setSaving(false)
@@ -220,11 +225,11 @@ function QuestionTemplateV8Inner() {
     }
   }
 
-  if (loading || accountLoading) return <ListState kind="loading" title="質問テンプレートを読み込んでいます" />
+  if (loading || accountLoading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="質問テンプレートを読み込んでいます" /></SaveErrorScope>
 
   if (!canMutateTemplates) {
     return (
-      <div className={styles.page}>
+      <SaveErrorScope errors={saveErrors}><div className={styles.page}>
         <header className={styles.head}>
           <Link href="/templates" className={styles.back}>テンプレートへ</Link>
         </header>
@@ -232,12 +237,12 @@ function QuestionTemplateV8Inner() {
           <p className={styles.cardTitle}>質問テンプレートの作成・変更はオーナーと管理者だけができます</p>
           <Link href="/templates" className="text-action text-sm underline">一覧へ戻る</Link>
         </div>
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <EditorV8
         title={id ? '質問を編集' : '質問を作る'}
         lead="ボタンで答えてもらい、答えでタグなどを付ける"
@@ -297,7 +302,7 @@ function QuestionTemplateV8Inner() {
         <EditorCard title="名前とフォルダ" note="一覧に出る名前です。友だちには見えません。">
           <div className={styles.fieldRow}>
             <Field label="テンプレート名" htmlFor="tq8-name" required>
-              <input
+              <SaveErrorField names={["name"]}><input
                 id="tq8-name"
                 type="text"
                 className={inputClass}
@@ -305,10 +310,10 @@ function QuestionTemplateV8Inner() {
                 onChange={(event) => setName(event.target.value)}
                 maxLength={120}
                 placeholder="例：継続の意思をうかがう"
-              />
+              /></SaveErrorField>
             </Field>
             <Field label="フォルダ" htmlFor="tq8-folder">
-              <Select
+              <SaveErrorField names={["folderId","folder_id"]}><Select
                 id="tq8-folder"
                 aria-label="フォルダ"
                 value={folderId ?? ''}
@@ -318,7 +323,7 @@ function QuestionTemplateV8Inner() {
                   setCategory(folders.find((folder) => folder.id === next)?.name ?? '未分類')
                 }}
                 options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
-              />
+              /></SaveErrorField>
             </Field>
           </div>
         </EditorCard>
@@ -350,7 +355,7 @@ function QuestionTemplateV8Inner() {
         }}
         onCancel={() => setPublishConfirm(false)}
       />
-    </>
+    </></SaveErrorScope>
   )
 }
 

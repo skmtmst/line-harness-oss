@@ -43,6 +43,7 @@ import { connectionReasonLine } from './connection-reasons'
 import styles from './home.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/folder-colors'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 type View = 'cards' | 'table'
@@ -87,6 +88,8 @@ function statusOf(account: AccountWithStats): { label: string; tone: 'ok' | 'war
 }
 
 export default function HqHomeV8() {
+  const saveErrors = useSaveFormErrors()
+
   // 左のメニューと同じ名前を見出しにする（バナー生成・課金プランなどと同じ書き方）。
   usePageTitle('アカウント')
   const router = useRouter()
@@ -143,10 +146,12 @@ export default function HqHomeV8() {
         setFolders([...res.data.folders].sort((a, b) => a.displayOrder - b.displayOrder))
         setUnfiledCount(typeof res.data.unclassifiedCount === 'number' ? res.data.unclassifiedCount : null)
       }
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       // フォルダが読めなくても一覧は出す
     }
-  }, [])
+  }, [saveErrors])
 
   useEffect(() => {
     let cancelled = false
@@ -174,7 +179,9 @@ export default function HqHomeV8() {
     setReloadFailed(false)
     try {
       await Promise.all([load(), refreshAccounts(), loadFolders()])
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       setReloadFailed(true)
     }
   }
@@ -199,7 +206,9 @@ export default function HqHomeV8() {
           body: JSON.stringify({ expectedRevision }),
         })
         succeeded += 1
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
+
         failed += 1
       }
     }
@@ -208,8 +217,10 @@ export default function HqHomeV8() {
       setConnectionResult(failed === 0
         ? `${succeeded}件のLINE IDと接続状態を更新しました。`
         : `${succeeded}件を更新し、${failed}件は更新できませんでした。`)
-    } catch {
-      setConnectionResult(`${succeeded}件を確認しましたが、一覧を再読み込みできませんでした。`)
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setConnectionResult(`${succeeded}件を確認しましたが、一覧を再読み込みできませんでした。`) }
     } finally {
       setConnectionProgress('')
       setCheckingConnections(false)
@@ -294,7 +305,9 @@ export default function HqHomeV8() {
       await loadFolders()
       void reloadAfterSave()
     } catch (caught) {
-      setFolderError(caught instanceof Error ? caught.message : 'フォルダを保存できませんでした')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setFolderError(caught instanceof Error ? caught.message : 'フォルダを保存できませんでした') }
     } finally {
       setFolderSaving(false)
     }
@@ -309,7 +322,9 @@ export default function HqHomeV8() {
     try {
       await api.lineAccountFolders.update(a.id, { displayOrder: b.displayOrder === a.displayOrder ? index + delta : b.displayOrder })
       await api.lineAccountFolders.update(b.id, { displayOrder: b.displayOrder === a.displayOrder ? index : a.displayOrder })
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       // 並びが変わらなかったときは読み直した結果を見せる
     } finally {
       setFolderSaving(false)
@@ -330,7 +345,9 @@ export default function HqHomeV8() {
       await loadFolders()
       void reloadAfterSave()
     } catch (caught) {
-      setFolderError(caught instanceof Error ? caught.message : 'フォルダを消せませんでした')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setFolderError(caught instanceof Error ? caught.message : 'フォルダを消せませんでした') }
     } finally {
       setFolderSaving(false)
     }
@@ -464,20 +481,20 @@ export default function HqHomeV8() {
             ))}
           </div>
           <span className={styles.spacer} />
-          <SegmentedControl<View>
+          <SaveErrorField names={["view"]}><SegmentedControl<View>
             aria-label="表示の切り替え"
             value={view}
             onChange={setView}
             options={[{ value: 'cards', label: 'カード' }, { value: 'table', label: '表' }]}
-          />
-          <Select aria-label="アカウントの並び順" value={sort} width={134} onChange={(value) => { setSort(value); resetPage() }} options={SORT_OPTIONS} />
-          <Select
+          /></SaveErrorField>
+          <SaveErrorField names={["sort"]}><Select aria-label="アカウントの並び順" value={sort} width={134} onChange={(value) => { setSort(value); resetPage() }} options={SORT_OPTIONS} /></SaveErrorField>
+          <SaveErrorField names={["size"]}><Select
             aria-label="アカウントの表示件数"
             value={String(size)}
             width={110}
             onChange={(value) => { setSize(Number(value)); resetPage() }}
             options={PAGE_SIZES.map((value) => ({ value: String(value), label: `${value}件表示` }))}
-          />
+          /></SaveErrorField>
         </div>
       </div>
 
@@ -585,7 +602,7 @@ export default function HqHomeV8() {
   )
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId="JKjsE"
       title="統括のアカウント"
       help="カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「詳細」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。"
@@ -667,6 +684,6 @@ export default function HqHomeV8() {
           onCancel={() => { if (!folderSaving) setDeleteFolder(null) }}
         />
       ) : null}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

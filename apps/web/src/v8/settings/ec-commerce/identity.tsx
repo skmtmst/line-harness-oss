@@ -33,6 +33,7 @@ import shared from './screen.module.css'
 import styles from './identity.module.css'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type View = 'all' | 'candidate' | 'none' | 'conflict'
 type Sort = 'newest' | 'confidence'
@@ -182,16 +183,16 @@ export default function EcIdentityCandidatesScreen() {
 
         <div className={styles.toolbar}>
           <span className={styles.sortBox}>
-            <Select aria-label="候補の並び順" value={sort} onChange={(value) => setSort(value as Sort)} options={[{ value: 'confidence', label: '確からしさが高い順' }, { value: 'newest', label: '注文が新しい順' }]} />
+            <SaveErrorField names={["sort"]}><Select aria-label="候補の並び順" value={sort} onChange={(value) => setSort(value as Sort)} options={[{ value: 'confidence', label: '確からしさが高い順' }, { value: 'newest', label: '注文が新しい順' }]} /></SaveErrorField>
           </span>
           {/* 絵に無い絞り込み（候補あり・候補なし・同じ人が2人いる疑い）は、並びの横に小さく残す。 */}
           <span className={styles.sortBox}>
-            <Select
+            <SaveErrorField names={["view"]}><Select
               aria-label="候補の絞り込み"
               value={view}
               onChange={(value) => setView(value as View)}
               options={VIEW_OPTIONS.map((option) => ({ value: option.value, label: viewCount[option.value] == null ? option.label : `${option.label} ${formatNumber(viewCount[option.value] ?? 0)}` }))}
-            />
+            /></SaveErrorField>
           </span>
           <span className={shared.spacer} />
           <span className={styles.note}>結び付けても元の注文と LINE の友だちは残り、過去の LINE 送信は再送しません。</span>

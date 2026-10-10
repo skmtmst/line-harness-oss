@@ -57,6 +57,7 @@ import ConditionBuilder, {
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { scenarioReferenceData } from './scenario-reference-data'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 export const ACTION_KINDS: {
   feature?: 'friend_fields' | 'support_marks' | 'common_vars'
@@ -309,6 +310,8 @@ export default function ActionEditor({
   onClose,
   onChanged,
 }: ActionEditorProps) {
+  const saveErrors = useSaveFormErrors()
+
   const { selectedAccountId: contextAccountId } = useAccount()
   const selectedAccountId = accountId === undefined ? contextAccountId : accountId
   // 共通の窓の約束: Escapeで閉じる・Tabは窓の中・閉じたら起点へ戻す。
@@ -449,8 +452,11 @@ export default function ActionEditor({
       setDraftVersion(response.data.version)
       return true
     } catch (saveError) {
+
+
       if (at !== scopeRef.current) return false
-      setError(describeSaveFailure(saveError))
+      const fieldFailure = saveErrors.capture(saveError)
+      { if (!fieldFailure) setError(describeSaveFailure(saveError)) }
       return false
     } finally {
       if (at === scopeRef.current) setDraftSaving(false)
@@ -579,11 +585,13 @@ export default function ActionEditor({
           }),
         )
       }
-      } catch { if (!cancelled) setError('候補を読み込めませんでした。もう一度お試しください。') }
+      } catch (saveFailure) {
+        const fieldFailure = saveErrors.capture(saveFailure)
+ if (!cancelled) { if (!fieldFailure) setError('候補を読み込めませんでした。もう一度お試しください。') } }
       finally { if (!cancelled) setTargetsLoading(false) }
     })()
     return () => { cancelled = true }
-  }, [scenarioId, selectedAccountId, reload])
+  }, [scenarioId, selectedAccountId, reload, saveErrors])
 
   const add = (kind: (typeof ACTION_KINDS)[number]) => {
     setError('')
@@ -763,9 +771,11 @@ export default function ActionEditor({
         onChanged?.()
         onClose()
       } catch (restoreError) {
-        setError(
+        const fieldFailure = saveErrors.capture(restoreError)
+
+        { if (!fieldFailure) setError(
           describeSaveFailure(restoreError),
-        )
+        ) }
       } finally {
         setCancelling(false)
       }
@@ -775,7 +785,7 @@ export default function ActionEditor({
   const editing = actions.find((a) => a.id === conditionFor) ?? null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
+    <SaveErrorScope errors={saveErrors}><div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
       <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="action-editor-title" data-design-node="hz9ti" className={`${styles.dialog} flex w-full flex-col overflow-hidden rounded-card shadow-float`}>
         {/* ① 見出しと説明。設計は見出し20/700・説明13。 */}
         <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6" style={{ paddingBlock: 18 }}>
@@ -948,7 +958,7 @@ export default function ActionEditor({
                         {open && (
                           <div className="border-hairline border-t p-4">
                             <ActionConfigEditor action={action} tags={tags} fields={fields} marks={marks} scenarios={scenarioOpts} vars={vars} templates={templates} reminders={reminders} events={events} targetsLoading={targetsLoading} onChange={(config) => save(action, { config })} />
-                            <Checkbox className="mt-3" checked={action.repeatOnRefire} onCheckedChange={(checked) => save(action, { repeatOnRefire: checked })}>発動2回目以降も実行する</Checkbox>
+                            <SaveErrorField names={[`actions.${index}.repeatOnRefire`,`actions.${index}.repeat_on_refire`,"repeatOnRefire","action.repeatOnRefire","repeat_on_refire","action.repeat_on_refire"]}><Checkbox className="mt-3" checked={action.repeatOnRefire} onCheckedChange={(checked) => save(action, { repeatOnRefire: checked })}>発動2回目以降も実行する</Checkbox></SaveErrorField>
                             <div className="mt-3 flex gap-2"><button type="button" onClick={() => move(index, -1)} disabled={index === 0}>上へ</button><button type="button" onClick={() => move(index, 1)} disabled={index === actions.length - 1}>下へ</button><button type="button" onClick={() => remove(action)} className="text-danger">削除する</button></div>
                           </div>
                         )}
@@ -970,7 +980,7 @@ export default function ActionEditor({
         {/* R242: キャンセルは開く前の値に戻して閉じる。反映は今の内容のまま閉じる。 */}
         {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={cancel} disabled={cancelling} busy={cancelling} busyLabel="戻しています…">キャンセル</Button><Button variant="primary" disabled={pendingCount > 0 || Boolean(error) || loading || !draftReady} onClick={closeWhenSaved}>このアクションを反映</Button></div>}
       </div>
-    </div>
+    </div></SaveErrorScope>
   )
 }
 
@@ -1010,7 +1020,7 @@ function TargetSelector({
   const missing = !loading && value !== '' && !options.some((o) => o.id === value)
   return (
     <div className="min-w-0 flex-1">
-      <EntityKindField kind={kind} label={label} options={options} meta={(row) => (row as ActionTargetOption).hint ?? undefined} value={value} onChange={onChange} />
+      <SaveErrorField names={["value"]}><EntityKindField kind={kind} label={label} options={options} meta={(row) => (row as ActionTargetOption).hint ?? undefined} value={value} onChange={onChange} /></SaveErrorField>
       {!loading && options.length === 0 && !missing && (
         <p className="text-ink-secondary mt-1.5 text-xs">選べる{kindName}がありません。</p>
       )}
@@ -1055,7 +1065,7 @@ export function ActionConfigEditor({
       const selected = Array.isArray(c.tagIds) ? (c.tagIds as string[]) : []
       return (
         <>
-          <RadioCardGroup legend="タグの操作" className="flex flex-wrap items-center gap-4">
+          <SaveErrorField names={["tag-op","op","c.op"]}><RadioCardGroup legend="タグの操作" className="flex flex-wrap items-center gap-4">
             {(['add', 'remove'] as const).map((op) => (
               <RadioCard
                 key={op}
@@ -1066,7 +1076,7 @@ export function ActionConfigEditor({
                 title={op === 'add' ? 'タグを追加' : 'タグをはずす'}
               />
             ))}
-          </RadioCardGroup>
+          </RadioCardGroup></SaveErrorField>
           <div className="flex flex-wrap gap-1.5">
             {tags.map((tag) => {
               const on = selected.includes(tag.id)
@@ -1091,7 +1101,7 @@ export function ActionConfigEditor({
     case 'friend_field':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <Select
+          <SaveErrorField names={["fieldId","c.fieldId","field_id","c.field_id"]}><Select
             aria-label="友だち情報の項目"
             value={String(c.fieldId ?? '')}
             onChange={(value) => onChange({ ...c, fieldId: value })}
@@ -1099,17 +1109,17 @@ export function ActionConfigEditor({
               { value: '', label: '項目を選ぶ' },
               ...fields.map((f) => ({ value: f.id, label: f.name })),
             ]}
-          />
+          /></SaveErrorField>
           <span className="text-ink-secondary text-sm">に</span>
           {c.op !== 'clear' && (
-            <input
+            <SaveErrorField names={["value","c.value"]}><input
               value={String(c.value ?? '')}
               onChange={(e) => onChange({ ...c, value: e.target.value })}
               className={inputClass}
-            />
+            /></SaveErrorField>
           )}
           <span className="text-ink-secondary text-sm">を</span>
-          <Select
+          <SaveErrorField names={["op","c.op"]}><Select
             aria-label="友だち情報の操作"
             value={String(c.op ?? 'set')}
             onChange={(value) => onChange({ ...c, op: value })}
@@ -1119,7 +1129,7 @@ export function ActionConfigEditor({
               { value: 'sub', label: '－ (減算)' },
               { value: 'clear', label: 'X (消去)' },
             ]}
-          />
+          /></SaveErrorField>
           <span className="text-ink-secondary text-sm">する</span>
         </div>
       )
@@ -1128,7 +1138,7 @@ export function ActionConfigEditor({
       return (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink text-sm font-semibold">対応マーク</span>
-          <Select
+          <SaveErrorField names={["markId","c.markId","mark_id","c.mark_id"]}><Select
             aria-label="対応マーク"
             value={String(c.markId ?? '')}
             onChange={(value) => onChange({ ...c, markId: value || null })}
@@ -1136,7 +1146,7 @@ export function ActionConfigEditor({
               { value: '', label: 'マークを外す' },
               ...marks.map((m) => ({ value: m.id, label: m.name })),
             ]}
-          />
+          /></SaveErrorField>
         </div>
       )
 
@@ -1144,7 +1154,7 @@ export function ActionConfigEditor({
       return (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Select
+            <SaveErrorField names={["op","c.op"]}><Select
               aria-label="シナリオ操作"
               value={String(c.op ?? 'start')}
               onChange={(value) => onChange({ ...c, op: value })}
@@ -1153,19 +1163,19 @@ export function ActionConfigEditor({
                 { value: 'stop', label: '購読を止める' },
                 { value: 'resume_previous', label: '1つ前のシナリオを再開する' },
               ]}
-            />
+            /></SaveErrorField>
             {c.op !== 'resume_previous' && (
               <div className="min-w-0 flex-1">
-                <EntityKindField kind="scenario" label="対象のシナリオ" options={scenarios} value={String(c.scenarioId ?? '')}
+                <SaveErrorField names={["scenarioId","c.scenarioId"]}><EntityKindField kind="scenario" label="対象のシナリオ" options={scenarios} value={String(c.scenarioId ?? '')}
                   placeholder={c.op === 'stop' ? '（このシナリオ）' : undefined} clearable={c.op === 'stop'}
-                  onChange={(value) => onChange({ ...c, scenarioId: value })} />
+                  onChange={(value) => onChange({ ...c, scenarioId: value })} /></SaveErrorField>
               </div>
             )}
           </div>
           {c.op === 'start' && (
             <div className="bg-canvas-sunken rounded-card space-y-2 px-3 py-2.5">
               <p className="text-ink text-xs font-medium">シナリオを購読する場合</p>
-              <RadioCardGroup legend="シナリオを購読する場合">
+              <SaveErrorField names={["scenario-restart","value","opt.value","restart","c.restart"]}><RadioCardGroup legend="シナリオを購読する場合">
                 {(
                   [
                     { value: 'from_start', label: '(新規)最初から／(再開)最初から' },
@@ -1181,13 +1191,13 @@ export function ActionConfigEditor({
                     title={opt.label}
                   />
                 ))}
-              </RadioCardGroup>
-              <Checkbox
+              </RadioCardGroup></SaveErrorField>
+              <SaveErrorField names={["rememberPrevious","c.rememberPrevious","remember_previous","c.remember_previous"]}><Checkbox
                 checked={c.rememberPrevious === true}
                 onCheckedChange={(checked) => onChange({ ...c, rememberPrevious: checked })}
               >
                 いま読んでいるシナリオを控えて、あとで「1つ前のシナリオを再開」で戻せるようにする
-              </Checkbox>
+              </Checkbox></SaveErrorField>
             </div>
           )}
         </div>
@@ -1196,7 +1206,7 @@ export function ActionConfigEditor({
     case 'common_var':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <Select
+          <SaveErrorField names={["varKey","c.varKey","var_key","c.var_key"]}><Select
             aria-label="共通情報"
             value={String(c.varKey ?? '')}
             onChange={(value) => onChange({ ...c, varKey: value })}
@@ -1204,15 +1214,15 @@ export function ActionConfigEditor({
               { value: '', label: '共通情報を選ぶ' },
               ...vars.map((v) => ({ value: v.varKey, label: v.name })),
             ]}
-          />
+          /></SaveErrorField>
           <span className="text-ink-secondary text-sm">に</span>
-          <input
+          <SaveErrorField names={["value","c.value"]}><input
             value={String(c.value ?? '')}
             onChange={(e) => onChange({ ...c, value: e.target.value })}
             className={inputClass}
-          />
+          /></SaveErrorField>
           <span className="text-ink-secondary text-sm">を</span>
-          <Select
+          <SaveErrorField names={["op","c.op"]}><Select
             aria-label="共通情報の操作"
             value={String(c.op ?? 'add')}
             onChange={(value) => onChange({ ...c, op: value })}
@@ -1220,13 +1230,13 @@ export function ActionConfigEditor({
               { value: 'add', label: '＋ (加算)' },
               { value: 'sub', label: '－ (減算)' },
             ]}
-          />
+          /></SaveErrorField>
           <span className="text-ink-secondary text-sm">する</span>
         </div>
       )
 
     case 'send_message':
-      return <textarea value={String(c.content ?? '')} onChange={(e) => onChange({ ...c, content: e.target.value })} placeholder="送信する本文" />
+      return <SaveErrorField names={["content","c.content"]}><textarea value={String(c.content ?? '')} onChange={(e) => onChange({ ...c, content: e.target.value })} placeholder="送信する本文" /></SaveErrorField>
     case 'send_template': {
       const templateId = typeof c.templateId === 'string' ? c.templateId : ''
       const selected = templates.find((t) => t.id === templateId)

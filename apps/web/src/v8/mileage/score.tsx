@@ -53,6 +53,7 @@ import { mileagePaginationTotal } from './display'
 import styles from './mileage.module.css'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const BAND_LABELS: Record<ActionScoreBand, string> = {
   high: '点が高い',
@@ -133,6 +134,8 @@ function actionScoreAdjustmentErrorMessage(error: unknown): string {
 }
 
 export default function ScoreTab() {
+  const saveErrors = useSaveFormErrors()
+
   const { readonly, narrow } = useMileageShell()
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -194,14 +197,15 @@ export default function ScoreTab() {
       if (accountAtRequest !== latestAccountRef.current) return
       if (!response.success) throw new Error(response.error)
       setOverview(response.data)
-    } catch {
+    } catch (saveFailure) {
       if (accountAtRequest !== latestAccountRef.current) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       setOverview(null)
-      setLoadError(true)
+      { if (!fieldFailure) setLoadError(true) }
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
-  }, [accountId, filter, page, pageSize, search, sort])
+  }, [accountId, filter, page, pageSize, search, sort, saveErrors])
 
   /* この頁の行動スコアを CSV（6列：友だち・いまの点数・帯・30日間の変化・最後に点数が変わった理由・最終変動）。 */
   const exportCurrentPage = () => {
@@ -239,14 +243,15 @@ export default function ScoreTab() {
       if (accountAtRequest !== latestAccountRef.current) return
       if (!response.success) throw new Error(response.error)
       setConfig(response.data)
-    } catch {
+    } catch (saveFailure) {
       if (accountAtRequest !== latestAccountRef.current) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       setConfig(null)
-      setRulesError(true)
+      { if (!fieldFailure) setRulesError(true) }
     } finally {
       if (accountAtRequest === latestAccountRef.current) setRulesLoading(false)
     }
-  }, [accountId])
+  }, [accountId, saveErrors])
 
   useEffect(() => {
     if (accountLoading) return
@@ -321,9 +326,11 @@ export default function ScoreTab() {
       setPublishConfirm(false)
       setConfig(response.data)
     } catch (caught) {
-      setRulesActionError(caught instanceof ApiError && caught.status === 409
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setRulesActionError(caught instanceof ApiError && caught.status === 409
         ? 'ほかの人が先に公開しています。読み直してからやり直してください。'
-        : '公開できませんでした。もう一度お試しください。')
+        : '公開できませんでした。もう一度お試しください。') }
     } finally {
       setRulesBusy(false)
     }
@@ -338,8 +345,10 @@ export default function ScoreTab() {
       if (!response.success) throw new Error(response.error)
       setStopConfirm(false)
       setConfig(response.data)
-    } catch {
-      setRulesActionError('公開中のルールを止められませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setRulesActionError('公開中のルールを止められませんでした。もう一度お試しください。') }
     } finally {
       setRulesBusy(false)
     }
@@ -362,9 +371,11 @@ export default function ScoreTab() {
       setRemoveTarget(null)
       setConfig(response.data)
     } catch (caught) {
-      setRulesActionError(caught instanceof ApiError && caught.status === 409
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setRulesActionError(caught instanceof ApiError && caught.status === 409
         ? 'ほかの人が先に変えています。読み直してからやり直してください。'
-        : '外せませんでした。もう一度お試しください。')
+        : '外せませんでした。もう一度お試しください。') }
     } finally {
       setRulesBusy(false)
     }
@@ -380,8 +391,10 @@ export default function ScoreTab() {
       const response = await api.actionScores.previewBands({ accountId, bands: editable.bands })
       if (!response.success) throw new Error(response.error)
       setPreview(response.data)
-    } catch {
-      setPreviewError('試算できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setPreviewError('試算できませんでした。もう一度お試しください。') }
     } finally {
       setPreviewBusy(false)
     }
@@ -715,7 +728,7 @@ export default function ScoreTab() {
   ) : undefined
 
   return (
-    <MileageFrame
+    <SaveErrorScope errors={saveErrors}><MileageFrame
       help="行の「…」から、点数の手直し・この人を見る。表の下の「できごとの決めごと」を開くと、できごとの編集・外す・＋ できごとを足す（30日間反応がない、も選べる）。公開中のルールを止めるときは、その題の横の「…」から。"
       actions={readonly ? undefined : <div className={styles.headActions}>
         <Button href="/mileage/score-rules" title="決めごとの編集画面で1人分を試します">
@@ -821,7 +834,7 @@ export default function ScoreTab() {
     >
       {friendsBody}
       {rulesSection}
-    </MileageFrame>
+    </MileageFrame></SaveErrorScope>
   )
 }
 
@@ -851,6 +864,8 @@ export function ScoreAdjustDialog({
   onCancel: () => void
   onCompleted: () => Promise<void>
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [direction, setDirection] = useState<'increase' | 'decrease'>('decrease')
   const [amountText, setAmountText] = useState('10')
   const [reason, setReason] = useState('')
@@ -884,7 +899,9 @@ export function ScoreAdjustDialog({
       await onCompleted()
       onCancel()
     } catch (caught) {
-      setError(actionScoreAdjustmentErrorMessage(caught))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setError(actionScoreAdjustmentErrorMessage(caught)) }
     } finally {
       setBusy(false)
     }
@@ -897,7 +914,7 @@ export function ScoreAdjustDialog({
     : '点数を変更する'
 
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open
       designNode="Nv7An"
       designWidth={560}
@@ -942,7 +959,7 @@ export function ScoreAdjustDialog({
 
         <div className={styles.dlgGroup}>
           <label className={styles.dlgFieldLabel} htmlFor="ml-score-amount">点数</label>
-          <input
+          <SaveErrorField names={["amountText","amount_text"]}><input
             id="ml-score-amount"
             className={styles.dlgInput}
             inputMode="numeric"
@@ -951,13 +968,13 @@ export function ScoreAdjustDialog({
             {...fields.bind('amount')}
             aria-invalid={fields.invalid('amount') || undefined}
             aria-describedby={fields.invalid('amount') ? 'ml-score-amount-error' : undefined}
-          />
+          /></SaveErrorField>
           <FieldError id="ml-score-amount-error">{fields.error('amount')}</FieldError>
         </div>
 
         <div className={styles.dlgGroup}>
           <label className={styles.dlgCaption} htmlFor="ml-score-reason">理由</label>
-          <textarea
+          <SaveErrorField names={["reason"]}><textarea
             id="ml-score-reason"
             className={styles.dlgTextarea}
             value={reason}
@@ -966,7 +983,7 @@ export function ScoreAdjustDialog({
             {...fields.bind('reason')}
             aria-invalid={fields.invalid('reason') || undefined}
             aria-describedby={fields.invalid('reason') ? 'ml-score-reason-error' : undefined}
-          />
+          /></SaveErrorField>
           <FieldError id="ml-score-reason-error">{fields.error('reason')}</FieldError>
         </div>
 
@@ -993,7 +1010,7 @@ export function ScoreAdjustDialog({
             : `帯は「${bandName(bandAfter, highMin, normalMin)}」のまま変わりません。`}
         </p>
       </div>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }
 

@@ -59,6 +59,7 @@ import {
   type TemplateSaveInput,
 } from './edit/edit-core'
 import TemplateAssetEditorV8 from './asset-editor-v8'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const EMPTY_REFERENCES = EMPTY_TEMPLATE_REFERENCES
 
@@ -85,6 +86,8 @@ function useNarrowBoard() {
 }
 
 function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean }) {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   /* 作る画面だけ：1152 幅なら板 `a1k3d`。変える画面は `u5YC6` のまま。 */
   const narrowBoard = useNarrowBoard()
@@ -312,15 +315,17 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
         return false
       }
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       /*
        * 409 = 他の人が先に更新した。`NCbYn` の帯を出して、比べるか
        * 最新の読み込みかを選んでもらう（一覧の詳細パネルと同じ扱い）。
        */
       if (caught instanceof ApiError && caught.status === 409) {
         setPublishConflict(true)
-        setPublishError('他の人が先に更新したため、公開を止めました。比べるか、最新を読み込んでから続けてください。')
+        { if (!fieldFailure) setPublishError('他の人が先に更新したため、公開を止めました。比べるか、最新を読み込んでから続けてください。') }
       } else {
-        setPublishError('公開できませんでした。もう一度お試しください。')
+        { if (!fieldFailure) setPublishError('公開できませんでした。もう一度お試しください。') }
       }
       return false
     }
@@ -354,8 +359,10 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
         messageType: detail.data.messageType,
         messageContent: detail.data.messageContent,
       })
-    } catch {
-      setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setCompareError('最新の内容を取れませんでした。もう一度お試しください。') }
     } finally {
       setCompareBusy(false)
     }
@@ -376,7 +383,7 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
 
   if (!canMutateTemplates) {
     return (
-      <div className={styles.page}>
+      <SaveErrorScope errors={saveErrors}><div className={styles.page}>
         <header className={styles.head}>
           <Link href="/templates" className={styles.back}>テンプレートへ</Link>
         </header>
@@ -385,7 +392,7 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
           <p className={styles.muted}>中身の確認は一覧の行を開くと読めます。</p>
           <Link href="/templates" className="text-action underline text-sm">一覧へ戻る</Link>
         </div>
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
@@ -395,7 +402,7 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
   const publishedVersion = editor.publishedVersion ?? 0
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <EditorV8
         title={id ? 'メッセージを編集' : 'メッセージを作る'}
         lead={id
@@ -468,49 +475,49 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
             <EditorCard title="名前とフォルダ" note="一覧に出る名前です。友だちには見えません。">
               <div className={styles.fieldRow}>
                 <Field label="テンプレート名" htmlFor="tp8-name" required>
-                  <input
+                  <SaveErrorField names={["name"]}><input
                     id="tp8-name"
                     type="text"
                     value={name}
                     onChange={(event) => updateDraft({ name: event.target.value })}
                     placeholder="例：予約前日のご案内"
                     className="border-hairline rounded-control focus-visible:outline-action w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
-                  />
+                  /></SaveErrorField>
                 </Field>
                 <Field label="フォルダ" htmlFor="tp8-folder">
-                  <Select
+                  <SaveErrorField names={["folderId","folder_id"]}><Select
                     id="tp8-folder"
                     aria-label="フォルダ"
                     value={folderId ?? ''}
                     onChange={(value) => updateDraft({ folderId: value || null })}
                     options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
-                  />
+                  /></SaveErrorField>
                 </Field>
               </div>
             </EditorCard>
 
             <EditorCard title="中身" note="形を選んで、本文を書きます。">
               <Field label="形" htmlFor="tp8-type">
-                <SegmentedControl
+                <SaveErrorField names={["messageType"]}><SegmentedControl
                   aria-label="メッセージの形"
                   options={MESSAGE_TEMPLATE_TYPES.map((t) => ({ value: t.value, label: t.label }))}
                   value={messageType}
                   onChange={(value) => updateDraft({ messageType: value })}
-                />
+                /></SaveErrorField>
               </Field>
               <Field
                 label={messageType === 'text' ? '本文' : 'メッセージ内容'}
                 htmlFor="tp8-content"
                 required
               >
-                <textarea
+                <SaveErrorField names={["messageContent","message_content"]}><textarea
                   id="tp8-content"
                   ref={contentRef}
                   rows={messageType === 'flex' ? 14 : 6}
                   value={messageContent}
                   onChange={(event) => updateDraft({ messageContent: event.target.value })}
                   className={`border-hairline rounded-control focus-visible:outline-action w-full resize-y border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 ${messageType === 'flex' ? 'font-mono text-xs' : ''}`}
-                />
+                /></SaveErrorField>
                 {messageType === 'flex' && flexError ? (
                   <p role="alert" className="text-danger mt-1 text-xs">{flexError}このままでは保存できません。</p>
                 ) : null}
@@ -619,7 +626,7 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
           ))}
         </ul>
       </ConfirmDialog>
-    </>
+    </></SaveErrorScope>
   )
 }
 

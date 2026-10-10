@@ -42,6 +42,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { TagRowsSkeleton } from './tag-rows-skeleton'
 import styles from './list-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -409,12 +410,12 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
               <Button type="button" variant="primary" className={styles.toolbarCreate} disabled>＋ 項目を作る</Button>
             )}
             <div className={styles.folderSelectWrap}>
-              <Select
+              <SaveErrorField names={["folderFilter","folder_filter"]}><Select
                 aria-label="フォルダ"
                 value={folderFilter}
                 onChange={setFolderFilter}
                 options={folderSelectOptions}
-              />
+              /></SaveErrorField>
             </div>
             <div className={styles.searchWrap}>
               <SearchField
@@ -425,12 +426,12 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
                 onClear={() => setQuery('')}
               />
             </div>
-            <Select
+            <SaveErrorField names={["type"]}><Select
               aria-label="項目の種類"
               value={type}
               onChange={(value) => setType(value as typeof type)}
               options={[{ value: 'all', label: '種類：すべて' }, ...Object.entries(FIELD_TYPE_LABELS).map(([value, label]) => ({ value, label }))]}
-            />
+            /></SaveErrorField>
           </div>
 
           {actionError ? (
@@ -574,7 +575,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
                   {visible.length}件中 {visible.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}〜{Math.min(currentPage * pageSize, visible.length)}件
                 </span>
                 <div className={styles.pagerRight}>
-                  <Select
+                  <SaveErrorField names={["pageSize","page_size"]}><Select
                     aria-label="表示件数"
                     size="page-size"
                     value={String(pageSize)}
@@ -586,7 +587,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
                       { value: '50', label: '50件表示' },
                       { value: '100', label: '100件表示' },
                     ]}
-                  />
+                  /></SaveErrorField>
                   <Pagination
                     page={currentPage}
                     pageCount={pages}

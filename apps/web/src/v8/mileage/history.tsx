@@ -43,6 +43,7 @@ import {
 import { MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './mileage.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 function viewName(item: MileageAdminHistoryItem) {
   return item.displayName || '名前未取得'
@@ -473,13 +474,13 @@ export default function HistoryTab() {
         >
           <label className={styles.fieldLabel}>
             理由（必須）
-            <textarea
+            <SaveErrorField names={["pendingReason","pending_reason"]}><textarea
               className={styles.textarea}
               value={pendingReason}
               onChange={(event) => setPendingReason(event.target.value)}
               placeholder={pendingAction?.kind === 'confirm' ? '例：入金を確認しました' : '例：予約がキャンセルされました'}
               rows={3}
-            />
+            /></SaveErrorField>
           </label>
         </Dialog>
       }

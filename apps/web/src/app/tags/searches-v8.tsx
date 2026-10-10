@@ -39,6 +39,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { TagRowsSkeleton } from './tag-rows-skeleton'
 import styles from './list-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export default function SearchesTabV8({ accountId, canEdit }: { accountId: string | null; canEdit: boolean }) {
   const router = useRouter()
@@ -291,7 +292,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
               onClear={() => setQuery('')}
             />
           </div>
-          <Select
+          <SaveErrorField names={["usageFilter","usage_filter"]}><Select
             value={usageFilter}
             onChange={(value) => setUsageFilter(value as SavedSearchUsageFilter)}
             aria-label="使用先"
@@ -300,8 +301,8 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
               { value: 'used', label: '使用中' },
               { value: 'unused', label: '未使用' },
             ]}
-          />
-          <Select
+          /></SaveErrorField>
+          <SaveErrorField names={["matchFilter","match_filter"]}><Select
             value={matchFilter}
             onChange={(value) => setMatchFilter(value as typeof matchFilter)}
             aria-label="該当人数"
@@ -311,7 +312,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
               { value: 'zero', label: '0人' },
               { value: 'unknown', label: '未集計' },
             ]}
-          />
+          /></SaveErrorField>
         </div>
 
         {error ? (
@@ -492,7 +493,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                 {filteredList.length}件中 {filteredList.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}〜{Math.min(currentPage * pageSize, filteredList.length)}件
               </span>
               <div className={styles.pagerRight}>
-                <Select
+                <SaveErrorField names={["pageSize","page_size"]}><Select
                   aria-label="表示件数"
                   size="page-size"
                   value={String(pageSize)}
@@ -501,7 +502,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                     { value: '20', label: '20件表示' },
                     { value: '50', label: '50件表示' },
                   ]}
-                />
+                /></SaveErrorField>
                 <Pagination
                   page={currentPage}
                   pageCount={pages}

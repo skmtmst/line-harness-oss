@@ -23,6 +23,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import { adMappingReturns, groupAdMappings, useAdLogs, type AdMappingRow } from './ad-shared'
 import adsStyles from './ads.module.css'
 import styles from './ad-pages.module.css'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const STEPS = [
   { title: 'クリックの目印を持ち帰る', text: '広告から中継リンクを通った人の目印を残します。中継リンクを通らないと広告と結びつきません。' },
@@ -33,6 +34,8 @@ const STEPS = [
 type MappingState = { kind: 'loading' } | { kind: 'ready'; rows: AdMappingRow[] } | { kind: 'error' }
 
 export default function AdConnectionsV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('広告とのつなぎ')
   usePageCrumbs([
     { label: 'ホーム', href: '/' },
@@ -60,10 +63,12 @@ export default function AdConnectionsV8() {
       const res = await api.adPlatforms.mappings(accountId)
       if (generation !== generationRef.current) return
       setMapping(res.success ? { kind: 'ready', rows: groupAdMappings(res.data) } : { kind: 'error' })
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       if (generation === generationRef.current) setMapping({ kind: 'error' })
     }
-  }, [accountId])
+  }, [accountId, saveErrors])
 
   useEffect(() => {
     void loadMappings()
@@ -100,9 +105,10 @@ export default function AdConnectionsV8() {
       if (moved()) return
       if (!res.success) setSaveError(res.error ?? '対応を保存できませんでした。読み直してからもう一度お試しください。')
       await loadMappings()
-    } catch {
+    } catch (saveFailure) {
       if (moved()) return
-      setSaveError('対応を保存できませんでした。通信状態を確かめて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure) setSaveError('対応を保存できませんでした。通信状態を確かめて、もう一度お試しください。') }
     } finally {
       if (!moved()) setSavingKey(null)
     }
@@ -129,7 +135,7 @@ export default function AdConnectionsV8() {
   }
 
   if (!accountId) {
-    return <ListState kind="empty" title="LINEアカウントを選択してください" description="選んだLINEアカウントの広告とのつなぎだけを表示します。" />
+    return <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="LINEアカウントを選択してください" description="選んだLINEアカウントの広告とのつなぎだけを表示します。" /></SaveErrorScope>
   }
 
   let table
@@ -173,7 +179,7 @@ export default function AdConnectionsV8() {
   }
 
   return (
-    <div className={adsStyles.board} data-design-node="FDBsG">
+    <SaveErrorScope errors={saveErrors}><div className={adsStyles.board} data-design-node="FDBsG">
       <header className={adsStyles.head}>
         <div className={adsStyles.headText}>
           <h1 className={adsStyles.title}>広告とのつなぎ</h1>
@@ -220,6 +226,6 @@ export default function AdConnectionsV8() {
           気をつけること：広告側で成果の名前を先に作ってから対応を決めてください。失敗した送信のやり直しは、送信履歴から行えます。
         </p>
       </div>
-    </div>
+    </div></SaveErrorScope>
   )
 }

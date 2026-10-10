@@ -58,8 +58,11 @@ import {
 import styles from './operator-edit.module.css'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 function OperatorEditInner() {
+  const saveErrors = useSaveFormErrors()
+
   const editId = useSearchParams().get('id')
   usePageTitle(editId ? '運用者へのお知らせをなおす' : '運用者へのお知らせを作る')
   usePageCrumbs([
@@ -147,7 +150,9 @@ function OperatorEditInner() {
       setTeams(current => [...current.filter(team => team.id !== result.data.id), result.data])
       teamIdRef.current = result.data.id
       setTeamId(result.data.id); setRecipientIds(result.data.staffIds)
-    } catch (caught) { if (generation === teamGeneration.current) setTeamError(caught instanceof Error ? caught.message : '保存できませんでした。') }
+    } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+ if (generation === teamGeneration.current) { if (!fieldFailure) setTeamError(caught instanceof Error ? caught.message : '保存できませんでした。') } }
     finally { setTeamBusy(false) }
   }
 
@@ -361,14 +366,16 @@ function OperatorEditInner() {
       setError('')
       return result.data.id
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (caught instanceof ApiError && caught.status === 403) {
-        setError('このLINEアカウントのお知らせを変更する権限がありません。')
+        { if (!fieldFailure) setError('このLINEアカウントのお知らせを変更する権限がありません。') }
       } else if (caught instanceof ApiError && caught.status === 404) {
-        setError('お知らせが見つかりません。一覧へ戻って開き直してください。')
+        { if (!fieldFailure) setError('お知らせが見つかりません。一覧へ戻って開き直してください。') }
       } else if (caught instanceof ApiError && (caught.status === 409 || caught.status === 400)) {
-        setError(caught.message)
+        { if (!fieldFailure) setError(caught.message) }
       } else {
-        setError('下書きを保存できませんでした。時間をおいてもう一度お試しください。')
+        { if (!fieldFailure) setError('下書きを保存できませんでした。時間をおいてもう一度お試しください。') }
       }
       return null
     } finally {
@@ -400,9 +407,11 @@ function OperatorEditInner() {
       await api.lineNotifications.operatorRules.publish(ruleId, selectedAccountId)
       router.push(`/line-notifications?tab=operator&highlight=${encodeURIComponent(ruleId)}`)
     } catch (caught) {
-      setError(describeApiFailure(caught, '公開', {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setError(describeApiFailure(caught, '公開', {
         forbidden: 'このLINEアカウントのお知らせを公開する権限がありません。',
-      }))
+      })) }
     } finally {
       setPublishing(false)
     }
@@ -418,9 +427,11 @@ function OperatorEditInner() {
       if (!result.success) throw new Error(result.error)
       setNotice(result.data.accepted > 0 ? '自分へのテスト送信を受け付けました。' : '受け取れる通知方法がありません。受信設定を確認してください。')
     } catch (caught) {
-      setError(describeApiFailure(caught, 'テスト送信', {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setError(describeApiFailure(caught, 'テスト送信', {
         forbidden: 'このLINEアカウントのお知らせをテスト送信する権限がありません。',
-      }))
+      })) }
     } finally { setSaving(false) }
   }
 
@@ -439,7 +450,7 @@ function OperatorEditInner() {
   const teamOptions = [{ value: '', label: 'スタッフを選ぶ' }, ...teams.map(team => ({ value: team.id, label: `${team.name}（${team.staffIds.length}人）` }))]
 
   return (
-    <PageFrame kind="settings" boardId={editId ? 'hiBO8' : 'gjUz3'}>
+    <SaveErrorScope errors={saveErrors}><PageFrame kind="settings" boardId={editId ? 'hiBO8' : 'gjUz3'}>
       <PageHeading title={title} description={description} />
 
       <div className={styles.body}>
@@ -493,7 +504,7 @@ function OperatorEditInner() {
           >
               <FormSection id="operator-when-heading" title="どんなときに知らせるか">
                 <FormField htmlFor="operator-name" label="お知らせの名前">
-                  <TextField
+                  <SaveErrorField names={["name"]}><TextField
                     id="operator-name"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
@@ -503,7 +514,7 @@ function OperatorEditInner() {
                     {...fields.bind('name')}
                     invalid={fields.invalid('name')}
                     aria-describedby={fields.invalid('name') ? 'operator-name-error' : undefined}
-                  />
+                  /></SaveErrorField>
                   <FieldError id="operator-name-error">{fields.error('name')}</FieldError>
                 </FormField>
                 <div className={styles.pair}>
@@ -566,7 +577,7 @@ function OperatorEditInner() {
                         {(canWrite ? items : items.filter((recipient) => recipientIds.includes(recipient.id))).map((recipient) => (
                           <li key={recipient.id} className={styles.staffRow}>
                             {canWrite ? (
-                              <Checkbox
+                              <SaveErrorField names={["id","recipient.id","teamId","team_id"]}><Checkbox
                                 checked={recipientIds.includes(recipient.id)}
                                 onCheckedChange={(checked) => {
                                   teamTouchedRef.current = true
@@ -579,7 +590,7 @@ function OperatorEditInner() {
                                 }}
                               >
                                 {recipient.name}
-                              </Checkbox>
+                              </Checkbox></SaveErrorField>
                             ) : <span>{recipient.name}</span>}
                             <span className={styles.staffSpacer} />
                             <StatusBadge tone={recipient.channels.line ? 'success' : 'neutral'}>
@@ -614,7 +625,7 @@ function OperatorEditInner() {
                   ) : null}
                   {canWrite && teamFormOpen ? (
                     <div className={styles.teamForm}>
-                      <TextField aria-label="チーム名" placeholder="チーム名" value={teamName} maxLength={100} disabled={teamBusy} onChange={event => setTeamName(event.target.value)} />
+                      <SaveErrorField names={["teamName","name","team_name"]}><TextField aria-label="チーム名" placeholder="チーム名" value={teamName} maxLength={100} disabled={teamBusy} onChange={event => setTeamName(event.target.value)} /></SaveErrorField>
                       <Button variant="secondary" disabled={teamBusy} onClick={() => void saveTeam()}>{teamId ? 'チームを更新する' : 'チームを作る'}</Button>
                     </div>
                   ) : null}
@@ -627,12 +638,12 @@ function OperatorEditInner() {
                 </div>
                 )}
                 {canWrite ? <>
-                  <Checkbox checked={onlyAvailable} onCheckedChange={setOnlyAvailable}>
+                  <SaveErrorField names={["onlyAvailable","only_available"]}><Checkbox checked={onlyAvailable} onCheckedChange={setOnlyAvailable}>
                     手が空いている人だけに送る（対応中の人には送りません）
-                  </Checkbox>
-                  <Checkbox checked={emailFallback} onCheckedChange={setEmailFallback}>
+                  </Checkbox></SaveErrorField>
+                  <SaveErrorField names={["emailFallback","email_fallback"]}><Checkbox checked={emailFallback} onCheckedChange={setEmailFallback}>
                     だれも受け取れないときはメールでも送る（LINE未ログインの人がいるとき）
-                  </Checkbox>
+                  </Checkbox></SaveErrorField>
                 </> : <>
                   {/* 閲覧のみ：チェックは置かず、いまの設定を文字で見せる。 */}
                   <p className={styles.cardNote}>{`手が空いている人だけに送る：${onlyAvailable ? 'する' : 'しない'}`}</p>
@@ -730,7 +741,7 @@ function OperatorEditInner() {
       </Dialog>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したお知らせ" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </PageFrame>
+    </PageFrame></SaveErrorScope>
   )
 }
 
@@ -755,8 +766,8 @@ function Field({ id, label, value, onChange, options, readOnly = false, error }:
   return (
     <FormField htmlFor={id} label={label} size="compact" error={error} fill>
       {readOnly
-        ? <TextField id={id} aria-label={label} value={shown} readOnly aria-readonly="true" title={shown} />
-        : <Select aria-label={label} id={id} size="full" invalid={!!error} value={value} onChange={onChange} options={options} />}
+        ? <SaveErrorField names={["shown"]}><TextField id={id} aria-label={label} value={shown} readOnly aria-readonly="true" title={shown} /></SaveErrorField>
+        : <SaveErrorField names={["value"]}><Select aria-label={label} id={id} size="full" invalid={!!error} value={value} onChange={onChange} options={options} /></SaveErrorField>}
     </FormField>
   )
 }

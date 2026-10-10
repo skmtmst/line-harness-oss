@@ -42,6 +42,7 @@ import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import type { TemplateEditHost } from './host'
 import styles from './edit.module.css'
 import rich from './rich.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /* ── 形と面（template-asset-editor.tsx と同じ値） ── */
 export interface RichArea { label: string; x: number; y: number; width: number; height: number }
@@ -174,6 +175,8 @@ function richInitial(host: TemplateEditHost | undefined) {
  * 画像は統括の置き場へ送って LINE の5サイズを作る（host.uploadRichImage）。登録メディア・画像の URL・動きを実行するは出さない。
  */
 export default function TemplateRichEditor({ visual = false, host }: { visual?: boolean; host?: TemplateEditHost }) {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const role = useStaffRole()
   const hqHost = Boolean(host && !host.composer?.accountId)
@@ -302,8 +305,10 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
       setSaved(true)
       setClean(snapshot)
       return true
-    } catch {
-      setError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setError('保存できませんでした。通信状態を確認して、もう一度お試しください。') }
       return false
     } finally {
       setSaving(false)
@@ -331,7 +336,9 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
       setUploaded(result)
       setImageUrl(url)
     } catch (cause) {
-      setError(japaneseDetailOf(cause) || '画像を送れませんでした。PNG・JPEG（8MB まで）を選び直してください。')
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure) setError(japaneseDetailOf(cause) || '画像を送れませんでした。PNG・JPEG（8MB まで）を選び直してください。') }
     } finally {
       setUploading(false)
     }
@@ -402,7 +409,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
 
   if (!canMutate) {
     return (
-      <TemplateEditFrame
+      <SaveErrorScope errors={saveErrors}><TemplateEditFrame
         boardId="EFV8l"
         title="リッチメッセージを作る"
         description="1枚の画像を面に分けて、押した面ごとに動く"
@@ -412,12 +419,12 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         <Card padding="none" layout="vertical" className={styles.card}>
           <p className={styles.cardNote}>中身の確認は一覧の行を開くと読めます。</p>
         </Card>
-      </TemplateEditFrame>
+      </TemplateEditFrame></SaveErrorScope>
     )
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <TemplateEditFrame
         composerHost={host ? { ...host, busy, onCancel: () => guarded(host.onCancel) } : undefined}
         onComposerInsert={(alsoSave) => void hostSave(alsoSave)}
@@ -458,12 +465,12 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
           <div className={styles.pair}>
             <div className={`${styles.field} ${styles.grow}`}>
               <label htmlFor="te-rich-name" className={styles.label}>テンプレート名</label>
-              <TextField {...fields.bind('name')} id="te-rich-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：夏のキャンペーン告知" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-rich-name-error' : undefined} />
+              <SaveErrorField names={["name"]}><TextField {...fields.bind('name')} id="te-rich-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：夏のキャンペーン告知" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-rich-name-error' : undefined} /></SaveErrorField>
               <FieldError id="te-rich-name-error">{fields.error('name')}</FieldError>
             </div>
             <div className={`${styles.field} ${styles.folderField}`}>
               <label htmlFor="te-rich-folder" className={styles.labelSmall}>フォルダ</label>
-              <FolderSelect
+              <SaveErrorField names={["folder","host.folder"]}><FolderSelect
                 id="te-rich-folder"
                 aria-label="フォルダ"
                 value={host ? host.folder : folder}
@@ -475,7 +482,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                   : canMutate && selectedAccountId
                     ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: selectedAccountId }), folderByName, (created) => setFolders((current) => [...current, created]))
                     : undefined}
-              />
+              /></SaveErrorField>
             </div>
           </div>
         </Card>}
@@ -498,7 +505,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
           </div>
           <div className={rich.imageRow}>
             <div className={rich.imageBox} {...fields.bind('image')}>
-              <MediaSlot
+              <SaveErrorField names={["imageUrl","image_url"]}><MediaSlot
                 error={fields.error('image') ?? undefined}
                 size="compact"
                 aspectRatio="1 / 1"
@@ -518,7 +525,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                 onFile={hqHost ? (file) => void uploadImage(file) : undefined}
                 onChange={(url) => { setImageUrl(url ?? ''); if (url === null) { setPickedMedia(null); setUploaded(null) } }}
                 onMediaPick={hqHost ? undefined : () => setPickerOpen(true)}
-              />
+              /></SaveErrorField>
             </div>
             <div className={rich.imageSide}>
               <p className={styles.cardNote}>面の線は画像の上に重ねて表示されます。友だちには線は見えません。</p>
@@ -527,12 +534,12 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                 /* 統括：PNG・JPEG（8MB まで）を送ると、配った先で使う5サイズを作る。URL の直書きは置かない（サイズを作れない）。 */
                 null
               ) : (
-              <TextField
+              <SaveErrorField names={["imageUrl","image_url"]}><TextField
                 value={imageUrl}
                 onChange={(event) => { setImageUrl(event.target.value); setPickedMedia(null) }}
                 placeholder="または画像のURL（https://…）"
                 aria-label="画像のURL"
-              />
+              /></SaveErrorField>
               )}
             </div>
           </div>
@@ -571,7 +578,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                   <div className={rich.areaRow} role="group" aria-label={`面 ${area.label}`}>
                     <span className={rich.areaChip} data-unset={draft.kind === 'none' || undefined}>{`${area.label} ${areaPlace(area, shapeDef.areas)}`}</span>
                     <div className={rich.areaTap} {...fields.bind(`area-${area.label}`)} aria-describedby={fields.invalid(`area-${area.label}`) ? 'te-rich-area-error' : undefined}>
-                      <TapActionField
+                      <SaveErrorField names={["draft"]}><TapActionField
                         name={`面 ${area.label} `}
                         kindLabel={`面 ${area.label} を押したら`}
                         value={draft}
@@ -585,7 +592,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                         readOnly={!canMutate}
                         sources={tapSources}
                         textMax={RICH_MESSAGE_TEXT_MAX}
-                      />
+                      /></SaveErrorField>
                     </div>
                   </div>
                   <FieldError id="te-rich-area-error">{fields.error(`area-${area.label}`)}</FieldError>
@@ -623,6 +630,6 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
       />
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="リッチメッセージの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }

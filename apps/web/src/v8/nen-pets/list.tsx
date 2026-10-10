@@ -28,6 +28,7 @@ import {
 import PetEditorV8 from './editor'
 import { NEUTERED_LABEL, Pill, RowMenu, feedingLines, monthDay, rangeText, type PetsQuery } from './parts'
 import styles from './pets.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 const PAGE_SIZES = [10, 20, 50]
@@ -96,14 +97,14 @@ export default function PetsListV8({
           <SearchField aria-label="ペット名・飼い主で探す" placeholder="ペット名・飼い主で探す" value={draft} onChange={setDraft} onClear={() => setDraft('')} />
         </span>
         <span className={styles.toolsBreak} aria-hidden="true" />
-        <Select
+        <SaveErrorField names={["species","query.species"]}><Select
           aria-label="種別で絞り込む"
           width={140}
           value={query.species}
           onChange={(value) => change({ species: value })}
           options={[{ value: '', label: '種別：すべて' }, { value: 'dog', label: '種別：犬' }, { value: 'cat', label: '種別：猫' }, { value: 'other', label: '種別：その他' }]}
-        />
-        <Select
+        /></SaveErrorField>
+        <SaveErrorField names={["product","query.product"]}><Select
           aria-label="主食で絞り込む"
           width={140}
           value={query.product}
@@ -113,15 +114,15 @@ export default function PetsListV8({
             ...(data?.products ?? []).map((p) => ({ value: p.id, label: `主食：${p.name}` })),
             { value: 'none', label: '主食：未設定' },
           ]}
-        />
-        <Select
+        /></SaveErrorField>
+        <SaveErrorField names={["weight","query.weight"]}><Select
           aria-label="体重の更新で絞り込む"
           width={140}
           value={query.weight}
           onChange={(value) => change({ weight: value === 'stale' || value === 'fresh' ? value : '' })}
           options={[{ value: '', label: '体重更新：すべて' }, { value: 'fresh', label: '体重更新：90日以内' }, { value: 'stale', label: '体重更新：90日以上前' }]}
-        />
-        <Select
+        /></SaveErrorField>
+        <SaveErrorField names={["sort","query.sort"]}><Select
           aria-label="並び順"
           width={170}
           value={query.sort}
@@ -132,9 +133,9 @@ export default function PetsListV8({
             { value: 'weight_desc', label: '並び：体重が重い順' },
             { value: 'age_desc', label: '並び：年齢が高い順' },
           ]}
-        />
+        /></SaveErrorField>
         <span className={styles.toolsTail}>
-          <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))} />
+          <SaveErrorField names={["pageSize","page_size"]}><Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))} /></SaveErrorField>
         </span>
       </div>
 

@@ -13,6 +13,7 @@ import { authRequest, passwordError } from '@/lib/auth-email'
 import { ApiError } from '@/lib/api'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 import styles from './auth.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type Check = { email: string; name: string; needsPassword: boolean }
 
@@ -132,13 +133,13 @@ export default function OpsInviteV8() {
             {usedInvite && error ? <Button href="/ops/login" className={styles.wide}>運営のログインへ</Button> : null}
             <div className={styles.field}>
               <label htmlFor="ops-invite-email" className={styles.label}>メールアドレス</label>
-              <TextField id="ops-invite-email" type="email" value={check?.email ?? ''} readOnly />
+              <SaveErrorField names={["email","check?.email"]}><TextField id="ops-invite-email" type="email" value={check?.email ?? ''} readOnly /></SaveErrorField>
             </div>
             {check?.needsPassword ? (
               <>
                 <div className={styles.field}>
                   <label htmlFor="ops-invite-name" className={styles.label}>名前</label>
-                  <TextField id="ops-invite-name" value={name} onChange={(event) => setName(event.target.value)} invalid={Boolean(nameMessage)} aria-describedby={nameMessage ? 'ops-invite-name-error' : undefined} autoComplete="name" placeholder="山田 花子" />
+                  <SaveErrorField names={["name"]}><TextField id="ops-invite-name" value={name} onChange={(event) => setName(event.target.value)} invalid={Boolean(nameMessage)} aria-describedby={nameMessage ? 'ops-invite-name-error' : undefined} autoComplete="name" placeholder="山田 花子" /></SaveErrorField>
                   {fieldError('ops-invite-name-error', nameMessage)}
                 </div>
                 <div className={styles.field}>

@@ -14,6 +14,7 @@ import Pagination from '@/components/shared/pagination'
 import { OpsHead } from './shell'
 import parts from './parts.module.css'
 import styles from './audit.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
  * 運営の監査ログ V8（絵 `e7ljE`）。
@@ -139,11 +140,11 @@ export default function OpsAuditV8() {
           <span className={styles.spacer} />
           <span className={styles.dateLabel}>開始日</span>
           <div className={styles.date}>
-            <DateField value={from} onChange={(value) => { setFrom(value); setPage(1) }} max={to || undefined} aria-label="開始日" />
+            <SaveErrorField names={["from"]}><DateField value={from} onChange={(value) => { setFrom(value); setPage(1) }} max={to || undefined} aria-label="開始日" /></SaveErrorField>
           </div>
           <span className={styles.dateLabel}>終了日</span>
           <div className={styles.date}>
-            <DateField value={to} onChange={(value) => { setTo(value); setPage(1) }} min={from || undefined} aria-label="終了日" />
+            <SaveErrorField names={["to"]}><DateField value={to} onChange={(value) => { setTo(value); setPage(1) }} min={from || undefined} aria-label="終了日" /></SaveErrorField>
           </div>
         </div>
 

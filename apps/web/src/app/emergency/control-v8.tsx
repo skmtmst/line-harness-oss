@@ -42,6 +42,7 @@ import { SendPathCoveragePanel } from './send-path-coverage-panel'
 import releaseLog from '@/generated/release-log-summary.json'
 import type { UpdateRelease } from './update-history'
 import styles from './control-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type StopTarget = 'broadcasts' | 'scenarios' | 'reminders' | 'automations'
 
@@ -599,13 +600,13 @@ const EmergencyControlV8 = (
         <div className={styles.targetRow} role="group" aria-label="止めるもの">
           {(Object.keys(targetLabels) as StopTarget[]).map((key) => (
             <span key={key} className={styles.targetItem} title={`${targetLabels[key].note}・${impactText(key)}`}>
-              {canControl ? <Checkbox
+              {canControl ? <SaveErrorField names={["targets"]}><Checkbox
                 checked={targets[key]}
                 onCheckedChange={(checked) => setTargets((current) => ({ ...current, [key]: checked }))}
                 disabled={mutationLocked || isStopped || !canControl}
               >
                 {targetLabels[key].label}
-              </Checkbox> : <span>{targetLabels[key].label}</span>}
+              </Checkbox></SaveErrorField> : <span>{targetLabels[key].label}</span>}
             </span>
           ))}
         </div>
@@ -613,7 +614,7 @@ const EmergencyControlV8 = (
           <div className={styles.accountField}>
             <label htmlFor="emergency-account-v8" className={styles.fieldLabel}>止めるアカウント</label>
             <span className={styles.accountSelect}>
-            <Select
+            <SaveErrorField names={["targetAccountId","impact","target_account_id"]}><Select
               size="full"
               id="emergency-account-v8"
               value={targetAccountId}
@@ -633,7 +634,7 @@ const EmergencyControlV8 = (
                 { value: 'all', label: 'すべてのアカウント' },
                 ...accounts.map((account) => ({ value: account.id, label: `${account.name}（いまのアカウント）` })),
               ]}
-            />
+            /></SaveErrorField>
             </span>
           </div>
           {canControl ? <Button
@@ -853,7 +854,7 @@ const EmergencyControlV8 = (
               <p className={styles.dialogHint}>止まらないもの：{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</p>
               <div className={styles.confirmReason}>
                 <label htmlFor="emergency-reason-v8" className={styles.dialogLabel}>止める理由（必須）</label>
-                <input
+                <SaveErrorField names={["reason"]}><input
                   id="emergency-reason-v8"
                   aria-label="止める理由"
                   value={reason}
@@ -863,14 +864,14 @@ const EmergencyControlV8 = (
                   placeholder="例：宛先の絞り込みを間違えた"
                   className={styles.dialogInput}
                   style={{ maxWidth: '100%' }}
-                />
+                /></SaveErrorField>
               </div>
               <div className={styles.detailBlock}>
                 <div className={styles.detailHead}>
                   <label htmlFor="emergency-detail-v8" className={styles.dialogLabel}>補足（任意）</label>
                   <p className={styles.detailCounter}>あと{1000 - reasonDetail.length}文字</p>
                 </div>
-                <textarea
+                <SaveErrorField names={["reasonDetail","detail","reason_detail"]}><textarea
                   id="emergency-detail-v8"
                   value={reasonDetail}
                   onChange={(event) => setReasonDetail(event.target.value)}
@@ -879,7 +880,7 @@ const EmergencyControlV8 = (
                   maxLength={1000}
                   placeholder="発生していることを短く入力"
                   className={styles.detailTextarea}
-                />
+                /></SaveErrorField>
               </div>
               <p className={styles.dialogHint}>停止前にすでに LINE へ渡したものは取り消せません。</p>
             </>
@@ -901,14 +902,14 @@ const EmergencyControlV8 = (
             <span className={styles.dialogLabel}>
               確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力
             </span>
-            <input
+            <SaveErrorField names={["confirmWord","confirm_word"]}><input
               value={confirmWord}
               onChange={(event) => setConfirmWord(event.target.value)}
               autoFocus
               disabled={mutationLocked || running}
               aria-label="確認の言葉"
               className={styles.dialogInput}
-            />
+            /></SaveErrorField>
           </label>
           {confirmMode === 'stop' && stepUpMethod !== 'none' ? (
             <div className={styles.dialogField}>
@@ -916,7 +917,7 @@ const EmergencyControlV8 = (
                 {stepUpMethod === 'password' ? '本人確認（パスワード）' : '本人確認（認証アプリの6桁）'}
               </span>
               {stepUpMethod === 'password' ? (
-                <input
+                <SaveErrorField names={["stopPassword","stop_password"]}><input
                   type="password"
                   aria-label="パスワード"
                   value={stopPassword}
@@ -925,15 +926,15 @@ const EmergencyControlV8 = (
                   autoComplete="current-password"
                   className={styles.dialogInput}
                   style={{ maxWidth: '100%' }}
-                />
+                /></SaveErrorField>
               ) : (
-                <OtpInput
+                <SaveErrorField names={["stopCode"]}><OtpInput
                   value={stopCode}
                   onChange={setStopCode}
                   labelledBy="emergency-stepup-label"
                   busy={running}
                   disabled={mutationLocked}
-                />
+                /></SaveErrorField>
               )}
             </div>
           ) : null}

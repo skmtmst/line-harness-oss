@@ -67,6 +67,7 @@ import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
 import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
 import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const modeLabel: Record<DeliveryMode, string> = {
   absolute_time: '時刻で指定',
@@ -88,6 +89,8 @@ const TIME_MINUTE_STEP = 30
 const DAY_OPTIONS = Array.from({ length: 61 }, (_, i) => String(i))
 
 export default function ScenarioFirstStepV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('1通目を設定')
   usePageCrumbs([{ label: 'シナリオ配信', href: '/scenarios' }])
   const router = useRouter()
@@ -227,18 +230,21 @@ export default function ScenarioFirstStepV8() {
         }
         setLoadState('ready')
       } catch (caught) {
+
+
         if (seq !== loadSeq.current) return
+        const fieldFailure = saveErrors.capture(caught)
         scenarioReferenceData.invalidateScenario(id)
         if (caught instanceof ApiError && caught.status === 404) {
-          setError('')
+          { if (!fieldFailure) setError('') }
           setLoadMissing(true)
         } else {
-          setError('シナリオを読み込めませんでした。通信状態を確認して、もう一度お試しください。')
+          { if (!fieldFailure) setError('シナリオを読み込めませんでした。通信状態を確認して、もう一度お試しください。') }
         }
-        setLoadState('error')
+        { if (!fieldFailure) setLoadState('error') }
       }
     })()
-  }, [id, reloadKey])
+  }, [id, reloadKey, saveErrors])
 
   const mode: DeliveryMode = scenario?.deliveryMode ?? 'absolute_time'
 
@@ -432,13 +438,15 @@ export default function ScenarioFirstStepV8() {
       notifyToast('1通目を保存しました')
       goDetail()
     } catch (submitError) {
+      const fieldFailure = saveErrors.capture(submitError)
+
       // 例外でも「保存中」のままにしない（SCENARIO-05）。入力は残し、同じ場所からやり直せる。
       const detail = submitError instanceof ApiError ? submitError.message : ''
-      setError(
+      { if (!fieldFailure) setError(
         detail
           ? `保存できませんでした（${detail}）。入力内容は残っています。もう一度お試しください。`
           : '保存できませんでした。通信状態を確認して、もう一度お試しください。',
-      )
+      ) }
     } finally {
       setSaving(false)
     }
@@ -446,13 +454,13 @@ export default function ScenarioFirstStepV8() {
 
   if (!id) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="unspecified"
         title="1通目を作るシナリオが指定されていません"
         description="一覧から、1通目を作るシナリオを選び直してください。"
         backHref="/scenarios"
         backLabel="シナリオ一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
   if (loadState === 'error') {
@@ -474,7 +482,7 @@ export default function ScenarioFirstStepV8() {
     )
   }
   /* シナリオが確定するまでフォームは出さない（SCENARIO-04）。 */
-  if (loadState !== 'ready') return <ListState kind="loading" title="シナリオを読み込んでいます" />
+  if (loadState !== 'ready') return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="シナリオを読み込んでいます" /></SaveErrorScope>
 
   /*
    * ===== 届く日時の例（いつの右） =====
@@ -561,7 +569,7 @@ export default function ScenarioFirstStepV8() {
   const dayOptions = DAY_OPTIONS.includes(String(offsetDays)) ? DAY_OPTIONS : [...DAY_OPTIONS, String(offsetDays)]
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       boardId={narrow ? 'U5rxyH' : 'V6xAo'}
       title="1通目を設定"
       identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
@@ -614,7 +622,7 @@ export default function ScenarioFirstStepV8() {
           <h2 className={styles.cardTitle}>この1通目を誰に送るか</h2>
           <p className={styles.cardDesc}>開始のきっかけは、このあとの編集で決めます</p>
         </div>
-        <RadioCardGroup legend="この1通目を誰に送るか" className={styles.targetRow}>
+        <SaveErrorField names={["targetMode","value","card.value"]}><RadioCardGroup legend="この1通目を誰に送るか" className={styles.targetRow}>
           {targetCards.map((card) => (
             <RadioCard
               key={card.value}
@@ -631,18 +639,18 @@ export default function ScenarioFirstStepV8() {
               className={styles.targetCard}
             />
           ))}
-        </RadioCardGroup>
+        </RadioCardGroup></SaveErrorField>
         {targetError && targetMode === 'advanced' ? <p className={styles.fieldError} role="alert">{targetError}</p> : null}
         {targetMode === 'tag' ? (
           <div className={styles.inlineField}>
             <span className={styles.inlineLabel}>絞り込むタグ</span>
-            <Select
+            <SaveErrorField names={["targetTagId","target_tag_id"]}><Select
               value={targetTagId}
               onChange={(value) => { setTargetTagId(value); setTargetError('') }}
               error={targetError || undefined}
               aria-label="絞り込みに使うタグ"
               options={[{ value: '', label: '選んでください' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]}
-            />
+            /></SaveErrorField>
           </div>
         ) : null}
       </Card>
@@ -657,50 +665,50 @@ export default function ScenarioFirstStepV8() {
         <div className={styles.whenRow}>
           <span className={styles.whenText}>購読開始から</span>
           <span className={styles.whenSelectDay}>
-            <Select
+            <SaveErrorField names={["offsetDays","offset_days"]}><Select
               value={String(offsetDays)}
               onChange={(value) => setOffsetDays(Math.max(0, Number(value)))}
               aria-label="購読開始から何日後"
               width={70}
               options={dayOptions.map((d) => ({ value: d, label: d }))}
-            />
+            /></SaveErrorField>
           </span>
           {mode === 'absolute_time' ? (
             <>
               <span className={styles.whenText}>日後の</span>
               <span className={styles.whenSelectTime}>
                 {/* ★V8 の時刻の欄（打つ＋時と分の2列・提案 YCOoR）。絵 V6xAo・U5rxyH は幅140。 */}
-                <TimeField
+                <SaveErrorField names={["deliveryTime","delivery_time"]}><TimeField
                   value={deliveryTime}
                   onChange={(value) => { setDeliveryTime(value); setTimeError('') }}
                   invalid={Boolean(timeError)}
                   aria-describedby={timeError ? 'first-step-time-error' : undefined}
                   aria-label="配信する時刻"
                   minuteStep={TIME_MINUTE_STEP}
-                />
+                /></SaveErrorField>
               </span>
             </>
           ) : (
             <>
               <span className={styles.whenText}>日と</span>
               <span className={styles.whenSelectDay}>
-                <Select
+                <SaveErrorField names={["offsetHours","offset_hours"]}><Select
                   value={String(offsetHours)}
                   onChange={(value) => setOffsetHours(Number(value))}
                   aria-label="さらに何時間後"
                   width={70}
                   options={Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: String(h) }))}
-                />
+                /></SaveErrorField>
               </span>
               <span className={styles.whenText}>時間</span>
               <span className={styles.whenSelectDay}>
-                <Select
+                <SaveErrorField names={["offsetMinutesRemainder","offset_minutes_remainder"]}><Select
                   value={String(offsetMinutesRemainder)}
                   onChange={(value) => setOffsetMinutesRemainder(Number(value))}
                   aria-label="さらに何分後"
                   width={70}
                   options={Array.from({ length: 60 }, (_, m) => ({ value: String(m), label: String(m) }))}
-                />
+                /></SaveErrorField>
               </span>
               <span className={styles.whenText}>分後</span>
             </>
@@ -710,7 +718,7 @@ export default function ScenarioFirstStepV8() {
 
         {timeError ? <p id="first-step-time-error" className={styles.fieldError} role="alert">{timeError}</p> : null}
         <div className={styles.modeRow}>
-          <SegmentedControl
+          <SaveErrorField names={["contentMode"]}><SegmentedControl
             aria-label="1通目の作り方"
             value={contentMode}
             onChange={changeContentMode}
@@ -718,7 +726,7 @@ export default function ScenarioFirstStepV8() {
               { value: 'compose', label: 'この画面で作る' },
               { value: 'template', label: 'テンプレートから選ぶ' },
             ]}
-          />
+          /></SaveErrorField>
         </div>
 
         {preserved && restoreNotice ? <Notice tone="warn" message={restoreNotice} /> : null}
@@ -750,7 +758,7 @@ export default function ScenarioFirstStepV8() {
 
             {kind === 'text' ? (
               <>
-                <InsertTextField
+                <SaveErrorField names={["body","messageContent"]}><InsertTextField
                   id="first-step-body"
                   aria-invalid={Boolean(contentError) || bodyOverLimit || undefined}
                   ref={bodyRef}
@@ -759,7 +767,7 @@ export default function ScenarioFirstStepV8() {
                   placeholder="はじめまして。友だち追加ありがとうございます。"
                   aria-label="本文"
                   className={styles.bodyField}
-                />
+                /></SaveErrorField>
                 <div className={styles.insertRow}>
                   <div className={styles.insertTools}>
                     <InsertToolbar targetRef={bodyRef} value={body} onChange={editBody} />
@@ -772,7 +780,7 @@ export default function ScenarioFirstStepV8() {
             ) : null}
             {kind === 'image' ? (
               <div className={styles.kindBody}>
-                <ImageUploader mode="line-image" value={image} onChange={editImage} label="送る画像" title="送る画像を追加" />
+                <SaveErrorField names={["image"]}><ImageUploader mode="line-image" value={image} onChange={editImage} label="送る画像" title="送る画像を追加" /></SaveErrorField>
               </div>
             ) : null}
             {kind === 'question' ? <QuestionEditor value={question} onChange={editQuestion} /> : null}
@@ -786,7 +794,7 @@ export default function ScenarioFirstStepV8() {
           <div className={styles.inlineField}>
             <span className={styles.inlineLabel}>テンプレート</span>
             <div className="w-full min-w-0">
-              <EntityKindField
+              <SaveErrorField names={["templateId"]}><EntityKindField
                 kind="template"
                 label="配信するテンプレート"
                 options={templates}
@@ -794,7 +802,7 @@ export default function ScenarioFirstStepV8() {
                 value={templateId}
                 onChange={(value) => editTemplateId(value)}
                 invalid={Boolean(contentError)}
-              />
+              /></SaveErrorField>
               {contentError ? <p className={styles.fieldError} role="alert">{contentError}</p> : null}
             </div>
             <span className={styles.cardDesc}>テンプレートを直すと、この通の中身も一緒に変わります。</span>
@@ -824,6 +832,6 @@ export default function ScenarioFirstStepV8() {
       >
         {phone}
       </ConfirmDialog>
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }

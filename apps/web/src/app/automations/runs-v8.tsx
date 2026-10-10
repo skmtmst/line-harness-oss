@@ -27,6 +27,7 @@ import { useAutomationRunPermissions } from '@/components/automations/use-can-ma
 import { formatDateTime, formatNumber } from '@/lib/format'
 import type { AutoV8Counts, AutoV8Model } from './automations-v8'
 import styles from './automations-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type RunStatus = 'queued' | 'claimed' | 'succeeded' | 'skipped' | 'waiting' | 'retry_wait' | 'partial' | 'permanent_failed' | 'cancelled'
 
@@ -454,25 +455,25 @@ export function V8RunsTab({
       {retryNotice ? <p role="status" className={styles.footnote}>{retryNotice}</p> : null}
 
       <div className={styles.toolbar}>
-        <TextField
+        <SaveErrorField names={["query","search"]}><TextField
           aria-label="友だちの名前・オートメーションの名前で検索"
           placeholder="友だちの名前・オートメーションの名前で検索"
           value={query}
           onChange={(event) => changeQuery(event.target.value)}
           className={styles.toolsSearch}
-        />
+        /></SaveErrorField>
         <label className={styles.checkLabel}>
-          <Checkbox
+          <SaveErrorField names={["includeTest","include_test"]}><Checkbox
             checked={includeTest}
             onCheckedChange={(checked) => changeIncludeTest(checked)}
-          />
+          /></SaveErrorField>
           テスト実行も見る
         </label>
         <p className={styles.footnote}>この30日・20件表示</p>
       </div>
 
       <div className={styles.toolbar}>
-        <SegmentedControl
+        <SaveErrorField names={["resultFilter"]}><SegmentedControl
           aria-label="結果で絞り込む"
           value={resultFilter}
           onChange={(value) => changeResultFilter(value)}
@@ -482,7 +483,7 @@ export function V8RunsTab({
             { value: 'skipped', label: `条件に外れた ${data ? formatNumber(data.summary.skipped) : '—'}` },
             { value: 'problems', label: `失敗 ${data ? formatNumber(data.summary.failed) : '—'}` },
           ]}
-        />
+        /></SaveErrorField>
       </div>
 
       {!data || data.items.length === 0 ? (

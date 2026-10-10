@@ -9,6 +9,7 @@ import { Th } from '@/components/shared/table'
 import { WEBINAR_SAKURA_COMMENTS_MAX } from '@/components/webinars/webinar-limits'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { ApiError, webinarApi, type WebinarSakuraComment } from '@/lib/api'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 function validateImportRow(raw: unknown): WebinarSakuraComment | string {
   if (typeof raw !== 'object' || raw === null) return 'オブジェクトではありません'
@@ -25,6 +26,8 @@ function validateImportRow(raw: unknown): WebinarSakuraComment | string {
 }
 
 export default function CommentsV8({ webinarId, onDirtyChange, registerSave }: { webinarId: string; onDirtyChange?: (dirty: boolean) => void; registerSave?: (save: (() => Promise<boolean>) | null) => void }) {
+  const saveErrors = useSaveFormErrors()
+
   const [comments, setComments] = useState<WebinarSakuraComment[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error' | 'denied'>('loading')
   const [attempt, setAttempt] = useState(0)
@@ -90,7 +93,9 @@ export default function CommentsV8({ webinarId, onDirtyChange, registerSave }: {
       setMessage(`${response.data.count}件保存しました`)
       return true
     } catch (cause) {
-      if (request === generation.current) setMessage(`保存できませんでした。入力を残しました。${webinarErrorText(cause, '通信を確認して、もう一度保存してください。')}`)
+      const fieldFailure = saveErrors.capture(cause)
+
+      if (request === generation.current) { if (!fieldFailure) setMessage(`保存できませんでした。入力を残しました。${webinarErrorText(cause, '通信を確認して、もう一度保存してください。')}`) }
       return false
     } finally {
       locked.current = false
@@ -118,13 +123,15 @@ export default function CommentsV8({ webinarId, onDirtyChange, registerSave }: {
       setIsErrorMessage(false)
       setMessage(`${rows.length}件読み込みました（保存ボタンで確定）`)
     } catch (err) {
-      setIsErrorMessage(true)
-      setMessage(`JSON が不正です: ${err instanceof Error ? err.message : String(err)}`)
+      const fieldFailure = saveErrors.capture(err)
+
+      { if (!fieldFailure) setIsErrorMessage(true) }
+      { if (!fieldFailure) setMessage(`JSON が不正です: ${err instanceof Error ? err.message : String(err)}`) }
     }
   }
 
   return (
-    <div className="flex flex-col gap-4" data-design-node="Omqd4">
+    <SaveErrorScope errors={saveErrors}><div className="flex flex-col gap-4" data-design-node="Omqd4">
       <div className="min-w-0 flex-1 space-y-3">
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface" aria-label="コメント演出">
           <h2 className="text-ink text-base font-bold">コメント演出<HelpTip label="コメント演出の説明">動画の途中で出すコメントをあらかじめ入れます。{WEBINAR_SAKURA_COMMENTS_MAX}件まで。</HelpTip></h2>
@@ -149,29 +156,29 @@ export default function CommentsV8({ webinarId, onDirtyChange, registerSave }: {
                     {comments.map((c, i) => (
                       <tr key={i}>
                         <td className="px-4 py-2">
-                          <input
+                          <SaveErrorField names={[`comments.${i}.atSeconds`,`comments.${i}.at_seconds`,"atSeconds","c.atSeconds","at_seconds","c.at_seconds"]}><input
                             type="number"
                             value={c.atSeconds}
                             onChange={(e) => update(i, { atSeconds: Number(e.target.value) })}
                             aria-label={`${i + 1}行目の出す秒数`}
                             className="border-hairline bg-canvas text-ink w-20 rounded-control border px-2 py-1 text-xs tabular-nums"
-                          />
+                          /></SaveErrorField>
                         </td>
                         <td className="px-4 py-2">
-                          <input
+                          <SaveErrorField names={[`comments.${i}.authorName`,`comments.${i}.author_name`,"authorName","c.authorName","author_name","c.author_name"]}><input
                             value={c.authorName}
                             onChange={(e) => update(i, { authorName: e.target.value })}
                             aria-label={`${i + 1}行目の名前`}
                             className="border-hairline bg-canvas text-ink w-full rounded-control border px-2 py-1 text-xs"
-                          />
+                          /></SaveErrorField>
                         </td>
                         <td className="px-4 py-2">
-                          <input
+                          <SaveErrorField names={[`comments.${i}.body`,"body","c.body"]}><input
                             value={c.body}
                             onChange={(e) => update(i, { body: e.target.value })}
                             aria-label={`${i + 1}行目のコメント`}
                             className="border-hairline bg-canvas text-ink w-full rounded-control border px-2 py-1 text-xs"
-                          />
+                          /></SaveErrorField>
                         </td>
                         <td className="px-4 py-2 text-right">
                           <button
@@ -211,13 +218,13 @@ export default function CommentsV8({ webinarId, onDirtyChange, registerSave }: {
                   <p className="text-ink-secondary text-xs">
                     形: {'[{"atSeconds":10,"authorName":"田中","body":"こんばんは"}]'}（{WEBINAR_SAKURA_COMMENTS_MAX}件まで）
                   </p>
-                  <textarea
+                  <SaveErrorField names={["importJson","import_json"]}><textarea
                     value={importJson}
                     onChange={(e) => setImportJson(e.target.value)}
                     rows={4}
                     aria-label="貼り付けるJSON"
                     className="border-hairline bg-canvas w-full rounded-control border p-2 font-mono text-xs"
-                  />
+                  /></SaveErrorField>
                   <Button variant="secondary" onClick={doImport}>
                     読み込む
                   </Button>
@@ -228,6 +235,6 @@ export default function CommentsV8({ webinarId, onDirtyChange, registerSave }: {
         </section>
       </div>
       <StickyBar status={dirty ? '保存していない変更があります' : undefined} actions={<><Button href="/webinars">キャンセル</Button><Button disabled={state !== 'ready' || saving} busy={saving} busyLabel="保存しています…" onClick={() => void save()}>保存する</Button></>} />
-    </div>
+    </div></SaveErrorScope>
   )
 }

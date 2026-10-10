@@ -61,6 +61,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import styles from './dashboard-editor.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const CARD_DEFINITION_MAP = new Map(DASHBOARD_CARD_DEFINITIONS.map((card) => [card.id, card]))
 const GROUPS: DashboardGroup[] = ['today', 'main', 'right']
@@ -115,7 +116,7 @@ function CardRow({ item, definition, canMoveUp, canMoveDown, disabled, onMove, o
           <ChevronDown aria-hidden="true" />
         </IconButton>
       </div>
-      <Toggle disabled={disabled} checked={item.visible} onChange={() => onToggle()} label={`${definition.label}を表示`} />
+      <SaveErrorField names={["visible","item.visible"]}><Toggle disabled={disabled} checked={item.visible} onChange={() => onToggle()} label={`${definition.label}を表示`} /></SaveErrorField>
     </div>
   )
 }
@@ -135,13 +136,13 @@ function Preview({ draft }: { draft: DashboardPreferences }) {
     <div className={styles.preview}>
       <div className={styles.previewHead}>
         <p className={styles.hint}>実際のダッシュボードと同じ順番で表示します。</p>
-        <SegmentedControl<'pc' | 'mobile'>
+        <SaveErrorField names={["device"]}><SegmentedControl<'pc' | 'mobile'>
           size="small"
           aria-label="プレビューの画面幅"
           value={device}
           onChange={setDevice}
           options={[{ value: 'pc', label: 'PC' }, { value: 'mobile', label: 'スマホ' }]}
-        />
+        /></SaveErrorField>
       </div>
       <div className={styles.previewBoard}>
         {total === 0 ? <p className={styles.previewEmpty}>表示するカードがありません</p> : null}
@@ -348,12 +349,12 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
         onClose={close}
         toolbar={(
           <div className={styles.toolbar}>
-            <SegmentedControl<'cards' | 'preview'>
+            <SaveErrorField names={["mode"]}><SegmentedControl<'cards' | 'preview'>
               aria-label="ダッシュボード編集の表示"
               value={mode}
               onChange={setMode}
               options={[{ value: 'cards', label: 'カードと配置' }, { value: 'preview', label: 'プレビュー' }]}
-            />
+            /></SaveErrorField>
             {mode === 'cards' ? (
               <p className={styles.hint}>持ち手をドラッグして移動。上下ボタン・キーボードでも順番を変更。スイッチで表示を切り替えます。</p>
             ) : null}

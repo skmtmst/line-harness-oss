@@ -91,6 +91,7 @@ import {
 } from './model'
 import VarsExportPanel from './export-panel'
 import styles from './list.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -210,6 +211,8 @@ function CopyKeyButton({ value, label }: { value: string; label: string }) {
 }
 
 function CommonVarsListInner() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('共通情報')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -285,11 +288,13 @@ function CommonVarsListInner() {
         setFolderFailure(new ApiError(500, folderList.error))
       }
     } catch (caught) {
-      if (accountAtRequest === latestAccountRef.current) setFolderFailure(caught)
+      const fieldFailure = saveErrors.capture(caught)
+
+      if (accountAtRequest === latestAccountRef.current) { if (!fieldFailure) setFolderFailure(caught) }
     } finally {
       if (accountAtRequest === latestAccountRef.current) setFolderReloading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   const load = useCallback(async () => {
     const accountAtRequest = selectedAccountId
@@ -312,16 +317,18 @@ function CommonVarsListInner() {
         setError('読み込みに失敗しました。接続を確かめて、もう一度お試しください。')
       }
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e)
+
       if (accountAtRequest === latestAccountRef.current) {
-        setListFailure(e)
-        setError(e instanceof ApiError && e.status === 403
+        { if (!fieldFailure) setListFailure(e) }
+        { if (!fieldFailure) setError(e instanceof ApiError && e.status === 403
           ? 'この一覧を見る権限がありません。管理者に権限を申請してください。'
-          : '読み込みに失敗しました。接続を確かめて、もう一度お試しください。')
+          : '読み込みに失敗しました。接続を確かめて、もう一度お試しください。') }
       }
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     if (accountLoading) return
@@ -473,11 +480,13 @@ function CommonVarsListInner() {
       setStatusReason('')
       await load()
     } catch (e) {
-      setStatusError(
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure) setStatusError(
         e instanceof ApiError && e.status === 409
           ? '別の担当者が先に更新しました。最新内容を読み直してください。'
           : '状態を変えられませんでした。通信を確かめて、もう一度お試しください。',
-      )
+      ) }
     } finally {
       setStatusBusy(false)
     }
@@ -568,8 +577,9 @@ function CommonVarsListInner() {
       if (!preview.success) throw new Error('replacement_impact_failed')
       setReplacementImpact(preview.data)
       setReplacementPhase('ready')
-    } catch {
+    } catch (saveFailure) {
       if (!isCurrentRequest()) return
+      saveErrors.capture(saveFailure)
       setReplacementPhase('error')
     }
   }
@@ -595,7 +605,9 @@ function CommonVarsListInner() {
       if (!res.success) throw new Error('replacement_impact_failed')
       setReplacementImpact(res.data)
       setReplacementPhase('ready')
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       if (deleteRequestRef.current.generation === request.generation) setReplacementPhase('error')
     }
   }
@@ -653,12 +665,15 @@ function CommonVarsListInner() {
       resetDeleteState()
       await load()
     } catch (caught) {
+
+
       if (deleteRequestRef.current.generation !== request.generation) return
+      const fieldFailure = saveErrors.capture(caught)
       if (caught instanceof ApiError && caught.status === 409) {
-        setDeleteError('使用先が変わりました。影響をもう一度確認してください。')
+        { if (!fieldFailure) setDeleteError('使用先が変わりました。影響をもう一度確認してください。') }
         await selectReplacement(replacementImpact.replacement.id)
       } else {
-        setDeleteError('差し替えを完了できませんでした。状態を読み直して、もう一度お試しください。')
+        { if (!fieldFailure) setDeleteError('差し替えを完了できませんでした。状態を読み直して、もう一度お試しください。') }
       }
     } finally {
       if (deleteRequestRef.current.generation === request.generation) setDeleteBusy(false)
@@ -686,19 +701,24 @@ function CommonVarsListInner() {
       resetDeleteState()
       await load()
     } catch (e) {
+
+
       if (!isCurrentRequest()) return
+      const fieldFailure = saveErrors.capture(e)
       if (e instanceof ApiError && e.status === 409) {
-        setDeleteError('いま使われ始めたため、削除できませんでした。使用先を読み直しました。')
+        { if (!fieldFailure) setDeleteError('いま使われ始めたため、削除できませんでした。使用先を読み直しました。') }
         try {
           const again = await api.commonVars.deleteImpact(request.itemId, request.accountId)
           if (!isCurrentRequest()) return
           if (again.success) setDeleteImpact(again.data)
-        } catch {
+        } catch (saveFailure) {
+          saveErrors.capture(saveFailure)
+
           if (isCurrentRequest()) setDeletePhase('error')
         }
         return
       }
-      setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。')
+      { if (!fieldFailure) setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       if (isCurrentRequest()) setDeleteBusy(false)
     }
@@ -724,8 +744,10 @@ function CommonVarsListInner() {
       }
       resetDeleteState()
       await load()
-    } catch {
-      setDeleteError('止められませんでした。通信を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setDeleteError('止められませんでした。通信を確かめて、もう一度お試しください。') }
     } finally {
       setDeleteBusy(false)
     }
@@ -831,16 +853,17 @@ function CommonVarsListInner() {
         setError(`${blocked.length}件は、合計${references}か所で使用中のため削除できません。`)
         return
       }
-    } catch {
+    } catch (saveFailure) {
       if (!isCurrentRequest()) return
-      setError('使用先を確認できないため削除できません。もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure) setError('使用先を確認できないため削除できません。もう一度お試しください。') }
       return
     }
 
     if (!isCurrentRequest()) return
     const targets = items.filter((item) => selected.has(item.id))
     if (targets.length !== selected.size) {
-      setError('選択した共通情報を確認できませんでした。状態を読み直してから、もう一度お試しください。')
+      if (!saveErrors.fail("selected", '選択した共通情報を確認できませんでした。状態を読み直してから、もう一度お試しください。')) setError('選択した共通情報を確認できませんでした。状態を読み直してから、もう一度お試しください。')
       return
     }
     setBatchReason('')
@@ -869,7 +892,9 @@ function CommonVarsListInner() {
       try {
         const result = await api.commonVars.delete(target.id, request.accountId, batchReason.trim())
         if (!result.success) throw new Error(result.error)
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
+
         failed.push(target)
       }
       if (!isCurrentRequest()) return
@@ -1032,7 +1057,7 @@ function CommonVarsListInner() {
   )
   const perPageBox = (
     <div className={styles.perPageBox}>
-      <Select
+      <SaveErrorField names={["pageSize","page_size"]}><Select
         aria-label="1ページに出す件数"
         size="page-size"
         value={String(pageSize)}
@@ -1041,7 +1066,7 @@ function CommonVarsListInner() {
           setPage(1)
         }}
         options={PAGE_SIZE_OPTIONS}
-      />
+      /></SaveErrorField>
     </div>
   )
 
@@ -1054,12 +1079,12 @@ function CommonVarsListInner() {
       <div className={styles.narrowRow}>
         {createButton(false)}
         <div className={styles.narrowFolder}>
-          <Select
+          <SaveErrorField names={["folderFilter","folderId","activeId","folder_filter"]}><Select
             aria-label="フォルダ"
             value={folderFilter}
             onChange={(value) => setFolderFilter(value)}
             options={folderOptions}
-          />
+          /></SaveErrorField>
         </div>
         <div className={styles.narrowSearch}>
           <SearchField
@@ -1228,7 +1253,7 @@ function CommonVarsListInner() {
               <TableHeadRow>
                 <Th className={styles.selectCell} aria-label="選択">
                   {canWrite ? (
-                    <Checkbox
+                    <SaveErrorField names={["allOnPageSelected","selected","all_on_page_selected"]}><Checkbox
                       checked={allOnPageSelected}
                       indeterminate={!allOnPageSelected && someOnPageSelected}
                       onCheckedChange={() =>
@@ -1242,7 +1267,7 @@ function CommonVarsListInner() {
                         })
                       }
                       aria-label="このページの共通情報をすべて選ぶ"
-                    />
+                    /></SaveErrorField>
                   ) : null}
                 </Th>
                 <Th className={styles.headCell}>共通情報（差し込み名）</Th>
@@ -1253,7 +1278,7 @@ function CommonVarsListInner() {
               </TableHeadRow>
             </thead>
             <tbody>
-              {current.map((item) => {
+              {current.map((item, saveFieldIndex) => {
                 const badge = stateBadge(item)
                 const valueText = formatVarValue(item.type, item.value)
                 const pending = item.nextSchedule ?? null
@@ -1278,11 +1303,11 @@ function CommonVarsListInner() {
                   >
                     <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
                       {canWrite ? (
-                        <Checkbox
+                        <SaveErrorField names={[`current.${saveFieldIndex}.id`,"id","item.id","itemId"]}><Checkbox
                           checked={selected.has(item.id)}
                           onCheckedChange={() => toggle(item.id)}
                           aria-label={`${item.name}を選ぶ`}
-                        />
+                        /></SaveErrorField>
                       ) : null}
                     </Td>
                     <NameCell
@@ -1466,12 +1491,12 @@ function CommonVarsListInner() {
               <span className={styles.dialogLabel}>
                 {statusAction === 'stop' ? '止める理由（記録に残ります）' : '再開する理由（記録に残ります）'}
               </span>
-              <input
+              <SaveErrorField names={["statusReason","statusError","changeReason","status_reason","status_error"]}><input
                 value={statusReason}
                 onChange={(e) => { setStatusError(''); setStatusReason(e.target.value) }}
                 placeholder={statusAction === 'stop' ? 'キャンペーンが終わったため' : '新しい期間の案内を始めるため'}
                 className={styles.dialogInput}
-              />
+              /></SaveErrorField>
             </label>
             {statusAction === 'stop' && statusScheduled.length > 0 ? (
               <p className={styles.dialogWarn} role="note">
@@ -1508,14 +1533,14 @@ function CommonVarsListInner() {
           <div className={`${styles.splitFooter} ${styles.deleteFooter}`}>
             {/* 絵 xxKtW に理由の欄は無いが、差し替え・止めるには理由が要る（版履歴に残す）。左の空きに小さく置く。 */}
             {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete ? (
-              <input
+              <SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
                 value={deleteReason}
                 onChange={(e) => setDeleteReason(e.target.value)}
                 placeholder="理由（必須・記録に残ります）"
                 aria-label="消した理由・止める理由（記録に残ります）"
                 title="消した理由・止める理由（記録に残ります）"
                 className={styles.footerReason}
-              />
+              /></SaveErrorField>
             ) : <span aria-hidden="true" />}
             <Button type="button" onClick={closeDelete} disabled={deleteBusy}>
               キャンセル
@@ -1648,7 +1673,7 @@ function CommonVarsListInner() {
                     </div>
                     {deleteChoice === 'replace' ? (
                       <>
-                        <Select
+                        <SaveErrorField names={["replacementId","replacement_id"]}><Select
                           size="full"
                           value={replacementId}
                           disabled={deleteBusy || replacementCandidates.length === 0}
@@ -1660,7 +1685,7 @@ function CommonVarsListInner() {
                               label: `差し替え先：${candidate.name} ${placeholderText(candidate.varKey)}`,
                             }))
                             : [{ value: '', label: replacementPhase === 'loading' ? '候補を読み込んでいます' : '差し替えられる候補がありません' }]}
-                        />
+                        /></SaveErrorField>
                         {replacementPhase === 'loading' ? (
                           <p className={styles.dialogHint}>差し替え後の影響を確認しています…</p>
                         ) : replacementPhase === 'error' ? (
@@ -1704,12 +1729,12 @@ function CommonVarsListInner() {
                 {deleteImpact.canDelete ? (
                 <label className={styles.dialogField}>
                   <span className={styles.dialogLabel}>消した理由（記録に残ります）</span>
-                  <input
+                  <SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
                     value={deleteReason}
                     onChange={(e) => setDeleteReason(e.target.value)}
                     placeholder="店舗情報の変更のため"
                     className={styles.dialogInput}
-                  />
+                  /></SaveErrorField>
                 </label>
                 ) : null}
 
@@ -1718,12 +1743,12 @@ function CommonVarsListInner() {
                     <span className={styles.dialogLabel}>
                       削除する場合は、差し込みキーを入力してください
                     </span>
-                    <input
+                    <SaveErrorField names={["typedKey","typed_key"]}><input
                       value={typedKey}
                       onChange={(e) => setTypedKey(e.target.value)}
                       placeholder={placeholderText(deleteImpact.variable.varKey)}
                       className={styles.dialogInput}
-                    />
+                    /></SaveErrorField>
                   </label>
                 ) : null}
 
@@ -1766,12 +1791,12 @@ function CommonVarsListInner() {
           <span className={styles.dialogLabel}>
             消した理由 <span className={styles.required}>必須</span>
           </span>
-          <input
+          <SaveErrorField names={["batchReason","batch_reason"]}><input
             value={batchReason}
             onChange={(e) => setBatchReason(e.target.value)}
             placeholder="店舗情報の変更のため"
             className={styles.dialogInput}
-          />
+          /></SaveErrorField>
         </label>
       </ConfirmDialog>
 
@@ -1859,14 +1884,14 @@ function CommonVarsListInner() {
                   {statusAction === 'stop' ? '止める理由（記録に残ります）' : '再開する理由（記録に残ります）'}
                 </p>
                 <div className={styles.panelBody}>
-                  <input
+                  <SaveErrorField names={["statusReason","statusError","changeReason","status_reason","status_error"]}><input
                     value={statusReason}
                     onChange={(e) => { setStatusError(''); setStatusReason(e.target.value) }}
                     placeholder={statusAction === 'stop' ? 'キャンペーンが終わったため' : '新しい期間の案内を始めるため'}
                     aria-label={statusAction === 'stop' ? '止める理由' : '再開する理由'}
                     disabled={statusBusy}
                     className={styles.dialogInput}
-                  />
+                  /></SaveErrorField>
                   <Button
                     type="button"
                     variant="primary"
@@ -1889,7 +1914,7 @@ function CommonVarsListInner() {
   )
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId={narrow ? 'XIzkJ' : canWrite ? 'FM94M' : 'OxSw8'}
       headingSize="regular"
       title="共通情報"
@@ -1942,7 +1967,7 @@ function CommonVarsListInner() {
       overlays={overlays}
     >
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }
 

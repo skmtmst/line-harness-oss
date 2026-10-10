@@ -36,6 +36,7 @@ import { AffiliateArchiveDialog } from './dialogs'
 import { AffiliateFrame, useAffiliateShell } from './frame'
 import { AffiliateToolbar, RetryButton, RowMenu, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './affiliates.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type ViewKey = 'affiliate' | 'offer'
 
@@ -255,7 +256,7 @@ export default function ReportTab() {
       />
       <div className={styles.periodBox}>
         <CalendarDays size={15} aria-hidden="true" className={styles.periodIcon} />
-        <Select
+        <SaveErrorField names={["period"]}><Select
           aria-label="期間"
           value={period}
           options={[
@@ -264,7 +265,7 @@ export default function ReportTab() {
             { value: 'all', label: 'すべての期間' },
           ]}
           onChange={(value) => setPeriod(value as ReportPeriod)}
-        />
+        /></SaveErrorField>
       </div>
     </>
   )

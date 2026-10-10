@@ -35,6 +35,7 @@ import { scenarioReferenceData } from '@/components/scenarios/scenario-reference
 import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import styles from './results.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 type Subscription = ScenarioRuns['subscriptions'][number]
@@ -529,7 +530,7 @@ export default function ScenarioResultsV8() {
             <div className={styles.tools}>
               {/* 状態の絞り込みはサーバーへ渡して全件へ掛ける（SCENARIO-12）。 */}
               <span className={styles.statusSelect}>
-                <Select
+                <SaveErrorField names={["subscriptionStatus","status","subscription_status"]}><Select
                   value={subscriptionStatus}
                   onChange={(value) => setSubscriptionStatus(value)}
                   aria-label="購読の状態で絞り込む"
@@ -540,7 +541,7 @@ export default function ScenarioResultsV8() {
                     { value: 'paused', label: '購読の状態：止まっている' },
                     { value: 'completed', label: '購読の状態：読み終えた' },
                   ]}
-                />
+                /></SaveErrorField>
               </span>
               {runs ? (
                 <span className={styles.count}>{`${formatNumber(runs.subscriptions.length)} / ${formatNumber(runs.pagination.total)}人`}</span>
@@ -715,7 +716,7 @@ export default function ScenarioResultsV8() {
             </button>
           </p>
         ) : (
-          <EntityKindField
+          <SaveErrorField names={["moveScenarioId"]}><EntityKindField
             kind="scenario"
             label="移し先のシナリオ"
             value={moveScenarioId}
@@ -727,7 +728,7 @@ export default function ScenarioResultsV8() {
                 ? '（稼働中の他のシナリオがありません）'
                 : '（シナリオを選んでください）'}
             options={moveChoices}
-          />
+          /></SaveErrorField>
         )}
       </Dialog>
     </DetailPage>

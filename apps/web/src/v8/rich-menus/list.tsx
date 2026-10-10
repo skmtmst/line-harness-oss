@@ -79,6 +79,7 @@ import { ExternalImportWorkspace, type LineMenu } from './external-import'
 import { richMenuError, richMenuErrorAll } from './errors'
 import BlockedDeleteDialog, { type BlockedRow } from './blocked-dialog'
 import styles from './list.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
 const UNFILED = '__unfiled__'
@@ -195,6 +196,8 @@ function thumbCells(g: RichMenuGroupListItem): { rows: number; cols: number } {
 const REORDER_MAX_PAGES = 50
 
 export default function RichMenusListV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('リッチメニュー')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -340,14 +343,16 @@ export default function RichMenusListV8() {
       setGroupTotal(groupsRes.data.total)
       setGroupFacets(groupsRes.data.facets ?? null)
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e)
+
       if (activeAccountRef.current === accountId) {
-        setError(richMenuError(e, 'load'))
-        setLoadError(e)
+        { if (!fieldFailure) setError(richMenuError(e, 'load')) }
+        { if (!fieldFailure) setLoadError(e) }
       }
     } finally {
       if (activeAccountRef.current === accountId) setLoading(false)
     }
-  }, [deferredQuery, folderFilter, page, pageSize, savedFilter, selectedAccount?.id, sortKey])
+  }, [deferredQuery, folderFilter, page, pageSize, savedFilter, selectedAccount?.id, sortKey, saveErrors])
 
   /** タップ集計。数が取れなくても一覧は出す。 */
   const loadTapStats = useCallback(async () => {
@@ -366,10 +371,12 @@ export default function RichMenusListV8() {
       } else {
         setTapStatsStatus('error')
       }
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       if (activeAccountRef.current === accountId) setTapStatsStatus('error')
     }
-  }, [selectedAccount?.id])
+  }, [selectedAccount?.id, saveErrors])
 
   /* 「誰に出すか」の「タグ『◯◯』」を解くためのタグ一覧。取れなくても一覧は出す。 */
   const loadTags = useCallback(async () => {
@@ -379,10 +386,12 @@ export default function RichMenusListV8() {
       const res = await api.tags.list({ accountId })
       if (activeAccountRef.current !== accountId) return
       if (res.success) setTagNameById(new Map(res.data.map((t) => [t.id, t.name])))
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       // タグ名が取れなくても一覧は出す。条件は説明の文へ落ちる。
     }
-  }, [selectedAccount?.id])
+  }, [selectedAccount?.id, saveErrors])
 
   /* LINE上の外部状態。重い口なので作業画面を開いてから取る。 */
   const loadExternal = useCallback(async () => {
@@ -402,14 +411,16 @@ export default function RichMenusListV8() {
         setExternal(null)
         setExternalStatus('error')
       }
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
       if (activeAccountRef.current === accountId) {
-        setExternalError('LINE上の状態を確認できませんでした。少し待ってから、もう一度読み込んでください。')
+        { if (!fieldFailure) setExternalError('LINE上の状態を確認できませんでした。少し待ってから、もう一度読み込んでください。') }
         setExternal(null)
         setExternalStatus('error')
       }
     }
-  }, [selectedAccount?.id])
+  }, [selectedAccount?.id, saveErrors])
 
   /** 公開・削除・取り込みのあとの更新。読み込み済みのものだけ取り直す。 */
   const reload = useCallback(async () => {
@@ -424,10 +435,12 @@ export default function RichMenusListV8() {
     try {
       const res = await api.folders.list('rich_menu', selectedAccount?.id ?? undefined)
       if (res.success) setFolders(res.data)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       // 置き場が取れなくても一覧は出す。
     }
-  }, [selectedAccount?.id])
+  }, [selectedAccount?.id, saveErrors])
 
 
   useEffect(() => { void loadList() }, [loadList])
@@ -480,10 +493,12 @@ export default function RichMenusListV8() {
       }
       if (all.length < total) return null
       return orderTargetingGroups(all)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       return null
     }
-  }, [groups, groupTotal, selectedAccount?.id])
+  }, [groups, groupTotal, selectedAccount?.id, saveErrors])
 
   /* 押した瞬間に並べ、裏で保存する。失敗したら元に戻し「もう一度」でやり直せる。 */
   const applyOrderedIds = useCallback((orderedIds: string[], notice: string) => {
@@ -575,11 +590,12 @@ export default function RichMenusListV8() {
       if (!impactMatchesRequest(res.data, request)) throw new Error('impact_scope_mismatch')
       setImpact(res.data)
       setImpactPhase('ready')
-    } catch {
+    } catch (saveFailure) {
       if (
         !sameDeleteImpactRequest(impactRequestRef.current, request)
         || impactLoadGenerationRef.current !== loadGeneration
       ) return
+      saveErrors.capture(saveFailure)
       /* 影響が読めないときは消させない。 */
       setImpactPhase('error')
     }
@@ -613,7 +629,9 @@ export default function RichMenusListV8() {
       setDuplicateTarget(null)
       router.push(`/rich-menus/edit?id=${res.data.id}`)
     } catch (e) {
-      setDuplicateError(richMenuErrorAll(e, 'duplicate'))
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure) setDuplicateError(richMenuErrorAll(e, 'duplicate')) }
     } finally {
       setDuplicateBusy(false)
     }
@@ -648,7 +666,10 @@ export default function RichMenusListV8() {
       if (goneId) leave(goneId, () => reload())
       else await reload()
     } catch (e) {
+
+
       if (!sameDeleteImpactRequest(impactRequestRef.current, request)) return
+      const fieldFailure = saveErrors.capture(e)
       /* 409は「読んだあとに状態が変わった」。新しい影響を描き直す。 */
       if (e instanceof ApiError && e.status === 409) {
         const latest = impactFromError(e.data)
@@ -659,7 +680,7 @@ export default function RichMenusListV8() {
           void loadImpact(request)
         }
       }
-      setDeleteError(richMenuError(e, action))
+      { if (!fieldFailure) setDeleteError(richMenuError(e, action)) }
     } finally {
       if (sameDeleteImpactRequest(impactRequestRef.current, request)) setDeleteBusy(false)
     }
@@ -686,8 +707,11 @@ export default function RichMenusListV8() {
       setImportedMenuName(res.data?.name ?? menu.name)
       await reload()
     } catch (e) {
+
+
       if (importRequestGenerationRef.current !== requestGeneration || activeAccountRef.current !== accountId) return
-      setImportError(richMenuError(e, 'import'))
+      const fieldFailure = saveErrors.capture(e)
+      { if (!fieldFailure) setImportError(richMenuError(e, 'import')) }
     } finally {
       if (importRequestGenerationRef.current === requestGeneration && activeAccountRef.current === accountId) {
         setImportBusy(false)
@@ -826,7 +850,7 @@ export default function RichMenusListV8() {
   )
 
   const folderSelect = (
-    <Select
+    <SaveErrorField names={["folderFilter","folder_filter"]}><Select
       aria-label="フォルダ"
       value={folderFilter}
       onChange={(value) => {
@@ -834,7 +858,7 @@ export default function RichMenusListV8() {
         setPage(1)
       }}
       options={folderSelectOptions}
-    />
+    /></SaveErrorField>
   )
 
   /* ===== 道具の段 ===== */
@@ -857,17 +881,17 @@ export default function RichMenusListV8() {
   const sortBox = (
     <div className={styles.sortBox} title={`並び：${SORT_OPTIONS.find((o) => o.value === sortKey)?.label ?? ''}`}>
       <ArrowDownUp size={14} aria-hidden="true" className={styles.sortIcon} />
-      <Select
+      <SaveErrorField names={["sortKey","sort","sort_key"]}><Select
         aria-label="並び順"
         value={sortKey}
         onChange={(value) => setSortKey(value as SortKey)}
         options={SORT_OPTIONS}
-      />
+      /></SaveErrorField>
     </div>
   )
   const perPageBox = (
     <div className={styles.perPageBox} data-per-page-select>
-      <Select
+      <SaveErrorField names={["pageSize","limit","page_size"]}><Select
         aria-label="1ページに出す件数"
         size="page-size"
         value={String(pageSize)}
@@ -876,7 +900,7 @@ export default function RichMenusListV8() {
           setPage(1)
         }}
         options={PAGE_SIZE_OPTIONS}
-      />
+      /></SaveErrorField>
     </div>
   )
   const priorityNotice = (
@@ -1290,7 +1314,7 @@ export default function RichMenusListV8() {
   )
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId={!canEdit ? 'ZoKow' : narrow ? 'Y9ASp' : 'rZEGN'}
       headingSize="regular"
       title="リッチメニュー"
@@ -1444,6 +1468,6 @@ export default function RichMenusListV8() {
         </p>
       ) : null}
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

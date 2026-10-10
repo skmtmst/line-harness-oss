@@ -21,6 +21,7 @@ import { restaurantGoogleApi, type GoogleHoursProposal, type GoogleProfileAddres
 import { errorMessage, formatPeriods, formatStampFull, formatYmdShort, summarizeWeekly, TIME_OPTIONS } from './format'
 import type { GoogleNav } from './google'
 import styles from './google.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 function addressText(a: GoogleProfileAddress | null | undefined): string {
   if (!a) return '—'
@@ -118,7 +119,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
         {earlyClose !== null ? (
           <div className={styles.inlinePanel}>
             <span className={styles.fieldLabel}>今日の閉店時刻</span>
-            <Select size="page-size" aria-label="今日の閉店時刻" value={earlyClose} onChange={(value) => setEarlyClose(value)} options={closeOptions} />
+            <SaveErrorField names={["earlyClose","closeTime","early_close"]}><Select size="page-size" aria-label="今日の閉店時刻" value={earlyClose} onChange={(value) => setEarlyClose(value)} options={closeOptions} /></SaveErrorField>
             <span className={styles.muted}>{`現在 ${formatPeriods(today.periods)}`}</span>
             <span className={styles.spacer} aria-hidden="true" />
             <Button onClick={() => setEarlyClose(null)} disabled={busy}>キャンセル</Button>

@@ -42,6 +42,7 @@ import {
   type UsageCategory,
 } from './use-feature-settings'
 import styles from './screen.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const TITLE = '機能設定'
 const DESCRIPTION = '使わない機能をオフにすると、左のメニューから消えます。作ったデータは消えません'
@@ -126,12 +127,12 @@ function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwi
           必須
         </span>
       ) : canManage ? (
-        <Toggle
+        <SaveErrorField names={["enabled"]}><Toggle
           checked={enabled}
           label={`${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
           disabled={busy}
           onChange={(next) => onToggle(item, next)}
-        />
+        /></SaveErrorField>
       ) : (
         <span className={styles.stateText}>{enabled ? 'オン' : 'オフ'}</span>
       )}
@@ -523,7 +524,7 @@ export default function FeatureSettingsScreen() {
           {/* N-444：変更があるときだけ理由の欄を出す。 */}
           {canManage && dirty && (
             <Field label="変更理由（必須）" htmlFor="feature-settings-reason" error={reasonError || undefined} note="空のままでは保存できません。運用状態の更新履歴に残ります。">
-              <TextField
+              <SaveErrorField names={["reason"]}><TextField
                 ref={reasonRef}
                 id="feature-settings-reason"
                 aria-required="true"
@@ -532,7 +533,7 @@ export default function FeatureSettingsScreen() {
                 placeholder="例: マイルを使わないのでオフにする"
                 maxLength={300}
                 disabled={saving}
-              />
+              /></SaveErrorField>
             </Field>
           )}
         </>

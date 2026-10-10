@@ -31,6 +31,7 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import ValidationSummary from '@/components/shared/validation-summary'
 import { FieldError } from '@/components/shared/form-controls'
 import styles from './create.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const OFFER_LIST_PATH = '/conversions?tab=offers'
 
@@ -51,6 +52,8 @@ export function rewardIntegerError(value: string, kind: 'amount' | 'miles'): str
 type Fetch = 'loading' | 'ready' | 'failed'
 
 export default function AffiliateOfferCreateV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('案件を作る')
   /* 板の頭の「← 〇〇へ」は 2026-10-08 に無くした。一覧へは上の帯のパンくずで戻る。 */
   usePageCrumbs([{ label: '成果とアフィリエイト', href: '/affiliates' }])
@@ -205,7 +208,9 @@ export default function AffiliateOfferCreateV8() {
         setSaveNote('下書きに保存しました。続けて作れます。')
       }
     } catch (caught) {
-      setSaveError(caught instanceof Error ? caught.message : '保存できませんでした')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setSaveError(caught instanceof Error ? caught.message : '保存できませんでした') }
     } finally {
       setSaving(false)
     }
@@ -246,7 +251,7 @@ export default function AffiliateOfferCreateV8() {
   )
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       boardId="Td4TN"
       identity={<Link href="/affiliates" className={styles.back}>← 成果とアフィリエイトへ</Link>}
       title="案件を作る"
@@ -281,12 +286,12 @@ export default function AffiliateOfferCreateV8() {
         </div>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="of-name">案件名</label>
-          <TextField {...fields.bind('name')} invalid={fields.invalid('name')} aria-describedby={describedBy('name')} id="of-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：定期便の初回" maxLength={120} readOnly={!canEdit} />
+          <SaveErrorField names={["name"]}><TextField {...fields.bind('name')} invalid={fields.invalid('name')} aria-describedby={describedBy('name')} id="of-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：定期便の初回" maxLength={120} readOnly={!canEdit} /></SaveErrorField>
           <FieldError id="of-name-error">{fields.error('name')}</FieldError>
         </div>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="of-description">説明<span className={styles.optional}>任意</span></label>
-          <TextField id="of-description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：初回の定期便をお申し込みいただいた方が対象です。" maxLength={500} readOnly={!canEdit} />
+          <SaveErrorField names={["description"]}><TextField id="of-description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：初回の定期便をお申し込みいただいた方が対象です。" maxLength={500} readOnly={!canEdit} /></SaveErrorField>
         </div>
       </section>
 
@@ -322,7 +327,7 @@ export default function AffiliateOfferCreateV8() {
         <div className={styles.pair}>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="of-amount">報酬額（円）</label>
-            <TextField {...fields.bind('amount')} invalid={fields.invalid('amount')} aria-describedby={describedBy('amount')} id="of-amount" type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="2000" readOnly={!canEdit} />
+            <SaveErrorField names={["rewardAmount","reward_amount"]}><TextField {...fields.bind('amount')} invalid={fields.invalid('amount')} aria-describedby={describedBy('amount')} id="of-amount" type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="2000" readOnly={!canEdit} /></SaveErrorField>
             <FieldError id="of-amount-error">{fields.error('amount')}</FieldError>
           </div>
           <div className={styles.field}>
@@ -330,7 +335,7 @@ export default function AffiliateOfferCreateV8() {
               マイル（任意）<span className={styles.optional}>任意</span>
               <HelpTip label="マイルの説明">現金とマイルは併用できます。マイルは標準プログラムで付けます。</HelpTip>
             </label>
-            <TextField {...fields.bind('miles')} invalid={fields.invalid('miles')} aria-describedby={describedBy('miles')} id="of-miles" type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="200" readOnly={!canEdit} />
+            <SaveErrorField names={["rewardMiles","reward_miles"]}><TextField {...fields.bind('miles')} invalid={fields.invalid('miles')} aria-describedby={describedBy('miles')} id="of-miles" type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="200" readOnly={!canEdit} /></SaveErrorField>
             <FieldError id="of-miles-error">{fields.error('miles')}</FieldError>
           </div>
         </div>
@@ -342,13 +347,13 @@ export default function AffiliateOfferCreateV8() {
           <p className={styles.cardNote}>任意</p>
         </div>
         <div className={styles.switchRow}>
-          <Toggle checked={tagEnabled} label="タグを付ける" onChange={canEdit ? (next) => { setTagEnabled(next); if (!next) setTagId('') } : undefined} />
+          <SaveErrorField names={["tagEnabled","tag_enabled"]}><Toggle checked={tagEnabled} label="タグを付ける" onChange={canEdit ? (next) => { setTagEnabled(next); if (!next) setTagId('') } : undefined} /></SaveErrorField>
           <div className={styles.switchBody}>
             <p className={styles.switchName}>タグを付ける</p>
             <p className={styles.switchNote}>{tagName ?? 'まだ決めていません'}</p>
             {tagEnabled ? (
               <div className={styles.selectBox} {...fields.bind('tag')}>
-                <EntityKindField
+                <SaveErrorField names={["tagId"]}><EntityKindField
                   invalid={fields.invalid('tag')}
                   describedBy={fields.error('tag') ? 'of-tag-error' : undefined}
                   id="of-tag"
@@ -360,7 +365,7 @@ export default function AffiliateOfferCreateV8() {
                   placeholder="（なし）"
                   readOnly={!canEdit}
                   options={tags.filter((t) => (t.status ?? 'active') === 'active')}
-                />
+                /></SaveErrorField>
               </div>
             ) : null}
             {tagEnabled ? <FieldError id="of-tag-error">{fields.error('tag')}</FieldError> : null}
@@ -369,13 +374,13 @@ export default function AffiliateOfferCreateV8() {
           </div>
         </div>
         <div className={styles.switchRow}>
-          <Toggle checked={scenarioEnabled} label="シナリオ配信を始める" onChange={canEdit ? (next) => { setScenarioEnabled(next); if (!next) setScenarioId('') } : undefined} />
+          <SaveErrorField names={["scenarioEnabled","scenario_enabled"]}><Toggle checked={scenarioEnabled} label="シナリオ配信を始める" onChange={canEdit ? (next) => { setScenarioEnabled(next); if (!next) setScenarioId('') } : undefined} /></SaveErrorField>
           <div className={styles.switchBody}>
             <p className={styles.switchName}>シナリオ配信を始める</p>
             <p className={styles.switchNote}>{scenarioName ?? 'まだ決めていません'}</p>
             {scenarioEnabled ? (
               <div className={styles.selectBox} {...fields.bind('scenario')}>
-                <EntityKindField
+                <SaveErrorField names={["scenarioId"]}><EntityKindField
                   invalid={fields.invalid('scenario')}
                   describedBy={fields.error('scenario') ? 'of-scenario-error' : undefined}
                   kind="scenario"
@@ -387,7 +392,7 @@ export default function AffiliateOfferCreateV8() {
                   placeholder="（なし）"
                   readOnly={!canEdit}
                   options={scenarios.filter((s) => s.isActive !== false)}
-                />
+                /></SaveErrorField>
               </div>
             ) : null}
             {scenarioEnabled ? <FieldError id="of-scenario-error">{fields.error('scenario')}</FieldError> : null}
@@ -398,6 +403,6 @@ export default function AffiliateOfferCreateV8() {
       </section>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した案件" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }

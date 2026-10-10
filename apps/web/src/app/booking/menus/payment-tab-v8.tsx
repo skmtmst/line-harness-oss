@@ -7,6 +7,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { bookingApi, type BookingMenu, type BookingPaymentAdminConfig } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type PayMode = 'none' | 'onsite' | 'online'
 type PayProvider = 'none' | 'onsite' | 'stripe'
@@ -31,6 +32,8 @@ export default function PaymentTabV8({ accountId, menus, canEdit }: {
   menus: BookingMenu[]
   canEdit: boolean
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [config, setConfig] = useState<BookingPaymentAdminConfig | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [draft, setDraft] = useState({ mode: 'none' as PayMode, provider: 'none' as PayProvider, holdMinutes: 30 })
@@ -78,8 +81,10 @@ export default function PaymentTabV8({ accountId, menus, canEdit }: {
       const response = await bookingApi.savePaymentConfig(accountId, draft)
       setConfig(response.data)
       notifyToast('お支払いの設定を保存しました。')
-    } catch {
-      setError('保存できませんでした。入力を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setError('保存できませんでした。入力を確かめて、もう一度お試しください。') }
     } finally {
       setSaving(false)
     }
@@ -95,8 +100,10 @@ export default function PaymentTabV8({ accountId, menus, canEdit }: {
         return next
       })
       notifyToast('店の既定に戻しました。')
-    } catch {
-      setError('店の既定に戻せませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setError('店の既定に戻せませんでした。もう一度お試しください。') }
     } finally {
       setMenuSaving(null)
     }
@@ -111,59 +118,61 @@ export default function PaymentTabV8({ accountId, menus, canEdit }: {
       })
       setMenuOverrides((current) => ({ ...current, [menuId]: mode }))
       notifyToast('メニューのお支払いを保存しました。')
-    } catch {
-      setError('メニューの保存ができませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setError('メニューの保存ができませんでした。もう一度お試しください。') }
     } finally {
       setMenuSaving(null)
     }
   }
 
-  if (status === 'loading') return <p>読み込んでいます…</p>
+  if (status === 'loading') return <SaveErrorScope errors={saveErrors}><p>読み込んでいます…</p></SaveErrorScope>
   if (status === 'error' || !config) {
     return (
-      <div>
+      <SaveErrorScope errors={saveErrors}><div>
         <p>お支払いの設定を読み込めませんでした。</p>
         <Button onClick={() => window.location.reload()}>読み直す</Button>
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
   return (
-    <div data-design-node="i7Zkz">
+    <SaveErrorScope errors={saveErrors}><div data-design-node="i7Zkz">
       <h2>お支払い</h2>
       <p>予約のお支払い方法を決めます。お支払いなしのままなら、今の予約の流れは変わりません。</p>
 
       <section aria-label="店の既定">
         <h3>店の既定</h3>
-        <Select
+        <SaveErrorField names={["mode","draft.mode"]}><Select
           aria-label="お支払い方法"
           label="お支払い方法"
           options={MODE_OPTIONS}
           value={draft.mode}
           onChange={(value) => setDraft((current) => ({ ...current, mode: value as PayMode }))}
           disabled={!canEdit}
-        />
+        /></SaveErrorField>
         {draft.mode === 'online' && (
-          <Select
+          <SaveErrorField names={["provider","draft.provider"]}><Select
             aria-label="決済サービス"
             label="決済サービス"
             options={PROVIDER_OPTIONS.filter((option) => option.value !== 'none')}
             value={draft.provider === 'none' ? 'stripe' : draft.provider}
             onChange={(value) => setDraft((current) => ({ ...current, provider: value as PayProvider }))}
             disabled={!canEdit}
-          />
+          /></SaveErrorField>
         )}
         {draft.mode === 'online' && (
           <label>
             仮押さえの期限（分）
-            <input
+            <SaveErrorField names={["holdMinutes","draft.holdMinutes","hold_minutes","draft.hold_minutes"]}><input
               type="number"
               min={5}
               max={1440}
               value={draft.holdMinutes}
               onChange={(event) => setDraft((current) => ({ ...current, holdMinutes: Number(event.target.value) }))}
               disabled={!canEdit}
-            />
+            /></SaveErrorField>
           </label>
         )}
         <div>
@@ -207,6 +216,6 @@ export default function PaymentTabV8({ accountId, menus, canEdit }: {
           ))}
         </ul>
       </section>
-    </div>
+    </div></SaveErrorScope>
   )
 }

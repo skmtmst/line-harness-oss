@@ -16,6 +16,7 @@ import { api } from '@/lib/api'
 import { readFileAsBase64, type BannerProject } from '@/lib/hq-banners'
 import BannerDialogFrame from './frame'
 import styles from './dialogs.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /** 取り込める画像（API と同じ）。 */
 export const BANNER_UPLOAD_ACCEPT = ['image/png', 'image/jpeg', 'image/webp']
@@ -80,7 +81,7 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
         <form className={styles.form} onSubmit={(event) => { event.preventDefault(); submit() }}>
           <div className={styles.field}>
             <label htmlFor={`${uid}-name`} className={styles.label}>プロジェクト名</label>
-            <TextField
+            <SaveErrorField names={["name"]}><TextField
               id={`${uid}-name`}
               value={name}
               maxLength={100}
@@ -89,14 +90,14 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
               placeholder="例: 春の感謝祭 2周年"
               onChange={(event) => setName(event.target.value)}
               className={styles.full}
-            />
+            /></SaveErrorField>
           </div>
           <div className={styles.field}>
             <div className={styles.labelRow}>
               <label htmlFor={`${uid}-description`} className={styles.labelSmall}>説明</label>
               <span className={styles.optional}>任意</span>
             </div>
-            <TextArea
+            <SaveErrorField names={["description"]}><TextArea
               id={`${uid}-description`}
               rows={2}
               value={description}
@@ -105,7 +106,7 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
               placeholder="例: 餃子・生ビールのキャンペーン告知"
               onChange={(event) => setDescription(event.target.value)}
               className={`${styles.full} ${styles.textarea}`}
-            />
+            /></SaveErrorField>
           </div>
         </form>
     </BannerDialogFrame>
@@ -210,7 +211,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
             <div className={styles.field}>
               <label htmlFor={`${uid}-project`} className={styles.label}>入れるプロジェクト</label>
               <div className={styles.full}>
-                <Select
+                <SaveErrorField names={["projectId","project_id"]}><Select
                   aria-label="入れるプロジェクト"
                   size="full"
                   id={`${uid}-project`}
@@ -218,10 +219,10 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
                   disabled={loading}
                   onChange={setProjectId}
                   options={projects.map((p) => ({ value: p.id, label: p.name }))}
-                />
+                /></SaveErrorField>
               </div>
             </div>
-            <MediaSlot
+            <SaveErrorField names={["filePreview","file_preview"]}><MediaSlot
               title="画像を追加"
               previewAlt={file?.name}
               value={filePreview}
@@ -231,7 +232,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
               busy={uploading}
               onFile={(next) => pickFile(next)}
               onRemove={() => setFile(null)}
-            />
+            /></SaveErrorField>
             {file ? <p className={styles.dropText} title={file.name}>{file.name}</p> : null}
           </>
         )}

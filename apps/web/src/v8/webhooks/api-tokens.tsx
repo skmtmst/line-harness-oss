@@ -42,6 +42,7 @@ import {
   useWebhookOverview,
 } from './shell'
 import styles from './api-tokens.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'disabled'
 
@@ -88,6 +89,8 @@ export function tokenUsedAt(value: string | null): string {
 }
 
 export default function WebhooksApiTokensV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('外部連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const staffRole = useStaffRole()
@@ -155,7 +158,10 @@ export default function WebhooksApiTokensV8() {
       setTokens(res.data.filter((item) => !item.revokedAt))
       setStatus('ready')
     } catch (caught) {
+
+
       if (loadGenerationRef.current !== requestGeneration || selectedAccountIdRef.current !== requestAccountId) return
+      const fieldFailure = saveErrors.capture(caught)
       if (caught instanceof ApiError && caught.code === 'FEATURE_DISABLED') {
         setTokens([])
         setStatus('disabled')
@@ -167,9 +173,9 @@ export default function WebhooksApiTokensV8() {
         return
       }
       setStatus('error')
-      setLoadError(describeApiFailure(caught, '読み込み'))
+      { if (!fieldFailure) setLoadError(describeApiFailure(caught, '読み込み')) }
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     void load()
@@ -225,14 +231,16 @@ export default function WebhooksApiTokensV8() {
       setName('')
       await load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (!stepUpToken && isStepUpRequired(caught)) {
         setStepUp({ purpose: 'webhook.api_token', action: 'API接続の鍵を発行する', retry: (token) => handleCreate(token) })
         return
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setCreateError(describeApiFailure(caught, '発行', {
+      { if (!fieldFailure) setCreateError(describeApiFailure(caught, '発行', {
         forbidden: '鍵の発行は統括だけができます。必要なときは統括に頼んでください。',
-      }))
+      })) }
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setCreating(false)
     }
@@ -255,6 +263,8 @@ export default function WebhooksApiTokensV8() {
       setRotateTarget(null)
       await load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (!stepUpToken && isStepUpRequired(caught)) {
         const target = rotateTarget
         setStepUp({
@@ -267,13 +277,13 @@ export default function WebhooksApiTokensV8() {
       if (selectedAccountIdRef.current !== requestAccountId) return
       if (caught instanceof ApiError && caught.code === 'TOKEN_ROTATE_CONFLICT') {
         setRotateTarget(null)
-        setActionError('ほかの操作が先にこの鍵を更新しました。一覧を読み直しました。最新の状態からもう一度お試しください')
+        { if (!fieldFailure) setActionError('ほかの操作が先にこの鍵を更新しました。一覧を読み直しました。最新の状態からもう一度お試しください') }
         await load()
         return
       }
-      setDialogError(describeApiFailure(caught, '入れ替え', {
+      { if (!fieldFailure) setDialogError(describeApiFailure(caught, '入れ替え', {
         forbidden: '鍵の入れ替えは統括だけができます。必要なときは統括に頼んでください。',
-      }))
+      })) }
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
     }
@@ -294,6 +304,8 @@ export default function WebhooksApiTokensV8() {
       setRevokeTarget(null)
       await load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (!stepUpToken && isStepUpRequired(caught)) {
         const target = revokeTarget
         setStepUp({
@@ -304,9 +316,9 @@ export default function WebhooksApiTokensV8() {
         return
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setDialogError(describeApiFailure(caught, '停止', {
+      { if (!fieldFailure) setDialogError(describeApiFailure(caught, '停止', {
         forbidden: '鍵の停止は統括だけができます。必要なときは統括に頼んでください。',
-      }))
+      })) }
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
     }
@@ -317,13 +329,15 @@ export default function WebhooksApiTokensV8() {
     try {
       await navigator.clipboard.writeText(issued.token)
       setCopied(true)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       // 手で選んで写せるので、失敗しても文は出さない。
     }
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       help="行の「…」から止める。止めても、すでに付けたタグは残ります。"
       boardId="ralAc"
       headingSize="regular"
@@ -355,22 +369,22 @@ export default function WebhooksApiTokensV8() {
         >
           <div className={styles.createBody}>
             <Field label="名前" htmlFor="wh-token-name" error={nameError}>
-              <TextField
+              <SaveErrorField names={["name"]}><TextField
                 id="wh-token-name"
                 value={name}
                 maxLength={120}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="例：在庫システム"
                 aria-invalid={nameError ? true : undefined}
-              />
+              /></SaveErrorField>
             </Field>
             <fieldset className={styles.field} id="wh-token-scopes" tabIndex={-1} aria-invalid={Boolean(scopesError) || undefined} aria-describedby={scopesError ? "wh-token-scopes-error" : undefined}>
               <legend className={styles.label}>できること</legend>
               <div className={styles.checkRow}>
                 {SCOPES.map((scope) => (
-                  <Checkbox key={scope} invalid={Boolean(scopesError)} aria-describedby={scopesError ? "wh-token-scopes-error" : undefined} checked={scopes.includes(scope)} onCheckedChange={() => toggleScope(scope)}>
+                  <SaveErrorField names={["scope"]} key={scope}><Checkbox key={scope} invalid={Boolean(scopesError)} aria-describedby={scopesError ? "wh-token-scopes-error" : undefined} checked={scopes.includes(scope)} onCheckedChange={() => toggleScope(scope)}>
                     {scopeLabel(scope)}
-                  </Checkbox>
+                  </Checkbox></SaveErrorField>
                 ))}
               </div>
               {scopesError ? <p id="wh-token-scopes-error" className={styles.fieldError} role="alert">{scopesError}</p> : null}
@@ -588,6 +602,6 @@ export default function WebhooksApiTokensV8() {
           </>
         ) : null}
       </div>
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

@@ -31,6 +31,7 @@ import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
 import { formatStamp, Panel, StatRow, Status } from '../common-a/parts'
 import styles from './organization.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const roleLabel: Record<RestaurantMembership['role'], string> = {
   super_admin: 'SuperAdmin',
@@ -80,7 +81,7 @@ function DefaultSelect({ name, ariaLabel, defaultValue, options }: {
   options: { value: string; label: string; disabled?: boolean }[]
 }) {
   const [value, setValue] = useState(defaultValue)
-  return <Select name={name} aria-label={ariaLabel} value={value} onChange={setValue} size="full" options={options} />
+  return <SaveErrorField names={["value"]}><Select name={name} aria-label={ariaLabel} value={value} onChange={setValue} size="full" options={options} /></SaveErrorField>
 }
 
 function StoreLineAccountSelect({ accounts, stores, currentStore }: {
@@ -126,7 +127,7 @@ function StoreForm({ store, accounts, stores, busy, onSubmit, onCancel }: {
         <Field label="店舗コード" name="code" defaultValue={store?.code} required />
         <Field label="エリア" name="area" defaultValue={store?.area || ''} />
         <Field label="収容人数" name="capacity" type="number" defaultValue={String(store?.capacity ?? 24)} required />
-        <div className={styles.field}><span className={styles.fieldLabel}>タイムゾーン</span><span>日本時間（Asia/Tokyo）</span><input type="hidden" name="timezone" value="Asia/Tokyo" /></div>
+        <div className={styles.field}><span className={styles.fieldLabel}>タイムゾーン</span><span>日本時間（Asia/Tokyo）</span><SaveErrorField names={["timezone"]}><input type="hidden" name="timezone" value="Asia/Tokyo" /></SaveErrorField></div>
         {store ? (
           <label className={styles.field}>
             <span className={styles.fieldLabel}>状態</span>
@@ -217,7 +218,7 @@ function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: string;
       ) : addresses.length === 0 ? (
         <p className={styles.intakeEmpty}>未発行</p>
       ) : (
-        addresses.map((item) => (
+        addresses.map((item, saveFieldIndex) => (
           <div key={item.id} className={styles.intakeCard}>
             <div className={styles.intakeCardHead}>
               <span className={styles.intakeState}>{item.revokedAt ? `${formatStamp(item.revokedAt)}まで有効` : '現在使用中'}</span>
@@ -225,7 +226,7 @@ function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: string;
               <Status value={item.status} />
             </div>
             <div className={styles.intakeRow}>
-              <TextField aria-label={`${store.name}の取り込みアドレス`} readOnly value={item.address} className={styles.intakeAddress} />
+              <SaveErrorField names={[`addresses.${saveFieldIndex}.address`,"address","item.address"]}><TextField aria-label={`${store.name}の取り込みアドレス`} readOnly value={item.address} className={styles.intakeAddress} /></SaveErrorField>
               <Button onClick={() => void copy(item)}><Copy aria-hidden className={styles.buttonIcon} />{copiedId === item.id ? 'コピー済み' : 'コピー'}</Button>
             </div>
             <p className={styles.intakeMeta}>{`発行日時：${formatStamp(item.createdAt)}`}</p>
@@ -264,7 +265,7 @@ function LoginConnection({ member, logins, busy, save }: { member: RestaurantMem
       <p className={styles.muted}>{loginSummary(member)}</p>
       {logins.length ? (
         <div className={styles.loginRow}>
-          <Select aria-label={`${member.staff_name}のログインメンバー`} value={selected} onChange={setSelected} size="full" options={[{ value: '', label: '連携しない' }, ...logins.map((l) => ({ value: l.id, label: l.name }))]} />
+          <SaveErrorField names={["selected"]}><Select aria-label={`${member.staff_name}のログインメンバー`} value={selected} onChange={setSelected} size="full" options={[{ value: '', label: '連携しない' }, ...logins.map((l) => ({ value: l.id, label: l.name }))]} /></SaveErrorField>
           <Button disabled={busy || selected === (member.staff_id || '')} onClick={() => save(selected || null)}>ログインと連携</Button>
         </div>
       ) : null}
@@ -311,6 +312,8 @@ function MemberForm({ member, stores, busy, onSubmit, onCancel, login }: {
 }
 
 function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
+  const saveErrors = useSaveFormErrors()
+
   const { data, store, selectedStoreId, busy, mutate } = ctx
   const { accounts, selectedAccountId } = useAccount()
   const role = useStaffRole()
@@ -342,6 +345,8 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
     const request = { ...body, expectedPolicyVersion: member?.loginPolicyVersion, idempotencyKey: crypto.randomUUID() }
     try { return await restaurantTestApi.updateMembership(accountId, id, request) }
     catch (error) {
+      saveErrors.capture(error)
+
       if (!isStepUpRequired(error)) throw error
       const token = await gate('staff.permissions.change', '店の役割とログイン権限を変更する')
       if (!token) throw new Error('本人確認を中止しました。変更は保存されていません。')
@@ -389,7 +394,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       {readOnly ? (
         <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.readOnlyIcon} /><span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span></div>
       ) : null}
@@ -565,7 +570,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
           </Panel>
         </div>
       </div>
-    </>
+    </></SaveErrorScope>
   )
 }
 

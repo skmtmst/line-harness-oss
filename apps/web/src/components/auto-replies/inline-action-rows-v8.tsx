@@ -13,6 +13,7 @@ import { actionIncompleteReason } from './action-completeness'
 import { newActionKey, type InlineAction } from './draft-fields'
 import type { ActionOptions } from './inline-action-list'
 import styles from './inline-action-rows-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8 自動応答の作る③「返したあとに行うこと」（絵 rfhIf「処理」の行）。
@@ -90,13 +91,13 @@ export default function InlineActionRowsV8({ actions, onChange, ...options }: Pr
               {incomplete ? <span className={styles.incomplete}>未完成</span> : null}
               <span className={styles.spacer} />
               <span className={styles.failLabel}>失敗したら</span>
-              <Select
+              <SaveErrorField names={[`shown.${index}.onFailure`,`shown.${index}.on_failure`,"onFailure","action.onFailure","on_failure","action.on_failure"]}><Select
                 className={styles.failSelect}
                 value={action.onFailure}
                 onChange={(v) => update(action.key, { onFailure: v === 'stop' ? 'stop' : 'continue' })}
                 aria-label={`${index + 1}つ目の失敗したときの動き`}
                 options={[{ value: 'continue', label: '次へ進む' }, { value: 'stop', label: 'ここで止める' }]}
-              />
+              /></SaveErrorField>
               <MoreAction label={`${index + 1}つ目の処理の操作`} onClick={() => setOpenMenu(openMenu === action.key ? null : action.key)} />
               <ActionMenu open={openMenu === action.key} items={items} onClose={() => setOpenMenu(null)} ariaLabel={`${index + 1}つ目の処理の操作`} />
             </div>
@@ -105,7 +106,7 @@ export default function InlineActionRowsV8({ actions, onChange, ...options }: Pr
               <div className={styles.editor}>
                 {action.actionType === 'notify_staff' ? (
                   <div className={styles.notify}>
-                    <Select
+                    <SaveErrorField names={["notificationRuleId","cfg(action).notificationRuleId","notification_rule_id","cfg(action).notification_rule_id"]}><Select
                       aria-label="通知先"
                       value={String(cfg(action).notificationRuleId ?? '')}
                       options={[{ value: '', label: '通知先を選ぶ' }, ...(options.notificationRules ?? []).map((r) => ({ value: r.id, label: r.name }))]}
@@ -113,14 +114,14 @@ export default function InlineActionRowsV8({ actions, onChange, ...options }: Pr
                         const rule = options.notificationRules?.find((r) => r.id === value)
                         update(action.key, { config: { ...cfg(action), notificationRuleId: value, notificationRuleVersion: rule?.version ?? 0 } })
                       }}
-                    />
-                    <textarea
+                    /></SaveErrorField>
+                    <SaveErrorField names={["message","cfg(action).message"]}><textarea
                       aria-label="通知の本文"
                       maxLength={2000}
                       className={styles.notifyText}
                       value={String(cfg(action).message ?? '')}
                       onChange={(e) => update(action.key, { config: { ...cfg(action), message: e.target.value } })}
-                    />
+                    /></SaveErrorField>
                   </div>
                 ) : (
                   <ActionConfigEditor

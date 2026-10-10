@@ -44,8 +44,11 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import styles from './create.module.css'
 import DeliveryModeDiagram from './delivery-mode-diagram'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 export default function ScenarioCreateV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('シナリオを作成')
   usePageCrumbs([{ label: 'シナリオ配信', href: '/scenarios' }])
   const router = useRouter()
@@ -105,7 +108,9 @@ export default function ScenarioCreateV8() {
         setFolderId(res.data.folderId ?? '')
         return true
       } catch (cause) {
-        setError(scenarioSaveError(cause))
+        const fieldFailure = saveErrors.capture(cause)
+
+        { if (!fieldFailure) setError(scenarioSaveError(cause)) }
         setFolderId(scenario.folderId ?? '')
         return false
       } finally {
@@ -258,7 +263,9 @@ export default function ScenarioCreateV8() {
       // 3段目へ。手順の帯が3段なので、2段で編集画面へ放り出さない。
       router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
     } catch (cause) {
-      setError(id ? scenarioModeError(cause) : 'シナリオを作成できませんでした。時間をおいてもう一度お試しください。')
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure) setError(id ? scenarioModeError(cause) : 'シナリオを作成できませんでした。時間をおいてもう一度お試しください。') }
       setSaving(null)
     }
   }
@@ -277,9 +284,11 @@ export default function ScenarioCreateV8() {
           finishDraft()
           router.push(`/scenarios/first-step?id=${encodeURIComponent(createdId)}`)
         }
-      } catch {
+      } catch (saveFailure) {
+        const fieldFailure = saveErrors.capture(saveFailure)
+
         // WEB226：通信の失敗（例外）も、方式を選んだときと同じ言葉で出す（黙って何も起きない、にしない）。
-        setError('シナリオを作成できませんでした。時間をおいてもう一度お試しください。')
+        { if (!fieldFailure) setError('シナリオを作成できませんでした。時間をおいてもう一度お試しください。') }
       } finally {
         setDetailsSaving(false)
       }
@@ -358,7 +367,7 @@ export default function ScenarioCreateV8() {
   const useCommonReason = scenarioError ? isForbiddenOrRateLimited(scenarioError) : false
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       stepsSpacing="compact"
       boardId="dnzqC"
       title="シナリオを作る"
@@ -433,7 +442,7 @@ export default function ScenarioCreateV8() {
         <div className={styles.infoRow}>
           <div className={styles.nameField} ref={nameWrapRef}>
             <span className={styles.fieldLabel}>シナリオ名 <RequiredBadge /></span>
-            <TextField
+            <SaveErrorField names={["name"]}><TextField
               value={name}
               disabled={fieldsDisabled}
               onChange={(e) => { setName(e.target.value); if (nameError) setNameError('') }}
@@ -442,13 +451,13 @@ export default function ScenarioCreateV8() {
               invalid={Boolean(nameError)}
               aria-label="シナリオ名"
               aria-describedby={nameError ? 'scenario-name-error' : undefined}
-            />
+            /></SaveErrorField>
             {nameError ? <span id="scenario-name-error" className={styles.fieldError}>{nameError}</span> : null}
           </div>
           <div className={styles.folderField}>
             <span className={styles.fieldLabelStrong}>フォルダ</span>
             <span title={selectedFolderName} className={styles.folderSelect}>
-              <FolderSelect
+              <SaveErrorField names={["folderId","folder_id"]}><FolderSelect
                 value={folderId}
                 disabled={fieldsDisabled || folderState !== 'ready'}
                 onChange={(value) => {
@@ -465,7 +474,7 @@ export default function ScenarioCreateV8() {
                 onCreate={canEdit && !locked
                   ? folderCreator((name, color) => api.folders.create({ kind: 'scenario', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
                   : undefined}
-              />
+              /></SaveErrorField>
             </span>
             {folderState !== 'ready' || detailsSaving ? (
               <span className={styles.fieldHint}>
@@ -491,7 +500,7 @@ export default function ScenarioCreateV8() {
           <h2 className={styles.cardTitle}>配信方式</h2>
           <HelpTip label="配信方式の説明">作ったあとは変えられません</HelpTip>
         </div>
-        <RadioCardGroup legend="配信方式" className={styles.modeRow}>
+        <SaveErrorField names={["delivery-mode","selectedMode"]}><RadioCardGroup legend="配信方式" className={styles.modeRow}>
           <RadioCard
             name="delivery-mode"
             value="absolute_time"
@@ -516,9 +525,9 @@ export default function ScenarioCreateV8() {
           >
             <DeliveryModeDiagram mode="elapsed" selected={selectedMode === 'elapsed'} />
           </RadioCard>
-        </RadioCardGroup>
+        </RadioCardGroup></SaveErrorField>
       </Card>
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }
 

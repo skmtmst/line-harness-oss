@@ -25,6 +25,7 @@ import {
   type LoadStatus,
 } from './shared'
 import styles from '../settings.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /* 候補は v7（/booking/menus の BookingRulesEditor）と同じ。 */
 const TIME_ZONE_CHOICES = [
@@ -51,7 +52,7 @@ function isUnknownTimeZone(zone: string): boolean {
 
 /** 閲覧のみ：選ぶ部品・つまみの代わりに、選んでいる値を読み取りだけの欄で見せる（2026-10-06 オーナー決定）。 */
 function ReadOnlyText({ label, value, spaced = false }: { label: string; value: string; spaced?: boolean }) {
-  return <TextField aria-label={label} value={value} readOnly aria-readonly="true" title={value} className={spaced ? 'mt-1' : undefined} />
+  return <SaveErrorField names={["value"]}><TextField aria-label={label} value={value} readOnly aria-readonly="true" title={value} className={spaced ? 'mt-1' : undefined} /></SaveErrorField>
 }
 
 function RuleNumberFieldV8({ label, unit, min, max, value, onChange, trackEmpty, humanize, readOnly = false }: {
@@ -88,7 +89,7 @@ function RuleNumberFieldV8({ label, unit, min, max, value, onChange, trackEmpty,
     <label className={styles.fieldLabel}>
       {label}
       <span className="mt-1 flex items-center gap-2">
-        <input
+        <SaveErrorField names={["shown","text"]}><input
           aria-label={label}
           type="number"
           min={min}
@@ -106,7 +107,7 @@ function RuleNumberFieldV8({ label, unit, min, max, value, onChange, trackEmpty,
             if (raw !== '') onChange(Number(raw))
           }}
           className={styles.numInput}
-        />
+        /></SaveErrorField>
         <span className="text-ink-faint whitespace-nowrap text-xs">{unit}</span>
       </span>
       {hint ? <span className="text-ink-faint mt-1 block text-xs">＝{hint}</span> : null}
@@ -126,6 +127,8 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
   onSaved: (settings: BookingSettings) => void
   onReload: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [draft, setDraft] = useState<BookingSettings | null>(null)
   /* 「指名なし」を出すか。店舗の保存先は無く、スタッフの is_designation_optional に書く。 */
   const [noAssign, setNoAssign] = useState<boolean | null>(null)
@@ -217,7 +220,9 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
       onSaved(response.data)
       if (noAssign !== null && noAssign !== initialNoAssign) onReload()
     } catch (cause) {
-      setSaveError(bookingRulesErrorMessage(cause, '保存'))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure) setSaveError(bookingRulesErrorMessage(cause, '保存')) }
     } finally {
       inFlightRef.current = false
       setSaving(false)
@@ -227,16 +232,16 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
   // WEB053：失敗を先に見る。draft は成功したときだけできるので、失敗が「読み込み中」のまま残らないように。
   if (status === 'error' || (status !== 'loading' && !settings)) {
     return (
-      <StateCard
+      <SaveErrorScope errors={saveErrors}><StateCard
         icon={<AccountIcon />}
         title="予約のルールを読み込めませんでした"
         description={error ?? '通信状態を確認して、もう一度お試しください。'}
         action={<Button onClick={onReload}>読み直す</Button>}
-      />
+      /></SaveErrorScope>
     )
   }
 
-  if (status === 'loading' || draft === null) return <SkeletonRows rows={5} />
+  if (status === 'loading' || draft === null) return <SaveErrorScope errors={saveErrors}><SkeletonRows rows={5} /></SaveErrorScope>
 
   const windowOptions = withCurrent(WINDOW_DAY_CHOICES, draft.bookingWindowDays)
     .map((days) => ({ value: String(days), label: `${days} 日先まで` }))
@@ -251,7 +256,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
     : '24時間前に送ります'
 
   return (
-    <div className={styles.tabStack} data-design="Rules">
+    <SaveErrorScope errors={saveErrors}><div className={styles.tabStack} data-design="Rules">
       {/* 閲覧のみ：選ぶ部品・つまみは置かず、選んでいる値を読み取りだけの欄で見せる（2026-10-06 オーナー決定）。 */}
       <div className="contents">
         <section className={styles.section}>
@@ -270,24 +275,24 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
             </span>
             <span className={styles.ruleHead}>キャンセルの期限</span>
             {canEdit ? <>
-              <Select size="full"
+              <SaveErrorField names={["bookingWindowDays","draft.bookingWindowDays","booking_window_days","draft.booking_window_days"]}><Select size="full"
                 aria-label="先の予約が取れる範囲"
                 value={String(draft.bookingWindowDays)}
                 onChange={(value) => set('bookingWindowDays', Number(value))}
                 options={windowOptions}
-              />
-              <Select size="full"
+              /></SaveErrorField>
+              <SaveErrorField names={["cutoffMinutesBefore","draft.cutoffMinutesBefore","cutoff_minutes_before","draft.cutoff_minutes_before"]}><Select size="full"
                 aria-label="受付の締め切り"
                 value={String(draft.cutoffMinutesBefore)}
                 onChange={(value) => set('cutoffMinutesBefore', Number(value))}
                 options={cutoffOptions}
-              />
-              <Select size="full"
+              /></SaveErrorField>
+              <SaveErrorField names={["cancelDeadlineMinutesBefore","draft.cancelDeadlineMinutesBefore","cancel_deadline_minutes_before","draft.cancel_deadline_minutes_before"]}><Select size="full"
                 aria-label="キャンセルの期限"
                 value={String(draft.cancelDeadlineMinutesBefore)}
                 onChange={(value) => set('cancelDeadlineMinutesBefore', Number(value))}
                 options={cancelOptions}
-              />
+              /></SaveErrorField>
             </> : <>
               <ReadOnlyText label="先の予約が取れる範囲" value={`${draft.bookingWindowDays} 日先まで`} />
               <ReadOnlyText label="受付の締め切り" value={beforeLabel(draft.cutoffMinutesBefore)} />
@@ -303,23 +308,23 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
           <div className={styles.ruleLine}>
             <span className={styles.ruleLineLabel}>お店が承認してから確定する</span>
             {canEdit ? (
-              <Toggle
+              <SaveErrorField names={["approvalMode","draft.approvalMode","approval_mode","draft.approval_mode"]}><Toggle
                 label="お店が承認してから確定する"
                 checked={draft.approvalMode === 'manual'}
                 onChange={(next) => set('approvalMode', next ? 'manual' : 'automatic')}
-              />
+              /></SaveErrorField>
             ) : <span className="text-sm text-ink-secondary">{draft.approvalMode === 'manual' ? 'オン' : 'オフ'}</span>}
           </div>
           <div className={styles.ruleLine}>
             <span className={styles.ruleLineLabel}>{`同じ人の予約は同時に ${draft.maxActiveBookingsPerFriend}件 まで`}</span>
             {canEdit ? (
               <span className={styles.ruleLineSelect}>
-                <Select
+                <SaveErrorField names={["maxActiveBookingsPerFriend","draft.maxActiveBookingsPerFriend","max_active_bookings_per_friend","draft.max_active_bookings_per_friend"]}><Select
                   aria-label="同じ人が同時に持てる予約の数"
                   value={String(draft.maxActiveBookingsPerFriend)}
                   onChange={(value) => set('maxActiveBookingsPerFriend', Number(value))}
                   options={maxOptions}
-                />
+                /></SaveErrorField>
               </span>
             ) : null}
           </div>
@@ -329,11 +334,11 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
               <HelpTip label="「指名なし」の説明">オンにすると、受付中のスタッフ全員が「指名なし」での予約の対象になります。</HelpTip>
             </span>
             {canEdit ? (
-              <Toggle
+              <SaveErrorField names={["noAssign","initialNoAssign","no_assign","initial_no_assign"]}><Toggle
                 label="「指名なし」を出す"
                 checked={noAssign ?? initialNoAssign}
                 onChange={(next) => setNoAssign(next)}
-              />
+              /></SaveErrorField>
             ) : <span className="text-sm text-ink-secondary">{(noAssign ?? initialNoAssign) ? 'オン' : 'オフ'}</span>}
           </div>
         </section>
@@ -366,11 +371,11 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
               前日のお知らせを送る時刻
               <span className="mt-1 flex items-center gap-2">
                 {canEdit ? (
-                  <TimeField
+                  <SaveErrorField names={["reminderDayBeforeTime","draft.reminderDayBeforeTime","reminder_day_before_time","draft.reminder_day_before_time"]}><TimeField
                     aria-label="前日のお知らせを送る時刻"
                     value={draft.reminderDayBeforeTime ?? ''}
                     onChange={(value) => set('reminderDayBeforeTime', value || null)}
-                  />
+                  /></SaveErrorField>
                 ) : <ReadOnlyText label="前日のお知らせを送る時刻" value={draft.reminderDayBeforeTime || '未設定'} />}
                 <span className="text-ink-faint whitespace-nowrap text-xs">空欄は24時間前</span>
               </span>
@@ -381,7 +386,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
             <label className={styles.fieldLabel}>
               タイムゾーン
               {canEdit ? (
-                <Select size="full"
+                <SaveErrorField names={["timeZone","draft.timeZone","time_zone","draft.time_zone"]}><Select size="full"
                   aria-label="タイムゾーン"
                   value={draft.timeZone}
                   onChange={(value) => set('timeZone', value)}
@@ -390,7 +395,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
                     ? TIME_ZONE_CHOICES
                     : [draft.timeZone, ...TIME_ZONE_CHOICES]
                   ).map((zone) => ({ value: zone, label: zone }))}
-                />
+                /></SaveErrorField>
               ) : <ReadOnlyText label="タイムゾーン" value={draft.timeZone} spaced />}
               {isUnknownTimeZone(draft.timeZone) ? (
                 <span className="text-danger mt-1 block text-xs">一覧にないタイムゾーンです。綴りを確認してください（よく使う値: Asia/Tokyo）。</span>
@@ -399,7 +404,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
             <label className={styles.fieldLabel}>
               日時を選ぶ画面の最初の形
               {canEdit ? (
-                <Select size="full"
+                <SaveErrorField names={["liffDateView","draft.liffDateView","liff_date_view","draft.liff_date_view"]}><Select size="full"
                   aria-label="日時を選ぶ画面の最初の形"
                   value={draft.liffDateView ?? 'list'}
                   onChange={(value) => set('liffDateView', value as 'list' | 'calendar')}
@@ -408,7 +413,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
                     { value: 'list', label: '週で見る（日付の横ならび）' },
                     { value: 'calendar', label: 'カレンダー' },
                   ]}
-                />
+                /></SaveErrorField>
               ) : <ReadOnlyText label="日時を選ぶ画面の最初の形" value={draft.liffDateView === 'calendar' ? 'カレンダー' : '週で見る（日付の横ならび）'} spaced />}
             </label>
           </div>
@@ -423,6 +428,6 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
           </p>
         ) : null}
       </div>
-    </div>
+    </div></SaveErrorScope>
   )
 }

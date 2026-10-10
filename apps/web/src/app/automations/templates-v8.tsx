@@ -16,6 +16,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
 import styles from './automation-api-v8.module.css'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8 オートメーション見本（板 `c7dxp`）。
@@ -24,6 +25,8 @@ import styles from './automation-api-v8.module.css'
  */
 
 export default function AutomationTemplatesV8() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const canManage = useCanManageAutomations()
@@ -72,11 +75,13 @@ export default function AutomationTemplatesV8() {
       setCommonActionCount(commonRes && commonRes.success ? commonRes.data.length : null)
       setSkipped(runsRes && runsRes.success ? runsRes.data.summary.skipped : null)
       setStatus('ready')
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       setItems([])
       setStatus('error')
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     if (accountLoading) return
@@ -105,15 +110,17 @@ export default function AutomationTemplatesV8() {
       if (!response.success) throw new Error(response.error)
       delete operationKeysRef.current[slot]
       router.push(`/automations/drafts?id=${encodeURIComponent(response.data.id)}`)
-    } catch {
-      setActionError('下書きを作れませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setActionError('下書きを作れませんでした。状態を読み直してから、もう一度お試しください。') }
       setCreating(null)
     }
   }
 
-  if (accountLoading) return <ListState kind="loading" title="見本を読み込んでいます" />
+  if (accountLoading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="見本を読み込んでいます" /></SaveErrorScope>
   if (!selectedAccountId) {
-    return <ListState kind="empty" title="LINE公式アカウントを選んでください" description="見本から作る下書きは、選んだアカウントだけに保存します。" />
+    return <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="LINE公式アカウントを選んでください" description="見本から作る下書きは、選んだアカウントだけに保存します。" /></SaveErrorScope>
   }
 
   const tabs = [
@@ -124,7 +131,7 @@ export default function AutomationTemplatesV8() {
   ]
 
   return (
-    <div className={styles.board} data-design-node="c7dxp">
+    <SaveErrorScope errors={saveErrors}><div className={styles.board} data-design-node="c7dxp">
       <div className={styles.head}>
         <div>
           <h1 className={styles.title}>オートメーション</h1>
@@ -204,6 +211,6 @@ export default function AutomationTemplatesV8() {
           <p className={styles.footnote}>実行まで確認できた見本だけを、ここへ表示します。見本に実データは入っていません。見本から作る下書きは、選んだアカウントだけに保存します。</p>
         </>
       ) : null}
-    </div>
+    </div></SaveErrorScope>
   )
 }

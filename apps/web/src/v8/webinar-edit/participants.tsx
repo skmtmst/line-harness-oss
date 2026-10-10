@@ -44,6 +44,7 @@ import {
 } from './helpers'
 import type { DetailChrome, EditContext } from './types'
 import styles from './participants.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'denied'
 
@@ -263,7 +264,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
             trailing={<>
               <div className={styles.savedBox}>
                 <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-                <Select aria-label="よく使う絞り込み" value={filter} onChange={(value) => setFilter(value as '' | WebinarParticipantClassification)} options={SAVED_OPTIONS} />
+                <SaveErrorField names={["filter"]}><Select aria-label="よく使う絞り込み" value={filter} onChange={(value) => setFilter(value as '' | WebinarParticipantClassification)} options={SAVED_OPTIONS} /></SaveErrorField>
               </div>
               <PageSizeSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1) }} options={[10, 20, 50]} label={null} />
             </>}

@@ -38,6 +38,7 @@ import { AffiliateFrame, useAffiliateShell } from './frame'
 import { PayoutStepUpDialog, SettlementCloseDialog } from './payment-dialogs'
 import { AffiliateToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, StatusPill, ToolbarNotices } from './parts'
 import styles from './affiliates.module.css'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type PaymentFilter = 'all' | 'bank_missing' | 'bank_ok'
 
@@ -61,6 +62,8 @@ const SAVED_VIEWS = [
 ]
 
 export default function PaymentTab() {
+  const saveErrors = useSaveFormErrors()
+
   const { readonly, narrow, accountId } = useAffiliateShell()
   const period = useMemo(() => currentSettlementPeriod(), [])
   const [items, setItems] = useState<AffiliatePaymentSummary[]>([])
@@ -121,13 +124,14 @@ export default function PaymentTab() {
         })
       }
       setLoadState('ready')
-    } catch {
+    } catch (saveFailure) {
       if (seq !== loadSeq.current) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       setItems([])
       setPreview(null)
-      setLoadState('error')
+      { if (!fieldFailure) setLoadState('error') }
     }
-  }, [accountId, period])
+  }, [accountId, period, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -178,7 +182,9 @@ export default function PaymentTab() {
       }
       if (resumed && succeeded > 0) void load()
     } catch (cause) {
-      setOperationError(cause instanceof Error ? cause.message : '支払明細を発行できませんでした')
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure) setOperationError(cause instanceof Error ? cause.message : '支払明細を発行できませんでした') }
     } finally {
       setOperationBusy(false)
     }
@@ -195,7 +201,9 @@ export default function PaymentTab() {
       if (!response.success) throw new Error(response.error)
       setBatch(response.data)
     } catch (cause) {
-      setOperationError(cause instanceof Error ? cause.message : '振込先を確認できませんでした')
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure) setOperationError(cause instanceof Error ? cause.message : '振込先を確認できませんでした') }
     } finally {
       setOperationBusy(false)
     }
@@ -458,7 +466,7 @@ export default function PaymentTab() {
   )
 
   return (
-    <AffiliateFrame
+    <SaveErrorScope errors={saveErrors}><AffiliateFrame
       help="口座番号は本人だけに表示します。銀行用 CSV（口座情報を含む）は、6桁コードかパスワードで本人確認したときだけ書き出せます（15分で期限切れ）。"
       actions={actions}
       stats={stats}
@@ -488,6 +496,6 @@ export default function PaymentTab() {
       </> : null}
     >
       {body}
-    </AffiliateFrame>
+    </AffiliateFrame></SaveErrorScope>
   )
 }

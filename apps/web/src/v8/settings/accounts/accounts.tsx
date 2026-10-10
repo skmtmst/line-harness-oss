@@ -46,6 +46,7 @@ import {
   webhookLabel,
 } from './view'
 import styles from './accounts.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const TITLE = 'LINEアカウント'
 const DESCRIPTION = 'musubo でつないでいる LINE 公式アカウントです。既定のアカウントと、親子（本店と支店など）を決めます。'
@@ -294,14 +295,14 @@ export default function AccountsV8() {
       >
         <label className={styles.reason}>
           <span className={styles.reasonLabel}>アーカイブの理由（任意）</span>
-          <TextArea
+          <SaveErrorField names={["archiveReason","archive_reason"]}><TextArea
             rows={2}
             maxLength={500}
             placeholder="例: 使わなくなった旧店舗のアカウント"
             value={archiveReason}
             onChange={(e) => setArchiveReason(e.target.value)}
             disabled={busy}
-          />
+          /></SaveErrorField>
         </label>
       </ConfirmDialog>
 

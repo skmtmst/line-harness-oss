@@ -27,6 +27,7 @@ import type { FileScanItem } from '@/lib/api'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { FILE_SCAN_PAGE_SIZE, useFileScan } from './use-file-scan'
 import styles from './screen.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const TITLE = 'ファイルの検査'
 const DESCRIPTION = '上げたファイルに危ないものがないかを確かめます'
@@ -158,14 +159,14 @@ export default function FileScanScreen() {
           }}
         >
           <Field label="理由（必須）" htmlFor="file-scan-release-reason" error={releaseReasonError || undefined}>
-            <TextArea
+            <SaveErrorField names={["releaseReason","release_reason"]}><TextArea
               ref={releaseReasonRef}
               id="file-scan-release-reason"
               aria-required="true"
               value={releaseReason}
               onChange={(event) => { setReleaseReason(event.target.value); setReleaseError('') }}
               placeholder="例：社内の画像と確認できたため"
-            />
+            /></SaveErrorField>
           </Field>
         </ConfirmDialog>
       ) : null}
@@ -361,13 +362,13 @@ export default function FileScanScreen() {
         {configOpen ? (
           <div className={styles.form}>
             <Field label="提供元" htmlFor="file-scan-provider" error={configErrors.provider}>
-              <TextField ref={providerRef} id="file-scan-provider" value={provider} onChange={(event) => { setProvider(event.target.value); setConfigErrors((current) => ({ ...current, provider: undefined })); if (configServerError) setActionError('') }} placeholder="例：example-scan" />
+              <SaveErrorField names={["provider"]}><TextField ref={providerRef} id="file-scan-provider" value={provider} onChange={(event) => { setProvider(event.target.value); setConfigErrors((current) => ({ ...current, provider: undefined })); if (configServerError) setActionError('') }} placeholder="例：example-scan" /></SaveErrorField>
             </Field>
             <Field label="送り先（https）" htmlFor="file-scan-endpoint" error={configErrors.endpoint || configServerError || undefined}>
-              <TextField ref={endpointRef} id="file-scan-endpoint" value={endpoint} onChange={(event) => { setEndpoint(event.target.value); setConfigErrors((current) => ({ ...current, endpoint: undefined })); if (configServerError) setActionError('') }} placeholder="https://example.com/scan" />
+              <SaveErrorField names={["endpoint"]}><TextField ref={endpointRef} id="file-scan-endpoint" value={endpoint} onChange={(event) => { setEndpoint(event.target.value); setConfigErrors((current) => ({ ...current, endpoint: undefined })); if (configServerError) setActionError('') }} placeholder="https://example.com/scan" /></SaveErrorField>
             </Field>
             <Field label="鍵の名前" htmlFor="file-scan-secret-ref">
-              <TextField id="file-scan-secret-ref" value={secretRef} onChange={(event) => setSecretRef(event.target.value)} placeholder="例：FILE_SCAN_API_KEY" />
+              <SaveErrorField names={["secretRef","secret_ref"]}><TextField id="file-scan-secret-ref" value={secretRef} onChange={(event) => setSecretRef(event.target.value)} placeholder="例：FILE_SCAN_API_KEY" /></SaveErrorField>
             </Field>
             <div>
               <Button type="button" variant="primary" disabled={configBusy} onClick={saveExternalConfig} busy={configBusy} busyLabel="保存しています…">

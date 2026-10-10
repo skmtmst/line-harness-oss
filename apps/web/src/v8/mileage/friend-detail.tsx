@@ -58,6 +58,7 @@ import {
 import { PerPageSelect } from './parts'
 import MileageAdjustDialog from './adjust-dialog'
 import styles from './mileage.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type MileageDetail = {
   summary: MileageSummary
@@ -422,12 +423,12 @@ function FriendDetailInner() {
           </div>
           <span className={styles.spacer} aria-hidden="true" />
           <div className={styles.periodBox}>
-            <Select
+            <SaveErrorField names={["period","page"]}><Select
               aria-label="期間"
               value={period}
               options={[{ value: 'all', label: 'すべて' }, { value: 'month', label: '今月' }]}
               onChange={(value) => { setPage(1); setPeriod(value) }}
-            />
+            /></SaveErrorField>
           </div>
           <PerPageSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next) }} />
         </div>
@@ -590,7 +591,7 @@ function FriendDetailInner() {
             </div>
           </div>
           <Field label="理由" htmlFor="mileage-pending-reason" required>
-            <TextArea id="mileage-pending-reason" rows={3} value={pendingReason} onChange={(event) => setPendingReason(event.target.value)} />
+            <SaveErrorField names={["pendingReason","pending_reason"]}><TextArea id="mileage-pending-reason" rows={3} value={pendingReason} onChange={(event) => setPendingReason(event.target.value)} /></SaveErrorField>
           </Field>
           <Notice tone="info">理由は履歴に残り、あとから実行者と一緒に確認できます。</Notice>
         </div>

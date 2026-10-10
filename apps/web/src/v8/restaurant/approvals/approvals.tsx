@@ -27,6 +27,7 @@ import {
 import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
 import { formatStamp, StatRow, Status } from '../common-a/parts'
 import styles from './approvals.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const kindLabel: Record<RestaurantApproval['kind'], string> = {
   gbp_post: 'Google投稿',
@@ -167,13 +168,13 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
           </div>
           <label className={styles.dialogField}>
             <span className={styles.dialogFieldLabel}>差し戻す理由（必須・申請者に届きます）</span>
-            <TextArea
+            <SaveErrorField names={["reason"]}><TextArea
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder="例：原価の根拠（仕入れ値の表）を添えてください"
               rows={3}
               disabled={busy}
-            />
+            /></SaveErrorField>
           </label>
           <p className={styles.dialogNote}>差し戻すと、申請は「差戻し」になり、直して出し直すまで公開されません。</p>
         </div>

@@ -41,10 +41,13 @@ import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import NoticeLineDialogV8 from './notice-line-dialog'
 import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
 import styles from './support.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
 export default function HqSupportV8() {
+  const saveErrors = useSaveFormErrors()
+
   // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」（絵 `V8-B/b8xBtZ`）。
   usePageTitle('お問い合わせ')
   const settingsNav = useHqSettingsFolderNav('contact')
@@ -71,9 +74,11 @@ export default function HqSupportV8() {
       if (!res.success) throw new Error(res.error)
       if (!Array.isArray(res.data)) throw new Error('unexpected history shape')
       setHistory(res.data)
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
       setHistory([])
-      setHistoryError(true)
+      { if (!fieldFailure) setHistoryError(true) }
     }
   }
 
@@ -118,8 +123,10 @@ export default function HqSupportV8() {
     try {
       const data = await readFileAsBase64(file)
       setAttachments((prev) => [...prev, { name: file.name, mimeType: file.type, data, size: file.size, previewUrl: URL.createObjectURL(file) }])
-    } catch {
-      setError('画像を読み取れませんでした')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setError('画像を読み取れませんでした') }
     } finally {
     }
   }
@@ -153,10 +160,12 @@ export default function HqSupportV8() {
       setAttachments([])
       void loadHistory()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       // M027：原文のまま出さず、共通の状態別案内へ渡す。
-      setError(japaneseDetailOf(caught) || describeApiFailure(caught, '送信', {
+      { if (!fieldFailure) setError(japaneseDetailOf(caught) || describeApiFailure(caught, '送信', {
         forbidden: 'お問い合わせの送信はオーナー・管理者・担当者だけができます。',
-      }))
+      })) }
       // 確定応答を失った再送でも履歴で確かめられるよう、履歴を読み直す（重複は口側 M028 が防ぐ）。
       void loadHistory()
     } finally {
@@ -182,7 +191,7 @@ export default function HqSupportV8() {
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId="b8xBtZ"
       title="お問い合わせ"
       description="使い方の質問・不具合・料金の相談を運営へ送れます。返信は登録メールアドレスと、下の「これまでの問い合わせ」に届きます（平日 2 営業日以内）。"
@@ -217,7 +226,7 @@ export default function HqSupportV8() {
         >
           <div className={styles.pair}>
             <Field label="種類" htmlFor={`${uid}-kind`}>
-              <Select
+              <SaveErrorField names={["kind","input.kind"]}><Select
                 aria-label="種類"
                 id={`${uid}-kind`}
                 size="full"
@@ -225,7 +234,7 @@ export default function HqSupportV8() {
                 disabled={sending}
                 onChange={(value) => set('kind', value as HqSupportKind | '')}
                 options={[{ value: '', label: '種類を選んでください' }, ...kinds.map((k) => ({ value: k.key, label: supportKindWord(k.key, k.label) }))]}
-              />
+              /></SaveErrorField>
             </Field>
             <Field label="関係する店舗" htmlFor={`${uid}-account`}>
               <HqAccountSelectField
@@ -242,7 +251,7 @@ export default function HqSupportV8() {
           </div>
 
           <Field label="件名" htmlFor={`${uid}-subject`} tone="large">
-            <TextField
+            <SaveErrorField names={["subject","input.subject"]}><TextField
               id={`${uid}-subject`}
               value={input.subject}
               maxLength={SUPPORT_SUBJECT_MAX}
@@ -250,11 +259,11 @@ export default function HqSupportV8() {
               placeholder="例：バナー生成で日本語の文字が崩れることがある"
               onChange={(e) => set('subject', e.target.value)}
               className={styles.full}
-            />
+            /></SaveErrorField>
           </Field>
 
           <Field label="本文" htmlFor={`${uid}-body`}>
-            <TextArea
+            <SaveErrorField names={["body","input.body"]}><TextArea
               id={`${uid}-body`}
               value={input.body}
               maxLength={SUPPORT_BODY_MAX}
@@ -262,7 +271,7 @@ export default function HqSupportV8() {
               placeholder="困っていること・期待する動き・起きた日時"
               onChange={(e) => set('body', e.target.value)}
               className={styles.textarea}
-            />
+            /></SaveErrorField>
           </Field>
 
           {attachments.length > 0 ? (
@@ -353,7 +362,7 @@ export default function HqSupportV8() {
           )}
         </section>
       </div>
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }
 

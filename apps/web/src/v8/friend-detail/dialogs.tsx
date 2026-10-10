@@ -13,8 +13,10 @@ import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { loadOperators } from '@/lib/operators-cache'
 import type { PanelStatus } from './use-friend-detail'
 import styles from './detail.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 export function useSupportEditor(friendId: string, onSaved: (notice: string) => void, onConflict: (message: string) => void, accountId: string | null = null) {
+  const saveErrors = useSaveFormErrors()
   const scopeRef = useRef({ friendId, accountId })
   const [targetAccount, setTargetAccount] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -95,6 +97,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
       onSaved('担当・対応状況を更新しました')
     } catch (err) {
       if (gen !== genRef.current) return
+      const fieldFailure = saveErrors.capture(err)
       if (err instanceof ApiError && err.status === 409) {
         // 人が入力した状況・担当者は残し、競合した改訂値だけ取り直す。
         // 取り直せない場合は古い改訂値のまま（再保存も409で保護される）。
@@ -106,12 +109,14 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
           if (gen !== genRef.current) return
           if (latest.success) setRevision(latest.data.revision)
           else setError('最新の内容を読み直せませんでした。入力は残っています。もう一度お試しください。')
-        } catch {
+        } catch (reloadFailure) {
+
           if (gen !== genRef.current) return
+          saveErrors.capture(reloadFailure)
           setError('最新の内容を読み直せませんでした。入力は残っています。もう一度お試しください。')
         }
       } else {
-        setError(describeSaveFailure(err))
+        if (!fieldFailure) setError(describeSaveFailure(err))
       }
     } finally {
       if (gen === genRef.current) setBusy(false)
@@ -119,7 +124,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
   }
 
   const dialog = (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open={open && target === friendId && targetAccount === accountId}
       title="対応状況を編集"
       designWidth={440}
@@ -132,7 +137,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
       <div className={styles.dialogBody} data-support-editor>
         <label className={styles.dialogLabel}>
           対応状況
-          <Select
+          <SaveErrorField names={["status"]}><Select
             size="full"
             value={status}
             disabled={busy}
@@ -144,21 +149,21 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
               { value: 'on_hold', label: '保留' },
               { value: 'resolved', label: '対応済み' },
             ]}
-          />
+          /></SaveErrorField>
         </label>
         <label className={styles.dialogLabel}>
           担当者
-          <Select
+          <SaveErrorField names={["operatorId","operator_id"]}><Select
             size="full"
             value={operatorId}
             disabled={busy}
             onChange={(value) => setOperatorId(value)}
             aria-label="担当者を変える"
             options={[{ value: '', label: '未割り当て' }, ...operators.map((o) => ({ value: o.id, label: o.name }))]}
-          />
+          /></SaveErrorField>
         </label>
       </div>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 
   return { openEditor, dialog }
@@ -277,7 +282,7 @@ export function useScenarioPicker(
           <p className={styles.secNote}>登録できるシナリオがありません。</p>
         ) : (
           <>
-            <EntityKindField
+            <SaveErrorField names={["pick"]}><EntityKindField
               kind="scenario"
               label="登録するシナリオ"
               value={pick}
@@ -285,7 +290,7 @@ export function useScenarioPicker(
               accountId={accountId}
               onChange={(value) => setPick(value)}
               options={active}
-            />
+            /></SaveErrorField>
             {picked ? <p className={styles.memo}>「{picked.name}」に{friendName || 'この友だち'}を登録します。</p> : null}
           </>
         )}

@@ -26,6 +26,7 @@ import { RequiredBadge } from '@/components/shared/form-controls'
 import { canSave, toSteps } from '../connection-check-view'
 import { isDuplicateChannelError, matchRegisteredAccountId } from './account-recovery'
 import styles from './register-v8.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const V8_STEPS = [
   { number: 1, label: 'LINE準備', designNode: 'xj3zz' },
@@ -197,6 +198,8 @@ function stepErrorsForChannel(form: FormState): FieldErrors {
 }
 
 export default function RegisterV8() {
+  const saveErrors = useSaveFormErrors()
+
   const [accountMethod, setAccountMethod] = useState<'existing' | 'new'>('existing')
   const [currentStep, setCurrentStep] = useState<StepNumber>(1)
   const [form, setForm] = useState<FormState>(emptyForm)
@@ -254,7 +257,9 @@ export default function RegisterV8() {
   // 変わるたびに端末の下書きを残す（秘密値は除く）。登録が終わったら消す。
   useEffect(() => {
     if (createdId) {
-      try { window.localStorage.removeItem(DRAFT_KEY) } catch { /* 下書きが消せなくても登録は続ける。 */ }
+      try { window.localStorage.removeItem(DRAFT_KEY) } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
+ /* 下書きが消せなくても登録は続ける。 */ }
       return
     }
     const draft: DraftState = {
@@ -267,8 +272,10 @@ export default function RegisterV8() {
       tagIds: form.tagIds, parentId: form.parentId, staffIds: form.staffIds, liffId: form.liffId,
       importFriends: form.importFriends,
     }
-    try { window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)) } catch { /* 書けなくても入力は続ける。 */ }
-  }, [createdId, currentStep, accountMethod, form.name, form.channelId, form.loginChannelId, form.lineId, form.tagIds, form.parentId, form.staffIds, form.liffId, form.importFriends])
+    try { window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)) } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+ /* 書けなくても入力は続ける。 */ }
+  }, [createdId, currentStep, accountMethod, form.name, form.channelId, form.loginChannelId, form.lineId, form.tagIds, form.parentId, form.staffIds, form.liffId, form.importFriends, saveErrors])
 
   // ③でタグの一覧を一度だけ読む。取れなくても登録は続ける。
   useEffect(() => {
@@ -278,10 +285,12 @@ export default function RegisterV8() {
       try {
         const response = await api.lineAccountTags.list()
         if (active && response.success) setTags(response.data)
-      } catch { /* タグ無しでも登録は続ける。 */ }
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
+ /* タグ無しでも登録は続ける。 */ }
     })()
     return () => { active = false }
-  }, [currentStep, tags])
+  }, [currentStep, tags, saveErrors])
 
   useEffect(() => {
     if (currentStep !== 3) return
@@ -295,10 +304,12 @@ export default function RegisterV8() {
           setStaffOptions(staff.data.filter(s => s.isActive && s.accountScope === 'accounts' && s.inviteStatus === 'active'))
           setOptionsError('')
         }
-      } catch { if (active) setOptionsError('親アカウント・担当者を読み込めませんでした。選択する場合は画面を開き直してください。') }
+      } catch (saveFailure) {
+        const fieldFailure = saveErrors.capture(saveFailure)
+ if (active) { if (!fieldFailure) setOptionsError('親アカウント・担当者を読み込めませんでした。選択する場合は画面を開き直してください。') } }
     })()
     return () => { active = false }
-  }, [currentStep])
+  }, [currentStep, saveErrors])
 
   // ⑤：Workerが画面を閉じても進める取り込みを、読み取りだけで確認する。
   useEffect(() => {
@@ -313,7 +324,9 @@ export default function RegisterV8() {
         if (['importing_ids', 'hydrating_profiles'].includes(response.data.phase)) {
           timer = setTimeout(() => void advance(), 3000)
         }
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
+
         if (active) timer = setTimeout(() => void advance(), 5000)
       }
     }
@@ -322,7 +335,7 @@ export default function RegisterV8() {
       active = false
       if (timer) clearTimeout(timer)
     }
-  }, [createdId, importState?.phase, connection?.followerImport.phase, form.importFriends])
+  }, [createdId, importState?.phase, connection?.followerImport.phase, form.importFriends, saveErrors])
 
   // ⑤：取り込みの総数（前日の友だち数）。取れなければ取り込んだ数だけ出す。
   useEffect(() => {
@@ -334,10 +347,12 @@ export default function RegisterV8() {
         if (active && response.success && typeof response.data.followers === 'number') {
           setInsightTotal(response.data.followers)
         }
-      } catch { /* 総数が出なくても取り込んだ数は出す。 */ }
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
+ /* 総数が出なくても取り込んだ数は出す。 */ }
     })()
     return () => { active = false }
-  }, [currentStep, createdId, insightTotal])
+  }, [currentStep, createdId, insightTotal, saveErrors])
 
   // 登録完了（取り込みも終わった）直後に契約者専用LINEの案内を一度だけ出す（v7 と同じ）。
   useEffect(() => {
@@ -379,7 +394,9 @@ export default function RegisterV8() {
       const list = await api.lineAccounts.list()
       if (!list.success) return null
       return matchRegisteredAccountId(list.data, channelId)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       return null
     }
   }
@@ -413,15 +430,17 @@ export default function RegisterV8() {
         return false
       }
       return true
-    } catch {
-      setError('LINEに接続できませんでした。時間をおいて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setError('LINEに接続できませんでした。時間をおいて、もう一度お試しください。') }
       return false
     } finally {
       busyLock.current = false
       setBusyAction(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.channelId, form.channelSecret, form.loginChannelId, form.loginChannelSecret, form.name, form.tagIds, form.staffIds, form.parentId, form.liffId])
+  }, [form.channelId, form.channelSecret, form.loginChannelId, form.loginChannelSecret, form.name, form.tagIds, form.staffIds, form.parentId, form.liffId, saveErrors])
 
   // ④「接続して設定する」：検査して、通れば結果の窓（qw80E）を開く。
   const runCheckThenReview = async () => {
@@ -453,8 +472,10 @@ export default function RegisterV8() {
       } else {
         setError('LINE ID を確認できませんでした。チャネル設定を確認してください。')
       }
-    } catch {
-      setError('LINEに接続できませんでした。時間をおいて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setError('LINEに接続できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       busyLock.current = false
       setBusyAction(null)
@@ -490,6 +511,8 @@ export default function RegisterV8() {
       setResultOpen(false)
       setCurrentStep(5)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       // LINEの接続は大事な操作。本人確認を求められたら窓を立ててやり直す（v7 と同じ）。
       if (!stepUpToken && isStepUpRequired(caught)) {
         setStepUp({ purpose: 'line_account.connect', action: 'LINEの接続を登録する', retry: save })
@@ -499,10 +522,10 @@ export default function RegisterV8() {
       const recovered = await findRegisteredAccountId(form.channelId)
       if (recovered) {
         setRecoveredAccountId(recovered)
-        setError('保存は終わっている可能性があります。登録済みのアカウントを開いて確認してください。')
+        { if (!fieldFailure) setError('保存は終わっている可能性があります。登録済みのアカウントを開いて確認してください。') }
         return
       }
-      setError('登録できませんでした。時間をおいて、もう一度お試しください。')
+      { if (!fieldFailure) setError('登録できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       busyLock.current = false
       setBusyAction(null)
@@ -520,7 +543,7 @@ export default function RegisterV8() {
     }
     if (currentStep === 3 && form.name.trim().length > 40) {
       setFieldErrors((current) => ({ ...current, name: '表示名は40文字以内で入力してください。' }))
-      setError('入力内容を確認してください。')
+      if (!saveErrors.fail("form.name", '入力内容を確認してください。')) setError('入力内容を確認してください。')
       return
     }
     setError('')
@@ -547,8 +570,10 @@ export default function RegisterV8() {
       setTags((current) => [...(current ?? []), response.data])
       setForm((current) => ({ ...current, tagIds: [...current.tagIds, response.data.id] }))
       setNewTagName('')
-    } catch {
-      setError('タグを追加できませんでした。時間をおいて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setError('タグを追加できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       busyLock.current = false
       setBusyAction(null)
@@ -571,7 +596,7 @@ export default function RegisterV8() {
     : (importingIds ? 0 : 100)
 
   return (
-    <div className={styles.board}>
+    <SaveErrorScope errors={saveErrors}><div className={styles.board}>
       <div className={styles.head}>
         <h1>LINEアカウントを登録</h1>
         <p>{currentStep === 4 && !createdId
@@ -638,24 +663,24 @@ export default function RegisterV8() {
                   <div className={styles.twoCol}>
                     <div>
                       <label className={styles.fieldLabel} htmlFor="v8-channel-id">Messaging API のチャネルID<RequiredBadge /></label>
-                      <input id="v8-channel-id" className={styles.fieldInput} value={form.channelId} onChange={(event) => update('channelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.channelId ? true : undefined} />
+                      <SaveErrorField names={["channelId","form.channelId","channel_id","form.channel_id"]}><input id="v8-channel-id" className={styles.fieldInput} value={form.channelId} onChange={(event) => update('channelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.channelId ? true : undefined} /></SaveErrorField>
                       {fieldErrors.channelId && <p className={styles.fieldError}>{fieldErrors.channelId}</p>}
                       <p className={styles.fieldHelp}>LINE Developers の Messaging API チャネルで取得　<a href="/manuals/line-connect/index.html#m1" target="_blank" rel="noreferrer" className="text-action font-semibold hover:underline">取得方法を見る</a></p>
                     </div>
                     <div>
                       <label className={styles.fieldLabel} htmlFor="v8-channel-secret">Messaging API のチャネルシークレット<RequiredBadge /></label>
-                      <input id="v8-channel-secret" type="password" autoComplete="new-password" className={styles.fieldInput} value={form.channelSecret} onChange={(event) => update('channelSecret', event.target.value)} required aria-invalid={fieldErrors.channelSecret ? true : undefined} />
+                      <SaveErrorField names={["channelSecret","form.channelSecret","channel_secret","form.channel_secret"]}><input id="v8-channel-secret" type="password" autoComplete="new-password" className={styles.fieldInput} value={form.channelSecret} onChange={(event) => update('channelSecret', event.target.value)} required aria-invalid={fieldErrors.channelSecret ? true : undefined} /></SaveErrorField>
                       {fieldErrors.channelSecret && <p className={styles.fieldError}>{fieldErrors.channelSecret}</p>}
                     </div>
                     <div>
                       <label className={styles.fieldLabel} htmlFor="v8-login-channel-id">LINE Login のチャネルID<RequiredBadge /></label>
-                      <input id="v8-login-channel-id" className={styles.fieldInput} value={form.loginChannelId} onChange={(event) => update('loginChannelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.loginChannelId ? true : undefined} />
+                      <SaveErrorField names={["loginChannelId","form.loginChannelId","login_channel_id","form.login_channel_id"]}><input id="v8-login-channel-id" className={styles.fieldInput} value={form.loginChannelId} onChange={(event) => update('loginChannelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.loginChannelId ? true : undefined} /></SaveErrorField>
                       {fieldErrors.loginChannelId && <p className={styles.fieldError}>{fieldErrors.loginChannelId}</p>}
                       <p className={styles.fieldHelp}>LIFF は自動で作ります。Messaging API と同じプロバイダーのチャネル　<a href="/manuals/line-connect/index.html#m2" target="_blank" rel="noreferrer" className="text-action font-semibold hover:underline">取得方法を見る</a></p>
                     </div>
                     <div>
                       <label className={styles.fieldLabel} htmlFor="v8-login-channel-secret">LINE Login のチャネルシークレット<RequiredBadge /></label>
-                      <input id="v8-login-channel-secret" type="password" autoComplete="new-password" className={styles.fieldInput} value={form.loginChannelSecret} onChange={(event) => update('loginChannelSecret', event.target.value)} required aria-invalid={fieldErrors.loginChannelSecret ? true : undefined} />
+                      <SaveErrorField names={["loginChannelSecret","form.loginChannelSecret","login_channel_secret","form.login_channel_secret"]}><input id="v8-login-channel-secret" type="password" autoComplete="new-password" className={styles.fieldInput} value={form.loginChannelSecret} onChange={(event) => update('loginChannelSecret', event.target.value)} required aria-invalid={fieldErrors.loginChannelSecret ? true : undefined} /></SaveErrorField>
                       {fieldErrors.loginChannelSecret && <p className={styles.fieldError}>{fieldErrors.loginChannelSecret}</p>}
                     </div>
                   </div>
@@ -673,13 +698,13 @@ export default function RegisterV8() {
                   <div className={styles.twoCol}>
                     <div>
                       <label className={styles.fieldLabel} htmlFor="v8-display-name">表示名</label>
-                      <input id="v8-display-name" className={styles.fieldInput} value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="未入力なら LINE公式アカウントの名前を使います" aria-invalid={fieldErrors.name ? true : undefined} />
+                      <SaveErrorField names={["name","form.name"]}><input id="v8-display-name" className={styles.fieldInput} value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="未入力なら LINE公式アカウントの名前を使います" aria-invalid={fieldErrors.name ? true : undefined} /></SaveErrorField>
                       {fieldErrors.name && <p className={styles.fieldError}>{fieldErrors.name}</p>}
                     </div>
                     <div>
                       <label className={styles.fieldLabel} htmlFor="v8-line-id">LINE ID</label>
                       <div className={styles.endpointRow}>
-                        <input id="v8-line-id" className={styles.fieldInput} value={form.lineId} readOnly placeholder="「LINEから取得」を押すと入ります" aria-readonly />
+                        <SaveErrorField names={["lineId","form.lineId","line_id","form.line_id"]}><input id="v8-line-id" className={styles.fieldInput} value={form.lineId} readOnly placeholder="「LINEから取得」を押すと入ります" aria-readonly /></SaveErrorField>
                         <Button type="button" onClick={() => void fetchLineId()} disabled={busyAction === 'check'} busy={busyAction === 'check'} busyLabel="取得しています…">LINEから取得</Button>
                       </div>
                     </div>
@@ -697,15 +722,15 @@ export default function RegisterV8() {
                       )}
                     </div>
                     <div className={styles.endpointRow} style={{ marginTop: 8 }}>
-                      <input className={styles.fieldInput} value={newTagName} onChange={(event) => setNewTagName(event.target.value)} placeholder="新しいタグの名前" aria-label="新しいタグの名前" maxLength={100} />
+                      <SaveErrorField names={["newTagName","new_tag_name"]}><input className={styles.fieldInput} value={newTagName} onChange={(event) => setNewTagName(event.target.value)} placeholder="新しいタグの名前" aria-label="新しいタグの名前" maxLength={100} /></SaveErrorField>
                       <Button type="button" onClick={() => void addTag()} disabled={!newTagName.trim() || busyAction === 'tags'} busy={busyAction === 'tags'} busyLabel="追加しています…">タグを追加</Button>
                     </div>
                   </div>
                   <div className={styles.twoCol}>
-                    <div><span className={styles.fieldLabel}>親アカウント</span><Select aria-label="親アカウント" value={form.parentId} onChange={value => update('parentId', value)} options={[{value:'',label:'親なし'}, ...parents.map(a => ({value:a.id,label:a.name}))]} /></div>
-                    <div><label className={styles.fieldLabel} htmlFor="v8-existing-liff">既存のLIFF ID（任意）</label><input id="v8-existing-liff" className={styles.fieldInput} value={form.liffId} onChange={e => update('liffId',e.target.value)} placeholder="未入力なら自動で用意します" /></div>
+                    <div><span className={styles.fieldLabel}>親アカウント</span><SaveErrorField names={["parentId","form.parentId","parent_id","parentLineAccountId","form.parent_id"]}><Select aria-label="親アカウント" value={form.parentId} onChange={value => update('parentId', value)} options={[{value:'',label:'親なし'}, ...parents.map(a => ({value:a.id,label:a.name}))]} /></SaveErrorField></div>
+                    <div><label className={styles.fieldLabel} htmlFor="v8-existing-liff">既存のLIFF ID（任意）</label><SaveErrorField names={["liffId","form.liffId","liff_id","form.liff_id"]}><input id="v8-existing-liff" className={styles.fieldInput} value={form.liffId} onChange={e => update('liffId',e.target.value)} placeholder="未入力なら自動で用意します" /></SaveErrorField></div>
                   </div>
-                  <fieldset><legend className={styles.fieldLabel}>このアカウントを担当範囲に追加する人</legend><div className={styles.tagRow}>{staffOptions.map(member => <Checkbox key={member.id} aria-label={member.name} checked={form.staffIds.includes(member.id)} onCheckedChange={checked => update('staffIds',checked ? [...form.staffIds,member.id] : form.staffIds.filter(id => id !== member.id))}>{member.name}</Checkbox>)}</div><p className={styles.fieldHelp}>全アカウント担当者は追加操作なしで閲覧できます。</p></fieldset>
+                  <fieldset><legend className={styles.fieldLabel}>このアカウントを担当範囲に追加する人</legend><div className={styles.tagRow}>{staffOptions.map((member, saveFieldIndex) => <SaveErrorField names={[`staffOptions.${saveFieldIndex}.id`,"id","member.id"]} key={member.id}><Checkbox key={member.id} aria-label={member.name} checked={form.staffIds.includes(member.id)} onCheckedChange={checked => update('staffIds',checked ? [...form.staffIds,member.id] : form.staffIds.filter(id => id !== member.id))}>{member.name}</Checkbox></SaveErrorField>)}</div><p className={styles.fieldHelp}>全アカウント担当者は追加操作なしで閲覧できます。</p></fieldset>
                   {optionsError ? <p role="alert" className={styles.fieldError}>{optionsError}</p> : null}
                   <div>
                     <span className={styles.fieldLabel}>Callback URL</span>
@@ -752,13 +777,13 @@ export default function RegisterV8() {
                     </aside>
                   </div>
                   <div className={styles.panel}>
-                    <Checkbox
+                    <SaveErrorField names={["importFriends","form.importFriends","import_friends","form.import_friends"]}><Checkbox
                       checked={form.importFriends}
                       onCheckedChange={(checked) => update('importFriends', checked)}
                       description="登録のあと、いまの友だちを musubo に取り込みます（数分かかります）"
                     >
                       既存の友だちの取り込み
-                    </Checkbox>
+                    </Checkbox></SaveErrorField>
                   </div>
                   <div className={styles.actions}>
                     <Button type="button" disabled={Boolean(busyAction)} onClick={() => { setError(''); setCurrentStep(3) }}>戻る</Button>
@@ -891,16 +916,16 @@ export default function RegisterV8() {
             </tbody>
           </table>
           <div className={styles.manualAck}>
-            <Checkbox checked={manualAck} onCheckedChange={setManualAck}>
+            <SaveErrorField names={["manualAck","manual_ack"]}><Checkbox checked={manualAck} onCheckedChange={setManualAck}>
               LINE Official Account Manager で「応答メッセージ」をオフにしたことを確かめました
-            </Checkbox>
+            </Checkbox></SaveErrorField>
           </div>
           {!rowsPassed && (
             <Notice tone="warn" message="止まった項目を直して、もう一度調べます。手動の1項目にチェックを入れても登録はできません。" />
           )}
         </div>
       </Dialog>
-    </div>
+    </div></SaveErrorScope>
   )
 }
 

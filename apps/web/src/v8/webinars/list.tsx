@@ -86,6 +86,7 @@ import {
 } from './helpers'
 import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft' | 'archived'
@@ -361,6 +362,8 @@ interface ListSnapshot {
 }
 
 function WebinarList() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('ウェビナー')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -461,14 +464,16 @@ function WebinarList() {
       setTotal(res.data.total)
       setLoadedAccountId(accountId)
     } catch (err) {
-      if (requestGeneration.current === generation) setLoadFailure(webinarLoadFailure(err))
+      const fieldFailure = saveErrors.capture(err)
+
+      if (requestGeneration.current === generation) { if (!fieldFailure) setLoadFailure(webinarLoadFailure(err)) }
     } finally {
       if (requestGeneration.current === generation) {
         if (mode === 'initial') setLoading(false)
         else setRefreshing(false)
       }
     }
-  }, [selectedAccountId, page, pageSize, debouncedQuery, selectedFolder, savedFilter, sortKey])
+  }, [selectedAccountId, page, pageSize, debouncedQuery, selectedFolder, savedFilter, sortKey, saveErrors])
 
   const refreshOverview = useCallback(async () => {
     const generation = ++overviewGeneration.current
@@ -483,11 +488,14 @@ function WebinarList() {
       setOverview(res.data)
       setOverviewAccountId(accountId)
     } catch (cause) {
+
+
       if (overviewGeneration.current !== generation) return
+      const fieldFailure = saveErrors.capture(cause)
       setOverviewAccountId(accountId)
-      setOverviewFailure(webinarLoadFailure(cause))
+      { if (!fieldFailure) setOverviewFailure(webinarLoadFailure(cause)) }
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   const refreshGrandTotal = useCallback(async () => {
     if (!selectedAccountId) {
@@ -502,7 +510,9 @@ function WebinarList() {
       if (!res.data || typeof res.data.total !== 'number') return
       setGrandTotal(res.data.total)
       setGrandAccountId(accountId)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       /* 欄の件数だけの補助取得。失敗時は前の値を残す。 */
     }
     /* 札の件数（絵 UyUMw「公開中 3」「下書き 1」）。札で絞ったときと同じ口・同じ条件で数える。取れなければ数を出さない。 */
@@ -516,10 +526,12 @@ function WebinarList() {
       setChipCounts(typeof activeTotal === 'number' && typeof draftTotal === 'number'
         ? { accountId, active: activeTotal, draft: draftTotal }
         : null)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       setChipCounts(null)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   const refreshFolders = useCallback(async () => {
     const generation = ++folderGeneration.current
@@ -531,10 +543,12 @@ function WebinarList() {
       if (folderGeneration.current !== generation) return
       setFolders(response.success ? response.data : [])
       setFoldersReady(response.success && Array.isArray(response.data))
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       if (folderGeneration.current === generation) setFolders([])
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => { void refresh() }, [refresh])
   useEffect(() => { snapshotRef.current = { items, total, loadedAccountId } }, [items, total, loadedAccountId])
@@ -565,8 +579,10 @@ function WebinarList() {
       setFolderFormOpen(false)
       await refreshFolders()
       await refreshGrandTotal()
-    } catch {
-      setFolderError('フォルダを保存できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setFolderError('フォルダを保存できませんでした。もう一度お試しください。') }
     } finally {
       setFolderBusy(false)
     }
@@ -611,8 +627,10 @@ function WebinarList() {
       if (selectedFolder === deletingFolder.id) setSelectedFolder('')
       setDeletingFolder(null)
       await Promise.all([refresh(), refreshFolders(), refreshGrandTotal()])
-    } catch {
-      setFolderError('フォルダを削除できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setFolderError('フォルダを削除できませんでした。もう一度お試しください。') }
     } finally {
       setFolderBusy(false)
     }
@@ -664,11 +682,13 @@ function WebinarList() {
       setArchiveTarget(null)
       await Promise.all([refresh(), refreshOverview(), refreshGrandTotal()])
     } catch (error) {
-      setArchiveError(error instanceof ApiError && error.status === 409
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure) setArchiveError(error instanceof ApiError && error.status === 409
         ? '公開中のウェビナーは、先に公開を停止してください。'
         : archiveTarget.status === 'archived'
           ? '下書きに戻せませんでした。もう一度お試しください。'
-          : 'アーカイブできませんでした。状態を読み直して、もう一度お試しください。')
+          : 'アーカイブできませんでした。状態を読み直して、もう一度お試しください。') }
     } finally {
       setArchiving(false)
     }
@@ -706,8 +726,10 @@ function WebinarList() {
       link.download = 'webinars.csv'
       link.click()
       URL.revokeObjectURL(url)
-    } catch {
-      if (currentCsvScope.current === csvScope) setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      if (currentCsvScope.current === csvScope) { if (!fieldFailure) setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') }
     } finally {
       csvLock.current = false
       setCsvBusy(false)
@@ -749,7 +771,7 @@ function WebinarList() {
     { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
   ]
   const folderSelect = (
-    <Select
+    <SaveErrorField names={["selectedFolder","selected_folder"]}><Select
       aria-label="フォルダ"
       value={selectedFolder}
       onChange={(value) => { setSelectedFolder(value); setPage(1) }}
@@ -758,7 +780,7 @@ function WebinarList() {
         ...folders.map((folder) => ({ value: folder.id, label: `フォルダ：${folder.name}` })),
         { value: UNFILED, label: 'フォルダ：未分類' },
       ]}
-    />
+    /></SaveErrorField>
   )
   // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
   const createButton = canEdit
@@ -786,7 +808,7 @@ function WebinarList() {
   const savedBox = (
     <div className={styles.savedBox}>
       <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-      <Select
+      <SaveErrorField names={["savedFilter","status","saved_filter"]}><Select
         aria-label="よく使う絞り込み"
         value={savedFilter}
         onChange={(value) => { setSavedFilter(value as SavedFilter); setPage(1) }}
@@ -796,7 +818,7 @@ function WebinarList() {
           { value: 'draft', label: '下書きのみ' },
           { value: 'archived', label: 'アーカイブ済み' },
         ]}
-      />
+      /></SaveErrorField>
     </div>
   )
   const perPageBox = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
@@ -959,7 +981,7 @@ function WebinarList() {
   const kpis = kpiCells(visibleOverview)
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       help="行の「…」から 参加者・分析・コメント演出・アーカイブ。行を押すと右に詳細が出ます（↑↓で次の行へ）。"
       boardId="UyUMw"
       headingSize="regular"
@@ -1098,6 +1120,6 @@ function WebinarList() {
       </>}
     >
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

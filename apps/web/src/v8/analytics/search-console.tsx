@@ -23,6 +23,7 @@ import { csvCell } from '@/lib/presentation'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { StatePill, shortDay } from './common'
 import styles from './analytics.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const RANGES = [7, 28, 90] as const
 type RangeDays = typeof RANGES[number]
@@ -115,7 +116,7 @@ export default function SearchConsoleV8() {
   }
   const settingsSiteUrl = data?.siteUrl ?? setup?.siteUrl
   const settingsHref = settingsSiteUrl ? `https://search.google.com/search-console/users?resource_id=${encodeURIComponent(settingsSiteUrl)}` : null
-  const periodControl = <SegmentedControl aria-label="集計期間" value={String(days)} options={RANGES.map((range) => ({ value: String(range), label: `${range}日` }))} onChange={(value) => setDays(Number(value) as RangeDays)} />
+  const periodControl = <SaveErrorField names={["days"]}><SegmentedControl aria-label="集計期間" value={String(days)} options={RANGES.map((range) => ({ value: String(range), label: `${range}日` }))} onChange={(value) => setDays(Number(value) as RangeDays)} /></SaveErrorField>
   const settingsButton = settingsHref ? <Button variant="secondary" href={settingsHref} target="_blank" rel="noreferrer"><SlidersHorizontal size={15} aria-hidden="true" />連携を設定</Button> : null
   const maxDaily = Math.max(1, ...(data?.daily ?? []).map((row) => row.clicks))
   const middle = data ? data.daily[Math.floor(data.daily.length / 2)] : null
@@ -146,7 +147,7 @@ export default function SearchConsoleV8() {
         <div className={styles.body} data-gap="tab">
           <div className={styles.controls} data-gap="narrow">
             <label className={styles.field} data-w="property"><span className={styles.fieldLabel}>対象プロパティ</span>
-              <Select id="search-property" aria-label="対象プロパティ" size="full" value={data.siteUrl} disabled onChange={() => {}} options={[{ value: data.siteUrl, label: data.siteUrl }]} />
+              <SaveErrorField names={["siteUrl","data.siteUrl","site_url","data.site_url"]}><Select id="search-property" aria-label="対象プロパティ" size="full" value={data.siteUrl} disabled onChange={() => {}} options={[{ value: data.siteUrl, label: data.siteUrl }]} /></SaveErrorField>
             </label>
             <span className={styles.pillSlot}><StatePill tone="ok">連携中</StatePill></span>
             {periodControl}
