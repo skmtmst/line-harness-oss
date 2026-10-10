@@ -144,7 +144,6 @@ describe('共通部品の影響範囲', () => {
       'app/webinars/list-v8.tsx',
       'components/friend-fields/tags-page-v4.tsx',
 
-      'components/line-notifications/notification-run-list.tsx',
       'components/ops/knowledge-list.tsx',
       // N-193/N-205・B-128: 登録メディアから選ぶ窓。3つの写しを共通部品1つにまとめた。20件ずつのページ送り。
       'components/shared/media-picker-dialog.tsx',

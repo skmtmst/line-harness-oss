@@ -3,7 +3,9 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { ApiError, api, type EcNotificationRun, type EcNotificationRunList } from '@/lib/api'
-import NotificationRunList from './notification-run-list'
+import NotificationRunList from '@/v8/settings/line-notifications/runs-tab'
+
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 
 // createRoot/actがhappy-dom環境をReactのact対応と認識するための明示フラグ。
 beforeAll(() => {
@@ -124,6 +126,8 @@ function waitForCommit(container: HTMLDivElement): Promise<void> {
 }
 
 async function setup() {
+  window.history.replaceState(null, '', '/line-notifications?tab=failures')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   // 店長権限を即答にしておき、再試行ボタンを常に出す。
   api.staff.me = vi.fn(async (): Promise<StaffMeResult> => ({
     success: true,
@@ -181,19 +185,24 @@ async function setup() {
 }
 
 function retryButton(container: HTMLDivElement): HTMLButtonElement {
-  const button = Array.from(container.querySelectorAll('button')).find((el) => el.textContent === '送信を再試行する')
+  const button = Array.from(document.querySelectorAll('[role="dialog"] button')).find((el) => el.textContent?.trim() === '送信を再試行する')
   if (!button) throw new Error('再試行ボタンが見つかりません')
   return button as HTMLButtonElement
 }
 
+async function openDetail(container: HTMLDivElement) {
+  const button = container.querySelector('button[title$="の記録の詳細を開く"]') as HTMLButtonElement
+  if (!button) throw new Error('記録を開くボタンが見つかりません')
+  await act(async () => { button.click(); await drainMicrotasks() })
+}
+
 function noticeText(container: HTMLDivElement): string | null {
-  const region = container.querySelector('[aria-label="送れなかったもの"]')
-  const candidate = region?.querySelector('.border-success, .border-danger')
+  const candidate = container.querySelector('[data-design-part="notice"][role="status"], [data-design-part="notice"][role="alert"]')
   return candidate ? candidate.textContent : null
 }
 
 describe('LINE通知一覧のReact実mount試験', () => {
-  it('失敗詳細・試行履歴・次回時刻・対応済み状態を実一覧行に表示する', async () => {
+  it('失敗の行から詳細を開き、試行履歴・次回時刻・対応済み状態を表示する', async () => {
     const { container, nextDelivery } = await setup()
     const detailed = Object.assign(run('詳細'), {
       nextRetryAt: '2026-09-09T12:00:00+09:00',
@@ -214,12 +223,27 @@ describe('LINE通知一覧のReact実mount試験', () => {
       nextDelivery('account-a').resolve(ok([detailed], 0))
       await drainMicrotasks()
     })
-    expect(container.textContent).toContain('次回 9月9日（水）12:00')
-    expect(container.textContent).toContain('対応済み 9月9日（水）11:30／店長')
-    expect(container.textContent).toContain('試行履歴を確認')
-    expect(container.textContent).toContain('未対応に戻す')
-    expect(container.textContent).not.toContain('送信を再試行')
+    await openDetail(container)
+    const detailBody = document.querySelector('[role="dialog"]')!
+    expect(detailBody.textContent).toContain('次の再試行 09/09 12:00')
+    expect(detailBody.textContent).toContain('対応済み 09/09 11:30')
+    expect(detailBody.textContent).toContain('／店長')
+    expect(detailBody.querySelector('[aria-label="試行の履歴"]')?.textContent).toContain('LINEの応答を確認できません')
+    expect(detailBody.textContent).toContain('未対応に戻す')
+    expect(detailBody.textContent).not.toContain('送信を再試行')
     expect(container.textContent).not.toContain('項目が追加された後に表示します')
+  })
+
+  it('同じ店の再送成功は通知して一覧を読み直す', async () => {
+    const { container, deliveryCalls, nextDelivery, retryDeferreds } = await setup()
+    await act(async () => { nextDelivery('account-a').resolve(ok([run('通常')], 1)); await drainMicrotasks() })
+    await openDetail(container)
+    await act(async () => { retryButton(container).click() })
+    await act(async () => { retryDeferreds[0].resolve({ success: true } as RetryResult); await drainMicrotasks() })
+    expect(noticeText(container)).toContain('同じ通知の送信を安全に再試行しました。')
+    expect(deliveryCalls).toEqual([{ lineAccountId: 'account-a' }, { lineAccountId: 'account-a' }])
+    await act(async () => { nextDelivery('account-a', 1).resolve(ok([], 0)); await drainMicrotasks() })
+    expect(container.textContent).toContain('送れなかったお知らせはありません')
   })
 
   it.each([
@@ -236,9 +260,10 @@ describe('LINE通知一覧のReact実mount試験', () => {
     })
     expect(container.textContent).toContain('顧客 Aの通知')
 
+    await openDetail(container)
     await act(async () => { retryButton(container).click() })
     expect(retryDeferreds).toHaveLength(1)
-    expect(container.textContent).toContain('再試行中')
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('再試行中')
 
     // actで包まない生のrender()。commit直後にMutationObserverで止めると、
     // 「Bのレンダーはcommit済み・load()を呼ぶuseEffectはまだ未実行」という
@@ -290,6 +315,7 @@ describe('LINE通知一覧のReact実mount試験', () => {
       await drainMicrotasks()
     })
 
+    await openDetail(container)
     await act(async () => { retryButton(container).click() })
 
     // 今度はBのuseEffectまで先に流し切ってから、Aの応答を戻す

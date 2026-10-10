@@ -12,21 +12,23 @@ import { describe, expect, it } from "vitest";
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
-const list = readFileSync(join(here, "notification-run-list.tsx"), "utf8");
+const list = readFileSync(join(here, "../../v8/settings/line-notifications/runs-tab.tsx"), "utf8");
+const css = readFileSync(join(here, "../../v8/settings/line-notifications/screen.module.css"), "utf8");
 const operator = readFileSync(
   join(here, "..", "..", "v8", "settings", "line-notifications", "operator-tab.tsx"),
   "utf8",
 );
 
 describe("notification-run-list-numfix (DrwMm/PZBVb/u8xibp)", () => {
-  it("検索欄の字は13", () => {
-    expect(list).toContain("px-3 text-label outline-none focus:border-accent");
+  it("検索欄は現役の共通部品を使う", () => {
+    expect(list).toContain("<SearchField aria-label=\"お客様の名前・注文番号で探す\"");
     expect(operator).toContain("<SearchField aria-label=\"お知らせを検索\"");
   });
 
-  it("行の日時は12/600・試行と理由は12", () => {
-    expect(list).toContain("whitespace-nowrap text-caption font-semibold");
-    expect(list).toContain("block text-caption\">試行");
-    expect(list).toContain("block text-caption leading-5 text-ink-secondary");
+  it("日時と試行の履歴は現役の文字の決まりで出す", () => {
+    expect(list).toContain("className={styles.runWhen}");
+    expect(css).toMatch(/\.runWhen\s*\{[\s\S]*?font-weight: 600/);
+    expect(list).toContain("className={styles.runAttempts}");
+    expect(css).toMatch(/\.runAttempts\s*\{[\s\S]*?font-size: var\(--tpl-sb-row-sub\)/);
   });
 });

@@ -73,7 +73,6 @@ const KNOWN_FILES: string[] = [
   'components/chats/friend-info-sidebar.tsx',
   'components/friend-fields/field-list.tsx',
   'components/inflow-links/site-script.tsx',
-  'components/line-notifications/notification-run-list.tsx',
   'components/scenarios/scenario-dialogs.tsx',
   'components/shared/list-kpis.tsx',
   'components/staff/login-audit.tsx',

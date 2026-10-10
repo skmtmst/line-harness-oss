@@ -12,10 +12,12 @@ const OPERATOR_NEW = fs.readFileSync(
   path.join(__dirname, '../../v8/line-notifications/operator-edit.tsx'),
   'utf8',
 )
-const RUN_LIST = fs.readFileSync(
-  path.join(__dirname, '../../components/line-notifications/notification-run-list.tsx'),
+const RUN_SOURCE = fs.readFileSync(
+  path.join(__dirname, '../../v8/settings/line-notifications/runs-tab.tsx'),
   'utf8',
 )
+
+const RUN_LIST = RUN_SOURCE + fs.readFileSync(path.join(__dirname, '../../components/line-notifications/notification-run-state.ts'), 'utf8')
 
 describe('点検・中: LINE通知の画面契約', () => {
   it('中4: 運用者一覧の補足数字は書き置きでなく実数を出す', () => {
@@ -41,7 +43,7 @@ describe('点検・中: LINE通知の画面契約', () => {
   })
 
   it('中7: 記録の検索は表示中の範囲だけと分かる', () => {
-    expect(RUN_LIST).toContain('表示中の20件のみ')
+    expect(RUN_LIST).toContain('検索と絞り込みは表示中のページの中だけに効きます。')
   })
 
   it('中8: 互換口への戻しは404のとき1回だけ', () => {

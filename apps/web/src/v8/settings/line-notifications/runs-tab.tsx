@@ -16,7 +16,7 @@ import {
   type ScopedLoadState,
   type ScopedNotice,
   type ScopedRetrying,
-} from '@/components/line-notifications/notification-run-list'
+} from '@/components/line-notifications/notification-run-state'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import StatusBadge from '@/components/shared/status-badge'
 import Button from '@/components/shared/button'
@@ -187,7 +187,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
       </KpiBand>
     ) : null}
 
-    {visibleNotice ? <Notice tone={visibleNotice.tone === 'success' ? 'success' : 'danger'}>{visibleNotice.text}</Notice> : null}
+    {visibleNotice ? <Notice role={visibleNotice.tone === 'success' ? 'status' : 'alert'} tone={visibleNotice.tone === 'success' ? 'success' : 'danger'}>{visibleNotice.text}</Notice> : null}
 
     <div className={styles.toolbar}>
       <div className={styles.runSearch}>
