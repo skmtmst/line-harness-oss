@@ -91,6 +91,8 @@ import {
 } from './model'
 import VarsExportPanel from './export-panel'
 import styles from './list.module.css'
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -1048,8 +1050,8 @@ function CommonVarsListInner() {
    * フォルダの追加・名前変更・削除は、縦の列が無いぶん、フォルダの印のメニューから。
    */
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
-      <div className={styles.narrowRow}>
+    <ListToolbarFrame>
+      <ListToolbarRow>
         {createButton(false)}
         <div className={styles.narrowFolder}>
           <Select
@@ -1059,7 +1061,7 @@ function CommonVarsListInner() {
             options={folderOptions}
           />
         </div>
-        <div className={styles.narrowSearch}>
+        <ListToolbarSearchSlot>
           <SearchField
             aria-label="共通情報を検索"
             placeholder="名前・差し込み名・中身"
@@ -1067,7 +1069,7 @@ function CommonVarsListInner() {
             onChange={onSearch}
             onClear={() => onSearch('')}
           />
-        </div>
+        </ListToolbarSearchSlot>
         {canWrite ? (
           <>
             <IconButton
@@ -1106,13 +1108,13 @@ function CommonVarsListInner() {
         <span className={styles.spacer} aria-hidden="true" />
         {orderBox}
         {perPageBox}
-      </div>
-      <div className={styles.narrowRow}>{filterChips}</div>
-    </div>
+      </ListToolbarRow>
+      <ListToolbarRow>{filterChips}</ListToolbarRow>
+    </ListToolbarFrame>
   )
 
   const wideToolbar = (
-    <div className={styles.wideTools}>
+    <ListToolbarFrame>
       <ListToolbar
         search={{
           placeholder: '名前・差し込み名・中身',
@@ -1123,7 +1125,7 @@ function CommonVarsListInner() {
         filters={filterChips}
         trailing={<>{orderBox}{perPageBox}</>}
       />
-    </div>
+    </ListToolbarFrame>
   )
 
   /* 空のまま使われているときの黄色の帯（絵：表の列の上・道具の段の上）。 */
@@ -1879,6 +1881,7 @@ function CommonVarsListInner() {
 
   return (
     <ListPage
+      skeleton
       boardId={narrow ? 'XIzkJ' : canWrite ? 'FM94M' : 'OxSw8'}
       headingSize="regular"
       title="共通情報"

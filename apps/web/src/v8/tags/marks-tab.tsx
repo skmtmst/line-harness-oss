@@ -40,6 +40,8 @@ import { ArchiveMarkDialog, autoRuleLabel, isUsed, usageLabel } from '@/componen
 import styles from './list.module.css'
 
 import type { AttributeListHost } from './attribute-host'
+import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+
 
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -489,8 +491,9 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
       </div>
 
       <ListPageBody
+        skeleton
         toolbar={<>
-          <span className={styles.search}>
+          <ListToolbarSearchSlot>
             <SearchField
               aria-label="マーク名で探す"
               placeholder="マーク名で探す"
@@ -498,7 +501,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
               onChange={setQuery}
               onClear={() => setQuery('')}
             />
-          </span>
+          </ListToolbarSearchSlot>
           <Select
             aria-label="使っているかで絞り込む"
             width={157}

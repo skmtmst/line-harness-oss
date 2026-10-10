@@ -17,7 +17,6 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import tpl from '@/components/templates/page-templates.module.css'
 import Button from '@/components/shared/button'
-import MediaSlot from '@/components/shared/media-slot'
 import ColorWell from '@/components/shared/color-well'
 import Combobox from '@/components/shared/combobox'
 import HelpTip from '@/components/shared/help-tip'
@@ -49,6 +48,8 @@ import {
 } from './display'
 import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, ReasonDialog, RewardDialog, StoresDialog } from './dialogs'
 import styles from './visit-stamps.module.css'
+import ImageFrame from '@/components/shared/image-frame'
+
 
 type PaperRow = { id: string; card_id?: string; friend_id: string; photo_url: string; stamps: number; status: string; created_at?: string }
 type FriendLite = { id: string; displayName?: string | null; metadata?: Record<string, unknown> | null }
@@ -426,8 +427,8 @@ function VisitStampsScreen() {
                   <span className={styles.label}>カードの見た目 <HelpTip label="カードの見た目の説明">画像があるときは画像を使います。色は文字の下地です。</HelpTip></span>
                   <div className={styles.appearance}>
                     <div className={styles.imageSlot}>
-                      <MediaSlot
-                        size="compact"
+                      <ImageFrame
+
                         title="背景画像を追加"
                         previewAlt="背景画像"
                         value={settings.backgroundImageUrl || null}

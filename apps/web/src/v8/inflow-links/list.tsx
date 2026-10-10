@@ -79,6 +79,8 @@ import {
   type TrackedLinkRow,
 } from './rows'
 import styles from './list.module.css'
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+
 
 interface MessageTemplate {
   id: string
@@ -602,22 +604,22 @@ export default function InflowListV8({
   const onSearch = (value: string) => { setSearch(value); setPage(1) }
   // 1152 の板（y1ztx）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
+    <ListToolbarFrame>
       {notice}
-      <div className={styles.narrowRow}>
+      <ListToolbarRow>
         {createButton}
         <div className={styles.narrowFolder}>{folderSelect}</div>
-        <div className={styles.narrowSearch}>
+        <ListToolbarSearchSlot>
           <SearchField value={search} onChange={onSearch} onClear={() => onSearch('')} placeholder={searchLabel} aria-label={searchLabel} />
-        </div>
-      </div>
-      <div className={styles.narrowRow}>
+        </ListToolbarSearchSlot>
+      </ListToolbarRow>
+      <ListToolbarRow>
         {filterChips}
         <span className={styles.spacer} aria-hidden="true" />
         {presetBox}
         {perPageBox}
-      </div>
-    </div>
+      </ListToolbarRow>
+    </ListToolbarFrame>
   )
   const wideToolbar = (
     <>
@@ -832,6 +834,7 @@ export default function InflowListV8({
 
   return (
     <ListPage
+      skeleton
       help={readonly
             ? '行の「…」から QRコードを表示・URLをコピーできます。'
             : '行の「…」から QRコードを表示・URLをコピー・リンクを編集・止める。左のチェックで、まとめて操作できます。'}

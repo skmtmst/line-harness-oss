@@ -76,6 +76,10 @@ import {
 } from '@/components/friend-fields/tags-page-v4'
 import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+import { ListPager } from '@/components/templates/list-page'
+
+
 
 /** 付け方の呼び名（絵 I1E7Bt の「EC 連携・LINE ログイン・EC 購入・誕生日のきまり」）。v7 の呼び名（tags-page-v4）は触らない。 */
 const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
@@ -572,7 +576,7 @@ export default function TagsTab({
   )
 
   const search = (
-    <span className={narrow ? styles.searchNarrow : styles.search}>
+    <ListToolbarSearchSlot>
       <SearchField
         aria-label="タグ名・用途で探す"
         placeholder="タグ名・用途で探す"
@@ -580,7 +584,7 @@ export default function TagsTab({
         onChange={setQuery}
         onClear={() => setQuery('')}
       />
-    </span>
+    </ListToolbarSearchSlot>
   )
   const usageSelect = (
     <Select
@@ -792,14 +796,14 @@ export default function TagsTab({
       </DataTable>
 
       {/* 件数とページ送り（絵：左に件数・右にページ送り）。表示件数は道具の段の右端。 */}
-      <div className={styles.pager}>
+      <ListPager>
         <span className={styles.pagerCount}>
           {`${filtered.length}件中 ${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, filtered.length)}件`}
         </span>
         {pages > 1 ? (
           <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="タグのページ送り" />
         ) : null}
-      </div>
+      </ListPager>
     </DelayedSkeleton>
   )
 
@@ -822,6 +826,7 @@ export default function TagsTab({
       </KpiBand>
 
       <ListPageBody
+        skeleton
         folders={<>
           {createButton(true) ?? (status === 'forbidden' ? null : <span className={styles.viewerCreateSpace} aria-hidden="true" />)}
           <FolderPanel
@@ -842,12 +847,12 @@ export default function TagsTab({
           {/* 1152（aPeD8）：1段目＝作る・フォルダ・探す・使用状態、2段目＝付け方・よく使う・右端に表示件数。 */}
           {search}
           {usageSelect}
-          <div className={styles.toolbarRow2}>
+          <ListToolbarRow>
             {sourceSelect}
             {quickButton}
             <span className={styles.toolbarSpacer} />
             {pageSizeSelect}
-          </div>
+          </ListToolbarRow>
         </> : <>
           {search}
           {usageSelect}

@@ -19,7 +19,6 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import type { StaffMember } from '@line-crm/shared'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
-import MediaSlot from '@/components/shared/media-slot'
 import TargetMissing from '@/components/shared/target-missing'
 import { TextArea } from '@/components/shared/text-field'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -35,6 +34,8 @@ import {
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
 import styles from './support-detail.module.css'
+import ImageFrame from '@/components/shared/image-frame'
+
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -238,8 +239,8 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                 ) : null}
                 {attachments.length < SUPPORT_ATTACHMENT_MAX ? (
                 <div className={styles.attachSlot}>
-                  <MediaSlot
-                    size="compact"
+                  <ImageFrame
+
                     title="画像を添える"
                     accept="image/png,image/jpeg"
                     limitText={`PNG・JPEG、1枚 5MB まで（${SUPPORT_ATTACHMENT_MAX}枚まで）`}

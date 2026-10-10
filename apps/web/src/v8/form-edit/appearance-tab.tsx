@@ -25,10 +25,11 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
-import MediaSlot from '@/components/shared/media-slot'
 import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import { ogImageUrlError } from './model'
 import styles from './edit.module.css'
+import ImageFrame from '@/components/shared/image-frame'
+
 
 type ColorKey = keyof Pick<FormTheme, 'main' | 'sub' | 'accent' | 'error' | 'text'>
 const COLOR_ROLES: { key: ColorKey; label: string }[] = [
@@ -206,8 +207,8 @@ export function AppearanceTab(props: Props) {
         {props.portable ? null : <div className={styles.subBox}>
           <h3 className={styles.subTitle}>背景とリンクの見え方</h3>
           <div className={styles.tight}>
-            <MediaSlot
-              size="compact"
+            <ImageFrame
+
               title="背景の画像を追加"
               previewAlt="背景の画像"
               value={theme.backgroundImageUrl || null}
@@ -266,8 +267,8 @@ export function AppearanceTab(props: Props) {
           </div>
           <div className={styles.field}>
             <span className={styles.fieldLabel}>カードの画像</span>
-            <MediaSlot
-              size="compact"
+            <ImageFrame
+
               title="カードの画像を追加"
               previewAlt="カードの画像"
               value={props.ogImageUrl || null}

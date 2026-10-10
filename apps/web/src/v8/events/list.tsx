@@ -630,6 +630,7 @@ export default function EventsListV8() {
 
   return (
     <ListPage
+      skeleton
       help="行の「…」から 中身を見る・申込者を見る・日時と定員を変える・プレビュー・削除。申込中・キャンセル待ちがいるイベントは削除できません。"
       boardId="e2ekFu"
       headingSize="regular"

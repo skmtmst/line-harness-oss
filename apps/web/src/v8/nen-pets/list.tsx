@@ -28,6 +28,8 @@ import {
 import PetEditorV8 from './editor'
 import { NEUTERED_LABEL, Pill, RowMenu, feedingLines, monthDay, rangeText, type PetsQuery } from './parts'
 import styles from './pets.module.css'
+import { ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from '@/components/shared/list-toolbar'
+
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 const PAGE_SIZES = [10, 20, 50]
@@ -50,7 +52,7 @@ export default function PetsListV8({
   const [data, setData] = useState<NenPetListData | null>(null)
   const [draft, setDraft] = useState(query.q)
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(20)
   const [editing, setEditing] = useState<NenPetRow | null>(null)
   const requestRef = useRef(0)
 
@@ -91,11 +93,10 @@ export default function PetsListV8({
         <Notice tone="info" message="体重が90日更新されていないペットは、マイページで更新をお願いできます（行の「…」→マイページで更新を促す）。" />
       </div>
 
-      <div className={styles.toolsRow} data-design="ListControls">
-        <span className={styles.searchBox}>
+      <ListToolbarRow data-design="ListControls">
+        <ListToolbarSearchSlot>
           <SearchField aria-label="ペット名・飼い主で探す" placeholder="ペット名・飼い主で探す" value={draft} onChange={setDraft} onClear={() => setDraft('')} />
-        </span>
-        <span className={styles.toolsBreak} aria-hidden="true" />
+        </ListToolbarSearchSlot>
         <Select
           aria-label="種別で絞り込む"
           width={140}
@@ -133,10 +134,10 @@ export default function PetsListV8({
             { value: 'age_desc', label: '並び：年齢が高い順' },
           ]}
         />
-        <span className={styles.toolsTail}>
+        <ListToolbarEnd>
           <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))} />
-        </span>
-      </div>
+        </ListToolbarEnd>
+      </ListToolbarRow>
 
       {status === 'loading' && !data ? (
         <ListState kind="loading" title="ペットを読み込んでいます" />

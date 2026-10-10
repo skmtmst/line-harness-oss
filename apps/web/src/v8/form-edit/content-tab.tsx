@@ -29,12 +29,13 @@ import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import Toggle from '@/components/shared/toggle'
 import { ADD_GROUPS, blockKindLine, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
-import MediaSlot from '@/components/shared/media-slot'
 import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import UriTapActionField from '@/components/shared/uri-tap-action-field'
 import { FieldError } from '@/components/shared/form-controls'
 import { useFormEditAttempted } from './field-issues'
 import styles from './edit.module.css'
+import ImageFrame from '@/components/shared/image-frame'
+
 
 type Props = {
   readOnly?: boolean
@@ -522,8 +523,8 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
       return (
         <>
           <div className={styles.decoRow}>
-            <MediaSlot
-              size="compact"
+            <ImageFrame
+
               title="画像を追加"
               previewAlt="フォームの画像"
               value={block.mediaUrl || null}

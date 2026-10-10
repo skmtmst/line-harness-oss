@@ -85,6 +85,8 @@ import {
   type FormSort,
 } from './model'
 import styles from './list.module.css'
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+
 
 const VIEWER_NOTE = '閲覧のみで見ています。変える操作は管理者に頼んでください。'
 
@@ -1040,15 +1042,15 @@ export default function FormsListV8() {
 
   /* 1152 の板（GrnO4）：1段目「作る・フォルダ・探す … 件数」、2段目「札・並び」。 */
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
-      <div className={styles.narrowRow}>
+    <ListToolbarFrame>
+      <ListToolbarRow>
         {reviewMode ? null : createButton(false)}
         {reviewMode ? null : (
           <div className={styles.narrowFolder}>
             <Select aria-label="フォルダ" value={activeFolderId} onChange={selectFolder} options={folderSelectOptions} />
           </div>
         )}
-        <div className={styles.narrowSearch}>
+        <ListToolbarSearchSlot>
           <SearchField
             aria-label="フォーム名・質問文で検索"
             placeholder="フォーム名・質問文"
@@ -1056,19 +1058,19 @@ export default function FormsListV8() {
             onChange={onSearch}
             onClear={() => onSearch('')}
           />
-        </div>
+        </ListToolbarSearchSlot>
         <span className={styles.spacer} aria-hidden="true" />
         {perPageBox}
-      </div>
-      <div className={styles.narrowRow}>
+      </ListToolbarRow>
+      <ListToolbarRow>
         {filterChips}
         {sortBox}
-      </div>
-    </div>
+      </ListToolbarRow>
+    </ListToolbarFrame>
   )
 
   const wideToolbar = (
-    <div className={styles.wideTools}>
+    <ListToolbarFrame>
       <ListToolbar
         search={{
           placeholder: 'フォーム名・質問文',
@@ -1079,7 +1081,7 @@ export default function FormsListV8() {
         filters={filterChips}
         trailing={<>{sortBox}{perPageBox}</>}
       />
-    </div>
+    </ListToolbarFrame>
   )
 
   /* ===== 一覧の中身（読込中・失敗・空・0件・表を分ける） ===== */
@@ -1683,6 +1685,7 @@ export default function FormsListV8() {
       data-list-state={accountLoading || loading ? 'loading' : loadError ? 'error' : visibleForms.length === 0 ? 'empty' : 'ready'}
     >
       <ListPage
+      skeleton
         boardId={narrow ? 'GrnO4' : 'I3L41O'}
         headingSize="regular"
         title="回答フォーム"
@@ -1705,7 +1708,7 @@ export default function FormsListV8() {
                 icon={<kpi.icon size={13} aria-hidden="true" />}
                 value={kpi.value}
                 unit={kpi.value == null ? '' : kpi.unit}
-                detail={narrow ? <span className={styles.kpiDetailWrap}>{kpi.detail}</span> : kpi.detail}
+                detail={kpi.detail}
                 action={kpi.action}
               />
             ))}

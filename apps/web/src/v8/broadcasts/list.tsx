@@ -67,6 +67,8 @@ import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import QuickSendV8 from './quick-send'
 import styles from './list.module.css'
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -777,7 +779,7 @@ export default function BroadcastListV8() {
   ))
 
   const searchBox = (
-    <div className={narrow ? `${styles.searchBox} ${styles.searchNarrow}` : styles.searchBox}>
+    <ListToolbarSearchSlot>
       <SearchField
         aria-label="タイトル・内容で探す"
         placeholder="タイトル・内容で探す"
@@ -785,7 +787,7 @@ export default function BroadcastListV8() {
         onChange={setTitleQuery}
         onClear={() => setTitleQuery('')}
       />
-    </div>
+    </ListToolbarSearchSlot>
   )
 
   const dateBox = (
@@ -934,8 +936,8 @@ export default function BroadcastListV8() {
 
   /* 道具の段：1440 は「探す・配信日・保存 … 保存した検索」／「札 … 件数・並び」。1152 は作る・フォルダが前に入り、札は選ぶ欄。 */
   const toolbar = (
-    <div className={styles.tools}>
-      <div className={styles.toolRow}>
+    <ListToolbarFrame>
+      <ListToolbarRow>
         {narrow ? createButton(false) : null}
         {narrow ? folderSelect : null}
         {searchBox}
@@ -943,13 +945,13 @@ export default function BroadcastListV8() {
         {narrow ? null : saveCurrentButton}
         <span className={styles.spacer} aria-hidden="true" />
         {savedSearchBox}
-      </div>
-      <div className={styles.toolRow}>
+      </ListToolbarRow>
+      <ListToolbarRow>
         {narrow ? statusSelect : statusChips}
         <span className={styles.spacer} aria-hidden="true" />
         {pageSizeBox}
         {sortButton}
-      </div>
+      </ListToolbarRow>
       {savedViewOpen ? (
         <div className={styles.saveRow}>
           <input
@@ -969,7 +971,7 @@ export default function BroadcastListV8() {
           <button type="button" onClick={() => setSavedViewsSeq((n) => n + 1)} className={styles.inlineRetry}>もう一度</button>
         </p>
       ) : null}
-    </div>
+    </ListToolbarFrame>
   )
 
   /* ===== 表 ===== */
@@ -1161,6 +1163,7 @@ export default function BroadcastListV8() {
 
   return (
     <ListPage
+      skeleton
       boardId={boardId}
       headingSize="compact"
       title="一斉配信"

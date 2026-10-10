@@ -510,6 +510,7 @@ export default function HqStoreList(props: HqStoreListProps) {
 
   return (
     <ListPage
+      skeleton
       boardId={type === 'template' ? 'i0Ao0R' : type === 'form' ? 'wZPua' : type === 'tag' ? 'DzdC3' : type === 'rich_menu' ? 'noVq4' : 'LRc93'}
       headingSize="regular"
       title={words.title}
@@ -518,7 +519,7 @@ export default function HqStoreList(props: HqStoreListProps) {
       stats={(
         <KpiBand data-design="KPIs" className={storeStyles.kpiStrip}>
           {bandKpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={<span className={storeStyles.kpiDetailWrap}>{kpi.detail}</span>} />
+            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} />
           ))}
         </KpiBand>
       )}

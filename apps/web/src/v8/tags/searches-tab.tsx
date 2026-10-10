@@ -42,6 +42,8 @@ import type { SavedSearchConditionLabels } from '@/components/friends/saved-sear
 import { filterSavedSearches, savedSearchKpiValues, type SavedSearchUsageFilter } from '@/components/friend-fields/saved-search-kpis'
 import { formatDay, formatNumber } from '@/lib/format'
 import styles from './list.module.css'
+import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+
 
 const PAGE_SIZES = [10, 20, 50]
 const MAX_SAVED = 50
@@ -455,11 +457,12 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       </div>
 
       <ListPageBody
+        skeleton
         listHelp={canEdit ? `保存は最大 ${MAX_SAVED} 件。行の「…」に：編集・複製して保存・削除。` : `保存は最大 ${MAX_SAVED} 件。`}
         toolbar={<>
-          <span className={styles.search}>
+          <ListToolbarSearchSlot>
             <SearchField aria-label="条件名で探す" placeholder="条件名で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
-          </span>
+          </ListToolbarSearchSlot>
           <Select
             value={usageFilter}
             width={170}

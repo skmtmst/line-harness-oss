@@ -37,11 +37,12 @@ import { toActionPayload, type InlineAction } from '@/components/auto-replies/dr
 import { TemplateEditFrame } from './frame'
 import type { TemplateEditHost } from './host'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
-import MediaSlot from '@/components/shared/media-slot'
 import { FieldError } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import styles from './edit.module.css'
+import ImageFrame from '@/components/shared/image-frame'
+
 
 export type AssetKind = 'coupon' | 'research'
 
@@ -470,8 +471,8 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               </div>
               <div className={styles.couponRow}>
                 <div className={styles.couponImage}>
-                  <MediaSlot
-                    size="compact"
+                  <ImageFrame
+
                     title="画像を追加"
                     previewAlt="クーポンの画像"
                     value={imageSet ? imageUrl.trim() : null}

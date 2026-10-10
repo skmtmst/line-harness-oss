@@ -13,7 +13,6 @@ import Link from 'next/link'
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
-import MediaSlot from '@/components/shared/media-slot'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
@@ -41,6 +40,8 @@ import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import NoticeLineDialogV8 from './notice-line-dialog'
 import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
 import styles from './support.module.css'
+import ImageFrame from '@/components/shared/image-frame'
+
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -280,8 +281,8 @@ export default function HqSupportV8() {
           ) : null}
           {attachments.length < SUPPORT_ATTACHMENT_MAX ? (
             <div className={styles.attachSlot}>
-              <MediaSlot
-                size="compact"
+              <ImageFrame
+
                 title="画像を添える"
                 accept="image/png,image/jpeg"
                 limitText={`PNG・JPEG、1枚 5MB まで（${SUPPORT_ATTACHMENT_MAX}枚まで）`}

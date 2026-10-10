@@ -43,6 +43,8 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { failedCount, jpDateTime, runBadge, sendTotals } from './model'
 import styles from '../broadcasts/list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+
 
 type StatusKey = 'all' | 'scheduled' | 'draft' | 'sent' | 'error'
 const STATUS_CHIPS: { key: StatusKey; label: string; icon: typeof List }[] = [
@@ -235,13 +237,13 @@ export default function HqBroadcastList() {
   }
 
   const toolbar = (
-    <div className={styles.tools}>
-      <div className={styles.toolRow}>
-        <div className={styles.searchBox}>
+    <ListToolbarFrame>
+      <ListToolbarRow>
+        <ListToolbarSearchSlot>
           <SearchField aria-label="タイトル・内容で探す" placeholder="タイトル・内容で探す" value={query} onChange={(value) => { setQuery(value); setPage(1) }} onClear={() => { setQuery(''); setPage(1) }} />
-        </div>
-      </div>
-      <div className={styles.toolRow}>
+        </ListToolbarSearchSlot>
+      </ListToolbarRow>
+      <ListToolbarRow>
         <div className={styles.chips} role="group" aria-label="状態で絞る">
           {STATUS_CHIPS.map((chip) => (
             <FilterChip key={chip.key} selected={status === chip.key} onChange={() => { setStatus(chip.key); setPage(1) }} icon={<chip.icon size={13} aria-hidden="true" />}>
@@ -268,8 +270,8 @@ export default function HqBroadcastList() {
           <ArrowUpDown size={14} aria-hidden="true" />
           {sortKey === 'newest' ? '新しい順' : '古い順'}
         </button>
-      </div>
-    </div>
+      </ListToolbarRow>
+    </ListToolbarFrame>
   )
 
   let content
@@ -363,6 +365,7 @@ export default function HqBroadcastList() {
 
   return (
     <ListPage
+      skeleton
       boardId="U4Eep0"
       headingSize="regular"
       title="一括配信"

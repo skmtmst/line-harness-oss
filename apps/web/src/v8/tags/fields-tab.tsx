@@ -47,6 +47,10 @@ import { FIELD_TYPE_LABELS, destinationLabel, fieldDeletionBlockedReason, knownU
 import styles from './list.module.css'
 
 import type { AttributeListHost } from './attribute-host'
+import { ListPager } from '@/components/templates/list-page'
+import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+
+
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -467,12 +471,12 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
       </DataTable>
 
       {pages > 1 ? (
-        <div className={styles.pager}>
+        <ListPager>
           <span className={styles.pagerCount}>
             {`${visible.length}件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, visible.length)}件`}
           </span>
           <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="友だち情報欄のページ送り" />
-        </div>
+        </ListPager>
       ) : null}
 
     </DelayedSkeleton>
@@ -495,6 +499,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
       </KpiBand>}
 
       <ListPageBody
+        skeleton
         listHelp={canEdit ? `行の「…」に：編集・${host ? '配る' : '移行（種類を変える）'}・削除。並べ替えはつまんで上下（キーボードは上下キー）` : '行から中身を見られます。'}
         folders={<>
           {createButton(true)}
@@ -524,9 +529,9 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
             <Info className={styles.readonlyIcon} aria-hidden="true" />
             {host ? '情報欄のひな形を各アカウントへ配れます。種類と差し込みの名前は作ったあと変えられません。別の種類は新しいひな形を作ってください。' : '項目の種類を変えると、入っている値が変わることがあります。種類を変えるときは「移行」で事前に確かめてから変えます。'}
           </p>
-          <span className={narrow ? styles.searchNarrow : styles.search}>
+          <ListToolbarSearchSlot>
             <SearchField aria-label="項目名で探す" placeholder="項目名で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
-          </span>
+          </ListToolbarSearchSlot>
           <Select
             aria-label="種類で絞り込む"
             width={119}

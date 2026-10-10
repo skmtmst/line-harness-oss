@@ -14,7 +14,6 @@ import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
-import MediaSlot from '@/components/shared/media-slot'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -42,6 +41,8 @@ import {
 import { errorMessage, formatShortDay, formatShortStamp } from './format'
 import type { GoogleNav } from './google'
 import styles from './google.module.css'
+import ImageFrame from '@/components/shared/image-frame'
+
 
 /** 端末からのアップロードの道具（今の画面の app/contents/media-direct-upload を入口が渡す）。 */
 export interface MediaUploadHelpers {
@@ -518,8 +519,8 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
           <span id="gb-post-summary-count" className="sr-only">{`${form.summary.length} / 1,500 文字`}</span>
         </Field>
         <div className={styles.imageSlot}>
-          <MediaSlot
-            size="compact"
+          <ImageFrame
+
             title="画像を追加"
             previewAlt={form.mediaFilename ?? '投稿の画像'}
             value={form.mediaSourceUrl}

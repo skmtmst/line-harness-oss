@@ -263,6 +263,7 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
 
   return (
     <ListPage
+      skeleton
       boardId={BOARD[tab]}
       headingSize="regular"
       title="NEN配信"
@@ -310,7 +311,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
   const [filter, setFilter] = useState<AutoFilter>('')
   const [saved, setSaved] = useState('')
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(20)
   const [savedOpen, setSavedOpen] = useState(false)
   const savedRef = useRef<HTMLSpanElement | null>(null)
 
@@ -626,7 +627,7 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
   const [filter, setFilter] = useState<ColumnFilter>('')
   const [category, setCategory] = useState('')
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(20)
   const [savedOpen, setSavedOpen] = useState(false)
   const savedRef = useRef<HTMLSpanElement | null>(null)
 

@@ -57,7 +57,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
-import ListToolbar, { ListToolbarOptional } from '@/components/shared/list-toolbar'
+import ListToolbar, { ListToolbarOptional, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -94,6 +94,7 @@ import {
   type UsageDetail,
 } from './words'
 import styles from './list.module.css'
+
 
 /** 一覧のタブ。message/question は同じテンプレートの束を中身で分ける。 */
 type Section = 'message' | 'question' | 'rich_video' | BroadcastAssetKind
@@ -1006,8 +1007,8 @@ export default function TemplatesListV8() {
 
   /* 1152 の板（L7zA7C）：1段目「作る・フォルダ・探す … 件数」、2段目「札・よく使う絞り込み（印だけ）」。 */
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
-      <div className={styles.narrowRow}>
+    <ListToolbarFrame>
+      <ListToolbarRow>
         {createButton(false)}
         <div className={styles.narrowFolder}>
           <Select
@@ -1020,7 +1021,7 @@ export default function TemplatesListV8() {
             options={folderSelectOptions}
           />
         </div>
-        <div className={styles.narrowSearch}>
+        <ListToolbarSearchSlot>
           <SearchField
             aria-label="テンプレートを検索"
             placeholder="名前・本文で探す"
@@ -1028,19 +1029,19 @@ export default function TemplatesListV8() {
             onChange={onSearch}
             onClear={() => onSearch('')}
           />
-        </div>
+        </ListToolbarSearchSlot>
         <span className={styles.spacer} aria-hidden="true" />
         {perPageBox}
-      </div>
-      <div className={styles.narrowRow}>
+      </ListToolbarRow>
+      <ListToolbarRow>
         {filterChips}
         {savedBox(true)}
-      </div>
-    </div>
+      </ListToolbarRow>
+    </ListToolbarFrame>
   )
 
   const wideToolbar = (
-    <div className={styles.wideTools}>
+    <ListToolbarFrame>
       <ListToolbar
         search={{
           placeholder: '名前・本文・差し込みで探す',
@@ -1051,7 +1052,7 @@ export default function TemplatesListV8() {
         filters={filterChips}
         trailing={<><ListToolbarOptional label="よく使う絞り込み">{savedBox(false)}</ListToolbarOptional>{perPageBox}</>}
       />
-    </div>
+    </ListToolbarFrame>
   )
 
   /* ===== 一覧の中身（`susGP`：読込中・読み込めない・空・0件を分ける） ===== */
@@ -1766,6 +1767,7 @@ export default function TemplatesListV8() {
 
   return (
     <ListPage
+      skeleton
       boardId={narrow ? 'L7zA7C' : 'v19Ivv'}
       headingSize="regular"
       {...heading}
@@ -1781,7 +1783,7 @@ export default function TemplatesListV8() {
               icon={<kpi.icon size={13} aria-hidden="true" />}
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
-              detail={<span className={styles.kpiDetailWrap}>{kpi.detail}</span>}
+              detail={kpi.detail}
             />
           ))}
         </KpiBand>

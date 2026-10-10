@@ -27,6 +27,9 @@ import {
 } from '@/lib/nen-ranks-api'
 import { RankChip, yen } from './parts'
 import styles from './members.module.css'
+import { ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+
+
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -48,7 +51,7 @@ export default function MembersListV8({
   const [rank, setRank] = useState('')
   const [sort, setSort] = useState<NenMemberSort>('annual_desc')
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(20)
   const requestRef = useRef(0)
 
   /*
@@ -111,8 +114,8 @@ export default function MembersListV8({
         会員はネットショップで登録した人です。LINE と結びつくと、ランクやペットに合わせた配信ができます。
       </NoteBar>
 
-      <div className={styles.toolbar}>
-        <div className={styles.searchWrap}>
+      <ListToolbarRow>
+        <ListToolbarSearchSlot>
           <SearchField
             aria-label="会員を検索"
             placeholder="会員を探す"
@@ -120,7 +123,7 @@ export default function MembersListV8({
             onChange={(value) => { setQuery(value); setPage(1) }}
             onClear={() => { setQuery(''); setPage(1) }}
           />
-        </div>
+        </ListToolbarSearchSlot>
         <FilterChip
           selected={chipTopRanks}
           count={topTwoCount}
@@ -135,7 +138,7 @@ export default function MembersListV8({
         <FilterChip selected={chipUnlinked} count={unlinkedCount} onChange={(next) => { setChipUnlinked(next); setPage(1) }}>
           EC未連携
         </FilterChip>
-        <span className={styles.toolbarRight}>
+        <ListToolbarEnd>
           <Select
             aria-label="よく使う絞り込み"
             value={rank}
@@ -157,8 +160,8 @@ export default function MembersListV8({
             ]}
           />
           <PageSizeSelect value={pageSize} options={[10, 20, 50]} onChange={(value) => { setPageSize(value); setPage(1) }} />
-        </span>
-      </div>
+        </ListToolbarEnd>
+      </ListToolbarRow>
 
       <section>
         {status === 'loading' && !data ? (

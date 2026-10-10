@@ -68,6 +68,8 @@ import { describeFriendAddFailure } from './failure'
 import { useCursorStack } from './use-cursor-stack'
 import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
+
 
 const KIND_LABELS: Record<FriendAddRuleKind, string> = {
   first_time: 'はじめて友だち追加した人',
@@ -601,18 +603,18 @@ function FriendAddList() {
   ) : null
   /* 1152 の板（P20kYU）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「状態の札」。 */
   const toolbar = narrow ? (
-    <div className={styles.narrowTools}>
+    <ListToolbarFrame>
       {notice}
       {errorBand}
-      <div className={styles.narrowRow}>
+      <ListToolbarRow>
         {createButton}
         {folderSelect}
         {searchBox}
         <span className={styles.spacer} aria-hidden="true" />
         {perPageBox}
-      </div>
-      <div className={styles.narrowRow}>{statusChips}</div>
-    </div>
+      </ListToolbarRow>
+      <ListToolbarRow>{statusChips}</ListToolbarRow>
+    </ListToolbarFrame>
   ) : (
     <>
       {notice}
@@ -801,6 +803,7 @@ function FriendAddList() {
 
   return (
     <ListPage
+      skeleton
       help={ORDER_NOTE}
       boardId={canEdit ? 'MRhef' : 'LEwkJ'}
       headingSize="regular"

@@ -46,6 +46,8 @@ import { CreateProjectDialogV8, UploadDialogV8 } from './dialogs'
 import BannerLimitNotice from './limit-notice'
 import { bannerFailureMessage, monthDay, shortPresetLabel } from './words'
 import styles from './list.module.css'
+import { ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+
 
 type Tab = 'projects' | 'library'
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -328,6 +330,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
 
   return (
     <ListPage
+      skeleton
       boardId="B9ZAr"
       title="バナー生成"
       description="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
@@ -338,8 +341,8 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
         {head}
         <BannerLimitNotice usage={usage} />
         {viewFilter}
-        <div className={styles.tools}>
-          <div className={styles.projectSearch}>
+        <ListToolbarRow>
+          <ListToolbarSearchSlot>
             <SearchField
               placeholder="プロジェクト名・説明で探す"
               aria-label="プロジェクト名・説明で探す"
@@ -347,12 +350,12 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
               onChange={setQuery}
               onClear={() => setQuery('')}
             />
-          </div>
+          </ListToolbarSearchSlot>
           <span className={styles.spacer} />
           <div className={styles.projectSort}>
             <Select aria-label="プロジェクトの並び順" value={sort} onChange={(value) => setSort(value as ProjectSort)} options={PROJECT_SORTS} />
           </div>
-        </div>
+        </ListToolbarRow>
         {actionError ? <Notice tone="danger" message={actionError} /> : null}
         {body}
       </div>
@@ -378,7 +381,7 @@ function ViewChips<K extends string>({ chips, active, onChange }: {
   onChange: (next: K | null) => void
 }) {
   return (
-    <div className={styles.tools}>
+    <ListToolbarRow>
       <span className={styles.toolLabel}>見る</span>
       <div role="group" aria-label="見るもので絞り込む" className={styles.chips}>
         {chips.map((chip) => (
@@ -387,7 +390,7 @@ function ViewChips<K extends string>({ chips, active, onChange }: {
           </FilterChip>
         ))}
       </div>
-    </div>
+    </ListToolbarRow>
   )
 }
 
@@ -656,6 +659,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
 
   return (
     <ListPage
+      skeleton
       boardId="W5Wxr"
       title="バナー生成"
       description="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
@@ -665,8 +669,8 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       <div className={styles.body}>
         {head}
         <ViewChips chips={viewChips} active={view} onChange={(next) => selectView(next ?? 'all')} />
-        <div className={styles.tools}>
-          <div className={styles.librarySearch}>
+        <ListToolbarRow>
+          <ListToolbarSearchSlot>
             <SearchField
               placeholder="テキスト・指示で検索"
               aria-label="テキスト・指示で検索"
@@ -674,7 +678,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
               onChange={(value) => { setQuery(value); resetPage() }}
               onClear={() => { setQuery(''); resetPage() }}
             />
-          </div>
+          </ListToolbarSearchSlot>
           <span className={styles.toolLabel}>用途</span>
           <div role="group" aria-label="用途で絞り込む" className={styles.chips}>
             <FilterChip selected={shape === null} icon={<CircleDot size={14} aria-hidden="true" />} onChange={() => { setShape(null); resetPage() }}>すべて</FilterChip>
@@ -687,7 +691,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
           <span className={styles.spacer} />
           {/* 並びは「作成が新しい順」だけ。選べないので箱の形で示すだけにする（押しても変わらない口を置かない）。 */}
           <span className={styles.sortStatic}>並び：作成が新しい順</span>
-        </div>
+        </ListToolbarRow>
         {actionError ? <Notice tone="danger" message={actionError} /> : null}
         {body}
       </div>

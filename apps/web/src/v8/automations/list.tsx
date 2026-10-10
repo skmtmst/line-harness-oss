@@ -553,6 +553,7 @@ export default function AutomationListV8() {
 
   return (
     <ListPage
+      skeleton
       help={canEdit
             ? '行の「…」から 編集・複製・1人で試す・止める・動いた記録を見る・削除。'
             : '行の「…」から 動いた記録を見る。'}
