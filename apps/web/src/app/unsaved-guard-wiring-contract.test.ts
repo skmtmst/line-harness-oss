@@ -297,8 +297,6 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8-B のメニュー管理（MJoJR）。restaurant-console.tsx（UNTRIAGED）と同じ画面のV8版。メニューの追加・変更は保存ボタン確定式で下書きを持たず、番兵の要否は元の画面と一緒に決める',
   'app/restaurant-test/v8/inventory.tsx':
     '★V8-B の予約枠・在庫（Y8SjT2）。restaurant-console.tsx（UNTRIAGED）と同じ画面のV8版。配分の保存は保存ボタン確定式で下書きを持たず、番兵の要否は元の画面と一緒に決める',
-  'app/events/bookings/bookings-v8.tsx':
-    '★V8 のイベント予約者（gHmNK）。承認・キャンセル・待ち順の操作は確認窓で確定して即時保存し、お知らせ送信も「送る」で即時送信する。窓内の理由欄は閉じると戻るダイアログ内の入力で、画面に残る下書きを持たない',
   /* ★V8 の新しい画面（src/v8）。古い画面ファイルの理由をそのまま写した（2026-10-06）。 */
   'v8/broadcasts/list.tsx':
     '★V8 の一斉配信一覧（l5V9a）。一覧と絞り込みが中心。フォルダ・並び替え・保存した検索など一覧上の操作は押した直後に即時保存し、配信の作成は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',

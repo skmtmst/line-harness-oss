@@ -9,6 +9,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent } from '@testing-library/react'
 
 const getEvent = vi.hoisted(() => vi.fn())
 const listOccurrenceSelector = vi.hoisted(() => vi.fn())
@@ -28,6 +29,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     api: {
       ...actual.api,
       broadcasts: { ...actual.api.broadcasts, send: broadcastsSend },
+      staff: { ...actual.api.staff, me: vi.fn().mockResolvedValue({ success: true, data: { id: 'me', role: 'owner', isActive: true } }) },
     },
     eventsApi: {
       ...actual.eventsApi,
@@ -50,6 +52,8 @@ vi.mock('next/link', () => ({
   ),
 }))
 
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useSearchParams: () => new URLSearchParams('id=e1') }))
+
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
     selectedAccountId: 'acc-1',
@@ -57,14 +61,14 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => {},
 }))
 
-import BookingsV8 from './bookings-v8'
+import BookingsV8 from '@/v8/events/bookings'
 
-const v8css = readFileSync(join(process.cwd(), 'src/app/events/bookings/bookings-v8.module.css'), 'utf8')
-const v8tsx = readFileSync(join(process.cwd(), 'src/app/events/bookings/bookings-v8.tsx'), 'utf8')
+const v8css = readFileSync(join(process.cwd(), 'src/v8/events/bookings.module.css'), 'utf8')
+const v8tsx = readFileSync(join(process.cwd(), 'src/v8/events/bookings.tsx'), 'utf8')
 
 function applicant(over: Record<string, unknown>) {
   return {
@@ -135,6 +139,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -156,6 +161,7 @@ afterEach(async () => {
   await act(async () => { root.unmount() })
   host.remove()
   document.body.innerHTML = ''
+  delete document.documentElement.dataset.theme
 })
 
 async function flush() {
@@ -165,7 +171,7 @@ async function flush() {
 }
 
 async function renderV8() {
-  await act(async () => { root.render(<BookingsV8 eventId="e1" />) })
+  await act(async () => { root.render(<BookingsV8 />) })
   await flush()
 }
 
@@ -197,12 +203,9 @@ describe('V8-B 申込者（Mu8qW）', () => {
     previewOccurrenceBroadcast.mockResolvedValue({ broadcastId: 'bc-1', recipientCount: 5 })
     broadcastsSend.mockResolvedValue({})
     await renderV8()
-    const input = document.querySelector('input[aria-label="申込者へ送るメッセージ"]') as HTMLInputElement
+    const input = document.querySelector('#ev-bk-message') as HTMLInputElement
     await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      setter?.call(input, '当日は動きやすい服装でお越しください')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
-      input.dispatchEvent(new Event('change', { bubbles: true }))
+      fireEvent.change(input, { target: { value: '当日は動きやすい服装でお越しください' } })
     })
     await flush()
     const send = [...document.querySelectorAll('button')].find((b) => b.textContent === '送る')
@@ -211,18 +214,20 @@ describe('V8-B 申込者（Mu8qW）', () => {
     expect(previewOccurrenceBroadcast, '対象の確定を叩く').toHaveBeenCalled()
     const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')
     expect(dialog, '送る前の確認窓が出る').toBeTruthy()
+    expect(dialog?.textContent).toContain('5 人に送りますか')
+    expect(broadcastsSend).not.toHaveBeenCalled()
     const confirm = [...dialog!.querySelectorAll('button')].find((b) => b.textContent === '送る')
     await act(async () => { confirm!.click() })
     await flush()
     expect(broadcastsSend, '送信を叩く').toHaveBeenCalledWith('bc-1')
   })
 
-  it('V8 の決まり（layer・色直書きなし・準備中なし）を守る', () => {
-    expect(v8css.split('\n')[0]).toContain('@layer properties, theme, base, components, utilities;')
+  it('V8 の型・色直書きなし・準備中なしを守る', () => {
+    expect(v8tsx).toContain("import { DetailPage } from '@/components/templates'")
     expect(v8css).not.toMatch(/#[0-9a-fA-F]{3,8}/)
     // 影は共通のカードの影だけ（2026-10-09 オーナー採用 B-137）。ほかの影は直書きしない。
     expect(v8css.replace(/box-shadow:\s*var\(--card-shadow\)/g, '')).not.toMatch(/box-shadow\s*:/)
-    expect(v8tsx).toContain('data-design-node="Mu8qW"')
+    expect(v8tsx).toContain('boardId="Mu8qW"')
     expect(v8tsx).not.toContain('準備中')
   })
 })
