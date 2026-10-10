@@ -67,7 +67,7 @@ async function flush() {
 }
 
 async function typeRuleName(value: string) {
-  const box = host.querySelector('input#sc-name') as HTMLInputElement
+  const box = host.querySelector('input#er-name') as HTMLInputElement
   const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
   await act(async () => {
     setter.call(box, value)
@@ -114,7 +114,7 @@ describe('mileage/earning-rules/new の未保存ガード', () => {
     await flush()
 
     expect(document.body.textContent).not.toContain('保存していない変更があります')
-    expect((host.querySelector('input#sc-name') as HTMLInputElement).value).toBe('来てくれたら 500 マイル')
+    expect((host.querySelector('input#er-name') as HTMLInputElement).value).toBe('来てくれたら 500 マイル')
   })
 
   it('「保存せずに移る」を押すと一覧へ進む', async () => {

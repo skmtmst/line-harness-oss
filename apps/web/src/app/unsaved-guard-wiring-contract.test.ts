@@ -50,7 +50,6 @@ const GUARDED = [
   'app/line-notifications/operator/new/operator-new-v8.tsx',
   'app/mileage/earning-rules/edit/page.tsx',
   'app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx',
-  'app/mileage/earning-rules/new/page.tsx',
   'app/mileage/earning-rules/new/v8-earning-rule-new.tsx',
   /* 入口 page.tsx は V8 の画面を出すだけ。番兵は src/v8 の画面が持つ。 */
   'v8/mileage/reward-edit.tsx',
