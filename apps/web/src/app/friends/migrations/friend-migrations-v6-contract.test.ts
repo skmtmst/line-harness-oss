@@ -9,7 +9,6 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const CSV_PAGE = [
   'page.tsx',
   'use-friend-migrations.ts',
-  'migrations-v8.tsx',
 ].map((name) => readFileSync(join(HERE, name), 'utf8')).join('\n')
 const UID_PAGE = [
   'migration.tsx',

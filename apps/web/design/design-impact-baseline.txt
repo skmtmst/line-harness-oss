@@ -148,8 +148,6 @@ shared-button-importer app/friend-add-settings/publish/done-v8.tsx
 shared-button-importer app/friend-add-settings/runs/detail/detail-v8.tsx
 shared-button-importer app/friend-add-settings/runs/runs-v8.tsx
 shared-button-importer app/friends/friends-nav-v8.tsx
-shared-button-importer app/friends/identity-candidates/identity-candidates-v8.tsx
-shared-button-importer app/friends/migrations/migrations-v8.tsx
 shared-button-importer app/getting-started/page.tsx
 shared-button-importer app/health/page.tsx
 shared-button-importer app/hq/account-browser-v8.tsx
@@ -339,8 +337,6 @@ shared-button-importer components/chats/friend-info-sidebar.tsx
 shared-button-importer components/chats/inbox-filter-panel.tsx
 shared-button-importer components/chats/saved-view-dialog.tsx
 shared-button-importer components/chats/template-folder-select.tsx
-shared-button-importer components/chats/template-picker.tsx
-shared-button-importer components/dashboard/dashboard-editor.tsx
 shared-button-importer components/dashboard/qr-dialog.tsx
 shared-button-importer components/events/event-form.tsx
 shared-button-importer components/events/event-questions-editor.tsx
