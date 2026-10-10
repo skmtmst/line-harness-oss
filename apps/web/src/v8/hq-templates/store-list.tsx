@@ -1,80 +1,41 @@
 'use client'
-import TagPill from "@/components/shared/tag-pill"
-import { useListUrlValue } from "@/components/shared/list-url-state"
-import { useMemo, useState, type ReactNode } from "react"
-import { CircleDashed, ClipboardList, Copy, FileText, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Inbox, Link2, MessageSquare, Pencil, Plus, Send, Sparkles, Ticket, Trash2, Unlink, Users } from "lucide-react"
-import type { HqTemplateFolder, HqTemplateListStats, TemplateKind } from "@line-crm/shared"
-import { ListPage } from "@/components/templates"
-import Button from "@/components/shared/button"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import FolderEditorDialog from "@/components/shared/folder-editor-dialog"
-import { describeFolderFailure } from "@/components/shared/folder-failure"
-import { notifyToast } from "@/components/shared/toast"
-import { FOLDER_SELECT_COLORS } from "@line-crm/shared"
-import EmptyList from "@/components/shared/empty-list"
-import FilterChip from "@/components/shared/filter-chip"
-import FolderPanel, { type FolderPanelRow } from "@/components/shared/folder-panel"
-import { FolderDotName, folderDisplayColor } from "@/components/shared/folder-dot"
-import { deleteFolderDescription } from "@/components/shared/folder-row-actions"
-import KpiBand from "@/components/shared/kpi-band"
-import KpiCard from "@/components/shared/kpi-card"
-import ListToolbar from "@/components/shared/list-toolbar"
-import Pagination from "@/components/shared/pagination"
-import { RowMenu, RowQuickAction } from "@/components/shared/row-actions"
-import type { ActionMenuItem } from "@/components/shared/action-menu"
-import Select from "@/components/shared/select"
-import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from "@/components/shared/table"
-import { Tabs } from "@/components/shared/tabs"
-import { formatNumber, formatDate as polishFormatDate } from "@/lib/format"
-import type { HqTemplate, TemplateType } from "@/lib/hq-templates-api"
-import { distributedAccountsLine, templateSubLine } from "./list-row"
-import { AttributeTabs, OtherTabPanel, assignmentMethods, cleanupTagCount, matchesTagFilters, unusedTagCount, useAttributeTab, type TagUsageFilter } from "./attribute-tabs"
-import storeStyles from "../templates/list.module.css"
-import hqStyles from "./store-list.module.css"
-import attributeStyles from "./attribute-tabs.module.css"
-import TruncatedText from "@/components/shared/truncated-text"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import TagPill from '@/components/shared/tag-pill'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useMemo, useState, type ReactNode } from 'react'
+import { CircleDashed, ClipboardList, Copy, FileText, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Inbox, Link2, MessageSquare, Pencil, Plus, Send, Sparkles, Ticket, Trash2, Unlink, Users } from 'lucide-react'
+import type { HqTemplateFolder, HqTemplateListStats, TemplateKind } from '@line-crm/shared'
+import { ListPage } from '@/components/templates'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
+import { describeFolderFailure } from '@/components/shared/folder-failure'
+import { notifyToast } from '@/components/shared/toast'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
+import EmptyList from '@/components/shared/empty-list'
+import FilterChip from '@/components/shared/filter-chip'
+import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
+import { deleteFolderDescription } from '@/components/shared/folder-row-actions'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import ListToolbar from '@/components/shared/list-toolbar'
+import Pagination from '@/components/shared/pagination'
+import { RowMenu, RowQuickAction } from '@/components/shared/row-actions'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
+import Select from '@/components/shared/select'
+import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { Tabs } from '@/components/shared/tabs'
+import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
+import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
+import { distributedAccountsLine, templateSubLine } from './list-row'
+import { AttributeTabs, OtherTabPanel, assignmentMethods, cleanupTagCount, matchesTagFilters, unusedTagCount, useAttributeTab, type TagUsageFilter } from './attribute-tabs'
+import storeStyles from '../templates/list.module.css'
+import hqStyles from './store-list.module.css'
+import attributeStyles from './attribute-tabs.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 統括のひな形の一覧を「店の同じ機能の一覧と同じ形」で出す（オーナー 2026-10-08・B-27〜B-29・B-34・B-36）。
@@ -87,8 +48,6 @@ import Notice from "@/components/shared/notice"
  *   - 数の帯は配ったアカウントの数
  * 読み書き（一覧・分類・複製・削除・配る）は呼ぶ側（console.tsx）が今までどおり持つ。ここは見せ方と押した知らせだけ。
  */
-
-
 
 /** 店のテンプレートと同じ6種類（上のタブ）。 */
 export const KIND_TABS: { kind: TemplateKind; label: string; icon: typeof MessageSquare }[] = [

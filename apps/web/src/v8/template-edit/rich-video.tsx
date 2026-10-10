@@ -1,79 +1,39 @@
 'use client'
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import { notifySaved } from "@/components/shared/toast"
-import { createPageReturnHref } from "@/components/shared/create-page"
-import { useEffect, useRef, useState } from "react"
-import { useRouter } from "next/navigation"
-import { Play } from "lucide-react"
-import { validateImagemapMessage, type Folder, type MessageTemplateMediaDefinition } from "@line-crm/shared"
-import { api } from "@/lib/api"
-import { japaneseDetailOf, permissionDeniedMessage } from "@/components/shared/api-error-message"
-import { useFeatureAccess } from "@/lib/use-feature-access"
-import { useAccount } from "@/contexts/account-context"
-import { usePageTitle, usePageCrumbs } from "@/components/shell/page-chrome"
-import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
-import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
-import Button from "@/components/shared/button"
-import Card from "@/components/shared/card"
-import Dialog from "@/components/shared/dialog"
-import { AttachmentRow } from "@/components/shared/file-drop"
-import MediaSlot from "@/components/shared/media-slot"
-import FolderSelect, { folderById, hostFolderCreate } from "@/components/shared/folder-select"
-import HelpTip from "@/components/shared/help-tip"
-import LinePreview from "@/components/shared/line-preview"
-import Select from "@/components/shared/select"
-import { SettingCheckbox } from "@/components/shared/checkbox"
-import { TextField } from "@/components/shared/text-field"
-import { TemplateEditFrame } from "./frame"
-import type { TemplateEditHost } from "./host"
-import { RICH_VIDEO_BUTTON_LABELS, richVideoContent, richVideoDraftIssue, videoPreviewFile, type RichVideoDraft, type RichVideoIssue } from "./rich-video-core"
-import styles from "./edit.module.css"
-import videoStyles from "./rich-video.module.css"
-import { Field } from "@/components/shared/form-controls"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import ImageFrame from "@/components/shared/image-frame"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { notifySaved } from '@/components/shared/toast'
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Play } from 'lucide-react'
+import { validateImagemapMessage, type Folder, type MessageTemplateMediaDefinition } from '@line-crm/shared'
+import { api } from '@/lib/api'
+import { japaneseDetailOf, permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useAccount } from '@/contexts/account-context'
+import { usePageTitle, usePageCrumbs } from '@/components/shell/page-chrome'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import Dialog from '@/components/shared/dialog'
+import { AttachmentRow } from '@/components/shared/file-drop'
+import MediaSlot from '@/components/shared/media-slot'
+import FolderSelect, { folderById, hostFolderCreate } from '@/components/shared/folder-select'
+import HelpTip from '@/components/shared/help-tip'
+import LinePreview from '@/components/shared/line-preview'
+import Select from '@/components/shared/select'
+import { SettingCheckbox } from '@/components/shared/checkbox'
+import { TextField } from '@/components/shared/text-field'
+import { TemplateEditFrame } from './frame'
+import type { TemplateEditHost } from './host'
+import { RICH_VIDEO_BUTTON_LABELS, richVideoContent, richVideoDraftIssue, videoPreviewFile, type RichVideoDraft, type RichVideoIssue } from './rich-video-core'
+import styles from './edit.module.css'
+import videoStyles from './rich-video.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ImageFrame from '@/components/shared/image-frame'
+import Notice from '@/components/shared/notice'
 
 const emptyDraft: RichVideoDraft = {name:'',folderId:'',originalContentUrl:'',previewImageUrl:'',height:1040,buttonEnabled:true,actionLabel:'詳しく見る',actionUrl:'',altText:''}
 

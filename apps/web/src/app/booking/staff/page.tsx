@@ -1,43 +1,24 @@
 'use client'
 
-import { usePermissionAccess } from "@/lib/use-feature-access"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import { PageHeading } from "@/components/templates/page-frame"
-import { useCallback, useEffect, useRef, useState } from "react"
-import { MoreHorizontal } from "lucide-react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import Button from "@/components/shared/button"
-import IconButton from "@/components/shared/icon-button"
-import ActionMenu from "@/components/shared/action-menu"
-import ListState from "@/components/shared/list-state"
-import { isForbidden, isForbiddenOrRateLimited } from "@/components/shared/api-error-message"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from "@/components/shared/table"
-import { DelayedSkeleton, Skeleton } from "@/components/shared/skeleton"
-import { bookingApi, type BookingStaff } from "@/lib/api"
-import { useAccount } from "@/contexts/account-context"
-import { usePageTitle } from "@/components/shell/page-chrome"
-import { EMPTY_STAFF as EMPTY, StaffEditModal } from "./staff-edit-dialog"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { usePermissionAccess } from '@/lib/use-feature-access'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PageHeading } from '@/components/templates/page-frame'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { MoreHorizontal } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
+import ActionMenu from '@/components/shared/action-menu'
+import ListState from '@/components/shared/list-state'
+import { isForbidden, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { bookingApi, type BookingStaff } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { EMPTY_STAFF as EMPTY, StaffEditModal } from './staff-edit-dialog'
 
 // 編集窓は V8 予約設定の担当スタッフタブ（menus/settings-v8.tsx）と共用。
 

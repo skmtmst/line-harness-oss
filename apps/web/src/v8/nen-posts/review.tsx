@@ -1,99 +1,50 @@
 'use client'
-import { notifySaved, notifyToast } from "@/components/shared/toast"
-import { useCallback, useEffect, useRef, useState } from "react"
-import { Check, Globe, HelpCircle, History, MoreHorizontal, Send, Undo2, X } from "lucide-react"
-import type { ApiResponse } from "@line-crm/shared"
-import { ApiError, api, fetchApi, type PhotoBulkReviewResult, type PhotoReviewMetrics } from "@/lib/api"
-import { TextArea } from "@/components/shared/text-field"
-import { FieldError, Field } from "@/components/shared/form-controls"
-import Radio from "@/components/shared/radio"
-import { focusFormField } from "@/lib/use-field-validation"
-import Button from "@/components/shared/button"
-import { RowMenu } from "@/components/shared/row-actions"
-import { collectUncountedListRows } from "@/components/shared/collect-list-rows"
-import BulkBar from "@/components/shared/bulk-bar"
-import Checkbox from "@/components/shared/checkbox"
-import Chip from "@/components/shared/chip"
-import StatusBadge from "@/components/shared/status-badge"
-import Dialog from "@/components/shared/dialog"
-import ListState from "@/components/shared/list-state"
-import IconButton from "@/components/shared/icon-button"
-import KpiBand from "@/components/shared/kpi-band"
-import KpiCard from "@/components/shared/kpi-card"
-import { ListPage } from "@/components/templates"
-import Notice from "@/components/shared/notice"
-import SearchField from "@/components/shared/search-field"
-import SegmentedControl from "@/components/shared/segmented"
-import { Tabs } from "@/components/shared/tabs"
-import { DataTable, TableHeadRow, Td, Th, Tr } from "@/components/shared/table"
-import { formatNumber, formatListDay as polishFormatListDay } from "@/lib/format"
-import { photoPetDisplayName } from "@/components/shared/photo-display-name"
-import { formatPhotoReceivedAt } from "./time"
-import { safePhotoSrc } from "./src"
-import { photoNoticeFor } from "./notice"
-import { photoReviewEntryFrom, photoReviewSearch, type PhotoReviewEntry } from "./query"
-import { formatMinutesRough, formatWaitRough } from "@/lib/format-duration"
-import { readSessionSnapshot } from "@/lib/session-snapshot"
-import { mileStatusLabel, reviewVersionOf, text } from "./text"
-import { PhotoReviewDetail } from "./detail"
-import PhotoPolicyHistoryV8 from "./policy-history"
-import styles from "./review.module.css"
-import TruncatedText from "@/components/shared/truncated-text"
-import { permissionDeniedMessage } from "@/components/shared/api-error-message"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { notifySaved, notifyToast } from '@/components/shared/toast'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Check, Globe, HelpCircle, History, MoreHorizontal, Send, Undo2, X } from 'lucide-react'
+import type { ApiResponse } from '@line-crm/shared'
+import { ApiError, api, fetchApi, type PhotoBulkReviewResult, type PhotoReviewMetrics } from '@/lib/api'
+import { TextArea } from '@/components/shared/text-field'
+import { FieldError, Field } from '@/components/shared/form-controls'
+import Radio from '@/components/shared/radio'
+import { focusFormField } from '@/lib/use-field-validation'
+import Button from '@/components/shared/button'
+import { RowMenu } from '@/components/shared/row-actions'
+import { collectUncountedListRows } from '@/components/shared/collect-list-rows'
+import BulkBar from '@/components/shared/bulk-bar'
+import Checkbox from '@/components/shared/checkbox'
+import Chip from '@/components/shared/chip'
+import StatusBadge from '@/components/shared/status-badge'
+import Dialog from '@/components/shared/dialog'
+import ListState from '@/components/shared/list-state'
+import IconButton from '@/components/shared/icon-button'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import { ListPage } from '@/components/templates'
+import Notice from '@/components/shared/notice'
+import SearchField from '@/components/shared/search-field'
+import SegmentedControl from '@/components/shared/segmented'
+import { Tabs } from '@/components/shared/tabs'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { formatNumber, formatListDay as polishFormatListDay } from '@/lib/format'
+import { photoPetDisplayName } from '@/components/shared/photo-display-name'
+import { formatPhotoReceivedAt } from './time'
+import { safePhotoSrc } from './src'
+import { photoNoticeFor } from './notice'
+import { photoReviewEntryFrom, photoReviewSearch, type PhotoReviewEntry } from './query'
+import { formatMinutesRough, formatWaitRough } from '@/lib/format-duration'
+import { readSessionSnapshot } from '@/lib/session-snapshot'
+import { mileStatusLabel, reviewVersionOf, text } from './text'
+import { PhotoReviewDetail } from './detail'
+import PhotoPolicyHistoryV8 from './policy-history'
+import styles from './review.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /* Pencil の6枚のHTMLをもとにした投稿画面。既存の審査APIを接続する。 */
-
-
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
 type PhotoView = 'list' | 'detail' | 'publications'

@@ -1,47 +1,25 @@
 'use client'
-import { Plus } from "lucide-react"
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
-import type { LineAccount, StaffMember } from "@line-crm/shared"
-import { ListPage } from "@/components/templates"
-import StepUpPrompt from "@/components/step-up-prompt"
-import KpiBand from "@/components/shared/kpi-band"
-import KpiCard from "@/components/shared/kpi-card"
-import Button from "@/components/shared/button"
-import ListState from "@/components/shared/list-state"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { describeApiFailure, japaneseDetailOf } from "@/components/shared/api-error-message"
-import { api, ApiError } from "@/lib/api"
-import StatusBadge, { type StatusBadgeTone } from "@/components/shared/status-badge"
-import { canResendInvite, lastLoginShort, memberKpis, memberStatus, sortMembersByRole, type MemberStatus } from "@/lib/hq-members"
-import HqSettingsNavV8, { useHqSettingsFolderNav } from "./settings-nav"
-import MemberDialogV8, { MemberChangeConfirmV8, type MemberDialogValue } from "./member-dialog"
-import styles from "./members.module.css"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { Plus } from 'lucide-react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import type { LineAccount, StaffMember } from '@line-crm/shared'
+import { ListPage } from '@/components/templates'
+import StepUpPrompt from '@/components/step-up-prompt'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
+import { api, ApiError } from '@/lib/api'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import { canResendInvite, lastLoginShort, memberKpis, memberStatus, sortMembersByRole, type MemberStatus } from '@/lib/hq-members'
+import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
+import MemberDialogV8, { MemberChangeConfirmV8, type MemberDialogValue } from './member-dialog'
+import styles from './members.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 統括のメンバー（Pencil `r4ARpV`。招待の窓 `yLKwV`・権限を変える窓 `BHEl9`・
@@ -51,9 +29,6 @@ import Notice from "@/components/shared/notice"
  * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左の「統括の設定」の列
  * （型のフォルダの列）・数のカード4枚・権限者の表・役割の説明。
  */
-
-
-
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 

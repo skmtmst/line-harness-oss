@@ -1,80 +1,41 @@
 'use client'
-import Toggle from "@/components/shared/toggle"
-import { createPageReturnHref } from "@/components/shared/create-page"
-import { notifySaved, notifyToast } from "@/components/shared/toast"
-import { SaveConflictBand } from "@/components/shared/save-conflict"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import Button from "@/components/shared/button"
-import Combobox from "@/components/shared/combobox"
-import Select from "@/components/shared/select"
-import StickyBar from "@/components/shared/sticky-bar"
-import { Pencil, Smartphone, Upload } from "lucide-react"
-import StatusBadge from "@/components/shared/status-badge"
-import { SettingCheckbox } from "@/components/shared/checkbox"
-import ListState from "@/components/shared/list-state"
-import { DelayedSkeleton, Skeleton } from "@/components/shared/skeleton"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
-import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
-import { useAccount } from "@/contexts/account-context"
-import { useBookingEdit } from "./lib/edit-permission"
-import { classifyApiFailure, permissionDeniedMessage } from "@/components/shared/api-error-message"
-import { formatNumber } from "@/lib/format"
-import { api, ApiError, bookingApi, type BookingMenu, type BookingResource, type BookingSettings, type BookingStaff, type StaffMenuMatrix } from "@/lib/api"
-import type { Tag } from "@line-crm/shared"
-import { bookingMenuBufferError, bookingMenuDurationError, bookingMenuError, bookingMenuNameError } from "./lib/menu-validation"
-import MenuVersionHistory from "./menu-version-history"
-import { LiffPhoneMenuStep } from "./liff-phone"
-import shell from "./settings.module.css"
-import styles from "./menu-form.module.css"
-import { PageHeading } from "@/components/templates/page-frame"
-import { Field } from "@/components/shared/form-controls"
-import TextLink from "@/components/shared/text-link"
-import { emptyValue } from "@/components/shared/empty-value"
-import NumberInput from "@/components/shared/number-field"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import Toggle from '@/components/shared/toggle'
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { notifySaved, notifyToast } from '@/components/shared/toast'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Button from '@/components/shared/button'
+import Combobox from '@/components/shared/combobox'
+import Select from '@/components/shared/select'
+import StickyBar from '@/components/shared/sticky-bar'
+import { Pencil, Smartphone, Upload } from 'lucide-react'
+import StatusBadge from '@/components/shared/status-badge'
+import { SettingCheckbox } from '@/components/shared/checkbox'
+import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { useAccount } from '@/contexts/account-context'
+import { useBookingEdit } from './lib/edit-permission'
+import { classifyApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { formatNumber } from '@/lib/format'
+import { api, ApiError, bookingApi, type BookingMenu, type BookingResource, type BookingSettings, type BookingStaff, type StaffMenuMatrix } from '@/lib/api'
+import type { Tag } from '@line-crm/shared'
+import { bookingMenuBufferError, bookingMenuDurationError, bookingMenuError, bookingMenuNameError } from './lib/menu-validation'
+import MenuVersionHistory from './menu-version-history'
+import { LiffPhoneMenuStep } from './liff-phone'
+import shell from './settings.module.css'
+import styles from './menu-form.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
+import { Field } from '@/components/shared/form-controls'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /**
  * ★V8「予約メニューを作る」（板 QqER7・競合時 v5L19Z）。
@@ -90,8 +51,6 @@ import Notice from "@/components/shared/notice"
  * 409 は板 v5L19Z の帯を出し、「違いを比べる」「最新を読み込んで続ける」
  * 「比べてから保存」で扱う（いきなり上書きしない）。
  */
-
-
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 

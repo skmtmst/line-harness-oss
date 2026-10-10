@@ -1,40 +1,23 @@
 'use client'
-import { useCallback, useEffect, useRef, useState } from "react"
-import { CreatePage } from "@/components/templates"
-import Button from "@/components/shared/button"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import Notice from "@/components/shared/notice"
-import { useAccount } from "@/contexts/account-context"
-import { describeSaveFailure, webinarApi, type WebinarFolder } from "@/lib/api"
-import { folderById, folderCreator } from "@/components/shared/folder-select"
-import { BasicForm, BasicPreview, SLUG_PATTERN, type BasicValues } from "./basic-form"
-import type { EditContext, PaneSaveProps, WizardChrome } from "./types"
-import styles from "./form.module.css"
-import { withPermissionFailure } from "@/components/shared/api-error-message"
-import { SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { CreatePage } from '@/components/templates'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
+import { useAccount } from '@/contexts/account-context'
+import { describeSaveFailure, webinarApi, type WebinarFolder } from '@/lib/api'
+import { folderById, folderCreator } from '@/components/shared/folder-select'
+import { BasicForm, BasicPreview, SLUG_PATTERN, type BasicValues } from './basic-form'
+import type { EditContext, PaneSaveProps, WizardChrome } from './types'
+import styles from './form.module.css'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 ウェビナーの編集 ①基本設定（並びは作る j7PP04 と同じ）。
  * 保存の決まり（版のある設定を先・競合したら基本情報は書き換えない）は app/webinars/edit/basic-v8.tsx と同じ。
  */
-
-
 
 export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: { ctx: EditContext; chrome: WizardChrome } & PaneSaveProps) {
   const saveErrors = useSaveFormErrors()

@@ -8,49 +8,27 @@
  * → 下の線の下にキャンセル・次へ（中央）。口と決まりは今の画面（app/restaurant-test/stores/new）と同じ。
  * 動きは BEHAVIOR.md。
  */
-import { useRouter } from "next/navigation"
-import { cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react"
-import { ArrowRight, BookOpen, CircleCheck } from "lucide-react"
-import { useAccount } from "@/contexts/account-context"
-import { TERMS_DOCUMENT } from "@/content/terms/musubo-terms"
-import { MANUAL_LINKS } from "@/lib/manual-links"
-import { restaurantTestApi } from "@/lib/restaurant-test-api"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { PageFrame, PageHeading } from "@/components/templates/page-frame"
-import { Steps } from "@/components/templates/steps"
-import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
-import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
-import Button from "@/components/shared/button"
-import Checkbox from "@/components/shared/checkbox"
-import { Field as SharedField } from "@/components/shared/form-controls"
-import { TextField } from "@/components/shared/text-field"
-import TermsBody from "./terms-body"
-import { canSubmitTerms, formatAgreedAt, hasReadTerms, initialWizardStep, STEP } from "./terms-state"
-import styles from "./store-new.module.css"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useRouter } from 'next/navigation'
+import { cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { ArrowRight, BookOpen, CircleCheck } from 'lucide-react'
+import { useAccount } from '@/contexts/account-context'
+import { TERMS_DOCUMENT } from '@/content/terms/musubo-terms'
+import { MANUAL_LINKS } from '@/lib/manual-links'
+import { restaurantTestApi } from '@/lib/restaurant-test-api'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { Steps } from '@/components/templates/steps'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import { Field as SharedField } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
+import TermsBody from './terms-body'
+import { canSubmitTerms, formatAgreedAt, hasReadTerms, initialWizardStep, STEP } from './terms-state'
+import styles from './store-new.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 const STEPS = [
   ['利用規約への同意', 'musubo の利用規約と、個人情報の取扱いをご確認ください。'],

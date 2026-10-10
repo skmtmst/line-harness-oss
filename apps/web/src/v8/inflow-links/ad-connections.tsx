@@ -1,44 +1,24 @@
 'use client'
-import { useCallback, useEffect, useRef, useState } from "react"
-import { Clock, History, RotateCw, Send, XCircle } from "lucide-react"
-import type { AdEventMapping } from "@line-crm/shared"
-import { api } from "@/lib/api"
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import Button from "@/components/shared/button"
-import KpiBand from "@/components/shared/kpi-band"
-import KpiCard from "@/components/shared/kpi-card"
-import ListState from "@/components/shared/list-state"
-import Select from "@/components/shared/select"
-import StatusBadge from "@/components/shared/status-badge"
-import { adMappingReturns, groupAdMappings, useAdLogs, type AdMappingRow } from "./ad-shared"
-import adsStyles from "./ads.module.css"
-import styles from "./ad-pages.module.css"
-import { PageHeading } from "@/components/templates/page-frame"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Clock, History, RotateCw, Send, XCircle } from 'lucide-react'
+import type { AdEventMapping } from '@line-crm/shared'
+import { api } from '@/lib/api'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import Button from '@/components/shared/button'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import ListState from '@/components/shared/list-state'
+import Select from '@/components/shared/select'
+import StatusBadge from '@/components/shared/status-badge'
+import { adMappingReturns, groupAdMappings, useAdLogs, type AdMappingRow } from './ad-shared'
+import adsStyles from './ads.module.css'
+import styles from './ad-pages.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 広告とのつなぎ（Pencil `FDBsG`・`/inflow-links?tab=connections`）。
@@ -48,9 +28,6 @@ import Notice from "@/components/shared/notice"
  * 呼ぶ口：送信記録の30日の集計（今と同じ）・対応表 `GET /api/ad-platforms/mappings`（F-21）・
  * 結びつける `PUT /api/ad-platforms/mappings/:pointId`（owner・admin）。BEHAVIOR.md の「広告とのつなぎ」。
  */
-
-
-
 
 const STEPS = [
   { title: 'クリックの目印を持ち帰る', text: '広告から中継リンクを通った人の目印を残します。中継リンクを通らないと広告と結びつきません。' },

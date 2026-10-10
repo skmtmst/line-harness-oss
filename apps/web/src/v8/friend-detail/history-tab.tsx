@@ -1,40 +1,26 @@
 'use client'
 
-import SegmentedControl from "@/components/shared/segmented"
-import { useListUrlValue } from "@/components/shared/list-url-state"
-import { Fragment } from "react"
-import Link from "next/link"
-import { CalendarDays, ClipboardList, MailOpen, MessageCircle, Send, ShoppingBag, Tag as TagIcon, Workflow } from "lucide-react"
-import Button from "@/components/shared/button"
-import { formatTime, formatDay } from "@/lib/format"
-import type { FriendDetail } from "@/lib/api"
-import type { FriendDetailState } from "./use-friend-detail"
-import { dayHeading, dayKey, matchesTimelineFilter, timelineKey, timelineSourceHref, timelineStatusLabel, timelineTone, timelineTypeLabel, type TimelineFilter } from "./timeline"
-import styles from "./detail.module.css"
-import TextLink from "@/components/shared/text-link"
-import { emptyValue } from "@/components/shared/empty-value"
-import Notice from "@/components/shared/notice"
-import ListState from "@/components/shared/list-state"
+import SegmentedControl from '@/components/shared/segmented'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { Fragment } from 'react'
+import Link from 'next/link'
+import { CalendarDays, ClipboardList, MailOpen, MessageCircle, Send, ShoppingBag, Tag as TagIcon, Workflow } from 'lucide-react'
+import Button from '@/components/shared/button'
+import { formatTime, formatDay } from '@/lib/format'
+import type { FriendDetail } from '@/lib/api'
+import type { FriendDetailState } from './use-friend-detail'
+import { dayHeading, dayKey, matchesTimelineFilter, timelineKey, timelineSourceHref, timelineStatusLabel, timelineTone, timelineTypeLabel, type TimelineFilter } from './timeline'
+import styles from './detail.module.css'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
+import ListState from '@/components/shared/list-state'
 
 
 /*
  * 履歴タブ（Q5F2QE の 3.）。全部の出来事を時系列で、日ごとに区切って並べる。
  * 受信・送信・システム通知の切り替えは、読んだ行の中で絞る（口は今と同じ1本）。
  */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const FILTERS: Array<{ value: TimelineFilter; label: string }> = [
   { value: 'all', label: '全件' },
@@ -79,7 +65,7 @@ export default function HistoryTab({ friend, friendId, data }: { friend: FriendD
             {[0, 1, 2, 3].map((i) => <div key={i} className={styles.skeletonRow} />)}
           </div>
         ) : historyStatus === 'error' ? (
-          <ListState kind="error" title="履歴を読み込めませんでした。" description="" action={<><Button onClick={() => void data.loadHistory()}>もう一度読み込む</Button></>} />
+          <ListState kind="error" title="履歴を読み込めませんでした。" description="" action={<><Button onClick={() => data.loadHistory()} busyLabel="処理中…">もう一度読み込む</Button></>} />
         ) : (
           <>
             {rows.map((item, index) => {

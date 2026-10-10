@@ -1,111 +1,54 @@
 'use client'
-import DetailPanel, { useDetailPanelUrl } from "@/components/shared/detail-panel"
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from "@/components/shared/list-toolbar"
-import SharedStatusPill from "@/components/shared/status-pill"
-import { useFeatureAccess } from "@/lib/use-feature-access"
-import { Suspense, useCallback, useEffect, useRef, useState } from "react"
-import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from "@/components/shared/list-url-state"
-import type { ReactNode } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Archive, Bookmark, CalendarClock, Download, FilePen, Inbox, MousePointerClick, Plus, Radio, Users, Video } from "lucide-react"
-import { ListPage, ListPagePagination } from "@/components/templates"
-import SearchField from "@/components/shared/search-field"
-import Button from "@/components/shared/button"
-import EmptyList from "@/components/shared/empty-list"
-import { notifyToast } from "@/components/shared/toast"
-import { RowMenu } from "@/components/shared/row-actions"
-import KpiBand from "@/components/shared/kpi-band"
-import KpiCard from "@/components/shared/kpi-card"
-import Notice from "@/components/shared/notice"
-import FilterChip from "@/components/shared/filter-chip"
-import Select from "@/components/shared/select"
-import PageSizeSelect from "@/components/shared/page-size-select"
-import FolderEditorDialog from "@/components/shared/folder-editor-dialog"
-import { FOLDER_SELECT_COLORS } from "@line-crm/shared"
-import FolderPanel, { FolderPanelNote, type FolderPanelRow } from "@/components/shared/folder-panel"
-import { FolderDotName, type FolderDotFolder, folderDisplayColor } from "@/components/shared/folder-dot"
-import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
-import { type ActionMenuItem } from "@/components/shared/action-menu"
-import ContextMenu, { type ContextMenuItem } from "@/components/shared/context-menu"
-import InlineEdit from "@/components/shared/inline-edit"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import ListState from "@/components/shared/list-state"
-import AccountRequiredState from "@/components/shared/account-required-state"
-import Pagination from "@/components/shared/pagination"
-import { DelayedSkeleton, Skeleton } from "@/components/shared/skeleton"
-import { withViewTransition } from "@/components/shared/view-transition"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { publicationStateLabel } from "@/components/webinars/publication-label"
-import { useAccount } from "@/contexts/account-context"
-import { useNarrowViewport } from "@/lib/use-narrow-viewport"
-import { runUndoable } from "@/lib/undoable"
-import { formatDateTime, formatNumber } from "@/lib/format"
-import { ApiError, webinarApi, type Webinar, type WebinarFolder, type WebinarListItem, type WebinarListParams, type WebinarOverview, type WebinarOverviewMetric } from "@/lib/api"
-import { beforeStart, publicPath, showsCounts, statusLabel, statusTone, webinarListCsv, webinarLoadFailure, type WebinarLoadFailure } from "./helpers"
-import styles from "./list.module.css"
-import TruncatedText from "@/components/shared/truncated-text"
-import { csvFileName } from "@/lib/csv-file-name"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
+import SharedStatusPill from '@/components/shared/status-pill'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
+import type { ReactNode } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Archive, Bookmark, CalendarClock, Download, FilePen, Inbox, MousePointerClick, Plus, Radio, Users, Video } from 'lucide-react'
+import { ListPage, ListPagePagination } from '@/components/templates'
+import SearchField from '@/components/shared/search-field'
+import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
+import { notifyToast } from '@/components/shared/toast'
+import { RowMenu } from '@/components/shared/row-actions'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import Notice from '@/components/shared/notice'
+import FilterChip from '@/components/shared/filter-chip'
+import Select from '@/components/shared/select'
+import PageSizeSelect from '@/components/shared/page-size-select'
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName, type FolderDotFolder, folderDisplayColor } from '@/components/shared/folder-dot'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import InlineEdit from '@/components/shared/inline-edit'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
+import Pagination from '@/components/shared/pagination'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { withViewTransition } from '@/components/shared/view-transition'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { publicationStateLabel } from '@/components/webinars/publication-label'
+import { useAccount } from '@/contexts/account-context'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import { runUndoable } from '@/lib/undoable'
+import { formatDateTime, formatNumber } from '@/lib/format'
+import { ApiError, webinarApi, type Webinar, type WebinarFolder, type WebinarListItem, type WebinarListParams, type WebinarOverview, type WebinarOverviewMetric } from '@/lib/api'
+import { beforeStart, publicPath, showsCounts, statusLabel, statusTone, webinarListCsv, webinarLoadFailure, type WebinarLoadFailure } from './helpers'
+import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 ウェビナーの一覧（Pencil：一覧 `UyUMw`・1152 `uBMuB`・閲覧のみ `jiNg0`・
@@ -119,8 +62,6 @@ import ReadOnlyNotice from "@/components/shared/read-only-notice"
  * データの口・保存の口・権限・失敗の扱いは app/webinars/list-v8.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
-
-
 
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft' | 'archived'
@@ -948,7 +889,7 @@ function WebinarList() {
     listBody = (
       <>
         {loadFailure ? (
-          <Notice tone="danger" ><span>{loadFailure.title}</span>{loadFailure.retryable ? <Button onClick={() => void refresh()}>もう一度読み込む</Button> : null}</Notice>
+          <Notice tone="danger" ><span>{loadFailure.title}</span>{loadFailure.retryable ? <Button onClick={() => refresh()} busyLabel="処理中…">もう一度読み込む</Button> : null}</Notice>
         ) : null}
         {refreshing ? <p role="status" className="sr-only">検索中…</p> : null}
         <div className={styles.tableWrap}>

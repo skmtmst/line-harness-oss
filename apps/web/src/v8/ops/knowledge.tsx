@@ -1,53 +1,28 @@
 'use client'
-import { BadgeCheck, CircleHelp, Clock, MessageSquareText } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
-import { api, type OpsKnowledgeArticle } from "@/lib/api"
-import { opsCall } from "@/components/ops/ops-ui"
-import { opsEnvironmentLabel } from "@/components/ops/ops-env-bar"
-import { KNOWLEDGE_ARTICLE_KINDS, KNOWLEDGE_KINDS, knowledgeState } from "@/components/ops/knowledge-format"
-import { isForbiddenOrRateLimited } from "@/components/shared/api-error-message"
-import Button from "@/components/shared/button"
-import KpiCard from "@/components/shared/kpi-card"
-import kpiStyles from "@/components/shared/kpi-card.module.css"
-import ListState from "@/components/shared/list-state"
-import Pagination from "@/components/shared/pagination"
-import ListRange from "@/components/ui/list-range"
-import SearchField from "@/components/shared/search-field"
-import Select from "@/components/shared/select"
-import StatusBadge, { type StatusBadgeTone } from "@/components/shared/status-badge"
-import { OpsHead } from "./shell"
-import KnowledgeArticleV8 from "./knowledge-article"
-import parts from "./parts.module.css"
-import styles from "./ops-knowledge-v8.module.css"
-import { formatDate as polishFormatDate } from "@/lib/format"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField } from "@/components/shared/save-form-errors"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { BadgeCheck, CircleHelp, Clock, MessageSquareText } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { api, type OpsKnowledgeArticle } from '@/lib/api'
+import { opsCall } from '@/components/ops/ops-ui'
+import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
+import { KNOWLEDGE_ARTICLE_KINDS, KNOWLEDGE_KINDS, knowledgeState } from '@/components/ops/knowledge-format'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import Button from '@/components/shared/button'
+import KpiCard from '@/components/shared/kpi-card'
+import kpiStyles from '@/components/shared/kpi-card.module.css'
+import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import { OpsHead } from './shell'
+import KnowledgeArticleV8 from './knowledge-article'
+import parts from './parts.module.css'
+import styles from './ops-knowledge-v8.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営のナレッジ V8（絵 `h114s`・記事 `R5ckwJ`）。

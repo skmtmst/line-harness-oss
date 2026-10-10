@@ -1,63 +1,34 @@
 'use client'
 
-import { formatDate as polishFormatDate, formatNumber, formatYen } from "@/lib/format"
-import { useCallback, useEffect, useRef, useState } from "react"
-import { AtSign, Check, Music, Plug, Plus, RefreshCw, Search, Target, ThumbsUp, UserPlus, Wallet, XCircle } from "lucide-react"
-import type { EntryRoute } from "@line-crm/shared"
-import { api, type AdPlatform } from "@/lib/api"
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import { useAccount } from "@/contexts/account-context"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import Button from "@/components/shared/button"
-import DateField from "@/components/shared/date-field"
-import Dialog from "@/components/shared/dialog"
-import { MoreAction } from "@/components/shared/row-actions"
-import KpiBand from "@/components/shared/kpi-band"
-import KpiCard from "@/components/shared/kpi-card"
-import ListState from "@/components/shared/list-state"
-import Select from "@/components/shared/select"
-import StatusBadge from "@/components/shared/status-badge"
-import { TextField } from "@/components/shared/text-field"
-import AdConnectionDialog from "./ad-connection-dialog"
-import { DetailPage } from "@/components/templates"
-import { focusField } from "./focus-field"
-import styles from "./ads.module.css"
-import { Field } from "@/components/shared/form-controls"
-import { emptyValue } from "@/components/shared/empty-value"
-import NumberInput from "@/components/shared/number-field"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { formatDate as polishFormatDate, formatNumber, formatYen } from '@/lib/format'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AtSign, Check, Music, Plug, Plus, RefreshCw, Search, Target, ThumbsUp, UserPlus, Wallet, XCircle } from 'lucide-react'
+import type { EntryRoute } from '@line-crm/shared'
+import { api, type AdPlatform } from '@/lib/api'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import Button from '@/components/shared/button'
+import DateField from '@/components/shared/date-field'
+import Dialog from '@/components/shared/dialog'
+import { MoreAction } from '@/components/shared/row-actions'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import ListState from '@/components/shared/list-state'
+import Select from '@/components/shared/select'
+import StatusBadge from '@/components/shared/status-badge'
+import { TextField } from '@/components/shared/text-field'
+import AdConnectionDialog from './ad-connection-dialog'
+import { DetailPage } from '@/components/templates'
+import { focusField } from './focus-field'
+import styles from './ads.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 広告連携（Pencil：画面 `qSTVR`・広告費を手で入れる `ZxKL5`）。
@@ -71,9 +42,6 @@ import Notice from "@/components/shared/notice"
  * - 未接続の媒体の「つなぐ」は、今の広告とのつなぎ（v7）と同じ接続の窓を開く
  * 閲覧のみ（owner・admin 以外）には、費用を手で入れる・つなぐ・再読み込み・行の「…」・操作の行を出さない。
  */
-
-
-
 
 const PROVIDERS = [
   { key: 'google', label: 'Google広告', icon: Search },

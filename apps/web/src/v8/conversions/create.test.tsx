@@ -4,17 +4,12 @@
  * 同じ名前の成果地点があると競合の帯（cXqlS）と「比べてから保存」・保存が 409 で返ったときも帯・
  * 送る形（使う場所は種類の行のチェックで全部）・閲覧のみは保存ボタンを置かない。
  */
-import React, { act } from "react"
-import { createRoot, type Root } from "react-dom/client"
-import { fireEvent, screen, waitFor } from "@testing-library/react"
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { ConversionDefinitionPreview } from "@/lib/api"
-import ConversionCreateV8 from "./create"
-
-
-
-
-
+import React, { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ConversionDefinitionPreview } from '@/lib/api'
+import ConversionCreateV8 from './create'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -47,7 +42,7 @@ vi.mock('@/components/shell/page-chrome', () => ({
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
   return { ...actual, useStaffRole: () => role.value }
-})
+});
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 

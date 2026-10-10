@@ -1,60 +1,31 @@
 'use client'
-import { notifySaved } from "@/components/shared/toast"
-import { useEffect, useRef, useState } from "react"
-import { useRouter } from "next/navigation"
-import { Check } from "lucide-react"
-import type { Scenario, Tag } from "@line-crm/shared"
-import { api } from "@/lib/api"
-import { formatNumber } from "@/lib/format"
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
-import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
-import { useAccount } from "@/contexts/account-context"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { CreatePage } from "@/components/templates"
-import Button from "@/components/shared/button"
-import HelpTip from "@/components/shared/help-tip"
-import Select from "@/components/shared/select"
-import { EntityKindField } from "@/components/shared/entity-picker-sources"
-import { TextField } from "@/components/shared/text-field"
-import { SettingCheckbox } from "@/components/shared/checkbox"
-import { useFormErrors } from "@/lib/use-form-errors"
-import ValidationSummary from "@/components/shared/validation-summary"
-import { FieldError, Field } from "@/components/shared/form-controls"
-import styles from "./create.module.css"
-import NumberInput from "@/components/shared/number-field"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { notifySaved } from '@/components/shared/toast'
+import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Check } from 'lucide-react'
+import type { Scenario, Tag } from '@line-crm/shared'
+import { api } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { CreatePage } from '@/components/templates'
+import Button from '@/components/shared/button'
+import HelpTip from '@/components/shared/help-tip'
+import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
+import { TextField } from '@/components/shared/text-field'
+import { SettingCheckbox } from '@/components/shared/checkbox'
+import { useFormErrors } from '@/lib/use-form-errors'
+import ValidationSummary from '@/components/shared/validation-summary'
+import { FieldError, Field } from '@/components/shared/form-controls'
+import styles from './create.module.css'
+import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8-B 案件を作る（絵 Td4TN・機能追加 F-23）。
@@ -64,9 +35,6 @@ import Notice from "@/components/shared/notice"
  * 聞く項目・保存の口・送る形・入力の断り方は今の画面（app/affiliate-offers/new-offer-v8.tsx）から写した。
  * 成果地点を案件につなぐ口がまだ無い（F-23）ので、成果地点の欄は押せない形で置く（BEHAVIOR.md）。
  */
-
-
-
 
 const OFFER_LIST_PATH = '/conversions?tab=offers'
 

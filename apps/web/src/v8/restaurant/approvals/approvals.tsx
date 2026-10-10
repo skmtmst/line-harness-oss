@@ -1,44 +1,24 @@
 'use client'
 
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import { useState } from "react"
-import KpiCard from "@/components/shared/kpi-card"
-import { Check, Undo2 } from "lucide-react"
-import { ApiError } from "@/lib/api"
-import Button from "@/components/shared/button"
-import Dialog from "@/components/shared/dialog"
-import ListState from "@/components/shared/list-state"
-import { TextArea } from "@/components/shared/text-field"
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import { useAccount } from "@/contexts/account-context"
-import { restaurantTestApi, type RestaurantApproval, type RestaurantSnapshot, type RestaurantStore } from "@/lib/restaurant-test-api"
-import RestaurantFrame, { type RestaurantContext } from "../common-a/frame"
-import { formatStamp, StatRow, Status } from "../common-a/parts"
-import styles from "./approvals.module.css"
-import { Field } from "@/components/shared/form-controls"
-import { permissionDeniedMessage } from "@/components/shared/api-error-message"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField } from "@/components/shared/save-form-errors"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { useState } from 'react'
+import KpiCard from '@/components/shared/kpi-card'
+import { Check, Undo2 } from 'lucide-react'
+import { ApiError } from '@/lib/api'
+import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
+import ListState from '@/components/shared/list-state'
+import { TextArea } from '@/components/shared/text-field'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useAccount } from '@/contexts/account-context'
+import { restaurantTestApi, type RestaurantApproval, type RestaurantSnapshot, type RestaurantStore } from '@/lib/restaurant-test-api'
+import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
+import { formatStamp, StatRow, Status } from '../common-a/parts'
+import styles from './approvals.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8 承認ワークフロー（Pencil `t8WgD8`、閲覧のみ `n4DT7`、差し戻す理由の小窓 `n4j0Rm`）。

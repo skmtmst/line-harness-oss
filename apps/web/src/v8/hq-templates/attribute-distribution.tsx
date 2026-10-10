@@ -1,43 +1,23 @@
 'use client'
-import { useListUrlValue } from "@/components/shared/list-url-state"
-import { useEffect, useRef, useState } from "react"
-import type { HqFriendAttributeDetail, HqTemplateReceivedVersion } from "@line-crm/shared"
-import { hqFriendAttributesApi as api, type HqAttributePreflight, type HqAttributeDistributionResult, type HqAttributeResolution } from "@/lib/hq-friend-attributes-api"
-import { PageFrame, PageHeading } from "@/components/templates/page-frame"
-import { ListPageBody } from "@/components/templates/list-page"
-import Button from "@/components/shared/button"
-import Checkbox from "@/components/shared/checkbox"
-import Notice from "@/components/shared/notice"
-import Select from "@/components/shared/select"
-import StatusBadge from "@/components/shared/status-badge"
-import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
-import { FolderDotName } from "@/components/shared/folder-dot"
-import SavedDistributionDialog from "./saved-distribution-dialog"
-import { accountsInFolder, distributionFolderRows, DistributionFolderPanel, useDistributionFolders } from "./distribution-accounts"
-import styles from "./console.module.css"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useEffect, useRef, useState } from 'react'
+import type { HqFriendAttributeDetail, HqTemplateReceivedVersion } from '@line-crm/shared'
+import { hqFriendAttributesApi as api, type HqAttributePreflight, type HqAttributeDistributionResult, type HqAttributeResolution } from '@/lib/hq-friend-attributes-api'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { ListPageBody } from '@/components/templates/list-page'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import Notice from '@/components/shared/notice'
+import Select from '@/components/shared/select'
+import StatusBadge from '@/components/shared/status-badge'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { FolderDotName } from '@/components/shared/folder-dot'
+import SavedDistributionDialog from './saved-distribution-dialog'
+import { accountsInFolder, distributionFolderRows, DistributionFolderPanel, useDistributionFolders } from './distribution-accounts'
+import styles from './console.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 const choiceKey = (account: string, source: string) => JSON.stringify([account, source])
 const labels = { create: '新しく作る', overwrite: '上書き', alias: '別名で作る', skip: '配らない' }

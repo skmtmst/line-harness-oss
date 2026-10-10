@@ -1,102 +1,53 @@
 'use client'
 
-import SharedStatusPill from "@/components/shared/status-pill"
-import { useListUrlValue, writeListUrlParam } from "@/components/shared/list-url-state"
-import { useSamePageUrl } from "@/lib/use-same-page-url"
-import { DelayedSkeleton, Skeleton } from "@/components/shared/skeleton"
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { ReactNode } from "react"
-import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Activity, CircleCheck, CircleHelp, FilePen, Link2, Lock, MessageSquareMore, Pause, Pencil, Plus, Route, Send, UserPlus } from "lucide-react"
-import type { FriendAddRule, FriendAddRuleKind, FriendAddRuleListData, FriendAddRuleStatus } from "@/lib/api"
-import { api } from "@/lib/api"
-import { useAccount } from "@/contexts/account-context"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { ListPage, ListPagePagination } from "@/components/templates"
-import { useStaffRole, canManageRole } from "@/lib/staff-role"
-import { useNarrowViewport } from "@/lib/use-narrow-viewport"
-import { formatNumber } from "@/lib/format"
-import Button from "@/components/shared/button"
-import EmptyList from "@/components/shared/empty-list"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import Notice from "@/components/shared/notice"
-import ListState from "@/components/shared/list-state"
-import AccountRequiredState from "@/components/shared/account-required-state"
-import FolderEditorDialog from "@/components/shared/folder-editor-dialog"
-import { FOLDER_SELECT_COLORS, type FriendAddRuleFolder } from "@line-crm/shared"
-import FolderPanel, { FolderPanelNote } from "@/components/shared/folder-panel"
-import { FolderDotName, folderDisplayColor } from "@/components/shared/folder-dot"
-import Select from "@/components/shared/select"
-import SearchField from "@/components/shared/search-field"
-import FilterChip from "@/components/shared/filter-chip"
-import KpiBand from "@/components/shared/kpi-band"
-import KpiCard from "@/components/shared/kpi-card"
-import { Tabs } from "@/components/shared/tabs"
-import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
-import { type ActionMenuItem } from "@/components/shared/action-menu"
-import { notifyToast } from "@/components/shared/toast"
-import { RowMenu } from "@/components/shared/row-actions"
-import PageSizeSelect from "@/components/shared/page-size-select"
-import ReorderHandle from "@/components/shared/reorder-handle"
-import { useFlipRows, useLiveReorder } from "@/lib/use-live-reorder"
-import { describeFriendAddFailure } from "./failure"
-import { useCursorStack } from "./use-cursor-stack"
-import styles from "./list.module.css"
-import TruncatedText from "@/components/shared/truncated-text"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import { ListToolbarFrame, ListToolbarRow } from "@/components/shared/list-toolbar"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import SharedStatusPill from '@/components/shared/status-pill'
+import { useListUrlValue, writeListUrlParam } from '@/components/shared/list-url-state'
+import { useSamePageUrl } from '@/lib/use-same-page-url'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Activity, CircleCheck, CircleHelp, FilePen, Link2, Lock, MessageSquareMore, Pause, Pencil, Plus, Route, Send, UserPlus } from 'lucide-react'
+import type { FriendAddRule, FriendAddRuleKind, FriendAddRuleListData, FriendAddRuleStatus } from '@/lib/api'
+import { api } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { ListPage, ListPagePagination } from '@/components/templates'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import { formatNumber } from '@/lib/format'
+import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
+import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
+import { FOLDER_SELECT_COLORS, type FriendAddRuleFolder } from '@line-crm/shared'
+import FolderPanel, { FolderPanelNote } from '@/components/shared/folder-panel'
+import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
+import Select from '@/components/shared/select'
+import SearchField from '@/components/shared/search-field'
+import FilterChip from '@/components/shared/filter-chip'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import { Tabs } from '@/components/shared/tabs'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { notifyToast } from '@/components/shared/toast'
+import { RowMenu } from '@/components/shared/row-actions'
+import PageSizeSelect from '@/components/shared/page-size-select'
+import ReorderHandle from '@/components/shared/reorder-handle'
+import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
+import { describeFriendAddFailure } from './failure'
+import { useCursorStack } from './use-cursor-stack'
+import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 友だち追加時の配信の一覧（Pencil：一覧 `MRhef`・閲覧のみ `LEwkJ`・1152 `P20kYU`・
@@ -109,8 +60,6 @@ import ReadOnlyNotice from "@/components/shared/read-only-notice"
  * データの口・保存の口・権限・失敗の扱いは app/friend-add-settings/list-v8.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
-
-
 
 const KIND_LABELS: Record<FriendAddRuleKind, string> = {
   first_time: 'はじめて友だち追加した人',
@@ -693,7 +642,7 @@ function FriendAddList() {
     </div>
   )
   const errorBand = actionError ? (
-    <Notice tone="danger" >{actionError}<Button onClick={() => void load()}>もう一度読み込む</Button></Notice>
+    <Notice tone="danger" >{actionError}<Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></Notice>
   ) : null
   /* 1152 の板（P20kYU）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「状態の札」。 */
   const toolbar = narrow ? (
@@ -778,7 +727,7 @@ function FriendAddList() {
   } else if (error) {
     /* 状態の板（kFz4b）：読めないときも道具はそのまま。数の帯は「—」。 */
     listBody = (
-      <ListState kind="error" title="設定を読み込めませんでした" description={errorStatus === 403 ? error : '数の帯は「—」、道具はそのまま使えます。条件を変えてから試し直せます。'}  action={<><Button onClick={() => void load()}>もう一度読み込む</Button></>} />
+      <ListState kind="error" title="設定を読み込めませんでした" description={errorStatus === 403 ? error : '数の帯は「—」、道具はそのまま使えます。条件を変えてから試し直せます。'}  action={<><Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
     )
   } else if (items.length === 0) {
     /* 修正案 D-2：空の一覧。 */

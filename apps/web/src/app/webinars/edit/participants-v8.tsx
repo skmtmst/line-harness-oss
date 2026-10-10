@@ -1,40 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from "react"
-import Button from "@/components/shared/button"
-import Notice from "@/components/shared/notice"
-import Pagination from "@/components/shared/pagination"
-import styles from "./participants-v8.module.css"
-import HelpTip from "@/components/shared/help-tip"
-import FilterChip from "@/components/shared/filter-chip"
-import StatusBadge from "@/components/shared/status-badge"
-import Select from "@/components/shared/select"
-import { Th } from "@/components/shared/table"
-import { ApiError, downloadApiFile, webinarApi, type WebinarAnalytics, type WebinarParticipantClassification, type WebinarParticipantPage } from "@/lib/api"
-import { formatNumber } from "@/lib/format"
-import { fmtSec, joinKindLabel, ParticipantAvatar, PARTICIPANT_FILTER_OPTIONS, PARTICIPANTS_PAGE_SIZE, participantStateLabel, percent, type ParticipantRow } from "./participants-shared"
-import TruncatedText from "@/components/shared/truncated-text"
-import { csvFileName } from "@/lib/csv-file-name"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField } from "@/components/shared/save-form-errors"
-import ListState from "@/components/shared/list-state"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import Pagination from '@/components/shared/pagination'
+import styles from './participants-v8.module.css'
+import HelpTip from '@/components/shared/help-tip'
+import FilterChip from '@/components/shared/filter-chip'
+import StatusBadge from '@/components/shared/status-badge'
+import Select from '@/components/shared/select'
+import { Th } from '@/components/shared/table'
+import { ApiError, downloadApiFile, webinarApi, type WebinarAnalytics, type WebinarParticipantClassification, type WebinarParticipantPage } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
+import { fmtSec, joinKindLabel, ParticipantAvatar, PARTICIPANT_FILTER_OPTIONS, PARTICIPANTS_PAGE_SIZE, participantStateLabel, percent, type ParticipantRow } from './participants-shared'
+import TruncatedText from '@/components/shared/truncated-text'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import ListState from '@/components/shared/list-state'
 
 export type ParticipantExport = { download: () => void; busy: boolean; available: boolean }
 

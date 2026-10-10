@@ -1,80 +1,42 @@
 'use client'
-import { notifySaved } from "@/components/shared/toast"
-import { SaveConflictBand } from "@/components/shared/save-conflict"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Check, Plus } from "lucide-react"
-import { api, ApiError, type ConversionDeduplicationMode, type ConversionDefinitionPreview, type ConversionDefinitionUsageKind, type ConversionReversalPolicy, type ConversionValueMode } from "@/lib/api"
-import type { ConversionPoint } from "@line-crm/shared"
-import { CreatePage } from "@/components/templates"
-import { useAccount } from "@/contexts/account-context"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { useStaffRole } from "@/lib/staff-role"
-import { canEditFeature } from "@/lib/staff-capability"
-import { formatNumber } from "@/lib/format"
-import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
-import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
-import Button from "@/components/shared/button"
-import Checkbox from "@/components/shared/checkbox"
-import Dialog from "@/components/shared/dialog"
-import Disclosure from "@/components/shared/disclosure"
-import HelpTip from "@/components/shared/help-tip"
-import ListState from "@/components/shared/list-state"
-import Notice from "@/components/shared/notice"
-import Select from "@/components/shared/select"
-import RadioCard, { RadioCardGroup } from "@/components/shared/radio-card"
-import { TextField } from "@/components/shared/text-field"
-import { Field } from "@/components/shared/form-controls"
-import Card from "@/components/shared/card"
-import { focusConversionField, type ConversionFieldIssue } from "./field-issue"
-import ConditionBuilder, { findConditionDraftIssue, isEmptyCondition, pruneCondition } from "@/components/shared/condition-builder"
-import type { SegmentCondition } from "@/lib/segment-condition"
-import { originInfoOf } from "./origin-labels"
-import { createLatestPreviewRequestGate, type LatestPreviewRequest } from "./latest-preview-request"
-import styles from "./create.module.css"
-import { permissionDeniedMessage } from "@/components/shared/api-error-message"
-import { emptyValue } from "@/components/shared/empty-value"
-import NumberInput from "@/components/shared/number-field"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { notifySaved } from '@/components/shared/toast'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Check, Plus } from 'lucide-react'
+import { api, ApiError, type ConversionDeduplicationMode, type ConversionDefinitionPreview, type ConversionDefinitionUsageKind, type ConversionReversalPolicy, type ConversionValueMode } from '@/lib/api'
+import type { ConversionPoint } from '@line-crm/shared'
+import { CreatePage } from '@/components/templates'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { useStaffRole } from '@/lib/staff-role'
+import { canEditFeature } from '@/lib/staff-capability'
+import { formatNumber } from '@/lib/format'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import Dialog from '@/components/shared/dialog'
+import Disclosure from '@/components/shared/disclosure'
+import HelpTip from '@/components/shared/help-tip'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+import Select from '@/components/shared/select'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
+import Card from '@/components/shared/card'
+import { focusConversionField, type ConversionFieldIssue } from './field-issue'
+import ConditionBuilder, { findConditionDraftIssue, isEmptyCondition, pruneCondition } from '@/components/shared/condition-builder'
+import type { SegmentCondition } from '@/lib/segment-condition'
+import { originInfoOf } from './origin-labels'
+import { createLatestPreviewRequestGate, type LatestPreviewRequest } from './latest-preview-request'
+import styles from './create.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 成果地点を作る（Pencil：作る `j8p3yj`・競合 `cXqlS`）。
@@ -88,8 +50,6 @@ import ReadOnlyNotice from "@/components/shared/read-only-notice"
  * - 競合（cXqlS）：同じ名前の成果地点がすでにある（入力中に見つかった／保存したら先に作られていた 409）とき、
  *   板の頭の下に帯を出し、主ボタンは「比べてから保存」になる
  */
-
-
 
 /* 数えるきっかけ6種（今の作る画面と同じ中身）。 */
 type TriggerKind = 'order' | 'form' | 'booking' | 'page' | 'video' | 'tag'

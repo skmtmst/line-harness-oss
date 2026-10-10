@@ -1,52 +1,29 @@
 'use client'
 
-import { useFeatureAccess } from "@/lib/use-feature-access"
-import { useStaffRole } from "@/lib/staff-role"
-import { useSamePageUrl } from "@/lib/use-same-page-url"
-import { useCallback, useEffect, useMemo, useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { ArrowLeft, Circle, CircleCheck, CircleX, GitBranch, Pencil, RefreshCw } from "lucide-react"
-import { api, ApiError, type RichMenuPublishRun, type RichMenuTargetPreview } from "@/lib/api"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { PageFrame, PageHeading } from "@/components/templates/page-frame"
-import { type ActionMenuItem } from "@/components/shared/action-menu"
-import { RowMenu } from "@/components/shared/row-actions"
-import Button from "@/components/shared/button"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import TargetMissing from "@/components/shared/target-missing"
-import { richMenuError, richMenuErrorAll } from "@/v8/rich-menus/errors"
-import { audienceOf, progressStatusText, runAudienceText, runStamp, type ProgressStep, type ReconcileDiff } from "./model"
-import styles from "./detail.module.css"
-import { formatNumber as polishFormatNumber } from "@/lib/format"
-import { permissionDeniedMessage } from "@/components/shared/api-error-message"
-import { DetailLoading } from "@/components/templates/detail-page"
-import { SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useStaffRole } from '@/lib/staff-role'
+import { useSamePageUrl } from '@/lib/use-same-page-url'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { ArrowLeft, Circle, CircleCheck, CircleX, GitBranch, Pencil, RefreshCw } from 'lucide-react'
+import { api, ApiError, type RichMenuPublishRun, type RichMenuTargetPreview } from '@/lib/api'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import TargetMissing from '@/components/shared/target-missing'
+import { richMenuError, richMenuErrorAll } from '@/v8/rich-menus/errors'
+import { audienceOf, progressStatusText, runAudienceText, runStamp, type ProgressStep, type ReconcileDiff } from './model'
+import styles from './detail.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 リッチメニューの詳細（公開した・公開の進み）`hKr8f`。一から書いた画面（2026-10-07）。
@@ -59,9 +36,6 @@ import Notice from "@/components/shared/notice"
  * （app/rich-menus/edit の PublishProgressSection・PublishHistorySection・一覧の取り下げ）と同じ API・同じ確かめ方。
  * 受け付ける指定・呼ぶ API は BEHAVIOR.md。
  */
-
-
-
 
 type Group = {
   id: string

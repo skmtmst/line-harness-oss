@@ -1,65 +1,34 @@
 'use client'
 
-import { datetimeLocalJstToUtcIso } from "@/lib/jst-datetime"
-import DateField from "@/components/shared/date-field"
-import { useCallback, useEffect, useId, useRef, useState } from "react"
-import { CalendarPlus, Check, Monitor, Play, Plus, Smartphone, Upload } from "lucide-react"
-import { CreatePage } from "@/components/templates"
-import { RowMenu } from "@/components/shared/row-actions"
-import Button from "@/components/shared/button"
-import Checkbox from "@/components/shared/checkbox"
-import Dialog from "@/components/shared/dialog"
-import IconButton from "@/components/shared/icon-button"
-import Notice from "@/components/shared/notice"
-import Select from "@/components/shared/select"
-import { TextField } from "@/components/shared/text-field"
-import DateTimeField, { TimeField } from "@/components/shared/date-time-field"
-import type { MediaItem } from "@line-crm/shared"
-import { api, describeSaveFailure, webinarApi, type WebinarScheduleRule, type WebinarSessionCapacity, type WebinarVideoAsset } from "@/lib/api"
-import { formatNumber, formatDate as polishFormatDate } from "@/lib/format"
-import { fmtJaDuration } from "./helpers"
-import { FieldError, Field } from "@/components/shared/form-controls"
-import { focusFieldById } from "@/lib/use-form-errors"
-import { ReadValue } from "./parts"
-import type { EditContext, PaneSaveProps, WizardChrome } from "./types"
-import form from "./form.module.css"
-import styles from "./video.module.css"
-import { withPermissionFailure } from "@/components/shared/api-error-message"
-import { emptyValue } from "@/components/shared/empty-value"
-import NumberInput from "@/components/shared/number-field"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
+import DateField from '@/components/shared/date-field'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { CalendarPlus, Check, Monitor, Play, Plus, Smartphone, Upload } from 'lucide-react'
+import { CreatePage } from '@/components/templates'
+import { RowMenu } from '@/components/shared/row-actions'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import Dialog from '@/components/shared/dialog'
+import IconButton from '@/components/shared/icon-button'
+import Notice from '@/components/shared/notice'
+import Select from '@/components/shared/select'
+import { TextField } from '@/components/shared/text-field'
+import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
+import type { MediaItem } from '@line-crm/shared'
+import { api, describeSaveFailure, webinarApi, type WebinarScheduleRule, type WebinarSessionCapacity, type WebinarVideoAsset } from '@/lib/api'
+import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
+import { fmtJaDuration } from './helpers'
+import { FieldError, Field } from '@/components/shared/form-controls'
+import { focusFieldById } from '@/lib/use-form-errors'
+import { ReadValue } from './parts'
+import type { EditContext, PaneSaveProps, WizardChrome } from './types'
+import form from './form.module.css'
+import styles from './video.module.css'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 ウェビナーの ②動画と公開期間（Pencil：オンデマンド VWNaA・日時指定と開催回 LPOe7）。
@@ -355,7 +324,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
               : `準備が済むまで公開できません（いま「${STAGES.find((stage) => stage.key === asset.stage)?.label ?? asset.stageLabel}」を作っています）`}
           </p>
         </> : null}
-        {assetError ? <Notice tone="danger" className={styles.stageNoteNoticePlacement} >{assetError}<Button size="compact" onClick={() => void loadAsset()}>もう一度読み込む</Button></Notice> : null}
+        {assetError ? <Notice tone="danger" className={styles.stageNoteNoticePlacement} >{assetError}<Button size="compact" onClick={() => loadAsset()} busyLabel="処理中…">もう一度読み込む</Button></Notice> : null}
       </section>
 
       {scheduled ? null : (

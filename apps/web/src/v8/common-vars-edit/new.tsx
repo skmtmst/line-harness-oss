@@ -1,65 +1,34 @@
 'use client'
-import { isOwnerOrAdmin } from "@/lib/staff-capability"
-import { useFeatureAccess } from "@/lib/use-feature-access"
-import { createPageReturnHref } from "@/components/shared/create-page"
-import CopyTextButton from "@/components/shared/copy-text-button"
-import { useCallback, useEffect, useRef, useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { AlignLeft, ArrowLeft, CalendarClock, CalendarDays, Hash, Image as ImageIcon, Link2, ToggleLeft, Type, Upload } from "lucide-react"
-import type { Folder } from "@line-crm/shared"
-import { api, ApiError, describeSaveFailure } from "@/lib/api"
-import { commonVarValueError, isSecretLikeVarValue } from "@/lib/common-vars"
-import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
-import { useAccount } from "@/contexts/account-context"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { CreatePage } from "@/components/templates"
-import Button from "@/components/shared/button"
-import DateField from "@/components/shared/date-field"
-import DateTimeField from "@/components/shared/date-time-field"
-import LinePreview from "@/components/shared/line-preview"
-import Notice from "@/components/shared/notice"
-import Select from "@/components/shared/select"
-import FolderSelect, { folderById, folderCreator } from "@/components/shared/folder-select"
-import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
-import styles from "./new.module.css"
-import { focusFieldById } from "@/lib/use-form-errors"
-import { Field } from "@/components/shared/form-controls"
-import { withPermissionFailure } from "@/components/shared/api-error-message"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { createPageReturnHref } from '@/components/shared/create-page'
+import CopyTextButton from '@/components/shared/copy-text-button'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { AlignLeft, ArrowLeft, CalendarClock, CalendarDays, Hash, Image as ImageIcon, Link2, ToggleLeft, Type, Upload } from 'lucide-react'
+import type { Folder } from '@line-crm/shared'
+import { api, ApiError, describeSaveFailure } from '@/lib/api'
+import { commonVarValueError, isSecretLikeVarValue } from '@/lib/common-vars'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { CreatePage } from '@/components/templates'
+import Button from '@/components/shared/button'
+import DateField from '@/components/shared/date-field'
+import DateTimeField from '@/components/shared/date-time-field'
+import LinePreview from '@/components/shared/line-preview'
+import Notice from '@/components/shared/notice'
+import Select from '@/components/shared/select'
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import styles from './new.module.css'
+import { focusFieldById } from '@/lib/use-form-errors'
+import { Field } from '@/components/shared/form-controls'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 共通情報を作る（板 `p82v9`）。
@@ -70,8 +39,6 @@ import ReadOnlyNotice from "@/components/shared/read-only-notice"
  * データの口・入力検査・秘密値の守り・下書き保存は `app/contents/vars/new/new-v8.tsx`
  * から写した（import はしない）。動きの一覧は同じ場所の BEHAVIOR.md。
  */
-
-
 
 /*
  * 種別8つ。板 `p82v9` のカードの並び（標準・長文・数値・URL／

@@ -1,38 +1,21 @@
 'use client'
 
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import { useRef, useState } from "react"
-import KpiCard from "@/components/shared/kpi-card"
-import { Eye, Utensils } from "lucide-react"
-import Button from "@/components/shared/button"
-import StatusBadge from "@/components/shared/status-badge"
-import { TextField } from "@/components/shared/text-field"
-import { useAccount } from "@/contexts/account-context"
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import { restaurantTestApi, type RestaurantLineFlow, type RestaurantStore } from "@/lib/restaurant-test-api"
-import RestaurantFrame, { type RestaurantContext } from "../common-a/frame"
-import { Panel, StatRow } from "../common-a/parts"
-import styles from "./line-followup.module.css"
-import { Field } from "@/components/shared/form-controls"
-import { permissionDeniedMessage } from "@/components/shared/api-error-message"
-import { SaveErrorField } from "@/components/shared/save-form-errors"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { useRef, useState } from 'react'
+import KpiCard from '@/components/shared/kpi-card'
+import { Eye, Utensils } from 'lucide-react'
+import Button from '@/components/shared/button'
+import StatusBadge from '@/components/shared/status-badge'
+import { TextField } from '@/components/shared/text-field'
+import { useAccount } from '@/contexts/account-context'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { restaurantTestApi, type RestaurantLineFlow, type RestaurantStore } from '@/lib/restaurant-test-api'
+import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
+import { Panel, StatRow } from '../common-a/parts'
+import styles from './line-followup.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8 LINE来店フォロー（Pencil `xLpnS`）。

@@ -1,71 +1,39 @@
 'use client'
 
-import SegmentedControl from "@/components/shared/segmented"
-import { useListUrlValue } from "@/components/shared/list-url-state"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowLeft, Download, MessageCircle, Pause, Pencil, RotateCcw } from "lucide-react"
-import type { AutoReplyRun, AutoReplyRunsResponse, ExecutionRunStatus } from "@line-crm/shared"
-import { DetailPage } from "@/components/templates"
-import { usePageTitle } from "@/components/shell/page-chrome"
-import Button from "@/components/shared/button"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import { type ActionMenuItem } from "@/components/shared/action-menu"
-import { RowMenu } from "@/components/shared/row-actions"
-import KpiBand from "@/components/shared/kpi-band"
-import KpiCard from "@/components/shared/kpi-card"
-import ListState from "@/components/shared/list-state"
-import Pagination from "@/components/shared/pagination"
-import SearchField from "@/components/shared/search-field"
-import Select from "@/components/shared/select"
-import DateField from "@/components/shared/date-field"
-import StatusBadge, { type StatusBadgeTone } from "@/components/shared/status-badge"
-import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
-import { api, ApiError } from "@/lib/api"
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import { formatDateTime, formatNumber, formatTime, formatListDateTime as polishFormatListDateTime } from "@/lib/format"
-import styles from "./runs.module.css"
-import TruncatedText from "@/components/shared/truncated-text"
-import { permissionDeniedMessage } from "@/components/shared/api-error-message"
-import { csvFileName } from "@/lib/csv-file-name"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import { PAGE_SIZE_SELECT_OPTIONS } from "@/components/shared/page-size-select"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import SegmentedControl from '@/components/shared/segmented'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { ArrowLeft, Download, MessageCircle, Pause, Pencil, RotateCcw } from 'lucide-react'
+import type { AutoReplyRun, AutoReplyRunsResponse, ExecutionRunStatus } from '@line-crm/shared'
+import { DetailPage } from '@/components/templates'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import DateField from '@/components/shared/date-field'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { api, ApiError } from '@/lib/api'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { formatDateTime, formatNumber, formatTime, formatListDateTime as polishFormatListDateTime } from '@/lib/format'
+import styles from './runs.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 自動応答の実行結果（Pencil `nWmLg`）。
@@ -75,10 +43,6 @@ import Notice from "@/components/shared/notice"
  * 取得・操作の動き（読み直し・一時停止・再実行・CSV）は `app/auto-replies/runs/runs-v8.tsx`
  * から写した（import はしない）。動きの一覧は BEHAVIOR.md の「実行結果」。
  */
-
-
-
-
 
 /* 再実行・一時停止は owner/admin だけ（R530・再実行POST・停止口の requireRole と同じ境目）。 */
 const NO_MANAGE_NOTE = '閲覧のみで見ています。再実行・一時停止はオーナーと管理者だけができます。実行結果の確認と書き出しはこのまま使えます。'

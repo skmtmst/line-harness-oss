@@ -1,65 +1,34 @@
 'use client'
 
-import { useListUrlValue } from "@/components/shared/list-url-state"
-import { notifySaved } from "@/components/shared/toast"
-import StatusPill from "@/components/shared/status-pill"
-import { Building2, Check, CircleDot, LogIn, Paperclip, Plus, RefreshCw, Send, Sparkles, Star } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
-import { api, type OpsKnowledgeReference, type OpsSupportDetail, type OpsSupportPriority, type OpsSupportStage, type OpsSupportSummary, type OpsSupportTicket, type OpsTenantRow } from "@/lib/api"
-import { KnowledgeReferences, TicketKnowledge } from "@/components/ops/knowledge-ticket"
-import { planLabel, tenantDetailHref, opsCall } from "@/components/ops/ops-ui"
-import { opsEnvironmentLabel } from "@/components/ops/ops-env-bar"
-import Button from "@/components/shared/button"
-import Dialog from "@/components/shared/dialog"
-import FilterChip from "@/components/shared/filter-chip"
-import ListState from "@/components/shared/list-state"
-import SearchField from "@/components/shared/search-field"
-import Select from "@/components/shared/select"
-import StatusBadge, { type StatusBadgeTone } from "@/components/shared/status-badge"
-import { TextArea, TextField } from "@/components/shared/text-field"
-import { OpsHead } from "./shell"
-import { useOpsReadOnly } from "./use-ops-read-only"
-import { useFormErrors } from "@/lib/use-form-errors"
-import { FieldError, Field } from "@/components/shared/form-controls"
-import parts from "./parts.module.css"
-import styles from "./support.module.css"
-import { formatDate as polishFormatDate } from "@/lib/format"
-import TextLink from "@/components/shared/text-link"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField } from "@/components/shared/save-form-errors"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { notifySaved } from '@/components/shared/toast'
+import StatusPill from '@/components/shared/status-pill'
+import { Building2, Check, CircleDot, LogIn, Paperclip, Plus, RefreshCw, Send, Sparkles, Star } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { api, type OpsKnowledgeReference, type OpsSupportDetail, type OpsSupportPriority, type OpsSupportStage, type OpsSupportSummary, type OpsSupportTicket, type OpsTenantRow } from '@/lib/api'
+import { KnowledgeReferences, TicketKnowledge } from '@/components/ops/knowledge-ticket'
+import { planLabel, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
+import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
+import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
+import FilterChip from '@/components/shared/filter-chip'
+import ListState from '@/components/shared/list-state'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import { TextArea, TextField } from '@/components/shared/text-field'
+import { OpsHead } from './shell'
+import { useOpsReadOnly } from './use-ops-read-only'
+import { useFormErrors } from '@/lib/use-form-errors'
+import { FieldError, Field } from '@/components/shared/form-controls'
+import parts from './parts.module.css'
+import styles from './support.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営のお問い合わせ V8（絵 `P0jhqO`・代わりに起票 `Izau1`）。

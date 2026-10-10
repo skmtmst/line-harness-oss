@@ -1,44 +1,23 @@
 'use client'
 
-import { ChevronRight, ArrowUpRight, Check, type LucideIcon } from "lucide-react"
-import { folderDisplayColor, FolderDot } from "./folder-dot"
-import { useFieldContext, joinDescribedBy } from "./field-context"
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type Ref } from "react"
-import Link from "next/link"
-import Button from "./button"
-import Checkbox from "./checkbox"
-import FilterChip from "./filter-chip"
-import FolderPanel, { type FolderPanelRow } from "./folder-panel"
-import Radio from "./radio"
-import SearchField from "./search-field"
-import Select from "./select"
-import StatusBadge, { type StatusBadgeTone } from "./status-badge"
-import SelectionDialog from "./selection-dialog"
-import shell from "./source-picker-dialog.module.css"
-import styles from "./entity-picker.module.css"
-import Dialog from "./dialog"
-import TagPill from "./tag-pill"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { ChevronRight, ArrowUpRight, Check, type LucideIcon } from 'lucide-react'
+import { folderDisplayColor, FolderDot } from './folder-dot'
+import { useFieldContext, joinDescribedBy } from './field-context'
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
+import Link from 'next/link'
+import Button from './button'
+import Checkbox from './checkbox'
+import FilterChip from './filter-chip'
+import FolderPanel, { type FolderPanelRow } from './folder-panel'
+import Radio from './radio'
+import SearchField from './search-field'
+import Select from './select'
+import StatusBadge, { type StatusBadgeTone } from './status-badge'
+import SelectionDialog from './selection-dialog'
+import shell from './source-picker-dialog.module.css'
+import styles from './entity-picker.module.css'
+import Dialog from './dialog'
+import TagPill from './tag-pill'
 
 /*
  * 受信箱の幅640の器を、作ってあるものを選ぶ窓へ共通化（B-155・163・164・165・175）。

@@ -1,53 +1,28 @@
 'use client'
-import { notifySaved } from "@/components/shared/toast"
-import { useEffect, useMemo, useRef, useState } from "react"
-import { Plus, Search } from "lucide-react"
-import { type ActionMenuItem } from "@/components/shared/action-menu"
-import Button from "@/components/shared/button"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import Dialog from "@/components/shared/dialog"
-import { EntityKindField } from "@/components/shared/entity-picker-sources"
-import DateField from "@/components/shared/date-field"
-import HelpTip from "@/components/shared/help-tip"
-import { TimeField } from "@/components/shared/date-time-field"
-import { SettingCheckbox } from "@/components/shared/checkbox"
-import { RowMenu } from "@/components/shared/row-actions"
-import { ApiError, bookingApi, type BookingMenu, type BookingResource, type BookingSettings, type BookingSlotCheckResult, type BookingStaff } from "@/lib/api"
-import { slotReasonLabel } from "../lib/slot-reason"
-import { AccountIcon, Band, DAYS, StateCard, SkeletonRows, useV8TabEdit, type BusinessHourInterval, type BusinessHoursDay, type LoadStatus } from "./shared"
-import styles from "../settings.module.css"
-import { Field } from "@/components/shared/form-controls"
-import { permissionDeniedMessage } from "@/components/shared/api-error-message"
-import NumberInput from "@/components/shared/number-field"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { notifySaved } from '@/components/shared/toast'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Plus, Search } from 'lucide-react'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
+import DateField from '@/components/shared/date-field'
+import HelpTip from '@/components/shared/help-tip'
+import { TimeField } from '@/components/shared/date-time-field'
+import { SettingCheckbox } from '@/components/shared/checkbox'
+import { RowMenu } from '@/components/shared/row-actions'
+import { ApiError, bookingApi, type BookingMenu, type BookingResource, type BookingSettings, type BookingSlotCheckResult, type BookingStaff } from '@/lib/api'
+import { slotReasonLabel } from '../lib/slot-reason'
+import { AccountIcon, Band, DAYS, StateCard, SkeletonRows, useV8TabEdit, type BusinessHourInterval, type BusinessHoursDay, type LoadStatus } from './shared'
+import styles from '../settings.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /* ② 受付枠（yRPxl）（settings-v8.tsx から分割。見た目・動きは変えない） */
-
-
 
 export function HoursTabV8({ accountId, settings, settingsStatus, settingsError, resources, resourcesStatus, resourcesError, canEdit, menus, onSaved, onReload, onResourceSaved, onResourceCreated, onResourceDeleted, onResourcesRetry }: {
   accountId: string

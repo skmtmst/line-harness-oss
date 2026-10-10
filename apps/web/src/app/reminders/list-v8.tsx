@@ -1,123 +1,61 @@
 'use client'
-import { useDeferredDelete } from "@/lib/use-deferred-delete"
-import DetailPanel, { useDetailPanelUrl } from "@/components/shared/detail-panel"
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import ListToolbar, { ListToolbarSearchSlot, ListToolbarSort as SortSelect } from "@/components/shared/list-toolbar"
-import { RowMenu } from "@/components/shared/row-actions"
-import { permissionDeniedMessage } from "@/components/shared/api-error-message"
-import { formatDate as polishFormatDate, formatNumber } from "@/lib/format"
-import { useFeatureAccess } from "@/lib/use-feature-access"
-import { RovingTbody } from "@/components/shared/row-roving"
-import BulkBar, { useEscapeToClearSelection } from "@/components/shared/bulk-bar"
-import { collectListRows } from "@/components/shared/collect-list-rows"
-import { ListPageBody } from "@/components/templates"
-import SearchField from "@/components/shared/search-field"
-import { PageFrame, PageHeading } from "@/components/templates/page-frame"
-import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react"
-import { useListScrollMemory, useListUrlParam, useListUrlValue } from "@/components/shared/list-url-state"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { Activity, AlertCircle, ArrowRight, Bell, Calendar, CalendarClock, FilePen, CircleCheck, Copy, Folder as FolderIcon, FolderInput, Pause, Pencil, Play, Plus, Send, Square, Trash2, TriangleAlert, Users } from "lucide-react"
-import type { ApiResponse, Folder, ReminderTriggerType } from "@line-crm/shared"
-import { api, fetchApi, type ListStats } from "@/lib/api"
-import { useOffsetServerList, type ServerListResponse } from "@/lib/use-server-list"
-import { clampSearchQuery } from "@/lib/search-query"
-import { useAccount } from "@/contexts/account-context"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { useNarrowViewport } from "@/lib/use-narrow-viewport"
-import Button from "@/components/shared/button"
-import EmptyList from "@/components/shared/empty-list"
-import KpiCard from "@/components/shared/kpi-card"
-import KpiBand from "@/components/shared/kpi-band"
-import Checkbox from "@/components/shared/checkbox"
-import Select from "@/components/shared/select"
-import FilterChip from "@/components/shared/filter-chip"
-import ManagedFolderPanel from "@/components/shared/managed-folder-panel"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import { type ActionMenuItem } from "@/components/shared/action-menu"
-import ContextMenu, { type ContextMenuItem } from "@/components/shared/context-menu"
-import { withViewTransition } from "@/components/shared/view-transition"
-import Pagination from "@/components/shared/pagination"
-import SheetDialog from "@/v8/reminders/sheet-dialog"
-import { DelayedSkeleton } from "@/components/shared/skeleton"
-import { DataTable, TableHeadRow, Tr, Td, Th, NameCell } from "@/components/shared/table"
-import { FolderDotName, type FolderDotFolder } from "@/components/shared/folder-dot"
-import { runUndoable, runOptimistic } from "@/lib/undoable"
-import PageSizeSelect from "@/components/shared/page-size-select"
-import { completeReorder } from "@/lib/complete-reorder"
-import ReorderHandle, { useReorder } from "@/components/shared/reorder-handle"
-import { formatTriggerOffset } from "./reminder-timing"
-import styles from "./list-v8.module.css"
-import TruncatedText from "@/components/shared/truncated-text"
-import { emptyValue } from "@/components/shared/empty-value"
-import { Field } from "@/components/shared/form-controls"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import { useDuplicateFeedback } from "@/components/shared/use-duplicate-feedback"
-import { notifyToast } from "@/components/shared/toast"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useDeferredDelete } from '@/lib/use-deferred-delete'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import ListToolbar, { ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
+import { RowMenu } from '@/components/shared/row-actions'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { formatDate as polishFormatDate, formatNumber } from '@/lib/format'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { RovingTbody } from '@/components/shared/row-roving'
+import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
+import { collectListRows } from '@/components/shared/collect-list-rows'
+import { ListPageBody } from '@/components/templates'
+import SearchField from '@/components/shared/search-field'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
+import { useListScrollMemory, useListUrlParam, useListUrlValue } from '@/components/shared/list-url-state'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { Activity, AlertCircle, ArrowRight, Bell, Calendar, CalendarClock, FilePen, CircleCheck, Copy, Folder as FolderIcon, FolderInput, Pause, Pencil, Play, Plus, Send, Square, Trash2, TriangleAlert, Users } from 'lucide-react'
+import type { ApiResponse, Folder, ReminderTriggerType } from '@line-crm/shared'
+import { api, fetchApi, type ListStats } from '@/lib/api'
+import { useOffsetServerList, type ServerListResponse } from '@/lib/use-server-list'
+import { clampSearchQuery } from '@/lib/search-query'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
+import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
+import Checkbox from '@/components/shared/checkbox'
+import Select from '@/components/shared/select'
+import FilterChip from '@/components/shared/filter-chip'
+import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
+import Pagination from '@/components/shared/pagination'
+import SheetDialog from '@/v8/reminders/sheet-dialog'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
+import { DataTable, TableHeadRow, Tr, Td, Th, NameCell } from '@/components/shared/table'
+import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
+import { runUndoable, runOptimistic } from '@/lib/undoable'
+import PageSizeSelect from '@/components/shared/page-size-select'
+import { completeReorder } from '@/lib/complete-reorder'
+import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
+import { formatTriggerOffset } from './reminder-timing'
+import styles from './list-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
+import { notifyToast } from '@/components/shared/toast'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 リマインダの一覧（Pencil「★V8 画面の地図」のリマインダの行：
@@ -132,9 +70,6 @@ import Notice from "@/components/shared/notice"
  * まとめての帯（止める・再開・フォルダへ移す）。
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
-
-
-
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'

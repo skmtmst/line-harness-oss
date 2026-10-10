@@ -1,91 +1,46 @@
 'use client'
 
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import { createPageReturnHref } from "@/components/shared/create-page"
-import { notifySaved, notifyToast } from "@/components/shared/toast"
-import { useFeatureAccess } from "@/lib/use-feature-access"
-import { useEffect, useRef, useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { SaveConflictBand } from "@/components/shared/save-conflict"
-import { GitCompare, Link2, Send } from "lucide-react"
-import { validateFlexContent, type Folder } from "@line-crm/shared"
-import { api, ApiError } from "@/lib/api"
-import { useStaffRole } from "@/lib/staff-role"
-import { useNarrowViewport } from "@/lib/use-narrow-viewport"
-import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
-import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
-import { useAccount } from "@/contexts/account-context"
-import { useFormErrors } from "@/lib/use-form-errors"
-import ValidationSummary from "@/components/shared/validation-summary"
-import { FieldError, Field } from "@/components/shared/form-controls"
-import { usePageTitle } from "@/components/shell/page-chrome"
-import Button from "@/components/shared/button"
-import Card from "@/components/shared/card"
-import Dialog from "@/components/shared/dialog"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import LinePreview, { LinePreviewMessage, LinePreviewFlex as FlexPreview } from "@/components/shared/line-preview"
-import Notice from "@/components/shared/notice"
-import FolderSelect, { folderById, folderCreator, hostFolderCreate } from "@/components/shared/folder-select"
-import { TextField } from "@/components/shared/text-field"
-import { SettingCheckbox } from "@/components/shared/checkbox"
-import { buildTemplatePreview, extractMessageUrls, LEGACY_MESSAGE_NOTICE } from "@/components/templates/message-template-editor"
-import { ACCOUNT_MISMATCH_MESSAGE, EMPTY_REFERENCES, TEMPLATE_LOAD_FAILED_MESSAGE, conflictTime, describeTemplateDiff, draftFromDetail, isTemplateDetailData, loadTemplateReferences, newTemplateEditorState, requestTemplateReferences, resolveEditorAccountId, saveTemplateEdit, validateTemplateSave, templateAccountMismatch, templateSaveGuard, templateUsageEntries, type TemplateDraft, type TemplateEditorState, type TemplateReferenceState, type TemplateReferences } from "./core"
-import { TemplateEditFrame } from "./frame"
-import type { TemplateEditHost } from "./host"
-import { useDraftAutosave } from "@/v8/autosave/use-draft-autosave"
-import InsertRow from "./insert-row"
-import InsertTextField, { type InsertTextFieldHandle } from "@/components/shared/insert-text-field"
-import { referenceTokenNames } from "@/components/shared/insert-tokens"
-import { loadTemplateExamples } from "@/v8/templates/examples"
-import styles from "./edit.module.css"
-import TruncatedText from "@/components/shared/truncated-text"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { notifySaved, notifyToast } from '@/components/shared/toast'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
+import { GitCompare, Link2, Send } from 'lucide-react'
+import { validateFlexContent, type Folder } from '@line-crm/shared'
+import { api, ApiError } from '@/lib/api'
+import { useStaffRole } from '@/lib/staff-role'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { useAccount } from '@/contexts/account-context'
+import { useFormErrors } from '@/lib/use-form-errors'
+import ValidationSummary from '@/components/shared/validation-summary'
+import { FieldError, Field } from '@/components/shared/form-controls'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import Dialog from '@/components/shared/dialog'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import LinePreview, { LinePreviewMessage, LinePreviewFlex as FlexPreview } from '@/components/shared/line-preview'
+import Notice from '@/components/shared/notice'
+import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
+import { TextField } from '@/components/shared/text-field'
+import { SettingCheckbox } from '@/components/shared/checkbox'
+import { buildTemplatePreview, extractMessageUrls, LEGACY_MESSAGE_NOTICE } from '@/components/templates/message-template-editor'
+import { ACCOUNT_MISMATCH_MESSAGE, EMPTY_REFERENCES, TEMPLATE_LOAD_FAILED_MESSAGE, conflictTime, describeTemplateDiff, draftFromDetail, isTemplateDetailData, loadTemplateReferences, newTemplateEditorState, requestTemplateReferences, resolveEditorAccountId, saveTemplateEdit, validateTemplateSave, templateAccountMismatch, templateSaveGuard, templateUsageEntries, type TemplateDraft, type TemplateEditorState, type TemplateReferenceState, type TemplateReferences } from './core'
+import { TemplateEditFrame } from './frame'
+import type { TemplateEditHost } from './host'
+import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
+import InsertRow from './insert-row'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import { referenceTokenNames } from '@/components/shared/insert-tokens'
+import { loadTemplateExamples } from '@/v8/templates/examples'
+import styles from './edit.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8「メッセージを作る／編集」（絵 u5YC6・1152 は a1k3d・競合は NCbYn）。

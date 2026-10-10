@@ -1,64 +1,35 @@
 'use client'
 
-import { useSamePageUrl } from "@/lib/use-same-page-url"
-import { useEffect, useRef, useState } from "react"
-import { useSearchParams } from "next/navigation"
-import { Inbox, ChevronUp, Download, RotateCw } from "lucide-react"
-import { api } from "@/lib/api"
-import { formatDay, formatNumber, formatYmd } from "@/lib/format"
-import { useStaffRole, canManageRole } from "@/lib/staff-role"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { PageFrame } from "@/components/templates/page-frame"
-import Button from "@/components/shared/button"
-import { type ActionMenuItem } from "@/components/shared/action-menu"
-import { RowMenu as SharedRowMenu } from "@/components/shared/row-actions"
-import KpiCard from "@/components/shared/kpi-card"
-import KpiBand from "@/components/shared/kpi-band"
-import Pagination from "@/components/shared/pagination"
-import SearchField from "@/components/shared/search-field"
-import Select from "@/components/shared/select"
-import StatusBadge from "@/components/shared/status-badge"
-import ListState from "@/components/shared/list-state"
-import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
-import { mergedPersonIdOf } from "@/components/merged-person/merged-person-view"
-import type { UserRowData } from "@/components/users/user-row"
-import { FriendsSectionHead } from "../shared/head"
-import MergedPersonV8 from "./person"
-import { useMergedUsers, USERS_PAGE_SIZES } from "./use-merged-users"
-import styles from "./merged.module.css"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField } from "@/components/shared/save-form-errors"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useSamePageUrl } from '@/lib/use-same-page-url'
+import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Inbox, ChevronUp, Download, RotateCw } from 'lucide-react'
+import { api } from '@/lib/api'
+import { formatDay, formatNumber, formatYmd } from '@/lib/format'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { PageFrame } from '@/components/templates/page-frame'
+import Button from '@/components/shared/button'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
+import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
+import Pagination from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import StatusBadge from '@/components/shared/status-badge'
+import ListState from '@/components/shared/list-state'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { mergedPersonIdOf } from '@/components/merged-person/merged-person-view'
+import type { UserRowData } from '@/components/users/user-row'
+import { FriendsSectionHead } from '../shared/head'
+import MergedPersonV8 from './person'
+import { useMergedUsers, USERS_PAGE_SIZES } from './use-merged-users'
+import styles from './merged.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 統合ユーザー（Pencil `ADjK8`）。/friends?tab=merged。
@@ -72,8 +43,6 @@ import Notice from "@/components/shared/notice"
  * （友だちの登録日は結び付けた日ではないので代わりに出さない。詳細の linkedAt を一覧にも足す依頼は Codex へ）。
  * 「複数アカウントのみ」の絞り込みは絵に口が無いので、所属アカウントの選びの末尾に入れた。
  */
-
-
 
 /** 所属アカウントの選びの「複数アカウントのみ」（絞り込みの口は今と同じ onlyDups）。 */
 const MULTI_ACCOUNTS = '__multi'

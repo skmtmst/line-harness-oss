@@ -1,41 +1,22 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowLeftRight, ArrowRight, GitFork, Pencil, Plus, TriangleAlert } from "lucide-react"
-import { api, ApiError, type RichMenuAreaResponse } from "@/lib/api"
-import { useAccount } from "@/contexts/account-context"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { CreatePage } from "@/components/templates"
-import { type ActionMenuItem } from "@/components/shared/action-menu"
-import { RowMenu } from "@/components/shared/row-actions"
-import Button from "@/components/shared/button"
-import ListState from "@/components/shared/list-state"
-import TargetMissing from "@/components/shared/target-missing"
-import { formatNumber } from "@/lib/format"
-import { analyzeConnections, type ConnectionAnalysis, type ConnectionPage } from "./connection-analysis"
-import styles from "./connections.module.css"
-import TruncatedText from "@/components/shared/truncated-text"
-import { emptyValue } from "@/components/shared/empty-value"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { ArrowLeftRight, ArrowRight, GitFork, Pencil, Plus, TriangleAlert } from 'lucide-react'
+import { api, ApiError, type RichMenuAreaResponse } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { CreatePage } from '@/components/templates'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
+import { formatNumber } from '@/lib/format'
+import { analyzeConnections, type ConnectionAnalysis, type ConnectionPage } from './connection-analysis'
+import styles from './connections.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /*
  * ★V8 リッチメニュー「切替のつながり」（Pencil `wxIQ7`）。

@@ -1,92 +1,49 @@
 'use client'
 
-import { useListUrlValue } from "@/components/shared/list-url-state"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { ClipboardList, FileText, GripVertical, Info, PenLine, Plus, Send, Users } from "lucide-react"
-import type { Folder, FriendField, FriendFieldListSummary, FriendFieldType } from "@line-crm/shared"
-import { api, ApiError } from "@/lib/api"
-import { createResponseGate } from "@/lib/latest-request"
-import { useRowLeaving } from "@/lib/use-row-leaving"
-import { ListPageBody } from "@/components/templates"
-import FolderPanel, { FolderPanelNote, type FolderPanelRow } from "@/components/shared/folder-panel"
-import FolderAddDialog from "@/components/shared/folder-add-dialog"
-import { FolderDotName } from "@/components/shared/folder-dot"
-import { type ActionMenuItem } from "@/components/shared/action-menu"
-import ListState from "@/components/shared/list-state"
-import { RowMenu, RowQuickAction } from "@/components/shared/row-actions"
-import DetailPanel, { useDetailPanelUrl } from "@/components/shared/detail-panel"
-import ContextMenu, { type ContextMenuItem } from "@/components/shared/context-menu"
-import InlineEdit from "@/components/shared/inline-edit"
-import { withViewTransition } from "@/components/shared/view-transition"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import Button from "@/components/shared/button"
-import Select from "@/components/shared/select"
-import Pagination from "@/components/shared/pagination"
-import SearchField from "@/components/shared/search-field"
-import KpiCard from "@/components/shared/kpi-card"
-import KpiBand from "@/components/shared/kpi-band"
-import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
-import { DelayedSkeleton } from "@/components/shared/skeleton"
-import { STATE_TEXT, notConnectedText } from "@/components/shared/not-connected"
-import { notifyToast } from "@/components/shared/toast"
-import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from "@/components/shared/page-size-select"
-import ReorderHandle from "@/components/shared/reorder-handle"
-import { useFlipRows, useLiveReorder } from "@/lib/use-live-reorder"
-import { mergeVisibleOrder, movableIds } from "@/components/friend-fields/reorder-utils"
-import { FIELD_TYPE_LABELS, destinationLabel, fieldDeletionBlockedReason, knownUsageCount } from "@/components/friend-fields/field-list"
-import styles from "./list.module.css"
-import type { AttributeListHost } from "./attribute-host"
-import TruncatedText from "@/components/shared/truncated-text"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField } from "@/components/shared/save-form-errors"
-import { ListPager } from "@/components/templates/list-page"
-import { ListToolbarSearchSlot } from "@/components/shared/list-toolbar"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { ClipboardList, FileText, GripVertical, Info, PenLine, Plus, Send, Users } from 'lucide-react'
+import type { Folder, FriendField, FriendFieldListSummary, FriendFieldType } from '@line-crm/shared'
+import { api, ApiError } from '@/lib/api'
+import { createResponseGate } from '@/lib/latest-request'
+import { useRowLeaving } from '@/lib/use-row-leaving'
+import { ListPageBody } from '@/components/templates'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { FolderDotName } from '@/components/shared/folder-dot'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import ListState from '@/components/shared/list-state'
+import { RowMenu, RowQuickAction } from '@/components/shared/row-actions'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import InlineEdit from '@/components/shared/inline-edit'
+import { withViewTransition } from '@/components/shared/view-transition'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Button from '@/components/shared/button'
+import Select from '@/components/shared/select'
+import Pagination from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
+import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
+import { notifyToast } from '@/components/shared/toast'
+import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
+import ReorderHandle from '@/components/shared/reorder-handle'
+import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
+import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils'
+import { FIELD_TYPE_LABELS, destinationLabel, fieldDeletionBlockedReason, knownUsageCount } from '@/components/friend-fields/field-list'
+import styles from './list.module.css'
+import type { AttributeListHost } from './attribute-host'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { ListPager } from '@/components/templates/list-page'
+import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 タグ「友だち情報欄」タブ（Pencil `q5gbcM`）。
@@ -97,9 +54,6 @@ import Notice from "@/components/shared/notice"
  * 右の上に案内の帯、表は名前の前にフォルダの色の丸（表にフォルダ列は置かない）、行の右端は必ず「…」、
  * 表の下に操作の説明。
  */
-
-
-
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 

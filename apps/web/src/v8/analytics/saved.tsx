@@ -1,48 +1,26 @@
 'use client'
-import { useListUrlValue } from "@/components/shared/list-url-state"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { AlertTriangle, Bookmark, Download, FilePen, History, Mail, Plus } from "lucide-react"
-import { useRouter } from "next/navigation"
-import { RowMenu } from "@/components/shared/row-actions"
-import KpiBand from "@/components/shared/kpi-band"
-import KpiCard from "@/components/shared/kpi-card"
-import Button from "@/components/shared/button"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import Dialog from "@/components/shared/dialog"
-import ListState from "@/components/shared/list-state"
-import SearchField from "@/components/shared/search-field"
-import { api, type AnalyticsReportRun, type AnalyticsReportSchedule, type RecentOneTimeReport, type SavedAnalyticsSnapshot, type SavedAnalyticsSummary } from "@/lib/api"
-import { formatNumber } from "@/lib/format"
-import { StatePill, shortDateTime, shortDay } from "./common"
-import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, useRegisterExport } from "./parts"
-import styles from "./analytics.module.css"
-import TruncatedText from "@/components/shared/truncated-text"
-import { csvFileName } from "@/lib/csv-file-name"
-import { emptyValue } from "@/components/shared/empty-value"
-import { useSaveFormErrors, SaveErrorScope } from "@/components/shared/save-form-errors"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AlertTriangle, Bookmark, Download, FilePen, History, Mail, Plus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { RowMenu } from '@/components/shared/row-actions'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import ListState from '@/components/shared/list-state'
+import SearchField from '@/components/shared/search-field'
+import { api, type AnalyticsReportRun, type AnalyticsReportSchedule, type RecentOneTimeReport, type SavedAnalyticsSnapshot, type SavedAnalyticsSummary } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
+import { StatePill, shortDateTime, shortDay } from './common'
+import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, useRegisterExport } from './parts'
+import styles from './analytics.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 分析「保存した分析」（Pencil `bglah`）。
@@ -50,8 +28,6 @@ import Notice from "@/components/shared/notice"
  * → 定期レポート（作る・止める・また送る・しまう）→ 1回だけ送った結果。
  * 呼ぶ口・世代の守り・失敗の言い分け・CSV は今の画面（SavedAnalyticsTab）と同じ。
  */
-
-
 
 const SAVED_STATE_LABELS: Record<SavedAnalyticsSnapshot['state'], string> = { available: '利用可能', partial: '一部集計', unavailable: '未取得', failed: '失敗' }
 const REPORT_STATUS_LABELS: Record<AnalyticsReportSchedule['status'], string> = { active: '有効', paused: '停止中', archived: 'アーカイブ' }

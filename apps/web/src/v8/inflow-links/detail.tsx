@@ -1,85 +1,45 @@
 'use client'
 
-import { useListUrlValue } from "@/components/shared/list-url-state"
-import CopyTextButton from "@/components/shared/copy-text-button"
-import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Suspense, useEffect, useMemo, useState } from "react"
-import { ArrowLeft, Info, Pause, Pencil, QrCode } from "lucide-react"
-import type { ApiResponse, EntryRoute, EntryRouteFunnel, Scenario, Tag, TrafficPool } from "@line-crm/shared"
-import { ApiError, api, fetchApi } from "@/lib/api"
-import { isPoolsFeatureAvailable } from "@/lib/pools-availability"
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import { canEditFeature } from "@/lib/staff-capability"
-import { formatNumber } from "@/lib/format"
-import { useAccount } from "@/contexts/account-context"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { DetailPage } from "@/components/templates"
-import { type ActionMenuItem } from "@/components/shared/action-menu"
-import { RowMenu } from "@/components/shared/row-actions"
-import Button from "@/components/shared/button"
-import Dialog from "@/components/shared/dialog"
-import KpiBand from "@/components/shared/kpi-band"
-import KpiCard from "@/components/shared/kpi-card"
-import ListState from "@/components/shared/list-state"
-import Notice from "@/components/shared/notice"
-import Pagination from "@/components/shared/pagination"
-import RadioCard, { RadioCardGroup } from "@/components/shared/radio-card"
-import SearchField from "@/components/shared/search-field"
-import Select from "@/components/shared/select"
-import StatusBadge from "@/components/shared/status-badge"
-import TargetMissing from "@/components/shared/target-missing"
-import { DataTable, TableHeadRow, Td, Th, Tr } from "@/components/shared/table"
-import EditRouteModal from "./edit-route-dialog"
-import QrDialog from "./qr-dialog"
-import RefOrdersPanel, { type RefOrdersResult } from "./ref-orders"
-import styles from "./detail.module.css"
-import { emptyValue } from "@/components/shared/empty-value"
-import { DetailLoading } from "@/components/templates/detail-page"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import { PAGE_SIZE_SELECT_OPTIONS } from "@/components/shared/page-size-select"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import CopyTextButton from '@/components/shared/copy-text-button'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useEffect, useMemo, useState } from 'react'
+import { ArrowLeft, Info, Pause, Pencil, QrCode } from 'lucide-react'
+import type { ApiResponse, EntryRoute, EntryRouteFunnel, Scenario, Tag, TrafficPool } from '@line-crm/shared'
+import { ApiError, api, fetchApi } from '@/lib/api'
+import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { canEditFeature } from '@/lib/staff-capability'
+import { formatNumber } from '@/lib/format'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { DetailPage } from '@/components/templates'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
+import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+import Pagination from '@/components/shared/pagination'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import StatusBadge from '@/components/shared/status-badge'
+import TargetMissing from '@/components/shared/target-missing'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import EditRouteModal from './edit-route-dialog'
+import QrDialog from './qr-dialog'
+import RefOrdersPanel, { type RefOrdersResult } from './ref-orders'
+import styles from './detail.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
 /*
  * ★V8 流入と計測の詳細（Pencil `Q5le3`）。
@@ -92,9 +52,6 @@ import { PAGE_SIZE_SELECT_OPTIONS } from "@/components/shared/page-size-select"
  * - 受付を止める・別リンクへ送る・削除するは「その後」の段の右上の「…」から（今は段の題の右）
  * - 閲覧のみ（owner・admin 以外）には、リンクを編集・止める・することを変える・「…」を出さず、閲覧のみの帯を出す
  */
-
-
-
 
 interface MessageTemplate {
   id: string

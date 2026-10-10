@@ -1,85 +1,45 @@
 'use client'
 
-import { useListUrlValue, useListUrlState } from "@/components/shared/list-url-state"
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { CircleDot, Flag, GripVertical, History, Info, Loader, Send } from "lucide-react"
-import { api, ApiError, type ListStats, type SupportMarkArchiveImpact, type SupportMarkListItem } from "@/lib/api"
-import { createResponseGate } from "@/lib/latest-request"
-import { ListPageBody } from "@/components/templates"
-import { type ActionMenuItem } from "@/components/shared/action-menu"
-import { RowMenu, RowQuickAction } from "@/components/shared/row-actions"
-import DetailPanel, { useDetailPanelUrl } from "@/components/shared/detail-panel"
-import ContextMenu, { type ContextMenuItem } from "@/components/shared/context-menu"
-import InlineEdit from "@/components/shared/inline-edit"
-import { withViewTransition } from "@/components/shared/view-transition"
-import Button from "@/components/shared/button"
-import FilterChip from "@/components/shared/filter-chip"
-import StatusBadge from "@/components/shared/status-badge"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import { describeApiFailure, permissionDeniedMessage } from "@/components/shared/api-error-message"
-import Select from "@/components/shared/select"
-import Pagination from "@/components/shared/pagination"
-import SearchField from "@/components/shared/search-field"
-import KpiCard from "@/components/shared/kpi-card"
-import KpiBand from "@/components/shared/kpi-band"
-import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
-import { DelayedSkeleton } from "@/components/shared/skeleton"
-import { STATE_TEXT } from "@/components/shared/not-connected"
-import { notifyToast } from "@/components/shared/toast"
-import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from "@/components/shared/page-size-select"
-import ReorderHandle from "@/components/shared/reorder-handle"
-import { useFlipRows, useLiveReorder } from "@/lib/use-live-reorder"
-import { mergeVisibleOrder, movableIds } from "@/components/friend-fields/reorder-utils"
-import { ArchiveMarkDialog, autoRuleLabel, isUsed, usageLabel } from "@/components/friend-fields/mark-list"
-import styles from "./list.module.css"
-import type { AttributeListHost } from "./attribute-host"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField } from "@/components/shared/save-form-errors"
-import { ListToolbarSearchSlot } from "@/components/shared/list-toolbar"
-import ListState from "@/components/shared/list-state"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useListUrlValue, useListUrlState } from '@/components/shared/list-url-state'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { CircleDot, Flag, GripVertical, History, Info, Loader, Send } from 'lucide-react'
+import { api, ApiError, type ListStats, type SupportMarkArchiveImpact, type SupportMarkListItem } from '@/lib/api'
+import { createResponseGate } from '@/lib/latest-request'
+import { ListPageBody } from '@/components/templates'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu, RowQuickAction } from '@/components/shared/row-actions'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import InlineEdit from '@/components/shared/inline-edit'
+import { withViewTransition } from '@/components/shared/view-transition'
+import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
+import StatusBadge from '@/components/shared/status-badge'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
+import Select from '@/components/shared/select'
+import Pagination from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
+import { STATE_TEXT } from '@/components/shared/not-connected'
+import { notifyToast } from '@/components/shared/toast'
+import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
+import ReorderHandle from '@/components/shared/reorder-handle'
+import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
+import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils'
+import { ArchiveMarkDialog, autoRuleLabel, isUsed, usageLabel } from '@/components/friend-fields/mark-list'
+import styles from './list.module.css'
+import type { AttributeListHost } from './attribute-host'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 タグ「対応マーク」タブ（Pencil `vKDj5`）。
@@ -90,10 +50,6 @@ import Notice from "@/components/shared/notice"
  * 数の帯は共通の帯（板の端から端）、案内は青い帯、道具の段の右端に表示件数、
  * 表は板の端から端（行の右端は必ず「…」）、表の下に安全確認の段。
  */
-
-
-
-
 
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -410,7 +366,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
   const table = status === 'forbidden' ? (
     <ListState kind="error" title="対応マークを見る権限がありません" description={permissionDeniedMessage('store')}  />
   ) : status === 'error' ? (
-    <ListState kind="error" title="対応マークを読み込めませんでした" description={error || '再読み込みしても直らない場合はエラー報告へ。'}  action={<><Button type="button" onClick={() => void load()}>もう一度読み込む</Button></>} />
+    <ListState kind="error" title="対応マークを読み込めませんでした" description={error || '再読み込みしても直らない場合はエラー報告へ。'}  action={<><Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
   ) : listReady && items.length === 0 ? (
     <ListState kind="empty" title="まだ対応マークはありません" description="受信箱で、対応の進み具合を見分ける印です。"  icon={<Flag className={styles.stateIcon} aria-hidden="true" />} action={<>{canEdit ? <Button href={host ? undefined : "/tags/marks/new"} onClick={host?.onCreate} variant="primary">マークを作る</Button> : null}</>} />
   ) : listReady && visible.length === 0 ? (

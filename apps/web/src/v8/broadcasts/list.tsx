@@ -1,106 +1,53 @@
 'use client'
-import DetailPanel, { useDetailPanelUrl } from "@/components/shared/detail-panel"
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from "@/components/shared/list-toolbar"
-import SharedStatusBadge from "@/components/shared/status-badge"
-import SharedStatusPill from "@/components/shared/status-pill"
-import { useListUrlValue, useListScrollMemory, useListUrlParam } from "@/components/shared/list-url-state"
-import { useFeatureAccess } from "@/lib/use-feature-access"
-import { RovingTbody } from "@/components/shared/row-roving"
-import { useCallback, useEffect, useRef, useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { AlertCircle, Bookmark, CalendarClock, CalendarDays, ChevronDown, Copy, FilePen, FileText, Gauge, List as ListIcon, Lock, MailOpen, Plus, Send, SendHorizontal, UserCheck } from "lucide-react"
-import type { Folder, Tag } from "@line-crm/shared"
-import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastListKpis, type BroadcastSavedView } from "@/lib/api"
-import { loadFailureNotice, permissionDeniedMessage } from "@/components/shared/api-error-message"
-import { useAccount } from "@/contexts/account-context"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { useNarrowViewport } from "@/lib/use-narrow-viewport"
-import { ListPage, ListPagePagination } from "@/components/templates"
-import BroadcastForm from "@/components/broadcasts/broadcast-form"
-import FolderPanel, { FolderPanelNote, type FolderPanelRow } from "@/components/shared/folder-panel"
-import { FolderDotName } from "@/components/shared/folder-dot"
-import FolderAddDialog from "@/components/shared/folder-add-dialog"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import ActionMenu, { type ActionMenuItem } from "@/components/shared/action-menu"
-import { RowMenu } from "@/components/shared/row-actions"
-import ContextMenu, { type ContextMenuItem } from "@/components/shared/context-menu"
-import { withViewTransition } from "@/components/shared/view-transition"
-import Select from "@/components/shared/select"
-import Button from "@/components/shared/button"
-import EmptyList from "@/components/shared/empty-list"
-import DateField from "@/components/shared/date-field"
-import SearchField from "@/components/shared/search-field"
-import FilterChip from "@/components/shared/filter-chip"
-import KpiBand from "@/components/shared/kpi-band"
-import KpiCard from "@/components/shared/kpi-card"
-import Pagination from "@/components/shared/pagination"
-import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
-import { DelayedSkeleton, Skeleton } from "@/components/shared/skeleton"
-import { audienceSummary, messageTypeLabel } from "@/lib/broadcast-summary"
-import { runOptimistic } from "@/lib/undoable"
-import { formatDateTime, formatNumber, formatListDateTime as polishFormatListDateTime } from "@/lib/format"
-import QuickSendV8 from "./quick-send"
-import styles from "./list.module.css"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import ListState from "@/components/shared/list-state"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar'
+import SharedStatusBadge from '@/components/shared/status-badge'
+import SharedStatusPill from '@/components/shared/status-pill'
+import { useListUrlValue, useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { RovingTbody } from '@/components/shared/row-roving'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { AlertCircle, Bookmark, CalendarClock, CalendarDays, ChevronDown, Copy, FilePen, FileText, Gauge, List as ListIcon, Lock, MailOpen, Plus, Send, SendHorizontal, UserCheck } from 'lucide-react'
+import type { Folder, Tag } from '@line-crm/shared'
+import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastListKpis, type BroadcastSavedView } from '@/lib/api'
+import { loadFailureNotice, permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import { ListPage, ListPagePagination } from '@/components/templates'
+import BroadcastForm from '@/components/broadcasts/broadcast-form'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
+import Select from '@/components/shared/select'
+import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
+import DateField from '@/components/shared/date-field'
+import SearchField from '@/components/shared/search-field'
+import FilterChip from '@/components/shared/filter-chip'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import Pagination from '@/components/shared/pagination'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
+import { runOptimistic } from '@/lib/undoable'
+import { formatDateTime, formatNumber, formatListDateTime as polishFormatListDateTime } from '@/lib/format'
+import QuickSendV8 from './quick-send'
+import styles from './list.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 一斉配信の一覧（Pencil `l5V9a`・1152 は `jjFNi`・閲覧のみは `NtCE3`）。
@@ -109,10 +56,6 @@ import Notice from "@/components/shared/notice"
  * 型（ListPage）と共通部品で一から組み直した。データの口・保存先は今と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
-
-
-
-
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'

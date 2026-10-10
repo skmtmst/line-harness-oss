@@ -1,67 +1,35 @@
 'use client'
-import { useFeatureAccess } from "@/lib/use-feature-access"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useSearchParams } from "next/navigation"
-import { Download, Eye, PencilLine } from "lucide-react"
-import type { Scenario, ScenarioStats, ScenarioStep } from "@line-crm/shared"
-import { api, ApiError, type ScenarioRuns } from "@/lib/api"
-import { IdempotencyKeyStore } from "@/lib/idempotency-key-store"
-import { useAccount } from "@/contexts/account-context"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { useStaffRole } from "@/lib/staff-role"
-import { DetailPage } from "@/components/templates"
-import Button from "@/components/shared/button"
-import type { ActionMenuItem } from "@/components/shared/action-menu"
-import { RowMenu } from "@/components/shared/row-actions"
-import Dialog from "@/components/shared/dialog"
-import ListState from "@/components/shared/list-state"
-import TargetMissing from "@/components/shared/target-missing"
-import NoteBar from "@/components/shared/note-bar"
-import Select from "@/components/shared/select"
-import { EntityKindField } from "@/components/shared/entity-picker-sources"
-import StatusBadge, { type StatusBadgeTone } from "@/components/shared/status-badge"
-import KpiBand from "@/components/shared/kpi-band"
-import KpiCard from "@/components/shared/kpi-card"
-import { scenarioReferenceData } from "@/components/scenarios/scenario-reference-data"
-import { FriendPlanDialog } from "@/components/scenarios/scenario-dialogs"
-import { formatDateTime, formatNumber } from "@/lib/format"
-import styles from "./results.module.css"
-import { csvFileName } from "@/lib/csv-file-name"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField } from "@/components/shared/save-form-errors"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Download, Eye, PencilLine } from 'lucide-react'
+import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared'
+import { api, ApiError, type ScenarioRuns } from '@/lib/api'
+import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { useStaffRole } from '@/lib/staff-role'
+import { DetailPage } from '@/components/templates'
+import Button from '@/components/shared/button'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
+import Dialog from '@/components/shared/dialog'
+import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
+import NoteBar from '@/components/shared/note-bar'
+import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
+import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs'
+import { formatDateTime, formatNumber } from '@/lib/format'
+import styles from './results.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 シナリオ配信の配信結果（Pencil `X4STXS`）。
@@ -71,8 +39,6 @@ import Notice from "@/components/shared/notice"
  * 取得口・操作（止める・再開・失敗を再送・別のシナリオへ移す・予定を見る・CSV）は
  * 今までの V8（app/scenarios/results/results-v8.tsx）と v7（results/page.tsx）から写した。
  */
-
-
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 type Subscription = ScenarioRuns['subscriptions'][number]

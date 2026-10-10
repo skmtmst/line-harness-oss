@@ -1,119 +1,61 @@
 'use client'
 
-import { isOwnerOrAdmin } from "@/lib/staff-capability"
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from "@/components/shared/list-toolbar"
-import SharedStatusPill from "@/components/shared/status-pill"
-import { useListUrlValue } from "@/components/shared/list-url-state"
-import CopyTextButton from "@/components/shared/copy-text-button"
-import { useFeatureAccess } from "@/lib/use-feature-access"
-import { useSamePageUrl } from "@/lib/use-same-page-url"
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Archive, ArrowRight, Braces, CalendarClock, CalendarX, CircleDashed, FolderCog, Link2, Pause, Plus, TriangleAlert } from "lucide-react"
-import type { CommonVar, CommonVarDeleteImpact, Folder } from "@line-crm/shared"
-import { api, ApiError, type CommonVarReplacementCandidate, type CommonVarReplacementImpact } from "@/lib/api"
-import { useAccount } from "@/contexts/account-context"
-import { useNarrowViewport } from "@/lib/use-narrow-viewport"
-import { clampSearchQuery } from "@/lib/search-query"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { ListPage } from "@/components/templates"
-import SearchField from "@/components/shared/search-field"
-import Button from "@/components/shared/button"
-import EmptyList from "@/components/shared/empty-list"
-import IconButton from "@/components/shared/icon-button"
-import Checkbox from "@/components/shared/checkbox"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import Dialog from "@/components/shared/dialog"
-import FilterChip from "@/components/shared/filter-chip"
-import ManagedFolderPanel, { managedFolderNavRows, type ManagedFolderControl } from "@/components/shared/managed-folder-panel"
-import KpiBand from "@/components/shared/kpi-band"
-import KpiCard from "@/components/shared/kpi-card"
-import Pagination from "@/components/shared/pagination"
-import DetailPanel, { useDetailPanelUrl } from "@/components/shared/detail-panel"
-import InlineEdit from "@/components/shared/inline-edit"
-import ContextMenu, { type ContextMenuItem } from "@/components/shared/context-menu"
-import ActionMenu, { type ActionMenuItem } from "@/components/shared/action-menu"
-import BulkBar from "@/components/shared/bulk-bar"
-import { RowMenu } from "@/components/shared/row-actions"
-import { withViewTransition } from "@/components/shared/view-transition"
-import Select from "@/components/shared/select"
-import HelpTip from "@/components/shared/help-tip"
-import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from "@/components/shared/table"
-import { FolderDotName, type FolderDotFolder } from "@/components/shared/folder-dot"
-import { classifyApiFailure, isForbidden, permissionDeniedMessage } from "@/components/shared/api-error-message"
-import { COMMON_VAR_STATE_LABELS, formatStamp } from "@/lib/common-vars"
-import { formatDay, formatNumber, formatDate as polishFormatDate } from "@/lib/format"
-import { blockedReason, canDelete as canDeleteVar, checkedAtText, consequenceText, filterAndSortCommonVars, placeholderText, splitItems, unavailableText, usageText, type CommonVarFilter, type CommonVarOrder } from "./model"
-import VarsExportPanel from "./export-panel"
-import styles from "./list.module.css"
-import TruncatedText from "@/components/shared/truncated-text"
-import { Field } from "@/components/shared/form-controls"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import ListState from "@/components/shared/list-state"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar'
+import SharedStatusPill from '@/components/shared/status-pill'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import CopyTextButton from '@/components/shared/copy-text-button'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useSamePageUrl } from '@/lib/use-same-page-url'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Archive, ArrowRight, Braces, CalendarClock, CalendarX, CircleDashed, FolderCog, Link2, Pause, Plus, TriangleAlert } from 'lucide-react'
+import type { CommonVar, CommonVarDeleteImpact, Folder } from '@line-crm/shared'
+import { api, ApiError, type CommonVarReplacementCandidate, type CommonVarReplacementImpact } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import { clampSearchQuery } from '@/lib/search-query'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { ListPage } from '@/components/templates'
+import SearchField from '@/components/shared/search-field'
+import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
+import IconButton from '@/components/shared/icon-button'
+import Checkbox from '@/components/shared/checkbox'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import FilterChip from '@/components/shared/filter-chip'
+import ManagedFolderPanel, { managedFolderNavRows, type ManagedFolderControl } from '@/components/shared/managed-folder-panel'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import Pagination from '@/components/shared/pagination'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import InlineEdit from '@/components/shared/inline-edit'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import BulkBar from '@/components/shared/bulk-bar'
+import { RowMenu } from '@/components/shared/row-actions'
+import { withViewTransition } from '@/components/shared/view-transition'
+import Select from '@/components/shared/select'
+import HelpTip from '@/components/shared/help-tip'
+import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
+import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
+import { classifyApiFailure, isForbidden, permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { COMMON_VAR_STATE_LABELS, formatStamp } from '@/lib/common-vars'
+import { formatDay, formatNumber, formatDate as polishFormatDate } from '@/lib/format'
+import { blockedReason, canDelete as canDeleteVar, checkedAtText, consequenceText, filterAndSortCommonVars, placeholderText, splitItems, unavailableText, usageText, type CommonVarFilter, type CommonVarOrder } from './model'
+import VarsExportPanel from './export-panel'
+import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 共通情報の一覧（Pencil「★V8 画面の地図」の共通情報の行：
@@ -127,10 +69,6 @@ import Notice from "@/components/shared/notice"
  * 空のまま使われているときの黄色の帯は表の列の上、行の右端は「…」
  * （編集・止める／再開する・削除する）。右クリックでも同じものが出る。
  */
-
-
-
-
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -1187,9 +1125,9 @@ function CommonVarsListInner() {
     <ListState kind="empty" title="LINEアカウントを選択してください" description="共通情報はLINEアカウントごとに管理します。"  icon={<Braces size={18} aria-hidden="true" />} />
   ) : listFailed ? (
     isForbidden(listFailure) ? (
-      <ListState kind="error" title="共通情報を見る権限がありません" description="オーナーか管理者に、共通情報を見られるよう頼んでください。"  action={<><Button type="button" onClick={() => void load()}>もう一度読み込む</Button><Button href="/staff" variant="secondary">できることを確かめる</Button></>} />
+      <ListState kind="error" title="共通情報を見る権限がありません" description="オーナーか管理者に、共通情報を見られるよう頼んでください。"  action={<><Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button><Button href="/staff" variant="secondary">できることを確かめる</Button></>} />
     ) : (
-      <ListState kind="error" title="共通情報を読み込めませんでした" description={error || '読み込みに失敗しました。接続を確かめて、もう一度お試しください。'} data-design-node="RqO7O" action={<><Button type="button" onClick={() => void load()}>もう一度読み込む</Button></>} />
+      <ListState kind="error" title="共通情報を読み込めませんでした" description={error || '読み込みに失敗しました。接続を確かめて、もう一度お試しください。'} data-design-node="RqO7O" action={<><Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
     )
   ) : filtered.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */

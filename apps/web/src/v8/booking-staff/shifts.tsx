@@ -1,71 +1,36 @@
 'use client'
-import { canEditFeature, canViewFeature } from "@/lib/staff-capability"
-import Toggle from "@/components/shared/toggle"
-import { jstDate } from "@/lib/jst-datetime"
-import { usePermissionAccess } from "@/lib/use-feature-access"
-import { useStaffRole } from "@/lib/staff-role"
-import { useSamePageUrl } from "@/lib/use-same-page-url"
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { CalendarPlus, Plus, Smartphone, Trash2, UserX } from "lucide-react"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { ApiError, api, bookingApi, type BookingAvailabilitySlot, type BookingBreakConflict, type BookingException, type BookingMenu, type BookingShift, type BookingStaff } from "@/lib/api"
-import { useAccount } from "@/contexts/account-context"
-import Button from "@/components/shared/button"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import DateField from "@/components/shared/date-field"
-import { TimeField } from "@/components/shared/date-time-field"
-import Checkbox, { SettingCheckbox } from "@/components/shared/checkbox"
-import Select from "@/components/shared/select"
-import { isForbiddenOrRateLimited, permissionDeniedMessage } from "@/components/shared/api-error-message"
-import ListState from "@/components/shared/list-state"
-import { PhoneDatetimeStep } from "./phone"
-import layout from "./layout.module.css"
-import styles from "./shifts.module.css"
-import { formatDate as polishFormatDate } from "@/lib/format"
-import { PageHeading } from "@/components/templates/page-frame"
-import { Field } from "@/components/shared/form-controls"
-import { emptyValue } from "@/components/shared/empty-value"
-import NumberInput from "@/components/shared/number-field"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
+import Toggle from '@/components/shared/toggle'
+import { jstDate } from '@/lib/jst-datetime'
+import { usePermissionAccess } from '@/lib/use-feature-access'
+import { useStaffRole } from '@/lib/staff-role'
+import { useSamePageUrl } from '@/lib/use-same-page-url'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { CalendarPlus, Plus, Smartphone, Trash2, UserX } from 'lucide-react'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { ApiError, api, bookingApi, type BookingAvailabilitySlot, type BookingBreakConflict, type BookingException, type BookingMenu, type BookingShift, type BookingStaff } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import DateField from '@/components/shared/date-field'
+import { TimeField } from '@/components/shared/date-time-field'
+import Checkbox, { SettingCheckbox } from '@/components/shared/checkbox'
+import Select from '@/components/shared/select'
+import { isForbiddenOrRateLimited, permissionDeniedMessage } from '@/components/shared/api-error-message'
+import ListState from '@/components/shared/list-state'
+import { PhoneDatetimeStep } from './phone'
+import layout from './layout.module.css'
+import styles from './shifts.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { PageHeading } from '@/components/templates/page-frame'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8「勤務とシフト」（板 d5fmnM・管理者）・「自分の勤務」（板 E3YDK・スタッフ本人）・
@@ -79,8 +44,6 @@ import Notice from "@/components/shared/notice"
  * 動き（読み込み・保存・版の競合・権限・失敗時の扱い）は今までの
  * app/booking/staff/shifts/staff-detail-v8.tsx から写した。BEHAVIOR.md を参照。
  */
-
-
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 

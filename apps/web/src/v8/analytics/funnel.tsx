@@ -1,56 +1,30 @@
 'use client'
 
-import { ValueBarChart, LineChart, FunnelChart } from "@/components/shared/charts"
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import { useRouter } from "next/navigation"
-import { ArrowDownRight, CalendarClock, Flag, LogIn, Plus, RefreshCw, Send, Users } from "lucide-react"
-import KpiBand from "@/components/shared/kpi-band"
-import KpiCard from "@/components/shared/kpi-card"
-import Button from "@/components/shared/button"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import { notifyToast } from "@/components/shared/toast"
-import Disclosure from "@/components/shared/disclosure"
-import ListState from "@/components/shared/list-state"
-import SegmentedControl from "@/components/shared/segmented"
-import Select from "@/components/shared/select"
-import { api, type AnalyticsFunnelRunResult } from "@/lib/api"
-import { formatNumber } from "@/lib/format"
-import { RangePickerV8, StatePill } from "./common"
-import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, rangeFor, useRegisterExport } from "./parts"
-import styles from "./analytics.module.css"
-import { useReportPeriod } from "@/components/shared/period-picker"
-import { Field } from "@/components/shared/form-controls"
-import { csvFileName } from "@/lib/csv-file-name"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
+import { ArrowDownRight, CalendarClock, Flag, LogIn, Plus, RefreshCw, Send, Users } from 'lucide-react'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { notifyToast } from '@/components/shared/toast'
+import Disclosure from '@/components/shared/disclosure'
+import ListState from '@/components/shared/list-state'
+import SegmentedControl from '@/components/shared/segmented'
+import Select from '@/components/shared/select'
+import { api, type AnalyticsFunnelRunResult } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
+import { RangePickerV8, StatePill } from './common'
+import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, rangeFor, useRegisterExport } from './parts'
+import styles from './analytics.module.css'
+import { useReportPeriod } from '@/components/shared/period-picker'
+import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 分析「ファネル」（Pencil `DkRDE`）。
@@ -60,8 +34,6 @@ import Notice from "@/components/shared/notice"
  * 作る／編集のフォームと保存の欄は、入口（app/analytics/page.tsx）が今の部品を渡す。
  * 呼ぶ口・世代の守り・判定不能の扱い・CSV は今の画面（FunnelTab）と同じ。
  */
-
-
 
 type FunnelStatus = 'active' | 'stopped' | 'archived'
 type FunnelSummary = { id: string; name: string; windowDays: number; createdAt: string; status: FunnelStatus; currentVersion: { id: string; versionNumber: number; createdAt: string } | null; migrationState: 'ready' | 'needs_migration' }

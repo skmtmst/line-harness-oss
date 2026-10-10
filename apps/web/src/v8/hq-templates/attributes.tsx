@@ -1,73 +1,38 @@
 'use client'
 
-import { permissionDeniedMessage } from "@/components/shared/api-error-message"
-import { useTenantWideAccess, useStaffRole } from "@/lib/staff-role"
-import { useCallback, useEffect, useRef, useState } from "react"
-import type { FriendField, Folder, HqFriendAttributeDetail, HqFriendAttributeInput, HqFriendAttributeTemplate, HqFriendAttributeType, HqFriendAttributeListStats, HqTemplateFolder, HqMarkDefinition } from "@line-crm/shared"
-import { ClipboardList, FileText, Flag, History, Loader, Users, CircleDot, PenLine, Plus } from "lucide-react"
-import { hqFriendAttributesApi as api } from "@/lib/hq-friend-attributes-api"
-import { hqTemplatesApi } from "@/lib/hq-templates-api"
-import { requestUnsavedAction } from "@/lib/unsaved-action"
-import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
-import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { ListPage, CreatePage } from "@/components/templates"
-import Button from "@/components/shared/button"
-import Notice from "@/components/shared/notice"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import FolderEditorDialog from "@/components/shared/folder-editor-dialog"
-import { FOLDER_SELECT_COLORS } from "@line-crm/shared"
-import Checkbox from "@/components/shared/checkbox"
-import KpiBand from "@/components/shared/kpi-band"
-import KpiCard from "@/components/shared/kpi-card"
-import FieldsTab from "@/v8/tags/fields-tab"
-import MarksTab from "@/v8/tags/marks-tab"
-import FieldEditor, { type FieldEditorValues } from "@/v8/tags/field-editor"
-import MarkBasicFields from "@/v8/tags/mark-basic-fields"
-import type { AttributeListHost } from "@/v8/tags/attribute-host"
-import { AttributeTabs, type AttributeTabKey } from "./attribute-tabs"
-import AttributeDistribution from "./attribute-distribution"
-import { fieldOf, fieldDefinition, markOf } from "./attribute-model"
-import listStyles from "@/v8/tags/list.module.css"
-import createStyles from "@/v8/tags/create.module.css"
-import { folderDisplayColor } from "@/components/shared/folder-dot"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { FriendField, Folder, HqFriendAttributeDetail, HqFriendAttributeInput, HqFriendAttributeTemplate, HqFriendAttributeType, HqFriendAttributeListStats, HqTemplateFolder, HqMarkDefinition } from '@line-crm/shared'
+import { ClipboardList, FileText, Flag, History, Loader, Users, CircleDot, PenLine, Plus } from 'lucide-react'
+import { hqFriendAttributesApi as api } from '@/lib/hq-friend-attributes-api'
+import { hqTemplatesApi } from '@/lib/hq-templates-api'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { ListPage, CreatePage } from '@/components/templates'
+import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
+import Checkbox from '@/components/shared/checkbox'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import FieldsTab from '@/v8/tags/fields-tab'
+import MarksTab from '@/v8/tags/marks-tab'
+import FieldEditor, { type FieldEditorValues } from '@/v8/tags/field-editor'
+import MarkBasicFields from '@/v8/tags/mark-basic-fields'
+import type { AttributeListHost } from '@/v8/tags/attribute-host'
+import { AttributeTabs, type AttributeTabKey } from './attribute-tabs'
+import AttributeDistribution from './attribute-distribution'
+import { fieldOf, fieldDefinition, markOf } from './attribute-model'
+import listStyles from '@/v8/tags/list.module.css'
+import createStyles from '@/v8/tags/create.module.css'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 type Attempt = { input: HqFriendAttributeInput; requestId: string; distribute: boolean }
 type Entry = { row: HqFriendAttributeTemplate; detail: HqFriendAttributeDetail }

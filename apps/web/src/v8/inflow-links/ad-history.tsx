@@ -1,51 +1,28 @@
 'use client'
 
-import { useListUrlValue } from "@/components/shared/list-url-state"
-import { useMemo, useState } from "react"
-import { Download, RotateCw } from "lucide-react"
-import { api, type AdConversionLog } from "@/lib/api"
-import { useStaffRole } from "@/lib/staff-role"
-import { formatNumber } from "@/lib/format"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import Button from "@/components/shared/button"
-import ListState from "@/components/shared/list-state"
-import Pagination from "@/components/shared/pagination"
-import SearchField from "@/components/shared/search-field"
-import Select from "@/components/shared/select"
-import StatusBadge from "@/components/shared/status-badge"
-import { notifyToast } from "@/components/shared/toast"
-import { AD_LOG_PAGE_SIZE, adDateTime, adLogStatus, adPlatformLabel, useAdLogs } from "./ad-shared"
-import adsStyles from "./ads.module.css"
-import styles from "./ad-pages.module.css"
-import { PageHeading } from "@/components/templates/page-frame"
-import { csvFileName } from "@/lib/csv-file-name"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField } from "@/components/shared/save-form-errors"
-import EntitySelect from "@/components/shared/entity-select"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useMemo, useState } from 'react'
+import { Download, RotateCw } from 'lucide-react'
+import { api, type AdConversionLog } from '@/lib/api'
+import { useStaffRole } from '@/lib/staff-role'
+import { formatNumber } from '@/lib/format'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import StatusBadge from '@/components/shared/status-badge'
+import { notifyToast } from '@/components/shared/toast'
+import { AD_LOG_PAGE_SIZE, adDateTime, adLogStatus, adPlatformLabel, useAdLogs } from './ad-shared'
+import adsStyles from './ads.module.css'
+import styles from './ad-pages.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 広告への送信履歴（Pencil `p0kA3`・`/inflow-links?tab=connections&view=history`）。
@@ -55,8 +32,6 @@ import Notice from "@/components/shared/notice"
  * 呼ぶ口：媒体の一覧・送信記録のページ（今と同じ）、断られた1件のやり直し `POST /api/ad-platforms/logs/:id/retry`（F-22・owner）。
  * BEHAVIOR.md の「広告への送信履歴」。
  */
-
-
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'すべての状態' },

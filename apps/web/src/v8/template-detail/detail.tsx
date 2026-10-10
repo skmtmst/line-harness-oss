@@ -1,63 +1,33 @@
 'use client'
-import { useFeatureAccess } from "@/lib/use-feature-access"
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowLeft, CircleAlert, Copy, GitCompare, List, Pencil, RotateCcw, Send, Upload } from "lucide-react"
-import { validateFlexContent } from "@line-crm/shared"
-import { api, ApiError } from "@/lib/api"
-import { useAccount } from "@/contexts/account-context"
-import { usePageTitle } from "@/components/shell/page-chrome"
-import { PageFrame, PageHeading } from "@/components/templates/page-frame"
-import { type ActionMenuItem } from "@/components/shared/action-menu"
-import { RowMenu } from "@/components/shared/row-actions"
-import Button from "@/components/shared/button"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import Dialog from "@/components/shared/dialog"
-import LinePreview, { LinePreviewFlex as FlexPreviewComponent } from "@/components/shared/line-preview"
-import { InsertText } from "@/components/shared/insert-text-field"
-import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from "@/components/templates/message-template-editor"
-import TargetMissing from "@/components/shared/target-missing"
-import { buildUsageRows, insertionNames, isTemplateDetailData, lineChanges, messageTypeText, publishRowState, shortStamp, templateDeleteDescription, type TemplateDetailData, type TemplateVersionItem, type UsageRow } from "./model"
-import styles from "./detail.module.css"
-import { formatNumber as polishFormatNumber } from "@/lib/format"
-import TruncatedText from "@/components/shared/truncated-text"
-import TextLink from "@/components/shared/text-link"
-import { emptyValue } from "@/components/shared/empty-value"
-import { DetailLoading } from "@/components/templates/detail-page"
-import { SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { ArrowLeft, CircleAlert, Copy, GitCompare, List, Pencil, RotateCcw, Send, Upload } from 'lucide-react'
+import { validateFlexContent } from '@line-crm/shared'
+import { api, ApiError } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import LinePreview, { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
+import { InsertText } from '@/components/shared/insert-text-field'
+import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor'
+import TargetMissing from '@/components/shared/target-missing'
+import { buildUsageRows, insertionNames, isTemplateDetailData, lineChanges, messageTypeText, publishRowState, shortStamp, templateDeleteDescription, type TemplateDetailData, type TemplateVersionItem, type UsageRow } from './model'
+import styles from './detail.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 テンプレートの詳細（一から書いた画面・2026-10-07）。
@@ -68,9 +38,6 @@ import Notice from "@/components/shared/notice"
  * 動き（読み込み・公開・この版に戻す・削除の安全・権限）は今の画面（app/templates/detail）と同じ。
  * 受け付ける指定・呼ぶ API は BEHAVIOR.md。
  */
-
-
-
 
 /** 表にまず見せる行数。残りは「ほか N か所を見る」で開く。 */
 const USAGE_VISIBLE = 4

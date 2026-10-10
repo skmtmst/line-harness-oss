@@ -1,58 +1,30 @@
 'use client'
-import { CalendarClock, Users, Armchair, CalendarX, Inbox, Check, Download, Send } from "lucide-react"
-import { formatDate as polishFormatDate } from "@/lib/format"
-import { Suspense, useCallback, useEffect, useRef, useState } from "react"
-import { useSearchParams } from "next/navigation"
-import { api, eventsApi, type EventDetail, type EventOccurrenceApplicant, type EventOccurrenceApplicants, type EventSlot } from "@/lib/api"
-import { useAccount } from "@/contexts/account-context"
-import { usePageTitle } from "@/components/shell/page-chrome"
-import { useStaffRole } from "@/lib/staff-role"
-import { DetailPage } from "@/components/templates"
-import KpiCard from "@/components/shared/kpi-card"
-import KpiBand from "@/components/shared/kpi-band"
-import Button from "@/components/shared/button"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import ListState from "@/components/shared/list-state"
-import Select from "@/components/shared/select"
-import TargetMissing from "@/components/shared/target-missing"
-import { jstShort } from "./shared"
-import styles from "./bookings.module.css"
-import { Field } from "@/components/shared/form-controls"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-import StatusBadge from "@/components/shared/status-badge"
-import { EventRosterCard, EventRosterTable, EventRosterRow, EventRosterActions, EventAttendanceSummary } from "@/components/shared/event-roster"
-import { TextField, TextArea } from "@/components/shared/text-field"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { CalendarClock, Users, Armchair, CalendarX, Inbox, Check, Download, Send } from 'lucide-react'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { api, eventsApi, type EventDetail, type EventOccurrenceApplicant, type EventOccurrenceApplicants, type EventSlot } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { useStaffRole } from '@/lib/staff-role'
+import { DetailPage } from '@/components/templates'
+import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ListState from '@/components/shared/list-state'
+import Select from '@/components/shared/select'
+import TargetMissing from '@/components/shared/target-missing'
+import { jstShort } from './shared'
+import styles from './bookings.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import StatusBadge from '@/components/shared/status-badge'
+import { EventRosterCard, EventRosterTable, EventRosterRow, EventRosterActions, EventAttendanceSummary } from '@/components/shared/event-roster'
+import { TextField, TextArea } from '@/components/shared/text-field'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 イベント予約の「申込者」（Pencil `Mu8qW`）。
@@ -62,8 +34,6 @@ import Notice from "@/components/shared/notice"
  * 処理（口・確かめの窓・失敗の文）は今の V8（src/app/events/bookings/bookings-v8.tsx）から写した。
  * 行の操作は絵どおり行に直接出す（承認する／断る・キャンセルにする／参加済／無断・予約に繰上げ・待ち順を変える）。
  */
-
-
 
 /** 予約・申込の状態の見え方。色だけに頼らず、必ず文字で言う。 */
 type ChipTone = 'warning' | 'success' | 'info' | 'neutral' | 'danger'
@@ -658,8 +628,8 @@ function Bookings({ eventId }: { eventId: string }) {
                 onChange={(e) => setBroadcastMessage(e.target.value)}
                 placeholder="当日は動きやすい服装でお越しください"
               /></SaveErrorField>
-              <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} aria- busy={broadcastBusy || undefined}>
-                {broadcastBusy ? '確認中…' : '送る'}
+              <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} busy={broadcastBusy} busyLabel="確認中…">
+                送る
               </Button>
             </div></Field></div>
           {broadcastError ? <Notice tone="danger" >{broadcastError}</Notice> : null}

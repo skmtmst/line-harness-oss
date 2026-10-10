@@ -1,55 +1,29 @@
 'use client'
 
-import { jstDate } from "@/lib/jst-datetime"
-import { Download, FileSearch, Info, Inbox } from "lucide-react"
-import { formatNumber } from "@/lib/format"
-import { usePageTitle } from "@/components/shell/page-chrome"
-import { PageFrame } from "@/components/templates/page-frame"
-import Button from "@/components/shared/button"
-import Checkbox from "@/components/shared/checkbox"
-import FileDropzone, { AttachmentRow } from "@/components/shared/file-drop"
-import HelpTip from "@/components/shared/help-tip"
-import KpiCard from "@/components/shared/kpi-card"
-import KpiBand from "@/components/shared/kpi-band"
-import ListState from "@/components/shared/list-state"
-import Select from "@/components/shared/select"
-import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
-import { FriendsSectionHead } from "../shared/head"
-import { slashDateTime } from "../duplicates/words"
-import { csvExportLine } from "../list/csv-export"
-import { formatImportBytes, JOB_STATUS_LABELS, MANAGE_FORBIDDEN, useFriendMigrations } from "./use-friend-migrations"
-import styles from "./migrations.module.css"
-import { permissionDeniedMessage } from "@/components/shared/api-error-message"
-import { csvFileName } from "@/lib/csv-file-name"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField } from "@/components/shared/save-form-errors"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { jstDate } from '@/lib/jst-datetime'
+import { Download, FileSearch, Info, Inbox } from 'lucide-react'
+import { formatNumber } from '@/lib/format'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { PageFrame } from '@/components/templates/page-frame'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
+import HelpTip from '@/components/shared/help-tip'
+import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
+import ListState from '@/components/shared/list-state'
+import Select from '@/components/shared/select'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { FriendsSectionHead } from '../shared/head'
+import { slashDateTime } from '../duplicates/words'
+import { csvExportLine } from '../list/csv-export'
+import { formatImportBytes, JOB_STATUS_LABELS, MANAGE_FORBIDDEN, useFriendMigrations } from './use-friend-migrations'
+import styles from './migrations.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 CSVで書き出す・取り込む（Pencil `T9gblG`）。/friends/migrations。

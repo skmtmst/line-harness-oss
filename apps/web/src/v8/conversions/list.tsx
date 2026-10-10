@@ -1,116 +1,58 @@
 'use client'
 
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from "@/components/shared/list-toolbar"
-import { useListUrlValue, useListUrlParam } from "@/components/shared/list-url-state"
-import { useFolderMove } from "@/components/shared/use-folder-move"
-import { moveConversionToFolder } from "@/lib/move-to-folder"
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { ReactNode } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Banknote, Bookmark, CircleOff, CirclePause, Download, FilePen, KeyRound, Pause, Play, Plus, Target, TriangleAlert, Trophy, Unplug } from "lucide-react"
-import { ListPage, ListPagePagination } from "@/components/templates"
-import SearchField from "@/components/shared/search-field"
-import Button from "@/components/shared/button"
-import EmptyList from "@/components/shared/empty-list"
-import KpiBand from "@/components/shared/kpi-band"
-import KpiCard from "@/components/shared/kpi-card"
-import Notice from "@/components/shared/notice"
-import FilterChip from "@/components/shared/filter-chip"
-import Select from "@/components/shared/select"
-import PageSizeSelect from "@/components/shared/page-size-select"
-import ManagedFolderPanel, { folderDotFor, managedFolderOptions, useManagedFolders } from "@/components/shared/managed-folder-panel"
-import { FolderDotName } from "@/components/shared/folder-dot"
-import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
-import { type ActionMenuItem } from "@/components/shared/action-menu"
-import { RowMenu } from "@/components/shared/row-actions"
-import RadioCard, { RadioCardGroup } from "@/components/shared/radio-card"
-import Disclosure from "@/components/shared/disclosure"
-import { Field } from "@/components/shared/form-controls"
-import { TextField } from "@/components/shared/text-field"
-import ListState from "@/components/shared/list-state"
-import StatusBadge from "@/components/shared/status-badge"
-import Card from "@/components/shared/card"
-import Pagination from "@/components/shared/pagination"
-import { DelayedSkeleton, Skeleton } from "@/components/shared/skeleton"
-import { findConditionDraftIssue, pruneCondition } from "@/components/shared/condition-builder"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { useAccount } from "@/contexts/account-context"
-import { useNarrowViewport } from "@/lib/use-narrow-viewport"
-import { canEditFeature } from "@/lib/staff-capability"
-import { formatNumber, formatDate as polishFormatDate } from "@/lib/format"
-import { api, describeSaveFailure, type ConversionDefinitionDeleteImpact, type ConversionDefinitionEvent, type ConversionDefinitionFilter, type ConversionDefinitionList, type ConversionDefinitionListItem, type ConversionDefinitionReport, type ConversionIngestionEvent } from "@/lib/api"
-import { deduplicationLabel } from "./dedup"
-import { originInfoOf } from "./origin-labels"
-import { readExclusionCondition, readExclusionMemo } from "./exclusion"
-import { ConversionDetailDialog, ConversionEditDialog, ConversionReversalDialog, EDIT_VALUE_MODE_LABELS, STATE_LABELS, sourceTriggerLabel, usageLabel, type ConversionStopAction, type EditForm } from "./dialogs"
-import { notifyToast } from "@/components/shared/toast"
-import { focusConversionField, type ConversionFieldIssue } from "./field-issue"
-import styles from "./list.module.css"
-import { withPermissionFailure } from "@/components/shared/api-error-message"
-import { csvFileName } from "@/lib/csv-file-name"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
+import { useListUrlValue, useListUrlParam } from '@/components/shared/list-url-state'
+import { useFolderMove } from '@/components/shared/use-folder-move'
+import { moveConversionToFolder } from '@/lib/move-to-folder'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Banknote, Bookmark, CircleOff, CirclePause, Download, FilePen, KeyRound, Pause, Play, Plus, Target, TriangleAlert, Trophy, Unplug } from 'lucide-react'
+import { ListPage, ListPagePagination } from '@/components/templates'
+import SearchField from '@/components/shared/search-field'
+import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import Notice from '@/components/shared/notice'
+import FilterChip from '@/components/shared/filter-chip'
+import Select from '@/components/shared/select'
+import PageSizeSelect from '@/components/shared/page-size-select'
+import ManagedFolderPanel, { folderDotFor, managedFolderOptions, useManagedFolders } from '@/components/shared/managed-folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Disclosure from '@/components/shared/disclosure'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
+import ListState from '@/components/shared/list-state'
+import StatusBadge from '@/components/shared/status-badge'
+import Card from '@/components/shared/card'
+import Pagination from '@/components/shared/pagination'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { findConditionDraftIssue, pruneCondition } from '@/components/shared/condition-builder'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { useAccount } from '@/contexts/account-context'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import { canEditFeature } from '@/lib/staff-capability'
+import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
+import { api, describeSaveFailure, type ConversionDefinitionDeleteImpact, type ConversionDefinitionEvent, type ConversionDefinitionFilter, type ConversionDefinitionList, type ConversionDefinitionListItem, type ConversionDefinitionReport, type ConversionIngestionEvent } from '@/lib/api'
+import { deduplicationLabel } from './dedup'
+import { originInfoOf } from './origin-labels'
+import { readExclusionCondition, readExclusionMemo } from './exclusion'
+import { ConversionDetailDialog, ConversionEditDialog, ConversionReversalDialog, EDIT_VALUE_MODE_LABELS, STATE_LABELS, sourceTriggerLabel, usageLabel, type ConversionStopAction, type EditForm } from './dialogs'
+import { notifyToast } from '@/components/shared/toast'
+import { focusConversionField, type ConversionFieldIssue } from './field-issue'
+import styles from './list.module.css'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 コンバージョンの一覧（Pencil：一覧 `r6dJFy`・1152 `BygrU`・閲覧のみ `WSGvo`・
@@ -123,8 +65,6 @@ import ReadOnlyNotice from "@/components/shared/read-only-notice"
  * データの口・保存の口・権限・失敗の扱いは app/conversions/page.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
-
-
 
 type StatusFilter = 'all' | ConversionDefinitionFilter
 /** フォルダの列の「未分類」（`?folder=unfiled`）。 */

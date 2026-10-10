@@ -1,115 +1,58 @@
 'use client'
 
-import { useOverlayFocus } from "@/components/shared/overlay-utils"
-import { formatDate as polishFormatDate, formatDateTime } from "@/lib/format"
-import SegmentedControl from "@/components/shared/segmented"
-import { useListUrlValue } from "@/components/shared/list-url-state"
-import { notifySaved, notifyToast } from "@/components/shared/toast"
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { UserPlus } from "lucide-react"
-import Link from "next/link"
-import { useMergedTab } from "@/components/layout/merged-tabs"
-import LoginAudit from "@/components/staff/login-audit"
-import Button from "@/components/shared/button"
-import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from "@/components/shared/grid-table"
-import Checkbox from "@/components/shared/checkbox"
-import { Field } from "@/components/shared/form-controls"
-import { TextField } from "@/components/shared/text-field"
-import Select from "@/components/shared/select"
-import { DelayedSkeleton, Skeleton } from "@/components/shared/skeleton"
-import SearchField from "@/components/shared/search-field"
-import FilterChip from "@/components/shared/filter-chip"
-import { Tabs } from "@/components/shared/tabs"
-import Pagination from "@/components/shared/pagination"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import Dialog from "@/components/shared/dialog"
-import Notice from "@/components/shared/notice"
-import StepUpPrompt, { isStepUpRequired, type StepUpRequest as SharedStepUpRequest } from "@/components/step-up-prompt"
-import NotificationSwitch from "@/components/ui/notification-switch"
-import { usePageTitle } from "@/components/shell/page-chrome"
-import { PageFrame, PageHeading } from "@/components/templates/page-frame"
-import SettingsInnerNav from "@/components/layout/settings-inner-nav"
-import { type ActionMenuItem } from "@/components/shared/action-menu"
-import { RowMenu } from "@/components/shared/row-actions"
-import styles from "./staff.module.css"
-import StatusBadge from "@/components/shared/status-badge"
-import { useAccount } from "@/contexts/account-context"
-import { ApiError, api, describeSaveFailure, fetchApi, type AccessRoleBundle, type AccessRoleItem, type AccessUserItem, type AccessUserSummary, type AuditEventItem } from "@/lib/api"
-import type { StaffMember } from "@line-crm/shared"
-import { SCOPE_ITEMS, BUNDLE_PRESETS, BROADCAST_EDIT_OPERATION_KEYS, type FeatureAccessLevel, type ScopeLevels } from "@line-crm/shared"
-import { csvCell } from "@/lib/presentation"
-import { qrToDataURL } from "@/lib/qr-image"
-import { isActiveAdministrator, matchStaffMember, staffActionPolicy } from "./staff-actions"
-import { applyScopeRowChange, findPartialScopeRows, restoreSavedLevels, scopePiiToEmailMask } from "./staff-scope-draft"
-import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from "./permission-labels"
-import OtpInput, { otpFailureMessage } from "@/components/shared/otp-input"
-import TruncatedText from "@/components/shared/truncated-text"
-import { withPermissionFailure } from "@/components/shared/api-error-message"
-import { csvFileName } from "@/lib/csv-file-name"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-import EditorSurface from "@/components/shared/editor-surface"
-import ListState from "@/components/shared/list-state"
-import { useRouter, useSearchParams } from "next/navigation"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format'
+import SegmentedControl from '@/components/shared/segmented'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { notifySaved, notifyToast } from '@/components/shared/toast'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { UserPlus } from 'lucide-react'
+import Link from 'next/link'
+import { useMergedTab } from '@/components/layout/merged-tabs'
+import LoginAudit from '@/components/staff/login-audit'
+import Button from '@/components/shared/button'
+import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/components/shared/grid-table'
+import Checkbox from '@/components/shared/checkbox'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
+import Select from '@/components/shared/select'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import SearchField from '@/components/shared/search-field'
+import FilterChip from '@/components/shared/filter-chip'
+import { Tabs } from '@/components/shared/tabs'
+import Pagination from '@/components/shared/pagination'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest as SharedStepUpRequest } from '@/components/step-up-prompt'
+import NotificationSwitch from '@/components/ui/notification-switch'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import SettingsInnerNav from '@/components/layout/settings-inner-nav'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
+import styles from './staff.module.css'
+import StatusBadge from '@/components/shared/status-badge'
+import { useAccount } from '@/contexts/account-context'
+import { ApiError, api, describeSaveFailure, fetchApi, type AccessRoleBundle, type AccessRoleItem, type AccessUserItem, type AccessUserSummary, type AuditEventItem } from '@/lib/api'
+import type { StaffMember } from '@line-crm/shared'
+import { SCOPE_ITEMS, BUNDLE_PRESETS, BROADCAST_EDIT_OPERATION_KEYS, type FeatureAccessLevel, type ScopeLevels } from '@line-crm/shared'
+import { csvCell } from '@/lib/presentation'
+import { qrToDataURL } from '@/lib/qr-image'
+import { isActiveAdministrator, matchStaffMember, staffActionPolicy } from './staff-actions'
+import { applyScopeRowChange, findPartialScopeRows, restoreSavedLevels, scopePiiToEmailMask } from './staff-scope-draft'
+import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from './permission-labels'
+import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
+import TruncatedText from '@/components/shared/truncated-text'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import EditorSurface from '@/components/shared/editor-surface'
+import ListState from '@/components/shared/list-state'
+import { useRouter, useSearchParams } from 'next/navigation'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 type Channel = { email: boolean; line: boolean }
 type CopyableAccessUser = AccessUserItem & { roleBundle: Exclude<AccessRoleBundle, 'custom'> }
@@ -711,7 +654,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
 
 
  setError(messageOf(caught)) } } finally { setStatusSaving(false) } }
-  return <SaveErrorScope errors={saveErrors}><EditorSurface surface={surface} open title="ログインユーザーを編集する" onCancel={onClose} footer={<div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void save()} disabled={saving}>✓ {saving ? '保存中…' : '保存する'}</Button></div>}><div data-design-node="EOTS4"><div className="flex items-start justify-between"><div><p className="mt-1 text-xs text-ink-secondary">役割・表示機能・担当範囲を確認し、このユーザーに必要な範囲だけを設定します。</p></div></div>
+  return <SaveErrorScope errors={saveErrors}><EditorSurface surface={surface} open title="ログインユーザーを編集する" onCancel={onClose} footer={<div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void save()} busyLabel="確認中…" disabled={saving}>✓ 保存する</Button></div>}><div data-design-node="EOTS4"><div className="flex items-start justify-between"><div><p className="mt-1 text-xs text-ink-secondary">役割・表示機能・担当範囲を確認し、このユーザーに必要な範囲だけを設定します。</p></div></div>
     <div className="mt-5 rounded-control bg-canvas-sunken p-3"><p className="font-semibold text-ink">{member.name}</p><p className="text-xs text-ink-secondary">{ROLE_LABEL[member.role]}</p></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}{emailNotice && <p role="status" className="mt-4 rounded-control bg-accent-soft p-3 text-sm text-accent-deep">{emailNotice}</p>}
     {policy.showAccountActions && <section className={`mt-5 rounded-card border p-4 ${member.isActive ? 'border-accent bg-accent-soft' : 'border-warning bg-warning-bg'}`} aria-label="ユーザーの利用状態"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-semibold text-ink">ログイン状態：{member.isActive ? '有効' : '無効'}</p><p className="mt-1 text-xs leading-5 text-ink-secondary">{member.isActive ? '無効にすると、このユーザーはログインできなくなります。' : '有効にすると、このユーザーは再びログインできます。'}</p><div className="mt-2"><LoginHistoryNote count={loginCount} loading={loginHistoryLoading} failed={loginHistoryFailed} /></div></div><Button variant="primary" className={(`min-w-48 rounded-control px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${member.isActive ? 'border border-warning bg-canvas text-warning hover:bg-warning-bg' : 'bg-accent-deep text-on-accent hover:brightness-90'}`) + ' h-auto whitespace-normal'} type="button" onClick={() => void toggleActive()} disabled={statusSaving || Boolean(policy.statusBlockedReason)} busy={Boolean(statusSaving)} busyLabel="変更中…">{member.isActive ? 'このユーザーを無効にする' : 'このユーザーを有効にする'}</Button></div>{policy.statusBlockedReason && <p className="mt-3 rounded-control bg-canvas p-3 text-xs font-semibold text-warning">{policy.statusBlockedReason}</p>}</section>}
     <div className="mt-5 grid gap-4 sm:grid-cols-2">{administrator && <Field label="名前" required htmlFor="staff-edit-name" error={fieldErrors.name}><SaveErrorField names={["name"]}><TextField ref={nameRef} id="staff-edit-name" value={name} onChange={(e) => { setName(e.target.value); setFieldErrors((current) => ({ ...current, name: undefined })) }} /></SaveErrorField></Field>}<Field label="メールアドレス" required htmlFor="staff-edit-email" error={fieldErrors.email}><SaveErrorField names={["email"]}><TextField ref={emailRef} id="staff-edit-email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setFieldErrors((current) => ({ ...current, email: undefined })) }} /></SaveErrorField></Field></div>
@@ -1149,7 +1092,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
           <GridCell className={styles.colMenu} role="columnheader"><span className={styles.srOnly}>操作</span></GridCell>
         </GridHeadRow>
         {loading ? <p className={styles.stateRow} role="status">ログインユーザーを読み込んでいます…</p>
-          : error ? <ListState kind="error" title="ログインユーザーを読み込めませんでした。登録した内容は消えていません。" description="" action={<><Button onClick={() => void load()}>もう一度読み込む</Button></>} />
+          : error ? <ListState kind="error" title="ログインユーザーを読み込めませんでした。登録した内容は消えていません。" description="" action={<><Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
           : shown.length === 0 ? <p className={styles.stateRow}>条件に合うログインユーザーはいません。条件を変えてお試しください。</p>
           : shown.map((user) => {
             const member = memberById.get(user.id)

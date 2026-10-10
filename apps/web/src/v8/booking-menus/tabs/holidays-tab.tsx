@@ -1,35 +1,20 @@
 'use client'
-import { jstDate } from "@/lib/jst-datetime"
-import { closedOn, closedRanges } from "../lib/closed-ranges"
-import { useMemo, useRef, useState } from "react"
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
-import Button from "@/components/shared/button"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import Dialog from "@/components/shared/dialog"
-import DateField from "@/components/shared/date-field"
-import { ApiError, bookingApi, type BookingException, type BookingSettings } from "@/lib/api"
-import { AccountIcon, StateCard, SkeletonRows, WEEKDAY_JP, addDaysStr, useV8TabEdit, type LoadStatus } from "./shared"
-import styles from "../settings.module.css"
-import { Field } from "@/components/shared/form-controls"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { jstDate } from '@/lib/jst-datetime'
+import { closedOn, closedRanges } from '../lib/closed-ranges'
+import { useMemo, useRef, useState } from 'react'
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import DateField from '@/components/shared/date-field'
+import { ApiError, bookingApi, type BookingException, type BookingSettings } from '@/lib/api'
+import { AccountIcon, StateCard, SkeletonRows, WEEKDAY_JP, addDaysStr, useV8TabEdit, type LoadStatus } from './shared'
+import styles from '../settings.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /* ③ 休業日（KRgTQ）（settings-v8.tsx から分割。見た目・動きは変えない） */
-
-
 
 function monthWeeks(month: string): string[][] {
   const first = new Date(`${month}-01T00:00:00Z`)

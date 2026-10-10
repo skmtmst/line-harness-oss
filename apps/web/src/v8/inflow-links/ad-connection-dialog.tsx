@@ -1,23 +1,13 @@
 'use client'
-import { useEffect, useRef, useState } from "react"
-import { api, type AdPlatform } from "@/lib/api"
-import Button from "@/components/shared/button"
-import Dialog from "@/components/shared/dialog"
-import { TextField } from "@/components/shared/text-field"
-import { Field } from "@/components/shared/form-controls"
-import { focusField } from "./focus-field"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
+import { useEffect, useRef, useState } from 'react'
+import { api, type AdPlatform } from '@/lib/api'
+import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
+import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
+import { focusField } from './focus-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 type ConfigField = {key: string; label: string; secret?: boolean}
 export const AD_CONNECTION_FIELDS: Record<string, ConfigField[]> = {

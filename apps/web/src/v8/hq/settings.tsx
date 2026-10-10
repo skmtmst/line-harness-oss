@@ -1,40 +1,22 @@
 'use client'
-import { notifySaved } from "@/components/shared/toast"
-import { FormLeaveGuard } from "@/components/shared/form-leave-guard"
-import { useEffect, useId, useState, type FormEvent } from "react"
-import { ListPage } from "@/components/templates"
-import Button from "@/components/shared/button"
-import { describeApiFailure, japaneseDetailOf } from "@/components/shared/api-error-message"
-import { TextField } from "@/components/shared/text-field"
-import Notice from "@/components/shared/notice"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { api } from "@/lib/api"
-import { useStaffRole } from "@/lib/staff-role"
-import HqSettingsNavV8, { useHqSettingsFolderNav } from "./settings-nav"
-import CompanyContactCard from "./company-contact"
-import styles from "./settings.module.css"
-import { Field } from "@/components/shared/form-controls"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { notifySaved } from '@/components/shared/toast'
+import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
+import { useEffect, useId, useState, type FormEvent } from 'react'
+import { ListPage } from '@/components/templates'
+import Button from '@/components/shared/button'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
+import { TextField } from '@/components/shared/text-field'
+import Notice from '@/components/shared/notice'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { api } from '@/lib/api'
+import { useStaffRole } from '@/lib/staff-role'
+import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
+import CompanyContactCard from './company-contact'
+import styles from './settings.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 統括の情報（Pencil `K7HYu`）。
@@ -44,8 +26,6 @@ import ReadOnlyNotice from "@/components/shared/read-only-notice"
  * （型のフォルダの列。板が狭いときは型が「設定：〇〇」の選ぶ欄に畳む）・統括名のカード。
  * 絵の「運営による操作」は契約先には出さない（2026-10-06 利用者指定。v7 と同じ）。
  */
-
-
 
 const TITLE = '統括の情報'
 const DESCRIPTION = '統括の名前です。各アカウントの画面の上と、メンバーへの招待メールに出ます。'

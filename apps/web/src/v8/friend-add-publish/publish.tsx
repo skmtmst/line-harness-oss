@@ -1,64 +1,34 @@
 'use client'
-import { useFeatureAccess } from "@/lib/use-feature-access"
-import { Suspense, useCallback, useEffect, useRef, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { CircleAlert, CircleCheck, Power, Send, Smartphone } from "lucide-react"
-import type { FriendAddRoutingValidation } from "@line-crm/shared"
-import { CreatePage } from "@/components/templates"
-import { Steps } from "@/components/templates/steps"
-import { CreateSummaryCard } from "@/components/templates/create-parts"
-import Button from "@/components/shared/button"
-import Card from "@/components/shared/card"
-import Select from "@/components/shared/select"
-import Notice from "@/components/shared/notice"
-import ListState from "@/components/shared/list-state"
-import TargetMissing from "@/components/shared/target-missing"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import LinePreview, { LinePreviewMessage } from "@/components/shared/line-preview"
-import { notifyToast } from "@/components/shared/toast"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { api, ApiError, type FriendAddRule } from "@/lib/api"
-import { useAccount } from "@/contexts/account-context"
-import { useStaffRole } from "@/lib/staff-role"
-import { useNarrowViewport } from "@/lib/use-narrow-viewport"
-import { resendSuppressionText } from "@/v8/friend-add/text"
-import { actionSummaryText, blockedReason, canPublish, firstSendText, idempotencyKeyFor, PUBLISH_STEPS, editStepHref } from "./flow"
-import FriendAddDoneV8 from "./done"
-import styles from "./publish.module.css"
-import { permissionDeniedMessage } from "@/components/shared/api-error-message"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { CircleAlert, CircleCheck, Power, Send, Smartphone } from 'lucide-react'
+import type { FriendAddRoutingValidation } from '@line-crm/shared'
+import { CreatePage } from '@/components/templates'
+import { Steps } from '@/components/templates/steps'
+import { CreateSummaryCard } from '@/components/templates/create-parts'
+import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import Select from '@/components/shared/select'
+import Notice from '@/components/shared/notice'
+import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
+import { notifyToast } from '@/components/shared/toast'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { api, ApiError, type FriendAddRule } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import { useStaffRole } from '@/lib/staff-role'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import { resendSuppressionText } from '@/v8/friend-add/text'
+import { actionSummaryText, blockedReason, canPublish, firstSendText, idempotencyKeyFor, PUBLISH_STEPS, editStepHref } from './flow'
+import FriendAddDoneV8 from './done'
+import styles from './publish.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 友だち追加時の配信 作る⑤ 確認（Pencil `U8Xm3X`）と、有効にしたあとの完了（`e0FD1J`）。
@@ -72,8 +42,6 @@ import ReadOnlyNotice from "@/components/shared/read-only-notice"
  * 2つの面（確認・完了）は同じ流れの前後なので1つのファイル。完了は読み直さず、
  * 公開したときの数をそのまま出す。`?done=1` は作る⑤（編集画面）から有効にして来たとき。
  */
-
-
 
 type Phase = 'loading' | 'ready' | 'empty' | 'error' | 'forbidden' | 'missing'
 type RuleDetail = {
@@ -494,7 +462,7 @@ function FriendAddPublish() {
               {canEdit ? (
                 check.href
                   ? <Button href={check.href} variant="text">{check.action}</Button>
-                  : <Button type="button" variant="text" disabled={testing} onClick={() => void runTest()}>{check.action}</Button>
+                  : <Button type="button" variant="text" disabled={testing} onClick={() => void runTest()} busyLabel="判定中…">{check.action}</Button>
               ) : null}
             </li>
           ))}

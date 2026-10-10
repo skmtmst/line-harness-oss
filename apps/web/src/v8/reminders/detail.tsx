@@ -1,89 +1,44 @@
 'use client'
-import { scheduledJstIso } from "@/lib/jst-datetime"
-import SharedStatusPill from "@/components/shared/status-pill"
-import { useListUrlValue } from "@/components/shared/list-url-state"
-import { useFeatureAccess } from "@/lib/use-feature-access"
-import { useSamePageUrl } from "@/lib/use-same-page-url"
-import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
-import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowRight, Check, Copy, Download, Info, Pause, Pencil, Play, RotateCcw, Trash2, X } from "lucide-react"
-import { describeReminderTiming, type Reminder, type ReminderStep } from "@line-crm/shared"
-import { api, ApiError, type ReminderDeliveryRun, type ReminderDeliveryRunsResponse, type ReminderDeliveryRunStatus, type ReminderRegistrant } from "@/lib/api"
-import { useAccount } from "@/contexts/account-context"
-import { useStaffRole, canManageRole } from "@/lib/staff-role"
-import { formatDateTime, formatNumber, formatDate as polishFormatDate } from "@/lib/format"
-import { csvCell } from "@/lib/presentation"
-import { usePageTitle } from "@/components/shell/page-chrome"
-import { PageFrame, PageHeading } from "@/components/templates/page-frame"
-import { CreateSummaryCard } from "@/components/templates/create-parts"
-import { type ActionMenuItem } from "@/components/shared/action-menu"
-import { RowMenu } from "@/components/shared/row-actions"
-import { TableHeadRow } from "@/components/shared/table"
-import Button from "@/components/shared/button"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import DateTimeField from "@/components/shared/date-time-field"
-import FilterChip from "@/components/shared/filter-chip"
-import LinePreview, { LinePreviewMessage } from "@/components/shared/line-preview"
-import ListState from "@/components/shared/list-state"
-import Notice from "@/components/shared/notice"
-import Pagination from "@/components/shared/pagination"
-import SearchField from "@/components/shared/search-field"
-import Select from "@/components/shared/select"
-import { Tabs } from "@/components/shared/tabs"
-import PageSizeSelect from "@/components/shared/page-size-select"
-import { reminderTriggerLabel, reminderStopSummary, renderReminderBodySample } from "@/components/reminders/reminder-labels"
-import SheetDialog from "./sheet-dialog"
-import styles from "./detail.module.css"
-import { csvFileName } from "@/lib/csv-file-name"
-import { emptyValue } from "@/components/shared/empty-value"
-import { DetailLoading } from "@/components/templates/detail-page"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { scheduledJstIso } from '@/lib/jst-datetime'
+import SharedStatusPill from '@/components/shared/status-pill'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useSamePageUrl } from '@/lib/use-same-page-url'
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { ArrowRight, Check, Copy, Download, Info, Pause, Pencil, Play, RotateCcw, Trash2, X } from 'lucide-react'
+import { describeReminderTiming, type Reminder, type ReminderStep } from '@line-crm/shared'
+import { api, ApiError, type ReminderDeliveryRun, type ReminderDeliveryRunsResponse, type ReminderDeliveryRunStatus, type ReminderRegistrant } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { formatDateTime, formatNumber, formatDate as polishFormatDate } from '@/lib/format'
+import { csvCell } from '@/lib/presentation'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { CreateSummaryCard } from '@/components/templates/create-parts'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
+import { TableHeadRow } from '@/components/shared/table'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import DateTimeField from '@/components/shared/date-time-field'
+import FilterChip from '@/components/shared/filter-chip'
+import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+import Pagination from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import { Tabs } from '@/components/shared/tabs'
+import PageSizeSelect from '@/components/shared/page-size-select'
+import { reminderTriggerLabel, reminderStopSummary, renderReminderBodySample } from '@/components/reminders/reminder-labels'
+import SheetDialog from './sheet-dialog'
+import styles from './detail.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8 リマインダの詳細（src/v8 に一から書いた版）。

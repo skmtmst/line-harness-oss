@@ -1,130 +1,62 @@
 'use client'
-import { Clock, Activity, Ban, ChevronDown, CircleCheck, CircleHelp, Copy, Folder as FolderIcon, Layers, MessageSquare, Pause, Pencil, Square, Play, Trash2, TriangleAlert, Zap, Bookmark, Eye, Plus } from "lucide-react"
-import DetailPanel, { useDetailPanelUrl } from "@/components/shared/detail-panel"
-import { scheduleChipLabels, scheduleText, LOAD_STATE_WORDS, NO_WRITE_PERMISSION, actionShortWord, autoReplyMatchesQuery, conditionChips, responseTypeWord, stopNote, templateWord, triggerSummary, isCurrentAutoReplyLoad, visibleAutoReplyLoadState, type LoadState } from "./words"
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from "@/components/shared/list-toolbar"
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import SharedStatusPill from "@/components/shared/status-pill"
-import BulkBar, { useEscapeToClearSelection } from "@/components/shared/bulk-bar"
-import { useListUrlValue, useListScrollMemory, useListUrlFlag, useListUrlParam } from "@/components/shared/list-url-state"
-import { useFeatureAccess } from "@/lib/use-feature-access"
-import { RovingTbody } from "@/components/shared/row-roving"
-import { ListPage, ListPagePagination } from "@/components/templates"
-import SearchField from "@/components/shared/search-field"
-import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import type { Folder } from "@line-crm/shared"
-import { api, ApiError } from "@/lib/api"
-import { clampSearchQuery } from "@/lib/search-query"
-import { useAccount } from "@/contexts/account-context"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { useNarrowViewport } from "@/lib/use-narrow-viewport"
-import { formatNumber } from "@/lib/format"
-import { isForbiddenOrRateLimited, permissionDeniedMessage } from "@/components/shared/api-error-message"
-import { notifyToast } from "@/components/shared/toast"
-import { runUndoable } from "@/lib/undoable"
-import { useLiveReorder } from "@/lib/use-live-reorder"
-import { DelayedSkeleton } from "@/components/shared/skeleton"
-import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from "@/components/shared/table"
-import { FolderDotName, type FolderDotFolder } from "@/components/shared/folder-dot"
-import Button from "@/components/shared/button"
-import EmptyList from "@/components/shared/empty-list"
-import KpiCard from "@/components/shared/kpi-card"
-import Notice from "@/components/shared/notice"
-import KpiBand from "@/components/shared/kpi-band"
-import Checkbox from "@/components/shared/checkbox"
-import Select from "@/components/shared/select"
-import FilterChip from "@/components/shared/filter-chip"
-import TagOverflow from "@/components/shared/tag-overflow"
-import ManagedFolderPanel from "@/components/shared/managed-folder-panel"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import Dialog from "@/components/shared/dialog"
-import { Field } from "@/components/shared/form-controls"
-import { TextField } from "@/components/shared/text-field"
-import ActionMenu, { type ActionMenuItem } from "@/components/shared/action-menu"
-import { RowMenu } from "@/components/shared/row-actions"
-import ContextMenu, { type ContextMenuItem } from "@/components/shared/context-menu"
-import { withViewTransition } from "@/components/shared/view-transition"
-import Pagination from "@/components/shared/pagination"
-import ReorderHandle from "@/components/shared/reorder-handle"
-import { compareEvaluationOrder, movePriorityUpdates } from "./order"
-import QuickCreateV8 from "./quick-create"
-import styles from "./list.module.css"
-import TruncatedText from "@/components/shared/truncated-text"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import { useDuplicateFeedback } from "@/components/shared/use-duplicate-feedback"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import ListState from "@/components/shared/list-state"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { Clock, Activity, Ban, ChevronDown, CircleCheck, CircleHelp, Copy, Folder as FolderIcon, Layers, MessageSquare, Pause, Pencil, Square, Play, Trash2, TriangleAlert, Zap, Bookmark, Eye, Plus } from 'lucide-react'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import { scheduleChipLabels, scheduleText, LOAD_STATE_WORDS, NO_WRITE_PERMISSION, actionShortWord, autoReplyMatchesQuery, conditionChips, responseTypeWord, stopNote, templateWord, triggerSummary, isCurrentAutoReplyLoad, visibleAutoReplyLoadState, type LoadState } from './words'
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import SharedStatusPill from '@/components/shared/status-pill'
+import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
+import { useListUrlValue, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { RovingTbody } from '@/components/shared/row-roving'
+import { ListPage, ListPagePagination } from '@/components/templates'
+import SearchField from '@/components/shared/search-field'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import type { Folder } from '@line-crm/shared'
+import { api, ApiError } from '@/lib/api'
+import { clampSearchQuery } from '@/lib/search-query'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import { formatNumber } from '@/lib/format'
+import { isForbiddenOrRateLimited, permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { notifyToast } from '@/components/shared/toast'
+import { runUndoable } from '@/lib/undoable'
+import { useLiveReorder } from '@/lib/use-live-reorder'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
+import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
+import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
+import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
+import KpiCard from '@/components/shared/kpi-card'
+import Notice from '@/components/shared/notice'
+import KpiBand from '@/components/shared/kpi-band'
+import Checkbox from '@/components/shared/checkbox'
+import Select from '@/components/shared/select'
+import FilterChip from '@/components/shared/filter-chip'
+import TagOverflow from '@/components/shared/tag-overflow'
+import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
+import Pagination from '@/components/shared/pagination'
+import ReorderHandle from '@/components/shared/reorder-handle'
+import { compareEvaluationOrder, movePriorityUpdates } from './order'
+import QuickCreateV8 from './quick-create'
+import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
 
 /*
  * ★V8 自動応答の一覧（Pencil「★V8 画面の地図」の自動応答の行：
@@ -138,9 +70,6 @@ import ListState from "@/components/shared/list-state"
  * まとめての帯（止める・再開・フォルダへ移す）。
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
-
-
-
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -1135,7 +1064,7 @@ export default function AutoRepliesListV8() {
           : isForbiddenOrRateLimited(loadError)
             ? LOAD_STATE_WORDS.error.note
             : '登録したルールは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'} data-design-node="G8i4xP" action={<>{visibleLoadState === 'error' && (
-        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
+        <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
       )}</>} />
   ) : sortedItems.length === 0 ? (
     /* 修正案 D-2：空の一覧。閲覧のみには作るボタンを出さない。 */

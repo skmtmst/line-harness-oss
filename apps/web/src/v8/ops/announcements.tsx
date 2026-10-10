@@ -1,70 +1,36 @@
 'use client'
-import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from "@/components/shared/save-conflict"
-import { notifySaved } from "@/components/shared/toast"
-import { Send } from "lucide-react"
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { ApiError, api, type OpsAnnouncement, type OpsAnnouncementAudience, type OpsAnnouncementChannel, type OpsAnnouncementInput, type OpsAudiencePreview, type OpsTenantRow } from "@/lib/api"
-import { formatDateTime, opsCall, opsErrorMessage } from "@/components/ops/ops-ui"
-import { opsEnvironmentLabel } from "@/components/ops/ops-env-bar"
-import { isForbiddenOrRateLimited } from "@/components/shared/api-error-message"
-import Button from "@/components/shared/button"
-import Checkbox from "@/components/shared/checkbox"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import DateTimeField from "@/components/shared/date-time-field"
-import Dialog from "@/components/shared/dialog"
-import FilterChip from "@/components/shared/filter-chip"
-import HelpTip from "@/components/shared/help-tip"
-import ListState from "@/components/shared/list-state"
-import Radio from "@/components/shared/radio"
-import StatusBadge, { type StatusBadgeTone } from "@/components/shared/status-badge"
-import { TextArea, TextField } from "@/components/shared/text-field"
-import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
-import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
-import { OpsHead } from "./shell"
-import { useOpsReadOnly } from "./use-ops-read-only"
-import { useFormErrors } from "@/lib/use-form-errors"
-import ValidationSummary from "@/components/shared/validation-summary"
-import { FieldError, Field } from "@/components/shared/form-controls"
-import parts from "./parts.module.css"
-import styles from "./announcements.module.css"
-import { formatDate as polishFormatDate } from "@/lib/format"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
+import { notifySaved } from '@/components/shared/toast'
+import { Send } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ApiError, api, type OpsAnnouncement, type OpsAnnouncementAudience, type OpsAnnouncementChannel, type OpsAnnouncementInput, type OpsAudiencePreview, type OpsTenantRow } from '@/lib/api'
+import { formatDateTime, opsCall, opsErrorMessage } from '@/components/ops/ops-ui'
+import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import DateTimeField from '@/components/shared/date-time-field'
+import Dialog from '@/components/shared/dialog'
+import FilterChip from '@/components/shared/filter-chip'
+import HelpTip from '@/components/shared/help-tip'
+import ListState from '@/components/shared/list-state'
+import Radio from '@/components/shared/radio'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import { TextArea, TextField } from '@/components/shared/text-field'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { OpsHead } from './shell'
+import { useOpsReadOnly } from './use-ops-read-only'
+import { useFormErrors } from '@/lib/use-form-errors'
+import ValidationSummary from '@/components/shared/validation-summary'
+import { FieldError, Field } from '@/components/shared/form-controls'
+import parts from './parts.module.css'
+import styles from './announcements.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営のお知らせ配信 V8（絵 `tQ2MJ`・送る前の確認 `TJUUl`）。

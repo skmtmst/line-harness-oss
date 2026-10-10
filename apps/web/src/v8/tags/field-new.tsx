@@ -1,31 +1,17 @@
 'use client'
-import { useCallback, useEffect, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import type { FriendField, Folder } from "@line-crm/shared"
-import { api, describeSaveFailure } from "@/lib/api"
-import { useAccount } from "@/contexts/account-context"
-import ListState from "@/components/shared/list-state"
-import { notifyToast } from "@/components/shared/toast"
-import { folderById, folderCreator } from "@/components/shared/folder-select"
-import { useStaffRole, canManageRole } from "@/lib/staff-role"
-import FieldEditor, { type FieldEditorValues } from "./field-editor"
-import { withPermissionFailure } from "@/components/shared/api-error-message"
-import { SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useCallback, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import type { FriendField, Folder } from '@line-crm/shared'
+import { api, describeSaveFailure } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import ListState from '@/components/shared/list-state'
+import { notifyToast } from '@/components/shared/toast'
+import { folderById, folderCreator } from '@/components/shared/folder-select'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import FieldEditor, { type FieldEditorValues } from './field-editor'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8「友だち情報欄を作る」（Pencil `w9zY5`）の入口。
@@ -33,8 +19,6 @@ import ReadOnlyNotice from "@/components/shared/read-only-notice"
  * 読み込み・重複確認・冪等キー・保存の動きは今の入口（app/tags/new-field-page-v8.tsx）と同じ。
  * 中身は src/v8 の FieldEditor。受け付ける URL：`/tags/fields/new`・`?back=<戻り先>`。
  */
-
-
 
 export default function FieldNew() {
   const saveErrors = useSaveFormErrors()

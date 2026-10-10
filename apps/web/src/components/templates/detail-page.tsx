@@ -1,14 +1,10 @@
 'use client'
 
-import { DelayedSkeleton, Skeleton } from "@/components/shared/skeleton"
-import type { ReactNode } from "react"
-import { PageFrame, PageHeading, type PageHeadingProps } from "./page-frame"
-import styles from "./page-templates.module.css"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-
-
-
-
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import type { ReactNode } from 'react'
+import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
+import styles from './page-templates.module.css'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export interface DetailPageProps extends PageHeadingProps {
   readOnly?: boolean

@@ -1,41 +1,22 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from "react"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import ActionMenu from "@/components/shared/action-menu"
-import StatusBadge from "@/components/shared/status-badge"
-import ListState from "@/components/shared/list-state"
-import { webinarErrorText } from "@/components/webinars/webinar-error-text"
-import Button from "@/components/shared/button"
-import Checkbox from "@/components/shared/checkbox"
-import Select from "@/components/shared/select"
-import Notice from "@/components/shared/notice"
-import { ApiError, fetchApi, webinarApi, type WebinarCtaCard, type WebinarEditor } from "@/lib/api"
-import { ctaCardProblems } from "./cta-card-validation"
-import { emptyValue } from "@/components/shared/empty-value"
-import NumberInput from "@/components/shared/number-field"
-import { Field } from "@/components/shared/form-controls"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useCallback, useEffect, useRef, useState } from 'react'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ActionMenu from '@/components/shared/action-menu'
+import StatusBadge from '@/components/shared/status-badge'
+import ListState from '@/components/shared/list-state'
+import { webinarErrorText } from '@/components/webinars/webinar-error-text'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import Select from '@/components/shared/select'
+import Notice from '@/components/shared/notice'
+import { ApiError, fetchApi, webinarApi, type WebinarCtaCard, type WebinarEditor } from '@/lib/api'
+import { ctaCardProblems } from './cta-card-validation'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /* ★V8 CTA・フォーム（Q0Jrk）。入力は下書き保存と次の段からも保存する。 */
 

@@ -1,83 +1,42 @@
 'use client'
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import CopyTextButton from "@/components/shared/copy-text-button"
-import { useSearchParams } from "next/navigation"
-import { LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical, Inbox } from "lucide-react"
-import type { IncomingWebhook } from "@line-crm/shared"
-import { api, ApiError, type IncomingWebhookDetail as DetailType, type IncomingWebhookTestResult, type IncomingWebhookUnmatchedItem } from "@/lib/api"
-import { useAccount } from "@/contexts/account-context"
-import { useOnAccountSwitch } from "@/components/shared/list-url-state"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { useStaffRole } from "@/lib/staff-role"
-import { ListPage } from "@/components/templates"
-import Button from "@/components/shared/button"
-import StatusBadge from "@/components/shared/status-badge"
-import Card from "@/components/shared/card"
-import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
-import { TextField, TextArea } from "@/components/shared/text-field"
-import { Field } from "@/components/shared/form-controls"
-import EmptyList from "@/components/shared/empty-list"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import Dialog from "@/components/shared/dialog"
-import ListState from "@/components/shared/list-state"
-import AccountRequiredState from "@/components/shared/account-required-state"
-import Notice from "@/components/shared/notice"
-import Select from "@/components/shared/select"
-import Toggle from "@/components/shared/toggle"
-import InlineEdit from "@/components/shared/inline-edit"
-import { DelayedSkeleton, Skeleton } from "@/components/shared/skeleton"
-import { notifyToast } from "@/components/shared/toast"
-import { withViewTransition } from "@/components/shared/view-transition"
-import { describeApiFailure, permissionDeniedMessage } from "@/components/shared/api-error-message"
-import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from "@/components/step-up-prompt"
-import { MANAGE_REASON, ViewerBand, WEBHOOKS_DESCRIPTION, WebhookBand, WebhookTabs, overviewBandCells, useWebhookOverview } from "./shell"
-import { MIN_SECRET_LENGTH, generateSecret } from "./secret"
-import { shortDateTime } from "./words"
-import styles from "./incoming.module.css"
-import TruncatedText from "@/components/shared/truncated-text"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import IncomingActions from "./incoming-actions"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import CopyTextButton from '@/components/shared/copy-text-button'
+import { useSearchParams } from 'next/navigation'
+import { LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical, Inbox } from 'lucide-react'
+import type { IncomingWebhook } from '@line-crm/shared'
+import { api, ApiError, type IncomingWebhookDetail as DetailType, type IncomingWebhookTestResult, type IncomingWebhookUnmatchedItem } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import { useOnAccountSwitch } from '@/components/shared/list-url-state'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { useStaffRole } from '@/lib/staff-role'
+import { ListPage } from '@/components/templates'
+import Button from '@/components/shared/button'
+import StatusBadge from '@/components/shared/status-badge'
+import Card from '@/components/shared/card'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { TextField, TextArea } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
+import EmptyList from '@/components/shared/empty-list'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
+import Notice from '@/components/shared/notice'
+import Select from '@/components/shared/select'
+import Toggle from '@/components/shared/toggle'
+import InlineEdit from '@/components/shared/inline-edit'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { notifyToast } from '@/components/shared/toast'
+import { withViewTransition } from '@/components/shared/view-transition'
+import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
+import { MANAGE_REASON, ViewerBand, WEBHOOKS_DESCRIPTION, WebhookBand, WebhookTabs, overviewBandCells, useWebhookOverview } from './shell'
+import { MIN_SECRET_LENGTH, generateSecret } from './secret'
+import { shortDateTime } from './words'
+import styles from './incoming.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import IncomingActions from './incoming-actions'
 
 /*
  * ★V8 外部連携「こちらで受け取る」タブ（Pencil `gW0F2`、作る窓 `H031gC`）。

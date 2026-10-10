@@ -1,18 +1,11 @@
 
-import type { ReactNode } from "react"
-import { CollapsedFolderActions, type FolderPanelRow } from "@/components/shared/folder-panel"
-import Select from "@/components/shared/select"
-import HelpTip from "@/components/shared/help-tip"
-import { PageFrame, PageHeading, type PageHeadingProps } from "./page-frame"
-import styles from "./page-templates.module.css"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-
-
-
-
-
-
-
+import type { ReactNode } from 'react'
+import { CollapsedFolderActions, type FolderPanelRow } from '@/components/shared/folder-panel'
+import Select from '@/components/shared/select'
+import HelpTip from '@/components/shared/help-tip'
+import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
+import styles from './page-templates.module.css'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /**
  * 左の列（フォルダ・タグ・設定のメニュー）を、白い板が狭いとき（1100 未満）に

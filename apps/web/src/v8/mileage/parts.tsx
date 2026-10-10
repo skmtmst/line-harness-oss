@@ -4,29 +4,17 @@
  * マイルの各タブで同じ形の部品（道具の段・よく使う絞り込み・件数・空と失敗の1枚）。
  * 形は一覧の型と共通部品に任せ、ここは並べ方だけを持つ。
  */
-import type { ReactNode } from "react"
-import { Bookmark } from "lucide-react"
-import ListState from "@/components/shared/list-state"
-import Button from "@/components/shared/button"
-import ListToolbar from "@/components/shared/list-toolbar"
-import Notice from "@/components/shared/notice"
-import SearchField from "@/components/shared/search-field"
-import Select from "@/components/shared/select"
-import styles from "./mileage.module.css"
-import { SaveErrorField } from "@/components/shared/save-form-errors"
-import { PAGE_SIZE_SELECT_OPTIONS } from "@/components/shared/page-size-select"
-
-
-
-
-
-
-
-
-
-
-
-
+import type { ReactNode } from 'react'
+import { Bookmark } from 'lucide-react'
+import ListState from '@/components/shared/list-state'
+import Button from '@/components/shared/button'
+import ListToolbar from '@/components/shared/list-toolbar'
+import Notice from '@/components/shared/notice'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import styles from './mileage.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
 export const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 

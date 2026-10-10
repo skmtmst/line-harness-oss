@@ -1,44 +1,23 @@
 'use client'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import { AlignLeft, Calendar, Check, CircleDot, Hash, ListChecks, Star, Type } from "lucide-react"
-import type { FriendField, FriendFieldType, Folder } from "@line-crm/shared"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { CreatePage } from "@/components/templates"
-import Button from "@/components/shared/button"
-import Checkbox from "@/components/shared/checkbox"
-import Notice from "@/components/shared/notice"
-import { TextField } from "@/components/shared/text-field"
-import { Field } from "@/components/shared/form-controls"
-import FolderSelect, { folderById, type FolderSelectCreate } from "@/components/shared/folder-select"
-import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
-import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
-import { requestUnsavedAction } from "@/lib/unsaved-action"
-import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from "@/components/friend-fields/attribute-kind-guide"
-import DefaultValueInput from "@/components/friend-fields/default-value-input"
-import { sameLabels, storedDefaultLabels, suggestKey } from "./field-model"
-import styles from "./create.module.css"
-import { SaveErrorField } from "@/components/shared/save-form-errors"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { AlignLeft, Calendar, Check, CircleDot, Hash, ListChecks, Star, Type } from 'lucide-react'
+import type { FriendField, FriendFieldType, Folder } from '@line-crm/shared'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { CreatePage } from '@/components/templates'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import Notice from '@/components/shared/notice'
+import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
+import FolderSelect, { folderById, type FolderSelectCreate } from '@/components/shared/folder-select'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
+import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
+import DefaultValueInput from '@/components/friend-fields/default-value-input'
+import { sameLabels, storedDefaultLabels, suggestKey } from './field-model'
+import styles from './create.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8 友だち情報欄を作る・編集（Pencil `w9zY5`）。

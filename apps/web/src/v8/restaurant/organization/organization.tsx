@@ -1,59 +1,33 @@
 'use client'
 
 
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import { Field as SharedField } from "@/components/shared/form-controls"
-import CopyTextButton from "@/components/shared/copy-text-button"
-import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from "react"
-import KpiCard from "@/components/shared/kpi-card"
-import { MailPlus, Plus } from "lucide-react"
-import Button from "@/components/shared/button"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import Dialog from "@/components/shared/dialog"
-import Disclosure from "@/components/shared/disclosure"
-import { RowActions } from "@/components/shared/row-actions"
-import Select from "@/components/shared/select"
-import { TextField } from "@/components/shared/text-field"
-import { useStepUpGate, isStepUpRequired } from "@/components/step-up-prompt"
-import type { RestaurantLoginMember } from "@line-crm/shared"
-import { ApiError } from "@/lib/api"
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import { restaurantTestApi, type RestaurantIntakeAddress, type RestaurantMembership, type RestaurantStore } from "@/lib/restaurant-test-api"
-import { useAccount, type AccountWithStats } from "@/contexts/account-context"
-import RestaurantFrame, { type RestaurantContext } from "../common-a/frame"
-import { formatStamp, Panel, StatRow, Status } from "../common-a/parts"
-import styles from "./organization.module.css"
-import { permissionDeniedMessage } from "@/components/shared/api-error-message"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { Field as SharedField } from '@/components/shared/form-controls'
+import CopyTextButton from '@/components/shared/copy-text-button'
+import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react'
+import KpiCard from '@/components/shared/kpi-card'
+import { MailPlus, Plus } from 'lucide-react'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import Disclosure from '@/components/shared/disclosure'
+import { RowActions } from '@/components/shared/row-actions'
+import Select from '@/components/shared/select'
+import { TextField } from '@/components/shared/text-field'
+import { useStepUpGate, isStepUpRequired } from '@/components/step-up-prompt'
+import type { RestaurantLoginMember } from '@line-crm/shared'
+import { ApiError } from '@/lib/api'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { restaurantTestApi, type RestaurantIntakeAddress, type RestaurantMembership, type RestaurantStore } from '@/lib/restaurant-test-api'
+import { useAccount, type AccountWithStats } from '@/contexts/account-context'
+import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
+import { formatStamp, Panel, StatRow, Status } from '../common-a/parts'
+import styles from './organization.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 組織・権限（Pencil `bSp4h`、店舗の窓 `vCEKM`、ユーザーの窓 `ou60i`、停止の確認 `bMpC5`、再発行の確認 `rSRFK`）。
@@ -64,8 +38,6 @@ import Notice from "@/components/shared/notice"
  * 「変更」の窓の中へ移した（機能は落とさない）。
  * 閲覧のみ（変える権限が無い人）には、作る・編集・停止・発行のボタンを置かない。動きは BEHAVIOR.md。
  */
-
-
 
 const roleLabel: Record<RestaurantMembership['role'], string> = {
   super_admin: 'SuperAdmin',

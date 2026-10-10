@@ -222,7 +222,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
           <SaveErrorField names={["floorX","draft.floorX","floor_x","draft.floor_x"]}><NumberInput id="rs-table-x" type="number" min={0} max={10000} value={draft.floorX} onChange={(event) => setDraft({ ...draft, floorX: event.target.value })} /></SaveErrorField>
         </Field>
         <Field label="縦の位置" htmlFor="rs-table-y" error={fieldErrors.floorY}>
-          <SaveErrorField names={["floorY","draft.floorY","floor_y","draft.floor_y"]}><NumberInput id="rs-table-y" type="number" min={0} max={10000} value={draft.floorY} onChange={(event) => setDraft({ ...draft, floorY: event.target.value })} />
+          <SaveErrorField names={["floorY","draft.floorY","floor_y","draft.floor_y"]}><NumberInput id="rs-table-y" type="number" min={0} max={10000} value={draft.floorY} onChange={(event) => setDraft({ ...draft, floorY: event.target.value })} /></SaveErrorField>
         </Field>
       </div>
       <DialogField label="結合グループ" htmlFor="rs-table-group">

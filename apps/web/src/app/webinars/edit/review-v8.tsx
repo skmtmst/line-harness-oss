@@ -1,32 +1,17 @@
 'use client'
-import React, { useCallback, useEffect, useRef, useState } from "react"
-import Button from "@/components/shared/button"
-import Notice from "@/components/shared/notice"
-import HelpTip from "@/components/shared/help-tip"
-import StatusBadge from "@/components/shared/status-badge"
-import StickyBar from "@/components/shared/sticky-bar"
-import { formatNumber } from "@/lib/format"
-import { publicationStateLabel } from "@/components/webinars/publication-label"
-import { webinarErrorText } from "@/components/webinars/webinar-error-text"
-import { webinarApi, type Webinar, type WebinarEditor, type WebinarPublishValidation } from "@/lib/api"
-import { reviewActionSummaryText, reviewMonitoringText, reviewTestSummaryBody } from "./review-text"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import HelpTip from '@/components/shared/help-tip'
+import StatusBadge from '@/components/shared/status-badge'
+import StickyBar from '@/components/shared/sticky-bar'
+import { formatNumber } from '@/lib/format'
+import { publicationStateLabel } from '@/components/webinars/publication-label'
+import { webinarErrorText } from '@/components/webinars/webinar-error-text'
+import { webinarApi, type Webinar, type WebinarEditor, type WebinarPublishValidation } from '@/lib/api'
+import { reviewActionSummaryText, reviewMonitoringText, reviewTestSummaryBody } from './review-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const NOTIFICATION_FLAGS = ['registrationEnabled', 'dayBeforeEnabled', 'hourBeforeEnabled', 'startEnabled', 'missedEnabled', 'completedEnabled'] as const
 

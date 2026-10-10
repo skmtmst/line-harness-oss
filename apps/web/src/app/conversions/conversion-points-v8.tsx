@@ -1,56 +1,30 @@
 'use client'
-import { useEffect, useMemo, useState } from "react"
-import { api } from "@/lib/api"
-import type { ConversionDefinitionDeleteImpact, ConversionDefinitionFilter, ConversionDefinitionListItem } from "@/lib/api"
-import { useAccount } from "@/contexts/account-context"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import { formatNumber } from "@/lib/format"
-import { deduplicationLabel } from "./dedup"
-import { STATE_LABELS, sourceTriggerLabel, usageLabel, type ConversionDetailDialogProps, type ConversionEditDialogProps, type ConversionReversalDialogProps, type ConversionStopAction } from "./_components/conversion-dialogs"
-import Button from "@/components/shared/button"
-import FilterChip from "@/components/shared/filter-chip"
-import ListRange from "@/components/ui/list-range"
-import Notice from "@/components/shared/notice"
-import Pagination from "@/components/shared/pagination"
-import RadioCard, { RadioCardGroup } from "@/components/shared/radio-card"
-import { RowActions } from "@/components/shared/row-actions"
-import { TableHeadRow, Th } from "@/components/shared/table"
-import SearchField from "@/components/shared/search-field"
-import Select from "@/components/shared/select"
-import { inputClass, Field } from "@/components/shared/form-controls"
-import styles from "./conversion-points-v8.module.css"
-import { emptyValue } from "@/components/shared/empty-value"
-import { PageHeading } from "@/components/templates/page-frame"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import ListState from "@/components/shared/list-state"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useEffect, useMemo, useState } from 'react'
+import { api } from '@/lib/api'
+import type { ConversionDefinitionDeleteImpact, ConversionDefinitionFilter, ConversionDefinitionListItem } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { formatNumber } from '@/lib/format'
+import { deduplicationLabel } from './dedup'
+import { STATE_LABELS, sourceTriggerLabel, usageLabel, type ConversionDetailDialogProps, type ConversionEditDialogProps, type ConversionReversalDialogProps, type ConversionStopAction } from './_components/conversion-dialogs'
+import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
+import ListRange from '@/components/ui/list-range'
+import Notice from '@/components/shared/notice'
+import Pagination from '@/components/shared/pagination'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import { RowActions } from '@/components/shared/row-actions'
+import { TableHeadRow, Th } from '@/components/shared/table'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import { inputClass, Field } from '@/components/shared/form-controls'
+import styles from './conversion-points-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
 
 /*
  * ★V8-B コンバージョンの一覧（Pencil「★V8-B 画面の地図」：一覧 `r6dJFy`、
@@ -67,9 +41,6 @@ import ListState from "@/components/shared/list-state"
  * v7 の既定（件数が多い順）のまま変えられない。月前半との比較は
  * 出さない（表の行の合計を正本にする）。
  */
-
-
-
 
 /** V8 の絞り込み。`all` を含む以外は v7 の `StatusFilter` と同じ。 */
 export type ConversionPointsV8Status = 'all' | ConversionDefinitionFilter

@@ -1,49 +1,26 @@
 'use client'
-import { useUrlTab } from "@/lib/use-url-tab"
-import { Eye, LogIn, Send, Users } from "lucide-react"
-import { useCallback, useEffect, useState, type FormEvent } from "react"
-import { api, type OpsMember, type OpsMemberSummary } from "@/lib/api"
-import { opsCall } from "@/components/ops/ops-ui"
-import { opsEnvironmentLabel } from "@/components/ops/ops-env-bar"
-import NoticeLineAccountCard from "@/components/ops/notice-line-account-card"
-import Button from "@/components/shared/button"
-import Dialog from "@/components/shared/dialog"
-import KpiCard from "@/components/shared/kpi-card"
-import kpiStyles from "@/components/shared/kpi-card.module.css"
-import ListState from "@/components/shared/list-state"
-import StatusBadge from "@/components/shared/status-badge"
-import { Tabs } from "@/components/shared/tabs"
-import { TextField } from "@/components/shared/text-field"
-import { OpsHead } from "./shell"
-import parts from "./parts.module.css"
-import styles from "./members.module.css"
-import { formatDate as polishFormatDate } from "@/lib/format"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField } from "@/components/shared/save-form-errors"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useUrlTab } from '@/lib/use-url-tab'
+import { Eye, LogIn, Send, Users } from 'lucide-react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { api, type OpsMember, type OpsMemberSummary } from '@/lib/api'
+import { opsCall } from '@/components/ops/ops-ui'
+import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
+import NoticeLineAccountCard from '@/components/ops/notice-line-account-card'
+import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
+import KpiCard from '@/components/shared/kpi-card'
+import kpiStyles from '@/components/shared/kpi-card.module.css'
+import ListState from '@/components/shared/list-state'
+import StatusBadge from '@/components/shared/status-badge'
+import { Tabs } from '@/components/shared/tabs'
+import { TextField } from '@/components/shared/text-field'
+import { OpsHead } from './shell'
+import parts from './parts.module.css'
+import styles from './members.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営のメンバー管理 V8（絵 `FvbHW`・停止の窓 `VUyYu`）。

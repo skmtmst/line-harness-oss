@@ -1,42 +1,22 @@
 'use client'
-import { useCallback, useEffect, useId, useRef, useState } from "react"
-import type { MediaDeleteImpactReference, MediaItem } from "@line-crm/shared"
-import { ApiError, api, type MediaVersionBlocker, type MediaVersionPreview } from "@/lib/api"
-import Button from "@/components/shared/button"
-import DateField from "@/components/shared/date-field"
-import MediaSlot from "@/components/shared/media-slot"
-import Notice from "@/components/shared/notice"
-import Select from "@/components/shared/select"
-import { formatMediaSize } from "./media-usage-display"
-import { checkedAtText, referenceKindText, referenceNameText } from "./media-delete-impact"
-import { setMediaUsageReference, type MediaUsageImpact, type MediaUsageReferenceItem, type MediaUsageReferenceState, type MediaUsageReferenceTarget } from "./media-usage-references"
-import { extractMediaMetadata, fileMatchesMediaKind, mediaAcceptForKind, putMediaFile, validateMediaFile } from "./media-direct-upload"
-import { formatDate as polishFormatDate } from "@/lib/format"
-import TruncatedText from "@/components/shared/truncated-text"
-import { Field } from "@/components/shared/form-controls"
-import TextLink from "@/components/shared/text-link"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import type { MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
+import { ApiError, api, type MediaVersionBlocker, type MediaVersionPreview } from '@/lib/api'
+import Button from '@/components/shared/button'
+import DateField from '@/components/shared/date-field'
+import MediaSlot from '@/components/shared/media-slot'
+import Notice from '@/components/shared/notice'
+import Select from '@/components/shared/select'
+import { formatMediaSize } from './media-usage-display'
+import { checkedAtText, referenceKindText, referenceNameText } from './media-delete-impact'
+import { setMediaUsageReference, type MediaUsageImpact, type MediaUsageReferenceItem, type MediaUsageReferenceState, type MediaUsageReferenceTarget } from './media-usage-references'
+import { extractMediaMetadata, fileMatchesMediaKind, mediaAcceptForKind, putMediaFile, validateMediaFile } from './media-direct-upload'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /* ★V8 写し：src/app/contents/media-detail-dialog.tsx から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
 
@@ -622,7 +602,7 @@ export default function MediaDetailDialog({
             {phase === 'loading' ? (
               <p className="text-ink-faint mt-3 text-xs">使われている場所を確認しています…</p>
             ) : phase === 'error' ? (
-              <Notice tone="danger" className="mt-3" action={<Button type="button" onClick={() => void loadImpact()}>もう一度読み込む</Button>}>使われている場所を確認できませんでした。</Notice>
+              <Notice tone="danger" className="mt-3" action={<Button type="button" onClick={() => loadImpact()} busyLabel="処理中…">もう一度読み込む</Button>}>使われている場所を確認できませんでした。</Notice>
             ) : impact ? (
               <>
                 {/*

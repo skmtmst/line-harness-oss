@@ -1,45 +1,23 @@
 'use client'
-import { Unlink } from "lucide-react"
-import { formatDateTime, formatDate as polishFormatDate } from "@/lib/format"
-import { useStaffRole, canManageRole } from "@/lib/staff-role"
-import { usePageTitle } from "@/components/shell/page-chrome"
-import { PageFrame, PageHeading } from "@/components/templates/page-frame"
-import Button from "@/components/shared/button"
-import Dialog from "@/components/shared/dialog"
-import ListState from "@/components/shared/list-state"
-import Toggle from "@/components/shared/toggle"
-import { TextArea } from "@/components/shared/text-field"
-import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
-import MergedDeliveryDialog from "@/components/merged-person/merged-delivery-dialog"
-import MergedProfileDialog from "@/components/merged-person/merged-profile-dialog"
-import { useMergedPerson } from "@/components/merged-person/use-merged-person"
-import styles from "./person.module.css"
-import { Field } from "@/components/shared/form-controls"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField } from "@/components/shared/save-form-errors"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { Unlink } from 'lucide-react'
+import { formatDateTime, formatDate as polishFormatDate } from '@/lib/format'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
+import ListState from '@/components/shared/list-state'
+import Toggle from '@/components/shared/toggle'
+import { TextArea } from '@/components/shared/text-field'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import MergedDeliveryDialog from '@/components/merged-person/merged-delivery-dialog'
+import MergedProfileDialog from '@/components/merged-person/merged-profile-dialog'
+import { useMergedPerson } from '@/components/merged-person/use-merged-person'
+import styles from './person.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 統合ユーザーの詳細（Pencil `Hn9eE`）。/friends?tab=merged&person=<id>（一覧の名前からも開く）。
@@ -49,8 +27,6 @@ import Notice from "@/components/shared/notice"
  * 見せ方：頭（← 統合ユーザーへ）→ 左に3つの段、右の列に「使う値を直す」と「使っている値」。
  * 変えられない人には、スイッチ・解除・直すのボタンを置かない（状態の文字だけ）。
  */
-
-
 
 /** 9/30（日本時間）。 */
 function shortDate(iso: string): string {

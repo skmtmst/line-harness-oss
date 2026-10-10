@@ -1,60 +1,31 @@
 'use client'
-import { notifySaved, notifyToast } from "@/components/shared/toast"
-import { Th } from "@/components/shared/table"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useSearchParams } from "next/navigation"
-import Button from "@/components/shared/button"
-import Checkbox from "@/components/shared/checkbox"
-import { Tabs } from "@/components/shared/tabs"
-import { DelayedSkeleton, Skeleton } from "@/components/shared/skeleton"
-import { usePageTitle } from "@/components/shell/page-chrome"
-import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
-import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
-import { isForbiddenOrRateLimited, loadFailureCopy, withPermissionFailure } from "@/components/shared/api-error-message"
-import { useAccount } from "@/contexts/account-context"
-import { useBookingEdit } from "./lib/edit-permission"
-import StickyBar from "@/components/shared/sticky-bar"
-import { Check } from "lucide-react"
-import { describeSaveFailure, bookingApi, type BookingMenu, type BookingStaff, type StaffMenuMatrix } from "@/lib/api"
-import { formatNumber } from "@/lib/format"
-import { menuPriceLabel } from "./lib/menu-price"
-import shell from "./settings.module.css"
-import styles from "./assign.module.css"
-import TruncatedText from "@/components/shared/truncated-text"
-import { PageHeading } from "@/components/templates/page-frame"
-import { Field } from "@/components/shared/form-controls"
-import NumberInput from "@/components/shared/number-field"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { notifySaved, notifyToast } from '@/components/shared/toast'
+import { Th } from '@/components/shared/table'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import { Tabs } from '@/components/shared/tabs'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { isForbiddenOrRateLimited, loadFailureCopy, withPermissionFailure } from '@/components/shared/api-error-message'
+import { useAccount } from '@/contexts/account-context'
+import { useBookingEdit } from './lib/edit-permission'
+import StickyBar from '@/components/shared/sticky-bar'
+import { Check } from 'lucide-react'
+import { describeSaveFailure, bookingApi, type BookingMenu, type BookingStaff, type StaffMenuMatrix } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
+import { menuPriceLabel } from './lib/menu-price'
+import shell from './settings.module.css'
+import styles from './assign.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { PageHeading } from '@/components/templates/page-frame'
+import { Field } from '@/components/shared/form-controls'
+import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8「担当メニューをまとめて決める」（板 ooufy）。
@@ -70,8 +41,6 @@ import Notice from "@/components/shared/notice"
  * v7 の /booking/menus/staff と同じ。テーマが v7 のときはこのファイルは
  * 読まれず、従来の見た目が出る。
  */
-
-
 
 /* 予約設定の5タブ（settings-v8.tsx の V8_TABS と同じ並び）。 */
 const V8_TABS = [

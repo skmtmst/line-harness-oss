@@ -168,7 +168,7 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
     </ListPage></SaveErrorScope>
   }
   if (view === 'edit' && selected) return <SaveErrorScope errors={saveErrors}><CreatePage dirty={false} busy={busy} boardId="X4JcOf" title={`${titleOf(type)}のひな形を${selected.template.id ? '編集する' : '作る'}`} help="保存した設定は、配布先で下書きとして受け取れます。" notice={notices}
-    footerActions={<><Button disabled={busy} onClick={back}>キャンセル</Button>{canEdit && <Button variant="primary" disabled={busy || !selected.template.name.trim()} onClick={()=>void save()}>{busy ? '保存中…' : '下書きを保存する'}</Button>}</>}>
+    footerActions={<><Button disabled={busy} onClick={back}>キャンセル</Button>{canEdit && <Button variant="primary" disabled={busy || !selected.template.name.trim()} onClick={()=>void save()} busy={busy} busyLabel="保存中…">下書きを保存する</Button>}</>}>
       <div className={styles.fields}>
         <label className={styles.field}><span>統括での名前</span><SaveErrorField names={["name"]}>{canEdit ? <TextField value={selected.template.name} onChange={(event) => setSelected({ ...selected, template: { ...selected.template, name: event.target.value } })} /> : <span>{String(selected.template.name)}</span>}</SaveErrorField></label>
         <label className={styles.field}><span>説明</span><SaveErrorField names={["description"]}>{canEdit ? <TextField value={selected.template.description ?? ''} onChange={(event) => setSelected({ ...selected, template: { ...selected.template, description: event.target.value } })} /> : <span>{String(selected.template.description ?? '')}</span>}</SaveErrorField></label>

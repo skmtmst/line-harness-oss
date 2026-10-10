@@ -1,106 +1,53 @@
 'use client'
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import { jstDate } from "@/lib/jst-datetime"
-import { formatDate as polishFormatDate, formatNumber } from "@/lib/format"
-import { notifySaved } from "@/components/shared/toast"
-import { useFeatureAccess } from "@/lib/use-feature-access"
-import { useEffect, useRef, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Filter, PencilLine, Smartphone, Tag as TagIcon, Users } from "lucide-react"
-import { countTemplateTextCharacters, type DeliveryMode, type Scenario, type ScenarioStep, type Tag, type Template } from "@line-crm/shared"
-import { api, ApiError } from "@/lib/api"
-import { scenarioReferenceData } from "@/components/scenarios/scenario-reference-data"
-import ImageUploader, { type ImageUploaderValue } from "@/components/shared/image-uploader"
-import { STEP_MESSAGE_KINDS, type StepMessageKind } from "@/components/scenarios/message-type-tabs"
-import MessageKindFields, { emptyMessageKindState, serializeMessageKind, type MessageKind, type MessageKindState } from "@/components/scenarios/message-kind-fields"
-import QuestionEditor, { emptyQuestion, type ScenarioQuestion } from "@/components/scenarios/question-editor"
-import { ConditionDialog } from "@/components/scenarios/scenario-dialogs"
-import CarouselPicker from "@/components/scenarios/carousel-picker"
-import InsertToolbar from "@/components/scenarios/insert-toolbar"
-import { LINE_TEXT_LIMIT, isOverCharLimit } from "@/components/scenarios/char-counter"
-import type { SegmentCondition } from "@/components/shared/condition-builder"
-import { pruneCondition } from "@/lib/segment-condition"
-import { CreatePage } from "@/components/templates"
-import { Steps } from "@/components/templates/steps"
-import Select from "@/components/shared/select"
-import { EntityKindField } from "@/components/shared/entity-picker-sources"
-import { Field } from "@/components/shared/form-controls"
-import { TimeField } from "@/components/shared/date-time-field"
-import SegmentedControl from "@/components/shared/segmented"
-import Button from "@/components/shared/button"
-import Card from "@/components/shared/card"
-import RadioCard, { RadioCardGroup } from "@/components/shared/radio-card"
-import Notice from "@/components/shared/notice"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import LinePreview, { LinePreviewMessage } from "@/components/shared/line-preview"
-import TargetMissing from "@/components/shared/target-missing"
-import ListState from "@/components/shared/list-state"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import { useAccount } from "@/contexts/account-context"
-import { useNarrowViewport } from "@/lib/use-narrow-viewport"
-import { restoreFirstStep, scheduleToPayload } from "./first-step-form"
-import styles from "./first-step.module.css"
-import { browserDraftKey } from "@/v8/autosave/use-browser-draft"
-import { BrowserDraftNotice, ScenarioDraftConflictNotice } from "@/v8/autosave/browser-draft-notice"
-import { scenarioDraftKey, useScenarioDraft } from "@/v8/autosave/use-scenario-draft"
-import InsertTextField, { type InsertTextFieldHandle } from "@/components/shared/insert-text-field"
-import { permissionDeniedMessage } from "@/components/shared/api-error-message"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { jstDate } from '@/lib/jst-datetime'
+import { formatDate as polishFormatDate, formatNumber } from '@/lib/format'
+import { notifySaved } from '@/components/shared/toast'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useEffect, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Filter, PencilLine, Smartphone, Tag as TagIcon, Users } from 'lucide-react'
+import { countTemplateTextCharacters, type DeliveryMode, type Scenario, type ScenarioStep, type Tag, type Template } from '@line-crm/shared'
+import { api, ApiError } from '@/lib/api'
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
+import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
+import { STEP_MESSAGE_KINDS, type StepMessageKind } from '@/components/scenarios/message-type-tabs'
+import MessageKindFields, { emptyMessageKindState, serializeMessageKind, type MessageKind, type MessageKindState } from '@/components/scenarios/message-kind-fields'
+import QuestionEditor, { emptyQuestion, type ScenarioQuestion } from '@/components/scenarios/question-editor'
+import { ConditionDialog } from '@/components/scenarios/scenario-dialogs'
+import CarouselPicker from '@/components/scenarios/carousel-picker'
+import InsertToolbar from '@/components/scenarios/insert-toolbar'
+import { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scenarios/char-counter'
+import type { SegmentCondition } from '@/components/shared/condition-builder'
+import { pruneCondition } from '@/lib/segment-condition'
+import { CreatePage } from '@/components/templates'
+import { Steps } from '@/components/templates/steps'
+import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
+import { Field } from '@/components/shared/form-controls'
+import { TimeField } from '@/components/shared/date-time-field'
+import SegmentedControl from '@/components/shared/segmented'
+import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Notice from '@/components/shared/notice'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
+import TargetMissing from '@/components/shared/target-missing'
+import ListState from '@/components/shared/list-state'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { useAccount } from '@/contexts/account-context'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import { restoreFirstStep, scheduleToPayload } from './first-step-form'
+import styles from './first-step.module.css'
+import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
+import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
+import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 シナリオを作る②：1通目を設定（Pencil `V6xAo`・1152 `U5rxyH`）。
@@ -113,8 +60,6 @@ import ReadOnlyNotice from "@/components/shared/read-only-notice"
  * 1通目は飛ばせる。書かせないと進めない形にすると、あとで考えたい人が
  * 適当な本文を入れて先へ進む。
  */
-
-
 
 const modeLabel: Record<DeliveryMode, string> = {
   absolute_time: '時刻で指定',

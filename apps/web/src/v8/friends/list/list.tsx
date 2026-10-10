@@ -1,129 +1,66 @@
 'use client'
 
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from "@/components/shared/list-toolbar"
-import TagOverflow from "@/components/shared/tag-overflow"
-import { FolderDotName } from "@/components/shared/folder-dot"
-import { collectListRows } from "@/components/shared/collect-list-rows"
-import { useListUrlJsonValue, useListUrlValue, useListScrollMemory } from "@/components/shared/list-url-state"
-import StatusPill, { SUPPORT_STATUS_TONES } from "@/components/shared/status-pill"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
-import { CircleDot, Bookmark, Columns3, Download, Megaphone, MessageSquare, UserRoundX, SlidersHorizontal, Star, TrendingUp, Upload, UserPlus, Users } from "lucide-react"
-import type { Scenario, Tag } from "@line-crm/shared"
-import { api, ApiError, fetchApi, type FriendListItem, type FriendStats, type SupportMarkListItem } from "@/lib/api"
-import { formatNumber } from "@/lib/format"
-import { useAccount } from "@/contexts/account-context"
-import { useFeatureVisibility } from "@/lib/use-feature-visibility"
-import { loadOperators } from "@/lib/operators-cache"
-import { useStaffRole, canManageRole } from "@/lib/staff-role"
-import { buildBroadcastHandoff } from "@/lib/friends-broadcast-condition"
-import { usePageTitle } from "@/components/shell/page-chrome"
-import { ListPage } from "@/components/templates"
-import Button from "@/components/shared/button"
-import TagPill from "@/components/shared/tag-pill"
-import Checkbox from "@/components/shared/checkbox"
-import Avatar from "@/components/shared/avatar"
-import KpiCard from "@/components/shared/kpi-card"
-import KpiBand from "@/components/shared/kpi-band"
-import FilterChip from "@/components/shared/filter-chip"
-import SearchField from "@/components/shared/search-field"
-import Select from "@/components/shared/select"
-import Pagination from "@/components/shared/pagination"
-import ListState from "@/components/shared/list-state"
-import { notifyToast } from "@/components/shared/toast"
-import MenuPortal from "@/components/shared/menu-portal"
-import BulkBar from "@/components/shared/bulk-bar"
-import Chip from "@/components/shared/chip"
-import Dialog from "@/components/shared/dialog"
-import { TableBody } from "@/components/shared/table-body"
-import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
-import { DelayedSkeleton, Skeleton } from "@/components/shared/skeleton"
-import AdvancedSearchDialog, { type AdvancedSearchResult } from "@/components/friends/advanced-search-dialog"
-import SavedSearchDialog from "@/components/friends/saved-search-dialog"
-import SingleFriendActions, { type FriendAction } from "@/components/friends/single-friend-actions"
-import NoticeDialog from "@/components/friends/notice-dialog"
-import BulkRunDialog from "@/components/friends/bulk-run-dialog"
-import FriendRowMenu from "@/components/friends/friend-row-menu"
-import { canRunBulk } from "@/components/friends/bulk-run-view"
-import { conditionsToEditorState, savedSearchParams, savedSearchSummary } from "@/components/friends/saved-search-utils"
-import { hasEditKey } from "../shared/nav"
-import { FriendsTabs } from "../shared/head"
-import { emptyMessageOf } from "./empty"
-import { csvExportLine } from "./csv-export"
-import { readFriendsListSnapshot, writeFriendsListSnapshot } from "./list-state"
-import { lastContactOf, monthDay, monthDayTime, statusOf, messageWord, splitTags } from "./words"
-import styles from "./list.module.css"
-import { csvFileName } from "@/lib/csv-file-name"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField } from "@/components/shared/save-form-errors"
-import { ListPager } from "@/components/templates/list-page"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import { PAGE_SIZES as STANDARD_PAGE_SIZES } from "@/components/shared/page-size-select"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar'
+import TagOverflow from '@/components/shared/tag-overflow'
+import { FolderDotName } from '@/components/shared/folder-dot'
+import { collectListRows } from '@/components/shared/collect-list-rows'
+import { useListUrlJsonValue, useListUrlValue, useListScrollMemory } from '@/components/shared/list-url-state'
+import StatusPill, { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { CircleDot, Bookmark, Columns3, Download, Megaphone, MessageSquare, UserRoundX, SlidersHorizontal, Star, TrendingUp, Upload, UserPlus, Users } from 'lucide-react'
+import type { Scenario, Tag } from '@line-crm/shared'
+import { api, ApiError, fetchApi, type FriendListItem, type FriendStats, type SupportMarkListItem } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
+import { useAccount } from '@/contexts/account-context'
+import { useFeatureVisibility } from '@/lib/use-feature-visibility'
+import { loadOperators } from '@/lib/operators-cache'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { buildBroadcastHandoff } from '@/lib/friends-broadcast-condition'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { ListPage } from '@/components/templates'
+import Button from '@/components/shared/button'
+import TagPill from '@/components/shared/tag-pill'
+import Checkbox from '@/components/shared/checkbox'
+import Avatar from '@/components/shared/avatar'
+import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
+import FilterChip from '@/components/shared/filter-chip'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import Pagination from '@/components/shared/pagination'
+import ListState from '@/components/shared/list-state'
+import { notifyToast } from '@/components/shared/toast'
+import MenuPortal from '@/components/shared/menu-portal'
+import BulkBar from '@/components/shared/bulk-bar'
+import Chip from '@/components/shared/chip'
+import Dialog from '@/components/shared/dialog'
+import { TableBody } from '@/components/shared/table-body'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
+import SavedSearchDialog from '@/components/friends/saved-search-dialog'
+import SingleFriendActions, { type FriendAction } from '@/components/friends/single-friend-actions'
+import NoticeDialog from '@/components/friends/notice-dialog'
+import BulkRunDialog from '@/components/friends/bulk-run-dialog'
+import FriendRowMenu from '@/components/friends/friend-row-menu'
+import { canRunBulk } from '@/components/friends/bulk-run-view'
+import { conditionsToEditorState, savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
+import { hasEditKey } from '../shared/nav'
+import { FriendsTabs } from '../shared/head'
+import { emptyMessageOf } from './empty'
+import { csvExportLine } from './csv-export'
+import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
+import { lastContactOf, monthDay, monthDayTime, statusOf, messageWord, splitTags } from './words'
+import styles from './list.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { ListPager } from '@/components/templates/list-page'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
 /*
  * ★V8 友だち一覧（Pencil `x6QsVz`：閲覧のみ。いつもの形は同じ板からボタンを出したもの）。
@@ -134,9 +71,6 @@ import { PAGE_SIZES as STANDARD_PAGE_SIZES } from "@/components/shared/page-size
  * 道具2段（探す・絞り込み4つ・詳細条件・保存した検索／未対応・注目のみ・件数・
  * 表示項目・件数・並び）→ 表（□・☆・友だち・対応/担当・シナリオ・最新・タグ・流入元・最終接触・…）→ ページ送り。
  */
-
-
-
 
 const PAGE_SIZE_OPTIONS = STANDARD_PAGE_SIZES
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]

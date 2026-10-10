@@ -1,139 +1,68 @@
 'use client'
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import KpiBand from "@/components/shared/kpi-band"
-import KpiCard from "@/components/shared/kpi-card"
-import { DetailLoading } from "@/components/templates/detail-page"
-import { formatDate as polishFormatDate, formatNumber } from "@/lib/format"
-import { SaveConflictBand } from "@/components/shared/save-conflict"
-import { useFeatureAccess } from "@/lib/use-feature-access"
-import { Fragment, useState, useEffect, useCallback, useRef } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { ArrowDown, ArrowUp, BarChart3, Check, CircleCheck, Copy, Eye, FilePlus2, GitBranch, GitCompareArrows, Pause, Pencil, Play, Plus, Send, ShieldCheck, SlidersHorizontal } from "lucide-react"
-import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from "@line-crm/shared"
-import { api, ApiError, type ScenarioRuns, type ScenarioTriggerItem } from "@/lib/api"
-import StickyBar from "@/components/shared/sticky-bar"
-import LinePreview, { LinePreviewFlex as FlexPreviewComponent } from "@/components/shared/line-preview"
-import Dialog from "@/components/shared/dialog"
-import VersionCompare from "@/components/shared/version-compare"
-import { TextField, TextArea } from "@/components/shared/text-field"
-import { startChecklist } from "./start-checklist"
-import styles from "./detail.module.css"
-import { PageFrame, PageHeading } from "@/components/templates/page-frame"
-import Button from "@/components/shared/button"
-import Checkbox from "@/components/shared/checkbox"
-import RadioCard, { RadioCardGroup } from "@/components/shared/radio-card"
-import TargetMissing from "@/components/shared/target-missing"
-import ActionEditor from "@/components/scenarios/action-editor"
-import TriggerEditor from "@/components/scenarios/trigger-editor"
-import CarouselPicker from "@/components/scenarios/carousel-picker"
-import InsertToolbar from "@/components/scenarios/insert-toolbar"
-import StepPreview, { previewOffsets, isDeliveryTimeSet } from "@/components/scenarios/step-preview"
-import type { StepMessageKind } from "@/components/scenarios/message-type-tabs"
-import MessageKindFields, { emptyMessageKindState, messageKindProblem, parseMessageKind, serializeMessageKind, type MessageKind, type MessageKindState } from "@/components/scenarios/message-kind-fields"
-import QuestionEditor, { deadAnswerSettings, emptyQuestion, isUriOnlyBehavior, planChoiceActionRemap, validateChoiceUris, withChoiceKeys, type ScenarioQuestion } from "@/components/scenarios/question-editor"
-import { ConditionDialog, MoveReferrersNotice, OnCompleteDialog, TestSendDialog, ON_COMPLETE_LABEL, describeCondition, type OnCompleteMode } from "@/components/scenarios/scenario-dialogs"
-import { findInvalidRangeIssue, type SegmentCondition } from "@/components/shared/condition-builder"
-import ScheduleInput, { emptySchedule, buildSchedulePayload, uiFromOffsetMinutes, type ScheduleValue } from "@/components/scenarios/schedule-input"
-import BulkPreviewModal from "@/components/scenarios/bulk-preview-modal"
-import { RowMenu } from "@/components/shared/row-actions"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import { notifyToast } from "@/components/shared/toast"
-import { useUnsavedGuard } from "@/lib/use-unsaved-guard"
-import { UnsavedLeaveDialog } from "@/lib/unsaved-leave-dialog"
-import StatusChip from "@/components/shared/status-chip"
-import Notice from "@/components/shared/notice"
-import { browserDraftKey } from "@/v8/autosave/use-browser-draft"
-import { BrowserDraftNotice, ScenarioDraftConflictNotice } from "@/v8/autosave/browser-draft-notice"
-import { scenarioDraftKey, useScenarioDraft } from "@/v8/autosave/use-scenario-draft"
-import Select from "@/components/shared/select"
-import { EntityKindField } from "@/components/shared/entity-picker-sources"
-import FolderSelect, { folderById, folderCreator } from "@/components/shared/folder-select"
-import { scenarioReachBarWidth, scenarioReachCountLabel, scenarioReachPercent, scenarioReachPercentLabel } from "./scenario-reach-display"
-import { describeAfterSend, describeStepAudience, stepListTitle } from "./scenario-step-audience"
-import { scenarioSimulationKey, simulationForKey, type ScenarioSimulationResult } from "./scenario-simulation-refresh"
-import { usePageTitle } from "@/components/shell/page-chrome"
-import { useAccount } from "@/contexts/account-context"
-import { scenarioReferenceData } from "@/components/scenarios/scenario-reference-data"
-import InsertTextField, { type InsertTextFieldHandle } from "@/components/shared/insert-text-field"
-import { useFormErrors } from "@/lib/use-form-errors"
-import { FieldError, Field } from "@/components/shared/form-controls"
-import { emptyValue } from "@/components/shared/empty-value"
-import NumberInput from "@/components/shared/number-field"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import { DetailLoading } from '@/components/templates/detail-page'
+import { formatDate as polishFormatDate, formatNumber } from '@/lib/format'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { ArrowDown, ArrowUp, BarChart3, Check, CircleCheck, Copy, Eye, FilePlus2, GitBranch, GitCompareArrows, Pause, Pencil, Play, Plus, Send, ShieldCheck, SlidersHorizontal } from 'lucide-react'
+import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared'
+import { api, ApiError, type ScenarioRuns, type ScenarioTriggerItem } from '@/lib/api'
+import StickyBar from '@/components/shared/sticky-bar'
+import LinePreview, { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
+import Dialog from '@/components/shared/dialog'
+import VersionCompare from '@/components/shared/version-compare'
+import { TextField, TextArea } from '@/components/shared/text-field'
+import { startChecklist } from './start-checklist'
+import styles from './detail.module.css'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import TargetMissing from '@/components/shared/target-missing'
+import ActionEditor from '@/components/scenarios/action-editor'
+import TriggerEditor from '@/components/scenarios/trigger-editor'
+import CarouselPicker from '@/components/scenarios/carousel-picker'
+import InsertToolbar from '@/components/scenarios/insert-toolbar'
+import StepPreview, { previewOffsets, isDeliveryTimeSet } from '@/components/scenarios/step-preview'
+import type { StepMessageKind } from '@/components/scenarios/message-type-tabs'
+import MessageKindFields, { emptyMessageKindState, messageKindProblem, parseMessageKind, serializeMessageKind, type MessageKind, type MessageKindState } from '@/components/scenarios/message-kind-fields'
+import QuestionEditor, { deadAnswerSettings, emptyQuestion, isUriOnlyBehavior, planChoiceActionRemap, validateChoiceUris, withChoiceKeys, type ScenarioQuestion } from '@/components/scenarios/question-editor'
+import { ConditionDialog, MoveReferrersNotice, OnCompleteDialog, TestSendDialog, ON_COMPLETE_LABEL, describeCondition, type OnCompleteMode } from '@/components/scenarios/scenario-dialogs'
+import { findInvalidRangeIssue, type SegmentCondition } from '@/components/shared/condition-builder'
+import ScheduleInput, { emptySchedule, buildSchedulePayload, uiFromOffsetMinutes, type ScheduleValue } from '@/components/scenarios/schedule-input'
+import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
+import { RowMenu } from '@/components/shared/row-actions'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { notifyToast } from '@/components/shared/toast'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import StatusChip from '@/components/shared/status-chip'
+import Notice from '@/components/shared/notice'
+import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
+import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
+import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft'
+import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
+import { scenarioReachBarWidth, scenarioReachCountLabel, scenarioReachPercent, scenarioReachPercentLabel } from './scenario-reach-display'
+import { describeAfterSend, describeStepAudience, stepListTitle } from './scenario-step-audience'
+import { scenarioSimulationKey, simulationForKey, type ScenarioSimulationResult } from './scenario-simulation-refresh'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAccount } from '@/contexts/account-context'
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import { useFormErrors } from '@/lib/use-form-errors'
+import { FieldError, Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 シナリオ配信の編集（src/v8 に一から組み直した版）。
@@ -164,8 +93,6 @@ function describeStartTrigger(trigger: ScenarioTriggerItem, tagName: string | nu
   if (trigger.kind === 'booking_confirmed') return '予約が確定したとき'
   return '呼ばれたとき'
 }
-
-
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 

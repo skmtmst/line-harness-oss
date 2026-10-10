@@ -1,46 +1,24 @@
 'use client'
-import { useCallback, useEffect, useState } from "react"
-import { api, type PhotoRewardPolicyVersion } from "@/lib/api"
-import Button from "@/components/shared/button"
-import StatusBadge from "@/components/shared/status-badge"
-import Dialog from "@/components/shared/dialog"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import ListState from "@/components/shared/list-state"
-import VersionCompare from "@/components/shared/version-compare"
-import { TextField } from "@/components/shared/text-field"
-import { FieldError, Field } from "@/components/shared/form-controls"
-import { useFieldValidation } from "@/lib/use-field-validation"
-import DateTimeField from "@/components/shared/date-time-field"
-import { DataTable, TableHeadRow, Td, Th, Tr } from "@/components/shared/table"
-import { formatPhotoReceivedAt } from "./time"
-import styles from "./review.module.css"
-import { formatDate as polishFormatDate } from "@/lib/format"
-import { emptyValue } from "@/components/shared/empty-value"
-import NumberInput from "@/components/shared/number-field"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useCallback, useEffect, useState } from 'react'
+import { api, type PhotoRewardPolicyVersion } from '@/lib/api'
+import Button from '@/components/shared/button'
+import StatusBadge from '@/components/shared/status-badge'
+import Dialog from '@/components/shared/dialog'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ListState from '@/components/shared/list-state'
+import VersionCompare from '@/components/shared/version-compare'
+import { TextField } from '@/components/shared/text-field'
+import { FieldError, Field } from '@/components/shared/form-controls'
+import { useFieldValidation } from '@/lib/use-field-validation'
+import DateTimeField from '@/components/shared/date-time-field'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { formatPhotoReceivedAt } from './time'
+import styles from './review.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 const policyContent = (version: PhotoRewardPolicyVersion) => `採用 ${version.points}・公式サイト掲載 ${version.publicationPoints ? `さらに ${version.publicationPoints}` : emptyValue('none')}`
 

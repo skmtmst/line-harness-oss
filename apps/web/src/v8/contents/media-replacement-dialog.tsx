@@ -1,36 +1,21 @@
 'use client'
 
-import { useEffect, useRef, useState } from "react"
-import type { MediaItem, MediaReplacementImpact } from "@line-crm/shared"
-import { ApiError, api } from "@/lib/api"
-import Button from "@/components/shared/button"
-import Dialog from "@/components/shared/dialog"
-import Select from "@/components/shared/select"
-import Pagination from "@/components/shared/pagination"
-import ListRange from "@/components/ui/list-range"
-import ListState from "@/components/shared/list-state"
-import { checkedAtText, referenceKindText, referenceNameText } from "./media-delete-impact"
-import { Field } from "@/components/shared/form-controls"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import EntitySelect, { entityOptionMetadata } from "@/components/shared/entity-select"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { useEffect, useRef, useState } from 'react'
+import type { MediaItem, MediaReplacementImpact } from '@line-crm/shared'
+import { ApiError, api } from '@/lib/api'
+import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
+import Select from '@/components/shared/select'
+import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
+import ListState from '@/components/shared/list-state'
+import { checkedAtText, referenceKindText, referenceNameText } from './media-delete-impact'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /* ★V8 写し：src/app/contents/media-replacement-dialog.tsx から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
-
-
 
 export default function MediaReplacementDialog({
   source,

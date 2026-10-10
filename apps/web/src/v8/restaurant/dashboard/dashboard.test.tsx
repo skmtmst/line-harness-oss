@@ -54,7 +54,8 @@ describe('hKRRF 今日のお店', () => {
     await screen.findByText('鈴木 美咲')
     const board = document.querySelector('[data-design-node="hKRRF"]')!
     // 一覧の統合で名前の列が二重になると、名前だけでなく後ろの列もずれる。
-    const table = board.querySelector('[data-design="restaurant-today"]')!
+    const table = board.querySelector('[data-reservation-board][data-axis="list"] table')!
+    expect(table).not.toBeNull()
     const columnCount = table.querySelectorAll('thead th').length
     for (const row of table.querySelectorAll('tbody tr')) expect(row.querySelectorAll('td')).toHaveLength(columnCount)
     for (const label of ['ダッシュボード', '予約（今日・今月・一覧）', '座席・卓', '予約枠・在庫', '今日の予約', '来店予定', '空席（いま）', '未返信の口コミ', '予約サイト・グルメ媒体', 'Instagram の新着']) {

@@ -1,57 +1,30 @@
 'use client'
-import CopyTextButton from "@/components/shared/copy-text-button"
-import Link from "next/link"
-import { useCallback, useEffect, useRef, useState } from "react"
-import { CircleHelp, Pause, Play, Plus, RefreshCw } from "lucide-react"
-import { ApiError, api, type MeasurementSite } from "@/lib/api"
-import { canManageRole, useStaffRole } from "@/lib/staff-role"
-import { formatNumber, formatDate as polishFormatDate } from "@/lib/format"
-import { useResponseGate } from "@/lib/use-response-gate"
-import { useAccount } from "@/contexts/account-context"
-import { usePageCrumbs, usePageTitle } from "@/components/shell/page-chrome"
-import HelpTip from "@/components/shared/help-tip"
-import Button from "@/components/shared/button"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import Dialog from "@/components/shared/dialog"
-import { MoreAction } from "@/components/shared/row-actions"
-import ListState from "@/components/shared/list-state"
-import StatusBadge from "@/components/shared/status-badge"
-import { TextArea, TextField } from "@/components/shared/text-field"
-import { DetailPage } from "@/components/templates"
-import { focusField } from "./focus-field"
-import styles from "./site-script.module.css"
-import { Field } from "@/components/shared/form-controls"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import ReadOnlyNotice from "@/components/shared/read-only-notice"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import CopyTextButton from '@/components/shared/copy-text-button'
+import Link from 'next/link'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { CircleHelp, Pause, Play, Plus, RefreshCw } from 'lucide-react'
+import { ApiError, api, type MeasurementSite } from '@/lib/api'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
+import { useResponseGate } from '@/lib/use-response-gate'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import HelpTip from '@/components/shared/help-tip'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import { MoreAction } from '@/components/shared/row-actions'
+import ListState from '@/components/shared/list-state'
+import StatusBadge from '@/components/shared/status-badge'
+import { TextArea, TextField } from '@/components/shared/text-field'
+import { DetailPage } from '@/components/templates'
+import { focusField } from './focus-field'
+import styles from './site-script.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 サイトスクリプト（Pencil `XjOte`）。
@@ -66,9 +39,6 @@ import Notice from "@/components/shared/notice"
  * - 「貼りかたが分からないときは」は窓で開く（今は右の列のいちばん下の段）
  * - 閲覧のみ（owner・admin 以外）には、サイトを追加する・「…」・操作の行を出さない
  */
-
-
-
 
 type PageRow = { host: string | null; path: string; views: number; visitors: number }
 type TrackingSummary = {

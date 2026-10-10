@@ -1,84 +1,45 @@
 'use client'
 
-import { notifySaved, notifyToast } from "@/components/shared/toast"
-import { useListUrlValue } from "@/components/shared/list-url-state"
-import { FolderDotName } from "@/components/shared/folder-dot"
-import { useCallback, useEffect, useRef, useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { Bookmark, CircleDashed, Filter, Lightbulb, MousePointerClick, Send, Users } from "lucide-react"
-import type { SavedSearch, Tag } from "@line-crm/shared"
-import { api, ApiError, type SavedSearchSummary } from "@/lib/api"
-import { ListPageBody } from "@/components/templates"
-import { type ActionMenuItem } from "@/components/shared/action-menu"
-import { RowMenu } from "@/components/shared/row-actions"
-import DetailPanel, { useDetailPanelUrl } from "@/components/shared/detail-panel"
-import ContextMenu, { type ContextMenuItem } from "@/components/shared/context-menu"
-import InlineEdit from "@/components/shared/inline-edit"
-import { withViewTransition } from "@/components/shared/view-transition"
-import ConfirmDialog from "@/components/shared/confirm-dialog"
-import Button from "@/components/shared/button"
-import Select from "@/components/shared/select"
-import StatusBadge from "@/components/shared/status-badge"
-import Pagination from "@/components/shared/pagination"
-import SearchField from "@/components/shared/search-field"
-import KpiCard from "@/components/shared/kpi-card"
-import KpiBand from "@/components/shared/kpi-band"
-import { DataTable, TableHeadRow, Th, Tr, Td } from "@/components/shared/table"
-import { DelayedSkeleton } from "@/components/shared/skeleton"
-import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from "@/components/shared/page-size-select"
-import { mergeVisibleOrder } from "@/components/friend-fields/reorder-utils"
-import { splitConditions } from "@/components/friend-fields/saved-search-list"
-import type { SavedSearchConditionLabels } from "@/components/friends/saved-search-utils"
-import { filterSavedSearches, savedSearchKpiValues, type SavedSearchUsageFilter } from "@/components/friend-fields/saved-search-kpis"
-import { formatDay, formatNumber } from "@/lib/format"
-import styles from "./list.module.css"
-import TruncatedText from "@/components/shared/truncated-text"
-import { permissionDeniedMessage } from "@/components/shared/api-error-message"
-import { emptyValue } from "@/components/shared/empty-value"
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from "@/components/shared/save-form-errors"
-import { ListToolbarSearchSlot } from "@/components/shared/list-toolbar"
-import ListState from "@/components/shared/list-state"
-import Notice from "@/components/shared/notice"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { notifySaved, notifyToast } from '@/components/shared/toast'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { FolderDotName } from '@/components/shared/folder-dot'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { Bookmark, CircleDashed, Filter, Lightbulb, MousePointerClick, Send, Users } from 'lucide-react'
+import type { SavedSearch, Tag } from '@line-crm/shared'
+import { api, ApiError, type SavedSearchSummary } from '@/lib/api'
+import { ListPageBody } from '@/components/templates'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import InlineEdit from '@/components/shared/inline-edit'
+import { withViewTransition } from '@/components/shared/view-transition'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Button from '@/components/shared/button'
+import Select from '@/components/shared/select'
+import StatusBadge from '@/components/shared/status-badge'
+import Pagination from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
+import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
+import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils'
+import { splitConditions } from '@/components/friend-fields/saved-search-list'
+import type { SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
+import { filterSavedSearches, savedSearchKpiValues, type SavedSearchUsageFilter } from '@/components/friend-fields/saved-search-kpis'
+import { formatDay, formatNumber } from '@/lib/format'
+import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 タグ「保存した検索」タブ（Pencil `IWnYX`）。
@@ -90,10 +51,6 @@ import Notice from "@/components/shared/notice"
  * 並べ替えは行の「…」の「上へ動かす・下へ動かす」（つまみで ↑↓ と同じ口）。
  * 絵の下の段のとおり、行の「…」に「複製して保存」を足した（同じ条件で新しく保存する）。
  */
-
-
-
-
 
 const PAGE_SIZES = STANDARD_PAGE_SIZES
 const MAX_SAVED = 50
@@ -378,7 +335,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
   ) : forbidden ? (
     <ListState kind="error" title="保存した検索を見る権限がありません" description={permissionDeniedMessage('store')}  />
   ) : loadError ? (
-    <ListState kind="error" title="保存した検索を読み込めませんでした" description={loadError}  action={<><Button type="button" onClick={() => void load()}>もう一度読み込む</Button></>} />
+    <ListState kind="error" title="保存した検索を読み込めませんでした" description={loadError}  action={<><Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
   ) : ready && items.length === 0 ? (
     <ListState kind="empty" title="まだ保存した検索はありません" description="友だち一覧で条件を絞り、「この条件を保存」を押すとここに追加されます。"  icon={<Filter className={styles.stateIcon} aria-hidden="true" />} action={<>{canEdit ? <Button href="/friends" variant="primary">友だち一覧で条件を作る</Button> : null}</>} />
   ) : ready && visible.length === 0 ? (
