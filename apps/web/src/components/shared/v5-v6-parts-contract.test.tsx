@@ -56,7 +56,7 @@ describe('共通Button', () => {
     expect(html).toContain('<a')
     expect(html).toContain('href="/settings"')
     expect(html).toContain('target="_blank"')
-    expect(html).toContain('rel="noreferrer"')
+    expect(html).toContain('rel="noopener noreferrer"')
     expect(html).toContain('hidden=""')
   })
 

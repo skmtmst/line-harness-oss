@@ -1,0 +1,22 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.list { display: flex; flex-direction: column; gap: var(--tpl-action-list-gap); min-width: 0; }
+.empty { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
+.item { min-width: 0; padding: var(--tpl-action-row-compact-pad); border-radius: var(--radius-control); outline: 1px solid var(--color-hairline); outline-offset: -1px; background: var(--color-canvas); }
+.row { display: flex; align-items: center; gap: var(--tpl-action-row-gap); min-width: 0; }
+.icon { display: inline-flex; align-items: center; justify-content: center; width: var(--tpl-action-icon-box); height: var(--tpl-action-icon-box); border-radius: var(--radius-control); background: var(--color-canvas-sunken); flex-shrink: 0; color: var(--color-ink-secondary); }
+.grip { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: var(--tpl-action-grip-w); padding: 0; border: 0; background: transparent; color: var(--color-ink-faint); cursor: grab; }
+.add { display: flex; }
+.kind { width: var(--tpl-action-kind-w); flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; color: var(--color-ink-secondary); font-size: var(--text-label); font-weight: 600; white-space: nowrap; }
+.title, .titleButton { flex: 1; min-width: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-label); text-overflow: ellipsis; white-space: nowrap; }
+.titleButton { padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.titleButton:focus-visible { outline: 2px solid var(--color-info); outline-offset: 2px; }
+.extra { display: flex; align-items: center; gap: var(--tpl-action-row-gap); min-width: 0; }
+.editor { display: flex; flex-direction: column; gap: var(--tpl-side-row-pad); margin-top: var(--tpl-side-row-pad); padding-top: var(--tpl-side-row-pad); border-top: 1px solid var(--color-hairline); min-width: 0; }
+@media (max-width: 600px) {
+  .row { flex-wrap: wrap; }
+  .kind { flex: 1; min-width: 0; width: auto; }
+  .title, .titleButton { flex-basis: 100%; order: 1; }
+  .extra { flex-basis: 100%; order: 2; }
+}
+}

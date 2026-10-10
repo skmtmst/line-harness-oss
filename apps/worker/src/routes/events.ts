@@ -785,12 +785,12 @@ events.get('/api/events/admin/events', async (c) => {
          -- 呼び出し側で別に見ること。
          (SELECT t.name FROM tags t WHERE t.id = e.visible_tag_id) AS visible_tag_name
        ${where}
-       ORDER BY ${sort === 'name'
+       ORDER BY ${c.req.query('highlight') ? 'CASE WHEN e.id = ? THEN 0 ELSE 1 END,' : ''} ${sort === 'name'
          ? `e.name COLLATE NOCASE ASC, e.id ASC`
          : `next_slot_starts_at IS NULL ASC, next_slot_starts_at ASC, e.id ASC`}
        LIMIT ? OFFSET ?`,
     )
-    .bind(...params, paging.limit, paging.offset)
+    .bind(...params, ...(c.req.query('highlight') ? [c.req.query('highlight')!] : []), paging.limit, paging.offset)
     .all();
   /*
    * R79/R80: 上部の数値カードは「今後の開催回」の全体像を出す。
@@ -858,6 +858,40 @@ events.get('/api/events/admin/events/:id', async (c) => {
     .first();
   if (!row) return bad(c, 'not_found', 404);
   return c.json(withFolder(row));
+});
+
+// 設定と開催回だけを下書きへ写す。申込者・公開版・送信予定は写さない。
+events.post('/api/events/admin/events/:id/duplicate', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+  const accountId = getAccountId(c);
+  if (!accountId) return bad(c, 'account_id_required', 400);
+  const sourceId = c.req.param('id');
+  const source = await c.env.DB.prepare(`SELECT * FROM events WHERE id = ? AND deleted_at IS NULL AND
+    ((target_type = 'single' AND line_account_id = ?) OR
+     (target_type = 'multi-account-dedup' AND EXISTS (SELECT 1 FROM json_each(account_ids) WHERE value = ?)))`)
+    .bind(sourceId, accountId, accountId).first<Record<string, unknown>>();
+  if (!source) return bad(c, 'not_found', 404);
+  const accounts = source.target_type === 'multi-account-dedup' ? JSON.parse(String(source.account_ids)) as string[] : [accountId];
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), accounts)) return bad(c, 'not_found', 404);
+  const body = await c.req.json<{ expectedVersion?: number }>().catch(() => ({} as { expectedVersion?: number }));
+  if (!Number.isInteger(body.expectedVersion) || body.expectedVersion! < 1) return bad(c, 'expected_version_required', 422);
+  if (body.expectedVersion !== source.version) return bad(c, 'version_conflict', 409);
+  const id = crypto.randomUUID();
+  const columns = ['line_account_id','venue_name','venue_url','venue_address','image_url','description','description_centered',
+    'max_bookings_per_friend','requires_approval','approval_deadline_hours','cancel_deadline_hours_before',
+    'reminder_day_before_enabled','reminder_hours_before','sort_order','target_type','account_ids','dedup_priority',
+    'confirmation_message_extra','reminder_message_extra','og_title','og_description','og_image_url','visible_tag_id',
+    'waitlist_enabled','entry_cutoff_hours_before','questions_json'];
+  const result = await c.env.DB.batch([
+    c.env.DB.prepare(`INSERT INTO events (id,name,is_published,lifecycle_status,${columns.join(',')},folder_id)
+      SELECT ?,name || '（複製）',0,'draft',${columns.join(',')},folder_id FROM events
+      WHERE id = ? AND version = ? AND deleted_at IS NULL`).bind(id, sourceId, body.expectedVersion!),
+    c.env.DB.prepare(`INSERT INTO event_slots (id,event_id,starts_at,ends_at,capacity,is_active,sort_order)
+      SELECT lower(hex(randomblob(16))),?,starts_at,ends_at,capacity,is_active,sort_order FROM event_slots
+      WHERE event_id = ? AND deleted_at IS NULL AND EXISTS (SELECT 1 FROM events WHERE id = ?)`)
+      .bind(id, sourceId, id),
+  ]);
+  if (!result[0].meta.changes) return bad(c, 'version_conflict', 409);
+  return c.json({ id, lifecycle_status: 'draft' }, 201);
 });
 
 events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {

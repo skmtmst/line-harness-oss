@@ -1,9 +1,10 @@
 'use client'
-
+import SegmentedControl from '@/components/shared/segmented'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { Fragment, useState, type ReactNode } from 'react'
-import { Calendar, Eye, Image as ImageIcon, Inbox, Package, Plus, SlidersHorizontal } from 'lucide-react'
+import { Calendar, Image as ImageIcon, Inbox, Package, Plus, SlidersHorizontal } from 'lucide-react'
 import type { DashboardCardId } from '@line-crm/shared'
 import { DashboardColumns, DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
 import Button from '@/components/shared/button'
@@ -27,22 +28,7 @@ import { FirstStepsCard, useFirstSteps } from './first-steps'
 import { FriendTrend, trendRangeNote } from './trend'
 import { InboxSection } from './inbox'
 import { FriendAddLink } from './friend-add'
-import {
-  ConnectionStatus,
-  DeliveryFailures,
-  FriendStatus,
-  Loading,
-  Metric,
-  MonthlyDelivery,
-  OperationalAlerts,
-  RecentActivity,
-  RecentResults,
-  SendQuota,
-  SupportStatus,
-  Tag,
-  Unavailable,
-  Upcoming,
-} from './sections'
+import { ConnectionStatus, DeliveryFailures, FriendStatus, Loading, Metric, MonthlyDelivery, OperationalAlerts, RecentActivity, RecentResults, SendQuota, SupportStatus, Tag, Unavailable, Upcoming } from './sections'
 import { RetryLabel } from '@/components/shared/retry-label'
 import styles from './dashboard.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
@@ -100,7 +86,7 @@ export default function DashboardV8() {
   const role = useStaffRole()
   const { refreshAccounts } = useAccount()
   /* 役割が読めるまでは出し、閲覧のみと分かったら隠す（サーバの 403 が最後の守り）。 */
-  const canManage = role === null || canManageRole(role)
+  const canManage = canManageRole(role)
   const canEditLayout = canEditDashboardLayout(role)
   /* 修正案 D-3：はじめにやること（今の「はじめの設定」の帯の場所に置き換える）。 */
   const start = useFirstSteps(d.selectedAccountId, role)
@@ -115,7 +101,7 @@ export default function DashboardV8() {
         title={title}
         items={[
           { id: 'detail', label: openDetail === id ? '内訳を閉じる' : '内訳を見る', onSelect: () => setOpenDetail((current) => (current === id ? null : id)) },
-          { id: 'go', label, external: true, href: href, onSelect: () => router.push(href) },
+          { id: 'go', label, external: false, href: href, onSelect: () => router.push(href) },
           ...(canEditLayout ? [{ id: 'edit', label: 'ダッシュボード編集', dividerBefore: true, onSelect: d.openEditor }] : []),
         ]}
       />
@@ -341,7 +327,7 @@ export default function DashboardV8() {
     return <><SectionHeader title="友だち数の推移" /><Unavailable section={data?.sections?.trend} onRetry={() => void d.load()} /></>
   }
 
-  const viewer = role !== null && !canManageRole(role)
+  const viewer = !canManageRole(role)
   /* 部品の中で自分のエラーを出すものは帯に重ねない。出し先の無いものだけ日本語の名前で帯に出す。 */
   const shownCardIds = new Set<string>([
     ...d.preferences.main.filter((item) => item.visible).map((item) => item.id),
@@ -351,24 +337,18 @@ export default function DashboardV8() {
   const notice = start.summary || viewer || d.error || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
-        <div className={styles.viewerBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-        </div>
+        <ReadOnlyNotice />
       ) : null}
       {start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} /> : null}
       {d.error ? (
-        <div className={styles.errorBand} role="alert">
-          <span>{d.error}</span>
-          <Button type="button" onClick={() => void d.load()}><RetryLabel /></Button>
-        </div>
+        <Notice tone="danger" role="alert" action={<Button type="button" onClick={() => d.load()} busyLabel="処理中…"><RetryLabel /></Button>}>{d.error}</Notice>
       ) : null}
       {looseFailures.length ? (
         <Notice
           tone="warn"
           role="status"
           message={`${partialFailureLabels(looseFailures)}を${STATE_TEXT.error}。0件としては表示していません。`}
-          action={<Button type="button" onClick={() => void d.load()}><RetryLabel /></Button>}
+          action={<Button type="button" onClick={() => d.load()} busyLabel="処理中…"><RetryLabel /></Button>}
         />
       ) : null}
     </div>

@@ -1,3 +1,4 @@
+
 import Link from 'next/link'
 import type { LinkProps } from 'next/link'
 import { Check, LoaderCircle, ArrowUpRight } from 'lucide-react'
@@ -22,7 +23,7 @@ type CommonProps = {
    * そろえるときだけ使う（★V7：行内の操作は32）。本文の操作は
    * `standard` のままにする。
    */
-  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail' | 'composer' | 'composer-small'
+  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail' | 'composer' | 'composer-small' | 'booking'
   align?: 'start'
   /** 行内の時刻など、リンク色にしない文字操作。 */
   textTone?: 'action' | 'ink'
@@ -98,10 +99,11 @@ export default function Button(props: ButtonProps) {
 
   if ('href' in props && props.href !== undefined) {
     const { children, className: _className, href, external, size: _size, variant: _variant, align, textTone: _textTone, presentation, ...linkProps } = props
+    const newTab = external || linkProps.target === '_blank'
     return (
-      <Link href={href} className={classes} data-align={align} data-presentation={presentation} {...linkProps} target={external ? '_blank' : linkProps.target} rel={external ? 'noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
+      <Link href={href} className={classes} data-align={align} data-presentation={presentation} {...linkProps} target={newTab ? '_blank' : linkProps.target} rel={newTab ? 'noopener noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
         {children}
-        {external ? <ArrowUpRight size={13} aria-hidden="true" data-external-icon /> : null}
+        {newTab ? <ArrowUpRight size={13} aria-hidden="true" data-external-icon /> : null}
       </Link>
     )
   }
@@ -140,7 +142,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   const [automaticBusy, setAutomaticBusy] = useState(false)
   const [automaticError, setAutomaticError] = useState('')
   const automaticLock = useRef(false)
-  const stateful = busy !== undefined || done !== undefined || automaticBusy
+  const stateful = busy !== undefined || done !== undefined || props.busyLabel !== undefined || automaticBusy
   const busyNow = busy === true || (busy === undefined && automaticBusy)
 
   /* done が true になったら 1.2 秒だけ ✓ を出して元の文字へ戻す。 */
@@ -157,13 +159,18 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   const elementRef = useRef<HTMLButtonElement | null>(null)
   const v8 = useAdminTheme() === 'v8'
   const idleWidthRef = useRef(0)
+  const measuredLabelRef = useRef<string | null>(null)
   useLayoutEffect(() => {
     const el = elementRef.current
     if (!el || !stateful) return
-    if (busy === true || done === true) {
+    if (busyNow || done === true) {
       if (idleWidthRef.current > 0) el.style.minWidth = `${idleWidthRef.current}px`
       return
     }
+    // 親の再描画でラベルが変わらなければ、複製・挿入・幅取得を繰り返さない。
+    const measurementKey = JSON.stringify([classes, el.innerHTML, busyLabel, doneLabel, v8, presentation, buttonProps.style, buttonProps.hidden])
+    if (measuredLabelRef.current === measurementKey) return
+    measuredLabelRef.current = measurementKey
     el.style.minWidth = ''
     idleWidthRef.current = el.offsetWidth
     if (!v8) return

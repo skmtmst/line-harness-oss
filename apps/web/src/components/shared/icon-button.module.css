@@ -103,12 +103,12 @@
 }
 
 [data-theme='v8'] .button:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
-[data-theme='v8'] .button { border: 0; padding: 0; gap: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; }
+[data-theme='v8'] .button { border: 0; padding: 0; gap: 0; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow); }
 [data-theme='v8'] .button > :is(svg, img) { width: 16px; height: 16px; }
 
 /* 行の中の小さい形（size="small"・mcOqK の上下 24×24・印 12）。既定の 36 は変えない。 */

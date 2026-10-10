@@ -1,37 +1,15 @@
 'use client'
-
-/*
- * ★V8 対応マークを作る・編集（Pencil `ulq9Y`、保管の小窓は `fy5dz`）。
- *
- * 型（CreatePage）の左に段「基本」（マーク名・色）と段「自動で変えるきまり」、右の列に「出す場所と数」と案内の帯。
- * 下の帯は「保管する」が左端、キャンセル・保存が真ん中。
- * 読み込み・保存・版の衝突（R513）・冪等キー（R512）・権限（R511）・保管の影響確認は
- * 今の部品（app/tags/mark-editor-v8.tsx）から写した。
- * 絵に無い「新しい友だちに最初から付ける」は右の列の下の空きに置く。並び順は一覧で並べ替える（ここでは今の値を保つ）。
- * きまりの中身を変える・作るは、今の自動変更ルールの部品（SupportMarkRulesPanel）を窓で開く。
- */
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Check, Pause, Pencil, Plus, Trash2, Zap } from 'lucide-react'
-import {
-  api,
-  ApiError,
-  describeSaveFailure,
-  type SaveSupportMarkAutomationRule,
-  type SupportMarkArchiveImpact,
-  type SupportMarkAutomationEvent,
-  type SupportMarkAutomationRule,
-  type SupportMarkListItem,
-} from '@/lib/api'
+import { api, ApiError, describeSaveFailure, type SaveSupportMarkAutomationRule, type SupportMarkArchiveImpact, type SupportMarkAutomationEvent, type SupportMarkAutomationRule, type SupportMarkListItem } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
-import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -48,8 +26,19 @@ import { AttributeKindGuide, findDuplicateNames } from '@/components/friend-fiel
 import { ArchiveMarkDialog } from '@/components/friend-fields/mark-list'
 import MarkBasicFields from './mark-basic-fields'
 import styles from './create.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { permissionDeniedMessage, withPermissionFailure } from '@/components/shared/api-error-message'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 対応マークを作る・編集（Pencil `ulq9Y`、保管の小窓は `fy5dz`）。
+ *
+ * 型（CreatePage）の左に段「基本」（マーク名・色）と段「自動で変えるきまり」、右の列に「出す場所と数」と案内の帯。
+ * 下の帯は「保管する」が左端、キャンセル・保存が真ん中。
+ * 読み込み・保存・版の衝突（R513）・冪等キー（R512）・権限（R511）・保管の影響確認は
+ * 今の部品（app/tags/mark-editor-v8.tsx）から写した。
+ * 絵に無い「新しい友だちに最初から付ける」は右の列の下の空きに置く。並び順は一覧で並べ替える（ここでは今の値を保つ）。
+ * きまりの中身を変える・作るは、今の自動変更ルールの部品（SupportMarkRulesPanel）を窓で開く。
+ */
 
 const COLORS = [
   { value: '#EF4B55', name: '赤' },
@@ -100,6 +89,7 @@ export default function MarkEditor({ markId }: { markId?: string }) {
 }
 
 function MarkEditorBody({ markId }: { markId?: string }) {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const editing = Boolean(markId)
@@ -222,13 +212,20 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       }
     } catch (reason) {
       if (loadSeqRef.current !== seq) return
+      const fieldFailure = saveErrors.capture(reason);
+
       const status = (reason as { status?: number } | null)?.status
       if (status === 403) {
-        setLoadMessage('')
+        { if (!fieldFailure)
+        setLoadMessage('') }
+        { if (!fieldFailure)
         setLoadState('forbidden')
+      }
       } else {
-        setLoadMessage('対応マークを読み込めませんでした。入力内容はそのままです。')
-        setLoadState('error')
+        { if (!fieldFailure)
+        setLoadMessage('対応マークを読み込めませんでした。入力内容はそのままです。') }
+        { if (!fieldFailure)
+        setLoadState('error') }
       }
     } finally {
       if (loadSeqRef.current === seq) {
@@ -236,7 +233,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         setReloading(false)
       }
     }
-  }, [editing, markId, selectedAccountId])
+  }, [editing, markId, selectedAccountId, saveErrors])
 
   useEffect(() => {
     initialLoadRef.current = true
@@ -256,10 +253,14 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       setRules(inExecutionOrder(res.data))
       setRulesState('ready')
     } catch (reason) {
-      if (!(reason instanceof ApiError)) { setRulesState('error'); return }
+      const fieldFailure = saveErrors.capture(reason);
+
+      if (!(reason instanceof ApiError)) { { if (!fieldFailure) setRulesState('error'); } return }
+      { if (!fieldFailure)
       setRulesState(reason.status === 403 ? 'forbidden' : reason.status === 404 ? 'not-connected' : 'error')
     }
-  }, [editing, markId, selectedAccountId])
+  }
+  }, [editing, markId, selectedAccountId, saveErrors])
   useEffect(() => { void loadRules() }, [loadRules])
 
   const stopRule = async () => {
@@ -272,9 +273,12 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       setStoppingRule(null)
       await loadRules()
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure)
       setRuleError(reason instanceof ApiError && reason.status === 409
         ? 'ほかの担当者が先に変えました。読み直してから、もう一度お試しください。'
-        : 'きまりを止められませんでした。もう一度お試しください。')
+        : 'きまりを止められませんでした。もう一度お試しください。') }
     } finally {
       setRuleBusy(false)
     }
@@ -308,11 +312,15 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         setBaseline({ name, color, displayOrder, isDefault })
       } else { disarm(); router.push(createPageReturnHref('/tags?tab=marks', result.data.id)) }
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason);
+
+
       const status = (reason as { status?: number } | null)?.status
       const code = (reason as { code?: string } | null)?.code
       if (status === 403) {
         setSaveForbidden(true)
-        setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store'))
+        { if (!fieldFailure)
+        setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store')) }
         return
       }
       if (status === 409 && code === 'SUPPORT_MARK_VERSION_CONFLICT') {
@@ -327,10 +335,12 @@ function MarkEditorBody({ markId }: { markId?: string }) {
           setConflict(next)
           collision.mark()
         }
-        setError('ほかの担当者が先に変更しました。最新の内容を確認してから保存し直してください。')
+        { if (!fieldFailure)
+        setError('ほかの担当者が先に変更しました。最新の内容を確認してから保存し直してください。') }
         return
       }
-      setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store'))
+      { if (!fieldFailure)
+      setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store')) }
     } finally {
       setSaving(false)
     }
@@ -350,8 +360,11 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       if (!res.success) throw new Error(res.error)
       setArchiveImpact(res.data)
       setReplacementMarkId(res.data.replacementOptions.find((option) => option.isDefault)?.id ?? res.data.replacementOptions[0]?.id ?? '')
-    } catch {
-      setArchiveError('保管の影響を確認できませんでした。画面を閉じて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setArchiveError('保管の影響を確認できませんでした。画面を閉じて、もう一度お試しください。') }
     } finally {
       setImpactLoading(false)
     }
@@ -373,8 +386,11 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       setArchiveImpact(null)
       disarm()
       router.push('/tags?tab=marks')
-    } catch {
-      setArchiveError('対応マークを保管できませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setArchiveError('対応マークを保管できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setArchiving(false)
     }
@@ -406,9 +422,9 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   const collision = useSaveConflict<NonNullable<typeof conflict>>({ fetchLatest: async () => conflict, reload: applyLatest })
   const comparison = collision.latest ? [['名前', name, collision.latest.name], ['色', color, collision.latest.color], ['並び順', displayOrder, collision.latest.displayOrder]].flatMap(([label, current, latest]) => current === latest ? [] : [{ text: `${label}：編集中 ${current} → 最新 ${latest}` }]) : null
 
-  if (loadState === 'loading') return <ListState kind="loading" />
+  if (loadState === 'loading') return <SaveErrorScope errors={saveErrors}><ListState kind="loading" /></SaveErrorScope>
 
-  const back = <Link href="/tags?tab=marks" className={styles.backLink}>← 対応マークへ</Link>
+  const back = null
   const description = editing && selected
     ? `${selected.friendCount} 人に付いている・${shownTargets.map((target) => PLACE_LABELS[target]).filter(Boolean).join('・')}に出る`
     : '対応の状態を、色つきの印で管理します。'
@@ -429,14 +445,14 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         </p>
       ) : null}
       <div className={styles.field}>
-        <Checkbox checked={isDefault} disabled={selected?.isDefault} onCheckedChange={setIsDefault}>新しい友だちに最初から付ける</Checkbox>
+        <SaveErrorField names={["isDefault","is_default"]}><Checkbox checked={isDefault} disabled={selected?.isDefault} onCheckedChange={setIsDefault}>新しい友だちに最初から付ける</Checkbox></SaveErrorField>
         <p className={styles.fieldNote}>最初から付けるマークは1つだけ選べます</p>
       </div>
     </div>
   )
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <CreatePage
         boardId="ulq9Y"
         title={editing ? (selected?.name ?? '対応マークを編集') : '対応マークを作る'}
@@ -445,11 +461,11 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         identity={back}
         preview={aside}
         destructive={editing && selected && !hideForm ? (
-          <Button type="button" variant="danger" onClick={() => void openArchive()} disabled={archiveBlockReason !== null} title={archiveBlockReason ?? undefined}>
+          <Button type="button" variant="danger" onClick={() => openArchive()} busyLabel="処理中…" disabled={archiveBlockReason !== null} title={archiveBlockReason ?? undefined}>
             <Pause size={15} aria-hidden="true" />保管する
           </Button>
         ) : undefined}
-        footerActions={hideForm ? <Button href="/tags?tab=marks">一覧へ戻る</Button> : <>
+        footerActions={hideForm ? <></> : <>
           <Button type="button" onClick={() => guarded(() => router.push('/tags?tab=marks'))}>キャンセル</Button>
           <Button type="button" variant="primary" disabled={saveDisabled} title={blockedReason ?? undefined}  onClick={() => void save()} busy={saving}>
             <Check size={15} aria-hidden="true" />{editing ? '保存する' : '対応マークを作る'}
@@ -485,8 +501,8 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                   {rulesState === 'forbidden' ? <p className={styles.fieldNote}>{permissionDeniedMessage('store')}</p> : null}
                   {rulesState === 'error' ? (
                     <div className={styles.inlineRetry}>
-                      <p className={styles.fieldError} role="alert">きまりを読み込めませんでした。</p>
-                      <Button type="button" variant="text" onClick={() => void loadRules()}>もう一度読み込む</Button>
+                      <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >きまりを読み込めませんでした。</Notice>
+                      <Button type="button" variant="text" onClick={() => loadRules()} busyLabel="処理中…">もう一度読み込む</Button>
                     </div>
                   ) : null}
                   {rulesState === 'ready' && rules.length === 0 ? <p className={styles.fieldNote}>今は自動で変えません。必要なときだけきまりを作ってください。</p> : null}
@@ -512,9 +528,9 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                 </>
               ) : createRule ? (
                 <div className={styles.ruleForm}>
-                  <Field note={<>{`→ 「${name || 'このマーク'}」に変える`}</>} label="きっかけ"><Select aria-label="きっかけ" value={ruleEvent} onChange={(value) => setRuleEvent(value as SupportMarkAutomationEvent)} options={EVENT_LABELS.map((item) => ({ value: item.value, label: item.label }))} size="full" /></Field>
+                  <Field note={<>{`→ 「${name || 'このマーク'}」に変える`}</>} label="きっかけ"><SaveErrorField names={["ruleEvent","event","rule_event"]}><Select aria-label="きっかけ" value={ruleEvent} onChange={(value) => setRuleEvent(value as SupportMarkAutomationEvent)} options={EVENT_LABELS.map((item) => ({ value: item.value, label: item.label }))} size="full" /></SaveErrorField></Field>
 
-                  <Field label="手動で変更した直後の保護"><Select
+                  <Field label="手動で変更した直後の保護"><SaveErrorField names={["ruleProtectionMinutes","manualProtectionMinutes","rule_protection_minutes"]}><Select
                       aria-label="手動変更の保護時間"
                       value={String(ruleProtectionMinutes)}
                       onChange={(value) => setRuleProtectionMinutes(Number(value))}
@@ -525,8 +541,8 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                         { value: '1440', label: '1日は手動の変更を守る' },
                       ]}
                       size="full"
-                    /></Field>
-                  <Checkbox checked={ruleActive} onCheckedChange={setRuleActive}>このきまりを有効にして登録する</Checkbox>
+                    /></SaveErrorField></Field>
+                  <SaveErrorField names={["ruleActive","isActive","rule_active"]}><Checkbox checked={ruleActive} onCheckedChange={setRuleActive}>このきまりを有効にして登録する</Checkbox></SaveErrorField>
                   <span><Button type="button" onClick={() => setCreateRule(false)}>きまりを外す</Button></span>
                 </div>
               ) : (
@@ -569,6 +585,6 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         onCancel={() => { if (!ruleBusy) setStoppingRule(null) }}
         onConfirm={() => stopRule()}
       />
-    </>
+    </></SaveErrorScope>
   )
 }

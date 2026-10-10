@@ -154,17 +154,17 @@
 
 /*
  * ★V8「ボタン」（doYdE・u101P・LrB2L）。
- * 高さ36・余白 0 14・文字13px。主は B-151 の墨色の影、副は白地に
+ * 高さ36・余白 0 16・文字13px。主は B-151 の墨色の影、副は白地に
  * 細い枠と薄い影。compact（行内の操作）はV8に別寸法が無いので32のまま。
  */
 [data-theme='v8'] .button {
-  padding: 0 14px;
-  font-size: var(--text-label);
+  padding: 0 var(--tpl-button-pad-side);
+  font-size: var(--text-body);
 }
 
 [data-theme='v8'] .standard,
 [data-theme='v8'] .field {
-  height: 36px;
+  height: var(--tpl-button-h);
 }
 
 [data-theme='v8'] .primary {
@@ -178,7 +178,7 @@
 /*
  * ★V8 仕上げ（M10）：押した沈みは 120ms（乗せた色変化と同じ速さ）。
  * v7 は 80ms のまま。キーボードの印は action の 2px の輪
- * （文字ボタン text-link と同じ色にそろえる）。
+ * （文字ボタン text-action と同じ色にそろえる）。
  */
 [data-theme='v8'] .button {
   transition:
@@ -215,7 +215,7 @@
 }
 
 [data-theme='v8'] .button:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -242,7 +242,7 @@
 [data-theme='v8'] .inline { height: auto; min-height: 0; padding: 0; font-size: var(--text-caption); line-height: 19px; }
 [data-theme='v8'] .inline.text { color: var(--color-action); }
 
-[data-theme='v8'] .slot { min-height: 0; height: 31px; padding: 7px 14px; font-size: var(--text-caption); line-height: 17px; }
+[data-theme='v8'] .slot { min-height: 0; height: var(--tpl-button-h); padding: 0 var(--tpl-button-pad-side); font-size: var(--text-caption); line-height: 17px; }
 }
 
 /* 節の見出しと同じ行に置く文字の操作。ほかの高さは変えない。 */
@@ -266,7 +266,7 @@
 
 [data-theme='v8'] .button.inline.text.textInk { color: var(--color-ink); }
 
-[data-theme='v8'] .button.composer { height: var(--tpl-btn-compact-h, 32px); min-height: var(--tpl-btn-compact-h, 32px); padding: 0 14px; font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
+[data-theme='v8'] .button.composer { height: var(--tpl-button-h); min-height: var(--tpl-button-h); padding: 0 var(--tpl-button-pad-side); font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
 
 [data-theme='v8'] .button.composer-small { min-height: var(--tpl-msg-composer-small-button-h); height: var(--tpl-msg-composer-small-button-h); padding: 0 8px; font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
 
@@ -276,6 +276,8 @@
 /* B-152・仕上げ7 */
 [data-theme='v8'] .button:disabled { opacity: var(--polish-disabled-opacity); }
 [data-theme='v8'] .button:is(:hover, :active):not(:disabled) { filter: none; }
+/* O2Z8u・GcyTr の電話予約。標準の高さを保ち、印と文字の間を絵へ合わせる。 */
+[data-theme='v8'] .button.booking { height: var(--tpl-chip-h); padding-inline: var(--tpl-booking-button-pad); gap: var(--tpl-body-gap); }
 
 @layer components {
 [data-theme='v8'] .button[data-presentation='restaurant']{font-size:13px;line-height:20px;font-weight:600;padding-inline:16px;}

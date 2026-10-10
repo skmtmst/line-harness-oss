@@ -23,6 +23,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       autoReplies: { ...actual.api.autoReplies, list: listReplies, update: updateReply, stop: stopReply, summary },
       templates: { ...actual.api.templates, list: listTemplates },
       folders: { ...actual.api.folders, list: listFolders },
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: 'owner' } }) },
     },
   }
 })

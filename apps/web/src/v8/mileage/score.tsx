@@ -1,16 +1,6 @@
 'use client'
 
-/*
- * ★V8 マイル「行動スコア」（板 `IRPw8`、点数を手で直す `Nv7An`、
- * 点数の変化の明細 `R8NNi`、状態は見本帳 `zaqP9`）。
- *
- * app/mileage/v8-score-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
- * 絵 IRPw8 の並び：数の帯 → 案内 → 道具（探す・札 … 何人入るか・件数・送る・作る）→
- * 友だちの表（友だち・いまの点数・帯・30日間の変化・最後の反応・操作）。
- * できごとの決めごと（探す・足す点／引く点・止める・外す・足す）は表の下に
- * 開け閉めの段で残す（絵の表の下の案内どおり、操作を落とさない）。
- * 決めごとの編集の器（試す・保存・公開の手順）は /mileage/score-rules の画面。
- */
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -62,6 +52,19 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 マイル「行動スコア」（板 `IRPw8`、点数を手で直す `Nv7An`、
+ * 点数の変化の明細 `R8NNi`、状態は見本帳 `zaqP9`）。
+ *
+ * app/mileage/v8-score-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
+ * 絵 IRPw8 の並び：数の帯 → 案内 → 道具（探す・札 … 何人入るか・件数・送る・作る）→
+ * 友だちの表（友だち・いまの点数・帯・30日間の変化・最後の反応・操作）。
+ * できごとの決めごと（探す・足す点／引く点・止める・外す・足す）は表の下に
+ * 開け閉めの段で残す（絵の表の下の案内どおり、操作を落とさない）。
+ * 決めごとの編集の器（試す・保存・公開の手順）は /mileage/score-rules の画面。
+ */
 
 const BAND_LABELS: Record<ActionScoreBand, string> = {
   high: '点が高い',
@@ -142,6 +145,7 @@ function actionScoreAdjustmentErrorMessage(error: unknown): string {
 }
 
 export default function ScoreTab() {
+  const saveErrors = useSaveFormErrors()
   const { readonly, narrow } = useMileageShell()
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -203,14 +207,16 @@ export default function ScoreTab() {
       if (accountAtRequest !== latestAccountRef.current) return
       if (!response.success) throw new Error(response.error)
       setOverview(response.data)
-    } catch {
+    } catch (saveFailure) {
       if (accountAtRequest !== latestAccountRef.current) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       setOverview(null)
-      setLoadError(true)
+      { if (!fieldFailure)
+      setLoadError(true) }
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
-  }, [accountId, filter, page, pageSize, search, sort])
+  }, [accountId, filter, page, pageSize, search, sort, saveErrors])
 
   /* この頁の行動スコアを CSV（6列：友だち・いまの点数・帯・30日間の変化・最後に点数が変わった理由・最終変動）。 */
   const exportCurrentPage = () => {
@@ -248,14 +254,16 @@ export default function ScoreTab() {
       if (accountAtRequest !== latestAccountRef.current) return
       if (!response.success) throw new Error(response.error)
       setConfig(response.data)
-    } catch {
+    } catch (saveFailure) {
       if (accountAtRequest !== latestAccountRef.current) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       setConfig(null)
-      setRulesError(true)
+      { if (!fieldFailure)
+      setRulesError(true) }
     } finally {
       if (accountAtRequest === latestAccountRef.current) setRulesLoading(false)
     }
-  }, [accountId])
+  }, [accountId, saveErrors])
 
   useEffect(() => {
     if (accountLoading) return
@@ -330,9 +338,12 @@ export default function ScoreTab() {
       setPublishConfirm(false)
       setConfig(response.data)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
       setRulesActionError(caught instanceof ApiError && caught.status === 409
         ? 'ほかの人が先に公開しています。読み直してからやり直してください。'
-        : '公開できませんでした。もう一度お試しください。')
+        : '公開できませんでした。もう一度お試しください。') }
     } finally {
       setRulesBusy(false)
     }
@@ -347,8 +358,11 @@ export default function ScoreTab() {
       if (!response.success) throw new Error(response.error)
       setStopConfirm(false)
       setConfig(response.data)
-    } catch {
-      setRulesActionError('公開中のルールを止められませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setRulesActionError('公開中のルールを止められませんでした。もう一度お試しください。') }
     } finally {
       setRulesBusy(false)
     }
@@ -371,9 +385,12 @@ export default function ScoreTab() {
       setRemoveTarget(null)
       setConfig(response.data)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
       setRulesActionError(caught instanceof ApiError && caught.status === 409
         ? 'ほかの人が先に変えています。読み直してからやり直してください。'
-        : '外せませんでした。もう一度お試しください。')
+        : '外せませんでした。もう一度お試しください。') }
     } finally {
       setRulesBusy(false)
     }
@@ -389,8 +406,11 @@ export default function ScoreTab() {
       const response = await api.actionScores.previewBands({ accountId, bands: editable.bands })
       if (!response.success) throw new Error(response.error)
       setPreview(response.data)
-    } catch {
-      setPreviewError('試算できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setPreviewError('試算できませんでした。もう一度お試しください。') }
     } finally {
       setPreviewBusy(false)
     }
@@ -518,8 +538,8 @@ export default function ScoreTab() {
             const day = formatMileageMonthDay(item.lastChangedAt)
             const reason = actionScoreReasonLabel(item.lastReason)
             return (
-              <Tr key={item.friendId} className={styles.row} data-table-layout="columns" data-row-id={item.friendId}>
-                <Td className={styles.colName}><span className={styles.rowName} title={item.displayName}>{item.displayName}</span></Td>
+              <Tr data-row-id={item.friendId} key={item.friendId} className={styles.row} data-table-layout="columns">
+                <Td className={styles.colName}><FolderDotName><span className={styles.rowName} title={item.displayName}>{item.displayName}</span></FolderDotName></Td>
                 <Td className={styles.colScore}><span className={styles.scoreNum}>{formatMileageNumber(item.currentScore)}</span></Td>
                 <Td className={styles.colBand}>
                   <span className={styles.pill} data-tone={BAND_TONE[item.band]}>
@@ -549,7 +569,7 @@ export default function ScoreTab() {
                           {
                             id: 'friend',
                             label: 'この人を見る',
-                            external: true,
+                            external: false,
                             href: `/friends/detail?id=${encodeURIComponent(item.friendId)}`, onSelect: () => router.push(`/friends/detail?id=${encodeURIComponent(item.friendId)}`),
                           },
                         ]}
@@ -621,7 +641,7 @@ export default function ScoreTab() {
                 open={ruleMenuId === '__head'}
                 onOpenChange={(next) => setRuleMenuId(next ? '__head' : null)}
                 items={[
-                  { id: 'edit', label: '決めごとの編集画面を開く', external: true, href: '/mileage/score-rules', onSelect: () => router.push('/mileage/score-rules') },
+                  { id: 'edit', label: '決めごとの編集画面を開く', external: false, href: '/mileage/score-rules', onSelect: () => router.push('/mileage/score-rules') },
                   {
                     id: 'stop',
                     label: '公開中のルールを止める',
@@ -657,11 +677,11 @@ export default function ScoreTab() {
                 const changed = ruleChanged(rule, publishedRules.get(rule.id))
                 const stopped = !rule.enabled
                 return (
-                  <Tr key={rule.id} className={styles.row} data-table-layout="columns" data-row-id={rule.id}>
-                    <Td className={styles.colName}>
-                      <span className={styles.rowNameInk} ><TruncatedText value={String(rule.name ?? '')} /></span>
-                      <span className={styles.rowSub}>{frequencyText(rule)}</span>
-                    </Td>
+                  <Tr data-row-id={rule.id} key={rule.id} className={styles.row} data-table-layout="columns">
+                    <Td className={styles.colName}><FolderDotName>
+                      <span className={styles.rowNameInk} title={rule.name}>{rule.name}</span>
+
+                    </FolderDotName></Td>
                     <Td className={styles.colGives}><span className={styles.cellMain}>{ruleValueText(rule)}</span></Td>
                     <Td className={styles.colStateWide}>
                       <span className={styles.pill} data-tone={stopped ? 'neutral' : changed ? 'warn' : 'active'}>
@@ -677,7 +697,7 @@ export default function ScoreTab() {
                             open={ruleMenuId === rule.id}
                             onOpenChange={(next) => setRuleMenuId(next ? rule.id : null)}
                             items={[
-                              { id: 'edit', label: '編集', external: true, href: '/mileage/score-rules', onSelect: () => router.push('/mileage/score-rules') },
+                              { id: 'edit', label: '編集', external: false, href: '/mileage/score-rules', onSelect: () => router.push('/mileage/score-rules') },
                               {
                                 id: 'remove',
                                 label: '外す',
@@ -724,7 +744,7 @@ export default function ScoreTab() {
   ) : undefined
 
   return (
-    <MileageFrame
+    <SaveErrorScope errors={saveErrors}><MileageFrame
       help="行の「…」から、点数の手直し・この人を見る。表の下の「できごとの決めごと」を開くと、できごとの編集・外す・＋ できごとを足す（30日間反応がない、も選べる）。公開中のルールを止めるときは、その題の横の「…」から。"
       actions={readonly ? undefined : <div className={styles.headActions}>
         <Button href="/mileage/score-rules" title="決めごとの編集画面で1人分を試します">
@@ -830,7 +850,7 @@ export default function ScoreTab() {
     >
       {friendsBody}
       {rulesSection}
-    </MileageFrame>
+    </MileageFrame></SaveErrorScope>
   )
 }
 
@@ -860,6 +880,8 @@ export function ScoreAdjustDialog({
   onCancel: () => void
   onCompleted: () => Promise<void>
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [direction, setDirection] = useState<'increase' | 'decrease'>('decrease')
   const [amountText, setAmountText] = useState('10')
   const [reason, setReason] = useState('')
@@ -893,7 +915,11 @@ export function ScoreAdjustDialog({
       await onCompleted()
       onCancel()
     } catch (caught) {
-      setError(actionScoreAdjustmentErrorMessage(caught))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
+      setError(actionScoreAdjustmentErrorMessage(caught)) }
     } finally {
       setBusy(false)
     }
@@ -906,7 +932,7 @@ export function ScoreAdjustDialog({
     : '点数を変更する'
 
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open
       designNode="Nv7An"
       designWidth={560}
@@ -949,7 +975,7 @@ export function ScoreAdjustDialog({
           </div>
         </div>
 
-        <div className={styles.dlgGroup}><Field label="点数" htmlFor="ml-score-amount"><NumberInput numericText
+        <div className={styles.dlgGroup}><Field label="点数" htmlFor="ml-score-amount"><SaveErrorField names={["amountText","amount_text"]}><NumberInput numericText
             id="ml-score-amount"
             className={styles.dlgInput}
             inputMode="numeric"
@@ -958,10 +984,10 @@ export function ScoreAdjustDialog({
             {...fields.bind('amount')}
             aria-invalid={fields.invalid('amount') || undefined}
             aria-describedby={fields.invalid('amount') ? 'ml-score-amount-error' : undefined}
-          />
+          /></SaveErrorField>
 <FieldError id="ml-score-amount-error">{fields.error('amount')}</FieldError></Field></div>
 
-        <div className={styles.dlgGroup}><Field label="理由" htmlFor="ml-score-reason"><textarea
+        <div className={styles.dlgGroup}><Field label="理由" htmlFor="ml-score-reason"><SaveErrorField names={["reason"]}><textarea
             id="ml-score-reason"
             className={styles.dlgTextarea}
             value={reason}
@@ -970,7 +996,7 @@ export function ScoreAdjustDialog({
             {...fields.bind('reason')}
             aria-invalid={fields.invalid('reason') || undefined}
             aria-describedby={fields.invalid('reason') ? 'ml-score-reason-error' : undefined}
-          />
+          /></SaveErrorField>
 <FieldError id="ml-score-reason-error">{fields.error('reason')}</FieldError></Field></div>
 
         <p className={styles.dlgCaption}>この変更で起きること</p>
@@ -996,7 +1022,7 @@ export function ScoreAdjustDialog({
             : `帯は「${bandName(bandAfter, highMin, normalMin)}」のまま変わりません。`}
         </p>
       </div>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }
 

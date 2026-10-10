@@ -1,14 +1,7 @@
 'use client'
-
 import { HorizontalBarChart } from '@/components/shared/charts'
-
-/*
- * ★V8 回答フォーム「集まった回答」（Pencil まとめて見る `v0SbYR`・1件ずつ見る `MKQyJ`）。
- *
- * 型（DetailPage）の頭とタブに、左の本文（まとめ／表）と右の列（フォームを編集・CSV・絞り込み・回答の詳細）をはめる。
- * 読み込み・検索・CSV・後処理のやり直しは今の作り（src/app/form-submissions/responses/page.tsx）と同じ口と同じ文。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -17,11 +10,11 @@ import type { FormBlock, FormInputType, FormLayout } from '@line-crm/shared'
 import { fetchApi, ApiError } from '@/lib/api'
 import { formAnswerText } from '@/lib/form-answer'
 import { csvCell } from '@/lib/presentation'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import { formatDateTime, formatNumber, formatDate as polishFormatDate } from '@/lib/format'
 import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import Notice from '@/components/shared/notice'
+import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { DetailPage, DetailColumns } from '@/components/templates'
 import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
@@ -33,18 +26,20 @@ import TargetMissing from '@/components/shared/target-missing'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import ListRange from '@/components/ui/list-range'
-import {
-  postActionStepLabel,
-  ratingAverageText,
-  type DestinationWrite,
-  type FormSubmissionSummary,
-  type SubmissionPostActions,
-} from './summary'
+import { postActionStepLabel, ratingAverageText, type DestinationWrite, type FormSubmissionSummary, type SubmissionPostActions } from './summary'
 import styles from './responses.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+/*
+ * ★V8 回答フォーム「集まった回答」（Pencil まとめて見る `v0SbYR`・1件ずつ見る `MKQyJ`）。
+ *
+ * 型（DetailPage）の頭とタブに、左の本文（まとめ／表）と右の列（フォームを編集・CSV・絞り込み・回答の詳細）をはめる。
+ * 読み込み・検索・CSV・後処理のやり直しは今の作り（src/app/form-submissions/responses/page.tsx）と同じ口と同じ文。
+ */
 
 type Submission = {
   id: string
@@ -137,7 +132,7 @@ export default function FormResponsesV8() {
 
 function Responses() {
   const role = useStaffRole()
-  const canEditForm = role ? canManageRole(role) || (role === 'staff' && !isOwnerOrAdmin() && canEditFeature('/form-submissions')) : canEditFeature('/form-submissions')
+  const canEditForm = useFeatureAccess('forms')
   const canRetry = canEditForm
   const searchParams = useSearchParams()
   const formId = searchParams.get('id') ?? ''
@@ -435,13 +430,13 @@ function Responses() {
       <section className={styles.railCard} aria-labelledby="fr-filter">
         <h2 className={styles.railTitle} id="fr-filter">絞り込み</h2>
         <p className={styles.railNote}>{total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件から、名前と答えで探します`}</p>
-        <Field label={<><Search size={15} aria-hidden="true" /></>}><input
+        <Field label={<><Search size={15} aria-hidden="true" /></>}><SaveErrorField names={["query"]}><input
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="名前・答えで探す（全件から）"
             aria-label="名前・答えで探す（全件から）"
-          /></Field>
+          /></SaveErrorField></Field>
       </section>
     </div>
   )
@@ -450,7 +445,7 @@ function Responses() {
     <DetailPage
       boardId={view === 'summary' ? 'v0SbYR' : 'MKQyJ'}
       tabSpacing="compact"
-      identity={<Link href="/form-submissions" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />回答フォームへ</Link>}
+      identity={<></>}
       title={`集まった回答：${form.name}`}
       help={headLine}
       tabs={(
@@ -464,7 +459,7 @@ function Responses() {
         />
       )}
     >
-      {!canEditForm && !canRetry ? <Notice tone="info" message="閲覧のみで見ています。フォームの編集や後処理の再実行には変更権限が必要です。" /> : null}
+      {!canEditForm && !canRetry ? <ReadOnlyNotice >閲覧のみで見ています。フォームの編集や後処理の再実行には変更権限が必要です。</ReadOnlyNotice> : null}
       <DetailColumns aside={rail} asideLabel="回答の詳細・絞り込み" expanded={asideExpanded} onExpandedChange={setAsideExpanded}>
           {total === 0 && !query.trim() ? (
             <ListState kind="empty" title="まだ回答がありません" description="フォームが回答されると、ここに1件ずつ並びます。" />

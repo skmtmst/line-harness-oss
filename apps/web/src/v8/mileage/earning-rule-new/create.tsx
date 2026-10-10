@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8-B マイル「たまる決めごとを作る」（Pencil：作る `ctLwT`・競合 `BnrQp`）。
- *
- * 型（CreatePage）に、4つの段（どのルールか・何マイル付けるか・受け取る人・使えるまで・付けすぎを防ぐ）と、
- * 右の列（この設定だとこう貯まります・気をつけること）、下の帯（キャンセル・保存して続けて作る・保存して動かす）を渡す。
- *
- * 聞く項目・保存の口・送る形・失敗の扱いは今の作る画面（app/mileage/earning-rules/new/v8-earning-rule-new.tsx）と同じ
- * （BEHAVIOR.md）。違うのは見せ方だけ。
- */
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
@@ -43,6 +33,18 @@ import {
 import styles from './create.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B マイル「たまる決めごとを作る」（Pencil：作る `ctLwT`・競合 `BnrQp`）。
+ *
+ * 型（CreatePage）に、4つの段（どのルールか・何マイル付けるか・受け取る人・使えるまで・付けすぎを防ぐ）と、
+ * 右の列（この設定だとこう貯まります・気をつけること）、下の帯（キャンセル・保存して続けて作る・保存して動かす）を渡す。
+ *
+ * 聞く項目・保存の口・送る形・失敗の扱いは今の作る画面（app/mileage/earning-rules/new/v8-earning-rule-new.tsx）と同じ
+ * （BEHAVIOR.md）。違うのは見せ方だけ。
+ */
 
 const DAILY_CAPS = [
   ['', '制限なし'],
@@ -73,6 +75,7 @@ function conflictWho(data: unknown): { who: string | null; at: string | null } {
 }
 
 export default function EarningRuleCreateV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('たまる決めごとを作る')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'マイル', href: LIST_HREF }])
   const router = useRouter()
@@ -214,19 +217,23 @@ export default function EarningRuleCreateV8() {
       if (!draftResponse.success) {
         const deleted = await api.mileage.deleteRule(res.data.id).catch(() => null)
         if (!deleted?.success) {
-          await api.mileage.updateRule(res.data.id, { isActive: false }).catch(() => undefined)
+          await api.mileage.updateRule(res.data.id, { isActive: false }).catch((saveFailure) => { saveErrors.capture(saveFailure); return undefined })
           throw new Error(`${draftResponse.error}(作りかけの決めごとが残っているかもしれません。一覧で確認してください)`)
         }
         throw new Error(draftResponse.error)
       }
       router.push(continueAfter ? '/mileage/earning-rules/new' : createPageReturnHref(LIST_HREF, res.data.id))
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       /* BnrQp：同時に作られた・版がずれたときは競合の帯で知らせる。 */
       if (caught instanceof ApiError && caught.status === 409) {
         setConflict(conflictWho(caught.data))
+        { if (!fieldFailure)
         setSaveError('')
+      }
       } else {
-        setSaveError(caught instanceof Error ? caught.message : '保存できませんでした。もう一度お試しください。')
+        { if (!fieldFailure)
+        setSaveError(caught instanceof Error ? caught.message : '保存できませんでした。もう一度お試しください。') }
       }
     } finally {
       setSaving(false)
@@ -243,8 +250,10 @@ export default function EarningRuleCreateV8() {
       if (!response.success) throw new Error(response.error)
       setTrial({ matchedFriends: response.data.matchedFriends, estimatedTotalMiles: response.data.estimatedTotalMiles })
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       setTrial(null)
-      setTrialError(caught instanceof Error ? caught.message : '試算できませんでした。もう一度お試しください。')
+      { if (!fieldFailure)
+      setTrialError(caught instanceof Error ? caught.message : '試算できませんでした。もう一度お試しください。') }
     } finally {
       setTrialBusy(false)
     }
@@ -302,7 +311,7 @@ export default function EarningRuleCreateV8() {
   )
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       boardId={conflict ? 'BnrQp' : 'ctLwT'}
       title="たまる決めごとを作る"
       help="どの行動で・何マイル・だれに付けるかを決めます。作った日からの行動に付きます（さかのぼらない）。"
@@ -328,7 +337,7 @@ export default function EarningRuleCreateV8() {
           <p className={styles.cardNote}>きっかけになる行動を選びます</p>
         </div>
         <Field label="名前" htmlFor="er-name" error={errorOf('er-name')}>
-          <TextField id="er-name" aria-label="名前" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：リンクをクリック" />
+          <SaveErrorField names={["name"]}><TextField id="er-name" aria-label="名前" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：リンクをクリック" /></SaveErrorField>
         </Field>
         <div className={styles.fieldRow}>
           <div className={styles.field}>
@@ -336,7 +345,7 @@ export default function EarningRuleCreateV8() {
               <span className={styles.pickLabel}>きっかけ</span>
               <HelpTip label="きっかけの説明">{selected.note}</HelpTip>
             </span>
-            <Select
+            <SaveErrorField names={["eventType","event_type"]}><Select
               aria-label="きっかけ"
               value={eventType}
               onChange={(next) => {
@@ -345,17 +354,17 @@ export default function EarningRuleCreateV8() {
               }}
               options={EVENT_TYPES.map((t) => ({ value: t.value, label: t.label }))}
               size="full"
-            />
+            /></SaveErrorField>
           </div>
           <div className={styles.field}>
             <span className={styles.pickLabel}>行動の出どころ</span>
-            <Select
+            <SaveErrorField names={["source"]}><Select
               aria-label="行動の出どころ"
               value={source}
               onChange={(next) => setSource(next)}
               size="full"
               options={selected.sources.map(([optionValue, label]) => ({ value: optionValue, label }))}
-            />
+            /></SaveErrorField>
           </div>
         </div>
         <button type="button" className={styles.linkButton} onClick={() => setShowConditions((v) => !v)} aria-expanded={showConditions}>
@@ -376,7 +385,7 @@ export default function EarningRuleCreateV8() {
         <div className={styles.fieldRow}>
           <div className={styles.field}>
             <Field label="マイル" htmlFor="er-amount" error={errorOf('er-amount')}>
-              <NumberInput id="er-amount" type="number" min={1} aria-label="マイル" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <SaveErrorField names={["amount"]}><NumberInput id="er-amount" type="number" min={1} aria-label="マイル" value={amount} onChange={(e) => setAmount(e.target.value)} /></SaveErrorField>
             </Field>
           </div>
           <div className={styles.field}>
@@ -397,18 +406,18 @@ export default function EarningRuleCreateV8() {
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="er-new-who">受け取る人・使えるまで</h2>
         </div>
-        <RadioCardGroup legend="受け取る人" className={styles.choiceRow}>
+        <SaveErrorField names={["beneficiary"]}><RadioCardGroup legend="受け取る人" className={styles.choiceRow}>
           <RadioCard name="beneficiary" value="actor" checked={beneficiary === 'actor'} onChange={() => setBeneficiary('actor')}
             icon={<User size={16} />} title="行動した本人" note="そのまま本人の残高に" />
           <RadioCard name="beneficiary" value="referrer" checked={beneficiary === 'referrer'} onChange={() => setBeneficiary('referrer')}
             icon={<Share2 size={16} />} title="紹介した人" note="この人を紹介した相手に" />
-        </RadioCardGroup>
-        <RadioCardGroup legend="使えるまで" className={styles.choiceRow}>
+        </RadioCardGroup></SaveErrorField>
+        <SaveErrorField names={["initial-status","initialStatus"]}><RadioCardGroup legend="使えるまで" className={styles.choiceRow}>
           <RadioCard name="initial-status" value="available" checked={initialStatus === 'available'} onChange={() => setInitialStatus('available')}
             icon={<Zap size={16} />} title="すぐ使える" note="その場で残高に入る" />
           <RadioCard name="initial-status" value="pending" checked={initialStatus === 'pending'} onChange={() => setInitialStatus('pending')}
             icon={<Hourglass size={16} />} title="確定待ち" note="確定するまで使えない" />
-        </RadioCardGroup>
+        </RadioCardGroup></SaveErrorField>
       </section>
 
       <section className={styles.card} aria-labelledby="er-new-limit">
@@ -418,17 +427,17 @@ export default function EarningRuleCreateV8() {
         <div className={styles.fieldRow}>
           <div className={styles.field}>
             <span className={styles.pickLabel}>1日に数える回数</span>
-            <Select
+            <SaveErrorField names={["dailyCap","daily_cap"]}><Select
               aria-label="1日に数える回数"
               value={dailyCap}
               onChange={(next) => setDailyCap(next)}
               size="full"
               options={DAILY_CAPS.map(([optionValue, label]) => ({ value: optionValue, label }))}
-            />
+            /></SaveErrorField>
           </div>
           <div className={styles.field}>
             <span className={styles.pickLabel}>同じ対象の数えかた</span>
-            <Select
+            <SaveErrorField names={["uniqueMode","unique_mode"]}><Select
               aria-label="同じ対象の数えかた"
               value={uniqueMode}
               onChange={(next) => setUniqueMode(next as typeof uniqueMode)}
@@ -438,20 +447,20 @@ export default function EarningRuleCreateV8() {
                 { value: 'subject', label: '同じ対象は1回' },
                 { value: 'subjectPerDay', label: '同じ URL は1回' },
               ]}
-            />
+            /></SaveErrorField>
           </div>
         </div>
         <div className={styles.fieldRow}>
           <div className={styles.field}>
             <span className={styles.label}>開始日</span>
-            <DateField value={validFrom} onChange={setValidFrom} aria-label="開始日" />
+            <SaveErrorField names={["validFrom","valid_from"]}><DateField value={validFrom} onChange={setValidFrom} aria-label="開始日" /></SaveErrorField>
           </div>
           <div className={styles.field}>
             <span className={styles.labelRow}>
               <span className={styles.label}>終了日</span>
               <span className={styles.optional}>任意</span>
             </span>
-            <DateField id="er-until" value={validUntil} onChange={setValidUntil} aria-label="終了日" placeholder="なし" invalid={Boolean(errorOf('er-until'))} aria-describedby={errorOf('er-until') ? 'er-until-error' : undefined} />
+            <SaveErrorField names={["validUntil","valid_until"]}><DateField id="er-until" value={validUntil} onChange={setValidUntil} aria-label="終了日" placeholder="なし" invalid={Boolean(errorOf('er-until'))} aria-describedby={errorOf('er-until') ? 'er-until-error' : undefined} /></SaveErrorField>
             {errorOf('er-until') ? <p id="er-until-error" className={styles.error} role="alert">{errorOf('er-until')}</p> : null}
           </div>
         </div>
@@ -460,33 +469,33 @@ export default function EarningRuleCreateV8() {
           <div className={styles.detailsBody}>
             <Field label="付いたマイルの有効期限" htmlFor="er-expiry" error={errorOf('er-expiry')}>
               <span className={styles.inlineRow}>
-                <NumberInput id="er-expiry" type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" />
+                <SaveErrorField names={["expiresAfterDays","expires_after_days"]}><NumberInput id="er-expiry" type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" /></SaveErrorField>
                 <span className={styles.cardNote}>日後（空欄なら期限なし）</span>
               </span>
             </Field>
-            <Checkbox checked={ignoreMultiplier} onCheckedChange={setIgnoreMultiplier} description="誰でも同じ額にしたいときに選びます。">
+            <SaveErrorField names={["ignoreMultiplier","ignore_multiplier"]}><Checkbox checked={ignoreMultiplier} onCheckedChange={setIgnoreMultiplier} description="誰でも同じ額にしたいときに選びます。">
               会員ランクの倍率をかけない
-            </Checkbox>
+            </Checkbox></SaveErrorField>
             {cancellationEvent ? (
-              <Checkbox
+              <SaveErrorField names={["reverseOnCancellation","reverse_on_cancellation"]}><Checkbox
                 checked={reverseOnCancellation}
                 onCheckedChange={setReverseOnCancellation}
                 description={`${eventType === 'booking_created' ? '予約の取り消し' : '注文の取り消し'}を同じ記録から追跡します。`}
               >
                 取り消されたら、付けたぶんを引く
-              </Checkbox>
+              </Checkbox></SaveErrorField>
             ) : null}
-            <Checkbox checked={notifyFriend} onCheckedChange={setNotifyFriend}>
+            <SaveErrorField names={["notifyFriend","enabled","notify_friend"]}><Checkbox checked={notifyFriend} onCheckedChange={setNotifyFriend}>
               マイルが付いたら、この内容を自動で知らせる
-            </Checkbox>
-            <Checkbox checked={isActive} onCheckedChange={setIsActive} description="オフにすると停止中で保存します。">
+            </Checkbox></SaveErrorField>
+            <SaveErrorField names={["isActive","is_active"]}><Checkbox checked={isActive} onCheckedChange={setIsActive} description="オフにすると停止中で保存します。">
               作成したらすぐ動かす
-            </Checkbox>
+            </Checkbox></SaveErrorField>
           </div>
         </Disclosure>
       </section>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した決めごと" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }

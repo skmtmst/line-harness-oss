@@ -11,6 +11,8 @@ import { SettingsFormCard, SettingsFormRow } from '@/components/shared/settings-
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { api } from '@/lib/api'
 import styles from './settings.module.css'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 const EMPTY: TenantCompanyContact = {
   legalCompanyName: null, postalCode: null, address: null, building: null,
@@ -21,6 +23,7 @@ type Candidate = { prefecture: string; city: string; town: string }
 
 /** 管理者だけが呼び出す。通常メンバーには連絡先も読み口も出さない。 */
 export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
+  const saveErrors = useSaveFormErrors()
   const uid = useId()
   const [values, setValues] = useState(EMPTY)
   const valuesRef = useRef(values)
@@ -50,7 +53,9 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
       setRevision(next)
     } catch (caught) {
       if (sequence !== loadSequence.current) return
-      setError(japaneseDetailOf(caught) || describeApiFailure(caught, '会社と連絡先の読み込み', { scope: 'hq' }))
+      const fieldFailure = saveErrors.capture(caught)
+      { if (!fieldFailure)
+      setError(japaneseDetailOf(caught) || describeApiFailure(caught, '会社と連絡先の読み込み', { scope: 'hq' })) }
     } finally { if (sequence === loadSequence.current) setLoading(false) }
   }
   useEffect(() => { void load(); return () => { loadSequence.current += 1 } }, [])
@@ -92,8 +97,10 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
       setRevision(next)
       setSaved(true); notifySaved('会社と連絡先を保存しました。')
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       // 通信失敗・権限不足・409でも入力と期待する版をそのまま残す。
-      setError(japaneseDetailOf(caught) || describeApiFailure(caught, '会社と連絡先の保存', { scope: 'hq' }))
+      { if (!fieldFailure)
+      setError(japaneseDetailOf(caught) || describeApiFailure(caught, '会社と連絡先の保存', { scope: 'hq' })) }
     } finally { setSaving(false) }
   }
 
@@ -116,6 +123,7 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
         : response.data.readiness.fullDataset ? '住所が見つかりませんでした。住所を手入力してください。'
         : '郵便番号の全データが未登録です。住所を手入力してください。')
     } catch (caught) {
+      saveErrors.capture(caught)
       if (valuesRef.current.postalCode === postal) setPostalNote(japaneseDetailOf(caught) || describeApiFailure(caught, '住所の検索', { scope: 'hq' }))
     } finally { setFinding(false) }
   }
@@ -132,7 +140,7 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
     </Field>
   }
 
-  return <SettingsFormCard title="会社と連絡先" description={DESCRIPTION} onSubmit={save} noValidate
+  return <SaveErrorScope errors={saveErrors}> <SettingsFormCard title="会社と連絡先" description={DESCRIPTION} onSubmit={save} noValidate
     actions={canEdit ? <Button variant="primary" type="submit" busy={saving} disabled={loading || finding || revision === null}>
       <Check aria-hidden size={14} />会社と連絡先を保存する</Button> : undefined}>
     {field('legalCompanyName')}
@@ -148,8 +156,8 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
     <SettingsFormRow>{field('phone')}{field('contactName')}</SettingsFormRow>
     <SettingsFormRow>{field('contactEmail')}{field('invoiceAddressee')}</SettingsFormRow>
     {loading ? <p role="status" className={styles.hint}>読み込んでいます…</p> : null}
-    {error ? <p role="alert" className={styles.error}>{error}</p> : null}
-    {!loading && revision === null && canEdit ? <Button type="button" onClick={() => void load()}>もう一度読み込む</Button> : null}
+    {error ? <Notice tone="danger" >{error}</Notice> : null}
+    {!loading && revision === null && canEdit ? <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button> : null}
     {null}
-  </SettingsFormCard>
+  </SettingsFormCard></SaveErrorScope>
 }

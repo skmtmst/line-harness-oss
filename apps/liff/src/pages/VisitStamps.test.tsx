@@ -45,7 +45,7 @@ describe('来店スタンプ（お客さまの LIFF）', () => {
     expect(await screen.findByText('然 来店スタンプカード')).toBeTruthy();
     expect(fx.cards).toHaveBeenCalledWith('acc-1');
     expect(fx.card).not.toHaveBeenCalled();
-    expect(fx.paperRequests).toHaveBeenCalledWith('acc-1', 'c1');
+    await waitFor(() => expect(fx.paperRequests).toHaveBeenCalledWith('acc-1', 'c1'));
   });
   it('ページを開き直すと、ゴールで受け取った次のカードを表示する', async () => {
     const previous = { ...card, settings: { ...card.settings, completion: 'next_card' as const, nextCardId: 'gold' } };
@@ -161,4 +161,12 @@ describe('来店スタンプ（お客さまの LIFF）', () => {
     expect(paperPhotoProblem({ type: 'image/png', size: 6 * 1024 * 1024 })).toContain('5MB');
     expect(paperPhotoProblem({ type: 'image/webp', size: 10 })).toBe('');
   });
+});
+
+it('カードを開いた時点で倍率と初回ボーナスを知らせる', async () => {
+  const configured = { ...card, settings: { ...card.settings, firstVisitBonus: 2, multipliers: [{ name: '週末', multiplier: 2, weekdays: [0, 6] }] } };
+  fx.cards.mockResolvedValue({ success: true, data: [{ card: configured, wallet: wallet(3) }] });
+  render(<VisitStamps />);
+  expect(await screen.findByText('初回の来店は2個追加')).toBeTruthy();
+  expect(screen.getByText('週末：2倍（日・土曜日）')).toBeTruthy();
 });

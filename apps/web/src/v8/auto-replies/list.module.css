@@ -8,19 +8,7 @@
 /* 枠・見出し・帯・フォルダ列は型（ListPage）が持つ。画面CSSに置かない。 */
 /* 道具の段は型の toolbar 枠（ListToolbar）が持つ。画面CSSに置かない。 */
 /* 操作の失敗の帯。 */
-.errorBand {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--tpl-cell-gap-half);
-  margin: 0;
-  border: 1px solid var(--color-danger);
-  border-radius: var(--radius-control);
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-  line-height: 1.6;
-}
+
 
 .errorBand button {
   padding: 0;
@@ -372,19 +360,7 @@
 .rowClick > td { height: var(--tpl-ar-row-h); } /* 絵 uE9gf の行は 63〜66。札の無い行も同じ高さに */
 
 /* 閲覧のみの帯（Q5lOCc）。数の帯の上。薄い青の地・目の印・枠なし。 */
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  margin: 0 var(--tpl-head-pad-side) var(--tpl-ro-band-after);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
-.viewerBand > svg { color: var(--color-action); flex-shrink: 0; }
+.viewerBand { margin: 0 var(--tpl-head-pad-side) var(--tpl-ro-band-after); }
 
 /* 1152 の板（WPrd5）の道具の段：案内の帯 → 1段目 → 2段目。 */
 .narrowTools {

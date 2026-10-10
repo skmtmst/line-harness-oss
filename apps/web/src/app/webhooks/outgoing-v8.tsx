@@ -1,27 +1,4 @@
 'use client'
-
-/*
- * ★V8-B 外部連携の一覧（こちらから送る）（Pencil「★V8-B 画面の地図」の
- * 外部連携の行：一覧 `ZSbFY`、状態 `wWrpY`、1152 `AsfFB`、
- * 閲覧のみ `l5SRfT`）。
- *
- * v7 の一覧（`page.tsx` の WebhooksPageInner＋`webhook-overviews.tsx` の
- * OutgoingOverview）とは別の部品として持つ。データの口（一覧・集計・
- * 開始と停止・試し送信・合言葉・削除）は同じ。違いは置き場と見せ方——
- * タブに件数、数の帯は白い板の左右いっぱい・区切り線、表は「つなぎ先・
- * いつ送るか・送るもの・この30日・ようす・操作（見る／やり直す＋設定）」。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
- *
- * 見本と今の作りが合わない所（API が無い所は作らず。今の形のまま）：
- * - フォルダの列：送り先にフォルダの口が無いので置かない。
- *   作るボタンは一覧の上の左（v7 と同じ置き場所）。
- * - 帯の「先月より+210」：先月の集計の口が無いので「成功 N回」と出す。
- * - 帯の「失敗」：失敗したやり取りの件数（`summary.failed`）を出す。
- * - ようすの2行目：最後の送達日時が無い行は「—」。
- *   「止めた日」は止めた日時の口が無いので出さない。
- * - 行の「…」改め「設定」の中身：今ある操作だけ（動かす・止める・直す・
- *   合言葉を作り直す・削除する・試しに送る）。複製は口が無いので足さない。
- */
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Inbox, Link2, Send, Webhook } from 'lucide-react'
@@ -54,6 +31,31 @@ import styles from './outgoing-v8.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B 外部連携の一覧（こちらから送る）（Pencil「★V8-B 画面の地図」の
+ * 外部連携の行：一覧 `ZSbFY`、状態 `wWrpY`、1152 `AsfFB`、
+ * 閲覧のみ `l5SRfT`）。
+ *
+ * v7 の一覧（`page.tsx` の WebhooksPageInner＋`webhook-overviews.tsx` の
+ * OutgoingOverview）とは別の部品として持つ。データの口（一覧・集計・
+ * 開始と停止・試し送信・合言葉・削除）は同じ。違いは置き場と見せ方——
+ * タブに件数、数の帯は白い板の左右いっぱい・区切り線、表は「つなぎ先・
+ * いつ送るか・送るもの・この30日・ようす・操作（見る／やり直す＋設定）」。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ *
+ * 見本と今の作りが合わない所（API が無い所は作らず。今の形のまま）：
+ * - フォルダの列：送り先にフォルダの口が無いので置かない。
+ *   作るボタンは一覧の上の左（v7 と同じ置き場所）。
+ * - 帯の「先月より+210」：先月の集計の口が無いので「成功 N回」と出す。
+ * - 帯の「失敗」：失敗したやり取りの件数（`summary.failed`）を出す。
+ * - ようすの2行目：最後の送達日時が無い行は「—」。
+ *   「止めた日」は止めた日時の口が無いので出さない。
+ * - 行の「…」改め「設定」の中身：今ある操作だけ（動かす・止める・直す・
+ *   合言葉を作り直す・削除する・試しに送る）。複製は口が無いので足さない。
+ */
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type OutgoingFilter = 'all' | 'active' | 'paused' | 'failed'
@@ -270,6 +272,7 @@ export default function OutgoingV8Page() {
 }
 
 function OutgoingV8Inner() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('外部連携')
   const { selectedAccountId, accounts } = useAccount()
   const selectedAccountIdRef = useRef(selectedAccountId)
@@ -318,7 +321,7 @@ function OutgoingV8Inner() {
    * 試し送信と失敗のやり直しは管理者も使える。見るだけの担当者は
    * 中身の確認と検索だけ（`l5SRfT`）。
    */
-  const canManage = staffRole === null || staffRole === 'owner'
+  const canManage = staffRole === 'owner'
   const canTest = canManage || staffRole === 'admin'
   const manageReason = '統括だけが変更できます。必要なときは統括に頼んでください。'
 
@@ -447,6 +450,8 @@ function OutgoingV8Inner() {
       })
     } catch (caught) {
       if (selectedAccountIdRef.current !== requestAccountId) return
+      saveErrors.capture(caught);
+
       const forbidden = caught instanceof ApiError && caught.status === 403
       if (!forbidden) await load().catch(() => {})
       failMessage(forbidden
@@ -473,9 +478,11 @@ function OutgoingV8Inner() {
         const status = response.success ? response.data.responseStatus : null
         setTestNotice(`「${item.name}」への試し送信は届きませんでした${status === null ? '' : `(相手の応答 ${status})`}。「やり取りの記録」タブで詳しく確認できます。`)
       }
-    } catch {
+    } catch (saveFailure) {
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setTestNotice(`「${item.name}」への試し送信に失敗しました。「やり取りの記録」タブで詳しく確認できます。`)
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure)
+      setTestNotice(`「${item.name}」への試し送信に失敗しました。「やり取りの記録」タブで詳しく確認できます。`) }
     } finally {
       setTestingId(null)
     }
@@ -507,10 +514,13 @@ function OutgoingV8Inner() {
       await load()
     } catch (caught) {
       if (selectedAccountIdRef.current !== requestAccountId) return
+      const fieldFailure = saveErrors.capture(caught);
+
       const forbidden = caught instanceof ApiError && caught.status === 403
+      { if (!fieldFailure)
       setDeleteError(forbidden
         ? 'この送り先の削除は統括だけができます。必要なときは統括に頼んでください。'
-        : 'この送り先を削除できませんでした。状態を読み直してから、もう一度お試しください。')
+        : 'この送り先を削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
@@ -531,6 +541,7 @@ function OutgoingV8Inner() {
       return
     }
     if (rotateSecretValue.length < MIN_SECRET_LENGTH) {
+      if (!saveErrors.fail("rotateSecretValue", `シークレットは最低${MIN_SECRET_LENGTH}文字必要です`))
       setError(`シークレットは最低${MIN_SECRET_LENGTH}文字必要です`)
       return
     }
@@ -549,14 +560,17 @@ function OutgoingV8Inner() {
       setRotateSecretValue('')
       void load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (!stepUpToken && isStepUpRequired(caught)) {
         setStepUp({ purpose: 'webhook.secret', action: 'シークレットを更新する', retry: (token) => handleRotateSubmit(e, token) })
         return
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
+      { if (!fieldFailure)
       setError(describeApiFailure(caught, 'シークレットの更新', {
         scope: 'store',
-      }))
+      })) }
     }
   }
 
@@ -680,7 +694,7 @@ function OutgoingV8Inner() {
   })()
 
   return (
-    <div className={styles.board} data-design-node="ZSbFY">
+    <SaveErrorScope errors={saveErrors}><div className={styles.board} data-design-node="ZSbFY">
       <WebhooksV8Head activeTab="outgoing" outgoingCount={readyCounts ? outgoing.length : null} incomingCount={incomingCount} />
       <WebhooksV8Band cells={outgoingKpiCells({ items: outgoingStatus === 'ready' ? outgoing : null, incomingCount, summary: summaryStatus === 'ready' ? summary : null })} />
 
@@ -718,7 +732,7 @@ function OutgoingV8Inner() {
           <FilterChip selected={filter === 'active'} onChange={(next) => setFilter(next ? 'active' : 'all')}>動いている{readyCounts ? ` ${activeCount}` : ''}</FilterChip>
           <FilterChip selected={filter === 'paused'} onChange={(next) => setFilter(next ? 'paused' : 'all')}>止めている{readyCounts ? ` ${pausedCount}` : ''}</FilterChip>
           <span className={styles.toolbarRight}>
-            <Select
+            <SaveErrorField names={["filter"]}><Select
               aria-label="よく使う絞り込み"
               value={filter}
               onChange={(value) => { setFilter(value as OutgoingFilter); setPage(1) }}
@@ -728,7 +742,7 @@ function OutgoingV8Inner() {
                 { value: 'paused', label: '止めているのみ' },
                 { value: 'failed', label: '失敗あり' },
               ]}
-            />
+            /></SaveErrorField>
             <SortSelect
               value={sort}
               onChange={(value) => setSort(value as OutgoingSort)}
@@ -801,7 +815,7 @@ function OutgoingV8Inner() {
               保存後も前の合言葉は24時間だけ使えるので、相手側の切り替え中も送信は止まりません。
             </p>
             <div className="flex gap-2 mb-4">
-              <input
+              <SaveErrorField names={["rotateSecretValue","secret","rotate_secret_value"]}><input
                 value={rotateSecretValue}
                 onChange={(e) => setRotateSecretValue(e.target.value)}
                 className="flex-1 border border-hairline rounded-control px-3 py-2 text-sm font-mono"
@@ -809,7 +823,7 @@ function OutgoingV8Inner() {
                 required
                 minLength={MIN_SECRET_LENGTH}
                 autoFocus
-              />
+              /></SaveErrorField>
               <Button type="button" onClick={() => setRotateSecretValue(generateSecret())}>
                 自動生成
               </Button>
@@ -832,7 +846,7 @@ function OutgoingV8Inner() {
         </div>
       )}
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
-    </div>
+    </div></SaveErrorScope>
   )
 }
 
@@ -886,7 +900,7 @@ function OutgoingV8Table({ items, canManage, canTest, manageReason, menuId, setM
       label: menuItem.label,
       danger: menuItem.tone === 'danger',
       disabled: menuItem.disabled,
-      onSelect: () => menuItem.onSelect(),
+      onSelect: () => menuItem.onSelect?.(),
     }))
     : []
   return (
@@ -935,7 +949,6 @@ function OutgoingV8Table({ items, canManage, canTest, manageReason, menuId, setM
               <tr key={item.id} data-ctx-row={item.id}>
                 <td className={styles.nameCell}>
                   <span className={styles.nameText} ><TruncatedText value={String(item.name ?? '')} /></span>
-                  <span className={styles.urlText} title={item.url}>{maskedUrl(item.url)}</span>
                 </td>
                 <td><span className={styles.cellSub} title={firstEventLabel(item)}>{firstEventLabel(item)}</span></td>
                 <td><span className={styles.cellSub} title={payloadLabel(item)}>{payloadLabel(item)}</span></td>

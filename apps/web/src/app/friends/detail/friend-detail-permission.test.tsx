@@ -1,7 +1,9 @@
-// @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+// @vitest-environment happy-dom
 
 /**
  * 友だち詳細の権限表示を本物のReactで確かめる（N-035 / N-037）。
@@ -143,6 +145,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       Promise.resolve({ success: true, data: { items: [], nextCursor: null } }),
     api: {
       ...actual.api,
+      // 権限の正本は staff.me。固定の偽APIへ漏らさず、この試験の役割を返す。
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: storage.get('lh_staff_role') ?? 'staff' } }) },
       friends: {
         ...actual.api.friends,
         get: () => Promise.resolve({ success: true, data: fixtures.friendDetail }),
@@ -196,6 +200,7 @@ let FriendDetailPage: typeof import('./page').default
 const storage = new Map<string, string>()
 
 function setRole(role: string | null, permissions: string[] = [], viewPermissions: string[] = []) {
+  forgetStaffIdentity(); if (role) rememberStaffIdentity({ role, permissionKeys: permissions, permissionViewKeys: viewPermissions } as StaffMember)
   if (role === null) storage.delete('lh_staff_role')
   else storage.set('lh_staff_role', role)
   storage.set('lh_staff_permissions', JSON.stringify(permissions))
@@ -203,6 +208,7 @@ function setRole(role: string | null, permissions: string[] = [], viewPermission
 }
 
 beforeEach(async () => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   net.calls.length = 0
   state.fieldItems = [fixtures.textField]
@@ -441,3 +447,6 @@ describe('N-035 友だち詳細から担当・対応状況を変える', () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull()
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

@@ -31,6 +31,7 @@ import {
   sameDay, shortCourse, slotLabel, sourceKind, sourceName, dayRange, toYmd,
 } from './format'
 import styles from './reservations.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export type PhonePreset = { date?: Date; time?: string; tableId?: string; hold?: boolean }
 
@@ -129,13 +130,13 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
 
 
       </>} trailingToolbar={<span className={styles.sourcePicker}>
-          <Select
+          <SaveErrorField names={["source"]}><Select
             aria-label="予約元"
             size="full"
             value={source}
             onChange={onSource}
             options={[{ value: 'all', label: '予約元：すべて' }, ...Object.entries(SOURCE_LABEL).map(([value, label]) => ({ value, label: `予約元：${label}` }))]}
-          />
+          /></SaveErrorField>
         </span>} notice={hidden.length > 0 ? <span className={styles.dateNote}>{`${hidden.map((table) => table.code).join('・')} は停止中のため出していません`}</span> : null} floor={floor} dates={[toYmd(day)]}
           onSlot={(tableId,startsAt)=>onAdd({date:day,time:hm(startsAt),tableId})} entries={shown.map(r=>seatBoardEntry(r as unknown as Record<string,unknown>))}
           resources={columns.map(t=>({id:t.id,label:`${t.code} ${t.max_capacity}名`,capacity:t.max_capacity,active:!!t.is_active}))}

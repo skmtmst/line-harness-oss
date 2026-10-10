@@ -254,6 +254,7 @@ export async function listFriendAddRulesPage(
     limit?: number;
     search?: string | null;
     folderName?: string | null;
+    highlightId?: string | null;
   },
 ): Promise<FriendAddRulePage> {
   const limit = Math.max(1, Math.min(input.limit ?? 20, 100));
@@ -262,7 +263,7 @@ export async function listFriendAddRulesPage(
   const clauses = [
     'r.line_account_id = ?',
     'r.friend_kind = ?',
-    'r.archived_at IS NULL',
+    input.status === 'archived' ? 'r.archived_at IS NOT NULL' : 'r.archived_at IS NULL',
   ];
   const bindings: Array<string | number> = [input.lineAccountId, input.friendKind];
   if (input.status) {
@@ -305,7 +306,12 @@ export async function listFriendAddRulesPage(
   const count = await db.prepare(
     `SELECT COUNT(*) AS total FROM friend_add_rules r WHERE ${clauses.join(' AND ')}`,
   ).bind(...bindings).first<{ total: number }>();
-  if (cursor) {
+  // 複製直後の1件を先頭に置く。次ページでは除外して、同じ行を再び出さない。
+  if (cursor && input.highlightId) {
+    clauses.push('r.id <> ?');
+    bindings.push(input.highlightId);
+  }
+  if (cursor && cursor.id !== input.highlightId) {
     clauses.push(`(
       r.priority > ? OR
       (r.priority = ? AND r.created_at > ?) OR
@@ -316,9 +322,9 @@ export async function listFriendAddRulesPage(
   const result = await db.prepare(
     `${RULE_SELECT}
       WHERE ${clauses.join(' AND ')}
-      ORDER BY r.priority ASC, r.created_at ASC, r.id ASC
+      ORDER BY ${input.highlightId ? 'CASE WHEN r.id = ? THEN 0 ELSE 1 END,' : ''} r.priority ASC, r.created_at ASC, r.id ASC
       LIMIT ?`,
-  ).bind(...bindings, limit + 1).all<FriendAddRuleRow>();
+  ).bind(...bindings, ...(input.highlightId ? [input.highlightId] : []), limit + 1).all<FriendAddRuleRow>();
   const rows = result.results ?? [];
   const items = rows.slice(0, limit);
   return {
@@ -330,13 +336,42 @@ export async function listFriendAddRulesPage(
 
 export async function getFriendAddRule(
   db: D1Database,
-  input: { lineAccountId: string; ruleId: string },
+  input: { lineAccountId: string; ruleId: string; includeArchived?: boolean },
 ): Promise<FriendAddRuleRow | null> {
   return db.prepare(
     `${RULE_SELECT}
-      WHERE r.line_account_id = ? AND r.id = ? AND r.archived_at IS NULL
+      WHERE r.line_account_id = ? AND r.id = ? ${input.includeArchived ? '' : 'AND r.archived_at IS NULL'}
       LIMIT 1`,
   ).bind(input.lineAccountId, input.ruleId).first<FriendAddRuleRow>();
+}
+
+/** 保管からはテスト未実施の下書きへ戻す。公開・配信は再開しない。 */
+export async function restoreFriendAddRule(db: D1Database, input: {
+  lineAccountId: string; ruleId: string; expectedVersion: number;
+}): Promise<FriendAddRuleRow | null> {
+  const current = await getFriendAddRule(db, { ...input, includeArchived: true });
+  if (!current || current.status !== 'archived' || current.is_unknown_route_fallback) return null;
+  const now = jstNow();
+  const statements: D1PreparedStatement[] = [];
+  if (current.version_status !== 'draft') {
+    statements.push(db.prepare(`INSERT INTO friend_add_rule_versions
+      (id, rule_id, version_number, definition_snapshot, status, created_at, updated_at)
+      SELECT ?, r.id, (SELECT COALESCE(MAX(version_number), 0) + 1 FROM friend_add_rule_versions WHERE rule_id = r.id), ?, 'draft', ?, ?
+        FROM friend_add_rules r WHERE r.id = ? AND r.line_account_id = ? AND r.status = 'archived' AND r.lock_version = ?`)
+      .bind(crypto.randomUUID(), current.definition_snapshot ?? JSON.stringify(EMPTY_FRIEND_ADD_RULE_DEFINITION), now, now, input.ruleId, input.lineAccountId, input.expectedVersion));
+  }
+  statements.push(db.prepare(`UPDATE friend_add_rule_versions
+    SET last_test_status = NULL, last_tested_at = NULL, last_tested_by_staff_id = NULL
+    WHERE rule_id = ? AND status = 'draft' AND EXISTS (
+      SELECT 1 FROM friend_add_rules WHERE id = ? AND line_account_id = ? AND status = 'archived' AND lock_version = ?)`)
+    .bind(input.ruleId, input.ruleId, input.lineAccountId, input.expectedVersion));
+  statements.push(db.prepare(`UPDATE friend_add_rules SET status = 'draft', archived_at = NULL,
+    lock_version = lock_version + 1, updated_at = ?
+    WHERE id = ? AND line_account_id = ? AND status = 'archived' AND lock_version = ? AND is_unknown_route_fallback = 0`)
+    .bind(now, input.ruleId, input.lineAccountId, input.expectedVersion));
+  const results = await db.batch(statements);
+  if (!results[results.length - 1].meta.changes) return null;
+  return getFriendAddRule(db, input);
 }
 
 export async function createFriendAddRuleDraft(
@@ -606,7 +641,7 @@ export async function archiveFriendAddRule(
 ): Promise<void> {
   const now = jstNow();
   const result = await db.prepare(
-    `UPDATE friend_add_rules SET status = 'archived', archived_at = ?, updated_at = ?
+    `UPDATE friend_add_rules SET status = 'archived', archived_at = ?, updated_at = ?, lock_version = lock_version + 1
       WHERE id = ? AND line_account_id = ?
         AND is_unknown_route_fallback = 0 AND archived_at IS NULL`,
   ).bind(now, now, input.ruleId, input.lineAccountId).run();

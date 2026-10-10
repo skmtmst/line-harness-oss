@@ -5,15 +5,7 @@
 
 .inputError { margin: 0; color: var(--color-danger); font-size: var(--text-caption); }
 
-.viewerBand {
-  margin: 0;
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
+.viewerBand { margin: 0; }
 .infoBand {
   display: flex;
   align-items: center;
@@ -224,6 +216,7 @@
 }
 .actionRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--tpl-rule-row-gap);
   padding: var(--tpl-rule-row-gap);
@@ -419,5 +412,5 @@
 }
 .sourceIcon {
   flex-shrink: 0;
-  color: var(--color-status-info);
+  color: var(--color-action);
 }

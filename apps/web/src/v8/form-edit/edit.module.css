@@ -177,7 +177,7 @@
 .urlNote { margin: 0; font-size: var(--tpl-fe-small-size); line-height: var(--tpl-fe-small-lh); color: var(--color-ink-faint); }
 .urlTest { display: flex; }
 .testNarrow { display: none; }
-.urlError { margin: 0; font-size: var(--tpl-fe-note-size); color: var(--color-danger); white-space: pre-wrap; }
+.urlError { font-size: var(--tpl-fe-note-size); color: var(--color-danger); white-space: pre-wrap; }
 .urlLink { font-size: var(--tpl-fe-note-size); color: var(--color-action); word-break: break-all; }
 .phoneArea { display: flex; justify-content: center; }
 .phoneDialog { display: flex; justify-content: center; }
@@ -254,3 +254,5 @@
 
 .phoneChoices { display: flex; flex-direction: column; gap: var(--tpl-fe-field-gap); }
 .phoneChoices[data-inline] { flex-direction: row; flex-wrap: wrap; }
+
+.urlError, .urlErrorNoticePlacement { margin: 0; }

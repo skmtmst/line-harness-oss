@@ -1,7 +1,7 @@
 'use client'
 
+import { useStaffRole } from '@/lib/staff-role'
 import { PageHeading } from '@/components/templates/page-frame'
-
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
@@ -16,6 +16,7 @@ import Notice from '@/components/shared/notice'
 import { parseJstDateTime, shortDateTime } from '@/lib/hq-banners'
 import { ChevronDown } from 'lucide-react'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 interface LineAccount {
   id: string
@@ -147,7 +148,7 @@ export default function HealthPage() {
    */
   const [accountsError, setAccountsError] = useState<unknown>(null)
   // M019：移行口は owner 専用（サーバの権限表）。画面側でも役割で出し分ける目安。
-  const [role, setRole] = useState<string | null>(null)
+  const role = useStaffRole()
 
   const loadAccounts = useCallback(async () => {
     setLoading(true)
@@ -212,7 +213,6 @@ export default function HealthPage() {
     loadAccounts()
     loadMigrations()
     try {
-      setRole(window.localStorage.getItem('lh_staff_role') || null)
     } catch {
       // ストレージが使えなくても画面は出せる
     }
@@ -242,7 +242,7 @@ export default function HealthPage() {
   }
 
   // M019：役割が分かっていて owner でないときは移行の入口を出さない。最終の門はサーバ。
-  const canMigrate = role === null || role === 'owner'
+  const canMigrate = role === 'owner'
 
   const getAccountName = (id: string): string => {
     const account = accounts.find((a) => a.id === id)
@@ -418,7 +418,7 @@ export default function HealthPage() {
               <form onSubmit={handleMigrate}>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-ink-secondary mb-1">移行先アカウント</label>
-                  <Select size="full"
+                  <EntitySelect size="full"
                     value={migrateToId}
                     onChange={(value) => setMigrateToId(value)}
                     aria-label="移行先アカウント"
@@ -426,7 +426,7 @@ export default function HealthPage() {
                       { value: '', label: '選択してください' },
                       ...accounts
                         .filter((account) => account.id !== migrateFrom && account.isActive)
-                        .map((account) => ({
+                        .map((account) => ({ ...entityOptionMetadata(account),
                           value: account.id,
                           label: `${account.name} (${account.channelId})`,
                         })),

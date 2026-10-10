@@ -14,6 +14,7 @@ import { api, ApiError, type AuditEventItem, type AuditEventSummary } from '@/li
 import ListRange from '@/components/ui/list-range'
 import Notice from '@/components/shared/notice'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const EMPTY_SUMMARY: AuditEventSummary = {
   periodDays: null,
@@ -225,8 +226,8 @@ export default function LoginAudit({ userId }: { userId?: string }) {
     <Notice tone="info" className="mb-4">だれが、いつ、何をしたかの記録です。いつもと違う場所からのログインは赤く出します。消した・配信した・設定を変えたで絞れます。</Notice>
     <div className="mb-3 flex flex-wrap items-center gap-3">
       <SearchField aria-label="人の名前・操作の内容で検索" value={query} onChange={setQuery} placeholder="人の名前・操作の内容で検索" className="min-w-64 flex-1" />
-      <Select aria-label="期間で絞り込む" value={periodFilter} onChange={setPeriodFilter} options={PERIOD_OPTIONS} />
-      <Select aria-label="表示件数" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={PAGE_SIZE_OPTIONS} />
+      <SaveErrorField names={["periodFilter","period_filter"]}><Select aria-label="期間で絞り込む" value={periodFilter} onChange={setPeriodFilter} options={PERIOD_OPTIONS} /></SaveErrorField>
+      <SaveErrorField names={["pageSize","limit","page_size"]}><Select aria-label="表示件数" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={PAGE_SIZE_OPTIONS} /></SaveErrorField>
     </div>
     <div className="mb-3 flex flex-wrap items-center gap-3">
       <Tabs items={[
@@ -237,7 +238,7 @@ export default function LoginAudit({ userId }: { userId?: string }) {
         { label: 'ログイン', count: counts.login, current: actionFilter === 'login', onClick: () => setActionFilter('login') },
         { label: '気になるもの', count: counts.attention, current: actionFilter === 'attention', onClick: () => setActionFilter('attention') },
       ]} />
-      <Select aria-label="並び順" value={sort} onChange={setSort} options={SORT_OPTIONS} />
+      <SaveErrorField names={["sort"]}><Select aria-label="並び順" value={sort} onChange={setSort} options={SORT_OPTIONS} /></SaveErrorField>
     </div>
     {error
       ? <Notice tone="danger" action={<Button onClick={() => void load()}>もう一度読み込む</Button>}>{error}</Notice>

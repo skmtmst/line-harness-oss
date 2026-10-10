@@ -116,7 +116,7 @@ export default function Stepper({
                   type="button"
                   onClick={() => {
                     if (step.onSelect) {
-                      step.onSelect()
+                      step.onSelect?.()
                       return
                     }
                     if (step.anchor) {

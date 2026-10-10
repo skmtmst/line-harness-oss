@@ -1,14 +1,5 @@
 'use client'
 
-/*
- * ★V8 統括のバナー生成（Pencil `B9ZAr` プロジェクト一覧・`W5Wxr` 画像ライブラリ）。
- * 窓：`W7Z57` プロジェクトを作る・`AnwtH` 画像を取り込む・画像の詳細（`rI5uh` と同じ窓）。
- *
- * v7 の画面（app/hq/banners/page.tsx と components/hq/banners/*）と、読み書きの口・
- * 失敗時の扱い・`?tab=` は同じ。見た目だけを絵どおりに一から組んだ：
- * 頭（型 ListPage）・左の「見る」の列（型のフォルダの列＋共通 FolderPanel）・数のカード4枚・
- * 案内の帯・タブ・道具の段・カード（プロジェクト）／画像のます（ライブラリ）・件数と次へ。
- */
 import { useListUrlValue, useListUrlJsonValue } from '@/components/shared/list-url-state'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
@@ -49,6 +40,18 @@ import BannerLimitNotice from './limit-notice'
 import { bannerFailureMessage, monthDay, shortPresetLabel } from './words'
 import styles from './list.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+
+/*
+ * ★V8 統括のバナー生成（Pencil `B9ZAr` プロジェクト一覧・`W5Wxr` 画像ライブラリ）。
+ * 窓：`W7Z57` プロジェクトを作る・`AnwtH` 画像を取り込む・画像の詳細（`rI5uh` と同じ窓）。
+ *
+ * v7 の画面（app/hq/banners/page.tsx と components/hq/banners/*）と、読み書きの口・
+ * 失敗時の扱い・`?tab=` は同じ。見た目だけを絵どおりに一から組んだ：
+ * 頭（型 ListPage）・左の「見る」の列（型のフォルダの列＋共通 FolderPanel）・数のカード4枚・
+ * 案内の帯・タブ・道具の段・カード（プロジェクト）／画像のます（ライブラリ）・件数と次へ。
+ */
 
 type Tab = 'projects' | 'library'
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -162,6 +165,8 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
   archivedCount: number | null
   onChanged: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const [projects, setProjects] = useState<BannerProject[]>([])
   const [thumbnails, setThumbnails] = useState<Record<string, BannerImage[]>>({})
@@ -200,12 +205,15 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
       setStatus('ready')
     } catch (caught) {
       if (requestId !== requestRef.current) return
+      saveErrors.capture(caught);
+
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
-  }, [archivedMode])
+  }, [archivedMode, saveErrors])
 
   useEffect(() => {
-    void load()
+    void load();
+
     return () => { requestRef.current += 1 }
   }, [load])
 
@@ -219,8 +227,10 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
       onChanged()
       router.push(createPageReturnHref('/hq/banners', res.data.id))
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       // M022：原文のまま出さず、共通の状態別案内へ渡す。窓は開いたまま送り直せる。
-      setFormError(bannerFailureMessage(caught, 'プロジェクトの作成'))
+      { if (!fieldFailure)
+      setFormError(bannerFailureMessage(caught, 'プロジェクトの作成')) }
     } finally {
       setFormBusy(false)
     }
@@ -235,9 +245,11 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
       const res = await api.hqBanners.projects.update(project.id, { isFavorite: next })
       if (!res.success) throw new Error(res.error)
       setProjects((prev) => prev.map((p) => (p.id === project.id ? res.data : p)))
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
       setProjects((prev) => prev.map((p) => (p.id === project.id ? { ...p, isFavorite: project.isFavorite } : p)))
-      notifyToast('お気に入りを変えられませんでした。', { tone: 'error', actionLabel: 'もう一度', onAction: () => { void toggleFavorite(project) } })
+      { if (!fieldFailure)
+      notifyToast('お気に入りを変えられませんでした。', { tone: 'error', actionLabel: 'もう一度', onAction: () => { void toggleFavorite(project) } }) }
     }
   }
 
@@ -334,7 +346,8 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
   )
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId="B9ZAr"
       title="バナー生成"
       help="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
@@ -345,8 +358,8 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
         {head}
         <BannerLimitNotice usage={usage} />
         {viewFilter}
-        <div className={styles.tools}>
-          <div className={styles.projectSearch}>
+        <ListToolbarRow>
+          <ListToolbarSearchSlot>
             <SearchField
               placeholder="プロジェクト名・説明で探す"
               aria-label="プロジェクト名・説明で探す"
@@ -354,12 +367,12 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
               onChange={setQuery}
               onClear={() => setQuery('')}
             />
-          </div>
+          </ListToolbarSearchSlot>
           <span className={styles.spacer} />
           <div className={styles.projectSort}>
-            <Select aria-label="プロジェクトの並び順" value={sort} onChange={(value) => setSort(value as ProjectSort)} options={PROJECT_SORTS} />
+            <SaveErrorField names={["sort"]}><Select aria-label="プロジェクトの並び順" value={sort} onChange={(value) => setSort(value as ProjectSort)} options={PROJECT_SORTS} /></SaveErrorField>
           </div>
-        </div>
+        </ListToolbarRow>
         {actionError ? <Notice tone="danger" message={actionError} /> : null}
         {body}
       </div>
@@ -374,7 +387,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
           setFormError('')
         }}
       />
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }
 
@@ -385,7 +398,7 @@ function ViewChips<K extends string>({ chips, active, onChange }: {
   onChange: (next: K | null) => void
 }) {
   return (
-    <div className={styles.tools}>
+    <ListToolbarRow>
       <span className={styles.toolLabel}>見る</span>
       <div role="group" aria-label="見るもので絞り込む" className={styles.chips}>
         {chips.map((chip) => (
@@ -394,7 +407,7 @@ function ViewChips<K extends string>({ chips, active, onChange }: {
           </FilterChip>
         ))}
       </div>
-    </div>
+    </ListToolbarRow>
   )
 }
 
@@ -465,6 +478,8 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   accounts: AccountWithStats[]
   onChanged: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const [images, setImages] = useState<BannerImage[]>([])
   const [counts, setCounts] = useState<import('@line-crm/shared').HqBannerImageCounts | null>(null)
@@ -514,12 +529,15 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       setStatus('ready')
     } catch (caught) {
       if (requestId !== requestRef.current) return
+      saveErrors.capture(caught);
+
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
-  }, [filters, before])
+  }, [filters, before, saveErrors])
 
   useEffect(() => {
-    void load()
+    void load();
+
     return () => { requestRef.current += 1 }
   }, [load])
 
@@ -538,8 +556,11 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       const res = await api.hqBanners.images.update(image.id, { isFavorite: !image.isFavorite })
       if (!res.success) throw new Error(res.error)
       replaceImage(res.data)
-    } catch {
-      setActionError('お気に入りを変更できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('お気に入りを変更できませんでした。もう一度お試しください。') }
     }
   }
 
@@ -553,7 +574,10 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       onChanged()
       return true
     } catch (caught) {
-      setModalError(bannerFailureMessage(caught, 'アカウントへの配布'))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setModalError(bannerFailureMessage(caught, 'アカウントへの配布')) }
       return false
     } finally {
       setModalBusy(false)
@@ -571,7 +595,10 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       onChanged()
       return true
     } catch (caught) {
-      setModalError(bannerFailureMessage(caught, '一覧からの削除'))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setModalError(bannerFailureMessage(caught, '一覧からの削除')) }
       return false
     } finally {
       setModalBusy(false)
@@ -662,7 +689,8 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   )
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId="W5Wxr"
       title="バナー生成"
       help="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
@@ -672,8 +700,8 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       <div className={styles.body}>
         {head}
         <ViewChips chips={viewChips} active={view} onChange={(next) => selectView(next ?? 'all')} />
-        <div className={styles.tools}>
-          <div className={styles.librarySearch}>
+        <ListToolbarRow>
+          <ListToolbarSearchSlot>
             <SearchField
               placeholder="テキスト・指示で探す"
               aria-label="テキスト・指示で探す"
@@ -681,7 +709,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
               onChange={(value) => { setQuery(value); resetPage() }}
               onClear={() => { setQuery(''); resetPage() }}
             />
-          </div>
+          </ListToolbarSearchSlot>
           <span className={styles.toolLabel}>用途</span>
           <div role="group" aria-label="用途で絞り込む" className={styles.chips}>
             <FilterChip selected={shape === null} icon={<CircleDot size={14} aria-hidden="true" />} onChange={() => { setShape(null); resetPage() }}>すべて</FilterChip>
@@ -694,7 +722,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
           <span className={styles.spacer} />
           {/* 並びは「作成が新しい順」だけ。選べないので箱の形で示すだけにする（押しても変わらない口を置かない）。 */}
           <span className={styles.sortStatic}>並び：作成が新しい順</span>
-        </div>
+        </ListToolbarRow>
         {actionError ? <Notice tone="danger" message={actionError} /> : null}
         {body}
       </div>
@@ -726,6 +754,6 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
             : undefined}
         />
       ) : null}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

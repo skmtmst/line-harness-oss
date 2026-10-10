@@ -1,9 +1,10 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useState } from 'react'
 import type { FriendBulkOperation } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
-import Combobox from '@/components/shared/combobox'
+
 import DateTimeField from '@/components/shared/date-time-field'
 import { Field, TextArea } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
@@ -89,8 +90,8 @@ export default function BulkOperationEditor({ kind, accountId, tags, input, onCh
   return (
     <>
       <Field label={label} required>
-        <Combobox aria-label={label} placeholder="選んでください" value={input.resourceId} disabled={disabled}
-          options={items.map((item) => ({ value: item.id, label: item.name }))}
+        <EntitySelect clearable size="full" aria-label={label} placeholder="選んでください" value={input.resourceId} disabled={disabled}
+          options={items.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name }))}
           onChange={(value) => {
             const choice = items.find((item) => item.id === value)
             onChange({ ...input, resourceId: choice?.id ?? '', resourceName: choice?.name ?? '', versionId: choice?.versionId ?? '' })

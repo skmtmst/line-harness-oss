@@ -347,9 +347,9 @@ describe('テスト送信の失敗と回復 (N-070)', () => {
 
   test('アカウント範囲外の下書きへは送信できない', async () => {
     setTestRecipients(sqlite.raw, ACC_B, [FRIEND_B]);
-    // staff は requireRole で止まる。
-    const staffDenied = await testSend(REMINDER_B, KEY_STAFF_B);
-    expect(staffDenied.status).toBe(403);
+    // 編集権限があっても担当外アカウントは隠す。
+    const staffDenied = await testSend(REMINDER_B, KEY_STAFF_A);
+    expect(staffDenied.status).toBe(404);
     // acc-a だけの admin は role を通っても acc-b の下書きには届かない。
     const outOfScope = await testSend(REMINDER_B, KEY_ADMIN_A);
     expect(outOfScope.status).toBe(404);

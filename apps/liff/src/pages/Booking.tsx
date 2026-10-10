@@ -1,3 +1,4 @@
+import { useUrlStep } from '../lib/use-url-step.js';
 import WaitlistOfferSheet from '../components/WaitlistOfferSheet.js';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
@@ -25,13 +26,13 @@ const STEPS = ['メニュー', '担当', '日時', '確認'];
  * 上の帯は ×・題・店名 (LiffHeader)。手順の印は短い緑の棒 (Stepper)。
  */
 export default function Booking() {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const isPeek = params.get('mode') === 'peek';
 
   const [initialMenuId] = useState(params.get('menu_id'));
   const menuTouched = useRef(false);
-  const [step, setStep] = useState<Step>('menu');
+  const [step, setStep] = useUrlStep<Step>('menu', { search: params.toString(), write: (query, replace) => setParams(query, { replace }) });
   const [menu, setMenu] = useState<MenuItem | null>(null);
   const [staff, setStaff] = useState<StaffItem | null>(null);
   const [slot, setSlot] = useState<SlotPick | null>(null);
@@ -41,6 +42,7 @@ export default function Booking() {
   const [doneStatus, setDoneStatus] = useState('requested');
   // 予約のルール「お店が承認してから確定する」。読めなければ承認あり扱い。
   const [autoConfirm, setAutoConfirm] = useState(false);
+  const [cancelDeadline, setCancelDeadline] = useState<number | null>(null);
   useEffect(() => {
     if (!initialMenuId) return;
     let alive = true;
@@ -56,7 +58,7 @@ export default function Booking() {
     api
       .bookingSettings()
       .then((r) => {
-        if (alive) setAutoConfirm(r.approval_mode === 'automatic');
+        if (alive) { setAutoConfirm(r.approval_mode === 'automatic'); setCancelDeadline(r.cancel_deadline_minutes_before ?? null); }
       })
       .catch(() => {
         if (alive) setAutoConfirm(false);
@@ -75,8 +77,9 @@ export default function Booking() {
     // peek モードを抜けて通常フローへ。同じ menu/staff/slot を持ち回したまま step を進める。
     const next = new URLSearchParams(params);
     next.delete('mode');
-    navigate({ pathname: '/booking', search: next.toString() }, { replace: true });
+    next.set('step', 'confirm');
     setStep('confirm');
+    navigate({ pathname: '/booking', search: next.toString() }, { replace: true });
   }
 
   function pickMenu(m: MenuItem) {
@@ -152,6 +155,7 @@ export default function Booking() {
             staff={staff}
             slot={slot}
             autoConfirm={autoConfirm}
+            cancelDeadlineMinutesBefore={cancelDeadline}
             onBack={() => setStep('datetime')}
             onSubmitted={(result) => {
               setBookingId(result.bookingId);

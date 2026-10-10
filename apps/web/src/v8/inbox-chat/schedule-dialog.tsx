@@ -1,4 +1,13 @@
 'use client'
+import { Clock3, FileText } from 'lucide-react'
+import Dialog from '@/components/shared/dialog'
+import DateTimeField from '@/components/shared/date-time-field'
+import FilterChip from '@/components/shared/filter-chip'
+import { isNightJst, schedulePresets, shortJst } from './schedule-presets'
+import styles from './inbox-chat.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
 
 /*
  * ★V8「予約して送る」（M0393 段2「6. 予約して送る（書く欄から・テンプレートと画像も）」）。
@@ -8,13 +17,6 @@
  * 日時を決める・夜中の注意・予約中の一覧（時刻を直す・取り消す）を1つの窓に置く。
  * 予約そのものの動き（口・二度押し止め・日本時間）は画面側の今の処理をそのまま呼ぶ。
  */
-import { Clock3, FileText } from 'lucide-react'
-import Dialog from '@/components/shared/dialog'
-import DateTimeField from '@/components/shared/date-time-field'
-import FilterChip from '@/components/shared/filter-chip'
-import { isNightJst, schedulePresets, shortJst } from './schedule-presets'
-import styles from './inbox-chat.module.css'
-import { Field } from '@/components/shared/form-controls'
 
 export type ScheduledRowView = {
   id: string
@@ -104,7 +106,7 @@ export default function ScheduleSendDialog({
           ))}
         </div>
       </div>
-      <div className={styles.schGroup}><Field note={<>日本時間です。相手が夜中（22時〜8時）になる日時は、選ぶと注意が出ます。</>} label="日時を決める" htmlFor="schedule-at"><DateTimeField id="schedule-at" value={value} onChange={onChange} className={styles.schField} />
+      <div className={styles.schGroup}><Field note={<>日本時間です。相手が夜中（22時〜8時）になる日時は、選ぶと注意が出ます。</>} label="日時を決める" htmlFor="schedule-at"><SaveErrorField names={["value"]}><DateTimeField id="schedule-at" value={value} onChange={onChange} className={styles.schField} /></SaveErrorField>
 
 {night ? (
           <p className={styles.schWarn} role="status">相手が夜中の時間です。送ってよいか確かめてください。</p>

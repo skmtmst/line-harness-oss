@@ -328,9 +328,8 @@ shared-button-importer components/accounts/account-setup-urls.tsx
 shared-button-importer components/accounts/account-switcher.tsx
 shared-button-importer components/auto-replies/edit-dialog.tsx
 shared-button-importer components/auto-replies/inline-action-list.tsx
-shared-button-importer components/auto-replies/inline-action-rows-v8.tsx
+shared-button-importer components/shared/action-rows.tsx
 shared-button-importer components/automations/automation-template-gallery.tsx
-shared-button-importer components/automations/common-action-editor.tsx
 shared-button-importer components/broadcasts/broadcast-approval.tsx
 shared-button-importer components/broadcasts/broadcast-asset-manager.tsx
 shared-button-importer components/broadcasts/broadcast-form.tsx
@@ -347,7 +346,6 @@ shared-button-importer components/events/event-form.tsx
 shared-button-importer components/events/event-questions-editor.tsx
 shared-button-importer components/events/event-wizard.tsx
 shared-button-importer components/feature-disabled-gate.tsx
-shared-button-importer components/forms/action-editor.tsx
 shared-button-importer components/forms/choice-table.tsx
 shared-button-importer components/forms/hq-form-definition-editor.tsx
 shared-button-importer components/forms/options-dialog.tsx
@@ -409,6 +407,7 @@ shared-button-importer components/session-lost-notice.tsx
 shared-button-importer components/shared/condition-builder.tsx
 shared-button-importer components/shared/create-page.tsx
 shared-button-importer components/shared/folder-editor-dialog.tsx
+shared-button-importer components/shared/use-folder-move.tsx
 shared-button-importer components/templates/detail-columns.tsx
 shared-button-importer components/shared/dialog.tsx
 shared-button-importer components/shared/empty-list.tsx
@@ -458,7 +457,6 @@ shared-button-importer v8/templates/carousel.tsx
 shared-button-importer v8/broadcasts/list.tsx
 shared-button-importer v8/broadcasts/quick-send.tsx
 shared-button-importer v8/forms/list.tsx
-shared-button-importer v8/form-edit/after-tab.tsx
 shared-button-importer v8/form-edit/appearance-tab.tsx
 shared-button-importer v8/form-edit/content-tab.tsx
 shared-button-importer v8/form-edit/edit.tsx
@@ -719,7 +717,6 @@ shared-button-importer v8/friend-add-publish/done.tsx
 shared-button-importer v8/friend-add-runs/runs.tsx
 shared-button-importer v8/friend-add-runs/detail.tsx
 shared-button-importer v8/automations/create/create.tsx
-shared-button-importer v8/automations/create/friend-multi-select.tsx
 # ★V8 LINEアカウントの詳細（ihjfd）・窓（CFAyf・Msb1j・WOfBN・n9Z2P）・乗り換え（x2dSNv）。src/v8 に一から書いた。
 shared-button-importer v8/accounts-detail/detail.tsx
 shared-button-importer v8/accounts-detail/dialogs.tsx
@@ -757,5 +754,17 @@ shared-button-importer components/shared/list-state.tsx
 shared-button-importer components/shared/form-file-attachments.tsx
 shared-button-importer components/shared/form-document-retention.tsx
 shared-button-importer components/shared/customer-info-panel.tsx
+shared-button-importer components/friend-fields/linked-action-list.tsx
+shared-button-importer components/shared/action-list.tsx
+shared-button-importer components/templates/preview-launcher.tsx
+shared-button-importer v8/webhooks/incoming-actions.tsx
+shared-button-importer components/shared/friend-picker-field.tsx
+# B-177：項目内の設定と、作る・編集に共通の箱。実利用先も照合。
+shared-button-importer components/shared/editor-surface.tsx
+shared-button-importer components/shared/inline-settings.tsx
+shared-button-importer v8/hq-templates/distribution-result-dialog.tsx
+shared-button-importer v8/automations/create/friend-multi-select.tsx
+shared-button-importer v8/form-edit/after-tab.tsx
+shared-button-importer v8/hq-deliveries/console.tsx
 shared-button-importer components/shared/reservation-board.tsx
 shared-button-importer components/shared/restaurant-floor-editor.tsx

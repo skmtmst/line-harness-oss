@@ -454,3 +454,53 @@
 [data-theme='v8'] .frame thead th { height: var(--polish-table-head); padding-block: 0; color: var(--color-ink-secondary); font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
 [data-theme='v8'] .frame[data-column-layout] .row { padding-block: 0; }
 [data-theme='v8'] .frame[data-column-layout] .row .bodyCell { padding-block: 0; }
+/* Native tables use the same optional-column contract as column layouts. */
+@container v8-page (max-width: 1099px) {
+  [data-theme='v8'] .frame:not([data-table-presentation='columns']) .table [data-cell-collapse='narrow'] {
+    display: none;
+  }
+}
+
+
+/* B-178：一覧の型の中は表の持ち主が寸法を決める。状態行・窓内は除く。 */
+[data-theme='v8'] :global([data-list-skeleton]) .table.table > thead > tr {
+  height: var(--tpl-list-head-h);
+}
+[data-theme='v8'] :global([data-list-skeleton]) .table.table > thead > tr > th {
+  height: var(--tpl-list-head-h); padding-block: 0;
+  padding-inline: var(--tpl-list-cell-side);
+}
+[data-theme='v8'] :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) {
+  height: var(--tpl-list-row-h);
+}
+[data-theme='v8'] :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) > td {
+  height: var(--tpl-list-row-h); padding-block: 0;
+  padding-inline: var(--tpl-list-cell-side);
+}
+
+/* 列型も同じ行高。縦の余白は行が持ち、セルの高さを二重に足さない。 */
+[data-theme='v8'] :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr[data-table-layout='columns'] { padding-block: 0; box-sizing: border-box; }
+[data-theme='v8'] :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr[data-table-layout='columns'] > :is(th, td) { height: auto; padding-inline: 0; }
+[data-theme='v8'] :global([data-list-skeleton]) .table.table > thead > tr { min-height: var(--tpl-list-head-h); }
+[data-theme='v8'] :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) { min-height: var(--tpl-list-row-h); }
+
+/* headHeight/rowHeightを持つ列型でも、一覧の骨組みが高さを決める。 */
+[data-theme='v8'] :global([data-list-skeleton]) .frame[data-column-layout] .table > thead > tr[data-table-layout='columns'] { height: var(--tpl-list-head-h); min-height: var(--tpl-list-head-h); }
+[data-theme='v8'] :global([data-list-skeleton]) .frame[data-column-layout] .table > tbody > tr[data-table-layout='columns']:not(:has([colspan])) { height: var(--tpl-list-row-h); min-height: var(--tpl-list-row-h); }
+.row[data-highlighted] {
+  background: var(--color-accent-soft);
+}
+
+/* e2ekFu：列の余白・行の高さは表の部品が持つ。 */
+[data-theme='v8'] .frame[data-table-presentation='event-list'] .table thead th:first-child,
+[data-theme='v8'] .frame[data-table-presentation='event-list'] .bodyCell:first-child {
+  padding-left: var(--tpl-ev-ls-first-pad);
+}
+[data-theme='v8'] .frame[data-table-presentation='event-list'] .table thead th:nth-child(5),
+[data-theme='v8'] .frame[data-table-presentation='event-list'] .bodyCell:nth-child(5) {
+  padding-left: var(--tpl-ev-ls-state-pad);
+}
+[data-theme='v8'] .frame[data-table-presentation='event-list'] .bodyCell {
+  height: var(--tpl-ev-ls-row-h);
+  padding-block: 0;
+}

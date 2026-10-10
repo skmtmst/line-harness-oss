@@ -28,9 +28,7 @@
   color: var(--color-danger);
   font-size: var(--text-caption);
 }
-.viewerBand {
-  margin: var(--tpl-mb-ro-margin);
-}
+.viewerBand { margin: var(--tpl-mb-ro-margin); }
 
 /* 競合の帯（e5yBLx）：タブの下に、琥珀の地・左に注意の印・右に2つのボタン。 */
 .conflictSlot {
@@ -88,11 +86,7 @@
   font-size: var(--tpl-mb-text-12);
   font-weight: 600;
 }
-.errorText {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--tpl-mb-text-12);
-}
+
 .rankSplit {
   display: flex;
   align-items: flex-start;

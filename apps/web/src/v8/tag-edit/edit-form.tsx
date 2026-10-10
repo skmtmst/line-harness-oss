@@ -1,21 +1,10 @@
 'use client'
-
+import { ArrowDown, ArrowUp, Plus, Trash2, ArrowLeft, Check, ChevronDown, ChevronUp, Copy, GitCompare, TriangleAlert } from 'lucide-react'
+import { ActionDrawer, RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-
-/*
- * ★V8 タグ：タグの編集（一から書いた画面・2026-10-07）。
- * Pencil：タグの編集 `Qat9s`、競合 `xn95q`、閲覧のみ `fkGUR`。
- *
- * 型は「作る」（CreatePage）：頭（戻る・タグ名・フォルダと人数）→ 左に「基本」「タグ連動」「マイル」、
- * 右に「使っている所」、下の帯（削除は左端・キャンセル／複製して作る／保存は中央）。
- * 「タグ連動」「マイル」は畳んで1行の要約を出し、「開く」で中身を出す（絵どおり）。
- * 動き（読み込み・保存・さかのぼり反映の確認・競合・削除・アーカイブ）は今の画面（app/tags/edit-tag-page-v8）と同じ。
- */
-
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, ChevronUp, Copy, GitCompare, Plus, Trash2, TriangleAlert } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, type TagDependencies, type TagRetroactivePreview } from '@/lib/api'
 import { formatDay } from '@/lib/format'
@@ -30,15 +19,25 @@ import { tagNameProblem } from '@/v8/tags/tag-name'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import FolderSelect, { type FolderSelectCreate } from '@/components/shared/folder-select'
-import Toggle from '@/components/shared/toggle'
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import { DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
-import { ActionDrawer, RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
+import LinkedActionList from '@/components/friend-fields/linked-action-list'
 import { MULTIPLIERS, PRIORITIES, actionsSummary, buildUsageRows, mileageSummary } from './model'
 import styles from './edit.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, useSaveErrorReveal } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+/*
+ * ★V8 タグ：タグの編集（一から書いた画面・2026-10-07）。
+ * Pencil：タグの編集 `Qat9s`、競合 `xn95q`、閲覧のみ `fkGUR`。
+ *
+ * 型は「作る」（CreatePage）：頭（戻る・タグ名・フォルダと人数）→ 左に「基本」「タグ連動」「マイル」、
+ * 右に「使っている所」、下の帯（削除は左端・キャンセル／複製して作る／保存は中央）。
+ * 「タグ連動」「マイル」は畳んで1行の要約を出し、「開く」で中身を出す（絵どおり）。
+ * 動き（読み込み・保存・さかのぼり反映の確認・競合・削除・アーカイブ）は今の画面（app/tags/edit-tag-page-v8）と同じ。
+ */
 
 export interface TagEditHost {
   initialValues: TagEditorValues
@@ -106,12 +105,15 @@ export function TagEditForm({
   const [applyToExisting, setApplyToExisting] = useState(retroactiveReference)
   const [reapplyMode, setReapplyMode] = useState<'once' | 'every'>(tag.reapplyPolicy === 'every_time' ? 'every' : 'once')
   const [actions, setActions] = useState<LinkedAction[]>(initialActions)
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [selectedActionId, setSelectedActionId] = useState<string | null>(null)
+
   const [retroactiveOpen, setRetroactiveOpen] = useState(retroactiveReference)
   /* 畳んだ段。競合のときは、直した所が見えるように全部開く（xn95q）。 */
   const [actionsOpen, setActionsOpen] = useState(false)
   const [mileageOpen, setMileageOpen] = useState(retroactiveReference)
+  useSaveErrorReveal(['reward', 'rewardMiles', 'mileageReward', 'mileage.self', 'tag.mileage.self', 'definition.tag.mileage.self',
+    'referralReward', 'referralRewardMiles', 'referralMileageReward', 'mileage.referrer', 'tag.mileage.referrer', 'definition.tag.mileage.referrer',
+    'multiplier', 'multiplierBps', 'mileageMultiplierBps', 'mileage.multiplier', 'tag.mileage.multiplier', 'definition.tag.mileage.multiplier',
+    'priority', 'multiplierPriority', 'mileageMultiplierPriority', 'mileage.priority', 'tag.mileage.priority', 'definition.tag.mileage.priority'], () => setMileageOpen(true))
   useEffect(() => {
     if (!conflict) return
     setActionsOpen(true)
@@ -169,23 +171,6 @@ export function TagEditForm({
     void onSave(values, false)
   }
 
-  const moveAction = (index: number, direction: -1 | 1) => {
-    setActions((current) => {
-      const next = index + direction
-      if (next < 0 || next >= current.length) return current
-      const reordered = [...current]
-      const [moved] = reordered.splice(index, 1)
-      reordered.splice(next, 0, moved)
-      return reordered
-    })
-  }
-  const duplicateAction = (action: LinkedAction, index: number) => {
-    const id = crypto.randomUUID()
-    const copy = { ...action, id, definition: action.definition ? { ...action.definition, id } : undefined }
-    setActions((current) => [...current.slice(0, index + 1), copy, ...current.slice(index + 1)])
-  }
-  const removeAction = (id: string) => setActions((current) => current.filter((item) => item.id !== id))
-
   /* 使っている所：削除の影響確認と同じ数え方（dependencies）。取れないときはタグの一覧の数。 */
   const usageRows = buildUsageRows(dependencies, tag.usedIn)
   /* 競合の帯は共通部品（save-conflict）。絵は `xn95q`（頭の説明の下・横いっぱい）。 */
@@ -242,9 +227,9 @@ export function TagEditForm({
         busy={saving}
         boardId={host ? 'MFgPZ' : 'Qat9s'}
         footerOutlined={Boolean(host)}
-        notice={<>{host?.notice}{readOnly ? <p className={styles.roBand} role="note" data-design-node="fkGUR">{host ? '閲覧のみで見ています。変える操作は統括の管理者に頼んでください。' : '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'}</p> : null}{conflictBand}</>}
+        notice={<>{host?.notice}{readOnly ? <div className={styles.roBand}><ReadOnlyNotice role="note" data-design-node="fkGUR">{host ? '閲覧のみで見ています。変える操作は統括の管理者に頼んでください。' : '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'}</ReadOnlyNotice></div> : null}{conflictBand}</>}
         title={host?.title ?? (tag.name || 'タグを編集')}
-        identity={host ? undefined : <Link href="/tags" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />タグへ</Link>}
+        identity={host ? undefined : <></>}
         help={host?.description ?? `${groupName}フォルダ・${tag.friendCount ?? 0}人に付いている・${formatDay(tag.createdAt)}作成`}
         preview={host ? host.preview(values) : side}
         destructive={host || readOnly ? undefined : <Button variant="danger" type="button" onClick={onDelete}>タグを削除する</Button>}
@@ -267,14 +252,14 @@ export function TagEditForm({
         <fieldset disabled={saving || readOnly} className={styles.fieldset}>
           <section className={styles.card} aria-label="基本">
             <h2 className={styles.cardTitle}>基本</h2>
-            <div className={styles.field}><Field label="タグ名" htmlFor="tag-edit-name">{readOnly ? <span className={styles.roValue}>{name}</span> : <Field error={nameError}><TextField id="tag-edit-name" ref={nameRef} value={name} onChange={(event) => { setName(event.target.value); setNameError('') }} placeholder="例：定期購入者" aria-required="true" /></Field>}
+            <div className={styles.field}><Field label="タグ名" htmlFor="tag-edit-name">{readOnly ? <span className={styles.roValue}>{name}</span> : <Field error={nameError}><SaveErrorField names={["name", "tag.name", "definition.tag.name"]}><TextField id="tag-edit-name" ref={nameRef} value={name} onChange={(event) => { setName(event.target.value); setNameError('') }} placeholder="例：定期購入者" aria-required="true" /></SaveErrorField></Field>}
 <DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" /></Field></div>
             <div className={styles.field}>
               <span className={styles.label}>所属フォルダ</span>
               <div className={styles.folderBox}>
                 {readOnly
                   ? <span className={styles.roValue}>{groups.find((group) => group.id === groupId)?.name ?? '未分類'}</span>
-                  : <FolderSelect aria-label="所属フォルダ" value={groupId} onChange={setGroupId} folders={groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))} onCreate={onCreateGroup} size="full" />}
+                  : <SaveErrorField names={["groupId", "group_id", "folderId", "tag.folderId", "definition.tag.folderId"]}><FolderSelect aria-label="所属フォルダ" value={groupId} onChange={setGroupId} folders={groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))} onCreate={onCreateGroup} size="full" /></SaveErrorField>}
               </div>
             </div>
             <div className={styles.switchRow}>
@@ -282,7 +267,7 @@ export function TagEditForm({
                 <span className={styles.label}>友だち一覧に出す</span>
                 <span className={styles.hint}>オンにすると、友だち一覧の名前の下にこのタグが出ます</span>
               </div>
-              {readOnly ? <span className={styles.linkedState}>{isStarred ? 'オン' : 'オフ'}</span> : <SettingCheckbox checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" />}
+              {readOnly ? <span className={styles.linkedState}>{isStarred ? 'オン' : 'オフ'}</span> : <SaveErrorField names={["isStarred","is_starred"]}><SettingCheckbox checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" /></SaveErrorField>}
             </div>
           </section>
 
@@ -294,7 +279,7 @@ export function TagEditForm({
                   <HelpTip label="タグ連動の説明">オフのままでも、タグの手動付与・配信の絞り込み・シナリオの条件には使えます。オフに戻すと、これ以降このタグが付いても連動は動きません。すでに積んだマイルは取り消されません。</HelpTip>
                   <span className={styles.titleSpacer} />
                   <span className={styles.linkedState}>{linked ? 'オン' : 'オフ'}</span>
-                  {readOnly ? null : <SettingCheckbox checked={linked} onChange={setLinked} label="タグ連動" />}
+                  {readOnly ? null : <SaveErrorField names={["linked", "linkedEnabled", "tag.linkedEnabled"]}><SettingCheckbox checked={linked} onChange={setLinked} label="タグ連動" /></SaveErrorField>}
                 </div>
                 <div className={styles.noteRow}>
                   <p className={styles.cardNote}>上から順に動きます。並べ替えは上下の印で</p>
@@ -313,22 +298,7 @@ export function TagEditForm({
               <>
                 {linked || host ? (
                   <>
-                    {actions.length === 0 ? <p className={styles.emptyBox}>連動の動きはまだありません</p> : actions.map((action, index) => (
-                      <div key={action.id} className={styles.actionRow} onFocus={() => setSelectedActionId(action.id)} onClick={() => setSelectedActionId(action.id)}>
-                        <span className={styles.actionIndex}>{index + 1}</span>
-                        <span className={styles.actionLabel} title={`${action.type}：${action.label}`}>{action.label}</span>
-                        {action.timing && action.timing !== 'すぐに' ? <span className={styles.actionTiming}>{action.timing}</span> : null}
-                        {readOnly ? null : <>
-                          <button type="button" className={styles.iconButton} aria-label={`「${action.label}」を上へ`} disabled={index === 0} onClick={() => moveAction(index, -1)}><ArrowUp size={14} aria-hidden="true" /></button>
-                          <button type="button" className={styles.iconButton} aria-label={`「${action.label}」を下へ`} disabled={index === actions.length - 1} onClick={() => moveAction(index, 1)}><ArrowDown size={14} aria-hidden="true" /></button>
-                          <button type="button" className={styles.iconButton} aria-label={`「${action.label}」を複製`} onClick={() => duplicateAction(action, index)}><Copy size={14} aria-hidden="true" /></button>
-                          <button type="button" className={styles.iconButton} aria-label={`「${action.label}」を削除`} onClick={() => removeAction(action.id)}><Trash2 size={14} aria-hidden="true" /></button>
-                        </>}
-                      </div>
-                    ))}
-                    {readOnly ? null : (
-                      <button type="button" className={styles.ghostButton} onClick={() => setDrawerOpen(true)}><Plus size={14} aria-hidden="true" />アクションを追加する</button>
-                    )}
+                    <LinkedActionList value={actions} onChange={next => { if (host && next.length > actions.length) setLinked(true); setActions(next) }} accountId={host ? null : accountId} allowedTypes={host?.allowedActionTypes} readOnly={readOnly} />
                   </>
                 ) : <p className={styles.emptyBox}>連動はオフです。右上のスイッチをオンにすると、付いたときの動きとマイルを決められます。</p>}
               </>
@@ -358,13 +328,13 @@ export function TagEditForm({
                       <span className={styles.label}>今後のマイル倍率</span>
                       {readOnly
                         ? <span className={styles.roValue}>{MULTIPLIERS.find((option) => option.value === multiplier)?.label ?? '倍率を設定しない'}</span>
-                        : <div className={styles.selectBox}><Select aria-label="今後のマイル倍率" value={multiplier} onChange={setMultiplier} options={MULTIPLIERS} size="full" /></div>}
+                        : <div className={styles.selectBox}><SaveErrorField names={["multiplier", "multiplierBps", "mileageMultiplierBps", "mileage.multiplier", "tag.mileage.multiplier", "definition.tag.mileage.multiplier"]}><Select aria-label="今後のマイル倍率" value={multiplier} onChange={setMultiplier} options={MULTIPLIERS} size="full" /></SaveErrorField></div>}
                     </div>
                     <div className={styles.field}>
                       <span className={styles.label}>倍率の優先度</span>
                       {readOnly
                         ? <span className={styles.roValue}>{PRIORITIES.find((option) => option.value === priority)?.label ?? '標準'}</span>
-                        : <div className={styles.selectBox}><Select aria-label="倍率の優先度" value={priority} onChange={setPriority} options={PRIORITIES} size="full" /></div>}
+                        : <div className={styles.selectBox}><SaveErrorField names={["priority", "multiplierPriority", "mileageMultiplierPriority", "mileage.priority", "tag.mileage.priority", "definition.tag.mileage.priority"]}><Select aria-label="倍率の優先度" value={priority} onChange={setPriority} options={PRIORITIES} size="full" /></SaveErrorField></div>}
                     </div>
                   </div>
                   {host ? null : <div className={styles.switchRow}>
@@ -372,7 +342,7 @@ export function TagEditForm({
                       <span className={styles.label}>今付いている人にもさかのぼって積む（倍率は次の付与から）</span>
                       <span className={styles.hint}>{`オンにすると、すでに付いている ${tag.friendCount ?? 0} 人にも本人・紹介者のマイルをさかのぼって積みます（倍率は次の付与から）。積む前に人数の確認が開きます`}</span>
                     </div>
-                    {readOnly ? <span className={styles.linkedState}>{applyToExisting ? 'オン' : 'オフ'}</span> : <SettingCheckbox checked={applyToExisting} onChange={setApplyToExisting} label="さかのぼって反映" />}
+                    {readOnly ? <span className={styles.linkedState}>{applyToExisting ? 'オン' : 'オフ'}</span> : <SaveErrorField names={["applyToExisting","apply_to_existing"]}><SettingCheckbox checked={applyToExisting} onChange={setApplyToExisting} label="さかのぼって反映" /></SaveErrorField>}
                   </div>
                   }
                   {applyToExisting ? (
@@ -389,9 +359,9 @@ export function TagEditForm({
                     <h3 className={styles.subTitle}>タグが付いたときに積むマイル</h3>
                   </div>
                   <div className={styles.pair}>
-                    <Field note={<>このタグが付いた本人へ、一度だけ積みます。</>} label="本人へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{reward || '0'}</span> : <NumberInput type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} />}<span className={styles.unit}>mile</span></span>
+                    <Field note={<>このタグが付いた本人へ、一度だけ積みます。</>} label="本人へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{reward || '0'}</span> : <SaveErrorField names={["reward", "rewardMiles", "mileageReward", "mileage.self", "tag.mileage.self", "definition.tag.mileage.self"]}><NumberInput type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} /></SaveErrorField>}<span className={styles.unit}>mile</span></span>
 </Field>
-                    <Field note={<>紹介経由の友だちなら、その紹介者にも積みます。</>} label="紹介者へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{referralReward || '0'}</span> : <NumberInput type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} />}<span className={styles.unit}>mile</span></span>
+                    <Field note={<>紹介経由の友だちなら、その紹介者にも積みます。</>} label="紹介者へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{referralReward || '0'}</span> : <SaveErrorField names={["referralReward", "referral_reward", "referralRewardMiles", "referralMileageReward", "mileage.referrer", "tag.mileage.referrer", "definition.tag.mileage.referrer"]}><NumberInput type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} /></SaveErrorField>}<span className={styles.unit}>mile</span></span>
 </Field>
                   </div>
                   {readOnly ? (
@@ -400,10 +370,10 @@ export function TagEditForm({
                       <span className={styles.roValue}>{reapplyMode === 'every' ? '付け直すたびに積む' : '最初の1回だけ積む'}</span>
                     </div>
                   ) : (
-                  <RadioCardGroup legend="タグを外して付け直したときの扱い" legendVisible>
+                  <SaveErrorField names={["reapplyMode"]}><RadioCardGroup legend="タグを外して付け直したときの扱い" legendVisible>
                     <RadioCard name="reapplyMode" value="once" checked={reapplyMode === 'once'} onChange={() => setReapplyMode('once')} title="最初の1回だけ積む" note="誤操作や付け直しで、同じマイルが重複しません。" />
                     <RadioCard name="reapplyMode" value="every" checked={reapplyMode === 'every'} onChange={() => setReapplyMode('every')} title="付け直すたびに積む" note="購入回数など、同じタグを繰り返し使う運用向けです。" />
-                  </RadioCardGroup>
+                  </RadioCardGroup></SaveErrorField>
                   )}
                 </>
               ) : null}
@@ -411,7 +381,7 @@ export function TagEditForm({
           ) : null}
         </fieldset>
       </CreatePage>
-      {drawerOpen ? <ActionDrawer hqV8={Boolean(host)} suppliedResources={host ? null : undefined} allowedActionTypes={host?.allowedActionTypes} accountId={host ? null : accountId} onClose={() => setDrawerOpen(false)} selectedAction={actions.find((action) => action.id === selectedActionId)} onAdd={(action, beforeId) => { if (host) setLinked(true); setActions((current) => { const index = beforeId ? current.findIndex((entry) => entry.id === beforeId) : -1; return index < 0 ? [...current, action] : [...current.slice(0, index), action, ...current.slice(index)] }); setDrawerOpen(false) }} /> : null}
+
       {retroactiveOpen ? (
         <RetroactiveDialog
           referenceState={retroactiveReference}

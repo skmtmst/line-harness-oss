@@ -12,11 +12,12 @@
  *   動作           … 選択肢ごとに、送る・付ける・開始するを組む
  */
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useState } from 'react'
 import { newBlockId, type FormChoice, type FormInputBlock, type FormSection } from '@line-crm/shared'
 import ActionEditor from './action-editor'
 import Checkbox from '@/components/shared/checkbox'
-import Select from '@/components/shared/select'
+
 import { cellInput, miniButton, type FormRefs } from './form-refs'
 import Button from '@/components/shared/button'
 
@@ -97,13 +98,13 @@ export default function ChoiceTable({
         </div>
 
         {mode === 'friendField' && (
-          <Select
+          <EntitySelect
             value={block.choiceFriendFieldId ?? ''}
             onChange={(value) => onChange({ choiceFriendFieldId: value || null })}
             aria-label="登録する友だち情報欄"
             options={[
               { value: '', label: '— 情報欄を選ぶ —' },
-              ...refs.friendFields.map((f) => ({
+              ...refs.friendFields.map((f) => ({ ...entityOptionMetadata(f),
                 value: f.id,
                 label: `${f.name}${f.ecIsMaster ? '（EC側が正）' : ''}`,
                 disabled: f.ecIsMaster,
@@ -135,13 +136,13 @@ export default function ChoiceTable({
                 />
 
                 {mode === 'tag' && (
-                  <Select
+                  <EntitySelect kind="tag"
                     value={choice.tagId ?? ''}
                     onChange={(value) => patchChoice(choice.id, { tagId: value || null })}
                     aria-label="付けるタグ"
                     options={[
                       { value: '', label: '— 付けない —' },
-                      ...refs.tags.map((t) => ({ value: t.id, label: t.name })),
+                      ...refs.tags.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name })),
                     ]}
                   />
                 )}
@@ -308,7 +309,7 @@ export default function ChoiceTable({
                       <span className="text-ink-secondary mb-1 block text-xs font-medium">
                         選んだ人を飛ばすページ
                       </span>
-                      <Select
+                      <EntitySelect
                         value={choice.jumpToSectionId ?? ''}
                         onChange={(value) =>
                           patchChoice(choice.id, { jumpToSectionId: value || null })
@@ -316,7 +317,7 @@ export default function ChoiceTable({
                         aria-label="選んだ人を飛ばすページ"
                         options={[
                           { value: '', label: '— 次のページへ進む —' },
-                          ...sections.map((s, i) => ({ value: s.id, label: `${i + 1}. ${s.name}` })),
+                          ...sections.map((s, i) => ({ ...entityOptionMetadata(s), value: s.id, label: `${i + 1}. ${s.name}` })),
                         ]}
                       />
                       <span className="text-ink-faint mt-1 block text-xs">

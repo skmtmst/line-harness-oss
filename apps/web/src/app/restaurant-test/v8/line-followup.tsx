@@ -15,6 +15,7 @@ import { restaurantTestApi, type RestaurantLineFlow } from '@/lib/restaurant-tes
 import RestaurantShell, { Panel, Stat, type RestaurantV8Context } from './shell'
 import shellStyles from './shell.module.css'
 import styles from './line-followup.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /** 流れの種別の見せ名（板 `xLpnS`）。 */
 const FLOW_NAMES: Record<string, { title: string; note: string }> = {
@@ -41,10 +42,10 @@ function FlowCard({ flow, ctx }: { flow: RestaurantLineFlow; ctx: RestaurantV8Co
       <div className={styles.flowInner}>
         <div>
           <label className={styles.field}>タイトル
-            <input value={title} onChange={(event) => setTitle(event.target.value)} className={styles.input} />
+            <SaveErrorField names={["title"]}><input value={title} onChange={(event) => setTitle(event.target.value)} className={styles.input} /></SaveErrorField>
           </label>
           <label className={styles.field}>本文
-            <textarea value={body} onChange={(event) => setBody(event.target.value)} rows={3} className={styles.input} />
+            <SaveErrorField names={["body"]}><textarea value={body} onChange={(event) => setBody(event.target.value)} rows={3} className={styles.input} /></SaveErrorField>
           </label>
           <div className={styles.timingRow}>
             <span>{timingLabel(flow)}</span>

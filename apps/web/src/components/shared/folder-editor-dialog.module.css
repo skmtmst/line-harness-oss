@@ -10,3 +10,8 @@
 .error { margin: 0; border-radius: var(--radius-control); background: var(--color-status-danger-soft); padding: var(--tpl-tg2-info-band-pad); color: var(--color-status-danger); font-size: var(--text-caption); line-height: var(--tpl-tg2-info-band-lh); overflow-wrap: anywhere; }
 .footer { display: flex; align-items: center; justify-content: flex-end; gap: var(--select-menu-panel-gap); padding: var(--tpl-tg2-dialog-footer-pad); }
 }
+
+[data-theme='v8'] .label {
+  font-size: var(--tpl-field-label-size);
+  font-weight: var(--tpl-field-label-weight);
+}

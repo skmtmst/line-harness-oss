@@ -1,12 +1,5 @@
 'use client'
-
-/*
- * ★V8 Googleビジネス プロフィール（`JUTGz`）。
- * 本日の営業時間（変更・今日を休みにする・祝日の確認・早く閉める）→ 店舗情報 → Google側の変更を確認。
- * 口は今の画面と同じ。営業時間の変更・変更の確認・変更履歴・プロフィールの編集は
- * ?tab=profile&view=hours|confirm|history|edit へ移り、入口の page.tsx が今の画面で出す。
- */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { CalendarDays, CalendarX, Clock, GitCompare, History, Pencil, RefreshCw, Timer } from 'lucide-react'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
@@ -23,6 +16,15 @@ import type { GoogleNav } from './google'
 import styles from './google.module.css'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+/*
+ * ★V8 Googleビジネス プロフィール（`JUTGz`）。
+ * 本日の営業時間（変更・今日を休みにする・祝日の確認・早く閉める）→ 店舗情報 → Google側の変更を確認。
+ * 口は今の画面と同じ。営業時間の変更・変更の確認・変更履歴・プロフィールの編集は
+ * ?tab=profile&view=hours|confirm|history|edit へ移り、入口の page.tsx が今の画面で出す。
+ */
 
 function addressText(a: GoogleProfileAddress | null | undefined): string {
   if (!a) return '—'
@@ -37,6 +39,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [syncing, setSyncing] = useState(false)
+  const syncLock = useRef(false)
   const [showHolidays, setShowHolidays] = useState(false)
   const [showDiff, setShowDiff] = useState(false)
   const [showMore, setShowMore] = useState(false)
@@ -45,8 +48,11 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
   const [earlyClose, setEarlyClose] = useState<string | null>(null)
 
   const load = useCallback(async (sync = false) => {
-    if (sync) setSyncing(true)
-    else setLoading(true)
+    if (sync) {
+      if (syncLock.current) return
+      syncLock.current = true
+      setSyncing(true)
+    } else setLoading(true)
     setError('')
     try {
       setData(sync ? await restaurantGoogleApi.syncProfile(accountId) : await restaurantGoogleApi.profile(accountId))
@@ -55,7 +61,10 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
       setError(errorMessage(err, 'プロフィールを読み込めませんでした。'))
     } finally {
       setLoading(false)
-      setSyncing(false)
+      if (sync) {
+        syncLock.current = false
+        setSyncing(false)
+      }
     }
   }, [accountId])
 
@@ -81,7 +90,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
   }
 
   const { profile, today } = data
-  const canChange = !data.closed && !busy && (role === null || canManageRole(role))
+  const canChange = !data.closed && !busy && (canManageRole(role))
   const todayText = today.closed ? '本日は休業' : formatPeriods(today.periods)
   const closeOptions = TIME_OPTIONS.filter((t) => today.periods.length > 0 && t > today.periods[today.periods.length - 1].open).map((t) => ({ value: t, label: t }))
   const updates = data.googleUpdates
@@ -103,10 +112,11 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
 
   return (
     <>
-      {role !== null && !canManageRole(role) ? <Notice tone="info">閲覧のみです。営業時間と店舗情報を確認できます。</Notice> : null}
-      {data.stale ? <Notice tone="warn" action={<Button variant="text" onClick={() => void load(true)}>{syncing ? '取得中…' : 'もう一度取得'}</Button>}>{`Googleから最新の情報を読み込めませんでした。前回取得した内容（${formatStampFull(data.fetchedAt)}）を表示しています。`}</Notice> : null}
+      {role !== null && !canManageRole(role) ? <ReadOnlyNotice>閲覧のみです。営業時間と店舗情報を確認できます。</ReadOnlyNotice> : null}
+      {data.stale ? <Notice tone="warn" action={<Button variant="text" onClick={() => void load(true)} busy={syncing} busyLabel="取得中…">もう一度取得</Button>}>{`Googleから最新の情報を読み込めませんでした。前回取得した内容（${formatStampFull(data.fetchedAt)}）を表示しています。`}</Notice> : null}
       {!data.stale && data.closed ? <Notice tone="danger">Google側で「臨時休業」または「閉業」になっています。営業時間の変更はGoogleビジネスプロフィールで営業状態を戻してから行ってください。</Notice> : null}
       {!data.stale && !data.closed && data.pendingChangeCount > 0 ? <Notice tone="info" action={<Button variant="text" onClick={() => go({ tab: 'profile', view: 'history', result: 'pending' })}>状態を確認</Button>}>{`Googleに変更を送信しました。反映を確認できるまで「反映確認中」と表示します（${data.pendingChangeCount} 件）。`}</Notice> : null}
+      {error ? <Notice tone="danger">{error}</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="gb-today-title">
         <SectionHeader size="small" title={<span id="gb-today-title">本日の営業時間</span>} />
@@ -120,7 +130,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
         {earlyClose !== null ? (
           <div className={styles.inlinePanel}>
             <span className={styles.fieldLabel}>今日の閉店時刻</span>
-            <Select size="page-size" aria-label="今日の閉店時刻" value={earlyClose} onChange={(value) => setEarlyClose(value)} options={closeOptions} />
+            <SaveErrorField names={["earlyClose","closeTime","early_close"]}><Select size="page-size" aria-label="今日の閉店時刻" value={earlyClose} onChange={(value) => setEarlyClose(value)} options={closeOptions} /></SaveErrorField>
             <span className={styles.muted}>{`現在 ${formatPeriods(today.periods)}`}</span>
             <span className={styles.spacer} aria-hidden="true" />
             <Button onClick={() => setEarlyClose(null)} disabled={busy}>キャンセル</Button>

@@ -62,6 +62,22 @@ afterEach(() => {
 const buttons = () => [...document.querySelectorAll('button')]
 
 describe('統括のひな形の一覧（店と同じ形）', () => {
+  it.each([true, false])('フォルダの取得失敗でも作る操作と閲覧時の場所を保つ（編集=%s）', async canEdit => {
+    const h = await render({ folderLoadFailed: true, canEdit })
+    const panel = host.querySelector('aside[aria-label="フォルダ"]')!
+    expect(panel.textContent).toContain('フォルダを読み込めませんでした')
+    expect(panel.textContent).not.toContain('フォルダを追加')
+    const create = panel.querySelector('button') as HTMLButtonElement | null
+    if (canEdit) {
+      expect(create).not.toBeNull()
+      await act(async () => create!.click())
+      expect(h.onCreate).toHaveBeenCalledOnce()
+    } else {
+      expect(create).toBeNull()
+      expect(panel.querySelectorAll(':scope > div[aria-hidden="true"]')).toHaveLength(1)
+    }
+  })
+
   for (const canEdit of [true, false]) {
     it(`タグ一覧はタグ名から始まり、星・注目の操作と絞り込みを出さない（編集=${canEdit}）`, async () => {
       await render({ type: 'tag', kind: undefined, canEdit })
@@ -83,13 +99,13 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     expect(host.innerHTML).toContain('#8b5cf6')
   })
 
-  it('タグ名はフォルダ色の札で出し、押すと詳細を開く', async () => {
+  it('タグ名はフォルダ色の丸と1行の名前で出し、押すと詳細を開く', async () => {
     const onOpen = vi.fn()
     await render({ type: 'tag', onOpen, folders: [{ id: 'f-1', name: 'お問い合わせ', revision: 1, color: '#8b5cf6' }] })
-    const pill = host.querySelector('[role="group"][aria-label="タグ「秋の新商品」"]')!
-    expect(pill).toBeTruthy()
-    expect(pill.querySelector('[aria-hidden="true"]')!.getAttribute('style')).toContain('#8b5cf6')
-    await act(async () => { (pill.closest('button') as HTMLButtonElement).click() })
+    const name = host.querySelector('[data-list-name]')!
+    expect(name.textContent).toBe('秋の新商品')
+    expect(name.querySelector('[data-folder-dot]')!.getAttribute('style')).toContain('#8b5cf6')
+    await act(async () => { name.querySelector<HTMLButtonElement>('button')!.click() })
     expect(onOpen).toHaveBeenCalledWith(ROWS[0])
   })
 

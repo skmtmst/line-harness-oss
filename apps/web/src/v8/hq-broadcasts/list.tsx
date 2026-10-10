@@ -1,26 +1,20 @@
 'use client'
 
-/*
- * ★V8 統括 一括配信の一覧（絵 U4Eep0・V8.pen の行「統括」。2026-10-08 オーナー：店の一斉配信とほぼ同じ画面）。
- *
- * 店の一斉配信の一覧（src/v8/broadcasts/list.tsx）と同じ型（ListPage）・同じ共通部品（数の帯・札・表・ページ送り）・
- * 同じ見た目（店の一覧の CSS をそのまま読む）で組む。違いは「送るアカウント」だけ：
- *   - 配信条件の列は「N アカウント」と、誰に送るか（友だち全員／タグ）
- *   - 結果の列はアカウントの合計（届いた人数・失敗したアカウント）
- * 1行＝1回の一括配信。行を押すと詳細（送った結果）へ。動きは BEHAVIOR.md。
- */
+import { canManageRole } from '@/lib/staff-role';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useTenantWideAccess } from '@/lib/staff-role'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertCircle, ArrowUpDown, CalendarClock, FilePen, Inbox, List, MailOpen, Plus, Send } from 'lucide-react'
+import { AlertCircle, CalendarClock, FilePen, Inbox, List, MailOpen, Plus, Send } from 'lucide-react'
 import type { HqBroadcastRun } from '@line-crm/shared'
 import { ListPage, ListPagePagination } from '@/components/templates/list-page'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel from '@/components/shared/folder-panel'
+import FolderPanel, { FolderPanelNote } from '@/components/shared/folder-panel'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -41,11 +35,22 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { formatNumber } from '@/lib/format'
 import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { failedCount, jpDateTime, runBadge, sendTotals } from './model'
 import styles from '../broadcasts/list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 統括 一括配信の一覧（絵 U4Eep0・V8.pen の行「統括」。2026-10-08 オーナー：店の一斉配信とほぼ同じ画面）。
+ *
+ * 店の一斉配信の一覧（src/v8/broadcasts/list.tsx）と同じ型（ListPage）・同じ共通部品（数の帯・札・表・ページ送り）・
+ * 同じ見た目（店の一覧の CSS をそのまま読む）で組む。違いは「送るアカウント」だけ：
+ *   - 配信条件の列は「N アカウント」と、誰に送るか（友だち全員／タグ）
+ *   - 結果の列はアカウントの合計（届いた人数・失敗したアカウント）
+ * 1行＝1回の一括配信。行を押すと詳細（送った結果）へ。動きは BEHAVIOR.md。
+ */
 
 type StatusKey = 'all' | 'scheduled' | 'draft' | 'sent' | 'error'
 const STATUS_CHIPS: { key: StatusKey; label: string; icon: typeof List }[] = [
@@ -84,10 +89,12 @@ function rateLine(targets: HqBroadcastRun['targets'], reached: number): string |
 type HqFolder = { id: string; name: string; revision: number; item_count: number; color?: string | null }
 
 export default function HqBroadcastList() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   usePageTitle('一括配信')
   const role = useStaffRole()
-  const canManage = role === null || canManageRole(role)
+  const canManage = useTenantWideAccess()
   const [runs, setRuns] = useState<HqBroadcastRun[] | null>(null)
   const [error, setError] = useState<unknown>(null)
   const [query, setQuery] = useListUrlValue('q', '')
@@ -111,18 +118,26 @@ export default function HqBroadcastList() {
       const res = await hqBroadcastsApi.list()
       setRuns(res.data); setError(null)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
       setError(caught)
     }
-  }, [])
+  }
+  }, [saveErrors]);
+
   const loadFolders = useCallback(async () => {
     try {
       const res = await hqBroadcastsApi.folders()
       setFolders(res.data)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       setFolders(null)
     }
-  }, [])
-  useEffect(() => { void load(); void loadFolders() }, [load, loadFolders])
+  }, [saveErrors])
+  useEffect(() => { void load(); void loadFolders() }, [load, loadFolders]);
+
 
   const all = useMemo(() => runs ?? [], [runs])
   const counts = useMemo(() => {
@@ -200,8 +215,10 @@ export default function HqBroadcastList() {
       await loadFolders()
       setFolderDialog(null)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       // 理由ごとに言い分ける（共通の describeFolderFailure）。入力した名前と色は残す。
-      const failure = describeFolderFailure(caught, 'save')
+      const failure = describeFolderFailure(caught, 'save');
+
       if (failure.kind === 'missing') {
         notifyToast(failure.message, { tone: 'error' })
         await loadFolders()
@@ -209,8 +226,8 @@ export default function HqBroadcastList() {
         return
       }
       if (failure.kind === 'conflict') await loadFolders()
-      if (failure.nameError) setFolderNameError(failure.nameError)
-      else setFolderError(failure.message)
+      if (failure.nameError) { if (!fieldFailure) setFolderNameError(failure.nameError) }
+      else { if (!fieldFailure) setFolderError(failure.message) }
     } finally {
       setFolderBusy(false)
     }
@@ -223,7 +240,11 @@ export default function HqBroadcastList() {
       await loadFolders()
       setDeletingFolder(null); setFolderFilter('all')
     } catch (caught) {
-      const failure = describeFolderFailure(caught, 'delete')
+      const fieldFailure = saveErrors.capture(caught);
+
+
+      const failure = describeFolderFailure(caught, 'delete');
+
       if (failure.kind === 'missing') {
         notifyToast(failure.message, { tone: 'error' })
         await loadFolders()
@@ -231,20 +252,21 @@ export default function HqBroadcastList() {
         return
       }
       if (failure.kind === 'conflict') await loadFolders()
-      setFolderError(failure.message)
+      { if (!fieldFailure)
+      setFolderError(failure.message) }
     } finally {
       setFolderBusy(false)
     }
   }
 
   const toolbar = (
-    <div className={styles.tools}>
-      <div className={styles.toolRow}>
-        <div className={styles.searchBox}>
+    <ListToolbarFrame>
+      <ListToolbarRow>
+        <ListToolbarSearchSlot>
           <SearchField aria-label="タイトル・内容で探す" placeholder="タイトル・内容で探す" value={query} onChange={(value) => { setQuery(value); setPage(1) }} onClear={() => { setQuery(''); setPage(1) }} />
-        </div>
-      </div>
-      <div className={styles.toolRow}>
+        </ListToolbarSearchSlot>
+      </ListToolbarRow>
+      <ListToolbarRow>
         <div className={styles.chips} role="group" aria-label="状態で絞る">
           {STATUS_CHIPS.map((chip) => (
             <FilterChip key={chip.key} selected={status === chip.key} onChange={() => { setStatus(chip.key); setPage(1) }} icon={<chip.icon size={13} aria-hidden="true" />}>
@@ -254,17 +276,17 @@ export default function HqBroadcastList() {
         </div>
         <span className={styles.spacer} aria-hidden="true" />
         <div className={styles.pageSizeBox}>
-          <Select
+          <SaveErrorField names={["pageSize","page_size"]}><Select
             aria-label="表示件数"
             size="page-size"
             value={String(pageSize)}
             onChange={(value) => { setPageSize(Number(value) || 20); setPage(1) }}
             options={[{ value: '10', label: '10件表示' }, { value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }]}
-          />
+          /></SaveErrorField>
         </div>
 <ListToolbarSort value={sortKey} onChange={(value) => { setSortKey(value as typeof sortKey); setPage(1) }} options={[{ value: 'newest', label: '新しい順' }, { value: 'oldest', label: '古い順' }]} />
-      </div>
-    </div>
+      </ListToolbarRow>
+    </ListToolbarFrame>
   )
 
   let content
@@ -314,7 +336,7 @@ export default function HqBroadcastList() {
                       <Link href={href} className={styles.cellTitle} title={run.title}>{run.title}</Link>
                     </FolderDotName>
                   </div>
-                  <span className={styles.cellSub}>{run.input?.messageType === 'image' ? '画像' : run.input?.messageType === 'flex' ? 'カード型' : 'テキスト'}</span>
+
                 </Td>
                 <Td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
                 <Td>
@@ -357,7 +379,8 @@ export default function HqBroadcastList() {
   ) : null
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId="U4Eep0"
       headingSize="regular"
       title="一括配信"
@@ -372,7 +395,7 @@ export default function HqBroadcastList() {
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: selectFolder, createAction: createButton(false) ?? undefined }}
       folders={(
         <FolderPanel
-          createAction={createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
+          createAction={createButton(true)}
           activeId={folderFilter}
           onSelect={selectFolder}
           onAddFolder={canManage ? () => { setFolderError(''); setFolderNameError(''); setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setFolderDialog({ editing: null }) } : undefined}
@@ -380,7 +403,7 @@ export default function HqBroadcastList() {
           rows={folderRows}
         >
           {canManage ? null : <span className={styles.viewerAddSpace} aria-hidden="true" />}
-          <p className={styles.note}>フォルダを消しても、入っていたものは未分類に残ります</p>
+          <FolderPanelNote>フォルダを消しても、入っていたものは未分類に残ります</FolderPanelNote>
         </FolderPanel>
       )}
       overlays={(
@@ -416,6 +439,6 @@ export default function HqBroadcastList() {
       pagination={pager}
     >
       {content}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

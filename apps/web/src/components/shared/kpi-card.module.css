@@ -324,6 +324,11 @@
   border-block-width: 0; box-shadow: var(--shadow-wh-kpi-top);
 }
 
+/* 予約の帯（O2Z8u・GcyTr）：短い3段、詳しい説明は「？」へ。 */
+[data-theme='v8'] .strip[data-kpi-layout='booking'] .label { font-size: var(--text-caption); line-height: var(--tpl-booking-kpi-label-lh); }
+[data-theme='v8'] .strip[data-kpi-layout='booking'] .labelText { flex: 0 1 auto; }
+[data-theme='v8'] .strip[data-kpi-layout='booking'] .detailText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-theme='v8'] .strip[data-kpi-layout='booking'] .card { min-height: var(--tpl-booking-kpi-height); }
 /* 飲食の共通盤の数の帯（R2w4j / vOtK2）。 */
 [data-theme='v8'] .strip[data-restaurant-fusion] .card { padding: 14px 24px 16px; gap: 8px; }
 [data-theme='v8'] .strip[data-restaurant-fusion] .label { gap: 8px; }

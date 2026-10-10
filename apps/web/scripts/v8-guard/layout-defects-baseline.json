@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-10T13:06+09:00",
+  "baseSha": "5c2829221153a90e35a269e92b647ba9378ee8cc",
+  "source": "design/v8/review/overlap-1010/detect.cjs",
+  "sourceSha256": "30c1323006d4d0589354476c6136f15863df766b0e267d03e732a79bface5412",
+  "blankfixBranch": "codex/kenta-blankfix-1010",
+  "blankfixStatusAtRead": "未コミットの道具を読み取り、検出部のみを取り込んだ。画面修正はこの枝に含めない",
+  "blankfixBrowserSha256AtRead": "1d7947d291e6bc8f4d924b54f8ff4bc7001e8db765cdec503679e05040d958c0",
+  "routes": 64,
+  "widths": [
+    1152,
+    1440,
+    1920
+  ],
+  "viewportHeight": 900,
+  "allowances": 351,
+  "platform": "macOS arm64 / 同梱Chromium (Playwright 1.62.1) / 同梱Noto Sans JP",
+  "reason": "既存の表示だけを対象ごとの実寸で許可し、新しい場所・件数増・悪化は止める"
+}

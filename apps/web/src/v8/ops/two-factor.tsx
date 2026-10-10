@@ -1,5 +1,4 @@
 'use client'
-
 import { Check, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import Button from '@/components/shared/button'
@@ -16,6 +15,7 @@ import { opsCall } from '@/components/ops/ops-ui'
 import styles from './auth.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { PageHeading } from '@/components/templates/page-frame'
+import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 
 type Session = { id: string; name: string; platformAdmin?: boolean; platformAdminState?: string | null }
 
@@ -27,6 +27,7 @@ type Session = { id: string; name: string; platformAdmin?: boolean; platformAdmi
  * ログインを解除するので、ログインし直しを案内する。
  */
 export default function OpsTwoFactorV8() {
+  const saveErrors = useSaveFormErrors()
   const [session, setSession] = useState<Session | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'done' | 'denied'>('loading')
   const [uri, setUri] = useState('')
@@ -58,10 +59,12 @@ export default function OpsTwoFactorV8() {
       let setup: Awaited<ReturnType<typeof api.staff.beginTwoFactorSetup>> | null = null
       try {
         setup = await api.staff.beginTwoFactorSetup(body.data.id)
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
         setup = null
       }
-      if (cancelledRef.current) return
+      if (cancelledRef.current)
+ return
       if (!setup || !setup.success) {
         setError(!setup || typeof setup.error !== 'string' || !setup.error ? 'QRコードを用意できませんでした' : setup.error)
         setState('ready')
@@ -70,14 +73,17 @@ export default function OpsTwoFactorV8() {
       setUri(setup.data.provisioningUri)
       setManualKey(setup.data.manualKey)
       setState('ready')
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure);
+
       if (!cancelledRef.current) window.location.assign('/ops/login')
     }
-  }, [])
+  }, [saveErrors])
 
   useEffect(() => {
     cancelledRef.current = false
-    void load()
+    void load();
+
     return () => { cancelledRef.current = true }
   }, [load])
 
@@ -112,7 +118,7 @@ export default function OpsTwoFactorV8() {
   }
 
   return (
-    <main className={styles.page} data-design-node="qod6X">
+    <SaveErrorScope errors={saveErrors}><main className={styles.page} data-design-node="qod6X">
       <div className={styles.brand}>
         <span className={styles.mark} aria-hidden="true">m</span>
         <span className={styles.brandText}>
@@ -138,14 +144,14 @@ export default function OpsTwoFactorV8() {
         ) : (
           <form onSubmit={(event) => void submit(event)} noValidate className={styles.form}>
             {error ? <Notice tone="danger" message={error} /> : null}
-            {error && !uri ? <Button onClick={() => void load()} className={styles.wide}>もう一度読み込む</Button> : null}
+            {error && !uri ? <Button onClick={() => load()} className={styles.wide} busyLabel="処理中…">もう一度読み込む</Button> : null}
             <div className={styles.qrRow}>
               <div className={styles.qr}>
                 {qr ? (
                   // eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない
                   <img src={qr} alt="認証アプリ登録用のQRコード" />
                 ) : qrFailed ? (
-                  <p role="alert" className={styles.error}>QRコードを表示できませんでした</p>
+                  <Notice tone="danger" >QRコードを表示できませんでした</Notice>
                 ) : (
                   <DelayedSkeleton loading skeleton={<Skeleton className="block h-full w-full" />} />
                 )}
@@ -170,6 +176,6 @@ export default function OpsTwoFactorV8() {
         )}
       </section>
       <p className={styles.foot}>この画面は運営メンバーだけが開けます。操作はすべて記録されます。</p>
-    </main>
+    </main></SaveErrorScope>
   )
 }

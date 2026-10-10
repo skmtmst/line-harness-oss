@@ -3,9 +3,6 @@
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import TagPill from '@/components/shared/tag-pill'
-
-/* ① メニュー（owaS3）（settings-v8.tsx から分割。見た目・動きは変えない） */
-
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
@@ -14,7 +11,6 @@ import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Pagination from '@/components/shared/pagination'
 import { RowMenu } from '@/components/shared/row-actions'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
@@ -24,16 +20,13 @@ import { bookingApi, type BookingMenu } from '@/lib/api'
 import { menuPriceLabel } from '../lib/menu-price'
 import { bookingErrorMessage } from '../lib/menu-validation'
 import MenuVersionHistory from '../menu-version-history'
-import {
-  AccountIcon,
-  Band,
-  MENU_PAGE_SIZE,
-  StateCard,
-  SkeletonRows,
-  sortedMenus,
-  type LoadStatus,
-} from './shared'
+import { AccountIcon, Band, MENU_PAGE_SIZE, StateCard, SkeletonRows, sortedMenus, type LoadStatus } from './shared'
 import styles from '../settings.module.css'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+
+/* ① メニュー（owaS3）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
 export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onReload }: {
   accountId: string
@@ -44,9 +37,13 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
   canEdit: boolean
   onReload: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const [query, setQuery] = useListUrlValue('q', '')
   const [page, setPage] = useListUrlValue('page', 1)
+  const [deleteTarget, setDeleteTarget] = useState<BookingMenu | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const [historyTarget, setHistoryTarget] = useState<BookingMenu | null>(null)
   const [visibilityError, setVisibilityError] = useState<string | null>(null)
   const [updatingVisibility, setUpdatingVisibility] = useState(false)
@@ -59,6 +56,19 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
   const menusRef = useRef(menus)
   menusRef.current = menus
   const reorderBusyRef = useRef(false)
+
+  async function deleteMenu() {
+    if (!deleteTarget || deleting || !canEdit) return
+    setDeleting(true); setDeleteError('')
+    try {
+      await bookingApi.deleteMenu(accountId, deleteTarget.id)
+      setDeleteTarget(null); onReload(); notifyToast('予約メニューを削除しました')
+    } catch (cause) {
+      setDeleteError(cause instanceof Error && 'status' in cause && cause.status === 409
+        ? '予約が付いているため削除できません。新しい予約を止めるには「止める」を使ってください。'
+        : '削除できませんでした。状態を読み直してお試しください。')
+    } finally { setDeleting(false) }
+  }
 
   const orderedBase = useMemo(() => {
     const sorted = sortedMenus(menus)
@@ -121,12 +131,14 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
         onAction: () => { void persistOrder(movedId, previousIds, false) },
       } : undefined)
     } catch (cause) {
+      const fieldFailure = saveErrors.capture(cause)
       setOrderOverride(null)
       onReload()
+      { if (!fieldFailure)
       notifyToast(bookingErrorMessage(cause, '保存'), {
         actionLabel: 'もう一度',
         onAction: () => { void persistOrder(movedId, nextIds, undoable) },
-      })
+      }) }
     } finally {
       reorderBusyRef.current = false
       setReorderBusy(false)
@@ -177,6 +189,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
         },
       })
     } catch (cause) {
+      const fieldFailure = saveErrors.capture(cause)
       setVisOverride((current) => {
         const copy = { ...current }
         delete copy[menu.id]
@@ -184,7 +197,8 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
       })
       onReload()
       if (cause instanceof Error && cause.message === 'booking_menu_version_missing') {
-        setVisibilityError('最新の状態を読み直しました。もう一度お試しください。')
+        { if (!fieldFailure)
+        setVisibilityError('最新の状態を読み直しました。もう一度お試しください。') }
       } else {
         notifyToast(bookingErrorMessage(cause, '保存'), {
           actionLabel: 'もう一度',
@@ -201,26 +215,29 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
 
   if (status === 'loading') {
     return (
-      <div aria-busy="true">
+      <SaveErrorScope errors={saveErrors}><div aria-busy="true">
         <DelayedSkeleton loading skeleton={<SkeletonRows rows={5} />} />
-      </div>
+      </div></SaveErrorScope>
     )
   }
   if (status === 'error') {
     return (
+      <SaveErrorScope errors={saveErrors}>
       <StateCard
         icon={<AccountIcon />}
         title="予約設定を読み込めませんでした"
         description={error ?? '通信状態を確認して、もう一度お試しください。'}
         action={<Button onClick={onReload}>もう一度読み込む</Button>}
-      />
+      /></SaveErrorScope>
     )
   }
 
   const activeCount = menus.filter((menu) => menu.is_active).length
 
   return (
+    <SaveErrorScope errors={saveErrors}>
     <div className={styles.tabStack} data-design="Table">
+      <ConfirmDialog open={deleteTarget !== null} title={`「${deleteTarget?.name ?? ''}」を削除しますか？`} description="予約が付いているメニューは削除できません。" confirmLabel="削除する" destructive busy={deleting} error={deleteError} onConfirm={() => void deleteMenu()} onCancel={() => { if (!deleting) setDeleteTarget(null) }} />
       <Band tone="hint">上から並んだ順に、お客さまの画面に出ます。つまみで並べ替えます。</Band>
 
       <div className={styles.toolbar}>
@@ -241,8 +258,8 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
         )}
       </div>
 
-      {reorderError ? <p className="text-danger mt-2 text-xs" role="alert">{reorderError}</p> : null}
-      {visibilityError ? <p className="text-danger mt-2 text-xs" role="alert">{visibilityError}</p> : null}
+      {reorderError ? <Notice tone="danger" className="mt-2" >{reorderError}</Notice> : null}
+      {visibilityError ? <Notice tone="danger" className="mt-2" >{visibilityError}</Notice> : null}
 
       {shown.length === 0 ? (
         /* 修正案 D-2：空の一覧。 */
@@ -282,6 +299,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
               ...(canEdit ? [
                 /* つまみと同じ入口の「上へ／下へ」。検索中・保存中は出さない（つまみも出さない）。 */
                 ...reorder.menuItems(menu.id, () => setOpenMenuId(null)),
+                { id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setDeleteError(''); setDeleteTarget(menu) } },
                 {
                   id: 'visibility',
                   label: (visOverride[menu.id] ?? menu.is_active) ? '止める' : '出す',
@@ -380,6 +398,6 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
         />
       ) : null}
 
-    </div>
+    </div></SaveErrorScope>
   )
 }

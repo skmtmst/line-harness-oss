@@ -1,13 +1,11 @@
 'use client'
-
-/* Pencil の6枚のHTMLをもとにした投稿画面。既存の審査APIを接続する。 */
-import { notifySaved } from '@/components/shared/toast'
+import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, Eye, Globe, HelpCircle, History, MoreHorizontal, Send, Undo2, X } from 'lucide-react'
+import { Check, Globe, HelpCircle, History, MoreHorizontal, Send, Undo2, X } from 'lucide-react'
 import type { ApiResponse } from '@line-crm/shared'
 import { ApiError, api, fetchApi, type PhotoBulkReviewResult, type PhotoReviewMetrics } from '@/lib/api'
 import { TextArea } from '@/components/shared/text-field'
-import { FieldError } from '@/components/shared/form-controls'
+import { FieldError, Field } from '@/components/shared/form-controls'
 import Radio from '@/components/shared/radio'
 import { focusFormField } from '@/lib/use-field-validation'
 import Button from '@/components/shared/button'
@@ -26,10 +24,9 @@ import { ListPage } from '@/components/templates'
 import Notice from '@/components/shared/notice'
 import SearchField from '@/components/shared/search-field'
 import SegmentedControl from '@/components/shared/segmented'
-import { notifyToast } from '@/components/shared/toast'
 import { Tabs } from '@/components/shared/tabs'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { formatNumber } from '@/lib/format'
+import { formatNumber, formatListDay as polishFormatListDay } from '@/lib/format'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { formatPhotoReceivedAt } from './time'
 import { safePhotoSrc } from './src'
@@ -41,11 +38,13 @@ import { mileStatusLabel, reviewVersionOf, text } from './text'
 import { PhotoReviewDetail } from './detail'
 import PhotoPolicyHistoryV8 from './policy-history'
 import styles from './review.module.css'
-import { formatListDay as polishFormatListDay } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+/* Pencil の6枚のHTMLをもとにした投稿画面。既存の審査APIを接続する。 */
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
 type PhotoView = 'list' | 'detail' | 'publications'
@@ -96,6 +95,7 @@ function isThisMonth(value: string): boolean {
  * 投稿の V8 画面。外枠（見出し・版の履歴・札・数の帯）は全部の札で同じ。
  */
 export default function PhotoReviewV8({ accountId }: { accountId: string | null }) {
+  const saveErrors = useSaveFormErrors()
   const [photos, setPhotos] = useState<Array<Record<string, unknown>>>([])
   const [reviewMetrics, setReviewMetrics] = useState<PhotoReviewMetrics | null>(null)
   const [policyPoints, setPolicyPoints] = useState<number | null>(null)
@@ -188,17 +188,21 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       setPhotos(response.data)
       setHasMorePhotos(response.data.length === PHOTO_PAGE_SIZE)
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error);
+
       if (sequence === loadSequence.current) {
         setPhotos([])
-        setHasMorePhotos(false)
+        setHasMorePhotos(false);
+
         const forbidden = error instanceof ApiError && error.status === 403
         setLoadForbidden(forbidden)
-        setLoadError(forbidden ? permissionDeniedMessage('store') : '写真を読み込めませんでした。')
+        { if (!fieldFailure)
+        setLoadError(forbidden ? permissionDeniedMessage('store') : '写真を読み込めませんでした。') }
       }
     } finally {
       if (sequence === loadSequence.current) setLoading(false)
     }
-  }, [accountId, searchQuery])
+  }, [accountId, searchQuery, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -214,15 +218,19 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
     try {
       const saved = JSON.parse(window.sessionStorage.getItem(`nen-photo-review:selection:${accountId}`) ?? '[]')
       setSelectedPhotoIds(Array.isArray(saved) ? saved.filter((id): id is string => typeof id === 'string') : [])
-    } catch { setSelectedPhotoIds([]) }
-  }, [accountId])
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure);
+ setSelectedPhotoIds([]) }
+  }, [accountId, saveErrors]);
+
 
   const selectionAccount = useRef(accountId)
   useEffect(() => {
     if (selectionAccount.current !== accountId) { selectionAccount.current = accountId; return }
     if (!accountId) return
-    try { window.sessionStorage.setItem(`nen-photo-review:selection:${accountId}`, JSON.stringify(selectedPhotoIds)) } catch { /* 選択操作は続けられる。 */ }
-  }, [accountId, selectedPhotoIds])
+    try { window.sessionStorage.setItem(`nen-photo-review:selection:${accountId}`, JSON.stringify(selectedPhotoIds)) } catch (saveFailure) {
+      saveErrors.capture(saveFailure) /* 選択操作は続けられる。 */ }
+  }, [accountId, selectedPhotoIds, saveErrors])
   useEffect(() => {
     const restore = () => {
       const next = photoReviewEntryFrom(window.location.search)
@@ -248,13 +256,16 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       setPhotos((current) => [...current, ...response.data])
       setHasMorePhotos(response.data.length === PHOTO_PAGE_SIZE)
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error);
+
       if (sequence === loadSequence.current) {
-        setNotice(photoNoticeFor(error, '続きの写真を読み込めませんでした。'))
+        { if (!fieldFailure)
+        setNotice(photoNoticeFor(error, '続きの写真を読み込めませんでした。')) }
       }
     } finally {
       if (sequence === loadSequence.current) setLoadingMore(false)
     }
-  }, [accountId, loadingMore, hasMorePhotos, photos.length, searchQuery])
+  }, [accountId, loadingMore, hasMorePhotos, photos.length, searchQuery, saveErrors])
 
   const counts = {
     pending: photos.filter((photo) => text(photo.status) === 'pending').length,
@@ -289,7 +300,9 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       if (generation !== accountGeneration.current) return
       if (!detail.success) throw new Error(detail.error)
       setPublicationCandidate({ id, version: Number(detail.data.publication?.version ?? 0), key: crypto.randomUUID() })
-    } catch (error) { if (generation === accountGeneration.current) setNotice(photoNoticeFor(error, '掲載状態を読み込めませんでした。')) }
+    } catch (error) {
+      const fieldFailure = saveErrors.capture(error);
+ if (generation === accountGeneration.current) { if (!fieldFailure) setNotice(photoNoticeFor(error, '掲載状態を読み込めませんでした。')) } }
     finally { if (generation === accountGeneration.current) setReviewing(null) }
   }
   const confirmPublication = async () => {
@@ -304,7 +317,9 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       setPublicationCandidate(null)
       notifySaved('公式サイトへの掲載を保存しました。追加報酬の手続き状況は掲載一覧で確認できます。')
       await load()
-    } catch (error) { if (generation === accountGeneration.current) setNotice(photoNoticeFor(error, '掲載できませんでした。掲載状態と同意を読み直してください。')) }
+    } catch (error) {
+      const fieldFailure = saveErrors.capture(error);
+ if (generation === accountGeneration.current) { if (!fieldFailure) setNotice(photoNoticeFor(error, '掲載できませんでした。掲載状態と同意を読み直してください。')) } }
     finally { if (generation === accountGeneration.current) setReviewing(null) }
   }
   useEffect(() => { setPublicationCandidate(null) }, [accountId])
@@ -360,11 +375,14 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       setRejectingPhotoId(null)
       await load()
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error);
+
       if (generation === accountGeneration.current) {
         const message = photoNoticeFor(error, '審査結果を保存できませんでした。')
-        setNotice(message)
+        { if (!fieldFailure)
+        setNotice(message) }
         // WEB225：見送りの窓が開いたままなら、失敗の理由を窓の中に出す（裏の一覧にだけ出さない）。
-        if (nextStatus === 'rejected') setReasonError(message)
+        if (nextStatus === 'rejected') { if (!fieldFailure) setReasonError(message) }
         if (error instanceof ApiError && error.status === 409) {
           reviewKeys.current.delete(id)
           await load()
@@ -487,11 +505,14 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       setReasonError(''); setReasonFieldError('')
       await load()
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error);
+
       if (generation === accountGeneration.current) {
         const message = photoNoticeFor(error, 'まとめて審査できませんでした。')
-        setNotice(message)
+        { if (!fieldFailure)
+        setNotice(message) }
         // WEB225：まとめて見送りの窓の中にも出す。
-        if (decision === 'return') setReasonError(message)
+        if (decision === 'return') { if (!fieldFailure) setReasonError(message) }
       }
     } finally {
       setBulkReviewing(false)
@@ -513,8 +534,11 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       setNotice('審査結果を投稿者へLINEで再送しました。')
       await load()
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error);
+
       if (generation === accountGeneration.current) {
-        setNotice(error instanceof Error ? error.message : 'LINE通知を再送できませんでした。')
+        { if (!fieldFailure)
+        setNotice(error instanceof Error ? error.message : 'LINE通知を再送できませんでした。') }
       }
     } finally {
       setReviewing(null)
@@ -538,7 +562,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
   )
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId={boardNode(view, status, canEdit)}
       headingSize="regular"
       title="投稿"
@@ -561,7 +585,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
         <>
           {!canEdit ? (
             <div className={styles.viewerRow}>
-              <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} data-design-node="photo-viewer-band" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+              <ReadOnlyNotice role="status" data-design-node="photo-viewer-band">閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice>
             </div>
           ) : null}
           <div className={styles.stats}>
@@ -623,10 +647,10 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
           }}>
             <div role="radiogroup" aria-label="見送り理由" className={styles.pillGroup}>
               {REVIEW_REASONS.map((reason) => (
-                <Radio key={reason.value} name="photo-reject-reason" checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError(''); setReasonFieldError('') }}>{reason.label}</Radio>
+                <SaveErrorField names={["photo-reject-reason","reasonCode","value","reason.value"]} key={reason.value}><Radio key={reason.value} name="photo-reject-reason" checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError(''); setReasonFieldError('') }}>{reason.label}</Radio></SaveErrorField>
               ))}
             </div>
-            <Field label="投稿者に届く補足（直せます）"><TextArea id="photo-reject-note" size="short" invalid={Boolean(reasonFieldError)} aria-describedby={reasonFieldError ? 'photo-reject-note-error' : undefined} value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError(''); setReasonFieldError('') }} rows={3} placeholder={reasonCode === 'other' ? '理由を入力してください' : '必要な場合だけ入力します'} />
+            <Field label="投稿者に届く補足（直せます）"><SaveErrorField names={["reasonNote","reason_note"]}><TextArea id="photo-reject-note" size="short" invalid={Boolean(reasonFieldError)} aria-describedby={reasonFieldError ? 'photo-reject-note-error' : undefined} value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError(''); setReasonFieldError('') }} rows={3} placeholder={reasonCode === 'other' ? '理由を入力してください' : '必要な場合だけ入力します'} /></SaveErrorField>
 <FieldError id="photo-reject-note-error">{reasonFieldError}</FieldError></Field>
           </Dialog>
 
@@ -717,7 +741,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
           onBulkReturn={() => setBulkReturnOpen(true)}
         />
       )}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }
 
@@ -920,7 +944,7 @@ function PhotoCardV8({ photo, status, ...props }: { photo: Record<string, unknow
         )}
         {status === 'pending' && props.canEdit ? (
           <span className={styles.cardPick}>
-            <Checkbox checked={selected} onCheckedChange={() => props.onToggleSelect(photoId)} aria-label={`${name}の写真を選ぶ`}>選ぶ</Checkbox>
+            <SaveErrorField names={["selected"]}><Checkbox checked={selected} onCheckedChange={() => props.onToggleSelect(photoId)} aria-label={`${name}の写真を選ぶ`}>選ぶ</Checkbox></SaveErrorField>
           </span>
         ) : null}
       </div>
@@ -1050,15 +1074,15 @@ function RejectDialogV8({
         <div className={styles.pillGroup} role="radiogroup" aria-labelledby="nen-posts-reject-reason">
           <p id="nen-posts-reject-reason" className={styles.fieldTitle}>見送った理由</p>
           {REVIEW_REASONS.map((reason) => (
-            <Radio key={reason.value} name="photo-reject-reason" checked={reasonCode === reason.value} onChange={() => { onReasonCode(reason.value); onReasonNote(reason.value === 'other' ? '' : reason.message) }}>{reason.label}</Radio>
+            <SaveErrorField names={["photo-reject-reason","reasonCode","value","reason.value"]} key={reason.value}><Radio key={reason.value} name="photo-reject-reason" checked={reasonCode === reason.value} onChange={() => { onReasonCode(reason.value); onReasonNote(reason.value === 'other' ? '' : reason.message) }}>{reason.label}</Radio></SaveErrorField>
           ))}
         </div>
-        <Field label="お客様に届く補足（直せます）"><TextArea id="photo-reject-note" size="short" invalid={Boolean(reasonFieldError)} aria-describedby={reasonFieldError ? 'photo-reject-note-error' : undefined} aria-label="お客様に届く補足" value={reasonNote} maxLength={500} rows={2} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} onChange={(event) => onReasonNote(event.target.value)} />
+        <Field label="お客様に届く補足（直せます）"><SaveErrorField names={["reasonNote","reason_note"]}><TextArea id="photo-reject-note" size="short" invalid={Boolean(reasonFieldError)} aria-describedby={reasonFieldError ? 'photo-reject-note-error' : undefined} aria-label="お客様に届く補足" value={reasonNote} maxLength={500} rows={2} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} onChange={(event) => onReasonNote(event.target.value)} /></SaveErrorField>
 <FieldError id="photo-reject-note-error">{reasonFieldError}</FieldError></Field>
         {/* 絵に無い「次の投稿は人が見る」は、同じ行の右に小さく置く（行を増やさない）。 */}
         <div className={styles.checkLine}>
-          <Checkbox checked={resubmitInvite} onCheckedChange={onResubmitInvite}>もう一度 送ってもらえるようお願いする</Checkbox>
-          <span className={styles.checkSub}><Checkbox checked={watchSubmitter} onCheckedChange={onWatchSubmitter}>この人の次の投稿は、必ず人が見る</Checkbox></span>
+          <SaveErrorField names={["resubmitInvite","resubmit_invite"]}><Checkbox checked={resubmitInvite} onCheckedChange={onResubmitInvite}>もう一度 送ってもらえるようお願いする</Checkbox></SaveErrorField>
+          <span className={styles.checkSub}><SaveErrorField names={["watchSubmitter","watch_submitter"]}><Checkbox checked={watchSubmitter} onCheckedChange={onWatchSubmitter}>この人の次の投稿は、必ず人が見る</Checkbox></SaveErrorField></span>
         </div>
         <div className={styles.fieldLabel}>
           <p className={styles.fieldTitle}>投稿者に届く内容</p>
@@ -1098,6 +1122,8 @@ function PublicationsV8({
   publishedCount: number | null
   onChanged: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [state, setState] = useState<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
   const [items, setItems] = useState<PublicationItem[]>([])
   const [orderItems, setOrderItems] = useState<PublicationItem[] | null>(null)
@@ -1127,7 +1153,9 @@ function PublicationsV8({
       if (accountGeneration !== generation.current) return
       if (!response.success) throw new Error(response.error)
       setEditing(null); await load(); onChanged()
-    } catch { if (accountGeneration === generation.current) setNotice('使う場所を保存できませんでした。最新の状態を読み直してください。') }
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+ if (accountGeneration === generation.current) { if (!fieldFailure) setNotice('使う場所を保存できませんでした。最新の状態を読み直してください。') } }
     finally { if (accountGeneration === generation.current) setBusyId('') }
   }
 
@@ -1151,10 +1179,13 @@ function PublicationsV8({
       setState('ready')
     } catch (error) {
       if (sequence !== loadSequence.current) return
+      const fieldFailure = saveErrors.capture(error)
       setItems([])
+      { if (!fieldFailure)
       setState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
     }
-  }, [accountId])
+  }
+  }, [accountId, saveErrors])
 
   useEffect(() => { void load(); return () => { generation.current += 1; loadSequence.current += 1 } }, [load])
 
@@ -1173,9 +1204,12 @@ function PublicationsV8({
       await load()
       onChanged()
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure)
       setNotice(error instanceof ApiError && error.status === 409
         ? '別の人が先に掲載状態を変更しました。最新の状態を読み直してください。'
-        : '写真を掲載先から外せませんでした。')
+        : '写真を掲載先から外せませんでした。') }
     } finally { setBusyId('') }
   }
 
@@ -1188,7 +1222,9 @@ function PublicationsV8({
       if (token !== generation.current) return
       if (!response.success) throw new Error(response.error)
       setOrderItems(response.data.items)
-    } catch (error) { if (token === generation.current) setNotice(photoNoticeFor(error, '掲載順を読み込めませんでした。')) }
+    } catch (error) {
+      const fieldFailure = saveErrors.capture(error);
+ if (token === generation.current) { if (!fieldFailure) setNotice(photoNoticeFor(error, '掲載順を読み込めませんでした。')) } }
     finally { if (token === generation.current) setBusyId('') }
   }
   const moveOrder = (index: number, delta: number) => {
@@ -1213,14 +1249,16 @@ function PublicationsV8({
       await load()
       onChanged()
     } catch (error) {
-      if (token === generation.current) setNotice(error instanceof ApiError && error.status === 409
+      const fieldFailure = saveErrors.capture(error);
+
+      if (token === generation.current) { if (!fieldFailure) setNotice(error instanceof ApiError && error.status === 409
         ? '掲載の集合か版が変わりました。キャンセルして最新の全件を読み直してください。'
-        : '掲載順を保存できませんでした。')
+        : '掲載順を保存できませんでした。') }
     } finally { if (busyId === 'order' || token === generation.current) setBusyId('') }
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <Dialog open={orderItems !== null} title="掲載順を変える" description="上から順に公式サイトへ表示します。全件と確認した版をまとめて保存します。"
         confirmLabel="並び順を保存する" error={notice} busy={busyId === 'order'} onConfirm={() => saveOrder()}
         onCancel={() => { if (!busyId) { setOrderItems(null); void load() } }}>
@@ -1318,9 +1356,9 @@ function PublicationsV8({
         </div>
       )}
       <Dialog open={Boolean(editing)} title="使う場所" description="同意のある写真の掲載先を選びます。原本は公開しません。" busy={Boolean(busyId)} error={notice} confirmLabel="保存する" onCancel={() => { if (!busyId) setEditing(null) }} onConfirm={() => savePlacements()}>
-        {placementChoices.map((choice) => <Checkbox key={choice.type} checked={selectedPlacements.includes(choice.type)} onCheckedChange={(checked) => setSelectedPlacements((current) => checked ? [...current, choice.type] : current.filter((type) => type !== choice.type))}>{choice.label}</Checkbox>)}
+        {placementChoices.map((choice, saveFieldIndex) => <SaveErrorField names={[`placementChoices.${saveFieldIndex}.type`,"type","choice.type","selectedPlacements","selected_placements"]} key={choice.type}><Checkbox key={choice.type} checked={selectedPlacements.includes(choice.type)} onCheckedChange={(checked) => setSelectedPlacements((current) => checked ? [...current, choice.type] : current.filter((type) => type !== choice.type))}>{choice.label}</Checkbox></SaveErrorField>)}
       </Dialog>
-    </>
+    </></SaveErrorScope>
   )
 }
 
@@ -1347,6 +1385,7 @@ function DetailV8({
   onBack: () => void
   onReload: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const [photoId, setPhotoId] = useState<string | null>(() => initialPhotoId ?? (photos.length > 0 ? text(photos[0].id) : null))
   const [detailPhoto, setDetailPhoto] = useState<Record<string, unknown> | null>(null)
   const [detailState, setDetailState] = useState<'ready' | 'empty' | 'error' | 'forbidden'>('empty')
@@ -1402,11 +1441,13 @@ function DetailV8({
       setDetailState('ready')
     } catch (error) {
       if (sequence !== sequenceRef.current) return
-      setDetailState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
+      const fieldFailure = saveErrors.capture(error)
+      { if (!fieldFailure)
+      setDetailState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error') }
     } finally {
       if (sequence === sequenceRef.current) setDetailLoading(false)
     }
-  }, [accountId, refreshDetailAssets])
+  }, [accountId, refreshDetailAssets, saveErrors])
 
   useEffect(() => {
     if (photoId) void openDetail(photoId)
@@ -1432,7 +1473,10 @@ function DetailV8({
       onReload()
       onBack()
     } catch (error) {
-      setNotice(photoNoticeFor(error, '審査結果を保存できませんでした。'))
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure)
+      setNotice(photoNoticeFor(error, '審査結果を保存できませんでした。')) }
     } finally { setReviewing(false) }
   }
 
@@ -1450,8 +1494,11 @@ function DetailV8({
       }
       setNotice(response.data.synced ? (response.data.duplicate ? 'EC側ではすでに付与済みでした。' : 'マイルを付けました。') : '手続きはまだ完了していません。')
       void openDetail(id)
-    } catch {
-      setNotice('マイルの手続きに失敗しました。通信を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setNotice('マイルの手続きに失敗しました。通信を確かめて、もう一度お試しください。') }
     } finally {
       setPointActionBusy(null)
     }
@@ -1476,7 +1523,10 @@ function DetailV8({
         : current)
       notifySaved('写真の向きを保存しました。')
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : '写真の向きを保存できませんでした。')
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure)
+      setNotice(error instanceof Error ? error.message : '写真の向きを保存できませんでした。') }
     } finally {
       setRotationSaving(false)
     }
@@ -1489,6 +1539,8 @@ function DetailV8({
     let grant
     try { grant = await api.nenMembers.photoOriginalStepUp({ method, value: code }) }
     catch (error) {
+      saveErrors.capture(error);
+
       if (error instanceof ApiError && (error.status === 400 || error.status === 401)) throw new Error('再認証コードを確認してください。')
       throw error
     }
@@ -1530,14 +1582,17 @@ function DetailV8({
         : '審査用画像の作り直しを受け付けました。')
       await refreshDetailAssets(id)
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : '審査用画像を作り直せませんでした。')
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure)
+      setNotice(error instanceof Error ? error.message : '審査用画像を作り直せませんでした。') }
     } finally {
       setAssetProcessing(false)
     }
   }
 
   return (
-    <PhotoReviewDetail
+    <SaveErrorScope errors={saveErrors}><PhotoReviewDetail
       canEdit={canEdit}
       photo={detailPhoto}
       position={position}
@@ -1564,6 +1619,6 @@ function DetailV8({
       onDownloadOriginal={downloadOriginal}
       onPointAction={pointAction}
       pointActionBusy={pointActionBusy}
-    />
+    /></SaveErrorScope>
   )
 }

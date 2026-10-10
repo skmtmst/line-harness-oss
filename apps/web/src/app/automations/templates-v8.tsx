@@ -1,10 +1,7 @@
 'use client'
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, fetchApi, type AutomationTemplateSummary } from '@/lib/api'
-
-type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import MergedTabs from '@/components/layout/merged-tabs'
@@ -18,6 +15,9 @@ import { useCanManageAutomations } from '@/components/automations/use-automation
 import styles from './automation-api-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 
 /*
  * ★V8 オートメーション見本（板 `c7dxp`）。
@@ -26,6 +26,7 @@ import { PageHeading } from '@/components/templates/page-frame'
  */
 
 export default function AutomationTemplatesV8() {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const canManage = useCanManageAutomations()
@@ -74,14 +75,17 @@ export default function AutomationTemplatesV8() {
       setCommonActionCount(commonRes && commonRes.success ? commonRes.data.length : null)
       setSkipped(runsRes && runsRes.success ? runsRes.data.summary.skipped : null)
       setStatus('ready')
-    } catch {
-      setItems([])
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+      setItems([]);
+
       setStatus('error')
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
-    if (accountLoading) return
+    if (accountLoading)
+ return
     void load()
   }, [accountLoading, load])
 
@@ -107,15 +111,19 @@ export default function AutomationTemplatesV8() {
       if (!response.success) throw new Error(response.error)
       delete operationKeysRef.current[slot]
       router.push(`/automations/drafts?id=${encodeURIComponent(response.data.id)}`)
-    } catch {
-      setActionError('下書きを作れませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('下書きを作れませんでした。状態を読み直してから、もう一度お試しください。') }
       setCreating(null)
     }
   }
 
-  if (accountLoading) return <ListState kind="loading" title="見本を読み込んでいます" />
+  if (accountLoading)
+ return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="見本を読み込んでいます" /></SaveErrorScope>
   if (!selectedAccountId) {
-    return <ListState kind="empty" title="LINE公式アカウントを選んでください" description="見本から作る下書きは、選んだアカウントだけに保存します。" />
+    return <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="LINE公式アカウントを選んでください" description="見本から作る下書きは、選んだアカウントだけに保存します。" /></SaveErrorScope>
   }
 
   const tabs = [
@@ -126,7 +134,7 @@ export default function AutomationTemplatesV8() {
   ]
 
   return (
-    <div className={styles.board} data-design-node="c7dxp">
+    <SaveErrorScope errors={saveErrors}><div className={styles.board} data-design-node="c7dxp">
       <div className={styles.head}>
         <div>
           <PageHeading title="オートメーション" help={<> 「○○したら△△する」を決めておくと、友だちの動きに合わせて自動で動きます。</>} />
@@ -171,7 +179,7 @@ export default function AutomationTemplatesV8() {
               </FilterChip>
             ))}
             <div className={styles.toolbarSpice}>
-              <Button variant="secondary" onClick={() => void load()}>見本を再読み込み</Button>
+              <Button variant="secondary" onClick={() => load()} busyLabel="処理中…">見本を再読み込み</Button>
             </div>
           </div>
 
@@ -206,6 +214,6 @@ export default function AutomationTemplatesV8() {
           <p className={styles.footnote}>実行まで確認できた見本だけを、ここへ表示します。見本に実データは入っていません。見本から作る下書きは、選んだアカウントだけに保存します。</p>
         </>
       ) : null}
-    </div>
+    </div></SaveErrorScope>
   )
 }

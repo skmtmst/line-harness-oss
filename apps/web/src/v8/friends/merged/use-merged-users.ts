@@ -13,10 +13,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
 import type { UserRowData } from '@/components/users/user-row'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
 export const USERS_PAGE_SIZE = 50
 /** ★V8：1ページの人数を選べる（既定は今と同じ 50）。 */
-export const USERS_PAGE_SIZES = [20, 50, 100] as const
+export const USERS_PAGE_SIZES = STANDARD_PAGE_SIZES
 
 export interface UsersAccountOption {
   id: string

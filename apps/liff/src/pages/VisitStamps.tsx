@@ -1,7 +1,9 @@
+
 import { TextInput } from '../components/forms/controls.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { VISIT_STAMP_DEFAULT_COLOR, visitStampDarkInk } from '@line-crm/shared';
 import stampStyles from './VisitStamps.module.css';
+import StampConditions from '../components/StampConditions.js';
 import type { VisitStampCard, VisitStampPaperRequest, VisitStampRedemption, VisitStampReward, VisitStampWallet } from '@line-crm/shared';
 import { api, visitStampsApi } from '../lib/api.js';
 import { SUBMIT_FAILED_MESSAGE, logFailure } from '../lib/user-message.js';
@@ -15,6 +17,7 @@ import Button from '../components/ui/Button.js';
 import Badge from '../components/ui/Badge.js';
 import Icon from '../components/ui/Icon.js';
 import { LiffInput } from '../components/forms/controls.js'
+import { useUrlStep } from '../lib/use-url-step.js';
 
 /**
  * ★V8 来店スタンプ（お客さまの LIFF・提案 E-8）。マイルとは別のスタンプカード。
@@ -129,7 +132,7 @@ export default function VisitStamps() {
   const [shopName, setShopName] = useState('');
   const [entry, setEntry] = useState<Entry | null>(null);
   const [state, setState] = useState<'loading' | 'error' | 'empty' | 'ready'>('loading');
-  const [view, setView] = useState<View>('card');
+  const [view, setView] = useUrlStep<View>('card');
   const [picked, setPicked] = useState<string>('');
   const [redemption, setRedemption] = useState<(VisitStampRedemption & { shownAt: Date }) | null>(null);
   const [used, setUsed] = useState<{ at: Date; balance: number; staffName: string } | null>(null);
@@ -269,6 +272,8 @@ export default function VisitStamps() {
           </p>
           </div>
         </section>
+
+        <StampConditions settings={card.settings} />
 
         {info.best ? (
           <section className="flex flex-col gap-2.5 rounded-2xl bg-liff-ok-bg p-4 outline-[1.5px] outline-liff-primary" aria-label="使える特典">

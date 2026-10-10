@@ -78,7 +78,7 @@ import {
 } from '@line-crm/db';
 import type { CommonVarDeleteImpact, CommonVarUsageKind } from '@line-crm/shared';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { imageDimensions, IMAGE_METADATA_PREFIX_BYTES } from '../services/media-metadata.js';
@@ -100,40 +100,6 @@ const REPLACEMENT_BODY_MAX_BYTES = 16 * 1024;
 class RequestBodyError extends Error {
   constructor(readonly status: 400 | 413, message: string) {
     super(message);
-  }
-}
-
-async function readBoundedJson(request: Request): Promise<Record<string, unknown>> {
-  const declared = Number.parseInt(request.headers.get('Content-Length') ?? '', 10);
-  if (Number.isFinite(declared) && declared > REPLACEMENT_BODY_MAX_BYTES) {
-    throw new RequestBodyError(413, '送信内容が大きすぎます');
-  }
-  const reader = request.body?.getReader();
-  if (!reader) return {};
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > REPLACEMENT_BODY_MAX_BYTES) {
-      await reader.cancel();
-      throw new RequestBodyError(413, '送信内容が大きすぎます');
-    }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  try {
-    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('object required');
-    return parsed as Record<string, unknown>;
-  } catch {
-    throw new RequestBodyError(400, '送信内容を読み取れませんでした');
   }
 }
 
@@ -925,7 +891,7 @@ contents.get('/api/media', async (c) => {
  * 詳細URLから1件だけ復元する。IDだけで探すと別アカウントの存在を漏らすため、
  * 担当者のaccount範囲を先に確かめ、同じaccount条件を付けた取得だけを行う。
  */
-contents.get('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
+contents.get('/api/media/:id', requireDeliveryAccess('contents'), async (c) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
     if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
@@ -1165,7 +1131,7 @@ contents.get('/media/:id/content', async (c) => {
   }
 });
 
-contents.patch('/api/media/:id', requireRole('owner', 'admin'), inputJsonBoundary({"filename":["string"],"folderId":["null","string"],"usageReference":["object"]}), async (c) => {
+contents.patch('/api/media/:id', requireDeliveryAccess('contents'), inputJsonBoundary({"filename":["string"],"folderId":["null","string"],"usageReference":["object"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const accountId = c.req.query('accountId')?.trim();
@@ -1385,7 +1351,7 @@ async function mediaArchiveRoute(c: Context<Env>, archive: boolean, mediaId: str
   }, 409);
 }
 
-contents.post('/api/media/:id/archive', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+contents.post('/api/media/:id/archive', requireDeliveryAccess('contents'), inputJsonBoundary(), async (c) => {
   try {
     return await mediaArchiveRoute(c, true, c.req.param('id'));
   } catch (err) {
@@ -1394,7 +1360,7 @@ contents.post('/api/media/:id/archive', requireRole('owner', 'admin'), inputJson
   }
 });
 
-contents.post('/api/media/:id/restore', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+contents.post('/api/media/:id/restore', requireDeliveryAccess('contents'), inputJsonBoundary(), async (c) => {
   try {
     return await mediaArchiveRoute(c, false, c.req.param('id'));
   } catch (err) {
@@ -1404,7 +1370,7 @@ contents.post('/api/media/:id/restore', requireRole('owner', 'admin'), inputJson
 });
 
 // 削除前に、現在記録されている使用先を名前と導線付きで確認する。
-contents.get('/api/media/:id/delete-impact', requireRole('owner', 'admin'), async (c) => {
+contents.get('/api/media/:id/delete-impact', requireDeliveryAccess('contents'), async (c) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
     if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
@@ -1490,7 +1456,7 @@ contents.get('/api/media/:id/delete-impact', requireRole('owner', 'admin'), asyn
 });
 
 // 差し替える前に、現在の使用先を7種類すべて読み直す。内部IDは返さない。
-contents.get('/api/media/:id/replacement-impact', requireRole('owner', 'admin'), async (c) => {
+contents.get('/api/media/:id/replacement-impact', requireDeliveryAccess('contents'), async (c) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
     const replacementId = c.req.query('replacementId')?.trim();
@@ -1515,14 +1481,14 @@ contents.get('/api/media/:id/replacement-impact', requireRole('owner', 'admin'),
 // 画面で読んだ影響は信用せず、同じ7種類を実行直前にも読み直す。
 // scope=replaceable は「置換可能な使用先だけ」を明示選択した部分実行。
 // 置き忘れ防止に、scope の省略・不正値は全件実行として扱わず 400/409 で止める。
-contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+contents.post('/api/media/:id/replace-usages', requireDeliveryAccess('contents'), inputJsonBoundary({}, { maxBytes: REPLACEMENT_BODY_MAX_BYTES }), async (c) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
     if (!accountId) return inputError(c, { success: false, error: 'accountId が必要です' }, 400, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
-    const body = await readBoundedJson(c.req.raw);
+    const body = await c.req.json<Record<string, unknown>>();
     const replacementId = typeof body.replacementMediaId === 'string'
       ? body.replacementMediaId.trim()
       : '';
@@ -1626,7 +1592,7 @@ contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin'), in
 });
 
 // 使われていれば最新の影響を返して止める。画面で前に読んだ結果は信用しない。
-contents.delete('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
+contents.delete('/api/media/:id', requireDeliveryAccess('contents'), async (c) => {
   try {
     const id = c.req.param('id');
     const accountId = c.req.query('accountId')?.trim();
@@ -2148,7 +2114,7 @@ contents.get('/api/common-vars/:id', async (c) => {
   }
 });
 
-contents.post('/api/common-vars', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+contents.post('/api/common-vars', requireDeliveryAccess('commonVars'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
@@ -2245,7 +2211,7 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), inputJsonBounda
   }
 });
 
-contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+contents.patch('/api/common-vars/:id', requireDeliveryAccess('commonVars'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const accountId = c.req.query('accountId')?.trim();
@@ -2398,7 +2364,7 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), inputJsonB
 
 // Q: 状態の切替。下書き→使用中（公開）、使用中→止めた、止めた→使用中（再開）。
 // 値の変更ではないので影響確認は求めないが、状態を変える操作なので理由は必須。
-contents.post('/api/common-vars/:id/status', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+contents.post('/api/common-vars/:id/status', requireDeliveryAccess('commonVars'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const accountId = c.req.query('accountId')?.trim();
@@ -2454,7 +2420,7 @@ contents.post('/api/common-vars/:id/status', requireRole('owner', 'admin'), inpu
   }
 });
 
-contents.get('/api/common-vars/:id/delete-impact', requireRole('owner', 'admin'), async (c) => {
+contents.get('/api/common-vars/:id/delete-impact', requireDeliveryAccess('commonVars'), async (c) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
     if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
@@ -2474,9 +2440,9 @@ contents.get('/api/common-vars/:id/delete-impact', requireRole('owner', 'admin')
   }
 });
 
-contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+contents.post('/api/common-vars/:id/impact-preview', requireDeliveryAccess('commonVars'), inputJsonBoundary({}, { maxBytes: REPLACEMENT_BODY_MAX_BYTES }), async (c) => {
   try {
-    const body = await readBoundedJson(c.req.raw);
+    const body = await c.req.json<Record<string, unknown>>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
     if (!accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
@@ -2534,9 +2500,9 @@ contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin
   }
 });
 
-contents.post('/api/common-vars/:id/replace', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+contents.post('/api/common-vars/:id/replace', requireDeliveryAccess('commonVars'), inputJsonBoundary({}, { maxBytes: REPLACEMENT_BODY_MAX_BYTES }), async (c) => {
   try {
-    const body = await readBoundedJson(c.req.raw);
+    const body = await c.req.json<Record<string, unknown>>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
     if (!accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
@@ -2643,7 +2609,7 @@ contents.post('/api/common-vars/:id/replace', requireRole('owner', 'admin'), inp
   }
 });
 
-contents.delete('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) => {
+contents.delete('/api/common-vars/:id', requireDeliveryAccess('commonVars'), async (c) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
     if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
@@ -2701,7 +2667,7 @@ contents.get('/api/common-vars/:id/schedules', async (c) => {
   }
 });
 
-contents.post('/api/common-vars/:id/schedules', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+contents.post('/api/common-vars/:id/schedules', requireDeliveryAccess('commonVars'), inputJsonBoundary({}, { maxBytes: REPLACEMENT_BODY_MAX_BYTES }), async (c) => {
   try {
     const varId = c.req.param('id');
     const accountId = c.req.query('accountId')?.trim();
@@ -2713,7 +2679,7 @@ contents.post('/api/common-vars/:id/schedules', requireRole('owner', 'admin'), i
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
     // 同じ画面の impact-preview・replace と同じ16KB制限にする。
-    const body = await readBoundedJson(c.req.raw);
+    const body = await c.req.json<Record<string, unknown>>();
     const effectiveFrom = typeof body.effectiveFrom === 'string' ? body.effectiveFrom : '';
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(effectiveFrom)
       || !isValidScheduleDateTime(effectiveFrom)) {
@@ -2779,7 +2745,7 @@ export function isValidScheduleDateTime(value: string): boolean {
 
 contents.delete(
   '/api/common-vars/:id/schedules/:scheduleId',
-  requireRole('owner', 'admin'),
+  requireDeliveryAccess('commonVars'),
   async (c) => {
     try {
       const accountId = c.req.query('accountId')?.trim();

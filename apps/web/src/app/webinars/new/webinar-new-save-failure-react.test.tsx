@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * D002: 保存に失敗しても `API error: 405` のような開発者向けの生文面を
  * 出さない。何が起きたか・どうすればよいかを運用者の言葉で出す。
@@ -59,12 +61,13 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   fixture.push.mockClear()
   fixture.create.mockReset()
   fixture.folders.mockReset()
   fixture.create.mockResolvedValue({ success: true, data: { id: 'new-webinar' } })
   fixture.folders.mockResolvedValue({ success: true, data: [] })
-  window.localStorage.setItem('lh_staff_role', 'owner')
+  window.localStorage.setItem('lh_staff_role', 'owner'); rememberStaffIdentity({ role: 'owner' } as StaffMember)
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -159,7 +162,7 @@ describe('ウェビナー作成のフォルダ取得失敗（D003）', () => {
 
 describe('ウェビナー作成の権限表示（D001）', () => {
   it('閲覧だけの担当者の保存ボタンは理由付きで押せない', async () => {
-    window.localStorage.setItem('lh_staff_role', 'staff')
+    window.localStorage.setItem('lh_staff_role', 'staff'); rememberStaffIdentity({ role: 'staff' } as StaffMember)
     await render()
 
     expect(buttonByText('下書きを保存').disabled).toBe(true)

@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+
 import type { ReactNode } from 'react'
 import { Inbox, Loader, Lock } from 'lucide-react'
 import Button from './button'
@@ -84,6 +84,7 @@ export default function ListState({
   emptyPreset = 'createable',
   className,
   'data-design': dataDesign,
+  'data-design-node': designNode,
   error,
   icon,
   loadingShape = 'list',
@@ -109,6 +110,7 @@ export default function ListState({
   className?: string
   /** 設計の節の印の受け口。共通化で印を落とさないため。 */
   'data-design'?: string
+  'data-design-node'?: string
   /**
    * 捕まえた読み込み失敗（m23m）。`error` のときだけ見る。
    * 403 は権限の案内を残し、権限変更後にも読み直せるようにする。
@@ -128,15 +130,16 @@ export default function ListState({
   if (kind === 'error') {
     const failure = error === undefined ? null : loadFailureCopy(error, 'この画面', permissionScope)
     return (
-      <div data-list-state="error" role="alert" data-design={dataDesign}>
+      <div data-list-state="error" role="alert" data-design={dataDesign} data-design-node={designNode}>
         <TargetMissing
           kind="error"
           title={title ?? failure?.title ?? preset.title}
           description={failure && !failure.retryable ? failure.description : description ?? failure?.description ?? preset.description}
           onRetry={onRetry ?? (() => window.location.reload())}
           retrying={retrying}
+          action={onRetry ? undefined : action}
         />
-        {action}
+        {onRetry ? action : null}
       </div>
     )
   }
@@ -155,6 +158,7 @@ export default function ListState({
       className={rootClass}
       data-list-state={kind}
       data-design={dataDesign}
+      data-design-node={designNode}
       // 読み込み中は読み上げにも伝える。権限不足はその場で読ませる。
       aria-busy={kind === 'loading' || undefined}
       role={kind === 'forbidden' ? 'alert' : undefined}

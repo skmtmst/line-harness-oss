@@ -1,3 +1,4 @@
+
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -5,6 +6,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { FolderDot, FolderDotName, folderDisplayColor } from './folder-dot'
+import TruncatedText from './truncated-text'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 
 /*
@@ -46,14 +48,20 @@ describe('フォルダの色の丸', () => {
 
   it('丸＋名前は1行で、名前の前に丸が来る', () => {
     const html = renderToStaticMarkup(<FolderDotName folder={{ name: '会員', color: '#e07b24' }}>NEN会員</FolderDotName>)
-    expect(html.indexOf('data-folder-dot')).toBeLessThan(html.indexOf('NEN会員'))
+    expect(html.indexOf('data-folder-dot')).toBeLessThan(html.indexOf('>NEN会員'))
   })
 
-  it('dot={false} は丸を置かず名前だけを返す（丸の無い 1152 の板）', () => {
+  it('B-194: dot={false} の古い指定でも丸と名前の1行を出す', () => {
     const html = renderToStaticMarkup(<FolderDotName folder={{ name: '会員', color: '#e07b24' }} dot={false}>NEN会員</FolderDotName>)
-    expect(html).toContain('NEN会員')
-    expect(html).toContain('data-truncated-text')
-    expect(html).not.toContain('data-folder-dot')
+    expect(html).toContain('data-folder-dot')
+    expect(html).toContain('title="NEN会員"')
+  })
+
+  it('リンク内の省略部品にも、名前の全文を残す', () => {
+    const name = 'Google広告から来た夏キャンペーンのお客さま'
+    const html = renderToStaticMarkup(<FolderDotName><a href="/inflow-links/detail?id=one"><TruncatedText value={name} /></a></FolderDotName>)
+    expect(html).toContain(`data-list-name="" title="${name}"`)
+    expect(html).toContain('href="/inflow-links/detail?id=one"')
   })
 
   it('大きさ 8・名前との間 8・説明の行の字下げ 16 は変数で持つ', () => {

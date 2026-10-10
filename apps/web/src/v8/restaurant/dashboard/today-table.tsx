@@ -5,11 +5,7 @@ import {useAccount} from '@/contexts/account-context'
 import {dayRange,toYmd} from '../reservations/format'
 import {seatBoardEntry,type RestaurantFloor,type ReservationAxis} from '@line-crm/shared'
 
-/*
- * 「今日のお店」の今日の予約の表（E-1 `今日の予約`）。
- * 列：時刻・名前・人数・卓・経路・状態・来店。予約中の行に［✓ 来店］（来店の印の口）と「…」。
- * 閲覧のみには［来店］と「…」の変える操作を置かない。
- */
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { useRouter } from 'next/navigation'
 import { Check,ArrowRight } from 'lucide-react'
@@ -28,6 +24,12 @@ import { sourceName } from '../reservations/format'
 import { canMarkVisited, visitState } from './summarize'
 import styles from './dashboard.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+
+/*
+ * 「今日のお店」の今日の予約の表（E-1 `今日の予約`）。
+ * 列：時刻・名前・人数・卓・経路・状態・来店。予約中の行に［✓ 来店］（来店の印の口）と「…」。
+ * 閲覧のみには［来店］と「…」の変える操作を置かない。
+ */
 
 function hm(iso: string): string {
   return polishFormatDate(iso, { style: 'time' })

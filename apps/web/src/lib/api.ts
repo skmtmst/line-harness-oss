@@ -1,3 +1,4 @@
+import { SESSION_LOST_EVENT } from './session-events'
 import type { ApiFieldErrors } from '@line-crm/shared'
 import { csvFileName } from './csv-file-name'
 import { getFeatureDisabledContext } from './feature-disabled-context'
@@ -81,7 +82,6 @@ import type {
   ConversionPoint,
   ConversionMeasureMethod,
   Affiliate,
-  Template,
   Automation,
   AutomationLog,
   Chat,
@@ -2488,7 +2488,7 @@ export const CSRF_STORAGE_KEY = 'lh_csrf'
  * 残っているかどうかを見て、案内を出すか、ただの未ログインとして
  * 見送るかを決める。
  */
-export const SESSION_LOST_EVENT = 'lh-session-lost'
+export { SESSION_LOST_EVENT } from './session-events'
 
 /** 機能設定でオフになっている API を開いたとき、共通 shell へ知らせる合図。 */
 export const FEATURE_DISABLED_EVENT = 'lh-feature-disabled'
@@ -2959,6 +2959,25 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
   }
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
+}
+
+const sharedReads = new Map<string, Promise<unknown>>()
+
+/** 同時に出る請求表示だけ共有する。完了後は捨て、保存後の読み直しは必ず通信する。 */
+function fetchSharedRead<T>(path: string): Promise<T> {
+  const csrf = getCsrfToken()
+  // Cookie だけでセッションの世代が分からない場合は共有しない。
+  if (!csrf) return fetchApi<T>(path)
+  const key = JSON.stringify([path, adminSessionHeaders(), csrf])
+  let pending = sharedReads.get(key)
+  if (!pending) {
+    pending = fetchApi<T>(path)
+    sharedReads.set(key, pending)
+    const forget = () => { if (sharedReads.get(key) === pending) sharedReads.delete(key) }
+    pending.then(forget, forget)
+  }
+  // 呼び出し側で表示用に並べ替え・加工しても、もう一方の表示へ伝えない。
+  return (pending as Promise<T>).then((response) => structuredClone(response))
 }
 
 /**
@@ -3899,8 +3918,6 @@ export type FriendListItem = FriendWithTags & Partial<{
 export function friendAddStopIdempotencyKey(ruleId: string, version: number): string {
   return `friend-add-rule-stop:${encodeURIComponent(ruleId)}:v${version}`
 }
-
-
 
 /** 一覧画面の上部に出す数（タグ・テンプレート・シナリオ・リマインダ）。 */
 export type ListStats = {
@@ -9131,7 +9148,7 @@ export const api = {
         amountDueYen: number; prorationDifferenceYen: number; nextBillingAt: string | null;
         estimatedAt: string; isEstimate: true; notice: string }>>(
         `/api/hq/billing/preview?${new URLSearchParams({ planKey, interval })}`),
-    summary: () => fetchApi<ApiResponse<BillingSummary>>('/api/hq/billing/summary'),
+    summary: () => fetchSharedRead<ApiResponse<BillingSummary>>('/api/hq/billing/summary'),
     /** Stripe の申込画面の URL。オーナーだけ。 */
     checkout: (planKey: PlanKey, interval: BillingInterval = 'month') =>
       fetchApi<ApiResponse<{ url: string }>>('/api/hq/billing/checkout', { method: 'POST', body: JSON.stringify({ planKey, interval }) }),
@@ -10876,12 +10893,14 @@ export const api = {
       accountId: string;
       status?: 'all' | 'draft' | 'published' | 'archived' | 'old_version' | 'unused';
       query?: string;
+      folderId?: string;
       limit?: number;
       offset?: number;
     }) => {
       const query = new URLSearchParams({ account_id: params.accountId });
       if (params.status && params.status !== 'all') query.set('status', params.status);
       if (params.query) query.set('query', params.query);
+      if (params.folderId) query.set('folder_id', params.folderId);
       if (params.limit !== undefined) query.set('limit', String(params.limit));
       if (params.offset !== undefined) query.set('offset', String(params.offset));
       return fetchApi<ApiResponse<CommonActionSummary[]> & {
@@ -11267,6 +11286,14 @@ export const api = {
    * 以後はこの V6 rules/runs 契約だけを使う。
    */
   friendAddRules: {
+    restore: (accountId: string, id: string, expectedVersion: number) => fetchApi<ApiResponse<{ id: string; status: 'draft'; version: number }>>(
+      `/api/friend-add-rules/${encodeURIComponent(id)}/unarchive?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'POST', body: JSON.stringify({ expectedVersion }) },
+    ),
+    duplicate: (accountId: string, id: string, expectedVersion: number, idempotencyKey: string) => fetchApi<ApiResponse<{ id: string; status: 'draft' }>>(
+      `/api/friend-add-rules/${encodeURIComponent(id)}/duplicate?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify({ expectedVersion }) },
+    ),
     list: (accountId: string, kind: FriendAddRuleKind, params?: {
       status?: FriendAddRuleStatus
       cursor?: string
@@ -11275,6 +11302,8 @@ export const api = {
       q?: string
       /** フォルダ名での絞り込み。未分類は '__uncategorized'。 */
       folder?: string
+      /** 複製直後の行を先頭へ。ページ送りにも同じ値を渡す。 */
+      highlightId?: string
     }) => {
       const query = new URLSearchParams({ account_id: accountId, kind })
       if (params?.status) query.set('status', params.status)
@@ -11282,6 +11311,7 @@ export const api = {
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       if (params?.q) query.set('q', params.q)
       if (params?.folder) query.set('folder', params.folder)
+      if (params?.highlightId) query.set('highlight', params.highlightId)
       return fetchApi<ApiResponse<FriendAddRuleListData>>(`/api/friend-add-rules?${query}`)
     },
     get: (accountId: string, ruleId: string) =>
@@ -12572,6 +12602,14 @@ export const api = {
   },
   webhooks: {
     incoming: {
+      saveConfig: (id: string, lineAccountId: string, data: {
+        expectedVersion: number;
+        identityMatching: IncomingWebhookDetail['identityMatching'];
+        actions: Array<Pick<IncomingWebhookDetail['actions'][number], 'refKind' | 'refId' | 'refVersionId'>>;
+      }) => fetchApi<ApiResponse<{ id: string; version: number }>>(
+        `/api/webhooks/incoming/${encodeURIComponent(id)}/config?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        { method: 'PATCH', body: JSON.stringify(data) },
+      ),
       list: (lineAccountId: string) =>
         fetchApi<ApiResponse<IncomingWebhook[]>>(
           `/api/webhooks/incoming?lineAccountId=${encodeURIComponent(lineAccountId)}`,
@@ -13540,7 +13578,7 @@ export const api = {
   // 同ページから参照する。Worker の applyRefAttribution は entry_routes → tracked_links
   // の順でフォールバックするので、tracked_links 登録済み ref は実際にはシナリオ発火している。
   trackedLinks: {
-    list: () =>
+    list: (accountId?: string) =>
       fetchApi<
         ApiResponse<
           Array<{
@@ -13558,7 +13596,7 @@ export const api = {
             updatedAt: string
           }>
         >
-      >('/api/tracked-links'),
+      >(`/api/tracked-links${accountId ? `?lineAccountId=${encodeURIComponent(accountId)}` : ''}`),
   },
   pools: {
     list: (options?: FetchApiOptions) =>
@@ -15483,6 +15521,7 @@ export interface EventQuestion {
 }
 
 export interface EventDetail {
+  folderId?: string | null;
   venue_address?: string | null;
   id: string;
   name: string;
@@ -15804,6 +15843,10 @@ export interface EventLifecycleResult {
 }
 
 export const eventsApi = {
+  duplicate: (accountId: string, id: string, expectedVersion: number) => fetchApi<{ id: string; lifecycle_status: 'draft' }>(
+    withAccount(`/api/events/admin/events/${encodeURIComponent(id)}/duplicate`, accountId),
+    { method: 'POST', body: JSON.stringify({ expectedVersion }) },
+  ),
   applicationPreview: (accountId: string, body: Partial<EventDetail> & { slot: { starts_at: string; ends_at: string; capacity: number } }) =>
     fetchApi<import('@line-crm/shared').EventApplicationPreview>(withAccount('/api/events/admin/application-preview', accountId), { method: 'POST', body: JSON.stringify(body) }),
   listEvents: (

@@ -4,6 +4,8 @@
  * 行の「…」から QR コードの小窓（GtI4Y）が開く・停止中の行は URL を出さない・
  * 閲覧のみは作る／編集を出さない・未登録 ref は「登録する」・数の帯の未設定の数。
  */
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -65,6 +67,7 @@ let root: Root
 let host: HTMLDivElement
 
 beforeEach(() => {
+  forgetStaffIdentity();
   role.value = 'owner'
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
@@ -157,11 +160,13 @@ describe('V8 流入と計測の一覧', () => {
     expect(labels.some((text) => text?.includes('受付を再開する'))).toBe(true)
   })
 
-  it('未登録の ref の行は「登録する」、登録済みは「編集」', async () => {
+  it('未登録の ref の行は「登録する」、登録済みの編集はメニューへ', async () => {
     await render()
     expect(rowOf('mail-sign')?.textContent).toContain('未設定')
     expect(rowOf('mail-sign')?.textContent).toContain('登録する')
-    expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeTruthy()
+    expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeFalsy()
+    await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="「夏のInstagram投稿」の操作"]')!.click() })
+    expect(document.querySelector('[role="menu"]')?.textContent).toContain('リンクを編集')
   })
 
   it('数の帯の「動きが未設定」は、タグもシナリオも無い登録済みの数（停止中も含む）', async () => {
@@ -173,6 +178,7 @@ describe('V8 流入と計測の一覧', () => {
   // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
   it('閲覧のみ（staff）は帯を出し、作る・編集・チェックを出さない', async () => {
     role.value = 'staff'
+    rememberStaffIdentity({ role: 'staff', permissionKeys: [] } as StaffMember)
     await render()
     expect(host.textContent).toContain('閲覧のみで見ています')
     const create = [...host.querySelectorAll('button')].filter((button) => button.textContent?.includes('流入リンクを作る'))
@@ -218,6 +224,7 @@ describe('V8 流入と計測の一覧', () => {
 
   it('WEB034: 「流入」を任された staff には作る・編集を出し、フォルダの作成は出さない', async () => {
     role.value = 'staff'
+    rememberStaffIdentity({ role: 'staff', permissionKeys: ['/inflow-links'] } as StaffMember)
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => (key === 'lh_staff_permissions' ? JSON.stringify(['/inflow-links']) : key === 'lh_staff_role' ? 'staff' : null),
       setItem: () => undefined,
@@ -226,7 +233,9 @@ describe('V8 流入と計測の一覧', () => {
     await render()
     expect(host.textContent).not.toContain('閲覧のみで見ています')
     expect([...host.querySelectorAll('a, button')].some((el) => el.textContent?.includes('流入リンクを作る'))).toBe(true)
-    expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeTruthy()
+    expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeFalsy()
+    await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="「夏のInstagram投稿」の操作"]')!.click() })
+    expect(document.querySelector('[role="menu"]')?.textContent).toContain('リンクを編集')
     expect([...host.querySelectorAll('button')].some((el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').includes('フォルダを追加'))).toBe(false)
   })
 })

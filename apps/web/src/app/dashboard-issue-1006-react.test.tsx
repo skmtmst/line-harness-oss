@@ -447,3 +447,6 @@ describe('A01-02 初期状態に戻すは確認なしに実行しない', () => 
     expect(net.deletes).toBe(1)
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

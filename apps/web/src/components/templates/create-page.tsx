@@ -2,9 +2,12 @@ import { AutoFormLeaveGuard, FormLeaveGuard } from '@/components/shared/form-lea
 import type { ReactNode } from 'react'
 import StickyBar from '@/components/shared/sticky-bar'
 import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
+import PreviewLauncher from './preview-launcher'
 import styles from './page-templates.module.css'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export interface CreatePageProps extends PageHeadingProps {
+  readOnly?: boolean
   dirty?: boolean
   busy?: boolean
   boardId?: string
@@ -40,13 +43,14 @@ export interface CreatePageProps extends PageHeadingProps {
   destructive?: ReactNode
   status?: ReactNode
 }
-export function CreatePage({ dirty, busy, boardId, standalone, children, preview, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
+export function CreatePage({ readOnly, dirty, busy, boardId, standalone, children, preview, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
   return <PageFrame kind="create" boardId={boardId} standalone={standalone} hasFooter>
     {dirty === undefined ? <AutoFormLeaveGuard busy={busy} /> : dirty ? <FormLeaveGuard dirty busy={busy} /> : null}
     <PageHeading {...heading} />
+    {readOnly ? <ReadOnlyNotice /> : null}
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     {notice ? <div className={styles.createNotice} data-template-region="notice" data-notice-spacing={noticeSpacing}>{notice}</div> : null}
-    {previewToggle ? <div className={styles.asideToggle}>{previewToggle}</div> : null}
+    {previewToggle || (preview && hidePreviewWhenNarrow) ? <div className={styles.asideToggle}>{previewToggle ?? <PreviewLauncher>{preview}</PreviewLauncher>}</div> : null}
     <div className={styles.split} data-template-region="body">
       <div className={styles.createContent} data-template-region="content" data-content-spacing={contentSpacing}>{children}</div>
       {preview ? <aside className={styles.preview} data-template-region="preview" data-preview-narrow={hidePreviewWhenNarrow ? 'hidden' : previewCompactWhenNarrow ? 'compact' : undefined} data-content-spacing={contentSpacing} data-preview-surface={previewSurface}><div className={styles.previewContent}>{preview}</div></aside> : null}

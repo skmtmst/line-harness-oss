@@ -20,7 +20,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', loading: false, accounts: [] }),
 }))
 vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => null }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 
 const scheduled = {

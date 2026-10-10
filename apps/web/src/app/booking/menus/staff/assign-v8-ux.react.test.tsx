@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * 担当メニューをまとめて決める（V8・ooufy）の「サクサク感」。
  * A: 読み込み中は目に見える「読み込み中」の文字を置かず、升目表の形の骨組みで待つ。
@@ -80,6 +82,7 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   clearToastsForTest()
   fixture.listMenus = async () => ({ menus: MENUS })
   fixture.putBulk = vi.fn(async () => ({ ok: true }))

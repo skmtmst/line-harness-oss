@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import MenuPortal from '@/components/shared/menu-portal'
 import Notice from '@/components/shared/notice'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
  * 受信箱のプルダウン。
@@ -211,14 +212,14 @@ export function OperatorDropdown({
         >
           {/* 担当が増えるほど縦に伸びる。探す手段が無いと使えない。 */}
           <div className="border-hairline border-b p-2">
-            <input
+            <SaveErrorField names={["query"]}><input
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="担当者名を検索"
               aria-label="担当者名を検索"
               className="border-hairline rounded-control text-ink placeholder:text-ink-faint w-full border px-2 py-1 text-xs outline-none"
-            />
+            /></SaveErrorField>
           </div>
           {shown.length === 0 ? (
             <p className="text-ink-faint px-3 py-3 text-xs">見つかりません</p>
@@ -409,14 +410,14 @@ export function FolderDropdown({
           panelClassName={`${panelClass} right-0 w-70`}
         >
           <div className="border-hairline border-b p-2">
-            <input
+            <SaveErrorField names={["query"]}><input
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="フォルダを検索"
               aria-label="フォルダを検索"
               className="border-hairline rounded-control text-ink placeholder:text-ink-faint w-full border px-2 py-1.5 text-xs outline-none"
-            />
+            /></SaveErrorField>
           </div>
           <button
             type="button"

@@ -1,14 +1,12 @@
 'use client'
-
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
-import {
-  bookingApi,
-  type BookingPrepayDecision,
-} from '@/lib/api'
+import { bookingApi, type BookingPrepayDecision } from '@/lib/api'
 import styles from './prepay-badge-v8.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 function jstMonthDay(iso: string): string {
   const date = new Date(iso)
@@ -36,6 +34,7 @@ export default function PrepayBadgeV8({ accountId, friendId, canEdit = true, onC
   canEdit?: boolean
   onChanged?: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const [decision, setDecision] = useState<BookingPrepayDecision | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -83,20 +82,25 @@ export default function PrepayBadgeV8({ accountId, friendId, canEdit = true, onC
       setDialogOpen(false)
       setReason('')
       onChanged?.()
-    } catch {
-      setError('印を外せませんでした。入力を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
+
+      if (!fieldFailure) {
+      setError('印を外せませんでした。入力を確かめて、もう一度お試しください。') }
     } finally {
       setSaving(false)
     }
   }
 
-  if (!loaded) return <p role="status">前払い情報を読み込み中…</p>
-  if (loadError) return <div role="alert"><p>前払い情報を読み込めませんでした</p><Button onClick={reload}>もう一度読み込む</Button></div>
+  if (!loaded)
+ return <SaveErrorScope errors={saveErrors}><p role="status">前払い情報を読み込み中…</p></SaveErrorScope>
+  if (loadError) return <SaveErrorScope errors={saveErrors}><div role="alert"><p>前払い情報を読み込めませんでした</p><Button onClick={reload}>もう一度読み込む</Button></div></SaveErrorScope>
   if (!decision?.prepayOnly) return null
   const dates = decision.recentDates.map(jstMonthDay).filter((text) => text !== '')
 
   return (
-    <div className={styles.badge} data-design="PrepayBadge">
+    <SaveErrorScope errors={saveErrors}><div className={styles.badge} data-design="PrepayBadge">
       <svg className={styles.icon} aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none">
         <rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" />
         <line x1="2" y1="8" x2="18" y2="8" stroke="currentColor" strokeWidth="1.5" />
@@ -130,14 +134,14 @@ export default function PrepayBadgeV8({ accountId, friendId, canEdit = true, onC
         onConfirm={() => void clearPrepay()}
         onCancel={() => setDialogOpen(false)}
       >
-        <Field label="外す理由（1行）"><input
+        <Field label="外す理由（1行）"><SaveErrorField names={["reason"]}><input
             aria-label="外す理由"
             value={reason}
             maxLength={200}
             onChange={(event) => setReason(event.target.value)}
             placeholder="例：電話で確認が取れた"
-          /></Field>
+          /></SaveErrorField></Field>
       </Dialog>
-    </div>
+    </div></SaveErrorScope>
   )
 }

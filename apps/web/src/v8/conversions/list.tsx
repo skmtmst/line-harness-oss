@@ -1,39 +1,15 @@
 'use client'
 
-/*
- * ★V8 コンバージョンの一覧（Pencil：一覧 `r6dJFy`・1152 `BygrU`・閲覧のみ `WSGvo`・
- * 状態の見本帳 `E2l8cw`）。
- *
- * 型（ListPage）に、数の帯・左のフォルダの列（上に「成果地点を作る」）・
- * 案内の帯・道具の段・表（絵の列の並び）を渡す。行の右端は「使う場所を足す」と「…」。
- * 行を押すと表の下に詳細の小窓、「止める」は表の下の止める小窓（3択＋理由）。
- *
- * データの口・保存の口・権限・失敗の扱いは app/conversions/page.tsx と同じ
- * （BEHAVIOR.md）。違うのは見せ方だけ。
- */
-import { useListUrlValue } from '@/components/shared/list-url-state'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
+import { useListUrlValue, useListUrlParam } from '@/components/shared/list-url-state'
+import { useFolderMove } from '@/components/shared/use-folder-move'
+import { moveConversionToFolder } from '@/lib/move-to-folder'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  Banknote,
-  Bookmark,
-  CircleOff,
-  CirclePause,
-  Download,
-  Eye,
-  FilePen,
-  KeyRound,
-  Pause,
-  Play,
-  Plus,
-  Target,
-  TriangleAlert,
-  Trophy,
-  Unplug,
-} from 'lucide-react'
+import { Banknote, Bookmark, CircleOff, CirclePause, Download, FilePen, KeyRound, Pause, Play, Plus, Target, TriangleAlert, Trophy, Unplug } from 'lucide-react'
 import { ListPage, ListPagePagination } from '@/components/templates'
-import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
@@ -42,10 +18,8 @@ import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
-import { ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import ManagedFolderPanel, { folderDotFor, managedFolderOptions, useManagedFolders } from '@/components/shared/managed-folder-panel'
-import { useListUrlParam } from '@/components/shared/list-url-state'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -63,41 +37,34 @@ import { findConditionDraftIssue, pruneCondition } from '@/components/shared/con
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { formatNumber } from '@/lib/format'
-import {
-  api,
-  describeSaveFailure,
-  type ConversionDefinitionDeleteImpact,
-  type ConversionDefinitionEvent,
-  type ConversionDefinitionFilter,
-  type ConversionDefinitionList,
-  type ConversionDefinitionListItem,
-  type ConversionDefinitionReport,
-  type ConversionIngestionEvent,
-} from '@/lib/api'
+import { canEditFeature } from '@/lib/staff-capability'
+import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
+import { api, describeSaveFailure, type ConversionDefinitionDeleteImpact, type ConversionDefinitionEvent, type ConversionDefinitionFilter, type ConversionDefinitionList, type ConversionDefinitionListItem, type ConversionDefinitionReport, type ConversionIngestionEvent } from '@/lib/api'
 import { deduplicationLabel } from './dedup'
 import { originInfoOf } from './origin-labels'
 import { readExclusionCondition, readExclusionMemo } from './exclusion'
-import {
-  ConversionDetailDialog,
-  ConversionEditDialog,
-  ConversionReversalDialog,
-  EDIT_VALUE_MODE_LABELS,
-  STATE_LABELS,
-  sourceTriggerLabel,
-  usageLabel,
-  type ConversionStopAction,
-  type EditForm,
-} from './dialogs'
+import { ConversionDetailDialog, ConversionEditDialog, ConversionReversalDialog, EDIT_VALUE_MODE_LABELS, STATE_LABELS, sourceTriggerLabel, usageLabel, type ConversionStopAction, type EditForm } from './dialogs'
 import { notifyToast } from '@/components/shared/toast'
 import { focusConversionField, type ConversionFieldIssue } from './field-issue'
 import styles from './list.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+/*
+ * ★V8 コンバージョンの一覧（Pencil：一覧 `r6dJFy`・1152 `BygrU`・閲覧のみ `WSGvo`・
+ * 状態の見本帳 `E2l8cw`）。
+ *
+ * 型（ListPage）に、数の帯・左のフォルダの列（上に「成果地点を作る」）・
+ * 案内の帯・道具の段・表（絵の列の並び）を渡す。行の右端は「使う場所を足す」と「…」。
+ * 行を押すと表の下に詳細の小窓、「止める」は表の下の止める小窓（3択＋理由）。
+ *
+ * データの口・保存の口・権限・失敗の扱いは app/conversions/page.tsx と同じ
+ * （BEHAVIOR.md）。違うのは見せ方だけ。
+ */
 
 type StatusFilter = 'all' | ConversionDefinitionFilter
 /** フォルダの列の「未分類」（`?folder=unfiled`）。 */
@@ -212,12 +179,13 @@ function StatePill({ point }: { point: ConversionDefinitionListItem }) {
   )
 }
 
-function TableHead() {
+function TableHead({ selection }: { selection?: ReactNode } = {}) {
   return (
     <thead>
       <TableHeadRow className={styles.headRow} data-table-layout="columns">
-        <Th className={styles.colName}>成果地点</Th>
-        <Th className={styles.colTrigger}>何が起きたら数えるか</Th>
+        <Th className={styles.colName}>{selection}成果地点</Th>
+        <Th>状態</Th>
+            <Th className={styles.colTrigger}>何が起きたら数えるか</Th>
         <Th className={styles.colCount} align="right">この30日</Th>
         <Th className={styles.colValue} align="right">金額</Th>
         <Th className={styles.colUsage}>使われている場所</Th>
@@ -240,7 +208,8 @@ function ListSkeleton() {
               {[0, 1, 2, 3, 4].map((index) => (
                 <Tr key={index} className={styles.row} data-table-layout="columns">
                   <Td className={styles.colName}><Skeleton className={styles.skeletonName} /></Td>
-                  <Td className={styles.colTrigger}><Skeleton className={styles.skeletonName} /></Td>
+                  <Td><Skeleton className={styles.skeletonName} /></Td>
+                    <Td className={styles.colTrigger}><Skeleton className={styles.skeletonName} /></Td>
                   <Td className={styles.colCount}><Skeleton className={styles.skeletonNum} /></Td>
                   <Td className={styles.colValue}><Skeleton className={styles.skeletonNum} /></Td>
                   <Td className={styles.colUsage}><Skeleton className={styles.skeletonName} /></Td>
@@ -255,15 +224,16 @@ function ListSkeleton() {
   )
 }
 
-export default function ConversionListV8({ accountId }: { accountId: string | null }) {
+export default function ConversionListV8({ accountId, editId }: { accountId: string | null; editId?: string | null }) {
   return (
     <Suspense fallback={<ListState kind="loading" />}>
-      <ConversionList accountId={accountId} />
+      <ConversionList accountId={accountId} editId={editId} />
     </Suspense>
   )
 }
 
-function ConversionList({ accountId }: { accountId: string | null }) {
+function ConversionList({ accountId, editId }: { accountId: string | null; editId?: string | null }) {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('コンバージョン')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -328,9 +298,10 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   const [reversalReason, setReversalReason] = useState('')
   const [reversalBusy, setReversalBusy] = useState(false)
   const [reversalError, setReversalError] = useState('')
-  /* 変える操作は owner/admin だけ（役割は /api/staff/me から読む。手元の保存値は使わない）。 */
+  /* APIと同じ機能鍵・操作鍵を本人APIの応答で確認する。 */
   const role = useStaffRole()
-  const canEdit = canManageRole(role)
+  const canEdit = canEditFeature('/conversions', role) && canEditFeature('conversion.definition.edit', role)
+  const canExport = canEditFeature('/conversions', role) && canEditFeature('conversion.report.export', role)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [actionNotice, setActionNotice] = useState('')
@@ -403,11 +374,12 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       } else {
         setReportFailed(true)
       }
-    } catch {
+    } catch (saveFailure) {
       if (loadSeq.current !== seq || accountIdRef.current !== requestAccountId) return
+      saveErrors.capture(saveFailure)
       setReportFailed(true)
     }
-  }, [accountId])
+  }, [accountId, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -436,7 +408,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
     setIngestError('')
   }, [panelId, detailTarget])
 
-  const openEdit = (target: ConversionDefinitionListItem) => {
+  const beginEdit = (target: ConversionDefinitionListItem) => {
     if (!canEdit) return
     setDetailTarget(null)
     setEditTarget(target)
@@ -455,6 +427,11 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   }
 
   /* 編集を送る。開いたときの版をそのまま渡し、409 は上書きせずに読み直しを促す。 */
+  const openEdit = (target: ConversionDefinitionListItem) => router.push(`/conversions/edit?id=${encodeURIComponent(target.id)}`)
+  useEffect(() => {
+    const target = definitions?.items.find((item) => item.id === editId)
+    if (target) beginEdit(target)
+  }, [editId, definitions])
   const submitEdit = async () => {
     if (!editTarget || !editForm || editSaving || !canEdit) return
     const invalid = (field: string, message: string) => {
@@ -506,11 +483,16 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       setEditForm(null)
       setEditValueModeNotice(null)
       await load()
+      if (editId !== undefined) router.push('/conversions')
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error);
+
+
       const message = error instanceof Error ? error.message : ''
+      { if (!fieldFailure)
       setEditError(message.includes('更新されています')
         ? 'ほかの人がこの成果地点を先に直しました。上書きしていません。画面を閉じて読み直してから、もう一度お試しください。'
-        : withPermissionFailure(error, describeSaveFailure(error), 'store'))
+        : withPermissionFailure(error, describeSaveFailure(error), 'store')) }
     } finally {
       setEditSaving(false)
     }
@@ -547,7 +529,10 @@ function ConversionList({ accountId }: { accountId: string | null }) {
         })
         .catch(() => undefined)
     } catch (err) {
-      setReversalError(err instanceof Error ? err.message : '記録できませんでした')
+      const fieldFailure = saveErrors.capture(err)
+
+      { if (!fieldFailure)
+      setReversalError(err instanceof Error ? err.message : '記録できませんでした') }
     } finally {
       setReversalBusy(false)
     }
@@ -563,8 +548,11 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       if (!res.success) throw new Error(res.error)
       setDetailTarget(null)
       await load()
-    } catch {
-      setIngestError('公開できませんでした。画面を閉じて読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setIngestError('公開できませんでした。画面を閉じて読み直してから、もう一度お試しください。') }
     } finally {
       setPublishing(false)
     }
@@ -580,8 +568,11 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       if (!res.success) throw new Error(res.error)
       await load()
       setIssuedSecret(res.data.secret)
-    } catch {
-      setIngestError('鍵を発行できませんでした。画面を閉じて読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setIngestError('鍵を発行できませんでした。画面を閉じて読み直してから、もう一度お試しください。') }
     } finally {
       setIngestBusy('')
     }
@@ -609,13 +600,15 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       const res = await api.conversions.setIngestDisabled(target.id, { expectedVersion: target.version, disabled: disable })
       if (!res.success) throw new Error(res.error)
       patch(target.id, { disabledAt: res.data.disabledAt, version: res.data.version })
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
       patch(target.id, { disabledAt: before })
+      { if (!fieldFailure)
       notifyToast(`「${target.name}」の受け口を${disable ? '止められ' : '再開でき'}ませんでした。元に戻しました。`, {
         tone: 'error',
         actionLabel: '読み直す',
         onAction: () => { void load() },
-      })
+      }) }
     } finally {
       setIngestBusy('')
     }
@@ -635,8 +628,11 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       const response = await api.conversions.definitionDeleteImpact(target.id)
       if (!response.success) throw new Error(response.error)
       setStopImpact(response.data)
-    } catch {
-      setStopError('利用先と停止の影響を読み込めませんでした。画面を閉じて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setStopError('利用先と停止の影響を読み込めませんでした。画面を閉じて、もう一度お試しください。') }
     } finally {
       setStopImpactLoading(false)
     }
@@ -672,12 +668,15 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       if (!res.success) throw new Error(res.error)
       setStopTarget(null)
       await load()
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
       setStopError(stopAction === 'replace'
         ? '利用先を差し替えられませんでした。状態を読み直して、もう一度お試しください。'
         : stopAction === 'delete'
           ? 'この成果地点は削除できませんでした。利用先と成果件数を確認してください。'
-          : 'この成果地点の計測を止められませんでした。状態を読み直してから、もう一度お試しください。')
+          : 'この成果地点の計測を止められませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setStopping(false)
     }
@@ -712,8 +711,11 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       if (!res.success) throw new Error(res.error)
       setActionNotice(`「${point.name}」のコピーを作りました。使う場所は引き継がないので、要れば足してください。`)
       await load()
-    } catch {
-      setActionError('コピーを作れませんでした。読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('コピーを作れませんでした。読み直してから、もう一度お試しください。') }
     } finally {
       setDuplicatingId(null)
     }
@@ -726,8 +728,11 @@ function ConversionList({ accountId }: { accountId: string | null }) {
     try {
       const blob = await api.conversions.exportDefinitions({ ...definitionRange(30), lineAccountId: accountId ?? undefined })
       downloadCsvBlob(blob, csvFileName("成果地点"))
-    } catch {
-      setExportError('CSVを書き出せませんでした。権限を確認して、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setExportError('CSVを書き出せませんでした。権限を確認して、もう一度お試しください。') }
     } finally {
       setExporting(false)
     }
@@ -782,11 +787,18 @@ function ConversionList({ accountId }: { accountId: string | null }) {
     `/analytics?tab=funnel&conversionPointId=${encodeURIComponent(point.id)}&conversionPointName=${encodeURIComponent(point.name)}`
 
   /* 行の「…」。見るだけの操作は誰でも、変える操作は権限のある人だけに出す（押せない物は置かない）。 */
+  const folderMove = useFolderMove({
+    accountId: accountId, canEdit: canEdit, items: current, folders,
+    move: (item, folderId) => moveConversionToFolder(item, folderId),
+    onChanged: async () => { await load(); await folderState.reload() },
+  })
+
   const rowMenuItems = (point: ConversionDefinitionListItem): ActionMenuItem[] => [
     { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
     { id: 'usage', label: '使う場所を見る', onSelect: () => setPanelId(point.id) },
     ...(canEdit ? [
-      { id: 'add-usage', label: '使う場所を足す', external: true, href: addUsageHref(point), onSelect: () => router.push(addUsageHref(point)) },
+      { id: 'move', label: 'フォルダへ移す', onSelect: () => folderMove.open(point) },
+      { id: 'add-usage', label: '使う場所を足す', external: false, href: addUsageHref(point), onSelect: () => router.push(addUsageHref(point)) },
       ...(point.status !== 'stopped' ? [{ id: 'edit', label: '編集する', onSelect: () => openEdit(point) }] : []),
       ...(point.state === 'draft'
         ? [{ id: 'publish', label: '公開する', disabled: publishing, onSelect: () => void publishDraft(point) }]
@@ -800,12 +812,12 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   /* ===== フォルダ ===== */
   /* 共通のフォルダ（種類 conversion）。すべて・各フォルダ・未分類・追加・「…」（名前・色・並べ替え・消す）。 */
   const folderSelect = (
-    <Select
+    <SaveErrorField names={["folderFilter","folder_filter"]}><Select
       aria-label="フォルダ"
       value={folderFilter}
       onChange={setFolderFilter}
       options={managedFolderOptions('conversion', folders, { allId: '', unfiledId: FOLDER_UNFILED })}
-    />
+    /></SaveErrorField>
   )
   /* 閲覧のみには作るボタンを置かない（場所だけ空ける）。 */
   const createLink = <Button variant="primary" href="/conversions/new"><Plus size={15} aria-hidden="true" />成果地点を作る</Button>
@@ -840,7 +852,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   const savedBox = (
     <div className={styles.savedBox}>
       <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-      <Select
+      <SaveErrorField names={["status","sort"]}><Select
         aria-label="よく使う絞り込み"
         value={status === 'all' ? '' : status}
         onChange={(value) => {
@@ -852,7 +864,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
           ...CHIPS.map((chip) => ({ value: chip.value, label: `${chip.label}だけ` })),
           ...(role !== null && !canEdit ? SORT_OPTIONS.map((option) => ({ value: `sort:${option.value}`, label: `並び：${option.label}` })) : []),
         ]}
-      />
+      /></SaveErrorField>
     </div>
   )
   const perPageBox = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
@@ -866,20 +878,20 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   )
   /* 1152 の板（BygrU）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。 */
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
+    <ListToolbarFrame>
       {notice}
-      <div className={styles.narrowRow}>
+      <ListToolbarRow>
         {createInRow}
         <div className={styles.narrowFolder}>{folderSelect}</div>
-        <div className={styles.narrowSearch}>{searchBox}</div>
-      </div>
-      <div className={styles.narrowRow}>
+        <ListToolbarSearchSlot>{searchBox}</ListToolbarSearchSlot>
+      </ListToolbarRow>
+      <ListToolbarRow>
         <div className={styles.narrowChips}>{filterChips}</div>
         <span className={styles.spacer} aria-hidden="true" />
         {savedBox}
         {perPageBox}
-      </div>
-    </div>
+      </ListToolbarRow>
+    </ListToolbarFrame>
   )
   const wideToolbar = (
     <div className={`${styles.wideTools} ${role !== null && !canEdit ? styles.viewerTools : ''}`}>
@@ -887,7 +899,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       <ListToolbar
         search={{ placeholder: '成果地点の名前で探す', label: '成果地点の名前で探す', width: 240, value: query, onChange: setQuery }}
         filters={filterChips}
-        trailing={<>{savedBox}{canEdit || role === null ? sortBox : null}{perPageBox}</>}
+        trailing={<>{savedBox}{canEdit ? sortBox : null}{perPageBox}</>}
       />
     </div>
   )
@@ -926,7 +938,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       {issuedSecret && panelPoint.measureMethod === 'webhook' ? (
         <p className={styles.secretBox} role="status">{`発行した鍵（この表示でだけ見られます。連携先へ渡してください）：${issuedSecret}`}</p>
       ) : null}
-      {ingestError ? <p className={styles.errorText} role="alert">{ingestError}</p> : null}
+      {ingestError ? <Notice tone="danger" >{ingestError}</Notice> : null}
       <div className={styles.panelButtons}>
         {canEdit && panelPoint.measureMethod === 'webhook' && panelPoint.status !== 'stopped' ? (
           <Button onClick={() => void issueIngest(panelPoint)} disabled={ingestBusy !== ''} busy={ingestBusy === 'issue'} busyLabel="発行しています"><KeyRound size={15} aria-hidden="true" />鍵を発行する</Button>
@@ -938,8 +950,8 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       </div>
       {canEdit && panelPoint.status !== 'stopped' ? (
         <div className={styles.panelButtons}>
-          {panelPoint.state !== 'draft' ? <Button onClick={() => void openStop(panelPoint, 'stop')}><Pause size={15} aria-hidden="true" />止める</Button> : null}
-          <Button variant="danger" onClick={() => void openStop(panelPoint, 'delete')}>削除する</Button>
+          {panelPoint.state !== 'draft' ? <Button onClick={() => openStop(panelPoint, 'stop')} busyLabel="処理中…"><Pause size={15} aria-hidden="true" />止める</Button> : null}
+          <Button variant="danger" onClick={() => openStop(panelPoint, 'delete')} busyLabel="処理中…">削除する</Button>
         </div>
       ) : null}
     </Card>
@@ -955,7 +967,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
             ? `${formatNumber(stopImpact.stopImpact.affectedUsageCount)}か所で使われています。どうしますか。`
             : '利用先と影響を読み込めませんでした。'}
       </p>
-      <RadioCardGroup legend="どうしますか？">
+      <SaveErrorField names={["conversion-v8-stop-action","stopAction"]}><RadioCardGroup legend="どうしますか？">
         <RadioCard
           variant="row"
           name="conversion-v8-stop-action"
@@ -984,30 +996,30 @@ function ConversionList({ accountId }: { accountId: string | null }) {
           disabledReason="成果または利用先があるため、物理削除は選べません。"
           title="削除する（使われていないときだけ選べる）"
         />
-      </RadioCardGroup>
+      </RadioCardGroup></SaveErrorField>
       {stopAction === 'replace' ? (
         <div className={styles.fieldBox}>
-          <Select
+          <SaveErrorField names={["replacementId","replacement_id"]}><EntitySelect
             aria-label="差し替え先の成果地点"
             value={replacementId}
             options={[
               { value: '', label: '差し替え先を選ぶ' },
-              ...(stopImpact?.replacementCandidates ?? []).map((item) => ({ value: item.id, label: `差し替え先：${item.name}` })),
+              ...(stopImpact?.replacementCandidates ?? []).map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `差し替え先：${item.name}` })),
             ]}
             onChange={setReplacementId}
-          />
+          /></SaveErrorField>
         </div>
       ) : null}
       <Field label="理由（必須）" htmlFor="cv-stop-reason">
-        <TextField
+        <SaveErrorField names={["stopReason","reason","stop_reason"]}><TextField
           aria-label="止める理由"
           value={stopReason}
           maxLength={500}
           placeholder="計測の仕方を変えるため"
           onChange={(event) => setStopReason(event.target.value)}
-        />
+        /></SaveErrorField>
       </Field>
-      {stopError ? <p className={styles.errorText} role="alert">{stopError}</p> : null}
+      {stopError ? <Notice tone="danger" >{stopError}</Notice> : null}
       <div className={styles.panelActions}>
         <Button onClick={() => setStopTarget(null)} disabled={stopping}>キャンセル</Button>
         <Button
@@ -1065,7 +1077,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
         ) : null}
         <div className={`${styles.tableWrap} ${narrow ? styles.tableWrapNarrow : role !== null && !canEdit ? styles.tableWrapViewer : ''}`}>
           <DataTable className={styles.table}>
-            <TableHead />
+            <TableHead selection={folderMove.pageCheckbox} />
             <tbody>
               {current.map((point) => {
                 const usage = usageLines(point)
@@ -1083,7 +1095,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                   >
                     <Td className={styles.colName}>
                       {/* 名前の前に左の列と同じフォルダの色の丸（未分類は色の無い輪）。札は名前の頭にそろえる。 */}
-                      <FolderDotName folder={folderDotFor(folders, point.folderId)} dot={!narrow}>
+                      <FolderDotName folder={folderDotFor(folders, point.folderId)} dot={!narrow}>{folderMove.checkbox(point)}
                       <button
                         type="button"
                         className={styles.nameButton}
@@ -1095,8 +1107,9 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                         {point.name}
                       </button>
                       </FolderDotName>
-                      <span className={narrow ? undefined : styles.pillIndent}><StatePill point={point} /></span>
+
                     </Td>
+                    <Td><StatePill point={point} /></Td>
                     <Td className={styles.colTrigger}>
                       <span className={styles.cellMain} title={sourceTriggerLabel(point)}>{shortTrigger(point)}</span>
                       <span className={styles.cellSub} title={rowSub(point)}>{rowSub(point)}</span>
@@ -1118,7 +1131,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                           label={menuLabel}
                           open={openMenuId === point.id}
                           onOpenChange={(next) => setOpenMenuId(next ? point.id : null)}
-                          items={rowMenuItems(point).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect() } }))}
+                          items={rowMenuItems(point).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect?.() } }))}
                         />
                       </div>
                     </Td>
@@ -1146,26 +1159,53 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   const reportUnavailable = listUnavailable || reportFailed
   const delta = kpi.previousCount === null ? null : kpi.currentCount - kpi.previousCount
 
+  const editSurface = (<ConversionEditDialog surface={editId !== undefined ? 'page' : 'dialog'}
+          editTarget={editTarget}
+          setEditTarget={(target) => { setEditTarget(target); if (!target && editId) router.push('/conversions') }}
+          editForm={editForm}
+          setEditForm={(next) => {
+            const changed = typeof next === 'function' ? next(editForm) : next
+            if (editFieldIssue && editForm && changed) {
+              const fieldKeys: Record<string, keyof EditForm> = {
+                'cv-edit-name': 'name', 'cv-edit-url': 'targetUrl', 'cv-edit-value-mode': 'valueMode',
+                'cv-edit-value': 'fixedValue', 'cv-edit-window': 'deduplicationWindowDays',
+                'cv-edit-days': 'attributionDays', 'cv-edit-memo': 'exclusionMemo', 'cv-edit-exclusion': 'exclusion',
+              }
+              const key = fieldKeys[editFieldIssue.field]
+              if (key && editForm[key] !== changed[key]) setEditFieldIssue(null)
+            }
+            setEditForm(changed)
+          }}
+          editValueModeNotice={editValueModeNotice}
+          setEditValueModeNotice={setEditValueModeNotice}
+          editSaving={editSaving}
+          editError={editError}
+          editFieldIssue={editFieldIssue}
+          submitEdit={() => void submitEdit()}
+        />)
+  if (editId !== undefined) {
+    if (loading) return <ListState kind="loading" />
+    if (!canEdit || !editTarget) return <ListState kind="error" title="この成果地点を編集できません" description="権限と成果地点を確認してください。" />
+    return editSurface
+  }
+
   return (
-    <ListPage
-      help={<>{"成果として数えるできごと（成果地点）を決めます。配信・流入・アフィリエイトの成果は、ここの数え方で集計します。"}{canEdit
+    <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
+      help={canEdit
             ? '行の「…」から 編集・使う場所を見る・使う場所を足す・止める・複製。止めると、使っている配信や流入リンクでも数えなくなります。'
-            : '行の「…」から 中身と使う場所を見られます。止めると、使っている配信や流入リンクでも数えなくなります。'}</>}
+            : '行の「…」から 中身と使う場所を見られます。止めると、使っている配信や流入リンクでも数えなくなります。'}
       boardId="r6dJFy"
       headingSize="regular"
       title="コンバージョン"
-
       actions={
         <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
-          <Download size={15} aria-hidden="true" />CSVで書き出す
+          <Download size={15} aria-hidden="true" />CSV で書き出す
         </Button>
       }
       stats={<>
         {!canEdit && role !== null ? (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
         {exportError ? <div className={styles.statsNotice}><Notice tone="warn">{exportError}</Notice></div> : null}
         {actionError ? <div className={styles.statsNotice}><Notice tone="warn">{actionError}</Notice></div> : null}
@@ -1173,7 +1213,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
         {highlightedPoint ? <div className={styles.statsNotice}><Notice tone="success">{`「${highlightedPoint.name}」を保存しました。色の付いた行です。`}</Notice></div> : null}
         {reportFailed && !loadFailed ? (
           <div className={styles.statsNotice}>
-            <Notice tone="info" action={<Button onClick={() => void reloadReport()}>集計を読み直す</Button>}>集計を表示できませんでした。一覧はそのまま使えます。</Notice>
+            <Notice tone="info" action={<Button onClick={() => reloadReport()} busyLabel="処理中…">集計を読み直す</Button>}>集計を表示できませんでした。一覧はそのまま使えます。</Notice>
           </div>
         ) : null}
         <KpiBand>
@@ -1238,6 +1278,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={pager}
       overlays={<>
+        {folderMove.overlays}
         <ConversionDetailDialog
           detailTarget={detailTarget}
           setDetailTarget={setDetailTarget}
@@ -1265,34 +1306,10 @@ function ConversionList({ accountId }: { accountId: string | null }) {
           setReversalTarget={setReversalTarget}
           setReversalReason={setReversalReason}
           submitReversal={() => void submitReversal()}
-        />
-        <ConversionEditDialog
-          editTarget={editTarget}
-          setEditTarget={setEditTarget}
-          editForm={editForm}
-          setEditForm={(next) => {
-            const changed = typeof next === 'function' ? next(editForm) : next
-            if (editFieldIssue && editForm && changed) {
-              const fieldKeys: Record<string, keyof EditForm> = {
-                'cv-edit-name': 'name', 'cv-edit-url': 'targetUrl', 'cv-edit-value-mode': 'valueMode',
-                'cv-edit-value': 'fixedValue', 'cv-edit-window': 'deduplicationWindowDays',
-                'cv-edit-days': 'attributionDays', 'cv-edit-memo': 'exclusionMemo', 'cv-edit-exclusion': 'exclusion',
-              }
-              const key = fieldKeys[editFieldIssue.field]
-              if (key && editForm[key] !== changed[key]) setEditFieldIssue(null)
-            }
-            setEditForm(changed)
-          }}
-          editValueModeNotice={editValueModeNotice}
-          setEditValueModeNotice={setEditValueModeNotice}
-          editSaving={editSaving}
-          editError={editError}
-          editFieldIssue={editFieldIssue}
-          submitEdit={() => void submitEdit()}
-        />
+        />{editSurface}
       </>}
     >
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

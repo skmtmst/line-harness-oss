@@ -1,23 +1,11 @@
 'use client'
 
-/*
- * ★V8 登録メディア一覧（Pencil `O7hUt7`）。
- *
- * 型（ListPage）に、数の帯（登録メディア・どこでも使っていない・使っている容量・アーカイブ）、
- * 左のフォルダの列（上に「メディアを登録する」）、案内の帯と道具の段、札の格子、表の下の範囲とページ送り、
- * 選んだときの一括バーをはめる。データの口・確かめの窓は今の V8（src/app/contents/list-v8.tsx）から写した。
- * 札の名前の前にフォルダの色の丸（2026-10-07 オーナー）。札の操作は「…」へ集める。
- */
+import { hasDeliveryAccess } from '@line-crm/shared'
 import { collectListRows } from '@/components/shared/collect-list-rows'
 import { useListUrlSetValue, useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type {
-  Folder,
-  MediaDeleteImpact,
-  MediaDeleteImpactReference,
-  MediaItem,
-} from '@line-crm/shared'
-import { Archive, Eye, EyeOff, HardDrive, Images, LayoutGrid, List as ListIcon, Plus } from 'lucide-react'
+import type { Folder, MediaDeleteImpact, MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
+import { Archive, EyeOff, HardDrive, Images, LayoutGrid, List as ListIcon, Plus } from 'lucide-react'
 import { api, ApiError, type MediaQuota } from '@/lib/api'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
@@ -27,16 +15,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import { formatMediaSize } from './media-usage-display'
 import MediaPreviewOverlay from './media-preview-overlay'
 import Dialog from '@/components/shared/dialog'
-import {
-  blockedReason,
-  canDelete as canDeleteMedia,
-  checkedAtText,
-  dialogTitle,
-  referenceKindText,
-  referenceNameText,
-  summarizeBulkDeleteResult,
-  usageText,
-} from './media-delete-impact'
+import { blockedReason, canDelete as canDeleteMedia, checkedAtText, dialogTitle, referenceKindText, referenceNameText, summarizeBulkDeleteResult, usageText } from './media-delete-impact'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import FilterChip from '@/components/shared/filter-chip'
@@ -45,9 +24,8 @@ import { FolderDot, type FolderDotFolder } from '@/components/shared/folder-dot'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import BulkBar from '@/components/shared/bulk-bar'
-import { classifyApiFailure } from '@/components/shared/api-error-message'
+import { classifyApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { notifyToast } from '@/components/shared/toast'
-import { RequiredBadge } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import { useAccount } from '@/contexts/account-context'
 import { formatNumber } from '@/lib/format'
@@ -63,8 +41,19 @@ import KpiCard from '@/components/shared/kpi-card'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { ListPager } from '@/components/templates/list-page'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+/*
+ * ★V8 登録メディア一覧（Pencil `O7hUt7`）。
+ *
+ * 型（ListPage）に、数の帯（登録メディア・どこでも使っていない・使っている容量・アーカイブ）、
+ * 左のフォルダの列（上に「メディアを登録する」）、案内の帯と道具の段、札の格子、表の下の範囲とページ送り、
+ * 選んだときの一括バーをはめる。データの口・確かめの窓は今の V8（src/app/contents/list-v8.tsx）から写した。
+ * 札の名前の前にフォルダの色の丸（2026-10-07 オーナー）。札の操作は「…」へ集める。
+ */
 
 type MediaSort = 'newest' | 'oldest' | 'name' | 'size' | 'usage'
 const UNGROUPED = '__ungrouped__'
@@ -141,6 +130,7 @@ const EMPTY_KPIS: MediaKpis = {
 }
 
 export default function MediaLibraryListV8() {
+  const saveErrors = useSaveFormErrors()
   const [view, setView] = useListUrlValue<MediaView>('view', 'grid')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
@@ -303,7 +293,7 @@ export default function MediaLibraryListV8() {
         return
       }
       setMediaManagementPermission(
-        response.data.role === 'owner' || response.data.role === 'admin' ? 'allowed' : 'denied',
+        hasDeliveryAccess(response.data, 'contents', 'edit') ? 'allowed' : 'denied',
       )
     }).catch(() => {
       if (active) setMediaManagementPermission('error')
@@ -436,11 +426,13 @@ export default function MediaLibraryListV8() {
         setFolderFailure(new ApiError(500, folderResponse.error))
       }
     } catch (caught) {
-      if (accountAtRequest === latestAccountRef.current) setFolderFailure(caught)
+      const fieldFailure = saveErrors.capture(caught);
+
+      if (accountAtRequest === latestAccountRef.current) { if (!fieldFailure) setFolderFailure(caught) }
     } finally {
       if (accountAtRequest === latestAccountRef.current) setFolderReloading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   /*
     WEB097: 同じアカウントの中でも、検索・絞り込み・ページを変えるたびに新しい要求を出す。
@@ -483,7 +475,9 @@ export default function MediaLibraryListV8() {
         setLoadFailed(true)
         setListKnown(false)
       }
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure);
+
       if (isLatest()) {
         setLoadFailed(true)
         setListKnown(false)
@@ -491,7 +485,7 @@ export default function MediaLibraryListV8() {
     } finally {
       if (isLatest()) setLoading(false)
     }
-  }, [folderFilter, kinds, page, pageSize, query, selectedAccountId, showArchivedOnly, showNearLimitOnly, showUnusedOnly, sort])
+  }, [folderFilter, kinds, page, pageSize, query, selectedAccountId, showArchivedOnly, showNearLimitOnly, showUnusedOnly, sort, saveErrors])
 
   /*
     WEB098: 容量と「すべて」の総数は検索・ページ送り・種別では変わらない。
@@ -627,8 +621,11 @@ export default function MediaLibraryListV8() {
       }
       setRenaming(null)
       void load()
-    } catch {
-      setRenameError('名前の変更に失敗しました。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setRenameError('名前の変更に失敗しました。もう一度お試しください。') }
     } finally {
       setRenamingBusy(false)
     }
@@ -665,7 +662,8 @@ export default function MediaLibraryListV8() {
       const name = [...items, ...selectionItems].find((m) => m.id === id)?.filename ?? id
       try {
         await api.media.delete(id, accountAtRequest)
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
         /*
           409（読み直したら使われ始めていた）も通信失敗も、ここでは
           名前だけ残して次へ進む。件ごとに文を出すと最後の1件しか残らない。
@@ -715,7 +713,12 @@ export default function MediaLibraryListV8() {
       anchor.click()
       URL.revokeObjectURL(href)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'ダウンロードできませんでした')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
+
+      setError(caught instanceof Error ? caught.message : 'ダウンロードできませんでした') }
     } finally {
       setDownloadingIds((current) => {
         const next = new Set(current)
@@ -753,8 +756,9 @@ export default function MediaLibraryListV8() {
       if (!res.success) throw new Error('impact_failed')
       setImpact(res.data)
       setImpactPhase('ready')
-    } catch {
+    } catch (saveFailure) {
       if (!isCurrent()) return
+      saveErrors.capture(saveFailure)
       /*
         使用先が読めないときは**消させない**。7種類のどれかに残ったまま
         消すと、その画面が壊れた画像を指す。
@@ -789,12 +793,15 @@ export default function MediaLibraryListV8() {
       void loadKpis()
     } catch (e) {
       if (!isCurrentDelete()) return
+      const fieldFailure = saveErrors.capture(e);
+
       if (e instanceof ApiError && e.status === 409) {
         /*
           **409 は「読んだあとに使われ始めた」。** 消せない理由が変わって
           いるので、影響を読み直してから見せる。
         */
-        setDeleteError('いま使われ始めたため、削除できませんでした。使用先を読み直しました。')
+        { if (!fieldFailure)
+        setDeleteError('いま使われ始めたため、削除できませんでした。使用先を読み直しました。') }
         /* 読み直しの返事も、同じ3つで照合してから映す。 */
         const at = { ...impactRequestRef.current }
         try {
@@ -806,12 +813,15 @@ export default function MediaLibraryListV8() {
             && impactRequestRef.current.mediaId === at.mediaId
             && impactRequestRef.current.generation === at.generation
           if (same && again.success) setImpact(again.data)
-        } catch {
+        } catch (saveFailure) {
+          saveErrors.capture(saveFailure);
+
           if (isCurrentDelete()) setImpactPhase('error')
         }
         return
       }
-      setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。')
+      { if (!fieldFailure)
+      setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       if (isCurrentDelete()) setDeleteBusy(false)
     }
@@ -860,19 +870,22 @@ export default function MediaLibraryListV8() {
       void load()
       void loadKpis()
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e)
       /*
         fetchApi は 2xx 以外で ApiError を投げる。409（直前に誰かが
         同じ操作を済ませた）は汎用エラーで止めず、一覧を読み直して
         最新の見え方に合わせる。
       */
       if (e instanceof ApiError && e.status === 409) {
+        { if (!fieldFailure)
         setArchiveError(mode === 'archive'
           ? 'このメディアは既にアーカイブ済みです。一覧を読み直しました。'
-          : 'このメディアは既に一覧へ戻っています。一覧を読み直しました。')
+          : 'このメディアは既に一覧へ戻っています。一覧を読み直しました。') }
         void load()
         return
       }
-      setArchiveError('処理に失敗しました。もう一度お試しください。')
+      { if (!fieldFailure)
+      setArchiveError('処理に失敗しました。もう一度お試しください。') }
     } finally {
       setArchiveBusy(false)
     }
@@ -902,12 +915,17 @@ export default function MediaLibraryListV8() {
       void load()
       void loadFolders()
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e);
+
       if (e instanceof ApiError && e.status === 409) {
-        setMoveError('直前に誰かが変えたため、移動できませんでした。一覧を読み直しました。')
-        void load()
+        { if (!fieldFailure)
+        setMoveError('直前に誰かが変えたため、移動できませんでした。一覧を読み直しました。') }
+        void load();
+
         return
       }
-      setMoveError('移動に失敗しました。もう一度お試しください。')
+      { if (!fieldFailure)
+      setMoveError('移動に失敗しました。もう一度お試しください。') }
     } finally {
       setMoveBusy(false)
     }
@@ -1021,47 +1039,47 @@ export default function MediaLibraryListV8() {
     : null
 
   if (!urlReady || (detailId && (detailPhase === 'idle' || detailPhase === 'loading'))) {
-    return <ListState kind="loading" title="メディアの詳細を読み込んでいます" />
+    return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="メディアの詳細を読み込んでいます" /></SaveErrorScope>
   }
 
   if (detailId && (detailPhase === 'unavailable' || !detailsFor)) {
     // R588: 403は権限案内を残し、権限変更後に同じIDを読み直せる。
     if (detailFailure === 'denied') {
       return (
-        <ListState
+        <SaveErrorScope errors={saveErrors}><ListState
           kind="forbidden"
           onRetry={retryDetail}
           title="メディアの詳細を見る権限がありません"
           description={permissionDeniedMessage('store')}
           action={<Button type="button" onClick={() => setDetailUrl(null)}>登録メディア一覧へ戻る</Button>}
-        />
+        /></SaveErrorScope>
       )
     }
     // R588: 503などの通信失敗は通信失敗と言い、同じIDで読み直せるようにする。
     if (detailFailure === 'retryable') {
       return (
-        <ListState
+        <SaveErrorScope errors={saveErrors}><ListState
           kind="error"
           title="表示できませんでした"
           description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
           onRetry={retryDetail}
           action={<Button type="button" onClick={() => setDetailUrl(null)}>登録メディア一覧へ戻る</Button>}
-        />
+        /></SaveErrorScope>
       )
     }
     return (
-      <ListState
+      <SaveErrorScope errors={saveErrors}><ListState
         kind="empty"
         title="メディアの詳細を開けません"
         description="メディアが存在しないか、このLINEアカウントでは表示できません。"
         action={<Button type="button" onClick={() => setDetailUrl(null)}>登録メディア一覧へ戻る</Button>}
-      />
+      /></SaveErrorScope>
     )
   }
 
   if (detailsFor) {
     return (
-      <MediaDetailDialog
+      <SaveErrorScope errors={saveErrors}><MediaDetailDialog
         item={detailsFor}
         accountId={selectedAccountId}
         folderName={detailsFor.folderId ? detailFolderName ?? '—（未取得）' : '未分類'}
@@ -1078,7 +1096,7 @@ export default function MediaLibraryListV8() {
           void loadKpis()
         }}
         onItemUpdated={(updated) => setDetailsFor(updated)}
-      />
+      /></SaveErrorScope>
     )
   }
 
@@ -1135,16 +1153,14 @@ export default function MediaLibraryListV8() {
   ]
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId="O7hUt7"
       headingSize="regular"
       title="登録メディア一覧"
       help="配信で使う画像・動画・音声・ファイルの置き場です。LINE アカウントごとに管理します。"
       tabs={!canManageMedia ? (
-        <p className={styles.roBand} role="note">
-          <Eye size={16} aria-hidden="true" />
-          <span>{`閲覧のみで見ています。${managementPermissionReason}。`}</span>
-        </p>
+        <div className={styles.roBand}><ReadOnlyNotice role="note">{`閲覧のみで見ています。${managementPermissionReason}。`}</ReadOnlyNotice></div>
       ) : undefined}
       stats={(
         <KpiBand aria-label="登録メディアの集計">
@@ -1187,18 +1203,13 @@ export default function MediaLibraryListV8() {
             placeholder="例：01_商品写真"
           >
             {folderFailure ? (
-              <div role="alert">
-                <p>
-                  {folderForbidden
-                    ? permissionDeniedMessage('store')
-                    : 'フォルダを読み込めませんでした。登録したメディアは消えていません。'}
-                </p>
-                {folderForbidden ? null : (
+              <Notice tone="danger" action={<> {folderForbidden ? null : (
                   <Button type="button" onClick={() => void loadFolders()} disabled={folderReloading}>
                     {folderReloading ? '読み込んでいます' : 'もう一度読み込む'}
                   </Button>
-                )}
-              </div>
+                )} </>} >{folderForbidden
+                    ? permissionDeniedMessage('store')
+                    : 'フォルダを読み込めませんでした。登録したメディアは消えていません。'}</Notice>
             ) : null}
           </ManagedFolderPanel>
         </>
@@ -1259,7 +1270,7 @@ export default function MediaLibraryListV8() {
             trailing={(
               <>
                 <div className={styles.otherBox}>
-                  <Select
+                  <SaveErrorField names={["otherFilterValue","sort","other_filter_value"]}><Select
                     aria-label="よく使う絞り込み"
                     value={otherFilterValue}
                     options={[
@@ -1277,7 +1288,7 @@ export default function MediaLibraryListV8() {
                       }
                       applyOtherFilter(value)
                     }}
-                  />
+                  /></SaveErrorField>
                 </div>
                 <div role="group" aria-label="並べ方" className={styles.viewToggle}>
                   {([
@@ -1297,7 +1308,7 @@ export default function MediaLibraryListV8() {
                     </button>
                   ))}
                 </div>
-                <Select
+                <SaveErrorField names={["pageSize","limit","page_size"]}><Select
                   aria-label="表示件数"
                   value={String(pageSize)}
                   options={PAGE_SIZE_OPTIONS}
@@ -1306,7 +1317,7 @@ export default function MediaLibraryListV8() {
                     setPage(1)
                   }}
                   size="page-size"
-                />
+                /></SaveErrorField>
               </>
             )}
           />
@@ -1318,13 +1329,11 @@ export default function MediaLibraryListV8() {
             「…」から プレビュー・使用箇所を見る・名前を変える・フォルダへ移す・ダウンロード・アーカイブ・削除（使っているものは消せません）。
           </p>
           {listKnown && !loadFailed ? (
-            <div className={styles.foot}>
-              <div className={styles.footLeft}>
+            <ListPager>
                 <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />
-                <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
                 {canManageMedia ? (
                   <label className={styles.selectAll}>
-                    <Checkbox
+                    <SaveErrorField names={["allSelected","selected","all_selected"]}><Checkbox
                       checked={allSelected}
                       onCheckedChange={() =>
                         setSelected((prev) => {
@@ -1334,26 +1343,26 @@ export default function MediaLibraryListV8() {
                           return next
                         })
                       }
-                    />
+                    /></SaveErrorField>
                     すべてのメディアを選択
                   </label>
                 ) : (
                   <span>{managementPermissionReason}。</span>
                 )}
-              </div>
-            </div>
+              <Pagination page={page} pageCount={pageCount} onPageChange={setPage}/>
+            </ListPager>
           ) : null}
           {canManageMedia ? (
             <BulkBar
               count={selected.size}
               total={selectionTotal}
               onSelectAll={selectAllMedia}
-              hint={selectionLoading ? 'すべての対象を確認しています…' : selectionError ? <><span role="alert">{selectionError}</span><Button size="compact" onClick={() => void readSelectableMedia()}>もう一度読み込む</Button></> : '対象を確認してから操作を選んでください'}
+              hint={selectionLoading ? 'すべての対象を確認しています…' : selectionError ? <><span role="alert">{selectionError}</span><Button size="compact" onClick={() => readSelectableMedia()} busyLabel="処理中…">もう一度読み込む</Button></> : '対象を確認してから操作を選んでください'}
             >
               <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>
                 選択を外す
               </Button>
-              <Button type="button" variant="danger" onClick={() => void removeSelected()}>
+              <Button type="button" variant="danger" onClick={() => removeSelected()} busyLabel="処理中…">
                 選択したメディアを削除
                 {selected.size > 0 && <span>（{selected.size}）</span>}
               </Button>
@@ -1416,11 +1425,9 @@ export default function MediaLibraryListV8() {
           <p>使われている場所を確認しています…</p>
         ) : impactPhase === 'error' ? (
           <div>
-            <p role="alert">
-              使われている場所を確認できませんでした。読み直してから、もう一度お試しください。
-            </p>
+            <Notice tone="danger" >使われている場所を確認できませんでした。読み直してから、もう一度お試しください。</Notice>
             {/* R34: 詳細と同じように、確認時刻と読み直しを一覧でも出す。 */}
-            <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>もう一度読み込む</Button>
+            <Button type="button" onClick={() => { if (deleting) return openDelete(deleting) }} busyLabel="処理中…">もう一度読み込む</Button>
           </div>
         ) : impact ? (
           <div>
@@ -1430,7 +1437,7 @@ export default function MediaLibraryListV8() {
             </p>
             {impact.verified === false ? (
               <div>
-                <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>もう一度読み込む</Button>
+                <Button type="button" onClick={() => { if (deleting) return openDelete(deleting) }} busyLabel="処理中…">もう一度読み込む</Button>
               </div>
             ) : null}
 
@@ -1533,14 +1540,14 @@ export default function MediaLibraryListV8() {
           </div>
         }
       >
-        <Field label="理由（あとから履歴で確認できます）" required><input
+        <Field label="理由（あとから履歴で確認できます）" required><SaveErrorField names={["archiveReason","archive_reason"]}><input
             type="text"
             autoFocus
             value={archiveReason}
             onChange={(event) => setArchiveReason(event.target.value)}
             placeholder={archiveTarget?.mode === 'archive' ? '例：古いキャンペーンの素材のため' : '例：再び使うため'}
             aria-label="理由"
-          /></Field>
+          /></SaveErrorField></Field>
       </Dialog>
 
       {/*
@@ -1574,7 +1581,7 @@ export default function MediaLibraryListV8() {
       >
         <div className={styles.moveField}>
           <span className={styles.moveLabel}>移し先のフォルダ</span>
-          <Select
+          <SaveErrorField names={["moveFolderId","folderId","move_folder_id"]}><Select
             aria-label="移し先のフォルダ"
             value={moveFolderId}
             options={[
@@ -1582,7 +1589,7 @@ export default function MediaLibraryListV8() {
               ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
             ]}
             onChange={(value) => setMoveFolderId(value)}
-          />
+          /></SaveErrorField>
         </div>
       </Dialog>
 
@@ -1705,7 +1712,7 @@ export default function MediaLibraryListV8() {
               ))}
             </div>
           )}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }
 
@@ -1803,7 +1810,7 @@ function MediaCardV8({
       <div className={view === 'grid' ? styles.cardBody : styles.rowBody}>
         {renaming ? (
           <div className={styles.renameBox}>
-            <input
+            <SaveErrorField names={["value","renaming.value"]}><input
               type="text"
               autoFocus
               value={renaming.value}
@@ -1815,7 +1822,7 @@ function MediaCardV8({
               }}
               aria-label="ファイル名"
               className={styles.renameInput}
-            />
+            /></SaveErrorField>
             {renameError && (
               <p className={styles.renameError} role="alert">{renameError}</p>
             )}
@@ -1823,8 +1830,8 @@ function MediaCardV8({
               <Button variant="secondary" onClick={onRenameCancel} disabled={renamingBusy}>
                 キャンセル
               </Button>
-              <Button variant="primary" onClick={onRenameConfirm} disabled={renamingBusy}>
-                {renamingBusy ? '保存中…' : '保存する'}
+              <Button variant="primary" onClick={onRenameConfirm} disabled={renamingBusy} busy={renamingBusy} busyLabel="保存中…">
+                保存する
               </Button>
             </div>
           </div>
@@ -1832,13 +1839,13 @@ function MediaCardV8({
           <>
             <span className={styles.nameRow}>
               {canManageMedia ? (
-                <Checkbox
+                <SaveErrorField names={["selected"]}><Checkbox
                   checked={selected}
                   disabled={!isKnownUnused(item) || !!item.archivedAt}
                   onCheckedChange={onToggleSelect}
                   aria-label={`${item.filename}を選ぶ`}
                   title={selectTitle}
-                />
+                /></SaveErrorField>
               ) : null}
               {item.archivedAt ? (
                 <span
@@ -1894,7 +1901,7 @@ function MediaCardV8({
                   : []),
                 {
                   id: 'download',
-                  label: downloading ? '取得中…' : 'ダウンロード',
+                  label: 'ダウンロード',
                   disabled: downloading,
                   disabledReason: downloading ? 'ファイルを取り出しています' : undefined,
                   onSelect: onDownload,

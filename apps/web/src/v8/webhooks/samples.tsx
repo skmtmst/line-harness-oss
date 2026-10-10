@@ -48,7 +48,7 @@ export default function WebhooksSamplesV8() {
   usePageTitle('外部連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || staffRole === 'owner'
+  const canManage = staffRole === 'owner'
   const overview = useWebhookOverview()
   return (
     <ListPage help={<>{WEBHOOKS_DESCRIPTION}{"見本に書いたことだけを送ります。「すべての出来事を送る」設定は見本からは作られません。"}</>}

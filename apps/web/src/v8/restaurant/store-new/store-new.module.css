@@ -90,7 +90,6 @@
 }
 
 .errorBox {
-  margin: 0;
   padding: var(--tpl-rt-notice-pad);
   border-radius: var(--tpl-rt-band-radius);
   background: var(--color-status-danger-soft);
@@ -215,6 +214,7 @@
 
 /* 右の「わからないときは」：幅340・余白18・段の間10・地 #fafafc。 */
 .helpPanel {
+  align-self: flex-start;
   display: flex;
   flex: 0 0 var(--tpl-rt-side-w);
   flex-direction: column;
@@ -268,3 +268,5 @@
   padding-top: var(--tpl-rt-footer-pad-top);
   box-shadow: var(--tpl-rt-line-top);
 }
+
+.errorBox, .errorBoxNoticePlacement { margin: 0; }

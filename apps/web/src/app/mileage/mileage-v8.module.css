@@ -557,7 +557,7 @@
   flex: none;
   border-radius: var(--radius-pill);
   background: var(--color-status-info-soft);
-  color: var(--color-status-info);
+  color: var(--color-action);
   font-size: 13px;
   font-weight: 600;
 }

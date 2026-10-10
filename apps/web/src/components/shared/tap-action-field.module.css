@@ -9,7 +9,7 @@
 .withExtras { container: tap-action / inline-size; }
 .pickRow { text-align: left; cursor: pointer; }
 .pickRow:disabled { cursor: default; }
-.pickRow:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+.pickRow:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 .pickChange { color: var(--color-action); font-size: var(--text-caption); white-space: nowrap; }
 .root {
   display: flex;
@@ -167,7 +167,7 @@
 }
 
 .liffLink:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 

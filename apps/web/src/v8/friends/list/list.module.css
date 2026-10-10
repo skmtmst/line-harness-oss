@@ -4,20 +4,7 @@
  */
 
 /* 閲覧のみの帯（見出しの下・タブの上）。 */
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-fm-band-gap);
-  margin-bottom: var(--tpl-fm-band-after);
-  padding: var(--tpl-fm-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-fm-band-lh);
-}
-
-.viewerBand > svg { flex-shrink: 0; color: var(--color-action); }
+.viewerBand { margin-bottom: var(--tpl-fm-band-after); }
 
 /* 閲覧のみで隠したボタンの場所（隣のボタンを動かさない）。 */
 .hiddenSlot {
@@ -197,6 +184,18 @@
 
 :global([data-theme='v8']) .table td.tdCheck { padding-left: var(--tpl-fr-row-side); }
 :global([data-theme='v8']) .table td.tdMenu { padding-right: var(--tpl-fr-row-side); }
+
+/*
+ * 高さが32px以下の欄だけ、画面外の中身の描画を後回しにする。
+ * 文字・操作・行はDOMに残す。名前と対応の欄は常に測るため、行の高さは
+ * 最低52pxのまま実データで決まり、戻ってきた欄も同じ位置に描かれる。
+ */
+:global([data-theme='v8']) .table td:is(.tdCheck, .tdStar, .tdMenu, .fixedContent) {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto var(--tpl-fr-avatar);
+  /* 枠の外の影・フォーカス輪郭まで描き、セルの端で切らない。 */
+  overflow-clip-margin: var(--tpl-fr-cell-inset);
+}
 
 .row { cursor: default; }
 

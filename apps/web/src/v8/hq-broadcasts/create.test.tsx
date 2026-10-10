@@ -45,7 +45,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   const actual = await importOriginal()
   return { ...actual, api: { ...actual.api, lineAccounts: { list: accounts }, lineAccountFolders: { list: folders }, tags: { list: tagList }, broadcastMessageAssets: { list: assets, upload }, scenarios: { list: async () => ({ success: true, data: [] }) }, segmentPresets: { list: async () => ({ success: true, data: [] }) } } }
 })
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
+vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => role.value === 'owner' || role.value === 'admin', useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push, replace }), useSearchParams: () => params.value }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => React.createElement('a', { href }, children) }))
@@ -130,7 +130,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     const view = render(<HqBroadcastCreate />)
     fireEvent.change(screen.getByLabelText('配信名'), { target: { value: '宛先の下書き' } })
     fireEvent.click(screen.getByRole('button', { name: '対象設定へ' }))
-    expect(await screen.findByText('（送るアカウントを選んでください）')).toBeTruthy()
+    expect(await screen.findByText('送るアカウントを選ぶ')).toBeTruthy()
     expect(screen.queryByRole('checkbox', { name: '銀座店' })).toBeNull()
     await selectAccounts('銀座店', '新宿店', '梅田店')
     expect(screen.getByText('3 アカウント')).toBeTruthy()
@@ -235,15 +235,15 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     expect(hq.send).not.toHaveBeenCalled()
   })
 
-  it('入れていない所があると口を呼ばず、その欄のある段へ移るボタンを出す', async () => {
+  it('入れていない所があると口を呼ばず、欄の理由を出してその段へ移る', async () => {
     render(<HqBroadcastCreate />)
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     expect((await screen.findByRole('alert')).textContent).toContain('配信名を入れてください')
     fireEvent.change(screen.getByLabelText('配信名'), { target: { value: '告知' } })
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     expect((await screen.findByRole('alert')).textContent).toContain('送るアカウントを選んでください')
-    fireEvent.click(screen.getByRole('button', { name: '配信対象へ移動' }))
     expect(await screen.findByRole('heading', { name: '送るアカウント' })).toBeTruthy()
+    await waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('送るアカウント：選ぶ'))
     expect(hq.create).not.toHaveBeenCalled()
   })
 
@@ -328,8 +328,9 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     fireEvent.click(screen.getByRole('tab', { name: 'その他' }))
     fireEvent.click(await screen.findByRole('button', { name: 'クーポンを選ぶ' }))
     /* 店に属する素材（銀座店だけ）は出さない。 */
-    expect(screen.queryByRole('option', { name: '銀座店だけ' })).toBeNull()
-    fireEvent.click(within(await screen.findByRole('option', { name: '冬の10%オフ' })).getByRole('button'))
+    expect(screen.queryByRole('radio', { name: '銀座店だけ' })).toBeNull()
+    fireEvent.click(await screen.findByRole('radio', { name: '冬の10%オフ' }))
+    fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     await waitFor(() => expect(hq.create).toHaveBeenCalled())
     const input = hq.create.mock.calls[0][0]
@@ -494,7 +495,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     expect((screen.getByLabelText('配信名') as HTMLInputElement).value).toBe('9月キャンペーンのお知らせ（コピー）')
     expect(within(screen.getByRole('complementary', { name: 'LINEの見え方' })).getByText('9月のご案内です')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '対象設定へ' }))
-    expect(await screen.findByText('（送るアカウントを選んでください）')).toBeTruthy()
+    expect(await screen.findByText('送るアカウントを選ぶ')).toBeTruthy()
     expect((screen.getByRole('radio', { name: /友だち全員に配信する/ }) as HTMLInputElement).checked).toBe(true)
   })
 

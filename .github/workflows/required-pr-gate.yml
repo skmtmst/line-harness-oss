@@ -258,12 +258,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Guard shared pattern ownership (B-172)
+        env:
+          PATTERN_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$PATTERN_BASE_SHA" ]; then
+            node scripts/visual-qa/v8-pattern-audit.mjs \
+              --code . --base "$PATTERN_BASE_SHA" --out "$RUNNER_TEMP/pattern-ownership"
+          else
+            node scripts/visual-qa/v8-pattern-audit.mjs \
+              --code . --out "$RUNNER_TEMP/pattern-ownership"
+          fi
       - name: Build shared packages
         run: >-
           pnpm
@@ -377,6 +390,7 @@ jobs:
           --filter @line-harness/update-engine
           build
       - run: pnpm --filter web exec next lint --report-unused-disable-directives-severity error
+      - run: node apps/web/scripts/verify-entity-pickers.mjs
       - run: pnpm --filter web typecheck
       - run: pnpm --filter web test
       # 外部連携画面の実挙動契約(webhook-runtime.spec.ts)。PR #1506 で入ったが
@@ -635,28 +649,57 @@ jobs:
           if [ "${{ steps.scope.outputs.diff }}" = "true" ]; then
             node apps/web/scripts/v8-guard/serve-out.mjs /tmp/base/apps/web/out 4311 > /tmp/serve-base.log 2>&1 &
           fi
+          ready=false
           for i in $(seq 1 30); do
-            curl -sf http://127.0.0.1:4310/login > /dev/null && break
+            if curl -sf http://127.0.0.1:4310/friends > /dev/null \
+              && curl -sf 'http://127.0.0.1:8788/api/friends?account_id=visual-qa-account' > /dev/null \
+              && { [ "${{ steps.scope.outputs.diff }}" != "true" ] || curl -sf http://127.0.0.1:4311/friends > /dev/null; }; then
+              ready=true
+              break
+            fi
             sleep 1
           done
+          if [ "$ready" != "true" ]; then
+            cat /tmp/mock-api.log /tmp/serve-head.log
+            echo "::error::速度・画面検査のサーバーが起動しませんでした"
+            exit 1
+          fi
       - name: No layout breaks at 1152, 1440 and 1920 (v7 and v8)
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout.json
+      # B-191/192 と B-187 はここに一本化。blank-gap.mjs を別ステップで重ねない。
+      - name: Broken fixtures must fail the V8 layout guard
+        if: steps.scope.outputs.run == 'true'
+        run: node --test apps/web/scripts/v8-guard/layout-defects.test.mjs
+      - name: No new overlap, wrap, squash, clipping, touching or blank space on V8
+        if: steps.scope.outputs.run == 'true'
+        run: node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json
+      - name: List row rules (B-190/193/194/195/198, with negative controls)
+        if: steps.scope.outputs.run == 'true'
+        run: |
+          node apps/web/scripts/list-row-audit.mjs
+          node apps/web/scripts/v8-guard/list-row-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/list-rows.json
+          node apps/web/scripts/v8-guard/list-skeleton-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/list-skeleton.json
       - name: All admin page titles are 22px / 700 / 32px at 1440
         if: steps.scope.outputs.run == 'true'
         run: node scripts/visual-qa/title-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/title-audit.tsv
       # 速さ予算（2026-10-04 オーナー採用「1」、同日司令塔決定で判定を変更）。
-      # 主要10画面を V8 で開き、1画面3回測った真ん中で比べる。
-      # 落とすのは悪化だけ：時間は基準より20%、JS は1KB超の増加。
+      # 主要10画面を V8 で開き、1画面5回測った中央値で比べる。
+      # 落とすのは悪化だけ：時間は基準より20%×CI倍率1.30、JS は1KB超の増加。
       # ただし同じ PR で基準表を更新していれば JS 超過は通す
       # （機能追加で JS は増える。理由は PR に書くこと）。
       # 目標（表示1秒・反応100ms・長い作業50ms）の未達は結果に出すだけ。
       # 道具の対照は speed-budget.mjs の頭に書いた。
+      - name: Speed measurement and reference policy controls
+        if: steps.scope.outputs.run == 'true'
+        run: node --test apps/web/scripts/v8-guard/speed-budget.test.mjs
       - name: Speed budget on V8 (10 screens on a real browser)
+        id: speed_budget
         # オーナー決定（2026-10-04）：速さは測り方のぶれで落ちることがあるので、当面は知らせるだけにして止めない。
         continue-on-error: true
         if: steps.scope.outputs.run == 'true'
         env:
+          V8_SPEED_PROFILE: ci
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
@@ -667,6 +710,23 @@ jobs:
             echo "基準表の更新があるため、JS 超過は通す（理由は PR に書くこと）。"
           fi
           ALLOW_JS_BASELINE_UPDATE="$allow_js" node apps/web/scripts/v8-guard/speed-budget.mjs http://127.0.0.1:4310 /tmp/v8-guard/speed.json
+      - name: 2000 friends meet absolute speed targets (reference)
+        id: stress_speed
+        # 速度だけ参考。測れなかったときも失敗を残し、次の工程で警告する。
+        continue-on-error: true
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        env:
+          V8_SPEED_PROFILE: ci
+        run: node apps/web/scripts/v8-guard/stress-targets.mjs /tmp/v8-guard/speed.json
+      - name: Report speed reference results (including incomplete measurements)
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        env:
+          SPEED_BUDGET_OUTCOME: ${{ steps.speed_budget.outcome }}
+          STRESS_SPEED_OUTCOME: ${{ steps.stress_speed.outcome }}
+        run: node apps/web/scripts/v8-guard/speed-report.mjs /tmp/v8-guard/speed.json
+      - name: Virtual table selection, keyboard and layout
+        if: steps.scope.outputs.run == 'true'
+        run: node scripts/visual-qa/friends-table.browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stress-table
       - name: v7 screens are pixel-identical to the base
         # オーナー決定（V8 へ完全切替）：共通部品が V8 になったので v7 の画素は変わる。比べた結果は残すが止めない。
         continue-on-error: true
@@ -676,11 +736,15 @@ jobs:
           node apps/web/scripts/v8-guard/shots.mjs http://127.0.0.1:4310 /tmp/v8-guard/head v7
           node apps/web/scripts/v8-guard/v7-pixel-diff.mjs /tmp/v8-guard/base /tmp/v8-guard/head /tmp/v8-guard/v7-diff
       - name: Upload V8 screen guard results
-        if: failure()
+        if: always() && steps.scope.outputs.run == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: v8-screen-guard
-          path: /tmp/v8-guard/
+          path: |
+            /tmp/v8-guard/
+            /tmp/mock-api.log
+            /tmp/serve-head.log
+            /tmp/serve-base.log
           retention-days: 7
 
   required-pr-gate:

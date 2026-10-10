@@ -1,28 +1,9 @@
 'use client'
 
-/*
- * ★V8-B 運用状態の緊急コントロール（板 `OHwbU`）。
- *
- * v7 の制御タブ（`page.tsx` 内の EmergencyControlPanel）とは別の部品として持つ。
- * データの口・確認の言葉（停止／復旧）・本人確認（6桁かパスワード）・
- * 二重押し防止（実行中ロック＋冪等キー）・競合の戻し方・権限の扱いは同じ。
- * 違いは置き場と見せ方だけ——上に4枚の数の帯、何を止めますか・
- * 止めるアカウントのカード、止めているときの赤い帯、止めるとどうなるか・
- * 止めたあとにすること、止めた・戻した記録の表。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8-B 完成までの二重管理）。
- */
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { Eye, PauseCircle, ShieldCheck, Tag, Timer } from 'lucide-react'
+import { PauseCircle, ShieldCheck, Tag, Timer } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
-import {
-  api,
-  ApiError,
-  type OperationCapability,
-  type OperationControl,
-  type OperationHistoryEntry,
-  type OperationImpactPreview,
-  type OperationRestoreDrift,
-} from '@/lib/api'
+import { api, ApiError, type OperationCapability, type OperationControl, type OperationHistoryEntry, type OperationImpactPreview, type OperationRestoreDrift } from '@/lib/api'
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
 import { formatOperationDate } from '@/lib/operation-status'
 import { formatMinutesRough } from '@/lib/format-duration'
@@ -44,6 +25,21 @@ import type { UpdateRelease } from './update-history'
 import styles from './control-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+/*
+ * ★V8-B 運用状態の緊急コントロール（板 `OHwbU`）。
+ *
+ * v7 の制御タブ（`page.tsx` 内の EmergencyControlPanel）とは別の部品として持つ。
+ * データの口・確認の言葉（停止／復旧）・本人確認（6桁かパスワード）・
+ * 二重押し防止（実行中ロック＋冪等キー）・競合の戻し方・権限の扱いは同じ。
+ * 違いは置き場と見せ方だけ——上に4枚の数の帯、何を止めますか・
+ * 止めるアカウントのカード、止めているときの赤い帯、止めるとどうなるか・
+ * 止めたあとにすること、止めた・戻した記録の表。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8-B 完成までの二重管理）。
+ */
 
 type StopTarget = 'broadcasts' | 'scenarios' | 'reminders' | 'automations'
 
@@ -505,10 +501,7 @@ const EmergencyControlV8 = (
     <div data-design-node="OHwbU" className={styles.board}>
       {/* 権限が無い人には閲覧のみの帯。操作は出さず、記録は読める。 */}
       {previewSettled && !canControl ? (
-        <div className={styles.roBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。止める・戻す操作はオーナーか許可された人に頼んでください。</span>
-        </div>
+        <div className={styles.roBand}><ReadOnlyNotice role="status">閲覧のみで見ています。止める・戻す操作はオーナーか許可された人に頼んでください。</ReadOnlyNotice></div>
       ) : null}
 
       {needsReload ? (
@@ -524,8 +517,8 @@ const EmergencyControlV8 = (
         <div className={`${styles.feedbackBand} ${styles.feedbackWarn}`} role="status">
           <span>{stopBlockers.map((blocker) => blockerText[blocker]).join('')}</span>
           {stopBlockers.includes('unavailable') ? (
-            <Button type="button" onClick={() => void reloadControl()} disabled={reloading}>
-              {reloading ? '読み直しています…' : '最新の状態を読み直す'}
+            <Button type="button" onClick={() => void reloadControl()} disabled={reloading} busy={reloading} busyLabel="読み直しています…">
+              最新の状態を読み直す
             </Button>
           ) : null}
         </div>
@@ -538,8 +531,8 @@ const EmergencyControlV8 = (
         >
           <span>{feedback.text}</span>
           {feedback.tone !== 'success' && needsReload ? (
-            <Button type="button" onClick={() => void reloadControl()} disabled={reloading}>
-              {reloading ? '読み直しています…' : '最新の状態を読み直す'}
+            <Button type="button" onClick={() => void reloadControl()} disabled={reloading} busy={reloading} busyLabel="読み直しています…">
+              最新の状態を読み直す
             </Button>
           ) : null}
         </div>
@@ -601,19 +594,19 @@ const EmergencyControlV8 = (
         <div className={styles.targetRow} role="group" aria-label="止めるもの">
           {(Object.keys(targetLabels) as StopTarget[]).map((key) => (
             <span key={key} className={styles.targetItem} title={`${targetLabels[key].note}・${impactText(key)}`}>
-              {canControl ? <Checkbox
+              {canControl ? <SaveErrorField names={["targets"]}><Checkbox
                 checked={targets[key]}
                 onCheckedChange={(checked) => setTargets((current) => ({ ...current, [key]: checked }))}
                 disabled={mutationLocked || isStopped || !canControl}
               >
                 {targetLabels[key].label}
-              </Checkbox> : <span>{targetLabels[key].label}</span>}
+              </Checkbox></SaveErrorField> : <span>{targetLabels[key].label}</span>}
             </span>
           ))}
         </div>
         <div className={styles.accountRow}>
           <div className={styles.accountField}><Field label="止めるアカウント" htmlFor="emergency-account-v8"><span className={styles.accountSelect}>
-            <Select
+            <SaveErrorField names={["targetAccountId","impact","target_account_id"]}><EntitySelect
               size="full"
               id="emergency-account-v8"
               value={targetAccountId}
@@ -631,9 +624,9 @@ const EmergencyControlV8 = (
               aria-label="緊急停止の対象アカウント"
               options={[
                 { value: 'all', label: 'すべてのアカウント' },
-                ...accounts.map((account) => ({ value: account.id, label: `${account.name}（いまのアカウント）` })),
+                ...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: `${account.name}（いまのアカウント）` })),
               ]}
-            />
+            /></SaveErrorField>
             </span></Field></div>
           {canControl ? <Button
             type="button"
@@ -678,7 +671,7 @@ const EmergencyControlV8 = (
                 <>
                   {/* WEB312：読めていないのに「止めていません」と言わない。読み直しを出す。 */}
                   <p className={styles.stoppedText}>いまの停止状態を確認できませんでした。読み直してください。</p>
-                  <Button type="button" variant="secondary" onClick={() => void reloadControl()} disabled={reloading}>
+                  <Button type="button" variant="secondary" onClick={() => void reloadControl()} busyLabel="読み直しています…" disabled={reloading}>
                     読み直す
                   </Button>
                 </>
@@ -850,7 +843,7 @@ const EmergencyControlV8 = (
                 ))}
               </div>
               <p className={styles.dialogHint}>止まらないもの：{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</p>
-              <div className={styles.confirmReason}><Field label="止める理由" htmlFor="emergency-reason-v8" required><input
+              <div className={styles.confirmReason}><Field label="止める理由" htmlFor="emergency-reason-v8" required><SaveErrorField names={["reason"]}><input
                   id="emergency-reason-v8"
                   aria-label="止める理由"
                   value={reason}
@@ -860,13 +853,13 @@ const EmergencyControlV8 = (
                   placeholder="例：宛先の絞り込みを間違えた"
                   className={styles.dialogInput}
                   style={{ maxWidth: '100%' }}
-                /></Field></div>
+                /></SaveErrorField></Field></div>
               <div className={styles.detailBlock}>
                 <div className={styles.detailHead}>
                   <label htmlFor="emergency-detail-v8" className={styles.dialogLabel}>補足（任意）</label>
                   <p className={styles.detailCounter}>あと{1000 - reasonDetail.length}文字</p>
                 </div>
-                <textarea
+                <SaveErrorField names={["reasonDetail","detail","reason_detail"]}><textarea
                   id="emergency-detail-v8"
                   value={reasonDetail}
                   onChange={(event) => setReasonDetail(event.target.value)}
@@ -875,7 +868,7 @@ const EmergencyControlV8 = (
                   maxLength={1000}
                   placeholder="発生していることを短く入力"
                   className={styles.detailTextarea}
-                />
+                /></SaveErrorField>
               </div>
               <p className={styles.dialogHint}>停止前にすでに LINE へ渡したものは取り消せません。</p>
             </>
@@ -893,21 +886,21 @@ const EmergencyControlV8 = (
               ) : null}
             </>
           )}
-          <Field label={`確認のため「${confirmMode === 'stop' ? '停止' : '復旧'}」と入力`} required><input
+          <Field label={`確認のため「${confirmMode === 'stop' ? '停止' : '復旧'}」と入力`} required><SaveErrorField names={["confirmWord","confirm_word"]}><input
               value={confirmWord}
               onChange={(event) => setConfirmWord(event.target.value)}
               autoFocus
               disabled={mutationLocked || running}
               aria-label="確認の言葉"
               className={styles.dialogInput}
-            /></Field>
+            /></SaveErrorField></Field>
           {confirmMode === 'stop' && stepUpMethod !== 'none' ? (
             <div className={styles.dialogField}>
               <span className={styles.dialogLabel} id="emergency-stepup-label">
                 {stepUpMethod === 'password' ? '本人確認（パスワード）' : '本人確認（認証アプリの6桁）'}
               </span>
               {stepUpMethod === 'password' ? (
-                <input
+                <SaveErrorField names={["stopPassword","stop_password"]}><input
                   type="password"
                   aria-label="パスワード"
                   value={stopPassword}
@@ -916,15 +909,15 @@ const EmergencyControlV8 = (
                   autoComplete="current-password"
                   className={styles.dialogInput}
                   style={{ maxWidth: '100%' }}
-                />
+                /></SaveErrorField>
               ) : (
-                <OtpInput
+                <SaveErrorField names={["stopCode"]}><OtpInput
                   value={stopCode}
                   onChange={setStopCode}
                   labelledBy="emergency-stepup-label"
                   busy={running}
                   disabled={mutationLocked}
-                />
+                /></SaveErrorField>
               )}
             </div>
           ) : null}

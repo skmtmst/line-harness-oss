@@ -2,7 +2,7 @@
 @layer components {
 [data-theme='v8'] .button { transition: transform var(--motion-instant) var(--motion-ease-out); }
 [data-theme='v8'] .button:active { transform: scale(var(--press-scale)); }
-.button:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+.button:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { [data-theme='v8'] .button:active { transform: none; } }
 
 }

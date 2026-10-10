@@ -34,7 +34,6 @@ type OperatorNotificationSummary = {
   excludedToday: number
 }
 
-
 function conditionsOf(rule: OperatorNotificationRule): DraftConditions {
   return rule.conditions as DraftConditions
 }
@@ -175,7 +174,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
       : <DataTable><thead><tr><Th>お知らせ</Th><Th>きっかけ</Th><Th>受け取る人</Th><Th>送る時間</Th><Th>今日</Th><Th>状態</Th><Th>操作</Th></tr></thead><tbody>{visible.map((rule) => <Tr key={rule.id}>
         {/* NOTIFY-04: 名前から編集画面へ戻れる。保存したお知らせを開き直して
             直せないと、直すたびに作り直しになる。 */}
-        <NameCell name={<Link href={`/line-notifications/operator/new?id=${encodeURIComponent(rule.id)}`} className="text-action hover:underline" title={rule.name}>{rule.name}</Link>} sub={importanceLabelOf(rule)} />
+        <NameCell name={<Link href={`/line-notifications/operator/new?id=${encodeURIComponent(rule.id)}`} className="text-action hover:underline" title={rule.name}>{rule.name}</Link>} />
         <Td>{operatorEventLabel(rule.eventType)}</Td>
         <Td>{conditionsOf(rule).recipientLabel ?? (rule.recipientCount > 0 ? `${rule.recipientCount}人` : '受け取れる人なし')}</Td>
         <Td>{conditionsOf(rule).scheduleLabel ?? 'いつでも'}</Td>

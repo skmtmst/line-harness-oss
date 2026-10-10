@@ -95,13 +95,13 @@ async function flush() {
 }
 
 describe('#641 リッチメニュー一覧の行操作', () => {
-  it('「編集」が枠つきボタン、表示先・複製・切替・削除は撮影口つき「・・・」メニュー', async () => {
+  it('編集・表示先・複製・切替・削除は行の「…」メニュー', async () => {
     await act(async () => { root.render(<RichMenusPage />) })
     await flush()
 
     const edit = [...host.querySelectorAll('a')]
       .find((el) => el.getAttribute('href') === '/rich-menus/edit?id=g-1' && el.textContent?.includes('編集'))
-    expect(edit, '枠つき「編集」ボタンが見つかりません').toBeTruthy()
+    expect(edit, '行の右に編集ボタンを置かない').toBeUndefined()
 
     // 行にゴミ箱アイコンだけのボタンは置かない。
     expect(host.querySelector('button[aria-label="通常メニューを削除する"]'), 'ゴミ箱アイコンの直置きが残っています').toBeNull()
@@ -113,6 +113,7 @@ describe('#641 リッチメニュー一覧の行操作', () => {
     // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
     const menu = document.querySelector('[role="menu"]')
     expect(menu, 'メニューが開きません').toBeTruthy()
+    expect(menu!.textContent).toContain('編集')
     expect(menu!.textContent).toContain('表示先')
     expect(menu!.textContent).toContain('複製')
     expect(menu!.textContent).toContain('切替のつながりを見る')

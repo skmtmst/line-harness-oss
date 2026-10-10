@@ -1,10 +1,4 @@
 'use client'
-
-/*
- * ★V8 Googleビジネス 設定（`CuHXG`：接続済み）。未接続・店舗の選択待ちも同じ場所で出す（今の画面と同じ口）。
- * 接続・再接続は Google の認可画面へ移る。解除・取り消し・切り替えは確認の小窓を経る。
- * 接続を管理できない人には、接続・解除のボタンを置かない。
- */
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import { useState } from 'react'
 import { Link2, RefreshCw } from 'lucide-react'
@@ -19,8 +13,17 @@ import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant
 import { errorMessage, formatStampFull, formatYmd } from './format'
 import styles from './google.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 Googleビジネス 設定（`CuHXG`：接続済み）。未接続・店舗の選択待ちも同じ場所で出す（今の画面と同じ口）。
+ * 接続・再接続は Google の認可画面へ移る。解除・取り消し・切り替えは確認の小窓を経る。
+ * 接続を管理できない人には、接続・解除のボタンを置かない。
+ */
 
 export default function SettingsBoard({ accountId, data, onChanged }: { accountId: string; data: GoogleConnectionData; onChanged: () => void }) {
+  const saveErrors = useSaveFormErrors()
   const canManage = data.permissions.canManageConnection
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')
@@ -40,7 +43,10 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
       const response = await restaurantGoogleApi.connectStart(accountId)
       window.location.assign(response.authorizeUrl)
     } catch (err) {
-      setActionError(errorMessage(err, 'Googleの認可画面を開けませんでした。'))
+      const fieldFailure = saveErrors.capture(err)
+
+      { if (!fieldFailure)
+      setActionError(errorMessage(err, 'Googleの認可画面を開けませんでした。')) }
       setBusy(false)
     }
   }
@@ -55,7 +61,10 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
       setConfirmSwitch(false)
       onChanged()
     } catch (err) {
-      setActionError(errorMessage(err, '店舗を選べませんでした。'))
+      const fieldFailure = saveErrors.capture(err)
+
+      { if (!fieldFailure)
+      setActionError(errorMessage(err, '店舗を選べませんでした。')) }
     } finally {
       setBusy(false)
     }
@@ -69,7 +78,10 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
       setConfirmDisconnect(false)
       onChanged()
     } catch (err) {
-      setActionError(errorMessage(err, '接続を解除できませんでした。'))
+      const fieldFailure = saveErrors.capture(err)
+
+      { if (!fieldFailure)
+      setActionError(errorMessage(err, '接続を解除できませんでした。')) }
     } finally {
       setBusy(false)
     }
@@ -79,7 +91,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
 
   if (connection.status === 'disconnected') {
     return (
-      <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="google-connect-title">
+      <SaveErrorScope errors={saveErrors}><Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="google-connect-title">
         <SectionHeader size="small" title={<span id="google-connect-title">Googleアカウントを接続 <StatusBadge tone="neutral">未接続</StatusBadge></span>} />
         <p className={styles.preText}>{'店舗を管理しているGoogleアカウントでログインしてください。\n接続する店舗は、1つのLINEアカウントにつき1店舗です。'}</p>
         {!data.oauthConfigured ? <Notice tone="warn">この環境にはGoogle接続の設定がありません。運営に連絡してください。</Notice> : null}
@@ -91,13 +103,13 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         ) : null}
         <p className={styles.grayNote}>初回接続時に、Googleで管理できる店舗から接続先を1店舗確認します。接続後は、このLINEアカウントの店舗だけを表示します。</p>
         {manageNote}
-      </Card>
+      </Card></SaveErrorScope>
     )
   }
 
   if (connection.status === 'pending_location') {
     return (
-      <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="google-location-title">
+      <SaveErrorScope errors={saveErrors}><Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="google-location-title">
         <FormLeaveGuard dirty={Boolean(selectedLocation) && !locationSaved} busy={busy} />
         <SectionHeader size="small" title={<span id="google-location-title">接続する店舗を選ぶ</span>} />
         <p className={styles.muted}>{`Googleアカウントの認証は完了しています${connection.googleAccountEmail ? `（${connection.googleAccountEmail}）` : ''}`}</p>
@@ -139,7 +151,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
           onConfirm={() => selectLocation(true)}
           onCancel={() => setConfirmSwitch(false)}
         />
-      </Card>
+      </Card></SaveErrorScope>
     )
   }
 
@@ -148,7 +160,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
     : connection.status === 'expired' ? '認可切れ（再接続してください）' : '権限なし（Google側の管理権限を確認してください）'
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       {connection.status === 'expired' ? <Notice tone="danger">Googleとの接続を確認してください。認可が切れています。店舗を管理するGoogleアカウントで再接続してください。保存中の返信の下書きはいま残っていますが、Googleから取得した口コミは最終更新から30日以内に削除するため、再接続しないままだと下書きも一緒に消えます。</Notice> : null}
       {connection.status === 'no_permission' ? <Notice tone="danger">この店舗を操作する権限がありません。接続済み店舗の管理権限をGoogle側で確認してください。</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
@@ -179,6 +191,6 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         onConfirm={() => disconnect()}
         onCancel={() => setConfirmDisconnect(false)}
       />
-    </>
+    </></SaveErrorScope>
   )
 }

@@ -1,5 +1,7 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import { PageTitle } from '@/components/templates/page-frame'
 
 import { Suspense, useCallback, useEffect, useState } from 'react'
@@ -15,7 +17,6 @@ import NoteBar from '@/components/shared/note-bar'
 import { useAccount } from '@/contexts/account-context'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 
 type PublishedWebinar = Webinar & {
@@ -54,8 +55,7 @@ function PublishedWebinarContent() {
    * 理由を添える（テンプレート詳細 N-144 と同じ出し分け）。
    * 読み取り（GET）は staff も通るので、編集画面への行き来は残す。
    */
-  const [canMutateWebinars] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canMutateWebinars = useFeatureAccess('webinars')
 
   const load = useCallback(async () => {
     if (!id) {

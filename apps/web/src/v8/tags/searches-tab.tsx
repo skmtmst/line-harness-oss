@@ -1,21 +1,12 @@
 'use client'
 
-/*
- * ★V8 タグ「保存した検索」タブ（Pencil `IWnYX`）。
- *
- * ここは管理だけ。条件を作るのは友だち一覧の絞り込みで、「この条件を保存」で増える。
- * 動き（読み込み・数の帯・絞り込み・並べ替え・削除・行の詳細パネル・名前のその場の直し・右クリック）は
- * 今の V8 タブ（app/tags/searches-v8.tsx）から写した。見た目は絵に合わせた：
- * 表は「条件名・内容／該当／共有／使っている所／更新／友だち一覧へ／…」。つまみの列は無く、
- * 並べ替えは行の「…」の「上へ動かす・下へ動かす」（つまみで ↑↓ と同じ口）。
- * 絵の下の段のとおり、行の「…」に「複製して保存」を足した（同じ条件で新しく保存する）。
- */
-import { notifySaved } from '@/components/shared/toast'
+import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, Bookmark, CircleDashed, Filter, Lightbulb, MousePointerClick, Send, Users } from 'lucide-react'
+import { Bookmark, CircleDashed, Filter, Lightbulb, MousePointerClick, Send, Users } from 'lucide-react'
 import type { SavedSearch, Tag } from '@line-crm/shared'
 import { api, ApiError, type SavedSearchSummary } from '@/lib/api'
 import { ListPageBody } from '@/components/templates'
@@ -35,8 +26,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
-import { notifyToast } from '@/components/shared/toast'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils'
 import { splitConditions } from '@/components/friend-fields/saved-search-list'
 import type { SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
@@ -46,8 +36,23 @@ import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 
-const PAGE_SIZES = [10, 20, 50]
+/*
+ * ★V8 タグ「保存した検索」タブ（Pencil `IWnYX`）。
+ *
+ * ここは管理だけ。条件を作るのは友だち一覧の絞り込みで、「この条件を保存」で増える。
+ * 動き（読み込み・数の帯・絞り込み・並べ替え・削除・行の詳細パネル・名前のその場の直し・右クリック）は
+ * 今の V8 タブ（app/tags/searches-v8.tsx）から写した。見た目は絵に合わせた：
+ * 表は「条件名・内容／該当／共有／使っている所／更新／友だち一覧へ／…」。つまみの列は無く、
+ * 並べ替えは行の「…」の「上へ動かす・下へ動かす」（つまみで ↑↓ と同じ口）。
+ * 絵の下の段のとおり、行の「…」に「複製して保存」を足した（同じ条件で新しく保存する）。
+ */
+
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 const MAX_SAVED = 50
 
 /* 使っている所の種類（絵の言葉）。 */
@@ -87,6 +92,7 @@ function updatedText(search: SavedSearch): string {
 }
 
 export default function SearchesTab({ accountId, canEdit }: { accountId: string | null; canEdit: boolean }) {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const [items, setItems] = useState<SavedSearch[]>([])
   const [summary, setSummary] = useState<SavedSearchSummary | null>(null)
@@ -151,14 +157,16 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       setItems(savedSearches.items)
       setSummary(savedSearches.summary)
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason);
+
       if (sequence === loadSequence.current) {
         if (reason instanceof ApiError && reason.status === 403) setForbidden(true)
-        else setLoadError(reason instanceof ApiError ? reason.message : '保存した検索を読み込めませんでした')
+        else { if (!fieldFailure) setLoadError(reason instanceof ApiError ? reason.message : '保存した検索を読み込めませんでした') }
       }
     } finally {
       if (sequence === loadSequence.current) setLoading(false)
     }
-  }, [accountId])
+  }, [accountId, saveErrors])
   useEffect(() => { void load() }, [load])
 
   /* アカウントが変わったら、前のアカウントの削除確認を閉じる。 */
@@ -178,7 +186,11 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       setPendingDelete(null)
       void load()
     } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure)
+
+      setError(reason instanceof ApiError ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。') }
     }
   }
 
@@ -197,7 +209,11 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       notifySaved(`「${search.name}のコピー」を保存しました`)
       void load()
     } catch (reason) {
-      setError(reason instanceof ApiError ? `複製できませんでした（${reason.message}）` : '複製できませんでした')
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure)
+
+      setError(reason instanceof ApiError ? `複製できませんでした（${reason.message}）` : '複製できませんでした') }
     }
   }
 
@@ -213,9 +229,13 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       if (!res.success) throw new Error(res.error)
       void load()
     } catch (reason) {
-      setItems(previous)
+      const fieldFailure = saveErrors.capture(reason)
+      setItems(previous);
+
       const message = reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした'
-      setError(message)
+      { if (!fieldFailure)
+
+      setError(message) }
       setRetryOrder(next)
       notifyToast(message, { tone: 'error', actionLabel: 'もう一度', onAction: () => { void applyOrder(next) } })
     }
@@ -256,9 +276,9 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
     const list: ActionMenuItem[] = []
     const index = filteredList.findIndex((item) => item.id === search.id)
     if (search.lineAccountId) {
-      list.push({ id: 'open', label: '友だち一覧へ', external: true, href: `/friends?savedSearch=${search.id}`, onSelect: () => router.push(`/friends?savedSearch=${search.id}`) })
+      list.push({ id: 'open', label: '友だち一覧へ', external: false, href: `/friends?savedSearch=${search.id}`, onSelect: () => router.push(`/friends?savedSearch=${search.id}`) })
       if (canEdit) {
-        list.push({ id: 'edit', label: '編集', external: true, href: `/tags/searches/edit?id=${encodeURIComponent(search.id)}`, onSelect: () => router.push(`/tags/searches/edit?id=${encodeURIComponent(search.id)}`) })
+        list.push({ id: 'edit', label: '編集', external: false, href: `/tags/searches/edit?id=${encodeURIComponent(search.id)}`, onSelect: () => router.push(`/tags/searches/edit?id=${encodeURIComponent(search.id)}`) })
         list.push({
           id: 'duplicate',
           label: '複製して保存',
@@ -297,7 +317,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   const sharedCount = items.filter((item) => item.isShared).length
@@ -311,41 +331,21 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
   const filterActive = Boolean(query || usageFilter !== 'all' || matchFilter !== 'all')
 
   const table = !accountId ? (
-    <div className={styles.stateCard}>
-      <p className={styles.stateTitle}>上部でLINE公式アカウントを選んでください</p>
-    </div>
+    <ListState kind="empty" title="上部でLINE公式アカウントを選んでください"   />
   ) : forbidden ? (
-    <div className={styles.stateCard}>
-      <AlertCircle className={styles.stateIconError} aria-hidden="true" />
-      <p className={styles.stateTitle}>保存した検索を見る権限がありません</p>
-      <p className={styles.stateDesc}>{permissionDeniedMessage('store')}</p>
-    </div>
+    <ListState kind="error" title="保存した検索を見る権限がありません" description={permissionDeniedMessage('store')}  />
   ) : loadError ? (
-    <div className={styles.stateCard}>
-      <AlertCircle className={styles.stateIconError} aria-hidden="true" />
-      <p className={styles.stateTitle}>保存した検索を読み込めませんでした</p>
-      <p className={styles.stateDesc}>{loadError}</p>
-      <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
-    </div>
+    <ListState kind="error" title="保存した検索を読み込めませんでした" description={loadError}  action={<><Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
   ) : ready && items.length === 0 ? (
-    <div className={styles.stateCard}>
-      <Filter className={styles.stateIcon} aria-hidden="true" />
-      <p className={styles.stateTitle}>まだ保存した検索はありません</p>
-      <p className={styles.stateDesc}>友だち一覧で条件を絞り、「この条件を保存」を押すとここに追加されます。</p>
-      {canEdit ? <Button href="/friends" variant="primary">友だち一覧で条件を作る</Button> : null}
-    </div>
+    <ListState kind="empty" title="まだ保存した検索はありません" description="友だち一覧で条件を絞り、「この条件を保存」を押すとここに追加されます。"  icon={<Filter className={styles.stateIcon} aria-hidden="true" />} action={<>{canEdit ? <Button href="/friends" variant="primary">友だち一覧で条件を作る</Button> : null}</>} />
   ) : ready && visible.length === 0 ? (
-    <div className={styles.stateCard}>
-      <p className={styles.stateTitle}>条件に合うものはありません</p>
-      <p className={styles.stateDesc}>検索や絞り込みを外すと、すべて出ます</p>
-      {filterActive ? <Button type="button" onClick={() => { setQuery(''); setUsageFilter('all'); setMatchFilter('all') }}>条件を外す</Button> : null}
-    </div>
+    <ListState kind="empty" title="条件に合うものはありません" description="検索や絞り込みを外すと、すべて出ます"  action={<>{filterActive ? <Button type="button" onClick={() => { setQuery(''); setUsageFilter('all'); setMatchFilter('all') }}>条件を外す</Button> : null}</>} />
   ) : (
     <DelayedSkeleton loading={loading} skeleton={<div className={styles.skeleton} aria-busy="true" />}>
       <DataTable className={styles.table}>
         <thead>
           <TableHeadRow>
-            <Th className={styles.searchColName}>条件名・内容</Th>
+            <Th className={styles.searchColName}>条件名・内容</Th><Th>状態</Th>
             <Th className={styles.searchColCount}>該当</Th>
             <Th className={styles.searchColShare}>共有</Th>
             <Th className={styles.searchColUsage}>使っている所</Th>
@@ -374,7 +374,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                   }
                 }} data-row-id={search.id}
               >
-                <Td className={styles.searchColName}>
+                <Td className={styles.searchColName}><FolderDotName>
                   <ContextMenu label={`保存した検索「${search.name}」の操作`} items={searchContextItems(search)}>
                     <div className={styles.nameRow}>
                       {editHref ? (
@@ -384,13 +384,13 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                       ) : (
                         <span className={styles.name} ><TruncatedText value={String(search.name ?? '')} /></span>
                       )}
-                      {!search.lineAccountId ? (
-                        <StatusBadge tone="warning" size="annotation" dot={false}>対象アカウント未割り当て</StatusBadge>
-                      ) : null}
                     </div>
-                    <p className={styles.sub} title={summaryText}>{summaryText}</p>
+
                   </ContextMenu>
-                </Td>
+                </FolderDotName></Td>
+                <Td>{!search.lineAccountId ? (
+                        <StatusBadge tone="warning" size="annotation" dot={false}>対象アカウント未割り当て</StatusBadge>
+                      ) : null}</Td>
                 <Td className={styles.searchColCount} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.cellText} title={search.matchCountError ?? undefined}>
                     {search.matchCount !== null && search.matchCount !== undefined ? `${formatNumber(search.matchCount)}人` : emptyValue('unknown')}
@@ -432,12 +432,11 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
         </div>
       ) : null}
 
-
     </DelayedSkeleton>
   )
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <KpiBand data-design="KPIs" className={styles.kpis}>
         {kpiCards.map((kpi) => (
           <KpiCard
@@ -460,12 +459,13 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       </div>
 
       <ListPageBody
+        skeleton
         listHelp={canEdit ? `保存は最大 ${MAX_SAVED} 件。行の「…」に：編集・複製して保存・削除。` : `保存は最大 ${MAX_SAVED} 件。`}
         toolbar={<>
-          <span className={styles.search}>
+          <ListToolbarSearchSlot>
             <SearchField aria-label="条件名で探す" placeholder="条件名で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
-          </span>
-          <Select
+          </ListToolbarSearchSlot>
+          <SaveErrorField names={["usageFilter","usage_filter"]}><Select
             value={usageFilter}
             width={170}
             onChange={(value) => setUsageFilter(value as SavedSearchUsageFilter)}
@@ -475,8 +475,8 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
               { value: 'used', label: '使っている所：あり' },
               { value: 'unused', label: '使っている所：なし' },
             ]}
-          />
-          <Select
+          /></SaveErrorField>
+          <SaveErrorField names={["matchFilter","match_filter"]}><Select
             value={matchFilter}
             width={145}
             onChange={(value) => setMatchFilter(value as typeof matchFilter)}
@@ -487,21 +487,17 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
               { value: 'zero', label: '該当人数：0人' },
               { value: 'unknown', label: '該当人数：未集計' },
             ]}
-          />
+          /></SaveErrorField>
           <span className={styles.toolbarSpacer} />
           <PageSizeSelect value={pageSize} onChange={(value) => setPageSize(value || 20)} options={PAGE_SIZES} label={null} />
         </>}
       >
         {error ? (
-          <p role="alert" className={styles.errorBand}>
-            <AlertCircle className={styles.errorIcon} aria-hidden="true" />
-            {error}
-            {retryOrder ? (
+          <Notice tone="danger" >{error}{retryOrder ? (
               <button type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</button>
             ) : (
               <button type="button" onClick={() => { setError(''); void load() }}>もう一度読み込む</button>
-            )}
-          </p>
+            )}</Notice>
         ) : null}
         {table}
       </ListPageBody>
@@ -569,6 +565,6 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
         onCancel={() => setPendingDelete(null)}
         onConfirm={() => { const target = pendingDelete; if (target) void confirmRemove(target) }}
       />
-    </>
+    </></SaveErrorScope>
   )
 }

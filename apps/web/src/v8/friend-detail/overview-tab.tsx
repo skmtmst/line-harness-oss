@@ -1,8 +1,5 @@
 'use client'
 
-/*
- * 概要タブ（JCDRm・Q5F2QE の 1.）。左に要点 320px、右に数の帯・進行中・同じ人・最近の履歴・行う操作。
- */
 import StatusPill from '@/components/shared/status-pill'
 import Link from 'next/link'
 import {
@@ -21,6 +18,7 @@ import type { FriendField } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import TagPill from '@/components/shared/tag-pill'
 import CustomerInfoPanel from '@/components/shared/customer-info-panel'
+import TagOverflow from '@/components/shared/tag-overflow'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { formatDay, formatDateTime, formatNumber, formatRelative } from '@/lib/format'
@@ -33,6 +31,12 @@ import styles from './detail.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import Notice from '@/components/shared/notice'
+
+
+/*
+ * 概要タブ（JCDRm・Q5F2QE の 1.）。左に要点 320px、右に数の帯・進行中・同じ人・最近の履歴・行う操作。
+ */
 
 function GroupHead({ title, action }: { title: string; action?: React.ReactNode }) {
   return (
@@ -119,7 +123,7 @@ export default function OverviewTab({
           </dl></> },
             { key: 'tags', label: 'タグ', action: perms.editSupport ? <Link className={styles.groupLink} href={inbox}>編集する</Link> : null, content: <><div className={styles.tags}>
             {friend.tags?.length
-              ? friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />)
+              ? <TagOverflow>{friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />)}</TagOverflow>
               : <span className={`${styles.memo} ${styles.faint}`}>タグはありません</span>}
             {perms.editSupport ? <Link className={`${styles.tag} ${styles.tagAdd}`} href={inbox}>＋ 追加</Link> : null}
           </div></> },
@@ -230,10 +234,8 @@ export default function OverviewTab({
           {upcomingStatus === 'loading' || upcomingStatus === 'idle' ? (
             <DetailLoading />
           ) : deliveryFailed ? (
-            <p className={styles.secNote} role="alert">
-              配信予定を読み込めませんでした
-              <button type="button" className={styles.retry} onClick={() => void data.loadUpcoming()}>もう一度読み込む</button>
-            </p>
+            <Notice tone="danger" className={styles.secNoteNoticePlacement} >配信予定を読み込めませんでした
+              <button type="button" className={styles.retry} onClick={() => void data.loadUpcoming()}>もう一度読み込む</button></Notice>
           ) : nextDelivery ? (
             <Link
               className={styles.row}

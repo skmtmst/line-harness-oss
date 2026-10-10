@@ -10,11 +10,18 @@
   color: var(--color-ink); background: var(--color-canvas);
 }
 :global([data-theme='v8']) .frame[data-standalone] { width: 100%; margin: 0; min-height: 100%; }
+:global([data-theme='v8']) .frame:is([data-template-layout='event-list'], [data-template-layout='event-roster'], [data-template-layout='distribution']) {
+  --tpl-head-pad-top: var(--tpl-head-pad-side);
+  --tpl-head-pad-bottom: var(--tpl-folder-pad-block);
+  --tpl-toolbar-pad-block: var(--tpl-folder-pad-block);
+}
+:global([data-theme='v8']) .frame[data-template-layout='event-list'] { --folder-row-pad-block: var(--tpl-toolbar-gap); }
+:global([data-theme='v8']) .frame[data-template-layout='event-list'] .toolbar { row-gap: var(--tpl-section-pad); }
 :global([data-theme='v8']) .heading {
   display: flex; align-items: center; flex-wrap: wrap; gap: var(--polish-space-field);
   padding: var(--tpl-head-pad-top) var(--tpl-head-pad-side) var(--tpl-head-pad-bottom); flex-shrink: 0;
 }
-:global([data-theme='v8']) .headingText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-head-gap); }
+:global([data-theme='v8']) .headingText { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-head-gap); }
 :global([data-theme='v8']) .titleRow { display: flex; align-items: center; gap: var(--polish-space-row); min-width: 0; }
 :global([data-theme='v8']) .title { margin: 0; min-width: 0; overflow: visible; white-space: normal; overflow-wrap: anywhere; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
 :global([data-theme='v8']) .pageTitle { min-width: 0; overflow: visible; white-space: normal; overflow-wrap: anywhere; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
@@ -67,7 +74,7 @@
 :global([data-theme='v8']) .dashboardRow[data-aside-size='column'] > .dashboardCell { grid-column: 1 / -2; }
 :global([data-theme='v8']) .dashboardRow[data-aside-size='column'] > .dashboardAside { grid-column: -2 / -1; width: auto; }
 :global([data-theme='v8']) .createContent { padding: var(--tpl-create-content-pad-block) var(--tpl-create-content-pad-side); display: flex; flex-direction: column; gap: var(--tpl-create-content-gap); min-width: 0; flex: 1; }
-:global([data-theme='v8']) .preview { width: 380px; flex-shrink: 0; padding: var(--tpl-preview-pad); border-left: 1px solid var(--color-hairline); background: var(--color-table-head); }
+:global([data-theme='v8']) .preview { align-self: flex-start; position: sticky; top: 0; max-height: 100%; width: 380px; flex-shrink: 0; padding: var(--tpl-preview-pad); border-left: 1px solid var(--color-hairline); background: var(--color-table-head); }
 /* 作成の型の余白の口（CreatePage の contentSpacing・previewSurface）。画面の CSS で型の余白を上書きしない。 */
 :global([data-theme='v8']) .createContent[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); gap: var(--tpl-create-flush-gap); }
 :global([data-theme='v8']) .preview[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); }
@@ -133,6 +140,7 @@
 :global([data-theme='v8']) [data-page-template='create'] > .heading .headingText { flex: 1 1 auto; }
 :global([data-theme='v8']) .preview { display: flex; flex-direction: column; align-items: center; gap: var(--polish-space-field); }
 :global([data-theme='v8']) .detailSummary { display: flex; flex-direction: column; gap: var(--polish-space-card); }
+:global([data-theme='v8']) [data-page-template='detail'] > .split { flex: 0 0 auto; align-items: flex-start; }
 :global([data-theme='v8']) .heading[data-heading-size='large'] { gap: var(--tpl-large-gap); }
 :global([data-theme='v8']) .heading[data-heading-size='large'] .headingText { gap: var(--tpl-head-gap); }
 :global([data-theme='v8']) .heading[data-heading-size='large'] .description { font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }
@@ -153,10 +161,12 @@
 :global([data-theme='v8']) .frame[data-has-footer] { height: calc(100dvh - 74px); min-height: 0; }
 :global([data-theme='v8']) .frame[data-has-footer] > .split,
 :global([data-theme='v8']) .frame[data-has-footer] > .settings { min-height: 0; overflow-y: auto; }
+:global([data-theme='v8']) .frame[data-has-footer] > [data-template-region='body'] { flex: 1; min-height: 0; overflow-y: auto; }
+:global([data-theme='v8']) .frame [data-template-region='preview'][data-preview-narrow='hidden'] { align-self: flex-start; }
 :global([data-theme='v8']) .footer { flex-shrink: 0; }
 
 /* 入力と見え方は別々に送る。本文全体のスクロールバーで左右の列幅を削らない。 */
-:global([data-theme='v8']) [data-page-template='create'][data-has-footer] > .split { overflow: hidden; }
+:global([data-theme='v8']) [data-page-template='create'][data-has-footer] > .split { align-items: flex-start; overflow: hidden; }
 :global([data-theme='v8']) [data-page-template='create'][data-has-footer] .createContent {
   max-height: 100%; min-height: 0; overflow-y: auto;
 }
@@ -180,12 +190,13 @@
   :global([data-theme='v8']) .collapsedFolders { display: flex; align-items: center; gap: var(--polish-space-row); }
   :global([data-theme='v8']) .toolbar[data-collapsed-only] { display: flex; }
   /* 900 の板でも右の列は残す（幅 280）。消すのは狭い幅だけ。 */
-  :global([data-theme='v8']) .preview { width: var(--tpl-preview-narrow-width); }
+  :global([data-theme='v8']) .preview { width: var(--tpl-preview-narrow-width); background: transparent; border-left: 0; }
   :global([data-theme='v8']) .previewContent { width: var(--tpl-preview-narrow-content-width); }
   /* 画面が詰めた右の列を頼んだとき（CreatePage の previewCompactWhenNarrow・絵 kmTab）。 */
   :global([data-theme='v8']) .preview[data-preview-narrow='compact'] { padding: var(--tpl-r2-rail-compact-pad); }
   :global([data-theme='v8']) .preview[data-preview-narrow='compact'] .previewContent { width: var(--tpl-r2-rail-compact-content-width); }
   :global([data-theme='v8']) .preview[data-preview-narrow='hidden'] { display: none; }
+  :global([data-theme='v8']) .frame [data-template-region='preview'][data-preview-narrow='hidden'] { display: none; }
   :global([data-theme='v8']) .inboxSummary, :global([data-theme='v8']) .analyticsAside, :global([data-theme='v8']) .dashboardAside:not([data-aside-size='column']) { display: none; }
   :global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside:not([data-aside-size='column']) { display: none; }
   :global([data-theme='v8']) .asideToggle { display: block; }
@@ -306,6 +317,33 @@
   :global([data-theme='v8']) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settingsContent { width: 100%; padding-left: var(--tpl-head-pad-side); align-self: stretch; }
 }
 
+/* O2Z8u・GcyTr：予約の主操作は題の行、数の帯はすぐ下。 */
+:global([data-theme='v8']) .bookingHeading,
+:global([data-theme='v8']) .bookingStats { min-width: 0; width: calc(100% - var(--tpl-booking-aside-width)); }
+:global([data-theme='v8']) .bookingHeading .actions { gap: var(--tpl-booking-heading-gap); }
+:global([data-theme='v8']) .bookingHeading .heading { padding-top: var(--tpl-booking-head-pad-top); }
+:global([data-theme='v8']) .bookingContent { min-width: 0; padding: var(--tpl-section-gap) var(--tpl-head-pad-side) var(--tpl-page-pad-block); }
+@container v8-page (width < 1100px) {
+  :global([data-theme='v8']) .bookingHeading,
+  :global([data-theme='v8']) .bookingStats { width: 100%; }
+  :global([data-theme='v8']) .bookingHeading .heading { padding-block: var(--tpl-booking-narrow-head-pad); }
+}
+
+/* B-178：フォルダの列は余白込み200、ページ送りは右寄せ。 */
+:global([data-theme='v8']) [data-list-skeleton] .folders { box-sizing: border-box; width: var(--tpl-folder-width); }
+:global([data-theme='v8']) [data-list-skeleton] .paginationRow { justify-content: flex-end; gap: var(--space-16); }
+
+:global([data-theme='v8']) [data-list-skeleton] .pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-16); }
+
+/* ページ送りを別の子で組む一覧でも、型の余白を二重に足さない。 */
+:global([data-theme='v8']) [data-list-skeleton] .pagination .pagination { padding: 0; }
+
+/* 道具の段の左右・上下の余白は型が一度だけ持つ。 */
+:global([data-theme='v8']) [data-list-skeleton] .toolbar :global([data-list-toolbar]) { padding: 0; }
+
+:global([data-theme='v8']) .frame[data-template-layout='distribution'] { --tpl-toolbar-pad-block: var(--tpl-distribution-toolbar-pad); }
+:global([data-theme='v8']) .frame[data-template-layout='distribution'] .listBody { flex: none; }
+:global([data-theme='v8']) .frame[data-template-layout='distribution'] > .footer { margin: var(--tpl-toolbar-gap) 0 0; }
 .subtitle{margin:0;color:var(--color-ink-secondary);font-size:var(--text-caption);line-height:var(--tpl-rs-lh-13);}
 
 :global([data-theme='v8']) [data-page-template='restaurant'] .heading { min-height: 60px; }

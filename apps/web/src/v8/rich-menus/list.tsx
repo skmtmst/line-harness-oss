@@ -1,35 +1,14 @@
 'use client'
 
-/*
- * ★V8 リッチメニューの一覧（Pencil「★V8 画面の地図」のリッチメニューの行：
- * 一覧 `rZEGN`、1152 `Y9ASp`、閲覧のみ `ZoKow`、削除できない理由の窓 `yOyCg`）。
- *
- * 2026-10-06 オーナー決定により、古い V8 一覧（app/rich-menus/list-v8.tsx）を
- * 直さず、型（ListPage）と共通部品で一から書いた。データの口・権限・失敗時の
- * 扱いは古い一覧と同じ（BEHAVIOR.md）。
- */
-import { formatDate as polishFormatDate } from '@/lib/format'
-import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar'
+import { formatDate as polishFormatDate, formatDay, formatNumber } from '@/lib/format'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useListUrlValue, useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  ArrowDownUp,
-  CalendarClock,
-  CircleCheck,
-  CloudDownload,
-  CloudOff,
-  Eye,
-  FilePen,
-  Hand,
-  Image as ImageIcon,
-  ListOrdered,
-  Plus,
-  Split,
-  TriangleAlert,
-  Trophy,
-} from 'lucide-react'
+import { ArrowDownUp, CalendarClock, CircleCheck, CloudDownload, CloudOff, FilePen, Hand, Image as ImageIcon, ListOrdered, Plus, Split, TriangleAlert, Trophy } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type RichMenuDeleteImpact, type RichMenuGroupListItem, type RichMenuTapStats } from '@/lib/api'
 import { clampSearchQuery } from '@/lib/search-query'
@@ -37,14 +16,11 @@ import type { SegmentCondition } from '@/lib/segment-condition'
 import { describeCondition } from '@/components/scenarios/scenario-dialogs'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { useRowLeaving } from '@/lib/use-row-leaving'
-import { formatDay, formatNumber } from '@/lib/format'
 import { runOptimistic } from '@/lib/undoable'
 import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 import { ListPage } from '@/components/templates'
-import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import DetailPanel from '@/components/shared/detail-panel'
 import Button from '@/components/shared/button'
@@ -65,26 +41,28 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
-import {
-  audienceReason,
-  audienceText,
-  blockerTexts,
-  canDelete as canDeleteImpact,
-  impactFromError,
-  impactMatchesRequest,
-  nextDisplayText,
-  referenceKindText,
-  sameDeleteImpactRequest,
-  type DeleteImpactRequest,
-} from './delete-impact'
+import { audienceReason, audienceText, blockerTexts, canDelete as canDeleteImpact, impactFromError, impactMatchesRequest, nextDisplayText, referenceKindText, sameDeleteImpactRequest, type DeleteImpactRequest } from './delete-impact'
 import { moveTargetingGroup, orderTargetingGroups, withNormalizedPriority } from './targeting-order'
 import { ExternalImportWorkspace, type LineMenu } from './external-import'
 import { richMenuError, richMenuErrorAll } from './errors'
 import BlockedDeleteDialog, { type BlockedRow } from './blocked-dialog'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
+import { notifyToast } from '@/components/shared/toast'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
+
+/*
+ * ★V8 リッチメニューの一覧（Pencil「★V8 画面の地図」のリッチメニューの行：
+ * 一覧 `rZEGN`、1152 `Y9ASp`、閲覧のみ `ZoKow`、削除できない理由の窓 `yOyCg`）。
+ *
+ * 2026-10-06 オーナー決定により、古い V8 一覧（app/rich-menus/list-v8.tsx）を
+ * 直さず、型（ListPage）と共通部品で一から書いた。データの口・権限・失敗時の
+ * 扱いは古い一覧と同じ（BEHAVIOR.md）。
+ */
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
 const UNFILED = '__unfiled__'
@@ -199,6 +177,7 @@ function thumbCells(g: RichMenuGroupListItem): { rows: number; cols: number } {
 const REORDER_MAX_PAGES = 50
 
 export default function RichMenusListV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('リッチメニュー')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -209,7 +188,8 @@ export default function RichMenusListV8() {
    * 役割はサーバ（/api/staff/me）から読む。読めるまでは今までどおり操作を出す。
    */
   const role = useStaffRole()
-  const canEdit = role === null ? true : canManageRole(role)
+  const featureAccess = useFeatureAccess('richMenus')
+  const canEdit = featureAccess
 
   const [showExternal, setShowExternal] = useListUrlValue('showExternal', false)
   const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
@@ -266,9 +246,10 @@ export default function RichMenusListV8() {
   const [importedMenuName, setImportedMenuName] = useState<string | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
-  const [duplicateTarget, setDuplicateTarget] = useState<RichMenuGroupListItem | null>(null)
+  const duplicateLock = useRef(false)
+  const duplicateFeedback = useDuplicateFeedback(selectedAccount?.id)
   const [duplicateBusy, setDuplicateBusy] = useState(false)
-  const [duplicateError, setDuplicateError] = useState<string | null>(null)
+  const setDuplicateError = (message:string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
   const [reorderBusy, setReorderBusy] = useState(false)
   const [dragId, setDragId] = useState<string | null>(null)
   const [moveNotice, setMoveNotice] = useState('')
@@ -307,7 +288,6 @@ export default function RichMenusListV8() {
     setImportedMenuName(null)
     setDeleteBusy(false)
     setDeleteError(null)
-    setDuplicateTarget(null)
     setDuplicateBusy(false)
     setDuplicateError(null)
     setTagNameById(new Map())
@@ -345,14 +325,19 @@ export default function RichMenusListV8() {
       setGroupTotal(groupsRes.data.total)
       setGroupFacets(groupsRes.data.facets ?? null)
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e);
+
       if (activeAccountRef.current === accountId) {
-        setError(richMenuError(e, 'load'))
-        setLoadError(e)
+        { if (!fieldFailure)
+
+        setError(richMenuError(e, 'load')) }
+        { if (!fieldFailure)
+        setLoadError(e) }
       }
     } finally {
       if (activeAccountRef.current === accountId) setLoading(false)
     }
-  }, [deferredQuery, folderFilter, page, pageSize, savedFilter, selectedAccount?.id, sortKey])
+  }, [deferredQuery, folderFilter, page, pageSize, savedFilter, selectedAccount?.id, sortKey, saveErrors])
 
   /** タップ集計。数が取れなくても一覧は出す。 */
   const loadTapStats = useCallback(async () => {
@@ -371,10 +356,12 @@ export default function RichMenusListV8() {
       } else {
         setTapStatsStatus('error')
       }
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure);
+
       if (activeAccountRef.current === accountId) setTapStatsStatus('error')
     }
-  }, [selectedAccount?.id])
+  }, [selectedAccount?.id, saveErrors])
 
   /* 「誰に出すか」の「タグ『◯◯』」を解くためのタグ一覧。取れなくても一覧は出す。 */
   const loadTags = useCallback(async () => {
@@ -384,10 +371,11 @@ export default function RichMenusListV8() {
       const res = await api.tags.list({ accountId })
       if (activeAccountRef.current !== accountId) return
       if (res.success) setTagNameById(new Map(res.data.map((t) => [t.id, t.name])))
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       // タグ名が取れなくても一覧は出す。条件は説明の文へ落ちる。
     }
-  }, [selectedAccount?.id])
+  }, [selectedAccount?.id, saveErrors])
 
   /* LINE上の外部状態。重い口なので作業画面を開いてから取る。 */
   const loadExternal = useCallback(async () => {
@@ -407,14 +395,17 @@ export default function RichMenusListV8() {
         setExternal(null)
         setExternalStatus('error')
       }
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
       if (activeAccountRef.current === accountId) {
-        setExternalError('LINE上の状態を確認できませんでした。少し待ってから、もう一度読み込んでください。')
+        { if (!fieldFailure)
+        setExternalError('LINE上の状態を確認できませんでした。少し待ってから、もう一度読み込んでください。') }
         setExternal(null)
         setExternalStatus('error')
       }
     }
-  }, [selectedAccount?.id])
+  }, [selectedAccount?.id, saveErrors])
 
   /** 公開・削除・取り込みのあとの更新。読み込み済みのものだけ取り直す。 */
   const reload = useCallback(async () => {
@@ -429,11 +420,11 @@ export default function RichMenusListV8() {
     try {
       const res = await api.folders.list('rich_menu', selectedAccount?.id ?? undefined)
       if (res.success) setFolders(res.data)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       // 置き場が取れなくても一覧は出す。
     }
-  }, [selectedAccount?.id])
-
+  }, [selectedAccount?.id, saveErrors])
 
   useEffect(() => { void loadList() }, [loadList])
   useEffect(() => { void loadTapStats() }, [loadTapStats])
@@ -485,14 +476,17 @@ export default function RichMenusListV8() {
       }
       if (all.length < total) return null
       return orderTargetingGroups(all)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure);
+
       return null
     }
-  }, [groups, groupTotal, selectedAccount?.id])
+  }, [groups, groupTotal, selectedAccount?.id, saveErrors])
 
   /* 押した瞬間に並べ、裏で保存する。失敗したら元に戻し「もう一度」でやり直せる。 */
   const applyOrderedIds = useCallback((orderedIds: string[], notice: string) => {
     if (!selectedAccount?.id || reorderBusy) return
+    duplicateFeedback.clear()
     const accountId = selectedAccount.id
     const fullView = groups.length === groupTotal && orderedIds.length === groups.length
     const previous = groups
@@ -537,7 +531,7 @@ export default function RichMenusListV8() {
   /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（自動応答と同じ動き）。 */
   const liveOrder = useLiveReorder(groups, (g) => g.id, dragId)
   const bodyRef = useRef<HTMLTableSectionElement>(null)
-  useFlipRows(bodyRef, liveOrder.shown.map((g) => g.id).join(','))
+  useFlipRows(bodyRef, duplicateFeedback.order( liveOrder.shown).map((g) => g.id).join(','))
 
   const dropOn = useCallback(async (targetId: string) => {
     const dragging = dragId
@@ -580,11 +574,12 @@ export default function RichMenusListV8() {
       if (!impactMatchesRequest(res.data, request)) throw new Error('impact_scope_mismatch')
       setImpact(res.data)
       setImpactPhase('ready')
-    } catch {
+    } catch (saveFailure) {
       if (
         !sameDeleteImpactRequest(impactRequestRef.current, request)
         || impactLoadGenerationRef.current !== loadGeneration
       ) return
+      saveErrors.capture(saveFailure)
       /* 影響が読めないときは消させない。 */
       setImpactPhase('error')
     }
@@ -608,18 +603,26 @@ export default function RichMenusListV8() {
     setImpactPhase('idle')
   }
 
-  async function confirmDuplicate() {
+  async function confirmDuplicate(duplicateTarget: RichMenuGroupListItem) {
+    if (duplicateLock.current) return
     if (!duplicateTarget || duplicateBusy) return
+    duplicateLock.current = true
     setDuplicateBusy(true)
     setDuplicateError(null)
     try {
       const res = await api.richMenuGroups.duplicate(duplicateTarget.id, crypto.randomUUID())
       if (!res.success) throw new ApiError(500, res.error ?? 'duplicate_failed')
-      setDuplicateTarget(null)
-      router.push(`/rich-menus/edit?id=${res.data.id}`)
+
+      notifyToast('複製しました', { tone: 'success' })
+      await reload()
+      duplicateFeedback.mark(duplicateTarget.id, res.data.id)
     } catch (e) {
-      setDuplicateError(richMenuErrorAll(e, 'duplicate'))
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure)
+      setDuplicateError(richMenuErrorAll(e, 'duplicate')) }
     } finally {
+      duplicateLock.current = false
       setDuplicateBusy(false)
     }
   }
@@ -654,9 +657,11 @@ export default function RichMenusListV8() {
       else await reload()
     } catch (e) {
       if (!sameDeleteImpactRequest(impactRequestRef.current, request)) return
+      const fieldFailure = saveErrors.capture(e)
       /* 409は「読んだあとに状態が変わった」。新しい影響を描き直す。 */
       if (e instanceof ApiError && e.status === 409) {
-        const latest = impactFromError(e.data)
+        const latest = impactFromError(e.data);
+
         if (latest && impactMatchesRequest(latest, request)) {
           setImpact(latest)
           setImpactPhase('ready')
@@ -664,7 +669,8 @@ export default function RichMenusListV8() {
           void loadImpact(request)
         }
       }
-      setDeleteError(richMenuError(e, action))
+      { if (!fieldFailure)
+      setDeleteError(richMenuError(e, action)) }
     } finally {
       if (sameDeleteImpactRequest(impactRequestRef.current, request)) setDeleteBusy(false)
     }
@@ -692,7 +698,9 @@ export default function RichMenusListV8() {
       await reload()
     } catch (e) {
       if (importRequestGenerationRef.current !== requestGeneration || activeAccountRef.current !== accountId) return
-      setImportError(richMenuError(e, 'import'))
+      const fieldFailure = saveErrors.capture(e)
+      { if (!fieldFailure)
+      setImportError(richMenuError(e, 'import')) }
     } finally {
       if (importRequestGenerationRef.current === requestGeneration && activeAccountRef.current === accountId) {
         setImportBusy(false)
@@ -767,7 +775,7 @@ export default function RichMenusListV8() {
       label: '複製する',
       onSelect: () => {
         setDuplicateError(null)
-        setDuplicateTarget(g)
+        void confirmDuplicate(g)
       },
     })
     items.push({
@@ -831,7 +839,7 @@ export default function RichMenusListV8() {
   )
 
   const folderSelect = (
-    <Select
+    <SaveErrorField names={["folderFilter","folder_filter"]}><Select
       aria-label="フォルダ"
       value={folderFilter}
       onChange={(value) => {
@@ -839,7 +847,7 @@ export default function RichMenusListV8() {
         setPage(1)
       }}
       options={folderSelectOptions}
-    />
+    /></SaveErrorField>
   )
 
   /* ===== 道具の段 ===== */
@@ -862,17 +870,17 @@ export default function RichMenusListV8() {
   const sortBox = (
     <div className={styles.sortBox} title={`並び：${SORT_OPTIONS.find((o) => o.value === sortKey)?.label ?? ''}`}>
       <ArrowDownUp size={14} aria-hidden="true" className={styles.sortIcon} />
-      <ListToolbarSort
+      <SaveErrorField names={["sortKey","sort","sort_key"]}><ListToolbarSort
         aria-label="並び順"
         value={sortKey}
         onChange={(value) => setSortKey(value as SortKey)}
         options={SORT_OPTIONS}
-      />
+      /></SaveErrorField>
     </div>
   )
   const perPageBox = (
     <div className={styles.perPageBox} data-per-page-select>
-      <Select
+      <SaveErrorField names={["pageSize","limit","page_size"]}><Select
         aria-label="1ページに出す件数"
         size="page-size"
         value={String(pageSize)}
@@ -881,7 +889,7 @@ export default function RichMenusListV8() {
           setPage(1)
         }}
         options={PAGE_SIZE_OPTIONS}
-      />
+      /></SaveErrorField>
     </div>
   )
   const priorityNotice = (
@@ -892,12 +900,12 @@ export default function RichMenusListV8() {
 
   /* 1152 の板（Y9ASp）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札」。 */
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
+    <ListToolbarFrame>
       {priorityNotice}
-      <div className={styles.narrowRow}>
+      <ListToolbarRow>
         {createButton}
         <div className={styles.narrowFolder}>{folderSelect}</div>
-        <div className={styles.narrowSearch}>
+        <ListToolbarSearchSlot>
           <SearchField
             placeholder="メニュー名・ボタン名"
             aria-label="メニュー名・ボタン名で探す"
@@ -908,13 +916,13 @@ export default function RichMenusListV8() {
             }}
             onClear={() => setQuery('')}
           />
-        </div>
+        </ListToolbarSearchSlot>
         <span className={styles.spacer} aria-hidden="true" />
         {sortBox}
         {perPageBox}
-      </div>
-      <div className={styles.narrowRow}>{filterChips}</div>
-    </div>
+      </ListToolbarRow>
+      <ListToolbarRow>{filterChips}</ListToolbarRow>
+    </ListToolbarFrame>
   )
 
   const wideToolbar = (
@@ -980,12 +988,7 @@ export default function RichMenusListV8() {
   )
 
   const stateCard = (icon: React.ReactNode, title: string, desc: string, action: React.ReactNode, tone?: 'error') => (
-    <div className={styles.stateCard}>
-      <span className={tone === 'error' ? `${styles.stateIcon} ${styles.stateIconError}` : styles.stateIcon}>{icon}</span>
-      <p className={styles.stateTitle}>{title}</p>
-      <p className={styles.stateDesc}>{desc}</p>
-      {action}
-    </div>
+    <ListState kind={tone === 'error' ? 'error' : 'empty'} title={title} description={desc} icon={icon} action={<>{action}</>} />
   )
 
   const listBody = !selectedAccount ? (
@@ -1001,7 +1004,7 @@ export default function RichMenusListV8() {
       loadFailure?.description
         ?? '登録したメニューは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。',
       loadFailure === null || loadFailure.retryable
-        ? <Button type="button" onClick={() => void reload()}>もう一度読み込む</Button>
+        ? <Button type="button" onClick={() => reload()} busyLabel="処理中…">もう一度読み込む</Button>
         : null,
       'error',
     )
@@ -1025,7 +1028,7 @@ export default function RichMenusListV8() {
           {tableCols}
           {tableHead}
           <tbody ref={bodyRef}>
-            {liveOrder.shown.map((g) => {
+            {duplicateFeedback.order(liveOrder.shown).map((g) => {
               const cells = thumbCells(g)
               const shape = menuShapeText(g)
               const audienceMain = audienceMainText(g, tagNameById)
@@ -1101,9 +1104,7 @@ export default function RichMenusListV8() {
                         <TruncatedText value={String(g.name ?? '')} />
                       </Link>
                     </FolderDotName>
-                    <span className={`${styles.sub} ${styles.nameSub}`} >
-                      <TruncatedText value={String(`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`)} />
-                    </span>
+
                   </Td>
                   <Td className={styles.audienceCell}>
                     <span className={audienceSub ? styles.audienceMain : `${styles.audienceMain} ${styles.audienceAlone}`} title={audienceMain}>{audienceMain}</span>
@@ -1260,7 +1261,7 @@ export default function RichMenusListV8() {
           {impactPhase === 'loading' ? (
             <p className={styles.impactFaint}>消したときの影響を確認しています…</p>
           ) : impactPhase === 'error' ? (
-            <p className={styles.impactDanger} role="alert">消したときの影響を確認できませんでした。読み直してから、もう一度お試しください。</p>
+            <Notice tone="danger" >消したときの影響を確認できませんでした。読み直してから、もう一度お試しください。</Notice>
           ) : impact ? (
             <div className={styles.impactDetail}>
               <p>
@@ -1295,7 +1296,8 @@ export default function RichMenusListV8() {
   )
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId={!canEdit ? 'ZoKow' : narrow ? 'Y9ASp' : 'rZEGN'}
       headingSize="regular"
       title="リッチメニュー"
@@ -1314,10 +1316,7 @@ export default function RichMenusListV8() {
       stats={<>
         {/* 見るだけの人への帯（ZoKow）。数の帯の上。 */}
         {!canEdit ? (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
         <KpiBand data-design="KPIs" className={styles.kpis}>
           <KpiCard
@@ -1393,20 +1392,7 @@ export default function RichMenusListV8() {
           <ApplyToTagModal groupId={applyTo.id} groupName={applyTo.name} onClose={() => setApplyTo(null)} />
         ) : null}
 
-        <ConfirmDialog
-          open={duplicateTarget !== null}
-          title={duplicateTarget ? `「${duplicateTarget.name}」を複製しますか？` : 'リッチメニューを複製しますか？'}
-          description="名前・画像・ボタン・出し分けの設定を写した下書きを新しく作ります。LINE上の表示は変わりません。"
-          confirmLabel="下書きとして複製する"
-          busy={duplicateBusy}
-          error={duplicateError ?? undefined}
-          onCancel={() => {
-            if (duplicateBusy) return
-            setDuplicateTarget(null)
-            setDuplicateError(null)
-          }}
-          onConfirm={() => confirmDuplicate()}
-        />
+        <></>
 
         <ConfirmDialog
           open={importTarget !== null}
@@ -1446,12 +1432,9 @@ export default function RichMenusListV8() {
     </>}
     >
       {actionError ? (
-        <p className={styles.errorBand} role="alert">
-          {actionError}
-          <button type="button" onClick={() => void reload()}>もう一度読み込む</button>
-        </p>
+        <Notice tone="danger" >{actionError}<button type="button" onClick={() => void reload()}>もう一度読み込む</button></Notice>
       ) : null}
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

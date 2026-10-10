@@ -60,7 +60,7 @@
 }
 
 .field:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -196,7 +196,7 @@
 }
 
 .weekdays span[data-weekday='sat'] {
-  color: var(--color-status-info);
+  color: var(--color-action);
 }
 
 .grid[data-slide='next'] {
@@ -278,7 +278,7 @@
 .clear:focus-visible,
 .today:focus-visible,
 .reset:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 

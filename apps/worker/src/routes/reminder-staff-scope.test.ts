@@ -187,18 +187,19 @@ describe('リマインダ登録・取消の staff 許可 (N-069)', () => {
     expect(enrollmentStatus(ENROLLMENT_A)).toBe('active');
   });
 
-  test('他の管理口は staff のまま止まる（リマインダ作成・削除）', async () => {
+  test('編集権限があるstaffは自分のアカウントに作成し、未使用のものを削除できる', async () => {
     const created = await app().request('/api/reminders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${KEY_STAFF_A}` },
-      body: JSON.stringify({ name: '作れないはず', lineAccountId: ACC_A, triggerType: 'manual' }),
+      body: JSON.stringify({ name: '担当者が作成', lineAccountId: ACC_A, triggerType: 'manual' }),
     }, env());
-    expect(created.status).toBe(403);
-    const deleted = await app().request(`/api/reminders/${REMINDER_A}`, {
+    expect(created.status).toBe(201);
+    const body = await created.json() as { data: { id: string } };
+    const deleted = await app().request(`/api/reminders/${body.data.id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${KEY_STAFF_A}` },
     }, env());
-    expect(deleted.status).toBe(403);
+    expect(deleted.status).toBe(200);
     expect(enrollmentStatus(ENROLLMENT_A)).toBe('active');
   });
 

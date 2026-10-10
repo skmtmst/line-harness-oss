@@ -114,14 +114,14 @@ describe('リッチメニューV8一覧のタップ数', () => {
     expect(within(tableRow as HTMLElement).getByText('7回')).toBeTruthy()
   })
 
-  test('更新日列とボタンの文言を行に出す（v7と同じ情報）', async () => {
+  test('名前のセルにボタン名や更新日を重ねない', async () => {
     fixture.listPage = () => Promise.resolve(listResult([groupItem('g5', '春メニュー')]))
     fixture.tapStats = () => Promise.resolve(tapResult([]))
     const rendered = await renderV8List()
     const row = await rendered.findByText('春メニュー')
     const tableRow = row.closest('tr') ?? row.closest('[role="row"]') ?? rendered.container
-    expect((tableRow as HTMLElement).textContent).toContain('ボタン「メニュー」')
-    expect((tableRow as HTMLElement).textContent).toContain('9月20日')
+    expect((tableRow as HTMLElement).querySelector('[data-list-name]')?.textContent).not.toContain('ボタン「メニュー」')
+    expect((tableRow as HTMLElement).querySelector('[data-list-name]')?.textContent).toBe('春メニュー')
   })
 
   test('集計自体が取れなければ「—」のままにする', async () => {

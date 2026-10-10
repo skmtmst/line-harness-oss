@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
 /* ★V8 自動応答の作る③「返したあとに行うこと」の行（絵 rfhIf「処理」）。値は型の変数だけ。 */
 .list { display: flex; flex-direction: column; gap: var(--tpl-section-gap); }
 .empty { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
@@ -21,3 +23,6 @@
 .notify { display: flex; flex-direction: column; gap: var(--tpl-side-row-pad); }
 .notifyText { width: 100%; min-height: var(--tpl-starter-card-h); padding: var(--tpl-side-row-pad); border: 1px solid var(--color-control-border); border-radius: var(--radius-control); font-size: var(--text-label); }
 .add { display: flex; }
+
+.notifyText:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+}

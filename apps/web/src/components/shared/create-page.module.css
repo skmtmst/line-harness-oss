@@ -44,7 +44,7 @@
 /* 択一の札（ChoiceCard）は自前で button を描くので、他の部品と
  * 同じ輪郭（2px・action 色・外側に余白）をキーボードのときだけ出す。 */
 .choice:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 }

@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8 保存した検索の編集（Pencil `AqDWN`）。
- *
- * v7（tags/searches/edit/page.tsx）と動きは同じで、置き場だけを
- * V8 の絵へ合わせる。段は「名前と共有」「条件」「友だち一覧での
- * 見せ方」、右の欄に「当てはまる人」（人数・数えた時刻・数え直す・
- * 当てはまる人を見る）。追従バーは削除＝左端、キャンセル・複製・
- * 保存＝真ん中（オーナー決定 2026-10-01）。
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { X } from 'lucide-react'
@@ -51,6 +41,18 @@ import { formatDateTime } from '@/lib/format'
 import styles from './search-editor-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 保存した検索の編集（Pencil `AqDWN`）。
+ *
+ * v7（tags/searches/edit/page.tsx）と動きは同じで、置き場だけを
+ * V8 の絵へ合わせる。段は「名前と共有」「条件」「友だち一覧での
+ * 見せ方」、右の欄に「当てはまる人」（人数・数えた時刻・数え直す・
+ * 当てはまる人を見る）。追従バーは削除＝左端、キャンセル・複製・
+ * 保存＝真ん中（オーナー決定 2026-10-01）。
+ */
 
 /*
  * R185: 友だち画面で作れる条件はここでも編集できるようにする。実行側
@@ -198,9 +200,9 @@ function DateRangeEditor({
   const reversed = Boolean(from && to && from > to)
   return (
     <div className="min-w-0 flex-1">
-      <div className="flex min-w-0 flex-wrap items-end gap-2"><Field label={<>
+      <div className="flex min-w-0 flex-wrap items-end gap-2"><SaveErrorField names={["op"]}><Field label={<>
           {op === 'before' ? '終了日' : '開始日'}
-          <DateField aria-label={op === 'before' ? '終了日' : '開始日'} value={op === 'before' ? to : from} onChange={op === 'before' ? setTo : setFrom} className="mt-1" />
+          <SaveErrorField names={["to","from"]}><DateField aria-label={op === 'before' ? '終了日' : '開始日'} value={op === 'before' ? to : from} onChange={op === 'before' ? setTo : setFrom} className="mt-1" /></SaveErrorField>
         </>}><Select
           aria-label="日付の比べ方"
           value={op}
@@ -215,9 +217,9 @@ function DateRangeEditor({
 {op === 'between' ? (
           <>
             <span className="pb-2 text-ink-faint" aria-hidden="true">〜</span>
-            <Field label="終了日"><DateField aria-label="終了日" value={to} onChange={setTo} className="mt-1" /></Field>
+            <Field label="終了日"><SaveErrorField names={["to"]}><DateField aria-label="終了日" value={to} onChange={setTo} className="mt-1" /></SaveErrorField></Field>
           </>
-        ) : null}</Field></div>
+        ) : null}</Field></SaveErrorField></div>
       {reversed ? (
         <p role="alert" className="mt-1 text-xs text-danger">開始日が終了日より後になっています。入れ替えてください。</p>
       ) : null}
@@ -265,16 +267,16 @@ function ConditionControls({
 
   return (
     <>
-      <Select aria-label="条件の種類" value={EDITABLE_KINDS.some((item) => item.value === condition.kind) ? condition.kind : ''} onChange={(value) => changeKind(value as SavedSearchConditionKind)} options={[{ value: '', label: '種類を選ぶ', disabled: true }, ...EDITABLE_KINDS]} className="w-36" />
+      <SaveErrorField names={["kind","condition.kind"]}><Select aria-label="条件の種類" value={EDITABLE_KINDS.some((item) => item.value === condition.kind) ? condition.kind : ''} onChange={(value) => changeKind(value as SavedSearchConditionKind)} options={[{ value: '', label: '種類を選ぶ', disabled: true }, ...EDITABLE_KINDS]} className="w-36" /></SaveErrorField>
 
       {condition.kind === 'tag' ? (
         <>
-          <Select aria-label="タグの比較" value={condition.op} onChange={(op) => onChange({ ...condition, op })} options={[{ value: 'includes', label: '次を含む' }, { value: 'excludes', label: '次を含まない' }]} className="w-32" />
-          <Select aria-label="タグ" value={rawValue} onChange={(value) => onChange({ ...condition, value })} options={[{ value: '', label: 'タグを選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} className="min-w-44 flex-1" />
+          <SaveErrorField names={["op","condition.op"]}><Select aria-label="タグの比較" value={condition.op} onChange={(op) => onChange({ ...condition, op })} options={[{ value: 'includes', label: '次を含む' }, { value: 'excludes', label: '次を含まない' }]} className="w-32" /></SaveErrorField>
+          <SaveErrorField names={["rawValue","raw_value"]}><Select aria-label="タグ" value={rawValue} onChange={(value) => onChange({ ...condition, value })} options={[{ value: '', label: 'タグを選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} className="min-w-44 flex-1" /></SaveErrorField>
         </>
       ) : condition.kind === 'field' ? (
         <>
-          <Select
+          <SaveErrorField names={["key","condition.key"]}><Select
             aria-label="友だち情報の項目"
             value={condition.key ?? ''}
             disabled={referenceErrors.fields}
@@ -286,13 +288,13 @@ function ConditionControls({
               referenceErrors.fields ? '友だち情報を読み込めませんでした' : fields.length ? '友だち情報を選ぶ' : '友だち情報がありません',
             )}
             className="min-w-44 flex-1"
-          />
+          /></SaveErrorField>
           {/*
             実行側が解釈できるものだけを選べるようにする（ATTR-13）。
             「登録あり／なし」と大小比較は以前は画面から作れず、
             保存済みの条件に混ざると表示も保存も壊れていた。
           */}
-          <Select
+          <SaveErrorField names={["op","condition.op"]}><Select
             aria-label="友だち情報の比較"
             value={condition.op}
             onChange={(op) => onChange({ ...condition, op, value: isSavedSearchValueOptionalOp(op) ? '' : condition.value })}
@@ -309,15 +311,15 @@ function ConditionControls({
               { value: 'not_exists', label: '登録なし' },
             ]}
             className="w-32"
-          />
+          /></SaveErrorField>
           {isSavedSearchValueOptionalOp(condition.op) ? (
             <span className="min-w-0 flex-1 text-xs text-ink-faint">値の有無だけで絞ります。入力は不要です。</span>
           ) : (
-            <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値" className="min-w-40 flex-1" />
+            <SaveErrorField names={["rawValue","raw_value"]}><TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値" className="min-w-40 flex-1" /></SaveErrorField>
           )}
         </>
       ) : condition.kind === 'mark' ? (
-        <Select
+        <SaveErrorField names={["rawValue","raw_value"]}><Select
           aria-label="対応マーク"
           value={rawValue}
           disabled={referenceErrors.marks}
@@ -329,9 +331,9 @@ function ConditionControls({
             referenceErrors.marks ? '対応マークを読み込めませんでした' : marks.length ? '対応マークを選ぶ' : '対応マークがありません',
           )}
           className="min-w-44 flex-1"
-        />
+        /></SaveErrorField>
       ) : condition.kind === 'scenario' ? (
-        <Select
+        <SaveErrorField names={["rawValue","raw_value"]}><Select
           aria-label="シナリオ"
           value={rawValue}
           disabled={referenceErrors.scenarios}
@@ -343,11 +345,11 @@ function ConditionControls({
             referenceErrors.scenarios ? 'シナリオを読み込めませんでした' : scenarios.length ? 'シナリオを選ぶ' : 'シナリオがありません',
           )}
           className="min-w-44 flex-1"
-        />
+        /></SaveErrorField>
       ) : condition.kind === 'following' ? (
         <Select aria-label="友だち状態" value={condition.value === false ? 'false' : 'true'} onChange={(value) => onChange({ ...condition, value: value === 'true' })} options={[{ value: 'true', label: '友だち中' }, { value: 'false', label: 'ブロック済み' }]} className="min-w-44 flex-1" />
       ) : condition.kind === 'chat_status' ? (
-        <Select aria-label="対応状況" value={rawValue} onChange={(value) => onChange({ ...condition, value })} options={[{ value: '', label: '対応状況を選ぶ' }, { value: 'unread', label: '未対応' }, { value: 'in_progress', label: '対応中' }, { value: 'on_hold', label: '保留' }, { value: 'resolved', label: '対応済み' }]} className="min-w-44 flex-1" />
+        <SaveErrorField names={["rawValue","raw_value"]}><Select aria-label="対応状況" value={rawValue} onChange={(value) => onChange({ ...condition, value })} options={[{ value: '', label: '対応状況を選ぶ' }, { value: 'unread', label: '未対応' }, { value: 'in_progress', label: '対応中' }, { value: 'on_hold', label: '保留' }, { value: 'resolved', label: '対応済み' }]} className="min-w-44 flex-1" /></SaveErrorField>
       ) : condition.kind === 'assignee' ? (
         <>
           <Select
@@ -357,7 +359,7 @@ function ConditionControls({
             options={[{ value: 'eq', label: '次の担当' }, { value: 'ne', label: '次以外' }]}
             className="w-32"
           />
-          <Select
+          <SaveErrorField names={["rawValue","raw_value"]}><Select
             aria-label="担当"
             value={rawValue}
             disabled={referenceErrors.operators}
@@ -369,18 +371,18 @@ function ConditionControls({
               referenceErrors.operators ? '担当者を読み込めませんでした' : operators.length ? '担当者を選ぶ' : '担当者がいません',
             )}
             className="min-w-44 flex-1"
-          />
+          /></SaveErrorField>
         </>
       ) : condition.kind === 'form' ? (
         <>
-          <Select
+          <SaveErrorField names={["op","condition.op"]}><Select
             aria-label="回答フォームの有無"
             value={canonicalExistenceOp(condition.op)}
             onChange={(op) => onChange({ ...condition, op })}
             options={[{ value: 'exists', label: '回答がある' }, { value: 'not_exists', label: '回答がない' }]}
             className="w-32"
-          />
-          <Select
+          /></SaveErrorField>
+          <SaveErrorField names={["rawValue","raw_value"]}><Select
             aria-label="回答フォーム"
             value={rawValue}
             disabled={referenceErrors.forms}
@@ -392,33 +394,33 @@ function ConditionControls({
               referenceErrors.forms ? '回答フォームを読み込めませんでした' : 'すべての回答フォーム',
             )}
             className="min-w-44 flex-1"
-          />
+          /></SaveErrorField>
         </>
       ) : condition.kind === 'purchase' ? (
         <>
-          <Select
+          <SaveErrorField names={["op","condition.op"]}><Select
             aria-label="購入履歴の有無"
             value={canonicalExistenceOp(condition.op)}
             onChange={(op) => onChange({ ...condition, op })}
             options={[{ value: 'exists', label: '購入がある' }, { value: 'not_exists', label: '購入がない' }]}
             className="w-32"
-          />
-          <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="空欄はすべての購入" aria-label="購入イベントの種類（空欄可）" className="min-w-40 flex-1" />
+          /></SaveErrorField>
+          <SaveErrorField names={["rawValue","raw_value"]}><TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="空欄はすべての購入" aria-label="購入イベントの種類（空欄可）" className="min-w-40 flex-1" /></SaveErrorField>
         </>
       ) : condition.kind === 'common_event' ? (
         <>
-          <Select
+          <SaveErrorField names={["op","condition.op"]}><Select
             aria-label="その他のイベントの有無"
             value={canonicalExistenceOp(condition.op)}
             onChange={(op) => onChange({ ...condition, op })}
             options={[{ value: 'exists', label: '発生がある' }, { value: 'not_exists', label: '発生がない' }]}
             className="w-32"
-          />
-          <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="イベント種別（例：conversion）" aria-label="イベント種別" className="min-w-40 flex-1" />
+          /></SaveErrorField>
+          <SaveErrorField names={["rawValue","raw_value"]}><TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="イベント種別（例：conversion）" aria-label="イベント種別" className="min-w-40 flex-1" /></SaveErrorField>
         </>
       ) : condition.kind === 'memo' ? (
         <>
-          <Select
+          <SaveErrorField names={["op","condition.op"]}><Select
             aria-label="メモの比較"
             value={['exists', 'has', 'not_exists', 'not_has', 'eq', 'contains'].includes(condition.op) ? condition.op : 'exists'}
             onChange={(op) => onChange({ ...condition, op, value: isSavedSearchValueOptionalOp(op) ? '' : condition.value })}
@@ -429,25 +431,25 @@ function ConditionControls({
               { value: 'contains', label: '含む' },
             ]}
             className="w-32"
-          />
+          /></SaveErrorField>
           {isSavedSearchValueOptionalOp(condition.op) ? (
             <span className="min-w-0 flex-1 text-xs text-ink-faint">有無だけで絞ります。入力は不要です。</span>
           ) : (
-            <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="メモの内容" aria-label="メモの内容" className="min-w-40 flex-1" />
+            <SaveErrorField names={["rawValue","raw_value"]}><TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="メモの内容" aria-label="メモの内容" className="min-w-40 flex-1" /></SaveErrorField>
           )}
         </>
       ) : EXISTENCE_KINDS.has(condition.kind) ? (
-        <Select
+        <SaveErrorField names={["op","condition.op"]}><Select
           aria-label={`${EDITABLE_KINDS.find((item) => item.value === condition.kind)?.label ?? '条件'}の有無`}
           value={canonicalExistenceOp(condition.op)}
           onChange={(op) => onChange({ ...condition, op })}
           options={[{ value: 'exists', label: 'ある' }, { value: 'not_exists', label: 'ない' }]}
           className="w-32"
-        />
+        /></SaveErrorField>
       ) : DATE_RANGE_KINDS.has(condition.kind) ? (
         <DateRangeEditor condition={condition} onChange={onChange} />
       ) : (
-        <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値を入力" className="min-w-44 flex-1" />
+        <SaveErrorField names={["rawValue","raw_value"]}><TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値を入力" className="min-w-44 flex-1" /></SaveErrorField>
       )}
     </>
   )
@@ -503,6 +505,8 @@ function ConditionRow({
 }
 
 function SearchEditorV8Inner() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -579,13 +583,15 @@ function SearchEditorV8Inner() {
       /* 応答は成功でも中身の計算が失敗していることがある（match.error）。 */
       if (!res.success) setPreviewError(res.error)
       else setPreviewError(res.data.match.error ?? '')
-    } catch {
+    } catch (saveFailure) {
       if (!gateRef.current.current(token) || accountRef.current !== account) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       setPreviewCount(null)
       setPreview(null)
-      setPreviewError('人数を計算できませんでした。条件を確かめて再計算してください。')
+      { if (!fieldFailure)
+      setPreviewError('人数を計算できませんでした。条件を確かめて再計算してください。') }
     }
-  }, [conditions, id, original?.revision, selectedAccountId])
+  }, [conditions, id, original?.revision, selectedAccountId, saveErrors])
 
   useEffect(() => {
     const generation = loadGenerationRef.current + 1
@@ -735,7 +741,7 @@ function SearchEditorV8Inner() {
 
   const save = async () => {
     if (!selectedAccountId || !id || saving) return
-    if (!name.trim()) { setError('条件名を入力してください'); return }
+    if (!name.trim()) { if (!saveErrors.fail("name", '条件名を入力してください')) setError('条件名を入力してください'); return }
     const editableConditions = [...(conditions.all ?? []), ...(conditions.any ?? [])]
     const problem = editableConditions.length === 0
       ? '条件を1つ以上追加してください'
@@ -758,7 +764,11 @@ function SearchEditorV8Inner() {
       /* R179: 保存応答の新しい版と正規化済み条件で数え直す。古い版では409になる。 */
       await recount({ revision: refreshed.data.revision, conditions: normalized })
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : '変更を保存できませんでした')
+      const fieldFailure = saveErrors.capture(saveError)
+
+      { if (!fieldFailure)
+
+      setError(saveError instanceof Error ? saveError.message : '変更を保存できませんでした') }
     } finally {
       setSaving(false)
     }
@@ -779,7 +789,11 @@ function SearchEditorV8Inner() {
       if (!res.success) { setError(res.error); return }
       router.push(`/tags/searches/edit?id=${encodeURIComponent(res.data.id)}`)
     } catch (duplicateError) {
-      setError(duplicateError instanceof Error ? duplicateError.message : '複製できませんでした')
+      const fieldFailure = saveErrors.capture(duplicateError)
+
+      { if (!fieldFailure)
+
+      setError(duplicateError instanceof Error ? duplicateError.message : '複製できませんでした') }
     } finally {
       setSaving(false)
     }
@@ -791,46 +805,50 @@ function SearchEditorV8Inner() {
       await api.savedSearches.delete(id, selectedAccountId)
       router.push('/tags?tab=searches')
     } catch (deleteError) {
-      setError(deleteError instanceof ApiError ? deleteError.message : '削除できませんでした')
+      const fieldFailure = saveErrors.capture(deleteError)
+
+      { if (!fieldFailure)
+
+      setError(deleteError instanceof ApiError ? deleteError.message : '削除できませんでした') }
     }
   }
 
   if (loading) {
-    return <DelayedSkeleton loading skeleton={<TagFormSkeleton />} />
+    return <SaveErrorScope errors={saveErrors}><DelayedSkeleton loading skeleton={<TagFormSkeleton />} /></SaveErrorScope>
   }
   if (!id) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="unspecified"
         title="編集する保存した検索が指定されていません"
         description="一覧から編集する検索を選び直してください。"
         backHref="/tags?tab=searches"
         backLabel="保存した検索の一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
-  if (!selectedAccountId) return <p className="rounded-card border border-hairline bg-canvas p-5 text-sm text-ink-secondary">上部でLINE公式アカウントを選んでください。</p>
+  if (!selectedAccountId) return <SaveErrorScope errors={saveErrors}><p className="rounded-card border border-hairline bg-canvas p-5 text-sm text-ink-secondary">上部でLINE公式アカウントを選んでください。</p></SaveErrorScope>
   /* #975 U069: 見つからないときも行き止まりにしない。一覧へ戻る道を出す。 */
   if (!original && (searchMissing || !error)) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="not-found"
         title="保存した検索が見つかりません"
         description="削除されたか、別のLINEアカウントの検索です。一覧から選び直せます。"
         accountName={selectedAccount?.name}
         backHref="/tags?tab=searches"
         backLabel="保存した検索の一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
   if (!original) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="error"
         title="保存した検索を読み込めませんでした"
         description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
         onRetry={() => setReloadKey((k) => k + 1)}
-      />
+      /></SaveErrorScope>
     )
   }
 
@@ -838,7 +856,7 @@ function SearchEditorV8Inner() {
   const anyConditions = conditions.any ?? []
 
   return (
-    <div className={styles.board}>
+    <SaveErrorScope errors={saveErrors}><div className={styles.board}>
       <div className={styles.head} data-design="Head">
         <div>
           <h2 className={styles.headTitle}>保存した検索を編集</h2>
@@ -856,18 +874,18 @@ function SearchEditorV8Inner() {
             <div className={styles.sectionBody}>
               <div className={styles.field}>
                 <span className={styles.fieldLabel}>条件名</span>
-                <TextInput value={name} maxLength={80} onChange={(event) => setName(event.target.value)} className="max-w-xl" aria-label="条件名" />
+                <SaveErrorField names={["name"]}><TextInput value={name} maxLength={80} onChange={(event) => setName(event.target.value)} className="max-w-xl" aria-label="条件名" /></SaveErrorField>
                 {/* IDEA-04: 同名の検索がすでにあるとき、保存する前に知らせる。 */}
                 <DuplicateNameNote duplicates={nameDuplicates} kindLabel="保存した検索" />
               </div>
               <div className={styles.field}>
                 <span className={styles.fieldLabel}>説明</span>
-                <TextInput value={conditions.description ?? ''} maxLength={300} onChange={(event) => patchConditions({ ...conditions, description: event.target.value })} placeholder="この検索を使う目的" className="max-w-xl" aria-label="説明" />
+                <SaveErrorField names={["description","conditions.description"]}><TextInput value={conditions.description ?? ''} maxLength={300} onChange={(event) => patchConditions({ ...conditions, description: event.target.value })} placeholder="この検索を使う目的" className="max-w-xl" aria-label="説明" /></SaveErrorField>
               </div>
-              <RadioCardGroup legend="共有範囲">
+              <SaveErrorField names={["saved-search-share","isShared"]}><RadioCardGroup legend="共有範囲">
                 <RadioCard name="saved-search-share" value="shared" checked={isShared} onChange={() => setIsShared(true)} title="全員" note="他の担当者からも使えます" />
                 <RadioCard name="saved-search-share" value="private" checked={!isShared} onChange={() => setIsShared(false)} title="自分だけ" />
-              </RadioCardGroup>
+              </RadioCardGroup></SaveErrorField>
               {/*
                 設計 `XBkiQ`：共有範囲を選ぶ場所で、上限と「共有すると何が
                 起きるか」を先に言う。50件に近づいてから初めて知る、という
@@ -939,11 +957,11 @@ function SearchEditorV8Inner() {
               <div className={styles.field}>
                 <span className={styles.fieldLabel}>並び順</span>
                 {/* R188: 一覧の実装は友だち追加日順。最終接触と書くと運用者の意図とずれる。 */}
-                <Select aria-label="並び順" value={conditions.list?.sort ?? 'recent'} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, sort: value as 'recent' | 'oldest' } })} options={[{ value: 'recent', label: '友だち追加の新しい順' }, { value: 'oldest', label: '友だち追加の古い順' }]} size="full" />
+                <SaveErrorField names={["sort","conditions.list?.sort","list?.sort"]}><Select aria-label="並び順" value={conditions.list?.sort ?? 'recent'} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, sort: value as 'recent' | 'oldest' } })} options={[{ value: 'recent', label: '友だち追加の新しい順' }, { value: 'oldest', label: '友だち追加の古い順' }]} size="full" /></SaveErrorField>
               </div>
               <div className={styles.field}>
                 <span className={styles.fieldLabel}>表示件数</span>
-                <Select aria-label="表示件数" value={String(conditions.list?.limit ?? 20)} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, limit: Number(value) as 10 | 20 | 30 | 40 | 50 } })} options={[10, 20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件表示` }))} size="full" />
+                <SaveErrorField names={["limit","conditions.list?.limit","list?.limit"]}><Select aria-label="表示件数" value={String(conditions.list?.limit ?? 20)} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, limit: Number(value) as 10 | 20 | 30 | 40 | 50 } })} options={[10, 20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件表示` }))} size="full" /></SaveErrorField>
               </div>
               <p className={styles.columnsNote}>表示列：{conditions.list?.columns?.join('・') || '名前・タグ・担当者'}</p>
             </div>
@@ -981,7 +999,7 @@ function SearchEditorV8Inner() {
               <p className={`${styles.noteText} mt-2`}>{preview ? `LINE ${preview.byChannel.line ?? emptyValue('unknown')}人・MAIL ${preview.byChannel.mail ?? emptyValue('unknown')}人` : '保存済み条件で集計'}</p>
             )}
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button type="button" onClick={() => void recount()}>数え直す</Button>
+              <Button type="button" onClick={() => recount()} busyLabel="処理中…">数え直す</Button>
               <Button href={`/friends?savedSearch=${encodeURIComponent(id)}`} variant="primary">当てはまる人を見る</Button>
             </div>
           </section>
@@ -1038,7 +1056,7 @@ function SearchEditorV8Inner() {
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }
 

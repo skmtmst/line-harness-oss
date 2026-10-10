@@ -1,11 +1,4 @@
 'use client'
-
-/*
- * ★V8「友だち情報欄を編集」（Pencil `w9zY5` の編集の形）の入口。
- *
- * 読み込み・版の衝突（R517）・共通項目の保護・保存の動きは今の入口（app/tags/edit-field-page-v8.tsx）と同じ。
- * 中身は src/v8 の FieldEditor。受け付ける URL：`/tags/fields/edit?id=<項目>`。
- */
 import Notice from '@/components/shared/notice'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
@@ -20,8 +13,18 @@ import TargetMissing from '@/components/shared/target-missing'
 import { folderById, folderCreator } from '@/components/shared/folder-select'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import FieldEditor, { type FieldEditorValues } from './field-editor'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+/*
+ * ★V8「友だち情報欄を編集」（Pencil `w9zY5` の編集の形）の入口。
+ *
+ * 読み込み・版の衝突（R517）・共通項目の保護・保存の動きは今の入口（app/tags/edit-field-page-v8.tsx）と同じ。
+ * 中身は src/v8 の FieldEditor。受け付ける URL：`/tags/fields/edit?id=<項目>`。
+ */
 
 export default function FieldEdit() {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -32,7 +35,7 @@ export default function FieldEdit() {
   const [folders, setFolders] = useState<Folder[]>([])
   // その場でフォルダを作れるのは、左の列の「フォルダを追加」と同じ人（閲覧のみは作れない）。
   const staffRole = useStaffRole()
-  const canCreateFolder = staffRole === null || canManageRole(staffRole)
+  const canCreateFolder = canManageRole(staffRole)
   const [foldersState, setFoldersState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [foldersReloading, setFoldersReloading] = useState(false)
   /* R517: 版の衝突で返ってきた最新の内容。 */
@@ -57,13 +60,15 @@ export default function FieldEdit() {
       if (!res.success) throw new Error(res.error)
       setFolders(res.data)
       setFoldersState('ready')
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
       // R516: 失敗を隠さず、所属の選択欄の場所で再試行する。
-      setFoldersState('error')
+      { if (!fieldFailure)
+      setFoldersState('error') }
     } finally {
       setFoldersReloading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     let cancelled = false
@@ -137,8 +142,12 @@ export default function FieldEdit() {
         setConflictName(latest.name)
             setError('ほかの担当者が先に変更しました。最新の内容を確認してから保存し直してください。')
       }
-    } catch {
-      setError('最新の内容を確認できませんでした。接続を確かめて、もう一度保存してください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+
+      setError('最新の内容を確認できませんでした。接続を確かめて、もう一度保存してください。') }
     }
   }
 
@@ -170,11 +179,14 @@ export default function FieldEdit() {
       collision.clear()
       notifySaved()
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason);
+
       if (reason instanceof ApiError && reason.status === 409
         && (reason as { code?: string }).code === 'VERSION_CONFLICT') {
         await handleVersionConflict(sent)
       } else {
-        setError(reason instanceof ApiError ? reason.message : '項目を保存できませんでした')
+        { if (!fieldFailure)
+        setError(reason instanceof ApiError ? reason.message : '項目を保存できませんでした') }
       }
     } finally {
       setSaving(false)
@@ -196,43 +208,43 @@ export default function FieldEdit() {
     return JSON.stringify(current) === JSON.stringify(latest ?? null) ? [] : [{ text: `${label}：編集中 ${JSON.stringify(current)} → 最新 ${JSON.stringify(latest ?? null)}` }]
   }) : null
 
-  if (loading) return <ListState kind="loading" />
+  if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" /></SaveErrorScope>
   if (!id) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="unspecified"
         title="編集する友だち情報欄が指定されていません"
         description="一覧から編集する項目を選び直してください。"
         backHref="/tags?tab=fields"
         backLabel="友だち情報欄の一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
-  if (!selectedAccountId) return <ListState kind="empty" title="上部でLINE公式アカウントを選んでください" />
+  if (!selectedAccountId) return <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="上部でLINE公式アカウントを選んでください" /></SaveErrorScope>
   if (notFound || (!error && !field)) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="not-found"
         title="この項目は見つかりません"
         description="削除されたか、別のLINEアカウントの項目です。一覧から選び直せます。"
         accountName={selectedAccount?.name}
         backHref="/tags?tab=fields"
         backLabel="友だち情報欄の一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
   if (!field) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="error"
         title="項目を読み込めませんでした"
         description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
         onRetry={() => setReloadKey((k) => k + 1)}
-      />
+      /></SaveErrorScope>
     )
   }
 
-  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></SaveErrorScope>
 
   const notices = (
     <>
@@ -245,7 +257,7 @@ export default function FieldEdit() {
 
   return (
     <>
-    <FieldEditor
+    <SaveErrorScope errors={saveErrors}><FieldEditor
       key={editorResetKey}
       mode="edit"
       field={field}
@@ -266,7 +278,7 @@ export default function FieldEdit() {
       backHref="/tags?tab=fields"
       onCancel={() => router.push('/tags?tab=fields')}
       onSubmit={(values) => void save(values)}
-    />
+    /></SaveErrorScope>
     <SaveConflictCompareDialog open={collision.compareOpen} busy={collision.compareBusy} error={collision.compareError} lines={comparison} onReload={collision.reloadLatest} onCancel={collision.closeCompare} />
     </>
   )

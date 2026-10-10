@@ -198,7 +198,8 @@ describe('予約枠の編集（入口29）', () => {
   async function openEdit() {
     await renderForm()
     await click(tabButton('2. 予約枠')!)
-    await click(button('編集')!)
+    await click(host.querySelector<HTMLButtonElement>('button[aria-label="そのほかの操作"]')!)
+    await click(document.querySelector<HTMLButtonElement>('[role="menuitem"]')!)
     expect(host.textContent).toContain('予約枠を編集')
   }
 

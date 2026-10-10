@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8 飲食店のダッシュボード「今日のお店」（提案 E-1 `hKRRF`。採用 2026-10-07）。
- *
- * 板の頭（今日のお店・日付・営業時間・更新／＋ウォークイン・＋電話予約）→ 店のタブ
- * → 他の予約サイトの枠を閉じる知らせ → 今日の数（今日の予約・来店予定・空席（いま）・未返信の口コミ）
- * → 今日の予約の表（来店の印）｜右：予約サイト・グルメ媒体・Google の口コミ・Instagram の新着。
- * 全店の一覧（前の店舗ダッシュボード `CHz31`）は `?view=stores` で残す。動きは BEHAVIOR.md。
- */
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useMemo, useState } from 'react'
 import { Armchair, Bell, CalendarCheck, Check, Plus, Star, Users } from 'lucide-react'
@@ -35,6 +26,17 @@ import { canWriteRole, groupCloseTasks, openItems, reasonText, slotTitle, summar
 import { useStoreToday } from './use-store-today'
 import styles from './dashboard.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 飲食店のダッシュボード「今日のお店」（提案 E-1 `hKRRF`。採用 2026-10-07）。
+ *
+ * 板の頭（今日のお店・日付・営業時間・更新／＋ウォークイン・＋電話予約）→ 店のタブ
+ * → 他の予約サイトの枠を閉じる知らせ → 今日の数（今日の予約・来店予定・空席（いま）・未返信の口コミ）
+ * → 今日の予約の表（来店の印）｜右：予約サイト・グルメ媒体・Google の口コミ・Instagram の新着。
+ * 全店の一覧（前の店舗ダッシュボード `CHz31`）は `?view=stores` で残す。動きは BEHAVIOR.md。
+ */
 
 function daysAgo(iso: string, now: number): string {
   const days = Math.max(0, Math.floor((now - Date.parse(iso)) / 86_400_000))
@@ -61,6 +63,7 @@ export function sourceBreakdown(summary: Pick<ReturnType<typeof summarizeToday>,
 }
 
 function TodayStore() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('店舗ダッシュボード')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const { selectedAccountId } = useAccount()
@@ -117,7 +120,11 @@ function TodayStore() {
       await restaurantTestApi.completeChannelCloseTask(d.accountId, taskId)
       notifyToast(`${name}の枠を閉じた印を付けました。`)
     } catch (caught) {
-      notifyToast(caught instanceof Error && caught.message ? caught.message : '印を付けられませんでした。', { tone: 'error' })
+      const fieldFailure = saveErrors.capture(caught);
+
+
+      if (!fieldFailure) {
+      notifyToast(caught instanceof Error && caught.message ? caught.message : '印を付けられませんでした。', { tone: 'error' }) }
     } finally {
       await d.reload()
       setBusyId('')
@@ -221,7 +228,7 @@ function TodayStore() {
   }
 
   return (
-    <DashboardPage
+    <SaveErrorScope errors={saveErrors}><DashboardPage
       boardId="hKRRF"
       subtitle={d.store ? headDescription(d.hours,d.updatedAt) : undefined}
       title="今日のお店"
@@ -258,7 +265,7 @@ function TodayStore() {
           />
         </>
       ) : null}
-    </DashboardPage>
+    </DashboardPage></SaveErrorScope>
   )
 }
 

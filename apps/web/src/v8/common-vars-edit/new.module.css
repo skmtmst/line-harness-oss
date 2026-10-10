@@ -4,18 +4,6 @@
  */
 .backLink { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); font-size: var(--text-label); text-decoration: none; }
 
-.roBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-info-bg);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-ro-band-lh);
-}
-
 /* カード：枠1本・角12・余白20・間14。題 15/700・説明 12。 */
 .card {
   display: flex;
@@ -83,7 +71,7 @@
   font-family: var(--font-mono);
   font-size: var(--text-label);
 }
-.keyBox:focus-within { outline: var(--tpl-fm-focus-ring) solid var(--color-action); }
+.keyBox:focus-within { outline: var(--tpl-fm-focus-ring) solid var(--color-focus-ring); }
 .keyMark { flex-shrink: 0; color: var(--color-ink-faint); }
 .keyInput {
   min-width: 0;
@@ -183,7 +171,7 @@
 }
 .talkTime { color: var(--v8-line-time); font-size: var(--tpl-ar-cv-talk-time-size); white-space: nowrap; }
 
-.formError { margin: 0; color: var(--color-danger); font-size: var(--text-label); font-weight: 600; }
+.formError { color: var(--color-danger); font-size: var(--text-label); font-weight: 600; }
 .secretConfirm {
   padding: var(--tpl-side-card-pad);
   border-radius: var(--radius-card);
@@ -194,3 +182,8 @@
 .secretConfirmTitle { margin: 0; color: var(--color-danger); font-size: var(--tpl-card-title-size); font-weight: 700; }
 .secretConfirmText { margin: var(--tpl-body-gap) 0 0; color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-body-lh); }
 .secretConfirmActions { display: flex; flex-wrap: wrap; gap: var(--tpl-body-gap); margin-top: var(--tpl-rule-row-gap); }
+
+/* 共通部品を包む位置だけの口。見た目は shared が持つ。 */
+.roBand { }
+
+.formError, .formErrorNoticePlacement { margin: 0; }

@@ -1,54 +1,23 @@
 'use client'
 
-/*
- * ★V8 テンプレートの一覧（Pencil「★V8 画面の地図」のテンプレートの行）。
- * 一覧 `v19Ivv`・1152 `L7zA7C`・閲覧のみ `hEDTK`・削除の確認 `V6JFnd`・
- * 削除できない `Z0g3si`・作る種類を選ぶ `R9XUMr`・状態の板 `susGP`。
- *
- * 動き（呼ぶ API・権限・失敗の扱い・URL の指定）は今までの V8 一覧
- * （app/templates/list-v8.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
- * 動きの一覧は同じ場所の BEHAVIOR.md。
- */
-import BulkBar from '@/components/shared/bulk-bar'
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional } from '@/components/shared/list-toolbar'
+import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import { runOptimistic } from '@/lib/undoable'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  Bookmark,
-  Braces,
-  ClipboardList,
-  Copy,
-  Eye,
-  FileText,
-  Folder as FolderIcon,
-  GalleryHorizontalEnd,
-  HelpCircle,
-  Image as ImageIcon,
-  Layers,
-  Link2,
-  List,
-  Mail,
-  MessageSquare,
-  Plus,
-  Send,
-  SquareArrowOutUpRight,
-  Ticket,
-  Trash2,
-  TriangleAlert,
-  Unlink,
-  Video,
-} from 'lucide-react'
+import { Bookmark, Braces, ClipboardList, Copy, FileText, Folder as FolderIcon, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Layers, Link2, List, Mail, MessageSquare, Plus, Send, SquareArrowOutUpRight, Ticket, Trash2, Unlink, Video } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
 import { clampSearchQuery } from '@/lib/search-query'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import { formatNumber, formatDate as polishFormatDate, formatListDateTime as polishFormatListDateTime } from '@/lib/format'
 import { contentExcerpt } from '@/lib/broadcast-summary'
 import { ListPage } from '@/components/templates'
 import { notifyToast } from '@/components/shared/toast'
@@ -58,7 +27,6 @@ import { RowMenu } from '@/components/shared/row-actions'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
-import ListToolbar, { ListToolbarOptional } from '@/components/shared/list-toolbar'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -80,24 +48,26 @@ import { Tabs } from '@/components/shared/tabs'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
 import StaffAssetList from './staff-asset-list'
 import { RovingTbody } from '@/components/shared/row-roving'
-import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
-import {
-  DELETE_UNUSED_DESCRIPTION,
-  blockedDeleteDescription,
-  createBlockedReason,
-  failureOf,
-  failureOfResponse,
-  listView,
-  messageTypeText,
-  usageRows,
-  type TemplatesFailure,
-  type UsageDetail,
-} from './words'
+import { DELETE_UNUSED_DESCRIPTION, blockedDeleteDescription, createBlockedReason, failureOf, failureOfResponse, listView, messageTypeText, usageRows, type TemplatesFailure, type UsageDetail } from './words'
 import styles from './list.module.css'
-import { formatDate as polishFormatDate, formatListDateTime as polishFormatListDateTime } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
+
+/*
+ * ★V8 テンプレートの一覧（Pencil「★V8 画面の地図」のテンプレートの行）。
+ * 一覧 `v19Ivv`・1152 `L7zA7C`・閲覧のみ `hEDTK`・削除の確認 `V6JFnd`・
+ * 削除できない `Z0g3si`・作る種類を選ぶ `R9XUMr`・状態の板 `susGP`。
+ *
+ * 動き（呼ぶ API・権限・失敗の扱い・URL の指定）は今までの V8 一覧
+ * （app/templates/list-v8.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
+ * 動きの一覧は同じ場所の BEHAVIOR.md。
+ */
 
 /** 一覧のタブ。message/question は同じテンプレートの束を中身で分ける。 */
 type Section = 'message' | 'question' | 'rich_video' | BroadcastAssetKind
@@ -213,6 +183,7 @@ function isRichVideoTemplate(template: Template): boolean {
 }
 
 export default function TemplatesListV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('テンプレート')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -221,11 +192,10 @@ export default function TemplatesListV8() {
    * 作成・編集・公開・削除は API が owner/admin で閉じている。
    * それ以外の人には押せない形で出す（閲覧は残す）。
    */
-  const [localCanMutate] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
   /* 役割はサーバ（/api/staff/me）で確かめる。答えが来るまでは手元の値で決める。 */
   const staffRole = useStaffRole()
-  const canMutateTemplates = staffRole === null ? localCanMutate : canManageRole(staffRole)
+  const featureAccess = useFeatureAccess('templates')
+  const canMutateTemplates = featureAccess
   /* 1152 の板（`L7zA7C`）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
 
@@ -309,9 +279,10 @@ export default function TemplatesListV8() {
   /* 右クリックされた行（「…」と同じ項目を出す）。 */
   const [contextId, setContextId] = useState<string | null>(null)
 
-  const [duplicateTarget, setDuplicateTarget] = useState<Template | null>(null)
+  const duplicateLock = useRef(false)
+  const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const [duplicating, setDuplicating] = useState(false)
-  const [duplicateError, setDuplicateError] = useState('')
+  const setDuplicateError =(message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
 
   /** まとめて削除の確認。対象は「使っていない」ものだけ。 */
   const [pendingBulkDelete, setPendingBulkDelete] = useState<Template[] | null>(null)
@@ -335,7 +306,6 @@ export default function TemplatesListV8() {
     setBlockedUsage(null)
     setPendingBulkDelete(null)
     setMoveIds(null)
-    setDuplicateTarget(null)
     setOpenMenuId(null)
     setSelectedIds(new Set())
   }, [selectedAccountId])
@@ -361,16 +331,19 @@ export default function TemplatesListV8() {
       if (res.success) setTemplates(res.data as Template[])
       else setFailure(failureOfResponse())
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e);
+
       if (activeAccountRef.current === accountId && requestGeneration === loadGenerationRef.current) {
         // 権限不足を「読み込めませんでした」に混ぜない。
-        setFailure(failureOf(e))
+        { if (!fieldFailure)
+        setFailure(failureOf(e)) }
       }
     } finally {
       if (activeAccountRef.current === accountId && requestGeneration === loadGenerationRef.current) {
         setLoading(false)
       }
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -385,10 +358,11 @@ export default function TemplatesListV8() {
       const result = await api.broadcastMessageAssets.counts({ accountId })
       if (activeAccountRef.current !== accountId) return
       if (result.success) setAssetCounts(result.data)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       /* 件数が取れなくても一覧は出す。黙って古い件数のままにする。 */
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => { void loadAssetCounts() }, [loadAssetCounts])
 
@@ -408,10 +382,13 @@ export default function TemplatesListV8() {
         setFolders(res.data)
         setUnfiledCount(res.unfiledCount ?? null)
       } else setFolderError('フォルダを読み込めませんでした。')
-    } catch {
-      if (activeAccountRef.current === accountId) setFolderError('フォルダを読み込めませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
+      if (activeAccountRef.current === accountId) { if (!fieldFailure) setFolderError('フォルダを読み込めませんでした。')
     }
-  }, [selectedAccountId])
+  }
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => { void loadFolders() }, [loadFolders])
 
@@ -561,7 +538,7 @@ export default function TemplatesListV8() {
       return next
     })
   }
-  const pageIds = shownItems.map((t) => t.id)
+  const pageIds = duplicateFeedback.order( shownItems, templates).map((t) => t.id)
   const allOnPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
   const toggleAllOnPage = () => {
     setSelectedIds((current) => {
@@ -599,8 +576,11 @@ export default function TemplatesListV8() {
       const res = await api.folders.swapOrder(target.id, neighbor.id, selectedAccountId ?? undefined)
       if (!res.success) throw new Error(res.error)
       await loadFolders()
-    } catch {
-      setFolderError('並び順を変えられませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setFolderError('並び順を変えられませんでした。') }
     } finally {
       setFolderBusy(false)
     }
@@ -616,8 +596,11 @@ export default function TemplatesListV8() {
       setDeletingFolder(null)
       if (selectedCategory === deletingFolder.id) setSelectedCategory('all')
       await loadFolders()
-    } catch {
-      setFolderError('フォルダを削除できませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setFolderError('フォルダを削除できませんでした。') }
     } finally {
       setFolderBusy(false)
     }
@@ -650,8 +633,11 @@ export default function TemplatesListV8() {
       setPendingDelete(null)
       // 件数（未分類・フォルダ別）はフォルダ側の集計が持つので両方読み直す。
       await Promise.all([load(), loadFolders()])
-    } catch {
-      setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
@@ -702,8 +688,10 @@ export default function TemplatesListV8() {
   }
 
   /* 複製。複製の口は無いので、同じ内容で「下書き」として新しく作る。 */
-  const runDuplicate = async () => {
+  const runDuplicate = async (duplicateTarget: Template) => {
+    if (duplicateLock.current) return
     if (!duplicateTarget) return
+    duplicateLock.current = true
     setDuplicating(true)
     setDuplicateError('')
     const source = duplicateTarget
@@ -722,16 +710,21 @@ export default function TemplatesListV8() {
         setDuplicateError('複製できませんでした。状態を読み直してからお試しください。')
         return
       }
-      setDuplicateTarget(null)
-      notifyToast(`「${source.name}」をコピーしました（下書きで作られました）`, { tone: 'success' })
+
+      duplicateFeedback.mark(source.id, result.data.id)
+      notifyToast('複製しました', { tone: 'success' })
       await Promise.all([load(), loadFolders()])
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure)
       setDuplicateError(
         reason instanceof ApiError && reason.status === 403
           ? permissionDeniedMessage('store')
           : '複製できませんでした。状態を読み直してからお試しください。',
-      )
+      ) }
     } finally {
+      duplicateLock.current = false
       setDuplicating(false)
     }
   }
@@ -757,11 +750,14 @@ export default function TemplatesListV8() {
       notifyToast(`${pendingBulkDelete.length} 件のテンプレートを削除しました`, { tone: 'success' })
       await Promise.all([load(), loadFolders()])
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure)
       setBulkDeleteError(
         reason instanceof ApiError && reason.status === 403
           ? permissionDeniedMessage('store')
           : '削除できませんでした。状態を読み直してからお試しください。',
-      )
+      ) }
     } finally {
       setBulkDeleting(false)
     }
@@ -780,7 +776,7 @@ export default function TemplatesListV8() {
       {
         id: 'usage',
         label: '使っている所を見る',
-        external: true,
+        external: false,
         href: detailHref(t), onSelect: () => withViewTransition(() => router.push(detailHref(t))),
       },
       {
@@ -795,7 +791,7 @@ export default function TemplatesListV8() {
           icon: <Copy size={14} aria-hidden="true" />,
           onSelect: () => {
             setDuplicateError('')
-            setDuplicateTarget(t)
+            void runDuplicate(t)
           },
         },
         {
@@ -842,7 +838,7 @@ export default function TemplatesListV8() {
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
     : []
 
@@ -897,6 +893,7 @@ export default function TemplatesListV8() {
   }
   const folderPanel = (
     <FolderPanel
+      createAction={createButton(true)}
       activeId={selectedCategory}
       onSelect={selectCategory}
       onAddFolder={canMutateTemplates ? () => setFolderDialogOpen(true) : undefined}
@@ -904,7 +901,7 @@ export default function TemplatesListV8() {
       rows={folderRows}
     >
       {/* 補助のデータ（フォルダ）だけ取れないときは、その場所に小さく1行だけ。 */}
-      {folderError ? <p role="alert" className={styles.folderNote}>{folderError}</p> : null}
+      {folderError ? <Notice tone="danger" className={styles.folderNoteNoticePlacement} >{folderError}</Notice> : null}
       <p className={styles.folderNote}>
         フォルダは種類のタブをまたいで使えます。消しても、中のテンプレートは未分類に残ります
       </p>
@@ -971,7 +968,7 @@ export default function TemplatesListV8() {
   )
   const perPageBox = (
     <div className={styles.perPageBox}>
-      <Select
+      <SaveErrorField names={["pageSize","page_size"]}><Select
         aria-label="1ページに出す件数"
         size="page-size"
         value={String(pageSize)}
@@ -980,17 +977,17 @@ export default function TemplatesListV8() {
           setPage(1)
         }}
         options={PAGE_SIZE_OPTIONS}
-      />
+      /></SaveErrorField>
     </div>
   )
 
   /* 1152 の板（L7zA7C）：1段目「作る・フォルダ・探す … 件数」、2段目「札・よく使う絞り込み（印だけ）」。 */
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
-      <div className={styles.narrowRow}>
+    <ListToolbarFrame>
+      <ListToolbarRow>
         {createButton(false)}
         <div className={styles.narrowFolder}>
-          <Select
+          <SaveErrorField names={["selectedCategory","selected_category"]}><Select
             aria-label="フォルダ"
             value={selectedCategory}
             onChange={(value) => {
@@ -998,9 +995,9 @@ export default function TemplatesListV8() {
               setPage(1)
             }}
             options={folderSelectOptions}
-          />
+          /></SaveErrorField>
         </div>
-        <div className={styles.narrowSearch}>
+        <ListToolbarSearchSlot>
           <SearchField
             aria-label="テンプレートを検索"
             placeholder="名前・本文で探す"
@@ -1008,19 +1005,19 @@ export default function TemplatesListV8() {
             onChange={onSearch}
             onClear={() => onSearch('')}
           />
-        </div>
+        </ListToolbarSearchSlot>
         <span className={styles.spacer} aria-hidden="true" />
         {perPageBox}
-      </div>
-      <div className={styles.narrowRow}>
+      </ListToolbarRow>
+      <ListToolbarRow>
         {filterChips}
         {savedBox(true)}
-      </div>
-    </div>
+      </ListToolbarRow>
+    </ListToolbarFrame>
   )
 
   const wideToolbar = (
-    <div className={styles.wideTools}>
+    <ListToolbarFrame>
       <ListToolbar
         search={{
           placeholder: '名前・本文・差し込みで探す',
@@ -1031,7 +1028,7 @@ export default function TemplatesListV8() {
         filters={filterChips}
         trailing={<><ListToolbarOptional label="よく使う絞り込み">{savedBox(false)}</ListToolbarOptional>{perPageBox}</>}
       />
-    </div>
+    </ListToolbarFrame>
   )
 
   /* ===== 一覧の中身（`susGP`：読込中・読み込めない・空・0件を分ける） ===== */
@@ -1048,31 +1045,13 @@ export default function TemplatesListV8() {
       ))}
     </div>
   ) : !selectedAccountId ? (
-    <div className={styles.stateCard}>
-      <span className={styles.stateIcon}>
-        <FileText size={18} aria-hidden="true" />
-      </span>
-      <p className={styles.stateTitle}>
-        {accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'}
-      </p>
-    </div>
+    <AccountRequiredState hasAccounts={accounts.length > 0}   icon={<FileText size={18} aria-hidden="true" />} />
   ) : view === 'forbidden' || view === 'error' ? (
-    <div className={styles.stateCard} data-design-node="susGP">
-      <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
-        <TriangleAlert size={18} aria-hidden="true" />
-      </span>
-      <p className={styles.stateTitle}>
-        {view === 'forbidden' ? (failure?.title ?? '見る権限がありません') : 'テンプレートを読み込めませんでした'}
-      </p>
-      <p className={styles.stateDesc}>
-        {view === 'forbidden'
+    <ListState kind="error" title={view === 'forbidden' ? (failure?.title ?? '見る権限がありません') : 'テンプレートを読み込めませんでした'} description={view === 'forbidden'
           ? (failure?.description ?? '')
-          : '登録したテンプレートは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'}
-      </p>
-      {view === 'error' && (
-        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
-      )}
-    </div>
+          : '登録したテンプレートは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'} data-design-node="susGP" action={<>{view === 'error' && (
+        <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
+      )}</>} />
   ) : filteredTemplates.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
     <EmptyList
@@ -1110,12 +1089,12 @@ export default function TemplatesListV8() {
                 <Th className={styles.selectCell} aria-label="選択">
                   {/* 閲覧のみ：まとめて変える操作が無いので、選ぶチェックを置かない（列の幅は残す） */}
                   {canMutateTemplates ? (
-                    <Checkbox
+                    <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
                       checked={allOnPageSelected}
                       indeterminate={!allOnPageSelected && selectedCount > 0}
                       onCheckedChange={() => toggleAllOnPage()}
                       aria-label="このページのテンプレートをすべて選択"
-                    />
+                    /></SaveErrorField>
                   ) : null}
                 </Th>
                 <Th className={styles.headCell}>テンプレート</Th>
@@ -1128,7 +1107,7 @@ export default function TemplatesListV8() {
               </TableHeadRow>
             </thead>
             <RovingTbody>
-              {shownItems.map((t) => {
+              {duplicateFeedback.order(shownItems, templates).map((t, saveFieldIndex) => {
                 const publish = publishStateOf(t)
                 const kindLabel = t.question ? 'question' : t.messageType
                 const excerpt = excerptOf(t)
@@ -1152,24 +1131,22 @@ export default function TemplatesListV8() {
                   >
                     <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
                       {canMutateTemplates ? (
-                        <Checkbox
+                        <SaveErrorField names={[`shownItems.${saveFieldIndex}.id`,"id","t.id"]}><Checkbox
                           checked={selectedIds.has(t.id)}
                           onCheckedChange={() => toggleOne(t.id)}
                           aria-label={`「${t.name}」を選択`}
-                        />
+                        /></SaveErrorField>
                       ) : null}
                     </Td>
-                    <NameCell
-                      name={
+                    <NameCell name={
                         <div className={styles.dotLine}>
-                          <FolderDotName folder={folderDotOf(t)}>
-                            <Link href={detailHref(t)}  className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
+                          <>
+                            <Link href={detailHref(t)} title={t.name} className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
                               <TruncatedText value={String(t.name ?? '')} />
                             </Link>
-                          </FolderDotName>
+                          </>
                         </div>
-                      }
-                      sub={<span className={narrow ? styles.cellSub : `${styles.cellSub} ${styles.dotIndent}`} title={excerpt}>{excerpt}</span>}
+                      } folder={folderDotOf(t)}
                     />
                     <Td>
                       <span className={styles.kindBadge}>{isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)}</span>
@@ -1278,10 +1255,7 @@ export default function TemplatesListV8() {
   const tabs = (
     <>
       {!canMutateTemplates ? (
-        <div className={styles.viewerBand} role="status" data-design-node="hEDTK">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-        </div>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="hEDTK"></ReadOnlyNotice></div>
       ) : null}
       <div className={styles.tabsBox}>
       <Tabs
@@ -1314,7 +1288,7 @@ export default function TemplatesListV8() {
         open={pickerOpen}
         title="どの種類を作りますか"
         designNode="I4jUUW"
-        designWidth={1060}
+        designWidth={960}
         designTop={200}
         designHeaderPadding="24px 24px 0"
         designHeaderHeight={48}
@@ -1393,7 +1367,7 @@ export default function TemplatesListV8() {
         onCancel={() => { if (!deleting) { setPendingDelete(null); setDeleteError('') } }}
       >
         <Notice tone="danger" message="削除は元に戻せません。" />
-        {pendingDelete !== null && pendingDelete.accountId !== selectedAccountId ? <p className={styles.alertText} role="alert">アカウントが切り替わりました。削除するテンプレートを選び直してください。</p> : null}
+        {pendingDelete !== null && pendingDelete.accountId !== selectedAccountId ? <Notice tone="danger" className={styles.alertTextNoticePlacement} >アカウントが切り替わりました。削除するテンプレートを選び直してください。</Notice> : null}
       </ConfirmDialog>
 
       {/* まとめて削除の確認窓。対象は「使っていない」ものだけ。 */}
@@ -1446,8 +1420,8 @@ export default function TemplatesListV8() {
                   const target = blockedDelete.item
                   setBlockedDelete(null)
                   setBlockedUsage(null)
-                  withViewTransition(() => router.push(detailHref(target)))
-                }}
+                  return withViewTransition(() => router.push(detailHref(target)))
+                }} busyLabel="処理中…"
               >
                 <List size={15} aria-hidden="true" />
                 使っている所をすべて見る
@@ -1460,9 +1434,7 @@ export default function TemplatesListV8() {
           <p className={styles.faintText}>使用先を読み込んでいます…</p>
         ) : blockedLoadError ? (
           // 消してよいか分からないのに消させない。閉じて読み直すだけ。
-          <p className={styles.alertText} role="alert">
-            使っている所を確認できませんでした。閉じてから、もう一度お試しください。
-          </p>
+          <Notice tone="danger" className={styles.alertTextNoticePlacement} >使っている所を確認できませんでした。閉じてから、もう一度お試しください。</Notice>
         ) : blockedUsage ? (
           <div className={styles.usageList}>
             <ul>
@@ -1495,7 +1467,7 @@ export default function TemplatesListV8() {
             : `${moveIds?.length ?? 0} 件のテンプレートをフォルダへ移す`
         }
         description="移動先のフォルダを選んでください。「未分類」を選ぶとフォルダから外れます。"
-        confirmLabel={moving ? '移動中…' : '移動する'}
+        confirmLabel="移動する" busyLabel="移動中…"
         busy={moving}
         error={moveError}
         onConfirm={() => runMove()}
@@ -1507,7 +1479,7 @@ export default function TemplatesListV8() {
       >
         <div className={styles.moveBody}>
           <span className={styles.moveLabel}>移動先のフォルダ</span>
-          <Select
+          <SaveErrorField names={["moveDraft","move_draft"]}><Select
             aria-label="移動先のフォルダ"
             size="full"
             value={moveDraft}
@@ -1517,25 +1489,12 @@ export default function TemplatesListV8() {
               { value: '', label: '未分類' },
               ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
             ]}
-          />
+          /></SaveErrorField>
         </div>
       </ConfirmDialog>
 
       {/* 複製の確認窓。コピーは下書きで作る（公開は別の操作）。 */}
-      <ConfirmDialog
-        open={duplicateTarget !== null}
-        title={duplicateTarget ? `「${duplicateTarget.name}」を複製しますか？` : ''}
-        description="同じ本文のテンプレートをもう1つ作ります。コピーは「下書き」で作られるので、確認してから公開してください。名前に「（コピー）」を付けます。"
-        confirmLabel={duplicating ? '複製中…' : '複製する'}
-        busy={duplicating}
-        error={duplicateError}
-        onConfirm={() => runDuplicate()}
-        onCancel={() => {
-          if (duplicating) return
-          setDuplicateTarget(null)
-          setDuplicateError('')
-        }}
-      />
+      <></>
 
       {folderDialogOpen && (
         <FolderAddDialog
@@ -1591,12 +1550,12 @@ export default function TemplatesListV8() {
           onNext={() => setActiveId(navItems[activeIndex + 1]?.id ?? null)}
           footer={
             <div className={styles.panelActions}>
-              <Button type="button" variant="primary" onClick={() => withViewTransition(() => router.push(detailHref(activeTemplate)))}>
+              <Button type="button" variant="primary" onClick={() => withViewTransition(() => router.push(detailHref(activeTemplate)))} busyLabel="移動中…">
                 詳細を見る
               </Button>
               {/* 閲覧のみ：変えるボタンは置かない（2026-10-06 オーナー決定） */}
               {canMutateTemplates ? <>
-                <Button type="button" variant="secondary" onClick={() => withViewTransition(() => router.push(editHref(activeTemplate)))}>
+                <Button type="button" variant="secondary" onClick={() => withViewTransition(() => router.push(editHref(activeTemplate)))} busyLabel="移動中…">
                   編集する
                 </Button>
                 <Button
@@ -1604,7 +1563,7 @@ export default function TemplatesListV8() {
                   variant="secondary"
                   onClick={() => {
                     setDuplicateError('')
-                    setDuplicateTarget(activeTemplate)
+                    void runDuplicate(activeTemplate)
                   }}
                 >
                   複製する
@@ -1656,7 +1615,7 @@ export default function TemplatesListV8() {
               <>
                 <p className={styles.panelLabel}>移動先のフォルダ</p>
                 <div className={styles.moveBody}>
-                  <Select
+                  <SaveErrorField names={["moveDraft","move_draft"]}><Select
                     aria-label="移動先のフォルダ"
                     size="full"
                     value={moveDraft}
@@ -1666,12 +1625,12 @@ export default function TemplatesListV8() {
                       { value: '', label: '未分類' },
                       ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
                     ]}
-                  />
-                  <Button type="button" variant="primary" disabled={moving} busy={moving} onClick={() => void runMove()}>
-                    {moving ? '移動中…' : '移動する'}
+                  /></SaveErrorField>
+                  <Button type="button" variant="primary" disabled={moving} busy={moving} onClick={() => void runMove()} busyLabel="移動中…">
+                    移動する
                   </Button>
                 </div>
-                {moveError ? <p className={styles.alertText} role="alert">{moveError}</p> : null}
+                {moveError ? <Notice tone="danger" className={styles.alertTextNoticePlacement} >{moveError}</Notice> : null}
               </>
             ) : null}
           </div>
@@ -1688,7 +1647,7 @@ export default function TemplatesListV8() {
   /* 資産タブ（カルーセル・リッチメッセージ・クーポン・リサーチ）。中身の管理は既存の部品のまま。 */
   if (!isTemplateSection) {
     return (
-      <ListPage boardId={narrow ? 'L7zA7C' : 'v19Ivv'} headingSize="regular" {...heading} tabs={tabs} overlays={overlays}>
+      <SaveErrorScope errors={saveErrors}><ListPage boardId={narrow ? 'L7zA7C' : 'v19Ivv'} headingSize="regular" {...heading} tabs={tabs} overlays={overlays}>
         <div className={styles.assetBody}>
           {canMutateTemplates ? (
             <BroadcastAssetManager kind={activeSection} onChanged={() => void loadAssetCounts()} />
@@ -1701,12 +1660,13 @@ export default function TemplatesListV8() {
             </>
           )}
         </div>
-      </ListPage>
+      </ListPage></SaveErrorScope>
     )
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId={narrow ? 'L7zA7C' : 'v19Ivv'}
       headingSize="regular"
       {...heading}
@@ -1722,18 +1682,18 @@ export default function TemplatesListV8() {
               icon={<kpi.icon size={13} aria-hidden="true" />}
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
-              detail={<span className={styles.kpiDetailWrap}>{kpi.detail}</span>}
+              detail={kpi.detail}
             />
           ))}
         </KpiBand>
       }
       folderNav={narrow ? undefined : { rows: folderRows, activeId: selectedCategory, onSelect: selectCategory, createAction: createButton(false) }}
-      folders={<>{createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
+      folders={folderPanel}
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={listPager}
       overlays={overlays}
     >
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

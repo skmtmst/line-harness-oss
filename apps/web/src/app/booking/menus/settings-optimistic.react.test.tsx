@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * 予約設定（V8）の「サクサク感」。
  * メニューの公開・並びは先に画面を変えて裏で保存する。
@@ -135,8 +137,9 @@ function rowOrder(): string[] {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   fixture.tab = 'menus'
-  window.localStorage.setItem('lh_staff_role', 'owner')
+  window.localStorage.setItem('lh_staff_role', 'owner'); rememberStaffIdentity({ role: 'owner' } as StaffMember)
   clearToastsForTest()
   fixture.updateMenu = vi.fn(async () => ({ ok: true }))
   fixture.patchMenu = vi.fn(async () => ({ ok: true }))

@@ -64,3 +64,8 @@ describe('decideFormSubmitStep', () => {
     expect(decideFormSubmitStep({ status: 500, body: null }).action).toBe('fail');
   });
 });
+
+  test('書類を付けられない時は選び直す案内を画面へ渡す', () => {
+    const message = '書類を回答に付けられませんでした。書類をもう一度選んで、送信してください';
+    expect(decideFormSubmitStep({ status: 409, body: { success: false, code: 'document_attachment_failed', error: message } })).toEqual({ action: 'fail', message });
+  });

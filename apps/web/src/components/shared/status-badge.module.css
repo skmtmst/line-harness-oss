@@ -56,7 +56,7 @@
  * ここでは押せるものとして輪郭の存在を契約へ示す。
  */
 .badge a:focus-visible {
-  outline: 2px solid var(--color-status-info);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 1px;
 }
 
@@ -95,7 +95,7 @@
 /* 点なしの札（dot={false}）。 */
 [data-theme='v8'] .noDot::before { content: none; }
 [data-theme='v8'] .neutral { background: var(--color-v8-pill-off); color: var(--color-ink-secondary); }
-[data-theme='v8'] .info { background: var(--color-status-info-soft); color: var(--color-link); }
+[data-theme='v8'] .info { background: var(--color-status-info-soft); color: var(--color-status-info); }
 [data-theme='v8'] .warning { background: var(--color-status-warn-soft); color: var(--color-warning); }
 [data-theme='v8'] .success { background: var(--color-success-bg); color: var(--color-success); }
 [data-theme='v8'] .danger { background: var(--color-status-danger-soft); color: var(--color-danger); }
@@ -128,4 +128,18 @@
 [data-theme='v8'] .badge:not(.annotation)[data-tone='neutral']::before { background: var(--polish-status-neutral-dot); }
 [data-theme='v8'] .badge:not(.annotation)::before { background: var(--polish-status-neutral-dot); width: var(--polish-status-dot-size); height: var(--polish-status-dot-size); flex-basis: var(--polish-status-dot-size); }
 
+/* B-159 / B-180：小さい注記も状態なら同じ22px・12/600。 */
+[data-theme='v8'] .badge {
+  box-sizing: border-box;
+  height: var(--tpl-badge-h);
+  font-size: var(--text-caption); font-weight: 600; line-height: 18px;
+}
+[data-theme='v8'] .badge.micro {
+  font-size: var(--text-caption); font-weight: 600; line-height: 18px;
+}
+[data-theme='v8'] .neutral { background: var(--color-badge-neutral-bg); color: var(--color-badge-neutral); }
+[data-theme='v8'] .success { background: var(--color-badge-success-bg); color: var(--color-badge-success); }
+[data-theme='v8'] .warning { background: var(--color-badge-warning-bg); color: var(--color-badge-warning); }
+[data-theme='v8'] .danger { background: var(--color-badge-danger-bg); color: var(--color-badge-danger); }
+[data-theme='v8'] .info { background: var(--color-badge-info-bg); color: var(--color-badge-info); }
 @layer components { [data-theme='v8'] .badge[data-size='dining']{--badge-padding:2px 14px;} }

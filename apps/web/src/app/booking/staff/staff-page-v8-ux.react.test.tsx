@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * 担当スタッフ一覧の「サクサク感」（V8 のときだけ）。
  * A: 読み込み中は目に見える「読み込み中」の文字を置かず、表の形の骨組みで待つ。
@@ -60,7 +62,8 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
-  memStorage.setItem('lh_staff_role', 'owner')
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
+  memStorage.setItem('lh_staff_role', 'owner'); rememberStaffIdentity({ role: 'owner' } as StaffMember)
   document.documentElement.dataset.theme = 'v8'
   fixture.listStaff = async () => ({ staff: [ROW] })
   fixture.createStaff = vi.fn(async () => ({ ok: true }))

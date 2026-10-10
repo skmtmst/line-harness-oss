@@ -1,3 +1,13 @@
+
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
+import React, { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import EditPage from '@/app/webinars/edit/page'
+import WebinarEditV8 from './edit'
+
+;
+import { fireEvent, screen, within } from '@testing-library/react'
 // @vitest-environment happy-dom
 /*
  * V8 ウェビナーの編集（src/v8/webinar-edit）の動きの試験。BEHAVIOR.md の主な動きを守る。
@@ -6,36 +16,31 @@
  * - 閲覧のみ（staff）には、押せないボタンを置かない（変える操作は隠す）
  * - コメント演出はその場で直して、秒の順に並べて保存する
  */
-import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
-import React, { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
-})
+});
 
+const routerPush = vi.hoisted(() => vi.fn())
 const nav = vi.hoisted(() => ({ search: 'id=webinar-1&pane=participants' }))
 const roleState = vi.hoisted(() => ({ role: 'owner' as string | null }))
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
+  useRouter: () => ({ push: routerPush, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   usePathname: () => '/webinars/edit',
   useSearchParams: () => new URLSearchParams(nav.search),
-}))
+}));
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: { id: 'account-a', name: '本店' }, accounts: [{ id: 'account-a', name: '本店', liffId: 'liff-1' }], loading: false }),
-}))
+}));
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
   return { ...actual, useStaffRole: () => roleState.role }
-})
+});
 
-import EditPage from '@/app/webinars/edit/page'
-import WebinarEditV8 from './edit'
 
-;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const webinar = {
   id: 'webinar-1', accountId: 'account-a', title: 'NEN活用スタートセミナー', slug: 'nen-start', status: 'active',
@@ -70,7 +75,7 @@ let comments = [
   { atSeconds: -60, authorName: '田中', body: 'こんばんは' },
 ]
 const puts: Array<{ path: string; body: unknown }> = []
-const conflictState = vi.hoisted(() => ({ ctas: false }))
+const conflictState = vi.hoisted(() => ({ ctas: false, actions: false }))
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
 
@@ -79,10 +84,12 @@ let host: HTMLDivElement
 
 beforeEach(() => {
   clearToastsForTest()
+  routerPush.mockReset()
   document.documentElement.dataset.theme = 'v8'
   roleState.role = 'owner'
   puts.length = 0
   conflictState.ctas = false
+  conflictState.actions = false
   comments = [
     { atSeconds: 45, authorName: 'まさ', body: 'わかりやすい！' },
     { atSeconds: -60, authorName: '田中', body: 'こんばんは' },
@@ -94,10 +101,15 @@ beforeEach(() => {
     const url = new URL(String(input))
     const path = url.pathname
     const method = init?.method ?? 'GET'
+    if (method === 'POST' && path.endsWith('/duplicate')) { puts.push({ path, body: JSON.parse(String(init?.body)) }); return json({ data: { ...webinar, id: 'copied-webinar', status: 'draft' } }) }
     if (method === 'POST' && path.endsWith('/pause')) { puts.push({ path, body: JSON.parse(String(init?.body)) }); return json({ data: { ...webinar, status: 'paused' } }) }
     if (method === 'PUT') {
       puts.push({ path, body: init?.body ? JSON.parse(String(init.body)) : null })
       if (conflictState.ctas && path.endsWith('/ctas')) return json({ success: false, error: 'ほかの人が保存しました', code: 'version_conflict' }, 409)
+      if (path.endsWith('/actions')) {
+        if (conflictState.actions) return json({ success: false, error: '保存できませんでした' }, 503)
+        return json({ data: JSON.parse(String(init?.body)).actions })
+      }
       if (path.endsWith('/comments')) return json({ data: { count: (JSON.parse(String(init?.body)) as { comments: unknown[] }).comments.length } })
       return json({ data: { count: 0 } })
     }
@@ -112,18 +124,19 @@ beforeEach(() => {
     if (path.endsWith('/ctas')) return json({ data: [{ atSeconds: 300, kind: 'url', title: '資料', body: null, buttonLabel: '受け取る', autoOpen: false, formId: null, url: 'https://example.com' }] })
     if (path.endsWith('/video-asset')) return json({ data: { asset: null } })
     if (path.endsWith('/publish-validation')) return json({ data: { version: 3, checks: [{ key: 'video_ready', label: '動画の準備ができている', status: 'passed', detail: null }], blockers: [], warnings: [] } })
+    if (path === '/api/common-actions/resources') return json({ success: true, data: { tags: [{ id: 'tag-owner', name: '完了のタグ' }], scenarios: [], templates: [], webhooks: [], richMenus: [], commonActions: [] } })
     if (path === '/api/forms') return json({ success: true, data: [] })
     if (path.includes('/folders')) return json({ success: true, data: [] })
     return json({ data: null })
   })
-})
+});
 
 afterEach(() => {
   act(() => { root.unmount() })
   host.remove()
   vi.unstubAllGlobals()
   document.documentElement.removeAttribute('data-theme')
-})
+});
 
 async function render(node: React.ReactNode) {
   await act(async () => { root.render(<>{node}<ToastHost /></>) })
@@ -200,6 +213,34 @@ describe('V8 ウェビナーの編集', () => {
     await act(async () => { video!.click() })
     for (let i = 0; i < 4; i += 1) await act(async () => {})
     expect(host.textContent).toContain('動画と公開期間')
+  })
+
+  it('B-169：対象を選んだ後に行を追加し、下書きの帯から視聴後の動きを保存する', async () => {
+    nav.search = 'id=webinar-1&pane=notifications'
+    await render(<WebinarEditV8 />)
+    await act(async () => fireEvent.click(screen.getAllByRole('button', { name: '行うことを足す' })[0]))
+    await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: /タグを付ける/ })))
+    const dialog = screen.getByRole('dialog', { name: 'タグを付ける対象を選ぶ' })
+    await act(async () => fireEvent.click(within(dialog).getByRole('radio', { name: '完了のタグ' })))
+    expect(puts.filter(item => item.path.endsWith('/actions'))).toHaveLength(0)
+    await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' })))
+    await act(async () => buttonText('下書きを保存')!.click())
+    expect(puts.find(item => item.path.endsWith('/actions'))?.body).toEqual({ actions: [{ trigger: 'completed', actionType: 'add_tag', config: { tagId: 'tag-owner' } }] })
+    expect(screen.getByRole('button', { name: '完了のタグ' })).toBeTruthy()
+  })
+
+  it('B-169：保存に失敗しても行を残し、もう一度保存できる', async () => {
+    nav.search = 'id=webinar-1&pane=notifications'
+    await render(<WebinarEditV8 />)
+    await act(async () => fireEvent.click(screen.getAllByRole('button', { name: '行うことを足す' })[0]))
+    await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: /リッチメニューを外す/ })))
+    conflictState.actions = true
+    await act(async () => buttonText('下書きを保存')!.click())
+    expect(host.textContent).toContain('保存できませんでした')
+    expect(screen.getByRole('button', { name: 'リッチメニューを外す' })).toBeTruthy()
+    conflictState.actions = false
+    await act(async () => buttonText('下書きを保存')!.click())
+    expect(puts.filter(item => item.path.endsWith('/actions'))).toHaveLength(2)
   })
 
   it('閲覧のみ（staff）には、押せないボタンを置かない（通知・CTA・コメント演出）', async () => {
@@ -294,18 +335,30 @@ describe('V8 ウェビナーの編集', () => {
     expect(buttonText('比べてから保存')).toBeTruthy()
     expect([...host.querySelectorAll('a')].some((link) => link.textContent?.trim() === 'キャンセル')).toBe(true)
   })
-})
+});
 
 it('WEB-166：公開中は編集の…から版を確認して停止する', async () => {
   await render(<WebinarEditV8 />)
   const menu = buttons().find(b => b.getAttribute('aria-label') === 'ウェビナーの操作')!
   expect(menu).toBeTruthy()
   await act(async () => { menu.click() })
-  const pause = document.querySelector('[role="menuitem"]') as HTMLElement
+  const pause = [...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim() === '停止') as HTMLElement
   expect(pause.textContent).toContain('停止')
   await act(async () => { pause.click() })
   const confirm = buttons().find(b => b.textContent?.trim() === '停止する')!
   expect(confirm).toBeTruthy()
   await act(async () => { confirm.click() })
   expect(puts.some(p => p.path.endsWith('/pause') && (p.body as { expectedVersion: number }).expectedVersion === 3)).toBe(true)
-})
+});
+
+
+it('編集の複製は保存済みの版を送り、一覧で下書きを光らせる行き先へ移る', async () => {
+  nav.search = 'id=webinar-1&pane=participants'
+  await render(<WebinarEditV8 />)
+  await act(async () => { buttons().find(b => b.getAttribute('aria-label') === 'ウェビナーの操作')!.click() })
+  const duplicate = [...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim() === '複製する') as HTMLElement
+  await act(async () => { duplicate.click() })
+  expect(puts).toContainEqual({ path: '/api/webinars/webinar-1/duplicate', body: { expectedVersion: 3 } })
+  expect(routerPush).toHaveBeenCalledWith('/webinars?status=draft&highlight=copied-webinar')
+  expect(document.querySelector('[role="dialog"]')).toBeNull()
+});

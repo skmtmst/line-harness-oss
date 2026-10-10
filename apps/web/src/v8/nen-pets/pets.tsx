@@ -9,9 +9,9 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { useListUrlJsonValue } from '@/components/shared/list-url-state'
-import { jstDate } from '@/lib/jst-datetime'
+
 import { useEffect, useState } from 'react'
-import { Calculator, Download, Eye, History, PawPrint, Sparkles } from 'lucide-react'
+import { Calculator, Download, History, PawPrint, Sparkles } from 'lucide-react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import KpiBand from '@/components/shared/kpi-band'
@@ -27,6 +27,7 @@ import FeedingV8 from './feeding'
 import { EMPTY_QUERY, downloadCsv, petsToCsv, type PetTab, type PetsQuery } from './parts'
 import styles from './pets.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export type { PetTab } from './parts'
 
@@ -45,7 +46,7 @@ export default function PetsV8({
   const role = useStaffRole()
   /* 役割が読めるまでは閲覧のみとして扱い、押せないボタンを先に出さない。 */
   const canEdit = role !== null && canManageRole(role)
-  const readonly = role !== null && !canManageRole(role)
+  const readonly = !canManageRole(role)
 
   const [kpis, setKpis] = useState<NenPetKpis | null>(null)
   const [kpisFailed, setKpisFailed] = useState(false)
@@ -107,7 +108,7 @@ export default function PetsV8({
   const stats = accountId ? (
     <>
       {readonly ? (
-        <div className={styles.viewerBand}><Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。ペットの情報や主食を変える操作は管理者に頼んでください。" /></div>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。ペットの情報や主食を変える操作は管理者に頼んでください。</ReadOnlyNotice></div>
       ) : null}
       <KpiBand data-design="KPIs" aria-label="ペットの数の帯">
         <KpiCard presentation="band" title="登録ペット" icon={<History size={13} aria-hidden="true" />} value={pending ? null : kpis.total} unit="匹" loading={pending && !kpisFailed} detail={pending ? missing : `犬 ${kpis.dogs}・猫 ${kpis.cats}・その他 ${Math.max(0, kpis.total - kpis.dogs - kpis.cats)}`} />
@@ -120,6 +121,7 @@ export default function PetsV8({
 
   return (
     <ListPage
+      skeleton
       boardId={BOARD[tab]}
       headingSize="regular"
       title="マイペット"

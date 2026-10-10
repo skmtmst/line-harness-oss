@@ -1,23 +1,13 @@
 'use client'
-
 import { Tabs } from '@/components/shared/tabs'
 import { useUrlTab } from '@/lib/use-url-tab'
-
-/*
- * ★V8 アフィリエイターの詳細の引き出し（板 `tnTn9`。右から出る 620px）。
- * 「成果を見る」・名前・`?affiliate=` で開く。上のタブで 概要・内訳・友だち・支払い。
- *
- * 動きは app/affiliates/v8-drawer.tsx から写した（集計・紹介リンク・紹介で増えた友だち・
- * 今回の締めの見込み・報酬の約束の保存）。絵にある「認めるのを待っている成果」
- * （断る・認める）と「支払いを確定する」は、成果承認・支払いのタブと同じ口を使う。
- * 世代番号で、別の人へ開き直した途中に届いた古い応答を捨てる。
- */
 import { notifySaved } from '@/components/shared/toast'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, PauseCircle } from 'lucide-react'
 import { api, type AffiliateAccountSettlementPreview, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
+import InlineEdit from '@/components/shared/inline-edit'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
@@ -48,6 +38,17 @@ import { StatusPill } from './parts'
 import styles from './affiliate-drawer.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 アフィリエイターの詳細の引き出し（板 `tnTn9`。右から出る 620px）。
+ * 「成果を見る」・名前・`?affiliate=` で開く。上のタブで 概要・内訳・友だち・支払い。
+ *
+ * 動きは app/affiliates/v8-drawer.tsx から写した（集計・紹介リンク・紹介で増えた友だち・
+ * 今回の締めの見込み・報酬の約束の保存）。絵にある「認めるのを待っている成果」
+ * （断る・認める）と「支払いを確定する」は、成果承認・支払いのタブと同じ口を使う。
+ * 世代番号で、別の人へ開き直した途中に届いた古い応答を捨てる。
+ */
 
 const JOURNEY_PAGE_SIZE = 30
 
@@ -89,6 +90,7 @@ export default function AffiliateDrawer({
   onChanged: () => void
   onStopRequest: (id: string, name: string) => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const period = useMemo(() => currentSettlementPeriod(), [])
   const [tab, setTab] = useUrlTab(DRAWER_TABS.map(t => t.key), startInEdit ? 'payment' : 'summary', 'affiliates')
   const [loading, setLoading] = useState(true)
@@ -203,10 +205,13 @@ export default function AffiliateDrawer({
       const mine = res.data.affiliates.find((item) => item.affiliateId === id) ?? null
       setSettlement(mine)
       setSettlementState('ready')
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure);
+
       if (isCurrent(id, gen)) setSettlementState('error')
     }
-  }, [accountId, isCurrent, period])
+  }, [accountId, isCurrent, period, saveErrors]);
+
 
   const reloadAll = useCallback(() => {
     genRef.current += 1
@@ -219,9 +224,6 @@ export default function AffiliateDrawer({
   }, [affiliate.id, loadDetail, loadJourneys, loadPending, loadSettlement])
 
   useEffect(() => { reloadAll() }, [reloadAll])
-
-
-
 
   const decide = useCallback(async (item: ConversionApprovalItem, status: 'approved' | 'rejected') => {
     setDeciding(item.eventId)
@@ -462,9 +464,14 @@ export default function AffiliateDrawer({
   )
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <Drawer open title={`${affiliate.name}の詳細`} description={subLine} designWidth={620} layout="inset" busy={paymentOpen} onClose={onClose}
-        heading={<span className={styles.titleRow}><span>{affiliate.name}</span><StatusPill tone={affiliate.isActive ? 'active' : 'neutral'}>{affiliate.isActive ? '計測中' : '停止中'}</StatusPill></span>}
+        heading={<span className={styles.titleRow}>{readonly ? <span>{affiliate.name}</span> : <InlineEdit value={affiliate.name} label="紹介者の名前を直す" maxLength={100} onSave={async (next) => {
+          if (!next.trim()) throw new Error('名前を入力してください')
+          const response = await api.affiliates.update(affiliate.id, { name: next.trim() })
+          if (!response.success) throw new Error('名前を保存できませんでした。もう一度お試しください。')
+          notifyToast('名前を保存しました'); onChanged()
+        }} />}<StatusPill tone={affiliate.isActive ? 'active' : 'neutral'}>{affiliate.isActive ? '計測中' : '停止中'}</StatusPill></span>}
         toolbar={<Tabs label="詳細の中身" items={DRAWER_TABS.map(item => ({ label: item.label, current: tab === item.key, onClick: () => setTab(item.key) }))} />}
         footer={(<>{readonly ? <span /> : (
             <button type="button" className={styles.stop} onClick={() => { onClose(); onStopRequest(affiliate.id, affiliate.name) }} disabled={!affiliate.isActive}>
@@ -505,7 +512,7 @@ export default function AffiliateDrawer({
           onConfirmed={() => { onChanged(); reloadAll() }}
         />
       ) : null}
-    </>
+    </></SaveErrorScope>
   )
 }
 
@@ -517,6 +524,8 @@ function SettlementEditor({
   affiliate: { id: string; rewardMode?: 'none' | 'fixed' | 'rate'; commissionRate: number; email?: string | null; holdDays?: number | null; payoutCycle?: string | null; notifyOnConversion?: boolean }
   onSaved: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [rewardMode, setRewardMode] = useState<'none' | 'fixed' | 'rate'>(affiliate.rewardMode ?? (affiliate.commissionRate > 0 ? 'rate' : 'fixed'))
   const [rate, setRate] = useState(String(affiliate.commissionRate))
   const [email, setEmail] = useState(affiliate.email ?? '')
@@ -562,38 +571,42 @@ function SettlementEditor({
       notifySaved('支払いの取り決めを保存しました。')
       onSaved()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存できませんでした。通信を確かめて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure)
+
+      setError(e instanceof Error ? e.message : '保存できませんでした。通信を確かめて、もう一度お試しください。') }
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <section className={styles.card} aria-label="支払いの取り決め">
+    <SaveErrorScope errors={saveErrors}><section className={styles.card} aria-label="支払いの取り決め">
       <h3 className={styles.cardTitle}>支払いの取り決め</h3>
       <div className={styles.fields}>
-        <Select aria-label="報酬の方式" value={rewardMode} onChange={(value) => setRewardMode(value as typeof rewardMode)} options={[
+        <SaveErrorField names={["rewardMode","reward_mode"]}><Select aria-label="報酬の方式" value={rewardMode} onChange={(value) => setRewardMode(value as typeof rewardMode)} options={[
           { value: 'none', label: '報酬なし（計測のみ）' },
           { value: 'fixed', label: '成果1件ごとに定額' },
           { value: 'rate', label: '売上に対する割合' },
-        ]} />
-        {rewardMode === 'rate' ? <NumberInput aria-label="報酬の割合（%）" type="number" min={0} max={100} step="0.1" value={rate} onChange={(e) => setRate(e.target.value)} /> : null}
+        ]} /></SaveErrorField>
+        {rewardMode === 'rate' ? <SaveErrorField names={["rate"]}><NumberInput aria-label="報酬の割合（%）" type="number" min={0} max={100} step="0.1" value={rate} onChange={(e) => setRate(e.target.value)} /></SaveErrorField> : null}
         <Field label="連絡先" htmlFor="af-settlement-email" error={fieldErrors.email}>
-          <TextField id="af-settlement-email" ref={emailRef} type="email" value={email} onChange={(event) => { setEmail(event.target.value); setFieldErrors((old) => ({ ...old, email: undefined })) }} placeholder="partner@example.com" />
+          <SaveErrorField names={["email"]}><TextField id="af-settlement-email" ref={emailRef} type="email" value={email} onChange={(event) => { setEmail(event.target.value); setFieldErrors((old) => ({ ...old, email: undefined })) }} placeholder="partner@example.com" /></SaveErrorField>
         </Field>
         <Field label="確定までの保留（日）" htmlFor="af-settlement-hold" error={fieldErrors.hold}>
-          <NumberInput unit="日" id="af-settlement-hold" ref={holdRef} type="number" min={0} max={365} value={holdDays} onChange={(event) => { setHoldDays(event.target.value); setFieldErrors((old) => ({ ...old, hold: undefined })) }} placeholder="なし" />
+          <SaveErrorField names={["holdDays","hold_days"]}><NumberInput unit="日" id="af-settlement-hold" ref={holdRef} type="number" min={0} max={365} value={holdDays} onChange={(event) => { setHoldDays(event.target.value); setFieldErrors((old) => ({ ...old, hold: undefined })) }} placeholder="なし" /></SaveErrorField>
         </Field>
         <Field label="支払いサイクル" htmlFor="af-settlement-cycle">
-          <TextField id="af-settlement-cycle" value={payoutCycle} onChange={(event) => setPayoutCycle(event.target.value)} placeholder="例：月末締め翌月末払い" maxLength={100} />
+          <SaveErrorField names={["payoutCycle","payout_cycle"]}><TextField id="af-settlement-cycle" value={payoutCycle} onChange={(event) => setPayoutCycle(event.target.value)} placeholder="例：月末締め翌月末払い" maxLength={100} /></SaveErrorField>
         </Field>
       </div>
-      <Checkbox checked={notify} onCheckedChange={setNotify}>成果が出たときに本人へ知らせる</Checkbox>
+      <SaveErrorField names={["notify","notifyOnConversion"]}><Checkbox checked={notify} onCheckedChange={setNotify}>成果が出たときに本人へ知らせる</Checkbox></SaveErrorField>
       <p className={styles.note}>保留日数と支払いサイクルは取り決めの記録です。報酬の計算そのものには使いません。</p>
       {error ? <Notice tone="danger" message={error} /> : null}
       <div>
         <Button type="button" onClick={() => { void save() }} disabled={saving} busy={saving} busyLabel="保存しています">取り決めを保存する</Button>
       </div>
-    </section>
+    </section></SaveErrorScope>
   )
 }

@@ -65,7 +65,7 @@
 
 /* 「？」の中の「くわしく」。キーボードで来たときに輪郭を出す。 */
 .helpLink:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -157,4 +157,13 @@
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
   line-height: 1.4;
+}
+
+/* B-180：欄の上の小見出しは形・密度にかかわらず12/500。 */
+[data-theme='v8'] .label,
+[data-theme='v8'] .field[data-field-size] .label,
+[data-theme='v8'] .field[data-label-size] .label,
+[data-theme='v8'] .field[data-density] .label {
+  font-size: var(--tpl-field-label-size);
+  font-weight: var(--tpl-field-label-weight);
 }

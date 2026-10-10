@@ -1,14 +1,6 @@
 'use client'
 
-/*
- * ★V8 LINEアカウント（Pencil `V7vn3`）。
- *
- * 白い板の頭（題・説明・右に「並び順と親子を変える」「LINEアカウントを登録」）→
- * 左に「設定の中のメニュー」→ 右に数の4枚・探す欄と絞り込みの札・表・下の案内。
- * データの口は今の画面（app/accounts/page.tsx）と同じ：
- * 一覧（確かめ直しは live）・アーカイブ（理由・本人確認）・アーカイブから戻す。
- * 「並び順と親子を変える」は今ある並び替えの部品（components/accounts/account-ordering）を窓で開く。
- */
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -53,6 +45,17 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 LINEアカウント（Pencil `V7vn3`）。
+ *
+ * 白い板の頭（題・説明・右に「並び順と親子を変える」「LINEアカウントを登録」）→
+ * 左に「設定の中のメニュー」→ 右に数の4枚・探す欄と絞り込みの札・表・下の案内。
+ * データの口は今の画面（app/accounts/page.tsx）と同じ：
+ * 一覧（確かめ直しは live）・アーカイブ（理由・本人確認）・アーカイブから戻す。
+ * 「並び順と親子を変える」は今ある並び替えの部品（components/accounts/account-ordering）を窓で開く。
+ */
 
 const TITLE = 'LINEアカウント'
 const DESCRIPTION = 'musubo でつないでいる LINE 公式アカウントです。既定のアカウントと、親子（本店と支店など）を決めます。'
@@ -62,7 +65,7 @@ export default function AccountsV8() {
   const router = useRouter()
   const role = useStaffRole()
   // 役割が読めるまでは今までどおり出し、見るだけと分かったら変える操作を隠す（最後の守りはサーバ）。
-  const canManage = role === null || canManageRole(role)
+  const canManage = canManageRole(role)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [query, setQuery] = useListUrlValue('q', '')
@@ -160,11 +163,11 @@ export default function AccountsV8() {
   /** 行の「…」の中身：詳細・接続をもう一度確かめる・引き継ぎ・アーカイブ（戻す）。 */
   const menuItems = (account: LineAccount): ActionMenuItem[] => {
     const items: ActionMenuItem[] = [
-      { id: 'detail', label: '詳細', external: true, href: `/accounts/detail?id=${account.id}`, onSelect: () => { setOpenMenuId(null); router.push(`/accounts/detail?id=${account.id}`) } },
+      { id: 'detail', label: '詳細', external: false, href: `/accounts/detail?id=${account.id}`, onSelect: () => { setOpenMenuId(null); router.push(`/accounts/detail?id=${account.id}`) } },
       { id: 'recheck', label: '接続をもう一度確かめる', disabled: busy, onSelect: () => void recheck(account) },
     ]
     if (!canManage) return items
-    items.push({ id: 'handover', label: '引き継ぎ', external: true, href: `/accounts/handover?id=${account.id}`, onSelect: () => { setOpenMenuId(null); router.push(`/accounts/handover?id=${account.id}`) } })
+    items.push({ id: 'handover', label: '引き継ぎ', external: false, href: `/accounts/handover?id=${account.id}`, onSelect: () => { setOpenMenuId(null); router.push(`/accounts/handover?id=${account.id}`) } })
     items.push(account.archivedAt
       ? { id: 'restore', label: 'アーカイブから戻す', dividerBefore: true, disabled: busy, onSelect: () => { setOpenMenuId(null); setDialogError(''); setRestoreTarget(account) } }
       : { id: 'archive', label: 'アーカイブ', tone: 'danger', dividerBefore: true, disabled: busy, onSelect: () => { setOpenMenuId(null); setDialogError(''); setArchiveReason(''); setArchiveTarget(account) } })
@@ -254,11 +257,11 @@ export default function AccountsV8() {
               const archived = Boolean(account.archivedAt)
               const friends = archived || account.stats?.friendCount == null ? '—' : polishFormatNumber(account.stats.friendCount)
               return (
-                <Tr key={account.id} interactive data-row-id={account.id}>
-                  <Td className={styles.colName}><div className={styles.nameStack}>
-                    <span className={styles.name} ><TruncatedText value={String(account.name ?? '')} /></span>
-                    <span className={styles.sub}>{`チャネル ${account.channelId}`}</span>
-                  </div></Td>
+                <Tr data-row-id={account.id} key={account.id} interactive>
+                  <Td className={styles.colName}><FolderDotName><div className={styles.nameStack}>
+                    <span className={styles.name} title={account.name}>{account.name}</span>
+
+                  </div></FolderDotName></Td>
                   <Td className={styles.colConn}><StatusBadge tone={connection.tone}>{connection.label}</StatusBadge></Td>
                   <Td className={styles.colHook}>
                     {archived ? <span className={styles.faint}>{emptyValue('unknown')}</span> : <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>}
@@ -299,14 +302,14 @@ export default function AccountsV8() {
         onCancel={() => { if (!busy) { setArchiveTarget(null); setArchiveReason(''); setDialogError('') } }}
         onConfirm={() => runArchive()}
       >
-        <Field label="アーカイブの理由"><TextArea
+        <Field label="アーカイブの理由"><SaveErrorField names={["archiveReason","archive_reason"]}><TextArea
             rows={2}
             maxLength={500}
             placeholder="例：使わなくなった旧店舗のアカウント"
             value={archiveReason}
             onChange={(e) => setArchiveReason(e.target.value)}
             disabled={busy}
-          /></Field>
+          /></SaveErrorField></Field>
       </ConfirmDialog>
 
       <ConfirmDialog

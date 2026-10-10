@@ -18,7 +18,7 @@ import {seatBoardEntry} from '../../packages/shared/dist/reservation-board.js'
  *   node scripts/visual-qa/mock-api.mjs            # 既定 8788番
  *   PORT=9000 node scripts/visual-qa/mock-api.mjs
  */
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
@@ -313,6 +313,11 @@ const HQ_TEMPLATES_HTN = [
   { id: 'visual-hq-tpl-tag-vip', name: 'VIP', description: null, template_type: 'tag', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 2, distributed_account_names: ['本店', '渋谷店'], distributed_account_more: 0, content_summary: 'タグ 1', friend_count: 64, manual_assignment_allowed: true, assignment_method: '手動・自動' },
   { id: 'visual-hq-tpl-tag-new', name: '新規', description: null, template_type: 'tag', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: 'タグ 1', friend_count: 0, manual_assignment_allowed: false, assignment_method: '自動' },
 ]
+/** 配信設定は別の受け口の種類。画面確認で空一覧に落とさない。 */
+const HQ_DELIVERY_FIXTURES = ['auto_reply', 'friend_add_rule', 'reminder'].map((type, index) => ({
+  template: { id: `visual-hq-delivery-${type}`, template_type: type, name: ['営業時間のご案内','友だち追加のお礼','イベント前日のお知らせ'][index], description: null, revision: 2, folder_id: null, distributed_account_count: 2, distributed_account_names: ['本店','渋谷店'], distributed_account_more: 0, content_summary: ['キーワード・本文','初めての友だち・本文','予定日の前日'][index] },
+  definition: { schemaVersion: 1, references: [], settings: type === 'auto_reply' ? { name:'営業時間のご案内', keyword:'営業時間', matchType:'contains', responseType:'text', responseContent:'営業時間は10時から18時です。' } : type === 'friend_add_rule' ? { name:'友だち追加のお礼', friendKind:'first_time', priority:0, definition:{ routeIds:[],scenarioId:null,messageType:'text',messageText:'友だち追加ありがとうございます。',timing:'immediate',friendCondition:'',actions:[],activeFrom:null,activeUntil:null } } : { name:'イベント前日のお知らせ', description:'前日のご案内', triggerType:'event', deliveryMode:'time',triggerOffsetMinutes:-1440,sendAtTime:'10:00',stopConditions:{},steps:[] } },
+}))
 const HQ_TEMPLATE_FOLDERS_HTN = [
   { id: 'visual-hq-folder-inquiry', name: 'お問い合わせ', revision: 1 },
   { id: 'visual-hq-folder-booking', name: '予約', revision: 1 },
@@ -2189,6 +2194,9 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
     return { id: 'apitok-new', name: '在庫システム', tokenPrefix: 'lh_live_7Kq2', scopes: ['tags:read', 'tags:write'], createdBy: 'visual-qa-owner', lastUsedAt: null, rotatedFromId: null, createdAt: '2026-10-05T01:00:00.000Z', revokedAt: null, token: 'lh_live_7Kq2mZ9xW4pR8vN3tY6bH1cJ5dF3f9a' }
   }
   // 統括のテンプレート（★V8-B meBRB）：配る前の確認。
+  const deliveryFixture = HQ_DELIVERY_FIXTURES.find(row=>pathname.startsWith(`/api/hq/templates/${row.template.id}/`))
+  if (deliveryFixture && method==='POST' && pathname.endsWith('/preflight')) return {...HQ_TEMPLATE_PREFLIGHT_HTN, stores: HQ_TEMPLATE_PREFLIGHT_HTN.stores.map(store=>({...store,items:store.items.map(item=>({...item,sourceId:deliveryFixture.template.id,itemKind:deliveryFixture.template.template_type,name:deliveryFixture.template.name}))}))}
+  if (deliveryFixture && method==='POST' && pathname.endsWith('/distribute')) return HQ_TEMPLATE_RESULT_HTN
   if (method === 'POST' && /^\/api\/hq\/templates\/visual-hq-tpl-[^/]+\/preflight$/.test(pathname)) return HQ_TEMPLATE_PREFLIGHT_HTN
   // 統括のテンプレート（★V8-B dEvJM）：配る。結果の窓に出す成功2・失敗1を返す。
   if (method === 'POST' && /^\/api\/hq\/templates\/visual-hq-tpl-[^/]+\/distribute$/.test(pathname)) return HQ_TEMPLATE_RESULT_HTN
@@ -3345,6 +3353,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/hq/templates' && method === 'GET') {
     const type = query.get('type')
     const kind = query.get('kind')
+    const deliveries = HQ_DELIVERY_FIXTURES.filter(row=>row.template.template_type===type)
+    if (deliveries.length) return {success:true,data:deliveries.map(row=>row.template)}
     if (type === 'friend_field' || type === 'mark') {
       const rows = HQ_ATTRIBUTE_ROWS.filter((item) => item.template.template_type === type).map((item) => item.template)
       return { success: true, data: rows, stats: { totalTemplates: rows.length, distributedAccountCount: 1, undistributedTemplateCount: 0, thisMonthSentCount: null, outdatedTemplateCount: 0 } }
@@ -3392,6 +3402,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   const attribute = HQ_ATTRIBUTE_ROWS.find((item) => pathname === `/api/hq/templates/${item.template.id}`)
   if (attribute && method === 'GET') return { success: true, data: attribute }
   if (/^\/api\/hq\/templates\/visual-hq-attr-[^/]+\/received-versions$/.test(pathname)) return { success: true, data: [] }
+  const deliveryDetail = HQ_DELIVERY_FIXTURES.find(row=>pathname===`/api/hq/templates/${row.template.id}`)
+  if (deliveryDetail && method==='GET') return {success:true,data:deliveryDetail}
   const hqTemplateDetail = /^\/api\/hq\/templates\/(visual-hq-tpl-[^/]+)$/.exec(pathname)
   if (hqTemplateDetail && method === 'GET') {
     const row = HQ_TEMPLATES_HTN.find((item) => item.id === hqTemplateDetail[1])

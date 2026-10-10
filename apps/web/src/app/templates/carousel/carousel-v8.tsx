@@ -10,6 +10,7 @@
  * 保存の2段階（作成→postback埋め直し）・再試行・離脱番兵の判断は
  * v7（carousel/page.tsx）と同じ関数を使う。ここにあるのは置き場と見え方だけ。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -27,7 +28,6 @@ import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared
 import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { readInlineActions } from '@/components/auto-replies/draft-fields'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import MediaPickerDialog from '@/app/contents/media-picker-dialog'
 import EditorV8, { EditorCard } from '../editor-v8'
 import styles from '../editor-v8.module.css'
@@ -44,8 +44,11 @@ import {
   visualPanels,
   type Panel,
 } from './carousel-core'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 function CarouselEditorV8Inner() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const params = useSearchParams()
@@ -74,8 +77,7 @@ function CarouselEditorV8Inner() {
   /** 「保存して公開」の使用先確認窓。 */
   const [publishCheck, setPublishCheck] = useState<{ id: string; usageCount: number } | null>(null)
   const [publishError, setPublishError] = useState('')
-  const [canMutateTemplates] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canMutateTemplates = useFeatureAccess('templates')
   const actionOptions = useActionOptions()
 
   const folderAccountId = id ? templateAccountId : selectedAccountId
@@ -143,13 +145,15 @@ function CarouselEditorV8Inner() {
               }),
             )
           }
-        } catch {
-          setError('いまの中身を読み取れませんでした。保存すると上書きされます。')
+        } catch (saveFailure) {
+          const fieldFailure = saveErrors.capture(saveFailure)
+
+          { if (!fieldFailure) setError('いまの中身を読み取れませんでした。保存すると上書きされます。') }
         }
       })
       .catch((caught: unknown) => markLoadFailed(caught))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, saveErrors])
 
   useEffect(() => {
     if (loading || snapshotTaken) return
@@ -198,7 +202,7 @@ function CarouselEditorV8Inner() {
       return null
     }
     if (!name.trim()) {
-      setError('名前を入力してください')
+      if (!saveErrors.fail("name", '名前を入力してください')) setError('名前を入力してください')
       return null
     }
     savingRef.current = true
@@ -276,10 +280,12 @@ function CarouselEditorV8Inner() {
         return false
       }
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (caught instanceof ApiError && caught.status === 409) {
-        setPublishError('他の人が先に更新したため、公開を止めました。画面を読み直して、もう一度お試しください。')
+        { if (!fieldFailure) setPublishError('他の人が先に更新したため、公開を止めました。画面を読み直して、もう一度お試しください。') }
       } else {
-        setPublishError('公開できませんでした。もう一度お試しください。')
+        { if (!fieldFailure) setPublishError('公開できませんでした。もう一度お試しください。') }
       }
       return false
     }
@@ -301,7 +307,7 @@ function CarouselEditorV8Inner() {
 
   if (!canMutateTemplates) {
     return (
-      <div className={styles.page}>
+      <SaveErrorScope errors={saveErrors}><div className={styles.page}>
         <header className={styles.head}>
           <Link href="/templates" className={styles.back}>テンプレートへ</Link>
         </header>
@@ -309,12 +315,12 @@ function CarouselEditorV8Inner() {
           <p className={styles.cardTitle}>カルーセルの作成・変更はオーナーと管理者だけができます</p>
           <Link href="/templates" className="text-action text-sm underline">一覧へ戻る</Link>
         </div>
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <EditorV8
         title={id ? 'カルーセルを編集' : 'カルーセルを作る'}
         lead="横にめくるカード。最大 10 枚"
@@ -382,23 +388,23 @@ function CarouselEditorV8Inner() {
             <EditorCard title="名前とフォルダ" note="一覧に出る名前です。友だちには見えません。">
               <div className={styles.fieldRow}>
                 <Field label="テンプレート名" htmlFor="cr8-name" required>
-                  <input
+                  <SaveErrorField names={["name"]}><input
                     id="cr8-name"
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="例：夏の定番5点"
                     className={inputClass}
-                  />
+                  /></SaveErrorField>
                 </Field>
                 <Field label="フォルダ" htmlFor="cr8-folder">
-                  <Select
+                  <SaveErrorField names={["folderId","folder_id"]}><Select
                     id="cr8-folder"
                     aria-label="フォルダ"
                     value={folderId ?? ''}
                     onChange={(value) => setFolderId(value || null)}
                     options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
-                  />
+                  /></SaveErrorField>
                 </Field>
               </div>
             </EditorCard>
@@ -478,25 +484,25 @@ function CarouselEditorV8Inner() {
                       <img src={panel.thumbnailImageUrl} alt="" className={styles.imageThumb} />
                     ) : null}
                     <button type="button" className={styles.toolButton} onClick={() => setPickerOpen(true)}>登録メディアから選ぶ</button>
-                    <input
+                    <SaveErrorField names={["thumbnailImageUrl","panel.thumbnailImageUrl","thumbnail_image_url","panel.thumbnail_image_url"]}><input
                       id="cr8-panel-image"
                       type="url"
                       className={inputClass}
                       value={panel.thumbnailImageUrl}
                       onChange={(e) => update(selectedIndex, { thumbnailImageUrl: e.target.value })}
                       placeholder="https://example.com/a.png"
-                    />
+                    /></SaveErrorField>
                   </div>
                 </Field>
 
                 <Field label="タイトル（40文字まで）" htmlFor="cr8-panel-title">
-                  <input
+                  <SaveErrorField names={["title","panel.title"]}><input
                     id="cr8-panel-title"
                     type="text"
                     className={inputClass}
                     value={panel.title}
                     onChange={(e) => update(selectedIndex, { title: e.target.value })}
-                  />
+                  /></SaveErrorField>
                   {[...panel.title].length > TITLE_MAX && (
                     <p className="text-danger mt-1 text-xs">{[...panel.title].length} 文字。{TITLE_MAX}文字までです。</p>
                   )}
@@ -507,12 +513,12 @@ function CarouselEditorV8Inner() {
                   htmlFor="cr8-panel-text"
                   required
                 >
-                  <TextArea
+                  <SaveErrorField names={["text","panel.text"]}><TextArea
                     id="cr8-panel-text"
                     rows={3}
                     value={panel.text}
                     onChange={(e) => update(selectedIndex, { text: e.target.value })}
-                  />
+                  /></SaveErrorField>
                   <p className={`${styles.countRow} ${[...panel.text].length > textMaxFor(panel) ? 'text-danger' : ''}`}>
                     {[...panel.text].length} / {textMaxFor(panel)}
                   </p>
@@ -523,7 +529,7 @@ function CarouselEditorV8Inner() {
                   {panel.actions.map((action, ai) => (
                     <div key={ai} className={`${styles.subCard} mt-2`}>
                       <div className={styles.choiceRow}>
-                        <input
+                        <SaveErrorField names={[`actions.${ai}.label`,"label","action.label"]}><input
                           type="text"
                           className={inputClass}
                           value={action.label}
@@ -534,8 +540,8 @@ function CarouselEditorV8Inner() {
                           }
                           placeholder="ボタンの文字"
                           aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の文字`}
-                        />
-                        <SegmentedControl
+                        /></SaveErrorField>
+                        <SaveErrorField names={["kind","action.kind"]}><SegmentedControl
                           aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の動き`}
                           options={[
                             { value: 'uri' as const, label: 'URLを開く' },
@@ -547,9 +553,9 @@ function CarouselEditorV8Inner() {
                               actions: panel.actions.map((a, j) => (j === ai ? { ...a, kind: value } : a)),
                             })
                           }
-                        />
+                        /></SaveErrorField>
                         {action.kind === 'uri' ? (
-                          <input
+                          <SaveErrorField names={[`actions.${ai}.uri`,"uri","action.uri"]}><input
                             type="url"
                             className={inputClass}
                             value={action.uri}
@@ -560,7 +566,7 @@ function CarouselEditorV8Inner() {
                             }
                             placeholder="https://example.com"
                             aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}のURL`}
-                          />
+                          /></SaveErrorField>
                         ) : (
                           <InlineActionList
                             actions={action.actions}
@@ -608,7 +614,7 @@ function CarouselEditorV8Inner() {
             </p>
 
             <EditorCard title="押せる回数" note="「動きを実行する」ボタンだけが対象です。URLを開くボタンはLINEの外へ出るので数えられません。">
-              <RadioCardGroup legend="押せる回数">
+              <SaveErrorField names={["tap-limit","tapLimitMode"]}><RadioCardGroup legend="押せる回数">
                 <RadioCard
                   name="tap-limit"
                   value="none"
@@ -624,17 +630,17 @@ function CarouselEditorV8Inner() {
                   title="1人につき1回だけ"
                   note="このカルーセル全体で1回です。どのボタンを押しても、次からは動きません。"
                 />
-              </RadioCardGroup>
+              </RadioCardGroup></SaveErrorField>
               {tapLimitMode === 'once' && (
                 <Field label="2回目に押されたときの返事" htmlFor="cr8-limit-text" note="空にすると、何も返さず黙って何も起きません。">
-                  <input
+                  <SaveErrorField names={["tapLimitText","tap_limit_text"]}><input
                     id="cr8-limit-text"
                     type="text"
                     className={inputClass}
                     value={tapLimitText}
                     onChange={(e) => setTapLimitText(e.target.value)}
                     placeholder="例：こちらはすでに受け付けています。"
-                  />
+                  /></SaveErrorField>
                 </Field>
               )}
             </EditorCard>
@@ -677,7 +683,7 @@ function CarouselEditorV8Inner() {
           setPickerOpen(false)
         }}
       />
-    </>
+    </></SaveErrorScope>
   )
 }
 

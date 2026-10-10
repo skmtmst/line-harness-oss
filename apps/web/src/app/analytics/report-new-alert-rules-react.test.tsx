@@ -1,3 +1,4 @@
+import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -192,8 +193,7 @@ describe('定期レポートの「入れる項目」(N-284)', () => {
     expect(sectionCheckbox('友だちの増減').disabled).toBe(false)
 
     // 宛先を選んで作っても、マイルは本文へ入らない。
-    const personCheck = Array.from(host.querySelectorAll('input[type="checkbox"]')).find((item) => !(item as HTMLInputElement).disabled && item.closest('label')?.textContent?.includes('テスト')) as HTMLInputElement
-    await act(async () => { personCheck.click(); await Promise.resolve() })
+    await pickEntities('レポートを受け取る人', ['テスト'])
     await act(async () => { button('つくって動かす').click(); await Promise.resolve() })
     const post = writeCalls('POST').at(-1)
     expect((post?.body as { sections: string[] }).sections).not.toContain('mileage')
@@ -222,8 +222,7 @@ describe('定期レポートの「入れる項目」(N-284)', () => {
 describe('定期レポートの「知らせの決めごと」(N-285)', () => {
   it('既定の3条件はそのままPOSTされる', async () => {
     await render()
-    const personCheck = Array.from(host.querySelectorAll('input[type="checkbox"]')).find((item) => !(item as HTMLInputElement).disabled && item.closest('label')?.textContent?.includes('テスト')) as HTMLInputElement
-    await act(async () => { personCheck.click(); await Promise.resolve() })
+    await pickEntities('レポートを受け取る人', ['テスト'])
     await act(async () => { button('つくって動かす').click(); await Promise.resolve() })
 
     const post = writeCalls('POST').at(-1)
@@ -256,8 +255,7 @@ describe('定期レポートの「知らせの決めごと」(N-285)', () => {
     expect(toggle).not.toBeNull()
     await act(async () => { toggle!.click(); await Promise.resolve() })
 
-    const personCheck = Array.from(host.querySelectorAll('input[type="checkbox"]')).find((item) => !(item as HTMLInputElement).disabled && item.closest('label')?.textContent?.includes('テスト')) as HTMLInputElement
-    await act(async () => { personCheck.click(); await Promise.resolve() })
+    await pickEntities('レポートを受け取る人', ['テスト'])
     await act(async () => { button('つくって動かす').click(); await Promise.resolve() })
 
     const post = writeCalls('POST').at(-1)
@@ -276,8 +274,7 @@ describe('定期レポートの「知らせの決めごと」(N-285)', () => {
       const toggle = host.querySelector(`input[aria-label="${label}"]`) as HTMLInputElement
       await act(async () => { toggle.click(); await Promise.resolve() })
     }
-    const personCheck = Array.from(host.querySelectorAll('input[type="checkbox"]')).find((item) => !(item as HTMLInputElement).disabled && item.closest('label')?.textContent?.includes('テスト')) as HTMLInputElement
-    await act(async () => { personCheck.click(); await Promise.resolve() })
+    await pickEntities('レポートを受け取る人', ['テスト'])
 
     await act(async () => { button('つくって動かす').click(); await Promise.resolve() })
     expect(host.textContent).toContain('知らせる条件を1つ以上えらぶか')
@@ -313,8 +310,7 @@ describe('定期レポートの「知らせの決めごと」(N-285)', () => {
 
 describe('定期レポートの作成後(R76)', () => {
   async function selectRecipient() {
-    const personCheck = Array.from(host.querySelectorAll('input[type="checkbox"]')).find((item) => !(item as HTMLInputElement).disabled && item.closest('label')?.textContent?.includes('テスト')) as HTMLInputElement
-    await act(async () => { personCheck.click(); await Promise.resolve() })
+    await pickEntities('レポートを受け取る人', ['テスト'])
   }
 
   it('新規作成の成功後は作りたての編集画面へ移す（再操作で増やさない）', async () => {
@@ -353,10 +349,7 @@ describe('定期レポートの宛先(R228)', () => {
   }
 
   async function selectStaffRecipient() {
-    const personCheck = Array.from(host.querySelectorAll('input[type="checkbox"]')).find(
-      (item) => !(item as HTMLInputElement).disabled && item.closest('label')?.textContent?.includes('テスト'),
-    ) as HTMLInputElement
-    await act(async () => { personCheck.click(); await Promise.resolve() })
+    await pickEntities('レポートを受け取る人', ['テスト'])
   }
 
   it('形の合わないメール宛先は行のそばで理由を出し、送信しない', async () => {

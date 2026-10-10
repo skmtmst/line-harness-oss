@@ -1,16 +1,9 @@
 'use client'
 
-/*
- * ★V8-B 会員 › ランク設定（fb9NJ）・ランクを消す（確認）（dEv6G）・競合（e5yBLx）。
- *
- * 左に「ランクの決まり」と「ランク」（行ごとに 名前・しきい値・還元・ごみ箱）、右に「ECとの同期」。
- * 下の中央に キャンセル・保存して EC へ同期。
- * 競合の帯はタブの下・数の帯の上（型の tabs の段）に出すので、外枠へ渡す（onTopBand）。
- */
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, GitCompareArrows, Plus, RefreshCw, TriangleAlert } from 'lucide-react'
+import { Check, Plus, RefreshCw } from 'lucide-react'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import { RowActions } from '@/components/shared/row-actions'
@@ -31,6 +24,17 @@ import { RULE_LABELS, parsePercent, parseYen, shortDateTime, shortTime, yen, typ
 import styles from './members.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
+
+/*
+ * ★V8-B 会員 › ランク設定（fb9NJ）・ランクを消す（確認）（dEv6G）・競合（e5yBLx）。
+ *
+ * 左に「ランクの決まり」と「ランク」（行ごとに 名前・しきい値・還元・ごみ箱）、右に「ECとの同期」。
+ * 下の中央に キャンセル・保存して EC へ同期。
+ * 競合の帯はタブの下・数の帯の上（型の tabs の段）に出すので、外枠へ渡す（onTopBand）。
+ */
 
 type RankDraft = { id: string | null; name: string; threshold: string; rate: string; tagId: string | null; tagName: string | null; memberCount: number }
 
@@ -69,6 +73,7 @@ export default function RankSettingsV8({
   /** 競合の帯を外枠（タブの下）へ置く。null で外す。 */
   onTopBand: (band: ReactNode) => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const [drafts, setDrafts] = useState<RankDraft[]>([])
   const [dirty, setDirty] = useState(false)
@@ -161,13 +166,15 @@ export default function RankSettingsV8({
         ? 'ランク設定を保存し、ECへ同期しました。タグも付け替えています。'
         : 'ランク設定を保存しました。ECへの同期は失敗したので、右の「もう一度同期」で送り直せます。')
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       /* 保存の口が版の違いを 409 で返したときも、競合の帯へ（e5yBLx）。 */
       if (caught instanceof ApiError && caught.status === 409) {
         await showConflict()
       } else {
+        { if (!fieldFailure)
         setError(describeApiFailure(caught, 'ランク設定の保存', {
           scope: 'store',
-        }))
+        })) }
       }
     } finally {
       setBusy(false)
@@ -208,13 +215,17 @@ export default function RankSettingsV8({
       setNotice(res.data.ecSync === 'synced' ? 'ランクを削除し、会員を移し先へ反映しました。' : `ランクを削除しました。${res.data.message ?? ''}`)
       onRetry()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 409) {
         setRemoveTarget(null)
         await showConflict()
       } else {
+        { if (!fieldFailure)
+
         setError(describeApiFailure(caught, 'ランクの削除', {
           scope: 'store',
-        }))
+        })) }
       }
     } finally {
       setBusy(false)
@@ -241,9 +252,13 @@ export default function RankSettingsV8({
       onSaved(accountId, res.data)
       setNotice(res.data.sync?.status === 'synced' ? 'ECへ同期しました。' : `ECへの同期に失敗しました：${res.data.sync?.error ?? ''}`)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
       setError(describeApiFailure(caught, 'ECへの同期', {
         scope: 'store',
-      }))
+      })) }
     } finally {
       setBusy(false)
     }
@@ -262,10 +277,10 @@ export default function RankSettingsV8({
   }, [conflict, conflictAt])
   useEffect(() => () => onTopBand(null), [onTopBand])
 
-  if (status === 'loading' && !settings) return <ListState kind="loading" title="ランク設定を読み込んでいます" />
-  if (status === 'forbidden') return <ListState kind="forbidden" />
-  if (status === 'error') return <ListState kind="error" title="ランク設定を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} />
-  if (!settings) return <ListState kind="loading" title="ランク設定を読み込んでいます" />
+  if (status === 'loading' && !settings) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="ランク設定を読み込んでいます" /></SaveErrorScope>
+  if (status === 'forbidden') return <SaveErrorScope errors={saveErrors}><ListState kind="forbidden" /></SaveErrorScope>
+  if (status === 'error') return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="ランク設定を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} /></SaveErrorScope>
+  if (!settings) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="ランク設定を読み込んでいます" /></SaveErrorScope>
 
   const rules = settings.rules
   const removeRow = removeTarget !== null ? drafts[removeTarget] : null
@@ -274,11 +289,11 @@ export default function RankSettingsV8({
   const moving = removeRow ? removeRow.memberCount : 0
 
   return (
-    <div className={styles.rankBody}>
+    <SaveErrorScope errors={saveErrors}><div className={styles.rankBody}>
       {notice || error ? (
         <div className={styles.messages}>
           {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-          {error ? <p className={styles.errorText} role="alert">{error}</p> : null}
+          {error ? <Notice tone="danger" >{error}</Notice> : null}
         </div>
       ) : null}
 
@@ -316,26 +331,26 @@ export default function RankSettingsV8({
               return (
                 <div key={row.id ?? `new-${index}`} className={styles.rankRow} title={row.tagName ? `タグ：${row.tagName}・会員 ${formatNumber(row.memberCount)} 人` : undefined}>
                   <div className={styles.rankColName}>
-                    <TextField {...fields.bind(`rank-name-${index}`)} aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} readOnly={readonly} onChange={(event) => update(index, { name: event.target.value })} />
+                    <SaveErrorField names={[`drafts.${index}.name`,"row.name"]}><TextField {...fields.bind(`rank-name-${index}`)} aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} readOnly={readonly} onChange={(event) => update(index, { name: event.target.value })} /></SaveErrorField>
                     <FieldError id={`rank-name-${index}-error`}>{fields.error(`rank-name-${index}`)}</FieldError>
                   </div>
                   <div className={styles.rankColThreshold}>
                     {isBase ? (
                       <span className={styles.fixedBox} title="いちばん下のランクは ¥0 から（変えられません）">¥0〜（固定）</span>
                     ) : (
-                      <NumberInput numericText {...fields.bind(`rank-threshold-${index}`)} aria-label={`しきい値 ${index + 1}`} inputMode="numeric" placeholder="¥0〜" value={row.threshold} readOnly={readonly} onChange={(event) => update(index, { threshold: event.target.value })} />
+                      <SaveErrorField names={[`drafts.${index}.threshold`,"threshold","row.threshold"]}><NumberInput numericText {...fields.bind(`rank-threshold-${index}`)} aria-label={`しきい値 ${index + 1}`} inputMode="numeric" placeholder="¥0〜" value={row.threshold} readOnly={readonly} onChange={(event) => update(index, { threshold: event.target.value })} /></SaveErrorField>
                     )}
                     <FieldError id={`rank-threshold-${index}-error`}>{fields.error(`rank-threshold-${index}`)}</FieldError>
                   </div>
                   <div className={styles.rankColRate}>
-                    <TextField {...fields.bind(`rank-rate-${index}`)} aria-label={`マイル還元 ${index + 1}`} inputMode="decimal" placeholder="0%" value={row.rate} readOnly={readonly} onChange={(event) => update(index, { rate: event.target.value })} />
+                    <SaveErrorField names={[`drafts.${index}.rate`,"rate","row.rate"]}><TextField {...fields.bind(`rank-rate-${index}`)} aria-label={`マイル還元 ${index + 1}`} inputMode="decimal" placeholder="0%" value={row.rate} readOnly={readonly} onChange={(event) => update(index, { rate: event.target.value })} /></SaveErrorField>
                     <FieldError id={`rank-rate-${index}-error`}>{fields.error(`rank-rate-${index}`)}</FieldError>
                   </div>
                   <div className={styles.rankColAction}>
                     {/* 行の右端は「…」（タグを開く・ランクを削除する）。1つの機能の印にしない。 */}
                     <RowActions
                       subjectName={`ランク「${label}」`}
-                      menuItems={row.tagId ? [{ id: 'tag', label: 'タグを開く', external: true, href: `/tags/edit?id=${encodeURIComponent(row.tagId ?? '')}`, onSelect: () => router.push(`/tags/edit?id=${encodeURIComponent(row.tagId ?? '')}`) }] : []}
+                      menuItems={row.tagId ? [{ id: 'tag', label: 'タグを開く', external: false, href: `/tags/edit?id=${encodeURIComponent(row.tagId ?? '')}`, onSelect: () => router.push(`/tags/edit?id=${encodeURIComponent(row.tagId ?? '')}`) }] : []}
                       destructiveItem={readonly ? undefined : {
                         id: 'delete',
                         label: 'ランクを削除する',
@@ -420,16 +435,16 @@ export default function RankSettingsV8({
           {moving > 0 ? (<>
             <div className={styles.removeField}>
               <span className={styles.removeLabel} id="nen-rank-move-label">移す先のランク（必須）</span>
-              <Select
+              <SaveErrorField names={["replacement"]}><EntitySelect
                 aria-label="移す先のランク（必須）"
                 size="full"
                 value={replacement}
                 onChange={setReplacement}
                 options={[
                   { value: '', label: '移す先のランクを選ぶ' },
-                  ...removeCandidates.map((row) => ({ value: row.id ?? '', label: row.name.trim() || '（名前なし）' })),
+                  ...removeCandidates.map((row) => ({ ...entityOptionMetadata(row), value: row.id ?? '', label: row.name.trim() || '（名前なし）' })),
                 ]}
-              />
+              /></SaveErrorField>
             </div>
             <p className={styles.removeNote}>
               移し先のランクは、各会員のいまの有効期限まで使います。期限のあとは通常のランク判定に戻ります。ECへ反映したあと、次の購入から還元率が変わります。タグも付け替えます。
@@ -470,7 +485,7 @@ export default function RankSettingsV8({
           </div>
         ) : null}
       </Dialog>
-    </div>
+    </div></SaveErrorScope>
   )
 }
 

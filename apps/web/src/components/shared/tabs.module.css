@@ -56,7 +56,7 @@
 }
 
 .tab:focus-visible {
-  outline: 2px solid var(--color-status-info);
+  outline: 2px solid var(--color-action);
   outline-offset: 2px;
 }
 
@@ -127,7 +127,7 @@
   height: var(--tpl-tabs-h);
   align-items: flex-end; /* 文字は下付き（文字の下10） */
   padding-bottom: var(--tpl-tabs-pad-bottom);
-  font-size: var(--text-body); /* 13px */
+  font-size: var(--text-body); /* B-180：13px */
   line-height: var(--tpl-tabs-text-lh);
   transition:
     color var(--motion-fast) var(--motion-ease-out),
@@ -224,3 +224,22 @@
 [data-theme='v8'] .tab, [data-theme='v8'] .current { font-weight: var(--polish-weight-body); }
 .list[data-wrap='true'] { min-width: 0; max-width: 100%; }
 .list[data-wrap='true'] .items { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+
+/* B-180：形の指定にかかわらず36px。滑る下線の動きは保つ。 */
+[data-theme='v8'] .list .tab.tab {
+  box-sizing: border-box;
+  height: var(--tpl-tabs-h);
+  min-height: var(--tpl-tabs-h);
+  padding: 0;
+  align-items: center;
+  line-height: 20px;
+  font-size: var(--text-body);
+  font-weight: var(--tpl-tabs-weight);
+  border-bottom: 2px solid transparent;
+  margin-bottom: 0;
+}
+[data-theme='v8'] .list .current.current {
+  font-weight: var(--tpl-tabs-current-weight);
+  border-bottom-color: var(--color-ink);
+}
+[data-theme='v8'] .list .items[data-sliding='true'] .current { border-bottom-color: transparent; }

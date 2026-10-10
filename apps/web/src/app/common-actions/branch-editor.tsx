@@ -2,9 +2,11 @@
 
 import type { CommonActionResources, CommonActionStep } from '@/lib/api'
 import { newCommonActionStep, newStepId } from '@/components/automations/common-action-editor'
+import BranchActionList from '@/components/automations/branch-action-list'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { ACTION_LABELS } from './version-diff'
+import EntitySelect from '@/components/shared/entity-select'
 
 export function newBranchStep(): CommonActionStep {
   return {
@@ -31,6 +33,7 @@ export type BranchPatch =
   | { kind: 'ruleAdd' }
   | { kind: 'ruleRemove'; ruleIndex: number }
   | { kind: 'sideAction'; side: 'then' | 'else'; stepIndex: number; commonActionId: string }
+  | { kind: 'sideSet'; side: 'then' | 'else'; steps: CommonActionStep[] }
   | { kind: 'sideAdd'; side: 'then' | 'else' }
   | { kind: 'sideRemove'; side: 'then' | 'else'; stepIndex: number }
 
@@ -110,6 +113,7 @@ export function updateBranchStep(step: CommonActionStep, patch: BranchPatch): Co
       )
       return { ...step, params: { ...step.params, [patch.side]: next } }
     }
+    case 'sideSet': return { ...step, params: { ...step.params, [patch.side]: patch.steps } }
     case 'sideAdd': {
       const next = [...(patch.side === 'then' ? thenSteps : elseSteps), newReferenceStep()]
       return { ...step, params: { ...step.params, [patch.side]: next } }
@@ -155,10 +159,7 @@ export default function BranchEditors({
   onUpdate: (id: string, patch: BranchPatch) => void
   onRemove: (id: string) => void
 }) {
-  const commonActionOptions = [
-    { value: '', label: '公開版を選ぶ' },
-    ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` })),
-  ]
+
   const tagOptions = (selected: string) => [
     { value: '', label: 'タグを選ぶ' },
     ...resources.tags.map((tag) => ({ value: tag.id, label: tag.name })),
@@ -177,28 +178,8 @@ export default function BranchEditors({
         const renderSide = (side: 'then' | 'else', sideSteps: CommonActionStep[], sideLabel: string) => (
           <div>
             <p className="text-ink-secondary mb-1 text-sm font-semibold">{sideLabel}</p>
-            <div className="space-y-2">
-              {sideSteps.map((sideStep, sideIndex) => sideStep.type === 'common_action' ? (
-                <div key={sideStep.id} className="flex items-center gap-2">
-                  <Select
-                    size="full"
-                    aria-label={`${sideLabel}${sideIndex + 1}の公開版`}
-                    className="mt-1"
-                    value={String(sideStep.params.commonActionId ?? '')}
-                    onChange={(value) => onUpdate(step.id, { kind: 'sideAction', side, stepIndex: sideIndex, commonActionId: value })}
-                    options={commonActionOptions}
-                  />
-                  {sideSteps.length > 1 ? (
-                    <Button aria-label={`${sideLabel}${sideIndex + 1}を外す`} onClick={() => onUpdate(step.id, { kind: 'sideRemove', side, stepIndex: sideIndex })}>外す</Button>
-                  ) : null}
-                </div>
-              ) : (
-                <div key={sideStep.id} className="text-ink-secondary text-sm">
-                  {readonlyStepSummary(sideStep)}（ここでは変えられません）
-                </div>
-              ))}
-              <Button onClick={() => onUpdate(step.id, { kind: 'sideAdd', side })}>処理を足す</Button>
-            </div>
+            <BranchActionList value={sideSteps} resources={resources} label={sideLabel} titleOf={readonlyStepSummary}
+              onChange={next => onUpdate(step.id, { kind: 'sideSet', side, steps: next })} />
           </div>
         )
         return (
@@ -225,7 +206,7 @@ export default function BranchEditors({
               {condition.rules.map((rule, ruleIndex) => rule.type === 'tag_exists' || rule.type === 'tag_not_exists' ? (
                 <div key={`${step.id}-rule-${ruleIndex}`} className="flex items-center gap-2">
                   <label className="text-ink-secondary flex-1 text-sm">条件{ruleIndex + 1}（{RULE_TYPE_LABEL[rule.type]}）
-                    <Select
+                    <EntitySelect kind="tag"
                       size="full"
                       aria-label={`条件${ruleIndex + 1}のタグ`}
                       className="mt-1"

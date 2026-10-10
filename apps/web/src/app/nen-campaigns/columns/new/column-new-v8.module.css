@@ -121,7 +121,6 @@
 }
 
 .errorText {
-  margin: 0;
   color: var(--color-danger);
   font-size: 12px;
   font-weight: 600;
@@ -159,3 +158,5 @@
 @container (max-width: 1100px) {
   .side { border-left: 0; border-top: 1px solid var(--color-hairline); }
 }
+
+.errorText, .errorTextNoticePlacement { margin: 0; }

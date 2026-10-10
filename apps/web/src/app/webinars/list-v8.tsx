@@ -1,6 +1,4 @@
 'use client'
-
-/* ★V8の一覧・閲覧のみ・狭い幅。数は実データで、未集計のものは「—」。 */
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
@@ -17,7 +15,7 @@ import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ListRange from '@/components/ui/list-range'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import SortSelect from '@/components/ui/sort-select'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
@@ -27,7 +25,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+
 import { runUndoable } from '@/lib/undoable'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -52,6 +50,10 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/* ★V8の一覧・閲覧のみ・狭い幅。数は実データで、未集計のものは「—」。 */
 
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft' | 'archived'
@@ -202,7 +204,7 @@ function WebinarFolderPanelForm({
 
   return (
     <div><Field label={<>フォルダ名</>} htmlFor="webinar-v8-folder-name"><p className="text-ink-secondary mt-2 text-sm">ウェビナーを整理する名前を入力してください。</p>
-<input
+<SaveErrorField names={["name"]}><input
         id="webinar-v8-folder-name"
         value={name}
         onChange={(event) => setName(event.target.value)}
@@ -211,7 +213,7 @@ function WebinarFolderPanelForm({
         }}
         className="border-hairline rounded-control focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         placeholder="例：商品説明"
-      />
+      /></SaveErrorField>
 {error ? <p className="text-danger mt-2 text-sm">{error}</p> : null}
 <div className="mt-5 flex justify-end gap-2">
         <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
@@ -350,7 +352,7 @@ function toContextMenuItems(menuItems: ActionMenuItem[]): ContextMenuItem[] {
     label: item.label,
     danger: item.tone === 'danger',
     disabled: item.disabled,
-    onSelect: () => item.onSelect(),
+    onSelect: () => item.onSelect?.(),
   }))
 }
 
@@ -403,7 +405,7 @@ export function WebinarListTableV8({
                       {w.title}
                     </button>
                   </ContextMenu>
-                  <span className={styles.slug} title={`/${w.slug}`}>/{w.slug}</span>
+
                 </td>
                 <td><span className={statusPillClass(w)}>● {statusLabelV8(w)}</span></td>
                 <td className={styles.countCell}>{unpublished ? emptyValue('unknown') : peopleText(w.registrationCount)}</td>
@@ -416,11 +418,10 @@ export function WebinarListTableV8({
                 <td><span className={styles.periodCell} title={period}>{period}</span></td>
                 <td className={styles.opsCell}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    {canEdit
-                      ? <Button href={`/webinars/edit?id=${w.id}`}>編集</Button>
-                      : <Button disabled title={readonlyReason}>編集</Button>}
+
                     <RowActions
                       subjectName={w.title}
+                      edit={canEdit ? { href: `/webinars/edit?id=${w.id}` } : undefined}
                       menuNote={canEdit ? undefined : readonlyReason}
                       menuItems={menuItems}
                     />
@@ -482,7 +483,7 @@ export async function requestWebinarListV8(args: {
 }
 
 export function WebinarListErrorNotice({ failure, onRetry }: { failure: WebinarLoadFailure; onRetry: () => void }) {
-  return <div role="alert" className="border-hairline border-b px-4 py-3"><p className="text-ink text-sm font-semibold">{failure.title}</p><p className="text-ink-secondary mt-1 text-xs">{failure.description}</p>{failure.retryable ? <Button onClick={onRetry}>もう一度読み込む</Button> : null}</div>
+  return <Notice tone="danger" heading={failure.title} action={failure.retryable ? <Button onClick={onRetry}>もう一度読み込む</Button> : null}>{failure.description}</Notice>
 }
 
 export function WebinarListContent({ accountLoading, loading, selectedAccountId, accountsCount, loadFailure, visibleItems, panelGrand, refreshing, onRetry, onArchive, canEdit = true, readonlyReason = '', onClearFilters = () => undefined, onOpenDetail = () => undefined }: {
@@ -504,6 +505,7 @@ export default function WebinarListV8() {
 }
 
 function WebinarListV8Inner() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('ウェビナー')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -593,14 +595,16 @@ function WebinarListV8Inner() {
       setTotal(next.total)
       setLoadedAccountId(next.loadedAccountId)
     } catch (err) {
-      if (requestGeneration.current === generation) setLoadFailure(webinarLoadFailure(err))
+      const fieldFailure = saveErrors.capture(err);
+
+      if (requestGeneration.current === generation) { if (!fieldFailure) setLoadFailure(webinarLoadFailure(err)) }
     } finally {
       if (requestGeneration.current === generation) {
         if (mode === 'initial') setLoading(false)
         else setRefreshing(false)
       }
     }
-  }, [selectedAccountId, page, pageSize, debouncedQuery, selectedFolder, savedFilter, sortKey])
+  }, [selectedAccountId, page, pageSize, debouncedQuery, selectedFolder, savedFilter, sortKey, saveErrors])
 
   const refreshOverview = useCallback(async () => {
     const generation = ++overviewRequestGeneration.current
@@ -616,10 +620,13 @@ function WebinarListV8Inner() {
       setLoadedOverviewAccountId(accountId)
     } catch (cause) {
       if (overviewRequestGeneration.current !== generation) return
+      const fieldFailure = saveErrors.capture(cause)
       setLoadedOverviewAccountId(accountId)
+      { if (!fieldFailure)
       setOverviewFailure(webinarLoadFailure(cause))
     }
-  }, [selectedAccountId])
+  }
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     void refresh()
@@ -649,14 +656,16 @@ function WebinarListV8Inner() {
       if (!res.data || typeof res.data.total !== 'number') return
       setGrandTotal(res.data.total)
       setGrandAccountId(accountId)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       /* 欄の件数だけの補助取得。失敗時は前値を残す。 */
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     void refreshGrandTotal()
-  }, [refreshGrandTotal])
+  }, [refreshGrandTotal]);
+
 
   const refreshFolders = useCallback(async () => {
     const generation = ++folderRequestGeneration.current
@@ -668,10 +677,12 @@ function WebinarListV8Inner() {
       if (folderRequestGeneration.current === generation) {
         setFolders(response.success ? response.data : []); setFoldersReady(response.success && Array.isArray(response.data))
       }
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure);
+
       if (folderRequestGeneration.current === generation) setFolders([])
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     setSelectedFolder('')
@@ -692,8 +703,11 @@ function WebinarListV8Inner() {
       setFolderDialogOpen(false)
       await refreshFolders()
       await refreshGrandTotal()
-    } catch {
-      setFolderError('フォルダを保存できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setFolderError('フォルダを保存できませんでした。もう一度お試しください。') }
     } finally {
       setFolderBusy(false)
     }
@@ -742,8 +756,11 @@ function WebinarListV8Inner() {
       if (selectedFolder === deletingFolder.id) setSelectedFolder('')
       setDeletingFolder(null)
       await Promise.all([refresh(), refreshFolders(), refreshGrandTotal()])
-    } catch {
-      setFolderError('フォルダを削除できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setFolderError('フォルダを削除できませんでした。もう一度お試しください。') }
     } finally {
       setFolderBusy(false)
     }
@@ -812,11 +829,14 @@ function WebinarListV8Inner() {
       setArchiveTarget(null)
       await Promise.all([refresh(), refreshOverview(), refreshGrandTotal()])
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure)
       setArchiveError(error instanceof ApiError && error.status === 409
         ? '公開中のウェビナーは、先に公開を停止してください。'
         : archiveTarget.status === 'archived'
           ? '下書きに戻せませんでした。もう一度お試しください。'
-          : 'アーカイブできませんでした。状態を読み直して、もう一度お試しください。')
+          : 'アーカイブできませんでした。状態を読み直して、もう一度お試しください。') }
     } finally {
       setArchiving(false)
     }
@@ -862,13 +882,15 @@ function WebinarListV8Inner() {
       if (csv === null) return
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
       const link = document.createElement('a'); link.href = url; link.download = csvFileName("動画セミナー"); link.click(); URL.revokeObjectURL(url)
-    } catch { if (currentCsvScope.current === csvScope) setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') }
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+ if (currentCsvScope.current === csvScope) { if (!fieldFailure) setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') } }
     finally { csvLock.current = false; setCsvBusy(false) }
   }
   const listBody = <WebinarListContent accountLoading={accountLoading} loading={loading} selectedAccountId={selectedAccountId} accountsCount={accounts.length} loadFailure={loadFailure} visibleItems={visible} panelGrand={panelGrand} refreshing={refreshing} onRetry={() => void refresh()} onArchive={openArchive} canEdit={canEdit} readonlyReason={readonlyReason} onClearFilters={clearFilters} onOpenDetail={openDetail} />
 
   return (
-    <div className={styles.board} data-design-node="UyUMw">
+    <SaveErrorScope errors={saveErrors}><div className={styles.board} data-design-node="UyUMw">
       <div className={styles.head}>
         <div className={styles.headText}>
           <PageHeading title="ウェビナー" help={<> 録画やライブのセミナーをLINEで案内し、申込から視聴・相談までをつなげます。</>} />
@@ -878,7 +900,7 @@ function WebinarListV8Inner() {
       </div>
 
       {csvError ? <Notice tone="info">{csvError}</Notice> : null}
-      {overviewFailure && !loadFailure ? <Notice tone="info" action={overviewFailure.retryable ? <Button onClick={() => void refreshOverview()}>集計を読み直す</Button> : undefined}>集計を表示できませんでした。</Notice> : null}
+      {overviewFailure && !loadFailure ? <Notice tone="info" action={overviewFailure.retryable ? <Button onClick={() => refreshOverview()} busyLabel="処理中…">集計を読み直す</Button> : undefined}>集計を表示できませんでした。</Notice> : null}
       <section className={styles.kpiBand} aria-label="ウェビナーの数の帯">
         {webinarKpiCells(visibleOverview).map((cell) => (
           <div className={styles.kpiCell} key={cell.key}>
@@ -923,7 +945,7 @@ function WebinarListV8Inner() {
                   : <Button variant="primary" disabled title={readonlyReason}>＋ ウェビナーを作る</Button>}
               </div>
               <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-                <Select
+                <SaveErrorField names={["selectedFolder","folder","selected_folder"]}><Select
                   aria-label="フォルダ"
                   value={selectedFolder}
                   onChange={(value) => { setSelectedFolder(value); setPage(1) }}
@@ -932,7 +954,7 @@ function WebinarListV8Inner() {
                     ...folders.map((folder) => ({ value: folder.id, label: `フォルダ：${folder.name}（${folder.count}）` })),
                     { value: UNFILED, label: `フォルダ：未分類${unfiledCount === null ? '' : `（${unfiledCount}）`}` },
                   ]}
-                />
+                /></SaveErrorField>
               </div>
             </div>
           </div>
@@ -950,7 +972,7 @@ function WebinarListV8Inner() {
             <FilterChip selected={savedFilter === 'active'} onChange={(next) => setSavedFilter(next ? 'active' : '')}>公開中</FilterChip>
             <FilterChip selected={savedFilter === 'draft'} onChange={(next) => setSavedFilter(next ? 'draft' : '')}>下書き</FilterChip>
             <span className={styles.toolbarRight}>
-              <Select
+              <SaveErrorField names={["savedFilter","status","saved_filter"]}><Select
                 aria-label="よく使う絞り込み"
                 value={savedFilter}
                 onChange={(value) => { setSavedFilter(value as SavedFilter); setPage(1) }}
@@ -960,7 +982,7 @@ function WebinarListV8Inner() {
                   { value: 'draft', label: '下書きのみ' },
                   { value: 'archived', label: 'アーカイブ済み' },
                 ]}
-              />
+              /></SaveErrorField>
               <SortSelect
                 value={sortKey}
                 onChange={(value) => setSortKey(value as SortKey)}
@@ -1089,6 +1111,6 @@ function WebinarListV8Inner() {
         }}
         onConfirm={() => void removeFolder()}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }

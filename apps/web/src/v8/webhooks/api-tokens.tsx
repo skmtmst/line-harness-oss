@@ -1,15 +1,6 @@
 'use client'
 
-/*
- * ★V8 外部連携「API 接続」タブ（Pencil `ralAc`）と、発行した直後の窓（`UkZLi`「鍵を発行しました」）。
- *
- * 今までの V8（app/webhooks/apitokens-v8.tsx）の動きを写して、外枠（題・タブ・数の帯）は
- * ほかのタブと同じ shell.tsx で一から書いた。データの口・本人確認・失敗の文は今と同じ。
- * - 鍵の発行は「API 接続の鍵を発行する」→ 発行の窓（名前・できること）→ 発行した鍵の窓（`UkZLi`）。
- * - 平文の鍵は発行・入れ替えの返事にだけ1回乗る。窓を閉じたら二度と出さない。
- * - 止めた鍵は一覧の口が返さないので、「止めている」行と「動かす」は出ない（動かす口も無い）。
- * - 発行・入れ替え・停止は統括だけ（R32）。閲覧のみの人には押せないボタンを置かず、場所だけ空ける。
- */
+import { FolderDotName } from '@/components/shared/folder-dot'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Copy, KeyRound, LayoutTemplate, Plus, RefreshCw } from 'lucide-react'
@@ -44,7 +35,18 @@ import {
 } from './shell'
 import styles from './api-tokens.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
+/*
+ * ★V8 外部連携「API 接続」タブ（Pencil `ralAc`）と、発行した直後の窓（`UkZLi`「鍵を発行しました」）。
+ *
+ * 今までの V8（app/webhooks/apitokens-v8.tsx）の動きを写して、外枠（題・タブ・数の帯）は
+ * ほかのタブと同じ shell.tsx で一から書いた。データの口・本人確認・失敗の文は今と同じ。
+ * - 鍵の発行は「API 接続の鍵を発行する」→ 発行の窓（名前・できること）→ 発行した鍵の窓（`UkZLi`）。
+ * - 平文の鍵は発行・入れ替えの返事にだけ1回乗る。窓を閉じたら二度と出さない。
+ * - 止めた鍵は一覧の口が返さないので、「止めている」行と「動かす」は出ない（動かす口も無い）。
+ * - 発行・入れ替え・停止は統括だけ（R32）。閲覧のみの人には押せないボタンを置かず、場所だけ空ける。
+ */
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'disabled'
 
@@ -81,10 +83,11 @@ export function tokenUsedAt(value: string | null): string {
 }
 
 export default function WebhooksApiTokensV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('外部連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || staffRole === 'owner'
+  const canManage = staffRole === 'owner'
   const overview = useWebhookOverview()
   const { selectedAccountId } = useAccount()
   const selectedAccountIdRef = useRef(selectedAccountId)
@@ -149,9 +152,13 @@ export default function WebhooksApiTokensV8() {
       setStatus('ready')
     } catch (caught) {
       if (loadGenerationRef.current !== requestGeneration || selectedAccountIdRef.current !== requestAccountId) return
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.code === 'FEATURE_DISABLED') {
-        setTokens([])
-        setStatus('disabled')
+        setTokens([]);
+
+        setStatus('disabled');
+
         return
       }
       if (caught instanceof ApiError && (caught.status === 403 || caught.status === 404)) {
@@ -160,9 +167,11 @@ export default function WebhooksApiTokensV8() {
         return
       }
       setStatus('error')
+      { if (!fieldFailure)
       setLoadError(describeApiFailure(caught, '読み込み'))
     }
-  }, [selectedAccountId])
+  }
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     void load()
@@ -218,14 +227,18 @@ export default function WebhooksApiTokensV8() {
       setName('')
       await load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (!stepUpToken && isStepUpRequired(caught)) {
-        setStepUp({ purpose: 'webhook.api_token', action: 'API接続の鍵を発行する', retry: (token) => handleCreate(token) })
+        setStepUp({ purpose: 'webhook.api_token', action: 'API接続の鍵を発行する', retry: (token) => handleCreate(token) });
+
         return
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
+      { if (!fieldFailure)
       setCreateError(describeApiFailure(caught, '発行', {
         scope: 'store',
-      }))
+      })) }
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setCreating(false)
     }
@@ -248,6 +261,8 @@ export default function WebhooksApiTokensV8() {
       setRotateTarget(null)
       await load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (!stepUpToken && isStepUpRequired(caught)) {
         const target = rotateTarget
         setStepUp({
@@ -260,13 +275,15 @@ export default function WebhooksApiTokensV8() {
       if (selectedAccountIdRef.current !== requestAccountId) return
       if (caught instanceof ApiError && caught.code === 'TOKEN_ROTATE_CONFLICT') {
         setRotateTarget(null)
-        setActionError('ほかの操作が先にこの鍵を更新しました。一覧を読み直しました。最新の状態からもう一度お試しください')
+        { if (!fieldFailure)
+        setActionError('ほかの操作が先にこの鍵を更新しました。一覧を読み直しました。最新の状態からもう一度お試しください') }
         await load()
         return
       }
+      { if (!fieldFailure)
       setDialogError(describeApiFailure(caught, '入れ替え', {
         scope: 'store',
-      }))
+      })) }
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
     }
@@ -287,6 +304,8 @@ export default function WebhooksApiTokensV8() {
       setRevokeTarget(null)
       await load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (!stepUpToken && isStepUpRequired(caught)) {
         const target = revokeTarget
         setStepUp({
@@ -297,18 +316,17 @@ export default function WebhooksApiTokensV8() {
         return
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
+      { if (!fieldFailure)
       setDialogError(describeApiFailure(caught, '停止', {
         scope: 'store',
-      }))
+      })) }
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
     }
   }
 
-
-
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       help={<>{WEBHOOKS_DESCRIPTION}{"行の「…」から止める。止めても、すでに付けたタグは残ります。"}</>}
       boardId="ralAc"
       headingSize="regular"
@@ -340,22 +358,22 @@ export default function WebhooksApiTokensV8() {
         >
           <div className={styles.createBody}>
             <Field label="名前" htmlFor="wh-token-name" error={nameError}>
-              <TextField
+              <SaveErrorField names={["name"]}><TextField
                 id="wh-token-name"
                 value={name}
                 maxLength={120}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="例：在庫システム"
                 aria-invalid={nameError ? true : undefined}
-              />
+              /></SaveErrorField>
             </Field>
             <fieldset className={styles.field} id="wh-token-scopes" tabIndex={-1} aria-invalid={Boolean(scopesError) || undefined} aria-describedby={scopesError ? "wh-token-scopes-error" : undefined}>
               <legend className={styles.label}>できること</legend>
               <div className={styles.checkRow}>
                 {SCOPES.map((scope) => (
-                  <Checkbox key={scope} invalid={Boolean(scopesError)} aria-describedby={scopesError ? "wh-token-scopes-error" : undefined} checked={scopes.includes(scope)} onCheckedChange={() => toggleScope(scope)}>
+                  <SaveErrorField names={["scope"]} key={scope}><Checkbox key={scope} invalid={Boolean(scopesError)} aria-describedby={scopesError ? "wh-token-scopes-error" : undefined} checked={scopes.includes(scope)} onCheckedChange={() => toggleScope(scope)}>
                     {scopeLabel(scope)}
-                  </Checkbox>
+                  </Checkbox></SaveErrorField>
                 ))}
               </div>
               {scopesError ? <p id="wh-token-scopes-error" className={styles.fieldError} role="alert">{scopesError}</p> : null}
@@ -524,8 +542,8 @@ export default function WebhooksApiTokensV8() {
                 {tokens.map((token) => {
                   const scopeText = token.scopes.map(scopeLabel).join('・')
                   return (
-                    <Tr key={token.id} data-table-layout="columns" data-ctx-row={token.id} data-row-id={token.id}>
-                      <Td className={styles.colName} title={token.name}>{token.name}</Td>
+                    <Tr data-row-id={token.id} key={token.id} data-table-layout="columns" data-ctx-row={token.id}>
+                      <Td className={styles.colName} title={token.name}><FolderDotName>{token.name}</FolderDotName></Td>
                       <Td className={styles.colScopes} title={scopeText}>{scopeText}</Td>
                       <Td className={styles.colCreated}>{tokenDate(token.createdAt)}</Td>
                       <Td className={styles.colUsed}>{tokenUsedAt(token.lastUsedAt)}</Td>
@@ -571,6 +589,6 @@ export default function WebhooksApiTokensV8() {
           </>
         ) : null}
       </div>
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

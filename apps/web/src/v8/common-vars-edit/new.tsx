@@ -1,39 +1,17 @@
 'use client'
-
-/*
- * ★V8 共通情報を作る（板 `p82v9`）。
- *
- * 型は作る（CreatePage）：頭（戻る・題・説明）→ 左に3枚のカード（名前と差し込み名・
- * 種別と中身・使える期間）と社内メモ、右の列に秘密値の注意と差し込んだときの見え方、
- * 下の帯にキャンセル・下書きを保存・保存して公開。
- * データの口・入力検査・秘密値の守り・下書き保存は `app/contents/vars/new/new-v8.tsx`
- * から写した（import はしない）。動きの一覧は同じ場所の BEHAVIOR.md。
- */
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  AlignLeft,
-  ArrowLeft,
-  CalendarClock,
-  CalendarDays,
-  Copy,
-  Eye,
-  Hash,
-  Image as ImageIcon,
-  Link2,
-  ToggleLeft,
-  Type,
-  Upload,
-} from 'lucide-react'
+import { AlignLeft, ArrowLeft, CalendarClock, CalendarDays, Hash, Image as ImageIcon, Link2, ToggleLeft, Type, Upload } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
-import { commonVarValueError, COMMON_VAR_VALUE_REQUIRED, isSecretLikeVarValue } from '@/lib/common-vars'
+import { commonVarValueError, isSecretLikeVarValue } from '@/lib/common-vars'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -47,9 +25,20 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './new.module.css'
 import { focusFieldById } from '@/lib/use-form-errors'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+/*
+ * ★V8 共通情報を作る（板 `p82v9`）。
+ *
+ * 型は作る（CreatePage）：頭（戻る・題・説明）→ 左に3枚のカード（名前と差し込み名・
+ * 種別と中身・使える期間）と社内メモ、右の列に秘密値の注意と差し込んだときの見え方、
+ * 下の帯にキャンセル・下書きを保存・保存して公開。
+ * データの口・入力検査・秘密値の守り・下書き保存は `app/contents/vars/new/new-v8.tsx`
+ * から写した（import はしない）。動きの一覧は同じ場所の BEHAVIOR.md。
+ */
 
 /*
  * 種別8つ。板 `p82v9` のカードの並び（標準・長文・数値・URL／
@@ -150,6 +139,8 @@ function suggestKey(name: string): string {
 }
 
 export default function NewCommonVarV8() {
+  const saveErrors = useSaveFormErrors()
+
   const [copied, setCopied] = useState(false)
   usePageTitle('共通情報を作る')
   usePageCrumbs([
@@ -165,8 +156,7 @@ export default function NewCommonVarV8() {
    * 登録の口は `requireRole('owner', 'admin')` で閉じている。staff には
    * 閲覧のみの帯を出して保存の押し口を押せない形にする（閉さない）。
    */
-  const [canWrite] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canWrite = useFeatureAccess('commonVars')
 
   const [folders, setFolders] = useState<Folder[]>([])
   const [name, setName] = useState('')
@@ -203,10 +193,14 @@ export default function NewCommonVarV8() {
       } else {
         setFoldersError(true)
       }
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
       setFoldersError(true)
     }
-  }, [])
+  }
+  }, [saveErrors])
 
   useEffect(() => {
     void loadFolders()
@@ -314,6 +308,7 @@ export default function NewCommonVarV8() {
         : null
     if (secretField) {
       const message = '鍵やトークンのような秘密の値は共通情報に保存できません。外部連携の設定へ登録してください'
+      if (!saveErrors.fail("expiryBehavior", message))
       setError(message)
       if (secretField === 'cv-value') {
         setValueFieldError(message)
@@ -365,19 +360,27 @@ export default function NewCommonVarV8() {
       }
       router.push(createPageReturnHref('/contents/vars', res.data.id))
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e);
+
       if (e instanceof ApiError && e.status === 409) {
-        setError('その差し込み名は既に使われています')
+        { if (!fieldFailure)
+
+
+        setError('その差し込み名は既に使われています') }
         focusField('cv-key')
       } else {
-        setError(withPermissionFailure(e, describeSaveFailure(e), 'store'))
+        { if (!fieldFailure)
+        setError(withPermissionFailure(e, describeSaveFailure(e), 'store')) }
         if (e instanceof ApiError && (e.status === 400 || e.status === 422)) {
           const target = e.status === 422 ? 'cv-key' : focusTargetForReason(e.message)
           if (target) focusField(target)
           if (target === 'cv-value') {
-            setValueFieldError(e.message)
+            { if (!fieldFailure)
+            setValueFieldError(e.message) }
             valueErrorMessageRef.current = e.message
           } else if (target === 'cv-fallback-value') {
-            setFallbackFieldError(e.message)
+            { if (!fieldFailure)
+            setFallbackFieldError(e.message) }
             fallbackErrorMessageRef.current = e.message
           }
         }
@@ -389,8 +392,6 @@ export default function NewCommonVarV8() {
 
   const saveDisabled = saving || !canWrite
   const previewName = name.trim() || '共通情報'
-
-
 
   const preview = (
     <>
@@ -418,11 +419,11 @@ export default function NewCommonVarV8() {
   )
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       boardId="p82v9"
       title="共通情報を作る"
       help="保存しただけでは差し込まれません。公開すると使えるようになります"
-      identity={<Link href="/contents/vars" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />共通情報へ</Link>}
+      identity={<></>}
       preview={preview}
       footerActions={(
         <>
@@ -450,10 +451,7 @@ export default function NewCommonVarV8() {
       )} dirty={false}
     >
       {canWrite ? null : (
-        <div className={styles.roBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-        </div>
+        <div className={styles.roBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       )}
 
       {!accountLoading && !selectedAccountId && (
@@ -465,7 +463,7 @@ export default function NewCommonVarV8() {
           <h2 id="cv-new-name-heading" className={styles.cardTitle}>名前と差し込み名</h2>
         </div>
         <div className={styles.nameRow}>
-          <div className={styles.field}><Field label="共通情報名（友だちには見えません）" htmlFor="cv-name"><input
+          <div className={styles.field}><Field label="共通情報名（友だちには見えません）" htmlFor="cv-name"><SaveErrorField names={["name"]}><input
               id="cv-name"
               type="text"
               maxLength={NAME_MAX}
@@ -481,10 +479,10 @@ export default function NewCommonVarV8() {
               className={styles.fieldInput}
               aria-invalid={nameFieldError ? true : undefined}
               title={`${name.length}/${NAME_MAX}文字`}
-            />
+            /></SaveErrorField>
 <VarFieldError message={nameFieldError} /></Field></div>
           <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="cv-folder"><div className={styles.selectBox}>
-              <FolderSelect
+              <SaveErrorField names={["folderId","folder_id"]}><FolderSelect
                 aria-label="フォルダ"
                 id="cv-folder"
                 value={folderId}
@@ -493,12 +491,12 @@ export default function NewCommonVarV8() {
                 onCreate={canWrite && selectedAccountId
                 ? folderCreator((name, color) => api.folders.create({ kind: 'common_var', name, color, accountId: selectedAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
                 : undefined}
-              />
+              /></SaveErrorField>
             </div>
 {foldersError ? (
               <div className={styles.folderError} data-folders-state="error">
                 <p className={styles.fieldHint}>フォルダの一覧を読み込めませんでした。未分類のまま登録できます。</p>
-                <Button type="button" onClick={() => void loadFolders()}>
+                <Button type="button" onClick={() => loadFolders()} busyLabel="処理中…">
                   再読み込み
                 </Button>
               </div>
@@ -509,7 +507,7 @@ export default function NewCommonVarV8() {
           </>} label="差し込み名（あとから変えられません）" htmlFor="cv-key"><div className={styles.keyRow}>
             <span className={styles.keyBox}>
               <span className={styles.keyMark} aria-hidden="true">{'{{var.'}</span>
-              <input
+              <SaveErrorField names={["varKey","keyTouched","var_key","key_touched"]}><input
                 id="cv-key"
                 type="text"
                 value={varKey}
@@ -523,7 +521,7 @@ export default function NewCommonVarV8() {
                 placeholder="shop_hours"
                 className={styles.keyInput}
                 aria-invalid={keyFieldError ? true : undefined}
-              />
+              /></SaveErrorField>
               <span className={styles.keyMark} aria-hidden="true">{'}}'}</span>
             </span>
             <CopyTextButton value={`{{var.${varKey.trim()}}}`} aria-label="差し込み名をコピー" disabled={!varKey.trim()} />
@@ -563,9 +561,9 @@ export default function NewCommonVarV8() {
           })}
         </div>
         <div className={styles.field}><Field label="中身" htmlFor="cv-value">{type === 'boolean' ? (
-            <Select size="full" aria-label="中身" id="cv-value" error={valueFieldError || undefined} value={value} onChange={(next) => { setValue(next); setSecretWarningFields(null) }} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
+            <SaveErrorField names={["value"]}><Select size="full" aria-label="中身" id="cv-value" error={valueFieldError || undefined} value={value} onChange={(next) => { setValue(next); setSecretWarningFields(null) }} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} /></SaveErrorField>
           ) : type === 'long_text' ? (
-            <textarea
+            <SaveErrorField names={["value"]}><textarea
               id="cv-value"
               maxLength={10000}
               value={value}
@@ -578,23 +576,23 @@ export default function NewCommonVarV8() {
               aria-invalid={valueFieldError ? true : undefined}
               rows={3}
               title={`${value.length}/10000文字`}
-            />
+            /></SaveErrorField>
           ) : type === 'date' ? (
-            <DateField
+            <SaveErrorField names={["value"]}><DateField
               id="cv-value"
               invalid={Boolean(valueFieldError)}
               value={value}
               onChange={(v) => { setValue(v); setSecretWarningFields(null) }}
-            />
+            /></SaveErrorField>
           ) : type === 'datetime' ? (
-            <DateTimeField
+            <SaveErrorField names={["value"]}><DateTimeField
               id="cv-value"
               invalid={Boolean(valueFieldError)}
               value={value}
               onChange={(v) => { setValue(v); setSecretWarningFields(null) }}
-            />
+            /></SaveErrorField>
           ) : (
-            <input
+            <SaveErrorField names={["value"]}><input
               ref={valueRef}
               id="cv-value"
               type={type === 'number' ? 'number' : 'text'}
@@ -605,7 +603,7 @@ export default function NewCommonVarV8() {
               className={styles.fieldInput}
               aria-invalid={valueFieldError ? true : undefined}
               title={type === 'number' ? undefined : `${value.length}/${VALUE_MAX}文字`}
-            />
+            /></SaveErrorField>
           )}
 <VarFieldError message={valueFieldError} /></Field></div>
       </section>
@@ -617,37 +615,35 @@ export default function NewCommonVarV8() {
         </div>
         <div className={styles.periodGrid}>
 
-
-
-          <Field label="始まり" htmlFor="cv-valid-from"><DateTimeField id="cv-valid-from" value={validFrom} onChange={(next) => { setValidFrom(next); setPeriodFieldError('') }} invalid={Boolean(periodFieldError)} /></Field>
-          <Field label="終わり" htmlFor="cv-valid-until"><DateTimeField id="cv-valid-until" value={validUntil} onChange={(next) => { setValidUntil(next); setPeriodFieldError('') }} invalid={Boolean(periodFieldError)} /></Field>
+          <Field label="始まり" htmlFor="cv-valid-from"><SaveErrorField names={["validFrom","valid_from"]}><DateTimeField id="cv-valid-from" value={validFrom} onChange={(next) => { setValidFrom(next); setPeriodFieldError('') }} invalid={Boolean(periodFieldError)} /></SaveErrorField></Field>
+          <Field label="終わり" htmlFor="cv-valid-until"><SaveErrorField names={["validUntil","valid_until"]}><DateTimeField id="cv-valid-until" value={validUntil} onChange={(next) => { setValidUntil(next); setPeriodFieldError('') }} invalid={Boolean(periodFieldError)} /></SaveErrorField></Field>
           <div className={styles.selectBox}>
-            <Field label="期間の外では" htmlFor="cv-expiry-behavior"><Select size="full" aria-label="期間の外では" id="cv-expiry-behavior" value={expiryBehavior} onChange={(next) => setExpiryBehavior(next as 'stop' | 'fallback')} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} /></Field>
+            <Field label="期間の外では" htmlFor="cv-expiry-behavior"><SaveErrorField names={["expiryBehavior","expiry_behavior"]}><Select size="full" aria-label="期間の外では" id="cv-expiry-behavior" value={expiryBehavior} onChange={(next) => setExpiryBehavior(next as 'stop' | 'fallback')} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} /></SaveErrorField></Field>
           </div>
         </div>
         <VarFieldError message={periodFieldError} />
         {expiryBehavior === 'fallback' && (
           <div className={styles.field}><Field label="代替値" htmlFor="cv-fallback-value">{type === 'boolean' ? (
-              <Select size="full" aria-label="代替値" id="cv-fallback-value" error={fallbackFieldError || undefined} value={fallbackValue} onChange={(next) => setFallbackValue(next)} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
+              <SaveErrorField names={["fallbackValue","fallback_value"]}><Select size="full" aria-label="代替値" id="cv-fallback-value" error={fallbackFieldError || undefined} value={fallbackValue} onChange={(next) => setFallbackValue(next)} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} /></SaveErrorField>
             ) : type === 'date' ? (
-              <DateField id="cv-fallback-value" invalid={Boolean(fallbackFieldError)} value={fallbackValue} onChange={setFallbackValue} />
+              <SaveErrorField names={["fallbackValue","fallback_value"]}><DateField id="cv-fallback-value" invalid={Boolean(fallbackFieldError)} value={fallbackValue} onChange={setFallbackValue} /></SaveErrorField>
             ) : type === 'datetime' ? (
-              <DateTimeField id="cv-fallback-value" invalid={Boolean(fallbackFieldError)} value={fallbackValue} onChange={setFallbackValue} />
+              <SaveErrorField names={["fallbackValue","fallback_value"]}><DateTimeField id="cv-fallback-value" invalid={Boolean(fallbackFieldError)} value={fallbackValue} onChange={setFallbackValue} /></SaveErrorField>
             ) : (
-              <input
+              <SaveErrorField names={["fallbackValue","fallback_value"]}><input
                 id="cv-fallback-value"
                 type={type === 'number' ? 'number' : 'text'}
                 value={fallbackValue}
                 onChange={(e) => setFallbackValue(e.target.value)}
                 className={styles.fieldInput}
                 aria-invalid={fallbackFieldError ? true : undefined}
-              />
+              /></SaveErrorField>
             )}
 <VarFieldError message={fallbackFieldError} /></Field></div>
         )}
       </section>
 
-      <div className={styles.field}><Field label="社内メモ" htmlFor="cv-memo"><input
+      <div className={styles.field}><Field label="社内メモ" htmlFor="cv-memo"><SaveErrorField names={["memo"]}><input
           id="cv-memo"
           type="text"
           maxLength={MEMO_MAX}
@@ -658,7 +654,7 @@ export default function NewCommonVarV8() {
           }}
           placeholder="臨時休業のときは「臨時のお知らせ」も直す"
           className={styles.fieldInput}
-        /></Field></div>
+        /></SaveErrorField></Field></div>
 
       {secretWarningFields && (
         <div
@@ -695,9 +691,9 @@ export default function NewCommonVarV8() {
         </div>
       )}
 
-      {error && <p className={styles.formError} role="alert">{error}</p>}
+      {error && <Notice tone="danger" className={styles.formErrorNoticePlacement} >{error}</Notice>}
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した共通情報" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }

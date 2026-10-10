@@ -1,12 +1,6 @@
 'use client'
 
-/*
- * ★V8-B 登録ペットの一覧（wTIej・1152 は t2SMXX）。
- * 案内の帯 → 道具の段（探す・種別・主食・体重更新・並び・件数）→ 表 → 件数 → ヒント。
- * 表は「見出し 36・行 56」。1152 では 年齢・避妊去勢・運動量 を隠し、年齢は種類の後ろへ寄せる。
- * 取得の口・指定は今の画面と同じ（GET /api/nen/pets）。
- */
-import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd, ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -19,21 +13,24 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ApiError } from '@/lib/api'
-import {
-  nenPetsApi,
-  petAnimalTypeLabel,
-  type NenPetKpis,
-  type NenPetListData,
-  type NenPetRow,
-  type NenPetSort,
-} from '@/lib/nen-pets-api'
+import { nenPetsApi, petAnimalTypeLabel, type NenPetKpis, type NenPetListData, type NenPetRow, type NenPetSort } from '@/lib/nen-pets-api'
 import PetEditorV8 from './editor'
 import { NEUTERED_LABEL, Pill, RowMenu, feedingLines, monthDay, rangeText, type PetsQuery } from './parts'
 import styles from './pets.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
+
+/*
+ * ★V8-B 登録ペットの一覧（wTIej・1152 は t2SMXX）。
+ * 案内の帯 → 道具の段（探す・種別・主食・体重更新・並び・件数）→ 表 → 件数 → ヒント。
+ * 表は「見出し 36・行 56」。1152 では 年齢・避妊去勢・運動量 を隠し、年齢は種類の後ろへ寄せる。
+ * 取得の口・指定は今の画面と同じ（GET /api/nen/pets）。
+ */
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 
 export default function PetsListV8({
   accountId,
@@ -53,7 +50,7 @@ export default function PetsListV8({
   const [data, setData] = useState<NenPetListData | null>(null)
   const [draft, setDraft] = useState(query.q)
   const [page, setPage] = useListUrlValue('page', 1)
-  const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [editing, setEditing] = useState<NenPetRow | null>(null)
   const requestRef = useRef(0)
 
@@ -89,37 +86,36 @@ export default function PetsListV8({
         <Notice tone="info" message="体重が90日更新されていないペットは、マイページで更新をお願いできます（行の「…」→マイページで更新を促す）。" />
       </div>
 
-      <div className={styles.toolsRow} data-design="ListControls">
-        <span className={styles.searchBox}>
+      <ListToolbarRow data-design="ListControls">
+        <ListToolbarSearchSlot>
           <SearchField aria-label="ペット名・飼い主で探す" placeholder="ペット名・飼い主で探す" value={draft} onChange={(value: string) => { setDraft(value); onQueryChange({ ...query, q: value.trim() }); setPage(1) }} onClear={() => { setDraft(''); onQueryChange({ ...query, q: '' }); setPage(1) }} />
-        </span>
-        <span className={styles.toolsBreak} aria-hidden="true" />
-        <Select
+        </ListToolbarSearchSlot>
+        <SaveErrorField names={["species","query.species"]}><Select
           aria-label="種別で絞り込む"
           width={140}
           value={query.species}
           onChange={(value) => change({ species: value })}
           options={[{ value: '', label: '種別：すべて' }, { value: 'dog', label: '種別：犬' }, { value: 'cat', label: '種別：猫' }, { value: 'other', label: '種別：その他' }]}
-        />
-        <Select
+        /></SaveErrorField>
+        <SaveErrorField names={["product","query.product"]}><EntitySelect
           aria-label="主食で絞り込む"
           width={140}
           value={query.product}
           onChange={(value) => change({ product: value })}
           options={[
             { value: '', label: '主食：すべて' },
-            ...(data?.products ?? []).map((p) => ({ value: p.id, label: `主食：${p.name}` })),
+            ...(data?.products ?? []).map((p) => ({ ...entityOptionMetadata(p), value: p.id, label: `主食：${p.name}` })),
             { value: 'none', label: '主食：未設定' },
           ]}
-        />
-        <Select
+        /></SaveErrorField>
+        <SaveErrorField names={["weight","query.weight"]}><Select
           aria-label="体重の更新で絞り込む"
           width={140}
           value={query.weight}
           onChange={(value) => change({ weight: value === 'stale' || value === 'fresh' ? value : '' })}
           options={[{ value: '', label: '体重更新：すべて' }, { value: 'fresh', label: '体重更新：90日以内' }, { value: 'stale', label: '体重更新：90日以上前' }]}
-        />
-        <ListToolbarSort
+        /></SaveErrorField>
+        <SaveErrorField names={["sort","query.sort"]}><ListToolbarSort
           aria-label="並び順"
           width={170}
           value={query.sort}
@@ -130,11 +126,11 @@ export default function PetsListV8({
             { value: 'weight_desc', label: '並び：体重が重い順' },
             { value: 'age_desc', label: '並び：年齢が高い順' },
           ]}
-        />
-        <span className={styles.toolsTail}>
-          <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))} />
-        </span>
-      </div>
+        /></SaveErrorField>
+        <ListToolbarEnd>
+          <SaveErrorField names={["pageSize","page_size"]}><Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))} /></SaveErrorField>
+        </ListToolbarEnd>
+      </ListToolbarRow>
 
       {status === 'loading' && !data ? (
         <ListState kind="loading" title="ペットを読み込んでいます" />
@@ -198,9 +194,9 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
   const friendHref = `/friends/detail?id=${encodeURIComponent(pet.owner.friendId)}`
   const items: ActionMenuItem[] = [
     ...(canEdit ? [{ id: 'edit', label: 'ペットの情報を直す', onSelect: onEdit }] : []),
-    { id: 'owner', label: '飼い主を開く', external: true, href: friendHref, onSelect: () => { router.push(friendHref) } },
+    { id: 'owner', label: '飼い主を開く', external: false, href: friendHref, onSelect: () => { router.push(friendHref) } },
     /* マイページの更新を頼む送信の口は無いので、受信箱でこの飼い主とのトークを開いて頼む。 */
-    { id: 'nudge', label: 'マイページで更新を促す', external: true, href: `/chats?friend=${encodeURIComponent(pet.owner.friendId)}`, onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(pet.owner.friendId)}`) } },
+    { id: 'nudge', label: 'マイページで更新を促す', external: false, href: `/chats?friend=${encodeURIComponent(pet.owner.friendId)}`, onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(pet.owner.friendId)}`) } },
   ]
   const updated = pet.weightKg == null ? emptyValue('unknown') : monthDay(pet.weightUpdatedAt)
   return (

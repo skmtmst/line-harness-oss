@@ -96,7 +96,7 @@ describe('useStaffRole', () => {
     expect(canManageRole(seen[seen.length - 1])).toBe(true)
   })
 
-  it('読めなかったときは null のまま（呼び出し側は今までどおり出す）', async () => {
+  it('読めなかったときは null のまま（呼び出し側は操作を隠す）', async () => {
     staffMe.mockImplementation(async () => ({ success: false, error: 'ng' }))
     await act(async () => {
       root.render(<Probe />)

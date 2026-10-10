@@ -1,29 +1,11 @@
 'use client'
 
 import SegmentedControl from '@/components/shared/segmented'
-
-/*
- * ★V8 自動応答の実行結果（Pencil `nWmLg`）。
- *
- * 型は詳細（DetailPage）：頭（戻る・題・説明・右に3つの操作）→ 数の帯（4つ）→
- * 失敗の帯 → 実行の記録（道具の段・表・ページ送り）→ 言葉ごとの数と引き継ぎ。
- * 取得・操作の動き（読み直し・一時停止・再実行・CSV）は `app/auto-replies/runs/runs-v8.tsx`
- * から写した（import はしない）。動きの一覧は BEHAVIOR.md の「実行結果」。
- */
-
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  ArrowLeft,
-  Download,
-  MessageCircle,
-  Pause,
-  Pencil,
-  RotateCcw,
-  TriangleAlert,
-} from 'lucide-react'
+import { ArrowLeft, Download, MessageCircle, Pause, Pencil, RotateCcw } from 'lucide-react'
 import type { AutoReplyRun, AutoReplyRunsResponse, ExecutionRunStatus } from '@line-crm/shared'
 import { DetailPage } from '@/components/templates'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -42,13 +24,25 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { api, ApiError } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
+import { formatDateTime, formatNumber, formatTime, formatListDateTime as polishFormatListDateTime } from '@/lib/format'
 import styles from './runs.module.css'
-import { formatListDateTime as polishFormatListDateTime } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
+import Notice from '@/components/shared/notice'
+
+/*
+ * ★V8 自動応答の実行結果（Pencil `nWmLg`）。
+ *
+ * 型は詳細（DetailPage）：頭（戻る・題・説明・右に3つの操作）→ 数の帯（4つ）→
+ * 失敗の帯 → 実行の記録（道具の段・表・ページ送り）→ 言葉ごとの数と引き継ぎ。
+ * 取得・操作の動き（読み直し・一時停止・再実行・CSV）は `app/auto-replies/runs/runs-v8.tsx`
+ * から写した（import はしない）。動きの一覧は BEHAVIOR.md の「実行結果」。
+ */
 
 /* 再実行・一時停止は owner/admin だけ（R530・再実行POST・停止口の requireRole と同じ境目）。 */
 const NO_MANAGE_NOTE = '閲覧のみで見ています。再実行・一時停止はオーナーと管理者だけができます。実行結果の確認と書き出しはこのまま使えます。'
@@ -141,7 +135,7 @@ export function periodFrom(period: PeriodKey, now: Date): string | null {
   return null
 }
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n} 件表示` }))
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 /** 届いた言葉は「」で囲んで1行。 */
 function quoted(text: string | null): string {
@@ -158,7 +152,7 @@ export default function AutoReplyRunsV8() {
   const searchParams = useSearchParams()
   const requestedRuleId = searchParams.get('id') ?? ''
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || canManageRole(staffRole)
+  const canManage = canManageRole(staffRole)
   const [period, setPeriod] = useListUrlValue<PeriodKey>('period', 'month')
   const [dateFrom, setDateFrom] = useListUrlValue('dateFrom', '')
   const [dateTo, setDateTo] = useListUrlValue('dateTo', '')
@@ -388,7 +382,7 @@ export default function AutoReplyRunsV8() {
         id: 'chat',
         label: 'トークを開く',
         icon: <MessageCircle size={14} aria-hidden="true" />,
-        external: true,
+        external: false,
         href: `/chats?friend=${encodeURIComponent(item.friendId)}`, onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(item.friendId)}`) },
       })
     }
@@ -409,7 +403,7 @@ export default function AutoReplyRunsV8() {
       boardId="nWmLg"
       title={`実行結果：${data?.rule.name ?? '自動応答'}`}
       help="いつ・誰に・何を返したか、失敗した処理を見ます。"
-      identity={<Link href="/auto-replies" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />自動応答へ</Link>}
+      identity={<></>}
       actions={<div className={styles.headActions}>
         {canManage ? (
           <Button onClick={() => setStopOpen(true)} disabled={!isActiveRule || stopping}>
@@ -430,7 +424,7 @@ export default function AutoReplyRunsV8() {
       </div>}
     >
       {!canManage ? (
-        <p className={styles.viewerBand} role="status">{NO_MANAGE_NOTE}</p>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">{NO_MANAGE_NOTE}</ReadOnlyNotice></div>
       ) : null}
 
       <div className={styles.kpis}>
@@ -448,14 +442,7 @@ export default function AutoReplyRunsV8() {
       </div>
 
       {failedCount > 0 ? (
-        <div className={styles.failBand} role="alert">
-          <TriangleAlert size={18} className={styles.failIcon} aria-hidden="true" />
-          <div className={styles.failText}>
-            <p className={styles.failTitle}>{`失敗した処理が ${formatNumber(failedCount)} 件あります`}</p>
-            <p className={styles.failNote}>止まった行の理由を見て、もう一度実行できます。返信が届いているかは「行ったこと」に出ます。</p>
-          </div>
-          <Button onClick={() => { setFilter('failed'); setPage(1) }}>失敗だけ見る</Button>
-          {canManage ? (
+        <Notice tone="danger" heading={<> {`失敗した処理が ${formatNumber(failedCount)} 件あります`} </>} action={<> <Button onClick={() => { setFilter('failed'); setPage(1) }}>失敗だけ見る</Button>{canManage ? (
             <Button
               variant="primary"
               onClick={() => void retryAllFailed()}
@@ -465,8 +452,7 @@ export default function AutoReplyRunsV8() {
             >
               <RotateCcw size={14} aria-hidden="true" />失敗した処理をもう一度
             </Button>
-          ) : null}
-        </div>
+          ) : null} </>} >止まった行の理由を見て、もう一度実行できます。返信が届いているかは「行ったこと」に出ます。</Notice>
       ) : null}
 
       <section className={styles.card} aria-label="実行の記録">
@@ -484,26 +470,26 @@ export default function AutoReplyRunsV8() {
           <span className={styles.toolsSpacer} aria-hidden="true" />
           {period === 'custom' ? (
             <>
-              <DateField value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} max={dateTo || undefined} aria-label="実行日（開始）" />
-              <DateField value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} min={dateFrom || undefined} aria-label="実行日（終了）" />
+              <SaveErrorField names={["dateFrom","from","date_from"]}><DateField value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} max={dateTo || undefined} aria-label="実行日（開始）" /></SaveErrorField>
+              <SaveErrorField names={["dateTo","to","date_to"]}><DateField value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} min={dateFrom || undefined} aria-label="実行日（終了）" /></SaveErrorField>
             </>
           ) : null}
           <div className={styles.periodBox}>
-            <Select
+            <SaveErrorField names={["period"]}><Select
               aria-label="期間"
               value={period}
               onChange={(value) => { setPeriod(value as PeriodKey); setPage(1) }}
               options={PERIOD_OPTIONS}
-            />
+            /></SaveErrorField>
           </div>
           <div className={styles.sizeBox}>
-            <Select
+            <SaveErrorField names={["pageSize","limit","page_size"]}><Select
               aria-label="1ページに出す件数"
               size="page-size"
               value={String(pageSize)}
               onChange={(value) => { setPageSize(Number(value)); setPage(1) }}
               options={PAGE_SIZE_OPTIONS}
-            />
+            /></SaveErrorField>
           </div>
         </div>
 
@@ -536,7 +522,7 @@ export default function AutoReplyRunsV8() {
                 const name = item.friendName ?? '削除済みの友だち'
                 const menuItems = rowMenuItems(item)
                 return (
-                  <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
+                  <Tr key={item.id} className={styles.row} data-table-layout="columns" href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>
                     <Td className={styles.colWhen}>
                       <time dateTime={item.occurredAt} title={polishFormatListDateTime(item.occurredAt)} className={styles.when}>{formatTime(item.occurredAt)}</time>
                     </Td>
@@ -641,14 +627,14 @@ export default function AutoReplyRunsV8() {
         onConfirm={() => stopRule()}
         onCancel={() => { if (!stopping) { setStopOpen(false); setStopReason('') } }}
       >
-        <input
+        <SaveErrorField names={["stopReason","reason","stop_reason"]}><input
           type="text"
           className={styles.stopReason}
           placeholder="止める理由（任意・記録に残ります）"
           aria-label="止める理由（任意）"
           value={stopReason}
           onChange={(e) => setStopReason(e.target.value)}
-        />
+        /></SaveErrorField>
       </ConfirmDialog>
     </DetailPage>
   )

@@ -77,9 +77,10 @@
   --color-on-accent: #ffffff;
 
   /* 操作。LINEの状態色とは分け、設定画面のリンクと主要ボタンに使う。 */
-  --color-action: #2563eb;
-  --color-action-hover: #0957b7;
-  --color-action-soft: #eaf4ff;
+  --color-action: var(--color-accent-deep);
+  --color-action-hover: var(--color-accent);
+  --color-action-soft: var(--color-accent-soft);
+  --color-focus-ring: #2563eb;
   --color-on-action: #ffffff;
 
   /*
@@ -135,7 +136,8 @@
   --color-info-bg: #e2f2f5;
 
   /* Pencilの状態バッジ。既存画面の状態色は移行時にこの語彙へ寄せる。 */
-  --color-status-info: #1d4ed8;
+  --color-status-info: var(--color-focus-ring);
+  --color-status-info-deep: #1d4ed8; /* §6.5-4 案内の文字は濃い青 */
   --color-status-info-soft: #2563eb1a;
   --color-status-warn: #f5c56b;
   --color-status-warn-soft: #f973161a;
@@ -476,7 +478,7 @@
   --color-notice-warning-bg: #fff7e6;
   --color-notice-danger-bg: #fef0f0;
   --color-menu-danger: #e5484d;
-  --color-link: #0b63ce;
+  --color-link: var(--color-accent-deep);
   --color-checkbox-line: #dadde2;
   --radius-checkbox-mark: 3px;
   --text-callout: 14px;
@@ -892,6 +894,16 @@
  * CSS Modules の pure 検査に当たるので、型の module ではなくこの層（①）に置く。
  */
 [data-theme="v8"] {
+  /* 予約の頭・数の帯（O2Z8u・GcyTr）。広い板では右の内訳列を空ける。 */
+  --tpl-booking-aside-width: 300px;
+  --tpl-booking-kpi-label-lh: 18px;
+  --tpl-booking-kpi-height: 116px;
+  --tpl-booking-heading-gap: 12px;
+  --tpl-booking-button-pad: 16px;
+  --tpl-booking-seg-item-width: 65px;
+  --tpl-booking-seg-last-width: 56px;
+  --tpl-booking-head-pad-top: 24px;
+  --tpl-booking-narrow-head-pad: 16px;
   --tpl-head-pad-top: var(--polish-space-section); --tpl-head-pad-side: var(--polish-space-section); --tpl-head-pad-bottom: var(--polish-space-field);
   /* 成果とアフィリエイトの V8（nJlxX・KdFRI・v9JWQ・h7dmB・OylSV・aINnz・Eo56k・tnTn9）。表は絵の列の並び（見出し 13/20・欄の間16）。 */
   --tpl-af-col-gap: 16px; --tpl-af-head-h: var(--polish-table-head); --tpl-af-head-pad: 13px 20px; --tpl-af-row-h: var(--polish-table-row); --tpl-af-row-pad: 9px 20px;
@@ -1068,7 +1080,7 @@
   --tpl-htn-radius-m: var(--polish-radius-control); --tpl-htn-radius-l: var(--polish-radius-card); --tpl-htn-radius-pill: var(--polish-radius-pill); --tpl-htn-line-2: 2px; --tpl-htn-soft-bg: #fafafc;
   --tpl-htn-text-11: 11px; --tpl-htn-text-12: 12px; --tpl-htn-text-13: 13px; --tpl-htn-text-14: 14px; --tpl-htn-lh-16: 16px; --tpl-htn-lh-17: 17px; --tpl-htn-lh-18: 18px; --tpl-htn-lh-19: 19px; --tpl-htn-lh-20: 20px; --tpl-htn-lh-21: 21px;
   --tpl-htn-panel-pad: var(--polish-space-section); --tpl-htn-panel-gap: 12px; --tpl-htn-aside-w: 340px; --tpl-htn-aside-pad: var(--polish-space-card); --tpl-htn-aside-gap: 10px; --tpl-htn-note-pad: 14px;
-  --tpl-htn-radio-gap: 24px; --tpl-htn-ring: inset 0 0 0 1px var(--color-hairline); --tpl-htn-ring-control: inset 0 0 0 1px var(--color-control-border); --tpl-htn-ring-accent: inset 0 0 0 2px var(--color-accent-deep); --tpl-htn-ring-focus: inset 0 0 0 2px var(--color-action); --tpl-htn-line-top: inset 0 1px 0 var(--color-hairline); --tpl-htn-line-bottom: inset 0 -1px 0 var(--color-hairline); --tpl-htn-input-h: 36px; --tpl-htn-input-pad: 0 12px;
+  --tpl-htn-radio-gap: 24px; --tpl-htn-ring: inset 0 0 0 1px var(--color-hairline); --tpl-htn-ring-control: inset 0 0 0 1px var(--color-control-border); --tpl-htn-ring-accent: inset 0 0 0 2px var(--color-accent-deep); --tpl-htn-ring-focus: inset 0 0 0 2px var(--color-focus-ring); --tpl-htn-line-top: inset 0 1px 0 var(--color-hairline); --tpl-htn-line-bottom: inset 0 -1px 0 var(--color-hairline); --tpl-htn-input-h: 36px; --tpl-htn-input-pad: 0 12px;
   --tpl-htn-chip-pad: 0 10px; --tpl-htn-chip-gap: 6px; --tpl-htn-tag-input-w: 320px; --tpl-htn-info-pad: 10px 12px; --tpl-htn-endpoint-pad: 8px 10px; --tpl-htn-basic-pad-bottom: 44px;
   --tpl-htn-check-row-h: var(--polish-table-row); --tpl-htn-check-pad: 0 16px; --tpl-htn-import-pad: 16px 16px 12px; --tpl-htn-import-gap: 2px; --tpl-htn-done-gap: 14px; --tpl-htn-progress-h: 6px;
   --tpl-htn-footer-pad: 14px 0 0; --tpl-htn-result-gap: 12px; --tpl-htn-result-row-h: var(--polish-table-row); --tpl-htn-result-label-w: 208px; --tpl-htn-result-badge-w: 120px; --tpl-htn-ack-pad: 4px 0 0; --tpl-htn-result-pull-top: -14px; --tpl-htn-result-pull-bottom: -15px; --tpl-htn-dialog-footer-pad: 14px 24px;
@@ -1385,7 +1397,7 @@
   /* 自動応答の一覧（uE9gf・Q5lOCc・WPrd5）。 */
   --tpl-ar-sort-w: 124px; --tpl-ar-saved-w: 151px; --tpl-ar-saved-icon-w: 48px; --tpl-ar-folder-w: 150px; --tpl-ar-row-h: var(--polish-table-row); --tpl-ar-narrow-head-h: 34px;
   --tpl-badge-h: 22px; --tpl-badge-dot: 6px;
-  --tpl-ro-band-pad: 10px 14px; --tpl-ro-band-gap: 10px; --tpl-ro-band-radius: var(--polish-radius-control); --tpl-ro-band-lh: 20px; --tpl-ro-band-after: 8px;
+  --tpl-ro-band-pad: 12px 16px; --tpl-ro-band-gap: 12px; --tpl-ro-band-bg: #e9f1ff; --tpl-ro-band-radius: var(--polish-radius-control); --tpl-ro-band-lh: 20px; --tpl-ro-band-after: 8px;
   --tpl-band-number-size: 22px; --tpl-band-number-lh: 26px;
   /* 外部連携（ZSbFY・AsfFB・l5SRfT・gW0F2・DxAAA・Uv9AA・SAUCs・hsD8e）。 */
   --tpl-wh-ro-row-pad: 12px 24px; --tpl-wh-notice-after: 6px; --tpl-wh-saved-w: 153px; --tpl-wh-create-w: 135px; --tpl-wh-create-after: 16px; --tpl-wh-add-space: 31px; --tpl-wh-note-lh: 17px;
@@ -1442,6 +1454,8 @@
   --tpl-preview-title-size: var(--polish-text-section); --tpl-preview-title-lh: 23px;
   --tpl-tabs-h: 28px; --tpl-tabs-pad-bottom: 10px; --tpl-tabs-text-lh: 18px; --tpl-tabs-compact-lh: 18.5px; --tpl-tabs-compact-line-overlap: -2px;
   --tpl-chip-h: 36px; --tpl-chip-pad: 0 10px; --tpl-chip-gap: 5px; --tpl-body-pad: var(--polish-space-card); --tpl-body-gap: var(--polish-space-row); --tpl-body-lh: 22px; --tpl-insert-pad: 0 14px; --tpl-body-spacer: 24px; --tpl-chip-row-gap: 4px; --tpl-rule-row-gap: 12px; --tpl-chip-label-lh: 20px; --tpl-kw-chip-pad: 4px 6px 4px 10px; --tpl-kw-input-w: 200px; --tpl-kw-input-pad: 0 12px; --tpl-seg-btn-h: 32px; --tpl-seg-btn-pad: 0 12px; --tpl-weekday-w: 48px; --tpl-field-gap-basic: var(--polish-space-row); --tpl-count-num-size: 24px; --tpl-count-num-lh: 29px; --tpl-summary-key-w: 140px; --tpl-summary-val-lh: 21px; --tpl-summary-gap: var(--polish-space-field); --tpl-conflict-desc-lh: 18px; --tpl-rule-note-lh: 16px;
+  /* B-169: 共通の行（★V8 XXFT4）の44pxの高さ・52pxの行間。 */
+  --tpl-action-row-compact-pad: 8px 12px; --tpl-action-kind-w: 100px; --tpl-action-list-gap: 8px; --tpl-action-icon-box: 24px; --tpl-action-grip-w: 16px;
   --tpl-action-row-pad: 10px 12px; --tpl-action-row-gap: 10px; --tpl-action-select-w: 140px;
   /* LINEアカウントの詳細（ihjfd）・送受信を止める（CFAyf）・資格情報（Msb1j）・アーカイブ（WOfBN）・登録の編集（n9Z2P）・乗り換え（x2dSNv）。 */
   /* acct：登録の手順の下と、乗り換えの本文の寸法（既定の設定フォームは保つ）。 */
@@ -1655,7 +1669,7 @@
   --tpl-rt-stat-value-sm: 20px; --tpl-rt-caution-bg: #fff4e0; --tpl-rt-caution-ink: #8a3c00; --tpl-rt-flow-head-pad: 12px 16px; --tpl-rt-flow-head-line: inset 0 -1px 0 var(--tpl-rt-band-line);
   --tpl-rt-tab-gap: 20px; --tpl-rt-tab-lh: 18px; --tpl-rt-tab-pad: 10px; --tpl-rt-tab-pad-wide: 12px; --tpl-rt-icon-13: 13px; --tpl-rt-search-w: 240px; --tpl-rt-section-gap: var(--polish-space-field); --tpl-rt-fact-pad: 6px 0; --tpl-rt-fact-key-w: 160px; --tpl-rt-gray-note-pad: 10px 12px;
   --tpl-rt-terms-lh: 22px; --tpl-rt-terms-indent: 20px; --tpl-rt-terms-cell-pad: 6px 10px; --tpl-rt-terms-box-h: 220px; --tpl-rt-terms-box-pad: 14px 16px; --tpl-rt-toc-w: 260px; --tpl-rt-toc-lh: 23px; --tpl-rt-toc-h: 115px; --tpl-rt-terms-card-pad: var(--polish-space-card);
-  --tpl-rt-step-strip-pad: 4px 0 8px; --tpl-rt-step-pad: 8px 12px; --tpl-rt-step-dot: 22px; --tpl-rt-step-current: 2px solid var(--color-accent-deep); --tpl-rt-wizard-title-size: var(--polish-text-section); --tpl-rt-help-pad: 18px; --tpl-rt-footer-pad-top: 14px; --tpl-rt-check-icon: 14px; --tpl-rt-kind-lh: 18px; --tpl-rt-focus-ring: 2px solid var(--color-action); --tpl-rt-focus-ring-accent: 2px solid var(--color-accent);
+  --tpl-rt-step-strip-pad: 4px 0 8px; --tpl-rt-step-pad: 8px 12px; --tpl-rt-step-dot: 22px; --tpl-rt-step-current: 2px solid var(--color-accent-deep); --tpl-rt-wizard-title-size: var(--polish-text-section); --tpl-rt-help-pad: 18px; --tpl-rt-footer-pad-top: 14px; --tpl-rt-check-icon: 14px; --tpl-rt-kind-lh: 18px; --tpl-rt-focus-ring: 2px solid var(--color-focus-ring); --tpl-rt-focus-ring-accent: 2px solid var(--color-accent);
   --tpl-rt-card-head-radius: var(--polish-radius-card) var(--polish-radius-card) 0 0; --tpl-rt-review-row-pad: 12px 20px; --tpl-rt-col-96: 96px; --tpl-rt-col-160: 160px; --tpl-rt-star: #c9a24b; --tpl-rt-star-small: #d4a017; --tpl-rt-side-w: 340px; --tpl-rt-draft-h: 120px; --tpl-rt-draft-lh: 19px;
   --tpl-rt-post-row-pad: 8px 0; --tpl-rt-chip-pad: 2px 8px; --tpl-rt-kind-offer-bg: #e6f4ea; --tpl-rt-kind-offer-ink: #1f7a3a; --tpl-rt-kind-event-ink: #8a5a00; --tpl-rt-kind-std-bg: #eef0f3; --tpl-rt-kind-std-ink: #4b5563;
   --tpl-rt-summary-h: 96px; /* ★V8-B `U1X7T2`（2026-10-07 承認）Instagram 同時投稿の区画：余白12・行の間10。 */ --tpl-rt-ig-pad: 12px; --tpl-rt-ig-gap: 10px; --tpl-rt-picker-size: 100px; --tpl-rt-seg-gap: 2px; --tpl-rt-seg-pad: 6px 12px; --tpl-rt-metric-menu: 24px; --tpl-rt-metric-num-trim: -5px; --tpl-rt-chart-h: 160px; --tpl-rt-inline-pad: 12px 16px;
@@ -1708,6 +1722,23 @@
   --tpl-ev-card-pad: var(--polish-space-card); --tpl-ev-row-h: var(--polish-table-row); --tpl-ev-num-w: 70px; --tpl-ev-state-w: 102px; --tpl-ev-state-pad: 10px; --tpl-ev-chip-pad: 2px 8px; --tpl-ev-chip-dot: 6px; --tpl-ev-chip-gap: 5px; --tpl-ev-chip-lh: 18px; --tpl-ev-band-pad: 10px 12px; --tpl-ev-band-lh: 18px; --tpl-ev-ba-gap: 4px; --tpl-ev-bubble-pad: 6px 11px; --tpl-ev-key-w: 150px; --tpl-ev-impact-h: 298px; --tpl-ev-confirm-pull: -21px;
   --tpl-ev-bk-pick-w: 220px; --tpl-ev-ls-col-when: 170px; --tpl-ev-ls-col-seats: 100px; --tpl-ev-ls-first-pad: 60px; --tpl-ev-ls-state-pad: 19px; --tpl-ev-ls-row-h: var(--polish-table-row); --tpl-ev-md-thumb-h: 126px; --tpl-ev-md-thumb-narrow-w: 80px; --tpl-ev-md-usage-top: 3px; --tpl-ev-md-grid-pad: 0 24px; --tpl-ev-md-grid-top: 18px; --tpl-ev-ls-saved-w: 152px; --tpl-ev-ls-col-pending: 88px; --tpl-ev-ls-col-state: 172px;
   --tpl-ev-fr-rail-w: 356px; --tpl-ev-fr-col-gap: 28px; --tpl-ev-fr-pull-top: 0px; --tpl-ev-fr-rail-pad: 24px; --tpl-ev-fr-alert-pad: 12px 20px; --tpl-ev-fr-bar-label-w: 118px; --tpl-ev-fr-bar-count-w: 90px; --tpl-ev-fr-bar-h: 8px; --tpl-ev-fr-quote-h: 47px; --tpl-ev-fr-head-h: var(--polish-table-head); --tpl-ev-fr-row-h: var(--polish-table-row); --tpl-ev-fr-col-when: 132px; --tpl-ev-fr-col-who: 352px; --tpl-ev-fr-col-state: 106px; --tpl-ev-fr-pager-pad: 0 4px 0 20px; --tpl-ev-fr-detail-h: 39px; --tpl-ev-fr-quote-gap: 6px; --tpl-ev-bk-pull-top: -8px; --tpl-ev-bk-broadcast-top: 19px; --tpl-ev-bk-broadcast-gap: 34px; --tpl-ev-bk-pull-side: -4px; --tpl-ev-bk-kpi-num: 20px; --tpl-ev-bk-kpi-num-lh: 24px; --tpl-ev-bk-head-gap: 11px; --tpl-ev-bk-card-top: 14px; --tpl-ev-bk-att-pad: 8px 12px; --tpl-ev-bk-row-h: var(--polish-table-row); --tpl-ev-bk-main-row-h: var(--polish-table-row); --tpl-ev-bk-main-cols: 462px 156px 116px minmax(0, 1fr) auto; --tpl-ev-bk-wait-cols: minmax(0, 1fr) 116px 136px 136px 120px; --tpl-ev-bk-cancel-cols: minmax(0, 1fr) 116px 140px;
+  --tpl-distribution-toolbar-pad: 13px;
+  --tpl-distribution-progress-pad: 14px 16px 12px;
+  --tpl-distribution-col-check: 52px;
+  --tpl-distribution-col-item: 196px;
+  --tpl-distribution-col-version: 156px;
+  --tpl-distribution-col-mode: 184px;
+  --tpl-distribution-dot-pull: -16px;
+  --tpl-distribution-compact-item: 180px;
+  --tpl-distribution-compact-version: 126px;
+  --tpl-distribution-compact-mode: 170px;
+  --tpl-roster-message-pad: 20px 24px;
+  --tpl-roster-head-pad: 14px 24px 13px;
+  --tpl-roster-body-pad: 16px 24px;
+  --tpl-roster-record-h: 46px;
+  --tpl-roster-history-head-h: 32px;
+  --tpl-roster-main-cols: minmax(0, 1fr) 156px 116px 366px;
+  --tpl-roster-main-compact-cols: minmax(0, 1fr) 120px 92px 330px;
   --tpl-composer-pad-top: 12px; --tpl-composer-pad-side: 20px; --tpl-composer-pad-bottom: 16px;
   /* 分析のレポートを作る（H5UoIu・競合 G83vi）。 */
   --tpl-an-rp-head-pad: 20px 24px 16px; --tpl-an-rp-head-gap: 8px; --tpl-an-rp-back-size: 13px; --tpl-an-rp-title-size: var(--polish-text-section); --tpl-an-rp-lead-size: 12px; --tpl-an-rp-bold: 700;
@@ -2609,7 +2640,7 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
   input:focus-visible,
   select:focus-visible,
   textarea:focus-visible {
-    outline: 2px solid var(--color-action);
+    outline: 2px solid var(--color-focus-ring);
     outline-offset: 2px;
   }
 }
@@ -2878,7 +2909,7 @@ select:not([multiple]):not(.appearance-none) {
 /* 作ってあるもの・配るアカウントを選ぶ窓 dJZ7Q（picker）：欄の1行と窓の寸法。 */
 [data-theme="v8"] {
   --tpl-picker-width: 880px;
-  --tpl-picker-narrow-width: 760px;
+  --tpl-picker-narrow-width: 640px;
   --tpl-picker-height: 560px;
   --tpl-picker-folder-width: 190px;
   --tpl-picker-preview-width: 250px;
@@ -2897,7 +2928,13 @@ select:not([multiple]):not(.appearance-none) {
 }
 [data-theme="v8"] { --tpl-hq-attribute-distribute-col: 76px; }
 
-[data-theme='v8'] { --tpl-wh-narrow-column-pad: 9px var(--tpl-af2-wh-narrow-pad); }
+[data-theme='v8'] {
+  /* B-190: タグの1行表示と「+N」の共通寸法。 */
+  --tpl-tag-overflow-max: 112px;
+  --tpl-tag-overflow-gap: 8px;
+  --tpl-tag-overflow-pad: 4px 8px;
+  --tpl-wh-narrow-column-pad: 9px var(--tpl-af2-wh-narrow-pad);
+}
 [data-theme='v8'] { --shadow-wh-kpi-top: inset 0 1px 0 var(--tpl-band-line); }
 
 /* B-152：V8の本文。数字の大きさ・数の帯は別の値を保つ。 */
@@ -2969,6 +3006,59 @@ html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader']
   box-shadow: var(--card-shadow);
 }
 
+/* B-159 / B-161 / B-180：採用済みの値。部品ごとの写しよりこの値を優先する。 */
+[data-theme='v8'] {
+  --text-body: 13px;
+  --text-label: 12px;
+  --radius-segment: 10px;
+  --color-table-head: #f7f8fa;
+  --color-focus-ring: #2563eb;
+  --shadow-controls-pop: 0 8px 24px rgba(29, 29, 31, 0.12);
+  --shadow-float: var(--shadow-controls-pop);
+  --shadow-overlay: var(--shadow-controls-pop);
+  --select-menu-shadow: var(--shadow-controls-pop);
+  --v8-parts-dialog-shadow: var(--shadow-controls-pop);
+  --shadow-controls-toggle: 0 1px 2px rgba(29, 29, 31, 0.16);
+  --color-badge-neutral-bg: #94a3b81a; --color-badge-neutral: #475569;
+  --color-badge-success-bg: #16a34a1a; --color-badge-success: #087a3e;
+  --color-badge-warning-bg: #f973161a; --color-badge-warning: #c2410c;
+  --color-badge-danger-bg: #ef44441a; --color-badge-danger: #b91c1c;
+  --color-badge-info-bg: #2563eb1a; --color-badge-info: #1d4ed8;
+  --tpl-folder-create-h: 36px;
+  --tpl-folder-create-pad: 0 16px;
+  --tpl-button-h: 36px;
+  --tpl-button-pad-side: 16px;
+  --tpl-dialog-width: 560px;
+  --tpl-dialog-large-width: 720px;
+  --tpl-dialog-title-size: 18px;
+  --tpl-dialog-title-weight: 700;
+  --tpl-tabs-h: 36px;
+  --tpl-tabs-weight: 500;
+  --tpl-tabs-current-weight: 600;
+  --tpl-badge-h: 22px;
+  --tpl-tag-pill-h: 24px;
+  --tpl-section-title-size: 15px;
+  --tpl-section-title-weight: 700;
+  --tpl-field-label-size: 12px;
+  --tpl-field-label-weight: 500;
+  --tpl-card-pad: 16px;
+  --tpl-notice-pad: 12px 16px;
+  --tpl-thead-pad-side: 16px;
+}
+
+/* B-178：一覧の骨組み（v19Ivv）。画面の寸法ではなく部品の値。 */
+[data-theme='v8'] {
+  --tpl-list-row-h: 60px;
+  --tpl-list-head-h: 40px;
+  --tpl-list-search-w: 240px;
+  --tpl-list-search-min: 120px;
+  --tpl-list-band-h: 116px;
+  --tpl-list-band-pad: 16px 24px;
+  --tpl-list-gap: 8px;
+  --tpl-list-cell-side: 16px;
+}
+
+[data-theme='v8'] { --tpl-image-frame-w: 160px; --tpl-image-frame-h: 106px; }
 [data-theme="v8"] { --tpl-floor-map-inset: 32px; --tpl-floor-aside-w: 400px; --tpl-floor-detail-row-h: 59px; --tpl-board-tabs-top: 18px; --tpl-board-body-top: 10px; --tpl-board-section-gap: 13px; --tpl-board-detail-w: 330px; --tpl-board-side-w: 304px; --tpl-board-resource-w: 86px; --tpl-board-row-h: 52px; --tpl-board-block-top: 4px; }
 /* 印刷の内容は body 直下へ置き、画面のスクロール枠・高さ制限から外す。 */
 @media print {

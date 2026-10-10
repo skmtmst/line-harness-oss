@@ -89,13 +89,13 @@ async function flush() {
 }
 
 describe('#641 ウェビナー一覧の行操作', () => {
-  it('「編集」が枠つきボタンで、アーカイブは撮影口つき「…」の中', async () => {
+  it('編集とアーカイブは行の「…」の中', async () => {
     await act(async () => { root.render(<WebinarsPage />) })
     await flush()
 
     const edit = [...host.querySelectorAll('a')]
       .find((el) => el.getAttribute('href') === '/webinars/edit?id=webinar-5' && el.textContent?.includes('編集'))
-    expect(edit, '枠つき「編集」ボタンが見つかりません').toBeTruthy()
+    expect(edit, '行の右に編集ボタンを置かない').toBeUndefined()
 
     // 行に箱アイコンだけのボタンは置かない。
     expect(host.querySelector('button[aria-label="旧機能説明会をアーカイブ"]'), '箱アイコンの直置きが残っています').toBeNull()
@@ -107,6 +107,7 @@ describe('#641 ウェビナー一覧の行操作', () => {
     // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
     const menu = document.querySelector('[role="menu"]')
     expect(menu, 'メニューが開きません').toBeTruthy()
+    expect(menu!.textContent).toContain('編集')
     expect(menu!.textContent).toContain('アーカイブする')
   })
 
@@ -119,6 +120,7 @@ describe('#641 ウェビナー一覧の行操作', () => {
     act(() => { more.click() })
     const menu = document.querySelector('[role="menu"]')
     expect(menu, 'メニューが開きません').toBeTruthy()
+    expect(menu!.textContent).toContain('編集')
     expect(menu!.textContent).toContain('参加者を見る')
     expect(menu!.textContent).toContain('分析を見る')
     expect(menu!.textContent).toContain('コメント演出を開く')

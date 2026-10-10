@@ -265,9 +265,9 @@ describe('ウェビナーアクション参照検証 (N-116)', () => {
     // 403 ではなく 404 —— 別アカウントのウェビナーの存在自体を返さない。
   });
 
-  test('staff は owner/admin 限定なので403', async () => {
+  test('編集権限があるstaffは有効な参照を保存できる', async () => {
     const res = await put(WEBINAR_A, KEY_STAFF_A, [completed('add_tag', { tagId: TAG_A })]);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
   });
 
   test('保存済みの幽霊参照は公開前検証で failed になる', async () => {

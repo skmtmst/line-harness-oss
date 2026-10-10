@@ -1,4 +1,41 @@
 'use client'
+import TagPill from '@/components/shared/tag-pill'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useMemo, useState, type ReactNode } from 'react'
+import { CircleDashed, ClipboardList, Copy, FileText, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Inbox, Link2, MessageSquare, Pencil, Plus, Send, Sparkles, Ticket, Trash2, Unlink, Users } from 'lucide-react'
+import type { HqTemplateFolder, HqTemplateListStats, TemplateKind } from '@line-crm/shared'
+import { ListPage } from '@/components/templates'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
+import { describeFolderFailure } from '@/components/shared/folder-failure'
+import { notifyToast } from '@/components/shared/toast'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
+import EmptyList from '@/components/shared/empty-list'
+import FilterChip from '@/components/shared/filter-chip'
+import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
+import { deleteFolderDescription } from '@/components/shared/folder-row-actions'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import ListToolbar from '@/components/shared/list-toolbar'
+import Pagination from '@/components/shared/pagination'
+import { RowMenu, RowQuickAction } from '@/components/shared/row-actions'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
+import Select from '@/components/shared/select'
+import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { Tabs } from '@/components/shared/tabs'
+import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
+import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
+import { distributedAccountsLine, templateSubLine } from './list-row'
+import { AttributeTabs, OtherTabPanel, assignmentMethods, cleanupTagCount, matchesTagFilters, unusedTagCount, useAttributeTab, type TagUsageFilter } from './attribute-tabs'
+import storeStyles from '../templates/list.module.css'
+import hqStyles from './store-list.module.css'
+import attributeStyles from './attribute-tabs.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 統括のひな形の一覧を「店の同じ機能の一覧と同じ形」で出す（オーナー 2026-10-08・B-27〜B-29・B-34・B-36）。
@@ -11,46 +48,6 @@
  *   - 数の帯は配ったアカウントの数
  * 読み書き（一覧・分類・複製・削除・配る）は呼ぶ側（console.tsx）が今までどおり持つ。ここは見せ方と押した知らせだけ。
  */
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useMemo, useState, type ReactNode } from 'react'
-import {
-  CircleDashed, ClipboardList, Copy, FileText, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Inbox, Link2,
-  MessageSquare, Pencil, Plus, Send, Sparkles, Ticket, Trash2, Unlink, Users,
-} from 'lucide-react'
-import type { HqTemplateFolder, HqTemplateListStats, TemplateKind } from '@line-crm/shared'
-import { ListPage } from '@/components/templates'
-import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
-import { describeFolderFailure } from '@/components/shared/folder-failure'
-import { notifyToast } from '@/components/shared/toast'
-import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
-import EmptyList from '@/components/shared/empty-list'
-import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import { FolderDotName } from '@/components/shared/folder-dot'
-import TagPill from '@/components/shared/tag-pill'
-import { deleteFolderDescription } from '@/components/shared/folder-row-actions'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import ListToolbar from '@/components/shared/list-toolbar'
-import Pagination from '@/components/shared/pagination'
-import { RowMenu, RowQuickAction } from '@/components/shared/row-actions'
-import type { ActionMenuItem } from '@/components/shared/action-menu'
-import Select from '@/components/shared/select'
-import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { Tabs } from '@/components/shared/tabs'
-import { formatNumber } from '@/lib/format'
-import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
-import { distributedAccountsLine, templateSubLine } from './list-row'
-import { AttributeTabs, OtherTabPanel, assignmentMethods, cleanupTagCount, matchesTagFilters, unusedTagCount, useAttributeTab, type TagUsageFilter } from './attribute-tabs'
-import storeStyles from '../templates/list.module.css'
-import hqStyles from './store-list.module.css'
-import attributeStyles from './attribute-tabs.module.css'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
-import { formatDate as polishFormatDate } from '@/lib/format'
-import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value'
 
 /** 店のテンプレートと同じ6種類（上のタブ）。 */
 export const KIND_TABS: { kind: TemplateKind; label: string; icon: typeof MessageSquare }[] = [
@@ -143,6 +140,7 @@ export interface HqStoreListProps {
 }
 
 export default function HqStoreList(props: HqStoreListProps) {
+  const saveErrors = useSaveFormErrors()
   const {
     type, rows, ready, busy, canEdit, accountTotal, stats, kind, kindCounts, onKindChange, folders, folderLoadFailed, folderFilter, onFolderFilter,
     onAddFolder, onRenameFolder, onDeleteFolder, onReloadFolders, onCreate, onEdit, onOpen, onDistribute, onDistributeFolder, folderContents, onDuplicate, onRemove, notices, overlays,
@@ -263,19 +261,19 @@ export default function HqStoreList(props: HqStoreListProps) {
     { kind: 'unfiled' as const, id: 'none', label: '未分類', count: ready ? countIn('none') : null, leadingActions: leadingActions('none', '未分類') },
   ]
   const selectFolder = (id: string) => { onFolderFilter(id); setPage(1) }
-  const folderPanel = folderLoadFailed ? (
-    <p role="alert" className={storeStyles.folderNote}>フォルダを読み込めませんでした。ページを再読み込みしてください。</p>
-  ) : (
+  const folderPanel = (
     <FolderPanel
+      createAction={createButton(true)}
+      showHeading={!folderLoadFailed}
       activeId={folderFilter}
       onSelect={selectFolder}
-      onAddFolder={canEdit ? () => { setFolderError(''); setFolderNameError(''); setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setFolderDialog({ editing: null }) } : undefined}
+      onAddFolder={!folderLoadFailed && canEdit ? () => { setFolderError(''); setFolderNameError(''); setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setFolderDialog({ editing: null }) } : undefined}
       addFolderLabel="フォルダを追加"
-      rows={folderRows}
+      rows={folderLoadFailed ? [] : folderRows}
     >
-      <p className={storeStyles.folderNote}>
+      {folderLoadFailed ? <Notice tone="danger" className={storeStyles.folderNoteNoticePlacement}>フォルダを読み込めませんでした。ページを再読み込みしてください。</Notice> : <p className={storeStyles.folderNote}>
         {type === 'template' ? 'フォルダは種類のタブをまたいで使えます。消しても、中のテンプレートは未分類に残ります' : `フォルダを消しても、中の${words.item}は未分類に残ります`}
-      </p>
+      </p>}
     </FolderPanel>
   )
 
@@ -290,8 +288,10 @@ export default function HqStoreList(props: HqStoreListProps) {
       else await onAddFolder(name, folderColor)
       setFolderDialog(null)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       // 理由ごとに言い分ける（共通の describeFolderFailure）。入力した名前と色は残す。
-      const failure = describeFolderFailure(caught, 'save')
+      const failure = describeFolderFailure(caught, 'save');
+
       if (failure.kind === 'missing') {
         notifyToast(failure.message, { tone: 'error' })
         await onReloadFolders?.().catch(() => undefined)
@@ -299,8 +299,8 @@ export default function HqStoreList(props: HqStoreListProps) {
         return
       }
       if (failure.kind === 'conflict') await onReloadFolders?.().catch(() => undefined)
-      if (failure.nameError) setFolderNameError(failure.nameError)
-      else setFolderError(failure.message)
+      if (failure.nameError) { if (!fieldFailure) setFolderNameError(failure.nameError) }
+      else { if (!fieldFailure) setFolderError(failure.message) }
     } finally {
       setFolderBusy(false)
     }
@@ -313,7 +313,10 @@ export default function HqStoreList(props: HqStoreListProps) {
       await onDeleteFolder(latestFolder(deletingFolder))
       setDeletingFolder(null)
     } catch (caught) {
-      const failure = describeFolderFailure(caught, 'delete')
+      const fieldFailure = saveErrors.capture(caught);
+
+      const failure = describeFolderFailure(caught, 'delete');
+
       if (failure.kind === 'missing') {
         notifyToast(failure.message, { tone: 'error' })
         await onReloadFolders?.().catch(() => undefined)
@@ -321,7 +324,8 @@ export default function HqStoreList(props: HqStoreListProps) {
         return
       }
       if (failure.kind === 'conflict') await onReloadFolders?.().catch(() => undefined)
-      setFolderError(failure.message)
+      { if (!fieldFailure)
+      setFolderError(failure.message) }
     } finally {
       setFolderBusy(false)
     }
@@ -342,15 +346,15 @@ export default function HqStoreList(props: HqStoreListProps) {
           <>
           {type === 'tag' ? (
             <>
-              <Select aria-label="使用状態で絞り込む" width={145} value={tagUsage} onChange={(value) => { setTagUsage(value as TagUsageFilter); setPage(1) }} options={[
+              <SaveErrorField names={["tagUsage","tag_usage"]}><Select aria-label="使用状態で絞り込む" width={145} value={tagUsage} onChange={(value) => { setTagUsage(value as TagUsageFilter); setPage(1) }} options={[
                 { value: 'all', label: '使用状態：すべて' },
                 { value: 'used', label: '使用状態：付いている' },
                 { value: 'unused', label: '使用状態：未使用' },
-              ]} />
-              <Select aria-label="付け方で絞り込む" width={132} value={tagMethod} onChange={(value) => { setTagMethod(value); setPage(1) }} options={[
+              ]} /></SaveErrorField>
+              <SaveErrorField names={["tagMethod","tag_method"]}><Select aria-label="付け方で絞り込む" width={132} value={tagMethod} onChange={(value) => { setTagMethod(value); setPage(1) }} options={[
                 { value: 'all', label: '付け方：すべて' },
                 ...assignmentMethods(rows).map((method) => ({ value: method, label: `付け方：${method}` })),
-              ]} />
+              ]} /></SaveErrorField>
             </>
           ) : null}
           <div role="group" aria-label="配ったかで絞り込む" className={storeStyles.chipGroup}>
@@ -362,7 +366,7 @@ export default function HqStoreList(props: HqStoreListProps) {
         )}
         trailing={(
           <div className={storeStyles.perPageBox}>
-            <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZE_OPTIONS} />
+            <SaveErrorField names={["pageSize","page_size"]}><Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZE_OPTIONS} /></SaveErrorField>
           </div>
         )}
       />
@@ -470,23 +474,15 @@ export default function HqStoreList(props: HqStoreListProps) {
             const folder = folderOf(row.folder_id)
             const sub = templateSubLine(row, KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? words.item)
             return (
-              <Tr key={row.id} data-row-id={row.id} density="template">
+              <Tr key={row.id} data-row-id={row.id} density="template" onOpen={() => (onOpen ?? onEdit)(row)}>
                 {type === 'rich_menu' ? <Td className={storeStyles.cellPlain}>{rankOf.get(row.id) ?? emptyValue('unknown')}</Td> : null}
-                <NameCell
-                  name={(
+                <NameCell name={(
                     <div className={storeStyles.dotLine}>
-                      {type === 'tag' ? (
-                        canEdit ? <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>
-                          <TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} size="sm" />
-                        </button> : <TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} size="sm" />
-                      ) : <FolderDotName folder={folder ? { name: folder.name, color: folder.color } : null}>
-                        {canEdit ? (
-                          <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{row.name}</button>
-                        ) : <span className={storeStyles.cellTitle} ><TruncatedText value={String(row.name ?? '')} /></span>}
-                      </FolderDotName>}
+                      {canEdit ? (
+                        <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{row.name}</button>
+                      ) : <span className={storeStyles.cellTitle} title={row.name}>{row.name}</span>}
                     </div>
-                  )}
-                  sub={<span className={`${storeStyles.cellSub} ${storeStyles.dotIndent}`} title={sub}>{sub}</span>}
+                  )} folder={folder ? { name: folder.name, color: folder.color } : null}
                 />
                 {columns.map((column) => column.cell(row))}
                 {canEdit ? (
@@ -517,11 +513,12 @@ export default function HqStoreList(props: HqStoreListProps) {
   ) : <p className={storeStyles.pagerSolo}>{summary}</p>
 
   if (type === 'tag' && attribute.tab !== 'tags') {
-    return <OtherTabPanel tab={attribute.tab} title={words.title} description={words.description} onSelect={(key) => { attribute.select(key); setPage(1) }} />
+    return <SaveErrorScope errors={saveErrors}><OtherTabPanel tab={attribute.tab} title={words.title} description={words.description} onSelect={(key) => { attribute.select(key); setPage(1) }} /></SaveErrorScope>
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId={type === 'template' ? 'i0Ao0R' : type === 'form' ? 'wZPua' : type === 'tag' ? 'DzdC3' : type === 'rich_menu' ? 'noVq4' : 'LRc93'}
       headingSize="regular"
       title={words.title}
@@ -530,12 +527,12 @@ export default function HqStoreList(props: HqStoreListProps) {
       stats={(
         <KpiBand data-design="KPIs" className={storeStyles.kpiStrip}>
           {bandKpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={<span className={storeStyles.kpiDetailWrap}>{kpi.detail}</span>} />
+            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} />
           ))}
         </KpiBand>
       )}
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: selectFolder, createAction: createButton(false) ?? undefined }}
-      folders={<>{createButton(true) ?? <span className={storeStyles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
+      folders={folderPanel}
       toolbar={toolbar}
       pagination={pager}
       overlays={(
@@ -571,6 +568,6 @@ export default function HqStoreList(props: HqStoreListProps) {
     >
       {notices}
       {body}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

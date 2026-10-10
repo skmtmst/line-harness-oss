@@ -1,4 +1,25 @@
 'use client'
+import { notifySaved, notifyToast } from '@/components/shared/toast'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import type { Tag, TagGroup } from '@line-crm/shared'
+import { api, ApiError, describeSaveFailure, type TagDefinition, type TagDependencies } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
+import { folderCreateResult } from '@/components/shared/folder-select'
+import TargetMissing from '@/components/shared/target-missing'
+import { ArchivedTagEditor, DeleteDialog } from '@/components/friend-fields/edit-tag-page-v4'
+import { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
+import { describeTagDiff } from './conflict-diff'
+import styles from './edit.module.css'
+import { TagEditForm } from './edit-form'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 タグ：タグの編集（一から書いた画面・2026-10-07）。
@@ -10,37 +31,8 @@
  * 動き（読み込み・保存・さかのぼり反映の確認・競合・削除・アーカイブ）は今の画面（app/tags/edit-tag-page-v8）と同じ。
  */
 
-import { notifySaved } from '@/components/shared/toast'
-import { useCallback, useEffect, useRef, useState } from 'react'
-
-import { useRouter, useSearchParams } from 'next/navigation'
-
-import type { Tag, TagGroup } from '@line-crm/shared'
-import { api, ApiError, describeSaveFailure, type TagDefinition, type TagDependencies } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
-
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-
-import Notice from '@/components/shared/notice'
-
-import { folderCreateResult } from '@/components/shared/folder-select'
-import TargetMissing from '@/components/shared/target-missing'
-
-import { notifyToast } from '@/components/shared/toast'
-
-import { ArchivedTagEditor, DeleteDialog } from '@/components/friend-fields/edit-tag-page-v4'
-import { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
-import { describeTagDiff } from './conflict-diff'
-
-import styles from './edit.module.css'
-
-import { TagEditForm } from './edit-form'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
-
 export default function TagEditV8() {
+  const saveErrors = useSaveFormErrors()
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }])
   const router = useRouter()
   const params = useSearchParams()
@@ -69,7 +61,7 @@ export default function TagEditV8() {
   usePageTitle(tag?.name ?? 'タグを編集')
   /* 閲覧のみ（fkGUR）：役割が取れるまでは押せる形（最後の守りはサーバの 403）。 */
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const canEdit = canManageRole(staffRole)
   /* 競合（xn95q）：入力は捨てず、比べる・読み込むを選んでもらう。 */
   const [conflictValues, setConflictValues] = useState<TagEditorValues | null>(null)
   const [compareTarget, setCompareTarget] = useState<TagDefinition | null>(null)
@@ -116,13 +108,16 @@ export default function TagEditV8() {
       setTag({ ...detail.data.tag, friendCount: dependenciesResult.success ? dependenciesResult.data.friendCount : detail.data.tag.friendCount })
     } catch (caught) {
       if (!stillHere()) return
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 404) setTagMissing(true)
-      else setError('読み込みに失敗しました。もう一度読み込んでください。')
+      else { if (!fieldFailure)
+ setError('読み込みに失敗しました。もう一度読み込んでください。') }
       setDependenciesStatus((prev) => (prev === 'ready' ? prev : 'error'))
     } finally {
       if (stillHere()) setLoading(false)
     }
-  }, [tagId, selectedAccountId, targetKey])
+  }, [tagId, selectedAccountId, targetKey, saveErrors])
 
   useEffect(() => { setConflictValues(null); setCompareTarget(null); setCompareError(''); setCompareBusy(false); setSaving(false); setDeleting(false); setDeleteOpen(false); void load(); return () => { requestRef.current += 1 } }, [load])
 
@@ -163,8 +158,11 @@ export default function TagEditV8() {
       await load(true)
     } catch (reason) {
       if (!stillHere()) return
+      const fieldFailure = saveErrors.capture(reason);
+
       if (reason instanceof ApiError && reason.status === 409) setConflictValues(values)
-      else setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store'))
+      else { if (!fieldFailure)
+ setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store')) }
     } finally {
       if (targetRef.current === savingTarget && targetGenerationRef.current === targetGeneration) setSaving(false)
     }
@@ -190,9 +188,11 @@ export default function TagEditV8() {
       if (!stillHere()) return
       if (!detail.success) throw new Error(detail.error)
       setCompareTarget(detail.data)
-    } catch {
+    } catch (saveFailure) {
       if (!stillHere()) return
-      setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure)
+      setCompareError('最新の内容を取れませんでした。もう一度お試しください。') }
     } finally {
       if (stillHere()) setCompareBusy(false)
     }
@@ -210,32 +210,35 @@ export default function TagEditV8() {
       router.push('/tags')
     } catch (reason) {
       if (!stillHere()) return
-      setError(reason instanceof Error ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(reason)
+      { if (!fieldFailure)
+
+      setError(reason instanceof Error ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。') }
       setDeleteOpen(false)
     } finally {
       if (stillHere()) setDeleting(false)
     }
   }
 
-  if (loading) return <p className={styles.loading} role="status">読み込み中…</p>
+  if (loading) return <SaveErrorScope errors={saveErrors}><p className={styles.loading} role="status">読み込み中…</p></SaveErrorScope>
   if (!tagId) {
-    return <TargetMissing kind="unspecified" title="編集するタグが指定されていません" description="一覧から編集するタグを選び直してください。" backHref="/tags" backLabel="タグ一覧へ戻る" />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="unspecified" title="編集するタグが指定されていません" description="一覧から編集するタグを選び直してください。" backHref="/tags" backLabel="タグ一覧へ戻る" /></SaveErrorScope>
   }
-  if (!selectedAccountId) return <Notice tone="warn">LINE公式アカウントを選んでください。</Notice>
+  if (!selectedAccountId) return <SaveErrorScope errors={saveErrors}><Notice tone="warn">LINE公式アカウントを選んでください。</Notice></SaveErrorScope>
   if ((!tag || !definition) && (tagMissing || !error)) {
-    return <TargetMissing kind="not-found" title="このタグは見つかりません" description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。" accountName={selectedAccount?.name} backHref="/tags" backLabel="タグ一覧へ戻る" />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="not-found" title="このタグは見つかりません" description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。" accountName={selectedAccount?.name} backHref="/tags" backLabel="タグ一覧へ戻る" /></SaveErrorScope>
   }
   if (!tag || !definition) {
-    return <TargetMissing kind="error" title="タグを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void load()} />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="error" title="タグを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void load()} /></SaveErrorScope>
   }
   // アーカイブのタグは通常の編集を出さない（#710）。
   if (tag.status === 'archived') {
-    if (!canEdit) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
-    return <ArchivedTagEditor tag={tag} accountId={selectedAccountId} onCancel={() => router.push('/tags')} onSaved={(updated) => { if (targetRef.current === targetKey && targetGenerationRef.current === targetGeneration) setTag((current) => (current ? { ...current, ...updated } : current)) }} />
+    if (!canEdit) return <SaveErrorScope errors={saveErrors}><ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></SaveErrorScope>
+    return <SaveErrorScope errors={saveErrors}><ArchivedTagEditor tag={tag} accountId={selectedAccountId} onCancel={() => router.push('/tags')} onSaved={(updated) => { if (targetRef.current === targetKey && targetGenerationRef.current === targetGeneration) setTag((current) => (current ? { ...current, ...updated } : current)) }} /></SaveErrorScope>
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <TagEditForm
         key={`${targetKey}:${editorRevision}`}
         tag={tag}
@@ -277,7 +280,7 @@ export default function TagEditV8() {
             : <ul className={styles.diffList}>{lines.map((line, index) => <li key={index}>{line}</li>)}</ul>
         })() : null}
       </ConfirmDialog>
-    </>
+    </></SaveErrorScope>
   )
 }
 

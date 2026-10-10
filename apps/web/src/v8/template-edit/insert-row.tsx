@@ -16,6 +16,7 @@ import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { formatNumber } from '@/lib/format'
 import type { TemplateReferenceState, TemplateReferences } from './core'
 import styles from './edit.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export const DATE_OPTIONS = [
   { value: '{{date}}', label: '月日と曜日（8月20日(水)）' },
@@ -185,7 +186,7 @@ export default function InsertRow({
         onCancel={() => setTargetOpen(false)}
       >
         <div className={styles.dateRow}>
-          <DateField aria-label="日数を数える目標日" value={targetDate} onChange={setTargetDate} />
+          <SaveErrorField names={["targetDate","target_date"]}><DateField aria-label="日数を数える目標日" value={targetDate} onChange={setTargetDate} /></SaveErrorField>
         </div>
       </Dialog>
     </div>

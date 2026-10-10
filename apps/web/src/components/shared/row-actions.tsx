@@ -239,7 +239,7 @@ export function RowQuickAction({ label, ariaLabel, icon, onClick, title, ...rest
  * #985 LAY-18: 一覧の操作はアプリ全体で同じルールにする。
  *
  * - 「詳細」は右端操作欄の先頭。閲覧する画面がない機能には置かない。
- * - 「編集」は「詳細」の次。同じ枠付きの補助ボタン（共通 Button）。
+ * - 編集は行の「…」へ入れる（B-193）。
  * - 複製・停止・アーカイブなどは「⋯」へ同じ順序で集約する。
  * - 削除など元に戻せない操作は区切りの後・赤で必ず最後に置く。
  *   ただし実装・許可されている操作だけを出す。全機能に削除を足さない。
@@ -260,9 +260,13 @@ export type RowAction = {
 export type RowActionDestructiveItem = Omit<ActionMenuItem, 'tone' | 'dividerBefore'>
 
 export type RowActionsProps = {
+  /** 行うことなど、枠付きの小さなメニューを使う行。既定は一覧の枠なし。 */
+  menuAppearance?: RowMenuProps['appearance']
+  menuSize?: RowMenuProps['size']
+
   /** 先頭の操作。既定ラベルは「詳細」。 */
   detail?: RowAction
-  /** 2番目の操作。既定ラベルは「編集」。 */
+  /** 編集は「…」に入れる。許可されない場合は渡さない。 */
   edit?: RowAction
   /** 「⋯」に集約する複製・停止・アーカイブなど。 */
   menuItems?: ActionMenuItem[]
@@ -293,10 +297,12 @@ function RowActionButton({ action, defaultLabel }: { action: RowAction; defaultL
 }
 
 /**
- * 一覧行の右端に置く操作の並び。「詳細」「編集」の枠付きボタンと、
+ * 一覧行の右端に置く操作の並び。「詳細」のボタンと、編集を含む
  * それ以外を集約する「⋯」メニューを同じ順・同じ見た目で出す。
  */
 export function RowActions({
+  menuAppearance = 'plain',
+  menuSize,
   detail,
   edit,
   menuItems = [],
@@ -306,16 +312,25 @@ export function RowActions({
   menuButtonProps,
   className,
 }: RowActionsProps) {
+  const editItem: ActionMenuItem[] = edit ? [{
+    id: 'edit', label: edit.label ?? '編集する', disabled: edit.disabled,
+    disabledReason: edit.disabled ? 'ほかの操作を反映しています' : undefined,
+    onSelect: () => {
+      if (edit.href !== undefined) window.location.assign(edit.href)
+      else edit.onClick?.()
+    },
+  }] : []
+  const normalItems = [...editItem, ...menuItems.filter((item) => !edit || item.id !== 'edit')]
   const items: ActionMenuItem[] = destructiveItem
-    ? [...menuItems, { ...destructiveItem, tone: 'danger' }]
-    : menuItems
+    ? [...normalItems, { ...destructiveItem, tone: 'danger' }]
+    : normalItems
   return (
     <span className={[styles.rowActions, className].filter(Boolean).join(' ')}>
       {detail ? <RowActionButton action={detail} defaultLabel="詳細" /> : null}
-      {edit ? <RowActionButton action={edit} defaultLabel="編集" /> : null}
       {items.length > 0 ? (
         <RowMenu
-          appearance="plain"
+          appearance={menuAppearance}
+          size={menuSize}
           items={items}
           label={subjectName ? `${subjectName}のその他操作` : 'そのほかの操作'}
           menuLabel={subjectName ? `${subjectName}の操作` : '操作'}

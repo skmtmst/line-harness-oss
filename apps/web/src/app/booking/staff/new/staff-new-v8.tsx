@@ -1,18 +1,5 @@
 'use client'
-
-/*
- * ★V8「予約スタッフを登録」（板 CcA4k）。
- *
- * 白い板1枚：頭（←担当スタッフへ・題・説明）→ 中身（左＝4つの段
- * 「お客さまに見える情報」「予約を受けられるメニュー」「受付と表示」
- * 「ログインユーザーとのひも付け」＋キャンセル・登録ボタン、右＝LIFFの
- * 担当選択の見本）。
- *
- * 動き（登録→担当メニューの割当、割当だけ失敗したときの「割当をやり直す」、
- * 未保存の離脱確認、権限での閲覧のみ化、失敗時の扱い）は v7 の
- * /booking/staff/new と同じ。テーマが v7 のときはこのファイルは読まれず、
- * 従来の見た目が出る。
- */
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -27,10 +14,8 @@ import { SettingCheckbox } from '@/components/shared/checkbox'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
-import { canEditFeature } from '@/lib/staff-capability'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { createPageReturnHref } from '@/components/shared/create-page'
-/* R309: メニュー候補の料金は一覧・割当表と同じ共通表示にする。 */
 import { menuPriceLabel } from '../../lib/menu-price'
 import { LiffPhoneStaffStep } from '../../menus/liff-phone-v8'
 import shell from '../../menus/settings-v8.module.css'
@@ -38,8 +23,27 @@ import styles from './staff-new-v8.module.css'
 import TextLink from '@/components/shared/text-link'
 import { Field } from '@/components/shared/form-controls'
 import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8「予約スタッフを登録」（板 CcA4k）。
+ *
+ * 白い板1枚：頭（←担当スタッフへ・題・説明）→ 中身（左＝4つの段
+ * 「お客さまに見える情報」「予約を受けられるメニュー」「受付と表示」
+ * 「ログインユーザーとのひも付け」＋キャンセル・登録ボタン、右＝LIFFの
+ * 担当選択の見本）。
+ *
+ * 動き（登録→担当メニューの割当、割当だけ失敗したときの「割当をやり直す」、
+ * 未保存の離脱確認、権限での閲覧のみ化、失敗時の扱い）は v7 の
+ * /booking/staff/new と同じ。テーマが v7 のときはこのファイルは読まれず、
+ * 従来の見た目が出る。
+ */
+
+/* R309: メニュー候補の料金は一覧・割当表と同じ共通表示にする。 */
 
 export default function StaffNewV8() {
+  const saveErrors = useSaveFormErrors()
   const { selectedAccountId, selectedAccount } = useAccount()
   const router = useRouter()
   // /booking/staff/new はメニューの接頭辞に当たらず上部バーが空になるため、画面名を明示する。
@@ -172,8 +176,7 @@ export default function StaffNewV8() {
   }
 
   // N-411: 予約スタッフ登録は 'booking.settings' の実効permission必須。
-  const [canManageStaff] = useState(() =>
-    typeof window === 'undefined' ? true : canEditFeature('booking.settings'))
+  const canManageStaff = usePermissionAccess('booking.settings')
 
   /*
    * 登録途中の離脱確認。名前・表示名・肩書き・写真・紹介文・メニュー割当・
@@ -253,7 +256,8 @@ export default function StaffNewV8() {
             override_price: null,
           })),
         )
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
         // スタッフ自体は残っている。IDを控えて割当のやり直しに備える。
         setCreatedStaffId(staffId)
         throw new Error('スタッフは登録できましたが、担当メニューの設定に失敗しました。入力は残っています。「割当をやり直す」を押してください。')
@@ -261,9 +265,12 @@ export default function StaffNewV8() {
       setCreatedStaffId(null)
       router.push(createPageReturnHref('/booking/menus?tab=staff', staffId))
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure)
       setSaveError(e instanceof Error && e.message && !/^API error: /.test(e.message)
         ? e.message
-        : 'スタッフを登録できませんでした。入力は残っています。もう一度お試しください。')
+        : 'スタッフを登録できませんでした。入力は残っています。もう一度お試しください。') }
     } finally {
       setSaving(false)
     }
@@ -276,7 +283,7 @@ export default function StaffNewV8() {
 
   if (!canManageStaff) {
     return (
-      <div className={shell.shell} data-design-node="CcA4k">
+      <SaveErrorScope errors={saveErrors}><div className={shell.shell} data-design-node="CcA4k">
         <div className="mx-auto max-w-2xl p-6">
           <ListState
             kind="error"
@@ -284,7 +291,7 @@ export default function StaffNewV8() {
             description="予約スタッフの登録は、予約設定の権限を持つログインユーザーだけが実行できます。管理者へ権限の確認を依頼してください。"
           />
         </div>
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
@@ -309,7 +316,7 @@ export default function StaffNewV8() {
     ?? null
 
   return (
-    <div className={shell.shell} data-design-node="CcA4k">
+    <SaveErrorScope errors={saveErrors}><div className={shell.shell} data-design-node="CcA4k">
       <header className={shell.boardHead} data-design="Head">
         <Link href="/booking/menus?tab=staff" className={shell.backLink}>← 担当スタッフへ</Link>
         <PageHeading title="予約スタッフを登録" help={<> お客さまが予約するときに指名できる担当者を登録します。</>} />
@@ -324,7 +331,7 @@ export default function StaffNewV8() {
               <h2 className={shell.sectionTitle}>お客さまに見える情報</h2>
             </div>
             <div className={styles.fieldGrid}>
-              <Field label="スタッフ名（管理画面での呼び名）"><input
+              <Field label="スタッフ名（管理画面での呼び名）"><SaveErrorField names={["name"]}><input
                   id="bs-name"
                   type="text"
                   value={name}
@@ -341,11 +348,11 @@ export default function StaffNewV8() {
                   placeholder="例：田中 美咲"
                   className={styles.input}
                   aria-invalid={fieldErrors.name !== undefined}
-                />
+                /></SaveErrorField>
 {fieldErrors.name !== undefined ? (
                   <span className={styles.formError} role="alert">{fieldErrors.name}</span>
                 ) : null}</Field>
-              <Field label="お客さま向けの表示名（空欄なら上の名前）"><input
+              <Field label="お客さま向けの表示名（空欄なら上の名前）"><SaveErrorField names={["displayName","display_name"]}><input
                   id="bs-display"
                   type="text"
                   value={displayName}
@@ -353,8 +360,8 @@ export default function StaffNewV8() {
                   maxLength={BOOKING_STAFF_LIMITS.displayName}
                   placeholder="例：みさき"
                   className={styles.input}
-                /></Field>
-              <Field label="肩書き"><input
+                /></SaveErrorField></Field>
+              <Field label="肩書き"><SaveErrorField names={["role"]}><input
                   id="bs-role"
                   type="text"
                   value={role}
@@ -362,8 +369,8 @@ export default function StaffNewV8() {
                   maxLength={BOOKING_STAFF_LIMITS.role}
                   placeholder="例：トリミング担当"
                   className={styles.input}
-                /></Field>
-              <Field label="顔写真（正方形・1MB まで）"><input
+                /></SaveErrorField></Field>
+              <Field label="顔写真（正方形・1MB まで）"><SaveErrorField names={["imageUrl","profile_image_url","image_url"]}><input
                   id="bs-image"
                   type="url"
                   value={imageUrl}
@@ -371,8 +378,8 @@ export default function StaffNewV8() {
                   maxLength={BOOKING_STAFF_LIMITS.profileImageUrl}
                   placeholder="https://…/misaki.jpg"
                   className={styles.input}
-                /></Field>
-              <Field label="紹介文"><textarea
+                /></SaveErrorField></Field>
+              <Field label="紹介文"><SaveErrorField names={["bio"]}><textarea
                   id="bs-bio"
                   rows={3}
                   value={bio}
@@ -380,7 +387,7 @@ export default function StaffNewV8() {
                   maxLength={BOOKING_STAFF_LIMITS.bio}
                   placeholder="例：トリミング歴10年。小型犬が得意です。"
                   className={styles.input}
-                /></Field>
+                /></SaveErrorField></Field>
             </div>
           </section>
 
@@ -458,22 +465,22 @@ export default function StaffNewV8() {
                 </span>
               </div>
               <div className={styles.switchRow}>
-                <SettingCheckbox
+                <SaveErrorField names={["isDesignationOptional","is_designation_optional"]}><SettingCheckbox
                   label="「指名なし」の枠にも含める"
                   checked={isDesignationOptional}
                   onChange={setIsDesignationOptional}
-                />
+                /></SaveErrorField>
                 <span className={styles.switchLabel}>
                   「指名なし」の枠にも含める
                   <span className={styles.switchNote}>お客さまが担当者を選ばなかったときの割り当て先になります。</span>
                 </span>
               </div>
               <div className={styles.switchRow}>
-                <SettingCheckbox
+                <SaveErrorField names={["isActive","is_active"]}><SettingCheckbox
                   label="登録したらすぐ予約を受ける"
                   checked={isActive}
                   onChange={setIsActive}
-                />
+                /></SaveErrorField>
                 <span className={styles.switchLabel}>
                   登録したらすぐ予約を受ける
                   <span className={styles.switchNote}>オフにすると予約画面に出ません。</span>
@@ -514,7 +521,7 @@ export default function StaffNewV8() {
                 onRetry={() => setMembersReloadKey((value) => value + 1)}
               />
             ) : (
-              <Field label="ログインユーザー"><Select
+              <Field label="ログインユーザー"><SaveErrorField names={["staffMemberId","staff_member_id"]}><Select
                   aria-label="ログインユーザーとの紐づけ"
                   id="bs-member"
                   size="full"
@@ -524,7 +531,7 @@ export default function StaffNewV8() {
                     { value: '', label: '紐づけない' },
                     ...members.map((m) => ({ value: m.id, label: `${m.name}${m.email ? `（${m.email}）` : ''}` })),
                   ]}
-                /></Field>
+                /></SaveErrorField></Field>
             )}
           </section>
 
@@ -572,6 +579,6 @@ export default function StaffNewV8() {
       </div>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したスタッフ" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div>
+    </div></SaveErrorScope>
   )
 }

@@ -1,5 +1,7 @@
 'use client'
 
+import { hasDeliveryAccess } from '@line-crm/shared'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   Folder,
@@ -316,7 +318,7 @@ function MediaLibraryInner() {
         return
       }
       setMediaManagementPermission(
-        response.data.role === 'owner' || response.data.role === 'admin' ? 'allowed' : 'denied',
+        hasDeliveryAccess(response.data, 'contents', 'edit') ? 'allowed' : 'denied',
       )
     }).catch(() => {
       if (active) setMediaManagementPermission('error')

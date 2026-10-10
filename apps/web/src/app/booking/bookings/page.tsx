@@ -3,13 +3,16 @@ import ReservationBoard from '@/components/shared/reservation-board'
 import {peopleBoardEntry} from '@line-crm/shared'
 import {reservationBoardApi,allBoardPages} from '@/lib/api-reservation-board'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { PageHeading } from '@/components/templates/page-frame'
+import { BookingPage } from '@/components/templates/booking-page'
+import SegmentedControl from '@/components/shared/segmented'
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { X } from 'lucide-react'
+import { Phone, X } from 'lucide-react'
 import { api, bookingApi, ApiError, type BookingAdminDetail, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -861,52 +864,24 @@ export default function BookingsPage() {
   const weekCount = summary.weekTabTotal ?? summary.weekTotal
   const monthCount = summary.monthTabTotal ?? kpi.total
 
-  const pageHead = (
+  const headingActions = (
     <>
-      <div className="v8-only"><PageHeading title="予約管理" /></div>
-      <div data-design="Toolbar" className="flex flex-wrap items-center justify-between gap-3">
-        <nav className="text-ink-faint text-xs" aria-label="パンくず">
-          <span>予約</span>
-          <span className="mx-1.5">/</span>
-          <span>予約管理</span>
-        </nav>
-      </div>
-      <nav aria-label="予約の表示" className="border-hairline flex items-center gap-7 border-b">
-        {/*
-          ★V7：集計が取れていない間、タブの件数に 0 を出さない。件数は出さない。
-        */}
-        {([
-          ['day', summaryReady ? `今日 ${todayCount}` : '今日'],
-          ['week', summaryReady ? `今週 ${weekCount}` : '今週'],
-          ['month', summaryReady ? `今月 ${monthCount}` : '今月'],
-          ['list', '一覧'],
-        ] as const).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setView(key)}
-            /* R315: 選んでいる表示を色だけでなく意味でも伝える。 */
-            aria-pressed={view === key}
-            className={`border-b-2 px-1 py-3 text-sm font-semibold ${
-              view === key ? 'border-accent text-accent-deep' : 'border-transparent text-ink-secondary'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
+      <SegmentedControl
+        aria-label="予約の表示"
+        size="booking"
+        value={view}
+        onChange={setView}
+        options={[
+          { value: 'day', label: '今日', count: summaryReady ? todayCount : undefined },
+          { value: 'week', label: '今週', count: summaryReady ? weekCount : undefined },
+          { value: 'month', label: '今月', count: summaryReady ? monthCount : undefined },
+          { value: 'list', label: '一覧' },
+        ]}
+      />
+      {canOperate ? <Button variant="primary" size="booking" href="/booking/bookings/new"><Phone size={16} aria-hidden="true" />電話の予約を入れる</Button> : null}
     </>
   )
-
-  /*
-   * 作る操作は一覧のすぐ上の左の並びへ。見出しの行の右端には置かない。
-   * N-401: 閲覧のみの人には代理予約の入口を出さない。
-   */
-  const createRow = canOperate ? (
-    <div className="mb-3 flex flex-wrap items-center gap-2">
-      <Button variant="primary" href="/booking/bookings/new">電話の予約を入れる</Button>
-    </div>
-  ) : null
+  const pageHead = <PageHeading title="予約管理" actions={headingActions} />
 
   const dialogs = (
     <>
@@ -947,9 +922,7 @@ export default function BookingsPage() {
   {/* 帯同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
   if (view === 'day' || view === 'week') {
     return (
-      <div className="flex flex-col gap-4" data-design-node="acRIl">
-        {pageHead}
-        {createRow}
+      <BookingPage title="予約管理" actions={headingActions}>
         {/*
           ★V7 `x63W5x`：同じ失敗を1画面に1つへ。失敗の1枚はカレンダーの場所に
           出す（#634 の読み直す口は保つ）。一覧が読めている間はカレンダーを出す。
@@ -976,7 +949,7 @@ export default function BookingsPage() {
           />
         )}
         {dialogs}
-      </div>
+      </BookingPage>
     )
   }
 
@@ -1026,7 +999,6 @@ export default function BookingsPage() {
         />
       </KpiBand>
 
-      {createRow}
 
       {/* R90: 今月の表示では対象の期間と状態を明示する。 */}
       {view === 'month' ? (
@@ -1098,13 +1070,13 @@ export default function BookingsPage() {
                   今週
                 </Button>
                 {/* N-398: 担当者と種別（予約経路）の絞り込み。一覧と件数の両方に効く。 */}
-                <Select
+                <EntitySelect
                   aria-label="担当者で絞り込む"
                   value={staffFilter}
                   onChange={setStaffFilter}
                   options={[
                     { value: 'all', label: '担当: すべて' },
-                    ...staffList.map((item) => ({ value: item.id, label: item.display_name })),
+                    ...staffList.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.display_name })),
                   ]}
                 />
                 <Select
@@ -1162,7 +1134,7 @@ export default function BookingsPage() {
                   kind="empty"
                   title="まだ予約はありません"
                   description="予約が入ると、ここに日時とお客さまが並びます。"
-                  action={canOperate ? <Button variant="primary" href="/booking/bookings/new">電話の予約を入れる</Button> : undefined}
+                  action={canOperate ? <Button variant="primary" size="booking" href="/booking/bookings/new">電話の予約を入れる</Button> : undefined}
                 />
               )}
             </div>

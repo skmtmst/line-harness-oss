@@ -33,37 +33,43 @@ const SESSION = {
   lh_selected_account: 'visual-qa-account',
 }
 
-export async function openPage(browser, { baseUrl, route, width, theme, stable = false }) {
+export async function openPage(browser, { baseUrl, route, width, theme, stable = false, settleMs = 2500, onPageError }) {
   const page = await browser.newPage({
     viewport: { width, height: 900 },
     ...(stable ? { reducedMotion: 'reduce' } : {}),
   })
-  if (stable) await page.clock.setFixedTime(new Date('2026-10-01T05:00:00Z'))
-  await page.addInitScript(([session, t]) => {
-    for (const [k, v] of Object.entries(session)) localStorage.setItem(k, v)
-    localStorage.setItem('lh_auth_selection_cleared', '1')
-    localStorage.setItem('lh-admin-theme', t)
-  }, [SESSION, theme])
-  await page.goto(new URL(route, baseUrl).toString())
-  if (stable) {
-    await page.addStyleTag({
-      /*
-       * タブ帯の「続きがある」ぼかし（`data-scroll-hint`・`data-tab-fade`）は、
-       * はみ出しの実測で出る・出ないが決まる。タブ名の幅が書体で1px前後
-       * するため、撮る時刻で出たり出なかったりし、v7 友だち詳細の右上だけ
-       * 違う誤検知になっていた（c-base/c-head）。飾りで判定に要らないので
-       * 比較撮影では隠す。はみ出し自体の見張りは layout-overflow が担う。
-       */
-      content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}[data-scroll-hint],[data-tab-fade]{display:none!important}',
-    })
-  }
-  await page.waitForTimeout(2500)
-  // Webフォントの読み込み待ち。来る前と来た後で文字の濃さが変わり、
-  // 画素比べがぶれる（v7 友だち詳細の右上の「マイ」など時々違う）。
   try {
-    await page.evaluate(() => document.fonts.ready.then(() => true))
-  } catch {
-    /* フォントなし環境では待たない */
+    if (onPageError) page.on('pageerror', onPageError)
+    if (stable) await page.clock.setFixedTime(new Date('2026-10-01T05:00:00Z'))
+    await page.addInitScript(([session, t]) => {
+      for (const [k, v] of Object.entries(session)) localStorage.setItem(k, v)
+      localStorage.setItem('lh_auth_selection_cleared', '1')
+      localStorage.setItem('lh-admin-theme', t)
+    }, [SESSION, theme])
+    await page.goto(new URL(route, baseUrl).toString())
+    if (stable) {
+      await page.addStyleTag({
+        /*
+         * タブ帯の「続きがある」ぼかし（`data-scroll-hint`・`data-tab-fade`）は、
+         * はみ出しの実測で出る・出ないが決まる。タブ名の幅が書体で1px前後
+         * するため、撮る時刻で出たり出なかったりし、v7 友だち詳細の右上だけ
+         * 違う誤検知になっていた（c-base/c-head）。飾りで判定に要らないので
+         * 比較撮影では隠す。はみ出し自体の見張りは layout-overflow が担う。
+         */
+        content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}[data-scroll-hint],[data-tab-fade]{display:none!important}',
+      })
+    }
+    await page.waitForTimeout(settleMs)
+    // Webフォントの読み込み待ち。来る前と来た後で文字の濃さが変わり、
+    // 画素比べがぶれる（v7 友だち詳細の右上の「マイ」など時々違う）。
+    try {
+      await page.evaluate(() => document.fonts.ready.then(() => true))
+    } catch {
+      /* フォントなし環境では待たない */
+    }
+    return page
+  } catch (error) {
+    await page.close()
+    throw error
   }
-  return page
 }

@@ -8,7 +8,7 @@ import {
   NEN_PET_NAME_MAX_LENGTH,
 } from '@line-crm/shared';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireRole, requireDeliveryAccess } from '../middleware/role-guard.js';
 import {
   type CampaignRow,
   NEN_CAMPAIGN_FORM_ISSUE_LABELS,
@@ -244,7 +244,7 @@ function readCampaignSettingUpdatedAt(raw: string | null, fallback: string): str
   }
 }
 
-nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary(), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const key = c.req.param('campaignKey');
@@ -408,7 +408,7 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner'
 // いる場合に停止すらできなくなる（#659差し戻し2点目）。停止は本文の長さに
 // 関わらず必ず実行できる必要があるため、is_enabled以外は今の値のまま
 // 変えず、本文の長さ検査も行わない。
-nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey/enabled', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey/enabled', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary(), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const key = c.req.param('campaignKey');
@@ -468,7 +468,7 @@ function applyCampaignDraft(campaign: CampaignRow, draft: NenCampaignDraft | und
   return { ...campaign, title, body_text: bodyText, button_label: buttonLabel, button_url: buttonUrl, image_url: imageUrl };
 }
 
-nenCampaigns.post('/api/nen-campaigns/test-send', requireRole('owner', 'admin'), inputJsonBoundary({"campaignKey":["string"],"accountId":["string"],"friendId":["string"],"draft":["object"]}), async (c) => {
+nenCampaigns.post('/api/nen-campaigns/test-send', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary({"campaignKey":["string"],"accountId":["string"],"friendId":["string"],"draft":["object"]}), async (c) => {
   const body = await c.req.json<{ campaignKey?: string; accountId?: string; friendId?: string; draft?: NenCampaignDraft }>().catch(() => null);
   if (!body?.campaignKey || !CAMPAIGN_KEYS.has(body.campaignKey) || !body.accountId || !body.friendId) {
     return inputError(c, { success: false, error: 'campaignKey, accountId and friendId are required' }, 400, ["campaignKey","accountId","friendId"]);
@@ -601,7 +601,7 @@ nenCampaigns.get('/api/nen-campaigns/deliveries/:id', requireRole('owner', 'admi
   }
 });
 
-nenCampaigns.post('/api/nen-campaigns/deliveries/:id/retry', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+nenCampaigns.post('/api/nen-campaigns/deliveries/:id/retry', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary(), async (c) => {
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   const accountId = typeof body?.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
   if (!accountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
@@ -666,7 +666,7 @@ nenCampaigns.get('/api/nen-campaigns/columns-preview', requireRole('owner', 'adm
   }
 });
 
-nenCampaigns.post('/api/nen-campaigns/columns', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+nenCampaigns.post('/api/nen-campaigns/columns', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary(), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
 
@@ -727,7 +727,7 @@ nenCampaigns.post('/api/nen-campaigns/columns', requireRole('owner', 'admin'), i
   return c.json({ success: true, data: { id, queued: 0 } }, 201);
 });
 
-nenCampaigns.post('/api/nen-campaigns/columns/:id/duplicate', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"]}), async (c) => {
+nenCampaigns.post('/api/nen-campaigns/columns/:id/duplicate', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary({"accountId":["string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string }>().catch(() => null);
   if (!body?.accountId || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
@@ -773,7 +773,7 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/duplicate', requireRole('owner
   }
 });
 
-nenCampaigns.post('/api/nen-campaigns/columns/:id/test-send', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"friendId":["string"]}), async (c) => {
+nenCampaigns.post('/api/nen-campaigns/columns/:id/test-send', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary({"accountId":["string"],"friendId":["string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string; friendId?: string }>().catch(() => null);
   if (!body?.accountId || !body.friendId) {
     return inputError(c, { success: false, error: 'accountId and friendId are required' }, 400, ["accountId","friendId"]);
@@ -832,7 +832,7 @@ nenCampaigns.post(
   },
 );
 
-nenCampaigns.post('/api/nen-campaigns/deliveries/pending-now', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"expectedCount":["number"]}), async (c) => {
+nenCampaigns.post('/api/nen-campaigns/deliveries/pending-now', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary({"accountId":["string"],"expectedCount":["number"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string; expectedCount?: number }>().catch(() => null);
   if (!body?.accountId || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
@@ -848,7 +848,7 @@ nenCampaigns.post('/api/nen-campaigns/deliveries/pending-now', requireRole('owne
   }
 });
 
-nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"scheduledAt":["string"]}), async (c) => {
+nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary({"accountId":["string"],"scheduledAt":["string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string; scheduledAt?: string }>().catch(() => null);
   if (!body?.accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
@@ -876,7 +876,7 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireRole('owner',
   return c.json({ success: true, data: { queued } });
 });
 
-nenCampaigns.put('/api/nen-campaigns/columns/:id/message', requireRole('owner', 'admin'), inputJsonBoundary({"introText":["string"],"expectedUpdatedAt":["string"]}), async (c) => {
+nenCampaigns.put('/api/nen-campaigns/columns/:id/message', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary({"introText":["string"],"expectedUpdatedAt":["string"]}), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const body = await c.req.json<{ introText?: string; expectedUpdatedAt?: string }>().catch(() => null);
@@ -1077,7 +1077,7 @@ async function findPetById(db: D1Database, id: string) {
   }>();
 }
 
-nenCampaigns.post('/api/nen-campaigns/pets', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+nenCampaigns.post('/api/nen-campaigns/pets', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary(), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
@@ -1133,7 +1133,7 @@ nenCampaigns.post('/api/nen-campaigns/pets', requireRole('owner', 'admin'), inpu
   return c.json({ success: true, data: { id } }, 201);
 });
 
-nenCampaigns.put('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), inputJsonBoundary({"expectedUpdatedAt":["string"]}), async (c) => {
+nenCampaigns.put('/api/nen-campaigns/pets/:id', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary({"expectedUpdatedAt":["string"]}), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const body = await c.req.json<Record<string, unknown> & { expectedUpdatedAt?: string }>().catch(() => null);
@@ -1214,7 +1214,7 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), i
   return c.json({ success: true, data: { updatedAt: petNewUpdatedAt } });
 });
 
-nenCampaigns.delete('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), async (c) => {
+nenCampaigns.delete('/api/nen-campaigns/pets/:id', requireDeliveryAccess('nenCampaigns'), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const pet = await c.env.DB.prepare(`SELECT p.friend_id, f.line_account_id FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id WHERE p.id = ?`)
@@ -1242,7 +1242,7 @@ nenCampaigns.get('/api/nen-campaigns/birthday-coupon', async (c) => {
   } });
 });
 
-nenCampaigns.put('/api/nen-campaigns/birthday-coupon', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+nenCampaigns.put('/api/nen-campaigns/birthday-coupon', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary(), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
@@ -1297,7 +1297,7 @@ async function resolveSoleActiveAccountId(db: D1Database): Promise<string | null
  * ★V6 37-6-A「ECのコラムを取り込む」。EC で保存されたコラムは Webhook で自動的に届くが、
  * 宛先が決められなかった分（アカウントが複数ある・古いコラム）がここに残る。
  */
-nenCampaigns.post('/api/nen-campaigns/columns/import', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+nenCampaigns.post('/api/nen-campaigns/columns/import', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary(), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const account = await getLineAccountById(c.env.DB, accountId);

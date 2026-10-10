@@ -1,14 +1,5 @@
 'use client'
-
-/*
- * ★V8 成果とアフィリエイト「成果承認」（板 `OylSV`、まとめて操作は `hadfk`）。
- *
- * app/affiliates/v8-approvals-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で
- * 組み直した。データの口・操作は今と同じ（承認の全件読み・続きの読み込み・認める・
- * 却下・まとめて判断・付帯動作のやり直し・成果の詳細と成果の付け方・CSV）。
- * 行の右端は「認める」と「…」（認める・認めない・付帯動作をやり直す・詳細を見る）。
- * 左のチェックで選ぶと下から一括バー →「操作を選ぶ」（hadfk）→ 確かめる → 結果。
- */
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -57,6 +48,17 @@ import {
 import styles from './affiliates.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 成果とアフィリエイト「成果承認」（板 `OylSV`、まとめて操作は `hadfk`）。
+ *
+ * app/affiliates/v8-approvals-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で
+ * 組み直した。データの口・操作は今と同じ（承認の全件読み・続きの読み込み・認める・
+ * 却下・まとめて判断・付帯動作のやり直し・成果の詳細と成果の付け方・CSV）。
+ * 行の右端は「認める」と「…」（認める・認めない・付帯動作をやり直す・詳細を見る）。
+ * 左のチェックで選ぶと下から一括バー →「操作を選ぶ」（hadfk）→ 確かめる → 結果。
+ */
 
 type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 type BulkOutcome = 'approved' | 'rejected'
@@ -412,7 +414,7 @@ export default function ApprovalsTab() {
           <TableHeadRow className={styles.headRow} data-table-layout="columns">
             <Th className={styles.colCheck}>
               {canSelect ? (
-                <Checkbox
+                <SaveErrorField names={["allSafeSelected","selected","all_safe_selected"]}><Checkbox
                   aria-label="このページの確認不要な成果をすべて選ぶ"
                   checked={allSafeSelected}
                   onCheckedChange={(checked) => setSelected((current) => {
@@ -423,7 +425,7 @@ export default function ApprovalsTab() {
                     }
                     return next
                   })}
-                />
+                /></SaveErrorField>
               ) : null}
             </Th>
             <Th className={styles.colName}>友だちと、成果が出た時刻</Th>
@@ -436,15 +438,15 @@ export default function ApprovalsTab() {
           </TableHeadRow>
         </thead>
         <tbody>
-          {pagedItems.map((item) => {
+          {pagedItems.map((item, saveFieldIndex) => {
             const reasons = approvalReviewReasons(item)
             const needsReview = reasons.length > 0
             const pending = item.approvalStatus === 'pending'
             return (
-              <Tr key={item.eventId} className={styles.row} data-table-layout="columns">
+              <Tr key={item.eventId} className={styles.row} data-table-layout="columns" onOpen={() => setDetailItem(item)}>
                 <Td className={styles.colCheck}>
                   {canSelect ? (
-                    <Checkbox
+                    <SaveErrorField names={[`pagedItems.${saveFieldIndex}.eventId`,`pagedItems.${saveFieldIndex}.event_id`,"eventId","item.eventId","selected","event_id","id","item.event_id"]}><Checkbox
                       aria-label={`${personName(item.friendName)}の成果を選ぶ`}
                       checked={selected.has(item.eventId)}
                       disabled={needsReview}
@@ -455,15 +457,15 @@ export default function ApprovalsTab() {
                         else next.delete(item.eventId)
                         return next
                       })}
-                    />
+                    /></SaveErrorField>
                   ) : null}
                 </Td>
-                <Td className={styles.colName}>
+                <Td className={styles.colName}><FolderDotName>
                   <span className={styles.stack}>
-                    <button type="button" className={styles.rowName} title={personName(item.friendName)}  onClick={() => setDetailItem(item)}>{personName(item.friendName)}</button>
-                    <span className={styles.rowPlan}>{`${formatMonthDayTime(item.createdAt)} に成果`}</span>
+                    <button type="button" className={styles.rowName} title={personName(item.friendName)} onClick={() => setDetailItem(item)}>{personName(item.friendName)}</button>
+
                   </span>
-                </Td>
+                </FolderDotName></Td>
                 <Td className={styles.colApAffiliate}><span className={styles.cellNum} title={item.affiliateName ?? undefined}>{item.affiliateName ?? '名前を読み込めませんでした'}</span></Td>
                 <Td className={styles.colApAccount}><span className={styles.cellNum} title={item.lineAccountName ?? undefined}>{item.lineAccountName ?? 'アカウント未設定'}</span></Td>
                 <Td className={styles.colApOffer}>

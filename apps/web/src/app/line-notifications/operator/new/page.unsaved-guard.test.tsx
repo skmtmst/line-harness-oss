@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * Devin 監査：重い入力画面（条件・宛先・公開設定）なのに、やめる操作で
  * 確認なしに入力が消えていた。入力後にやめるを押すと共通窓で止め、
@@ -27,7 +29,6 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
 }))
-vi.mock('@/lib/staff-capability', () => ({ isOwnerOrAdmin: () => true }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined, useSettingsNavInline: () => undefined }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
@@ -50,6 +51,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   fixture.push.mockClear()
   fixture.previewRecipients.mockReset()
   fixture.previewRecipients.mockResolvedValue({ success: true, data: { items: [] } })

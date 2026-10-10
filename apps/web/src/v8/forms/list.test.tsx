@@ -1,19 +1,26 @@
+
+import React, { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
+import FormsListV8 from './list'
+
+;
 // @vitest-environment happy-dom
 /*
  * V8 回答フォーム一覧（src/v8/forms）の動きの試験。BEHAVIOR.md の「今までと変えたところ」を守る。
  * 未分類の件数・閲覧のみの帯と押せない「フォルダを追加」・行の「…」の読み上げ名・1152 で保存先を出さない・表示件数 10/20/50。
  */
-import React, { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
-})
+});
 
 const fetchApi = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
+const unarchive = vi.hoisted(() => vi.fn())
 const listStats = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const narrow = vi.hoisted(() => ({ value: false }))
@@ -24,41 +31,39 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   return {
     ...actual,
     fetchApi,
-    api: { ...api, folders: { ...api.folders, list: listFolders }, listStats: { get: listStats } },
+    api: { ...api, forms: { ...api.forms, unarchive }, folders: { ...api.folders, list: listFolders }, listStats: { get: listStats } },
   }
-})
+});
 
 vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
     React.createElement('a', { href, ...rest }, children),
-}))
+}));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
-}))
+}));
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: { id: 'account-a', liffId: 'liff-a' }, loading: false }),
-}))
+}));
 
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
   usePageCrumbs: () => {},
-}))
+}));
 
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
   return { ...actual, useStaffRole: () => role.value }
-})
+});
 
 vi.mock('@/lib/use-narrow-viewport', () => ({
   useNarrowViewport: () => narrow.value,
-}))
+}));
 
-import FormsListV8 from './list'
-
-;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 let host: HTMLDivElement
 let root: Root
@@ -93,6 +98,8 @@ async function mount() {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/form-submissions')
+  forgetStaffIdentity()
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -106,6 +113,8 @@ beforeEach(() => {
   Object.defineProperty(window, 'localStorage', { value: storage, configurable: true })
   window.localStorage.setItem('lh_staff_role', 'owner')
   narrow.value = false
+  unarchive.mockReset()
+  unarchive.mockResolvedValue({ success: true, data: { status: 'active', revision: 2, isActive: false } })
   fetchApi.mockReset()
   fetchApi.mockImplementation(async (path: string) => {
     if (path.startsWith('/api/forms?')) {
@@ -117,12 +126,12 @@ beforeEach(() => {
   listFolders.mockResolvedValue({ success: true, data: [{ id: 'fol-1', kind: 'form', name: '来店・予約', itemCount: 6, displayOrder: 0, color: null }], unfiledCount: 3 })
   listStats.mockReset()
   listStats.mockResolvedValue({ success: true, data: { forms: { published: 5, draft: 2, monthlySubmits: 712, prevMonthSubmits: 640, monthlyCompletionRate: 74, pendingPostActions: 2 } } })
-})
+});
 
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
-})
+});
 
 describe('V8 回答フォーム一覧', () => {
   it('未分類の行にフォルダの口の unfiledCount を出す', async () => {
@@ -177,7 +186,7 @@ describe('V8 回答フォーム一覧', () => {
     expect(screen.getByRole('menuitem', { name: '集まった回答' })).toBeTruthy()
     expect(screen.queryByRole('menuitem', { name: '編集' })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: '削除' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '「来店アンケート」の詳細を見る' }))
+    fireEvent.click(host.querySelector('[data-row-id="f-1"]')!)
     await flush()
     expect(screen.queryByRole('button', { name: 'フォーム名を変更する' })).toBeNull()
     expect(screen.queryByText('編集する')).toBeNull()
@@ -187,7 +196,7 @@ describe('V8 回答フォーム一覧', () => {
   it('フォームの編集権限がある staff は変更でき、フォルダの管理だけは出さない', async () => {
     role.value = 'staff'
     window.localStorage.setItem('lh_staff_role', 'staff')
-    window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/form-submissions']))
+    rememberStaffIdentity({ role: 'staff', permissionKeys: ['/form-submissions'] } as StaffMember)
     await mount()
     expect(screen.getAllByRole('button', { name: /フォームを作る/ }).length).toBeGreaterThan(0)
     expect(screen.queryByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeNull()
@@ -246,7 +255,7 @@ describe('V8 回答フォーム一覧', () => {
     await mount()
     expect(host.textContent).toContain('45件中 1〜2件を表示')
   })
-})
+});
 
 /*
  * 2026-10-06 点検：表全体を1つの右クリックで包み、押した行を state に入れてから項目を作っていたので、
@@ -304,4 +313,18 @@ describe('V8 回答フォーム一覧の右クリック', () => {
     expect(menu!.getAttribute('aria-label')).toBe('「来店アンケート」の操作')
     expect(menu!.textContent).toContain('受付を止める')
   })
-})
+});
+
+it('アーカイブの絞り込みと復元は版番号を送り、受付を勝手に再開しない', async () => {
+  fetchApi.mockImplementation(async (path: string) => ({ success: true, data: path.includes('filter=archived')
+    ? { items: [{ ...baseForm, id: 'f-old', name: '過去のフォーム', status: 'archived', isActive: false, revision: 7 }], total: 1 }
+    : { items: [], total: 0 } }));
+  await mount();
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'アーカイブ済み' })));
+  await flush();
+  expect(fetchApi.mock.calls.some(([path]) => path.includes('filter=archived'))).toBe(true);
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '「過去のフォーム」のその他の操作' })));
+  await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: 'アーカイブから戻す' })));
+  await flush();
+  expect(unarchive).toHaveBeenCalledWith('f-old', 'account-a', 7);
+});

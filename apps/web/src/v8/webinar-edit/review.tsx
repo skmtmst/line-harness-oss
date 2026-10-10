@@ -1,14 +1,7 @@
 'use client'
-
-/*
- * ★V8 ウェビナーの ⑤確認（Pencil XCUNf）。
- * 公開前の確認（検査の行：できた／まだ・右に中身）→ 公開できない理由 → ページをテスト・通知のテスト
- * → 設定のまとめ。右は公開ページでの見え方。下の帯の主ボタンは「この版を公開」。
- * 口・公開の決まりは app/webinars/edit/review-v8.tsx と同じ（BEHAVIOR.md）。
- */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Check, ExternalLink, Globe, Play, Send } from 'lucide-react'
+import { Check, Globe, Play, Send } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -21,10 +14,20 @@ import type { EditContext, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './review.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 ウェビナーの ⑤確認（Pencil XCUNf）。
+ * 公開前の確認（検査の行：できた／まだ・右に中身）→ 公開できない理由 → ページをテスト・通知のテスト
+ * → 設定のまとめ。右は公開ページでの見え方。下の帯の主ボタンは「この版を公開」。
+ * 口・公開の決まりは app/webinars/edit/review-v8.tsx と同じ（BEHAVIOR.md）。
+ */
 
 const FLAGS = ['registrationEnabled', 'dayBeforeEnabled', 'hourBeforeEnabled', 'startEnabled', 'missedEnabled', 'completedEnabled'] as const
 
 export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chromeFor: (primary: ReactNode) => WizardChrome }) {
+  const saveErrors = useSaveFormErrors()
   const { webinar, editor, readOnly } = ctx
   const [validation, setValidation] = useState<WebinarPublishValidation | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -81,7 +84,10 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
       setNotice(response.data.publicPage.test?.status === 'passed' ? '公開ページを確かめました。' : '公開ページに未設定があります。')
       load()
     } catch (cause) {
-      setNotice(webinarErrorText(cause, '公開ページを確かめられませんでした。'))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+      setNotice(webinarErrorText(cause, '公開ページを確かめられませんでした。')) }
     } finally {
       lock.current = false
       setTesting(false)
@@ -99,7 +105,10 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
       const refreshed = await webinarApi.editor(webinar.id)
       ctx.onEditorChange(refreshed.data)
     } catch (cause) {
-      setNotice(webinarErrorText(cause, 'テスト送信できませんでした。時間をおいてもう一度お試しください。'))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+      setNotice(webinarErrorText(cause, 'テスト送信できませんでした。時間をおいてもう一度お試しください。')) }
     } finally {
       lock.current = false
       setTesting(false)
@@ -115,7 +124,10 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
       ctx.onPublished()
       window.location.assign(`/webinars/published?id=${encodeURIComponent(webinar.id)}`)
     } catch (cause) {
-      setPublishError(webinarErrorText(cause, '公開できませんでした'))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+      setPublishError(webinarErrorText(cause, '公開できませんでした')) }
       setPublishing(false)
       lock.current = false
     }
@@ -133,7 +145,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
   ))
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       boardId="XCUNf"
       title={chrome.title}
       actions={chrome.actions}
@@ -169,7 +181,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
           </div>
         ))}
         {state === 'ready' && failed.length > 0 ? (
-          <p className={styles.blocker} role="alert">{`このままでは公開できません：${(validation?.blockers.length ? validation.blockers : failed.map((check) => `${check.label}がまだです。`)).join('・')}`}</p>
+          <Notice tone="danger" className={styles.blockerNoticePlacement} >{`このままでは公開できません：${(validation?.blockers.length ? validation.blockers : failed.map((check) => `${check.label}がまだです。`)).join('・')}`}</Notice>
         ) : state === 'ready' ? <p className={styles.ok}>必要なものはそろっています。</p> : null}
         {readOnly ? null : (
           <div className={form.buttons}>
@@ -178,7 +190,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
           </div>
         )}
         {notice ? <p className={form.cardNote} role="status">{notice}</p> : null}
-        {publishError ? <p className={form.fieldError} role="alert">{publishError}</p> : null}
+        {publishError ? <Notice tone="danger" className={form.fieldErrorNoticePlacement} >{publishError}</Notice> : null}
       </section>
 
       <section className={form.card} aria-labelledby="webinar-summary-title">
@@ -194,6 +206,6 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
       </section>
 
       <ConfirmDialog open={notifyConfirm} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing === 'notify'} onCancel={() => { if (testing === false) setNotifyConfirm(false) }} onConfirm={() => testNotify()} />
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }

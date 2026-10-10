@@ -1,19 +1,10 @@
 'use client'
 
-/*
- * ★V8 タグ「対応マーク」タブ（Pencil `vKDj5`）。
- *
- * 動き（読み込み・数の帯・絞り込み・並べ替え・保管の確認・行の詳細パネル・右クリック・
- * 名前のその場の直し）は今の V8 タブ（app/tags/marks-v8.tsx）から写した。数え方・判定・
- * 保管の窓は v7 と同じ部品（components/friend-fields/mark-list）を使う。見た目だけを絵に合わせた：
- * 数の帯は共通の帯（板の端から端）、案内は青い帯、道具の段の右端に表示件数、
- * 表は板の端から端（行の右端は必ず「…」）、表の下に安全確認の段。
- */
-import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useListUrlValue, useListUrlState } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, CircleDot, Flag, GripVertical, History, Info, Loader, Send } from 'lucide-react'
+import { CircleDot, Flag, GripVertical, History, Info, Loader, Send } from 'lucide-react'
 import { api, ApiError, type ListStats, type SupportMarkArchiveImpact, type SupportMarkListItem } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
 import { ListPageBody } from '@/components/templates'
@@ -27,8 +18,7 @@ import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { describeApiFailure } from '@/components/shared/api-error-message'
-import { useListUrlState } from '@/components/shared/list-url-state'
+import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -38,21 +28,33 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { notifyToast } from '@/components/shared/toast'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils'
 import { ArchiveMarkDialog, autoRuleLabel, isUsed, usageLabel } from '@/components/friend-fields/mark-list'
 import styles from './list.module.css'
-
 import type { AttributeListHost } from './attribute-host'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+
+/*
+ * ★V8 タグ「対応マーク」タブ（Pencil `vKDj5`）。
+ *
+ * 動き（読み込み・数の帯・絞り込み・並べ替え・保管の確認・行の詳細パネル・右クリック・
+ * 名前のその場の直し）は今の V8 タブ（app/tags/marks-v8.tsx）から写した。数え方・判定・
+ * 保管の窓は v7 と同じ部品（components/friend-fields/mark-list）を使う。見た目だけを絵に合わせた：
+ * 数の帯は共通の帯（板の端から端）、案内は青い帯、道具の段の右端に表示件数、
+ * 表は板の端から端（行の右端は必ず「…」）、表の下に安全確認の段。
+ */
 
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 
 export default function MarksTab({ accountId, canEdit, host }: { accountId: string | null; canEdit: boolean; host?: AttributeListHost<MarkRow> }) {
   const router = useRouter()
@@ -307,7 +309,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
     if (!canEdit) return [{ id: 'open', label: '詳しく見る', onSelect: () => openMarkDetail(mark.id) }]
     if (mark.archivedAt) return [{ id: 'restore', label: '保管から戻す', disabled: restoring, onSelect: () => { setRestoreError(''); setRestoreTarget(mark) } }]
     return [
-      { id: 'edit', label: '編集', external: true, href: `/tags/marks/edit?id=${encodeURIComponent(mark.id)}`, onSelect: () => router.push(`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`) },
+      { id: 'edit', label: '編集', external: false, href: `/tags/marks/edit?id=${encodeURIComponent(mark.id)}`, onSelect: () => router.push(`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`) },
       {
         id: 'archive',
         label: '保管する',
@@ -329,7 +331,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   /* 帯は4つ。マークの数は一覧そのものから、人数は受信箱の集計から。 */
@@ -362,31 +364,13 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
   const filterActive = Boolean(query || usage !== 'all' || onlyArchived)
 
   const table = status === 'forbidden' ? (
-    <div className={styles.stateCard}>
-      <AlertCircle className={styles.stateIconError} aria-hidden="true" />
-      <p className={styles.stateTitle}>対応マークを見る権限がありません</p>
-      <p className={styles.stateDesc}>{permissionDeniedMessage('store')}</p>
-    </div>
+    <ListState kind="error" title="対応マークを見る権限がありません" description={permissionDeniedMessage('store')}  />
   ) : status === 'error' ? (
-    <div className={styles.stateCard}>
-      <AlertCircle className={styles.stateIconError} aria-hidden="true" />
-      <p className={styles.stateTitle}>対応マークを読み込めませんでした</p>
-      <p className={styles.stateDesc}>{error || '再読み込みしても直らない場合はエラー報告へ。'}</p>
-      <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
-    </div>
+    <ListState kind="error" title="対応マークを読み込めませんでした" description={error || '再読み込みしても直らない場合はエラー報告へ。'}  action={<><Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
   ) : listReady && items.length === 0 ? (
-    <div className={styles.stateCard}>
-      <Flag className={styles.stateIcon} aria-hidden="true" />
-      <p className={styles.stateTitle}>まだ対応マークはありません</p>
-      <p className={styles.stateDesc}>受信箱で、対応の進み具合を見分ける印です。</p>
-      {canEdit ? <Button href={host ? undefined : "/tags/marks/new"} onClick={host?.onCreate} variant="primary">マークを作る</Button> : null}
-    </div>
+    <ListState kind="empty" title="まだ対応マークはありません" description="受信箱で、対応の進み具合を見分ける印です。"  icon={<Flag className={styles.stateIcon} aria-hidden="true" />} action={<>{canEdit ? <Button href={host ? undefined : "/tags/marks/new"} onClick={host?.onCreate} variant="primary">マークを作る</Button> : null}</>} />
   ) : listReady && visible.length === 0 ? (
-    <div className={styles.stateCard}>
-      <p className={styles.stateTitle}>条件に合うものはありません</p>
-      <p className={styles.stateDesc}>検索や絞り込みを外すと、すべて出ます</p>
-      {filterActive ? <Button type="button" onClick={() => { setQuery(''); setUsage('all'); setView({ archived: '' }) }}>条件を外す</Button> : null}
-    </div>
+    <ListState kind="empty" title="条件に合うものはありません" description="検索や絞り込みを外すと、すべて出ます"  action={<>{filterActive ? <Button type="button" onClick={() => { setQuery(''); setUsage('all'); setView({ archived: '' }) }}>条件を外す</Button> : null}</>} />
   ) : (
     <DelayedSkeleton loading={!listReady} skeleton={<div className={styles.skeleton} aria-busy="true" />}>
       <DataTable className={styles.table}>
@@ -529,8 +513,9 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
         confirmLabel="保管から戻す" busy={restoring} error={restoreError}
         onConfirm={() => void confirmRestore()} onCancel={() => { if (!restoring) setRestoreTarget(null) }} />
       <ListPageBody
+        skeleton
         toolbar={<>
-          <span className={styles.search}>
+          <ListToolbarSearchSlot>
             <SearchField
               aria-label="マーク名で探す"
               placeholder="マーク名で探す"
@@ -538,8 +523,8 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
               onChange={setQuery}
               onClear={() => setQuery('')}
             />
-          </span>
-          <Select
+          </ListToolbarSearchSlot>
+          <SaveErrorField names={["usage"]}><Select
             aria-label="使っているかで絞り込む"
             width={157}
             value={usage}
@@ -549,22 +534,18 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
               { value: 'used', label: '使っている：あり' },
               { value: 'unused', label: '使っている：なし' },
             ]}
-          />
+          /></SaveErrorField>
           {!host ? <FilterChip selected={onlyArchived} onChange={(next) => { setView({ archived: next ? '1' : '' }); setPage(1) }}>保管</FilterChip> : null}
           <span className={styles.toolbarSpacer} />
           <PageSizeSelect value={pageSize} onChange={(value) => setPageSize(value || 20)} options={PAGE_SIZES} label={null} />
         </>}
       >
         {actionError ? (
-          <p role="alert" className={styles.errorBand}>
-            <AlertCircle className={styles.errorIcon} aria-hidden="true" />
-            {actionError}
-            {retryOrder ? (
+          <Notice tone="danger" >{actionError}{retryOrder ? (
               <button type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</button>
             ) : (
               <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
-            )}
-          </p>
+            )}</Notice>
         ) : null}
         {table}
       </ListPageBody>

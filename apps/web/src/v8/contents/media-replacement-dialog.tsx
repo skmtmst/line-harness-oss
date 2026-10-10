@@ -1,7 +1,5 @@
 'use client'
 
-/* ★V8 写し：src/app/contents/media-replacement-dialog.tsx から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
-
 import { useEffect, useRef, useState } from 'react'
 import type { MediaItem, MediaReplacementImpact } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
@@ -13,6 +11,11 @@ import ListRange from '@/components/ui/list-range'
 import ListState from '@/components/shared/list-state'
 import { checkedAtText, referenceKindText, referenceNameText } from './media-delete-impact'
 import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
+
+/* ★V8 写し：src/app/contents/media-replacement-dialog.tsx から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
 
 export default function MediaReplacementDialog({
   source,
@@ -25,6 +28,7 @@ export default function MediaReplacementDialog({
   onClose: () => void
   onComplete: (message: string) => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const requestRef = useRef(0)
   const candidateRequestRef = useRef(0)
   const [candidates, setCandidates] = useState<MediaItem[]>([])
@@ -103,8 +107,12 @@ export default function MediaReplacementDialog({
       setPhase('ready')
     } catch (caught) {
       if (requestRef.current !== request) return
+      const fieldFailure = saveErrors.capture(caught)
       setPhase('error')
-      setError(caught instanceof Error ? caught.message : '差し替えたときの影響を確認できませんでした')
+      { if (!fieldFailure)
+
+
+      setError(caught instanceof Error ? caught.message : '差し替えたときの影響を確認できませんでした') }
     }
   }
 
@@ -135,10 +143,16 @@ export default function MediaReplacementDialog({
         : ''
       onComplete(`${response.data.replacedUsageCount}か所を「${impact.replacement.filename}」へ差し替えました。${remaining}${verification}`)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
+
       const message = caught instanceof ApiError || caught instanceof Error
         ? caught.message
         : '使用先を差し替えられませんでした'
-      setError(message)
+      { if (!fieldFailure)
+
+
+      setError(message) }
       setBusy(false)
       if (caught instanceof ApiError && caught.status === 409 && caught.data) {
         setImpact(caught.data as MediaReplacementImpact)
@@ -148,7 +162,7 @@ export default function MediaReplacementDialog({
   }
 
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open={source !== null}
       title={source ? `「${source.filename}」の使用先を差し替える` : ''}
       description="元のメディアは消さず、使われている場所だけを既存の別メディアへ付け替えます。"
@@ -177,14 +191,14 @@ export default function MediaReplacementDialog({
               setCandidateQuery(candidateQueryInput.trim())
             }}
           >
-            <input
+            <SaveErrorField names={["candidateQueryInput","candidate_query_input"]}><input
               type="text"
               aria-label="差し替え候補を名前で探す"
               placeholder="名前で探す"
               value={candidateQueryInput}
               onChange={(event) => setCandidateQueryInput(event.target.value)}
               className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-            />
+            /></SaveErrorField>
             <Button type="submit">検索</Button>
           </form>
 {candidatePhase === 'loading' ? (
@@ -211,12 +225,12 @@ export default function MediaReplacementDialog({
             />
           ) : (
             <>
-              <Select
+              <SaveErrorField names={["replacementId","replacement_id"]}><EntitySelect
                 aria-label="差し替え先"
                 value={replacementId}
-                options={[{ value: '', label: '別のメディアを選択' }, ...candidates.map((item) => ({ value: item.id, label: item.filename }))]}
+                options={[{ value: '', label: '別のメディアを選択' }, ...candidates.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.filename }))]}
                 onChange={(value) => void selectReplacement(value)}
-              />
+              /></SaveErrorField>
               {candidateTotal > 50 ? (
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
                   <span className="text-ink-faint">
@@ -234,7 +248,7 @@ export default function MediaReplacementDialog({
         {phase === 'loading' ? (
           <p className="text-ink-faint text-xs">差し替わる場所を確認しています…</p>
         ) : phase === 'error' ? (
-          <p className="text-danger text-xs" role="alert">影響を確認できませんでした。読み直してから、もう一度お試しください。</p>
+          <Notice tone="danger" >影響を確認できませんでした。読み直してから、もう一度お試しください。</Notice>
         ) : impact ? (
           <div className="space-y-3">
             <div className={`rounded-control p-3 text-xs ${impact.canReplace ? 'bg-accent-soft text-accent-deep' : 'bg-danger-bg text-danger'}`}>
@@ -266,6 +280,6 @@ export default function MediaReplacementDialog({
           </div>
         ) : null}
       </div>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }

@@ -24,6 +24,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { checkTemporaryAllowances } from '../../../scripts/visual-qa/temporary-allowances.mjs'
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), '..')
 const PARTS = join(WEB, 'design', 'design-parts.json')
@@ -395,12 +396,59 @@ function v8EffectiveBody(css, cls) {
     .join(';')
 }
 
+/** 固定HTMLの色・選択状態の照合。同じ要素の合成クラスとv8上書きだけを読む。 */
+export function frozenSelectorBody(css, selector) {
+  const clean = s => s.trim().replace(/\[data-theme=["']?v8["']?\]\s*/g, '').replace(/["']/g, '')
+  const wanted = clean(selector)
+  const classes = [...wanted.matchAll(/\.([\w-]+)/g)].map(m => m[1])
+  const rest = wanted.replace(/\.[\w-]+/g, '')
+  const bodies = []
+  for (const m of stripConditionalBlocks(stripComments(css)).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const match = m[1].split(',').some(raw => {
+      const sel = clean(raw)
+      if (/\s|>|\+|~/.test(sel)) return false
+      const used = [...sel.matchAll(/\.([\w-]+)/g)].map(m => m[1])
+      const suffix = sel.replace(/\.[\w-]+/g, '')
+      return used.length > 0 && used.every(cls => classes.includes(cls)) && (suffix === '' || suffix === rest)
+    })
+    if (match) bodies.push(m[2])
+  }
+  return bodies.join(';')
+}
+
+function verifyFrozenChecks(values, lines, failures) {
+  let checked = 0
+  let matched = 0
+  for (const check of values.checks ?? []) {
+    const file = join(WEB, check.file)
+    if (!existsSync(file)) { failures.push(`固定値: ${check.file} がありません`); continue }
+    const body = frozenSelectorBody(readFileSync(file, 'utf8'), check.selector)
+    for (const d of check.declarations) {
+      checked++
+      let raw = declaration(body, d.prop)
+      // HTMLとCSSで枠の略記が異なる場合も、実際に描く色・太さを解いて比較する。
+      if (raw === null && d.prop.startsWith('outline-')) {
+        const outline = resolveVars(declaration(body, 'outline') ?? '', v8VarsCache)
+        raw = d.prop === 'outline-width' ? outline.match(/^[\d.]+px/)?.[0] ?? null : outline.match(/#[0-9a-f]+\b|rgba?\([^)]*\)/)?.[0] ?? null
+      }
+      if (raw === null && d.prop === 'background') raw = declaration(body, 'background-color')
+      const got = raw === null ? null : normalize(resolveVars(raw, v8VarsCache))
+      const want = normalize(d.resolved)
+      if (want === got) matched++
+      else failures.push(`固定値不一致: ${check.name} ${check.file} ${check.selector} ${d.prop}\n    設計 ${check.source} = ${want}\n    実際 ${got ?? '宣言なし（継承元の確認が必要）'}`)
+      lines.push(`  ${check.name} ${d.prop}: ${want} / ${got ?? '宣言なし'} ${want === got ? '一致' : '★不一致'}`)
+    }
+  }
+  return { checked, matched }
+}
+
 /** globals.css の :root 変数に [data-theme="v8"] の上書きを重ねた変数表。 */
 function v8Vars() {
-  const css = readFileSync(GLOBALS, 'utf8')
+  const css = stripComments(readFileSync(GLOBALS, 'utf8'))
   const vars = {}
-  const rootBlock = css.slice(0, css.indexOf('[data-theme'))
-  Object.assign(vars, collectVariables(rootBlock))
+  // 冒頭の @custom-variant にも [data-theme] がある。そこまでで切ると@themeの色を失う。
+  const base = css.replace(/\[data-theme=["']?v8["']?\]\s*\{[^}]*\}/g, '')
+  Object.assign(vars, collectVariables(base))
   const v8re = /\[data-theme=["']?v8["']?\]\s*\{([^}]*)\}/g
   let m
   while ((m = v8re.exec(css))) Object.assign(vars, collectVariables(m[1]))
@@ -438,7 +486,8 @@ function verifyV8Parts(lines, failures) {
     failures.push('design/v8-part-values.json がありません（design/v8/check/ から写してください）')
     return { checked: 0, matched: 0 }
   }
-  const values = JSON.parse(readFileSync(V8_VALUES, 'utf8')).parts ?? {}
+  const snapshot = JSON.parse(readFileSync(V8_VALUES, 'utf8'))
+  const values = snapshot.parts ?? {}
   v8VarsCache = v8Vars()
 
   let checked = 0
@@ -547,7 +596,9 @@ function verifyV8Parts(lines, failures) {
     if (rows.length === 0) uncovered.push(`${entry.name}（${spec.id}）：比べられる宣言がありません`)
     lines.push(...rows)
   }
-  return { checked, matched, uncovered }
+  lines.push('', '固定HTMLの色・状態・一覧共通の値')
+  const frozen = verifyFrozenChecks(snapshot, lines, failures)
+  return { checked: checked + frozen.checked, matched: matched + frozen.matched, uncovered }
 }
 
 /* ---------- 本体 -------------------------------------------------------- */
@@ -584,7 +635,7 @@ export function verify() {
     const want = normalize(t.status === 'active' ? t.resolved : t.source)
     let got = null
     if (t.status === 'active') {
-      got = name.slice(2) in builtVars ? builtVars[name.slice(2)] : null
+      got = name.slice(2) in builtVars ? resolveVars(builtVars[name.slice(2)], builtVars) : null
       if (got === null) {
         failures.push(`配信漏れ: ${name} がビルド後CSSに見つかりません（${t.pencil}）`)
         lines.push(`  ${pad(name, 24)}${pad(t.pencil, 18)}${pad(want, 24)}★配信漏れ`)
@@ -710,7 +761,10 @@ if (process.argv[1] && process.argv[1].endsWith('verify-design-values.mjs')) {
     console.log('\n不合格:')
     for (const f of r.failures) console.log(`  ${f}`)
   }
-  const bad = r.shape.length + r.failures.length
+  const temporary = checkTemporaryAllowances('design', r.failures)
+  console.log(`\n理由・期限付き一時許可 ${temporary.allowed.length} / 未許可 ${temporary.unexpected.length}`)
+  for (const permit of temporary.allowed) console.log(`  ${permit.finding.split('\n')[0]}: ${permit.reason}（担当 ${permit.owner} / 期限 ${permit.expires}）`)
+  const bad = r.shape.length + temporary.unexpected.length
   console.log(bad === 0 ? (r.checked === 0 ? '\n合格（照合対象がまだありません）' : '\n合格') : '')
   process.exit(bad === 0 ? 0 : 1)
 }

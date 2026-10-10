@@ -1,4 +1,33 @@
 'use client'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { ArrowLeft, CircleAlert, Copy, GitCompare, List, Pencil, RotateCcw, Send, Upload } from 'lucide-react'
+import { validateFlexContent } from '@line-crm/shared'
+import { api, ApiError } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import LinePreview, { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
+import { InsertText } from '@/components/shared/insert-text-field'
+import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor'
+import TargetMissing from '@/components/shared/target-missing'
+import { buildUsageRows, insertionNames, isTemplateDetailData, lineChanges, messageTypeText, publishRowState, shortStamp, templateDeleteDescription, type TemplateDetailData, type TemplateVersionItem, type UsageRow } from './model'
+import styles from './detail.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 テンプレートの詳細（一から書いた画面・2026-10-07）。
@@ -10,47 +39,6 @@
  * 受け付ける指定・呼ぶ API は BEHAVIOR.md。
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, CircleAlert, Copy, ExternalLink, GitCompare, List, Pencil, RotateCcw, Send, Upload } from 'lucide-react'
-import { validateFlexContent } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
-import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import LinePreview from '@/components/shared/line-preview'
-import { InsertText } from '@/components/shared/insert-text-field'
-import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor'
-import TargetMissing from '@/components/shared/target-missing'
-import { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
-import {
-  buildUsageRows,
-  insertionNames,
-  isTemplateDetailData,
-  lineChanges,
-  messageTypeText,
-  publishRowState,
-  shortStamp,
-  templateDeleteDescription,
-  type TemplateDetailData,
-  type TemplateVersionItem,
-  type UsageRow,
-} from './model'
-import styles from './detail.module.css'
-import { formatNumber as polishFormatNumber } from '@/lib/format'
-import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import TextLink from '@/components/shared/text-link'
-import { emptyValue } from '@/components/shared/empty-value'
-import { DetailLoading } from '@/components/templates/detail-page'
-
 /** 表にまず見せる行数。残りは「ほか N か所を見る」で開く。 */
 const USAGE_VISIBLE = 4
 /** 窓にまず見せる行数（公開は4・削除できないは2。絵どおり）。 */
@@ -58,6 +46,7 @@ const PUBLISH_VISIBLE = 4
 const BLOCKED_VISIBLE = 2
 
 export default function TemplateDetailV8() {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -90,7 +79,7 @@ export default function TemplateDetailV8() {
   const usageRef = useRef<HTMLElement>(null)
 
   /* N-144：編集・公開・削除の口は owner/admin だけ。閲覧のみには押せない操作を置かない（隠す）。 */
-  const [canMutate] = useState(() => (typeof window === 'undefined' ? true : isOwnerOrAdmin()))
+  const canMutate = useFeatureAccess('templates')
   usePageTitle(template?.name ?? null)
 
   const loadVersions = useCallback(async () => {
@@ -100,10 +89,15 @@ export default function TemplateDetailV8() {
       const res = await api.templates.versions(id)
       if (res.success) setVersions(res.data)
       else setVersionsError('版の履歴を読み込めませんでした。もう一度お試しください。')
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
       setVersionsError('版の履歴を読み込めませんでした。もう一度お試しください。')
     }
-  }, [id])
+  }
+  }, [id, saveErrors]);
+
 
   const reload = useCallback(async () => {
     setMissing(false)
@@ -119,13 +113,16 @@ export default function TemplateDetailV8() {
       else if (!detail.success) setError('テンプレートを読み込めませんでした。もう一度お試しください。')
       else setMissing(true)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 404) setMissing(true)
-      else setError('テンプレートを読み込めませんでした。もう一度お試しください。')
+      else { if (!fieldFailure)
+ setError('テンプレートを読み込めませんでした。もう一度お試しください。') }
     } finally {
       setLoading(false)
     }
     void loadVersions()
-  }, [id, loadVersions])
+  }, [id, loadVersions, saveErrors])
 
   useEffect(() => {
     if (!id) {
@@ -180,16 +177,20 @@ export default function TemplateDetailV8() {
       setPublishOpen(false)
       await reload()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 409) {
-        setPublishError('ほかの人が先に公開・編集しました。最新の状態を読み直したので、内容を確かめてからもう一度お試しください。')
+        { if (!fieldFailure)
+        setPublishError('ほかの人が先に公開・編集しました。最新の状態を読み直したので、内容を確かめてからもう一度お試しください。') }
         void reload()
       } else {
-        setPublishError('公開できませんでした。状態を読み直してから、もう一度お試しください。')
+        { if (!fieldFailure)
+        setPublishError('公開できませんでした。状態を読み直してから、もう一度お試しください。') }
       }
     } finally {
       setPublishing(false)
     }
-  }, [id, publishing, template, reload])
+  }, [id, publishing, template, reload, saveErrors])
 
   const doRevert = useCallback(async () => {
     if (reverting || revertTarget === null || !template) return
@@ -202,13 +203,17 @@ export default function TemplateDetailV8() {
       setCompareTarget(null)
       await reload()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
       setRevertError(caught instanceof ApiError && caught.status === 409
         ? 'ほかの人が先に公開しました。開き直して確認してください。'
         : 'この版に戻せませんでした。状態を読み直してから、もう一度お試しください。')
+    }
     } finally {
       setReverting(false)
     }
-  }, [id, reverting, revertTarget, template, reload])
+  }, [id, reverting, revertTarget, template, reload, saveErrors])
 
   const remove = useCallback(async () => {
     if (deleting || usageCount > 0 || !template) return
@@ -219,12 +224,15 @@ export default function TemplateDetailV8() {
       if (!res.success) throw new Error(res.error)
       setDeleteOpen(false)
       router.push('/templates')
-    } catch {
-      setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
-  }, [deleting, usageCount, template, id, router])
+  }, [deleting, usageCount, template, id, router, saveErrors])
 
   /*
    * 複製：公開済みの版（いま使っている版）の中身で新しいテンプレートを作る。
@@ -249,12 +257,15 @@ export default function TemplateDetailV8() {
       })
       if (!res.success) throw new Error(res.error)
       router.push(`/templates/detail?id=${encodeURIComponent(res.data.id)}`)
-    } catch {
-      setDuplicateError('複製できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDuplicateError('複製できませんでした。もう一度お試しください。') }
     } finally {
       setDuplicating(false)
     }
-  }, [duplicating, template, inUseVersion, selectedAccountId, router])
+  }, [duplicating, template, inUseVersion, selectedAccountId, router, saveErrors])
 
   const openDelete = useCallback(() => {
     setDeleteError('')
@@ -269,22 +280,22 @@ export default function TemplateDetailV8() {
   }, [])
 
   if (!id) {
-    return <TargetMissing kind="unspecified" title="見るテンプレートが指定されていません" description="一覧から、見たいテンプレートを選び直してください。" backHref="/templates" backLabel="テンプレートの一覧へ戻る" />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="unspecified" title="見るテンプレートが指定されていません" description="一覧から、見たいテンプレートを選び直してください。" backHref="/templates" backLabel="テンプレートの一覧へ戻る" /></SaveErrorScope>
   }
   if (missing || (!error && !loading && !template)) {
-    return <TargetMissing kind="not-found" title="このテンプレートは見つかりません" description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。" backHref="/templates" backLabel="テンプレートの一覧へ戻る" />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="not-found" title="このテンプレートは見つかりません" description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。" backHref="/templates" backLabel="テンプレートの一覧へ戻る" /></SaveErrorScope>
   }
   if (error || (!loading && !template)) {
-    return <TargetMissing kind="error" title="テンプレートを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void reload()} />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="error" title="テンプレートを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void reload()} /></SaveErrorScope>
   }
 
-  const backLink = <Link href="/templates" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />テンプレートへ</Link>
+  const backLink = <></>
   if (loading || !template) {
     return (
-      <div className={styles.page} data-design-node="UTbi1">
+      <SaveErrorScope errors={saveErrors}><div className={styles.page} data-design-node="UTbi1">
         <div className={styles.loadingHead}>{backLink}</div>
         <DetailLoading />
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
@@ -349,7 +360,7 @@ export default function TemplateDetailV8() {
           <RowMenu className={styles.moreButton} label="そのほかの操作" menuLabel={`テンプレート「${template.name}」の操作`} items={menuItems} />
         </div>
       ) : null}
-      {duplicateError ? <p className={styles.errorText} role="alert">{duplicateError}</p> : null}
+      {duplicateError ? <Notice tone="danger" >{duplicateError}</Notice> : null}
       <section className={styles.aboutBox} aria-label="このテンプレートについて">
         <h2 className={styles.aboutTitle}>このテンプレートについて</h2>
         <dl className={styles.aboutList}>
@@ -360,13 +371,8 @@ export default function TemplateDetailV8() {
         </dl>
       </section>
       {flexError ? (
-        <div role="alert" className={styles.flexError}>
-          <p className={styles.flexErrorTitle}>{flexError}</p>
-          <p className={styles.flexErrorNote}>
-            このままでは公開できません。
-            {canMutate ? <Link href={editHref} className={styles.inlineLink}>再編集で直してください。</Link> : 'オーナー・管理者に再編集を依頼してください。'}
-          </p>
-        </div>
+        <Notice tone="danger" heading={<> {flexError} </>} >このままでは公開できません。
+            {canMutate ? <Link href={editHref} className={styles.inlineLink}>再編集で直してください。</Link> : 'オーナー・管理者に再編集を依頼してください。'}</Notice>
       ) : (
         <LinePreview title="届き方" accountName="然 - NEN -" note="受け取る人のLINEでの見え方です。{ } の差し込みは、送るときに受け取る人ごとの値に変わります。">
           {template.messageType === 'flex' ? <FlexPreviewComponent content={draftContent} /> : (
@@ -387,14 +393,14 @@ export default function TemplateDetailV8() {
   )
 
   return (
-    <div className={styles.page} data-design-node="UTbi1">
+    <SaveErrorScope errors={saveErrors}><div className={styles.page} data-design-node="UTbi1">
       <DetailFrame
         title={template.name}
         identity={backLink}
         description={[messageTypeText(template.messageType), folderLabel, `更新 ${shortStamp(template.updatedAt)}`].join('・')}
         preview={side}
       >
-        {canMutate ? null : <p className={styles.roBand} role="note">閲覧のみで見ています。編集・公開・削除はオーナーか管理者に頼んでください。</p>}
+        {canMutate ? null : <div className={styles.roBand}><ReadOnlyNotice role="note">閲覧のみで見ています。編集・公開・削除はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>}
         {template.hasDraft ? (
           <div className={styles.draftBand} role="status">
             <CircleAlert size={18} aria-hidden="true" className={styles.draftIcon} />
@@ -465,7 +471,7 @@ export default function TemplateDetailV8() {
           {versions === null && !versionsError ? <DetailLoading /> : versionsError ? (
             <div className={styles.versionError}>
               <p className={styles.errorText}>{versionsError}</p>
-              <Button variant="secondary" onClick={() => void loadVersions()}>もう一度読み込む</Button>
+              <Button variant="secondary" onClick={() => loadVersions()} busyLabel="処理中…">もう一度読み込む</Button>
             </div>
           ) : (
             <>
@@ -617,7 +623,7 @@ export default function TemplateDetailV8() {
           setRevertError('')
         }}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }
 

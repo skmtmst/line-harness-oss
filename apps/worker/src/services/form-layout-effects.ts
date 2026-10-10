@@ -189,7 +189,7 @@ export function collectCapacitySlots(layout: FormLayout, answers: FormAnswers): 
  *
  * 時差が書いてある文字列（`Z` や `+09:00`）は、そのまま信じる。
  */
-function parseJstDateTime(value: string): Date | null {
+export function parseJstDateTime(value: string): Date | null {
   const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(value);
   const normalized = hasZone ? value : `${value.length === 16 ? value : value.slice(0, 16)}:00+09:00`;
   const parsed = new Date(normalized);

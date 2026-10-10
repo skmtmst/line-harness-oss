@@ -1,9 +1,4 @@
 'use client'
-
-/*
- * ★V8 ウェビナーの編集 ①基本設定（並びは作る j7PP04 と同じ）。
- * 保存の決まり（版のある設定を先・競合したら基本情報は書き換えない）は app/webinars/edit/basic-v8.tsx と同じ。
- */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -15,10 +10,17 @@ import { folderById, folderCreator } from '@/components/shared/folder-select'
 import { BasicForm, BasicPreview, SLUG_PATTERN, type BasicValues } from './basic-form'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import styles from './form.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+/*
+ * ★V8 ウェビナーの編集 ①基本設定（並びは作る j7PP04 と同じ）。
+ * 保存の決まり（版のある設定を先・競合したら基本情報は書き換えない）は app/webinars/edit/basic-v8.tsx と同じ。
+ */
 
 export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: { ctx: EditContext; chrome: WizardChrome } & PaneSaveProps) {
+  const saveErrors = useSaveFormErrors()
   const { webinar, editor, readOnly } = ctx
   const { accounts } = useAccount()
   const accountName = accounts.find((account) => account.id === webinar.accountId)?.displayName ?? accounts.find((account) => account.id === webinar.accountId)?.name ?? '公式アカウント'
@@ -74,10 +76,12 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
       if (!response.success || !Array.isArray(response.data)) throw new Error('folders')
       setFolders(response.data)
       setFolderState('ready')
-    } catch {
-      if (request === folderRequest.current) setFolderState('error')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
+      if (request === folderRequest.current) { if (!fieldFailure) setFolderState('error') }
     }
-  }, [webinar.accountId])
+  }, [webinar.accountId, saveErrors])
   useEffect(() => {
     void loadFolders()
     return () => { folderRequest.current += 1 }
@@ -117,7 +121,11 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
       }
       return true
     } catch (cause) {
-      setError(withPermissionFailure(cause, describeSaveFailure(cause), 'store'))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+
+      setError(withPermissionFailure(cause, describeSaveFailure(cause), 'store')) }
       return false
     } finally {
       lock.current = false
@@ -142,14 +150,18 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
       setTestResult(`通知テスト：成功 ${response.data.sent} 件・失敗 ${response.data.failed} 件`)
       setTestConfirm(false)
     } catch (cause) {
-      setError(withPermissionFailure(cause, describeSaveFailure(cause), 'store'))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+
+      setError(withPermissionFailure(cause, describeSaveFailure(cause), 'store')) }
     } finally {
       setTesting(false)
     }
   }
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       boardId="j7PP04"
       title={chrome.title}
       actions={chrome.actions}
@@ -165,7 +177,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
         action={readOnly ? null : <div className={styles.previewActions}><Button disabled={saving || testing} onClick={() => setTestConfirm(true)}>テストを送る</Button></div>}
       />}
     >
-      {readOnly ? <Notice tone="info">閲覧のみで見ています。変えるときはオーナーか管理者に頼んでください。</Notice> : null}
+      {readOnly ? <ReadOnlyNotice >閲覧のみで見ています。変えるときはオーナーか管理者に頼んでください。</ReadOnlyNotice> : null}
       <BasicForm
         idPrefix="webinar-basic"
         values={values}
@@ -195,6 +207,6 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
       >
         {dirty ? <p className={styles.cardNote}>変えた基本設定を保存してから送ります。</p> : null}
       </ConfirmDialog>
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }

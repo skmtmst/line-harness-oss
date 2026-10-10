@@ -1,13 +1,5 @@
 'use client'
 
-/*
- * ★V8 飲食店向け（テスト）の器 — 在庫・予約台帳・座席・メニューの4画面用。
- *
- * 板の頭（題・説明・右上に店舗を選ぶ欄）→ 検証環境の帯 → 中身。
- * 寸法は Pencil の板（メニュー管理 MJoJR ほか）の書き出しから読む。
- * データの口は今の画面（app/restaurant-test/v8/shell.tsx）と同じ
- * restaurantTestApi.snapshot。src/v8 は古い画面を import できないので写した。
- */
 import { notifySaved } from '@/components/shared/toast'
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
@@ -29,6 +21,17 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import StoreTabs, { type StoreTabKey } from '../store-tabs/store-tabs'
 import styles from './shell.module.css'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+/*
+ * ★V8 飲食店向け（テスト）の器 — 在庫・予約台帳・座席・メニューの4画面用。
+ *
+ * 板の頭（題・説明・右上に店舗を選ぶ欄）→ 検証環境の帯 → 中身。
+ * 寸法は Pencil の板（メニュー管理 MJoJR ほか）の書き出しから読む。
+ * データの口は今の画面（app/restaurant-test/v8/shell.tsx）と同じ
+ * restaurantTestApi.snapshot。src/v8 は古い画面を import できないので写した。
+ */
 
 export interface RestaurantV8Context {
   data: RestaurantSnapshot
@@ -211,14 +214,14 @@ export default function RestaurantShell({ boardId, title, description, query, he
   ) : (
     children(ctx)
   )
-  const storePicker = snapshot && snapshot.stores.length > 0 ? templateHeading ? <span className={styles.fusionStore}><Select size="full" aria-label="店舗" value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:`店舗：${item.name}`}))}/></span> : <StoreFilterTabs value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/> : null
+  const storePicker = snapshot && snapshot.stores.length > 0 ? templateHeading ? <span className={styles.fusionStore}><SaveErrorField names={["selectedStoreId","selected_store_id"]}><Select size="full" aria-label="店舗" value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:`店舗：${item.name}`}))}/></SaveErrorField></span> : <StoreFilterTabs value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/> : null
   const noticeBand = notice ? (
     <Notice role="status" tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />
   ) : null
 
   if (bare) {
     return (
-      <div data-design-node={boardId} className={styles.page}>
+      <div data-design-node={boardId} className={styles.page} data-list-skeleton={layout === 'ledger' ? 'templates' : undefined}>
         {noticeBand}
         {content}
       </div>
@@ -226,7 +229,7 @@ export default function RestaurantShell({ boardId, title, description, query, he
   }
 
   const page = (
-    <div data-design-node={boardId} data-restaurant-fusion={templateHeading||undefined} className={styles.page}>
+    <div data-design-node={boardId} data-restaurant-fusion={templateHeading||undefined} data-list-skeleton={layout === 'ledger' && !templateHeading ? 'templates' : undefined} className={styles.page}>
       {templateHeading ? <PageHeading
         inset="none"
         title={title}

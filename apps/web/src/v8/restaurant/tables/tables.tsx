@@ -31,6 +31,18 @@ import { DialogField, DialogNote, RsDialog } from '../booking-kit/parts'
 import { pickMoveTarget, reservationLine } from './move'
 import styles from './tables.module.css'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 座席・卓管理（板 `BERxg`・卓を止める `eY9F3`・卓を追加・変更 `gBrCz`）。
+ *
+ * 数4（卓数・総席数・結合可能・個室）→ 右上に「卓を追加する」→
+ * 左にフロアマップ（結合グループは緑の地と札・停止中は薄く）、右に卓の詳細
+ * （有効／停止中の札・変更・停止／再開）→ 自動配席ルール。
+ * 止めるときは、この卓に入っている先の予約を見せ、別の卓へ移すか未配席に戻してから止める。
+ * データの口・送る形は今の画面（app/restaurant-test/v8/tables.tsx）と同じ。動きは BEHAVIOR.md。
+ */
 
 const SEAT_TYPE_LABEL: Record<string, string> = {
   table: 'テーブル',
@@ -58,6 +70,7 @@ type Draft = {
 type MoveMode = 'move' | 'unassign'
 
 function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:number }) {
+  const saveErrors = useSaveFormErrors()
   const { data, store, busy, mutate } = ctx
   const { selectedAccountId } = useAccount()
   const [floors,setFloors]=useState<RestaurantFloor[]>([])
@@ -179,7 +192,10 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
         await restaurantTestApi.updateTable(selectedAccountId, table.id, { isActive: false })
         return { moved, unassigned }
       } catch (error) {
-        setStopError(japaneseDetailOf(error) || '予約の移動・卓の停止に失敗しました。')
+        const fieldFailure = saveErrors.capture(error)
+
+        { if (!fieldFailure)
+        setStopError(japaneseDetailOf(error) || '予約の移動・卓の停止に失敗しました。') }
         throw new QuietError()
       }
     }, reservations.length === 0
@@ -203,20 +219,20 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
       <div className={styles.pair}>
         <Field label="階・エリア"><Select aria-label="階・エリア" value={draft.floorId} onChange={v=>setDraft({...draft,floorId:v})} options={floors.map(f=>({value:f.id,label:f.name}))}/></Field>
         <Field label="横の位置" htmlFor="rs-table-x" error={fieldErrors.floorX}>
-          <NumberInput id="rs-table-x" type="number" min={0} max={10000} value={draft.floorX} onChange={(event) => setDraft({ ...draft, floorX: event.target.value })} />
+          <SaveErrorField names={["floorX","draft.floorX","floor_x","draft.floor_x"]}><NumberInput id="rs-table-x" type="number" min={0} max={10000} value={draft.floorX} onChange={(event) => setDraft({ ...draft, floorX: event.target.value })} /></SaveErrorField>
         </Field>
         <Field label="縦の位置" htmlFor="rs-table-y" error={fieldErrors.floorY}>
-          <NumberInput id="rs-table-y" type="number" min={0} max={10000} value={draft.floorY} onChange={(event) => setDraft({ ...draft, floorY: event.target.value })} />
+          <SaveErrorField names={["floorY","draft.floorY","floor_y","draft.floor_y"]}><NumberInput id="rs-table-y" type="number" min={0} max={10000} value={draft.floorY} onChange={(event) => setDraft({ ...draft, floorY: event.target.value })} /></SaveErrorField>
         </Field>
       </div>
       <DialogField label="結合グループ" htmlFor="rs-table-group">
-        <TextField id="rs-table-group" maxLength={100} value={draft.joinGroup} onChange={(event) => setDraft({ ...draft, joinGroup: event.target.value })} />
+        <SaveErrorField names={["joinGroup","draft.joinGroup","join_group","draft.join_group"]}><TextField id="rs-table-group" maxLength={100} value={draft.joinGroup} onChange={(event) => setDraft({ ...draft, joinGroup: event.target.value })} /></SaveErrorField>
       </DialogField>
     </>
   ) : null
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <StatRow fusion>
         <KpiCard title="卓数" value={rows.length} unit="卓" detail="稼働・停止を含む" icon={undefined} presentation="band" />
         <KpiCard title="総席数" value={rows.reduce((sum, item) => sum + item.max_capacity, 0)} unit="席" detail="最大収容人数" icon={undefined} presentation="band" />
@@ -283,21 +299,21 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
           <div ref={editorRef} className={styles.editorFields}>
             <div className={styles.pair}>
               <Field label="卓番" htmlFor="rs-table-code" error={fieldErrors.code}>
-                <TextField id="rs-table-code" value={draft.code} onChange={(event) => setDraft({ ...draft, code: event.target.value })} />
+                <SaveErrorField names={["code","draft.code"]}><TextField id="rs-table-code" value={draft.code} onChange={(event) => setDraft({ ...draft, code: event.target.value })} /></SaveErrorField>
               </Field>
               <Field label="表示名" htmlFor="rs-table-label" error={fieldErrors.label}>
-                <TextField id="rs-table-label" value={draft.label} onChange={(event) => setDraft({ ...draft, label: event.target.value })} />
+                <SaveErrorField names={["label","draft.label"]}><TextField id="rs-table-label" value={draft.label} onChange={(event) => setDraft({ ...draft, label: event.target.value })} /></SaveErrorField>
               </Field>
             </div>
             <DialogField label="席種" kind="select">
-              <Select aria-label="席種" size="full" value={draft.seatType} onChange={(value) => setDraft({ ...draft, seatType: value })} options={SEAT_TYPE_OPTIONS} />
+              <SaveErrorField names={["seatType","draft.seatType","seat_type","draft.seat_type"]}><Select aria-label="席種" size="full" value={draft.seatType} onChange={(value) => setDraft({ ...draft, seatType: value })} options={SEAT_TYPE_OPTIONS} /></SaveErrorField>
             </DialogField>
             <div className={styles.pair}>
               <Field label="最小人数" htmlFor="rs-table-min" error={fieldErrors.minCapacity}>
-                <NumberInput id="rs-table-min" type="number" min={1} value={draft.minCapacity} onChange={(event) => setDraft({ ...draft, minCapacity: event.target.value })} />
+                <SaveErrorField names={["minCapacity","draft.minCapacity","min_capacity","draft.min_capacity"]}><NumberInput id="rs-table-min" type="number" min={1} value={draft.minCapacity} onChange={(event) => setDraft({ ...draft, minCapacity: event.target.value })} /></SaveErrorField>
               </Field>
               <Field label="最大人数" htmlFor="rs-table-max" error={fieldErrors.maxCapacity}>
-                <NumberInput id="rs-table-max" type="number" min={1} value={draft.maxCapacity} onChange={(event) => setDraft({ ...draft, maxCapacity: event.target.value })} />
+                <SaveErrorField names={["maxCapacity","draft.maxCapacity","max_capacity","draft.max_capacity"]}><NumberInput id="rs-table-max" type="number" min={1} value={draft.maxCapacity} onChange={(event) => setDraft({ ...draft, maxCapacity: event.target.value })} /></SaveErrorField>
               </Field>
             </div>
             {showPlacement ? placementFields : null}
@@ -335,7 +351,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
               {upcoming.map((item) => <li key={item.id}>{reservationLine(item, store?.timezone)}</li>)}
             </ul>
             <DialogField label="この予約をどうしますか" kind="select">
-              <Select
+              <SaveErrorField names={["moveMode","move_mode"]}><Select
                 aria-label="この予約をどうしますか"
                 size="full"
                 value={moveMode}
@@ -344,13 +360,13 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
                   { value: 'move', label: '同じ人数が入る別の卓へ自動で移す' },
                   { value: 'unassign', label: '未配席に戻す（予約台帳で割り当てる）' },
                 ]}
-              />
+              /></SaveErrorField>
             </DialogField>
             <p className={styles.stopNotice}>お客さまへの LINE のお知らせは、この画面からは送りません。</p>
           </>
         )}
       </RsDialog>
-    </>
+    </></SaveErrorScope>
   )
 }
 

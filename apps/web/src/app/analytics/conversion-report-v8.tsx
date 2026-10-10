@@ -13,6 +13,7 @@ import { analyticsWeekday } from './analytics-time'
 import './readonly-v8.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 /** 成果地点の既存APIを使う閲覧画面。コンバージョン側の旧入口も残す。 */
 export default function ConversionReportV8({ accountId }: { accountId: string }) {
@@ -56,7 +57,7 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
   }
   return <div>
     <div className="flex flex-wrap items-center justify-between gap-3"><div role="group" aria-label="成果レポートの期間" className="flex gap-2">{[7, 30, 90].map((value) => <Button key={value} variant="secondary" aria-pressed={days === value} onClick={() => setDays(value)}>{value}日</Button>)}</div><Button variant="secondary" disabled={!report || exporting} onClick={() => void exportCsv()}>CSVで書き出す</Button></div>
-    {exportError && <p role="alert" className="text-danger text-sm">{exportError}</p>}
+    {exportError && <Notice tone="danger" >{exportError}</Notice>}
     {loading ? <ListState kind="loading" title="成果レポートを読み込んでいます" /> : error ? <ListState kind="error" title={error} onRetry={() => setAttempt((value) => value + 1)} /> : report && <>
       <div className="grid grid-cols-4"><KpiCard title="この期間の成果" value={report.kpis.netCount} unit="件" detail={`売上 ${formatNumber(report.kpis.netValue)}円`} /><KpiCard title="前の期間" value={report.kpis.previousNetCount} unit="件" detail={`${report.previousRange.from}〜${report.previousRange.to}`} /><KpiCard title="増減" value={report.kpis.netCount - report.kpis.previousNetCount} unit="件" detail="前の期間と比較" /><KpiCard title="1件あたり" value={report.kpis.averageNetValue} unit="円" detail="取り消し後の成果から集計" /></div>
       <section className="v8-ro-analytics-trend"><h2 className="text-base font-semibold">日ごとの成果（成果地点すべて）</h2><p className="mb-4 mt-2 text-xs text-ink-secondary">{report.range.from}〜{report.range.to}</p>{daily.length ? <BarChart items={daily} /> : <ListState kind="empty" title="この期間の成果はありません" />}</section>

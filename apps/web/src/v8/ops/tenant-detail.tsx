@@ -1,7 +1,5 @@
 'use client'
-
 import { useUrlTab } from '@/lib/use-url-tab'
-
 import { ChevronLeft, LogIn } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
@@ -17,16 +15,17 @@ import TargetMissing from '@/components/shared/target-missing'
 import { Tabs } from '@/components/shared/tabs'
 import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
-import { formatNumber } from '@/lib/format'
+import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
 import { OpsHead } from './shell'
 import { useOpsReadOnly } from './use-ops-read-only'
 import parts from './parts.module.css'
 import styles from './tenant-detail.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営の契約先の詳細 V8（絵 `Oub6x`・停止の窓 `okXoi`）。
@@ -154,7 +153,7 @@ function DetailContent() {
         )}
       />
       <div className={parts.stack}>
-        {error ? <p role="alert" className={parts.alert}>{error}</p> : null}
+        {error ? <Notice tone="danger" className={parts.alertNoticePlacement} >{error}</Notice> : null}
         <div className={parts.tabs}>
           <Tabs
             label="契約先の中身"
@@ -188,7 +187,7 @@ function DetailContent() {
                   v={readOnly ? (restaurant ? '使う' : '使わない') : (
                     <span className={styles.toggleRow}>
                       <span>{restaurant ? '使う' : '使わない'}</span>
-                      <Toggle checked={restaurant} label={`飲食店機能を${restaurant ? 'オフ' : 'オン'}にする`} onChange={(next) => void toggleRestaurantFeature(next)} />
+                      <SaveErrorField names={["restaurant"]}><Toggle checked={restaurant} label={`飲食店機能を${restaurant ? 'オフ' : 'オン'}にする`} onChange={(next) => void toggleRestaurantFeature(next)} /></SaveErrorField>
                     </span>
                   )}
                 />
@@ -368,9 +367,9 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
               : '再開すると、権限者がまたログインできるようになります。'}
         </p>
         {needsName ? (
-          <Field label="確認のため、契約先の名前をそのまま入力"><TextField value={confirmName} onChange={(event) => setConfirmName(event.target.value)} placeholder={tenantName} /></Field>
+          <Field label="確認のため、契約先の名前をそのまま入力"><SaveErrorField names={["confirmName","confirm_name"]}><TextField value={confirmName} onChange={(event) => setConfirmName(event.target.value)} placeholder={tenantName} /></SaveErrorField></Field>
         ) : null}
-        <Field label="理由（4文字以上）" required><TextField value={reason} onChange={(event) => setReason(event.target.value)} placeholder="支払いの遅れが3か月続いたため" aria-label="理由（4文字以上）" required /></Field>
+        <Field label="理由（4文字以上）" required><SaveErrorField names={["reason"]}><TextField value={reason} onChange={(event) => setReason(event.target.value)} placeholder="支払いの遅れが3か月続いたため" aria-label="理由（4文字以上）" required /></SaveErrorField></Field>
       </div>
     </Dialog>
   )

@@ -1,15 +1,4 @@
 'use client'
-
-/*
- * ★V8 リマインダ詳細（絵 `rbAig` 概要）と登録者管理（絵 `loVfW`）。
- *
- * 読む口・操作の中身は v7 の detail/page.tsx と同じものを受け取る。
- * 並びは 戻るリンク＋題名＋1行説明 → タブ（概要・配信予定・実行結果・
- * 登録者）→ 左の本文／右の欄（一時停止・編集・その他 → いまの状態 →
- * 届き方のスマホ）。
- * 数は実値だけ出す。取れない値（公開前の実行記録など）は「—」ではなく
- * 0件・未取得として正直に出す。
- */
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -60,6 +49,19 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 リマインダ詳細（絵 `rbAig` 概要）と登録者管理（絵 `loVfW`）。
+ *
+ * 読む口・操作の中身は v7 の detail/page.tsx と同じものを受け取る。
+ * 並びは 戻るリンク＋題名＋1行説明 → タブ（概要・配信予定・実行結果・
+ * 登録者）→ 左の本文／右の欄（一時停止・編集・その他 → いまの状態 →
+ * 届き方のスマホ）。
+ * 数は実値だけ出す。取れない値（公開前の実行記録など）は「—」ではなく
+ * 0件・未取得として正直に出す。
+ */
 
 const PAGE_SIZE = 20
 /** 書き出しの上限。実行結果が多いとき、手元に全部ため込むと固まる。 */
@@ -135,6 +137,8 @@ export default function ReminderDetailV8Page() {
 }
 
 function ReminderDetailV8() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const searchParams = useSearchParams()
   const reminderId = searchParams.get('id') ?? ''
@@ -184,15 +188,19 @@ function ReminderDetailV8() {
       setData(runsRes.data)
       if (reminderRes.success) setReminder(reminderRes.data)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 404) {
         setMissing(true)
       } else {
-        setError('リマインダの詳細を読み込めませんでした。時間を置いてもう一度お試しください。')
+        { if (!fieldFailure)
+
+        setError('リマインダの詳細を読み込めませんでした。時間を置いてもう一度お試しください。') }
       }
     } finally {
       setLoading(false)
     }
-  }, [reminderId])
+  }, [reminderId, saveErrors])
 
   useEffect(() => {
     void load()
@@ -224,12 +232,14 @@ function ReminderDetailV8() {
       } : current)
       setActionMessage(isActive ? 'リマインダを再開しました。' : 'リマインダを一時停止しました。')
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       // R146 監査：API も未公開の再開を 409 で止める。その文面をそのまま出す。
+      { if (!fieldFailure)
       setActionMessage(caught instanceof ApiError && caught.status === 409
         ? caught.message
         : isActive
           ? '再開できませんでした。状態を読み直してからお試しください。'
-          : '一時停止できませんでした。状態を読み直してからお試しください。')
+          : '一時停止できませんでした。状態を読み直してからお試しください。') }
     }
   }
 
@@ -261,8 +271,11 @@ function ReminderDetailV8() {
       anchor.download = csvFileName("リマインダの実行履歴")
       anchor.click()
       URL.revokeObjectURL(url)
-    } catch {
-      setActionMessage('CSVを書き出せませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionMessage('CSVを書き出せませんでした。もう一度お試しください。') }
     } finally {
       setExporting(false)
     }
@@ -285,8 +298,11 @@ function ReminderDetailV8() {
       if (!res.success) throw new Error(res.error)
       const newId = String(res.data.reminderId)
       router.push(`/reminders/edit?id=${encodeURIComponent(newId)}&stage=target`)
-    } catch {
-      setActionMessage('複製できませんでした。通信を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionMessage('複製できませんでした。通信を確かめて、もう一度お試しください。') }
     } finally {
       setDuplicating(false)
     }
@@ -302,8 +318,11 @@ function ReminderDetailV8() {
       const res = await api.reminders.delete(reminderId)
       if (!res.success) throw new Error(res.error)
       router.push('/reminders')
-    } catch {
-      setDeleteError('削除できませんでした。時間を置いてもう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDeleteError('削除できませんでした。時間を置いてもう一度お試しください。') }
       setDeleting(false)
     }
   }
@@ -346,35 +365,35 @@ function ReminderDetailV8() {
 
   if (!reminderId) {
     return (
-      <ListState
+      <SaveErrorScope errors={saveErrors}><ListState
         kind="empty"
         title="リマインダが指定されていません"
         description="一覧から選び直してください。"
         action={<Button href="/reminders">リマインダ一覧へ戻る</Button>}
-      />
+      /></SaveErrorScope>
     )
   }
   if (loading) {
-    return <DetailLoading label="リマインダの詳細を読み込んでいます" />
+    return <SaveErrorScope errors={saveErrors}><DetailLoading label="リマインダの詳細を読み込んでいます" /></SaveErrorScope>
   }
   if (missing) {
     return (
-      <ListState
+      <SaveErrorScope errors={saveErrors}><ListState
         kind="empty"
         title="このリマインダは見つかりません"
         description="削除されたか、別の記録です。一覧から選び直してください。"
         action={<Button href="/reminders">リマインダ一覧へ戻る</Button>}
-      />
+      /></SaveErrorScope>
     )
   }
   if (error || !data) {
     return (
-      <ListState
+      <SaveErrorScope errors={saveErrors}><ListState
         kind="error"
         title="詳細を表示できませんでした"
         description={error || '詳細を読み込めませんでした。'}
         onRetry={() => void load()}
-      />
+      /></SaveErrorScope>
     )
   }
 
@@ -382,7 +401,7 @@ function ReminderDetailV8() {
   const firstStep = data.steps[0] ?? null
 
   return (
-    <div className={styles.page}>
+    <SaveErrorScope errors={saveErrors}><div className={styles.page}>
       <div className={styles.headText}>
         <Link href="/reminders" className={styles.backLink}>
           <ChevronLeft size={14} aria-hidden="true" />
@@ -443,11 +462,11 @@ function ReminderDetailV8() {
         <aside className={styles.side}>
           <div className={styles.sideActions}>
             {isUnpublishedDraft ? null : data.reminder.isActive ? (
-              <Button size="field" onClick={() => void setReminderActive(false)} disabled={!canManage}>
+              <Button size="field" onClick={() => setReminderActive(false)} busyLabel="処理中…" disabled={!canManage}>
                 一時停止する
               </Button>
             ) : (
-              <Button size="field" onClick={() => void setReminderActive(true)} disabled={!canManage}>
+              <Button size="field" onClick={() => setReminderActive(true)} busyLabel="処理中…" disabled={!canManage}>
                 再開する
               </Button>
             )}
@@ -513,7 +532,7 @@ function ReminderDetailV8() {
         onConfirm={() => void runDelete()}
         onCancel={() => setConfirmDelete(false)}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }
 
@@ -840,12 +859,12 @@ function RunsTab({
             }
           }}
         />
-        <Select
+        <SaveErrorField names={["status"]}><Select
           aria-label="結果で絞り込む"
           value={status}
           onChange={(value) => { setStatus(value as '' | ReminderDeliveryRunStatus); setPage(1) }}
           options={RUN_STATUS_OPTIONS}
-        />
+        /></SaveErrorField>
         <Button size="field" onClick={() => { setAppliedSearch(search.trim()); setPage(1) }}>
           探す
         </Button>
@@ -931,6 +950,8 @@ function RunsTab({
 type RegistrantFilter = 'all' | 'active' | 'cancelled'
 
 function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canManage: boolean }) {
+  const saveErrors = useSaveFormErrors()
+
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<ReminderRegistrant[]>([])
   const [draftDates, setDraftDates] = useState<Record<string, string>>({})
@@ -956,13 +977,16 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
       if (!registrants.success) throw new Error('load failed')
       setItems(registrants.data)
       setDraftDates(Object.fromEntries(registrants.data.map((item) => [item.id, dateTimeLocalJst(item.targetDate)])))
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
       setItems([])
-      setError('登録者を読み込めませんでした。時間を置いてもう一度お試しください。')
+      { if (!fieldFailure)
+
+      setError('登録者を読み込めませんでした。時間を置いてもう一度お試しください。') }
     } finally {
       setLoading(false)
     }
-  }, [reminderId])
+  }, [reminderId, saveErrors])
 
   useEffect(() => {
     // アカウント切替直後に前の店舗の一覧を見せたままにしない。
@@ -1010,8 +1034,11 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
       if (!response.success) throw new Error(response.error)
       apply(item.id, response.data)
       setNotice(response.data.replayed ? '同じ変更を確認しました。基準日は変更済みです。' : '基準日を変更しました。未送信分だけ新しい日程で組み直します。')
-    } catch {
-      setNotice('基準日を変更できませんでした。ほかの担当者による変更がないか、一覧を読み直してください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setNotice('基準日を変更できませんでした。ほかの担当者による変更がないか、一覧を読み直してください。') }
     } finally { setActioningId(null) }
   }
 
@@ -1028,13 +1055,16 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
       setNotice(action === 'cancel'
         ? '登録を取り消しました。送信済みの履歴は残り、未送信分だけを止めています。'
         : '登録を再開しました。未送信分だけを次の配信処理で組み直します。')
-    } catch {
-      setNotice('操作を完了できませんでした。一覧を読み直してからもう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setNotice('操作を完了できませんでした。一覧を読み直してからもう一度お試しください。') }
     } finally { setActioningId(null) }
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <div className={styles.bannerInfo}>
         基準日を変えると、まだ送っていない通知だけ新しい日程で組み直します。送った履歴は消えません。
       </div>
@@ -1113,12 +1143,12 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
                         </Link>
                       </td>
                       <td>
-                        <DateTimeField
+                        <SaveErrorField names={["draftDates","draft_dates"]}><DateTimeField
                           aria-label={`${item.friendName || '登録者'}の基準日`}
                           value={draftDates[item.id] ?? ''}
                           disabled={item.status !== 'active' || actioningId === item.id || !canManage}
                           onChange={(v) => setDraftDates((current) => ({ ...current, [item.id]: v }))}
-                        />
+                        /></SaveErrorField>
                       </td>
                       <td>
                         <span className={[styles.statusDot, item.status === 'active' ? styles.statusDotOk : ''].filter(Boolean).join(' ')}>
@@ -1169,6 +1199,6 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
           </>
         )}
       </section>
-    </>
+    </></SaveErrorScope>
   )
 }

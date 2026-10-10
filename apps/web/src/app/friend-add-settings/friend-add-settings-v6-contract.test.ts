@@ -31,7 +31,7 @@ describe('V6 友だち追加時配信 7画面の契約', () => {
   })
 
   it('読込中・空・失敗と再読込を用意する', () => {
-    expect(LIST_PAGE).toContain("onClick={() => void load()}")
+    expect(LIST_PAGE).toContain("onClick={() => load()}")
   })
 
   it('未接続の見せかけアクションを選択肢に出さない', () => {

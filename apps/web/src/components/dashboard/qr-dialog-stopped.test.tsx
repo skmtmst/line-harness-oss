@@ -100,3 +100,6 @@ describe('止めた経路のQR（M）', () => {
     expect(html).not.toContain('alt="友だち追加QRコード"')
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

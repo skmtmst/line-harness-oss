@@ -1,3 +1,4 @@
+import { READ_ONLY_MESSAGE } from '@/components/shared/read-only-notice'
 // @vitest-environment happy-dom
 /*
  * V8 コンバージョンの一覧（src/v8/conversions/list.tsx）の動きの試験。BEHAVIOR.md の主な動きを守る。
@@ -21,30 +22,36 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   usePathname: () => '/conversions',
   useSearchParams: () => new URLSearchParams(''),
-}))
+}));
+
 
 vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
     React.createElement('a', { href, ...rest }, children),
-}))
+}));
+
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [{ id: 'account-a', name: '本店' }], loading: false }),
-}))
+}));
+
 
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
   usePageCrumbs: () => {},
-}))
+}));
+
 
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
   return { ...actual, useStaffRole: () => role.value }
-})
+});
+
 
 vi.mock('@/lib/use-narrow-viewport', () => ({
   useNarrowViewport: () => narrow.value,
-}))
+}));
+
 
 import ConversionListV8 from './list'
 
@@ -144,6 +151,9 @@ describe('V8 コンバージョンの一覧', () => {
     await flush()
     fireEvent.click(screen.getByRole('menuitem', { name: '編集する' }))
     await flush()
+    expect(push).toHaveBeenCalledWith('/conversions/edit?id=cp-1')
+    await act(async () => { root.render(<ConversionListV8 accountId="account-a" editId="cp-1" />) })
+    await flush()
     const input = screen.getByLabelText('成果地点の名前') as HTMLInputElement
     const scroll = vi.fn()
     input.scrollIntoView = scroll
@@ -193,7 +203,7 @@ describe('V8 コンバージョンの一覧', () => {
   it('閲覧のみ：帯を出し、作る・使う場所を足す・変える操作は置かない（見る操作は残す）', async () => {
     role.value = 'staff'
     await mount()
-    expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
+    expect(screen.getByText(READ_ONLY_MESSAGE)).toBeTruthy()
     expect(screen.queryByRole('link', { name: /成果地点を作る/ })).toBeNull()
     expect(screen.queryByRole('link', { name: '使う場所を足す' })).toBeNull()
     expect(Array.from(document.querySelectorAll('button')).filter((button) => button.disabled)).toEqual([])

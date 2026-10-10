@@ -1,4 +1,41 @@
 'use client'
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { notifySaved } from '@/components/shared/toast'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { Check, Send } from 'lucide-react'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import Dialog from '@/components/shared/dialog'
+import Select from '@/components/shared/select'
+import StatusBadge from '@/components/shared/status-badge'
+import StickyBar from '@/components/shared/sticky-bar'
+import { DetailColumns } from '@/components/templates/detail-columns'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { Field as FormField, FieldError } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
+import FormSection from '@/components/shared/form-section'
+import ListState from '@/components/shared/list-state'
+import SettingsInnerNav from '@/components/layout/settings-inner-nav'
+import { useAccount } from '@/contexts/account-context'
+import { ApiError, api, type OperatorRecipientPreview } from '@/lib/api'
+import { describeApiFailure, isForbidden, isForbiddenOrRateLimited, loadFailureNotice, permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { ROLE_LABELS } from '@/lib/hq-members'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import type { OperatorNotificationTeam } from '@line-crm/shared'
+import { DEDUPE_OPTIONS, DEFAULT_EVENT_TYPE, EVENT_OPTIONS, IMPORTANCE_OPTIONS, RECIPIENTS_SAVE_GUARD_MESSAGE, SCHEDULE_OPTIONS, THRESHOLD_OPTIONS, eventLabel, eventPlaceLabel, importanceLabel, readConditions } from './operator-words'
+import styles from './operator-edit.module.css'
+import { useFormErrors } from '@/lib/use-form-errors'
+import TruncatedText from '@/components/shared/truncated-text'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 運用者へのお知らせを作る・なおす（板 `gjUz3` 作る・`hiBO8` なおす、公開前の確認 `sDXNy`）。
@@ -11,59 +48,9 @@
  * データの口・下書き保存・公開・テスト送信・版の守り・未保存の番兵は、今の画面
  * （app/line-notifications/operator/new/operator-new-v8.tsx）から写した。動きは BEHAVIOR.md。
  */
-import { createPageReturnHref } from '@/components/shared/create-page'
-import { notifySaved } from '@/components/shared/toast'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useEffect, useRef, useState } from 'react'
-import { Check, Eye, Send } from 'lucide-react'
-import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
-import Dialog from '@/components/shared/dialog'
-import Select from '@/components/shared/select'
-import StatusBadge from '@/components/shared/status-badge'
-import StickyBar from '@/components/shared/sticky-bar'
-import { DetailColumns } from '@/components/templates/detail-columns'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import { Field as FormField } from '@/components/shared/form-controls'
-import { TextField } from '@/components/shared/text-field'
-import FormSection from '@/components/shared/form-section'
-import ListState from '@/components/shared/list-state'
-import SettingsInnerNav from '@/components/layout/settings-inner-nav'
-import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
-import { ApiError, api, type OperatorRecipientPreview } from '@/lib/api'
-import {
-  describeApiFailure,
-  isForbidden,
-  isForbiddenOrRateLimited,
-  loadFailureNotice,
-} from '@/components/shared/api-error-message'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { ROLE_LABELS } from '@/lib/hq-members'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import type { OperatorNotificationTeam } from '@line-crm/shared'
-import {
-  DEDUPE_OPTIONS,
-  DEFAULT_EVENT_TYPE,
-  EVENT_OPTIONS,
-  IMPORTANCE_OPTIONS,
-  RECIPIENTS_SAVE_GUARD_MESSAGE,
-  SCHEDULE_OPTIONS,
-  THRESHOLD_OPTIONS,
-  eventLabel,
-  eventPlaceLabel,
-  importanceLabel,
-  readConditions,
-} from './operator-words'
-import styles from './operator-edit.module.css'
-import { useFormErrors } from '@/lib/use-form-errors'
-import { FieldError } from '@/components/shared/form-controls'
-import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 function OperatorEditInner() {
+  const saveErrors = useSaveFormErrors()
   const editId = useSearchParams().get('id')
   usePageTitle(editId ? '運用者へのお知らせをなおす' : '運用者へのお知らせを作る')
   usePageCrumbs([
@@ -78,8 +65,7 @@ function OperatorEditInner() {
    * お知らせの口はすべて owner・admin だけ。staff には閲覧のみの帯を出し、
    * 変える操作のボタンは置かずに隠す（2026-10-06 オーナー決定）。
    */
-  const [canWrite] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canWrite = useFeatureAccess('lineNotifications')
 
   const [eventType, setEventType] = useState(DEFAULT_EVENT_TYPE)
   const [threshold, setThreshold] = useState('one')
@@ -151,7 +137,9 @@ function OperatorEditInner() {
       setTeams(current => [...current.filter(team => team.id !== result.data.id), result.data])
       teamIdRef.current = result.data.id
       setTeamId(result.data.id); setRecipientIds(result.data.staffIds)
-    } catch (caught) { if (generation === teamGeneration.current) setTeamError(caught instanceof Error ? caught.message : '保存できませんでした。') }
+    } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+ if (generation === teamGeneration.current) { if (!fieldFailure) setTeamError(caught instanceof Error ? caught.message : '保存できませんでした。') } }
     finally { setTeamBusy(false) }
   }
 
@@ -367,14 +355,23 @@ function OperatorEditInner() {
       if (!quiet) { notifySaved('下書きを保存しました'); if (!editId) router.push(createPageReturnHref('/line-notifications?tab=operator', result.data.id)) }
       return result.data.id
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 403) {
-        setError(permissionDeniedMessage('store'))
+        { if (!fieldFailure)
+
+
+        setError(permissionDeniedMessage('store')) }
       } else if (caught instanceof ApiError && caught.status === 404) {
-        setError('お知らせが見つかりません。一覧へ戻って開き直してください。')
+        { if (!fieldFailure)
+        setError('お知らせが見つかりません。一覧へ戻って開き直してください。') }
       } else if (caught instanceof ApiError && (caught.status === 409 || caught.status === 400)) {
+        { if (!fieldFailure)
         setError(caught.message)
+      }
       } else {
-        setError('下書きを保存できませんでした。時間をおいてもう一度お試しください。')
+        { if (!fieldFailure)
+        setError('下書きを保存できませんでした。時間をおいてもう一度お試しください。') }
       }
       return null
     } finally {
@@ -411,9 +408,14 @@ function OperatorEditInner() {
       notifySaved('公開しました')
       if (!editId) router.push(createPageReturnHref('/line-notifications?tab=operator', ruleId))
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
+
       setError(describeApiFailure(caught, '公開', {
         scope: 'store',
-      }))
+      })) }
     } finally {
       setPublishing(false)
     }
@@ -429,9 +431,14 @@ function OperatorEditInner() {
       if (!result.success) throw new Error(result.error)
       setNotice(result.data.accepted > 0 ? '自分へのテスト送信を受け付けました。' : '受け取れる通知方法がありません。受信設定を確認してください。')
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
+
       setError(describeApiFailure(caught, 'テスト送信', {
         scope: 'store',
-      }))
+      })) }
     } finally { setSaving(false) }
   }
 
@@ -450,17 +457,14 @@ function OperatorEditInner() {
   const teamOptions = [{ value: '', label: 'スタッフを選ぶ' }, ...teams.map(team => ({ value: team.id, label: `${team.name}（${team.staffIds.length} 人）` }))]
 
   return (
-    <PageFrame kind="settings" boardId={editId ? 'hiBO8' : 'gjUz3'}>
+    <SaveErrorScope errors={saveErrors}><PageFrame kind="settings" boardId={editId ? 'hiBO8' : 'gjUz3'}>
       <PageHeading title={title} help={description} />
 
       <div className={styles.body}>
         <SettingsInnerNav inline />
         <div className={styles.content}>
           {canWrite ? null : (
-            <div className={styles.roBand} role="status">
-              <Eye size={14} aria-hidden="true" />
-              <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-            </div>
+            <div className={styles.roBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
           )}
           <DetailColumns
             presentation="notification"
@@ -504,7 +508,7 @@ function OperatorEditInner() {
           >
               <FormSection id="operator-when-heading" title="どんなときに知らせるか">
                 <FormField htmlFor="operator-name" label="お知らせの名前">
-                  <TextField
+                  <SaveErrorField names={["name"]}><TextField
                     id="operator-name"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
@@ -514,7 +518,7 @@ function OperatorEditInner() {
                     {...fields.bind('name')}
                     invalid={fields.invalid('name')}
                     aria-describedby={fields.invalid('name') ? 'operator-name-error' : undefined}
-                  />
+                  /></SaveErrorField>
                   <FieldError id="operator-name-error">{fields.error('name')}</FieldError>
                 </FormField>
                 <div className={styles.pair}>
@@ -551,7 +555,7 @@ function OperatorEditInner() {
                 {/* 絵 gjUz3：チームを選んでいるときはスタッフの箱を出さない（顔ぶれはチームのとおり）。 */}
                 {teamId ? (teamError ? (
                   <div className={styles.teamError}>
-                    <p role="alert">{teamError}</p>
+                    <Notice tone="danger" >{teamError}</Notice>
                     <Button variant="secondary" onClick={loadTeams}>チームをもう一度読み込む</Button>
                   </div>
                 ) : null) : (
@@ -572,43 +576,21 @@ function OperatorEditInner() {
                         <Link href="/staff" className={styles.linkItem}>ログインユーザーでスタッフを確認する</Link>
                       </div>
                     ) : (
-                      <ul className={styles.staffList}>
-                        {/* 閲覧のみ：選ぶチェックは置かず、受け取る人の名前だけを並べる（2026-10-06 オーナー決定）。 */}
-                        {(canWrite ? items : items.filter((recipient) => recipientIds.includes(recipient.id))).map((recipient) => (
-                          <li key={recipient.id} className={styles.staffRow}>
-                            {canWrite ? (
-                              <Checkbox
-                                checked={recipientIds.includes(recipient.id)}
-                                onCheckedChange={(checked) => {
-                                  teamTouchedRef.current = true
-                                  teamIdRef.current = ''
-                                  setTeamId('')
-                                  setRecipientsFieldError('')
-                                  setRecipientIds((current) => checked
-                                    ? [...current, recipient.id]
-                                    : current.filter((id) => id !== recipient.id))
-                                }}
-                              >
-                                {recipient.name}
-                              </Checkbox>
-                            ) : <span>{recipient.name}</span>}
-                            <span className={styles.staffSpacer} />
-                            <StatusBadge tone={recipient.channels.line ? 'success' : 'neutral'}>
-                              {recipient.channels.line ? 'LINE' : 'LINE 未ログイン'}
-                            </StatusBadge>
-                            <StatusBadge tone={recipient.channels.dashboard ? 'success' : 'neutral'}>管理画面</StatusBadge>
-                          </li>
-                        ))}
-                      </ul>
+                      <EntitySelect aria-label="受け取るスタッフ" noun="スタッフ" values={recipientIds} readOnly={!canWrite}
+                        onChange={(ids) => {
+                          teamTouchedRef.current = true
+                          teamIdRef.current = ''
+                          setTeamId('')
+                          setRecipientsFieldError('')
+                          setRecipientIds(ids)
+                        }} options={items.map((recipient) => ({ value: recipient.id, label: recipient.name, description: `${recipient.channels.line ? 'LINE' : 'LINE 未ログイン'}・${recipient.channels.dashboard ? '管理画面' : '管理画面 未対応'}` }))} />
                     ))
                     : recipientsError !== null
                       ? (
                         <div>
-                          <p className={styles.cardNote} role="alert">
-                            {isForbiddenOrRateLimited(recipientsError)
+                          <Notice tone="danger" className={styles.cardNoteNoticePlacement} >{isForbiddenOrRateLimited(recipientsError)
                               ? loadFailureNotice(recipientsError, '受け取る人')
-                              : '受け取る人を読み込めませんでした。時間をおいて、もう一度お試しください。'}
-                          </p>
+                              : '受け取る人を読み込めませんでした。時間をおいて、もう一度お試しください。'}</Notice>
                           {isForbidden(recipientsError) ? null : (
                             <Button variant="secondary" onClick={() => loadRecipients()}>もう一度読み込む</Button>
                           )}
@@ -625,25 +607,25 @@ function OperatorEditInner() {
                   ) : null}
                   {canWrite && teamFormOpen ? (
                     <div className={styles.teamForm}>
-                      <TextField aria-label="チーム名" placeholder="チーム名" value={teamName} maxLength={100} disabled={teamBusy} onChange={event => setTeamName(event.target.value)} />
+                      <SaveErrorField names={["teamName","name","team_name"]}><TextField aria-label="チーム名" placeholder="チーム名" value={teamName} maxLength={100} disabled={teamBusy} onChange={event => setTeamName(event.target.value)} /></SaveErrorField>
                       <Button variant="secondary" disabled={teamBusy} onClick={() => void saveTeam()} busy={Boolean(teamBusy)} busyLabel="処理中…">{teamId ? 'チームを更新する' : 'チームを作る'}</Button>
                     </div>
                   ) : null}
                   {teamError ? (
                     <div className={styles.teamError}>
-                      <p role="alert">{teamError}</p>
+                      <Notice tone="danger" >{teamError}</Notice>
                       <Button variant="secondary" onClick={loadTeams}>チームをもう一度読み込む</Button>
                     </div>
                   ) : null}
                 </div>
                 )}
                 {canWrite ? <>
-                  <Checkbox checked={onlyAvailable} onCheckedChange={setOnlyAvailable}>
+                  <SaveErrorField names={["onlyAvailable","only_available"]}><Checkbox checked={onlyAvailable} onCheckedChange={setOnlyAvailable}>
                     手が空いている人だけに送る（対応中の人には送りません）
-                  </Checkbox>
-                  <Checkbox checked={emailFallback} onCheckedChange={setEmailFallback}>
+                  </Checkbox></SaveErrorField>
+                  <SaveErrorField names={["emailFallback","email_fallback"]}><Checkbox checked={emailFallback} onCheckedChange={setEmailFallback}>
                     だれも受け取れないときはメールでも送る（LINE未ログインの人がいるとき）
-                  </Checkbox>
+                  </Checkbox></SaveErrorField>
                 </> : <>
                   {/* 閲覧のみ：チェックは置かず、いまの設定を文字で見せる。 */}
                   <p className={styles.cardNote}>{`手が空いている人だけに送る：${onlyAvailable ? 'する' : 'しない'}`}</p>
@@ -656,7 +638,7 @@ function OperatorEditInner() {
                 <p className={styles.cardNote}>営業時間外のものは翌朝 10:00 にまとめて送ります。</p>
               </FormSection>
 
-              {error ? <p className={styles.formError} role="alert">{error}</p> : null}
+              {error ? <Notice tone="danger" className={styles.formErrorNoticePlacement} >{error}</Notice> : null}
               {notice ? <p className={styles.formNotice} role="status">{notice}</p> : null}
           </DetailColumns>
 
@@ -741,7 +723,7 @@ function OperatorEditInner() {
       </Dialog>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したお知らせ" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </PageFrame>
+    </PageFrame></SaveErrorScope>
   )
 }
 
@@ -766,8 +748,8 @@ function Field({ id, label, value, onChange, options, readOnly = false, error }:
   return (
     <FormField htmlFor={id} label={label} size="compact" error={error} fill>
       {readOnly
-        ? <TextField id={id} aria-label={label} value={shown} readOnly aria-readonly="true" title={shown} />
-        : <Select aria-label={label} id={id} size="full" invalid={!!error} value={value} onChange={onChange} options={options} />}
+        ? <SaveErrorField names={["shown"]}><TextField id={id} aria-label={label} value={shown} readOnly aria-readonly="true" title={shown} /></SaveErrorField>
+        : <SaveErrorField names={["value"]}><Select aria-label={label} id={id} size="full" invalid={!!error} value={value} onChange={onChange} options={options} /></SaveErrorField>}
     </FormField>
   )
 }

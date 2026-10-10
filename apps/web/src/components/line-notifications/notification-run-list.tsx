@@ -13,6 +13,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Notice from '@/components/shared/notice'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const PAGE_SIZE = 20
 
@@ -473,9 +474,9 @@ export default function NotificationRunList({
       <div className="flex flex-wrap items-center gap-2">
         <label className="min-w-64 flex-1">
           <span className="sr-only">お客様の名前・注文番号で検索</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お客様の名前・注文番号で検索（表示中の20件のみ）" className="min-h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-label outline-none focus:border-accent" />
+          <SaveErrorField names={["query"]}><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お客様の名前・注文番号で検索（表示中の20件のみ）" className="min-h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-label outline-none focus:border-accent" /></SaveErrorField>
         </label>
-        <Select
+        <SaveErrorField names={["recipientFilter","recipient","recipient_filter"]}><Select
           aria-label="対象を絞り込み"
           label="対象"
           value={recipientFilter}
@@ -485,8 +486,8 @@ export default function NotificationRunList({
             { value: 'customer', label: '顧客' },
             { value: 'operator', label: '運用者' },
           ]}
-        />
-        <Select
+        /></SaveErrorField>
+        <SaveErrorField names={["periodFilter","period","period_filter"]}><Select
           aria-label="期間を絞り込み"
           label="期間"
           value={periodFilter}
@@ -497,7 +498,7 @@ export default function NotificationRunList({
             { value: '7d', label: '7日以内' },
             { value: '30d', label: '30日以内' },
           ]}
-        />
+        /></SaveErrorField>
         {mode === 'history' ? <FilterChip selected={filter === 'clicked'} onChange={() => setFilter(filter === 'clicked' ? 'all' : 'clicked')}>クリック記録あり</FilterChip> : null}
         <span className="flex-1" />
         <Button onClick={() => void load()}>記録を再読み込み</Button>
@@ -541,9 +542,8 @@ export default function NotificationRunList({
                 <Tr key={item.id}>
                   <NameCell
                     name={<><span className="block whitespace-nowrap text-caption font-semibold">{formatJst(item.receivedAt)}</span><span className="mt-0.5 block">{item.notificationName}</span></>}
-                    sub={item.orderNumber ? `注文 ${item.orderNumber}` : item.source}
                   />
-                  <NameCell name={item.friendName || '名前は未取得'} sub={item.recipientType === 'customer' ? `顧客${item.orderNumber ? `・${item.orderNumber}` : ''}` : '運用者'} />
+                  <NameCell name={item.friendName || '名前は未取得'} />
                   <Td><StatusBadge status={item.status} /></Td>
                   <Td>
                     <span className="block text-caption leading-5 text-ink-secondary">{item.reason || '—'}</span>

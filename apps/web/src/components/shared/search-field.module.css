@@ -52,12 +52,12 @@
  * 色・太さ・余白は #804 と同じ（2px・action 色・offset 2px）。
  */
 .input:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
 .clear:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -132,7 +132,7 @@
 
 /* 複合欄の焦点は外枠へ。内側の入力の輪郭を重ねない。 */
 [data-theme='v8'] .search:has(:focus-visible) {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 [data-theme='v8'] .input:focus-visible { outline: none; }

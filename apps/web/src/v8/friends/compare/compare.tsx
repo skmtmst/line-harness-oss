@@ -1,23 +1,11 @@
 'use client'
-
-/*
- * ★V8 重複候補を比べて決める（Pencil `fcg2D`：判定の小窓を開いた形、1152 は `p15At`：閉じた形）。
- * /friends/identity-candidates（`?id=` で候補を指定。無ければ未判定の先頭）。
- *
- * 読み込み・判定は今と同じ口（components/identity の useIdentityReview：
- * 一覧・詳細・判定・版の照合）。判定の中身も今と同じ（理由は必須・結び付けるときは
- * 採用する値と3つの確認）。違いは見せ方だけ：
- * - 判定は窓ではなく「結び付けた人に使う値」の中に開く小窓。下の帯の3つのボタンが開く
- * - 採用する値は表の「使う値」で選ぶ（小窓はその要約）
- * - 判定の履歴は小窓の右に出す
- */
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CircleHelp, Link2, UserX } from 'lucide-react'
 import type { IdentityCandidateDecision } from '@line-crm/shared'
 import type { IdentityCandidateWithProfiles } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { PageFrame } from '@/components/templates/page-frame'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Radio from '@/components/shared/radio'
@@ -30,9 +18,22 @@ import { useIdentityReview } from '@/components/identity/identity-review'
 import { canSubmitDecision } from '@/components/identity/identity-view'
 import { CONFIDENCE_WORD, STATUS_WORD, slashDateTime } from '../duplicates/words'
 import styles from './compare.module.css'
-import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
+
+/*
+ * ★V8 重複候補を比べて決める（Pencil `fcg2D`：判定の小窓を開いた形、1152 は `p15At`：閉じた形）。
+ * /friends/identity-candidates（`?id=` で候補を指定。無ければ未判定の先頭）。
+ *
+ * 読み込み・判定は今と同じ口（components/identity の useIdentityReview：
+ * 一覧・詳細・判定・版の照合）。判定の中身も今と同じ（理由は必須・結び付けるときは
+ * 採用する値と3つの確認）。違いは見せ方だけ：
+ * - 判定は窓ではなく「結び付けた人に使う値」の中に開く小窓。下の帯の3つのボタンが開く
+ * - 採用する値は表の「使う値」で選ぶ（小窓はその要約）
+ * - 判定の履歴は小窓の右に出す
+ */
 
 const STRENGTH_WORD = { strong: '決め手', medium: '手がかり', weak: '参考' } as const
 const ATTRIBUTE_WORD: Record<string, string> = { メールアドレス: 'メール', 電話番号: '電話' }
@@ -200,9 +201,9 @@ function CompareInner() {
                   <div ref={panelRef} className={styles.panel} role="group" aria-labelledby="compare-decide"><Field label={<>判定の理由</>} htmlFor="compare-reason" required><p id="compare-decide" className={styles.panelTitle}>「この2件を判定する」の小窓</p>
 <div className={styles.radios} role="radiogroup" aria-label="判定">
                       {DECISIONS.map((item) => (
-                        <Radio key={item.value} name="compare-decision" value={item.value} checked={decision === item.value} onChange={() => setDecision(item.value)}>
+                        <SaveErrorField names={["compare-decision","value","item.value","decision"]} key={item.value}><Radio key={item.value} name="compare-decision" value={item.value} checked={decision === item.value} onChange={() => setDecision(item.value)}>
                           {item.label}
-                        </Radio>
+                        </Radio></SaveErrorField>
                       ))}
                     </div>
 {decision === 'linked' ? (
@@ -211,24 +212,24 @@ function CompareInner() {
                         <p className={styles.fieldBox}>{selectionSummary}</p>
                         <div className={styles.checks}>
                           {CONSENTS.map((label, index) => (
-                            <Checkbox
+                            <SaveErrorField names={["consents"]} key={label}><Checkbox
                               key={label}
                               checked={consents[index]}
                               onCheckedChange={(checked) => setConsents((current) => current.map((value, itemIndex) => (itemIndex === index ? checked : value)))}
                             >
                               {label}
-                            </Checkbox>
+                            </Checkbox></SaveErrorField>
                           ))}
                         </div>
                       </>
                     ) : null}
-<TextField
+<SaveErrorField names={["reason"]}><TextField
                       id="compare-reason"
                       value={reason}
                       onChange={(event) => setReason(event.target.value)}
                       placeholder={decisive ? `${decisive.label}` : '何を見てそう判断したか'}
-                    />
-{review.decideError ? <p className={styles.error} role="alert">{review.decideError}</p> : null}
+                    /></SaveErrorField>
+{review.decideError ? <Notice tone="danger" >{review.decideError}</Notice> : null}
 {!ready && reason.trim() !== '' && decision === 'linked' && !linkedReady ? (
                       <p className={styles.note} role="status">3つの確認をそろえると判定できます。</p>
                     ) : null}
@@ -280,7 +281,7 @@ function CompareInner() {
                         <Td className={styles.td}>{left?.valuePreview ?? emptyValue('unknown')}</Td>
                         <Td className={styles.td}>{right?.valuePreview ?? emptyValue('unknown')}</Td>
                         <Td className={styles.td}>
-                          <Select
+                          <SaveErrorField names={["selections"]}><Select
                             aria-label={`${field.fieldLabel}に使う値`}
                             size="full"
                             value={selections[field.fieldKey] ?? ''}
@@ -290,7 +291,7 @@ function CompareInner() {
                               value: option.sourceFriendId,
                               label: same && index === 0 ? '同じ' : `${sideLetter(option.sourceFriendId) || option.sourceLabel}：${option.valuePreview ?? emptyValue('unconfigured')}`,
                             }))}
-                          />
+                          /></SaveErrorField>
                         </Td>
                       </Tr>
                     )

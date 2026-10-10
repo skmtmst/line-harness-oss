@@ -1,3 +1,4 @@
+import { DELIVERY_API_PERMISSIONS, effectiveStaffEditKeys } from '@line-crm/shared';
 import type { Context, Next } from 'hono';
 import { getStaffByAdminSession, getStaffByApiKey } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -174,6 +175,7 @@ function toAuthenticatedStaff(staff: {
 }): AuthenticatedStaff {
   let permissionKeys: string[] = [];
   try { permissionKeys = staff.permission_keys ? JSON.parse(staff.permission_keys) as string[] : []; } catch { permissionKeys = []; }
+  permissionKeys = effectiveStaffEditKeys(permissionKeys);
   let viewPermissionKeys: string[] = [];
   try { viewPermissionKeys = staff.view_permission_keys ? JSON.parse(staff.view_permission_keys) as string[] : []; } catch { viewPermissionKeys = []; }
   const emailMask = staff.email_mask === 'full' || staff.email_mask === 'masked' || staff.email_mask === 'none'
@@ -214,22 +216,13 @@ export function isTenantSuspensionExemptPath(method: string, path: string): bool
 }
 
 const STAFF_API_PERMISSIONS: Array<[string, string]> = [
+  ...DELIVERY_API_PERMISSIONS,
   ['/api/inbox', '/chats'], ['/api/chats', '/chats'], ['/api/conversations', '/chats'],
   ['/api/support', '/chats'], ['/api/operators', '/chats'],
   ['/api/friends', '/friends'], ['/api/tags', '/tags'], ['/api/friend-fields', '/tags'],
   ['/api/tag-groups', '/tags'], ['/api/support-marks', '/tags'], ['/api/support-mark-rules', '/tags'],
   ['/api/saved-searches', '/tags'], ['/api/folders', '/tags'],
-  ['/api/scenarios', '/scenarios'], ['/api/scenario-drafts', '/scenarios'], ['/api/broadcasts', '/broadcasts'], ['/api/broadcast-message-assets/upload-sessions', '/broadcasts'], ['/api/reminders', '/reminders'],
-  ['/api/friend-reminders', '/reminders'], ['/api/reminder-runs', '/reminders'],
-  ['/api/auto-replies', '/auto-replies'], ['/api/auto-reply-runs', '/auto-replies'], ['/api/friend-add', '/friend-add-settings'], ['/api/webinars', '/webinars'],
-  ['/api/templates', '/templates'], ['/api/rich-menu', '/rich-menus'], ['/api/rich-menus', '/rich-menus'],
-  ['/api/rich-menu-groups', '/rich-menus'], ['/api/rich-menu-images', '/rich-menus'],
-  ['/api/form-files', '/form-submissions'], ['/api/forms', '/form-submissions'], ['/api/contents', '/contents'], ['/api/media', '/contents'],
-  // 危険なファイルの検査は登録メディアと同じ contents の鍵で守る。
-  // 一覧・設定・戻し・消去は route 側で owner/admin に絞っている。
-  ['/api/file-scans', '/contents'],
-  // 共通情報は登録メディアと同じ contents.ts 配下。メニューの href と同じ鍵を使う。
-  ['/api/common-vars', '/contents/vars'],
+  ['/api/form-files', '/form-submissions'],
   // 流入計測の入口経路と文面は /inflow-links 画面が呼ぶ。
   ['/api/entry-routes', '/inflow-links'], ['/api/entry-route-genres', '/inflow-links'],
   ['/api/message-templates', '/inflow-links'],
@@ -249,15 +242,12 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/automations', '/automations'], ['/api/automation-runs', '/automations'],
   ['/api/automation-templates', '/automations'], ['/api/automation-drafts', '/automations'],
   ['/api/automation-draft-resources', '/automations'], ['/api/common-actions', '/automations'],
-  ['/api/webhooks', '/webhooks'], ['/api/instagram', '/webhooks'], ['/api/line-notifications', '/line-notifications'],
+  ['/api/webhooks', '/webhooks'], ['/api/instagram', '/webhooks'],
   ['/api/booking', '/booking/bookings'], ['/api/events', '/events'],
   // 個別相談の変更・取消は予約と同じ `/booking/bookings` 権限で守る
   // (N-065 #623 司令塔裁定。`/api/meet-callback` は公開コールバックのため対象外)。
   ['/api/meet-consultations', '/booking/bookings'],
-  // 友だち追加時の配信ルールと実行記録。旧 `/api/friend-add` 項目に
-  // 合う実経路は無いが、互換のため残す。
-  ['/api/friend-add-rules', '/friend-add-settings'], ['/api/friend-add-runs', '/friend-add-settings'],
-  ['/api/nen-campaigns', '/nen-campaigns'], ['/api/nen-members', '/nen-members'], ['/api/ec-commerce', '/ec-commerce'],
+  ['/api/ec-commerce', '/ec-commerce'],
   // 然の会員（★V6 37-1）。メニューの href は /nen/members。
   ['/api/nen/rank-settings', '/nen/members'], ['/api/nen/lifetime-milestones', '/nen/members'], ['/api/nen/members', '/nen/members'],
   // 然のマイペット・健康日記（★V6 37-3／37-4）。主食のカロリー表はマイペット画面へ移した。

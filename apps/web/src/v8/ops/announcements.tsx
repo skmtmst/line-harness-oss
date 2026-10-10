@@ -1,19 +1,9 @@
 'use client'
-
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
 import { Send } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  ApiError,
-  api,
-  type OpsAnnouncement,
-  type OpsAnnouncementAudience,
-  type OpsAnnouncementChannel,
-  type OpsAnnouncementInput,
-  type OpsAudiencePreview,
-  type OpsTenantRow,
-} from '@/lib/api'
+import { ApiError, api, type OpsAnnouncement, type OpsAnnouncementAudience, type OpsAnnouncementChannel, type OpsAnnouncementInput, type OpsAudiencePreview, type OpsTenantRow } from '@/lib/api'
 import { formatDateTime, opsCall, opsErrorMessage } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
@@ -34,12 +24,13 @@ import { OpsHead } from './shell'
 import { useOpsReadOnly } from './use-ops-read-only'
 import { useFormErrors } from '@/lib/use-form-errors'
 import ValidationSummary from '@/components/shared/validation-summary'
-import { FieldError } from '@/components/shared/form-controls'
+import { FieldError, Field } from '@/components/shared/form-controls'
 import parts from './parts.module.css'
 import styles from './announcements.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営のお知らせ配信 V8（絵 `tQ2MJ`・送る前の確認 `TJUUl`）。
@@ -141,6 +132,8 @@ function loadDescription(err: unknown): string | undefined {
 }
 
 export default function OpsAnnouncementsV8() {
+  const saveErrors = useSaveFormErrors()
+
   const [rows, setRows] = useState<OpsAnnouncement[]>([])
   const [loaded, setLoaded] = useState(false)
   const [lineConfigured, setLineConfigured] = useState(true)
@@ -171,11 +164,14 @@ export default function OpsAnnouncementsV8() {
       setLineConfigured(res.noticeLineConfigured)
       setLinked(res.linked)
     } catch (caught) {
-      setLoadError(caught)
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setLoadError(caught) }
     } finally {
       setLoaded(true)
     }
-  }, [])
+  }, [saveErrors])
 
   useEffect(() => { void load() }, [load])
   useEffect(() => {
@@ -261,18 +257,23 @@ export default function OpsAnnouncementsV8() {
       }
       await load()
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error);
+
       if (error instanceof ApiError && error.status === 409) {
         if (error.code === 'IDEMPOTENCY_CONFLICT') {
-          setFormError('同じ再実行キーが別の内容に使われています。作り直してください。')
+          { if (!fieldFailure)
+          setFormError('同じ再実行キーが別の内容に使われています。作り直してください。') }
           setCreateKey(crypto.randomUUID())
           return
         }
         collision.mark()
         setConfirmSend(false)
-        setFormError('')
+        { if (!fieldFailure)
+        setFormError('') }
         return
       }
-      setFormError(error instanceof ApiError ? opsErrorMessage(error) : '保存できませんでした')
+      { if (!fieldFailure)
+      setFormError(error instanceof ApiError ? opsErrorMessage(error) : '保存できませんでした') }
     } finally {
       setBusy(false)
     }
@@ -330,7 +331,7 @@ export default function OpsAnnouncementsV8() {
   const editing = rows.find((a) => a.id === editingId) ?? null
 
   return (
-    <div data-design-node="tQ2MJ">
+    <SaveErrorScope errors={saveErrors}><div data-design-node="tQ2MJ">
       <OpsHead
         title="お知らせ"
         description="契約先へ、画面のお知らせ・メール・契約者専用LINE でお知らせを送ります。"
@@ -348,11 +349,11 @@ export default function OpsAnnouncementsV8() {
                 { text: `本文：入力 ${form.body} ／ 最新 ${collision.latest.body}` },
                 { text: `公開時刻：入力 ${form.publishAt || 'すぐに'} ／ 最新 ${toLocalInput(collision.latest.publishAt) || 'すぐに'}` },
               ] : null} />
-            {formError && !confirmSend ? <p role="alert" className={parts.alert}>{formError}</p> : null}
+            {formError && !confirmSend ? <Notice tone="danger" className={parts.alertNoticePlacement} >{formError}</Notice> : null}
             <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
-            <div className={styles.field}><Field label="件名" htmlFor="ann-subject"><TextField {...fields.bind('subject')} id="ann-subject" invalid={fields.invalid('subject')} aria-describedby={describedBy('subject')} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：9月20日 深夜のメンテナンスのお知らせ" maxLength={120} disabled={busy} />
+            <div className={styles.field}><Field label="件名" htmlFor="ann-subject"><SaveErrorField names={["subject","form.subject"]}><TextField {...fields.bind('subject')} id="ann-subject" invalid={fields.invalid('subject')} aria-describedby={describedBy('subject')} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：9月20日 深夜のメンテナンスのお知らせ" maxLength={120} disabled={busy} /></SaveErrorField>
 <FieldError id="ann-subject-error">{fields.error('subject')}</FieldError></Field></div>
-            <div className={styles.field}><Field label="本文" htmlFor="ann-body"><TextArea {...fields.bind('body')} id="ann-body" invalid={fields.invalid('body')} aria-describedby={describedBy('body')} rows={4} className={styles.body} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="お客様各位　いつも musubo をご利用いただきありがとうございます。…" maxLength={4000} disabled={busy} />
+            <div className={styles.field}><Field label="本文" htmlFor="ann-body"><SaveErrorField names={["body","form.body"]}><TextArea {...fields.bind('body')} id="ann-body" invalid={fields.invalid('body')} aria-describedby={describedBy('body')} rows={4} className={styles.body} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="お客様各位　いつも musubo をご利用いただきありがとうございます。…" maxLength={4000} disabled={busy} /></SaveErrorField>
 <FieldError id="ann-body-error">{fields.error('body')}</FieldError></Field></div>
             <fieldset className={styles.field} {...fields.bind('audience')} aria-invalid={fields.invalid('audience') || undefined} aria-describedby={describedBy('audience')}>
               <legend className={`${styles.smallLabel} ${styles.legend}`}>
@@ -361,7 +362,7 @@ export default function OpsAnnouncementsV8() {
               </legend>
               <div className={styles.choices}>
                 {AUDIENCES.map((a) => (
-                  <Radio key={a.key} name="announcement-audience" value={a.key} checked={form.audienceKind === a.key} disabled={busy} onChange={() => setForm((f) => ({ ...f, audienceKind: a.key }))}>{a.label}</Radio>
+                  <SaveErrorField names={["announcement-audience","key","a.key","audienceKind","form.audienceKind","form"]} key={a.key}><Radio key={a.key} name="announcement-audience" value={a.key} checked={form.audienceKind === a.key} disabled={busy} onChange={() => setForm((f) => ({ ...f, audienceKind: a.key }))}>{a.label}</Radio></SaveErrorField>
                 ))}
               </div>
               {form.audienceKind === 'plan' ? (
@@ -381,7 +382,7 @@ export default function OpsAnnouncementsV8() {
             <fieldset className={styles.field} {...fields.bind('channels')} aria-invalid={fields.invalid('channels') || undefined} aria-describedby={describedBy('channels')}>
               <legend className={`${styles.smallLabel} ${styles.legend}`}>送り方</legend>
               <div className={styles.choices}>
-                {CHANNELS.map((ch) => <Checkbox key={ch.key} checked={form.channels.includes(ch.key)} disabled={busy} onCheckedChange={() => setForm((f) => ({ ...f, channels: toggle(f.channels, ch.key) }))}>{ch.label}</Checkbox>)}
+                {CHANNELS.map((ch, saveFieldIndex) => <SaveErrorField names={[`CHANNELS.${saveFieldIndex}.key`,"key","ch.key","form"]} key={ch.key}><Checkbox key={ch.key} checked={form.channels.includes(ch.key)} disabled={busy} onCheckedChange={() => setForm((f) => ({ ...f, channels: toggle(f.channels, ch.key) }))}>{ch.label}</Checkbox></SaveErrorField>)}
               </div>
               <FieldError id="ann-channels-error">{fields.error('channels')}</FieldError>
             </fieldset>
@@ -394,7 +395,7 @@ export default function OpsAnnouncementsV8() {
                 <HelpTip label="配信日時の説明">空のままなら、押したときにすぐ送ります。日時を入れると「配信を予約する」に変わります。</HelpTip>
               </span>
               <div className={styles.dateTime}>
-              <DateTimeField value={form.publishAt} onChange={(v) => setForm((f) => ({ ...f, publishAt: v }))} aria-label="公開日時（日本時間）" placeholder="空のままならすぐに送る" disabled={busy} />
+              <SaveErrorField names={["publishAt","form.publishAt","publish_at","form.publish_at"]}><DateTimeField value={form.publishAt} onChange={(v) => setForm((f) => ({ ...f, publishAt: v }))} aria-label="公開日時（日本時間）" placeholder="空のままならすぐに送る" disabled={busy} /></SaveErrorField>
               </div>
             </div>
             <div className={styles.actions}>
@@ -498,6 +499,6 @@ export default function OpsAnnouncementsV8() {
         onCancel={() => { if (!busy) setDeleting(null) }}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div>
+    </div></SaveErrorScope>
   )
 }

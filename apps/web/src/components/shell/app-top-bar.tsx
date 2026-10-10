@@ -1,5 +1,6 @@
 'use client'
 
+import { useStaffRole } from '@/lib/staff-role'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import TopBar from '@/components/shared/top-bar'
@@ -106,7 +107,7 @@ export default function AppTopBar() {
   const router = useRouter()
   const { accounts, selectedAccountId, setSelectedAccountId, clearSelectedAccountId, loading, error, refreshing, refreshAccounts } = useAccount()
   const [staffName, setStaffName] = useState('')
-  const [staffRole, setStaffRole] = useState('')
+  const staffRole = useStaffRole()
   /*
    * ★V8 外側：ベルの未読の数。取るのは v8 のときだけ（v7 では描かない
    * ので余計な要求を出さない）。取れなくても帯は壊さない。
@@ -142,7 +143,6 @@ export default function AppTopBar() {
   useEffect(() => {
     try {
       setStaffName(localStorage.getItem('lh_staff_name') ?? '')
-      setStaffRole(localStorage.getItem('lh_staff_role') ?? '')
     } catch {
       // localStorage が使えない環境では名前を出さない
     }
@@ -186,7 +186,7 @@ export default function AppTopBar() {
     return () => { cancelled = true }
   }, [hqShell])
   const hqPill = hqShell ? { name: hqName ?? '統括', mark: brandInitial(hqName ?? '統括') } : null
-  const roleLabel = hqShell && (staffRole === 'owner' || staffRole === 'admin') ? '統括' : (ROLE_LABELS[staffRole] ?? '')
+  const roleLabel = hqShell && (staffRole === 'owner' || staffRole === 'admin') ? '統括' : (staffRole ? ROLE_LABELS[staffRole] ?? '' : '')
   /* 統括の札から店を選んだら、その店へ入る（カードの「このアカウントへ入る」と同じ）。 */
   const changeAccount = (accountId: string) => {
     requestUnsavedAction(() => {

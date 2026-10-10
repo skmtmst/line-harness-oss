@@ -10,7 +10,7 @@
  */
 import { useRouter } from 'next/navigation'
 import { cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { ArrowRight, BookOpen, CircleCheck, ExternalLink } from 'lucide-react'
+import { ArrowRight, BookOpen, CircleCheck } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { TERMS_DOCUMENT } from '@/content/terms/musubo-terms'
 import { MANUAL_LINKS } from '@/lib/manual-links'
@@ -27,6 +27,8 @@ import { TextField } from '@/components/shared/text-field'
 import TermsBody from './terms-body'
 import { canSubmitTerms, formatAgreedAt, hasReadTerms, initialWizardStep, STEP } from './terms-state'
 import styles from './store-new.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 const STEPS = [
   ['利用規約への同意', 'musubo の利用規約と、個人情報の取扱いをご確認ください。'],
@@ -109,6 +111,8 @@ function useTermsReading() {
 }
 
 export default function StoreNewV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('店舗を追加')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'アカウント', href: '/hq' }])
   const router = useRouter()
@@ -159,7 +163,9 @@ export default function StoreNewV8() {
       setTermsAgreedAt(response.data.agreedAt)
       setStep(STEP.BASICS)
     } catch (caught) {
-      setAgreeError(caught instanceof Error ? caught.message : '同意を記録できませんでした。時間を置いてもう一度お試しください。')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setAgreeError(caught instanceof Error ? caught.message : '同意を記録できませんでした。時間を置いてもう一度お試しください。') }
     } finally {
       setAgreeing(false)
     }
@@ -188,7 +194,9 @@ export default function StoreNewV8() {
       setCreated({ id: response.data.store.id, storeName: response.data.store.name, lineAccountName: response.data.lineAccountName })
       setChannelSecret('')
     } catch (caught) {
-      setConnectionError(caught instanceof Error ? caught.message : '接続を確認できませんでした。入力内容を確認してください。')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setConnectionError(caught instanceof Error ? caught.message : '接続を確認できませんでした。入力内容を確認してください。') }
     } finally {
       setSaving(false)
     }
@@ -201,7 +209,9 @@ export default function StoreNewV8() {
       await restaurantTestApi.selectStore(selectedAccountId, created.id)
       router.push('/restaurant-test/dashboard')
     } catch (caught) {
-      setConnectionError(caught instanceof Error ? caught.message : '店舗画面へ切り替えられませんでした。')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setConnectionError(caught instanceof Error ? caught.message : '店舗画面へ切り替えられませんでした。') }
       setSaving(false)
     }
   }
@@ -213,7 +223,7 @@ export default function StoreNewV8() {
     if (step === STEP.TERMS) {
       return <>
         <Button href="/hq">キャンセル</Button>
-        <Button variant="primary" disabled={!canSubmitTerms(readToEnd, termsChecked) || agreeing} onClick={() => void agree()}><ArrowRight aria-hidden className={styles.icon15} />{agreeing ? '同意を記録中…' : '同意して次へ進む'}</Button>
+        <Button variant="primary" disabled={!canSubmitTerms(readToEnd, termsChecked) || agreeing} onClick={() => void agree()} busy={agreeing} busyLabel="同意を記録中…"><ArrowRight aria-hidden className={styles.icon15} />同意して次へ進む</Button>
       </>
     }
     if (step === STEP.BASICS) return <><Button href="/hq">キャンセル</Button><Button variant="primary" onClick={nextFromBasics}><ArrowRight aria-hidden className={styles.icon15} />次へ</Button></>
@@ -224,11 +234,11 @@ export default function StoreNewV8() {
         ? <Button variant="primary" disabled={saving} onClick={() => void enterStore()} busy={Boolean(saving)} busyLabel="処理中…">この店舗の管理画面へ</Button>
         : <Button href="/hq">統括の店舗一覧へ</Button>
     }
-    return <><Button disabled={saving} onClick={() => setStep(STEP.CREDENTIALS)}>戻る</Button><Button variant="primary" disabled={saving} onClick={() => void connect()} busy={Boolean(saving)} busyLabel="処理中…">{saving ? '接続を確認中…' : 'アカウントセットアップ実行'}</Button></>
+    return <><Button disabled={saving} onClick={() => setStep(STEP.CREDENTIALS)}>戻る</Button><Button variant="primary" disabled={saving} onClick={() => void connect()} busy={Boolean(saving)} busyLabel="接続を確認中…">アカウントセットアップ実行</Button></>
   })()
 
   return (
-    <PageFrame kind="list" boardId={step === STEP.TERMS ? 'ao15G' : step === STEP.BASICS ? 'faGn4' : undefined}>
+    <SaveErrorScope errors={saveErrors}><PageFrame kind="list" boardId={step === STEP.TERMS ? 'ao15G' : step === STEP.BASICS ? 'faGn4' : undefined}>
       <PageHeading
         title="店舗を追加"
         help={`LINEへ接続し、店舗を登録します。ステップ ${step} / 5`}
@@ -269,18 +279,18 @@ export default function StoreNewV8() {
                   <span className={styles.spacer} aria-hidden="true" />
                   <Button external href="/restaurant-test/terms">利用規約を別画面で読む</Button>
                 </div>
-                <Checkbox checked={termsChecked} disabled={!readToEnd || agreeing} onCheckedChange={setTermsChecked}>上記の利用規約および個人情報の取扱いに同意します</Checkbox>
-                {agreeError ? <p role="alert" className={styles.error}>{agreeError}</p> : null}
+                <SaveErrorField names={["termsChecked"]}><Checkbox checked={termsChecked} disabled={!readToEnd || agreeing} onCheckedChange={setTermsChecked}>上記の利用規約および個人情報の取扱いに同意します</Checkbox></SaveErrorField>
+                {agreeError ? <Notice tone="danger" >{agreeError}</Notice> : null}
               </>
             ) : null}
 
             {step === STEP.BASICS ? (
               <>
                 <Field label="店舗名" required help="店舗名はあとから店舗設定で変更できます。" error={errors.name}>
-                  <TextField value={name} onChange={(event) => setName(event.target.value)} autoComplete="organization" />
+                  <SaveErrorField names={["name"]}><TextField value={name} onChange={(event) => setName(event.target.value)} autoComplete="organization" /></SaveErrorField>
                 </Field>
                 <Field label="店舗の略称" required={false} error={undefined}>
-                  <TextField value={alias} onChange={(event) => setAlias(event.target.value)} placeholder="空欄なら店舗名を使います" />
+                  <SaveErrorField names={["alias"]}><TextField value={alias} onChange={(event) => setAlias(event.target.value)} placeholder="空欄なら店舗名を使います" /></SaveErrorField>
                 </Field>
                 <p className={styles.warnBox}>{PROVIDER_NOTE}</p>
                 {termsAgreedAt ? <p className={styles.agreed}><CircleCheck aria-hidden className={styles.checkIcon} />{`利用規約に同意済み${agreedLabel ? `（${agreedLabel}）` : ''}`}</p> : null}
@@ -293,7 +303,7 @@ export default function StoreNewV8() {
                   <p className={styles.grayTitle}>まずはLINE公式アカウントの登録を行いましょう。</p>
                   <p className={styles.cardText}>LINE公式アカウントをお持ちでない方は、LINE for Businessから無料で店舗専用のアカウントを開設してください。作成後、この画面へ戻ってチェックを入れます。</p>
                 </div>
-                <Checkbox checked={officialAccountReady} onCheckedChange={setOfficialAccountReady}>LINE公式アカウントを作成済みです</Checkbox>
+                <SaveErrorField names={["officialAccountReady"]}><Checkbox checked={officialAccountReady} onCheckedChange={setOfficialAccountReady}>LINE公式アカウントを作成済みです</Checkbox></SaveErrorField>
               </>
             ) : null}
 
@@ -301,10 +311,10 @@ export default function StoreNewV8() {
               <>
                 <p className={styles.infoBox}>LINE公式アカウントのチャネルIDとチャネルシークレットを使用して、アカウントセットアップを行います。</p>
                 <Field label="チャネルID" required help="LINE Developersの「チャネル基本設定」にある数字をコピーしてください。" error={errors.channelId}>
-                  <TextField value={channelId} onChange={(event) => setChannelId(event.target.value)} inputMode="numeric" autoComplete="off" />
+                  <SaveErrorField names={["channelId"]}><TextField value={channelId} onChange={(event) => setChannelId(event.target.value)} inputMode="numeric" autoComplete="off" /></SaveErrorField>
                 </Field>
                 <Field label="チャネルシークレット" required help="同じ「チャネル基本設定」のチャネルシークレットをコピーしてください。保存後、この値は画面に表示されません。" error={errors.channelSecret}>
-                  <TextField type="password" value={channelSecret} onChange={(event) => setChannelSecret(event.target.value)} autoComplete="new-password" />
+                  <SaveErrorField names={["channelSecret"]}><TextField type="password" value={channelSecret} onChange={(event) => setChannelSecret(event.target.value)} autoComplete="new-password" /></SaveErrorField>
                 </Field>
               </>
             ) : null}
@@ -316,7 +326,7 @@ export default function StoreNewV8() {
                     <p className={styles.doneTitle}>接続できました</p>
                     <p className={styles.cardText}>{`「${created.storeName}」とLINE公式アカウント「${created.lineAccountName}」を登録しました。`}</p>
                   </div>
-                  {connectionError ? <p role="alert" className={styles.errorBox}>{connectionError}</p> : null}
+                  {connectionError ? <Notice tone="danger" className={styles.errorBoxNoticePlacement} >{connectionError}</Notice> : null}
                 </>
               ) : (
                 <>
@@ -328,7 +338,7 @@ export default function StoreNewV8() {
                       <div><dt className={styles.help}>店舗の略称</dt><dd className={styles.summaryValue}>{alias || name}</dd></div>
                     </dl>
                   </div>
-                  {connectionError ? <p role="alert" className={styles.errorBox}>{connectionError}</p> : null}
+                  {connectionError ? <Notice tone="danger" className={styles.errorBoxNoticePlacement} >{connectionError}</Notice> : null}
                 </>
               )
             ) : null}
@@ -338,6 +348,6 @@ export default function StoreNewV8() {
         <div className={styles.footer}>{footer}</div>
       </div>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した店舗の内容" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </PageFrame>
+    </PageFrame></SaveErrorScope>
   )
 }

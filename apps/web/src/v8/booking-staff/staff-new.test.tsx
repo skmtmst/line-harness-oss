@@ -1,18 +1,24 @@
+
+import React from 'react'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import StaffNewV8 from './staff-new'
+import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 /*
  * ★V8 予約スタッフを登録（CcA4k）の動き。
  * - メニューのチェックは4つまで並べ、残りは「ほかのメニュー（n）」で開く（絵は1行に4つ）。
  * - 右の見本の「指名なし」は、指名なしの枠に入る担当が1人でもいれば出る。
  */
-import React from 'react'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({ staff: [] as Array<Record<string, unknown>>, create: vi.fn(), assign: vi.fn(), update: vi.fn() }))
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null }) }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }));
+
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null }) }));
+
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }));
+
 
 const MENUS = ['カット', 'シャンプー', '爪切り', '歯みがき', '足裏ケア', '毛刈り'].map((name, i) => ({
   id: `m-${i}`, name, duration_minutes: 30, base_price: 1000, price_mode: 'fixed', is_active: 1, sort_order: i,
@@ -22,7 +28,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
     ...actual,
-    api: { staff: { list: async () => ({ success: true, data: [] }) } },
+    api: { staff: { me: async () => ({ success: true, data: { role: 'owner' } }), list: async () => ({ success: true, data: [] }) } },
     bookingApi: {
       listMenus: async () => ({ menus: MENUS }),
       listStaff: async () => ({ staff: fixture.staff }),
@@ -31,9 +37,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
       putStaffMenus: (...args: unknown[]) => fixture.assign(...args),
     },
   }
-})
+});
 
-import StaffNewV8 from './staff-new'
 
 const memStorage = vi.hoisted(() => {
   const values = new Map<string, string>()
@@ -63,20 +68,18 @@ afterEach(() => {
 })
 
 describe('予約スタッフを登録（V8）', () => {
-  test('メニューは4つまで並べ、残りは「ほかのメニュー」で開く', async () => {
+  test('予約メニューは窓の中で全件から探して選べる', async () => {
     render(<StaffNewV8 />)
-    await screen.findByRole('checkbox', { name: 'カット' })
-    expect(screen.getAllByRole('checkbox').filter(item => item.closest('[data-setting-checkbox]') === null)).toHaveLength(4)
-    expect(screen.queryByRole('checkbox', { name: '足裏ケア' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'ほかのメニュー（2）' }))
-    expect(screen.getAllByRole('checkbox').filter(item => item.closest('[data-setting-checkbox]') === null)).toHaveLength(6)
-    expect(screen.getByRole('checkbox', { name: '足裏ケア' })).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: '予約を受けられるメニュー' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getAllByRole('checkbox').filter(item => item.closest('[data-setting-checkbox]') === null)).toHaveLength(6)
+    expect(within(dialog).getByRole('checkbox', { name: '足裏ケア' })).toBeTruthy()
   })
 
   test('指名なしの枠に入る担当がいなければ、見本に「指名なし」を出さない。スイッチを入れると出る', async () => {
     render(<StaffNewV8 />)
     const phone = await screen.findByRole('region', { name: 'お客さまの予約画面の見本' })
-    await screen.findByRole('checkbox', { name: 'カット' })
+    await screen.findByRole('button', { name: '予約を受けられるメニュー' })
     expect(within(phone).queryByText('指名なし')).toBeNull()
     fireEvent.click(screen.getByRole('checkbox', { name: '「指名なし」の枠にも含める' }))
     expect(within(phone).getByText('指名なし')).toBeTruthy()
@@ -93,9 +96,9 @@ describe('予約スタッフを登録（V8）', () => {
  test('WEB186：割当の再試行前に直した名前も登録済みスタッフに保存する', async () => {
     fixture.assign.mockRejectedValueOnce(new Error('network')).mockResolvedValue({ ok: true })
     render(<StaffNewV8 />)
-    await screen.findByRole('checkbox', { name: 'カット' })
+    await screen.findByRole('button', { name: '予約を受けられるメニュー' })
     fireEvent.change(screen.getByLabelText('スタッフ名（管理画面での呼び名）'), { target: { value: '田中' } })
-    fireEvent.click(screen.getByRole('checkbox', { name: 'カット' }))
+    await pickEntities('予約を受けられるメニュー', [ 'カット'])
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録する' })) })
     await screen.findByRole('button', { name: '割当をやり直す' })
     fireEvent.change(screen.getByLabelText('スタッフ名（管理画面での呼び名）'), { target: { value: '田中 美咲' } })

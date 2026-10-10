@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * E-03 #657: 予約メニュー作成画面の「予約後に付けるタグ」を、実物の React で描いて操作する。
  *
@@ -154,6 +156,7 @@ function optionLabels(select: HTMLSelectElement): string[] {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   fixture.selectedAccountId = 'account-a'
   fixture.tagsList = async () => ({ success: true, data: TAGS })
   fixture.createMenu = vi.fn(async () => ({ id: 'menu-new', version: 1 }))
@@ -368,3 +371,6 @@ describe('R306/R307 予約時マイルの設定リンク', () => {
     await waitFor(() => expect(screen.getByText('マイルを 50 付ける')).toBeTruthy())
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

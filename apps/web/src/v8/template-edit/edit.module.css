@@ -29,7 +29,7 @@
 .cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-te-card-title-lh); }
 .cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
 .hint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-te-hint-lh); }
-.error { margin: 0; color: var(--color-danger); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+
 
 /* 名前とフォルダの並び：名前は伸びる・フォルダ 220・間12・下でそろえる。 */
 .pair { display: flex; align-items: flex-end; gap: var(--tpl-rule-row-gap); width: 100%; }
@@ -53,7 +53,7 @@
   outline: 1px solid var(--color-control-border); outline-offset: -1px;
   background: var(--color-canvas);
 }
-.bodyBox:focus-within { outline-color: var(--color-action); }
+.bodyBox:focus-within { outline-color: var(--color-focus-ring); }
 .bodyText {
   height: var(--tpl-te-body-h); min-height: var(--tpl-te-body-h);
   padding: 0; border: 0; outline: 0; background: transparent;
@@ -74,7 +74,7 @@
 }
 .insertChip:hover:not(:disabled) { background: var(--color-canvas-sunken); }
 .insertChip:disabled { cursor: not-allowed; opacity: 0.5; }
-.insertChip:focus-visible { outline: var(--tpl-te-focus) solid var(--color-action); outline-offset: calc(var(--tpl-te-focus) * -1); }
+.insertChip:focus-visible { outline: var(--tpl-te-focus) solid var(--color-focus-ring); outline-offset: calc(var(--tpl-te-focus) * -1); }
 .counter { margin-left: auto; color: var(--color-ink-faint); font-size: var(--text-micro); white-space: nowrap; }
 .counter[data-over] { color: var(--color-danger); }
 
@@ -91,6 +91,7 @@
 
 /* 右の列（作る型の右の列と同じ寸法）：幅380・余白24・左の線。左右は別々に縦へ送る。 */
 .side {
+  align-self: flex-start; position: sticky; top: 0; max-height: 100%;
   display: flex; flex-direction: column; align-items: center; flex-shrink: 0;
   width: var(--tpl-te-side-w); min-height: 0; overflow-x: hidden; overflow-y: auto;
   padding: var(--tpl-preview-pad);
@@ -119,10 +120,9 @@
 .previewToggle > * { width: 100%; }
 .previewDialog { display: flex; justify-content: center; }
 
-
 /* 1152 の板（a1k3d）：右の列は余白16・中の幅いっぱい。スマホは窓で開く。 */
 @container v8-page (max-width: 1099px) {
-  .side { width: var(--tpl-preview-narrow-width); padding: var(--tpl-te-narrow-side-pad); }
+  .side { width: var(--tpl-preview-narrow-width); padding: var(--tpl-te-narrow-side-pad); background: transparent; border-left: 0; }
   .sideContent { width: 100%; }
   .previewToggle { display: block; }
   .phone, .previewHead { display: none; }
@@ -130,14 +130,7 @@
   .insertRow { flex-direction: column; align-items: stretch; gap: var(--tpl-body-gap); }
 }
 
-/* 閲覧のみの帯（決まり：押せない操作は置かず、帯で知らせる）。 */
-.readonly {
-  display: flex; align-items: center; gap: var(--tpl-ro-band-gap);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-ro-band-lh);
-}
+/* 閲覧のみの案内は ReadOnlyNotice が持つ。 */
 
 /* 比べる窓の中の差分。 */
 .diffList { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--tpl-side-row-gap); color: var(--color-ink); font-size: var(--text-label); }
@@ -177,7 +170,7 @@
 }
 .grip { display: inline-flex; align-items: center; padding: 0; border: 0; background: transparent; color: var(--color-ink-faint); cursor: pointer; }
 .grip:disabled { cursor: default; opacity: 0.5; }
-.grip:focus-visible { outline: var(--tpl-te-focus) solid var(--color-action); outline-offset: var(--tpl-te-focus); }
+.grip:focus-visible { outline: var(--tpl-te-focus) solid var(--color-focus-ring); outline-offset: var(--tpl-te-focus); }
 .questionNo { color: var(--color-ink); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-text-sm-lh); }
 .formatField { width: var(--tpl-te-format-w); flex-shrink: 0; }
 .formatField :global(*) { max-width: 100%; }
@@ -189,7 +182,7 @@
   outline: 1px solid var(--color-hairline); outline-offset: -1px;
   background: var(--color-canvas);
 }
-.choice:focus-within { outline-color: var(--color-action); }
+.choice:focus-within { outline-color: var(--color-focus-ring); }
 .choiceInput {
   field-sizing: content; min-width: var(--tpl-te-choice-min-w);
   padding: 0; border: 0; outline: 0; background: transparent;
@@ -229,3 +222,5 @@
 .composerFooter::after { content: ''; flex: 1; }
 
 .composerTitleAccessories { display: flex; align-items: center; gap: var(--tpl-msg-composer-gap-s); }
+
+.error { margin: 0; color: var(--color-danger); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }

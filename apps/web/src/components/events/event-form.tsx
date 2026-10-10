@@ -1,10 +1,11 @@
 'use client'
 
 import { jstDate } from '@/lib/jst-datetime'
-
+import { RowActions } from '@/components/shared/row-actions'
 import { X } from 'lucide-react'
+import { RowMenu } from '@/components/shared/row-actions'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import StickyBar from '@/components/shared/sticky-bar'
-
 import { useEffect, useState } from 'react'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useRouter } from 'next/navigation'
@@ -31,7 +32,6 @@ import DateField from '@/components/shared/date-field'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TimeField } from '@/components/shared/date-time-field'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-// #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
 import {
   EVENT_CANCEL_DEADLINE_OPTIONS,
   EVENT_DEFAULT_DRAFT,
@@ -43,6 +43,9 @@ import {
   parseDeadlineSelect,
 } from './event-draft-shared'
 import { formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+// #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
 
 type Tab = 'overview' | 'slots' | 'publish'
 
@@ -109,13 +112,31 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   const [slots, setSlots] = useState<EventSlot[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
+  const role = useStaffRole()
+  const canDuplicate = role === null || canManageRole(role)
   const [loading, setLoading] = useState(true)
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(savedDraft)
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
+  const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: saving || duplicating })
 
   const [copiedValue, setCopiedValue] = useState<string | null>(null)
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
+
+  async function duplicateSaved() {
+    if (!eventId || !canDuplicate || saving || duplicating || loading) return
+    const expectedVersion = savedDraft.version
+    if (typeof expectedVersion !== 'number') { setError('保存済みの版を読み直してから複製してください。'); return }
+    setDuplicating(true); setError(null)
+    try {
+      const response = await eventsApi.duplicate(accountId, eventId, expectedVersion)
+      notifyToast('複製した下書きを追加しました')
+      router.push(`/events?highlight=${encodeURIComponent(response.id)}`)
+    } catch (caught) {
+      setError(caught instanceof ApiError && caught.status === 409
+        ? '別の人が変更しました。読み直してから複製してください。' : '複製できませんでした。もう一度お試しください。')
+    } finally { setDuplicating(false) }
+  }
 
   async function copyValue(v: string) {
     try {
@@ -311,6 +332,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
             {eventId ? 'タブで各項目を編集できます' : 'まず「概要」を保存するとイベントが作成されます'}
           </p>
         </div>
+        {eventId && canDuplicate ? <RowMenu label="イベントの操作" triggerProps={{ disabled: saving || duplicating }} items={[{ id: 'duplicate', label: '複製する', onSelect: () => guarded(() => void duplicateSaved()) }]} /> : null}
         {eventId && (
           <Button
             href={`/events/bookings?id=${eventId}`}
@@ -704,32 +726,7 @@ function OverviewTab({
             {activeAccounts.length === 0 && (
               <div className="text-sm text-ink-faint italic p-2">アクティブなアカウントがありません</div>
             )}
-            {activeAccounts.map((a) => {
-              // 現在ログイン中のアカウントは外せない (外すと保存後 redirect が
-              // 即 404 になる)。target_type 切替時に sentinel seed されている
-              // ことの保護も兼ねる。
-              const isCurrent = a.id === currentAccountId
-              const checked = accountIds.includes(a.id) || isCurrent
-              return (
-                <Checkbox
-                  key={a.id}
-                  className={`flex w-full gap-2 rounded-control border border-hairline p-2 ${isCurrent ? 'opacity-90 bg-canvas-sunken cursor-not-allowed' : 'cursor-pointer hover:bg-canvas-sunken'}`}
-                  checked={checked}
-                  disabled={isCurrent}
-                  onCheckedChange={(next) => {
-                    if (isCurrent) return
-                    update('account_ids', (next
-                      ? [...accountIds, a.id]
-                      : accountIds.filter((x) => x !== a.id)) as unknown as EventDetail['account_ids'])
-                  }}
-                  description={isCurrent ? '今のアカウント・必須' : undefined}
-                >
-                  <span title={isCurrent ? '現在ログイン中のアカウントは必須です' : undefined}>
-                    {a.country ? a.country + ' ' : ''}{a.name}
-                  </span>
-                </Checkbox>
-              )
-            })}
+            <EntitySelect aria-label="対象アカウント（重複なし配信）" noun="アカウント" values={[...new Set([...accountIds, ...(currentAccountId ? [currentAccountId] : [])])]} onChange={(ids) => update('account_ids', [...new Set([...ids, ...(currentAccountId ? [currentAccountId] : [])])] as unknown as EventDetail['account_ids'])} options={activeAccounts.map((a) => ({ value: a.id, label: `${a.country ? a.country + ' ' : ''}${a.name}`, locked: a.id === currentAccountId, description: a.id === currentAccountId ? '今のアカウント・必須' : undefined }))} />
             <div className="text-ink-faint mt-1 text-xs">{accountIds.length} 件選択中</div>
           </div>
         )}
@@ -951,13 +948,7 @@ function SlotsTab({
                   </Td>
                   <ActionCell>
                     <div className="flex items-center justify-end gap-3">
-                      <button
-                        onClick={() => setEditSlotTarget(s)}
-                        disabled={busy}
-                        className="text-action text-xs hover:underline disabled:opacity-30 disabled:no-underline"
-                      >
-                        編集
-                      </button>
+                      <RowActions edit={{ onClick: () => setEditSlotTarget(s), disabled: busy }} />
                       <button
                         onClick={() => { setDeleteSlotError(''); setDeleteSlotTarget(s) }}
                         disabled={busy || (s.active_count ?? 0) > 0}
@@ -1497,12 +1488,12 @@ function PublishTab({
         <label htmlFor="ev-visible-tag" className="mb-1.5 block text-sm font-medium text-ink-secondary">
           公開対象
         </label>
-        <Select
+        <EntitySelect kind="tag"
           aria-label="公開対象"
           id="ev-visible-tag"
           value={draft.visible_tag_id ?? ''}
           onChange={(value) => update('visible_tag_id', value === '' ? null : value)}
-          options={[{ value: '', label: '友だち全員' }, ...tags.map((t) => ({ value: t.id, label: `${t.name} を持つ人だけ` }))]}
+          options={[{ value: '', label: '友だち全員' }, ...tags.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: `${t.name} を持つ人だけ` }))]}
         />
         <p className="mt-1 text-xs text-ink-faint">
           絞ると、タグを持たない人にはイベントが存在しないものとして扱われます。

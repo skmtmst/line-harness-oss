@@ -40,7 +40,7 @@ describe('xGLVe 一覧の行（日付・待ち時間・担当）', () => {
   const lineRow = region(PAGE, 'const waitingLabel = needsAttention', '{/* Right Panel: Chat Detail */}')
 
   it('一覧の日時は共通の書式から時刻を出す', () => {
-    expect(PAGE).toContain("import { formatDateTime, formatNumber, formatRelative, formatTime }")
+    expect(PAGE).toContain("import { formatDateTime, formatNumber, formatTime }")
     expect(lineRow).toContain('formatInboxListTime(chat.lastMessageAt)')
   })
 

@@ -1,38 +1,15 @@
 'use client'
 
-/*
- * ★V8 友だち一覧（Pencil `x6QsVz`：閲覧のみ。いつもの形は同じ板からボタンを出したもの）。
- *
- * v7 の一覧（app/friends/page.tsx の FriendsPageInner）とは別の部品として持つ。
- * 呼ぶ API・送る形・保存先（sessionStorage・localStorage）は今と同じ。
- * 違いは見せ方だけ：頭（題・CSV・取り込む）→ 閲覧のみの帯 → タブ → 数の帯 →
- * 道具2段（探す・絞り込み4つ・詳細条件・保存した検索／未対応・注目のみ・件数・
- * 表示項目・件数・並び）→ 表（□・☆・友だち・対応/担当・シナリオ・最新・タグ・流入元・最終接触・…）→ ページ送り。
- */
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar'
+import TagOverflow from '@/components/shared/tag-overflow'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { collectListRows } from '@/components/shared/collect-list-rows'
-import { ListToolbarSort } from '@/components/shared/list-toolbar'
-import { useListUrlJsonValue, useListUrlValue } from '@/components/shared/list-url-state'
-import { jstDate } from '@/lib/jst-datetime'
+import { useListUrlJsonValue, useListUrlValue, useListScrollMemory } from '@/components/shared/list-url-state'
 import StatusPill, { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  CircleDot,
-  Bookmark,
-  Columns3,
-  Download,
-  Eye,
-  Megaphone,
-  MessageSquare,
-  UserRoundX,
-  SlidersHorizontal,
-  Star,
-  TrendingUp,
-  Upload,
-  UserPlus,
-  Users,
-} from 'lucide-react'
+import { CircleDot, Bookmark, Columns3, Download, Megaphone, MessageSquare, UserRoundX, SlidersHorizontal, Star, TrendingUp, Upload, UserPlus, Users } from 'lucide-react'
 import type { Scenario, Tag } from '@line-crm/shared'
 import { api, ApiError, fetchApi, type FriendListItem, type FriendStats, type SupportMarkListItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
@@ -55,11 +32,11 @@ import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import { notifyToast } from '@/components/shared/toast'
-import { useListScrollMemory } from '@/components/shared/list-url-state'
 import MenuPortal from '@/components/shared/menu-portal'
 import BulkBar from '@/components/shared/bulk-bar'
 import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
+import { TableBody } from '@/components/shared/table-body'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
@@ -77,11 +54,25 @@ import { csvExportLine } from './csv-export'
 import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
 import { lastContactOf, monthDay, monthDayTime, statusOf, messageWord, splitTags } from './words'
 import styles from './list.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { ListPager } from '@/components/templates/list-page'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
-const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
+/*
+ * ★V8 友だち一覧（Pencil `x6QsVz`：閲覧のみ。いつもの形は同じ板からボタンを出したもの）。
+ *
+ * v7 の一覧（app/friends/page.tsx の FriendsPageInner）とは別の部品として持つ。
+ * 呼ぶ API・送る形・保存先（sessionStorage・localStorage）は今と同じ。
+ * 違いは見せ方だけ：頭（題・CSV・取り込む）→ 閲覧のみの帯 → タブ → 数の帯 →
+ * 道具2段（探す・絞り込み4つ・詳細条件・保存した検索／未対応・注目のみ・件数・
+ * 表示項目・件数・並び）→ 表（□・☆・友だち・対応/担当・シナリオ・最新・タグ・流入元・最終接触・…）→ ページ送り。
+ */
+
+const PAGE_SIZE_OPTIONS = STANDARD_PAGE_SIZES
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
 type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'
@@ -135,7 +126,7 @@ export default function FriendsListV8() {
    */
   const [keys, setKeys] = useState({ friends: false, chats: false })
   useEffect(() => { setKeys({ friends: hasEditKey('/friends'), chats: hasEditKey('/chats') }) }, [])
-  const manager = staffRole === null || canManageRole(staffRole)
+  const manager = canManageRole(staffRole)
   const canEditFriends = manager || keys.friends
   const canEditChats = manager || keys.chats
   const readOnly = !canEditFriends && !canEditChats
@@ -625,15 +616,14 @@ export default function FriendsListV8() {
   )
 
   const toolbar = (
-    <div className={styles.tools} data-design="V8SearchPanel">
-      <form
-        className={styles.toolRow}
+    <ListToolbarFrame data-design="V8SearchPanel">
+      <ListToolbarRow as="form"
         onSubmit={(event) => {
           event.preventDefault()
           resetPageWith(() => setSearchSubmitted(searchInput.trim()))
         }}
       >
-        <div className={styles.search}>
+        <ListToolbarSearchSlot>
           <SearchField
             className={styles.searchField}
             aria-label="名前・LINE名・タグ・メモで探す"
@@ -648,20 +638,20 @@ export default function FriendsListV8() {
             }}
             placeholder="名前・LINE名・タグ・メモで探す"
           />
-        </div>
+        </ListToolbarSearchSlot>
         {/* 選んだ値は「タグ：すべて」の1つの文字で出す（絵どおり。部品の label は文字が2つに割れる）。 */}
-        <Select aria-label="タグで絞り込む" width={119} value={selectedTagId}
+        <SaveErrorField names={["selectedTagId","tagId","selected_tag_id"]}><EntitySelect kind="tag" aria-label="タグで絞り込む" width={119} value={selectedTagId}
           onChange={(value) => resetPageWith(() => setSelectedTagId(value))}
-          options={prefixed('タグ', [{ value: '', label: 'すべて' }, ...allTags.map((tag) => ({ value: tag.id, label: tag.name }))])} />
-        <Select aria-label="対応状況で絞り込む" width={119} value={responseFilter}
+          options={prefixed('タグ', [{ value: '', label: 'すべて' }, ...allTags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))])} /></SaveErrorField>
+        <SaveErrorField names={["responseFilter","response_filter"]}><Select aria-label="対応状況で絞り込む" width={119} value={responseFilter}
           onChange={(value) => resetPageWith(() => setResponseFilter(value as ResponseFilter))}
-          options={prefixed('対応', [{ value: 'all', label: 'すべて' }, { value: 'unhandled', label: '未対応のみ' }])} />
-        <Select aria-label="担当で絞り込む" width={132} value={operatorId}
+          options={prefixed('対応', [{ value: 'all', label: 'すべて' }, { value: 'unhandled', label: '未対応のみ' }])} /></SaveErrorField>
+        <SaveErrorField names={["operatorId","operator_id"]}><EntitySelect aria-label="担当で絞り込む" width={132} value={operatorId}
           onChange={(value) => resetPageWith(() => setOperatorId(value))}
-          options={prefixed('担当者', [{ value: '', label: 'すべて' }, ...operators.map((operator) => ({ value: operator.id, label: operator.name }))])} />
-        <Select aria-label="シナリオで絞り込む" width={147} value={scenarioId}
+          options={prefixed('担当者', [{ value: '', label: 'すべて' }, ...operators.map((operator) => ({ ...entityOptionMetadata(operator), value: operator.id, label: operator.name }))])} /></SaveErrorField>
+        <SaveErrorField names={["scenarioId","scenario_id"]}><EntitySelect kind="scenario" aria-label="シナリオで絞り込む" width={147} value={scenarioId}
           onChange={(value) => resetPageWith(() => setScenarioId(value))}
-          options={prefixed('シナリオ', [{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))])} />
+          options={prefixed('シナリオ', [{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ ...entityOptionMetadata(scenario), value: scenario.id, label: scenario.name }))])} /></SaveErrorField>
         <button
           type="button"
           aria-pressed={advanced !== null}
@@ -678,8 +668,8 @@ export default function FriendsListV8() {
             保存した検索
           </Button>
         ) : null}
-      </form>
-      <div className={styles.toolRow}>
+      </ListToolbarRow>
+      <ListToolbarRow>
         <div role="group" aria-label="すばやく絞り込む" className={styles.chips}>
           <FilterChip selected={responseFilter === 'unhandled'} icon={<CircleDot size={14} aria-hidden="true" />} onChange={() => resetPageWith(() => setResponseFilter(responseFilter === 'unhandled' ? 'all' : 'unhandled'))}>
             未対応
@@ -704,9 +694,9 @@ export default function FriendsListV8() {
           </button>
           <MenuPortal open={columnsOpen} align="end" getAnchor={() => columnsButtonRef.current} onClose={() => setColumnsOpen(false)}>
             <div className={styles.columnsMenu}>
-              {COLUMNS.map((column) => (
+              {COLUMNS.map((column, saveFieldIndex) => (
                 <div key={column.key} className={styles.columnsItem}>
-                  <Checkbox
+                  <SaveErrorField names={[`COLUMNS.${saveFieldIndex}.key`,"key","column.key","visible"]}><Checkbox
                     checked={visible.has(column.key)}
                     onCheckedChange={(checked) => setVisible((previous) => {
                       const next = new Set(previous)
@@ -716,28 +706,28 @@ export default function FriendsListV8() {
                     })}
                   >
                     {column.label}
-                  </Checkbox>
+                  </Checkbox></SaveErrorField>
                 </div>
               ))}
             </div>
           </MenuPortal>
         </span>
-        <Select
+        <SaveErrorField names={["pageSize","limit","page_size"]}><Select
           aria-label="表示件数"
           width={98}
           value={String(pageSize)}
           onChange={(value) => resetPageWith(() => setPageSize(Number(value) as PageSize))}
           options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
-        />
-        <ListToolbarSort
+        /></SaveErrorField>
+        <SaveErrorField names={["sortMode","sort","sort_mode"]}><ListToolbarSort
           aria-label="並び順"
           treatment="text"
           width={171}
           value={sortMode}
           onChange={(value) => resetPageWith(() => setSortMode(value as SortMode))}
           options={[{ value: 'recent', label: '友だち追加の新しい順' }, { value: 'oldest', label: '友だち追加の古い順' }]}
-        />
-      </div>
+        /></SaveErrorField>
+      </ListToolbarRow>
       {advanced?.summary.length ? (
         <div className={styles.applied}>
           <span className={styles.appliedLabel}>絞り込み中</span>
@@ -762,7 +752,7 @@ export default function FriendsListV8() {
           <button type="button" onClick={() => { void loadOptions(); void loadMarks() }} className={styles.linkButton}>もう一度読み込む</button>
         </p>
       ) : null}
-    </div>
+    </ListToolbarFrame>
   )
 
   const colCount = 4 + [...visible].length
@@ -774,33 +764,124 @@ export default function FriendsListV8() {
           <col className={styles.colStar} />
           <col />
           {visible.has('support') ? <col className={styles.colSupport} /> : null}
-          {visible.has('scenario') ? <col className={styles.colScenario} /> : null}
+          {visible.has('scenario') ? <col className={styles.colScenario} data-cell-collapse="narrow" /> : null}
           {visible.has('latest') ? <col className={styles.colLatest} /> : null}
           {visible.has('tags') ? <col className={styles.colTags} /> : null}
-          {visible.has('source') ? <col className={styles.colSource} /> : null}
+          {visible.has('source') ? <col className={styles.colSource} data-cell-collapse="narrow" /> : null}
           {visible.has('last') ? <col className={styles.colLast} /> : null}
           <col className={styles.colMenu} />
         </colgroup>
         <thead>
           <TableHeadRow>
             <Th className={styles.thCheck}>
-              <Checkbox
+              <SaveErrorField names={["allSelected","selectedIds","all_selected","selected_ids"]}><Checkbox
                 checked={allSelected}
                 indeterminate={selectedCount > 0 && !allSelected}
                 onCheckedChange={(checked) => setSelectedIds(checked ? new Set(friends.map((friend) => friend.id)) : new Set())}
                 aria-label="表示中の友だちをすべて選ぶ"
-              />
+              /></SaveErrorField>
             </Th>
             <Th colSpan={2} className={styles.thFriend}>
               <span className={styles.thFriendInner}><Star size={14} aria-label="注目" className={styles.thStar} />友だち</span>
             </Th>
             {COLUMNS.filter((column) => visible.has(column.key)).map((column) => (
-              <Th key={column.key} className={styles.th}>{column.label}</Th>
+              <Th key={column.key} className={styles.th} collapseAt={column.key === 'scenario' || column.key === 'source' ? 'narrow' : undefined}>{column.label}</Th>
             ))}
             <Th className={styles.thMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
-        <tbody>
+        <TableBody
+          items={loadStatus === 'ready' ? friends : []}
+          itemKey={(friend) => friend.id}
+          colSpan={colCount}
+          renderRow={(friend , saveFieldIndex) => {
+            const status = statusOf(friend.chatStatus)
+            const latest = friend.latestIncomingMessage
+            const lastContact = lastContactOf(friend)
+            const attention = String(friend.metadata?.__attention ?? '') === '1'
+            const tags = splitTags(friend.tags)
+            return (
+              <Tr key={friend.id} interactive selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row data-row-id={friend.id}>
+                <Td className={styles.tdCheck} onClick={(event) => event.stopPropagation()}>
+                  <Checkbox checked={selectedIds.has(friend.id)} onCheckedChange={() => toggleSelect(friend.id)} aria-label={`${friend.displayName}を選ぶ`} />
+                </Td>
+                <Td className={styles.tdStar}>
+                  {rowCanEdit ? (
+                    <button
+                      type="button"
+                      className={attention ? `${styles.star} ${styles.starOn}` : styles.star}
+                      aria-pressed={attention}
+                      aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
+                      onClick={() => void toggleAttention(friend)}
+                    >
+                      <Star size={16} aria-hidden="true" />
+                    </button>
+                  ) : (
+                    /* 閲覧のみは押せない星を置かない。注目の印だけ見せる。 */
+                    <span className={attention ? `${styles.star} ${styles.starOn}` : styles.star} title={attention ? '注目' : undefined}>
+                      <Star size={16} aria-hidden="true" />
+                    </span>
+                  )}
+                </Td>
+                <Td className={styles.td}>
+                  <FolderDotName><Link href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</Link></FolderDotName>
+                </Td>
+                {visible.has('support') ? (
+                  <Td className={styles.td}>
+                    <div className={styles.supportCell}>
+                      <span className={styles.statusRow}>
+                        <StatusPill tone={SUPPORT_STATUS_TONES[friend.chatStatus ?? 'resolved']}>{status.label}</StatusPill>
+                        {friend.supportMark ? <span className={styles.mark} title={`対応マーク：${friend.supportMark.name}`}>{friend.supportMark.name}</span> : null}
+                      </span>
+                      <span className={styles.sub}>{`担当：${friend.operator?.name ?? '担当なし'}`}</span>
+                    </div>
+                  </Td>
+                ) : null}
+                {visible.has('scenario') ? (
+                  <Td className={`${styles.td} ${styles.fixedContent}`} collapseAt="narrow"><span className={styles.cellText} title={friend.activeScenario?.name}>{friend.activeScenario?.name ?? emptyValue('none')}</span></Td>
+                ) : null}
+                {visible.has('latest') ? (
+                  <Td className={styles.td}>
+                    {latest ? (
+                      <div className={styles.twoLine}>
+                        <span className={styles.cellText} title={latest.content}>{messageWord(latest)}</span>
+                        <span className={styles.sub}>{monthDayTime(latest.createdAt)}</span>
+                      </div>
+                    ) : <span className={styles.cellText}>受信なし</span>}
+                  </Td>
+                ) : null}
+                {visible.has('tags') ? (
+                  <Td className={`${styles.td} ${styles.fixedContent}`}>
+                    <div className={styles.tags} title={friend.tags.map((tag) => tag.name).join('・') || undefined}>
+                      <TagOverflow>{friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="sm" />)}</TagOverflow>
+
+                      {friend.tags.length === 0 ? <span className={styles.faint}>—</span> : null}
+                    </div>
+                  </Td>
+                ) : null}
+                {visible.has('source') ? (
+                  <Td className={`${styles.td} ${styles.fixedContent}`} collapseAt="narrow"><span className={styles.cellText} title={friend.firstTrackedLinkName || '不明'}>{friend.firstTrackedLinkName || '不明'}</span></Td>
+                ) : null}
+                {visible.has('last') ? (
+                  <Td className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={monthDayTime(lastContact)}>{monthDay(lastContact)}</span></Td>
+                ) : null}
+                <Td className={styles.tdMenu}>
+                  <div className={styles.menuBox}>
+                    <FriendRowMenu
+                      friendId={friend.id}
+                      friendName={friend.displayName}
+                      attention={attention}
+                      canEdit={rowCanEdit}
+                      allowedActions={allowedActions}
+                      onAction={(action) => setRowAction({ friend, action })}
+                      onToggleAttention={() => void toggleAttention(friend)}
+                    />
+                  </div>
+                </Td>
+              </Tr>
+            )
+          }}
+        >
           {loadStatus === 'loading' ? (
             <tr>
               <td colSpan={colCount}>
@@ -834,115 +915,24 @@ export default function FriendsListV8() {
                 <ListState kind="empty" title={emptyMessage.title} description={emptyMessage.description} />
               </td>
             </tr>
-          ) : friends.map((friend) => {
-            const status = statusOf(friend.chatStatus)
-            const latest = friend.latestIncomingMessage
-            const lastContact = lastContactOf(friend)
-            const attention = String(friend.metadata?.__attention ?? '') === '1'
-            const tags = splitTags(friend.tags)
-            return (
-              <Tr key={friend.id} interactive selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row data-row-id={friend.id}>
-                <Td className={styles.tdCheck} onClick={(event) => event.stopPropagation()}>
-                  <Checkbox checked={selectedIds.has(friend.id)} onCheckedChange={() => toggleSelect(friend.id)} aria-label={`${friend.displayName}を選ぶ`} />
-                </Td>
-                <Td className={styles.tdStar}>
-                  {rowCanEdit ? (
-                    <button
-                      type="button"
-                      className={attention ? `${styles.star} ${styles.starOn}` : styles.star}
-                      aria-pressed={attention}
-                      aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
-                      onClick={() => void toggleAttention(friend)}
-                    >
-                      <Star size={16} aria-hidden="true" />
-                    </button>
-                  ) : (
-                    /* 閲覧のみは押せない星を置かない。注目の印だけ見せる。 */
-                    <span className={attention ? `${styles.star} ${styles.starOn}` : styles.star} title={attention ? '注目' : undefined}>
-                      <Star size={16} aria-hidden="true" />
-                    </span>
-                  )}
-                </Td>
-                <Td className={styles.td}>
-                  <div className={styles.friendCell}>
-                    <Avatar name={friend.displayName} src={friend.pictureUrl} size={32} />
-                    <div className={styles.friendText}>
-                      <Link href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</Link>
-                      <span className={styles.sub}>{monthDay(friend.createdAt)}に登録</span>
-                    </div>
-                  </div>
-                </Td>
-                {visible.has('support') ? (
-                  <Td className={styles.td}>
-                    <div className={styles.supportCell}>
-                      <span className={styles.statusRow}>
-                        <StatusPill tone={SUPPORT_STATUS_TONES[friend.chatStatus ?? 'resolved']}>{status.label}</StatusPill>
-                        {friend.supportMark ? <span className={styles.mark} title={`対応マーク：${friend.supportMark.name}`}>{friend.supportMark.name}</span> : null}
-                      </span>
-                      <span className={styles.sub}>{`担当：${friend.operator?.name ?? '担当なし'}`}</span>
-                    </div>
-                  </Td>
-                ) : null}
-                {visible.has('scenario') ? (
-                  <Td className={styles.td}><span className={styles.cellText} title={friend.activeScenario?.name}>{friend.activeScenario?.name ?? emptyValue('none')}</span></Td>
-                ) : null}
-                {visible.has('latest') ? (
-                  <Td className={styles.td}>
-                    {latest ? (
-                      <div className={styles.twoLine}>
-                        <span className={styles.cellText} title={latest.content}>{messageWord(latest)}</span>
-                        <span className={styles.sub}>{monthDayTime(latest.createdAt)}</span>
-                      </div>
-                    ) : <span className={styles.cellText}>受信なし</span>}
-                  </Td>
-                ) : null}
-                {visible.has('tags') ? (
-                  <Td className={styles.td}>
-                    <div className={styles.tags} title={friend.tags.map((tag) => tag.name).join('・') || undefined}>
-                      {tags.shown.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="sm" />)}
-                      {tags.rest > 0 ? <span className={styles.tagRest}>+{tags.rest}</span> : null}
-                      {friend.tags.length === 0 ? <span className={styles.faint}>{emptyValue('unknown')}</span> : null}
-                    </div>
-                  </Td>
-                ) : null}
-                {visible.has('source') ? (
-                  <Td className={styles.td}><span className={styles.cellText} title={friend.firstTrackedLinkName || '不明'}>{friend.firstTrackedLinkName || '不明'}</span></Td>
-                ) : null}
-                {visible.has('last') ? (
-                  <Td className={styles.td}><span className={styles.cellText} title={monthDayTime(lastContact)}>{monthDay(lastContact)}</span></Td>
-                ) : null}
-                <Td className={styles.tdMenu}>
-                  <div className={styles.menuBox}>
-                    <FriendRowMenu
-                      friendId={friend.id}
-                      friendName={friend.displayName}
-                      attention={attention}
-                      canEdit={rowCanEdit}
-                      allowedActions={allowedActions}
-                      onAction={(action) => setRowAction({ friend, action })}
-                      onToggleAttention={() => void toggleAttention(friend)}
-                    />
-                  </div>
-                </Td>
-              </Tr>
-            )
-          })}
-        </tbody>
+          ) : null}
+        </TableBody>
       </DataTable>
     </div>
   )
 
   const pager = (
-    <div className={styles.pager}>
+    <ListPager>
       <span className={styles.pagerCount}>
         {loadStatus === 'ready' ? `${formatNumber(total)}人中 ${formatNumber(rangeStart)}〜${formatNumber(rangeEnd)}人` : emptyValue('unknown')}
       </span>
       <Pagination page={page} pageCount={totalPages} onPageChange={setPage} disabled={loadStatus !== 'ready'} ariaLabel="友だち一覧のページ" />
-    </div>
+    </ListPager>
   )
 
   return (
     <ListPage
+      skeleton
       boardId="x6QsVz"
       headingSize="compact"
       title="友だち"
@@ -951,10 +941,7 @@ export default function FriendsListV8() {
       tabs={(
         <>
           {readOnly ? (
-            <div className={styles.viewerBand} role="status">
-              <Eye size={16} aria-hidden="true" />
-              <span>{VIEWER_NOTE}</span>
-            </div>
+            <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div>
           ) : null}
           <FriendsTabs current="list" />
         </>

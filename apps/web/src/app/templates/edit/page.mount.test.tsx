@@ -178,6 +178,7 @@ async function fakeApi(input: string, init?: RequestInit): Promise<Response> {
 
   await held.get(path)?.promise
 
+  if (path === '/api/staff/me') return jsonResponse({ success: true, data: { role: 'owner', permissionKeys: [], accountScope: 'all' } })
   if (path === '/api/line-accounts') {
     return jsonResponse({ success: true, data: [
       lineAccount('account-a', 'A店'),
@@ -532,3 +533,6 @@ describe('新しく作る', () => {
     expect(insertOptions()).toContain('A店のペット名')
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

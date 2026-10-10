@@ -2,24 +2,7 @@
  * ★V8 組織・権限（bSp4h）。値は globals.css の `--tpl-rt-*`。
  * 左の組織階層は幅280、右は段の間16。
  */
-.readOnly {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
 
-.readOnlyIcon {
-  width: var(--tpl-rt-icon-16);
-  height: var(--tpl-rt-icon-16);
-  flex-shrink: 0;
-  color: var(--color-status-info);
-}
 
 .layout {
   display: flex;
@@ -56,6 +39,11 @@
 /* 組織階層：幅280・中身は余白16・段の間8。 */
 .tree {
   flex: 0 0 var(--tpl-rt-tree-w);
+  min-width: 0;
+}
+
+.treeCollapsed {
+  display: none;
 }
 
 .treeBody {
@@ -186,7 +174,6 @@
 }
 
 .intakeError {
-  margin: 0;
   color: var(--color-danger);
   font-size: var(--text-caption);
   font-weight: 600;
@@ -310,12 +297,6 @@
   font-weight: 600;
 }
 
-.ops {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--tpl-rt-payload-gap);
-}
-
 .matrixYes {
   color: var(--color-accent-deep);
   font-weight: 700;
@@ -419,3 +400,13 @@
   padding-top: var(--tpl-rt-dialog-gap);
   box-shadow: var(--tpl-sb-line-top);
 }
+
+/* 狭い白い板では階層を開閉する段へ移し、表の名前と操作の幅を保つ。 */
+@container v8-page (width < 1100px) {
+  .layout { flex-direction: column; }
+  .tree { flex: none; width: 100%; }
+  .treeExpanded { display: none; }
+  .treeCollapsed { display: block; }
+  .main { width: 100%; }
+}
+.intakeError, .intakeErrorNoticePlacement { margin: 0; }

@@ -106,6 +106,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     ...actual,
     api: {
       ...actual.api,
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: 'owner' } }) },
       operations: {
         ...actual.api.operations,
         preview: (accountId: string | null) => {
@@ -1165,3 +1166,6 @@ describe('EmergencyControlPanel を実際に mount して操作する', () => {
     host.unmount()
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

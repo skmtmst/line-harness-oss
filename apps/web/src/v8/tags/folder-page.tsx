@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8 タグ「フォルダを追加」（Pencil `IjVpM`）。タグの一覧（src/v8/tags/list）の上に窓を重ねる。
- *
- * 読み込み・保存・削除・クエリの切り替え（古い応答を捨てる）は今の画面（app/tags/folders/new/page.tsx）と同じ。
- * 受け付ける URL：`/tags/folders/new`（タグのフォルダを追加）・`?id=<フォルダ>`（直す・削除）・
- * `?kind=friend_field`（友だち情報欄のフォルダを追加。今の「作成する場所」の切り替えの代わり）。
- * 色は共通部品と同じ名前つきの8色を、名前の横の共通ボタンから選ぶ。
- */
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { FolderCheck, FolderPlus, Trash2 } from 'lucide-react'
@@ -17,15 +8,26 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import Notice from '@/components/shared/notice'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import ListState from '@/components/shared/list-state'
 import TagsList from './list'
 import styles from './create.module.css'
-
-/* 絵の9色。保存する値は色コード、読み上げと見出しは名前。既定は緑（基調色）。 */
 import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+/*
+ * ★V8 タグ「フォルダを追加」（Pencil `IjVpM`）。タグの一覧（src/v8/tags/list）の上に窓を重ねる。
+ *
+ * 読み込み・保存・削除・クエリの切り替え（古い応答を捨てる）は今の画面（app/tags/folders/new/page.tsx）と同じ。
+ * 受け付ける URL：`/tags/folders/new`（タグのフォルダを追加）・`?id=<フォルダ>`（直す・削除）・
+ * `?kind=friend_field`（友だち情報欄のフォルダを追加。今の「作成する場所」の切り替えの代わり）。
+ * 色は共通部品と同じ名前つきの8色を、名前の横の共通ボタンから選ぶ。
+ */
+
+/* 絵の9色。保存する値は色コード、読み上げと見出しは名前。既定は緑（基調色）。 */
+
 export { TAG_FOLDER_COLORS } from './folder-colors'
 const DEFAULT_COLOR = DEFAULT_TAG_FOLDER_COLOR
 
@@ -62,6 +64,7 @@ export default function TagFolderPageV8() {
 }
 
 function TagFolderPage() {
+  const saveErrors = useSaveFormErrors()
   const staffRole = useStaffRole()
   const router = useRouter()
   const params = useSearchParams()
@@ -138,7 +141,10 @@ function TagFolderPage() {
       close()
     } catch (reason) {
       if (!sameRequest(activeRef.current, request)) return
-      setError(folderSaveError(reason instanceof ApiError ? reason.status : undefined))
+      const fieldFailure = saveErrors.capture(reason)
+      { if (!fieldFailure)
+
+      setError(folderSaveError(reason instanceof ApiError ? reason.status : undefined)) }
     } finally {
       if (sameRequest(activeRef.current, request)) setSaving(false)
     }
@@ -156,14 +162,17 @@ function TagFolderPage() {
       router.push('/tags')
     } catch (reason) {
       if (!sameRequest(activeRef.current, request)) return
+      const fieldFailure = saveErrors.capture(reason)
       setDeleteOpen(false)
-      setError(folderDeleteError(reason instanceof ApiError ? reason.status : undefined))
+      { if (!fieldFailure)
+
+      setError(folderDeleteError(reason instanceof ApiError ? reason.status : undefined)) }
     } finally {
       if (sameRequest(activeRef.current, request)) setSaving(false)
     }
   }
 
-  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></SaveErrorScope>
 
   /* 止まっている理由は押せない見た目だけにせず、ボタンの title と本文に出す。 */
   const blockedReason =
@@ -174,7 +183,7 @@ function TagFolderPage() {
   const title = editId ? 'フォルダを直す' : scope === 'friend_field' ? '友だち情報欄のフォルダを追加する' : 'フォルダを追加する'
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <TagsList accountId={selectedAccountId} />
       <FolderEditorDialog
         open
@@ -225,6 +234,6 @@ function TagFolderPage() {
         onCancel={() => { if (!saving) setDeleteOpen(false) }}
         onConfirm={() => remove()}
       />
-    </>
+    </></SaveErrorScope>
   )
 }

@@ -75,7 +75,8 @@ describe('V8の5手順で送信を確定する', () => {
     mocks.config.mockResolvedValue({ success: true, data: { threshold: 5, singleOperator: false } })
     await render(); const dialog = await confirm()
     await act(async () => { fireEvent.click(dialog.querySelector('button[aria-label="承認をお願いする人"]')!) }); await flush()
-    await act(async () => { fireEvent.click(Array.from(document.querySelectorAll('[role="option"] button')).find((item) => item.textContent?.includes('確認担当'))!) }); await flush()
+    await act(async () => { fireEvent.click(Array.from(document.querySelectorAll('input[type="radio"]')).find((item) => item.getAttribute('aria-label')?.includes('確認担当'))!) }); await flush()
+    await click('選ぶ', [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!)
     await click('承認を依頼する', dialog)
     expect(mocks.request).toHaveBeenCalledWith('draft', { approverStaffId: 'reviewer', note: undefined })
     expect(mocks.send).not.toHaveBeenCalled(); expect(mocks.success).toHaveBeenCalledTimes(1)
@@ -108,7 +109,8 @@ describe('V8の5手順で送信を確定する', () => {
   it('ORの絞り込みへ除外タグを足しても、除外は必ずANDで効き、人数と保存は同じ条件になる', async () => {
     await render('audience')
     await act(async () => { fireEvent.click(container.querySelector('button[aria-label="除くタグ"]')!) }); await flush()
-    await act(async () => { fireEvent.click(Array.from(document.querySelectorAll('[role="option"] button')).find((item) => item.textContent?.includes('配信不要'))!) }); await flush()
+    await act(async () => { fireEvent.click(Array.from(document.querySelectorAll('input[type="radio"]')).find((item) => item.getAttribute('aria-label')?.includes('配信不要'))!) }); await flush()
+    await click('選ぶ', [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!)
     await act(async () => { await vi.advanceTimersByTimeAsync(650) }); await flush()
     const counted = mocks.preflight.mock.calls.at(-1)![0].segmentConditions
     expect(counted).toMatchObject({ operator: 'AND', rules: [{ type: 'tag_not_exists', value: 'exclude' }], groups: [{ operator: 'AND', rules: [{ type: 'is_following', value: true }], groups: [{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'vip' }, { type: 'tag_exists', value: 'member' }] }] }] })

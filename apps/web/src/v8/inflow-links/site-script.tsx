@@ -1,4 +1,30 @@
 'use client'
+import CopyTextButton from '@/components/shared/copy-text-button'
+import Link from 'next/link'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { CircleHelp, Pause, Play, Plus, RefreshCw } from 'lucide-react'
+import { ApiError, api, type MeasurementSite } from '@/lib/api'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
+import { useResponseGate } from '@/lib/use-response-gate'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import HelpTip from '@/components/shared/help-tip'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import { MoreAction } from '@/components/shared/row-actions'
+import ListState from '@/components/shared/list-state'
+import StatusBadge from '@/components/shared/status-badge'
+import { TextArea, TextField } from '@/components/shared/text-field'
+import { DetailPage } from '@/components/templates'
+import { focusField } from './focus-field'
+import styles from './site-script.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 サイトスクリプト（Pencil `XjOte`）。
@@ -13,31 +39,6 @@
  * - 「貼りかたが分からないときは」は窓で開く（今は右の列のいちばん下の段）
  * - 閲覧のみ（owner・admin 以外）には、サイトを追加する・「…」・操作の行を出さない
  */
-import CopyTextButton from '@/components/shared/copy-text-button'
-import Link from 'next/link'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { CircleHelp, Copy, Eye, Mail, MoreHorizontal, Pause, Play, Plus, RefreshCw } from 'lucide-react'
-import { ApiError, api, type MeasurementSite } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { formatNumber } from '@/lib/format'
-import { useResponseGate } from '@/lib/use-response-gate'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import HelpTip from '@/components/shared/help-tip'
-import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import IconButton from '@/components/shared/icon-button'
-import ListState from '@/components/shared/list-state'
-import StatusBadge from '@/components/shared/status-badge'
-import { TextArea, TextField } from '@/components/shared/text-field'
-import { DetailPage } from '@/components/templates'
-import { focusField } from './focus-field'
-import styles from './site-script.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
 
 type PageRow = { host: string | null; path: string; views: number; visitors: number }
 type TrackingSummary = {
@@ -61,10 +62,11 @@ function formatShort(value: string | null | undefined): string | null {
 const parseDomains = (text: string) => text.split(/[\s,]+/).map((d) => d.trim()).filter(Boolean)
 
 export default function SiteScriptV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('サイトスクリプト')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '流入と計測', href: '/inflow-links' }])
   const role = useStaffRole()
-  const readonly = role !== null && !canManageRole(role)
+  const readonly = !canManageRole(role)
   const { selectedAccountId } = useAccount()
   const [pages, setPages] = useState<PageRow[]>([])
   const [summary, setSummary] = useState<TrackingSummary | null>(null)
@@ -198,6 +200,8 @@ export default function SiteScriptV8() {
       await load()
     } catch (err) {
       if (moved()) return
+      saveErrors.capture(err);
+
       const message = err instanceof Error ? err.message : '保存できませんでした'
       const field = err instanceof ApiError && err.status === 400
         ? message.includes('ドメイン') ? 'site-domains' : message.includes('サイトの名前') ? 'site-name' : null
@@ -235,6 +239,7 @@ export default function SiteScriptV8() {
       await load()
     } catch (err) {
       if (moved()) return
+      saveErrors.capture(err)
       setStopDialog({ ...stopDialog, error: err instanceof Error ? err.message : '停止できませんでした' })
     } finally {
       setSiteBusy(false)
@@ -255,14 +260,14 @@ export default function SiteScriptV8() {
       await load()
     } catch (err) {
       if (moved()) return
+      const fieldFailure = saveErrors.capture(err)
       setResumeTarget(null)
-      setSiteActionError(err instanceof Error ? err.message : '再開できませんでした')
+      { if (!fieldFailure)
+      setSiteActionError(err instanceof Error ? err.message : '再開できませんでした') }
     } finally {
       setSiteBusy(false)
     }
   }
-
-
 
   /** 制作会社へ送る文（コードつき）をコピーする。 */
 
@@ -282,7 +287,7 @@ export default function SiteScriptV8() {
     <p className={styles.note}>まだサイトがありません。追加するとサイトごとの計測コードが出ます。</p>
   ) : (
     <>
-      {siteActionError ? <p className={styles.note} role="alert">{siteActionError}</p> : null}
+      {siteActionError ? <Notice tone="danger" className={styles.noteNoticePlacement} >{siteActionError}</Notice> : null}
       <div className={styles.siteTable} role="table" aria-label="成果を数えるサイト">
       <div className={styles.siteHead} role="row">
         <span className={styles.colSite} role="columnheader">サイト</span>
@@ -308,15 +313,13 @@ export default function SiteScriptV8() {
             <span className={styles.colLast} role="cell"><span className={styles.cellText}>{last ?? emptyValue('unknown')}</span></span>
             <span className={styles.colMenu} role="cell">
               {manage ? (
-                <IconButton
+                <MoreAction
                   title={`「${site.label}」の操作`}
                   aria-label={`「${site.label}」の操作`}
                   aria-expanded={selectedSiteId === site.id}
                   aria-controls="site-script-row-actions"
                   onClick={() => setSelectedSiteId((current) => (current === site.id ? null : site.id))}
-                >
-                  <MoreHorizontal size={16} aria-hidden="true" />
-                </IconButton>
+                 />
               ) : null}
             </span>
           </div>
@@ -344,12 +347,12 @@ export default function SiteScriptV8() {
   )
 
   return (
-    <DetailPage boardId="XjOte" title="サイトスクリプト" help="ホームページに1行貼ると、サイトを見た人と LINE の友だちを結びつけ、成果も数えられます。"
+    <SaveErrorScope errors={saveErrors}><DetailPage boardId="XjOte" title="サイトスクリプト" help="ホームページに1行貼ると、サイトを見た人と LINE の友だちを結びつけ、成果も数えられます。"
       contentPadding="var(--tpl-detail-head-pad-bottom) var(--tpl-head-pad-side)"
       actions={<Button onClick={() => setHelpOpen(true)}><CircleHelp size={15} aria-hidden="true" />貼りかたが分からないときは</Button>}>
       <div className={styles.body}>
         {readonly ? (
-          <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
 
         {loading && summary == null && !failed ? (
@@ -385,7 +388,7 @@ export default function SiteScriptV8() {
                 ) : snippet ? (
                   <>
                     <div className={styles.codeBox}><code className={styles.code}>{snippet}</code></div>
-                    {copyFailed ? <p className={styles.small} role="alert">コピーできませんでした。上のコードを選んでコピーしてください。</p> : null}
+                    {copyFailed ? <Notice tone="danger" className={styles.smallNoticePlacement} >コピーできませんでした。上のコードを選んでコピーしてください。</Notice> : null}
                     <div className={styles.buttons}>
                       <CopyTextButton value={snippet ?? ""} label="コードをコピー" aria-label="コードをコピー"  />
                       <CopyTextButton value={`ホームページの</head>の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。\n${snippet}`} label="制作会社へ送る文をコピー" aria-label="制作会社へ送る文をコピー"  />
@@ -437,7 +440,7 @@ export default function SiteScriptV8() {
                       <p className={styles.faint}>コードを貼ったあと、サイトを開くと数分で表示されます。</p>
                     </>
                   )}
-                  <span><Button onClick={() => void load()}><RefreshCw size={15} aria-hidden="true" />いま届いているか確かめる</Button></span>
+                  <span><Button onClick={() => load()} busyLabel="処理中…"><RefreshCw size={15} aria-hidden="true" />いま届いているか確かめる</Button></span>
                 </div>
                 <div className={styles.pageTable} role="table" aria-label="ページごとの表示">
                   <div className={styles.pageHead} role="row">
@@ -504,9 +507,9 @@ export default function SiteScriptV8() {
       >
         {siteDialog ? (
           <div className={styles.dialogFields}>
-            <Field label="サイトの名前"><TextField id="site-name" aria-invalid={Boolean(siteFieldErrors['site-name'])} aria-describedby={siteFieldErrors['site-name'] ? 'site-name-error' : undefined} value={siteDialog.label} maxLength={100} placeholder="例：公式ショップ" onChange={(e) => { setSiteDialog({ ...siteDialog, label: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-name': '' })) }} />
+            <Field label="サイトの名前"><SaveErrorField names={["label","siteDialog.label","site_dialog.label","site_dialog"]}><TextField id="site-name" aria-invalid={Boolean(siteFieldErrors['site-name'])} aria-describedby={siteFieldErrors['site-name'] ? 'site-name-error' : undefined} value={siteDialog.label} maxLength={100} placeholder="例：公式ショップ" onChange={(e) => { setSiteDialog({ ...siteDialog, label: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-name': '' })) }} /></SaveErrorField>
 {siteFieldErrors['site-name'] ? <span id="site-name-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-name']}</span> : null}</Field>
-            <Field label="計測を許可するドメイン"><TextArea id="site-domains" aria-invalid={Boolean(siteFieldErrors['site-domains'])} aria-describedby={siteFieldErrors['site-domains'] ? 'site-domains-error' : undefined} rows={4} value={siteDialog.domainsText} placeholder={'example.com\nshop.example.com'} onChange={(e) => { setSiteDialog({ ...siteDialog, domainsText: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-domains': '' })) }} />
+            <Field label="計測を許可するドメイン"><SaveErrorField names={["domainsText","siteDialog.domainsText","domains_text","site_dialog.domains_text","site_dialog"]}><TextArea id="site-domains" aria-invalid={Boolean(siteFieldErrors['site-domains'])} aria-describedby={siteFieldErrors['site-domains'] ? 'site-domains-error' : undefined} rows={4} value={siteDialog.domainsText} placeholder={'example.com\nshop.example.com'} onChange={(e) => { setSiteDialog({ ...siteDialog, domainsText: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-domains': '' })) }} /></SaveErrorField>
 {siteFieldErrors['site-domains'] ? <span id="site-domains-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-domains']}</span> : null}</Field>
           </div>
         ) : null}
@@ -525,7 +528,7 @@ export default function SiteScriptV8() {
         {stopDialog ? (
           <div className={styles.dialogFields}>
             <p className={styles.small}>{`対象: ${stopDialog.site.label}`}</p>
-            <Field label="止める理由" required><TextField id="site-stop-reason" aria-invalid={Boolean(stopReasonError)} aria-describedby={stopReasonError ? 'site-stop-reason-error' : undefined} value={stopDialog.reason} maxLength={200} placeholder="例：サイトを閉じたため" onChange={(e) => { setStopDialog({ ...stopDialog, reason: e.target.value }); setStopReasonError('') }} />
+            <Field label="止める理由" required><SaveErrorField names={["reason","stopDialog.reason","stop_dialog.reason","stop_dialog"]}><TextField id="site-stop-reason" aria-invalid={Boolean(stopReasonError)} aria-describedby={stopReasonError ? 'site-stop-reason-error' : undefined} value={stopDialog.reason} maxLength={200} placeholder="例：サイトを閉じたため" onChange={(e) => { setStopDialog({ ...stopDialog, reason: e.target.value }); setStopReasonError('') }} /></SaveErrorField>
 {stopReasonError ? <span id="site-stop-reason-error" className={styles.fieldError} role="alert">{stopReasonError}</span> : null}</Field>
           </div>
         ) : null}
@@ -540,6 +543,6 @@ export default function SiteScriptV8() {
         onConfirm={() => resumeSite()}
         onCancel={() => { if (!siteBusy) setResumeTarget(null) }}
       />
-    </DetailPage>
+    </DetailPage></SaveErrorScope>
   )
 }

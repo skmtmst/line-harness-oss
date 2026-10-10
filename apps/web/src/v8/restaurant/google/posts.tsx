@@ -1,11 +1,6 @@
 'use client'
+import Toggle from '@/components/shared/toggle';
 
-/*
- * ★V8 Googleビジネス 投稿（一覧 `Cfed0`・投稿を作る `T1j2Sw`）と公開前の確認。
- * 口（一覧・状態の確認・下書きの保存・取消・削除・公開）は今の画面と同じ。
- * 端末からの画像のアップロードは、入口の page.tsx が渡す道具（mediaUpload）で行う
- * （src/v8 から @/app を読まないため）。渡されないときは登録メディアから選ぶだけ。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useState } from 'react'
 import { Plus, RefreshCw, Send } from 'lucide-react'
@@ -45,6 +40,15 @@ import type { GoogleNav } from './google'
 import styles from './google.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ImageFrame from '@/components/shared/image-frame'
+
+/*
+ * ★V8 Googleビジネス 投稿（一覧 `Cfed0`・投稿を作る `T1j2Sw`）と公開前の確認。
+ * 口（一覧・状態の確認・下書きの保存・取消・削除・公開）は今の画面と同じ。
+ * 端末からの画像のアップロードは、入口の page.tsx が渡す道具（mediaUpload）で行う
+ * （src/v8 から @/app を読まないため）。渡されないときは登録メディアから選ぶだけ。
+ */
 
 /** 端末からのアップロードの道具（今の画面の app/contents/media-direct-upload を入口が渡す）。 */
 export interface MediaUploadHelpers {
@@ -199,7 +203,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
     const items: ActionMenuItem[] = [
       { id: 'open', label: actionable ? '編集' : '中身を見る', onSelect: () => go({ tab: 'posts', view: 'edit', id: post.id }) },
     ]
-    if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', external: true, href: post.searchUrl ?? '', onSelect: () => window.open(post.searchUrl ?? '', '_blank', 'noopener') })
+    if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', external: true, href: post.searchUrl ?? '' })
     if (post.status === 'draft') items.push({ id: 'cancel', label: '取り消す', disabled: busyId === post.id, onSelect: () => void cancelDraft(post) })
     if (post.instagram?.status === 'failed') items.push({ id: 'ig-retry', label: 'Instagram へ再送', disabled: busyId === post.id, onSelect: () => void retryInstagram(post) })
     if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, disabled: busyId === post.id, onSelect: () => setConfirmRemove(post) })
@@ -212,8 +216,8 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
     <>
       <div className={styles.toolbar}>
         <p className={styles.toolbarText}>Google に出す投稿（最新情報・イベント・特典・お知らせ）</p>
-        <Select aria-label="状態で絞り込み" width={150} value={filter} onChange={(value) => { setFilter(value as GooglePostFilter); setPage(1) }} options={FILTER_OPTIONS.map((option) => ({ ...option, disabled: option.value === 'scheduled' && (data?.counts.scheduled ?? 0) === 0 }))} />
-        <Select aria-label="種類で絞り込み" width={150} value={kind} onChange={(value) => { setKind(value as typeof kind); setPage(1) }} options={[{ value: 'all', label: '種類：すべて' }, ...(['standard', 'event', 'offer'] as GooglePostKind[]).map((k) => ({ value: k, label: `種類：${KIND_LABELS[k]}` }))]} />
+        <SaveErrorField names={["filter"]}><Select aria-label="状態で絞り込み" width={150} value={filter} onChange={(value) => { setFilter(value as GooglePostFilter); setPage(1) }} options={FILTER_OPTIONS.map((option) => ({ ...option, disabled: option.value === 'scheduled' && (data?.counts.scheduled ?? 0) === 0 }))} /></SaveErrorField>
+        <SaveErrorField names={["kind"]}><Select aria-label="種類で絞り込み" width={150} value={kind} onChange={(value) => { setKind(value as typeof kind); setPage(1) }} options={[{ value: 'all', label: '種類：すべて' }, ...(['standard', 'event', 'offer'] as GooglePostKind[]).map((k) => ({ value: k, label: `種類：${KIND_LABELS[k]}` }))]} /></SaveErrorField>
         <Button onClick={() => void sync()} disabled={syncing} busy={syncing} busyLabel="確認中…"><RefreshCw aria-hidden className={styles.icon15} />Googleの状態を確認</Button>
         <Button variant="primary" onClick={() => go({ tab: 'posts', view: 'new', kind: 'standard' })}><Plus aria-hidden className={styles.icon15} />投稿を作る</Button>
       </div>
@@ -335,6 +339,8 @@ function draftInputFrom(form: PostForm, igAvailable: boolean): GooglePostDraftIn
 
 /** 投稿を作る・直す（T1j2Sw）。 */
 export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUpload }: { accountId: string; kind: GooglePostKind; postId: string | null; go: GoogleNav; mediaUpload?: MediaUploadHelpers }) {
+  const saveErrors = useSaveFormErrors()
+
   const [form, setForm] = useState<PostForm>(emptyForm(kindFromUrl))
   const [initial, setInitial] = useState<PostForm>(emptyForm(kindFromUrl))
   const [loading, setLoading] = useState(Boolean(postId))
@@ -384,6 +390,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
       if (!response.success) throw new ApiError(500, response.error)
       setPicker({ open: true, items: response.data.items, loading: false, error: '' })
     } catch (err) {
+      saveErrors.capture(err)
       setPicker({ open: true, items: [], loading: false, error: errorMessage(err, '登録メディアを読み込めませんでした。') })
     }
   }
@@ -411,6 +418,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
       setPicker({ open: false, items: [], loading: false, error: '' })
       setUpload({ busy: false, progress: 100, error: '' })
     } catch (err) {
+      saveErrors.capture(err)
       setUpload({ busy: false, progress: 0, error: errorMessage(err, 'アップロードできませんでした。') })
     }
   }
@@ -459,7 +467,10 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
       setInitial(form)
       return response.post.id
     } catch (err) {
-      setActionError(errorMessage(err, '下書きを保存できませんでした。'))
+      const fieldFailure = saveErrors.capture(err)
+
+      { if (!fieldFailure)
+      setActionError(errorMessage(err, '下書きを保存できませんでした。')) }
       return null
     } finally {
       setBusy(null)
@@ -478,8 +489,8 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
     if (id) go({ tab: 'posts', view: 'confirm', id })
   }
 
-  if (loading) return <div className={styles.stateBox}><ListState kind="loading" title="投稿を読み込んでいます" /></div>
-  if (loadError) return <ListState kind="error" title="投稿を表示できませんでした" description={loadError} action={<Button onClick={() => go({ tab: 'posts' })}>投稿一覧へ戻る</Button>} />
+  if (loading) return <SaveErrorScope errors={saveErrors}><div className={styles.stateBox}><ListState kind="loading" title="投稿を読み込んでいます" /></div></SaveErrorScope>
+  if (loadError) return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="投稿を表示できませんでした" description={loadError} action={<Button onClick={() => go({ tab: 'posts' })}>投稿一覧へ戻る</Button>} /></SaveErrorScope>
 
   const withPeriod = form.kind !== 'standard'
   const set = (patch: Partial<PostForm>) => {
@@ -488,42 +499,42 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       {!editable ? <Notice tone="warn">この投稿はもう編集できません（送信済み、または送信手続き中です）。</Notice> : null}
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
         <SectionHeader size="small" title={<>{postId ? '投稿を直す' : '投稿を作る'}</>} />
         <Field density="compact" label="種類">
-          <Select
+          <SaveErrorField names={["kind","form.kind"]}><Select
             aria-label="投稿の種類"
             size="full"
             value={form.kind}
             disabled={Boolean(postId) || !editable}
             onChange={(value) => go({ tab: 'posts', view: 'new', kind: value })}
             options={(['standard', 'event', 'offer'] as GooglePostKind[]).map((k) => ({ value: k, label: KIND_LABELS[k] }))}
-          />
+          /></SaveErrorField>
         </Field>
         {withPeriod ? (
           <div className={styles.fieldGroup}>
             <Field density="input" label="タイトル（特典・イベントのとき）" htmlFor="gb-post-title" error={fieldErrors.title}>
-              <TextField id="gb-post-title" value={form.title} onChange={(e) => set({ title: e.target.value })} disabled={!editable} maxLength={100} />
+              <SaveErrorField names={["title","form.title"]}><TextField id="gb-post-title" value={form.title} onChange={(e) => set({ title: e.target.value })} disabled={!editable} maxLength={100} /></SaveErrorField>
             </Field>
             <div className={styles.fieldPair}>
               <Field density="input" label="期間 はじめ" htmlFor="gb-post-start" error={fieldErrors.start} grow>
-                <DateTimeField size="compact" id="gb-post-start" invalid={Boolean(fieldErrors.start)} value={form.start} onChange={(next) => set({ start: next })} disabled={!editable} />
+                <SaveErrorField names={["start","form.start"]}><DateTimeField size="compact" id="gb-post-start" invalid={Boolean(fieldErrors.start)} value={form.start} onChange={(next) => set({ start: next })} disabled={!editable} /></SaveErrorField>
               </Field>
               <Field density="input" label="期間 おわり" htmlFor="gb-post-end" error={fieldErrors.end} grow>
-                <DateTimeField size="compact" id="gb-post-end" invalid={Boolean(fieldErrors.end)} value={form.end} onChange={(next) => set({ end: next })} disabled={!editable} />
+                <SaveErrorField names={["end","form.end"]}><DateTimeField size="compact" id="gb-post-end" invalid={Boolean(fieldErrors.end)} value={form.end} onChange={(next) => set({ end: next })} disabled={!editable} /></SaveErrorField>
               </Field>
             </div>
           </div>
         ) : null}
+        <div className={styles.postCompose}>
         <Field density="compact" label="本文" htmlFor="gb-post-summary" error={fieldErrors.summary}>
-          <TextArea density="compact" height="post" id="gb-post-summary" value={form.summary} onChange={(e) => set({ summary: e.target.value })} disabled={!editable} maxLength={1500} aria-describedby="gb-post-summary-count" />
+          <SaveErrorField names={["summary","form.summary"]}><TextArea density="compact" height="post" id="gb-post-summary" value={form.summary} onChange={(e) => set({ summary: e.target.value })} disabled={!editable} maxLength={1500} aria-describedby="gb-post-summary-count" /></SaveErrorField>
           <span id="gb-post-summary-count" className="sr-only">{`${form.summary.length} / 1,500 文字`}</span>
         </Field>
         <div className={styles.imageSlot}>
-          <MediaSlot
-            size="compact"
+          <SaveErrorField names={["mediaSourceUrl","form.mediaSourceUrl","media_source_url","form.media_source_url"]}><ImageFrame
             title="画像を追加"
             previewAlt={form.mediaFilename ?? '投稿の画像'}
             value={form.mediaSourceUrl}
@@ -537,8 +548,9 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             onFile={mediaUpload ? (file) => void uploadFromDevice(file) : undefined}
             onMediaPick={() => (picker.open ? setPicker({ ...picker, open: false }) : void openPicker())}
             onRemove={() => set({ mediaId: null, mediaFilename: null, mediaSourceUrl: null })}
-          />
+          /></SaveErrorField>
           {form.mediaFilename ? <span className={styles.imageName} title={form.mediaFilename}>{`${form.mediaFilename}・4:3`}</span> : null}
+        </div>
         </div>
         {picker.open ? (
           <div className={styles.picker} role="group" aria-label="画像を選ぶ">
@@ -564,30 +576,30 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
           <div className={styles.fieldGroup}>
             <div className={styles.fieldPair}>
               <Field density="input" label="クーポンコード（任意）" htmlFor="gb-post-coupon" grow>
-                <TextField id="gb-post-coupon" value={form.couponCode} onChange={(e) => set({ couponCode: e.target.value })} disabled={!editable} maxLength={40} />
+                <SaveErrorField names={["couponCode","form.couponCode","coupon_code","form.coupon_code"]}><TextField id="gb-post-coupon" value={form.couponCode} onChange={(e) => set({ couponCode: e.target.value })} disabled={!editable} maxLength={40} /></SaveErrorField>
               </Field>
               <Field density="input" label="特典の利用リンク（任意）" htmlFor="gb-post-redeem" grow>
-                <TextField id="gb-post-redeem" type="url" placeholder="https://" value={form.redeemOnlineUrl} onChange={(e) => set({ redeemOnlineUrl: e.target.value })} disabled={!editable} maxLength={200} />
+                <SaveErrorField names={["redeemOnlineUrl","form.redeemOnlineUrl","redeem_online_url","form.redeem_online_url"]}><TextField id="gb-post-redeem" type="url" placeholder="https://" value={form.redeemOnlineUrl} onChange={(e) => set({ redeemOnlineUrl: e.target.value })} disabled={!editable} maxLength={200} /></SaveErrorField>
               </Field>
             </div>
             <Field density="input" label="利用条件（任意）" htmlFor="gb-post-terms">
-              <TextField id="gb-post-terms" value={form.termsConditions} onChange={(e) => set({ termsConditions: e.target.value })} disabled={!editable} maxLength={300} />
+              <SaveErrorField names={["termsConditions","form.termsConditions","terms_conditions","form.terms_conditions"]}><TextField id="gb-post-terms" value={form.termsConditions} onChange={(e) => set({ termsConditions: e.target.value })} disabled={!editable} maxLength={300} /></SaveErrorField>
             </Field>
           </div>
         ) : null}
         <div className={styles.fieldPair}>
           <Field density="compact" label="ボタン（任意）" grow>
-            <Select
+            <SaveErrorField names={["ctaType","form.ctaType","cta_type","type","form.cta_type"]}><Select
               aria-label="ボタンの種類"
               size="full"
               value={form.kind === 'offer' ? '' : form.ctaType}
               onChange={(v) => set({ ctaType: v as GooglePostCtaType | '' })}
               options={[{ value: '', label: form.kind === 'offer' ? 'なし（特典は Google の決まりで付けられません）' : emptyValue('none') }, ...(Object.keys(CTA_LABELS) as GooglePostCtaType[]).map((k) => ({ value: k, label: CTA_LABELS[k] }))]}
               disabled={!editable || form.kind === 'offer'}
-            />
+            /></SaveErrorField>
           </Field>
           <Field density="input" label="リンク先" htmlFor="gb-post-cta-url" grow>
-            <TextField id="gb-post-cta-url" type="url" placeholder="https://" value={form.ctaUrl} onChange={(e) => set({ ctaUrl: e.target.value })} disabled={!editable || form.kind === 'offer' || !form.ctaType || form.ctaType === 'call'} maxLength={500} />
+            <SaveErrorField names={["ctaUrl","form.ctaUrl","cta_url","form.cta_url"]}><TextField id="gb-post-cta-url" type="url" placeholder="https://" value={form.ctaUrl} onChange={(e) => set({ ctaUrl: e.target.value })} disabled={!editable || form.kind === 'offer' || !form.ctaType || form.ctaType === 'call'} maxLength={500} /></SaveErrorField>
           </Field>
         </div>
         <Field density="compact" label="公開方法">
@@ -605,7 +617,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             <div className={styles.igToggleRow}>
               {editable ? (
                 <>
-                  <SettingCheckbox checked={form.igEnabled} label="Instagram にも投稿する" onChange={(next) => set({ igEnabled: next })} />
+                  <SaveErrorField names={["igEnabled","form.igEnabled","ig_enabled","enabled","form.ig_enabled"]}><SettingCheckbox checked={form.igEnabled} label="Instagram にも投稿する" onChange={(next) => set({ igEnabled: next })} /></SaveErrorField>
                   <span className={styles.igToggleLabel}>Instagram にも投稿する</span>
                 </>
               ) : (
@@ -615,7 +627,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             {form.igEnabled ? (
               <>
                 <Field label="Instagram 用の文章（書き換えたいときだけ）" htmlFor="gb-post-ig-caption">
-                  <TextArea density="compact" height="post" id="gb-post-ig-caption" value={form.igCaption} onChange={(e) => set({ igCaption: e.target.value })} disabled={!editable} maxLength={2200} placeholder="空のままなら、上の本文をそのまま使います" aria-describedby="gb-post-ig-caption-count" />
+                  <SaveErrorField names={["igCaption","form.igCaption","ig_caption","caption","form.ig_caption"]}><TextArea density="compact" height="post" id="gb-post-ig-caption" value={form.igCaption} onChange={(e) => set({ igCaption: e.target.value })} disabled={!editable} maxLength={2200} placeholder="空のままなら、上の本文をそのまま使います" aria-describedby="gb-post-ig-caption-count" /></SaveErrorField>
                   <span id="gb-post-ig-caption-count" className="sr-only">{`${form.igCaption.length} / 2,200 文字`}</span>
                 </Field>
                 <p className={styles.igNote}>Instagram には画像が 1 枚必要です。PNG の画像は自動で JPEG に変換されます。</p>
@@ -635,16 +647,18 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             </div>
           </>
         ) : (
-          <div className={styles.formActions}><Button onClick={() => go({ tab: 'posts' })}>投稿一覧へ戻る</Button></div>
+          <div className={styles.formActions}></div>
         )}
       </Card>
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }
 
 /** 公開前の最終確認（今の画面 jqSak と同じ動き。V8 の絵はまだ無い）。 */
 export function PostConfirm({ accountId, id, go }: { accountId: string; id: string; go: GoogleNav }) {
+  const saveErrors = useSaveFormErrors()
+
   const [post, setPost] = useState<GooglePost | null>(null)
   const [storeName, setStoreName] = useState('')
   const [writeEnabled, setWriteEnabled] = useState(true)
@@ -666,11 +680,14 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
       setWriteEnabled(response.writeEnabled)
       setCanPublish(response.canPublish)
     } catch (err) {
-      setLoadError(errorMessage(err, '投稿を読み込めませんでした。'))
+      const fieldFailure = saveErrors.capture(err)
+
+      { if (!fieldFailure)
+      setLoadError(errorMessage(err, '投稿を読み込めませんでした。')) }
     } finally {
       setLoading(false)
     }
-  }, [accountId, id])
+  }, [accountId, id, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -682,25 +699,29 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
       setPost(response.post)
       setSent({ alreadyPublished: response.alreadyPublished })
     } catch (err) {
+      const fieldFailure = saveErrors.capture(err);
+
       if (err instanceof ApiError && err.status === 502) {
-        setActionError('Googleへの送信結果を確認できませんでした。重複を防ぐため、次に「この内容で予約する」を押したときはGoogle側の状態を照合してから送ります。')
+        { if (!fieldFailure)
+        setActionError('Googleへの送信結果を確認できませんでした。重複を防ぐため、次に「この内容で予約する」を押したときはGoogle側の状態を照合してから送ります。') }
         await load()
       } else {
-        setActionError(errorMessage(err, 'Googleへの投稿に失敗しました。'))
+        { if (!fieldFailure)
+        setActionError(errorMessage(err, 'Googleへの投稿に失敗しました。')) }
       }
     } finally {
       setBusy(false)
     }
   }
 
-  if (loading) return <div className={styles.stateBox}><ListState kind="loading" title="投稿を読み込んでいます" /></div>
-  if (loadError || !post) return <ListState kind="error" title="投稿を表示できませんでした" description={loadError} onRetry={() => void load()} action={<Button onClick={() => go({ tab: 'posts' })}>投稿一覧へ戻る</Button>} />
+  if (loading) return <SaveErrorScope errors={saveErrors}><div className={styles.stateBox}><ListState kind="loading" title="投稿を読み込んでいます" /></div></SaveErrorScope>
+  if (loadError || !post) return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="投稿を表示できませんでした" description={loadError} onRetry={() => void load()} action={<Button onClick={() => go({ tab: 'posts' })}>投稿一覧へ戻る</Button>} /></SaveErrorScope>
 
   const done = post.status === 'published' || post.status === 'accepted' || post.status === 'rejected'
   const canPress = canPublish && writeEnabled && checked && !busy && !done && post.status !== 'cancelled'
 
   return (
-    <Card appearance="outlined" layout="vertical" padding="default" gap="normal" data-design-node="jqSak">
+    <SaveErrorScope errors={saveErrors}><Card appearance="outlined" layout="vertical" padding="default" gap="normal" data-design-node="jqSak">
       <SectionHeader size="small" title={<>{done ? 'この投稿をGoogleに送信しました' : 'この投稿を予約しますか？'}</>} />
       <p className={styles.muted}>Googleに公開される内容と日時を確認してください。</p>
       {sent ? <Notice tone="success">{sent.alreadyPublished ? 'この内容はすでにGoogleに届いていました。送信はしていません。' : post.status === 'published' ? 'Googleに投稿を送信し、公開を確認しました。' : 'Googleに投稿を送信しました。反映を確認できるまで「審査中」と表示します。'}</Notice> : null}
@@ -722,7 +743,7 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
       <p className={styles.preText}>{post.summary}</p>
       {!done && post.status !== 'cancelled' ? (
         <>
-          <Checkbox checked={checked} onCheckedChange={setChecked}>公開先・本文・画像・リンク・日時を確認しました</Checkbox>
+          <SaveErrorField names={["checked"]}><Checkbox checked={checked} onCheckedChange={setChecked}>公開先・本文・画像・リンク・日時を確認しました</Checkbox></SaveErrorField>
           <p className={styles.grayNote}>予約後も編集・取消できます。送信後はGoogleの状態を取得し、予約中・公開済み・不承認を区別します。通信結果が不明な場合は、重複投稿を避けるため先にGoogle側の状態を確認します。</p>
           <div className={styles.formActions}>
             <Button onClick={() => go({ tab: 'posts', view: 'edit', id })} disabled={busy}>修正する</Button>
@@ -730,8 +751,8 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
           </div>
         </>
       ) : (
-        <div className={styles.formActions}><Button variant="primary" onClick={() => go({ tab: 'posts' })}>投稿一覧へ戻る</Button></div>
+        <div className={styles.formActions}></div>
       )}
-    </Card>
+    </Card></SaveErrorScope>
   )
 }

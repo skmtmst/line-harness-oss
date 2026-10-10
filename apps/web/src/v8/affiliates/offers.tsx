@@ -1,15 +1,5 @@
 'use client'
 
-/*
- * ★V8 成果とアフィリエイト「案件」（板 `h7dmB`）。
- *
- * app/affiliates/v8-offers-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で
- * 組み直した。データの口は今と同じ（案件・アカウント・タグ・シナリオの名前・承認の全件）。
- * 行の「…」は 編集・決まり・公開を止める（公開する）・複製。複製は下書きで作る。
- *
- * フォルダの列：案件をフォルダへ入れる口は無いので、成果が出たときの動き
- * （タグ・シナリオ・マイル）で分けた見え方の切り替えとして持つ（保存しない）。
- */
 import { useListUrlJsonValue } from '@/components/shared/list-url-state'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
@@ -60,6 +50,18 @@ import styles from './affiliates.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 成果とアフィリエイト「案件」（板 `h7dmB`）。
+ *
+ * app/affiliates/v8-offers-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で
+ * 組み直した。データの口は今と同じ（案件・アカウント・タグ・シナリオの名前・承認の全件）。
+ * 行の「…」は 編集・決まり・公開を止める（公開する）・複製。複製は下書きで作る。
+ *
+ * フォルダの列：案件をフォルダへ入れる口は無いので、成果が出たときの動き
+ * （タグ・シナリオ・マイル）で分けた見え方の切り替えとして持つ（保存しない）。
+ */
 
 type FilterKey = 'open' | 'draft'
 type FolderKey = 'all' | 'tag' | 'scenario' | 'miles' | 'none'
@@ -77,7 +79,6 @@ const FOLDERS: Array<{ key: FolderKey; label: string; match: (o: AffiliateOffer)
   { key: 'none', label: '動きが未設定', match: (o) => !o.tagId && !o.scenarioId && o.rewardMiles === 0 },
 ]
 
-
 const SAVED_VIEWS: Array<{ value: string; label: string; filters: FilterKey[]; sort: 'newest' | 'name' | 'reward'; folder?: FolderKey }> = [
   { value: '', label: 'よく使う絞り込み', filters: [], sort: 'newest' },
   { value: 'open-reward', label: '公開中・報酬が高い順', filters: ['open'], sort: 'reward' },
@@ -87,6 +88,7 @@ const SAVED_VIEWS: Array<{ value: string; label: string; filters: FilterKey[]; s
 ]
 
 export default function OffersTab() {
+  const saveErrors = useSaveFormErrors()
   const { readonly, narrow, setCount, accountId } = useAffiliateShell()
   const settlementPeriod = useMemo(() => currentSettlementPeriod(), [])
 
@@ -133,12 +135,16 @@ export default function OffersTab() {
         setOffers([])
         setLoadState('error')
       }
-    } catch {
+    } catch (saveFailure) {
       if (!mounted.current) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       setOffers([])
+      { if (!fieldFailure)
       setLoadState('error')
     }
-  }, [])
+  }
+  }, [saveErrors]);
+
 
   const loadOptions = useCallback(async () => {
     try {
@@ -147,8 +153,10 @@ export default function OffersTab() {
       if (accountsRes.success && Array.isArray(accountsRes.data)) setAccounts(accountsRes.data as unknown as LineAccount[])
       if (tagsRes.success && Array.isArray(tagsRes.data)) setTags(tagsRes.data as unknown as Tag[])
       if (scenariosRes.success && Array.isArray(scenariosRes.data)) setScenarios(scenariosRes.data as unknown as (Scenario & { stepCount?: number })[])
-    } catch { /* 名前が引けなくても一覧は出せる */ }
-  }, [])
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure) /* 名前が引けなくても一覧は出せる */ }
+  }, [saveErrors]);
+
 
   const loadApprovals = useCallback(async () => {
     setApprovalState('loading')
@@ -158,10 +166,14 @@ export default function OffersTab() {
       setApprovals(results.flatMap((result) => result.items))
       setApprovalsTruncated(results.some((result) => result.truncated))
       setApprovalState('ready')
-    } catch {
-      if (mounted.current) setApprovalState('error')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
+      if (mounted.current) { if (!fieldFailure) setApprovalState('error')
     }
-  }, [accountId])
+  }
+  }, [accountId, saveErrors]);
+
 
   const loadMonthly = useCallback(async () => {
     setMonthlyState('loading')
@@ -177,10 +189,13 @@ export default function OffersTab() {
       if (!mounted.current) return
       setMonthly({ count: current, delta: prevRes.success ? current - total(prevRes.data) : null })
       setMonthlyState('ready')
-    } catch {
-      if (mounted.current) setMonthlyState('error')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
+      if (mounted.current) { if (!fieldFailure) setMonthlyState('error')
     }
-  }, [settlementPeriod])
+  }
+  }, [settlementPeriod, saveErrors])
 
   useEffect(() => {
     void loadOffers()
@@ -279,13 +294,15 @@ export default function OffersTab() {
       if (!res.success) throw new Error('update failed')
       if (res.data && res.data.id === offer.id) setOffers((current) => current.map((item) => (item.id === offer.id ? { ...item, ...res.data } : item)))
       notifyToast(next ? `「${offer.name}」を公開しました。` : `「${offer.name}」の公開を止めました。紹介リンクに出なくなります。`)
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
       setActive(offer.isActive)
+      { if (!fieldFailure)
       notifyToast(`「${offer.name}」を${next ? '公開でき' : '止められ'}ませんでした。元に戻しました。`, {
         tone: 'error',
         actionLabel: 'もう一度',
         onAction: () => { void togglePublish(offer) },
-      })
+      }) }
     } finally {
       setBusyId(null)
     }
@@ -322,8 +339,11 @@ export default function OffersTab() {
       if (!res.success) throw new Error('create failed')
       notifyToast(`「${offer.name}」を下書きで複製しました。`)
       void loadOffers()
-    } catch {
-      notifyToast('複製できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      notifyToast('複製できませんでした。もう一度お試しください。') }
     } finally {
       setBusyId(null)
     }
@@ -412,12 +432,12 @@ export default function OffersTab() {
 
   const folderSelect = (
     <div className={styles.narrowFolder}>
-      <Select
+      <SaveErrorField names={["folder"]}><Select
         aria-label="成果のときの動き"
         value={folder}
         options={FOLDERS.map((item) => ({ value: item.key, label: item.key === 'all' || !ready ? item.label : `${item.label} ${offers.filter(item.match).length}` }))}
         onChange={(value) => resetPage(() => setFolder(value as FolderKey))}
-      />
+      /></SaveErrorField>
     </div>
   )
 
@@ -468,7 +488,7 @@ export default function OffersTab() {
       <DataTable className={`${styles.table} ${styles.tableOffers}`}>
         <thead>
           <TableHeadRow className={styles.headRow} data-table-layout="columns">
-            <Th className={styles.colName}>案件</Th>
+            <Th className={styles.colName}>案件</Th><Th>状態</Th>
             <Th className={styles.colOfferReward}>報酬</Th>
             <Th className={styles.colOfferAction}>成果が出たときの動き</Th>
             <Th className={`${styles.colOfferPeople} ${styles.num}`}>紹介している人</Th>
@@ -490,9 +510,10 @@ export default function OffersTab() {
                         <button type="button" className={styles.rowName} title={offer.name}  onClick={() => { setEditTarget(offer); setFormOpen(true) }}>{offer.name}</button>
                       )}
                     </FolderDotName>
-                    <span className={styles.rowPlan} title={offer.description ?? undefined}>{offer.description ?? '説明はありません'}</span>
+
                   </span>
                 </Td>
+                <Td><StatusPill tone={offer.isActive ? 'active' : 'neutral'}>{offer.isActive ? '公開中' : '下書き'}</StatusPill></Td>
                 <Td className={styles.colOfferReward}>
                   <span className={styles.stack}>
                     <span className={styles.cellNum}>{rewardText(offer)}</span>
@@ -513,10 +534,7 @@ export default function OffersTab() {
                 </Td>
                 <Td className={styles.colOfferOps}>
                   <span className={styles.rowActions}>
-                    {readonly ? null : (
-                      <Button type="button" onClick={() => { setEditTarget(offer); setFormOpen(true) }}>編集</Button>
-                    )}
-                    <StatusPill tone={offer.isActive ? 'active' : 'neutral'}>{offer.isActive ? '公開中' : '下書き'}</StatusPill>
+
                     <RowMenu
                       label={`${offer.name}の操作`}
                       items={[
@@ -567,7 +585,7 @@ export default function OffersTab() {
   ) : undefined
 
   return (
-    <AffiliateFrame
+    <SaveErrorScope errors={saveErrors}><AffiliateFrame
       help={readonly ? '行の「…」から 決まり（受付期間・上限・数える期間）を見る。' : '行の「…」から 編集・決まり・公開を止める・複製。'}
       actions={<Button onClick={exportCsv} disabled={shown.length === 0}><Download size={15} aria-hidden="true" /> CSVで書き出す</Button>}
       stats={stats}
@@ -590,6 +608,6 @@ export default function OffersTab() {
       </>}
     >
       {body}
-    </AffiliateFrame>
+    </AffiliateFrame></SaveErrorScope>
   )
 }

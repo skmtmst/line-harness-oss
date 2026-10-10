@@ -210,7 +210,7 @@
 
 .mediumLink {
   flex: 0 0 auto;
-  color: var(--color-status-info);
+  color: var(--color-action);
   font-size: var(--text-caption);
   font-weight: 500;
   white-space: nowrap;

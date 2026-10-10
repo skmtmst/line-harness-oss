@@ -1,5 +1,4 @@
 'use client'
-
 import { File as FileIcon, FileAudio, FileUp, Loader } from 'lucide-react'
 import {
   useCallback,
@@ -16,6 +15,7 @@ import {
 import styles from './media-slot.module.css'
 import { TextField } from './text-field'
 import HelpTip from './help-tip'
+import { joinDescribedBy, useFieldContext } from './field-context'
 
 /**
  * 画像・動画・ファイルを入れる所。Pencil ★V8 の採用案 Z7vd2（B-128「画像を追加する所」）。
@@ -105,6 +105,9 @@ function reasonOf(caught: unknown): string {
 }
 
 export interface MediaSlotProps {
+  id?: string
+  invalid?: boolean
+  'aria-describedby'?: string
   /** 何を入れるか。印・言葉・入ったときの見せ方が変わる。 */
   kind?: MediaSlotKind
   /** 太字の題（「メイン画像を追加」など）。読み上げの名前にもなる。 */
@@ -174,6 +177,7 @@ export interface MediaSlotProps {
 }
 
 export default function MediaSlot({
+  id, invalid, 'aria-describedby': saveDescription,
   kind = 'image',
   title,
   value,
@@ -209,6 +213,10 @@ export default function MediaSlot({
   children,
   'data-testid': testId,
 }: MediaSlotProps) {
+  const field = useFieldContext()
+  id = id ?? field?.controlId
+  invalid = invalid || field?.invalid
+  saveDescription = joinDescribedBy(saveDescription, field?.describedBy)
   const inputRef = useRef<HTMLInputElement>(null)
   const dragCount = useRef(0)
   const gen = useRef(0)
@@ -469,10 +477,10 @@ export default function MediaSlot({
         ) : error ? (
           <>
             <span className={styles.reason} role="alert">{error}</span>
-            {limit ? <span className={styles.desc}>{limit}</span> : null}
+            {limit ? <span className={`${styles.desc} ${styles.limit}`} title={limit}>{limit}</span> : null}
           </>
         ) : !canFile ? (
-          limit ? <span className={styles.desc}>{compact ? limit : `（${limit}）`}</span> : null
+          limit ? <span className={`${styles.desc} ${styles.limit}`} title={limit}>{compact ? limit : `（${limit}）`}</span> : null
         ) : (
           <>
             <span className={styles.desc}>
@@ -480,7 +488,7 @@ export default function MediaSlot({
               <br />
               {compact ? 'またはクリック' : 'またはクリックしてファイルをアップロード'}
             </span>
-            {limit ? <span className={styles.desc}>{compact ? limit : `（${limit}）`}</span> : null}
+            {limit ? <span className={`${styles.desc} ${styles.limit}`} title={limit}>{compact ? limit : `（${limit}）`}</span> : null}
           </>
         )}
       </>
@@ -523,7 +531,7 @@ export default function MediaSlot({
   if (renderTrigger) return <>{renderTrigger(openPicker)}{picker}{error ? <p role="alert">{error}</p> : null}</>
 
   return (
-    <div className={styles.root} data-testid={testId}>
+    <div id={id} className={styles.root} data-testid={testId} aria-invalid={invalid || undefined} aria-describedby={saveDescription} style={invalid ? { outline: '1px solid var(--color-danger)' } : undefined}>
       <div
         role="group"
         aria-label={title}
