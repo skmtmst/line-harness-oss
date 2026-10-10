@@ -12,7 +12,7 @@ import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { actionIncompleteReason } from '@/components/auto-replies/action-completeness'
 import { newActionKey, type InlineAction } from '@/components/auto-replies/draft-fields'
 import type { ActionOptions } from '@/components/auto-replies/inline-action-list'
-import styles from '@/components/auto-replies/inline-action-rows-v8.module.css'
+import styles from './action-rows.module.css'
 
 /*
  * ★V8 自動応答の作る③「返したあとに行うこと」（絵 rfhIf「処理」の行）。

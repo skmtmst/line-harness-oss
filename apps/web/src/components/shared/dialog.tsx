@@ -27,6 +27,8 @@ export type DialogProps = {
   /** 確認のボタンを先に置く板だけで指定する。 */
   confirmFirst?: boolean
   designWidth?: number
+  /** B-165の共通選択窓だけ640pxの幅を使う。 */
+  widthPreset?: 'picker'
   /** ★V8：絵の窓の上からの位置（px）。渡すと上寄せにする。渡さなければ今までどおり。v7 では効かない。 */
   designTop?: number
   /**
@@ -111,6 +113,7 @@ export default function Dialog({
   open,
   size = 'medium',
   designWidth,
+  widthPreset,
   designLayout,
   confirmFirst,
   designTop,
@@ -261,7 +264,7 @@ export default function Dialog({
       data-design-content-padding={designContentPadding ? '' : undefined}
       style={({
         ...(designFooterGap !== undefined ? { '--dialog-footer-gap': `${designFooterGap}px` } : {}),
-        '--dialog-design-width': `${dialogWidth((designWidth === 600 ? 560 : designWidth === 844 ? 720 : designWidth) ?? ({ small: 480, medium: 560, large: 720, wide: 960 } as const)[size])}px`,
+        '--dialog-design-width': `${widthPreset === 'picker' ? 640 : dialogWidth((designWidth === 600 ? 560 : designWidth === 844 ? 720 : designWidth) ?? ({ small: 480, medium: 560, large: 720, wide: 960 } as const)[size])}px`,
         ...(designHeaderPadding ? { '--dialog-design-header-padding': designHeaderPadding } : {}),
         ...(designHeaderHeight ? { '--dialog-design-header-height': `${designHeaderHeight}px` } : {}),
         ...(designContentPadding ? { '--dialog-design-content-padding': designContentPadding } : {}),

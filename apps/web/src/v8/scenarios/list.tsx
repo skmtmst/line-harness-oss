@@ -1,5 +1,4 @@
 'use client'
-import { useDeferredDelete } from '@/lib/use-deferred-delete';
 import { useDetailPanelUrl } from '@/components/shared/detail-panel';
 
 import { canManageRole } from '@/lib/staff-role';

@@ -1234,12 +1234,13 @@ export function ActionConfigEditor({
             onChange={(value) => onChange({ ...c, eventId: value, slotId: null })}
           />
           {eventId && (
-            <Select
+            <EntitySelect
               aria-label="開催回"
               value={typeof c.slotId === 'string' ? c.slotId : ''}
               options={[
                 { value: '', label: c.op === 'cancel' ? 'イベント全体の申込を取り消す' : '次に空いている回' },
                 ...eventSlots.map((slot) => ({
+                  ...entityOptionMetadata(slot),
                   value: slot.id,
                   label: new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(slot.starts_at)),
                 })),

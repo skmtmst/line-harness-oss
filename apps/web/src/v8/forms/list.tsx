@@ -1,6 +1,5 @@
 'use client'
 import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability';
-import { useDeferredDelete } from '@/lib/use-deferred-delete';
 import { useDetailPanelUrl } from '@/components/shared/detail-panel';
 
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
@@ -1419,57 +1418,7 @@ export default function FormsListV8() {
         </DetailPanel>
       ) : null}
 
-      {duplicateTarget !== null ? (
-        <DetailPanel
-          open
-          title={`「${displayFormName(duplicateTarget.name)}」を複製しますか？`}
-          description="質問・分岐・デザイン・回答後の設定を引き継いだ、受付停止中のフォームを作ります。集まった回答・公開状態・集計は引き継ぎません。"
-          onClose={() => {
-            if (duplicating) return
-            withViewTransition(() => {
-              setDuplicateTarget(null)
-              setDuplicateError('')
-            })
-          }}
-          footer={(
-            <div className={styles.panelFooter}>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={duplicating}
-                onClick={() => {
-                  if (duplicating) return
-                  setDuplicateTarget(null)
-                  setDuplicateError('')
-                }}
-              >
-                キャンセル
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                busy={duplicating}
-                busyLabel="処理中"
-                disabled={duplicating || !duplicateName.trim()}
-                onClick={() => void duplicateForm()}
-              >
-                複製する
-              </Button>
-            </div>
-          )}
-        >
-          <Field label="複製の名前"><SaveErrorField names={["duplicateName","duplicate_name"]}><input
-              value={duplicateName}
-              onChange={(event) => setDuplicateName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
-                if (event.key === 'Enter') void duplicateForm()
-              }}
-              className={styles.panelInput}
-            /></SaveErrorField></Field>
-          {duplicateError ? <p className={styles.alertText} role="alert">{duplicateError}</p> : null}
-        </DetailPanel>
-      ) : null}
+
 
       <DetailPanel
         open={active !== null}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage, CreatePage } from '@/components/templates'
@@ -16,6 +16,9 @@ import { Tabs } from '@/components/shared/tabs'
 import { Plus, Send } from 'lucide-react'
 import type { HqTemplateFolder } from '@line-crm/shared'
 import { useDistributionFolders, accountsInFolder, distributionFolderRows } from '../hq-templates/distribution-accounts'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -40,6 +43,8 @@ const initialSettings = (type: HqDeliveryTemplateType) => type === 'auto_reply'
 
 export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateType }) {
   const router = useRouter()
+  const saveErrors = useSaveFormErrors()
+  const savedSnapshot = useRef('')
   const staffRole = useStaffRole()
   const canEdit = staffRole !== null && canManageRole(staffRole)
   const [query, setQuery] = useState('')
@@ -63,6 +68,8 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
   const [preflight, setPreflight] = useState<Awaited<ReturnType<typeof hqDeliveriesApi.preflight>> | null>(null)
   const [distributionResult, setDistributionResult] = useState<Awaited<ReturnType<typeof hqDeliveriesApi.distribute>> | null>(null)
   const accountFolders = useDistributionFolders(view==='accounts' || view==='preflight' || view==='result')
+  const dirty = view === 'edit' && JSON.stringify(selected) !== savedSnapshot.current
+  const guard = useUnsavedGuard({ dirty, busy, onDiscard: () => setSelected(null) })
   usePageTitle(`${titleOf(type)}を配る`)
 
   const load = useCallback(async () => {
@@ -75,14 +82,14 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
 
   const edit = async (row: HqDeliveryTemplate) => {
     setError(''); setNotice(''); setBusy(true)
-    try { setSelected(await hqDeliveriesApi.detail(row.id)); setPreflight(null); setSelectedAccounts([]); setAccountFolder('all'); setQuery(''); setView('edit'); return true }
+    try { const loaded = await hqDeliveriesApi.detail(row.id); savedSnapshot.current = JSON.stringify(loaded); saveErrors.reset(); setSelected(loaded); setPreflight(null); setSelectedAccounts([]); setAccountFolder('all'); setQuery(''); setView('edit'); return true }
     catch { setError('ひな形を開けませんでした。一覧を読み直してください。'); return false }
     finally { setBusy(false) }
   }
   const create = () => {
     const settings = initialSettings(type)
-    setSelected({ template: { id: '', name: '', description: null, template_type: type, revision: 0, distributed_account_names: [], distributed_account_more: 0, distributed_account_count: 0, content_summary: '' }, definition: { schemaVersion: 1, settings, references: [] } })
-    setAccountFolder('all'); setQuery(''); setPreflight(null); setSelectedAccounts([]); setError(''); setNotice(''); setView('edit')
+    const created: HqDeliveryTemplateDetail = { template: { id: '', name: '', description: null, template_type: type, revision: 0, distributed_account_names: [], distributed_account_more: 0, distributed_account_count: 0, content_summary: '' }, definition: { schemaVersion: 1, settings, references: [] } }
+    savedSnapshot.current = JSON.stringify(created); setSelected(created); saveErrors.reset(); setAccountFolder('all'); setQuery(''); setPreflight(null); setSelectedAccounts([]); setError(''); setNotice(''); setView('edit')
   }
   const settings = selected?.definition.settings as Record<string, unknown> | undefined
   const updateSetting = (key: string, value: unknown) => {
@@ -93,9 +100,9 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
     const nested = type === 'friend_add_rule' && key === 'messageText'
     const value = String(nested ? (settings?.definition as Record<string, unknown>)?.[key] ?? '' : settings?.[key] ?? '')
     const change = (text: string) => nested ? updateSetting('definition', { ...(settings?.definition as object), [key]: text }) : updateSetting(key, text)
-    return <label className={styles.field} key={key}><span>{label}</span>{multiline
-      ? <TextArea disabled={!canEdit} value={value} onChange={(event) => change(event.target.value)} rows={4} />
-      : <TextField disabled={!canEdit} value={value} onChange={(event) => change(event.target.value)} />}</label>
+    return <label className={styles.field} key={key}><span>{label}</span><SaveErrorField names={[key, `definition.settings.${nested ? 'definition.' : ''}${key}`]}>{multiline
+      ? canEdit ? <TextArea value={value} onChange={(event) => change(event.target.value)} rows={4} /> : <span>{String(value)}</span>
+      : canEdit ? <TextField value={value} onChange={(event) => change(event.target.value)} /> : <span>{String(value)}</span>}</SaveErrorField></label>
   }
   const save = async () => {
     if (!canEdit || !selected || busy) return
@@ -105,8 +112,8 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
       const result = selected.template.id
         ? await hqDeliveriesApi.update(selected.template.id, { ...input, expectedRevision: selected.template.revision })
         : await hqDeliveriesApi.create({ ...input, type, folderId: null, requestId: crypto.randomUUID() } as never)
-      setSelected(result); setNotice('下書きを保存しました。配布先を選べます。'); setPreflight(null); setView('accounts'); await load()
-    } catch { setError('保存できませんでした。内容を確認してもう一度お試しください。') }
+      savedSnapshot.current = JSON.stringify(result); guard.disarm(); setSelected(result); setNotice('下書きを保存しました。配布先を選べます。'); setPreflight(null); setView('accounts'); await load()
+    } catch (cause) { if (!saveErrors.capture(cause)) setError('保存できませんでした。内容を確認してもう一度お試しください。') }
     finally { setBusy(false) }
   }
   const prepare = async () => {
@@ -136,8 +143,8 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
     finally { setBusy(false) }
   }
 
-  const back = () => { setSelected(null); setPreflight(null); setNotice(''); setView('list') }
-  const notices = <>{foldersFailed && <Notice tone="warn">フォルダを読み込めませんでした。ページを再読み込みしてください。</Notice>}{!canEdit && <Notice tone="info">閲覧のみで見ています。変更や配布は統括の管理者に頼んでください。</Notice>}{error && <Notice tone="validation">{error}</Notice>}{notice && <Notice tone="success">{notice}</Notice>}{accountsFailed && <Notice tone="warn">配布先を読み込めませんでした。ページを再読み込みしてください。</Notice>}</>
+  const back = () => guard.guarded(() => { setSelected(null); setPreflight(null); setNotice(''); setView('list') })
+  const notices = <><ConfirmDialog open={guard.leaveTarget !== null} title="入力を破棄しますか？" description="保存していないひな形の変更があります。" primaryAction="cancel" cancelLabel="編集を続ける" confirmLabel="保存せずに移る" busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />{foldersFailed && <Notice tone="warn">フォルダを読み込めませんでした。ページを再読み込みしてください。</Notice>}{!canEdit && <Notice tone="info">閲覧のみで見ています。変更や配布は統括の管理者に頼んでください。</Notice>}{error && <Notice tone="warn">{error}</Notice>}{notice && <Notice tone="success">{notice}</Notice>}{accountsFailed && <Notice tone="warn">配布先を読み込めませんでした。ページを再読み込みしてください。</Notice>}</>
   const stats = <KpiBand>
     <KpiCard title="ひな形" value={!rowsReady ? null : rows.length} unit="件" detail={titleOf(type)} />
     <KpiCard title="配布先" value={!accountsReady ? null : accounts.length} unit="アカウント" detail="配ることのできるアカウント" />
@@ -151,50 +158,50 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
   ]
   if (view === 'list') {
     const shown = rows.filter(row => (folderFilter === 'all' || (row.folder_id ?? 'none') === folderFilter) && `${row.name} ${row.content_summary ?? ''}`.includes(query.trim()))
-    return <ListPage boardId="LRc93" title={titleOf(type)} help="設定のひな形を保存して各アカウントへ下書きとして配ります。" stats={stats}
+    return <SaveErrorScope errors={saveErrors}><ListPage boardId="LRc93" title={titleOf(type)} help="設定のひな形を保存して各アカウントへ下書きとして配ります。" stats={stats}
       tabs={<Tabs label="配る設定の種類" items={[{id:'template',label:'メッセージなど',onClick:()=>router.push('/hq/templates')},...TYPES.map(item=>({id:item.id,label:item.label,current:item.id===type,onClick:()=>router.push(`/hq/templates?type=${item.id}`)}))]} />}
       folders={<>{canEdit && <Button variant="primary" className="v8-folder-create w-full" disabled={busy} onClick={create}><Plus size={15} />ひな形を作る</Button>}<FolderPanel rows={folderRows} activeId={folderFilter} onSelect={setFolderFilter} /></>}
       folderNav={{rows:folderRows,activeId:folderFilter,onSelect:setFolderFilter,createAction:canEdit ? <Button variant="primary" onClick={create}>ひな形を作る</Button> : undefined}}
       toolbar={<SearchField aria-label="ひな形を検索" placeholder="ひな形を探す" value={query} onChange={setQuery} />}>
       {notices}
-      {loading ? <p role="status">読み込み中…</p> : shown.length ? <ResourceTable updatedLabel="版" canEdit={canEdit} rows={shown.map(row=>({id:row.id,name:<button type="button" className={styles.nameButton} onClick={()=>void edit(row)}>{row.name}</button>,summary:row.content_summary || titleOf(type),folder:folders.find(folder=>folder.id===row.folder_id),references:'—',updated:`版 ${row.revision}`,destinations:row.distributed_account_count == null ? '—' : row.distributed_account_count ? `${row.distributed_account_count} アカウント` : 'まだ配っていない',actions:<Button disabled={busy || accountsFailed} onClick={async()=>{if (await edit(row)) setView('accounts')}}><Send size={15} />アカウントへ配る</Button>}))} /> : <p>ひな形がありません。検索・フォルダを確認するか、新しく作ってください。</p>}
-    </ListPage>
+      {loading ? <p role="status">読み込み中…</p> : shown.length ? <ResourceTable updatedLabel="版" canEdit={canEdit} rows={shown.map(row=>({id:row.id,name:<Button variant="text" onClick={()=>void edit(row)}>{row.name}</Button>,summary:row.content_summary || titleOf(type),folder:folders.find(folder=>folder.id===row.folder_id),references:'—',updated:`版 ${row.revision}`,destinations:row.distributed_account_count == null ? '—' : row.distributed_account_count ? `${row.distributed_account_count} アカウント` : 'まだ配っていない',actions:<Button disabled={busy || accountsFailed} onClick={async()=>{if (await edit(row)) setView('accounts')}}><Send size={15} />アカウントへ配る</Button>}))} /> : <p>ひな形がありません。検索・フォルダを確認するか、新しく作ってください。</p>}
+    </ListPage></SaveErrorScope>
   }
-  if (view === 'edit' && selected) return <CreatePage boardId="X4JcOf" title={`${titleOf(type)}のひな形を${selected.template.id ? '編集する' : '作る'}`} help="保存した設定は、配布先で下書きとして受け取れます。" notice={notices}
+  if (view === 'edit' && selected) return <SaveErrorScope errors={saveErrors}><CreatePage dirty={false} busy={busy} boardId="X4JcOf" title={`${titleOf(type)}のひな形を${selected.template.id ? '編集する' : '作る'}`} help="保存した設定は、配布先で下書きとして受け取れます。" notice={notices}
     footerActions={<><Button disabled={busy} onClick={back}>キャンセル</Button>{canEdit && <Button variant="primary" disabled={busy || !selected.template.name.trim()} onClick={()=>void save()}>{busy ? '保存中…' : '下書きを保存する'}</Button>}</>}>
       <div className={styles.fields}>
-        <label className={styles.field}><span>統括での名前</span><TextField disabled={!canEdit} value={selected.template.name} onChange={(event) => setSelected({ ...selected, template: { ...selected.template, name: event.target.value } })} /></label>
-        <label className={styles.field}><span>説明</span><TextField disabled={!canEdit} value={selected.template.description ?? ''} onChange={(event) => setSelected({ ...selected, template: { ...selected.template, description: event.target.value } })} /></label>
+        <label className={styles.field}><span>統括での名前</span><SaveErrorField names={["name"]}>{canEdit ? <TextField value={selected.template.name} onChange={(event) => setSelected({ ...selected, template: { ...selected.template, name: event.target.value } })} /> : <span>{String(selected.template.name)}</span>}</SaveErrorField></label>
+        <label className={styles.field}><span>説明</span><SaveErrorField names={["description"]}>{canEdit ? <TextField value={selected.template.description ?? ''} onChange={(event) => setSelected({ ...selected, template: { ...selected.template, description: event.target.value } })} /> : <span>{String(selected.template.description ?? '')}</span>}</SaveErrorField></label>
         {field('name', '店に届く名前')}
         {type === 'auto_reply' && <>{field('keyword', 'キーワード')}
-          <label className={styles.field}><span>一致方法</span><Select disabled={!canEdit} aria-label="一致方法" value={String(settings?.matchType ?? 'contains')} options={[{ value: 'contains', label: '含む' }, { value: 'exact', label: '完全一致' }]} onChange={(value) => updateSetting('matchType', value)} /></label>
+          <label className={styles.field}><span>一致方法</span>{canEdit ? <Select aria-label="一致方法" value={String(settings?.matchType ?? 'contains')} options={[{ value: 'contains', label: '含む' }, { value: 'exact', label: '完全一致' }]} onChange={(value) => updateSetting('matchType', value)} /> : <span>{settings?.matchType === 'exact' ? '完全一致' : '含む'}</span>}</label>
           {field('responseContent', '返信内容', true)}</>}
         {type === 'friend_add_rule' && <>
-          <label className={styles.field}><span>対象</span><Select disabled={!canEdit} aria-label="対象" value={String(settings?.friendKind ?? 'first_time')} options={[{ value: 'first_time', label: '初めての友だち' }, { value: 'returning', label: '再び追加した友だち' }]} onChange={(value) => updateSetting('friendKind', value)} /></label>
+          <label className={styles.field}><span>対象</span>{canEdit ? <Select aria-label="対象" value={String(settings?.friendKind ?? 'first_time')} options={[{ value: 'first_time', label: '初めての友だち' }, { value: 'returning', label: '再び追加した友だち' }]} onChange={(value) => updateSetting('friendKind', value)} /> : <span>{settings?.friendKind === 'returning' ? '再び追加した友だち' : '初めての友だち'}</span>}</label>
           {field('messageText', '最初に送る内容', true)}
         </>}
         {type === 'reminder' && <>{field('description', '説明')}
-          <label className={styles.field}><span>配信方式</span><Select disabled={!canEdit} aria-label="配信方式" value={String(settings?.deliveryMode ?? 'time')} options={[{ value: 'time', label: '日時で送る' }, { value: 'countdown', label: '予定日から数えて送る' }]} onChange={(value) => updateSetting('deliveryMode', value)} /></label>
+          <label className={styles.field}><span>配信方式</span>{canEdit ? <Select aria-label="配信方式" value={String(settings?.deliveryMode ?? 'time')} options={[{ value: 'time', label: '日時で送る' }, { value: 'countdown', label: '予定日から数えて送る' }]} onChange={(value) => updateSetting('deliveryMode', value)} /> : <span>{settings?.deliveryMode === 'countdown' ? '予定日から数えて送る' : '日時で送る'}</span>}</label>
           {field('sendAtTime', '送る時刻')}</>}
       </div>
-  </CreatePage>
+  </CreatePage></SaveErrorScope>
   const shownAccounts = accountsInFolder(accounts, accountFolder, accountFolders.membership).filter(account=>account.name.includes(query.trim()))
   const targets = view === 'result' ? distributionResult?.stores.map(store=>store.accountId) ?? selectedAccounts : selectedAccounts
-  const accountFolderRows = distributionFolderRows({accounts, folders:accountFolders.folders, membership:accountFolders.membership, selected:selectedAccounts, onChange:setSelectedAccounts, disabled:!canEdit || busy || view!=='accounts'})
-  return <DistributionPage boardId="meBRB" title={`アカウントへ配る：${selected?.template.name ?? ''}`} help="配った設定は下書きで届きます。公開や送信は各店で確認します。" stats={stats} notices={notices}
+  const accountFolderRows = distributionFolderRows({accounts, folders:accountFolders.folders, membership:accountFolders.membership, selected:selectedAccounts, onChange:setSelectedAccounts, disabled:busy || view!=='accounts'})
+  return <SaveErrorScope errors={saveErrors}><DistributionPage boardId="meBRB" title={`アカウントへ配る：${selected?.template.name ?? ''}`} help="配った設定は下書きで届きます。公開や送信は各店で確認します。" stats={stats} notices={notices}
     toolbar={<DistributionToolbar><SearchField aria-label="アカウントを検索" placeholder="アカウント名で探す" value={query} onChange={setQuery} /><Select aria-label="アカウントのフォルダ" value={accountFolder} onChange={setAccountFolder} options={accountFolderRows.map(row=>({value:row.id,label:row.label}))} />{accountFolderRows.find(row=>row.id===accountFolder)?.leading}{accountFolders.failed && <Notice tone="warn">アカウントのフォルダを読み込めませんでした。</Notice>}</DistributionToolbar>}
     actions={<><Button disabled={busy} onClick={view==='preflight' ? ()=>setView('accounts') : back}>{view==='preflight' ? 'アカウントを選び直す' : 'キャンセル'}</Button>{canEdit && view!=='result' && <Button variant="primary" disabled={busy || accountsFailed || !targets.length} onClick={()=>void (view==='accounts' ? prepare() : distribute())}>{view==='accounts' ? `選んだ${targets.length}アカウントを確かめる` : '選んだ内容で配る'}</Button>}{view==='result' && <Button variant="primary" onClick={back}>完了する</Button>}</>}>
     <div className={styles.distribution}>
-      <DistributionTable selectAll={<Checkbox aria-label="表示中のアカウントをすべて選ぶ" checked={shownAccounts.length>0 && shownAccounts.every(account=>targets.includes(account.id))} indeterminate={shownAccounts.some(account=>targets.includes(account.id)) && !shownAccounts.every(account=>targets.includes(account.id))} disabled={!canEdit || busy || view!=='accounts'} onCheckedChange={checked=>setSelectedAccounts(old=>checked ? [...new Set([...old,...shownAccounts.map(account=>account.id)])] : old.filter(id=>!shownAccounts.some(account=>account.id===id)))} />}>
+      <DistributionTable selectAll={canEdit ? <Checkbox aria-label="表示中のアカウントをすべて選ぶ" checked={shownAccounts.length>0 && shownAccounts.every(account=>targets.includes(account.id))} indeterminate={shownAccounts.some(account=>targets.includes(account.id)) && !shownAccounts.every(account=>targets.includes(account.id))} disabled={busy || view!=='accounts'} onCheckedChange={checked=>setSelectedAccounts(old=>checked ? [...new Set([...old,...shownAccounts.map(account=>account.id)])] : old.filter(id=>!shownAccounts.some(account=>account.id===id)))} /> : null}>
         {shownAccounts.map(account=>{
           const chosen=targets.includes(account.id)
           const store=preflight?.stores.find(store=>store.accountId===account.id)
           return <tr key={account.id} data-selected={chosen || undefined}>
-            <td><Checkbox id={`delivery-${account.id}`} aria-label={account.name} checked={chosen} disabled={!canEdit || busy || view!=='accounts'} onCheckedChange={checked=>setSelectedAccounts(old=>checked ? [...new Set([...old,account.id])] : old.filter(id=>id!==account.id))} /></td>
+            <td>{canEdit ? <Checkbox id={`delivery-${account.id}`} aria-label={account.name} checked={chosen} disabled={busy || view!=='accounts'} onCheckedChange={checked=>setSelectedAccounts(old=>checked ? [...new Set([...old,account.id])] : old.filter(id=>id!==account.id))} /> : null}</td>
             <td><DistributionAccountName name={account.name} note={chosen ? '配る' : '配らない'} htmlFor={`delivery-${account.id}`} folder={accountFolders.membership?.get(account.id)?.folder} /></td>
             <td>{chosen ? selected?.template.content_summary || titleOf(type) : '—'}</td>
             <td>{chosen ? store?.items[0]?.expectedRevision ? `版 ${store.items[0].expectedRevision}` : store ? '未配布' : '確認前' : '—'}</td>
-            <td>{!chosen ? '—' : view==='result' ? distributionResult?.stores.find(store=>store.accountId===account.id)?.status === 'succeeded' ? '配布済み' : '確認が必要' : store ? store.items.map(item=><Select key={item.sourceId} aria-label={`${account.name}：${item.name}の配り方`} disabled={!canEdit || busy} value={choices[`${account.id}:${item.sourceId}`] ?? ''} options={[{value:'',label:'選んでください'},...item.allowedModes.map(mode=>({value:mode,label:mode==='create' ? '新しく作る' : mode==='overwrite' ? '下書きを上書きする' : '別名で作る'}))]} onChange={value=>setChoices(old=>({...old,[`${account.id}:${item.sourceId}`]:value}))} />) : '確認のあとで選ぶ'}</td>
+            <td>{!chosen ? '—' : view==='result' ? distributionResult?.stores.find(store=>store.accountId===account.id)?.status === 'succeeded' ? '配布済み' : '確認が必要' : store ? store.items.map(item=>canEdit ? <Select key={item.sourceId} aria-label={`${account.name}：${item.name}の配り方`} disabled={busy} value={choices[`${account.id}:${item.sourceId}`] ?? ''} options={[{value:'',label:'選んでください'},...item.allowedModes.map(mode=>({value:mode,label:mode==='create' ? '新しく作る' : mode==='overwrite' ? '下書きを上書きする' : '別名で作る'}))]} onChange={value=>setChoices(old=>({...old,[`${account.id}:${item.sourceId}`]:value}))} /> : <span>{String(choices[`${account.id}:${item.sourceId}`] ?? '')}</span>) : '確認のあとで選ぶ'}</td>
           </tr>
         })}
       </DistributionTable>
@@ -202,5 +209,5 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
         <p>{distributionResult.stores.map(store=>`${store.accountName ?? accounts.find(account=>account.id===store.accountId)?.name ?? 'アカウント'}：${store.status==='succeeded' ? '完了' : store.reason ?? '確認中'}`).join(' ・ ')}</p>
       </DistributionProgress>}
     </div>
-  </DistributionPage>
+  </DistributionPage></SaveErrorScope>
 }

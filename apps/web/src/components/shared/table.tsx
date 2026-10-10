@@ -192,7 +192,8 @@ export type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'cl
 export function Tr({ children, className, selected, interactive, href, onOpen, density, leaving, highlighted, onClick, onKeyDown, ...rowProps }: TrProps) {
   const [listState] = useListUrlState({ highlight: '' })
   const createdHighlight = Boolean(listState.highlight && listState.highlight === (rowProps as Record<string, unknown>)['data-row-id'])
-  const canOpen = Boolean(href || onOpen || onClick || interactive)
+  const hasLink = (nodes: ReactNode): boolean => React.Children.toArray(nodes).some(node => React.isValidElement<{ href?: string; children?: ReactNode }>(node) && (Boolean(node.props.href) || hasLink(node.props.children)))
+  const canOpen = Boolean(href || onOpen || onClick || hasLink(children))
   const classes = [shell.row, density === 'comfortable' && shell.rowComfortable, density === 'template' && shell.rowTemplate,
     interactive !== false && canOpen && shell.rowInteractive, (selected || createdHighlight) && shell.rowSelected, className].filter(Boolean).join(' ')
   const openLink = (newTab: boolean) => {

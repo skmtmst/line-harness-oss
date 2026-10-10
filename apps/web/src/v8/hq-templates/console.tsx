@@ -181,6 +181,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const [choices, setChoices] = useState<Record<string, DistributionMode>>({})
   const [bulkMode, setBulkMode] = useState<'' | DistributionMode>('')
   const [result, setResult] = useState<DistributionResult | null>(null)
+  const [resultDialogFor, setResultDialogFor] = useState<string | null>(null)
   const [pendingRun, setPendingRun] = useState<string | null>(null)
   /** 配った結果の窓（★V8-B dEvJM）。結果が出たら開く。閉じても同じ画面の進み具合と操作は残る。 */
   const [requestBusy, setBusy] = useState(false)
@@ -628,6 +629,9 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const resolutions = preflight ? resolvedItems(preflight, choices) : null
   const shownAccounts = accountsInFolder(accounts, accountFolder, accountFolders.membership).filter((account) => account.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
   const accountFolderRows = distributionFolderRows({ accounts, ...accountFolders, selected, onChange: setSelected, disabled: busy || stage !== 'accounts' })
+  useEffect(() => {
+    if (result && result.status !== 'running') setResultDialogFor(`${result.runId}:${result.status}`)
+  }, [result])
   const done = result && result.status !== 'running'
   const failures = result ? failedStores(result) : []
   const successes = result?.stores.filter((store) => store.status === 'succeeded') ?? []
@@ -1109,9 +1113,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const shortName = (accountName: string) => accountName.replace(/^然\s*-NEN-\s*/, '')
 
   return (
-    <DistributionPage boardId={stage === 'result' && done ? 'dEvJM' : 'meBRB'} title={`配った結果：${detail?.template.name ?? ''}`}
-        tag={type === 'tag' ? { name, color: tagColor } : undefined}
-        summary="1つのアカウントだけ、または複数のアカウントを選んで一括で配れます。アカウントのフォルダで絞り込むこともできます。"
+    <DistributionPage boardId={stage === 'result' && done ? 'dEvJM' : 'meBRB'} title={type === 'tag' ? <>アカウントへ配る：<TagPill name={name} color={tagColor} /></> : pageTitle}
+        help="1つのアカウントだけ、または複数のアカウントを選んで一括で配れます。アカウントのフォルダで絞り込むこともできます。"
       stats={<KpiBand>
         <KpiCard title="配布先" value={accounts.length} unit="アカウント" detail="配ることのできるアカウント" />
         <KpiCard title="選んだアカウント" value={selected.length} unit="アカウント" detail="この内容を配る先" />

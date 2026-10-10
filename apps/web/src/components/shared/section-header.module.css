@@ -56,7 +56,7 @@
 [data-theme='v8'] .root { gap: var(--polish-space-row); }
 
 /* B-152②：役割ごとの文字の段。 */
-[data-theme='v8'] .title, [data-theme='v8'] .root[data-size='small'] .title { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); white-space: normal; overflow: visible; text-overflow: clip; }
+[data-theme='v8'] .title, [data-theme='v8'] .root[data-size='small'] .title { font-size: var(--tpl-section-title-size); font-weight: var(--tpl-section-title-weight); white-space: normal; overflow: visible; text-overflow: clip; }
 [data-theme='v8'] .note { font-size: var(--polish-text-note); font-weight: var(--polish-weight-body); }
 
 [data-theme='v8'] .root[data-size="small"] .title { font-size: var(--tpl-section-title-size); font-weight: var(--tpl-section-title-weight); line-height: var(--tpl-rt-label-lh); }

@@ -189,8 +189,7 @@ export default function HqHomeV8() {
   }
 
   const refreshConnectionInfo = async () => {
-    if (checkingConnections || accounts.length === 0)
- return
+    if (checkingConnections || accounts.length === 0) return
     setCheckingConnections(true)
     setConnectionResult('')
     let succeeded = 0

@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
 .header {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
   gap: var(--tpl-rule-row-gap); padding: var(--tpl-roster-head-pad);
@@ -34,3 +36,5 @@
 .attendanceStrong { color: var(--color-ink); font-weight: 700; }
 .attendanceDanger { color: var(--color-danger); font-weight: 700; }
 .attendance .attendanceNote { flex: 1; min-width: 0; white-space: normal; font-size: var(--text-caption); line-height: var(--tpl-wh-cell-lh); }
+
+}

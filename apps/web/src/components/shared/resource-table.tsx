@@ -13,8 +13,8 @@ export default function ResourceTable({ rows, canEdit, updatedLabel = '更新日
     <colgroup><col /><col className={styles.references} /><col className={styles.updated} /><col className={styles.destinations} />{canEdit ? <col className={styles.actions} /> : null}</colgroup>
     <thead><TableHeadRow><Th>名前</Th><Th>参照先</Th><Th>{updatedLabel}</Th><Th>配布先</Th>{canEdit ? <Th aria-label="操作" /> : null}</TableHeadRow></thead>
     <tbody>{rows.map(row => <Tr key={row.id} density="template">
-      <NameCell name={<FolderDotName folder={row.folder}>{row.name}</FolderDotName>} sub={row.summary} />
-      <Td>{row.references}</Td><Td>{row.updated}</Td><Td>{row.destinations}</Td>
+      <NameCell name={row.name} folder={row.folder} />
+      <Td>{row.references}<span className={styles.summary}>{row.summary}</span></Td><Td>{row.updated}</Td><Td>{row.destinations}</Td>
       {canEdit ? <Td>{row.actions}</Td> : null}
     </Tr>)}</tbody>
   </DataTable>

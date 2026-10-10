@@ -419,7 +419,7 @@ export default function QuestionEditor({
               </div>
             </div> : null}
 
-            {(choiceOnly !== undefined ||choiceColumns || openChoice === index) && (
+            {(choiceOnly !== undefined || choiceColumns || openChoice === index) && (
               <div className="space-y-4 px-4 py-4">
                 {choiceOnly === undefined ? <>
                 <div>

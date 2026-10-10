@@ -137,8 +137,8 @@ export type EntityPickerWindowProps = {
   band?: ReactNode
 }
 export function EntityPickerDialog(props: SingleProps | EntityPickerWindowProps) {
-  if ('children' in props) return <Dialog open title={props.title} description={props.description}
-    designNode={props.designNode} designWidth={640} designHeaderPadding="var(--tpl-inbox-tp-head-pad)"
+  if ('children' in props) return <Dialog open dirty={false} title={props.title} description={props.description}
+    designNode={props.designNode} designWidth={640} widthPreset="picker" designHeaderPadding="var(--tpl-inbox-tp-head-pad)"
     busy={props.busy} initialFocusId={props.initialFocusId} onCancel={props.onCancel}
     footer={<>
       {props.children}
@@ -175,7 +175,7 @@ function SingleEntityPickerDialog({
   if (items.some((item) => item.frequent !== undefined)) folderRows.unshift ({id: '__frequent__', label: 'よく使う', kind: 'folder', count: listState ? null : items.filter((item) => item.frequent).length })
   const previewNode = typeof preview === 'function' ? preview(picked) : preview
 
-  return <EntityPickerDialog title={title} description={description} size="picker-narrow" busy={busy} error={error} designNode={designNode} onCancel={onCancel} initialFocusId={`${id}-search`}
+  return <EntityPickerDialog title={title} description={description} busy={busy} error={error} designNode={designNode} onCancel={onCancel} initialFocusId={`${id}-search`}
     footer={<>
       <div className={styles.tpFootLead}>
         {!readOnly ?

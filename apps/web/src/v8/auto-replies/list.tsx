@@ -1,6 +1,5 @@
 'use client'
 import { Clock } from 'lucide-react';
-import { useDeferredDelete } from '@/lib/use-deferred-delete';
 import { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { scheduleChipLabels, scheduleText } from './words';
 

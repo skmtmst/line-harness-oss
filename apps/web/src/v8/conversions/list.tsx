@@ -1238,7 +1238,6 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       boardId="r6dJFy"
       headingSize="regular"
       title="コンバージョン"
-      description="成果として数えるできごと（成果地点）を決めます。配信・流入・アフィリエイトの成果は、ここの数え方で集計します。"
       actions={
         <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
           <Download size={15} aria-hidden="true" />CSV で書き出す

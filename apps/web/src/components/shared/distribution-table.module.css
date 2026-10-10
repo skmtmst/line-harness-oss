@@ -1,4 +1,6 @@
-.tableBox { border-radius: var(--radius-card); box-shadow: var(--tpl-htn-ring); overflow: hidden; }
+@layer properties, theme, base, components, utilities;
+@layer components {
+.tableBox { border-radius: var(--radius-card); box-shadow: var(--tpl-htn-ring), var(--card-shadow); overflow: hidden; }
 .table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .colCheck { width: var(--tpl-distribution-col-check); }
 .colItem { width: var(--tpl-distribution-col-item); }
@@ -10,7 +12,7 @@
 .table th:last-child, .table td:last-child { padding-right: var(--tpl-htn-edge); }
 .table tbody tr[data-selected] { background: var(--color-success-bg); }
 .table tbody tr:has(textarea) td { height: auto; padding-block: var(--tpl-toolbar-gap); }
-.progressPanel { display: flex; flex-direction: column; gap: var(--tpl-toolbar-gap); padding: var(--tpl-distribution-progress-pad); border-radius: var(--radius-card); box-shadow: var(--tpl-htn-ring); }
+.progressPanel { display: flex; flex-direction: column; gap: var(--tpl-toolbar-gap); padding: var(--tpl-distribution-progress-pad); border-radius: var(--radius-card); box-shadow: var(--tpl-htn-ring), var(--card-shadow); }
 .progressPanel h2 { margin: 0; font-size: var(--text-label); line-height: var(--tpl-htn-lh-20); font-weight: 700; }
 .progressRow { display: flex; align-items: center; gap: var(--tpl-htn-panel-gap); font-size: var(--text-caption); line-height: var(--tpl-wh-cell-lh); }
 .progressTrack { flex: 1; height: var(--tpl-htn-dist-progress-h); border-radius: var(--radius-pill); background: var(--color-surface-pearl); overflow: hidden; }
@@ -25,3 +27,5 @@
 
 .progressHeader { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-toolbar-gap); }
 .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--tpl-rule-row-gap); min-width: 0; width: 100%; }
+
+}

@@ -193,7 +193,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = 'æ“
           ) : null}
           <Item href={Item === 'a' ?item.href : undefined}
             target={Item === 'a' &&item.external ? '_blank' : undefined}
-            rel={Item === 'a' && item.external ? 'noreferrer' : undefined}
+            rel={Item === 'a' && item.external ? 'noopener noreferrer' : undefined}
             type="button"
             role="menuitem"
             className={`${styles.item} ${item.description || (item.disabled && item.disabledReason) ? styles.itemTall : ''} ${item.tone === 'danger' ? styles.danger : ''}`}

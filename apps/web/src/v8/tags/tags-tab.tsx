@@ -1,5 +1,4 @@
 'use client'
-import { useDeferredDelete } from '@/lib/use-deferred-delete';
 
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'

@@ -452,12 +452,12 @@ function Bookings({ eventId }: { eventId: string }) {
             <Download size={15} aria-hidden="true" />CSV を書き出す
           </Button>
           <div className={styles.occurrencePick}>
-            <SaveErrorField names={["selectedOccurrenceId","selected_occurrence_id"]}><Select
+            <SaveErrorField names={["selectedOccurrenceId","selected_occurrence_id"]}><EntitySelect
               size="full"
               value={selectedOccurrenceId}
               onChange={setSelectedOccurrenceId}
               aria-label="開催回を選ぶ"
-              options={slots.map((slot) => ({ value: slot.id, label: `開催回：${formatOccurrence(slot.starts_at)}` }))}
+              options={slots.map((slot) => ({ ...entityOptionMetadata(slot), value: slot.id, label: `開催回：${formatOccurrence(slot.starts_at)}` }))}
             /></SaveErrorField>
           </div>
         </div>

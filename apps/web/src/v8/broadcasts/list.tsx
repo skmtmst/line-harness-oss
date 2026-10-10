@@ -1,6 +1,5 @@
 'use client'
 import { useDetailPanelUrl } from '@/components/shared/detail-panel';
-import { useDeferredDelete } from '@/lib/use-deferred-delete';
 
 import { canManageRole } from '@/lib/staff-role';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';

@@ -383,19 +383,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
       <SaveErrorScope errors={saveErrors}><TemplateEditFrame boardId="J60utH" title="カルーセル" description="カルーセルの作成・変更はオーナーと管理者だけができます" side={null}>
         <p className={styles.note}>一覧で中身を確認できます。</p>
         <></>
-      <InlineSettings open={actionsFor !== null && Boolean(panel?.actions[actionsFor ?? 0])} title="押されたときの動き" onClose={() => setActionsFor(null)}>
-        {actionsFor !== null && panel?.actions[actionsFor] ? (
-          <InlineActionList
-            actions={panel.actions[actionsFor].actions}
-            onChange={(next) => update(selectedIndex, { actions: panel.actions.map((a, j) => (j === actionsFor ? { ...a, actions: next } : a)) })}
-            tags={actionOptions.tags}
-            fields={actionOptions.fields}
-            marks={actionOptions.marks}
-            scenarios={actionOptions.scenarios}
-            vars={actionOptions.vars}
-          />
-        ) : null}
-      </InlineSettings>
+
       </TemplateEditFrame></SaveErrorScope>
     )
   }

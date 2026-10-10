@@ -1,5 +1,4 @@
 'use client'
-import { useDeferredDelete } from '@/lib/use-deferred-delete';
 
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import { canManageRole } from '@/lib/staff-role';

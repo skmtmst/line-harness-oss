@@ -781,6 +781,7 @@ function StaffRoleGuide() {
 }
 
 function StaffPageHost({ editId }: { editId?: string | null }) {
+  const saveErrors = useSaveFormErrors()
 
   const router = useRouter()
 

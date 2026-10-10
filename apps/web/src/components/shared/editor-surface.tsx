@@ -19,7 +19,7 @@ export default function EditorSurface({ surface = 'dialog', ...props }: DialogPr
     {props.error ? <Notice tone="danger">{props.error}</Notice> : null}
     {props.children}
   </InlineSettings>
-  return <CreatePage title={props.title} description={props.description} footerActions={actions}>
+  return <CreatePage title={props.title} footerActions={actions}>
     {props.error ? <Notice tone="danger">{props.error}</Notice> : null}
     <Card variant="form" padding="roomy" layout="vertical">{props.children}</Card>
   </CreatePage>
