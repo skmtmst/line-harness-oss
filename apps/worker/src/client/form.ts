@@ -509,7 +509,7 @@ function render(): void {
       const surveyData: Record<string, unknown> = {};
       for (const field of surveyFields) {
         if (field.type === 'checkbox') {
-          surveyData[field.name] = Array.from(document.querySelectorAll<HTMLInputElement>(`input[name="${field.name}"]:checked`)).map((el) => el.value);
+          surveyData[field.name] = collectFormData()[field.name];
         } else if (field.type === 'radio') {
           surveyData[field.name] = document.querySelector<HTMLInputElement>(`input[name="${field.name}"]:checked`)?.value ?? '';
         } else {

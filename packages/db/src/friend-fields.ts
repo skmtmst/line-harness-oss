@@ -1,6 +1,6 @@
 import { friendFieldReminderTargetStatements } from './reminders.js';
 import { jstNow } from './utils.js';
-import { ageFromBirthday, validateAllergyValues, DEFAULT_ALLERGY_OPTIONS } from '@line-crm/shared';
+import { ageFromBirthday, allergyValues, validateAllergyValues, DEFAULT_ALLERGY_OPTIONS } from '@line-crm/shared';
 
 /** 移行前の情報欄を所属させる既定テナント。既存IDと値は変えない。 */
 const LEGACY_TENANT_ID = '00000000-0000-4000-8000-000000000001';
@@ -1077,6 +1077,7 @@ export async function getFriendFieldMap(
     .all<{ field_key: string; field_type: string; options_json: string | null; value: string | null }>();
   const out: Record<string, string> = {};
   for (const row of result.results) {
+    if (row.field_key === 'fixed_allergy') { out[row.field_key] = allergyValues(row.value).join('、'); continue; }
     if (row.value == null || row.field_type === 'image' || row.field_type === 'pdf') continue;
     if (row.field_type === 'select' || row.field_type === 'multi_select') {
       try {
@@ -1097,6 +1098,8 @@ export async function getFriendFieldMap(
     }
     out[row.field_key] = row.value;
   }
+  const derivedAge = ageFromBirthday(out.fixed_birthday);
+  if (derivedAge !== null) out.fixed_age = String(derivedAge);
   return out;
 }
 

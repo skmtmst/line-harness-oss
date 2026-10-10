@@ -933,7 +933,13 @@ forms.get('/api/forms/:id', async (c) => {
       if (!draft) {
         return c.json({ success: false, error: 'Form not found' }, 404);
       }
-      return c.json({ success: true, data: { ...serializePublicForm(draft), isTest: true, availability: await formAvailability({ db: c.env.DB, formId: id, layout: parseLayout(draft.layout, draft.fields), active: !!draft.is_active, submitCount: draft.submit_count ?? 0, friendId: null, isTest: true }) } });
+      const testAccounts = await getFormAccountIds(c.env.DB, id);
+      let testLayout = parseLayout(draft.layout, draft.fields);
+      const testAccountId = testAccounts.length === 1 ? testAccounts[0] : null;
+      if (testAccountId) testLayout = await applyAccountAllergyOptions(c.env.DB, testAccountId, testLayout);
+      const testLook = testAccountId ? (await accountCustomerLook(c.env.DB, testAccountId)).look : undefined;
+      testLayout = {...testLayout, options: {...testLayout.options, theme: resolveCustomerFormTheme(testLayout.options, testLook)}};
+      return c.json({ success: true, data: { ...serializePublicForm(draft, testLayout), isTest: true, availability: await formAvailability({ db: c.env.DB, formId: id, layout: testLayout, active: !!draft.is_active, submitCount: draft.submit_count ?? 0, friendId: null, isTest: true }) } });
     }
     // ログイン中の運用者が公開URLを開いても、account_id を明示した管理画面取得で
     // ない限り下書きを漏らさない。
