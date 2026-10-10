@@ -1,3 +1,4 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
@@ -9,7 +10,7 @@ import { describe, expect, it } from 'vitest'
  * - 集計状態と定義版の新旧を別の軸として出す
  * - 成果地点への利用先記録の失敗を静かに成功に見せない
  */
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 const WORKER = readFileSync(
   new URL('../../../../worker/src/routes/analytics.ts', import.meta.url),
@@ -44,11 +45,11 @@ describe('ANALYTICS-04: 未取得・失敗のファネルで数字を出さな�
     expect(PAGE).toContain('previous.droppedAfter')
     expect(PAGE).toContain('previous.inProgressAfter')
     expect(PAGE).not.toContain('prev - result[i].reached')
-    expect(PAGE).toContain('result[picked].inProgressAfter')
+    expect(PAGE).toContain('pickedStep.inProgressAfter')
   })
 
   it('判定不能では対象者を選べない', () => {
-    expect(PAGE).toContain('if (!measurable) return')
+    expect(PAGE).toContain('if (!measurable || !run?.runId')
     expect(PAGE).toContain('この結果は判定不能のため、対象者は選べません')
   })
 
@@ -66,12 +67,12 @@ describe('ANALYTICS-05: 未取得・失敗を「定義が古い」と分類し�
     expect(PAGE).not.toContain(
       "['unavailable', 'failed'].includes(item.latestSnapshot.state)",
     )
-    expect(PAGE).toContain('いまの定義でまだ集計していないもの')
+    expect(PAGE).toContain('更新後まだ集計していない')
   })
 
   it('行ごとに集計状態と版ずれを分けて出す', () => {
     expect(PAGE).toContain('更新後未集計')
-    expect(PAGE).toContain('SAVED_STATE_TONES[item.latestSnapshot.state]')
+    expect(PAGE).toContain('latestPill(item)')
   })
 
   it('台帳は写しの版と元の定義のいまの版を返す', () => {

@@ -1,3 +1,4 @@
+import { readUiSource } from '../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
@@ -10,7 +11,7 @@ const FRIEND_ADD = read('../v8/friend-add/list.tsx')
 const VARS = read('../app/contents/vars/page.tsx')
 const NEN_OVERVIEW = read('../app/nen-campaigns/nen-overview.tsx')
 const TAGS = read('../components/friend-fields/tags-page-v4.tsx')
-const ANALYTICS = read('../app/analytics/page.tsx')
+const ANALYTICS = readUiSource(new URL('../app/analytics/page.tsx', import.meta.url), 'utf8')
 const ANALYTICS_TIME = read('../app/analytics/analytics-time.ts')
 
 /*
@@ -65,13 +66,13 @@ describe('#640 省略表示の全文確認（title）', () => {
 })
 
 describe('#640 日時表記の統一（JST・フォーマット）', () => {
-  it('/analytics: 配信日時は formatAnalyticsDateTime にそろえる', () => {
+  it('/analytics: 配信日時は共通の日本時間の一覧表示にそろえる', () => {
     expect(ANALYTICS).not.toContain("slice(0, 16).replace('T', ' ')")
-    expect(ANALYTICS).toContain('formatAnalyticsDateTime(item.sentAt)')
+    expect(ANALYTICS).toContain('shortDateTime(item.sentAt)')
   })
 
   it('/analytics: 集計期間・結果履歴は formatAnalyticsDate にそろえる', () => {
-    expect(ANALYTICS).toMatch(/集計期間 \{formatAnalyticsDate\(from\)\}〜\{formatAnalyticsDate\(to\)\}/)
+    expect(ANALYTICS).toMatch(/集計期間 \$\{formatAnalyticsDate\(from\)\}〜\$\{formatAnalyticsDate\(to\)\}/)
     expect(ANALYTICS).toContain('formatAnalyticsDate(item.latestSnapshot.periodFrom)')
     expect(ANALYTICS).toContain('formatAnalyticsDate(snapshot.periodFrom)')
     // 生の YYYY-MM-DD を表示へ流す残りがないこと（API引数用の slice は許容）。

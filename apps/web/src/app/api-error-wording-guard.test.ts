@@ -56,7 +56,7 @@ const BASELINE: Record<string, number> = {
   'app/affiliates/v8-approvals-tab.tsx': 3,
   'app/affiliates/v8-payment-tab.tsx': 2,
   'app/affiliates/v8-report-tab.tsx': 1,
-  'app/analytics/page.tsx': 10,
+  'app/analytics/page.tsx': 1,
   'app/analytics/reports/new/page.tsx': 1,
   'app/auto-replies/edit/page.tsx': 1,
   'app/automations/runs-v8.tsx': 2,

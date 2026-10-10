@@ -52,7 +52,6 @@ shared-button-importer app/affiliates/v8-offers-tab.tsx
 shared-button-importer app/affiliates/v8-payment-tab.tsx
 shared-button-importer app/affiliates/v8-report-tab.tsx
 shared-button-importer app/affiliates/v8-shared.tsx
-shared-button-importer app/analytics/conversion-report-v8.tsx
 shared-button-importer app/analytics/page.tsx
 shared-button-importer app/analytics/reports/new/page.tsx
 shared-button-importer app/auto-replies/edit/wizard-v8.tsx

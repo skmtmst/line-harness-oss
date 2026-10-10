@@ -18,7 +18,6 @@ const SRC = join(__dirname, '..')
 const STATUS_LABELS: Record<string, string> = {
   'app/booking/bookings/new/page.tsx': '予約確認の送信結果の札',
   'app/automations/runs/page.tsx': '実行履歴の状態の札',
-  'app/analytics/page.tsx': '数字の枠の状態（狭い枠に出す）',
   'components/staff/login-audit.tsx': 'ログイン記録の1行',
 }
 

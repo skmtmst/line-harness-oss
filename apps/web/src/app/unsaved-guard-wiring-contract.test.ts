@@ -441,8 +441,6 @@ const EDITOR_MIN_INPUTS = 3
  * **ここへの追加は禁止。** 新しい編集画面は最初から GUARDED か EXEMPTIONS に入れる。
  */
 const UNTRIAGED: Record<string, string> = {
-  'app/analytics/page.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   /* 予約設定V8化でスタッフ編集窓を staff-edit-dialog.tsx へ切り出し、page.tsx から編集画面の印が無くなったので行を消した。 */
   'app/chats/page.tsx':
     's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',

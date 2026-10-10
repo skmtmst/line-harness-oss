@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -7,7 +8,7 @@ import AnalyticsPage from './page'
 const state = vi.hoisted(() => ({ role: 'viewer', query: '', account: 'account-a', calls: [] as string[] }))
 const metric = (value: number | null) => ({ value, state: value === null ? 'unavailable' : 'available', reason: value === null ? '未取得' : null })
 vi.mock('next/link', () => ({ default: ({ children, href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a href={href} {...props}>{children}</a> }))
-vi.mock('next/navigation', () => ({ usePathname: () => '/analytics', useSearchParams: () => new URLSearchParams(state.query) }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/analytics', useSearchParams: () => new URLSearchParams(state.query) }))
 vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('@/components/layout/merged-tabs', () => ({ default: () => null, useMergedTab: () => 'friends' }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: state.account, loading: false }) }))
@@ -28,6 +29,7 @@ vi.mock('@/lib/api', () => ({
 let root: Root
 let host: HTMLDivElement
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   state.role = 'viewer'; state.query = ''; state.account = 'account-a'; state.calls = []
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   host = document.createElement('div'); document.body.append(host); root = createRoot(host)
