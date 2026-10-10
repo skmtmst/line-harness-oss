@@ -16,8 +16,23 @@ export class InstagramError extends Error {
   }
 }
 /**
+ * `%XX` の並びだけを元の文字へ戻す。秘密値が URL エンコードされた形で混ざっていても
+ * 見つけられるようにするための下ごしらえで、記録に出す本文そのものを作るためではない。
+ * 壊れた並び（不完全な `%` 等）があっても例外にせず、その部分はそのまま残す。
+ */
+function safeDecodeURIComponent(text: string): string {
+  return text.replace(/(?:%[0-9A-Fa-f]{2})+/g, (match) => {
+    try {
+      return decodeURIComponent(match);
+    } catch {
+      return match;
+    }
+  });
+}
+/**
  * 記録へ出す文字から、合鍵らしい並びを消す。Meta の説明文は Meta が書く自由な文章で、
  * 要求に渡した値がそのまま混ざって返ってくる可能性があるため、二重に守る。
+ * 値が URL エンコードされた形で混ざっていても見つけられるよう、先に `%XX` を元へ戻してから見る。
  *
  * 1. その要求で実際に使った秘密値（合鍵・アプリシークレット・認可コード）を丸ごと置き換える。
  *    取り違えで文章を壊さないよう、6文字以上のものだけを対象にする。
@@ -28,7 +43,7 @@ export function redactInstagramSecrets(
   text: string,
   secrets: Array<string | null | undefined>,
 ): string {
-  let out = text;
+  let out = safeDecodeURIComponent(text);
   for (const secret of secrets)
     if (secret && secret.length >= 6)
       out = out.split(secret).join('[redacted]');

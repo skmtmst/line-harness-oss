@@ -447,6 +447,74 @@ it('Metaのエラー説明文に秘密値が混ざっても、サーバー記録
     expect(logged.join('\n')).not.toContain(secret);
 });
 
+/**
+ * Meta の説明文に秘密値が URL エンコードされた形（`%XX`）で混ざって返ってくる場合もある。
+ * `%` が文字の並びを分断するため、エンコードを戻さずに見ると厳密一致・取りこぼし対策の
+ * どちらも素通りしてしまう。戻してから見るようにしたので、この形でも記録に残らないことを確かめる。
+ */
+it('Metaのエラー説明文に秘密値がURLエンコードされた形で混ざっても、サーバー記録には出さない', async () => {
+  const longToken = 'EAAI9x+9ZaOp/ZBdBO1234567890ABCDEFG=';
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      Response.json(
+        {
+          error: {
+            type: 'OAuthException',
+            code: 100,
+            error_subcode: 36,
+            // Meta がこちらの送った値を URL エンコードした形で返してきた場合を模す。
+            message:
+              `Invalid redirect_uri, received params: ` +
+              `client_secret%3D${encodeURIComponent(config.META_APP_SECRET)}%26` +
+              `code%3D${encodeURIComponent('mock_code_2')}%26` +
+              `access_token%3D${encodeURIComponent(longToken)}`,
+          },
+        },
+        { status: 400 },
+      ),
+    ),
+  );
+  const logged: string[] = [];
+  const spy = vi
+    .spyOn(console, 'error')
+    .mockImplementation((...args: unknown[]) => {
+      logged.push(args.map(String).join(' '));
+    });
+  try {
+    const start = await read(await req('/api/instagram/oauth/start', {})),
+      state = new URL(start.data.url).searchParams.get('state')!;
+    const callback = await req(
+      '/api/instagram/oauth/callback?' +
+        new URLSearchParams({ state, code: 'mock_code_2' }),
+    );
+    expect(callback.status).toBe(302);
+    expect(callback.headers.get('location')).toContain('instagram=failed');
+  } finally {
+    spy.mockRestore();
+  }
+  const record = logged.find((line) =>
+    line.includes('instagram_oauth_callback_failed'),
+  );
+  expect(record).toBeDefined();
+  // 原因調べに使う種別・番号は残る。
+  expect(record).toContain('type=OAuthException');
+  expect(record).toContain('code=100');
+  expect(record).toContain('subcode=36');
+  expect(record).toContain('[redacted]');
+  // URL エンコードされた形も含めて、秘密値そのものは一切残らない。
+  for (const secret of [
+    config.META_APP_SECRET,
+    'mock_code_2',
+    longToken,
+    encodeURIComponent(config.META_APP_SECRET),
+    encodeURIComponent('mock_code_2'),
+    encodeURIComponent(longToken),
+    config.META_TOKEN_ENCRYPTION_KEY,
+  ])
+    expect(logged.join('\n')).not.toContain(secret);
+});
+
 it('写真DMと受信時刻の順、別アカウントのカーソルを守る', async () => {
   await connect();
   const messages = [
