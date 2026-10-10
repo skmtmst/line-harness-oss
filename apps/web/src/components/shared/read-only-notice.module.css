@@ -9,7 +9,8 @@
   /* 閲覧のみの13枚の正本HTMLは同じ青の地と12/16の余白。Notice一般の寸法とは別に持つ。 */
   background: var(--tpl-ro-band-bg);
   color: var(--color-ink-secondary);
-  font-size: var(--text-label);
+  font-size: var(--text-body);
+  font-weight: 400;
   line-height: var(--tpl-ro-band-lh);
 }
 .band > svg { flex-shrink: 0; color: var(--color-action); }
