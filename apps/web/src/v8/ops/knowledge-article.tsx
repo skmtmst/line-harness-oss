@@ -1,5 +1,5 @@
 'use client'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { ArrowLeft, Check } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { api, type OpsKnowledgeArticle, type OpsKnowledgeInput } from '@/lib/api'

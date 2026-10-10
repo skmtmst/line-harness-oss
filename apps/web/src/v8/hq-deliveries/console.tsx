@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage, CreatePage } from '@/components/templates'
 import { DistributionPage } from '@/components/templates/distribution-page'

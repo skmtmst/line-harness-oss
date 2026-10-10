@@ -1,13 +1,14 @@
 'use client'
 
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { RowNameLink } from '@/components/shared/table'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   Bookmark,
   CircleAlert,
@@ -726,9 +727,9 @@ export default function InflowListV8({
                 const menuItems = rowMenuItems(r)
                 const menuLabel = `「${r.name}」の操作`
                 const nameNode = r.source === 'entry_route' && r.entryRouteId ? (
-                  <Link href={`/inflow-links/detail?id=${r.entryRouteId}`} className={styles.nameLink} >
+                  <RowNameLink href={`/inflow-links/detail?id=${r.entryRouteId}`} className={styles.nameLink} >
                     <TruncatedText value={String(r.name ?? '')} />
-                  </Link>
+                  </RowNameLink>
                 ) : (
                   <span className={styles.nameText} ><TruncatedText value={String(r.name ?? '')} /></span>
                 )

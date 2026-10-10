@@ -1,6 +1,7 @@
 'use client'
 
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
+import { RowNameLink } from '@/components/shared/table'
 import { canManageRole } from '@/lib/staff-role';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import SharedStatusPill from '@/components/shared/status-pill'
@@ -10,8 +11,9 @@ import CopyTextButton from '@/components/shared/copy-text-button'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   Archive,
   ArrowRight,
@@ -1264,17 +1266,11 @@ function CommonVarsListInner() {
                     className={styles.rowClick}
                     tabIndex={0}
                     title={updateTitle}
-                    onClick={() => setActiveId(item.id)}
+                    detailKey="row" onOpen={() => setActiveId(activeId === item.id ? null : item.id)}
                     onContextMenuCapture={() => setContextId(item.id)}
-                    onKeyDown={(event) => {
-                      if (event.target !== event.currentTarget) return
-                      if (event.key === 'Enter') {
-                        event.preventDefault()
-                        setActiveId(item.id)
-                      }
-                    }}
+
                   >
-                    <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.selectCell}>
                       {canWrite ? (
                         <SaveErrorField names={[`current.${saveFieldIndex}.id`,"id","item.id","itemId"]}><Checkbox
                           checked={selected.has(item.id)}
@@ -1286,14 +1282,14 @@ function CommonVarsListInner() {
                     <NameCell name={
                         <div className={styles.dotLine}>
                           <>
-                            <Link
+                            <RowNameLink
                               href={`/contents/vars/edit?id=${item.id}`}
 
                               className={styles.nameLink}
                               onClick={(event) => event.stopPropagation()}
                             >
                               <TruncatedText value={String(item.name ?? '')} />
-                            </Link>
+                            </RowNameLink>
                           </>
                         </div>
                       } folder={folderDotOf(item)}
@@ -1305,7 +1301,7 @@ function CommonVarsListInner() {
                       <SharedStatusPill tone={badge.tone}>{badge.label}</SharedStatusPill>
                     </Td>
                     {!narrow && (
-                      <Td onClick={(event) => event.stopPropagation()}>
+                      <Td>
                         {item.usageCount === undefined ? (
                           <span className={styles.usageNone} title="使われている場所（未取得）">—（未取得）</span>
                         ) : item.usageCount === 0 ? (
@@ -1321,7 +1317,7 @@ function CommonVarsListInner() {
                         )}
                       </Td>
                     )}
-                    <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.menuCell}>
                       {/* 横並びにして、メニューの位置の目印が行を1段増やさないようにする。
                           閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す）。 */}
                       {canWrite ? <div className={styles.menuBox}>

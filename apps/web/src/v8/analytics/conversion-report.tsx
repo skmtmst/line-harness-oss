@@ -10,7 +10,7 @@ import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
  * 呼ぶ口（成果レポート・CSV）は今の画面（app/analytics/conversion-report-v8.tsx）と同じ。
  */
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'

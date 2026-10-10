@@ -1,7 +1,7 @@
 'use client'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { inboxItemHref, type PendingInboxSummary } from '@/components/support/pending-inbox-card'

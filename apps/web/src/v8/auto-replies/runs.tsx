@@ -1,10 +1,12 @@
 'use client'
 
 import SegmentedControl from '@/components/shared/segmented'
+import { RowNameLink } from '@/components/shared/table'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   ArrowLeft,
   Download,
@@ -543,7 +545,7 @@ export default function AutoReplyRunsV8() {
                     <Td className={styles.colFriend}>
                       <span className={styles.face} aria-hidden="true">{initialOf(item.friendName)}</span>
                       {item.friendId ? (
-                        <Link className={styles.friendName} href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} ><TruncatedText value={String(name ?? '')} /></Link>
+                        <RowNameLink className={styles.friendName} href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} ><TruncatedText value={String(name ?? '')} /></RowNameLink>
                       ) : (
                         <span className={styles.friendName} ><TruncatedText value={String(name ?? '')} /></span>
                       )}

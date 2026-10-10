@@ -3,7 +3,7 @@
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CircleDot, Star, Repeat2, Play, Pause, CreditCard } from 'lucide-react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import Disclosure from '@/components/shared/disclosure'
 import FilterChip from '@/components/shared/filter-chip'

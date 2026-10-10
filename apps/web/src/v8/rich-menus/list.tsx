@@ -1,14 +1,15 @@
 'use client'
 
 import { canManageRole } from '@/lib/staff-role';
+import { RowNameLink } from '@/components/shared/table'
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useListUrlValue, useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   ArrowDownUp,
   CalendarClock,
@@ -41,7 +42,7 @@ import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/a
 import { ListPage } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
-import DetailPanel from '@/components/shared/detail-panel'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
@@ -224,7 +225,7 @@ export default function RichMenusListV8() {
   const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
   const importRequestGenerationRef = useRef(0)
   const externalLoadedRef = useRef(false)
-  const [detailId, setDetailId] = useState<string | null>(null)
+  const [detailId, setDetailId] = useDetailPanelUrl('menu')
   const [groups, setGroups] = useState<RichMenuGroupListItem[]>([])
   const [external, setExternal] = useState<{ currentDefault: string | null; lineMenus: LineMenu[] } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -1084,14 +1085,8 @@ export default function RichMenusListV8() {
                   className={styles.row}
                   leaving={leavingId === g.id}
                   tabIndex={0}
-                  onClick={() => setDetailId(g.id)}
-                  onKeyDown={(event) => {
-                    if (event.target !== event.currentTarget) return
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      setDetailId(g.id)
-                    }
-                  }} data-row-id={g.id}
+                  detailKey="menu" onOpen={() => setDetailId(detailId === g.id ? null : g.id)}
+ data-row-id={g.id}
                 >
                   <Td
                     className={styles.orderCell}
@@ -1129,14 +1124,13 @@ export default function RichMenusListV8() {
                   </Td>
                   <Td className={styles.nameCell}>
                     <FolderDotName folder={folderDotOf(g.folderId)}>
-                      <Link
+                      <RowNameLink
                         href={`/rich-menus/edit?id=${g.id}`}
 
                         className={styles.name}
-                        onClick={(event) => { event.stopPropagation(); if (!event.ctrlKey && !event.metaKey && !event.shiftKey) { event.preventDefault(); setDetailId(g.id) } }}
                       >
                         <TruncatedText value={String(g.name ?? '')} />
-                      </Link>
+                      </RowNameLink>
                     </FolderDotName>
 
                   </Td>
@@ -1165,7 +1159,7 @@ export default function RichMenusListV8() {
                     >
                       {taps == null ? emptyValue('unknown') : `${formatNumber(taps)}回`}
                     </Td>
-                  <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
+                  <Td className={styles.menuCell}>
                     <div className={styles.menuBox}>
                       <RowMenu
                         className={styles.menuBtn}
@@ -1463,7 +1457,7 @@ export default function RichMenusListV8() {
 
         {blockedDialog}
         {deleteConfirm}
-        <DetailPanel open={detailId !== null} title={groups.find(group => group.id === detailId)?.name ?? 'リッチメニュー'} onClose={() => setDetailId(null)} footer={detailId ? <Button href={`/rich-menus/edit?id=${encodeURIComponent(detailId)}`}>{canEdit ? '編集する' : '詳しく見る'}</Button> : undefined}>
+        <DetailPanel open={detailId !== null && groups.some(group => group.id === detailId)} title={groups.find(group => group.id === detailId)?.name ?? 'リッチメニュー'} onClose={() => setDetailId(null)} footer={detailId ? <Button href={`/rich-menus/edit?id=${encodeURIComponent(detailId)}`}>{canEdit ? '編集する' : '詳しく見る'}</Button> : undefined}>
         <p>このリッチメニューの中身や設定は「{canEdit ? '編集する' : '詳しく見る'}」から確認できます。</p>
       </DetailPanel>
     </>}

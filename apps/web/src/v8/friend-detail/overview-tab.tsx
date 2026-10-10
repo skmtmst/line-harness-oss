@@ -1,7 +1,7 @@
 'use client'
 
 import StatusPill from '@/components/shared/status-pill'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import {
   ArrowRight,
   Bell,

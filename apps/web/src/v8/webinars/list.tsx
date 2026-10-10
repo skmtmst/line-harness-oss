@@ -1,4 +1,5 @@
 'use client'
+import { RowNameLink } from '@/components/shared/table'
 import { useDetailPanelUrl } from '@/components/shared/detail-panel';
 
 import { canManageRole } from '@/lib/staff-role';
@@ -8,7 +9,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import type { ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   Archive,
   Bookmark,
@@ -663,7 +664,7 @@ function WebinarList() {
   /* 行 → 右の詳細パネル。開閉と↑↓の移動はつながる移り変わりで。 */
   const activeIndex = visibleItems.findIndex((w) => w.id === activeId)
   const active = activeIndex >= 0 ? visibleItems[activeIndex] : null
-  const openDetail = useCallback((id: string) => { withViewTransition(() => setActiveId(id)) }, [])
+  const openDetail = useCallback((id: string) => { withViewTransition(() => setActiveId(current => current === id ? null : id)) }, [setActiveId])
   const closeDetail = useCallback(() => { withViewTransition(() => setActiveId(null)) }, [])
   const goDetail = (direction: -1 | 1) => {
     const next = visibleItems[activeIndex + direction]
@@ -949,20 +950,20 @@ function WebinarList() {
                     className={styles.row}
                     data-table-layout="columns"
                     data-row-id={w.id}
-                    onClick={() => openDetail(w.id)}
+                    detailKey="webinar" onOpen={() => openDetail(w.id)}
                   >
                     <Td className={styles.colName}>
                       <ContextMenu label={`「${w.title}」の操作`} items={toContextItems(menuItems)}>
                         <FolderDotName folder={folderDotOf(w)}>
-                          <button
-                            type="button"
+                          <RowNameLink
+                            href={`/webinars/edit?id=${encodeURIComponent(w.id)}`}
                             className={styles.nameButton}
                             title={w.title}
                             aria-label={`「${w.title}」の詳細を見る`}
-                            onClick={(event) => { event.stopPropagation(); openDetail(w.id) }}
+
                           >
                             {w.title}
-                          </button>
+                          </RowNameLink>
                         </FolderDotName>
                       </ContextMenu>
 
@@ -984,7 +985,7 @@ function WebinarList() {
                       )}
                     </Td>
                     <Td className={styles.colPeriod}><span className={styles.period} title={period}>{period}</span></Td>
-                    <Td className={styles.colOps} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.colOps}>
                       <div className={styles.opsBox}>
 
                         <RowMenu

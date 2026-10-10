@@ -2,7 +2,7 @@
 
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { formatDate as polishFormatDate } from '@/lib/format'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Check } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'

@@ -10,7 +10,7 @@
  */
 import { useMemo } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Card from '@/components/shared/card'
 import { BookingBlock, BookingSlot } from '@/components/shared/booking-controls'

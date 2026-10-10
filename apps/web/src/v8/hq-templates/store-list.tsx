@@ -27,7 +27,7 @@ import Pagination from '@/components/shared/pagination'
 import { RowMenu, RowQuickAction } from '@/components/shared/row-actions'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Select from '@/components/shared/select'
-import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { RowNameLink, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { formatNumber } from '@/lib/format'
 import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
@@ -134,6 +134,7 @@ export interface HqStoreListProps {
   onEdit: (row: HqTemplate) => void
   /** 名前を押したとき（詳細 pQ4fH）。無ければ編集を開く。 */
   onOpen?: (row: HqTemplate) => void
+  itemHref?: (row: HqTemplate) => string
   onDistributeFolder?: (id: string, name: string) => void
   /** 全種類を数える。種類タブや検索でフォルダの配布範囲を狭めない。 */
   folderContents?: HqTemplate[] | null
@@ -148,7 +149,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   const saveErrors = useSaveFormErrors()
   const {
     type, rows, ready, busy, canEdit, accountTotal, stats, kind, kindCounts, onKindChange, folders, folderLoadFailed, folderFilter, onFolderFilter,
-    onAddFolder, onRenameFolder, onDeleteFolder, onReloadFolders, onCreate, onEdit, onOpen, onDistribute, onDistributeFolder, folderContents, onDuplicate, onRemove, notices, overlays,
+    onAddFolder, onRenameFolder, onDeleteFolder, onReloadFolders, onCreate, onEdit, onOpen, itemHref, onDistribute, onDistributeFolder, folderContents, onDuplicate, onRemove, notices, overlays,
   } = props
   const words = WORDS[type]
   const [query, setQuery] = useListUrlValue('q', '')
@@ -483,7 +484,7 @@ export default function HqStoreList(props: HqStoreListProps) {
                 {type === 'rich_menu' ? <Td className={storeStyles.cellPlain}>{rankOf.get(row.id) ?? emptyValue('unknown')}</Td> : null}
                 <NameCell name={(
                     <div className={storeStyles.dotLine}>
-                      {canEdit ? (
+                      {itemHref ? <RowNameLink href={itemHref(row)} className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name}>{row.name}</RowNameLink> : canEdit ? (
                         <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{row.name}</button>
                       ) : <span className={storeStyles.cellTitle} title={row.name}>{row.name}</span>}
                     </div>

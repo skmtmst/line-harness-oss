@@ -1,13 +1,15 @@
 'use client'
 import { canManageRole } from '@/lib/staff-role';
+import { RowNameLink } from '@/components/shared/table'
 
 import SegmentedControl from '@/components/shared/segmented'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import type {
   FriendAddEventAttributionStatus,
   FriendAddEventKind,
@@ -556,7 +558,7 @@ function FriendAddRunsInner() {
                     </Td>
                     <Td className={styles.colFriend}>
                       <span className={styles.face} aria-hidden="true">{initialOf(name)}</span>
-                      <Link className={styles.friendName} href={detailHref(item.id)} title={`${name}（${kindLabel}）`}>{name}</Link>
+                      <RowNameLink className={styles.friendName} href={detailHref(item.id)} title={`${name}（${kindLabel}）`}>{name}</RowNameLink>
                     </Td>
                     <Td className={styles.colRoute}><span className={styles.route} title={route}>{route}</span></Td>
                     <Td className={styles.colResult}><StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge></Td>

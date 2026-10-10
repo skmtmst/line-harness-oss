@@ -3,7 +3,7 @@
 import { ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from '@/components/shared/list-toolbar';
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'

@@ -8,8 +8,9 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import { runOptimistic } from '@/lib/undoable'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { RowNameLink } from '@/components/shared/table'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   Bookmark,
   Braces,
@@ -1171,18 +1172,11 @@ export default function TemplatesListV8() {
                     data-row-id={t.id}
                     className={styles.rowClick}
                     tabIndex={0}
-                    onClick={() => setActiveId(t.id)}
+                    detailKey="row" onOpen={() => setActiveId(activeId === t.id ? null : t.id)}
                     onContextMenuCapture={() => setContextId(t.id)}
-                    onKeyDown={(event) => {
-                      // 行内のリンク・ボタンにフォーカスがあるときは行を開かない。
-                      if (event.target !== event.currentTarget) return
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        setActiveId(t.id)
-                      }
-                    }}
+
                   >
-                    <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.selectCell}>
                       {canMutateTemplates ? (
                         <SaveErrorField names={[`shownItems.${saveFieldIndex}.id`,"id","t.id"]}><Checkbox
                           checked={selectedIds.has(t.id)}
@@ -1194,9 +1188,9 @@ export default function TemplatesListV8() {
                     <NameCell name={
                         <div className={styles.dotLine}>
                           <>
-                            <Link href={detailHref(t)} title={t.name} className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
+                            <RowNameLink href={detailHref(t)} title={t.name} className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
                               <TruncatedText value={String(t.name ?? '')} />
-                            </Link>
+                            </RowNameLink>
                           </>
                         </div>
                       } folder={folderDotOf(t)}
@@ -1236,7 +1230,7 @@ export default function TemplatesListV8() {
                         {formatMonthDay(t.updatedAt)}
                       </Td>
                     )}
-                    <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.menuCell}>
                       {/* 横並びにして、メニューの位置の目印が行を1段増やさないようにする。 */}
                       <div className={styles.menuBox}>
                         <RowMenu

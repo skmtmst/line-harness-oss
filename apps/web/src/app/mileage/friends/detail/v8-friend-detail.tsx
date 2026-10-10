@@ -12,7 +12,7 @@
  */
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { MessageCircle, Minus, Plus } from 'lucide-react'
 import Button from '@/components/shared/button'

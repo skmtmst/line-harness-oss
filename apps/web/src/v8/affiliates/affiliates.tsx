@@ -8,7 +8,8 @@
  * `?tab=points` はコンバージョンの画面へ返す（古い URL を壊さない）。
  */
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import ListState from '@/components/shared/list-state'
 import { useAccount } from '@/contexts/account-context'

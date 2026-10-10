@@ -7,7 +7,7 @@ import TagPill from '@/components/shared/tag-pill'
 /* ① メニュー（owaS3）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
 import { useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Plus } from 'lucide-react'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'

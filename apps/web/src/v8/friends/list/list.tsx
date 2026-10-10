@@ -1,6 +1,7 @@
 'use client'
 
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { RowNameLink } from '@/components/shared/table'
 import TagOverflow from '@/components/shared/tag-overflow'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { collectListRows } from '@/components/shared/collect-list-rows'
@@ -9,8 +10,9 @@ import { useListUrlJsonValue, useListUrlValue } from '@/components/shared/list-u
 import { jstDate } from '@/lib/jst-datetime'
 import StatusPill, { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   CircleDot,
   Bookmark,
@@ -819,7 +821,7 @@ export default function FriendsListV8() {
             const tags = splitTags(friend.tags)
             return (
               <Tr key={friend.id} interactive selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row data-row-id={friend.id}>
-                <Td className={styles.tdCheck} onClick={(event) => event.stopPropagation()}>
+                <Td className={styles.tdCheck}>
                   <Checkbox checked={selectedIds.has(friend.id)} onCheckedChange={() => toggleSelect(friend.id)} aria-label={`${friend.displayName}を選ぶ`} />
                 </Td>
                 <Td className={styles.tdStar}>
@@ -841,7 +843,7 @@ export default function FriendsListV8() {
                   )}
                 </Td>
                 <Td className={styles.td}>
-                  <FolderDotName><Link href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</Link></FolderDotName>
+                  <FolderDotName><RowNameLink href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</RowNameLink></FolderDotName>
                 </Td>
                 {visible.has('support') ? (
                   <Td className={styles.td}>

@@ -3,7 +3,7 @@
 import { CommonActionConfig, commonActionChoices } from '@/components/automations/common-action-editor';
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ArrowDown, ArrowUp, Save, Trash2 } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { api, describeSaveFailure, type CommonActionResources, type CommonActionStep } from '@/lib/api'

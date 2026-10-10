@@ -65,6 +65,7 @@ async function eventually(check: () => void, timeout = 3000) {
   }
 }
 beforeEach(() => {
+  window.history.replaceState(null, '', '/scenarios')
   pushes.length = 0
   puts.length = 0
   document.documentElement.dataset.theme = 'v8'
@@ -115,7 +116,11 @@ test('パネルの「開く」は詳細へ進む', async () => {
   const open = [...document.body.querySelectorAll('button')].find((b) => b.textContent === '開く')
   if (!open) throw new Error('no open button')
   await act(async () => { open.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
-  expect(pushes).toEqual(['/scenarios/detail?id=s1'])
+  expect(pushes).toHaveLength(1)
+  const destination = new URL(pushes[0], window.location.origin)
+  expect(destination.pathname).toBe('/scenarios/detail')
+  expect(destination.searchParams.get('id')).toBe('s1')
+  expect(destination.searchParams.get('returnTo')).toBe('/scenarios?scenario=s1')
 })
 
 test('パネルで名前を変えると保存口へ送る', async () => {

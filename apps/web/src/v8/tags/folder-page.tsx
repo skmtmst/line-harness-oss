@@ -1,6 +1,7 @@
 'use client'
 import { Suspense, useEffect, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { FolderCheck, FolderPlus, Trash2 } from 'lucide-react'
 import { ApiError, api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'

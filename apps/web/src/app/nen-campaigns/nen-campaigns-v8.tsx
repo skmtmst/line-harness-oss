@@ -1,6 +1,6 @@
 'use client'
 import { Fragment, useMemo, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { Inbox, MailOpen, Megaphone, Newspaper } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'

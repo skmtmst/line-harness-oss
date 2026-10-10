@@ -2,7 +2,7 @@
 import { Field as SharedField } from '@/components/shared/form-controls'
 import StatusPill from '@/components/shared/status-pill'
 import { CheckCircle2, Plus, X } from 'lucide-react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'

@@ -2,7 +2,7 @@
 
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useState, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Check, GitCompareArrows, Plus, RefreshCw, TriangleAlert } from 'lucide-react'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'

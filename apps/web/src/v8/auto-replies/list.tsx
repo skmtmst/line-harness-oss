@@ -1,5 +1,6 @@
 'use client'
 import { Clock } from 'lucide-react';
+import { RowNameLink } from '@/components/shared/table'
 import { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { scheduleChipLabels, scheduleText } from './words';
 
@@ -16,8 +17,8 @@ import SearchField from '@/components/shared/search-field'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   Activity,
   Ban,
@@ -1181,16 +1182,10 @@ export default function AutoRepliesListV8() {
                   onDrop={dragId ? () => dropOn(liveOrder.dropTarget(r.id)) : undefined}
                   className={styles.rowClick}
                   tabIndex={0}
-                  onClick={() => setPanelId(r.id)}
-                  onKeyDown={(event) => {
-                    if (event.target !== event.currentTarget) return
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      setPanelId(r.id)
-                    }
-                  }} data-row-id={r.id}
+                  detailKey="reply" onOpen={() => setPanelId(panelId === r.id ? null : r.id)}
+                   data-row-id={r.id}
                 >
-                    <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.selectCell}>
                       {canEdit && <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","r.id"]}><Checkbox
                         checked={selectedIds.has(r.id)}
                         onCheckedChange={() => toggleOne(r.id)}
@@ -1214,19 +1209,17 @@ export default function AutoRepliesListV8() {
                   </Td>
                   <NameCell name={<div className={styles.nameRow}>
                       <>
-                        {canEdit ? <Link
+                        {canEdit ? <RowNameLink
                           href={`/auto-replies/edit?id=${r.id}`}
 
                           className={styles.cellTitle}
                           onClick={(event) => {
                             event.stopPropagation()
-                            if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
-                            event.preventDefault()
-                            goEdit(r.id)
+
                           }}
                         >
                           <TruncatedText value={String(name ?? '')} />
-                        </Link> : <button type="button" className={styles.cellTitle} title={name} onClick={(event) => { event.stopPropagation(); setPanelId(r.id) }}>{name}</button>}
+                        </RowNameLink> : <button type="button" className={styles.cellTitle} title={name} onClick={(event) => { event.stopPropagation(); setPanelId(r.id) }}>{name}</button>}
                       </>
 
                     </div>} folder={folderDotOf(r)}
@@ -1276,7 +1269,7 @@ export default function AutoRepliesListV8() {
                       </p>
                     )}
                   </Td>
-                    <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()} data-design-node={openMenuId === r.id ? 'IIesG' : undefined}>
+                    <Td className={styles.menuCell} data-design-node={openMenuId === r.id ? 'IIesG' : undefined}>
                       {/* 横並びにして、メニューの位置の目印（空の span）が行を1段増やさないようにする。 */}
                       <ContextMenu
                         label={`自動応答「${name}」の操作`}

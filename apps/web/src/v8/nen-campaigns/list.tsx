@@ -1,12 +1,15 @@
 'use client'
 
+import { useListItemHref } from '@/components/shared/list-navigation'
+
 import Toggle from '@/components/shared/toggle';
+import { RowNameLink } from '@/components/shared/table'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import {
   Bookmark,
   CalendarDays,
@@ -442,10 +445,10 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
                 const timing = formatCampaignTiming(setting)
                 const audience = formatCampaignAudience(setting)
                 return (
-                  <Tr data-row-id={setting.campaignKey} key={setting.campaignKey} className={styles.row} data-table-layout="columns" onOpen={() => props.onPreviewCampaign(setting.campaignKey)}>
+                  <Tr data-row-id={setting.campaignKey} key={setting.campaignKey} className={styles.row} data-table-layout="columns" detailKey="campaign" onOpen={() => props.onPreviewCampaign(props.previewCampaignKey === setting.campaignKey ? null : setting.campaignKey)}>
                     <Td className={styles.colName}><FolderDotName>
                       {canEdit ? (
-                        <Link href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className={styles.name} ><TruncatedText value={String(setting.label ?? '')} /></Link>
+                        <RowNameLink href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className={styles.name} ><TruncatedText value={String(setting.label ?? '')} /></RowNameLink>
                       ) : (
                         <button type="button" className={styles.name} title={setting.label}  onClick={() => props.onPreviewCampaign(setting.campaignKey)}>{setting.label}</button>
                       )}
@@ -620,6 +623,7 @@ function columnBadge(column: NenColumn, sent: number | null) {
 }
 
 function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
+  const itemHref = useListItemHref()
   const { columns, columnMetrics, canEdit } = props
   const tabError = props.tabError ?? ''
   const [query, setQuery] = useListUrlValue('q', '')
@@ -737,10 +741,10 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                 const views = metric?.articleOpened.value
                 const draft = column.publishedAt == null
                 return (
-                  <Tr data-row-id={column.id} key={column.id} className={styles.row} data-table-layout="columns" selected={props.selectedColumnId === column.id} onOpen={() => props.onSelectColumn(column.id)}>
+                  <Tr data-row-id={column.id} key={column.id} className={styles.row} data-table-layout="columns" selected={props.selectedColumnId === column.id} detailKey="column" onOpen={() => props.onSelectColumn(props.selectedColumnId === column.id ? null : column.id)}>
                     <Td className={styles.colName}><FolderDotName>
                       <span className={styles.nameStack}>
-                        <button type="button" className={styles.name} title={column.title} onClick={() => props.onSelectColumn(column.id)}>{column.title}</button>
+                        <RowNameLink onOpen={() => props.onSelectColumn(column.id)} href={itemHref('column', column.id, { tab: 'columns' })} className={styles.name} title={column.title}>{column.title}</RowNameLink>
 
                       </span>
                     </FolderDotName></Td>

@@ -8,7 +8,7 @@ import SegmentedControl from '@/components/shared/segmented'
  */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Fragment, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { CalendarDays, ClipboardList, MailOpen, MessageCircle, Send, ShoppingBag, Tag as TagIcon, Workflow } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { formatTime, formatDay } from '@/lib/format'

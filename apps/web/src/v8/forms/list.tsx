@@ -9,8 +9,10 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useState, useEffect, useCallback, useMemo, useRef, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { useListScrollMemory } from '@/components/shared/list-url-state'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { RowNameLink } from '@/components/shared/table'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   Archive,
   CircleCheck,
@@ -446,8 +448,8 @@ export default function FormsListV8() {
   const activeIndex = reviewMode ? -1 : visibleForms.findIndex((form) => form.id === activeId)
   const active = activeIndex >= 0 ? visibleForms[activeIndex] : null
   const openDetail = useCallback((id: string) => {
-    withViewTransition(() => setActiveId(id))
-  }, [])
+    withViewTransition(() => setActiveId(activeId === id ? null : id))
+  }, [activeId, setActiveId])
   const closeDetail = useCallback(() => {
     withViewTransition(() => setActiveId(null))
   }, [])
@@ -1228,17 +1230,17 @@ export default function FormsListV8() {
               const nameNode = reviewMode ? (
                 <span className={styles.cellTitle} ><TruncatedText value={String(name ?? '')} /></span>
               ) : (
-                <Link
+                <RowNameLink
                   href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`}
                   title={`${name}の詳細を見る`}
                   aria-label={`「${name}」の詳細を見る`}
                   className={styles.cellTitleButton}
                 >
                   {name}
-                </Link>
+                </RowNameLink>
               )
               const row = (
-                <Tr highlighted={duplicateFeedback.highlightedId === form.id} key={form.id} data-row-id={form.id} onOpen={reviewMode ? undefined : () => openDetail(form.id)}>
+                <Tr highlighted={duplicateFeedback.highlightedId === form.id} key={form.id} data-row-id={form.id} detailKey={reviewMode ? undefined : "form"} onOpen={reviewMode ? undefined : () => openDetail(form.id)}>
                   <NameCell name={nameNode} folder={folderDotOf(form.folderId)}
                   />
                   {!narrow && (

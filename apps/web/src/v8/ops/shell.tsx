@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 import {
   BookOpen,

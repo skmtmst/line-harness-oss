@@ -5,7 +5,7 @@ import { canEditFeature } from '@/lib/staff-capability';
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import ImageUploader from '@/components/shared/image-uploader'
 import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Check, ChevronDown, Smartphone } from 'lucide-react'
 import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '@line-crm/shared'
 import { api, bookingApi, type BookingMenu, type BookingStaff } from '@/lib/api'

@@ -8,7 +8,7 @@
  * → 下の線の下にキャンセル・次へ（中央）。口と決まりは今の画面（app/restaurant-test/stores/new）と同じ。
  * 動きは BEHAVIOR.md。
  */
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { ArrowRight, BookOpen, CircleCheck, ExternalLink } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'

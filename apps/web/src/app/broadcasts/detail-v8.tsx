@@ -10,8 +10,8 @@
  * 下書きの進みの帯は「作るときの5手順」、それ以外は「送るまでの6段階」。
  */
 import { useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Check, Copy, Download, MoreHorizontal, RefreshCw, Send, Trash2 } from 'lucide-react'
 import { notifyToast } from '@/components/shared/toast'
 import {

@@ -1,7 +1,7 @@
 'use client'
 import { DragHandle } from '@/components/shared/row-actions'
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { ArrowDown, ArrowUp, Copy, Trash2 } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, type CommonActionResources, type TagRetroactivePreview } from '@/lib/api'

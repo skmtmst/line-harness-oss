@@ -9,7 +9,7 @@
  * 保存した検索だけはアカウントごとの機能として入口を残す。
  */
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { LogIn } from 'lucide-react'
 import type { HqTemplate } from '@/lib/hq-templates-api'
 import { hqOpenHref } from '@/lib/hq-navigation'

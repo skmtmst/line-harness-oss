@@ -3,8 +3,9 @@
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { RowNameLink } from '@/components/shared/table'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   AlertCircle,
   Bookmark,
@@ -254,7 +255,7 @@ export default function TagsTab({
   const [menuMoveFor, setMenuMoveFor] = useState<string | null>(null)
   /* 行の詳細パネル。URL に ?tag=<id> を残す。 */
   const [activeTagId, setActiveTagId] = useDetailPanelUrl('tag')
-  const openTagDetail = (id: string) => withViewTransition(() => setActiveTagId(id))
+  const openTagDetail = (id: string) => withViewTransition(() => setActiveTagId(activeTagId === id ? null : id))
   const loadRequestRef = useRef<TagListRequestKey>({ accountId, generation: 0 })
 
   const load = useCallback(async () => {
@@ -740,14 +741,8 @@ export default function TagsTab({
                 className={styles.row}
                 leaving={leavingId === tag.id}
                 tabIndex={0}
-                onClick={() => openTagDetail(tag.id)}
-                onKeyDown={(event) => {
-                  if (event.target !== event.currentTarget) return
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    openTagDetail(tag.id)
-                  }
-                }} data-row-id={tag.id}
+                detailKey="tag" onOpen={() => openTagDetail(tag.id)}
+                data-row-id={tag.id}
               >
                 <Td className={styles.colName}>
                   <ContextMenu label={`タグ「${tag.name}」の操作`} items={tagContextItems(tag)}>
@@ -769,7 +764,7 @@ export default function TagsTab({
                         )}
                       </span>
                       <FolderDotName folder={group}>
-                        {canEdit ? <Link href={editHref} title={tag.name} className={styles.name}>{tag.name}</Link> : <span title={tag.name}>{tag.name}</span>}
+                        {canEdit ? <RowNameLink href={editHref} title={tag.name} className={styles.name}>{tag.name}</RowNameLink> : <span title={tag.name}>{tag.name}</span>}
                       </FolderDotName>
                       </div>
 
@@ -792,7 +787,7 @@ export default function TagsTab({
                   </Td>
                 ) : null}
                 {/* 人数は、そのタグで絞った友だち一覧へのリンク。 */}
-                <Td className={styles.colCount} onClick={(event) => event.stopPropagation()}>
+                <Td className={styles.colCount}>
                   <Link href={`/friends?tag=${encodeURIComponent(tag.id)}`} className={styles.countLink} title={`「${tag.name}」が付いている友だちを見る`}>
                     {tag.friendCount ?? 0} 人
                   </Link>
@@ -800,7 +795,7 @@ export default function TagsTab({
                 <Td className={styles.colSource}><span className={styles.cellText} title={sourceLabel(tag)}>{sourceLabel(tag)}</span></Td>
                 <Td className={styles.colLink}><span className={styles.cellText} title={tagLinkText(tag)}>{tagLinkText(tag)}</span></Td>
                 <Td className={styles.colUsage}><span className={styles.cellText} title={usageLabel(tag)}>{usageLabel(tag)}</span></Td>
-                <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
+                <Td className={styles.colMenu}>
                   {/* 閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す） */}
                   {canEdit ? <span className={styles.menuAnchor}>
                     <RowMenu

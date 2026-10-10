@@ -9,7 +9,7 @@
  * 「対応マークの設定を開く」から（そこだけがページを移る）。
  */
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { Settings2 } from 'lucide-react'
 import MenuPortal from '@/components/shared/menu-portal'
 import Button from '@/components/shared/button'

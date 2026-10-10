@@ -1,8 +1,8 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { PageHeading } from '@/components/templates/page-frame'
 import styles from './create-page.module.css'
 import { AutoFormLeaveGuard } from './form-leave-guard'

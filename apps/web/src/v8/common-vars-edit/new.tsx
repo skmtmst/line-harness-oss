@@ -5,8 +5,8 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   AlignLeft,
   ArrowLeft,

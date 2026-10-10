@@ -1,7 +1,6 @@
 'use client'
 
 import { jstDate } from '@/lib/jst-datetime'
-import Link from 'next/link'
 import { Download, Info, RotateCw } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -12,7 +11,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { DataTable, TableHeadRow, Th, Tr, Td, RowNameLink } from '@/components/shared/table'
 import { loadFailureCopy, isForbidden } from '@/components/shared/api-error-message'
 import { FriendsSectionHead } from '../shared/head'
 import { csvExportLine } from '../list/csv-export'
@@ -218,9 +217,9 @@ export default function DuplicatesListV8() {
                 return (
                   <Tr key={candidate.id} className={styles.row} data-row-id={candidate.id}>
                     <Td className={styles.td}>
-                      <Link href={href} className={styles.pair} title={`${candidate.left.label} ↔ ${candidate.right.label}`}>
+                      <RowNameLink href={href} className={styles.pair} title={`${candidate.left.label} ↔ ${candidate.right.label}`}>
                         {`${candidate.left.label} ↔ ${candidate.right.label}`}
-                      </Link>
+                      </RowNameLink>
                     </Td>
                     <Td className={styles.td}>
                       <span className={confidenceTone(candidate.confidence.label) === 'ok' ? `${styles.pill} ${styles.pill_ok}` : `${styles.pill} ${styles.pill_muted}`}>

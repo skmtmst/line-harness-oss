@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import type { Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Disclosure from '@/components/shared/disclosure'

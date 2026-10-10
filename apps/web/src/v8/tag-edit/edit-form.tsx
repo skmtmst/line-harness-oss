@@ -5,7 +5,7 @@ import { ActionDrawer } from '@/components/friend-fields/tag-editor-v4';
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { ArrowLeft, Check, ChevronDown, ChevronUp, Copy, GitCompare, TriangleAlert } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, type TagDependencies, type TagRetroactivePreview } from '@/lib/api'

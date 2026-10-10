@@ -7,7 +7,7 @@ import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import {
   ArrowRight,
   BookOpen,

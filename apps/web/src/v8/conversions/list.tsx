@@ -1,5 +1,7 @@
 'use client'
 
+import { useDetailPanelUrl } from '@/components/shared/detail-panel'
+
 import { canManageRole } from '@/lib/staff-role';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -7,7 +9,8 @@ import { useFolderMove } from '@/components/shared/use-folder-move'
 import { moveConversionToFolder } from '@/lib/move-to-folder'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   Banknote,
   Bookmark,
@@ -306,7 +309,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   accountIdRef.current = accountId
 
   /* 表の下の詳細の小窓（行を押すと開く）と、止める小窓。 */
-  const [panelId, setPanelId] = useState<string | null>(null)
+  const [panelId, setPanelId] = useDetailPanelUrl('point')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [stopTarget, setStopTarget] = useState<ConversionDefinitionListItem | null>(null)
   const [stopImpact, setStopImpact] = useState<ConversionDefinitionDeleteImpact | null>(null)
@@ -1132,7 +1135,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
                     className={styles.row}
                     data-table-layout="columns"
                     data-row-id={point.id}
-                    onClick={() => setPanelId((currentId) => (currentId === point.id ? null : point.id))}
+                    detailKey="point" onOpen={() => setPanelId((currentId) => (currentId === point.id ? null : point.id))}
                   >
                     <Td className={styles.colName}>
                       {/* 名前の前に左の列と同じフォルダの色の丸（未分類は色の無い輪）。札は名前の頭にそろえる。 */}
@@ -1163,7 +1166,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
                       <span className={styles.usageMain} title={usageLabel(point)}>{usage.main}</span>
                       {usage.sub ? <span className={styles.cellSub} title={usage.sub}>{usage.sub}</span> : null}
                     </Td>
-                    <Td className={styles.colOps} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.colOps}>
                       <div className={styles.opsBox}>
                         {canEdit
                           ? <Button href={addUsageHref(point)}>使う場所を足す</Button>

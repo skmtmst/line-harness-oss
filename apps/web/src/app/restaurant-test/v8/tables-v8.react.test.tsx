@@ -67,6 +67,8 @@ describe('BERxg 座席・卓管理のV8', () => {
     fireEvent.change(screen.getByDisplayValue('2人卓'), { target: { value: '奥の2人卓' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 't1', expect.objectContaining({ label: '奥の2人卓' })))
+    // API到達だけでは再取得が終わっていない。操作が再び可能になるまで待つ。
+    await waitFor(() => expect((within(detail).getAllByRole('button', { name: '停止' })[0] as HTMLButtonElement).disabled).toBe(false))
     fireEvent.click(within(detail).getAllByRole('button', { name: '停止' })[0])
     fireEvent.click(screen.getByRole('button', { name: '停止する' }))
     await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 't1', { isActive: false }))

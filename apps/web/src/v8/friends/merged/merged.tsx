@@ -1,8 +1,8 @@
 'use client'
 
-import { useSamePageUrl } from '@/lib/use-same-page-url'
+import { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import { useListItemHref } from '@/components/shared/list-navigation'
 import { useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
 import { ChevronUp, Download, RotateCw } from 'lucide-react'
 import { api } from '@/lib/api'
 import { formatDay, formatNumber, formatYmd } from '@/lib/format'
@@ -18,7 +18,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import ListState from '@/components/shared/list-state'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { RowNameLink, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { mergedPersonIdOf } from '@/components/merged-person/merged-person-view'
 import type { UserRowData } from '@/components/users/user-row'
 import { FriendsSectionHead } from '../shared/head'
@@ -59,15 +59,8 @@ function deliveryAccount(row: UserRowData): string {
 }
 
 export default function MergedUsersV8() {
-  const searchParams = useSearchParams()
-  const samePageUrl = useSamePageUrl()
-  const personFromUrl = searchParams.get('person')
-  const [openedPersonId, setOpenedPersonId] = useState<string | null>(personFromUrl)
-  useEffect(() => { setOpenedPersonId(personFromUrl) }, [personFromUrl])
-  const close = () => {
-    setOpenedPersonId(null)
-    if (personFromUrl) samePageUrl.replace('/friends?tab=merged')
-  }
+  const [openedPersonId, setOpenedPersonId] = useDetailPanelUrl('person')
+  const close = () => setOpenedPersonId(null)
   /*
    * 人の詳細は一覧と同じ URL のまま開くことがあるので、上の帯のパンくずの「統合ユーザー」で
    * 一覧へ戻す（板の頭の「← 統合ユーザーへ」は 2026-10-08 に無くした）。最新の close を呼ぶ。
@@ -85,6 +78,7 @@ export default function MergedUsersV8() {
 }
 
 function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
+  const itemHref = useListItemHref()
   usePageTitle('友だち')
   const u = useMergedUsers()
   const staffRole = useStaffRole()
@@ -252,7 +246,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
                       <Td className={styles.td}>
                         <div className={styles.person}>
                           {personId ? (
-                            <button type="button" className={styles.name} onClick={() => onOpen(personId)} data-qa-open="Hn9eE">{row.displayName || '名前なし'}</button>
+                            <RowNameLink onOpen={() => onOpen(personId)} href={itemHref('person', personId)} className={styles.name} data-qa-open="Hn9eE">{row.displayName || '名前なし'}</RowNameLink>
                           ) : (
                             <span className={`${styles.name} ${styles.nameStatic}`}>{row.displayName || emptyValue('unknown')}</span>
                           )}

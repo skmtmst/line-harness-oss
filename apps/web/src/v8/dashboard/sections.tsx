@@ -1,7 +1,7 @@
 'use client'
 
 import StatusPill from '@/components/shared/status-pill'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Bell, Send, TriangleAlert, UserPlus } from 'lucide-react'
 import type { NotificationCenterItem } from '@line-crm/shared'

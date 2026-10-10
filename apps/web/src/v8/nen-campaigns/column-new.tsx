@@ -2,8 +2,8 @@
 
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Eye, Image as ImageIcon, Save, Type } from 'lucide-react'
 import type { Tag } from '@line-crm/shared'
 import { CreatePage } from '@/components/templates'

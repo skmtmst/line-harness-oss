@@ -1,5 +1,5 @@
 
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import type { AnchorHTMLAttributes } from 'react'
 import { ArrowRight, ArrowUpRight } from 'lucide-react'
 import styles from './text-link.module.css'

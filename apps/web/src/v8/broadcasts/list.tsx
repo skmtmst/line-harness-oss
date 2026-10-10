@@ -1,5 +1,6 @@
 'use client'
 import { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import { RowNameLink } from '@/components/shared/table'
 
 import { canManageRole } from '@/lib/staff-role';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
@@ -11,8 +12,8 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   AlertCircle,
   ArrowUpDown,
@@ -1056,19 +1057,17 @@ export default function BroadcastListV8() {
           const detailHref = `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`
           const menuLabel = `配信「${broadcast.title}」の操作`
           const titleLink = (
-            <Link
+            <RowNameLink
               href={detailHref}
               className={styles.cellTitle}
               title={broadcast.title}
               onClick={(event) => {
                 event.stopPropagation()
-                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
-                event.preventDefault()
-                goDetail(broadcast.id)
+
               }}
             >
               {broadcast.title}
-            </Link>
+            </RowNameLink>
           )
           return (
             <Tr
@@ -1076,14 +1075,8 @@ export default function BroadcastListV8() {
               className={styles.row}
               interactive
               tabIndex={0}
-              onClick={() => setPanelId(broadcast.id)}
-              onKeyDown={(event) => {
-                if (event.target !== event.currentTarget) return
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  setPanelId(broadcast.id)
-                }
-              }} data-row-id={broadcast.id}
+              detailKey="broadcast" onOpen={() => setPanelId(panelId === broadcast.id ? null : broadcast.id)}
+               data-row-id={broadcast.id}
             >
               <Td>
                 <FolderDotName folder={folderDotOf(broadcast.folderId)}>{titleLink}</FolderDotName>
@@ -1117,7 +1110,7 @@ export default function BroadcastListV8() {
                   </>
                 )}
               </Td>
-              <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
+              <Td className={styles.colMenu}>
                 {/* 閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す） */}
                 {canEdit ? <div className={styles.menuBox}>
                   <ContextMenu label={menuLabel} items={rowContextItems(broadcast)}>

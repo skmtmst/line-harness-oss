@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import Link, { useListNavigationHref } from './list-navigation'
 import { ArrowUpRight } from 'lucide-react'
 import React, { useEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import MenuPortal from './menu-portal'
@@ -64,6 +64,7 @@ export type ActionMenuProps = {
 
 /** Pencil ★V8 `hnuY9`「その他操作メニュー」を正本にした小型操作メニュー。 */
 export default function ActionMenu({ open, items, note, onClose, ariaLabel = '操作', inline = false, anchorRef }: ActionMenuProps) {
+  const navigationHref = useListNavigationHref()
   const leaving = useV8Leave(open, 80)
   const menuRef = useRef<HTMLDivElement>(null)
   const anchorMarkRef = useRef<HTMLSpanElement>(null)
@@ -191,7 +192,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
               {item.sectionBefore}
             </p>
           ) : null}
-          <Item href={Item === 'a' ?item.href : undefined}
+          <Item href={Item === 'a' && item.href ? navigationHref(item.href) : undefined}
             target={Item === 'a' &&item.external ? '_blank' : undefined}
             rel={Item === 'a' && item.external ? 'noopener noreferrer' : undefined}
             type="button"

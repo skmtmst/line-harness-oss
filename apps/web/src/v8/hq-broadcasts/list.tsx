@@ -1,13 +1,14 @@
 'use client'
 
 import { canManageRole } from '@/lib/staff-role';
+import { RowNameLink } from '@/components/shared/table'
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useTenantWideAccess } from '@/lib/staff-role'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { AlertCircle, ArrowUpDown, CalendarClock, FilePen, Inbox, List, MailOpen, Plus, Send } from 'lucide-react'
 import type { HqBroadcastRun } from '@line-crm/shared'
 import { ListPage, ListPagePagination } from '@/components/templates/list-page'
@@ -333,7 +334,7 @@ export default function HqBroadcastList() {
                 <Td>
                   <div className={styles.titleLine}>
                     <FolderDotName folder={(() => { const folder = (folders ?? []).find((f) => f.id === folderIdOf(run)); return folder ? { name: folder.name, color: folder.color } : null })()}>
-                      <Link href={href} className={styles.cellTitle} title={run.title}>{run.title}</Link>
+                      <RowNameLink href={href} className={styles.cellTitle} title={run.title}>{run.title}</RowNameLink>
                     </FolderDotName>
                   </div>
 

@@ -1,5 +1,6 @@
 'use client'
 import { useDeferredDelete } from '@/lib/use-deferred-delete';
+import { RowNameLink } from '@/components/shared/table'
 import { useDetailPanelUrl } from '@/components/shared/detail-panel';
 
 import { canManageRole } from '@/lib/staff-role';
@@ -16,8 +17,8 @@ import SearchField from '@/components/shared/search-field'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlParam, useListUrlValue } from '@/components/shared/list-url-state'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   Activity,
   AlertCircle,
@@ -937,7 +938,7 @@ export default function RemindersListV8() {
                     </Td>
                     <NameCell name={<div className={styles.nameRow}>
                         <>
-                          <Link
+                          <RowNameLink
                             href={detailHref(row.id)}
 
                             className={styles.cellTitle}
@@ -949,7 +950,7 @@ export default function RemindersListV8() {
                             }}
                           >
                             <TruncatedText value={String(row.name ?? '')} />
-                          </Link>
+                          </RowNameLink>
                         </>
 
                       </div>} folder={folderDotOf(row)}

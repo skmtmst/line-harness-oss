@@ -1,7 +1,7 @@
 'use client'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { Download, Eye, PencilLine } from 'lucide-react'
 import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared'

@@ -5,8 +5,8 @@ import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   ArrowRight,
   Bot,

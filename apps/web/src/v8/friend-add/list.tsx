@@ -1,13 +1,15 @@
 'use client'
 
 import SharedStatusPill from '@/components/shared/status-pill'
+import { RowNameLink } from '@/components/shared/table'
 import { useListUrlValue, writeListUrlParam } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   Activity,
   AlertCircle,
@@ -818,7 +820,7 @@ function FriendAddList() {
                   </Td>
                   <Td className={styles.colName}>
                     <FolderDotName folder={folderDotOf(rule.folderName)}>
-                      <Link href={editHref(rule.id)} title={rule.name} className={styles.name}><TruncatedText value={String(rule.name ?? '')} /></Link>
+                      <RowNameLink href={editHref(rule.id)} title={rule.name} className={styles.name}><TruncatedText value={String(rule.name ?? '')} /></RowNameLink>
                     </FolderDotName>
 
                   </Td>
@@ -839,7 +841,7 @@ function FriendAddList() {
                   </Td>
                   <Td className={styles.colName}>
                     <FolderDotName folder={folderDotOf(sinkRule.folderName)}>
-                      <Link href={editHref(sinkRule.id)}  className={styles.name}><TruncatedText value={String(sinkRule.name ?? '')} /></Link>
+                      <RowNameLink href={editHref(sinkRule.id)}  className={styles.name}><TruncatedText value={String(sinkRule.name ?? '')} /></RowNameLink>
                     </FolderDotName>
 
                   </Td>

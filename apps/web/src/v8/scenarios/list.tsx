@@ -1,5 +1,6 @@
 'use client'
 import { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import { RowNameLink } from '@/components/shared/table'
 
 import { canManageRole } from '@/lib/staff-role';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
@@ -13,8 +14,8 @@ import { RovingTbody } from '@/components/shared/row-roving'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   Bookmark,
   CalendarPlus,
@@ -913,16 +914,10 @@ export default function ScenariosListV8() {
                     onDrop={dragId ? () => dropOn(liveOrder.dropTarget(s.id)) : undefined}
                     className={`${styles.row} ${styles.rowClick}`}
                     tabIndex={0}
-                    onClick={() => setPanelId(s.id)}
-                    onKeyDown={(event) => {
-                      if (event.target !== event.currentTarget) return
-                      if (event.key === 'Enter') {
-                        event.preventDefault()
-                        setPanelId(s.id)
-                      }
-                    }} data-row-id={s.id}
+                    detailKey="scenario" onOpen={() => setPanelId(panelId === s.id ? null : s.id)}
+                     data-row-id={s.id}
                   >
-                    <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.selectCell}>
                       {canEdit && <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","s.id"]}><Checkbox
                         checked={selectedIds.has(s.id)}
                         onCheckedChange={() => toggleOne(s.id)}
@@ -949,19 +944,17 @@ export default function ScenariosListV8() {
                     <NameCell name={
                         <div className={styles.nameRow}>
                           <>
-                            <Link
+                            <RowNameLink
                               href={`/scenarios/detail?id=${s.id}`}
 
                               className={styles.cellTitle}
                               onClick={(event) => {
                                 event.stopPropagation()
-                                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
-                                event.preventDefault()
-                                goDetail(s.id)
+
                               }}
                             >
                               <TruncatedText value={String(s.name ?? '')} />
-                            </Link>
+                            </RowNameLink>
                           </>
                           {s.lineAccountId === null && (
                             <span className={styles.miniBadge} title="全アカウントに適用されるシナリオです">
@@ -981,7 +974,7 @@ export default function ScenariosListV8() {
                     <Td>
                       <SharedStatusPill tone={s.isActive ? 'success' : 'neutral'}>{s.isActive ? '有効' : '停止中'}</SharedStatusPill>
                     </Td>
-                    <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.menuCell}>
                       {/* 横並びにして、メニューの位置の目印（空の span）が行を1段増やさないようにする。 */}
                       <div className={styles.menuBox}>
                         <ContextMenu label={`シナリオ「${s.name}」の操作`} items={rowContextItems(s)}>
