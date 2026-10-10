@@ -22,6 +22,7 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { Field } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
+import EntitySelect from '@/components/shared/entity-select'
 import { TextField } from '@/components/shared/text-field'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -217,7 +218,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
   const placementFields = draft ? (
     <>
       <div className={styles.pair}>
-        <Field label="階・エリア"><Select aria-label="階・エリア" value={draft.floorId} onChange={v=>setDraft({...draft,floorId:v})} options={floors.map(f=>({value:f.id,label:f.name}))}/></Field>
+        <Field label="階・エリア"><SaveErrorField names={["floorId","draft.floorId","floor_id","draft.floor_id"]}><EntitySelect size="full" aria-label="階・エリア" noun="階・エリア" value={draft.floorId} onChange={v=>setDraft({...draft,floorId:v})} options={floors.map(f=>({value:f.id,label:f.name}))}/></SaveErrorField></Field>
         <Field label="横の位置" htmlFor="rs-table-x" error={fieldErrors.floorX}>
           <SaveErrorField names={["floorX","draft.floorX","floor_x","draft.floor_x"]}><NumberInput id="rs-table-x" type="number" min={0} max={10000} value={draft.floorX} onChange={(event) => setDraft({ ...draft, floorX: event.target.value })} /></SaveErrorField>
         </Field>

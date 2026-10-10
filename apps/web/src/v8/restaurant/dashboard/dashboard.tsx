@@ -3,7 +3,7 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useMemo, useState } from 'react'
 import { Armchair, Bell, CalendarCheck, Check, Plus, Star, Users } from 'lucide-react'
 import { DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
-import Select from '@/components/shared/select'
+import EntitySelect from '@/components/shared/entity-select'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import KpiBand from '@/components/shared/kpi-band'
@@ -132,7 +132,7 @@ function TodayStore() {
   }
 
   const actions = d.store ? (
-    <><Select aria-label="店舗" value={d.store.id} options={[{value:d.store.id,label:`店舗：${d.store.name}`}]} onChange={()=>{}}/>{canWrite?<><Button presentation="restaurant" onClick={() => setWalkInOpen(true)}><Plus size={15} aria-hidden="true" />ウォークイン</Button>
+    <><EntitySelect aria-label="店舗" noun="店舗" value={d.store.id} options={[{value:d.store.id,label:d.store.name}]} onChange={()=>{}}/>{canWrite?<><Button presentation="restaurant" onClick={() => setWalkInOpen(true)}><Plus size={15} aria-hidden="true" />ウォークイン</Button>
       <Button presentation="restaurant" variant="primary" onClick={() => setPhoneOpen(true)}><Plus size={15} aria-hidden="true" />電話予約</Button></>:null}
     </>
   ) : null
