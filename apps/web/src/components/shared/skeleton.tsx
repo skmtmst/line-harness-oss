@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import styles from './skeleton.module.css'
+import { motionMs } from './overlay-utils'
 
 /*
  * 骨組み（★V7 仕上げ `z97zZN` §3）。
@@ -69,7 +70,7 @@ export function useDelayedSkeleton(loading: boolean): boolean {
         timer = setTimeout(() => {
           shownAtRef.current = Date.now()
           setVisible(true)
-        }, Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--polish-loading-delay')) || SHOW_DELAY_MS)
+        }, motionMs('--polish-loading-delay', SHOW_DELAY_MS))
       }
     } else if (shownAtRef.current !== null) {
       const remaining = MIN_VISIBLE_MS - (Date.now() - shownAtRef.current)
