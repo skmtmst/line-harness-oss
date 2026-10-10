@@ -484,7 +484,7 @@ export default function SeatReserve() {
             : ''
         }
         confirmLabel="取り消す"
-        cancelLabel="やめる"
+        cancelLabel="閉じる"
         destructive
         busy={busy}
         error={cancelling ? (error ?? undefined) : undefined}

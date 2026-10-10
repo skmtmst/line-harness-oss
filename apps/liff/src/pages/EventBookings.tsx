@@ -354,7 +354,7 @@ export default function EventBookings() {
         }
         description="キャンセル待ちの方へ順番に案内されます。前日を過ぎるとここからは変えられません（お店へご連絡ください）。"
         confirmLabel="キャンセルする"
-        cancelLabel="やめる"
+        cancelLabel="閉じる"
         destructive
         busy={busy}
         onCancel={() => {
@@ -371,7 +371,7 @@ export default function EventBookings() {
             : ''
         }
         confirmLabel="この時間に変える"
-        cancelLabel="やめる"
+        cancelLabel="閉じる"
         busy={busy}
         error={pendingChange?.changeError ?? undefined}
         onCancel={() => {

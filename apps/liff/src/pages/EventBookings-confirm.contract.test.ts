@@ -65,9 +65,9 @@ describe('イベント予約の取り消し確認', () => {
     expect(page).toContain('setPendingCancel(b)');
   });
 
-  it('題は日時＋行事の問いかけで、ボタンは「やめる」と取り消し', () => {
+  it('題は日時＋行事の問いかけで、閉じるか取り消す', () => {
     expect(page).toContain('をキャンセルしますか');
-    expect(page).toContain('cancelLabel="やめる"');
+    expect(page).toContain('cancelLabel="閉じる"');
     expect(page).toContain('confirmLabel="キャンセルする"');
     expect(page).toContain('destructive');
     expect(page).toContain('キャンセル待ちの方へ順番に案内されます');

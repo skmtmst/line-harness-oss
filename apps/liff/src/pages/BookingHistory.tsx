@@ -271,7 +271,7 @@ export default function BookingHistory() {
         }
         description="キャンセルすると元に戻せません。キャンセルの期限を過ぎると、ここからは変えられません（トークでご連絡ください）。"
         confirmLabel="キャンセルする"
-        cancelLabel="やめる"
+        cancelLabel="閉じる"
         destructive
         busy={busy}
         onCancel={() => {
@@ -284,7 +284,7 @@ export default function BookingHistory() {
         title={pendingChange ? `「${pendingChange.booking.menu_name}」の日時を変えますか` : ''}
         description="空いている日時から選びます。新しい日時を取れたときだけ、今の予約が変わります。"
         confirmLabel="この日時に変える"
-        cancelLabel="やめる"
+        cancelLabel="閉じる"
         busy={busy}
         error={pendingChange?.error ?? undefined}
         onCancel={() => {
