@@ -6,8 +6,40 @@ export class InstagramError extends Error {
   constructor(
     public code: string,
     public status: 400 | 401 | 403 | 404 | 409 | 422 | 502 | 503 = 502,
+    /**
+     * Meta が返した失敗の中身（種別・番号・説明）。原因調べのためにサーバー記録へ残すだけで、
+     * 画面と応答には出さない（`instagram.onError` は `code` しか返さない）。
+     */
+    public detail?: string,
   ) {
     super(code);
+  }
+}
+/** Meta のエラー本文から、秘密値を含まない部分だけを短く取り出す。 */
+async function metaErrorDetail(response: Response): Promise<string | undefined> {
+  try {
+    const body = (await response.json()) as {
+      error?: {
+        type?: string;
+        code?: number;
+        error_subcode?: number;
+        message?: string;
+      };
+    };
+    const e = body?.error;
+    if (!e) return undefined;
+    return [
+      `status=${response.status}`,
+      e.type ? `type=${e.type}` : '',
+      e.code != null ? `code=${e.code}` : '',
+      e.error_subcode != null ? `subcode=${e.error_subcode}` : '',
+      e.message ? `message=${String(e.message).slice(0, 300)}` : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+  } catch {
+    // 本文が読めなくても、どの状態で落ちたかだけは残す。
+    return `status=${response.status}`;
   }
 }
 export type InstagramConfig = {
@@ -88,13 +120,25 @@ export async function instagramGraph<T>(
       response.status === 401 || response.status === 403
         ? 'meta_authorization_failed'
         : 'meta_request_failed',
+      502,
+      `${method} ${config.version}/${path} ${await metaErrorDetail(response)}`,
     );
   return response.json() as Promise<T>;
 }
 export type InstagramPage = InstagramOAuthPage & { token: string };
+/** 原因調べ用の数えだけを受け取る入れもの。ページ名やIDなどの中身は入れない。 */
+export type InstagramPageScan = {
+  /** me/accounts が返したページの数 */
+  total: number;
+  /** そのうち Instagram のビジネスアカウントがつながっていた数 */
+  withInstagram: number;
+  /** そのうちページの合鍵も一緒に返ってきた数 */
+  withToken: number;
+};
 export async function instagramPages(
   config: InstagramConfig,
   userToken: string,
+  scan?: InstagramPageScan,
 ): Promise<InstagramPage[]> {
   const pages: InstagramPage[] = [];
   let after: string | undefined;
@@ -112,7 +156,13 @@ export async function instagramPages(
       limit: '100',
       ...(after ? { after } : {}),
     });
-    for (const p of r.data ?? [])
+    for (const p of r.data ?? []) {
+      if (scan) {
+        scan.total++;
+        if (/^\d+$/.test(p.instagram_business_account?.id ?? ''))
+          scan.withInstagram++;
+        if (p.access_token) scan.withToken++;
+      }
       if (
         /^\d+$/.test(p.id) &&
         /^\d+$/.test(p.instagram_business_account?.id ?? '') &&
@@ -124,6 +174,7 @@ export async function instagramPages(
           instagramId: p.instagram_business_account!.id,
           token: p.access_token,
         });
+    }
     if (!r.paging?.next) return pages;
     if (!r.paging.cursors?.after || r.paging.cursors.after === after)
       throw new InstagramError('meta_pagination_failed');
