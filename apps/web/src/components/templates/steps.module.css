@@ -141,3 +141,6 @@ button.step:focus-visible {
 }
 
 .root[data-connector-size='short'] { --tpl-steps-line-w: var(--tpl-msg-composer-step-line-w); --tpl-steps-dot-gap: var(--tpl-msg-composer-step-gap); }
+
+/* B-211：今の番号は緑の面＋白い数字。 */
+.dot[data-step-dot='current'] { background: var(--color-selection-border); color: var(--color-on-accent); }

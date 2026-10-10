@@ -72,3 +72,14 @@
 .fileName { display: block; padding-right: 32px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
 .fileSlot:focus-visible, .fileRemove:focus-visible { outline: 2px solid var(--color-liff-primary, var(--color-accent)); outline-offset: 2px; }
 .input[aria-invalid="true"] { border-color: var(--color-danger); outline: 1px solid var(--color-danger); }
+
+/* B-203：本番LIFFと管理画面の入力見本に同じ輪・点・チェック。 */
+.choice[data-selected] { border: var(--choice-card-ring) solid var(--color-selection-border); background: var(--color-choice-selected); }
+.choiceInput, .choice input { appearance: none; width: var(--choice-size); height: var(--choice-size); margin: 0; border: var(--choice-ring) solid var(--color-choice-border); background: var(--color-canvas); }
+input.choiceInput[type='radio'], .choice input[type='radio'] { border-radius: 50%; }
+input.choiceInput[type='radio']:checked, .choice input[type='radio']:checked { border-color: var(--color-selection-border); background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
+input.choiceInput[type='checkbox'], .choice input[type='checkbox'] { border-radius: 3px; }
+input.choiceInput[type='checkbox']:checked, .choice input[type='checkbox']:checked { border-color: var(--color-selection-border); background: var(--color-selection-border) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='white' stroke-width='2' d='m3 8 3 3 7-7'/%3E%3C/svg%3E") center/contain no-repeat; }
+.choiceInput:focus-visible, .choice input:focus-visible { outline: 2px solid var(--color-status-info); outline-offset: 2px; }
+
+.fileSlot { min-height: var(--upload-slot-height, var(--tpl-slot-h-compact)); padding: var(--upload-slot-padding, var(--tpl-slot-pad-compact)); }

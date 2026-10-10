@@ -371,3 +371,15 @@ html[data-theme='v8'] .disabled:not(.compact):not(.form) .radio:disabled { opaci
 
 /* B-152⑩：説明文は省略せず、必要な行数で読む。 */
 [data-theme='v8'] .note, html[data-theme='v8'] .card:is(.compact, .row) .note { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+
+/* B-203・B-207・B-211：10-10 に採用した共通の形。 */
+html[data-theme='v8'] .card:not(.row) { outline: 1px solid var(--color-choice-border); outline-offset: -1px; }
+html[data-theme='v8'] .checked:not(.row), html[data-theme='v8'] .checked:not(.row):hover { outline: var(--choice-card-ring) solid var(--color-selection-border); outline-offset: -2px; background: var(--color-choice-selected); }
+html[data-theme='v8'] .radio { width: var(--choice-size); height: var(--choice-size); border: var(--choice-ring) solid var(--color-choice-border); outline-color: transparent; background: var(--color-canvas); box-shadow: none; }
+html[data-theme='v8'] .radio:checked { outline-color: transparent; border-color: var(--color-selection-border); background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); box-shadow: none; }
+html[data-theme='v8'] .radio:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+html[data-theme='v8'] .card:not(.row):has(.radio:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+html[data-theme='v8'] .invalid, html[data-theme='v8'] .invalid .radio { border-color: var(--color-danger); outline-color: var(--color-danger); }
+
+html[data-theme='v8'] .card:is(.compact, .form) > .radio { width: var(--choice-size); height: var(--choice-size); opacity: 1; pointer-events: auto; top: var(--space-16); right: var(--space-16); }
+html[data-theme='v8'] .card:not(.row) .body { padding-right: calc(var(--choice-size) + var(--space-8)); }

@@ -1,3 +1,6 @@
+'use client'
+
+import { useCardHeights } from './use-card-heights'
 import React, { type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
 import styles from './card.module.css'
 
@@ -44,6 +47,7 @@ export default function Card({
   spacing,
   ...props
 }: CardProps) {
+  const cardRef = useCardHeights()
   const gapToken = gap === 'tight' || gap === 'normal' || gap === 'loose' ? gap : undefined
   const gapValue = gapToken ? undefined : gap
   const classes = [
@@ -72,7 +76,8 @@ export default function Card({
     .join(' ')
 
   return (
-    <section className={classes} data-design-part="card" data-appearance={appearance} data-gap={gapToken} data-spacing={spacing}
+    <section ref={cardRef} className={classes} data-design-part="card" data-appearance={appearance} data-gap={gapToken} data-spacing={spacing}
+      data-card-padding={padding} data-card-variant={variant}
       data-card-surface={surface === 'standard' ? undefined : surface} data-card-corner={corner === 'control' ? corner : undefined}
       data-card-spacing={contentPadding || gapValue ? '' : undefined}
       style={contentPadding || gapValue ? { ...style, '--card-content-padding': contentPadding, '--card-content-gap': gapValue } as CSSProperties : style} {...props}>

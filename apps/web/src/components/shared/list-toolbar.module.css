@@ -218,3 +218,7 @@
 .searchSlot { flex: 0 1 var(--tpl-list-search-w); min-width: min(var(--tpl-list-search-min), 100%); max-width: 100%; }
 .searchSlot > * { width: 100%; min-width: 0; }
 .slotsEnd { display: flex; flex-wrap: wrap; align-items: center; margin-left: auto; min-width: 0; gap: var(--tpl-list-gap); }
+
+.filterChoices, .filterWide { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
+.filterNarrow { display: none; }
+@container v8-page (max-width: 1100px) { .filterWide { display: none; } .filterNarrow { display: flex; } }

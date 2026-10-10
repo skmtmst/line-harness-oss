@@ -68,3 +68,6 @@
 [data-theme='v8'] .pill[data-tone='neutral'] { --status-dot: var(--polish-status-neutral-dot); --status-bg: var(--polish-status-neutral-bg); --status-ink: var(--polish-status-neutral-ink); }
 [data-theme='v8'] .pill .dot { width: var(--polish-status-dot-size); height: var(--polish-status-dot-size); flex-basis: var(--polish-status-dot-size); background: var(--status-dot); }
 [data-theme='v8'] .pill.control[data-tone] { background: var(--status-bg); color: var(--status-ink); }
+
+/* B-191/192：4文字の状態を数文字に切らない。列の中で縮めない。 */
+html[data-theme='v8'] .pill { flex-shrink: 0; min-width: max-content; }

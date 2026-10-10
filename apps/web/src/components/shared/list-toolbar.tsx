@@ -1,9 +1,10 @@
 'use client'
 import type React from 'react'
 
-import { useLayoutEffect, useRef, useState, type ReactNode, type HTMLAttributes } from 'react'
+import { Fragment, Children, isValidElement, cloneElement, useLayoutEffect, useRef, useState, type ReactNode, type HTMLAttributes } from 'react'
 import Select, { type SelectProps } from './select'
 import SearchField from './search-field'
+import FilterChip from './filter-chip'
 import styles from './list-toolbar.module.css'
 
 export type ListToolbarSearch = {
@@ -83,7 +84,7 @@ export default function ListToolbar({
       </div>
       {filters || trailing || sort ? (
         <div className={styles.row2}>
-          {filters ? <div className={styles.filters} data-toolbar-tools>{filters}</div> : null}
+          {filters ? <div className={styles.filters} data-toolbar-tools>{compactFilterGroups(filters)}</div> : null}
           {trailing || sort ? <div className={styles.trailing} data-toolbar-tools>{sort ? <ListToolbarSort {...sort} /> : null}{trailing}</div> : null}
         </div>
       ) : null}
@@ -144,4 +145,24 @@ export type ListToolbarSortProps = Omit<SelectProps, 'aria-label' | 'label'> & {
 /** 並びの名前と選ぶ操作はこの欄にそろえる。 */
 export function ListToolbarSort(props: ListToolbarSortProps) {
   return <span data-list-sort><Select {...props} label="並び" aria-label="並び" /></span>
+}
+
+/** B-205：札の集まりだけを状態の選ぶ欄へ畳む。日付・複数条件は元の操作を保つ。 */
+function compactFilterGroups(node: ReactNode): ReactNode {
+  const children = Children.toArray(node)
+  if (children.length > 1 && children.every(child => isValidElement(child) && child.type === FilterChip))
+    return <ResponsiveFilterChips>{children}</ResponsiveFilterChips>
+  return children.map(child => isValidElement<{ children?: ReactNode }>(child) && child.props.children && (typeof child.type === 'string' || child.type === Fragment)
+    ? cloneElement(child, {}, compactFilterGroups(child.props.children)) : child)
+}
+export function ResponsiveFilterChips({ children, label = '状態' }: { children: ReactNode; label?: string }) {
+  const chips = Children.toArray(children).filter(isValidElement<React.ComponentProps<typeof FilterChip>>)
+  const text = (node: ReactNode): string => Children.toArray(node).map(child => isValidElement<{ children?: ReactNode }>(child) ? text(child.props.children) : String(child)).join('')
+  const current = chips.findIndex(child => child.props.selected)
+  return <span className={styles.filterChoices}>
+    <span className={styles.filterWide}>{children}</span>
+    <span className={styles.filterNarrow}><Select label={label} aria-label={label} value={String(current < 0 ? 0 : current)}
+      options={chips.map((child,index) => ({ value: String(index), label: text(child.props.children), disabled: child.props.disabled }))}
+      onChange={next => chips[Number(next)]?.props.onChange(true)} /></span>
+  </span>
 }

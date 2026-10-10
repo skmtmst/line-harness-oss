@@ -343,3 +343,13 @@
 :global([data-theme='v8']) .frame[data-template-layout='distribution'] { --tpl-toolbar-pad-block: var(--tpl-distribution-toolbar-pad); }
 :global([data-theme='v8']) .frame[data-template-layout='distribution'] .listBody { flex: none; }
 :global([data-theme='v8']) .frame[data-template-layout='distribution'] > .footer { margin: var(--tpl-toolbar-gap) 0 0; }
+
+/* B-217：表は領域いっぱい。道具・知らせ・件数の中身だけ24。 */
+:global([data-theme='v8']) .listBody .content[data-content-inset] { padding-inline: 0; }
+:global([data-theme='v8']) .listBody .toolbar { padding-inline: var(--tpl-list-inset); }
+:global([data-theme='v8']) .listBody .pagination { padding-inline: var(--tpl-list-inset); }
+:global([data-theme='v8']) [data-list-skeleton] .paginationRow,
+:global([data-theme='v8']) [data-list-skeleton] .pagination { justify-content: space-between; }
+
+/* 旧画面が表の外に足していた枠も、共通の型で平らにする。 */
+:global([data-theme='v8']) [data-list-skeleton] .content :global(div:has(> [data-shared-part='list-table'])) { margin: 0; padding-inline: 0; border: 0; border-radius: var(--radius-flat); box-shadow: none; }

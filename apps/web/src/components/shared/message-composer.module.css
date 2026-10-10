@@ -62,3 +62,6 @@
 .previewCard strong { display: block; padding: 6px 8px; font-size: var(--text-micro); line-height: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .previewAction { display: flex; align-items: center; justify-content: center; height: var(--tpl-msg-composer-preview-action-h); border-top: 1px solid var(--color-hairline); color: var(--color-accent-deep); font-size: var(--text-micro); font-weight: 700; }
 }
+
+html[data-theme='v8'] .number { background: var(--color-selection-border); color: var(--color-canvas); }
+html[data-theme='v8'] .audioIcon { background: var(--color-code-bg); color: var(--color-ink); }
