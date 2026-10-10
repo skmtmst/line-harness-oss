@@ -21,7 +21,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   usePathname: () => '/form-submissions/responses',
   useSearchParams: () => new URLSearchParams('id=form-1'),
@@ -31,7 +31,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageChrome: () => ({}) }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => {}, usePageChrome: () => ({}) }))
 
 import FormResponsesPage from './page'
 
