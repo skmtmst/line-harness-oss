@@ -33,13 +33,6 @@
 .colState { width: var(--tpl-ev-ls-col-state); }
 .colMenu { width: var(--tpl-fm-col-menu); }
 .headName { text-align: left; }
-/* 絵の表は名前の列の左が広い（見出し 500・名前 516）。状態の列も左を少し空ける。 */
-.tableBox .firstCell.firstCell.firstCell { padding-left: var(--tpl-ev-ls-first-pad); }
-.tableBox .stateCell.stateCell.stateCell { padding-left: var(--tpl-ev-ls-state-pad); }
-.tableBox tbody td {
-  height: var(--tpl-ev-ls-row-h);
-  padding-block: 0;
-}
 .headWithTip {
   display: inline-flex;
   align-items: center;
@@ -101,28 +94,6 @@
   align-items: flex-start;
   gap: var(--tpl-compact-gap);
 }
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-fm-pill-gap);
-  padding: var(--tpl-fm-badge-pad);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-fm-badge-lh);
-  white-space: nowrap;
-}
-.pill::before {
-  content: '';
-  width: var(--tpl-fm-dot);
-  height: var(--tpl-fm-dot);
-  border-radius: var(--radius-pill);
-  background: currentColor;
-}
-.pillOn { background: var(--color-accent-soft); color: var(--color-success); }
-.pillWarn { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
-.pillLow { background: var(--color-status-info-soft); color: var(--color-status-info); }
-.pillOff { background: var(--color-shell); color: var(--color-ink-secondary); }
 .menuCell { text-align: right; }
 .menuBox {
   display: flex;

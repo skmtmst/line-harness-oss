@@ -64,6 +64,6 @@ export function PageFrame({ kind, children, boardId, layout, standalone = false,
 }
 
 /** 型が保存帯の置き場所と追従を持つ。画面は操作と状態だけを渡す。 */
-export function PageFooter({ actions, status }: { actions: ReactNode; status?: ReactNode }) {
-  return <div className={styles.footer} data-template-region="footer"><StickyBar actions={actions} status={status} /></div>
+export function PageFooter({ actions, status, presentation }: { actions: ReactNode; status?: ReactNode; presentation?: 'distribution' }) {
+  return <div className={styles.footer} data-template-region="footer"><StickyBar actions={actions} status={status} presentation={presentation} /></div>
 }

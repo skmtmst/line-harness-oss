@@ -441,3 +441,16 @@
 [data-theme='v8'] .table[data-table-presentation='connection-check'] td:last-child { width: var(--tpl-htn-result-badge-w); text-align: right; }
 
 [data-theme='v8'] .table.table[data-table-presentation='account-list'] :is(th, td):nth-child(4) { padding-right: var(--tpl-sa-acc-friends-pad); }
+/* e2ekFu：列の余白・行の高さは表の部品が持つ。 */
+[data-theme='v8'] .frame[data-table-presentation='event-list'] .table thead th:first-child,
+[data-theme='v8'] .frame[data-table-presentation='event-list'] .bodyCell:first-child {
+  padding-left: var(--tpl-ev-ls-first-pad);
+}
+[data-theme='v8'] .frame[data-table-presentation='event-list'] .table thead th:nth-child(5),
+[data-theme='v8'] .frame[data-table-presentation='event-list'] .bodyCell:nth-child(5) {
+  padding-left: var(--tpl-ev-ls-state-pad);
+}
+[data-theme='v8'] .frame[data-table-presentation='event-list'] .bodyCell {
+  height: var(--tpl-ev-ls-row-h);
+  padding-block: 0;
+}

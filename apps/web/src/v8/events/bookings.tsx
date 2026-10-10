@@ -18,6 +18,11 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole } from '@/lib/staff-role'
 import { DetailPage } from '@/components/templates'
 import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
+import StatusBadge from '@/components/shared/status-badge'
+import { EventRosterCard, EventRosterTable, EventRosterRow, EventRosterActions, EventAttendanceSummary } from '@/components/shared/event-roster'
+import { TextField, TextArea } from '@/components/shared/text-field'
+import { CalendarClock, Users, Armchair, CalendarX } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -31,7 +36,7 @@ type ChipTone = 'warning' | 'success' | 'info' | 'neutral' | 'danger'
 const STATUS_TONE: Record<string, ChipTone> = {
   requested: 'warning',
   confirmed: 'success',
-  waiting: 'warning',
+  waiting: 'neutral',
   offered: 'info',
   accepted: 'success',
   converted: 'success',
@@ -53,8 +58,6 @@ const STATUS_LABELS: Record<string, string> = {
   attended: '参加済',
   no_show: '無断',
 }
-
-const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const
 
 /** 開催回の選び口の表示（板：`10/12（月）14:00`）。曜日は日付から作る。 */
 function formatOccurrence(iso: string): string {
@@ -102,6 +105,7 @@ function Bookings({ eventId }: { eventId: string }) {
   const staffRole = useStaffRole()
   const [event, setEvent] = useState<EventDetail | null>(null)
   const [eventStatus, setEventStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [slotsStatus, setSlotsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [slots, setSlots] = useState<EventSlot[]>([])
   const [selectedOccurrenceId, setSelectedOccurrenceId] = useState('')
   const [applicants, setApplicants] = useState<EventOccurrenceApplicants | null>(null)
@@ -145,6 +149,7 @@ function Bookings({ eventId }: { eventId: string }) {
   }, [selectedAccountId, eventId])
 
   const refreshSlots = useCallback(async () => {
+    setSlotsStatus('loading')
     if (!selectedAccountId) {
       setSlots([])
       setSelectedOccurrenceId('')
@@ -153,9 +158,11 @@ function Bookings({ eventId }: { eventId: string }) {
     try {
       const res = await eventsApi.listOccurrenceSelector(selectedAccountId, eventId)
       setSlots(res.items)
+      setSlotsStatus('ready')
       setSelectedOccurrenceId((current) => current || res.items[0]?.id || '')
     } catch {
       setSlots([])
+      setSlotsStatus('error')
     }
   }, [selectedAccountId, eventId])
 
@@ -398,13 +405,7 @@ function Bookings({ eventId }: { eventId: string }) {
 
   const chip = (status: string) => {
     const label = STATUS_LABELS[status] ?? status
-    switch (STATUS_TONE[status] ?? 'neutral') {
-      case 'success': return <span className={`${styles.chip} ${styles.chip_success}`}>{label}</span>
-      case 'warning': return <span className={`${styles.chip} ${styles.chip_warning}`}>{label}</span>
-      case 'info': return <span className={`${styles.chip} ${styles.chip_info}`}>{label}</span>
-      case 'danger': return <span className={`${styles.chip} ${styles.chip_danger}`}>{label}</span>
-      default: return <span className={`${styles.chip} ${styles.chip_neutral}`}>{label}</span>
-    }
+    return <StatusBadge tone={STATUS_TONE[status] ?? 'neutral'}>{label}</StatusBadge>
   }
   const historyRows = history.filter((entry) => entry.status !== 'cancelled')
   const cancelRows = history.filter((entry) => entry.status === 'cancelled')
@@ -416,11 +417,15 @@ function Bookings({ eventId }: { eventId: string }) {
     <DetailPage
       boardId="Mu8qW"
       title={title}
-      description={(
-        <span className={styles.subLine}>
-          {subLine ? <span>{subLine}</span> : null}
-        </span>
-      )}
+      layout="event-roster"
+      help={subLine || '開催回ごとの申込・承認・キャンセル待ちを確認できます。'}
+      contentPadding="var(--tpl-roster-body-pad)"
+      stats={<KpiBand>
+        <KpiCard icon={<CalendarClock size={13} />} title="開催回" value={slotsStatus === 'ready' ? slots.length : null} unit="回" detail="このイベントの回" />
+        <KpiCard icon={<Users size={13} />} title="全回の申込" value={slotsStatus === 'ready' && slots.every((slot) => typeof slot.active_count === 'number') ? slots.reduce((sum, slot) => sum + slot.active_count!, 0) : null} unit="人" detail="全開催回の合計" />
+        <KpiCard icon={<Armchair size={13} />} title="全回の定員" value={slotsStatus === 'ready' && slots.every((slot) => slot.capacity !== null) ? slots.reduce((sum, slot) => sum + slot.capacity!, 0) : null} unit="人" detail="定員なしの回があるときは —" />
+        <KpiCard icon={<CalendarX size={13} />} title="取消期限" value={event?.cancel_deadline_hours_before} unit="時間前" detail="開始時刻から数えます" />
+      </KpiBand>}
       actions={(
         <div className={styles.headActions}>
           <Button onClick={() => void exportCsv()} disabled={csvBusy || !applicants} busy={csvBusy} busyLabel="書き出しています…">
@@ -449,26 +454,20 @@ function Bookings({ eventId }: { eventId: string }) {
       {actionError ? <p className={styles.error} role="alert">{actionError}</p> : null}
 
       {/* 数の帯。絵（Mu8qW）は4枚のカードなので、共通の KpiCard をカードの見せ方で並べる。 */}
-      <div className={styles.kpis} data-design="KPIs">
-        <KpiCard presentation="card" density="compact" icon={null} title="申込" value={ready ? (occurrence?.activeSeats ?? confirmedSeats + requestedSeats) : null} valueText={ready ? `${occurrence?.activeSeats ?? confirmedSeats + requestedSeats}${capacity !== null ? ` / ${capacity}` : ''}` : undefined} unit="" detail="人・この回" />
-        <KpiCard presentation="card" density="compact" icon={null} title="承認待ち" value={ready ? requestedSeats : null} unit="" detail="件" />
-        <KpiCard presentation="card" density="compact" icon={null} title="キャンセル待ち" value={ready ? waitingSeats + offeredSeats : null} unit="" detail="人" />
-        <KpiCard presentation="card" density="compact" icon={null} title="キャンセル" value={ready ? cancelledCount : null} unit="" detail="件" />
-      </div>
+      <KpiBand data-design="KPIs">
+        <KpiCard presentation="band" title="申込" icon={<Users size={13} />} value={ready ? (occurrence?.activeSeats ?? confirmedSeats + requestedSeats) : null} valueText={ready ? `${occurrence?.activeSeats ?? confirmedSeats + requestedSeats}${capacity !== null ? ` / ${capacity}` : ''}` : undefined} valueTextWithUnit unit="人・この回" detail="" />
+        <KpiCard presentation="band" title="承認待ち" icon={<CalendarClock size={13} />} value={ready ? requestedSeats : null} unit="件" detail="" />
+        <KpiCard presentation="band" title="キャンセル待ち" icon={<Armchair size={13} />} value={ready ? waitingSeats + offeredSeats : null} unit="人" detail="" />
+        <KpiCard presentation="band" title="キャンセル" icon={<CalendarX size={13} />} value={ready ? cancelledCount : null} unit="件" detail="" />
+      </KpiBand>
 
-      <section className={styles.card} aria-labelledby="ev-bk-applicants">
-        <div className={styles.cardHeadSplit}>
-          <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle} id="ev-bk-applicants">申込者</h2>
-            <p className={styles.cardNote}>承認待ちは期限までに承認か断るを選びます。断る・キャンセルにすると LINE でお知らせが届き、枠が空きます</p>
-          </div>
-          <div className={styles.attendance} aria-label="当日の受付">
-            <span className={styles.attendanceStrong}>{`参加済 ${attendance?.attendedSeats ?? 0}人`}</span>
-            <span className={styles.attendanceDanger}>{`無断欠席 ${attendance?.noShowSeats ?? 0}人`}</span>
-            <span>{`受付前 ${Math.max(0, confirmedSeats - (attendance?.attendedSeats ?? 0) - (attendance?.noShowSeats ?? 0))}人`}</span>
-            <span className={styles.attendanceNote}>当日、来た人に「参加済」、来なかった人に「無断」を付けます</span>
-          </div>
-        </div>
+      <EventRosterCard title="申込者" id="ev-bk-applicants" splitAction
+        note="承認待ちは期限までに承認か断るを選びます。断る・キャンセルにすると LINE でお知らせが届き、枠が空きます"
+        action={<EventAttendanceSummary
+          attended={ready ? attendance?.attendedSeats ?? null : null}
+          noShow={ready ? attendance?.noShowSeats ?? null : null}
+          before={ready && attendance ? Math.max(0, confirmedSeats - attendance.attendedSeats - attendance.noShowSeats) : null}
+        />}>
         {applicantsStatus === 'loading' ? <ListState kind="loading" /> : applicantsStatus === 'error' ? (
           <ListState
             kind="error"
@@ -478,16 +477,9 @@ function Bookings({ eventId }: { eventId: string }) {
         ) : rows.length === 0 ? (
           <p className={styles.empty}>この開催回には申込者もキャンセル待ちもいません。</p>
         ) : (
-          <div role="table" aria-label="申込者" className={styles.table}>
-            <div role="row" className={`${styles.headRow} ${styles.mainGrid}`}>
-              <span role="columnheader">申込者</span>
-              <span role="columnheader">区分・順位</span>
-              <span role="columnheader">状態</span>
-              <span role="columnheader">案内期限</span>
-              <span role="columnheader" className={styles.srOnly}>操作</span>
-            </div>
+          <EventRosterTable kind="applicants" label="申込者" headings={["申込者", "区分・順位", "状態", "案内期限"]}>
             {rows.map((row) => (
-              <div role="row" key={`${row.source}:${row.id}`} className={`${styles.row} ${styles.mainRow} ${styles.mainGrid}`}>
+              <EventRosterRow key={`${row.source}:${row.id}`}>
                 <span role="cell" className={styles.person}>
                   <span className={styles.personName} title={row.displayName ?? '友だちは未取得'}>{row.displayName ?? '友だちは未取得'}</span>
                   <span className={styles.personSub} title={participationSub(row)}>{participationSub(row)}</span>
@@ -500,10 +492,9 @@ function Bookings({ eventId }: { eventId: string }) {
                     : '申込'}
                 </span>
                 <span role="cell">{chip(row.status)}</span>
-                <span role="cell" className={styles.cellText} title={row.offerExpiresAt ? jstShort(row.offerExpiresAt) : undefined}>
+                <EventRosterActions deadline={<span title={row.offerExpiresAt ? jstShort(row.offerExpiresAt) : undefined}>
                   {row.offerExpiresAt ? jstShort(row.offerExpiresAt) : row.status === 'waiting' ? '案内前' : '—'}
-                </span>
-                <span role="cell" className={styles.rowActions}>
+                </span>}>
                   {row.source === 'booking' && row.status === 'requested' ? (
                     <>
                       <Button onClick={() => void decide(row, 'confirm')} disabled={busy}>承認する</Button>
@@ -553,19 +544,14 @@ function Bookings({ eventId }: { eventId: string }) {
                       title={waitingRows.length < 2 ? '並んでいる人が2人以上いるときに使えます' : undefined}
                     >待ち順を変える</Button>
                   ) : null}
-                </span>
-              </div>
+                </EventRosterActions>
+              </EventRosterRow>
             ))}
-          </div>
+          </EventRosterTable>
         )}
-      </section>
+      </EventRosterCard>
 
-      <section className={styles.card} aria-labelledby="ev-bk-waitlist">
-        <div className={styles.cardHeadSplit}>
-          <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle} id="ev-bk-waitlist">キャンセル待ち</h2>
-            <p className={styles.cardNote}>空きが出たら先頭の方へ期限つきの案内を送ります。期限までに返事がなければ次の方へ</p>
-          </div>
+      <EventRosterCard title="キャンセル待ち" id="ev-bk-waitlist" note="空きが出たら先頭の方へ期限つきの案内を送ります。期限までに返事がなければ次の方へ" action={(
           <Button
             onClick={() => {
               setWaitlistReason('')
@@ -576,81 +562,64 @@ function Bookings({ eventId }: { eventId: string }) {
           >
             <Send size={15} aria-hidden="true" />次の方へ案内する
           </Button>
-        </div>
-        <div role="table" aria-label="キャンセル待ち" className={styles.table}>
-          <div role="row" className={`${styles.headRow} ${styles.waitGrid}`}>
-            <span role="columnheader">友だち</span>
-            <span role="columnheader">結果</span>
-            <span role="columnheader">並んだ日時</span>
-            <span role="columnheader">案内日時</span>
-            <span role="columnheader">終了日時</span>
-          </div>
+        )}>
+        <EventRosterTable kind="waitlist" label="キャンセル待ち" headings={["友だち", "結果", "並んだ日時", "案内日時", "終了日時"]}>
           {rows.filter((row) => row.source === 'waitlist').map((row) => (
-            <div role="row" key={`now:${row.id}`} className={`${styles.row} ${styles.waitGrid}`}>
+            <EventRosterRow key={`now:${row.id}`}>
               <span role="cell" className={styles.cellName} title={row.displayName ?? '友だちは未取得'}>{row.displayName ?? '友だちは未取得'}</span>
               <span role="cell">{chip(row.status)}</span>
               <span role="cell" className={styles.cellText}>{jstShort(row.appliedAt)}</span>
               <span role="cell" className={styles.cellText}>{jstShort(row.offeredAt)}</span>
               <span role="cell" className={styles.cellText}>—</span>
-            </div>
+            </EventRosterRow>
           ))}
           {historyRows.map((entry) => (
-            <div role="row" key={`done:${entry.id}`} className={`${styles.row} ${styles.waitGrid}`}>
+            <EventRosterRow key={`done:${entry.id}`}>
               <span role="cell" className={styles.cellName} title={entry.displayName ?? '友だちは未取得'}>{entry.displayName ?? '友だちは未取得'}</span>
               <span role="cell">{chip(entry.status)}</span>
               <span role="cell" className={styles.cellText}>{jstShort(entry.createdAt)}</span>
               <span role="cell" className={styles.cellText}>{jstShort(entry.offeredAt)}</span>
               <span role="cell" className={styles.cellText}>{jstShort(entry.updatedAt)}</span>
-            </div>
+            </EventRosterRow>
           ))}
           {waitingRows.length === 0 && historyRows.length === 0 && !rows.some((row) => row.source === 'waitlist') ? (
             <p className={styles.empty}>キャンセル待ちはいません。</p>
           ) : null}
-        </div>
-      </section>
+        </EventRosterTable>
+      </EventRosterCard>
 
-      <section className={styles.card} aria-labelledby="ev-bk-cancel">
-        <h2 className={styles.cardTitle} id="ev-bk-cancel">キャンセル</h2>
-        <div role="table" aria-label="キャンセル" className={styles.table}>
-          <div role="row" className={`${styles.headRow} ${styles.cancelGrid}`}>
-            <span role="columnheader">友だち</span>
-            <span role="columnheader">結果</span>
-            <span role="columnheader">記録日時</span>
-          </div>
+      <EventRosterCard title="キャンセル" id="ev-bk-cancel">
+        <EventRosterTable kind="cancel" label="キャンセル" headings={["友だち", "結果", "記録日時"]}>
           {cancelRows.map((entry) => (
-            <div role="row" key={entry.id} className={`${styles.row} ${styles.cancelGrid}`}>
+            <EventRosterRow key={entry.id}>
               <span role="cell" className={styles.cellName} title={entry.displayName ?? '友だちは未取得'}>{entry.displayName ?? '友だちは未取得'}</span>
               <span role="cell">{chip('cancelled')}</span>
               <span role="cell" className={styles.cellText}>{jstShort(entry.updatedAt)}</span>
-            </div>
+            </EventRosterRow>
           ))}
           {cancelRows.length === 0 ? <p className={styles.empty}>キャンセルはありません。</p> : null}
-        </div>
-      </section>
+        </EventRosterTable>
+      </EventRosterCard>
 
       {canBroadcast ? (
-        <section className={`${styles.card} ${styles.cardPadded}`} aria-labelledby="ev-bk-broadcast">
-          <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle} id="ev-bk-broadcast">お知らせを送る</h2>
-            <p className={styles.cardNote}>この回の申込者へ LINE でまとめて送ります（送ったお知らせは取り消せません）</p>
-          </div>
+        <EventRosterCard title="お知らせを送る" id="ev-bk-broadcast" note="この回の申込者へ LINE でまとめて送ります（送ったお知らせは取り消せません）">
           <div className={styles.field}>
             <label className={styles.label} htmlFor="ev-bk-message">申込者へ送るメッセージ</label>
             <div className={styles.broadcastRow}>
-              <input
+              <TextField
+                className={styles.messageInput}
                 id="ev-bk-message"
                 value={broadcastMessage}
                 onChange={(e) => setBroadcastMessage(e.target.value)}
                 placeholder="当日は動きやすい服装でお越しください"
-                className={styles.input}
               />
-              <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} busy={broadcastBusy} busyLabel="確かめています…">
-                送る
+              <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} aria-busy={broadcastBusy || undefined}>
+                {broadcastBusy ? '確認中…' : '送る'}
               </Button>
             </div>
           </div>
           {broadcastError ? <p className={styles.error} role="alert">{broadcastError}</p> : null}
-        </section>
+        </EventRosterCard>
       ) : null}
       </div>
 
@@ -689,11 +658,11 @@ function Bookings({ eventId }: { eventId: string }) {
         {rejectApplicant ? (
           <label className={styles.dialogLabel}>
             断る理由（任意・内部メモ）
-            <textarea
+            <TextArea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               rows={2}
-              className={styles.textarea}
+
             />
           </label>
         ) : null}
@@ -772,11 +741,11 @@ function Bookings({ eventId }: { eventId: string }) {
             ) : null}
             <label className={styles.dialogLabel}>
               理由（必須・記録に残ります）
-              <textarea
+              <TextArea
                 value={waitlistReason}
                 onChange={(e) => setWaitlistReason(e.target.value)}
                 rows={2}
-                className={styles.textarea}
+
               />
             </label>
           </>
