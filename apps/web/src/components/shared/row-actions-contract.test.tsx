@@ -13,15 +13,14 @@ const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
 /**
  * #985 LAY-18: 一覧の操作をアプリ全体で同じルールにする。
  *
- * - 「詳細」は操作欄の先頭、「編集」はその次。どちらも枠付きの
- *   補助ボタン（共通 Button）で、文字は1行。
- * - 複製・停止・アーカイブなどは「⋯」メニューへ集約する。
+ * - 「詳細」は操作欄の先頭の補助ボタン。文字は1行。
+ * - 編集・複製・停止・アーカイブなどは「⋯」メニューへ集約する（B-193）。
  * - 削除など元に戻せない操作は区切りの後・赤で必ず最後。
  * - 押せない操作は無効状態と具体的な理由を示す。
  * - タッチ端末では操作領域44px以上を確保する。
  */
 describe('RowActions 一覧の操作の共通ルール（#985 LAY-18）', () => {
-  it('「詳細」→「編集」→「⋯」の順で出す', () => {
+  it('詳細と「…」を出し、編集は閉じた行に出さない', () => {
     const html = renderToStaticMarkup(
       <RowActions
         subjectName="来店お礼"
@@ -30,14 +29,9 @@ describe('RowActions 一覧の操作の共通ルール（#985 LAY-18）', () => 
         menuItems={[{ id: 'copy', label: '複製する', onSelect: vi.fn() }]}
       />,
     )
-    const detailAt = html.indexOf('詳細')
-    const editAt = html.indexOf('編集')
-    const moreAt = html.indexOf('来店お礼のその他操作')
-    expect(detailAt).toBeGreaterThan(-1)
-    expect(editAt).toBeGreaterThan(-1)
-    expect(moreAt).toBeGreaterThan(-1)
-    expect(detailAt).toBeLessThan(editAt)
-    expect(editAt).toBeLessThan(moreAt)
+    expect(html).toContain('詳細')
+    expect(html).not.toContain('編集')
+    expect(html).toContain('来店お礼のその他操作')
     // 「⋯」は閉じた状態で aria-expanded="false" を持つ。
     expect(html).toContain('aria-expanded="false"')
   })
@@ -76,7 +70,7 @@ describe('RowActions 一覧の操作の共通ルール（#985 LAY-18）', () => 
     // 並べ替えと区切りは「…」の部品（RowMenu の orderRowMenuItems）が持つ。動きは row-menu.react.test.tsx。
     expect(src).toContain('items={orderRowMenuItems(items)}')
     // destructiveItem を menuItems の後ろへ連結する（途中に挟まない）。
-    expect(src).toContain('[...menuItems, { ...destructiveItem')
+    expect(src).toContain('[...normalItems, { ...destructiveItem')
   })
 
   it('押せない操作は無効状態と具体的な理由をメニューに出す', () => {

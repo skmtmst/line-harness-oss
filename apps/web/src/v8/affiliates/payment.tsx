@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 成果とアフィリエイト「支払い」（板 `aINnz`、期間を締めるの確かめは `usDpO`）。
  *
@@ -375,12 +377,12 @@ export default function PaymentTab() {
             const gross = item.grossAmount ?? item.amount + (item.deduction ?? 0)
             return (
               <Tr key={item.affiliateId} className={styles.row} data-table-layout="columns">
-                <Td className={styles.colName}>
+                <Td className={styles.colName}><FolderDotName>
                   <span className={styles.stack}>
                     <button type="button" className={styles.rowName} title={item.affiliateName} onClick={() => setConfirmTarget({ id: item.affiliateId, name: item.affiliateName })}>{item.affiliateName}</button>
-                    <span className={styles.rowPlan}>{`コード ${item.code}`}</span>
+
                   </span>
-                </Td>
+                </FolderDotName></Td>
                 <Td className={`${styles.colPayAmount} ${styles.num}`}>
                   <span className={styles.stackEnd}>
                     <span className={styles.cellNum}>{formatYen(item.amount)}</span>

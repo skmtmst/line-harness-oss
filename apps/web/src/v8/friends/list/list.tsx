@@ -1,5 +1,8 @@
 'use client'
 
+import TagOverflow from '@/components/shared/tag-overflow'
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 友だち一覧（Pencil `x6QsVz`：閲覧のみ。いつもの形は同じ板からボタンを出したもの）。
  *
@@ -808,13 +811,7 @@ export default function FriendsListV8() {
                   )}
                 </Td>
                 <Td className={styles.td}>
-                  <div className={styles.friendCell}>
-                    <Avatar name={friend.displayName} src={friend.pictureUrl} size={32} />
-                    <div className={styles.friendText}>
-                      <Link href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</Link>
-                      <span className={styles.sub}>{monthDay(friend.createdAt)}に登録</span>
-                    </div>
-                  </div>
+                  <FolderDotName><Link href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</Link></FolderDotName>
                 </Td>
                 {visible.has('support') ? (
                   <Td className={styles.td}>
@@ -843,8 +840,8 @@ export default function FriendsListV8() {
                 {visible.has('tags') ? (
                   <Td className={styles.td}>
                     <div className={styles.tags} title={friend.tags.map((tag) => tag.name).join('・') || undefined}>
-                      {tags.shown.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="sm" />)}
-                      {tags.rest > 0 ? <span className={styles.tagRest}>+{tags.rest}</span> : null}
+                      <TagOverflow>{friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="sm" />)}</TagOverflow>
+
                       {friend.tags.length === 0 ? <span className={styles.faint}>—</span> : null}
                     </div>
                   </Td>

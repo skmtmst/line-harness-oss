@@ -1,5 +1,7 @@
 'use client'
 
+import { RowActions } from '@/components/shared/row-actions'
+
 import { Fragment, useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
 import {
@@ -177,7 +179,6 @@ export function asReportV2(raw: unknown): ReportV2 | null {
   if (!Array.isArray(value.byOffer) || !Array.isArray(value.conversionsByPoint)) return null
   return value as ReportV2
 }
-
 
 export interface JourneySummary {
   friendId: string
@@ -2783,12 +2784,7 @@ function OffersList({
                 <span className="text-ink-faint block text-xs">確定 {formatYen(offerStats.get(offer.id)?.reward ?? 0)}</span>
               </td>
               <td className="px-4 py-3 text-right whitespace-nowrap">
-                <button
-                  onClick={() => onEdit(offer)}
-                  className="text-action text-xs font-medium hover:underline"
-                >
-                  編集
-                </button>
+                <RowActions edit={{ onClick: () => onEdit(offer) }} />
                 <button
                   onClick={() => onTerms(offer)}
                   className="text-action ml-2 text-xs font-medium hover:underline"
@@ -3095,7 +3091,6 @@ export function OffersTab() {
   )
 }
 
-
 /**
  * 支払いの取り決めの編集。
  *
@@ -3168,7 +3163,7 @@ export function SettlementEditor({
               setSaved(false)
             }}
             placeholder="partner@example.com"
-            className="w-full rounded-mini border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-action"
+            className="w-full rounded-mini border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-focus-ring"
           />
         </div>
         <div>
@@ -3190,7 +3185,7 @@ export function SettlementEditor({
                 setSaved(false)
               }}
               placeholder="なし"
-              className="w-full rounded-mini border border-hairline px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-action"
+              className="w-full rounded-mini border border-hairline px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-focus-ring"
             />
             <span className="whitespace-nowrap text-xs text-ink-faint">日</span>
           </div>
@@ -3212,7 +3207,7 @@ export function SettlementEditor({
             }}
             placeholder="例: 月末締め翌月末払い"
             maxLength={100}
-            className="w-full rounded-mini border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-action"
+            className="w-full rounded-mini border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-focus-ring"
           />
         </div>
       </div>

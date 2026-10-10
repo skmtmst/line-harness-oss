@@ -262,7 +262,7 @@ describe('N-411 項目別権限と画面の一致（実React）', () => {
     render(<BookingStaffPage />)
     await screen.findByText('佐藤')
     expect((screen.getByRole('button', { name: '＋ スタッフを作る' }) as HTMLButtonElement).disabled).toBe(false)
-    expect(screen.getByText('編集')).toBeTruthy()
+    expect(screen.queryByText('編集')).toBeNull()
     // 削除は行に直に置かず、…メニューの中の危ない操作にある。
     expect(screen.queryByRole('menuitem', { name: '削除する' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '佐藤のその他操作' }))
@@ -287,7 +287,8 @@ describe('N-411 項目別権限と画面の一致（実React）', () => {
     fixture.listStaff.mockResolvedValue({ staff: [STAFF_ROW] })
     render(<BookingStaffPage />)
     await screen.findByText('佐藤')
-    fireEvent.click(screen.getByText('編集'))
+    fireEvent.click(screen.getByRole('button', { name: '佐藤のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '編集する' }))
     await screen.findByText('スタッフ編集')
     // 共有 Select（button + listbox）。開いて選択肢のボタンを押す。
     fireEvent.click(await screen.findByRole('button', { name: 'ログインユーザーとの紐づけ' }))

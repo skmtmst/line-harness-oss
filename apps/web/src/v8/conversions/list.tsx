@@ -211,7 +211,8 @@ function TableHead() {
     <thead>
       <TableHeadRow className={styles.headRow} data-table-layout="columns">
         <Th className={styles.colName}>成果地点</Th>
-        <Th className={styles.colTrigger}>何が起きたら数えるか</Th>
+        <Th>状態</Th>
+            <Th className={styles.colTrigger}>何が起きたら数えるか</Th>
         <Th className={styles.colCount} align="right">この30日</Th>
         <Th className={styles.colValue} align="right">金額</Th>
         <Th className={styles.colUsage}>使われている場所</Th>
@@ -234,7 +235,8 @@ function ListSkeleton() {
               {[0, 1, 2, 3, 4].map((index) => (
                 <Tr key={index} className={styles.row} data-table-layout="columns">
                   <Td className={styles.colName}><Skeleton className={styles.skeletonName} /></Td>
-                  <Td className={styles.colTrigger}><Skeleton className={styles.skeletonName} /></Td>
+                  <Td><Skeleton className={styles.skeletonName} /></Td>
+                    <Td className={styles.colTrigger}><Skeleton className={styles.skeletonName} /></Td>
                   <Td className={styles.colCount}><Skeleton className={styles.skeletonNum} /></Td>
                   <Td className={styles.colValue}><Skeleton className={styles.skeletonNum} /></Td>
                   <Td className={styles.colUsage}><Skeleton className={styles.skeletonName} /></Td>
@@ -1090,8 +1092,9 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                         {point.name}
                       </button>
                       </FolderDotName>
-                      <span className={narrow ? undefined : styles.pillIndent}><StatePill point={point} /></span>
+
                     </Td>
+                    <Td><StatePill point={point} /></Td>
                     <Td className={styles.colTrigger}>
                       <span className={styles.cellMain} title={sourceTriggerLabel(point)}>{shortTrigger(point)}</span>
                       <span className={styles.cellSub} title={rowSub(point)}>{rowSub(point)}</span>

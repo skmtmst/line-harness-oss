@@ -1,5 +1,7 @@
 'use client'
 
+import { RowActions } from '@/components/shared/row-actions'
+
 import { X } from 'lucide-react'
 import StickyBar from '@/components/shared/sticky-bar'
 
@@ -953,13 +955,7 @@ function SlotsTab({
                   </Td>
                   <ActionCell>
                     <div className="flex items-center justify-end gap-3">
-                      <button
-                        onClick={() => setEditSlotTarget(s)}
-                        disabled={busy}
-                        className="text-action text-xs hover:underline disabled:opacity-30 disabled:no-underline"
-                      >
-                        編集
-                      </button>
+                      <RowActions edit={{ onClick: () => setEditSlotTarget(s), disabled: busy }} />
                       <button
                         onClick={() => { setDeleteSlotError(''); setDeleteSlotTarget(s) }}
                         disabled={busy || (s.active_count ?? 0) > 0}

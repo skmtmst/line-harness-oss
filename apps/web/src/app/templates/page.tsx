@@ -1,5 +1,7 @@
 'use client'
 
+import { RowActions } from '@/components/shared/row-actions'
+
 import Select from '@/components/shared/select'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -859,7 +861,6 @@ function TemplatesPageV7() {
         }
       />
 
-
       {/*
         ★V7 `x63W5x`：一覧の失敗でページ上の帯は出さない。一覧の場所の
         ListState error だけにまとめる。入力・保存の失敗の知らせは別に残す。
@@ -1139,15 +1140,9 @@ function TemplatesPageV7() {
                         onClick={(e) => e.stopPropagation()}
                       >
                         {canMutateTemplates && (
-                          <Button
-                            href={
-                              t.question
+                          <RowActions edit={{ href: t.question
                                 ? `/templates/questions/new?id=${encodeURIComponent(t.id)}`
-                                : `/templates/edit?id=${encodeURIComponent(t.id)}`
-                            }
-                          >
-                            編集
-                          </Button>
+                                : `/templates/edit?id=${encodeURIComponent(t.id)}` }} />
                         )}
                         <MoreAction
                           label={`${t.name}のその他操作`}

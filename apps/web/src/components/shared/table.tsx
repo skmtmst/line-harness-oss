@@ -1,3 +1,4 @@
+import { FolderDotName, type FolderDotFolder } from './folder-dot'
 import React from 'react'
 import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes, CSSProperties } from 'react'
 import shell from './data-table.module.css'
@@ -219,23 +220,15 @@ export function Td({ children, align = 'left', className, collapseAt, grow, ...c
   return <td className={classes} data-align={align} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} {...cellProps}>{children}</td>
 }
 
-/** 名前・副題・注記を同じ列にまとめる先頭セル。 */
-export function NameCell({
-  name,
-  sub,
-  memo,
-  className,
-}: {
+/** B-194: 名前のセルはフォルダの丸と名前1行だけ。 */
+export function NameCell({ name, folder, className }: {
   name: ReactNode
-  sub?: ReactNode
-  memo?: ReactNode
+  folder?: FolderDotFolder | null
   className?: string
 }) {
   return (
-    <td className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
-      <div className={shell.name}>{name}</div>
-      {sub ? <div className={shell.sub}>{sub}</div> : null}
-      {memo ? <div className={shell.memo}>{memo}</div> : null}
+    <td data-list-name-cell="" className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
+      <div className={shell.name}><FolderDotName folder={folder}>{name}</FolderDotName></div>
     </td>
   )
 }

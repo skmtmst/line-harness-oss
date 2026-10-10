@@ -71,7 +71,6 @@ const FOLDERS: Array<{ key: FolderKey; label: string; match: (o: AffiliateOffer)
   { key: 'none', label: '動きが未設定', match: (o) => !o.tagId && !o.scenarioId && o.rewardMiles === 0 },
 ]
 
-
 const SAVED_VIEWS: Array<{ value: string; label: string; filters: FilterKey[]; sort: 'newest' | 'name' | 'reward'; folder?: FolderKey }> = [
   { value: '', label: 'よく使う絞り込み', filters: [], sort: 'newest' },
   { value: 'open-reward', label: '公開中・報酬が高い順', filters: ['open'], sort: 'reward' },
@@ -462,7 +461,7 @@ export default function OffersTab() {
       <DataTable className={`${styles.table} ${styles.tableOffers}`}>
         <thead>
           <TableHeadRow className={styles.headRow} data-table-layout="columns">
-            <Th className={styles.colName}>案件</Th>
+            <Th className={styles.colName}>案件</Th><Th>状態</Th>
             <Th className={styles.colOfferReward}>報酬</Th>
             <Th className={styles.colOfferAction}>成果が出たときの動き</Th>
             <Th className={`${styles.colOfferPeople} ${styles.num}`}>紹介している人</Th>
@@ -484,9 +483,10 @@ export default function OffersTab() {
                         <button type="button" className={styles.rowName} title={offer.name} onClick={() => { setEditTarget(offer); setFormOpen(true) }}>{offer.name}</button>
                       )}
                     </FolderDotName>
-                    <span className={styles.rowPlan} title={offer.description ?? undefined}>{offer.description ?? '説明はありません'}</span>
+
                   </span>
                 </Td>
+                <Td><StatusPill tone={offer.isActive ? 'active' : 'neutral'}>{offer.isActive ? '公開中' : '下書き'}</StatusPill></Td>
                 <Td className={styles.colOfferReward}>
                   <span className={styles.stack}>
                     <span className={styles.cellNum}>{rewardText(offer)}</span>
@@ -507,10 +507,7 @@ export default function OffersTab() {
                 </Td>
                 <Td className={styles.colOfferOps}>
                   <span className={styles.rowActions}>
-                    {readonly ? null : (
-                      <Button type="button" onClick={() => { setEditTarget(offer); setFormOpen(true) }}>編集</Button>
-                    )}
-                    <StatusPill tone={offer.isActive ? 'active' : 'neutral'}>{offer.isActive ? '公開中' : '下書き'}</StatusPill>
+
                     <RowMenu
                       label={`${offer.name}の操作`}
                       items={[

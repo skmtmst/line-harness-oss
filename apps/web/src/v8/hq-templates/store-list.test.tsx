@@ -83,13 +83,13 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     expect(host.innerHTML).toContain('#8b5cf6')
   })
 
-  it('タグ名はフォルダ色の札で出し、押すと詳細を開く', async () => {
+  it('タグ名はフォルダ色の丸と1行の名前で出し、押すと詳細を開く', async () => {
     const onOpen = vi.fn()
     await render({ type: 'tag', onOpen, folders: [{ id: 'f-1', name: 'お問い合わせ', revision: 1, color: '#8b5cf6' }] })
-    const pill = host.querySelector('[role="group"][aria-label="タグ「秋の新商品」"]')!
-    expect(pill).toBeTruthy()
-    expect(pill.querySelector('[aria-hidden="true"]')!.getAttribute('style')).toContain('#8b5cf6')
-    await act(async () => { (pill.closest('button') as HTMLButtonElement).click() })
+    const name = host.querySelector('[data-list-name]')!
+    expect(name.textContent).toBe('秋の新商品')
+    expect(name.querySelector('[data-folder-dot]')!.getAttribute('style')).toContain('#8b5cf6')
+    await act(async () => { name.querySelector<HTMLButtonElement>('button')!.click() })
     expect(onOpen).toHaveBeenCalledWith(ROWS[0])
   })
 

@@ -1,5 +1,7 @@
 'use client'
 
+import { RowActions } from '@/components/shared/row-actions'
+
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -1147,12 +1149,7 @@ function VarsPageInner() {
                              （data-qa-open="yPkWe"）のため行に残す。
                             */}
                             <span className="flex w-full items-center justify-end gap-2">
-                              <Button
-                                href={`/contents/vars/edit?id=${item.id}`}
-                                size="compact"
-                              >
-                                編集
-                              </Button>
+                              <RowActions edit={{ href: `/contents/vars/edit?id=${item.id}` }} />
                               <Button
                                 type="button"
                                 size="compact"

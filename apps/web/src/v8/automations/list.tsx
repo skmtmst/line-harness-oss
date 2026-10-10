@@ -222,7 +222,6 @@ export default function AutomationListV8() {
     }
   }, [selectedAccountId])
 
-
   useEffect(() => {
     if (accountLoading) return
     void load()
@@ -523,9 +522,7 @@ export default function AutomationListV8() {
                     </Td>
                     <Td className={styles.colOps}>
                       <div className={styles.opsBox}>
-                        {canEdit
-                          ? <Button onClick={() => void openEditor(item.id, false)} disabled={busy}>編集する</Button>
-                          : <span className={styles.editSpace} aria-hidden="true" />}
+
                         <RowMenu
                           label={menuLabel}
                           open={openMenuId === item.id}

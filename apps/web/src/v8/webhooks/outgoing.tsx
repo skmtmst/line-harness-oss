@@ -606,10 +606,7 @@ export default function WebhooksOutgoingV8() {
                     : completedAt ? `最後 ${shortDateTime(completedAt)}` : null
                   return (
                     <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
-                      <Td grow className={styles.colName}>
-                        {nameNode}
-                        <span className={`${styles.sub} ${styles.nameSub}`} title={`${when} → ${item.url}`}>{target}</span>
-                      </Td>
+                      <Td grow className={styles.colName}>{nameNode}</Td>
                       <Td className={styles.colMonth}>
                         <span className={styles.num}>{`${formatNumber(item.deliverySummary.total)} 回`}</span>
                         {countSub ? <span className={styles.numSub}>{countSub}</span> : null}
@@ -650,7 +647,7 @@ export default function WebhooksOutgoingV8() {
                           <span className={styles.name} title={item.name}>{item.name}</span>
                         )}
                       </FolderDotName>
-                      <span className={`${styles.sub} ${styles.nameSub}`} title={item.url}>{maskedUrl(item.url)}</span>
+
                     </Td>
                     <Td className={styles.colWhen}><span className={styles.cellText} title={when}>{when}</span></Td>
                     <Td className={styles.colPayload}><span className={styles.cellText} title={payload}>{payload}</span></Td>

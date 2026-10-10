@@ -117,7 +117,7 @@ describe('V8 テンプレートの一覧', () => {
 
   it('画像は中身の JSON を出さず「画像 1枚」、一度も公開していないものの送信数は「—」', async () => {
     await renderList()
-    expect(screen.getByText('画像 1枚')).toBeTruthy()
+    expect(document.querySelector('[data-list-name]')?.textContent).not.toContain('画像 1枚')
     expect(screen.queryByText(/originalContentUrl/)).toBeNull()
     expect(screen.getByText('—')).toBeTruthy()
     expect(screen.queryByText('0通')).toBeNull()

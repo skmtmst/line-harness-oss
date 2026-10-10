@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 マイル「行動スコア」（板 `IRPw8`、点数を手で直す `Nv7An`、
  * 点数の変化の明細 `R8NNi`、状態は見本帳 `zaqP9`）。
@@ -510,7 +512,7 @@ export default function ScoreTab() {
             const reason = actionScoreReasonLabel(item.lastReason)
             return (
               <Tr key={item.friendId} className={styles.row} data-table-layout="columns">
-                <Td className={styles.colName}><span className={styles.rowName} title={item.displayName}>{item.displayName}</span></Td>
+                <Td className={styles.colName}><FolderDotName><span className={styles.rowName} title={item.displayName}>{item.displayName}</span></FolderDotName></Td>
                 <Td className={styles.colScore}><span className={styles.scoreNum}>{formatMileageNumber(item.currentScore)}</span></Td>
                 <Td className={styles.colBand}>
                   <span className={styles.pill} data-tone={BAND_TONE[item.band]}>
@@ -649,10 +651,10 @@ export default function ScoreTab() {
                 const stopped = !rule.enabled
                 return (
                   <Tr key={rule.id} className={styles.row} data-table-layout="columns">
-                    <Td className={styles.colName}>
+                    <Td className={styles.colName}><FolderDotName>
                       <span className={styles.rowNameInk} title={rule.name}>{rule.name}</span>
-                      <span className={styles.rowSub}>{frequencyText(rule)}</span>
-                    </Td>
+
+                    </FolderDotName></Td>
                     <Td className={styles.colGives}><span className={styles.cellMain}>{ruleValueText(rule)}</span></Td>
                     <Td className={styles.colStateWide}>
                       <span className={styles.pill} data-tone={stopped ? 'neutral' : changed ? 'warn' : 'active'}>

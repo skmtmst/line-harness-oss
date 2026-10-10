@@ -1,5 +1,8 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+import { RowActions } from '@/components/shared/row-actions'
+
 /*
  * ★V8 LINE通知（Pencil `g3iDs`。運用者へのお知らせ `u8xibp`・送れなかったもの `DrwMm`・記録 `PZBVb`）。
  *
@@ -1358,13 +1361,13 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
               const sent = sendCountsFailed ? null : sent30dOf(setting.eventType)
               const name = setting.title?.trim() || setting.label
               return <Tr key={setting.eventType}>
-                <Td><span className={styles.name} title={`${name}（${deliveryWords(setting).trigger}）`}>{deliveryWords(setting).trigger || name}</span></Td>
+                <Td><FolderDotName>{canManage ? <button type="button" className={styles.name} title={name} aria-label={`${name}の内容を編集`} onClick={() => setExpanded(setting.eventType)}>{deliveryWords(setting).trigger || name}</button> : <span className={styles.name} title={name}>{deliveryWords(setting).trigger || name}</span>}</FolderDotName></Td>
                 <Td className={styles.cell} title={timingLabel(setting)}>{timingLabel(setting)}</Td>
                 <Td className={styles.cell} title={audienceLabel(setting)}>{audienceLabel(setting)}</Td>
                 <Td><span className={`${styles.num} ${sent ? styles.numStrong : styles.numFaint}`} title={sendCountsFailed ? '送信件数を読み込めませんでした' : undefined}>{sendCountsFailed ? '取得失敗' : sent ? formatNumber(sent) : '—'}</span></Td>
                 <Td><StatusBadge tone={status.tone === 'good' ? 'success' : status.tone === 'warn' ? 'warning' : 'neutral'}>{status.label}</StatusBadge></Td>
                 <Td>{canManage ? <NotificationToggle setting={setting} busy={busy === setting.eventType} onToggle={() => setPendingToggle(setting)} /> : <span className={styles.minor}>{setting.isEnabled ? 'オン' : 'オフ'}</span>}</Td>
-                <Td className={styles.actions}>{canManage ? <Button variant="secondary" onClick={() => setExpanded(setting.eventType)} aria-label={`${name}の内容を編集`}>内容を編集</Button> : null}</Td>
+                <Td className={styles.actions}>{canManage ? <RowActions edit={{ onClick: () => setExpanded(setting.eventType) }} /> : null}</Td>
               </Tr>
             })}
           </tbody>

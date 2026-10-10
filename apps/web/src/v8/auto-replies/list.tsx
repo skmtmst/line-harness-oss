@@ -1,6 +1,5 @@
 'use client'
 
-
 import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar, { ListToolbarOptional } from '@/components/shared/list-toolbar'
@@ -28,7 +27,6 @@ import {
   ChevronDown,
   CircleCheck,
   CircleHelp,
-  Clock,
   Copy,
   Folder as FolderIcon,
   Layers,
@@ -69,6 +67,7 @@ import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import SortSelect from '@/components/ui/sort-select'
 import FilterChip from '@/components/shared/filter-chip'
+import TagOverflow from '@/components/shared/tag-overflow'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -89,8 +88,6 @@ import {
   autoReplyMatchesQuery,
   conditionChips,
   responseTypeWord,
-  scheduleChipLabels,
-  scheduleText,
   stopNote,
   templateWord,
   triggerSummary,
@@ -212,7 +209,6 @@ function displayName(r: AutoReply): string {
 
 /** 閲覧のみでも出す行の「…」の項目（見るだけのもの）。 */
 const VIEW_ONLY_MENU_IDS = new Set(['runs'])
-
 
 /* 作るボタン（板 `uE9gf` の ▾）。窓は1つだけ置き、押したボタンの位置に出す。 */
 function CreateRuleButton({ full, compact, disabled, disabledTitle, menuOpen, onOpenMenu }: {
@@ -365,7 +361,6 @@ export default function AutoRepliesListV8() {
       // 置き場が取れなくても一覧は出す。取れない失敗で画面を落とさない。
     }
   }, [])
-
 
   useEffect(() => { load() }, [load])
   useEffect(() => { void loadFolders() }, [loadFolders])
@@ -1168,13 +1163,6 @@ export default function AutoRepliesListV8() {
               const name = displayName(r)
               const conflicts = r.conflictAttentionCount ?? 0
               const actions = actionSummary(r)
-              // 曜日・時間帯は札にせず条件の行の中に書く（絵どおり）。それ以外の札だけ残す。
-              const trigger = triggerSummary(r)
-              const schedule = scheduleText(r)
-              const scheduleLabels = scheduleChipLabels(r)
-              const extraChips = conditionChips(r).filter(
-                (label) => !scheduleLabels.includes(label),
-              )
               const tpl = templateWord(
                 r.templateId,
                 templateById.get(r.templateId ?? '')?.name ?? null,
@@ -1220,10 +1208,9 @@ export default function AutoRepliesListV8() {
                       <span aria-hidden>⠿</span>
                     </ReorderHandle>}
                   </Td>
-                  <NameCell
-                    name={<div className={styles.nameRow}>
-                      <FolderDotName folder={folderDotOf(r)}>
-                        <Link
+                  <NameCell name={<div className={styles.nameRow}>
+                      <>
+                        {canEdit ? <Link
                           href={`/auto-replies/edit?id=${r.id}`}
                           title={name}
                           className={styles.cellTitle}
@@ -1235,42 +1222,10 @@ export default function AutoRepliesListV8() {
                           }}
                         >
                           {name}
-                        </Link>
-                      </FolderDotName>
-                      {conflicts > 0 && (
-                        <button
-                          type="button"
-                          className={styles.miniBadgeWarn}
-                          title="同じ受信に先に当たるルールがあります。押すと重なりのあるルールだけを表示します"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setConflictOnly(true)
-                            setPage(1)
-                          }}
-                        >
-                          <span>重なり {conflicts}</span>
-                        </button>
-                      )}
-                    </div>}
-                    sub={<span className={narrow ? undefined : styles.dotIndent} title={schedule ? `${trigger.title} ／ ${schedule}` : trigger.title}>
-                      {trigger.text}
-                      {schedule ? (
-                        <>
-                          {' '}
-                          <Clock size={11} aria-hidden="true" className={styles.cellSubIcon} />
-                          {' '}{schedule}
-                        </>
-                      ) : null}
-                    </span>}
-                    memo={extraChips.length > 0 ? (
-                      <div className={narrow ? undefined : styles.dotIndent}>
-                        {extraChips.map((label) => (
-                          <span key={label} className={styles.condChip} title={label}>
-                            {label}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
+                        </Link> : <button type="button" className={styles.cellTitle} title={name} onClick={(event) => { event.stopPropagation(); setPanelId(r.id) }}>{name}</button>}
+                      </>
+
+                    </div>} folder={folderDotOf(r)}
                   />
                   <Td className={styles.middleCell}>
                     {/* 絵 uE9gf：1行目「テキストで返す」／「テンプレート『〇〇』」、2行目「＋対応マーク・担当者へ通知」／「なし」。 */}
@@ -1303,6 +1258,20 @@ export default function AutoRepliesListV8() {
                       <span style={{ width: 6, height: 6, borderRadius: 'var(--radius-pill)', background: 'currentColor' }} aria-hidden="true" />
                       {r.isActive ? '有効' : '停止中'}
                     </span>
+                      {conflicts > 0 && (
+                        <button
+                          type="button"
+                          className={styles.miniBadgeWarn}
+                          title="同じ受信に先に当たるルールがあります。押すと重なりのあるルールだけを表示します"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setConflictOnly(true)
+                            setPage(1)
+                          }}
+                        >
+                          <span>重なり {conflicts}</span>
+                        </button>
+                      )}
                     {!r.isActive && r.stopReason && (
                       <p className={styles.stateSub} style={{ maxWidth: 140 }} title={stopNote(r) ?? ''}>
                         {r.stopReason}
@@ -1352,9 +1321,9 @@ export default function AutoRepliesListV8() {
               hasNext={panelIndex < items.length - 1}
               footer={
                 <>
-                  <Button variant="primary" onClick={() => goEdit(panelRow.id)}>
+                  {canEdit && <Button variant="primary" onClick={() => goEdit(panelRow.id)}>
                     開く
-                  </Button>
+                  </Button>}
                   <Button
                     variant="secondary"
                     onClick={() =>
@@ -1395,6 +1364,8 @@ export default function AutoRepliesListV8() {
                 </>
               }
             >
+              <p title={trigger.title}>{trigger.text}</p>
+              <TagOverflow label="すべての応答条件">{conditionChips(panelRow).map((label) => <span key={label} className={styles.condChip} title={label}>{label}</span>)}</TagOverflow>
               <p>
                 {panelRow.isActive ? '有効' : '停止中'} ／ 今月 {panelRow.hits?.period ?? '—'}回 ／
                 累計 {panelRow.hits?.total ?? '—'}回

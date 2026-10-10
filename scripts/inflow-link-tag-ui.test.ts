@@ -7,6 +7,7 @@ const page = readFileSync(
   resolve(root, 'apps/web/src/app/inflow-links/page.tsx'),
   'utf8',
 );
+const v8List = readFileSync(resolve(root, 'apps/web/src/v8/inflow-links/list.tsx'), 'utf8');
 const listStyles = readFileSync(
   resolve(root, 'apps/web/src/app/inflow-links/inflow-list-v8.module.css'),
   'utf8',
@@ -39,7 +40,8 @@ describe('inflow link tag auto-assignment UI wiring', () => {
       expect(rule, cell).toContain('text-overflow: ellipsis');
       expect(rule, cell).toContain('white-space: nowrap');
     }
-    expect(page).toContain('title={r.refCode}');
+    expect(page).not.toContain('title={r.refCode}')
+    expect(v8List).toContain('<FolderDotName');
     expect(page).not.toContain('min-w-[1180px]');
     expect(page).not.toContain('font-mono text-blue-600 break-all');
   });

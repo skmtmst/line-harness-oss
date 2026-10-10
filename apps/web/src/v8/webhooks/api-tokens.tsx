@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 外部連携「API 接続」タブ（Pencil `ralAc`）と、発行した直後の窓（`UkZLi`「鍵を発行しました」）。
  *
@@ -542,7 +544,7 @@ export default function WebhooksApiTokensV8() {
                   const scopeText = token.scopes.map(scopeLabel).join('・')
                   return (
                     <Tr key={token.id} data-table-layout="columns" data-ctx-row={token.id}>
-                      <Td className={styles.colName} title={token.name}>{token.name}</Td>
+                      <Td className={styles.colName} title={token.name}><FolderDotName>{token.name}</FolderDotName></Td>
                       <Td className={styles.colScopes} title={scopeText}>{scopeText}</Td>
                       <Td className={styles.colCreated}>{tokenDate(token.createdAt)}</Td>
                       <Td className={styles.colUsed}>{tokenUsedAt(token.lastUsedAt)}</Td>

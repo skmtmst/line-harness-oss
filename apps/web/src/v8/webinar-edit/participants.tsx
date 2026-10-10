@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 ウェビナーの参加者（Pencil uNsEy）。
  * 頭（戻る・題・説明・CSV）→ タブ → 数の帯 → 案内の帯 → 道具の段 → 表 → ページ送り。
@@ -196,10 +198,10 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
             const badge = actionBadge(participant)
             return (
               <Tr key={participant.friendId} className={styles.row} data-table-layout="columns">
-                <Td className={styles.colName}>
+                <Td className={styles.colName}><FolderDotName>
                   <Link href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`} title={name} className={styles.name}>{name}</Link>
-                  <span className={styles.sub}>{`${joinNote(participant)}${joinKindLabel(participant)}`}</span>
-                </Td>
+
+                </FolderDotName></Td>
                 <Td className={styles.colWhen}><span className={styles.main}>{shortDateTime(participant.latestJoinedAt)}</span></Td>
                 <Td className={styles.colWatch}>
                   <span className={styles.main}>{participant.maxWatchedSeconds > 0 ? `${fmtJaDuration(participant.maxWatchedSeconds)}（${rate}%）` : '—'}</span>

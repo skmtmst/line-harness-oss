@@ -1,3 +1,4 @@
+import { FolderDotName, type FolderDotFolder } from './folder-dot'
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react'
 import styles from './grid-table.module.css'
 
@@ -42,4 +43,13 @@ export function GridRow({ children, className, ...props }: HTMLAttributes<HTMLDi
 
 export function GridCell({ children, className, ...props }: HTMLAttributes<HTMLSpanElement>) {
   return <span role="cell" className={[styles.cell, className].filter(Boolean).join(' ')} {...props}>{children}</span>
+}
+
+/** B-194: grid で描く一覧にも表と同じ名前のセルを使う。 */
+export function GridNameCell({ name, folder, className }: {
+  name: ReactNode
+  folder?: FolderDotFolder | null
+  className?: string
+}) {
+  return <GridCell className={className} data-list-name-cell=""><FolderDotName folder={folder}>{name}</FolderDotName></GridCell>
 }

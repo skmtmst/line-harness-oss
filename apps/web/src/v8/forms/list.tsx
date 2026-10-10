@@ -1222,22 +1222,7 @@ export default function FormsListV8() {
               )
               const row = (
                 <Tr key={form.id} data-row-id={form.id}>
-                  <NameCell
-                    name={
-                      <span className={styles.nameLine}>
-                        <FolderDotName folder={folderDotOf(form.folderId)}>{nameNode}</FolderDotName>
-                        {reviewMode && form.accountScopeReviewRequired ? (
-                          <span className={styles.reviewBadge}>管理者確認</span>
-                        ) : null}
-                        {pendingCount > 0 ? (
-                          <span className={styles.pendingBadge}>
-                            <span className={styles.dot} aria-hidden="true" />
-                            {`後処理の未完 ${pendingCount}`}
-                          </span>
-                        ) : null}
-                      </span>
-                    }
-                    sub={<span className={styles.cellSub} title={sub}>{sub}</span>}
+                  <NameCell name={nameNode} folder={folderDotOf(form.folderId)}
                   />
                   {!narrow && (
                     <Td className={styles.destCell} title={destination}>{destination}</Td>
@@ -1247,6 +1232,8 @@ export default function FormsListV8() {
                       <span className={styles.dot} aria-hidden="true" />
                       {form.isActive ? '公開中' : '下書き'}
                     </span>
+                    {reviewMode && form.accountScopeReviewRequired ? <span className={styles.reviewBadge}>管理者確認</span> : null}
+                    {pendingCount > 0 ? <span className={styles.pendingBadge}>{`後処理の未完 ${pendingCount}`}</span> : null}
                   </Td>
                   <Td className={styles.answerCell}>
                     {reviewMode ? (

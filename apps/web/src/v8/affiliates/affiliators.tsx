@@ -91,7 +91,6 @@ const GROUPS: Array<{ key: GroupKey; label: string; match: (row: AffiliateListRo
   { key: 'stopped', label: '止めている', match: (row) => !row.isActive },
 ]
 
-
 export default function AffiliatorsTab() {
   const samePageUrl = useSamePageUrl()
   const { readonly, narrow, accountId, setCount, focusAffiliateId } = useAffiliateShell()
@@ -517,6 +516,7 @@ export default function AffiliatorsTab() {
               )}
             </Th>
             <Th className={styles.colName}>アフィリエイター</Th>
+            <Th>状態</Th>
             <Th className={`${styles.colLinks} ${styles.num}`}>紹介リンク</Th>
             <Th className={`${styles.colFriends} ${styles.num}`}>友だち追加</Th>
             <Th className={`${styles.colConv} ${styles.num}`}>成果</Th>
@@ -541,11 +541,10 @@ export default function AffiliatorsTab() {
                   <FolderDotName folder={null}>
                     {nameButton(row)}
                   </FolderDotName>
-                  <span className={styles.rowCode} title={row.code}>{row.code}</span>
-                  <span className={styles.rowPlan}>{planText(row)}</span>
-                  <StatusPill tone={row.isActive ? 'active' : 'neutral'}>{row.isActive ? '計測中' : '停止中'}</StatusPill>
+
                 </span>
               </Td>
+              <Td><StatusPill tone={row.isActive ? 'active' : 'neutral'}>{row.isActive ? '計測中' : '停止中'}</StatusPill></Td>
               <Td className={`${styles.colLinks} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.linkCount)}本`}</span></Td>
               <Td className={`${styles.colFriends} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.friendAdds)}人`}</span></Td>
               <Td className={`${styles.colConv} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.totalConversions)}件`}</span></Td>

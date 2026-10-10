@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 メニュー管理（板 `MJoJR`・停止の確認 `MV5Os`・追加と変更 `NkmwU`）。
  *
@@ -161,11 +163,11 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
               const allergens = safeArray(item.allergens_json)
               return (
                 <Tr key={item.id} className={styles.row}>
-                  <Td className={`${styles.td} ${styles.colName}`}>
+                  <Td className={`${styles.td} ${styles.colName}`}><FolderDotName>
                     {canEdit ? (
                       <button type="button" className={styles.name} title={item.name} onClick={() => openEdit(item)}>{item.name}</button>
                     ) : <span className={styles.name} title={item.name}>{item.name}</span>}
-                  </Td>
+                  </FolderDotName></Td>
                   <Td className={styles.td}>{item.kind === 'course' ? 'コース' : '単品'}</Td>
                   <Td className={`${styles.td} ${styles.colPrice}`} align="right">{formatYen(item.price)}</Td>
                   <Td className={styles.td}>{periodLabel(safeArray(item.service_periods_json))}</Td>

@@ -46,12 +46,13 @@ describe('フォルダの色の丸', () => {
 
   it('丸＋名前は1行で、名前の前に丸が来る', () => {
     const html = renderToStaticMarkup(<FolderDotName folder={{ name: '会員', color: '#e07b24' }}>NEN会員</FolderDotName>)
-    expect(html.indexOf('data-folder-dot')).toBeLessThan(html.indexOf('NEN会員'))
+    expect(html.indexOf('data-folder-dot')).toBeLessThan(html.indexOf('>NEN会員'))
   })
 
-  it('dot={false} は丸を置かず名前だけを返す（丸の無い 1152 の板）', () => {
+  it('B-194: dot={false} の古い指定でも丸と名前の1行を出す', () => {
     const html = renderToStaticMarkup(<FolderDotName folder={{ name: '会員', color: '#e07b24' }} dot={false}>NEN会員</FolderDotName>)
-    expect(html).toBe('NEN会員')
+    expect(html).toContain('data-folder-dot')
+    expect(html).toContain('title="NEN会員"')
   })
 
   it('大きさ 8・名前との間 8・説明の行の字下げ 16 は変数で持つ', () => {

@@ -1,5 +1,7 @@
 'use client'
 
+import { RowActions } from '@/components/shared/row-actions'
+
 import '@/app/notifications/readonly-v8.css'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
 
@@ -27,6 +29,7 @@ import {
   type LineNotificationSendCounts,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import {
   canOpenCustomerNotificationKpi,
   customerNotificationKpis,
@@ -630,6 +633,7 @@ function CustomerNotificationEditor({
 }
 
 function LineNotificationsPage() {
+  const canManage = canManageRole(useStaffRole())
   const { selectedAccountId, selectedAccount } = useAccount()
   /*
    * N-340: `loadGeneration` は load() の useEffect の中でしか進まない。
@@ -1263,13 +1267,13 @@ function LineNotificationsPage() {
         : visible.length === 0 ? <ListState kind="empty" title="条件に合うお知らせはありません" description="絞り込みを変えてください。" />
         : <DataTable><thead><tr><Th>お知らせの種類（きっかけ）</Th><Th>いつ送るか</Th><Th>だれに</Th><Th>この30日</Th><Th>状態</Th><Th>出す</Th><Th>内容を編集</Th></tr></thead><tbody>
         {visible.map((setting) => <Tr key={setting.eventType}>
-          <NameCell name={setting.title?.trim() || setting.label} sub={deliveryWords(setting).trigger} />
+          <NameCell name={canManage ? <button type="button" aria-label="内容を編集" onClick={() => setExpanded(setting.eventType)}>{setting.title?.trim() || setting.label}</button> : setting.title?.trim() || setting.label} />
           <Td>{timingLabel(setting)}</Td>
           <Td>{audienceLabel(setting)}</Td>
           <Td>{sendCountsFailed ? '取得失敗' : `${sent30dOf(setting.eventType) ?? '—'}通`}</Td>
           <Td><span className={`whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-semibold ${setting.isEnabled ? 'bg-success-bg text-success' : !setting.isEnabled && isIncomplete(setting) ? 'bg-warning-bg text-warning' : 'bg-canvas-sunken text-ink-faint'}`}>{setting.isEnabled ? '出している' : isIncomplete(setting) ? '文面が未設定' : '止めている'}</span></Td>
           <Td><Toggle setting={setting} busy={busy === setting.eventType} onToggle={() => setPendingToggle(setting)} /></Td>
-          <Td><div className="flex justify-end"><Button variant="secondary" size="compact" onClick={() => setExpanded(setting.eventType)}>内容を編集</Button></div></Td>
+          <Td><div className="flex justify-end"><RowActions edit={canManage ? { onClick: () => setExpanded(setting.eventType) } : undefined} /></div></Td>
         </Tr>)}
         </tbody></DataTable>}
     </section>

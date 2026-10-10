@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 LINEアカウントの乗り換え（Pencil `x2dSNv`）。
  *
@@ -482,14 +484,14 @@ export default function AccountHandoverV8() {
           const name = decision.sourceName ?? decision.from_friend_id
           return (
             <Tr key={decision.id}>
-              <Td className={styles.colName}><div className={styles.nameStack}>
+              <Td className={styles.colName}><FolderDotName><div className={styles.nameStack}>
                 <span className={styles.name} title={name}>{name}</span>
-                <span className={styles.sub}>元の友だち</span>
-              </div></Td>
-              <Td className={styles.colName}><div className={styles.nameStack}>
+
+              </div></FolderDotName></Td>
+              <Td className={styles.colName}><FolderDotName><div className={styles.nameStack}>
                 <span className={styles.name}>{decision.candidateName ?? '候補なし'}</span>
-                <span className={styles.sub}>受け取り先の候補</span>
-              </div></Td>
+
+              </div></FolderDotName></Td>
               <Td className={styles.colEvidence}>{decision.evidenceLabel ?? decision.note ?? '—'}</Td>
               <Td className={styles.colChoice}>
                 {editable ? (

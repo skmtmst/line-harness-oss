@@ -1079,11 +1079,9 @@ export default function BroadcastListV8() {
               }}
             >
               <Td>
-                {/* 左にフォルダの列がある広い板は、名前の前にフォルダの色の丸（絵 l5V9a・NtCE3）。1152（jjFNi）は列が無いので出さない。 */}
-                {narrow ? (isFromHeadquarters(broadcast) ? <div className={styles.titleLine}>{titleLink}<HqMark /></div> : titleLink) : <div className={styles.titleLine}><FolderDotName folder={folderDotOf(broadcast.folderId)}>{titleLink}</FolderDotName>{isFromHeadquarters(broadcast) ? <HqMark /> : null}</div>}
-                <span className={narrow ? styles.cellSub : `${styles.cellSub} ${styles.dotIndent}`}>{messageTypeLabel(broadcast.messageType)}</span>
+                <FolderDotName folder={folderDotOf(broadcast.folderId)}>{titleLink}</FolderDotName>
               </Td>
-              <Td><StatusBadge broadcast={broadcast} /></Td>
+              <Td><StatusBadge broadcast={broadcast} />{isFromHeadquarters(broadcast) ? <HqMark /> : null}</Td>
               {narrow ? null : (
                 <Td><span className={styles.audience} title={audience}>{audience}</span></Td>
               )}

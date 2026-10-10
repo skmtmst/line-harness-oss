@@ -326,7 +326,7 @@ export default function CommonActionsV8() {
                       <FolderDotName folder={null}>
                         <a className={styles.name} href={versionsHref(item.id)} title={item.name} onClick={(event) => { event.preventDefault(); router.push(versionsHref(item.id)) }}>{item.name}</a>
                       </FolderDotName>
-                      <span className={`${styles.sub} ${styles.subIndent}`} title={item.description ?? undefined}>{item.description || '説明はありません'}</span>
+
                     </Td>
                     <Td className={styles.colState}>
                       <span className={styles.pill} data-tone={item.status === 'published' ? 'active' : 'neutral'}>

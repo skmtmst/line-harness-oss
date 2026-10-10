@@ -32,3 +32,9 @@
   white-space: nowrap;
 }
 }
+
+.line { width: 100%; white-space: nowrap; }
+.name { flex: 1; }
+.name :is(a, button) { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-action); }
+
+[data-theme='v8'] [data-list-name] .name :is(a, button) { color: var(--color-action); }

@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * 「今日のお店」の今日の予約の表（E-1 `今日の予約`）。
  * 列：時刻・名前・人数・卓・経路・状態・来店。予約中の行に［✓ 来店］（来店の印の口）と「…」。
@@ -76,7 +78,7 @@ export function TodayTable({ rows, canWrite, busyId, onVisited, onUndo }: {
               return (
                 <Tr key={r.id} className={styles.row} data-table-layout="columns">
                   <Td className={styles.colTime}><span className={styles.time}>{hm(r.starts_at)}</span></Td>
-                  <Td className={styles.colName}><span className={styles.name} title={r.customer_name}>{r.customer_name}</span></Td>
+                  <Td className={styles.colName}><FolderDotName><span className={styles.name} title={r.customer_name}>{r.customer_name}</span></FolderDotName></Td>
                   <Td className={styles.colGuests}>{`${r.guest_count}名`}</Td>
                   <Td className={styles.colTable}>{r.table_label || '未配席'}</Td>
                   <Td className={styles.colRoute}><span className={styles.route}>{routeLabel(r)}</span></Td>

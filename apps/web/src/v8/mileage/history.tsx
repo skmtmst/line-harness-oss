@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 マイル「履歴」（板 `oRbJi`、状態は見本帳 `zaqP9`）。
  *
@@ -353,12 +355,10 @@ export default function HistoryTab() {
                   router.push(friendHref)
                 }}
               >
-                <Td className={styles.colName}>
+                <Td className={styles.colName}><FolderDotName>
                   <span className={styles.rowName} title={viewName(item)}>{viewName(item)}</span>
-                  <span className={styles.rowSub}>
-                    {`${formatMileageShortDateTime(item.occurredAt)}${item.lineAccountName ? `・${item.lineAccountName}` : ''}`}
-                  </span>
-                </Td>
+
+                </FolderDotName></Td>
                 <Td className={`${styles.colDelta} ${styles.num}`}><span className={styles.cellMain}>{formatMileageChange(item.amount)}</span></Td>
                 <Td className={styles.colWhy}>
                   <span

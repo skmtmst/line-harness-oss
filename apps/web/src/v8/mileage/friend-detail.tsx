@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 マイル「友だちのマイル詳細」（板 `R6kIG`、手で増やす・減らす `M8zhjL`）。
  *
@@ -483,7 +485,7 @@ function FriendDetailInner() {
                         {pill.text}
                       </span>
                     </Td>
-                    <Td className={styles.colName}><span className={styles.cellMain}>{assignee(item)}</span></Td>
+                    <Td className={styles.colName}><FolderDotName><span className={styles.cellMain}>{assignee(item)}</span></FolderDotName></Td>
                     <Td className={styles.colDeltaDetail}>
                       <span className={styles.cellMain} title={'balanceAfter' in item && typeof item.balanceAfter === 'number' ? `残高 ${formatNumber(item.balanceAfter)}` : undefined}>
                         {formatMileageChange(item.amount)}

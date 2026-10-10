@@ -626,7 +626,7 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
               const summary = summaries.get(item.affiliateId)
               return (
                 <Tr key={item.affiliateId}>
-                  <NameCell name={item.affiliateName} sub={`コード ${item.code}`} />
+                  <NameCell name={item.affiliateName} />
                   <Td align="right" className="font-semibold tabular-nums">
                     {yen(item.amount)}
                     {(item.deduction ?? 0) > 0 ? (

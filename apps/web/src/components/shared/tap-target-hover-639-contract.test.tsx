@@ -142,7 +142,7 @@ describe('#639 高さ規則は本物の操作部品に載る（実React描画）
     expect(html).toContain('aria-current="page"')
   })
 
-  it('行内操作は「詳細」「編集」の実ボタンを出す', () => {
+  it('行内操作の編集は「…」へ入る', () => {
     const html = renderToStaticMarkup(
       <RowActions
         subjectName="来店お礼"
@@ -151,7 +151,8 @@ describe('#639 高さ規則は本物の操作部品に載る（実React描画）
       />,
     )
     expect(html).toContain('詳細')
-    expect(html).toContain('編集')
+    expect(html).not.toContain('編集')
+    expect(html).toContain('来店お礼のその他操作')
     expect(html).toMatch(/<(button|a)\b/)
   })
 

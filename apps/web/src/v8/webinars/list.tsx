@@ -879,7 +879,7 @@ function WebinarList() {
             <TableHead />
             <tbody>
               {visibleItems.map((w) => {
-                const menuItems = rowMenuItems(w, canEdit, go, openArchive)
+                const menuItems = [...(canEdit ? [{ id: 'edit', label: '編集する', onSelect: () => go(`/webinars/edit?id=${w.id}`) }] : []), ...rowMenuItems(w, canEdit, go, openArchive)]
                 const counts = showsCounts(w)
                 const period = periodSummary(w)
                 const menuLabel = `ウェビナー「${w.title}」の操作`
@@ -906,7 +906,7 @@ function WebinarList() {
                           </button>
                         </FolderDotName>
                       </ContextMenu>
-                      <span className={styles.slug} title={publicPath(w)}>{publicPath(w)}</span>
+
                     </Td>
                     <Td className={styles.colStatus}><StatusPill webinar={w} /></Td>
                     <Td className={styles.colCount}>
@@ -927,7 +927,7 @@ function WebinarList() {
                     <Td className={styles.colPeriod}><span className={styles.period} title={period}>{period}</span></Td>
                     <Td className={styles.colOps} onClick={(event) => event.stopPropagation()}>
                       <div className={styles.opsBox}>
-                        {canEdit ? <Button href={`/webinars/edit?id=${w.id}`}>編集</Button> : null}
+
                         <RowMenu
                           label={menuLabel}
                           open={openMenuId === w.id}

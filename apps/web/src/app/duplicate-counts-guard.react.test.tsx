@@ -237,14 +237,14 @@ const RULES = [
 ]
 
 describe('m22d 同じ件数は1画面に1か所', () => {
-  it('/auto-replies は有効・要確認の2か所だけ（行の数え残しは「つ」）', async () => {
+  it('/auto-replies は有効・要確認の件数を重ねず、名前を1行にする', async () => {
     fns.autoRepliesList.mockResolvedValue({ success: true, data: AUTO_REPLIES })
     fns.templatesList.mockResolvedValue({ success: true, data: [] })
     fns.autoRepliesSummary.mockResolvedValue({ success: true, data: { conflicts: [], conflictCount: 3, receiveSourceCounts: null, matchedLast28Days: null } })
     fns.foldersList.mockResolvedValue({ success: true, data: AUTO_REPLY_FOLDERS, unfiledCount: 0 })
     await renderPage(React.createElement(AutoRepliesPage))
     expectNoDuplicateCounts()
-    expect(host.textContent).toContain('ほか3つ')
+    expect(host.querySelector('[data-list-name]')?.textContent).not.toContain('ほか3つ')
   })
 
   it('/auto-replies/runs は失敗した行に理由を出す（「失敗1件」を出さない）', async () => {

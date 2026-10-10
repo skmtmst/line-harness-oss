@@ -1,6 +1,7 @@
 'use client'
 
 /* 契約試験が renderToStaticMarkup で描くので、明示的に React を読む。 */
+import TagOverflow from '@/components/shared/tag-overflow'
 import React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -187,10 +188,9 @@ export default function FriendListRow({
 
       {visibleColumns.has('tags') ? (
         <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
-          {friend.tags.slice(0, 1).map((tag) => (
+          <TagOverflow>{friend.tags.map((tag) => (
             <span key={tag.id} title={tag.name} className="max-w-28 min-w-0 truncate rounded-mini border border-hairline bg-canvas px-1.5 py-0.5 text-micro text-ink-secondary">{tag.name}</span>
-          ))}
-          {friend.tags.length > 1 ? <span title={friend.tags.slice(1).map((tag) => tag.name).join('・')} className="shrink-0 text-micro text-ink-secondary">+{friend.tags.length - 1}</span> : null}
+          ))}</TagOverflow>
           {!friend.tags.length ? <span className="text-micro text-ink-disabled">—</span> : null}
         </div>
       ) : null}

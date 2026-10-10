@@ -6,7 +6,7 @@
  * - 行：編集ボタンと公開中／下書きの札
  */
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const OFFERS = [
   {
@@ -59,10 +59,13 @@ describe('h7dmB 案件タブの絵合わせ', () => {
   test('行に編集と札が出る', async () => {
     render(<OffersTabV8 canEdit registerHeaderActions={() => {}} />)
     await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: '編集' }).length).toBe(2)
+      expect(screen.getAllByText('公開中').length).toBeGreaterThan(0)
     })
     expect(screen.getAllByText('公開中').length).toBeGreaterThan(0)
     expect(screen.getAllByText('下書き').length).toBeGreaterThan(0)
+    expect(screen.queryAllByRole('button', { name: '編集' })).toHaveLength(0)
+    fireEvent.click(screen.getAllByRole('button', { name: /のその他操作$/ })[0])
+    expect(screen.getByRole('menuitem', { name: '編集' })).toBeTruthy()
     expect(screen.queryByText('停止・終了')).toBeNull()
   })
 })

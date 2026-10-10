@@ -166,7 +166,7 @@ function EventFolderPanelForm({
             if (event.key === 'Enter' && name.trim()) void add()
           }}
           placeholder="例：教室"
-          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
+          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
         />
       </label>
       <div className="mt-3">
@@ -706,9 +706,7 @@ export default function EventsListV8() {
                                 </button>
                               </FolderDotName>
                             </ContextMenu>
-                            {e.venue_name ? (
-                              <span className={`${styles.venue} ${styles.nameSub}`} title={e.venue_name}>{e.venue_name}</span>
-                            ) : null}
+
                           </td>
                           <td className="truncate px-2 py-3 tabular-nums" title={formatJpDate(e.next_slot_starts_at)}>
                             {formatJpDate(e.next_slot_starts_at)}

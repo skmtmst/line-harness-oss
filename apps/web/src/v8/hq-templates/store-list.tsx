@@ -28,7 +28,6 @@ import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
-import TagPill from '@/components/shared/tag-pill'
 import { deleteFolderDescription } from '@/components/shared/folder-row-actions'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -469,21 +468,13 @@ export default function HqStoreList(props: HqStoreListProps) {
             return (
               <Tr key={row.id} data-row-id={row.id} density="template">
                 {type === 'rich_menu' ? <Td className={storeStyles.cellPlain}>{rankOf.get(row.id) ?? '—'}</Td> : null}
-                <NameCell
-                  name={(
+                <NameCell name={(
                     <div className={storeStyles.dotLine}>
-                      {type === 'tag' ? (
-                        canEdit ? <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>
-                          <TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} size="sm" />
-                        </button> : <TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} size="sm" />
-                      ) : <FolderDotName folder={folder ? { name: folder.name, color: folder.color } : null}>
-                        {canEdit ? (
-                          <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{row.name}</button>
-                        ) : <span className={storeStyles.cellTitle} title={row.name}>{row.name}</span>}
-                      </FolderDotName>}
+                      {canEdit ? (
+                        <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{row.name}</button>
+                      ) : <span className={storeStyles.cellTitle} title={row.name}>{row.name}</span>}
                     </div>
-                  )}
-                  sub={<span className={`${storeStyles.cellSub} ${storeStyles.dotIndent}`} title={sub}>{sub}</span>}
+                  )} folder={folder ? { name: folder.name, color: folder.color } : null}
                 />
                 {columns.map((column) => column.cell(row))}
                 {canEdit ? (

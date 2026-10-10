@@ -146,7 +146,7 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
     act(() => { root.render(<CommonVarsListV8 />) })
     await flush()
     expect(host.textContent).toContain('会社名')
-    expect(host.textContent).toContain('{{var.company_name}}')
+    expect(host.querySelector('[data-list-name]')?.textContent).not.toContain('{{var.company_name}}')
     expect(host.textContent).toContain('問い合わせ先')
     expect(host.textContent).toContain('差し込んでいる所')
     expect(host.textContent).toContain('「問い合わせ先」が空のまま 2か所で使われています。')
@@ -172,7 +172,7 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
     act(() => { fix.click() })
     await flush()
     expect(host.textContent).not.toContain('株式会社NEN')
-    expect(host.textContent).toContain('{{var.contact}}')
+    expect(host.textContent).toContain('問い合わせ先')
   })
 
   it('行の「…」から止める窓（Hhl9M）が開き、予約中の配信を知らせる', async () => {

@@ -4,6 +4,8 @@ import React from 'react'
 import Link from 'next/link'
 import { ArrowRight, ChartNoAxesColumn } from 'lucide-react'
 import type { ReactNode } from 'react'
+import StatusBadge from './status-badge'
+import { isKpiNumberText } from './kpi-number-text'
 import HelpTip from './help-tip'
 import { isCountableValue } from './not-connected'
 import styles from './kpi-card.module.css'
@@ -144,6 +146,9 @@ export default function KpiCard({
     補足は見出しの「？」（HelpTip）へ。開閉・Esc・外側・1つだけの
     扱いは HelpTip が持つので、カード側は中身を渡すだけにする。
   */
+  const textIsNumber = valueText === undefined || isKpiNumberText(valueText)
+  const statusText = textIsNumber ? undefined : valueText
+  const numberText = textIsNumber ? valueText : undefined
   const tip = help ?? description
   const hasTip = tip !== undefined && tip !== null
 
@@ -204,11 +209,12 @@ export default function KpiCard({
             .filter(Boolean)
             .join(' ')}
         >
-          <span data-kpi-number className={styles.number}>{valueText === undefined && signed && isCountableValue(value) && value > 0 ? '+' : null}{valueText !== undefined ? valueText : isCountableValue(value) ? formatNumber(value) : '—'}</span>
-          {valueText !== undefined ? null : <span className={styles.unit}>{unit}</span>}
+          <span data-kpi-number className={styles.number}>{numberText === undefined && signed && isCountableValue(value) && value > 0 ? '+' : null}{numberText !== undefined ? numberText : isCountableValue(value) ? formatNumber(value) : '—'}</span>
+          {numberText !== undefined || statusText ? null : <span className={styles.unit}>{unit}</span>}
         </p>
       )}
 
+      {statusText && !loading ? <StatusBadge>{statusText}</StatusBadge> : null}
       {delta ? <span className={`${styles.delta} v8-only`}>{delta}</span> : null}
       </div>
 

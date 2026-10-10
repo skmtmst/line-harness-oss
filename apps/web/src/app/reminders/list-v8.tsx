@@ -1,6 +1,5 @@
 'use client'
 
-
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
@@ -929,9 +928,8 @@ export default function RemindersListV8() {
                         <span aria-hidden>⠿</span>
                       </ReorderHandle>
                     </Td>
-                    <NameCell
-                      name={<div className={styles.nameRow}>
-                        <FolderDotName folder={folderDotOf(row)}>
+                    <NameCell name={<div className={styles.nameRow}>
+                        <>
                           <Link
                             href={detailHref(row.id)}
                             title={row.name}
@@ -945,7 +943,19 @@ export default function RemindersListV8() {
                           >
                             {row.name}
                           </Link>
-                        </FolderDotName>
+                        </>
+
+                      </div>} folder={folderDotOf(row)}
+                    />
+                    <Td>
+                      <span
+                        className={`${styles.statePill} ${
+                          view.status === 'active' ? styles.statePillActive : styles.statePillStopped
+                        }`}
+                      >
+                        <span className={styles.stateDot} aria-hidden="true" />
+                        {view.status === 'active' ? '有効' : view.status === 'draft' ? '下書き' : '停止中'}
+                      </span>
                         {row.hasFailure || (row.failedCount ?? 0) > 0 ? (
                           <button
                             type="button"
@@ -960,21 +970,6 @@ export default function RemindersListV8() {
                             失敗{row.failedCount != null && row.failedCount > 0 ? ` ${row.failedCount}` : ''}
                           </button>
                         ) : null}
-                      </div>}
-                      sub={<span className={styles.dotIndent} title={view.subtitle}>
-                        <Calendar size={11} aria-hidden="true" className={styles.cellSubIcon} />
-                        {view.subtitle}
-                      </span>}
-                    />
-                    <Td>
-                      <span
-                        className={`${styles.statePill} ${
-                          view.status === 'active' ? styles.statePillActive : styles.statePillStopped
-                        }`}
-                      >
-                        <span className={styles.stateDot} aria-hidden="true" />
-                        {view.status === 'active' ? '有効' : view.status === 'draft' ? '下書き' : '停止中'}
-                      </span>
                     </Td>
                     <Td className={styles.countCell}>
                       <div className={styles.countMain}>{planned}</div>
@@ -1185,7 +1180,6 @@ export default function RemindersListV8() {
           <KpiCard key={kpi.title} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} onRetry={kpi.link && !statsFailed && kpi.value !== null && kpi.value > 0 ? kpi.link : undefined} retryLabel="失敗を見る →" />
         ))}
       </KpiBand>
-
 
       {/* 一時停止の窓（★V8 `RwVo5`）。確定で即反映し、裏で保存する。 */}
       <ConfirmDialog

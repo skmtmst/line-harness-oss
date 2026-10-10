@@ -813,9 +813,7 @@ export default function EarningRulesTab() {
                       <span className={styles.rowName} title={rule.draft.name}>{rule.draft.name}</span>
                     </FolderDotName>
                   </div>
-                  <span className={narrow ? styles.rowSub : `${styles.rowSub} ${styles.dotIndent}`}>
-                    {`${rule.draft.targetConditions ? '条件あり' : '全員'}・${rule.publishedVersion == null ? `下書き v${rule.draftVersion}` : `公開版 v${rule.publishedVersion}`}`}
-                  </span>
+
                 </Td>
                 <Td className={styles.colEvent}>
                   <span className={styles.cellMain}>{ruleEventLabel(rule.draft.eventType, EVENT_LABELS)}</span>

@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8-B NEN配信の一覧（Pencil「★V8-B 画面の地図」専用機能の組）。
  * 自動配信 `MuhWR`・コラム `Jxmqh`・送った履歴 `Tj7n4`・誕生日クーポンの決めごと（引き出し）`oqSJP`。
@@ -429,13 +431,13 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
                 const audience = formatCampaignAudience(setting)
                 return (
                   <Tr key={setting.campaignKey} className={styles.row} data-table-layout="columns">
-                    <Td className={styles.colName}>
+                    <Td className={styles.colName}><FolderDotName>
                       {canEdit ? (
                         <Link href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className={styles.name} title={setting.label}>{setting.label}</Link>
                       ) : (
                         <button type="button" className={styles.name} title={setting.label} onClick={() => props.onPreviewCampaign(setting.campaignKey)}>{setting.label}</button>
                       )}
-                    </Td>
+                    </FolderDotName></Td>
                     <Td className={styles.colTrigger}><span className={styles.cell} title={timing}>{timing}</span></Td>
                     <Td className={styles.colTarget}><span className={styles.cell} title={audience}>{audience}</span></Td>
                     <Td className={styles.colSent}><span className={styles.num}>{sent == null ? '—' : formatNumber(sent)}</span></Td>
@@ -736,12 +738,12 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                 const draft = column.publishedAt == null
                 return (
                   <Tr key={column.id} className={styles.row} data-table-layout="columns" selected={props.selectedColumnId === column.id}>
-                    <Td className={styles.colName}>
+                    <Td className={styles.colName}><FolderDotName>
                       <span className={styles.nameStack}>
                         <button type="button" className={styles.name} title={column.title} onClick={() => props.onSelectColumn(column.id)}>{column.title}</button>
-                        {draft ? <span className={styles.sub}>下書き</span> : null}
+
                       </span>
-                    </Td>
+                    </FolderDotName></Td>
                     <Td className={styles.colCategory}><span className={styles.cell}>{column.category?.trim() || '分類なし'}</span></Td>
                     <Td className={styles.colDate}><span className={styles.cell}>{column.publishedAt ? jstMonthDay(column.publishedAt) : column.deliveryAt ? `${jstMonthDay(column.deliveryAt)} 予定` : '—'}</span></Td>
                     <Td className={styles.colLine}>{columnBadge(column, metric?.sent ?? null)}</Td>
@@ -959,7 +961,7 @@ function HistoryTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                           <span className={styles.sub} title={who}>{who}</span>
                         </span>
                       </Td>
-                      <Td className={styles.colName}><span className={styles.cell} title={delivery.label}>{delivery.label}</span></Td>
+                      <Td className={styles.colName}><FolderDotName><span className={styles.cell} title={delivery.label}>{delivery.label}</span></FolderDotName></Td>
                       <Td className={styles.colResult}>
                         <span className={styles.nameStack}>
                           <Pill tone={tone}>{statusLabel[delivery.status] ?? '状態を確認できません'}</Pill>

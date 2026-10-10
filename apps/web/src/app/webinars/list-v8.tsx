@@ -402,7 +402,7 @@ export function WebinarListTableV8({
                       {w.title}
                     </button>
                   </ContextMenu>
-                  <span className={styles.slug} title={`/${w.slug}`}>/{w.slug}</span>
+
                 </td>
                 <td><span className={statusPillClass(w)}>● {statusLabelV8(w)}</span></td>
                 <td className={styles.countCell}>{unpublished ? '—' : peopleText(w.registrationCount)}</td>
@@ -415,11 +415,10 @@ export function WebinarListTableV8({
                 <td><span className={styles.periodCell} title={period}>{period}</span></td>
                 <td className={styles.opsCell}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    {canEdit
-                      ? <Button href={`/webinars/edit?id=${w.id}`}>編集</Button>
-                      : <Button disabled title={readonlyReason}>編集</Button>}
+
                     <RowActions
                       subjectName={w.title}
+                      edit={canEdit ? { href: `/webinars/edit?id=${w.id}` } : undefined}
                       menuNote={canEdit ? undefined : readonlyReason}
                       menuItems={menuItems}
                     />

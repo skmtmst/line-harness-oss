@@ -429,7 +429,6 @@ export default function RichMenusListV8() {
     }
   }, [selectedAccount?.id])
 
-
   useEffect(() => { void loadList() }, [loadList])
   useEffect(() => { void loadTapStats() }, [loadTapStats])
   useEffect(() => { void loadTags() }, [loadTags])
@@ -1096,9 +1095,7 @@ export default function RichMenusListV8() {
                         {g.name}
                       </Link>
                     </FolderDotName>
-                    <span className={`${styles.sub} ${styles.nameSub}`} title={`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`}>
-                      {`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`}
-                    </span>
+
                   </Td>
                   <Td className={styles.audienceCell}>
                     <span className={audienceSub ? styles.audienceMain : `${styles.audienceMain} ${styles.audienceAlone}`} title={audienceMain}>{audienceMain}</span>

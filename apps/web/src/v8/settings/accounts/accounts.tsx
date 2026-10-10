@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 LINEアカウント（Pencil `V7vn3`）。
  *
@@ -248,10 +250,10 @@ export default function AccountsV8() {
               const friends = archived || account.stats?.friendCount == null ? '—' : account.stats.friendCount.toLocaleString('ja-JP')
               return (
                 <Tr key={account.id} interactive>
-                  <Td className={styles.colName}><div className={styles.nameStack}>
+                  <Td className={styles.colName}><FolderDotName><div className={styles.nameStack}>
                     <span className={styles.name} title={account.name}>{account.name}</span>
-                    <span className={styles.sub}>{`チャネル ${account.channelId}`}</span>
-                  </div></Td>
+
+                  </div></FolderDotName></Td>
                   <Td className={styles.colConn}><StatusBadge tone={connection.tone}>{connection.label}</StatusBadge></Td>
                   <Td className={styles.colHook}>
                     {archived ? <span className={styles.faint}>—</span> : <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>}
