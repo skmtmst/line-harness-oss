@@ -6,6 +6,7 @@ import {api,visitStampsApi} from '../lib/api.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
 import LiffLookScope from '../components/LiffLookScope.js';
 import LoadingView from '../components/LoadingView.js';
+import LoadErrorView from '../components/LoadErrorView.js';
 import Button from '../components/ui/Button.js';
 import {StampQrCard,StampQrMessage} from '../components/ui/StampQrResult.js';
 import styles from './VisitStampQr.module.css';
@@ -35,6 +36,7 @@ export default function VisitStampQr() {
  const close=()=>{if(liff.isInClient())liff.closeWindow();else {const back=new URLSearchParams(params);back.delete('token');if(result?.status==='success'||result?.status==='limited')back.set('card',result.card.id);navigate(`/visit-stamps?${back}`)}};
  const add=()=>{if(!shop?.botBasicId)return;setAdding(true);liff.openWindow({url:`https://line.me/R/ti/p/${encodeURIComponent(shop.botBasicId)}`,external:true})};
  if(!result&&!error)return <LoadingView/>;
+ if(error)return <LiffLookScope className={styles.screen} designNode="zz9R3"><LiffHeader title="来店スタンプ"/><LoadErrorView message={error} onRetry={()=>{if(!busy)void load()}}/><Button variant="primary" onClick={close}>LINE に戻る</Button></LiffLookScope>;
  const board=result?.status==='success'?'eSJ8v':result?.status==='limited'?'e9lZv':result?.status==='friend_required'?'ZhddO':'xLyNh';
  const next=result?.status==='success'?result.nextReward:null;
  const retry=result?.status==='limited'?new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(result.retryAt)):'';
@@ -46,9 +48,7 @@ export default function VisitStampQr() {
      {result?.status==='visit_required'?<><StampQrMessage icon="check" title="今日の来店を選んでください" description="台帳と同じ来店として確認し、二重に数えません。来店前の予約は、店員に来店を記録してもらってください。"/>{result.visits.map(v=><Button key={v.id} variant="secondary" disabled={busy||!v.arrived} onClick={()=>void load(v.id)}>{`${v.storeName}・${new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'}).format(new Date(v.startsAt))}${v.arrived?'':'（来店の記録待ち）'}`}</Button>)}</>:null}
      {result?.status==='invalid'?<StampQrMessage icon="qr-code" title="この QR は使えません" description="期限が切れたか、もう使われた QR です。店員にもう一度出してもらってください。"/>:null}
      {result?.status==='friend_required'?<StampQrMessage icon="user-plus" title={'友だち追加すると\nスタンプがたまります'} description={`${shop?.accountName??'このお店'}を友だちに追加してから、もう一度 QR を読み取ってください。`}/>:null}
-     {error?<p className={styles.error} role="alert">{error}</p>:null}
      <div className={styles.spacer}/>
-     {error?<Button variant="secondary" disabled={busy} onClick={()=>void load()}>読み直す</Button>:null}
      {result?.status==='friend_required'?<><Button variant="primary" disabled={!shop?.botBasicId||busy} onClick={add}>友だち追加</Button>{!shop?.botBasicId?<p className={styles.sub}>LINE公式アカウントから友だち追加して、読み直してください。</p>:null}{adding||!shop?.botBasicId?<Button variant="secondary" disabled={busy} onClick={()=>void load()}>追加したので読み直す</Button>:null}</>:<Button variant="primary" onClick={close}>LINE に戻る</Button>}
    </main>
  </LiffLookScope>;
