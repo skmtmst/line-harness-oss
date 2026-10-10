@@ -80,6 +80,12 @@ const V8_SECTIONS: Record<string, string[]> = {
 }
 const V8_COPY: Record<string, Record<string, string>> = {
   '/hq/members': { '担当アカウントの割り当て': '担当範囲' },
+  '/chats': {
+    '顧客情報を開く': '顧客情報を表示',
+    'テンプレート名・本文で検索': 'テンプレート名・本文で探す',
+    '送信内容のプレビュー': '解決できない差し込みがあります',
+    '入力欄へ挿入': '入力欄に入れる',
+  },
   '/staff': { "人の名前・メールで探す": '名前・メールで探す' },
   // ★V8 ywFJT：区分の頭のボタンは「まとめて」。
   '/settings': { 'まとめて切替': 'まとめて' },
@@ -93,6 +99,9 @@ const V8_COPY: Record<string, Record<string, string>> = {
 // V8へ移った画面には旧JSONの節・語を要求しない。
 // 見た目は★V8との画像照合、動きは各V8本体の試験が守る。ここは入口と描く本体の接続を守る。
 const MAINB_V8_SCREENS = [
+  ['/booking/menus/new', '@/v8/booking-menus/menu-form', 'v8/booking-menus/menu-form.tsx', '<PageHeading'],
+  ['/booking/staff/new', '@/v8/booking-staff/staff-new', 'v8/booking-staff/staff-new.tsx', '<PageHeading'],
+  ['/booking/menus/staff', '@/v8/booking-menus/assign', 'v8/booking-menus/assign.tsx', '<PageHeading'],
   ['/contents/vars/new', '@/v8/common-vars-edit/new', 'v8/common-vars-edit/new.tsx', '<CreatePage'],
   ['/broadcasts', '@/v8/broadcasts/list', 'v8/broadcasts/list.tsx', '<ListPage'],
   ['/broadcasts/detail', '@/v8/broadcast-detail/detail', 'v8/broadcast-detail/detail.tsx', '<PageFrame'],
@@ -204,6 +213,9 @@ describe('画面の骨格が設計と一致する', () => {
       .find((match) => match[2] === module);
     expect(imported, `${route} が ${module} を読む`).toBeDefined();
     expect(entry).toContain(`<${imported![1]}`);
+  });
+
+  it.each(MAINB_V8_SCREENS)('%s のV8本体は共通の型を使う', (_route, _module, file, template) => {
     const body = readFileSync(join(SRC, file), 'utf8');
     expect(body).toContain(template);
   });

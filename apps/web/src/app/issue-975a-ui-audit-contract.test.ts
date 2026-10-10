@@ -61,11 +61,12 @@ describe('U054: 作成画面の余白を二重に取らない', () => {
   })
 })
 
-describe('U055: 予約メニューの数値欄は1列に積み、単位を値の右へ置く', () => {
+describe('U055: V8の予約メニューの数値欄は共通部品で単位を表示する', () => {
   const page = read('booking/menus/new/page.tsx')
 
-  it('狭い画面では1列', () => {
-    expect(page).toContain('grid-cols-1 gap-4 sm:grid-cols-2')
+  it('所要時間はV8の共通NumberInputで分を表示する', () => {
+    expect(page).toContain('<NumberInput unit="分"')
+    expect(page).toContain('aria-label="金額（円）"')
   })
 })
 
