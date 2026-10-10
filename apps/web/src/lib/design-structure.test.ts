@@ -99,6 +99,7 @@ const V8_COPY: Record<string, Record<string, string>> = {
 // V8へ移った画面には旧JSONの節・語を要求しない。
 // 見た目は★V8との画像照合、動きは各V8本体の試験が守る。ここは入口と描く本体の接続を守る。
 const MAINB_V8_SCREENS = [
+  ['/mileage', '@/v8/mileage/mileage', 'v8/mileage/mileage.tsx', '<MileageShell.Provider'],
   ['/conversions', '@/v8/conversions/list', 'v8/conversions/list.tsx', '<ListPage'],
   ['/conversions/new', '@/v8/conversions/create', 'v8/conversions/create.tsx', '<CreatePage'],
   ['/webhooks', '@/v8/webhooks/outgoing', 'v8/webhooks/outgoing.tsx', '<ListPage'],

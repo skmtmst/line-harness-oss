@@ -12,7 +12,7 @@ const REWARD_EDIT = readFileSync(join(HERE, 'rewards', 'edit', 'v8-reward-edit.t
 
 describe('点検 #511(中)の再発防止(#541)', () => {
   it('CSVのボタンは「この頁だけ」と分かる文にする(#511-4)', () => {
-    expect(PAGE).toContain('この頁の残高をCSVで書き出す')
+    expect(PAGE).toContain('この頁の残高を CSV')
     expect(ACTION_SCORE).toContain('この頁の行動スコアをCSVで書き出す')
     expect(HISTORY).toContain('この頁の履歴をCSVで書き出す')
   })

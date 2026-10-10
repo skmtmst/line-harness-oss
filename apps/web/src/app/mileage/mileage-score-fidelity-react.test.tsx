@@ -11,7 +11,7 @@ import { AccountProvider } from '@/contexts/account-context'
 import V8ScoreTab from './v8-score-tab'
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams('tab=score'),
   usePathname: () => '/mileage',

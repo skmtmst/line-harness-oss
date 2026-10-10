@@ -125,7 +125,6 @@ shared-button-importer app/mileage/friends/detail/v8-mileage-adjust-dialog.tsx
 shared-button-importer app/mileage/mileage-history-tab.tsx
 shared-button-importer app/mileage/mileage-rewards-tab.tsx
 shared-button-importer app/mileage/mileage-v8.tsx
-shared-button-importer app/mileage/page.tsx
 shared-button-importer app/mileage/rewards/edit/v8-reward-edit.tsx
 shared-button-importer app/mileage/score-rules/page.tsx
 shared-button-importer app/mileage/v8-balances-tab.tsx

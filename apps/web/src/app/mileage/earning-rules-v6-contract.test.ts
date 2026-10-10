@@ -18,7 +18,7 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     // 1件ずつPATCHすると途中失敗で一部だけ反映されるため、全順序を1回で送る。
     expect(PAGE).toContain('api.mileage.saveEarningRulesOrder')
     expect(PAGE).toContain('ids: ruleOrder')
-    expect(PAGE).toContain('busy={savingRuleOrder} busyLabel="保存しています">並び順を保存する')
+    expect(PAGE).toContain('busy={savingOrder} busyLabel="保存しています"')
     const orderBody = readFileSync(new URL('../../v8/mileage/earning-rules.tsx', import.meta.url), 'utf8').split('const saveOrder = async')[1]?.split('const toggleRule')[0] ?? ''
     expect(orderBody).toContain('saveEarningRulesOrder')
     expect(orderBody).not.toContain('saveEarningRuleDraft')
@@ -26,7 +26,7 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
 
   it('利用対象条件と公開版の中身を一覧から確認できる', () => {
     expect(PAGE).toContain('公開版の中身を見る')
-    expect(PAGE).toContain('rule.draft.targetConditions')
+    expect(PAGE).toContain('viewTarget.draft.targetConditions')
     expect(PAGE).toContain('利用対象：すべての友だち')
   })
 
@@ -35,13 +35,13 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     // 公開済みだと思い込む。未公開は下書きの中身と版・保存日時を出す。
     expect(PAGE).toContain("rule.publishedVersion == null ? '下書きの内容を見る' : '公開版の中身を見る'")
     expect(PAGE).toContain('まだ公開版はありません')
-    expect(PAGE).toContain('公開版 v${rule.publishedVersion}')
+    expect(PAGE).toContain('公開版 v${viewTarget.publishedVersion}')
     expect(PAGE).toContain('に反映')
   })
 
   it('R296: 一覧から下書きの編集画面へ行け、未公開だけ削除できる', () => {
     // 編集の入口。別画面へ行く項目には external の印を付ける。
-    expect(PAGE).toContain('下書きを編集')
+    expect(PAGE).toContain("label: '編集'")
     expect(PAGE).toContain('/mileage/earning-rules/edit?id=')
     // 消せるのは公開前の下書きだけ。履歴のある運用済みは口が409で断り、
     // 画面は確認窓に理由を残す（一覧を消さない）。
@@ -75,10 +75,10 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(PAGE).toContain('api.mileage.earningRulesV6')
     expect(PAGE).toContain('api.mileage.history')
     expect(PAGE).toContain('api.mileage.friendsV6')
-    expect(PAGE).toContain('title="この30日で付いたマイル"')
-    expect(PAGE).toContain('title="1人あたりの平均"')
-    expect(PAGE).toContain('ruleSummary?.grantedMiles')
-    expect(PAGE).toContain('ruleSummary?.averageBalance')
+    expect(PAGE).toContain('title="直近30日 付けたマイル"')
+    expect(PAGE).toContain('title="残高の合計"')
+    expect(PAGE).toContain('setGrantedMiles(grant?.amount ?? 0)')
+    expect(PAGE).toContain('balanceTotal / averageDenominator')
     expect(PAGE).toContain('grantedMiles30d(rule)')
     // R53: 決めごと行の30日額は台帳の実額。回数×今の下書き金額にしない。
     expect(PAGE).toContain('rule.metrics30d.grantedMiles')
@@ -88,8 +88,8 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
   it('平均の分母と説明文の人数は同じ値を使う（MILEAGE-05）', () => {
     // 計算は「残高のある人」で割っているのに、説明が別の口の人数
     // （全員の数）を出すと、運用者が違う分母で読んでしまう。
-    expect(PAGE).toContain('averageDenominator: friendsRes.data.summary.withBalanceCount')
-    expect(PAGE).toContain('formatMileageNumber(ruleSummary.averageDenominator)')
+    expect(PAGE).toContain('setAverageDenominator(friendsRes.data.summary.withBalanceCount)')
+    expect(PAGE).toContain('formatMileageNumber(averageDenominator)')
     expect(PAGE).not.toContain('formatMileageNumber(tabCounts.balances')
     // 残高0の人を含めるか除くかを明記する
     expect(PAGE).toContain('残高0の人は除き')
@@ -101,11 +101,13 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(PAGE).toContain('rule.draft.expiresAfterDays')
   })
 
-  it('停止・再開の失敗は一覧を消さず行内の帯で出す', () => {
-    // 失敗は共通 Notice の危険の帯（role=alert は部品が付ける。★V7 共通部品その2 §1）。
-    expect(PAGE).toContain('ruleActionError')
-    expect(PAGE).toContain('<Notice tone="danger"')
-    expect(PAGE).not.toContain("setLoadError('たまる決めごとを更新できませんでした")
+  it('停止・再開の失敗は一覧を消さず元へ戻し、再試行できる通知を出す', () => {
+    const body = PAGE.split('const toggleRule = async')[1]?.split('const publishRule')[0] ?? ''
+    expect(body).toContain('setStatus(before)')
+    expect(body).toContain('notifyToast(')
+    expect(body).toContain("tone: 'error'")
+    expect(body).toContain("actionLabel: 'もう一度'")
+    expect(body).not.toContain('setLoadError(')
   })
 
   it('N-231 案1: 下書きの公開は保存と別の操作で、版を見せて確認窓で確かめる', () => {
@@ -113,7 +115,7 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(PAGE).toContain('api.mileage.publishEarningRule')
     expect(PAGE).toContain('公開して反映')
     expect(PAGE).toContain('rule.publishedVersion')
-    expect(PAGE).toContain('公開版 v${rule.publishedVersion}')
+    expect(PAGE).toContain('公開版 v${viewTarget.publishedVersion}')
     expect(PAGE).toContain('expectedVersion: rule.draftVersion')
     // 取り消せない操作のため共通の確認窓で確かめる。ブラウザのconfirmは使わない。
     expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
@@ -126,8 +128,8 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
   it('読込中・取得失敗・空を言い分ける', () => {
     expect(PAGE).toContain('title="たまる決めごとを読み込んでいます"')
     expect(PAGE).toContain('title="たまる決めごとを読み込めませんでした"')
-    expect(PAGE).toContain('title="まだ決めごとがありません"')
-    expect(PAGE).toContain('title="絞り込みに合う決めごとがありません"')
+    expect(PAGE).toContain('title="まだたまる決めごとがありません"')
+    expect(PAGE).toContain('<EmptyList')
   })
 })
 

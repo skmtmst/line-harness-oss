@@ -1,7 +1,7 @@
 # マイル（V8）の動き
 
 入口：
-- `app/mileage/page.tsx`：V8 のときだけ `src/v8/mileage/mileage.tsx`（それ以外は今の v7 の画面）。
+- `app/mileage/page.tsx`：`src/v8/mileage/mileage.tsx` へ固定（旧画面の分岐は削除）。
 - `app/mileage/rewards/edit/page.tsx`：`src/v8/mileage/reward-edit.tsx`（この入口はもとから V8 の画面だけを出している）。
 - `app/mileage/friends/detail/page.tsx`：V8 のときだけ `src/v8/mileage/friend-detail.tsx`。
 

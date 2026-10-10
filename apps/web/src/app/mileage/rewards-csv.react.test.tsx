@@ -13,7 +13,7 @@ vi.mock('@/lib/api', async (original) => ({
   ...await original<typeof import('@/lib/api')>(),
   api: { mileage: { rewards: mocks.rewards } }, fetchApi: mocks.redemptions,
 }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => ({ push: vi.fn() }) }))
 import V8RewardsTab from './v8-rewards-tab'
 
 function Screen() {

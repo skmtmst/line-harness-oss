@@ -74,7 +74,7 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(PAGE).toContain('kind="loading"')
     expect(PAGE).toContain('kind="empty"')
     expect(PAGE).toContain('kind="error"')
-    expect(PAGE).toContain('まだ決めごとがありません')
+    expect(PAGE).toContain('title="まだたまる決めごとがありません"')
     expect(PAGE).toContain('もうすぐ消えるマイル')
     expect(PAGE).toContain('summary?.expiringMiles30d')
     expect(PAGE).toContain('member.expiringMiles30d')
@@ -83,16 +83,16 @@ describe('V6 マイルの正本URLと概念分離', () => {
   })
 
   it('残高一覧を設計の20件表示・絞り込み札・2操作にそろえる', () => {
-    expect(PAGE).toContain('const PAGE_SIZE = 20')
+    expect(PAGE).toContain("useListUrlValue('pageSize', 20)")
     for (const label of ['ゴールド', 'シルバー', 'ブロンズ', '消える予定', '残高が多い順']) {
       expect(PAGE).toContain(label)
     }
     expect(PAGE).toContain("rank === 'gold'")
-    expect(PAGE).toContain('displayRank')
-    expect(PAGE).toContain("friend_added: '友だち登録'")
+    expect(PAGE).toContain('rankLabel(member.rank)')
+    expect(PAGE).toContain("friend_added: '友だち追加'")
     expect(PAGE).toContain("broadcast_link_clicked: '配信リンククリック'")
     expect(PAGE).toContain("inflow_return: 'LINE帰還'")
-    expect(PAGE).toContain('増やす・減らす')
+    expect(PAGE).toContain('増減')
     expect(PAGE).toContain('&adjust=1')
     expect(FRIEND_DETAIL).toContain("searchParams.get('adjust') === '1'")
     expect(FRIEND_DETAIL).toContain('setAdjustmentOpen(true)')
@@ -100,11 +100,11 @@ describe('V6 マイルの正本URLと概念分離', () => {
 
   it('V6の一覧契約を読み、既存の更新APIから停止と再開を操作できる', () => {
     expect(PAGE).toContain('api.mileage.earningRulesV6')
-    expect(PAGE).toContain("updateRule(rule.id, { isActive: rule.published.status !== 'published' })")
-    expect(PAGE).toContain("rule.published.status === 'published' ? '決めごとを停止' : '決めごとを再開'")
+    expect(PAGE).toContain("updateRule(rule.id, { isActive: next === 'published' })")
+    expect(PAGE).toContain("active ? '止める' : '再開する'")
     // 2026-09-02: 一覧をカード格子から設計の表へ移し、状態を共通Chipで出す。
     // 言い方は変えていない。
-    expect(PAGE).toContain('<Chip tone="ok">動いています</Chip> : <Chip>止めています</Chip>')
+    expect(PAGE).toContain('動いています')
   })
 
   it('作成画面も mileage_rules のAPIと正本URLを使う', () => {

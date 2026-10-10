@@ -111,11 +111,7 @@ describe('共通部品の影響範囲', () => {
       'app/inflow-links/detail/page.tsx',
       'app/inflow-links/page.tsx',
       // #291: 顧客へのお知らせ9種類を、設計どおり1ページ6件に区切る。
-      'app/mileage/action-score-tab.tsx',
-      'app/mileage/mileage-history-tab.tsx',
       // R365: 要対応の交換が21件以上あっても残りを出せるよう、20件ずつのページ送りに寄せた。
-      'app/mileage/mileage-rewards-tab.tsx',
-      'app/mileage/page.tsx',
       // 2026-09-18: NEN配信のコラム一覧（★V6 37-6-A）。8本ずつのページ送り。
       'app/nen-campaigns/nen-overview.tsx',
       // 2026-09-16 採用: 然の健康日記（★V6 37-4）とマイペット（★V6 37-3）。20頭ずつのページ送り。

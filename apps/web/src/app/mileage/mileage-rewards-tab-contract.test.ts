@@ -8,7 +8,7 @@
  * ここが 0 に化ける書き方を入れると、**必ず**嘘が出る。
  */
 
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -72,7 +72,10 @@ describe('マイルのタブ', () => {
 
   it('使い道の面はアカウントごとに読む', () => {
     // アカウントを渡さないと、ほかの店の使い道まで混ざる。
-    expect(PAGE).toMatch(/<MileageRewardsTab[\s\S]{0,120}accountId=/)
+    expect(PAGE).toMatch(/<RewardsTab key=\{tab\}/)
+    const rewards = readFileSync(join(__dirname, '../../v8/mileage/rewards.tsx'), 'utf8')
+    expect(rewards).toContain('useAccount()')
+    expect(rewards).toContain('selectedAccountId')
   })
 })
 describe('届かなかった交換', () => {
