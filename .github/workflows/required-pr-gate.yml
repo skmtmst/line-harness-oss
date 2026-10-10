@@ -647,6 +647,7 @@ jobs:
         run: |
           node apps/web/scripts/list-row-audit.mjs
           node apps/web/scripts/v8-guard/list-row-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/list-rows.json
+          node apps/web/scripts/v8-guard/list-skeleton-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/list-skeleton.json
       - name: All admin page titles are 22px / 700 / 32px at 1440
         if: steps.scope.outputs.run == 'true'
         run: node scripts/visual-qa/title-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/title-audit.tsv
