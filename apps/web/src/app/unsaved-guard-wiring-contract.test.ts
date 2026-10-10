@@ -97,7 +97,6 @@ const GUARDED = [
   'v8/common-vars-edit/edit.tsx',
   'v8/common-vars-edit/new.tsx',
   'app/webinars/edit/page.tsx',
-  'app/webinars/new/new-v8.tsx',
   'app/webinars/new/page.tsx',
   'components/broadcasts/broadcast-form.tsx',
   'components/events/event-form.tsx',

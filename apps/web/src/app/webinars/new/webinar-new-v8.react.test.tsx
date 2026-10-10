@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -7,15 +9,15 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-/* 入口（page.tsx）は V8 のとき src/v8/webinar-edit/new を出す。この試験は今の作る画面（new-v8）の動きを見る。 */
-import NewWebinarPage from './new-v8'
+/* 現役の作成入口から、同じ操作を確かめる。 */
+import NewWebinarPage from './page'
 
 /*
  * ★V8-B ウェビナー①基本設定（作る）（板 `j7PP04`）の契約。
  * V8 の作る画面に統一し、
  * 5段の帯・開催形式・見え方・下の帯が出ることを実DOMで固定する。
  */
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
   usePathname: () => '/webinars/new',
   useSearchParams: () => new URLSearchParams(),
@@ -33,6 +35,7 @@ const json = (data: unknown, status = 200) => new Response(
 )
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember)
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -66,6 +69,6 @@ test('v8 では j7PP04 の作る画面（5段の帯・開催形式・見え方�
   expect(board?.textContent).toContain('基本設定')
   expect(board?.textContent).toContain('オンデマンド配信')
   expect(board?.textContent).toContain('日時指定配信')
-  expect(board?.textContent).toContain('LINE での見え方')
+  expect(board?.querySelector('[data-template-region="preview"]')?.textContent).toContain('▶ 申込はこちら')
   expect(board?.textContent).toContain('動画の設定へ')
 })

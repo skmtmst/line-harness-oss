@@ -221,7 +221,6 @@ shared-button-importer app/webinars/edit/viewer-comments.tsx
 shared-button-importer app/webinars/edit/webinar-edit-compare-dialog.tsx
 shared-button-importer app/webinars/edit/webinar-edit-conflict-band.tsx
 shared-button-importer app/webinars/list-v8.tsx
-shared-button-importer app/webinars/new/new-v8.tsx
 shared-button-importer app/webinars/published/page.tsx
 shared-button-importer components/accounts/account-edit-modal.tsx
 shared-button-importer components/accounts/account-ordering.tsx
@@ -669,3 +668,5 @@ shared-button-importer v8/restaurant/reservations/waitlist.tsx
 
 shared-button-importer v8/booking-bookings/day-list.tsx
 shared-button-importer v8/booking-bookings/visit-actions.tsx
+shared-button-importer app/emergency/control-feedback-v8.tsx
+shared-button-importer v8/settings/emergency/history-details.tsx
