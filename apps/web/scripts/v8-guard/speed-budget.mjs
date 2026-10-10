@@ -18,8 +18,9 @@
  *   長い作業 longTaskMs   … 50ms 以内（longtask が出たら超過）
  *   JS jsBytes            … ラチェット（基準より1バイトでも増えたら超過）
  * 判定は「悪くなったら落とす」だけ（2026-10-04 司令塔決定）。
- *   時間（表示・LCP・反応・長い作業）… 1画面3回測って真ん中の値で比べ、
- *     基準より 20% を超えて悪くなったら落ちる
+ *   時間（表示・LCP・反応・長い作業）… 1画面5回測って真ん中の値で比べ、
+ *     基準より 20% を超えて悪くなったら落ちる（CIの時間は1.30倍の余裕）。
+ *     longtask の基準0は検出境界50msを下限とする。JSは補正しない。
  *   JS jsBytes … 基準より 1KB を超えて増えたら落ちる。
  *     ただし同じ PR で speed-budget.json の基準を更新していれば通す
  *     （機能を足すと JS は増えるため。理由は PR に書くこと）
@@ -36,6 +37,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
 import { screenReady } from './screen-ready.mjs'
+import { SAMPLE_COUNT, REGRESSION_FACTOR, LONG_TASK_FLOOR_MS, speedPolicy } from './speed-policy.mjs'
 export { screenReady } from './screen-ready.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -57,12 +59,12 @@ export const SPEED_ROUTES = {
 }
 
 /* 悪くなったら落とす幅（2026-10-04 司令塔決定①）。時間は20%、JS は1KB。 */
-export const REGRESSION_FACTOR = 1.2
+export { REGRESSION_FACTOR }
 export const JS_SLACK_BYTES = 1024
 
-/* 3回測って真ん中。1回のぶれ（CIで表示が15〜24%揺れた）に引っ張られないため。 */
+/* 5回の中央値。外れ値と欠測は生の測定値と一緒に結果へ残す。 */
 export function median(values) {
-  const nums = values.filter((v) => typeof v === 'number').sort((a, b) => a - b)
+  const nums = values.filter((v) => Number.isFinite(v)).sort((a, b) => a - b)
   if (!nums.length) return null
   return nums[Math.floor(nums.length / 2)]
 }
@@ -300,6 +302,7 @@ async function measureStress(browser, target) {
   debug('friends-2000: data-ready')
   await waitForScreenReady(page, '/friends', 2000)
   const rows = assertStressResponse(responseState)
+  if (SLOW_MS) await page.waitForTimeout(SLOW_MS)
   const renderedRows = await page.locator('[data-friend-row]').count()
   const showMs = Date.now() - start
   /* 一気に下まで 20 回に分けて送る。途中の長い作業が記録される。 */
@@ -322,7 +325,7 @@ async function measureStress(browser, target) {
 }
 
 /* 落とすのは悪化だけ。時間は20%、JS は1KB（2026-10-04 司令塔決定①）。 */
-function judge(measured, baselines) {
+function judge(measured, baselines, policy = speedPolicy('local')) {
   const failures = []
   for (const m of measured) {
     const base = baselines[m.name]
@@ -331,8 +334,10 @@ function judge(measured, baselines) {
       const value = m[key]
       const b = base[key]
       if (typeof value !== 'number' || typeof b !== 'number') continue
-      if (value > b * REGRESSION_FACTOR) {
-        failures.push(`${m.name} ${key}=${value} が基準 ${b} より20%を超えて悪い`)
+      const reference = key === 'longTaskMs' ? Math.max(b, LONG_TASK_FLOOR_MS) : b
+      const limit = reference * REGRESSION_FACTOR * policy.timeFactor
+      if (value > limit) {
+        failures.push(`${m.name} ${key}=${value} が基準 ${b} の許容上限 ${limit.toFixed(1)} を超えて悪い（20%・${policy.profile}時間倍率${policy.timeFactor}）`)
       }
     }
     if (typeof m.jsBytes === 'number' && typeof base.jsBytes === 'number'
@@ -344,7 +349,7 @@ function judge(measured, baselines) {
 }
 
 /* 同じ PR で基準を更新済みなら JS 超過は通す（理由は PR に書くこと）。
-   時間の悪化は通さない。判定の数値（20%・1KB）は変えない。 */
+   時間の悪化は通さない。時間倍率はspeed-policy.mjsで決める。 */
 export function applyJsBaselineAllowance(failures, allowed) {
   if (!allowed) return { failures, notices: [] }
   return {
@@ -397,55 +402,70 @@ async function buildTarget({ stubDir, baseUrl }) {
   return { stub: false, url: (route) => new URL(route, baseUrl).toString() }
 }
 
-/* 1画面3回測って真ん中を残す（司令塔決定①）。 */
-async function measureMedian(run) {
-  const tries = [await run(), await run(), await run()]
-  const at = (key) => median(tries.map((t) => t[key]))
+/* 各回を順番に測る。失敗した回を成功した回へ差し替えない。 */
+export async function measureMedian(run) {
+  const samples = []
+  for (let i = 0; i < SAMPLE_COUNT; i += 1) samples.push(await run())
+  const at = (key) => {
+    const values = samples.map((sample) => sample[key])
+    const count = values.filter(Number.isFinite).length
+    const nullable = ['lcpMs', 'pressMs'].includes(key)
+    if ((!nullable || count > 0) && count < Math.ceil(SAMPLE_COUNT / 2)) {
+      throw new Error(`${samples[0].name} ${key}: 5回のうち${count}回しか測れませんでした`)
+    }
+    return median(values)
+  }
   return {
-    ...tries[0],
+    ...samples[0],
     showMs: at('showMs'),
     lcpMs: at('lcpMs'),
     pressMs: at('pressMs'),
     longTaskMs: at('longTaskMs'),
     jsBytes: at('jsBytes'),
+    samples,
   }
 }
 
-function checkpoint(out, measured, error = null) {
+function checkpoint(out, measured, error = null, policy = null) {
   if (!out) return
   mkdirSync(dirname(out), { recursive: true })
-  writeFileSync(out, `${JSON.stringify({ measured, complete: measured.length === 11 && !error, error }, null, 2)}\n`)
+  writeFileSync(out, `${JSON.stringify({ measured, complete: measured.length === 11 && !error, error, policy }, null, 2)}\n`)
 }
 
 async function main() {
   const { updateBaseline, stubDir, out, baseUrl } = parseArgs(process.argv.slice(2))
+  const measured = []
+  let browser = null
+  let policy = null
+  checkpoint(out, measured)
+  try {
+  policy = speedPolicy()
   const target = await buildTarget({ stubDir, baseUrl })
   const budget = JSON.parse(readFileSync(BUDGET_PATH, 'utf-8'))
-  const browser = await chromium.launch()
-  const measured = []
-  try {
+  browser = await chromium.launch()
+  console.log(`測定条件: ${policy.profile}・各${policy.sampleCount}回の中央値・時間倍率${policy.timeFactor}`)
   for (const [name, route] of Object.entries(SPEED_ROUTES)) {
     console.log(`測定開始: ${name}`)
     measured.push(await measureMedian(() => measureScreen(browser, target, name, route)))
-    checkpoint(out, measured)
+    checkpoint(out, measured, null, policy)
     console.log(`測定完了: ${name} showMs=${measured.at(-1).showMs}`)
   }
   console.log('測定開始: friends-2000')
   measured.push(await measureMedian(() => measureStress(browser, target)))
-  checkpoint(out, measured)
-  return { budget, updateBaseline, out, measured }
+  checkpoint(out, measured, null, policy)
+  return { budget, updateBaseline, out, measured, policy }
   } catch (error) {
-    checkpoint(out, measured, error.message)
+    checkpoint(out, measured, error.message, policy)
     throw error
   } finally {
-    await browser.close()
+    await browser?.close()
   }
 }
 
 export { expandFriends, judge, parseArgs, targetMisses }
 
 if (isMain) {
-  const { budget, updateBaseline, out, measured } = await main()
+  const { budget, updateBaseline, out, measured, policy } = await main()
 
   if (updateBaseline) {
     const next = {
@@ -466,7 +486,7 @@ if (isMain) {
   }
 
   if (out) {
-    checkpoint(out, measured)
+    checkpoint(out, measured, null, policy)
   }
 
   console.log('name showMs lcpMs pressMs longTaskMs jsBytes')
@@ -476,7 +496,7 @@ if (isMain) {
 
   /* 同じ PR で基準を更新済みなら JS 超過は通す。CI が環境変数で教える。 */
   const allowJs = process.env.ALLOW_JS_BASELINE_UPDATE === '1'
-  const judged = updateBaseline ? { failures: [], notices: [] } : applyJsBaselineAllowance(judge(measured, budget.baselines), allowJs)
+  const judged = updateBaseline ? { failures: [], notices: [] } : applyJsBaselineAllowance(judge(measured, budget.baselines, policy), allowJs)
   const failures = judged.failures
   /* 目標に届いていない画面は出すだけ。落とさない（司令塔決定②）。 */
   for (const miss of targetMisses(measured, budget.targets ?? {})) {
