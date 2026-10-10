@@ -22,7 +22,7 @@ const ADDITIONS = {
   tfxQh: { from: 'LRc93', width: null, kind: '採用の説明' },
   Ft2Ey: { from: 'meBRB', width: null, kind: '採用の説明' },
   G8KDe: { url: '/visit-stamps', width: null, kind: '採用の説明' },
-  T53Stv: { url: '/hq/messages/new', width: null, kind: '採用の説明' },
+  T53Stv: { from: 'HfK0O', width: null, kind: '採用の説明' },
   cu3vm: { from: 'dnzqC', width: null, kind: '採用の説明' },
   oIFk7: { from: 'Ni0V8', width: null, kind: '採用の説明' },
   fpPlW: { url: '/visit-stamps', kind: '画面' },
@@ -76,6 +76,7 @@ export function regenerateFrozenMap(seed, changes, names) {
         route: url?.split('?')[0] ?? null, url, routes: url ? [url] : [],
         width: Object.hasOwn(spec, 'width') ? spec.width : 1440, shot: null,
       }
+      Object.assign(boards[next], { route: url?.split('?')[0] ?? null, url, routes: url ? [url] : [] })
       if (row['文書'] === 'V8-B.pen') boards[next].doc = 'V8-B'
       // 新しい1152は元の1440の撮影用データも引き継ぐ。
       if (donor?.state && !boards[next].state) boards[next].state = structuredClone(donor.state)

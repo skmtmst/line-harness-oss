@@ -7470,10 +7470,10 @@
       "doc": "V8",
       "name": "提案 G-3a 統括 メッセージを作る（下の帯）",
       "kind": "採用の説明",
-      "route": "/hq/messages/new",
-      "url": "/hq/messages/new",
+      "route": "/hq/templates",
+      "url": "/hq/templates",
       "routes": [
-        "/hq/messages/new"
+        "/hq/templates"
       ],
       "width": null,
       "shot": null
