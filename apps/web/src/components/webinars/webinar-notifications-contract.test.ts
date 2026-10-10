@@ -7,7 +7,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const PART = readFileSync(join(HERE, '../../v8/webinar-edit/notifications.tsx'), 'utf8')
 const EDIT = readFileSync(join(HERE, '..', '..', 'app', 'webinars', 'edit', 'page.tsx'), 'utf8')
 const SCREEN = PART
-const STEPS = readFileSync(join(HERE, '..', '..', 'app', 'webinars', 'edit', 'edit-steps.ts'), 'utf8')
+const STEPS = readFileSync(join(HERE, '..', '..', 'v8', 'webinar-edit', 'helpers.ts'), 'utf8')
 
 /**
  * ウェビナーの通知・リマインド（設計 `Ho8z4` 10-1-D）。

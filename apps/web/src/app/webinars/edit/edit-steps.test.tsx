@@ -1,14 +1,27 @@
-import { describe, expect, it } from 'vitest'
+// @vitest-environment happy-dom
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Webinar, WebinarAnalytics } from '@/lib/api'
 import {
-  NOT_AVAILABLE,
   STEPS,
   nextLabelOf,
   nextStepOf,
-  publishBlockers,
   stepStateOf,
-  summaryRows,
-} from './edit-steps'
+} from '@/v8/webinar-edit/helpers'
+import { summaryRows } from '@/v8/webinar-edit/review-summary'
+import fs from 'node:fs'
+import path from 'node:path'
+import React, { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import ReviewPane from '@/v8/webinar-edit/review'
+import { webinarEditContext, webinarWizardChrome } from '@/test-utils/webinar-edit'
+import type { WebinarEditor } from '@/lib/api'
+const NOT_AVAILABLE = '—'
+const api = vi.hoisted(() => ({ validation: vi.fn(), publish: vi.fn() }))
+vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('@/lib/api')>(), webinarApi: { publishValidation: api.validation, publish: api.publish, notifications: async () => ({ data: { settings: null } }) } }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+const roots: Root[] = []
+afterEach(() => { act(() => { for (const root of roots.splice(0)) root.unmount() }); document.body.innerHTML = ''; vi.resetAllMocks() })
 
 const webinar = (over: Partial<Webinar> = {}): Webinar => ({
   id: 'webinar-1',
@@ -108,12 +121,17 @@ describe('設定サマリー', () => {
 })
 
 describe('公開の可否', () => {
-  it('足りないものを1つずつ言う', () => {
-    expect(publishBlockers(webinar())).toEqual([])
-    expect(publishBlockers(webinar({ videoPrefix: null, schedule: [] }))).toEqual([
-      '動画が設定されていません',
-      '配信枠が1件もありません',
-    ])
+  it('足りないものを1つずつ言う', async () => {
+    api.validation.mockResolvedValue({ data: { version: 2, blockers: ['動画が設定されていません', '配信枠が1件もありません'], warnings: [], checks: [{ key: 'video', label: '動画', status: 'failed' }, { key: 'schedule', label: '配信枠', status: 'failed' }] } })
+    const host = document.createElement('div'); document.body.append(host)
+    const root = createRoot(host); roots.push(root)
+    await act(async () => root.render(<ReviewPane ctx={webinarEditContext(webinar({ videoPrefix: null, schedule: [] }), { version: 2 } as WebinarEditor)} chromeFor={primary => ({ ...webinarWizardChrome, footerActions: primary })} />))
+    expect(host.textContent).toContain('動画が設定されていません')
+    expect(host.textContent).toContain('配信枠が1件もありません')
+    const publish = [...host.querySelectorAll('button')].find(button => button.textContent === 'この版を公開')!
+    expect(publish.disabled).toBe(true)
+    await act(async () => publish.click())
+    expect(api.publish).not.toHaveBeenCalled()
   })
 })
 
@@ -123,12 +141,13 @@ describe('撮影の目印', () => {
       基本設定は編集画面ぶんの設計面が無い（`lvaY5` は作成画面の面）。
       Nodeを流用すると、別のルートの絵をこの画面から撮ってしまう。
     */
-    expect(STEPS.find((s) => s.key === 'basic')?.node).toBeUndefined()
-    expect(STEPS.find((s) => s.key === 'basic')?.mark).toBe('webinar-step-basic')
-    expect(STEPS.filter((s) => s.node).map((s) => s.node)).toEqual(['VWNaA', 'Q0Jrk', 'E7iAYs', 'XCUNf'])
+    for (const [file, id] of [['basic', 'j7PP04'], ['video', 'VWNaA'], ['cta', 'Q0Jrk'], ['notifications', 'E7iAYs'], ['review', 'XCUNf']]) {
+      expect(fs.readFileSync(path.join(__dirname, `../../../v8/webinar-edit/${file}.tsx`), 'utf8')).toContain(id)
+    }
+    expect(fs.readFileSync(path.join(__dirname, '../../../v8/webinar-edit/edit.tsx'), 'utf8')).not.toContain('data-qa-open')
   })
 
   it('目印は重ならない', () => {
-    expect(new Set(STEPS.map((s) => s.mark)).size).toBe(STEPS.length)
+    expect(new Set(STEPS.map((s) => s.key)).size).toBe(STEPS.length)
   })
 })

@@ -14,7 +14,7 @@ import type { EditContext, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './review.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
-import { reviewActionSummaryText, reviewMonitoringText, reviewTestSummaryBody } from './review-summary'
+import { summaryRows, reviewActionSummaryText, reviewMonitoringText, reviewTestSummaryBody } from './review-summary'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 
@@ -152,7 +152,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
       actions={chrome.actions}
       identity={chrome.identity}
       steps={chrome.steps}
-      help={`すべての段がそろうと公開できます。公開すると、申込ページと LINE の案内が使えるようになります。 ${reviewTestSummaryBody(validation, state)}${editor.monitoring ? ` 監視：${reviewMonitoringText(editor.monitoring.notificationFailures + editor.monitoring.viewSegmentFailures + editor.monitoring.actionFailures)}` : ''}`}
+      help={`${summaryRows(webinar, ctx.analytics).map(row => `${row.label}：${row.value}${row.note ? `（${row.note}）` : ''}`).join('・')}。すべての段がそろうと公開できます。公開すると、申込ページと LINE の案内が使えるようになります。 ${reviewTestSummaryBody(validation, state)}${editor.monitoring ? ` 監視：${reviewMonitoringText(editor.monitoring.notificationFailures + editor.monitoring.viewSegmentFailures + editor.monitoring.actionFailures)}` : ''}`}
       footerActions={chrome.footerActions}
       status={chrome.status}
       preview={<>

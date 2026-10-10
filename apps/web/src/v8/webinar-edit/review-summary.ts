@@ -1,4 +1,16 @@
-import type { WebinarPublishValidation } from '@/lib/api'
+import type { Webinar, WebinarAnalytics, WebinarPublishValidation } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
+
+/** 概要は実際の値と、読めていない理由を既存の説明にまとめる。 */
+export function summaryRows(webinar: Webinar, analytics: WebinarAnalytics | null) {
+  const hasVideo = Boolean(webinar.videoPrefix || webinar.videoMediaId)
+  return [
+    { label: '動画', value: hasVideo ? 'アップロード済み' : '未設定', note: hasVideo ? undefined : '動画が無いままでは友だちが視聴できません' },
+    { label: '公開', value: webinar.status === 'active' ? '公開中' : webinar.status === 'draft' ? '下書き' : 'アーカイブ' },
+    { label: '配信枠', value: `${webinar.schedule.length}件`, note: webinar.schedule.length === 0 ? '枠が無いと「次の回」が出ません' : undefined },
+    { label: '申込', value: analytics ? `${formatNumber(analytics.summary.reservations)}人` : '—', note: analytics ? undefined : 'まだ読み込んでいません' },
+  ]
+}
 
 /*
  * R93: 設定サマリーと最終確認の文言は値に連動させる。未設定・未検証の
