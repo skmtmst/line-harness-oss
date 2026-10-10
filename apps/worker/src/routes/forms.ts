@@ -79,7 +79,7 @@ import type {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireRole, requireDeliveryAccess } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundaries } from '../services/request-boundary.js';
 import { applyMileageRulesForEvent } from '@line-crm/db';
@@ -1404,7 +1404,7 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
 });
 
 // GET /api/forms/:id/delete-impact — 回答・利用先・開けなくなるURLを同時に確認する。
-forms.get('/api/forms/:id/delete-impact', requireRole('owner', 'admin'), async (c) => {
+forms.get('/api/forms/:id/delete-impact', requireDeliveryAccess('forms'), async (c) => {
   try {
     const accountId = c.req.query('account_id')?.trim();
     if (!accountId) return c.json({ success: false, error: 'account_id is required' }, 400);

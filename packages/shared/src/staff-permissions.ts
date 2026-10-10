@@ -64,6 +64,57 @@ export const BROADCAST_EDIT_OPERATION_KEYS: readonly string[] = [
   BROADCAST_RESULT_EXPORT_KEY,
 ];
 
+/** 束の鍵・APIの入口・画面の操作判定が読む共通の表。 */
+export const DELIVERY_FEATURE_POLICIES = {
+  broadcasts: { key: '/broadcasts', api: ['/api/broadcasts', '/api/broadcast-message-assets/upload-sessions'], edit: BROADCAST_DEFINITION_EDIT_KEY, test: BROADCAST_TEST_SEND_KEY, export: BROADCAST_RESULT_EXPORT_KEY, bundled: BROADCAST_EDIT_OPERATION_KEYS },
+  scenarios: { key: '/scenarios', api: ['/api/scenarios', '/api/scenario-drafts'], edit: 'scenario.definition.edit', test: 'scenario.definition.edit', bundled: ['scenario.definition.edit'] },
+  reminders: { key: '/reminders', api: ['/api/reminders', '/api/friend-reminders', '/api/reminder-runs'], edit: '/reminders' },
+  autoReplies: { key: '/auto-replies', api: ['/api/auto-replies', '/api/auto-reply-runs'], edit: '/auto-replies' },
+  friendAdd: { key: '/friend-add-settings', api: ['/api/friend-add', '/api/friend-add-rules', '/api/friend-add-runs'], edit: '/friend-add-settings' },
+  templates: { key: '/templates', api: ['/api/templates'], edit: '/templates' },
+  richMenus: { key: '/rich-menus', api: ['/api/rich-menu', '/api/rich-menus', '/api/rich-menu-groups', '/api/rich-menu-images'], edit: '/rich-menus' },
+  lineNotifications: { key: '/line-notifications', api: ['/api/line-notifications'], edit: '/line-notifications' },
+  nenCampaigns: { key: '/nen-campaigns', api: ['/api/nen-campaigns'], edit: '/nen-campaigns' },
+  nenMembers: { key: '/nen-members', api: ['/api/nen-members'], edit: '/nen-members' },
+  webinars: { key: '/webinars', api: ['/api/webinars'], edit: '/webinars', export: 'administrator' },
+  contents: { key: '/contents', api: ['/api/contents', '/api/media', '/api/file-scans'], edit: '/contents' },
+  commonVars: { key: '/contents/vars', api: ['/api/common-vars'], edit: '/contents/vars', export: 'administrator' },
+  forms: { key: '/form-submissions', api: ['/api/forms'], edit: '/form-submissions' },
+} satisfies Record<string, { key: string; api: string[]; edit: string; test?: string; export?: string; bundled?: readonly string[] }>;
+
+export type DeliveryFeature = keyof typeof DELIVERY_FEATURE_POLICIES;
+export type StaffFeatureOperation = 'view' | 'edit' | 'test' | 'export';
+export interface StaffAccessSubject {
+  role?: string | null;
+  permissionKeys?: readonly string[];
+  viewPermissionKeys?: readonly string[];
+  readOnly?: boolean;
+}
+
+export function deliveryPermissionKey(feature: DeliveryFeature, operation: StaffFeatureOperation): string {
+  const policy: { key: string; edit: string; test?: string; export?: string } = DELIVERY_FEATURE_POLICIES[feature];
+  if (operation === 'view') return policy.key;
+  return operation === 'edit' ? policy.edit : policy[operation] ?? policy.edit;
+}
+
+export function hasStaffAccess(subject: StaffAccessSubject | null | undefined, key: string, read = false): boolean {
+  if (!subject?.role || (!read && subject.readOnly)) return false;
+  if (subject.role === 'owner' || subject.role === 'admin') return true;
+  if (subject.role !== 'staff' || key === 'administrator') return false;
+  return subject.permissionKeys?.includes(key) === true
+    || (read && subject.viewPermissionKeys?.includes(key) === true);
+}
+
+export function hasDeliveryAccess(subject: StaffAccessSubject | null | undefined, feature: DeliveryFeature, operation: StaffFeatureOperation): boolean {
+  if (operation === 'export' && subject?.readOnly) return false;
+  const read = operation === 'view' || operation === 'export';
+  return hasStaffAccess(subject, DELIVERY_FEATURE_POLICIES[feature].key, read)
+    && hasStaffAccess(subject, deliveryPermissionKey(feature, operation), read);
+}
+
+export const DELIVERY_API_PERMISSIONS: Array<[string, string]> = Object.values(DELIVERY_FEATURE_POLICIES)
+  .flatMap((policy) => policy.api.map((prefix): [string, string] => [prefix, policy.key]));
+
 /**
  * 予約の細かい権限（N-411 / v6-30 §7-2「予約管理editでも予約設定は別permission」）。
  * - `/booking/menus`: メニューと担当割当の編集・閲覧
@@ -113,22 +164,7 @@ export const SCOPE_ITEMS: readonly ScopeItem[] = [
     label: '配信',
     note: '一斉配信・シナリオ・リマインダ',
     kind: 'feature',
-    keys: [
-      '/broadcasts',
-      '/scenarios',
-      '/reminders',
-      '/auto-replies',
-      '/friend-add-settings',
-      '/templates',
-      '/rich-menus',
-      '/line-notifications',
-      '/nen-campaigns',
-      '/nen-members',
-      '/webinars',
-      '/contents',
-      '/contents/vars',
-      '/form-submissions',
-    ],
+    keys: Object.values(DELIVERY_FEATURE_POLICIES).map((policy) => policy.key),
     hint: '誤送信を防ぐためです',
   },
   {
@@ -277,7 +313,11 @@ export function scopeLevelsToKeys(levels: ScopeLevels): { edit: string[]; view: 
       edit.push(...item.keys);
       // 配信を変えられる人は、下書き・テスト・送信・CSVも組で付ける。
       // 止める・送り直すは指定者のみ（ここには入れない）。
-      if (item.id === 'delivery') edit.push(...BROADCAST_EDIT_OPERATION_KEYS);
+      if (item.id === 'delivery') {
+        for (const policy of Object.values(DELIVERY_FEATURE_POLICIES)) {
+          if ('bundled' in policy) edit.push(...policy.bundled);
+        }
+      }
     } else if (level === 'view') view.push(...item.keys);
   }
   return { edit, view };
@@ -297,3 +337,15 @@ export function keysToScopeLevels(editKeys: string[], viewKeys: string[]): Scope
   }
   return levels;
 }
+
+/** 既存の「配信=edit」の完全な束も、同じ表の操作鍵に展開する（DB更新不要）。 */
+export function effectiveStaffEditKeys(keys: readonly string[]): string[] {
+  if (!Array.isArray(keys)) return [];
+  keys = keys.filter((key): key is string => typeof key === 'string');
+  const delivery = SCOPE_ITEMS.find((item) => item.id === 'delivery')!;
+  return [...new Set(delivery.keys.every((key) => keys.includes(key))
+    ? [...keys, ...scopeLevelsToKeys({ delivery: 'edit' }).edit]
+    : keys)];
+}
+export const SCOPE_OPERATION_KEYS: readonly string[] = Object.values(DELIVERY_FEATURE_POLICIES)
+  .flatMap((policy) => 'bundled' in policy ? [...policy.bundled] : []);

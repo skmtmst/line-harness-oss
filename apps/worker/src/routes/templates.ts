@@ -25,7 +25,7 @@ import {
 } from '@line-crm/db';
 import type { TemplateRow } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { validateCarousel } from '../services/carousel-validation.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -544,7 +544,7 @@ function isBlankText(value: unknown): boolean {
   return typeof value !== 'string' || !value.trim();
 }
 
-templates.post('/api/templates', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"name":["string"],"category":["string"],"messageType":["string"],"messageContent":["string"],"questionStatus":["string"],"folderId":["null","string"]}), async (c) => {
+templates.post('/api/templates', requireDeliveryAccess('templates'), inputJsonBoundary({"accountId":["string"],"name":["string"],"category":["string"],"messageType":["string"],"messageContent":["string"],"questionStatus":["string"],"folderId":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       accountId?: string;
@@ -623,7 +623,7 @@ templates.post('/api/templates', requireRole('owner', 'admin'), inputJsonBoundar
   }
 });
 
-templates.put('/api/templates/:id', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"category":["string"],"messageType":["string"],"messageContent":["string"],"questionStatus":["string"],"folderId":["null","string"]}), async (c) => {
+templates.put('/api/templates/:id', requireDeliveryAccess('templates'), inputJsonBoundary({"name":["string"],"category":["string"],"messageType":["string"],"messageContent":["string"],"questionStatus":["string"],"folderId":["null","string"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -778,7 +778,7 @@ function validPublishKey(value: string | null | undefined): value is string {
  * 別の下書きを公開しない。公開版・下書き版の両方を確認できる(自動応答の
  * POST /api/auto-replies/:id/publish より厳しい約束)。
  */
-templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+templates.post('/api/templates/:id/publish', requireDeliveryAccess('templates'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const requestKey = c.req.header('Idempotency-Key');
@@ -913,7 +913,7 @@ templates.get('/api/templates/:id/versions', async (c) => {
  * 466: この版に戻す。過去の版は変えず、その中身で新しい版を作る
  * （下書きへ写して公開する）。公開口と同じ確認キーと版確認を使う。
  */
-templates.post('/api/templates/:id/revert', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+templates.post('/api/templates/:id/revert', requireDeliveryAccess('templates'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const requestKey = c.req.header('Idempotency-Key');
@@ -976,7 +976,7 @@ templates.post('/api/templates/:id/revert', requireRole('owner', 'admin'), input
   }
 });
 
-templates.delete('/api/templates/:id', requireRole('owner', 'admin'), async (c) => {
+templates.delete('/api/templates/:id', requireDeliveryAccess('templates'), async (c) => {
   try {
     const id = c.req.param('id');
     const existing = await getTemplateById(c.env.DB, id);
