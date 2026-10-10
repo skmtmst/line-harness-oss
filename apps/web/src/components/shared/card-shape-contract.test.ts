@@ -99,7 +99,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["app/affiliates/tabs.tsx", "className=\"bg-canvas rounded-card border-hairline overflow-x-auto border\"", "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"],
   ["app/affiliates/tabs.tsx", "className=\"rounded-card border-hairline bg-canvas border p-4\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["app/affiliates/tabs.tsx", "className=\"bg-canvas rounded-card border-hairline mt-3 flex flex-wrap items-center gap-3 border p-3\"", "絞り込み・段の切り替え・選択の枠。中身のカードではない。"],
-  ["app/broadcasts/detail/broadcast-recipients.tsx", "className=\"bg-canvas rounded-card border-hairline border p-5\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["app/common-actions/branch-editor.tsx", "className=\"border-hairline bg-canvas-sunken mt-3 rounded-card border p-4\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["app/contents/media-detail-dialog.tsx", "className=\"bg-canvas-sunken rounded-card flex min-h-96 items-center justify-center overflow-hidden border border-hairline\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["app/contents/media-upload-dialog.tsx", "className=\"border-hairline max-h-screen w-full max-w-2xl overflow-y-auto rounded-card border bg-canvas shadow-float\"", "開いた窓・メニュー。浮く面の影を使い、カードの影を重ねない。"],
