@@ -32,6 +32,9 @@ import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { RowMenu } from '@/components/shared/row-actions'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useCustomerDeletion } from '@/lib/use-customer-deletion'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
@@ -132,6 +135,7 @@ export default function FormResponsesV8() {
 
 function Responses() {
   const role = useStaffRole()
+  const canDeleteResponse = canManageRole(role)
   const canEditForm = useFeatureAccess('forms')
   const canRetry = canEditForm
   const searchParams = useSearchParams()
@@ -201,6 +205,12 @@ function Responses() {
       if (request === loadRequest.current) setLoading(false)
     }
   }, [formId, selectedAccountId])
+
+  const deletion = useCustomerDeletion(async () => { await load(page, pageSize) })
+  const openDeletion = (item: Submission) => {
+    if (!canDeleteResponse || !selectedAccountId) return
+    deletion.open({ id: item.id, name: `${item.friendName ?? '不明'}（${formatDateTime(item.createdAt)}）の回答`, kind: 'form_response', path: `/api/forms/${encodeURIComponent(formId)}/submissions/${encodeURIComponent(item.id)}?account_id=${encodeURIComponent(selectedAccountId)}` })
+  }
 
   useEffect(() => {
     void load(1, 20)
@@ -376,6 +386,7 @@ function Responses() {
       {view === 'rows' && selected ? (
         <section className={styles.railCard} aria-label={`回答の詳細：${selected.friendName ?? '不明'}`}>
           <h2 className={styles.railTitle}>{`回答の詳細：${selected.friendName ?? '不明'}`}</h2>
+          {canDeleteResponse ? <RowMenu label="回答の詳細の操作" items={[{ id: 'delete-response', label: '回答を削除する', tone: 'danger', onSelect: () => openDeletion(selected) }]} /> : null}
           <dl className={styles.detailList}>
             <div className={styles.detailRow}>
               <dt>答えた日時</dt>
@@ -551,6 +562,7 @@ function Responses() {
                     <Th className={styles.colWho}>答えた人</Th>
                     <Th truncate>{firstKey ? (labels[firstKey] ?? firstKey) : '回答'}</Th>
                     <Th className={styles.colState}>後処理</Th>
+                    {canDeleteResponse ? <Th>操作</Th> : null}
                   </TableHeadRow>
                 </thead>
                 <tbody>
@@ -577,6 +589,7 @@ function Responses() {
                             : incomplete ? <span className={`${styles.chip} ${styles.chipNg}`}>未完</span>
                               : <span className={`${styles.chip} ${styles.chipOk}`}>済み</span>}
                         </td>
+                        {canDeleteResponse ? <td><RowMenu size="row" label={`回答 ${item.id} の操作`} items={[{ id: 'delete-response', label: '回答を削除する', tone: 'danger', onSelect: () => openDeletion(item) }]} /></td> : null}
                       </tr>
                     )
                   })}
@@ -591,6 +604,10 @@ function Responses() {
             </section>
           )}
       </DetailColumns>
+      <ConfirmDialog open={deletion.target !== null} title="回答を削除しますか？" deleteName="この回答"
+        description={`${deletion.target?.name ?? 'この回答'}と添付した写真・PDF・本人確認書類を削除します。元に戻せません。すでに行った送信やタグの変更は取り消されません。`}
+        destructive confirmDisabled={deletion.blocked} busy={deletion.busy} busyLabel="削除中…" error={deletion.error}
+        onConfirm={deletion.confirm} onCancel={deletion.close} />
     </DetailPage>
   )
 }
