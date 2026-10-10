@@ -4,17 +4,17 @@
  * ★V8 デリバリー受注・注文履歴と売上（板 `OzHLO`）。
  *
  * 絵のとおり「日付」「サービス」の2つだけで絞る（状態の絞り込みは絵に無いので置かない）。
- * 絞り込みと「CSVで保存」は板の頭の右（親が RestaurantPage の picker に置く）。
- * 数の帯は4枚（合計＋サービス3つ）。件数と売上はキャンセル・拒否を除いた数なので、
- * 足もとの「N件中」（キャンセルも含む行数）と食い違う。そのずれは合計の札に文字で書く。
+ * 絞り込みと「CSVで保存」は板の頭の右（親が RestaurantPage の picker に置く）。絵は1行なので
+ * 折り返さない幅で置く（折り返すと板の頭が伸びて下の集計・表がまるごとずれる）。
+ * 集計の帯は枠付きの札4枚（合計＋サービス3つ）。絵の大きい値は売上金額で、件数は題の右に小さく出す。
+ * 件数と売上はキャンセル・拒否を除いた数なので、足もとの「N件中」（キャンセルも含む行数）と
+ * 食い違う。そのずれは件数に指を当てたときだけ文字で出す（絵に3行目が無いため）。
  * 取れない値は数を作らず「—」を出す（D024）。
  */
 
 import { Download } from 'lucide-react'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
@@ -81,15 +81,17 @@ export function HistoryHeaderActions({
   onCsv,
 }: HistoryHeaderActionsProps) {
   return (
-    <div className={styles.filterRow}>
+    <div className={`${styles.filterRow} ${styles.filterRowOneLine}`}>
       <DateField
         aria-label="日付"
         size="compact"
+        className={styles.filterDate}
         value={date}
         onChange={onDateChange}
       />
       <Select
         aria-label="サービス"
+        className={styles.filterService}
         value={service}
         onChange={(value) => {
           const next = DELIVERY_SERVICES.find((item) => item === value)
@@ -132,7 +134,8 @@ function HistoryRow({
         </Button>
       </Td>
       <Td className={styles.td}>
-        <StatusBadge tone={SERVICE_TONES[order.service]} size="compact">
+        {/* 絵のサービス札（OzHLO）は点なし。状態札だけが点を持つ。 */}
+        <StatusBadge tone={SERVICE_TONES[order.service]} size="compact" dot={false}>
           {order.serviceLabel || DELIVERY_SERVICE_LABELS[order.service]}
         </StatusBadge>
       </Td>
@@ -193,6 +196,10 @@ export default function HistoryBoard({
   const totals = data?.totals ?? null
   const prefix = isToday ? '本日 ' : ''
   const canceled = totals ? totals.canceledCount : null
+  /* 絵に3行目が無いので、キャンセルを除いた数であることは件数に指を当てたときだけ出す。 */
+  const countNote = typeof canceled === 'number' && Number.isFinite(canceled)
+    ? `キャンセル・拒否を除く（キャンセル ${canceled}件）`
+    : 'キャンセル・拒否を除く'
   /* サービスの札は絵のとおり3つとも出す。その日に注文が無かったサービスは0件になる。 */
   const byService = DELIVERY_SERVICES.map((service) => {
     const row = totals?.byService.find((item) => item.service === service)
@@ -224,30 +231,29 @@ export default function HistoryBoard({
 
       {data ? (
         <>
-          <KpiBand gridClassName="">
-            <KpiCard
-              presentation="cell"
-              title={isToday ? '本日の合計' : '合計'}
-              value={totals ? totals.count : null}
-              unit="件"
-              detail={formatYen(totals ? totals.amount : null)}
-              description={
-                typeof canceled === 'number' && Number.isFinite(canceled)
-                  ? `キャンセル・拒否を除く（キャンセル ${canceled}件）`
-                  : 'キャンセル・拒否を除く'
-              }
-            />
+          {/* 絵（`ZuE0v`）は枠付きの別々の札4枚。大きい値は売上金額で、件数は題の右に小さく出す。 */}
+          <div className={styles.sumRow} data-design="ZuE0v">
+            <div className={styles.sumCard}>
+              <div className={styles.sumHead}>
+                <span className={styles.sumTitle}>{isToday ? '本日の合計' : '合計'}</span>
+                <span className={styles.fillLine} aria-hidden="true" />
+                <span className={styles.sumCount} title={countNote}>
+                  {totals ? `${totals.count}件` : DASH}
+                </span>
+              </div>
+              <p className={styles.sumAmount}>{formatYen(totals ? totals.amount : null)}</p>
+            </div>
             {byService.map((row) => (
-              <KpiCard
-                key={row.service}
-                presentation="cell"
-                title={row.label}
-                value={row.count}
-                unit="件"
-                detail={formatYen(row.amount)}
-              />
+              <div key={row.service} className={styles.sumCard}>
+                <div className={styles.sumHead}>
+                  <StatusBadge tone={SERVICE_TONES[row.service]} size="compact" dot={false}>{row.label}</StatusBadge>
+                  <span className={styles.fillLine} aria-hidden="true" />
+                  <span className={styles.sumCount}>{row.count}件</span>
+                </div>
+                <p className={styles.sumAmount}>{formatYen(row.amount)}</p>
+              </div>
             ))}
-          </KpiBand>
+          </div>
 
           <DataTable className={styles.table} data-design="OzHLO" label="デリバリーの注文履歴"><thead>
             <TableHeadRow>
@@ -255,7 +261,8 @@ export default function HistoryBoard({
               <Th className={styles.th}>サービス</Th>
               <Th className={styles.th}>時刻</Th>
               <Th className={styles.th}>注文内容</Th>
-              <Th className={styles.th} align="right">金額</Th>
+              {/* 絵（OzHLO）の見出しは全部左。中の金額だけ右に寄せる。 */}
+              <Th className={styles.th}>金額</Th>
               <Th className={styles.th}>状態</Th>
             </TableHeadRow></thead><tbody>
             {visible.length === 0 ? (

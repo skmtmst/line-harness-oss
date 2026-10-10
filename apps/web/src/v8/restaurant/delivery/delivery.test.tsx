@@ -8,8 +8,10 @@
  *  - 急ぎ度は結果と理由の文だけを出し、判定の仕組みの名前（Clef）は画面に出さない。
  *  - 閲覧のみ（staff）には送るボタンを置かない。
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RestaurantStore } from '@/lib/restaurant-test-api'
 import type {
@@ -378,5 +380,109 @@ describe('閲覧のみ（staff）', () => {
 
     // 見るだけの操作は残す。
     expect(screen.getByLabelText('注文UE-1001の詳細')).toBeTruthy()
+  })
+})
+
+/*
+ * 承認v02（★承認済み デリバリー受注_v02.pen／2026-10-09 利用者承認）の見え方を守る。
+ * ここは絵との「一致」を測る場ではない（happy-dom に寸法の計算は無いので、
+ * 1行か2行か・窓の高さは測れない）。測るのは scripts/visual-qa/frame-parity.mjs の役目。
+ * この組は、絵に合わせて決めた作り（並べ方の組・頭の印・札の種類・札の数）が
+ * あとから静かに戻っていないかを見張る。
+ */
+describe('承認v02の見え方を守る', () => {
+  const css = readFileSync(join(__dirname, 'delivery.module.css'), 'utf8')
+
+  it('注文一覧（kDQHr）のサービス札は1行に3つ並べる', () => {
+    // 絵（kDQHr）は札3つを横一列。縦積みにすると KPI も表もまるごと下へずれる。
+    expect(css).toMatch(/\.serviceRow \{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/)
+  })
+
+  it('注文一覧（kDQHr）は絵の段（頭の下14・段の間12・表は間0）で置く', () => {
+    // 共通の器 CHz31 は上16・間16。絵は12・12で、表だけタブにくっつく（間0）。
+    expect(css).toMatch(
+      /div:has\(> \.table table\[data-design='kDQHr'\]\) \{[^}]*padding-top: 14px;[^}]*gap: 12px;/,
+    )
+    expect(css).toMatch(/\.table:has\(table\[data-design='kDQHr'\]\) \{[^}]*margin-top: -12px/)
+  })
+
+  it('注文履歴（OzHLO）の絞り込みは折り返さない', () => {
+    // 折り返すと板の頭が2段に伸びて、下の集計・表がまるごとずれる。
+    expect(css).toMatch(/\.filterRowOneLine \{[^}]*flex-wrap: nowrap/)
+  })
+
+  it('注文履歴（OzHLO）は大きく出す値を売上金額にし、件数は頭の右に小さく置く', async () => {
+    at('/restaurant-test/delivery?view=history')
+    render(<DeliveryPage />)
+    await waitFor(() => expect(fixture.history).toHaveBeenCalled())
+
+    // 絞り込みは1行の組を足した側に出す。
+    const date = await screen.findByLabelText('日付')
+    expect(date.closest('[class*="filterRowOneLine"]')).toBeTruthy()
+
+    // 大きい値（.sumAmount は p）は金額。件数（.sumCount は span）はその前＝頭の中。
+    const amount = await screen.findByText('¥41,200')
+    expect(amount.tagName).toBe('P')
+    const count = screen.getByText('12件')
+    expect(count.tagName).toBe('SPAN')
+    expect(count.compareDocumentPosition(amount) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('キャンセルの確認（dgeTy）は白地の頭＋注意三角で、危険用の帯を出さない', async () => {
+    render(<DeliveryPage />)
+    await screen.findByText('#UE-1001')
+    fireEvent.click(screen.getByLabelText('注文UE-1001の詳細'))
+
+    const detail = (await waitFor(() => {
+      const el = document.querySelector('[data-design-node="hjdqV"]')
+      expect(el).toBeTruthy()
+      return el
+    })) as HTMLElement
+    fireEvent.click(within(detail).getByRole('button', { name: 'キャンセル' }))
+
+    const dialog = (await waitFor(() => {
+      const el = document.querySelector('[data-design-node="dgeTy"]')
+      expect(el).toBeTruthy()
+      return el
+    })) as HTMLElement
+
+    // 共通の窓は危険な操作のとき頭を帯で囲むが、絵は白地。plainTitle で帯を外している。
+    expect(dialog.querySelector('[data-qa-dialog-callout]')).toBeNull()
+    // 題の左に丸い注意三角を置く。
+    const heading = dialog.querySelector('h2')
+    const mark = heading?.previousElementSibling
+    expect(mark?.tagName).toBe('SPAN')
+    expect(mark?.querySelector('svg')).toBeTruthy()
+  })
+
+  it('受付の一括停止（XCVGd）は枠付きのサービス札と、別々の時間札4つを置く', async () => {
+    render(<DeliveryPage />)
+    await screen.findByText('#UE-1001')
+    fireEvent.click(screen.getByText('受付を一括停止'))
+
+    const dialog = (await waitFor(() => {
+      const el = document.querySelector('[data-design-node="XCVGd"]')
+      expect(el).toBeTruthy()
+      return el
+    })) as HTMLElement
+
+    expect(dialog.querySelector('[data-qa-dialog-callout]')).toBeNull()
+
+    // 枠付きの札（.stopCard）をサービスごとに置き、中に選ぶ印と丸い札を入れる。
+    for (const label of ['Uber Eats', '出前館', 'ロケットナウ']) {
+      const box = within(dialog).getByLabelText(`${label}の受付を停止する`)
+      expect(box.closest('[class*="stopCard"]')).toBeTruthy()
+      expect(within(dialog).getByText(label)).toBeTruthy()
+    }
+    expect(css).toMatch(/\.stopCard \{[^}]*outline: 1px solid var\(--color-choice-border\)/)
+
+    // 時間はつながった帯ではなく、離れた札4つ（押した札だけ色が付く）。
+    const times = within(dialog).getByRole('group', { name: '停止する時間' })
+    const cards = times.querySelectorAll('button')
+    expect(cards.length).toBe(4)
+    for (const card of Array.from(cards)) {
+      expect(card.getAttribute('aria-pressed')).toBeTruthy()
+      expect(card.className).toMatch(/timeCard/)
+    }
   })
 })

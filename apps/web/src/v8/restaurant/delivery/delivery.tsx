@@ -153,7 +153,8 @@ function DeliveryInner() {
   /* ── 受付の一括停止（XCVGd） ─────────────────────────────── */
   const [stopOpen, setStopOpen] = useState(false)
   const [stopSelected, setStopSelected] = useState<DeliveryService[]>([])
-  const [stopPreset, setStopPreset] = useState<DeliveryIntakeStopPreset>('30m')
+  /* 絵（XCVGd）で選ばれている札は「60分」なので、窓を開いた最初もそこに合わせる。 */
+  const [stopPreset, setStopPreset] = useState<DeliveryIntakeStopPreset>('60m')
   const [stopBusy, setStopBusy] = useState(false)
   const [stopError, setStopError] = useState<string | null>(null)
 
@@ -424,7 +425,7 @@ function DeliveryInner() {
     setStopSelected(service
       ? [service]
       : open.map((state) => state.service))
-    setStopPreset('30m')
+    setStopPreset('60m')
     setStopError(null)
     setStopOpen(true)
   }, [data])

@@ -8,9 +8,10 @@
  * 窓の頭は絵のとおり「注文の詳細」で固定し、注文番号は中の段へ置く
  * （番号を頭に入れると長さで頭が崩れるため）。
  * キャンセルは取り消せないので、別の窓で理由を選んでから送る。自由文は扱わず符号だけを送る。
+ * キャンセルの窓の頭は絵のとおり白地で、題の左に赤い丸の注意三角を置く（桃色の帯で囲まない）。
  */
 
-import { Ban, Check, X } from 'lucide-react'
+import { AlertTriangle, Ban, Check, X } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice, { type NoticeTone } from '@/components/shared/notice'
@@ -62,8 +63,9 @@ const URGENCY_NOTICE_TONES: Record<DeliveryUrgency, NoticeTone | null> = {
 /** 窓の寸法（絵のとおり）。詳細は中身が多いので上に寄せる。 */
 const DETAIL_WIDTH = 560
 const DETAIL_TOP = 120
-const CANCEL_WIDTH = 480
-const CANCEL_TOP = 240
+/* キャンセルの確認（dgeTy）は絵のとおり 460×258 を (490,330) に置く。 */
+const CANCEL_WIDTH = 460
+const CANCEL_TOP = 330
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -196,7 +198,8 @@ export function OrderDetailDialog({
 
           <div className={styles.detailHead}>
             <span className={styles.orderNumber}>{formatOrderNumber(order.orderNumber)}</span>
-            <StatusBadge tone={SERVICE_TONES[order.service]} size="compact">{serviceLabel}</StatusBadge>
+            {/* 絵のサービス札（hjdqV）は点なし。続く状態札・急ぎ札は点あり。 */}
+            <StatusBadge tone={SERVICE_TONES[order.service]} size="compact" dot={false}>{serviceLabel}</StatusBadge>
             <StatusBadge tone={STATUS_TONES[order.status]} size="compact">
               {order.statusLabel || DASH}
             </StatusBadge>
@@ -311,6 +314,15 @@ export function CancelOrderDialog({
       tone="destructive"
       busy={busy}
       designNode="dgeTy"
+      /* 絵の頭は白地＋注意三角。帯で囲まず、題の左に丸い印を置く。 */
+      titleIcon={(
+        <span className={styles.warnMark}>
+          <AlertTriangle size={18} aria-hidden="true" />
+        </span>
+      )}
+      plainTitle
+      contentPadding="18px 24px 20px"
+      footerPlain
       onCancel={onClose}
       actions={(
         <>
@@ -336,9 +348,6 @@ export function CancelOrderDialog({
           }))}
         />
       </DialogField>
-      <DialogNote>
-        選んだ理由はサービスへ送る区分としてだけ使われます。
-      </DialogNote>
       {error ? <DialogNote>{error}</DialogNote> : null}
     </RsDialog>
   )

@@ -184,6 +184,36 @@ const HIDE_BANNER = () => {
 
 const HIDE_BANNER_CALL = `(${HIDE_BANNER.toString()})()`
 
+/*
+ * 板（カード）の箱を測る。文字だけだと「どの入れ物が何 px 高いのか」が見えないため。
+ *
+ * 絵の書き出しは入れ物にも名前（`data-pencil-name`）が付いているので、
+ * 「板の頭」「数の帯」「表の見出し」のような段ごとの高さと上下の余白をそのまま比べられる。
+ * 画面側は名前がないので、位置（左端）と大きさで同じ段を見分ける。
+ * 中身の横幅いっぱいに広がる段だけを残す（左メニューと小さな部品を落とす）。
+ */
+const MEASURE_BOXES = () => [...document.querySelectorAll('div, section, main, table, thead, tbody, tr')]
+  .map((el) => {
+    const box = el.getBoundingClientRect()
+    const style = getComputedStyle(el)
+    return {
+      x: Math.round(box.x + window.scrollX),
+      y: Math.round(box.y + window.scrollY),
+      w: Math.round(box.width),
+      h: Math.round(box.height),
+      tag: el.tagName.toLowerCase(),
+      name: el.getAttribute('data-pencil-name') ?? '',
+      cls: String(el.className || '').slice(0, 56),
+      padTop: style.paddingTop,
+      padBottom: style.paddingBottom,
+      gap: style.rowGap === 'normal' ? style.gap : style.rowGap,
+    }
+  })
+  .filter((box) => box.w >= 560 && box.h >= 24 && box.x >= 200)
+  .sort((a, b) => a.y - b.y || b.h - a.h)
+
+const MEASURE_BOXES_CALL = `(${MEASURE_BOXES.toString()})()`
+
 /* ── 突き合わせ ──────────────────────────────────────────── */
 
 const norm = (text) => text.replace(/\s+/g, '').replace(/[，､、]/g, '、')
@@ -511,7 +541,10 @@ async function main() {
    * 調べ直すときの手当て。
    *   ONLY=kDQHr,hjdqV … その板・窓だけ測る（直しながら試すとき用）
    *   DUMP_PAIRS=1      … 突き合わせた1件ずつを metrics.json に残す（ずれの中身を見るため）
-   * どちらも付けなければ 6枚すべて・要約だけ。
+   *   DUMP_BOXES=1      … 板（カード）の箱も残す（どの段が何 px 高いのかを見るため）
+   * どれも付けなければ 6枚すべて・要約だけ。
+   * ONLY を付けた回は metrics.json がその板だけに書き換わる。
+   * 残す記録は ONLY なしの回で取り直す。
    */
   const only = process.env.ONLY ? process.env.ONLY.split(',').map((s) => s.trim()) : null
   const targets = only ? FRAMES.filter((frame) => only.includes(frame.id)) : FRAMES
@@ -566,6 +599,14 @@ async function main() {
         docWidth: implOut.docWidth,
         overflowX: implOut.scrollWidth - implOut.docWidth,
         ...(process.env.DUMP_PAIRS ? { pairs, pairsNoBanner: noBanner.pairs } : {}),
+        ...(process.env.DUMP_BOXES
+          ? {
+            boxes: {
+              design: await design.page.evaluate(MEASURE_BOXES_CALL),
+              impl: await impl.page.evaluate(MEASURE_BOXES_CALL),
+            },
+          }
+          : {}),
       }
       perFrame.push(entry)
 

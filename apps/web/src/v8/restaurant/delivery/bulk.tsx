@@ -18,7 +18,6 @@ import Checkbox from '@/components/shared/checkbox'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
-import SegmentedControl from '@/components/shared/segmented'
 import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, TableStateRow, Td, Th, Tr } from '@/components/shared/table'
 import Toggle from '@/components/shared/toggle'
@@ -30,12 +29,12 @@ import {
   type DeliveryServiceState,
 } from '@/lib/restaurant-delivery-api'
 import { DialogField, DialogNote, RsDialog } from '../booking-kit/parts'
-import { DASH, INTAKE_STOP_PRESET_OPTIONS, formatYen } from './format'
+import { DASH, INTAKE_STOP_PRESET_OPTIONS, SERVICE_TONES, formatYen } from './format'
 import styles from './delivery.module.css'
 
-/** 窓の寸法（絵のとおり）。確認の窓は小さめ。 */
-const STOP_WIDTH = 480
-const STOP_TOP = 260
+/** 窓の寸法（絵のとおり）。受付停止（XCVGd）は 500×438 を (470,230) に置く。 */
+const STOP_WIDTH = 500
+const STOP_TOP = 230
 
 const SOLD_OUT_COLUMN_COUNT = 6
 /** 閲覧のみの人には「選択」と「切替」を出さないので2つ少ない（★V8 2026-10-06）。 */
@@ -196,7 +195,12 @@ export default function SoldOutBoard({
               ) : null}
               <Th className={styles.th}>商品名</Th>
               <Th className={styles.th}>分類</Th>
-              <Th className={styles.th} align="right">価格</Th>
+              {/*
+                * 絵（h7OeT）の「価格」は左。見出し `X4NEtR` も中の欄 `hwhgs`・`IRs4m` も
+                * 左寄せで、右へ寄せる詰め物を持っていない。注文履歴（OzHLO）の「金額」は
+                * 逆に詰め物を持っていて右寄せなので、3つの表をまとめて同じにしない。
+                */}
+              <Th className={styles.th}>価格</Th>
               <Th className={styles.th}>状態</Th>
               {canManage ? <Th className={styles.th}>切替</Th> : null}
             </TableHeadRow></thead><tbody>
@@ -223,7 +227,7 @@ export default function SoldOutBoard({
                     </span>
                   </Td>
                   <Td className={styles.td}>{item.category || DASH}</Td>
-                  <Td className={styles.td} align="right">
+                  <Td className={styles.td}>
                     <span className={styles.amount}>{formatYen(item.price)}</span>
                   </Td>
                   <Td className={styles.td}>
@@ -308,6 +312,15 @@ export function IntakeStopDialog({
       tone="destructive"
       busy={busy}
       designNode="XCVGd"
+      /* 絵（`lSfGT`）の頭は白地。帯で囲まず、題の左の丸い印の中は一時停止の印。 */
+      titleIcon={(
+        <span className={styles.warnMark}>
+          <Pause size={18} aria-hidden="true" />
+        </span>
+      )}
+      plainTitle
+      contentPadding="18px 24px 20px"
+      footerPlain
       onCancel={onClose}
       actions={(
         <>
@@ -328,26 +341,40 @@ export function IntakeStopDialog({
         選んだサービスで新しい注文の受け付けを止めます。すでに受け付けた注文の調理・受け渡しはそのまま続きます。
       </p>
 
-      <DialogField label="停止するサービス">
-        <div className={styles.checkList}>
+      <DialogField label="停止するサービス" kind="select">
+        <div className={styles.stopList}>
           {services.length === 0 ? (
             <p className={styles.muted}>{DASH}</p>
           ) : (
             services.map((state) => {
               const label = state.label || DELIVERY_SERVICE_LABELS[state.service]
               const stopped = state.intakeStatus === 'stopped'
+              const picked = !stopped && selectedSet.has(state.service)
               return (
-                <div key={state.service} className={styles.checkRow}>
+                <div
+                  key={state.service}
+                  className={[
+                    styles.stopCard,
+                    picked ? styles.stopCardOn : null,
+                    stopped ? styles.stopCardOff : null,
+                  ].filter(Boolean).join(' ')}
+                >
+                  {/* サービス名は色の付いた札で見せるので、印には読み上げ名を渡す。 */}
                   <Checkbox
-                    className={styles.checkMain}
-                    checked={!stopped && selectedSet.has(state.service)}
+                    aria-label={`${label}の受付を停止する`}
+                    checked={picked}
                     disabled={stopped || busy}
-                    description={stopped ? 'すでに停止中' : `現在 受付中・${state.todayCount}件対応中`}
                     onCheckedChange={(checked) => onToggleService(state.service, checked)}
-                  >
-                    {label}
-                  </Checkbox>
-                  <span className={styles.checkState}>{stopped ? '対象外' : '停止する'}</span>
+                  />
+                  {/* 絵（XCVGd `Iv4Dr`/`Cxo9i`/`XK0ja`）のサービス札は点なしの丸い札。 */}
+                  <StatusBadge tone={SERVICE_TONES[state.service]} size="compact" dot={false}>{label}</StatusBadge>
+                  <span className={[styles.stopState, stopped ? styles.stopStateOff : null].filter(Boolean).join(' ')}>
+                    {stopped ? 'すでに停止中' : `現在 受付中・${state.todayCount}件対応中`}
+                  </span>
+                  <span className={styles.fillLine} aria-hidden="true" />
+                  <span className={[styles.stopMark, stopped ? styles.stopMarkOff : null].filter(Boolean).join(' ')}>
+                    {stopped ? '対象外' : '停止する'}
+                  </span>
                 </div>
               )
             })
@@ -355,23 +382,28 @@ export function IntakeStopDialog({
         </div>
       </DialogField>
 
+      {/* 絵（`To5Y0`）の時間はつながった帯ではなく離れた札4つ。押した札だけ薄い緑にする。 */}
       <DialogField label="停止する時間（過ぎると自動で再開します）" kind="select">
-        <SegmentedControl
-          aria-label="停止する時間"
-          equalWidth
-          disabled={busy}
-          value={preset}
-          onChange={(value) => onPresetChange(value as DeliveryIntakeStopPreset)}
-          options={INTAKE_STOP_PRESET_OPTIONS.map((option) => ({
-            value: option.value as DeliveryIntakeStopPreset,
-            label: option.label,
-          }))}
-        />
+        <div className={styles.timeRow} role="group" aria-label="停止する時間">
+          {INTAKE_STOP_PRESET_OPTIONS.map((option) => {
+            const value = option.value as DeliveryIntakeStopPreset
+            const on = preset === value
+            return (
+              <button
+                key={value}
+                type="button"
+                className={[styles.timeCard, on ? styles.timeCardOn : null].filter(Boolean).join(' ')}
+                aria-pressed={on}
+                disabled={busy}
+                onClick={() => onPresetChange(value)}
+              >
+                {option.label}
+              </button>
+            )
+          })}
+        </div>
       </DialogField>
 
-      <DialogNote>
-        停止するとお客様の画面から受付が閉じ、新しい注文は届きません。時間が過ぎると自動で戻り、札の「再開」でいつでも戻せます。
-      </DialogNote>
       {error ? <DialogNote>{error}</DialogNote> : null}
     </RsDialog>
   )

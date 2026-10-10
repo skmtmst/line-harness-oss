@@ -40,6 +40,14 @@
   box-shadow: var(--tpl-rs-line-top);
 }
 
+/* 絵に下の線が無い窓（デリバリーの確認窓 dgeTy・XCVGd）のボタンの段。 */
+.dialogActionsPlain {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tpl-rs-dlg-actions-gap);
+  padding-top: 8px;
+}
+
 .field {
   display: flex;
   flex: 1 1 0;

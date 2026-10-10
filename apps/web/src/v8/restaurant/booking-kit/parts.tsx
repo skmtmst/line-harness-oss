@@ -26,7 +26,7 @@ export function RowMore({ subject, items }: { subject: string; items: ActionMenu
  * （題の段のあと 14 の間・各段 14・下の線の上 14）で置く。
  * onSubmit を渡すと中身を form にする（Enter で保存できる）。
  */
-export function RsDialog({ open, title, width, top, tone, busy, designNode, onCancel, onSubmit, noValidate = false, actions, children }: {
+export function RsDialog({ open, title, width, top, tone, busy, designNode, titleIcon, plainTitle = false, contentPadding, footerPlain = false, onCancel, onSubmit, noValidate = false, actions, children }: {
   open: boolean
   title: string
   width: number
@@ -34,6 +34,14 @@ export function RsDialog({ open, title, width, top, tone, busy, designNode, onCa
   tone?: 'default' | 'destructive'
   busy?: boolean
   designNode?: string
+  /** 題の左に置く絵（危険な操作の確認の注意三角など）。 */
+  titleIcon?: ReactNode
+  /** 題のまわりを桃色の帯で囲まない（絵が白い見出しのとき）。 */
+  plainTitle?: boolean
+  /** 中身の余白を絵の値にする（例 `18px 24px 20px`）。 */
+  contentPadding?: string
+  /** 下のボタンの段に上の線を引かない（絵に線が無いとき）。 */
+  footerPlain?: boolean
   onCancel: () => void
   onSubmit?: () => void
   noValidate?: boolean
@@ -43,7 +51,7 @@ export function RsDialog({ open, title, width, top, tone, busy, designNode, onCa
   const body = (
     <>
       {children}
-      <div className={styles.dialogActions}>{actions}</div>
+      <div className={footerPlain ? styles.dialogActionsPlain : styles.dialogActions}>{actions}</div>
     </>
   )
   return (
@@ -52,8 +60,11 @@ export function RsDialog({ open, title, width, top, tone, busy, designNode, onCa
       title={title}
       tone={tone}
       busy={busy}
+      titleIcon={titleIcon}
+      confirmation={plainTitle || undefined}
       designWidth={width}
       designTop={top}
+      designContentPadding={contentPadding}
       designNode={designNode}
       onCancel={onCancel}
     >
