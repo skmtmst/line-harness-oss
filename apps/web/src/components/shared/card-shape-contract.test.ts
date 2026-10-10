@@ -117,7 +117,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["app/tags/edit-field-page-v8.tsx", "className=\"rounded-card border border-hairline bg-canvas p-5 text-sm text-ink-secondary\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["app/tags/search-editor-v8.tsx", "className=\"rounded-card border border-hairline bg-canvas p-5 text-sm text-ink-secondary\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["app/templates/staff-asset-list.tsx", "className=\"bg-canvas border-hairline text-ink-faint col-span-full rounded-card border border-dashed p-12 text-center text-sm\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
-  ["app/webhooks/outgoing-v8.tsx", "className=\"overflow-x-auto rounded-card border border-hairline bg-canvas\"", "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"],
   ["components/broadcasts/broadcast-approval.tsx", "className=\"bg-warning-bg rounded-card border-hairline border p-5\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["components/broadcasts/broadcast-form.tsx", "className=\"border-hairline mt-4 rounded-card border bg-canvas p-5\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["components/broadcasts/broadcast-form.tsx", "className=\"rounded-card border border-hairline bg-canvas p-8 text-center\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
