@@ -96,4 +96,3 @@ export function SettingsNavV8() {
     </nav>
   )
 }
-

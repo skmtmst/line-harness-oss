@@ -33,4 +33,3 @@ test('配布先の選択肢を読む。統括の選択肢を写さず、元の�
   expect(b.sections[0].blocks[0]).toMatchObject({choices:expect.arrayContaining([{id:'allergy-0',label:'卵'}])});
   expect(layout.sections[0].blocks[0]).toMatchObject({choices:[{label:'統括の選択肢'}]});
 });
-
