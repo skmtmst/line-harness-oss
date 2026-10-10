@@ -7,11 +7,12 @@
  * 送る前（下書き）・予約中は取り消す（cancel）。下書きは店ごとの確かめを見て、そのまま送れる（send）。
  * 送った LINE は取り消せない。動きは BEHAVIOR.md。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Ban, Check, CirclePause, Copy, Download, PencilLine, RotateCcw, Send } from 'lucide-react'
-import Select from '@/components/shared/select'
+
 import { Tabs } from '@/components/shared/tabs'
 import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval'
 import { downloadApiFile } from '@/lib/api'
@@ -218,7 +219,7 @@ function RecipientsTab({ run }: { run: HqBroadcastRun }) {
           <p className={styles.cardSub}>{total == null ? 'アカウントを選ぶと、その店の宛先が出ます' : `${n(total)}人`}</p>
         </div>
         <span className={styles.accountPick}>
-          <Select aria-label="宛先を見るアカウント" size="full" value={accountId} onChange={setAccountId} options={sentTo.map((t) => ({ value: t.accountId, label: t.accountName }))} />
+          <EntitySelect aria-label="宛先を見るアカウント" size="full" value={accountId} onChange={setAccountId} options={sentTo.map((t) => ({ ...entityOptionMetadata(t), value: t.accountId, label: t.accountName }))} />
         </span>
       </div>
       {state === 'error' ? <ListState kind="error" error={new Error('宛先を読み込めませんでした')} onRetry={() => void load(0, false)} /> : (

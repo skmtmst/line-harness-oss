@@ -11,6 +11,7 @@
  * - 受付を止める・別リンクへ送る・削除するは「その後」の段の右上の「…」から（今は段の題の右）
  * - 閲覧のみ（owner・admin 以外）には、リンクを編集・止める・することを変える・「…」を出さず、閲覧のみの帯を出す
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useState } from 'react'
@@ -803,7 +804,7 @@ function InflowDetailContent() {
             {deleteChoice === 'redirect' ? (
               <div className={styles.deleteField}>
                 <span className={styles.deleteChoiceTitle}>転送先のリンク</span>
-                <Select
+                <EntitySelect
                   aria-label="転送先のリンク"
                   id="inflow-redirect-target"
                   value={redirectTargetId}
@@ -812,7 +813,7 @@ function InflowDetailContent() {
                   size="full"
                   options={[
                     { value: '', label: '選んでください' },
-                    ...routes.filter((candidate) => candidate.id !== route.id).map((candidate) => ({ value: candidate.id, label: `${candidate.name}（${candidate.refCode}）` })),
+                    ...routes.filter((candidate) => candidate.id !== route.id).map((candidate) => ({ ...entityOptionMetadata(candidate), value: candidate.id, label: `${candidate.name}（${candidate.refCode}）` })),
                   ]}
                 />
                 <span className={styles.note}>先頭を自動で選ぶことはしません。必ず選んでください。</span>

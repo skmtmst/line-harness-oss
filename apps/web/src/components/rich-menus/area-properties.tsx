@@ -1,8 +1,9 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useId } from 'react'
 import { ArrowLeftRight, CalendarClock, Copy, Phone, Send, Zap } from 'lucide-react'
-import MultiSelect from '@/components/shared/multi-select'
+
 import Select from '@/components/shared/select'
 import TapActionField, { type TapActionExtraKind } from '@/components/shared/tap-action-field'
 import { tapLiffIdOf, useTapActionAccount, useTapActionSources } from '@/components/shared/use-tap-action-sources'
@@ -284,14 +285,14 @@ export function AreaProperties({
   /* URLを開く：計測リンクを選べる（選ぶと飛び先は計測リンクの設定）。 */
   const urlBody = (
     <>
-      <Select
+      <EntitySelect
         value={area.trackedLinkId ?? ''}
         onChange={(value) => onUpdate({ trackedLinkId: value || null })}
         aria-label="計測リンクを使う"
         disabled={readOnly}
         options={[
           { value: '', label: '計測リンクを使わない（下のURLをそのまま開く）' },
-          ...trackedLinks.map((l) => ({ value: l.id, label: l.name })),
+          ...trackedLinks.map((l) => ({ ...entityOptionMetadata(l), value: l.id, label: l.name })),
         ]}
         size="full"
       />
@@ -473,14 +474,14 @@ export function AreaProperties({
 
       {intent === 'switch' && (
         <Field label="切り替え先のページ">
-          <Select
+          <EntitySelect
             value={(data.targetPageId as string) ?? ''}
             onChange={(value) => onUpdate({ actionData: { ...data, targetPageId: value } })}
             aria-label="切り替え先のページ"
             invalid={Boolean(error)}
             options={[
               { value: '', label: '選択...' },
-              ...pages.map((p) => ({ value: p.id, label: p.name })),
+              ...pages.map((p) => ({ ...entityOptionMetadata(p), value: p.id, label: p.name })),
             ]}
             size="full"
           />
@@ -593,9 +594,9 @@ export function AreaProperties({
               {tags.length === 0 ? (
                 <p className="text-ink-faint mt-1 text-micro">タグがまだありません。</p>
               ) : (
-                <MultiSelect
+                <EntitySelect size="full" kind="tag"
                   aria-label="タグを付ける"
-                  options={tags.map((t) => ({ value: t.id, label: t.name }))}
+                  options={tags.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))}
                   values={selectedTagIds}
                   onChange={(next) => onUpdate({ tagIds: next })}
                   placeholder="タグを選ぶ"

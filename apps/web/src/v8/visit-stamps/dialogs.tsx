@@ -1,10 +1,14 @@
 'use client'
 
+import { EntityMultiPickerDialog } from '@/components/shared/entity-picker'
+
 /*
  * 来店スタンプ（V8 w4SBbv）の小窓。絵に窓は無いので、共通の Dialog に欄を並べるだけにする。
  * 特典・倍率・初回ボーナス・ランク倍率は「下書き」を変えるだけ（保存は下の帯の［保存する］）。
  * 理由・暗証番号・写真は、その場で口を呼ぶ（呼び出しは画面側）。
  */
+import EntityRemoteField from '@/components/shared/entity-remote-field'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useState } from 'react'
 import type { VisitStampMultiplier, VisitStampReward, VisitStampSettings } from '@line-crm/shared'
 import Checkbox from '@/components/shared/checkbox'
@@ -180,7 +184,7 @@ export function RankDialog({ open, settings, onClose, onSave }: {
       <div className={styles.dialogBody}>
         {rows.map((row, i) => (
           <div key={i} className={styles.row2}>
-            <Field label={`タグの名前 ${i + 1}`}><TextField value={row.tagName} onChange={(e) => setRows(rows.map((r, k) => (k === i ? { ...r, tagName: e.target.value } : r)))} placeholder="例：ゴールド" /></Field>
+            <Field label={`タグ ${i + 1}`}><EntityRemoteField kind="tag" valueMode="name" label={`タグ ${i + 1}`} value={row.tagName} emptyLabel="指定しない" onChange={(tagName) => setRows(rows.map((r, k) => (k === i ? { ...r, tagName } : r)))} /></Field>
             <CheckedField id={`vs-rank-rate-${i}`} label="倍率" fields={fields} name={`rate-${i}`}><TextField {...checkedProps(fields, `rate-${i}`, `vs-rank-rate-${i}`)} value={row.multiplier} onChange={(e) => setRows(rows.map((r, k) => (k === i ? { ...r, multiplier: e.target.value } : r)))} inputMode="decimal" /></CheckedField>
           </div>
         ))}
@@ -222,7 +226,7 @@ export function PinDialog({ open, staff, busy, error, onClose, onSave }: {
     <Dialog open={open} title="店員の暗証番号" description="特典を使用済みにするとき、店員がお客さまのスマホで打つ4桁の番号です。保存したあとは番号を表示しません。" confirmLabel="保存する" busy={busy} error={error}
       onCancel={onClose} onConfirm={() => { if (fields.submit().length === 0) onSave(staffId, pin) }}>
       <div className={styles.dialogBody}>
-        <CheckedField id="vs-pin-staff" label="店員" fields={fields} name="staff"><div {...fields.bind('staff')}><Select id="vs-pin-staff" aria-label="店員" size="full" value={staffId} error={fields.error('staff') ?? undefined} onChange={(v) => { fields.clear('staff'); setStaffId(v) }} options={staff.map((s) => ({ value: s.id, label: s.name }))} /></div></CheckedField>
+        <CheckedField id="vs-pin-staff" label="店員" fields={fields} name="staff"><div {...fields.bind('staff')}><EntitySelect id="vs-pin-staff" aria-label="店員" size="full" value={staffId} error={fields.error('staff') ?? undefined} onChange={(v) => { fields.clear('staff'); setStaffId(v) }} options={staff.map((s) => ({ ...entityOptionMetadata(s), value: s.id, label: s.name }))} /></div></CheckedField>
         <CheckedField id="vs-pin" label="暗証番号（4桁）" fields={fields} name="pin"><TextField {...checkedProps(fields, 'pin', 'vs-pin')} className={styles.pin} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))} inputMode="numeric" autoComplete="off" type="password" /></CheckedField>
       </div>
     </Dialog>
@@ -233,18 +237,7 @@ export function PinDialog({ open, staff, busy, error, onClose, onSave }: {
 export function StoresDialog({ open, accounts, value, onClose, onSave }: {
   open: boolean; accounts: Array<{ id: string; name: string }>; value: string[]; onClose: () => void; onSave: (ids: string[]) => void
 }) {
-  const [ids, setIds] = useState<string[]>([])
-  useEffect(() => { if (open) setIds(value) }, [open, value])
-  return (
-    <Dialog open={open} title="押せる店" description="このカードのスタンプを押せる店です。同じカードの店どうしでスタンプを合わせて数えます。" confirmLabel="決める" onCancel={onClose}
-      error={ids.length ? undefined : '店を1つ以上選んでください。'} onConfirm={() => { if (ids.length) onSave(ids) }}>
-      <div className={styles.dialogBody}>
-        {accounts.map((a) => (
-          <Checkbox key={a.id} checked={ids.includes(a.id)} onCheckedChange={(on) => setIds(on ? [...ids, a.id] : ids.filter((x) => x !== a.id))}>{a.name}</Checkbox>
-        ))}
-      </div>
-    </Dialog>
-  )
+  return open ? <EntityMultiPickerDialog title="押せる店" description="このカードのスタンプを押せる店です。同じカードの店どうしでスタンプを合わせて数えます。" items={accounts} initialIds={value} allowEmpty={false} onCancel={onClose} onConfirm={onSave} /> : null
 }
 
 export function PhotoDialog({ url, name, onClose }: { url: string | null; name: string; onClose: () => void }) {

@@ -10,6 +10,7 @@
  * 保存を止めるのではなく**その場で残り文字数を出す**。
  */
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useId, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import Checkbox from '@/components/shared/checkbox'
@@ -649,7 +650,7 @@ export default function QuestionEditor({
                     */}
                     <div>
                       <label htmlFor={`${fieldBase}-choice-${index}-field`} className="text-ink-secondary text-xs font-medium">友だち情報欄</label>
-                      <Select
+                      <EntitySelect
                         aria-label="友だち情報欄"
                         id={`${fieldBase}-choice-${index}-field`}
                         value={choice.field?.fieldId ?? ''}
@@ -662,7 +663,7 @@ export default function QuestionEditor({
                         }
                         options={[
                           { value: '', label: '設定しない' },
-                          ...fields.map((f) => ({ value: f.id, label: f.name })),
+                          ...fields.map((f) => ({ ...entityOptionMetadata(f), value: f.id, label: f.name })),
                         ]}
                         size="full"
                         className="mt-1.5"

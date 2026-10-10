@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { ActionConfigEditor, ACTION_KINDS } from '@/components/scenarios/action-editor'
@@ -105,10 +106,10 @@ export default function InlineActionRowsV8({ actions, onChange, ...options }: Pr
               <div className={styles.editor}>
                 {action.actionType === 'notify_staff' ? (
                   <div className={styles.notify}>
-                    <Select
+                    <EntitySelect
                       aria-label="通知先"
                       value={String(cfg(action).notificationRuleId ?? '')}
-                      options={[{ value: '', label: '通知先を選ぶ' }, ...(options.notificationRules ?? []).map((r) => ({ value: r.id, label: r.name }))]}
+                      options={[{ value: '', label: '通知先を選ぶ' }, ...(options.notificationRules ?? []).map((r) => ({ ...entityOptionMetadata(r), value: r.id, label: r.name }))]}
                       onChange={(value) => {
                         const rule = options.notificationRules?.find((r) => r.id === value)
                         update(action.key, { config: { ...cfg(action), notificationRuleId: value, notificationRuleVersion: rule?.version ?? 0 } })

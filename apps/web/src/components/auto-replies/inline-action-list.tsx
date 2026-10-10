@@ -1,8 +1,9 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
-import type { ScenarioActionType } from '@/lib/api'
+
 import { ActionConfigEditor, ACTION_KINDS } from '@/components/scenarios/action-editor'
 import Select from '@/components/shared/select'
 import { actionIncompleteReason } from './action-completeness'
@@ -207,7 +208,7 @@ export default function InlineActionList({
               />
             </label>
             {action.actionType === 'notify_staff' ? <div className="space-y-2">
-              <label className="block text-xs">通知先<Select aria-label="通知先" value={String((action.config as Record<string,unknown>)?.notificationRuleId??'')} options={[{value:'',label:'選んでください'},...notificationRules.map(r=>({value:r.id,label:r.name}))]} onChange={value=>{const rule=notificationRules.find(r=>r.id===value);update(action.key,{...(action.config as object),notificationRuleId:value,notificationRuleVersion:rule?.version??0})}}/></label>
+              <label className="block text-xs">通知先<EntitySelect aria-label="通知先" value={String((action.config as Record<string,unknown>)?.notificationRuleId??'')} options={[{value:'',label:'選んでください'},...notificationRules.map(r=>({ ...entityOptionMetadata(r),value:r.id,label:r.name}))]} onChange={value=>{const rule=notificationRules.find(r=>r.id===value);update(action.key,{...(action.config as object),notificationRuleId:value,notificationRuleVersion:rule?.version??0})}}/></label>
               <label className="block text-xs">通知の本文<textarea aria-label="通知の本文" maxLength={2000} className="w-full border border-hairline rounded-control p-2" value={String((action.config as Record<string,unknown>)?.message??'')} onChange={e=>update(action.key,{...(action.config as object),message:e.target.value})}/></label>
               {notificationRules.length===0&&<p className="text-xs text-ink-faint">公開済みの担当者通知を先に設定してください</p>}
             </div> : <ActionConfigEditor

@@ -1,5 +1,7 @@
 'use client'
 
+import FriendPickerField from '@/components/shared/friend-picker-field'
+
 /*
  * ★V8 オートメーションのルール一覧（Pencil：一覧 `LWQXd`・1152 `En14p`・閲覧のみ `nH9L8`）。
  *
@@ -50,7 +52,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { Field } from '@/components/shared/form-controls'
-import { TextField } from '@/components/shared/text-field'
+
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import {
@@ -626,14 +628,8 @@ export default function AutomationListV8() {
         >
           {testing ? (
             <div className={styles.testBody}>
-              <Field label="試す友だちのID">
-                <TextField
-                  aria-label="試す友だちのID"
-                  value={testFriendId}
-                  onChange={(event) => setTestFriendId(event.target.value)}
-                  placeholder="試す友だちID"
-                  disabled={testBusy || testDone}
-                />
+              <Field label="試す友だち">
+                <FriendPickerField label="試す友だち" accountId={selectedAccountId ?? null} value={testFriendId} onChange={setTestFriendId} disabled={testBusy || testDone} />
               </Field>
               <p className={styles.testNote}>
                 すること：{testing.actions.map((action) => automationActionLabel(action.type)).join('・') || '登録した処理'}

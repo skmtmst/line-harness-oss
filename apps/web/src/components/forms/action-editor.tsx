@@ -9,6 +9,7 @@
  * と探すことになるので、1つの部品にしてある。
  */
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import type { FormAction } from '@line-crm/shared'
 import Select from '@/components/shared/select'
 import { cellInput, miniButton, type FormRefs } from './form-refs'
@@ -88,7 +89,7 @@ export default function ActionEditor({
           )}
 
           {action.kind === 'send_template' && (
-            <Select
+            <EntitySelect kind="template"
               value={action.templateId}
               onChange={(value) => patch(index, { ...action, templateId: value })}
               aria-label="送るテンプレート"
@@ -96,7 +97,7 @@ export default function ActionEditor({
                 { value: '', label: '— 選んでください —' },
                 ...refs.templates
                   .filter((t) => t.type === 'text')
-                  .map((t) => ({ value: t.id, label: t.name })),
+                  .map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name })),
               ]}
             />
           )}
@@ -114,7 +115,7 @@ export default function ActionEditor({
                   { value: 'remove', label: '外す' },
                 ]}
               />
-              <Select
+              <EntitySelect kind="tag"
                 value={action.tagIds[0] ?? ''}
                 onChange={(value) =>
                   patch(index, { ...action, tagIds: value ? [value] : [] })
@@ -122,7 +123,7 @@ export default function ActionEditor({
                 aria-label="タグ"
                 options={[
                   { value: '', label: '— タグ —' },
-                  ...refs.tags.map((t) => ({ value: t.id, label: t.name })),
+                  ...refs.tags.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name })),
                 ]}
               />
             </>
@@ -130,13 +131,13 @@ export default function ActionEditor({
 
           {action.kind === 'friend_field' && (
             <>
-              <Select
+              <EntitySelect
                 value={action.fieldId}
                 onChange={(value) => patch(index, { ...action, fieldId: value })}
                 aria-label="書き込む友だち情報欄"
                 options={[
                   { value: '', label: '— 情報欄 —' },
-                  ...refs.friendFields.map((f) => ({
+                  ...refs.friendFields.map((f) => ({ ...entityOptionMetadata(f),
                     value: f.id,
                     label: `${f.name}${f.ecIsMaster ? '（EC側が正）' : ''}`,
                     disabled: f.ecIsMaster,
@@ -166,26 +167,26 @@ export default function ActionEditor({
                   { value: 'stop', label: '停止する' },
                 ]}
               />
-              <Select
+              <EntitySelect kind="scenario"
                 value={action.scenarioId}
                 onChange={(value) => patch(index, { ...action, scenarioId: value })}
                 aria-label="シナリオ"
                 options={[
                   { value: '', label: '— シナリオ —' },
-                  ...refs.scenarios.map((s) => ({ value: s.id, label: s.name })),
+                  ...refs.scenarios.map((s) => ({ ...entityOptionMetadata(s), value: s.id, label: s.name })),
                 ]}
               />
             </>
           )}
 
           {action.kind === 'reminder' && (
-            <Select
+            <EntitySelect kind="reminder"
               value={action.reminderId}
               onChange={(value) => patch(index, { ...action, reminderId: value })}
               aria-label="リマインダ"
               options={[
                 { value: '', label: '— リマインダ —' },
-                ...refs.reminders.map((r) => ({ value: r.id, label: r.name })),
+                ...refs.reminders.map((r) => ({ ...entityOptionMetadata(r), value: r.id, label: r.name })),
               ]}
             />
           )}

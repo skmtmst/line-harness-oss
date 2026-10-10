@@ -11,6 +11,7 @@
  * データの口は今の画面（app/restaurant-test/v8/shell.tsx）と同じ
  * restaurantTestApi.snapshot。取得失敗と未登録を混ぜない（D024）。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
@@ -23,7 +24,7 @@ import {
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import ListState from '@/components/shared/list-state'
-import Select from '@/components/shared/select'
+
 import styles from './frame.module.css'
 
 export interface RestaurantContext {
@@ -138,14 +139,14 @@ export default function RestaurantFrame({
   )
 
   const picker = snapshot && snapshot.stores.length > 0 ? (
-    <Select
+    <EntitySelect
       aria-label="店舗を選ぶ"
       width={STORE_PICKER_WIDTH}
       value={selectedStoreId}
       onChange={setSelectedStoreId}
       options={[
         ...(allStores ? [{ value: '', label: '店舗：すべての店舗' }] : []),
-        ...snapshot.stores.map((item) => ({ value: item.id, label: `店舗：${item.name}` })),
+        ...snapshot.stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}` })),
       ]}
     />
   ) : null

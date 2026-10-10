@@ -11,6 +11,7 @@
  * データの口・保存の口・権限・失敗の扱いは app/conversions/page.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -982,12 +983,12 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       </RadioCardGroup>
       {stopAction === 'replace' ? (
         <div className={styles.fieldBox}>
-          <Select
+          <EntitySelect
             aria-label="差し替え先の成果地点"
             value={replacementId}
             options={[
               { value: '', label: '差し替え先を選ぶ' },
-              ...(stopImpact?.replacementCandidates ?? []).map((item) => ({ value: item.id, label: `差し替え先：${item.name}` })),
+              ...(stopImpact?.replacementCandidates ?? []).map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `差し替え先：${item.name}` })),
             ]}
             onChange={setReplacementId}
           />

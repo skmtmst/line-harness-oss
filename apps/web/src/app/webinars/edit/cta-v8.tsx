@@ -1,6 +1,7 @@
 'use client'
 
 /* ★V8 CTA・フォーム（Q0Jrk）。入力は下書き保存と次の段からも保存する。 */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu from '@/components/shared/action-menu'
@@ -13,8 +14,8 @@ import Select from '@/components/shared/select'
 import Notice from '@/components/shared/notice'
 import { ApiError, fetchApi, webinarApi, type WebinarCtaCard, type WebinarEditor } from '@/lib/api'
 import { ctaCardProblems } from './cta-card-validation'
-import { extractEditConflict } from './webinar-edit-conflict-band'
-import type { CompareMine } from './webinar-edit-compare-dialog'
+
+
 
 /* 申込フォームの候補（編集画面の CtaDesignStep と同じ形）。 */
 type FormCandidates = {
@@ -368,14 +369,14 @@ export default function CtaV8({
                       ]}
                     />
                     {current.kind === 'form' ? (
-                      <Select
+                      <EntitySelect kind="form"
                         label="使うフォーム"
                         aria-label="使うフォーム"
                         value={current.formId ?? ''}
                         onChange={(value) => update(currentIndex, { formId: value || null })}
                         options={[
                           { value: '', label: 'フォームを選ぶ' },
-                          ...publishedForms.map((form) => ({ value: form.id, label: form.name })),
+                          ...publishedForms.map((form) => ({ ...entityOptionMetadata(form), value: form.id, label: form.name })),
                         ]}
                       />
                     ) : (
@@ -416,7 +417,7 @@ export default function CtaV8({
           {formCandidates.state === 'error' ? <p className="text-ink-secondary mt-3 text-sm" role="alert">回答フォームを読み込めませんでした。候補が取れない間は種類をURLに切り替えて保存できます。 <Button onClick={loadForms}>もう一度読み込む</Button></p> : null}
           {formCandidates.state === 'forbidden' ? <p className="text-ink-secondary mt-3 text-sm">回答フォームを見る権限がありません。管理者に権限の確認を依頼してください。</p> : null}
           {formCandidates.state === 'ready' && publishedForms.length === 0 ? <p className="text-ink-faint mt-3 text-sm">公開中の回答フォームがありません。</p> : null}
-          {formCandidates.state === 'ready' && publishedForms.length > 0 ? <div className="mt-3"><Select label="申込フォーム" aria-label="申込に使う回答フォーム" value={selectedRegistrationFormId} onChange={setSelectedRegistrationFormId} options={[{ value: '', label: '申込フォームを選ぶ' }, ...publishedForms.map((form) => ({ value: form.id, label: form.name }))]} /></div> : null}
+          {formCandidates.state === 'ready' && publishedForms.length > 0 ? <div className="mt-3"><EntitySelect kind="form" label="申込フォーム" aria-label="申込に使う回答フォーム" value={selectedRegistrationFormId} onChange={setSelectedRegistrationFormId} options={[{ value: '', label: '申込フォームを選ぶ' }, ...publishedForms.map((form) => ({ ...entityOptionMetadata(form), value: form.id, label: form.name }))]} /></div> : null}
           {formCandidates.state === 'ready' && selectedRegistrationFormId && !publishedForms.some((form) => form.id === selectedRegistrationFormId) ? <p role="alert" className="text-warning mt-2 text-sm">前に選んだフォームは使えなくなりました。公開中のフォームを選び直してください。</p> : null}
           {formCandidates.state === 'ready' && editor.registrationFormId && !publishedForms.some((form) => form.id === editor.registrationFormId) ? <p className="text-warning mt-2 text-sm">保存済みの申込フォームは公開中ではありません。</p> : null}
           {registrationError ? <p className="text-danger mt-2 text-xs" role="alert">{registrationError}</p> : null}

@@ -11,6 +11,7 @@
  * ・右に LINE での見え方・気をつけること・この画面でできないこと・自分にテストを送る。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useRef, useState } from 'react'
 import { CalendarClock, ClipboardList, Coins, Eye, Package, Save, Send } from 'lucide-react'
 import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared'
@@ -371,7 +372,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
           </span>
           {/* 相手が2人以上いるときだけ、送る相手を選ぶ欄を出す（ボタンの下：上の並びを動かさない）。 */}
           {testCandidates.length > 1 ? (
-            <Select aria-label="テスト送信の相手" size="full" value={testTarget} onChange={setTestTarget} options={testCandidates.map((candidate) => ({ value: candidate.id, label: `送る相手：${candidate.displayName ?? '名前なし'}` }))} />
+            <EntitySelect aria-label="テスト送信の相手" size="full" value={testTarget} onChange={setTestTarget} options={testCandidates.map((candidate) => ({ ...entityOptionMetadata(candidate), value: candidate.id, label: `送る相手：${candidate.displayName ?? '名前なし'}` }))} />
           ) : null}
         </Card>
       ) : null}

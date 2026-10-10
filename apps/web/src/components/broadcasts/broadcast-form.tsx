@@ -1,5 +1,8 @@
 'use client'
 
+import { EntityPickerDialog } from '@/components/shared/entity-picker'
+
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -71,12 +74,12 @@ import {
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
-import Combobox from '@/components/shared/combobox'
+
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Checkbox from '@/components/shared/checkbox'
 import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
-import Select from '@/components/shared/select'
+
 import { useStaffRole } from '@/lib/staff-role'
 import { canEditFeature } from '@/lib/staff-capability'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
@@ -619,10 +622,7 @@ export default function BroadcastForm({
    * (`folders` / kind='broadcast') とは別物なので別に持つ。
    */
   const [templateFolders, setTemplateFolders] = useState<Folder[]>([])
-  const [templatePickerQuery, setTemplatePickerQuery] = useState('')
-  const [templatePickerFolderId, setTemplatePickerFolderId] = useState('')
   const [showTemplatePicker, setShowTemplatePicker] = useState(openTemplatePickerInitially)
-  const [selectedTemplate, setSelectedTemplate] = useState<BroadcastTemplateOption | null>(null)
   const [targetMode, setTargetMode] = useState<TargetMode>(initialCondition ? 'advanced' : 'scenario')
   /** シナリオ購読で絞るときの相手。空なら「どれか1つでも購読している人」。 */
   const [scenarioId, setScenarioId] = useState('')
@@ -759,7 +759,7 @@ export default function BroadcastForm({
   usePageTitle(
     preflightDialogOpen
       ? '一斉配信の配信前チェック'
-      : showTemplatePicker || selectedTemplate
+      : showTemplatePicker
         ? '一斉配信を作成・テンプレートを選ぶ'
         : stepTitle[currentStep ?? 'basic'],
   )
@@ -1075,7 +1075,6 @@ export default function BroadcastForm({
   // 独立審査(指摘4): アカウント切替で旧候補・選択・吹き出しを残さない。
   // 持ち主の分かる吹き出しだけ落とし、手書き・素材は保つ。
   useEffect(() => {
-    setSelectedTemplate(null)
     setExcludeTagId('')
     setBubbles((items) => items.filter((bubble) => {
       const owner = bubble.content.templateAccountId
@@ -1206,24 +1205,6 @@ export default function BroadcastForm({
   }
   const moveBubble = (index: number, direction: -1 | 1) => setBubbles((items) => { const next = [...items]; const [item] = next.splice(index, 1); next.splice(index + direction, 0, item); return next })
 
-  /*
-   * テンプレート選択窓の候補（IDEA-11）。
-   * 以前は先頭3件だけを出していたので、4件目以降は検索・フォルダでも
-   * 届かなかった。読み込み済みの候補を全部対象に、名前・本文と置き場で絞る。
-   */
-  const pickerTemplates = useMemo(() => {
-    const q = templatePickerQuery.trim().toLowerCase()
-    return messageTemplates.filter((template) => {
-      if (composerTemplateKind && messageTemplateToBubble(template)?.type !== composerTemplateKind) return false
-      if (templatePickerFolderId === '__none__') {
-        if (template.folderId) return false
-      } else if (templatePickerFolderId && template.folderId !== templatePickerFolderId) {
-        return false
-      }
-      if (!q) return true
-      return template.name.toLowerCase().includes(q) || template.messageContent.toLowerCase().includes(q)
-    })
-  }, [messageTemplates, templatePickerQuery, templatePickerFolderId, composerTemplateKind])
   const applyTemplate = async (template: BroadcastTemplateOption) => {
     const accountId = selectedAccountId
     if (templateApplyLock.current) return
@@ -1245,7 +1226,6 @@ export default function BroadcastForm({
       return
     }
     placeTemplateBubble(bubble)
-    setSelectedTemplate(null)
     setShowTemplatePicker(false)
   }
 
@@ -2340,12 +2320,12 @@ export default function BroadcastForm({
           </div>
           {targetMode === 'scenario' && <div className="mt-4 border-t pt-4">
             <label className="text-ink-secondary block text-xs font-semibold">どのシナリオ</label>
-            <Combobox
+            <EntitySelect clearable size="full" kind="scenario"
               aria-label="どのシナリオ"
               placeholder="すべてのシナリオ（どれか1つでも購読中）"
               value={scenarioId}
               onChange={setScenarioId}
-              options={scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))}
+              options={scenarios.map((scenario) => ({ ...entityOptionMetadata(scenario), value: scenario.id, label: scenario.name }))}
               loading={scenariosStatus === 'loading'}
               className="mt-1 w-full sm:max-w-sm"
             />
@@ -2358,12 +2338,12 @@ export default function BroadcastForm({
               「すべて」は置かない。タグを選ばないままだと絞り込みが消えて
               全員に届く。全員に送るなら上の「友だち全員に配信する」を選ぶ。
             */}
-            <Combobox
+            <EntitySelect clearable size="full" kind="tag"
               aria-label="どのタグ"
               placeholder="タグを選んでください"
               value={tagId}
               onChange={setTagId}
-              options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+              options={tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))}
               loading={tagsStatus === 'loading'}
               /*
                * R581: 候補が取れていない間は開かせない。空のまま開くと
@@ -2416,7 +2396,7 @@ export default function BroadcastForm({
             <Checkbox checked onCheckedChange={() => {}} disabled>ブロック中の人を除く</Checkbox>
             <small>ブロック中・非表示・宛先不明の友だちには送りません</small>
           </div>
-          <label className={styles.excludeTag}><span className={styles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><Select aria-label="除くタグ" value={excludeTagId} onChange={setExcludeTagId} disabled={tagsStatus !== 'ready'} options={[{ value: '', label: '除外なし' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} size="full" /></label>
+          <label className={styles.excludeTag}><span className={styles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><EntitySelect kind="tag" aria-label="除くタグ" value={excludeTagId} onChange={setExcludeTagId} disabled={tagsStatus !== 'ready'} options={[{ value: '', label: '除外なし' }, ...tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))]} size="full" /></label>
           <div className={styles.exclusion}>
             <Checkbox checked={false} onCheckedChange={() => {}} disabled>この1週間に送った人を除く</Checkbox>
             <small>最近送った人を除く機能は、まだ使えません</small>
@@ -2427,7 +2407,7 @@ export default function BroadcastForm({
           {preflight?.audience && <details className={styles.details}><summary>対象プレビュー・除外の内訳</summary><p className="text-xs text-ink-secondary">条件一致 {formatNumber(preflight.audience.matched)}人 ・ 送信可能 {formatNumber(preflight.audience.sendable)}人 ・ {exclusionNote ?? '除外 —'}</p>{preflight.audience.representatives.map((friend) => <Link key={friend.friendId} href={`/friends/detail?id=${encodeURIComponent(friend.friendId)}`} className="block text-xs text-action">{friend.displayName ?? '名前未登録'}　{friend.summary}</Link>)}</details>}
         </section>
         <div className={shows('message') ? 'contents' : 'hidden'}>
-        <section id="broadcast-step-message" className={showTemplatePicker ? 'hidden' : styles.section}>
+        <section id="broadcast-step-message" className={styles.section}>
           <MessageComposer bubbleErrors={bubbles.map((_, index) => fields.error(`bubble-${index}`))} bubbleFieldProps={(index) => fields.bind(`bubble-${index}`)} bubbles={bubbles} accountId={selectedAccountId} busy={composerBusy} onBusyChange={(value) => { if (selectedAccountIdRef.current === selectedAccountId) setComposerBusy(value) }}
             unavailable={{ intro: '紹介メッセージは現在利用できません。', research: UNSENDABLE_TYPES.research }}
             onChange={updateBubble} onMove={moveBubble} onDelete={(index) => setBubbles((items) => items.filter((_, i) => i !== index))}
@@ -2435,76 +2415,20 @@ export default function BroadcastForm({
             onPickTemplate={(index, kind) => { setComposerTemplateKind(kind); setComposerTemplateIndex(index); setShowTemplatePicker(true) }}
             onSaveTemplate={(index) => { setTemplateSaveCreatedId(null); setTemplateSaveIndex(index); setTemplateSaveName(String(bubbles[index].content.templateName ?? bubbles[index].content.assetName ?? title)); setTemplateSaveError('') }}
             onCompose={(index, kind) => { setTemplateSaveError(''); setInlineComposer({ index, kind }) }}
-            extraFields={(index, bubble) => bubble.type === 'text' ? null : isContentTemplateType(bubble.type) ? <Combobox aria-label="コンテンツで作成したテンプレートから選択" placeholder="テンプレートを選択してください" value={String(bubble.content.assetId ?? '')} onChange={(id) => { const asset = assets.find((item) => item.id === id); updateBubble(index, { ...bubble, content: asset ? { assetId: asset.id, assetName: asset.name, ...asset.payload } : {} }) }} options={assets.filter((item) => item.kind === bubble.type).map((item) => ({ value: item.id, label: item.name }))} /> : null}
+            extraFields={(index, bubble) => bubble.type === 'text' ? null : isContentTemplateType(bubble.type) ? <EntitySelect clearable size="full" aria-label="コンテンツで作成したテンプレートから選択" placeholder="テンプレートを選択してください" value={String(bubble.content.assetId ?? '')} onChange={(id) => { const asset = assets.find((item) => item.id === id); updateBubble(index, { ...bubble, content: asset ? { assetId: asset.id, assetName: asset.name, ...asset.payload } : {} }) }} options={assets.filter((item) => item.kind === bubble.type).map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name }))} /> : null}
           />
         </section>
         {showTemplatePicker && (
-          <section className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-card-surface">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-bold text-ink">テンプレート選択</h3>
-                <p className="mt-1 text-xs text-ink-faint">名前・本文・置き場でテンプレートを探します。選ぶと右側に内容が出ます。</p>
-              </div>
-              <button type="button" onClick={() => setShowTemplatePicker(false)} className="text-sm font-semibold text-action hover:underline">メッセージ編集へ戻る</button>
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="block text-xs font-medium text-ink-secondary">名前・本文で検索
-                <input
-                  type="search"
-                  aria-label="テンプレート名・本文で検索"
-                  value={templatePickerQuery}
-                  onChange={(event) => setTemplatePickerQuery(event.target.value)}
-                  placeholder="テンプレート名・本文で検索"
-                  className="mt-2 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal"
-                />
-              </label>
-              <label className="block text-xs font-medium text-ink-secondary">フォルダ
-                <Select
-                  aria-label="テンプレートのフォルダ"
-                  value={templatePickerFolderId}
-                  onChange={setTemplatePickerFolderId}
-                  options={[
-                    { value: '', label: 'すべて' },
-                    ...templateFolders.map((folder) => ({ value: folder.id, label: folder.name })),
-                    { value: '__none__', label: '未分類' },
-                  ]}
-                  size="full"
-                />
-              </label>
-            </div>
-            <div className="mt-4 space-y-3">
-              {assets.filter((asset) => (!composerTemplateKind || asset.kind === composerTemplateKind) && (!asset.lineAccountId || asset.lineAccountId === selectedAccountId) && (!templatePickerQuery.trim() || asset.name.toLowerCase().includes(templatePickerQuery.trim().toLowerCase())) && (!templatePickerFolderId || templatePickerFolderId === '__none__')).map((asset) => <button key={asset.id} type="button" className="broadcast-template-row" onClick={() => { placeTemplateBubble(contentTemplateToBubble(asset)); setSelectedTemplate(null); setShowTemplatePicker(false) }}><span className="min-w-0 flex-1"><strong>{asset.name}</strong><small>{typeLabel(asset.kind)}</small></span><span aria-hidden>›</span></button>)}
-              {pickerTemplates.map((template) => (
-                <button key={template.id} type="button" onClick={() => setSelectedTemplate(template)} className="broadcast-template-row">
-                  <span className="min-w-0 flex-1">
-                    <strong className="break-words">{template.name}</strong>
-                    <small>{template.messageType === 'imagemap' ? (/"video"\s*:/.test(template.messageContent) ? 'リッチビデオ' : 'リッチメッセージ') : typeLabel(template.messageType)}</small>
-                  </span>
-                  <span aria-hidden>›</span>
-                </button>
-              ))}
-              {templateCandidatesStatus === 'loading' && (
-                <div className="rounded-card border border-dashed bg-canvas p-8 text-center text-sm text-ink-faint">
-                  テンプレートを読み込んでいます…
-                </div>
-              )}
-              {templateCandidatesStatus === 'error' && (
-                <div className="rounded-card border border-dashed bg-canvas p-8 text-center text-sm text-warning">
-                  テンプレートを読み込めませんでした。窓を閉じて開き直すと再取得します。
-                </div>
-              )}
-              {templateCandidatesStatus === 'ready' && messageTemplates.length === 0 && assets.length === 0 && (
-                <div className="rounded-card border border-dashed bg-canvas p-8 text-center text-sm text-ink-faint">
-                  テンプレートがありません。「コンテンツ ＞ テンプレート」で作成してください。
-                </div>
-              )}
-              {messageTemplates.length > 0 && pickerTemplates.length === 0 && assets.length === 0 && (
-                <p className="rounded-card border border-dashed bg-canvas p-6 text-center text-sm text-ink-faint">
-                  条件に合うテンプレートはありません。検索文字やフォルダを変えてください。
-                </p>
-              )}
-            </div>
-          </section>
+          <EntityPickerDialog key={selectedAccountId ?? ''} title="テンプレートを選ぶ"
+            folders={templateFolders} busy={composerBusy} error={templateApplyError}
+            state={templateCandidatesStatus === 'loading' ? <p role="status">テンプレートを読み込んでいます…</p> : templateCandidatesStatus === 'error' ? <p role="alert">テンプレートを読み込めませんでした。窓を閉じて開き直すと再取得します。</p> : undefined}
+            items={[
+              ...assets.filter((asset) => (!composerTemplateKind || asset.kind === composerTemplateKind) && (!asset.lineAccountId || asset.lineAccountId === selectedAccountId)).map((asset) => ({ id: `asset:${asset.id}`, name: asset.name, folderId: null, meta: typeLabel(asset.kind) })),
+              ...messageTemplates.filter((template) => !composerTemplateKind || messageTemplateToBubble(template)?.type === composerTemplateKind).map((template) => ({ id: template.id, name: template.name, folderId: template.folderId, content: template.messageType === 'text' ? template.messageContent : undefined, keywords: template.messageContent, meta: typeLabel(messageTemplateToBubble(template)?.type ?? 'unknown') })),
+            ]}
+            preview={(item) => { const template = messageTemplates.find((row) => row.id === item?.id); const asset = assets.find((row) => `asset:${row.id}` === item?.id); const bubble = template ? messageTemplateToBubble(template) : asset ? contentTemplateToBubble(asset) : null; return bubble ? <LinePreview accountName={selectedAccount?.name}><BubblePreview bubble={bubble} accountName={selectedAccount?.name} /></LinePreview> : null }}
+            onCancel={() => setShowTemplatePicker(false)}
+            onConfirm={(id) => { const asset = assets.find((row) => `asset:${row.id}` === id); if (asset) { placeTemplateBubble(contentTemplateToBubble(asset)); setShowTemplatePicker(false); return }; const template = messageTemplates.find((row) => row.id === id); if (template) void applyTemplate(template) }} />
         )}
         {!showTemplatePicker && <section className="rounded-card border border-hairline bg-canvas p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2512,7 +2436,7 @@ export default function BroadcastForm({
             <Link href="/common-actions" className="text-xs font-semibold text-action hover:underline">＋ アクションを追加する</Link>
           </div>
           <div className="mt-3 block text-xs font-medium text-ink-secondary">実行する公開済みアクション
-            <Combobox aria-label="配信後のアクション" placeholder="実行しない" value={afterActionVersionId} onChange={setAfterActionVersionId} options={[{ value: '', label: '実行しない' }, ...publishedActions.map((action) => ({ value: action.versionId, label: `${action.name}（第${action.version}版）` }))]} className="mt-2 w-full font-normal" />
+            <EntitySelect clearable size="full" kind="common_action" aria-label="配信後のアクション" placeholder="実行しない" value={afterActionVersionId} onChange={setAfterActionVersionId} options={[{ value: '', label: '実行しない' }, ...publishedActions.map((action) => ({ ...entityOptionMetadata(action), value: action.versionId, label: `${action.name}（第${action.version}版）` }))]} className="mt-2 w-full font-normal" />
           </div>
           {!afterActionVersionId && <p className="mt-2 text-xs text-ink-faint">実行しない</p>}
           {afterActionVersionId && <p className="mt-2 text-xs text-success">✓ 配信完了後に、選んだ公開版を実行します。</p>}
@@ -2668,8 +2592,8 @@ export default function BroadcastForm({
       <aside id="broadcast-line-preview" className={styles.preview} data-open={previewOpen || undefined} aria-label="LINEの見え方">
         <div className={styles.previewHead}><h3>LINE の見え方</h3><div className={styles.deviceSwitch} role="group" aria-label="プレビューの端末"><Button variant="secondary" className={styles.textButton} size="compact" aria-pressed={previewDevice === 'phone'} onClick={() => setPreviewDevice('phone')}>スマホ</Button><Button variant="secondary" className={styles.textButton} size="compact" aria-pressed={previewDevice === 'pc'} onClick={() => setPreviewDevice('pc')}>PC</Button></div><Button ref={previewCloseRef} className={styles.previewClose} size="compact" onClick={() => { setPreviewOpen(false); previewToggleRef.current?.focus() }}>閉じる</Button></div>
         <div className={previewDevice === 'pc' ? styles.pcPreview : styles.phonePreview}>
-          <LinePreview accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={scheduledLabel ? `${scheduledLabel} に届きます` : '配信日時は STEP 4 で設定します'} empty={!selectedTemplate && Boolean(bubblesError(bubbles)) && bubbles.every((bubble) => bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) ? 'メッセージは手順3で作成します' : false}>
-            <div className="flex flex-col gap-3 text-ink">{selectedTemplate ? (() => { const bubble = messageTemplateToBubble(selectedTemplate); return bubble ? <BubblePreview bubble={bubble} accountName={selectedAccount?.name} /> : <p className="whitespace-pre-wrap break-words">{selectedTemplate.messageContent}</p> })() : bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} buttons={index === 0 ? messageButtons : []} />)}</div>
+          <LinePreview accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={scheduledLabel ? `${scheduledLabel} に届きます` : '配信日時は STEP 4 で設定します'} empty={Boolean(bubblesError(bubbles)) && bubbles.every((bubble) => bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) ? 'メッセージは手順3で作成します' : false}>
+            <div className="flex flex-col gap-3 text-ink">{bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} buttons={index === 0 ? messageButtons : []} />)}</div>
           </LinePreview>
         </div>
         <p className={styles.previewCaption}>「名前」は相手の名前で置き換えます</p>
@@ -2735,26 +2659,6 @@ export default function BroadcastForm({
       いま画面が持っているものだけで、固定値は使わない。人数は
       `runPreflight()` が数えたぶん（`preflight.audienceCount`）。
     */}
-    <ConfirmDialog
-      open={selectedTemplate !== null}
-      busy={composerBusy}
-      error={templateApplyError || undefined}
-      title="テンプレートを選択"
-      description={selectedTemplate ? `「${selectedTemplate.name}」を一斉配信のメッセージに読み込みます。読み込み後も内容を編集できます。` : ''}
-      confirmLabel="このテンプレートを使用"
-      cancelLabel="キャンセル"
-      designNode="p97Tf"
-      titleIcon={<CheckCircle2 size={22} />}
-      onCancel={() => setSelectedTemplate(null)}
-      onConfirm={selectedTemplate ? () => applyTemplate(selectedTemplate) : undefined}
-    >
-      <ul className="space-y-2 rounded-control border border-hairline bg-canvas-sunken p-4 text-sm">
-        <li className="text-success">テンプレートの内容を確認してください</li>
-        <li className="text-success">差し込みの項目がこの配信で使えるか確認してください</li>
-        <li className="text-success">読み込んだあとも内容を直せます</li>
-      </ul>
-    </ConfirmDialog>
-
     <ConfirmDialog
       open={conditionDialogOpen}
       title="配信対象の条件を設定"

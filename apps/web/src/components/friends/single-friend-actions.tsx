@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useRef, useState } from 'react'
 import type { Chat, Reminder, Scenario, Tag, Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -9,7 +10,7 @@ import DateTimeField from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import ScheduleDialog from './schedule-dialog'
-import { TextArea } from '@/components/shared/text-field'
+
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 
 /**
@@ -444,7 +445,7 @@ function OperatorPanel({ friendId, busy, run }: { friendId: string; busy: boolea
     return () => { active = false }
   }, [])
   return <Row>
-    <Select aria-label="担当者" value={id} onChange={setId} options={[{ value: '', label: '未割り当て' }, ...operators.map((operator) => ({ value: operator.id, label: operator.name }))]} />
+    <EntitySelect aria-label="担当者" value={id} onChange={setId} options={[{ value: '', label: '未割り当て' }, ...operators.map((operator) => ({ ...entityOptionMetadata(operator), value: operator.id, label: operator.name }))]} />
     <Go busy={busy || failed} onClick={() => void run(() => api.chats.update(friendId, { operatorId: id || null }), '担当者を変えました')} />
     {failed && <p role="alert" className="text-xs text-danger">担当者を読み込めませんでした。閉じてもう一度開いてください。</p>}
   </Row>

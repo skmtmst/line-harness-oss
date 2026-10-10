@@ -1,5 +1,7 @@
 'use client'
 
+import EntitySelect from '@/components/shared/entity-select'
+
 /* 写し：app/common-actions/branch-editor.tsx（src/v8 は古い画面ファイルを import できない）。中身は変えていない。 */
 
 import type { CommonActionResources, CommonActionStep } from '@/lib/api'
@@ -182,7 +184,7 @@ export default function BranchEditors({
             <div className="space-y-2">
               {sideSteps.map((sideStep, sideIndex) => sideStep.type === 'common_action' ? (
                 <div key={sideStep.id} className="flex items-center gap-2">
-                  <Select
+                  <EntitySelect
                     size="full"
                     aria-label={`${sideLabel}${sideIndex + 1}の公開版`}
                     className="mt-1"

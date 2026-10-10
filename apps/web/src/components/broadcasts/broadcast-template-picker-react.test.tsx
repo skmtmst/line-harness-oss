@@ -13,7 +13,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const TEMPLATE_FOLDERS = [
   { id: 'folder-visit', name: '来店案内', kind: 'template', parentId: null, displayOrder: 0, color: null, accountId: 'acc-1', createdAt: '', updatedAt: '' },
@@ -135,11 +135,11 @@ async function renderPicker() {
 }
 
 function templateRows(): HTMLElement[] {
-  return [...container.querySelectorAll<HTMLElement>('.broadcast-template-row')]
+  return [...document.querySelectorAll<HTMLElement>('[role="dialog"] input[type="radio"]')]
 }
 
 function templateRowNames(): string[] {
-  return templateRows().map((row) => row.querySelector('strong')?.textContent ?? '')
+  return templateRows().map((row) => row.getAttribute('aria-label') ?? '')
 }
 
 function setNativeValue(element: HTMLInputElement | HTMLSelectElement, value: string) {
@@ -152,16 +152,14 @@ function setNativeValue(element: HTMLInputElement | HTMLSelectElement, value: st
 }
 
 async function chooseFolder(value: string) {
-  const select = container.querySelector<HTMLSelectElement>('select[aria-label="テンプレートのフォルダ"]')
-  expect(select, 'フォルダの選択欄がない').not.toBeNull()
-  await act(async () => {
-    setNativeValue(select!, value)
-  })
+  const label = value === 'folder-visit' ? '来店案内' : value === '__none__' ? '未分類' : 'すべて'
+  const button = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((node) => node.textContent?.startsWith(label))!
+  await act(async () => { button.click() })
   await flush()
 }
 
 async function typeSearch(value: string) {
-  const input = container.querySelector<HTMLInputElement>('input[aria-label="テンプレート名・本文で検索"]')
+  const input = document.querySelector<HTMLInputElement>('[role="dialog"] input[type="search"]')
   expect(input, '検索欄がない').not.toBeNull()
   await act(async () => {
     setNativeValue(input!, value)
@@ -170,7 +168,7 @@ async function typeSearch(value: string) {
 }
 
 async function clickRow(name: string) {
-  const row = templateRows().find((el) => el.textContent?.includes(name))
+  const row = templateRows().find((el) => el.getAttribute('aria-label') === name)
   expect(row, `${name} の行がない`).toBeDefined()
   await act(async () => {
     row!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -189,9 +187,9 @@ describe('一斉配信のテンプレート選択（IDEA-11）', () => {
     TEMPLATES.push({...TEMPLATES[0],id:'tpl-video',name:'お店紹介の動画',messageType:'imagemap',messageContent:JSON.stringify({baseUrl:'https://worker.example/images/imagemaps/v',baseSize:{width:1040,height:520},actions:[],altText:'お店の動画',video})})
     try {
       await renderPicker()
-      expect(templateRows().find(row=>row.textContent?.includes('お店紹介の動画'))?.textContent).toContain('リッチビデオ')
+      expect(templateRows().find(row=>row.getAttribute('aria-label') === 'お店紹介の動画')?.closest('label')?.textContent).toContain('リッチビデオ')
       await clickRow('お店紹介の動画')
-      const insert=[...document.querySelectorAll<HTMLButtonElement>('button')].find(button=>button.textContent?.includes('このテンプレートを使用'))
+      const insert=[...document.querySelectorAll<HTMLButtonElement>('button')].find(button=>button.textContent === '選ぶ')
       expect(insert).toBeDefined()
       await act(async()=>insert!.dispatchEvent(new MouseEvent('click',{bubbles:true})))
       await flush()
@@ -215,8 +213,7 @@ describe('一斉配信のテンプレート選択（IDEA-11）', () => {
   it('フォルダの選択肢はテンプレートの置き場から読む', async () => {
     await renderPicker()
 
-    const select = container.querySelector<HTMLSelectElement>('select[aria-label="テンプレートのフォルダ"]')!
-    const labels = [...select.options].map((option) => option.textContent)
+    const labels = [...document.querySelectorAll('[role="dialog"] button')].map((button) => button.textContent?.replace(/\d+$/, ''))
     expect(labels).toContain('すべて')
     expect(labels).toContain('来店案内')
     expect(labels).toContain('未分類')
@@ -244,14 +241,14 @@ describe('一斉配信のテンプレート選択（IDEA-11）', () => {
     await typeSearch('存在しない文字列')
 
     expect(templateRows()).toHaveLength(0)
-    expect(container.textContent).toContain('条件に合うテンプレートはありません')
+    expect(document.body.textContent).toContain('当てはまる候補がありません。')
   })
 
   it('選ぶと挿入前に改行つきの全文がプレビューへ出る', async () => {
     await renderPicker()
     await clickRow('初回来店のお礼')
 
-    const preview = container.querySelector<HTMLElement>('aside[aria-label="LINEの見え方"]')
+    const preview = document.querySelector<HTMLElement>('[aria-label="選んだ候補の見え方"]')
     expect(preview, 'プレビューの領域がない').toBeDefined()
     // whitespace-pre-wrap の吹き出しで出るので、改行もそのまま確かめられる。
     const bubble = preview!.querySelector('.whitespace-pre-wrap')
@@ -259,3 +256,6 @@ describe('一斉配信のテンプレート選択（IDEA-11）', () => {
     expect(bubble!.textContent).toBe('ご来店ありがとうございました。\n次回のご予約はこちらです。')
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

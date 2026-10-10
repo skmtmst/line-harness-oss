@@ -9,6 +9,7 @@
  * 行の操作は絵どおり行に直接出す（承認する／断る・キャンセルにする／参加済／無断・予約に繰上げ・待ち順を変える）。
  */
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Check, Download, Send } from 'lucide-react'
@@ -21,7 +22,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
-import Select from '@/components/shared/select'
+
 import TargetMissing from '@/components/shared/target-missing'
 import { jstShort } from './shared'
 import styles from './bookings.module.css'
@@ -427,12 +428,12 @@ function Bookings({ eventId }: { eventId: string }) {
             <Download size={15} aria-hidden="true" />CSV を書き出す
           </Button>
           <div className={styles.occurrencePick}>
-            <Select
+            <EntitySelect
               size="full"
               value={selectedOccurrenceId}
               onChange={setSelectedOccurrenceId}
               aria-label="開催回を選ぶ"
-              options={slots.map((slot) => ({ value: slot.id, label: `開催回：${formatOccurrence(slot.starts_at)}` }))}
+              options={slots.map((slot) => ({ ...entityOptionMetadata(slot), value: slot.id, label: `開催回：${formatOccurrence(slot.starts_at)}` }))}
             />
           </div>
         </div>

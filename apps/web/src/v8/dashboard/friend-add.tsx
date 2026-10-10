@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -8,7 +9,7 @@ import type { EntryRoute } from '@line-crm/shared'
 import { api, type DashboardOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
-import Select from '@/components/shared/select'
+
 import SectionHeader from './head'
 import QrDialog from '@/components/dashboard/qr-dialog'
 import styles from './dashboard.module.css'
@@ -88,13 +89,13 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
       <div className={styles.linkRow}>
         <span className={styles.linkKey}>発行中</span>
         <span className={styles.routeSelect}>
-          <Select
+          <EntitySelect
             value={routeId}
             onChange={(value) => setRouteId(value)}
             aria-label="発行中の追加URL"
             options={[
               { value: '', label: '基本の追加URL' },
-              ...(routes ?? []).map((entry) => ({ value: entry.id, label: entry.name })),
+              ...(routes ?? []).map((entry) => ({ ...entityOptionMetadata(entry), value: entry.id, label: entry.name })),
             ]}
           />
         </span>

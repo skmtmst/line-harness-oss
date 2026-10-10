@@ -8,6 +8,7 @@
  * ①② は下書きで、下の帯の［保存する］でまとめて保存する。③・店で手入力・④の取り消しは、その場で口を呼ぶ。
  * 呼ぶ口は visit-stamps-api（Codex の API-7）だけ。動き・権限は BEHAVIOR.md。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Gift, ImageIcon, Minus, Plus, Stamp } from 'lucide-react'
@@ -19,7 +20,7 @@ import tpl from '@/components/templates/page-templates.module.css'
 import Button from '@/components/shared/button'
 import MediaSlot from '@/components/shared/media-slot'
 import ColorWell from '@/components/shared/color-well'
-import Combobox from '@/components/shared/combobox'
+
 import HelpTip from '@/components/shared/help-tip'
 import { FieldError } from '@/components/shared/form-controls'
 import IconButton from '@/components/shared/icon-button'
@@ -465,9 +466,9 @@ function VisitStampsScreen() {
                   </div>
                   <div className={styles.field}>
                     <span className={styles.label}>ゴールしたら <HelpTip label="ゴールしたらの説明">ゴールの特典を使うと、次のカードを受け取れます。</HelpTip></span>
-                    <Select id="stamp-nextCardId" error={issue?.field === 'nextCardId' ? issue.message : undefined} aria-label="ゴールしたら" size="full" disabled={ro} value={settings.completion === 'next_card' ? settings.nextCardId ?? 'repeat' : 'repeat'}
+                    <EntitySelect id="stamp-nextCardId" error={issue?.field === 'nextCardId' ? issue.message : undefined} aria-label="ゴールしたら" size="full" disabled={ro} value={settings.completion === 'next_card' ? settings.nextCardId ?? 'repeat' : 'repeat'}
                       onChange={v => set({ completion: v === 'repeat' ? 'repeat' : 'next_card', nextCardId: v === 'repeat' ? null : v })}
-                      options={[{ value: 'repeat', label: '同じカードをもう一度' }, ...nextCards.map(c => ({ value: c.id, label: `次のカードへ：${c.name}` })), ...(settings.completion === 'next_card' && settings.nextCardId && !nextCards.some(c => c.id === settings.nextCardId) ? [{ value: settings.nextCardId, label: '次のカードを選び直してください', disabled: true }] : [])]} />
+                      options={[{ value: 'repeat', label: '同じカードをもう一度' }, ...nextCards.map(c => ({ ...entityOptionMetadata(c), value: c.id, label: `次のカードへ：${c.name}` })), ...(settings.completion === 'next_card' && settings.nextCardId && !nextCards.some(c => c.id === settings.nextCardId) ? [{ value: settings.nextCardId, label: '次のカードを選び直してください', disabled: true }] : [])]} />
                   </div>
                 </div>
                 <span className={styles.label}>特典</span>
@@ -724,8 +725,8 @@ function VisitStampsScreen() {
                   {!card ? <p className={styles.sub}>カードを保存すると、店で押せるようになります。</p> : null}
                   <div className={styles.field}>
                     <span className={styles.label}>友だち</span>
-                    <Combobox key={selectedFriend ? `f-${friendId}` : 'none'} aria-label="友だちを探す" placeholder="名前で探す" value={friendId} onChange={(v) => { setFriendId(v) }} options={friendOptions}
-                      disabled={!card} emptyText={(q) => `「${q}」に合う友だちはいません`} />
+                    <EntitySelect clearable size="full" key={selectedFriend ? `f-${friendId}` : 'none'} aria-label="友だちを探す" placeholder="名前で探す" value={friendId} onChange={(v) => { setFriendId(v) }} options={friendOptions}
+                      disabled={!card} noun="友だち" />
                   </div>
                   {stampable ? (
                     <>

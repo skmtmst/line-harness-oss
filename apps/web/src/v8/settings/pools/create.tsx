@@ -9,12 +9,13 @@
  * 受け入れ先は複数・1件以上、URLに使う名前は半角英小文字・数字・ハイフンの2〜32文字、
  * 全部の受け入れ先を1回の保存で登録（落ちたらプールも所属も作られない・入力は残す）、作れたら一覧へ（作った行を目立たせる）。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import Button from '@/components/shared/button'
-import Select from '@/components/shared/select'
+
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import { createPageErrorMessage, createPageReturnHref } from '@/components/shared/create-page'
@@ -181,7 +182,7 @@ export default function PoolCreateV8() {
             {pickerOpen ? (
               <div className={styles.picker}>
                 <span className={styles.pickerSelect}>
-                  <Select value={pickerValue} onChange={setPickerValue} aria-label="足すアカウント" size="full" options={addableAccounts.map((account) => ({ value: account.id, label: account.name }))} />
+                  <EntitySelect value={pickerValue} onChange={setPickerValue} aria-label="足すアカウント" size="full" options={addableAccounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name }))} />
                 </span>
                 <Button type="button" onClick={addAccount} disabled={!pickerValue}>追加</Button>
               </div>

@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/lib/api'
 import { AdEventMappings } from './ad-event-mappings'
@@ -937,7 +938,7 @@ export default function AdIntegration({
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-route">計測リンク（分かれば）</label>
-            <Select
+            <EntitySelect
               id="ad-cost-route"
               aria-label="計測リンク"
               value={manualRouteId}
@@ -948,7 +949,7 @@ export default function AdIntegration({
               }}
               options={[
                 { value: '', label: '結びつけない' },
-                ...entryRoutes.map((route) => ({ value: route.id, label: route.name })),
+                ...entryRoutes.map((route) => ({ ...entityOptionMetadata(route), value: route.id, label: route.name })),
               ]}
             />
             <p className="mt-1 text-xs text-ink-faint">結びつけると友だち追加の人数で「1人あたり」が出ます。</p>

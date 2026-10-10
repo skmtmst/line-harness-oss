@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import StatusPill from '@/components/shared/status-pill'
 import { Building2, Check, CircleDot, LogIn, Paperclip, Plus, RefreshCw, Send, Sparkles, Star } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -532,7 +533,7 @@ export default function OpsSupportV8() {
           <div className={styles.field}>
             <span className={styles.smallLabel}>契約先</span>
             <div className={styles.fullSelect} {...createFields.bind('tenant')}>
-              <Select size="full" aria-label="契約先" error={createFields.error('tenant') ?? undefined} value={form.tenantId} onChange={(value) => setForm((f) => ({ ...f, tenantId: value }))} options={[{ value: '', label: '契約先を選ぶ' }, ...tenants.map((t) => ({ value: t.id, label: t.name }))]} />
+              <EntitySelect size="full" aria-label="契約先" error={createFields.error('tenant') ?? undefined} value={form.tenantId} onChange={(value) => setForm((f) => ({ ...f, tenantId: value }))} options={[{ value: '', label: '契約先を選ぶ' }, ...tenants.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))]} />
             </div>
             <FieldError id="sup-tenant-error">{createFields.error('tenant')}</FieldError>
           </div>

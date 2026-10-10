@@ -12,6 +12,7 @@
  * 空のまま使われているときの黄色の帯は表の列の上、行の右端は「…」
  * （編集・止める／再開する・削除する）。右クリックでも同じものが出る。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -1648,14 +1649,14 @@ function CommonVarsListInner() {
                     </div>
                     {deleteChoice === 'replace' ? (
                       <>
-                        <Select
+                        <EntitySelect
                           size="full"
                           value={replacementId}
                           disabled={deleteBusy || replacementCandidates.length === 0}
                           onChange={(value) => void selectReplacement(value)}
                           aria-label="差し替え先"
                           options={replacementCandidates.length > 0
-                            ? replacementCandidates.map((candidate) => ({
+                            ? replacementCandidates.map((candidate) => ({ ...entityOptionMetadata(candidate),
                               value: candidate.id,
                               label: `差し替え先：${candidate.name} ${placeholderText(candidate.varKey)}`,
                             }))

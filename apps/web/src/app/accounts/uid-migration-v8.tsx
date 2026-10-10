@@ -14,6 +14,7 @@
  * - 完了した履歴は L48eY の形（結果の帯＋照合の結果＋履歴）
  * - 「本移行を実行」「切り戻す」は確認ダイアログを開くだけ（FRIEND-33/36）
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import type { UidMigrationItem, UidMigrationRun } from '@/lib/api'
 import Button from '@/components/shared/button'
 import { Steps } from '@/components/templates/steps'
@@ -162,11 +163,11 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
         <div className={styles.duoCards}>
           <div className={styles.fieldStack}>
             <span className={styles.fieldLabel}>移行元</span>
-            <Select aria-label="移行元アカウント" value={fromAccountId} onChange={(value) => setFromAccountId(value)} options={[{ value: '', label: '移行元アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} size="full" />
+            <EntitySelect aria-label="移行元アカウント" value={fromAccountId} onChange={(value) => setFromAccountId(value)} options={[{ value: '', label: '移行元アカウントを選択' }, ...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name }))]} size="full" />
           </div>
           <div className={styles.fieldStack}>
             <span className={styles.fieldLabel}>移行先</span>
-            <Select aria-label="移行先アカウント" value={toAccountId} onChange={(value) => setToAccountId(value)} options={[{ value: '', label: '移行先アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} size="full" />
+            <EntitySelect aria-label="移行先アカウント" value={toAccountId} onChange={(value) => setToAccountId(value)} options={[{ value: '', label: '移行先アカウントを選択' }, ...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name }))]} size="full" />
           </div>
         </div>
         <div className={styles.fieldStack} style={{ marginTop: 12 }}>

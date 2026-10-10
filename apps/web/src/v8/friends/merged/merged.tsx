@@ -12,6 +12,7 @@
  * （友だちの登録日は結び付けた日ではないので代わりに出さない。詳細の linkedAt を一覧にも足す依頼は Codex へ）。
  * 「複数アカウントのみ」の絞り込みは絵に口が無いので、所属アカウントの選びの末尾に入れた。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -168,7 +169,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
               { value: 'unlinked', label: 'UID連携：未連携・要確認' },
             ]}
           />
-          <Select
+          <EntitySelect
             aria-label="所属アカウントで絞り込む"
             width={200}
             value={u.onlyDups ? MULTI_ACCOUNTS : u.account}
@@ -183,7 +184,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
             }}
             options={[
               { value: '', label: '所属アカウント：すべて' },
-              ...u.accountOptions.map((a) => ({ value: a.id, label: `所属アカウント：${a.name}` })),
+              ...u.accountOptions.map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: `所属アカウント：${a.name}` })),
               { value: MULTI_ACCOUNTS, label: '所属アカウント：複数アカウントのみ' },
             ]}
           />

@@ -7,6 +7,7 @@
  * 下の中央に キャンセル・保存して EC へ同期。
  * 競合の帯はタブの下・数の帯の上（型の tabs の段）に出すので、外枠へ渡す（onTopBand）。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, GitCompareArrows, Plus, RefreshCw, TriangleAlert } from 'lucide-react'
@@ -15,7 +16,7 @@ import Button from '@/components/shared/button'
 import { RowActions } from '@/components/shared/row-actions'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
-import Select from '@/components/shared/select'
+
 import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import { FieldError } from '@/components/shared/form-controls'
@@ -425,14 +426,14 @@ export default function RankSettingsV8({
           {moving > 0 ? (<>
             <div className={styles.removeField}>
               <span className={styles.removeLabel} id="nen-rank-move-label">移す先のランク（必須）</span>
-              <Select
+              <EntitySelect
                 aria-label="移す先のランク（必須）"
                 size="full"
                 value={replacement}
                 onChange={setReplacement}
                 options={[
                   { value: '', label: '移す先のランクを選ぶ' },
-                  ...removeCandidates.map((row) => ({ value: row.id ?? '', label: row.name.trim() || '（名前なし）' })),
+                  ...removeCandidates.map((row) => ({ ...entityOptionMetadata(row), value: row.id ?? '', label: row.name.trim() || '（名前なし）' })),
                 ]}
               />
             </div>

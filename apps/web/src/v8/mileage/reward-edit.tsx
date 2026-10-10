@@ -9,6 +9,7 @@
  * 欄は1つも落とさない。絵に無い欄（説明・交換したときの案内・交換後に使える日数・種類ごとの説明）は
  * 最後の「そのほか（任意）」の段にまとめ、欄の説明は「？」へ入れる。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Check, FlaskConical, Plus } from 'lucide-react'
@@ -417,7 +418,7 @@ function RewardEditorInner() {
           <SelectField label="交換後に渡すもの" htmlFor="reward-action"
             help={form.rewardKind === 'coupon' ? 'クーポンは引換コードで渡すので、選ばなくても出せます' : '共通アクションの版を指定します'}
           >
-            <Select
+            <EntitySelect kind="common_action"
               id="reward-action"
               error={errorOf('交換後に渡すものを選んでください')}
               aria-label="交換後に渡すもの"
@@ -429,7 +430,7 @@ function RewardEditorInner() {
                 ...(form.commonActionVersionId && !commonActions.some((item) => item.id === form.commonActionVersionId)
                   ? [{ value: form.commonActionVersionId, label: '現在選択中の公開版' }]
                   : []),
-                ...commonActions.map((item) => ({ value: item.id, label: item.label })),
+                ...commonActions.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.label })),
               ]}
               disabled={commonActionsFailed}
             />

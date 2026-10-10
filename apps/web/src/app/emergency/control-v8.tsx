@@ -11,6 +11,7 @@
  * 止めたあとにすること、止めた・戻した記録の表。
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8-B 完成までの二重管理）。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Eye, PauseCircle, ShieldCheck, Tag, Timer } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
@@ -33,7 +34,7 @@ import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import Select from '@/components/shared/select'
+
 import OtpInput from '@/components/shared/otp-input'
 import StepUpDialog from '@/components/shared/step-up-dialog'
 import SaveConflictBar from '@/components/shared/save-conflict-bar'
@@ -613,7 +614,7 @@ const EmergencyControlV8 = (
           <div className={styles.accountField}>
             <label htmlFor="emergency-account-v8" className={styles.fieldLabel}>止めるアカウント</label>
             <span className={styles.accountSelect}>
-            <Select
+            <EntitySelect
               size="full"
               id="emergency-account-v8"
               value={targetAccountId}
@@ -631,7 +632,7 @@ const EmergencyControlV8 = (
               aria-label="緊急停止の対象アカウント"
               options={[
                 { value: 'all', label: 'すべてのアカウント' },
-                ...accounts.map((account) => ({ value: account.id, label: `${account.name}（いまのアカウント）` })),
+                ...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: `${account.name}（いまのアカウント）` })),
               ]}
             />
             </span>

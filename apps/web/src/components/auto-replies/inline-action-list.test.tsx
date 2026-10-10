@@ -67,7 +67,8 @@ it('担当者通知の通知先と本文を編集し、必要な版も保存す�
  const {fireEvent}=await import('@testing-library/react');
  render(<InlineActionList actions={[{key:'notify',actionType:'notify_staff',config:{notificationRuleId:'',notificationRuleVersion:0,message:'確認してください'},onFailure:'stop'}]} onChange={changed} {...EMPTY_OPTIONS} notificationRules={[{id:'r',name:'担当者',version:2}]}/>);
  fireEvent.click(screen.getByRole('button',{name:'通知先'}));
- fireEvent.click(screen.getByRole('button',{name:'担当者'}));
+ fireEvent.click(screen.getByRole('radio',{name:'担当者'}));
+ fireEvent.click(screen.getByRole('button',{name:'選ぶ'}));
  expect(changed).toHaveBeenCalledWith([expect.objectContaining({config:{notificationRuleId:'r',notificationRuleVersion:2,message:'確認してください'}})]);
  expect(screen.getByText(/通知先と本文が選ばれていません/)).toBeTruthy();
 });

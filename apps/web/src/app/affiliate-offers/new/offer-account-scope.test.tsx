@@ -3,7 +3,7 @@
  * N-211: 案件作成で選ぶタグ・シナリオが選択accountで絞られることを、
  * 本物のReactで動かして見る。一覧取得のURLに選択accountが付くこと。
  */
-import React, { act } from 'react'
+import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -106,7 +106,7 @@ describe('N-211 案件作成の選択肢は選択accountで絞る', () => {
   const toggle = host.querySelector<HTMLButtonElement>(`[role=switch][aria-label="${switchName}"]`)
   if (toggle?.getAttribute('aria-checked') === 'false') await act(async () => { toggle.click() })
   // タグは選ぶ窓（dJZ7Q）。欄の［選ぶ］で開き、窓の候補（radio）の名前を読む。
-  const button = host.querySelector<HTMLButtonElement>(`#${buttonId} button[aria-haspopup="dialog"]`)
+  const button = host.querySelector<HTMLButtonElement>(`#${buttonId}`)
       expect(button).toBeTruthy()
       await act(async () => { button!.click() })
       const labels = [...document.querySelectorAll('[role="dialog"] input[type="radio"]')]

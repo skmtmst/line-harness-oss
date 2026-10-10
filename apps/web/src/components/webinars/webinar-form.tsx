@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, webinarApi, type Webinar, type WebinarInput, type WebinarScheduleRule } from '@/lib/api'
@@ -352,7 +353,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
                   <button type="button" onClick={() => setMediaLoadKey((key) => key + 1)} className="ml-2 font-medium underline">もう一度読み込む</button>
                 </p>
               ) : (
-                <Select
+                <EntitySelect
                   aria-label="配信動画"
                   size="full"
                   value={videoChoice}
@@ -363,7 +364,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
                     ...(videoChoice === EXTERNAL_VIDEO
                       ? [{ value: EXTERNAL_VIDEO, label: '現在の設定を維持（ライブラリ外の動画）' }]
                       : []),
-                    ...(videoMedia ?? []).map((item) => ({ value: item.id, label: item.filename })),
+                    ...(videoMedia ?? []).map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.filename })),
                     ...(videoMedia && videoChoice && videoChoice !== EXTERNAL_VIDEO &&
                     !videoMedia.some((item) => item.id === videoChoice)
                       ? [{ value: videoChoice, label: '現在の動画（ライブラリで見つかりません）' }]

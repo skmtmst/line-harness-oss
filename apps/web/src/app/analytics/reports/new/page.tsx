@@ -1,5 +1,7 @@
 'use client'
 
+import EntitySelect from '@/components/shared/entity-select'
+
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
@@ -1086,31 +1088,13 @@ function AnalyticsReportFormPage() {
               <h2 className="report-v8-cardTitle">保存した分析を添えます</h2>
               <p className="report-v8-cardSub">選んだ分析は、そのときの数で添えます</p>
             </div>
-            <div className="report-v8-chips">
-              {savedAnalysisIds.map((id) => {
-                const item = options.savedAnalyses.find((analysis) => analysis.id === id)
-                return <span className="report-v8-chip" key={id}><span className="report-v8-chipText" title={item?.name}>{item?.name ?? '名前を確認できません'}</span>{canManage && <button type="button" className="report-v8-chipRemove" aria-label={`${item?.name ?? '分析'}を外す`} onClick={() => setSavedAnalysisIds((current) => current.filter((value) => value !== id))}>×</button>}</span>
-              })}
-              {savedAnalysisIds.length === 0 && <span className="report-v8-chipEmpty">{options.savedAnalyses.length > 0 ? 'まだ選んでいません。選ばなくても作れます。' : '保存した分析がありません。'}</span>}
-            </div>
-            {/* 閲覧のみには押せない「選ぶ」を置かない。 */}
-            {canManage && options.savedAnalyses.length > 0 && <>
-              <div className="report-v8-linkRow">
-                <button type="button" className="report-v8-addLink" aria-expanded={savedOpen} onClick={() => setSavedOpen((open) => !open)}>＋ 保存した分析を選ぶ</button>
-              </div>
-              <div className="report-v8-panel" hidden={!savedOpen}>
-                <div className="report-v8-sectionCards">{options.savedAnalyses.map((item) => <Checkbox key={item.id} checked={savedAnalysisIds.includes(item.id)} onCheckedChange={() => setSavedAnalysisIds((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id])} description={item.kind === 'cross' ? 'クロス分析' : 'ファネル'}><strong>{item.name}</strong></Checkbox>)}</div>
-              </div>
-            </>}
+            <EntitySelect aria-label="保存した分析" noun="保存した分析" values={savedAnalysisIds} onChange={setSavedAnalysisIds} readOnly={!canManage} options={options.savedAnalyses.map((item) => ({ value: item.id, label: item.name, description: item.kind === 'cross' ? 'クロス分析' : 'ファネル' }))} />
           </section>
           <section className="report-v8-card">
             <h2 className="report-v8-cardTitle">だれに送りますか<span className="report-v8-required">必須</span></h2>
             {editing && editing.recipients.some((item) => item.kind === 'staff' && item.staffId && !options.recipients.some((person) => person.id === item.staffId)) && <Notice tone="warn" message={`前に選んでいた${editing.recipients.filter((item) => item.kind === 'staff' && item.staffId && !options.recipients.some((person) => person.id === item.staffId)).map((item) => `「${item.label}」`).join('・')}は、いまは受け取れません（利用停止・閲覧範囲外の可能性があります）。このまま保存すると宛先から外れます。`} />}
+            <EntitySelect aria-label="レポートを受け取る人" noun="担当者" values={staffIds} onChange={setStaffIds} readOnly={!canManage} options={options.recipients.map((person) => ({ value: person.id, label: person.name, description: `${ROLE_LABEL[person.role]}${person.lineLinked ? ' ／ LINE連携済み' : ''}` }))} />
             <div className="report-v8-chips">
-              {staffIds.map((id) => {
-                const person = options.recipients.find((item) => item.id === id)
-                return <span className="report-v8-chip" key={id}><span className="report-v8-chipText" title={person?.name}>{person?.name ?? '受け取れない担当者'}</span>{canManage && <button type="button" className="report-v8-chipRemove" aria-label={`${person?.name ?? '担当者'}を宛先から外す`} onClick={() => setStaffIds((current) => current.filter((value) => value !== id))}>×</button>}</span>
-              })}
               {emails.map((email, index) => email.trim() && <span className="report-v8-chip" key={index}><span className="report-v8-chipText" title={email}>{email}（メール）</span>{canManage && <button type="button" className="report-v8-chipRemove" aria-label={`${email}を宛先から外す`} onClick={() => setEmails((current) => current.filter((_, value) => value !== index))}>×</button>}</span>)}
               {!hasRecipient && <span className="report-v8-chipEmpty">受け取る人を1人以上選んでください。選ぶまで作れません。</span>}
             </div>
@@ -1121,12 +1105,6 @@ function AnalyticsReportFormPage() {
             </div>
             <div className="report-v8-panel" hidden={!recipientsOpen && !hasInvalidEmail}>
               <ul className="report-v8-recipients divide-y" aria-label="レポートを受け取る人">
-                {options.recipients.map((person) => {
-                  const checked = staffIds.includes(person.id)
-                  return <li key={person.id} className={checked ? 'report-v8-recipient bg-accent-soft' : 'report-v8-recipient'}>
-                    <Checkbox checked={checked} onCheckedChange={() => setStaffIds((current) => current.includes(person.id) ? current.filter((id) => id !== person.id) : [...current, person.id])} description={<span>{ROLE_LABEL[person.role]}{person.lineLinked ? ' ／ LINE連携済み' : ''}</span>}><strong className="block truncate text-sm" title={person.name}>{person.name}</strong></Checkbox>
-                  </li>
-                })}
                 {emails.map((email, index) => <li className="report-v8-recipient" key={index}>
                   <div className="report-v8-emailRow"><TextField id={`report-email-${index}`} type="email" value={email} onChange={(event) => setEmails((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} placeholder="report@example.com" aria-label={`宛先のメールアドレス ${index + 1}行目`} aria-invalid={invalidEmails[index] ? true : undefined} /><Button size="compact" aria-label={`${index + 1}行目の宛先を消す`} onClick={() => setEmails((current) => current.filter((_, itemIndex) => itemIndex !== index))}>消す</Button></div>
                   {invalidEmails[index] && <p className="report-v8-fieldError" role="alert">「{invalidEmails[index]}」はメールアドレスの形になっていません。この宛先だけ外れないよう、直すか消してください。</p>}

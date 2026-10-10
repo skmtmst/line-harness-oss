@@ -16,9 +16,10 @@
  * 運用で実際に要る形に絞ったほうが間違えにくい。
  */
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useState } from 'react'
-import { useAdminTheme } from '@/lib/use-admin-theme'
-import { TagToggle } from './tag-pill'
+
+import EntityRemoteField from './entity-remote-field'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
@@ -108,6 +109,8 @@ interface Option {
   id: string
   name: string
   color?: string | null
+  groupId?: string | null
+  folderId?: string | null
 }
 
 export interface ConditionBuilderProps {
@@ -184,10 +187,10 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
           api.scenarios.list({ accountId: selectedAccountId }),
         ])
         if (cancelled) return
-        if (tagRes.success && Array.isArray(tagRes.data)) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name, color: t.color })))
+        if (tagRes.success && Array.isArray(tagRes.data)) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name, color: t.color, groupId: t.groupId })))
         if (fieldRes.success && Array.isArray(fieldRes.data)) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))
         if (markRes.success && Array.isArray(markRes.data)) setMarks(markRes.data.map((m) => ({ id: m.id, name: m.name })))
-        if (scenarioRes.success && Array.isArray(scenarioRes.data)) setScenarios(scenarioRes.data.map((s) => ({ id: s.id, name: s.name })))
+        if (scenarioRes.success && Array.isArray(scenarioRes.data)) setScenarios(scenarioRes.data.map((s) => ({ id: s.id, name: s.name, folderId: s.folderId })))
         if (!tagRes.success || !fieldRes.success || !markRes.success || !scenarioRes.success) setOptionsFailed(true)
       } catch {
         if (!cancelled) setOptionsFailed(true)
@@ -437,68 +440,12 @@ function KindPicker({
  * 選んだものは常に先頭に出す。絞り込んだ状態で選ぶと、消したいときに
  * もう一度同じ言葉を打ち直さないと見つからない。
  */
-function TagPicker({
-  tags,
-  selected,
-  onToggle,
-}: {
-  tags: Option[]
-  selected: string[]
-  onToggle: (id: string) => void
+function TagPicker({ tags, selected, multiple, onChange }: {
+  tags: Option[]; selected: string[]; multiple: boolean; onChange: (ids: string[]) => void
 }) {
-  const [query, setQuery] = useState('')
-  const [showAll, setShowAll] = useState(false)
-
-  const isV8 = useAdminTheme() === 'v8'
-  if (tags.length === 0) {
-    return <span className="text-ink-faint text-xs">タグがまだありません</span>
-  }
-
-  const chosen = tags.filter((t) => selected.includes(t.id))
-  const rest = tags.filter(
-    (t) => !selected.includes(t.id) && (query === '' || t.name.includes(query)),
-  )
-  // 打っていないときだけ畳む。絞り込んだ結果を隠すと、探しているものが出ない。
-  const LIMIT = 24
-  const collapsed = query === '' && !showAll && rest.length > LIMIT
-  const shown = collapsed ? rest.slice(0, LIMIT) : rest
-
-  const chip = (tag: Option, on: boolean) => isV8 ? (
-    <TagToggle key={tag.id} name={tag.name} color={tag.color} selected={on} onToggle={() => onToggle(tag.id)} />
-  ) : (
-    <Button variant="primary" className={(`rounded-pill v7:h-8 px-3 text-xs transition-colors ${
-        on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
-      }`) + ' whitespace-normal'} key={tag.id} type="button" onClick={() => onToggle(tag.id)}>
-      {tag.name}
-    </Button>
-  )
-
-  return (
-    <div className="space-y-2">
-      {tags.length > LIMIT && (
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={`タグ名で絞り込む（${tags.length}件）`}
-          aria-label="タグ名で絞り込む"
-          className="border-hairline rounded-control h-9 w-full border px-3 text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:max-w-xs"
-        />
-      )}
-      <div className="flex flex-wrap gap-1.5">
-        {chosen.map((tag) => chip(tag, true))}
-        {shown.map((tag) => chip(tag, false))}
-      </div>
-      {collapsed && (
-        <Button variant="secondary" className="text-ink-secondary v7:h-8 px-3 text-xs whitespace-normal" type="button" onClick={() => setShowAll(true)}>
-          残り {rest.length - LIMIT} 件を表示
-        </Button>
-      )}
-      {query !== '' && rest.length === 0 && chosen.length === 0 && (
-        <p className="text-ink-faint text-xs">「{query}」に当てはまるタグがありません</p>
-      )}
-    </div>
-  )
+  const options = tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))
+  return multiple ? <EntitySelect kind="tag" aria-label="条件のタグ" size="full" options={options} values={selected} onChange={onChange} />
+    : <EntitySelect kind="tag" aria-label="条件のタグ" size="full" options={[{ value: '', label: 'タグを選ぶ' }, ...options]} value={selected[0] ?? ''} onChange={(id) => onChange(id ? [id] : [])} />
 }
 
 interface RuleEditorProps {
@@ -551,10 +498,8 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
         <TagPicker
           tags={tags}
           selected={selected}
-          onToggle={(id) => {
-            const next = selected.includes(id) ? selected.filter((t) => t !== id) : [...selected, id]
-            onChange({ type: rule.type, value: isMulti ? next : (next[next.length - 1] ?? '') })
-          }}
+          multiple={isMulti}
+          onChange={(next) => onChange({ type: rule.type, value: isMulti ? next : (next[0] ?? '') })}
         />
       </>
     )
@@ -678,26 +623,9 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
               ]}
             />
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {marks.map((mark) => {
-              const on = selected.includes(mark.id)
-              return (
-                <Button variant="primary" className={(`rounded-pill v7:h-8 px-3 text-xs transition-colors ${
-                    on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border'
-                  }`) + ' whitespace-normal'} key={mark.id} type="button" onClick={() =>
-                    onChange({
-                      type: rule.type,
-                      value: {
-                        ...v,
-                        markIds: on ? selected.filter((id) => id !== mark.id) : [...selected, mark.id],
-                      },
-                    })
-                  }>
-                  {mark.name}
-                </Button>
-              )
-            })}
-          </div>
+          <EntitySelect aria-label="条件の対応マーク" size="full" values={selected}
+            options={marks.map((mark) => ({ ...entityOptionMetadata(mark), value: mark.id, label: mark.name }))}
+            onChange={(markIds) => onChange({ type: rule.type, value: { ...v, markIds } })} />
         </>
       )
     }
@@ -708,11 +636,11 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink text-sm font-semibold">友だち情報</span>
-          <Select
+          <EntitySelect
             aria-label="友だち情報の項目"
             value={String(v.fieldId ?? '')}
             onChange={(value) => onChange({ type: rule.type, value: { ...v, fieldId: value } })}
-            options={[{ value: '', label: '項目を選ぶ' }, ...fields.map((f) => ({ value: f.id, label: f.name }))]}
+            options={[{ value: '', label: '項目を選ぶ' }, ...fields.map((f) => ({ ...entityOptionMetadata(f), value: f.id, label: f.name }))]}
           />
           <Select
             aria-label="項目の比べ方"
@@ -736,11 +664,11 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink text-sm font-semibold">シナリオ購読</span>
-          <Select
+          <EntitySelect kind="scenario"
             aria-label="購読中のシナリオ"
             value={String(rule.value ?? '')}
             onChange={(value) => onChange({ type: rule.type, value: value })}
-            options={[{ value: '', label: 'シナリオを選ぶ' }, ...scenarios.map((sc) => ({ value: sc.id, label: sc.name }))]}
+            options={[{ value: '', label: 'シナリオを選ぶ' }, ...scenarios.map((sc) => ({ ...entityOptionMetadata(sc), value: sc.id, label: sc.name }))]}
           />
         </div>
       )
@@ -749,11 +677,11 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink text-sm font-semibold">シナリオ</span>
-          <Select
+          <EntitySelect kind="scenario"
             aria-label="シナリオ"
             value={String(v.scenarioId ?? '')}
             onChange={(value) => onChange({ type: rule.type, value: { ...v, scenarioId: value } })}
-            options={[{ value: '', label: 'シナリオを選ぶ' }, ...scenarios.map((sc) => ({ value: sc.id, label: sc.name }))]}
+            options={[{ value: '', label: 'シナリオを選ぶ' }, ...scenarios.map((sc) => ({ ...entityOptionMetadata(sc), value: sc.id, label: sc.name }))]}
           />
           <Select
             aria-label="シナリオの状態"
@@ -768,13 +696,8 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink text-sm font-semibold">回答フォーム</span>
-          <input
-            value={String(rule.value ?? '')}
-            onChange={(e) => onChange({ type: rule.type, value: e.target.value })}
-            placeholder="フォームID（空ならどれかに回答した人）"
-            aria-label="回答フォームのID"
-            className={inputClass}
-          />
+          <EntityRemoteField kind="form" label="回答フォーム" value={String(rule.value ?? '')}
+            emptyLabel="いずれかのフォームに回答した人" onChange={(value) => onChange({ type: rule.type, value })} />
         </div>
       )
 

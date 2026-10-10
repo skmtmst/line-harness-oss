@@ -1,5 +1,6 @@
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
-import React, { act } from 'react'
+import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MediaItem, MediaReplacementImpact } from '@line-crm/shared'
@@ -158,10 +159,8 @@ function buttons(): HTMLButtonElement[] {
 }
 
 async function chooseReplacement() {
-  const trigger = buttons().find((b) => b.getAttribute('aria-label') === '差し替え先')!
-  await act(async () => { trigger.click(); await settle() })
-  const option = buttons().find((b) => b.textContent === '差し替え先.png')!
-  await act(async () => { option.click(); await settle() })
+  await pickEntity('差し替え先', '差し替え先.png')
+  await act(async () => { await settle() })
 }
 
 async function waitForDialogText(text: string) {

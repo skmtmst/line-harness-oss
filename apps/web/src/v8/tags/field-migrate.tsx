@@ -10,6 +10,7 @@
  * 事前確認したあとは、結果・切り替わる使用先・実行の結果の段を足す。
  * 受け付ける URL：`/tags/fields/migrate?id=<移行元の項目>`。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -568,14 +569,14 @@ function FieldMigrate() {
               <div className={styles.field}>
                 <span className={styles.label}>移行先</span>
                 <span className={styles.selectBox}>
-                  <Select
+                  <EntitySelect
                     value={existingTargetId}
                     onChange={(value) => { setExistingTargetId(value); resetConfirmation() }}
                     aria-label="移行先の既存項目"
                     size="full"
                     options={[
                       { value: '', label: '項目を選ぶ' },
-                      ...fields.filter((field) => field.id !== source.id).map((field) => ({ value: field.id, label: `${field.name}（${FIELD_TYPE_WORDS[field.type]}）` })),
+                      ...fields.filter((field) => field.id !== source.id).map((field) => ({ ...entityOptionMetadata(field), value: field.id, label: `${field.name}（${FIELD_TYPE_WORDS[field.type]}）` })),
                     ]}
                   />
                 </span>

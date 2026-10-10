@@ -1,5 +1,8 @@
 'use client'
 
+import FriendPickerField from '@/components/shared/friend-picker-field'
+
+import EntityRemoteField from '@/components/shared/entity-remote-field'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -2371,13 +2374,7 @@ export function NewAutomationV8({
         </div>
         <label className={styles.field} htmlFor="v8-test-friend">
           <span className={styles.label}>友だち</span>
-          <TextField
-            id="v8-test-friend"
-            aria-label="1人テストの友だちID"
-            value={testFriendId}
-            onChange={(event) => setTestFriendId(event.target.value)}
-            placeholder="試す友だちのID"
-          />
+          <FriendPickerField label="試す友だち" accountId={selectedAccountId ?? null} value={testFriendId} onChange={setTestFriendId} id="v8-test-friend" />
         </label>
         {canEdit ? (
           <div>
@@ -2630,11 +2627,11 @@ export function NewAutomationV8({
             <div className={styles.formGrid}>
               {eventType === 'tag_change' ? <EntityKindField kind="tag" label="きっかけのタグ" placeholder="（どのタグか選ぶ）" value={String(triggerConfig.tagId ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, tagId: value })} options={tags} /> : null}
               {eventType === 'tag_change' ? <Select aria-label="付いたとき・外れたとき" value={String(triggerConfig.action ?? 'add')} onChange={(value) => setTriggerConfig({ ...triggerConfig, action: value })} options={[{ value: 'add', label: '付いたとき' }, { value: 'remove', label: '外れたとき' }]} size="full" /> : null}
-              {eventType === 'form_submitted' ? <TextField aria-label="回答フォーム" placeholder="フォームID（空欄ならすべて）" value={String(triggerConfig.formId ?? '')} onChange={(e) => setTriggerConfig({ formId: e.target.value })} /> : null}
-              {eventType === 'link_clicked' ? <TextField aria-label="計測リンク" placeholder="計測リンクID（空欄ならすべて）" value={String(triggerConfig.trackedLinkId ?? '')} onChange={(e) => setTriggerConfig({ trackedLinkId: e.target.value })} /> : null}
+              {eventType === 'form_submitted' ? <EntityRemoteField kind="form" label="回答フォーム" value={String(triggerConfig.formId ?? '')} accountId={selectedAccountId} emptyLabel="すべて" onChange={(value) => setTriggerConfig({ ...triggerConfig, formId: value })} /> : null}
+              {eventType === 'link_clicked' ? <EntityRemoteField kind="tracked_link" label="計測リンク" value={String(triggerConfig.trackedLinkId ?? '')} accountId={selectedAccountId} emptyLabel="すべて" onChange={(value) => setTriggerConfig({ ...triggerConfig, trackedLinkId: value })} /> : null}
               {eventType === 'calendar_booked' ? <Select aria-label="予約の種類" value={String(triggerConfig.bookingType ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, bookingType: value })} options={[{ value: '', label: 'すべての予約' }, { value: 'salon', label: 'サロン予約' }, { value: 'event', label: 'イベント予約' }]} size="full" /> : null}
-              {eventType === 'calendar_booked' && triggerConfig.bookingType !== 'event' ? <TextField aria-label="予約メニュー" placeholder="メニューID（空欄ならすべて）" value={String(triggerConfig.menuId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, menuId: e.target.value })} /> : null}
-              {eventType === 'calendar_booked' && triggerConfig.bookingType === 'event' ? <TextField aria-label="対象イベント" placeholder="イベントID（空欄ならすべて）" value={String(triggerConfig.eventId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, eventId: e.target.value })} /> : null}
+              {eventType === 'calendar_booked' && triggerConfig.bookingType !== 'event' ? <EntityRemoteField kind="booking_menu" label="予約メニュー" value={String(triggerConfig.menuId ?? '')} accountId={selectedAccountId} emptyLabel="すべて" onChange={(value) => setTriggerConfig({ ...triggerConfig, menuId: value })} /> : null}
+              {eventType === 'calendar_booked' && triggerConfig.bookingType === 'event' ? <EntityRemoteField kind="event" label="対象イベント" value={String(triggerConfig.eventId ?? '')} accountId={selectedAccountId} emptyLabel="すべて" onChange={(value) => setTriggerConfig({ ...triggerConfig, eventId: value })} /> : null}
               {eventType === 'datetime' ? <DateTimeField id="v8-trigger-at" invalid={inputError?.target === 'v8-trigger-at'} aria-describedby={inputError?.target === 'v8-trigger-at' ? 'v8-trigger-error' : undefined} aria-label="実行日時" value={String(triggerConfig.at ?? '')} onChange={(v) => setTriggerConfig({ ...triggerConfig, at: v })} /> : null}
               {eventType === 'weekly' ? (
                 <WeekdaySelect

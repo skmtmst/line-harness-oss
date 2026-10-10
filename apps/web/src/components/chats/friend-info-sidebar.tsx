@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { DragHandle } from '@/components/shared/row-actions'
 
 import StatusPill, { StatusDot, SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
@@ -15,7 +16,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import { TextArea } from '@/components/shared/text-field'
-import Combobox from '@/components/shared/combobox'
+
 import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import InlineEdit from '@/components/shared/inline-edit'
@@ -1041,13 +1042,13 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                 {canEditChat && operators && isV8 ? (
                   /* ★V8 B-26：共通の選ぶ欄（選んだ行は ✓ だけ）。 */
                   <div className={v8.editField}>
-                    <Select
+                    <EntitySelect
                       id="inbox-panel-assignee"
                       size="full"
                       aria-label="担当者を変える"
                       value={effectiveOperatorId ?? ''}
                       onChange={(value) => saveAssignee(value || null)}
-                      options={[{ value: '', label: '未割り当て' }, ...operators.map((op) => ({ value: op.id, label: op.name }))]}
+                      options={[{ value: '', label: '未割り当て' }, ...operators.map((op) => ({ ...entityOptionMetadata(op), value: op.id, label: op.name }))]}
                     />
                   </div>
                 ) : canEditChat && operators ? (
@@ -1196,14 +1197,14 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               {canEditFriend && isV8 ? (
                 /* ★V8 B-26：共通の候補つき入力。選ぶと付け、無ければ「＋ 新しく作る」で作って付ける。 */
                 <div id="inbox-panel-tag-picker" hidden={!tagPickerOpen} className={v8.editField}>
-                  <Combobox
+                  <EntitySelect clearable size="full" kind="tag"
                     id="inbox-panel-tag"
                     aria-label="タグを探して付ける"
                     placeholder="タグを探して付ける"
                     value=""
                     options={tagOptions
                       .filter((t) => !(effectiveTags ?? []).some((own) => own.id === t.id))
-                      .map((t) => ({ value: t.id, label: t.name }))}
+                      .map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))}
                     onChange={(tagId) => { if (tagId) addTagById(tagId) }}
                     createLabel={(query) => `＋「${query}」を作って付ける`}
                     onCreate={(query) => { void createAndAddTag(query) }}

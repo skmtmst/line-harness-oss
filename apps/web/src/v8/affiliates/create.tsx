@@ -12,6 +12,7 @@
  *   「すぐに計測を始める」（今の画面にある）を同じ形で置く。
  * - Gqve5 の同時編集の比較・再読込はAPIが無いため出さない。紹介コードの重複は欄で知らせる。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Link as LinkIcon } from 'lucide-react'
@@ -405,7 +406,7 @@ export default function CreateAffiliateV8() {
                   <TextField aria-label="友だちの名前で検索" value={friendSearchInput} onChange={(event) => setFriendSearchInput(event.target.value)} placeholder="友だちの名前で探す" />
                   <Button type="submit">検索</Button>
                 </form>
-                <Select
+                <EntitySelect
                   id="af-friend"
                   aria-label="LINEの友だちと結びつける"
                   value={friendId}
@@ -416,7 +417,7 @@ export default function CreateAffiliateV8() {
                   }}
                   options={[
                     { value: '', label: friendLoading ? '読み込んでいます' : '結びつけない' },
-                    ...friendOptions.map((friend) => ({ value: friend.id, label: friend.displayName })),
+                    ...friendOptions.map((friend) => ({ ...entityOptionMetadata(friend), value: friend.id, label: friend.displayName })),
                   ]}
                 />
                 {friendError ? (

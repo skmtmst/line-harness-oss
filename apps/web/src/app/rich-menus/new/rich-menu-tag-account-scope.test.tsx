@@ -1,3 +1,4 @@
+import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 /*
  * R23: リッチメニュー作成のタグ候補は、いま選んでいるアカウントのものだけ。
@@ -5,7 +6,7 @@
  * - タグ一覧の取得に選択accountが付く（別アカウントの同名タグが混ざらない）
  * - アカウントを切り替えたら、前の候補にしかない選択を外して知らせる
  */
-import React, { act } from 'react'
+import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -112,16 +113,7 @@ describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
       fireEvent.click(setup!)
     })
     await settle(50)
-    await act(async () => {
-      fireEvent.focus(combobox())
-    })
-    await settle(50)
-    // 候補の一覧は MenuPortal で document.body 直下に出る（host の中にはない）。
-    const option = Array.from(document.querySelectorAll('[role="option"]')).find((el) => el.textContent?.includes('会員'))
-    expect(option).toBeTruthy()
-    await act(async () => {
-      fireEvent.click(option!)
-    })
+    await pickEntities('タグを付ける', ['会員'])
     await settle(50)
     const save = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'この面の設定を保存する')
     expect(save).toBeTruthy()

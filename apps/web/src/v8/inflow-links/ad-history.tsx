@@ -1,5 +1,7 @@
 'use client'
 
+import EntitySelect from '@/components/shared/entity-select'
+
 /*
  * ★V8 広告への送信履歴（Pencil `p0kA3`・`/inflow-links?tab=connections&view=history`）。
  *
@@ -186,7 +188,7 @@ export default function AdHistoryV8() {
             <Select aria-label="送信状態" value={status} onChange={(value) => { setStatus(value); setPage(1) }} options={STATUS_OPTIONS} width={160} />
           </span>
           <span className={styles.selectBox}>
-            <Select aria-label="媒体" value={media} onChange={setMedia} options={mediaOptions} width={160} />
+            <EntitySelect aria-label="媒体" value={media} onChange={setMedia} options={mediaOptions} width={160} />
           </span>
           <span className={styles.toolsSpacer} aria-hidden="true" />
           <span className={styles.toolsCount}>{`${formatNumber(model.total)} 件中 ${formatNumber(visible.length)} 件`}</span>

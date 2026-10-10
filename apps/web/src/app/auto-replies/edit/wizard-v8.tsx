@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -2334,7 +2335,7 @@ function AutoReplyWizardV8Inner() {
                 </div>
                 {/* 絵 Guoye：送信者の行 → 届いたメッセージと「試す」の行。友だちを名前で探す欄は機能なので送信者の行の右に残す。 */}
                 <div className={styles.testRow}>
-                  <Select
+                  <EntitySelect
                     id="wiz-test-friend"
                     className={styles.testGrow}
                     aria-label="送信者"
@@ -2345,7 +2346,7 @@ function AutoReplyWizardV8Inner() {
                         ? [{ value: '', label: '友だちを読み込めませんでした' }]
                         : friends.length === 0
                           ? [{ value: '', label: '友だちがいません' }]
-                          : friends.map((f) => ({
+                          : friends.map((f) => ({ ...entityOptionMetadata(f),
                               value: f.id,
                               label: f.id === selectedFriendId
                                 ? `送信者：${f.displayName || '名前なし'}（名前で探す・候補 ${formatNumber(friendTotal)}人中 ${friends.length}人）`

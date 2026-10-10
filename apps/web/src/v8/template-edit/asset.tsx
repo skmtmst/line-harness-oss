@@ -7,6 +7,7 @@
  * 同じ口（POST /api/broadcast-message-assets）・同じ形の payload。違いは置き場と
  * 見せ方だけ（BEHAVIOR.md）。リッチメッセージは今の画面のまま（入口が渡す）。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { GripVertical, Plus, Send, X } from 'lucide-react'
@@ -22,7 +23,7 @@ import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
 import ActionMenu from '@/components/shared/action-menu'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
-import Combobox from '@/components/shared/combobox'
+
 import DateTimeField from '@/components/shared/date-time-field'
 import LinePreview from '@/components/shared/line-preview'
 import SegmentedControl from '@/components/shared/segmented'
@@ -710,12 +711,12 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                 <h2 className={styles.cardTitle}>答えてもらう人</h2>
                 <p className={styles.cardNote}>タグで絞れます。選ばなければ全員が対象です。</p>
               </div>
-              <Combobox
+              <EntitySelect clearable size="full" kind="tag"
                 aria-label="答えてもらう人"
                 placeholder="友だち全員"
                 value={targetTagId}
                 onChange={setTargetTagId}
-                options={actionOptions.tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+                options={actionOptions.tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))}
               />
             </Card>
             </>

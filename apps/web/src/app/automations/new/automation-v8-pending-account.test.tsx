@@ -37,6 +37,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     ...actual,
     api: {
       ...actual.api,
+      friends: { ...actual.api.friends, list: vi.fn(async () => ({ success: true, data: { items: [{ id: 'friend-1', displayName: '試験の友だち' }], total: 1 } })) },
       tags: { ...actual.api.tags, list: vi.fn() },
       scenarios: { ...actual.api.scenarios, list: vi.fn() },
       friendFields: { ...actual.api.friendFields, list: vi.fn() },
@@ -157,7 +158,7 @@ describe('V8本体の遅延応答と店舗の分離', () => {
 
   it.each(['成功', '失敗'])('1人テストの%s応答が店舗切替後に来ても、別店舗と戻った店舗へ成否を残さない', async (outcome) => {
     const view = await mount()
-    fireEvent.change(screen.getByLabelText('1人テストの友だちID'), { target: { value: 'friend-1' } })
+    await pickEntity('試す友だち', '試験の友だち')
     fireEvent.click(screen.getByRole('button', { name: '1人で試す', exact: true }))
     const dialog = await screen.findByRole('dialog', { name: '1人テストの確認' })
     const pending = deferred<unknown>()
@@ -178,3 +179,6 @@ describe('V8本体の遅延応答と店舗の分離', () => {
     expect(screen.queryByText(/テストする友だちが見つかりません/)).toBeNull()
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

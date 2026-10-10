@@ -1,12 +1,13 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { api } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Select from '@/components/shared/select'
+
 import Button from '@/components/shared/button'
 
 type Tag = { id: string; name: string; color: string }
@@ -189,7 +190,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                 </RadioCardGroup>
                 {mode.kind === 'tag' && (
                   <div className="mt-2">
-                    <Select
+                    <EntitySelect kind="tag"
                       value={mode.tagId}
                       onChange={(value) =>
                         pickMode({ kind: 'tag', tagId: value })
@@ -198,7 +199,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                       options={
                         tags.length === 0
                           ? [{ value: '', label: tagsLoading ? 'タグを読み込んでいます' : 'タグがありません' }]
-                          : tags.map((t) => ({ value: t.id, label: t.name }))
+                          : tags.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))
                       }
                       size="full"
                     />

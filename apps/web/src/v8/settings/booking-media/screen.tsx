@@ -10,6 +10,7 @@
  * 保存した URL は「今日のお店」の右の列と「枠を閉じる知らせ」の［管理画面を開く ↗］に使われる。
  * 動きは BEHAVIOR.md。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, MessageCircle, Plus } from 'lucide-react'
 import { PageFrame, PageHeading, PageFooter } from '@/components/templates/page-frame'
@@ -19,7 +20,7 @@ import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import SectionHeader from '@/components/shared/section-header'
-import Select from '@/components/shared/select'
+
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import Toggle from '@/components/shared/toggle'
 import Checkbox from '@/components/shared/checkbox'
@@ -439,7 +440,7 @@ export default function BookingMediaPage() {
             <span className={styles.headActions}>
               {stores.length > 1 ? (
                 <span className={styles.storeSelect}>
-                  <Select aria-label="店舗" value={storeId} onChange={(value) => { if (value === storeId) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={stores.map((s) => ({ value: s.id, label: s.name }))} />
+                  <EntitySelect aria-label="店舗" value={storeId} onChange={(value) => { if (value === storeId) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={stores.map((s) => ({ ...entityOptionMetadata(s), value: s.id, label: s.name }))} />
                 </span>
               ) : null}
               {canManage ? <Button onClick={() => { setAdding(true); setAddName(''); setAddError(''); setAddNameError('') }}><Plus size={15} aria-hidden="true" />媒体を足す</Button> : null}

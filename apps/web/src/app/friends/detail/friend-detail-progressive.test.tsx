@@ -493,3 +493,6 @@ describe('概要の次の予定', () => {
     await eventually(() => expect(document.body.textContent).toContain('確定した配信予定はありません'))
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

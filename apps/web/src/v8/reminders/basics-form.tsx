@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useRef, useState } from 'react'
 import { CalendarDays, IdCard } from 'lucide-react'
 import type { FriendField, ReminderDraftSettings, ReminderDraftStep, ReminderTriggerType } from '@line-crm/shared'
@@ -354,7 +355,7 @@ export function ReminderBasicsFormV8({
           <div className={styles.field}>
             <span className={styles.label}>基準日に使う情報欄</span>
             <div className={styles.testRow}>
-              <Select
+              <EntitySelect
                 error={fieldError?.key === 'triggerFieldId' ? fieldError.message : undefined}
                 value={value.triggerFieldId}
                 onChange={(next) => patch({ triggerFieldId: next })}
@@ -363,7 +364,7 @@ export function ReminderBasicsFormV8({
                 size="full"
                 options={[
                   { value: '', label: fieldsLoadState === 'loading' || fieldsLoadState === 'idle' ? '情報欄を読み込み中' : fieldsLoadState === 'error' ? '情報欄を読み込めませんでした' : '選んでください' },
-                  ...dateFields.map((field) => ({ value: field.id, label: field.name })),
+                  ...dateFields.map((field) => ({ ...entityOptionMetadata(field), value: field.id, label: field.name })),
                 ]}
               />
               {fieldsLoadState === 'error' ? <Button onClick={() => setFieldsLoadState('idle')}>再読み込み</Button> : null}

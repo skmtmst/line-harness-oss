@@ -8,6 +8,7 @@
  * 口は今と同じ（tags.list・approval.candidates・preflight・create・send・approval.request）。
  * 入口：一斉配信一覧の「配信を作る ▾」の「かんたんに送る」（絵 `Xr6eu` の分け方）。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ListOrdered, Send, Users } from 'lucide-react'
@@ -16,7 +17,7 @@ import { api, type BroadcastApprovalCandidate } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval'
-import Select from '@/components/shared/select'
+
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import DateTimeField from '@/components/shared/date-time-field'
 import { formatNumber } from '@/lib/format'
@@ -326,12 +327,12 @@ export default function QuickSendV8({
           {needsApproval ? (
             <div className={styles.approval}>
               <p className={styles.approvalTitle}>{`${formatNumber(approvalConfig?.threshold ?? APPROVAL_THRESHOLD)}人以上に送るときは承認が要ります。承認する人を選んで頼んでください。`}</p>
-              <Select
+              <EntitySelect
                 aria-label="承認する人"
                 size="full"
                 value={approverId}
                 onChange={setApproverId}
-                options={[{ value: '', label: '承認する人を選ぶ' }, ...candidates.map((item) => ({ value: item.id, label: `承認する人：${item.name}${ROLE_LABELS[item.role] ? `（${ROLE_LABELS[item.role]}）` : ''}` }))]}
+                options={[{ value: '', label: '承認する人を選ぶ' }, ...candidates.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `承認する人：${item.name}${ROLE_LABELS[item.role] ? `（${ROLE_LABELS[item.role]}）` : ''}` }))]}
               />
               <p className={styles.approvalNote}>1人で運用しているときは、人数を確かめるチェックだけで送れます。</p>
             </div>

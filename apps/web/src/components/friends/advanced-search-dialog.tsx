@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import TagPill from '@/components/shared/tag-pill'
@@ -21,7 +22,7 @@ import { TextInput } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import Button from '@/components/shared/button'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Combobox from '@/components/shared/combobox'
+
 import Select from '@/components/shared/select'
 import HelpTip from '@/components/shared/help-tip'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -884,13 +885,13 @@ function OrAxisPicker({
       <span className="text-xs font-semibold text-ink-secondary">{axis.label}</span>
       <div className="flex items-center gap-1.5">
         {axis.input === 'mark' || axis.input === 'scenario' ? (
-          <Combobox
+          <EntitySelect clearable size="full"
             aria-label={`${axis.label}を選ぶ`}
             placeholder="選ぶ"
             value={draft}
             onChange={setDraft}
             disabled={waitingForOptions}
-            options={options.map((option) => ({ value: option.id, label: option.name }))}
+            options={options.map((option) => ({ ...entityOptionMetadata(option), value: option.id, label: option.name }))}
             className="min-w-0 flex-1"
           />
         ) : axis.input === 'date' ? (
@@ -952,7 +953,7 @@ function TagPicker({
         同じ行に並べると狭いパネルでタグ名が数文字に切れて読めなかった。
         選んだタグの札は下で複数行に広がり、全文を確認できる。
       */}
-      <Combobox
+      <EntitySelect clearable size="full" kind="tag"
         aria-label="タグ名を選ぶ"
         placeholder="タグ名を選ぶ"
         value={pick}
@@ -965,7 +966,7 @@ function TagPicker({
           }
           setPick('')
         }}
-        options={tags.map((t) => ({ value: t.id, label: t.name }))}
+        options={tags.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))}
         className="w-full"
       />
       <div className="mt-2 flex flex-wrap items-center gap-2">

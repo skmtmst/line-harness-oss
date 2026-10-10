@@ -6,12 +6,13 @@
  * 読み書きの口・本人確認は v7（app/hq/account-settings-dialogs.tsx）と同じ（import できないので写した）。
  * 設定の窓だけ、見た目を絵 `HMpVx` どおりに組み直した。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useState } from 'react'
 import { CircleHelp, RotateCcw, Users } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import Button from '@/components/shared/button'
-import Select from '@/components/shared/select'
+
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
 import { api } from '@/lib/api'
@@ -159,7 +160,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
         </div>
         <div className={styles.field}>
           <label htmlFor="hq-account-settings-parent" className={styles.label}>親アカウント</label>
-          <Select
+          <EntitySelect
             id="hq-account-settings-parent"
             aria-label="親アカウント"
             size="full"
@@ -169,7 +170,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
             options={[
               { value: '', label: parentName ? (parentName.displayName || parentName.name) : '変えない' },
               { value: 'none', label: 'なしにする' },
-              ...accounts.filter((item) => item.id !== account.id && item.id !== currentParent).map((item) => ({ value: item.id, label: item.displayName || item.name })),
+              ...accounts.filter((item) => item.id !== account.id && item.id !== currentParent).map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.displayName || item.name })),
             ]}
           />
         </div>

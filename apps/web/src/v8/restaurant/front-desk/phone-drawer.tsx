@@ -7,6 +7,7 @@
  * → 空いている時刻の札 → 卓は自動（変えられる）→ メモ → 「LINE で確認を送る」（友だちのときだけ）→［予約を入れる］。
  * 電話番号・時刻・［予約を入れる］の3〜4手で入る。保存は今の手動予約の口（source=phone）。動きは BEHAVIOR.md。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useMemo, useState } from 'react'
 import { Check, CircleCheck, Minus, Plus } from 'lucide-react'
 import type { RestaurantOpeningDay } from '@line-crm/shared'
@@ -16,7 +17,7 @@ import Drawer from '@/components/shared/drawer'
 import FilterChip from '@/components/shared/filter-chip'
 import IconButton from '@/components/shared/icon-button'
 import SegmentedControl from '@/components/shared/segmented'
-import Select from '@/components/shared/select'
+
 import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
 import { restaurantTestApi, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
@@ -264,12 +265,12 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
           {candidates.length > 1 && !changingTable ? <Button variant="text" onClick={() => setChangingTable(true)}>変える</Button> : null}
         </div>
         {changingTable && candidates.length > 1 ? (
-          <Select
+          <EntitySelect
             aria-label="卓を選ぶ"
             size="full"
             value={chosenTable?.id ?? ''}
             onChange={setTableId}
-            options={candidates.map((t) => ({ value: t.id, label: `${t.code}（${tableNote(t)}）` }))}
+            options={candidates.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: `${t.code}（${tableNote(t)}）` }))}
           />
         ) : null}
         <label className={styles.field}>

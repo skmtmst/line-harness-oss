@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Gift, MessageSquare, Newspaper, Package, RotateCw, Send } from 'lucide-react'
@@ -186,7 +187,7 @@ export function TestRecipientPicker({ friends, value, onChange, accountId }: {
       </span>
     )
   }
-  return <Select aria-label="テスト送信先" value={value} onChange={onChange} options={friends.map((friend) => ({ value: friend.id, label: friend.displayName || '名前未取得' }))} />
+  return <EntitySelect aria-label="テスト送信先" value={value} onChange={onChange} options={friends.map((friend) => ({ ...entityOptionMetadata(friend), value: friend.id, label: friend.displayName || '名前未取得' }))} />
 }
 
 function Kpis({ kpis, loading, failed }: { kpis: NenKpis | null; loading: boolean; failed: boolean }) {

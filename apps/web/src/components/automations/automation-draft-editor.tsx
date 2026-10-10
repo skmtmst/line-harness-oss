@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useState } from 'react'
 import { AUTOMATION_DRAFT_ACTION_OPTIONS, AUTOMATION_DRAFT_TRIGGER_OPTIONS } from '@line-crm/shared'
 import { api, ApiError, type AutomationDraftAction, type AutomationDraftDetail } from '@/lib/api'
@@ -258,13 +259,13 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       {eventType === 'tag_change' ? (
         <>
           <Field label="対象のタグ" htmlFor="au-trigger-tag" required note="見本は実データIDを持たないため、必ず選び直します。">
-            <Select
+            <EntitySelect kind="tag"
               id="au-trigger-tag"
               aria-label="対象のタグ"
               size="full"
               value={triggerTagId}
               onChange={setTriggerTagId}
-              options={[{ value: '', label: '— 選んでください —' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]}
+              options={[{ value: '', label: '— 選んでください —' }, ...tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))]}
             />
           </Field>
           <Field label="付いたとき・外れたとき" htmlFor="au-trigger-tag-action" required>
@@ -394,24 +395,24 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       </Field>
       {actionType === 'add_tag' ? (
         <Field label="付けるタグ" htmlFor="au-action-tag" required>
-          <Select
+          <EntitySelect kind="tag"
             id="au-action-tag"
             aria-label="付けるタグ"
             size="full"
             value={actionTagId}
             onChange={setActionTagId}
-            options={[{ value: '', label: '— 選んでください —' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]}
+            options={[{ value: '', label: '— 選んでください —' }, ...tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))]}
           />
         </Field>
       ) : actionType === 'start_scenario' ? (
         <Field label="始めるシナリオ" htmlFor="au-scenario" required>
-          <Select
+          <EntitySelect kind="scenario"
             id="au-scenario"
             aria-label="始めるシナリオ"
             size="full"
             value={actionScenarioId}
             onChange={setActionScenarioId}
-            options={[{ value: '', label: '— 選んでください —' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))]}
+            options={[{ value: '', label: '— 選んでください —' }, ...scenarios.map((scenario) => ({ ...entityOptionMetadata(scenario), value: scenario.id, label: scenario.name }))]}
           />
         </Field>
       ) : actionType === 'common_action' ? (
@@ -421,7 +422,7 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
           required
           note="公開済みのものだけ選べます。実行するときの版が記録に残ります。"
         >
-          <Select
+          <EntitySelect kind="common_action"
             id="au-common-action"
             aria-label="使う共通アクション"
             size="full"
@@ -429,7 +430,7 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
             onChange={setActionCommonActionId}
             options={[
               { value: '', label: commonActions.length === 0 ? '公開済みの共通アクションがありません' : '— 選んでください —' },
-              ...commonActions.map((item) => ({ value: item.id, label: item.name })),
+              ...commonActions.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name })),
             ]}
           />
         </Field>

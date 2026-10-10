@@ -6,11 +6,12 @@
  * - `AnwtH` 画像を取り込む（入れるプロジェクトを選び、PNG・JPEG・WebP、10MB まで）
  * - `I0w2e` アーカイブの確認・`B24oNg` 一覧から外す確認（プロジェクトの中で使う）
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { Archive, Plus, Upload } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import Button from '@/components/shared/button'
 import MediaSlot from '@/components/shared/media-slot'
-import Select from '@/components/shared/select'
+
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { api } from '@/lib/api'
 import { readFileAsBase64, type BannerProject } from '@/lib/hq-banners'
@@ -210,14 +211,14 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
             <div className={styles.field}>
               <label htmlFor={`${uid}-project`} className={styles.label}>入れるプロジェクト</label>
               <div className={styles.full}>
-                <Select
+                <EntitySelect
                   aria-label="入れるプロジェクト"
                   size="full"
                   id={`${uid}-project`}
                   value={projectId}
                   disabled={loading}
                   onChange={setProjectId}
-                  options={projects.map((p) => ({ value: p.id, label: p.name }))}
+                  options={projects.map((p) => ({ ...entityOptionMetadata(p), value: p.id, label: p.name }))}
                 />
               </div>
             </div>

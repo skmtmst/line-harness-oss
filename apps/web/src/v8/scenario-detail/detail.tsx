@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 
@@ -2028,13 +2029,13 @@ export default function ScenarioDetailV8({
           <div className="space-y-3">
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">到達したらタグ付与</label>
-              <Select
+              <EntitySelect kind="tag"
                 aria-label="到達したらタグ付与"
                 value={stepForm.onReachTagId ?? ''}
                 onChange={(value) => setStepForm({ ...stepForm, onReachTagId: value || null })}
                 options={[
                   { value: '', label: '-- なし --' },
-                  ...tags.map((t) => ({ value: t.id, label: t.name })),
+                  ...tags.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name })),
                 ]}
                 size="full"
               />

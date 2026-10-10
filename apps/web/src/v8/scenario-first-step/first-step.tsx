@@ -11,6 +11,7 @@
  * 1通目は飛ばせる。書かせないと進めない形にすると、あとで考えたい人が
  * 適当な本文を入れて先へ進む。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -34,7 +35,7 @@ import MessageKindFields, {
   type MessageKindState,
 } from '@/components/scenarios/message-kind-fields'
 import QuestionEditor, { emptyQuestion, type ScenarioQuestion } from '@/components/scenarios/question-editor'
-import { ConditionDialog, describeCondition } from '@/components/scenarios/scenario-dialogs'
+import { ConditionDialog } from '@/components/scenarios/scenario-dialogs'
 import CarouselPicker from '@/components/scenarios/carousel-picker'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scenarios/char-counter'
@@ -636,12 +637,12 @@ export default function ScenarioFirstStepV8() {
         {targetMode === 'tag' ? (
           <div className={styles.inlineField}>
             <span className={styles.inlineLabel}>絞り込むタグ</span>
-            <Select
+            <EntitySelect kind="tag"
               value={targetTagId}
               onChange={(value) => { setTargetTagId(value); setTargetError('') }}
               error={targetError || undefined}
               aria-label="絞り込みに使うタグ"
-              options={[{ value: '', label: '選んでください' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]}
+              options={[{ value: '', label: '選んでください' }, ...tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))]}
             />
           </div>
         ) : null}

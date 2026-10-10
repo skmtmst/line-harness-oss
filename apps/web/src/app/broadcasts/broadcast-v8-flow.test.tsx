@@ -8,7 +8,7 @@ import React from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -180,7 +180,7 @@ describe('V8 一斉配信の通し', () => {
     })
     // テンプレートの選択は使わず、メッセージの編集へ戻って自分で書く。
     await act(async () => {
-      fireEvent.click(await screen.findByRole('button', { name: 'メッセージ編集へ戻る' }))
+      fireEvent.click(within(await screen.findByRole('dialog', { name: 'テンプレートを選ぶ' })).getByRole('button', { name: 'キャンセル' }))
     })
     await screen.findByPlaceholderText('例：8月キャンペーンのお知らせ')
 

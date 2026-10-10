@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect from '@/components/shared/entity-select'
 import type { CommonActionResources, CommonActionStep } from '@/lib/api'
 import { newCommonActionStep, newStepId } from '@/components/automations/common-action-editor'
 import Button from '@/components/shared/button'
@@ -180,7 +181,7 @@ export default function BranchEditors({
             <div className="space-y-2">
               {sideSteps.map((sideStep, sideIndex) => sideStep.type === 'common_action' ? (
                 <div key={sideStep.id} className="flex items-center gap-2">
-                  <Select
+                  <EntitySelect
                     size="full"
                     aria-label={`${sideLabel}${sideIndex + 1}の公開版`}
                     className="mt-1"
@@ -225,7 +226,7 @@ export default function BranchEditors({
               {condition.rules.map((rule, ruleIndex) => rule.type === 'tag_exists' || rule.type === 'tag_not_exists' ? (
                 <div key={`${step.id}-rule-${ruleIndex}`} className="flex items-center gap-2">
                   <label className="text-ink-secondary flex-1 text-sm">条件{ruleIndex + 1}（{RULE_TYPE_LABEL[rule.type]}）
-                    <Select
+                    <EntitySelect kind="tag"
                       size="full"
                       aria-label={`条件${ruleIndex + 1}のタグ`}
                       className="mt-1"

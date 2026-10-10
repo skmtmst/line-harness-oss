@@ -26,7 +26,7 @@ describe('候補を選ぶ共通の窓', () => {
     fireEvent.click(screen.getByRole('radio', { name: '春のお知らせ' }))
     expect(onSelect).toHaveBeenCalledWith('1')
     expect(onConfirm).not.toHaveBeenCalled()
-    expect(screen.getByText('選んだもの：春のお知らせ（テキスト）')).toBeTruthy()
+    expect(screen.getByText('選んだもの：春のお知らせ')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'このテンプレートを使う' }))
     expect(onConfirm).toHaveBeenCalledWith('1')
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '存在しない名前' } })

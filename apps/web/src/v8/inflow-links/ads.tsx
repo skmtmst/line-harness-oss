@@ -12,6 +12,7 @@
  * - 未接続の媒体の「つなぐ」は、今の広告とのつなぎ（v7）と同じ接続の窓を開く
  * 閲覧のみ（owner・admin 以外）には、費用を手で入れる・つなぐ・再読み込み・行の「…」・操作の行を出さない。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AtSign, Check, Eye, Music, MoreHorizontal, Plug, Plus, RefreshCw, Search, Target, ThumbsUp, UserPlus, Wallet, XCircle } from 'lucide-react'
 import type { EntryRoute } from '@line-crm/shared'
@@ -27,7 +28,7 @@ import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
-import Select from '@/components/shared/select'
+
 import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import AdConnectionDialog from './ad-connection-dialog'
@@ -530,7 +531,7 @@ export default function AdsV8() {
           </label>
           <div className={styles.field}>
             <span className={styles.pickLabel}>計測リンク（分かれば）</span>
-            <Select
+            <EntitySelect
               aria-label="計測リンク（分かれば）"
               size="full"
               value={manualRouteId}
@@ -539,7 +540,7 @@ export default function AdsV8() {
                 const route = entryRoutes.find((item) => item.id === value)
                 if (route && !manualLabel.trim()) setManualLabel(route.name)
               }}
-              options={[{ value: '', label: '結びつけない' }, ...entryRoutes.map((route) => ({ value: route.id, label: route.name }))]}
+              options={[{ value: '', label: '結びつけない' }, ...entryRoutes.map((route) => ({ ...entityOptionMetadata(route), value: route.id, label: route.name }))]}
             />
           </div>
           <div className={styles.fieldRow}>

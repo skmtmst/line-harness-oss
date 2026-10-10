@@ -10,6 +10,7 @@
  * 板にある「配信に使うアカウント」の列は /api/users-grouped の行に無いので
  * 出さない（DEVIN-QUESTIONS に未接続として記録）。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useCallback, useEffect, useState } from 'react'
 import { CircleAlert, RotateCw, SearchX, UserPlus } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -167,7 +168,7 @@ export default function UsersV8() {
           />
         </div>
         <div className={styles.selectWrap}>
-          <Select
+          <EntitySelect
             aria-label="所属アカウントで絞り込む"
             label="所属アカウント"
             size="full"
@@ -175,7 +176,7 @@ export default function UsersV8() {
             onChange={u.setAccount}
             options={[
               { value: '', label: '所属：すべて' },
-              ...u.accountOptions.map((a) => ({ value: a.id, label: a.name })),
+              ...u.accountOptions.map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: a.name })),
             ]}
           />
         </div>

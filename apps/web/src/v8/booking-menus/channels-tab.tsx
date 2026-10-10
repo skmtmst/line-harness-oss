@@ -1,12 +1,13 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchApi } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import Select from '@/components/shared/select'
+
 import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
@@ -223,7 +224,7 @@ export function ConflictDialog({
         {conflict.reason ? <p className={ch.conflictReason}>{conflict.reason}</p> : null}
         {canEdit ? <>
         <p className={ch.conflictLabel}>①の予約を移す先のスタッフ</p>
-        <Select
+        <EntitySelect
           aria-label="移す先のスタッフ"
           size="full"
           disabled={busy}
@@ -231,7 +232,7 @@ export function ConflictDialog({
           onChange={setTargetId}
           options={[
             { value: '', label: '移す先を選ぶ' },
-            ...targets.map((t) => ({ value: t.staffId, label: `${t.displayName}へ移す` })),
+            ...targets.map((t) => ({ ...entityOptionMetadata(t), value: t.staffId, label: `${t.displayName}へ移す` })),
           ]}
         />
         <div className={ch.detailRow}>

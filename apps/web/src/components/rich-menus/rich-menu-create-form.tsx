@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useMemo, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -302,13 +303,13 @@ export default function RichMenuCreateForm({
               {value.tabCount > 0 ? (
                 <div>
                   <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-default-page">最初に見せるページ</label>
-                  <Select
+                  <EntitySelect
                     id="rich-menu-default-page"
                     aria-label="最初に見せるページ"
                     value={String(value.defaultPageIndex)}
                     disabled={locked}
                     onChange={(value) => patch({ defaultPageIndex: Number(value) })}
-                    options={createPages.map((page) => ({ value: page.id, label: page.name }))}
+                    options={createPages.map((page) => ({ ...entityOptionMetadata(page), value: page.id, label: page.name }))}
                   />
                   <p className="text-ink-faint mt-1 text-xs">タブを切り替えていない人が最初に見るページです。</p>
                 </div>

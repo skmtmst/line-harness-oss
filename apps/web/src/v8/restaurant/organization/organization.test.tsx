@@ -1,5 +1,6 @@
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
-import React from 'react'
+
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
@@ -34,8 +35,7 @@ it('ログインとの連携は「変更」の窓の中で保存する', async (
   const row = (await screen.findByText('試験担当')).closest('[role="row"]') as HTMLElement
   expect(row.querySelector('[title]')?.getAttribute('title')).toContain('試験ログイン・スタッフ')
   fireEvent.click(within(row).getByRole('button', { name: '変更' }))
-  fireEvent.click(await screen.findByRole('button', { name: '試験担当のログインメンバー' }))
-  fireEvent.click(within(await screen.findByRole('option', { name: '別のログイン' })).getByRole('button'))
+  await pickEntity('試験担当のログインメンバー', '別のログイン')
   fireEvent.click(screen.getByRole('button', { name: 'ログインと連携' }))
   await waitFor(() => expect(fixture.linkMembershipLogin).toHaveBeenCalledWith('account-1', 'member', 'next'))
 })
@@ -68,8 +68,7 @@ it('ユーザーの保存中は窓の×・キャンセル・Escで閉じられ�
   render(<OrganizationV8 />)
   const row = (await screen.findByText('試験担当')).closest('[role="row"]') as HTMLElement
   fireEvent.click(within(row).getByRole('button', { name: '変更' }))
-  fireEvent.click(await screen.findByRole('button', { name: '試験担当のログインメンバー' }))
-  fireEvent.click(within(await screen.findByRole('option', { name: '別のログイン' })).getByRole('button'))
+  await pickEntity('試験担当のログインメンバー', '別のログイン')
   fireEvent.click(screen.getByRole('button', { name: 'ログインと連携' }))
   expect(screen.getByRole('button', { name: '閉じる' }).hasAttribute('disabled')).toBe(true)
   expect(screen.getByRole('button', { name: 'キャンセル' }).hasAttribute('disabled')).toBe(true)

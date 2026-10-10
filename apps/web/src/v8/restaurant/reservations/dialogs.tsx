@@ -4,6 +4,7 @@
  * ★V8 予約台帳の窓：予約の変更（取消・復活・押さえの解除もここ）・取消の確認・受信データの試し。
  * 送る形は今の画面（app/restaurant-test/v8/reservations.tsx）と同じ。
  */
+import EntitySelect from '@/components/shared/entity-select'
 import { useEffect, useState } from 'react'
 import { Field } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
@@ -141,7 +142,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
             </Field>
             <Field labelSize="compact" label="卓">
               {canWrite ? (
-                <Select aria-label="卓" size="full" value={draft.tableId} onChange={(value) => setDraft({ ...draft, tableId: value })} options={tableOptions} />
+                <EntitySelect aria-label="卓" size="full" value={draft.tableId} onChange={(value) => setDraft({ ...draft, tableId: value })} options={tableOptions} />
               ) : <ReadOnlyChoice label="卓" value={draft.tableId} options={tableOptions} />}
             </Field>
           </div>
@@ -155,7 +156,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
           </div>
           <Field labelSize="compact" label="コース">
             {canWrite ? (
-              <Select aria-label="コース" size="full" value={draft.courseId} onChange={(value) => setDraft({ ...draft, courseId: value })} options={courseOptions} />
+              <EntitySelect aria-label="コース" size="full" value={draft.courseId} onChange={(value) => setDraft({ ...draft, courseId: value })} options={courseOptions} />
             ) : <ReadOnlyChoice label="コース" value={draft.courseId} options={courseOptions} />}
           </Field>
           <Field label="アレルギー・特記事項" htmlFor="rs-edit-allergy">

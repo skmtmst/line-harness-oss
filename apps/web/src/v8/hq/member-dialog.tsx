@@ -10,6 +10,7 @@
  * 行内のラジオ、担当するアカウントは枠の中に縦1列のチェック、下の帯は線の下で真ん中寄せ。
  * 窓の枠・×・題は共通の Dialog、頭の寸法は dialog-head.module.css。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Send, ShieldCheck } from 'lucide-react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
@@ -245,7 +246,7 @@ export default function MemberDialogV8({
         </div>
 
         <Field label="最初に表示するアカウント" htmlFor={`${uid}-assigned`}>
-          <Select
+          <EntitySelect
             aria-label="最初に表示するアカウント"
             size="full"
             id={`${uid}-assigned`}
@@ -253,7 +254,7 @@ export default function MemberDialogV8({
             disabled={busy}
             error={fieldErrors.assigned}
             onChange={(next) => set('assignedLineAccountId', next)}
-            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+            options={accounts.map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: a.name }))}
           />
           <FieldError id={`${uid}-assigned-error`}>{fieldErrors.assigned}</FieldError>
         </Field>

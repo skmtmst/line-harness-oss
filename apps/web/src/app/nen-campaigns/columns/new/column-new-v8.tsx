@@ -12,6 +12,7 @@
  *   （保存されるのは画像つきカードの今の作りのまま）。
  * ・前コラムの下敷きは一覧で選ぶ（今の作りのまま）。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -212,12 +213,12 @@ export default function ColumnNewV8() {
             {draft.targetMode === 'tag' ? (
               <label className={styles.fieldLabel}>
                 対象タグ
-                <Select
+                <EntitySelect kind="tag"
                   aria-label="対象タグ"
                   value={draft.targetTagId}
                   options={[
                     { value: '', label: 'タグを選択' },
-                    ...accountTags.map((tag) => ({ value: tag.id, label: tag.name })),
+                    ...accountTags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name })),
                   ]}
                   onChange={(value) => set({ targetTagId: value })}
                 />
@@ -242,12 +243,12 @@ export default function ColumnNewV8() {
               </label>
               <label className={styles.fieldLabel}>
                 読了後に付けるタグ
-                <Select
+                <EntitySelect kind="tag"
                   aria-label="読了後に付けるタグ"
                   value={draft.completionTagId}
                   options={[
                     { value: '', label: '付けない' },
-                    ...accountTags.map((tag) => ({ value: tag.id, label: tag.name })),
+                    ...accountTags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name })),
                   ]}
                   onChange={(value) => set({ completionTagId: value })}
                 />

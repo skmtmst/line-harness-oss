@@ -14,11 +14,12 @@
  * 409 は板 v5L19Z の帯を出し、「違いを比べる」「最新を読み込んで続ける」
  * 「比べてから保存」で扱う（いきなり上書きしない）。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
-import Combobox from '@/components/shared/combobox'
-import Select from '@/components/shared/select'
+
+
 import StickyBar from '@/components/shared/sticky-bar'
 import { GitCompare, Pencil, RefreshCw, Smartphone, TriangleAlert, Upload } from 'lucide-react'
 import StatusBadge from '@/components/shared/status-badge'
@@ -837,7 +838,7 @@ export default function MenuFormV8() {
               </label>
               <span className={`${styles.field} ${styles.categoryField}`}>
                 <span className={styles.labelSmall}>分類</span>
-                <Select
+                <EntitySelect
                   size="full"
                   aria-label="分類"
                   value={categoryPicking ? '__new__' : categoryLabel}
@@ -1106,13 +1107,13 @@ export default function MenuFormV8() {
                 <p className="text-ink-faint text-sm">このアカウントに使えるタグがありません。タグなしで保存できます。</p>
               ) : (
                 /* 打って絞り込める1つ選び（タグが多いアカウントでも探せる）。 */
-                <Combobox
+                <EntitySelect clearable size="full" kind="tag"
                   aria-label="予約後に付けるタグ"
                   value={autoTagId ?? ''}
                   onChange={(value) => setAutoTagId(value === '' ? null : value)}
                   placeholder="付けるタグ：なし"
                   /* 「なし」は候補に入れず、空のときの見出し（placeholder）と × で表す。 */
-                  options={tagCandidates.map((tag) => ({ value: tag.id, label: `付けるタグ：${tag.name}` }))}
+                  options={tagCandidates.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: `付けるタグ：${tag.name}` }))}
                 />
               )}
               <div className={styles.toggleLineLead}>

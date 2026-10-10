@@ -25,8 +25,8 @@ import {
   TAP_ACTION_DEFS, TAP_ACTION_KINDS, tapActionDef,
   type TapActionKind, type TapActionValue,
 } from '@/lib/tap-actions'
-import Button from './button'
-import { EntityPickerDialog, type EntityPickerItem } from './entity-picker'
+
+import { EntityPickerSummary, EntityPickerDialog, type EntityPickerItem } from './entity-picker'
 import { ENTITY_KINDS, EntityKindDialog, type EntityKind } from './entity-picker-sources'
 import Select from './select'
 import { TextField } from './text-field'
@@ -169,24 +169,15 @@ export default function TapActionField({
     const picked = items?.find((item) => item.id === value.refId)
     const Icon = TAP_ACTION_ICONS[def.kind]
     const emptyText = target.required
-      ? `（${target.noun}を選んでください）`
+      ? `${target.noun}を選ぶ`
       : def.kind === 'booking' ? 'メニューを決めずに開く（予約ページの最初）' : 'ふつうのスタンプカードを開く'
     body = (
-      <div className={styles.pickRow} data-empty={!value.refId || undefined}>
-        <Icon className={styles.icon} aria-hidden="true" />
-        <span className={styles.pickText} title={picked?.name}>
-          {value.refId ? (
-            <>
-              <strong className={styles.pickName}>{picked?.name ?? `保存してある${target.noun}`}</strong>
-              {picked?.note ? <span className={styles.pickNote}>{picked.note}</span> : def.kind === 'booking' ? <span className={styles.pickNote}>メニューを決めて開く（空のときは予約ページの最初）</span> : null}
-            </>
-          ) : <span className={styles.pickEmpty}>{emptyText}</span>}
-        </span>
-        {readOnly ? null : (
-          <Button type="button" size="compact" aria-label={`${name}の${target.noun}を${value.refId ? '変える' : '選ぶ'}`} onClick={() => setPicking(true)}>
-            {value.refId ? '変える' : '選ぶ'}
-          </Button>
-        )}
+      <>
+        {readOnly ? <span className={styles.readBody}>{picked?.name ?? emptyText}{picked?.note ? <small>{picked.note}</small> : null}</span> : <EntityPickerSummary
+          label={`${name}の${target.noun}`} noun={target.noun} icon={Icon}
+          name={value.refId ? picked?.name ?? `保存してある${target.noun}` : undefined}
+          meta={picked?.note} placeholder={emptyText}
+          ariaLabel={`${name}の${target.noun}を${value.refId ? '変える' : '選ぶ'}`} onOpen={() => setPicking(true)} />}
         {picking ? (
           <TapTargetPicker
             tapKind={def.kind}
@@ -199,7 +190,7 @@ export default function TapActionField({
             onCancel={() => setPicking(false)}
           />
         ) : null}
-      </div>
+      </>
     )
   }
 

@@ -1,5 +1,6 @@
 'use client'
 
+
 /*
  * ★V8「予約スタッフを登録」（板 CcA4k）。
  *
@@ -11,6 +12,7 @@
  * 未保存の離脱確認、権限が無いときの案内、読み込み失敗の言い分け）は
  * 今までの app/booking/staff/new（v7・staff-new-v8）から写した。BEHAVIOR.md を参照。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import ImageUploader from '@/components/shared/image-uploader'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -19,10 +21,10 @@ import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '
 import { api, bookingApi, type BookingMenu, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
+
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import Select from '@/components/shared/select'
+
 import Toggle from '@/components/shared/toggle'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -33,9 +35,6 @@ import { createPageReturnHref } from '@/components/shared/create-page'
 import { PhoneStaffStep, priceLabel } from './phone'
 import layout from './layout.module.css'
 import styles from './staff-new.module.css'
-
-/** 一度に見せるメニューの数。残りは「ほかのメニュー」で開く（1行に収める）。 */
-const MENU_FOLD = 4
 
 export default function StaffNewV8() {
   const { selectedAccountId, selectedAccount } = useAccount()
@@ -53,7 +52,6 @@ export default function StaffNewV8() {
   const [isActive, setIsActive] = useState(true)
   const [menus, setMenus] = useState<BookingMenu[]>([])
   const [offered, setOffered] = useState<Set<string>>(new Set())
-  const [showAllMenus, setShowAllMenus] = useState(false)
   // N-411 本人勤務: 登録と同時にログインユーザーへひも付けられるようにする。
   const [staffMemberId, setStaffMemberId] = useState('')
   const [members, setMembers] = useState<StaffMember[]>([])
@@ -153,15 +151,6 @@ export default function StaffNewV8() {
       alive = false
     }
   }, [selectedAccountId])
-
-  function toggle(id: string) {
-    setOffered((cur) => {
-      const next = new Set(cur)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
 
   // N-411: 予約スタッフ登録は 'booking.settings' の実効 permission 必須。
   const [canManageStaff] = useState(() =>
@@ -311,8 +300,6 @@ export default function StaffNewV8() {
     ?? menus.find((m) => m.is_active)
     ?? menus[0]
     ?? null
-  const shownMenus = showAllMenus ? menus : menus.slice(0, MENU_FOLD)
-  const hiddenMenus = menus.length - shownMenus.length
   const memberLabel = (m: StaffMember) => `${m.name}${m.email ? `（${m.email}）` : ''}`
 
   return (
@@ -394,18 +381,7 @@ export default function StaffNewV8() {
             ) : menus.length === 0 ? (
               <p className={layout.cardNote}>まだメニューがありません。先に予約設定の「メニュー」から登録してください。</p>
             ) : (
-              <div className={styles.checkRow} role="group" aria-label="予約を受けられるメニュー" aria-invalid={!!fieldErrors.menus && offered.size === 0} tabIndex={-1}>
-                {shownMenus.map((m) => (
-                  <span key={m.id} className={styles.checkItem} title={`${m.name}（${m.duration_minutes}分・${priceLabel(m)}）`}>
-                    <Checkbox checked={offered.has(m.id)} onCheckedChange={() => toggle(m.id)} className={styles.check}>{m.name}</Checkbox>
-                  </span>
-                ))}
-                {hiddenMenus > 0 ? (
-                  <button type="button" className={styles.more} onClick={() => setShowAllMenus(true)}>
-                    ほかのメニュー（{hiddenMenus}）{[...offered].some((id) => !shownMenus.some((m) => m.id === id)) ? '・選択あり' : ''}
-                  </button>
-                ) : null}
-              </div>
+              <EntitySelect aria-label="予約を受けられるメニュー" noun="予約メニュー" values={[...offered]} onChange={(ids) => setOffered(new Set(ids))} invalid={!!fieldErrors.menus && offered.size === 0} options={menus.map((m) => ({ value: m.id, label: m.name, description: `${m.duration_minutes}分・${priceLabel(m)}` }))} />
             )}
           </section>
 
@@ -459,13 +435,13 @@ export default function StaffNewV8() {
               <div className={layout.field}>
                 <span className={layout.smallLabel} id="bs-member-label">ログインユーザー</span>
                 <span className={styles.selectBox}>
-                  <Select
+                  <EntitySelect
                     aria-label="ログインユーザーとの紐づけ"
                     id="bs-member"
                     size="full"
                     value={staffMemberId}
                     onChange={setStaffMemberId}
-                    options={[{ value: '', label: '紐づけない' }, ...members.map((m) => ({ value: m.id, label: memberLabel(m) }))]}
+                    options={[{ value: '', label: '紐づけない' }, ...members.map((m) => ({ ...entityOptionMetadata(m), value: m.id, label: memberLabel(m) }))]}
                   />
                 </span>
               </div>

@@ -8,6 +8,7 @@
  * お客さまに何を送りますか。右：その時間の卓・LINE で届く見本・この方について。下の帯：キャンセル／台帳に入れる。
  * 送る形・口は今の画面（app/restaurant-test/v8/reservation-phone.tsx）と同じ。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Lock, UserPlus } from 'lucide-react'
 import type { RestaurantCustomerHistory, RestaurantOpeningDay } from '@line-crm/shared'
@@ -26,7 +27,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import SearchField from '@/components/shared/search-field'
-import Select from '@/components/shared/select'
+
 import { TextField } from '@/components/shared/text-field'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -382,15 +383,15 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
             </div>
             <div className={styles.pair}>
               <Field labelSize="compact" label="卓">
-                <Select aria-label="卓" size="full" value={tableMode} onChange={setTableMode} options={[
+                <EntitySelect aria-label="卓" size="full" value={tableMode} onChange={setTableMode} options={[
                   { value: 'auto', label: recommended ? `自動で選ぶ（おすすめ：${recommended.code} ${recommended.label} ${recommended.max_capacity}名）` : '自動で選ぶ' },
-                  ...activeTables.map((t) => ({ value: t.id, label: `${t.code}・${t.label}（${t.min_capacity}〜${t.max_capacity}名）` })),
+                  ...activeTables.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: `${t.code}・${t.label}（${t.min_capacity}〜${t.max_capacity}名）` })),
                 ]} />
               </Field>
               <Field labelSize="compact" label="コース">
-                <Select aria-label="コース" size="full" value={courseId} onChange={setCourseId} options={[
+                <EntitySelect aria-label="コース" size="full" value={courseId} onChange={setCourseId} options={[
                   { value: '', label: '席のみ' },
-                  ...courses.map((c) => ({ value: c.id, label: `${c.name} ${c.price.toLocaleString()}円` })),
+                  ...courses.map((c) => ({ ...entityOptionMetadata(c), value: c.id, label: `${c.name} ${c.price.toLocaleString()}円` })),
                 ]} />
               </Field>
             </div>

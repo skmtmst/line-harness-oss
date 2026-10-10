@@ -7,6 +7,7 @@
  * 見せ方：頭（← 友だちへ・タブ）→ 案内 → 書き出す／取り込むの2枚 → 確認の結果 → 履歴。
  * 確認の結果は、確認する前も場所と5つの区分を出しておく（数は「—」）。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { Download, FileSearch, Info } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -17,7 +18,7 @@ import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import HelpTip from '@/components/shared/help-tip'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
-import Select from '@/components/shared/select'
+
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { FriendsSectionHead } from '../shared/head'
 import { slashDateTime } from '../duplicates/words'
@@ -75,12 +76,12 @@ export default function CsvMigrationsV8() {
           <h3 id="csv-export-title" className={styles.cardTitle}>CSVで書き出す</h3>
           <div className={styles.field}>
             <span className={styles.fieldLabel}>アカウント</span>
-            <Select
+            <EntitySelect
               aria-label="書き出すLINEアカウント"
               size="full"
               value={m.accountId}
               onChange={m.setAccountId}
-              options={[{ value: '', label: 'アカウントを選択' }, ...m.accounts.map((account) => ({ value: account.id, label: account.name }))]}
+              options={[{ value: '', label: 'アカウントを選択' }, ...m.accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name }))]}
             />
           </div>
           <fieldset className={styles.fieldset}>

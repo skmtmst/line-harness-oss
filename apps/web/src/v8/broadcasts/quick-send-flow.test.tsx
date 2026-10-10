@@ -130,3 +130,6 @@ it('WEB112: 確定前に人数が変わったら作成せず新しい人数を�
   await act(async () => screen.getByRole('button', { name: '送る', exact: true }).click())
   expect(mocks.send).toHaveBeenCalledWith('created-1', { confirmedRecipientCount: 61 })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

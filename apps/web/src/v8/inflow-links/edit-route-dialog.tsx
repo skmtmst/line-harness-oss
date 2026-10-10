@@ -6,9 +6,10 @@
  * 中身（保存する口・送る形・失敗の出し方）は元と同じ。元を直したらここも直す。
  */
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useState } from 'react'
-import Combobox from '@/components/shared/combobox'
-import Select from '@/components/shared/select'
+
+
 import { api, describeSaveFailure } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -252,12 +253,12 @@ export default function EditRouteModal({
         </Field>
 
         <Field label="自動付与タグ（任意）">
-          <Combobox
+          <EntitySelect clearable size="full" kind="tag"
             aria-label="自動付与タグ（任意）"
             placeholder="— 設定なし —"
             value={form.tagId ?? ''}
             onChange={(next) => setForm({ ...form, tagId: next || null })}
-            options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+            options={tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))}
             className="w-full"
           />
           <p className="text-ink-faint mt-1 text-xs">
@@ -266,7 +267,7 @@ export default function EditRouteModal({
         </Field>
 
         <Field label="送り先 Pool">
-          <Select
+          <EntitySelect
             aria-label="送り先 Pool"
             value={form.poolId ?? ''}
             onChange={(value) => setForm({ ...form, poolId: value || null })}
@@ -277,7 +278,7 @@ export default function EditRouteModal({
                 members.length === 0
                   ? '（アカウント未所属）'
                   : `— ${members.join(', ')}`
-              return {
+              return { ...entityOptionMetadata(p),
                 value: p.id,
                 label: `${p.name}${p.slug === 'main' ? '（既定）' : ''} ${memberText}`,
               }
@@ -286,23 +287,23 @@ export default function EditRouteModal({
         </Field>
 
         <Field label="起動シナリオ（任意）">
-          <Combobox
+          <EntitySelect clearable size="full" kind="scenario"
             aria-label="起動シナリオ（任意）"
             placeholder="— 設定なし —"
             value={form.scenarioId ?? ''}
             onChange={(next) => setForm({ ...form, scenarioId: next || null })}
-            options={scenarios.map((s) => ({ value: s.id, label: s.name }))}
+            options={scenarios.map((s) => ({ ...entityOptionMetadata(s), value: s.id, label: s.name }))}
             className="w-full"
           />
         </Field>
 
         <Field label="即時 push テンプレ（任意）">
-          <Combobox
+          <EntitySelect clearable size="full" kind="template"
             aria-label="即時 push テンプレ（任意）"
             placeholder="— 設定なし —"
             value={form.introTemplateId ?? ''}
             onChange={(next) => setForm({ ...form, introTemplateId: next || null })}
-            options={templates.map((t) => ({ value: t.id, label: t.name }))}
+            options={templates.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))}
             className="w-full"
           />
         </Field>

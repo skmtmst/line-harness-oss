@@ -7,6 +7,7 @@
  * 口・保存の順（通知の設定 → 版のある設定）・テスト送信は app/webinars/edit/notifications-v8.tsx と
  * components/webinars/webinar-notifications.tsx と同じ（BEHAVIOR.md）。
  */
+import EntityRemoteField, { type RemoteEntityKind } from '@/components/shared/entity-remote-field'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Plus, Send } from 'lucide-react'
@@ -398,6 +399,7 @@ function ActionsDialog({ webinarId, initialTrigger, actions, onClose, onSaved }:
   onClose: () => void
   onSaved: (next: WebinarAction[]) => void
 }) {
+  const { selectedAccountId } = useAccount()
   const [draft, setDraft] = useState<WebinarAction[]>(actions)
   const [trigger, setTrigger] = useState(initialTrigger)
   const [saving, setSaving] = useState(false)
@@ -422,10 +424,11 @@ function ActionsDialog({ webinarId, initialTrigger, actions, onClose, onSaved }:
         <Select aria-label="どの場合か" size="full" value={trigger} onChange={(value) => setTrigger(value as WebinarAction['trigger'])} options={TRIGGERS.map((item) => ({ value: item.key, label: item.label }))} />
         {visible.length === 0 ? <p className={form.cardNote}>この場合の動きはまだありません。</p> : visible.map((action, index) => {
           const key = referenceKey(action.actionType)
+          const kind: RemoteEntityKind = key === 'tagId' ? 'tag' : key === 'scenarioId' ? 'scenario' : key === 'templateId' ? 'template' : key === 'webhookId' ? 'webhook' : 'rich_menu'
           return (
             <div key={action.id ?? `${trigger}-${index}`} className={styles.dialogRow}>
               <Select aria-label="する動き" size="full" value={action.actionType} onChange={(value) => update(action, { actionType: value as WebinarAction['actionType'], config: {} })} options={Object.entries(ACTION_LABEL).map(([value, label]) => ({ value, label }))} />
-              {key ? <TextField aria-label="対象（タグ・シナリオなどの名前やID）" value={String(action.config[key] ?? '')} onChange={(event) => update(action, { config: { [key]: event.target.value } })} placeholder="対象の名前・ID" /> : <span className={form.cardNote}>ほかに決めることはありません</span>}
+              {key ? <EntityRemoteField key={kind} kind={kind} label="動きの対象" accountId={selectedAccountId} value={String(action.config[key] ?? '')} onChange={(value) => update(action, { config: { ...action.config, [key]: value } })} disabled={saving} /> : <span className={form.cardNote}>ほかに決めることはありません</span>}
               <Button onClick={() => setDraft((current) => current.filter((item) => item !== action))}>外す</Button>
             </div>
           )

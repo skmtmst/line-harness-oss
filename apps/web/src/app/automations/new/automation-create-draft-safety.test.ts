@@ -144,6 +144,12 @@ function json(route: Route, body: unknown, status = 200) {
 
 /** この画面の合否に関係しない、共通の下ごしらえ（在席・店の一覧・機能表）。 */
 async function serveSharedStubs(route: Route, pathname: string): Promise<boolean> {
+  if (pathname === '/api/friends') {
+    const accountId = new URL(route.request().url()).searchParams.get('lineAccountId')
+    const ids = accountId === ACCOUNT_B ? [FRIEND_B] : [FRIEND_A, 'friend-a', 'friend-001']
+    await json(route, { success: true, data: { items: ids.map((id) => ({ id, displayName: `試験-${id}` })), total: ids.length } })
+    return true
+  }
   if (pathname === '/api/auth/session') {
     await json(route, { success: true, data: { name: '試験担当', role: 'owner', permissionKeys: [] }, csrfToken: 'csrf-test' })
     return true
@@ -607,8 +613,15 @@ async function storedDraftsOf(page: Page): Promise<StoredDrafts> {
   return page.evaluate((key) => JSON.parse(sessionStorage.getItem(key) ?? '{}') as StoredDrafts, DRAFT_STORAGE_KEY)
 }
 
+async function chooseTestFriend(page: Page, friendId: string) {
+  await page.getByRole('button', { name: /試す友だち：(選ぶ|変える)/ }).click()
+  const picker = page.getByRole('dialog', { name: '友だちを選ぶ' })
+  await picker.getByRole('radio', { name: `試験-${friendId}`, exact: true }).check()
+  await picker.getByRole('button', { name: '選ぶ', exact: true }).click()
+}
+
 async function openTestConfirmation(page: Page, friendId: string) {
-  await page.getByLabel('1人テストの友だちID').fill(friendId)
+  await chooseTestFriend(page, friendId)
   await page.getByRole('button', { name: '1人で試す', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '1人テストの確認' })
   await dialog.waitFor()
@@ -724,7 +737,7 @@ describe('V8 ルールを作る（M4torY）の誤操作防止（#679）', () => 
     await waitUntil(() => page.getByRole('button', { name: '下書きを保存', exact: true }).isEnabled({ timeout: 200 }).catch(() => false), '保存中の状態が終わりませんでした')
 
     await switchAccount(page, ACCOUNT_A)
-    await page.getByLabel('1人テストの友だちID').fill('friend-a')
+    await chooseTestFriend(page, 'friend-a')
     expect(await page.getByRole('button', { name: '1人で試す', exact: true }).isEnabled()).toBe(true)
     await fillTagRule(page, '既存Aを更新')
     await saveDraft(page)
@@ -916,11 +929,13 @@ describe('V8 ルールを作る（M4torY）を本物のWorkerに繋いだとき�
     // 店舗Bには、店舗Aの下書きも見込み人数も引き継がない。
     expect(await page.getByRole('button', { name: '1人で試す', exact: true }).isDisabled()).toBe(true)
 
-    // 失敗する1人テスト（この店にいない友だち）でも、返事を店舗Bへ残さない。
-    const failing = await openWorkerPage({ slowTest: true })
+    // 候補を選んだあとに所属が変わって失敗しても、返事を店舗Bへ残さない。
+    const failing = await openWorkerPage({ slowTest: true, beforeTest: (harness) => {
+      harness.raw.prepare('UPDATE friends SET line_account_id = ? WHERE id = ?').run(ACCOUNT_B, FRIEND_A)
+    } })
     await fillMessageRule(failing.page, '予約返信', '失敗する側の文面です。')
     await saveDraft(failing.page)
-    const failingDialog = await openTestConfirmation(failing.page, FRIEND_B)
+    const failingDialog = await openTestConfirmation(failing.page, FRIEND_A)
     await failingDialog.getByRole('button', { name: 'この内容で送る' }).click()
     await waitUntil(() => failing.worker.testCalls.length === 1, '失敗させる1人テストが呼ばれませんでした')
 

@@ -8,6 +8,7 @@
  * データの口は今の画面（app/restaurant-test/v8/shell.tsx）と同じ
  * restaurantTestApi.snapshot。src/v8 は古い画面を import できないので写した。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
@@ -23,7 +24,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import ListState from '@/components/shared/list-state'
-import Select from '@/components/shared/select'
+
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import StoreTabs, { type StoreTabKey } from '../store-tabs/store-tabs'
 import styles from './shell.module.css'
@@ -210,12 +211,12 @@ export default function RestaurantShell({ boardId, title, description, query, he
   )
   const storePicker = snapshot && snapshot.stores.length > 0 ? (
     <span className={`${styles.storePicker} ${layout === 'standard' ? '' : styles.storeLedger}`}>
-      <Select
+      <EntitySelect
         aria-label="店舗を選ぶ"
         size="full"
         value={selectedStoreId}
         onChange={setSelectedStoreId}
-        options={snapshot.stores.map((item) => ({ value: item.id, label: `店舗：${item.name}` }))}
+        options={snapshot.stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}` }))}
       />
     </span>
   ) : null

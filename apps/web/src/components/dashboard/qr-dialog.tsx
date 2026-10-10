@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { useEffect, useState } from 'react'
 import { QrCode } from 'lucide-react'
 import type { EntryRoute } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -375,7 +376,7 @@ export default function QrDialog({
               <label htmlFor="qr-route" className="text-ink-secondary mb-1 block text-xs font-medium">
                 発行中の追加URL
               </label>
-              <Select
+              <EntitySelect
                 aria-label="発行中の追加URL"
                 size="full"
                 id="qr-route"
@@ -387,7 +388,7 @@ export default function QrDialog({
                 className="w-full"
                 options={[
                   { value: '', label: '基本の追加URL' },
-                  ...routes.filter((r) => r.isActive).map((r) => ({ value: r.id, label: r.name })),
+                  ...routes.filter((r) => r.isActive).map((r) => ({ ...entityOptionMetadata(r), value: r.id, label: r.name })),
                 ]}
               />
               {routeStopped ? (

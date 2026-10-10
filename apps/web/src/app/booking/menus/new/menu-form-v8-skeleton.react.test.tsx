@@ -126,9 +126,7 @@ describe('メニュー作成（V8）の読み込みと保存ボタン', () => {
 
     await act(async () => { gate.resolve({ success: true, data: TAGS }) })
     // ★V8 書き直し（src/v8/booking-menus/menu-form.tsx）：打って絞れる1つ選び。候補を開いて中身を見る。
-    await screen.findByRole('combobox', { name: '予約後に付けるタグ' })
-    fireEvent.click(screen.getByRole('button', { name: '候補を開く' }))
-    const listbox = await screen.findByRole('listbox', { name: '予約後に付けるタグの候補' })
+    const listbox = await screen.findByRole('combobox', { name: '予約後に付けるタグ' })
     const options = within(listbox).getAllByRole('option')
     expect(options.map((o) => o.textContent)).toEqual(['付けるタグ：予約済み', '付けるタグ：常連さん'])
   })
@@ -153,3 +151,6 @@ describe('メニュー作成（V8）の読み込みと保存ボタン', () => {
     await waitFor(() => { expect(fixture.push).toHaveBeenCalledWith('/booking/menus') })
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

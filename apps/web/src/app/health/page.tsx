@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { PageHeading } from '@/components/templates/page-frame'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -9,7 +10,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import ListState from '@/components/shared/list-state'
 import Progress from '@/components/shared/progress'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import Select from '@/components/shared/select'
+
 import Avatar from '@/components/shared/avatar'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
@@ -418,7 +419,7 @@ export default function HealthPage() {
               <form onSubmit={handleMigrate}>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-ink-secondary mb-1">移行先アカウント</label>
-                  <Select size="full"
+                  <EntitySelect size="full"
                     value={migrateToId}
                     onChange={(value) => setMigrateToId(value)}
                     aria-label="移行先アカウント"
@@ -426,7 +427,7 @@ export default function HealthPage() {
                       { value: '', label: '選択してください' },
                       ...accounts
                         .filter((account) => account.id !== migrateFrom && account.isActive)
-                        .map((account) => ({
+                        .map((account) => ({ ...entityOptionMetadata(account),
                           value: account.id,
                           label: `${account.name} (${account.channelId})`,
                         })),

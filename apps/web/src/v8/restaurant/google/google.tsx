@@ -9,6 +9,7 @@
  * 営業時間の変更・変更の確認・変更履歴・プロフィールの編集（?tab=profile&view=hours|confirm|history|edit）は
  * 入口の page.tsx が今の画面へ渡す（V8 の絵がまだ無い）。動きは BEHAVIOR.md。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -17,7 +18,7 @@ import { ApiError } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
+
 import { Tabs } from '@/components/shared/tabs'
 import { restaurantTestApi, type RestaurantStore } from '@/lib/restaurant-test-api'
 import { restaurantGoogleApi, type GoogleConnectionData, type GooglePostKind } from '@/lib/restaurant-google-api'
@@ -125,7 +126,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     ?? stores.find((item) => item.id === data?.store.id)?.id ?? '', [stores, selectedAccountId, data])
 
   const picker = stores.length > 0 ? (
-    <Select
+    <EntitySelect
       aria-label="店舗を選ぶ"
       width={STORE_PICKER_WIDTH}
       value={currentStoreId}
@@ -133,7 +134,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
         const next = stores.find((item) => item.id === value)
         if (next?.line_account_id && next.line_account_id !== selectedAccountId) setSelectedAccountId(next.line_account_id)
       }}
-      options={stores.map((item) => ({ value: item.id, label: `店舗：${item.name}`, disabled: !item.line_account_id }))}
+      options={stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}`, disabled: !item.line_account_id }))}
     />
   ) : null
 

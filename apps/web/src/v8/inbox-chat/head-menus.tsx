@@ -7,6 +7,7 @@
  * 四角い箱を出さず、選んでいる行は ✓ だけ（オーナー指摘：複数選べないのにチェックボックス）。
  * 対応状況は先頭に状態の色の点。LINE の会話もメールの会話も、この同じ部品を使う。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { StatusDot, SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import Select from '@/components/shared/select'
 import { buildOperatorRows, type OperatorOption } from '@/components/chats/inbox-dropdown'
@@ -44,13 +45,13 @@ export function HeadOperatorMenu({
 }) {
   const rows = buildOperatorRows(operators, false, value)
   return (
-    <Select
+    <EntitySelect
       aria-label={ariaLabel}
       label="担当"
       width={OPERATOR_WIDTH}
       value={value}
       onChange={onChange}
-      options={rows.map((row) => ({ value: row.id, label: row.name }))}
+      options={rows.map((row) => ({ ...entityOptionMetadata(row), value: row.id, label: row.name }))}
     />
   )
 }

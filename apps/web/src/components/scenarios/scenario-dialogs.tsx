@@ -7,6 +7,7 @@
  * 「どこを直すと何が変わるか」が追えなくなる。
  */
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useCallback, useEffect, useId, useState } from 'react'
 import { api, type ScenarioFriendPlan, type ScenarioFriendPlanStep } from '@/lib/api'
 import { shortDateTime } from '@/lib/hq-banners'
@@ -16,7 +17,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
+
 import ConditionBuilder, {
   findConditionDraftIssue,
   findInvalidRangeIssue,
@@ -579,7 +580,7 @@ export function OnCompleteDialog({
             </p>
           ) : (
             <>
-              <Select
+              <EntitySelect kind="scenario"
                 aria-label="移動先のシナリオ"
                 id="on-complete-move-target"
                 value={draftTarget ?? ''}
@@ -594,7 +595,7 @@ export function OnCompleteDialog({
                     value: '',
                     label: candidatesState === 'loading' ? '候補を読み込んでいます' : '選んでください',
                   },
-                  ...scenarios.map((s) => ({ value: s.id, label: s.name })),
+                  ...scenarios.map((s) => ({ ...entityOptionMetadata(s), value: s.id, label: s.name })),
                   // SCENARIO-14: 保存済みの移動先が候補に無いときは、現在の保存値を選択肢に残す。
                   ...(savedTargetMissing && targetScenarioId
                     ? [{ value: targetScenarioId, label: savedTargetName ?? '現在の保存値（名前を取得できません）' }]

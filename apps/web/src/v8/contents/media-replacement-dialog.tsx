@@ -2,12 +2,13 @@
 
 /* ★V8 写し：src/app/contents/media-replacement-dialog.tsx から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useRef, useState } from 'react'
 import type { MediaItem, MediaReplacementImpact } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
-import Select from '@/components/shared/select'
+
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import ListState from '@/components/shared/list-state'
@@ -216,10 +217,10 @@ export default function MediaReplacementDialog({
             />
           ) : (
             <>
-              <Select
+              <EntitySelect
                 aria-label="差し替え先"
                 value={replacementId}
-                options={[{ value: '', label: '別のメディアを選択' }, ...candidates.map((item) => ({ value: item.id, label: item.filename }))]}
+                options={[{ value: '', label: '別のメディアを選択' }, ...candidates.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.filename }))]}
                 onChange={(value) => void selectReplacement(value)}
               />
               {candidateTotal > 50 ? (

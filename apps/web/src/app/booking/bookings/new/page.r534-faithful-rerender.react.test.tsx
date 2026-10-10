@@ -276,7 +276,7 @@ describe('J7 R534 explicit Retry (正の受入・別結果)', () => {
     )
     // actual Selectを開き、portal optionを観測 (選択は行わずstaff追加取得なし)。
     fireEvent.click(screen.getByRole('button', { name: '予約メニュー' }))
-    expect(await screen.findByRole('option', { name: '監査メニュー' })).toBeTruthy()
+    expect(await screen.findByRole('radio', { name: '監査メニュー' })).toBeTruthy()
     expect(transport.listMenuStaff).not.toHaveBeenCalled()
     // 入力保持・登録系0・未知0。
     expect((screen.getByRole('textbox', { name: 'お客様からの要望' }) as HTMLTextAreaElement).value).toBe('J7 note')

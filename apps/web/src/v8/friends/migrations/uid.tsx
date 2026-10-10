@@ -8,6 +8,7 @@
  * 見せ方：頭（← 友だちへ・タブ）→ 5つの段 → 判断中なら数4つと「要確認の判断」、終わったら結果の帯と「照合の結果」
  * → 移行の履歴 → 新しい移行の登録（開いて使う）。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useState } from 'react'
 import { CheckCheck, CircleCheck, Download, Plus, Undo2 } from 'lucide-react'
 import type { UidMigrationItem, UidMigrationRun } from '@/lib/api'
@@ -107,11 +108,11 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
       <div className={styles.pair}>
         <div className={styles.field}>
           <span className={styles.fieldLabel}>移行元</span>
-          <Select aria-label="移行元アカウント" size="full" value={m.fromAccountId} onChange={m.setFromAccountId} options={[{ value: '', label: '移行元アカウントを選択' }, ...m.accounts.map((account) => ({ value: account.id, label: account.name }))]} />
+          <EntitySelect aria-label="移行元アカウント" size="full" value={m.fromAccountId} onChange={m.setFromAccountId} options={[{ value: '', label: '移行元アカウントを選択' }, ...m.accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name }))]} />
         </div>
         <div className={styles.field}>
           <span className={styles.fieldLabel}>移行先</span>
-          <Select aria-label="移行先アカウント" size="full" value={m.toAccountId} onChange={m.setToAccountId} options={[{ value: '', label: '移行先アカウントを選択' }, ...m.accounts.map((account) => ({ value: account.id, label: account.name }))]} />
+          <EntitySelect aria-label="移行先アカウント" size="full" value={m.toAccountId} onChange={m.setToAccountId} options={[{ value: '', label: '移行先アカウントを選択' }, ...m.accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name }))]} />
         </div>
       </div>
       <div className={styles.field}>

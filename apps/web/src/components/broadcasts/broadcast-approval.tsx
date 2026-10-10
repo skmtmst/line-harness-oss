@@ -11,11 +11,12 @@
  * 既存の共有部品だけを使う。新しい見た目の決まりは作らない。
  * 緑の塗りボタンは置かない（押すボタンは呼び出し側の確認ダイアログが持つ）。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useState } from 'react'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import HelpTip from '@/components/shared/help-tip'
-import Select from '@/components/shared/select'
+
 import { TextArea, TextField } from '@/components/shared/text-field'
 import type {
   ApiBroadcast,
@@ -108,7 +109,7 @@ export function ApprovalRequestFields({
           ) : candidatesState === 'error' ? (
             <p className="text-danger text-xs">承認できる人を読み込めませんでした。開き直してください。</p>
           ) : (
-            <Select
+            <EntitySelect
               aria-label="承認をお願いする人"
               size="full"
               id="approval-approver"
@@ -117,7 +118,7 @@ export function ApprovalRequestFields({
               onChange={(value) => onApproverChange(value)}
               options={[
                 { value: '', label: candidates.length === 0 ? '承認できる人がいません' : '選んでください' },
-                ...candidates.map((item) => ({ value: item.id, label: item.name })),
+                ...candidates.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name })),
               ]}
             />
           )}

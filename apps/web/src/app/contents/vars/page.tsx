@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -1279,14 +1280,14 @@ function VarsPageInner() {
                     </p>
                     <label className="text-ink-secondary mt-2 block text-xs font-semibold">
                       差し替え先
-                      <Select size="full"
+                      <EntitySelect size="full"
                         value={replacementId}
                         disabled={singleBusy || replacementCandidates.length === 0}
                         onChange={(value) => void selectReplacement(value)}
                         aria-label="差し替え先"
                         className="mt-1"
                         options={replacementCandidates.length > 0
-                          ? replacementCandidates.map((candidate) => ({
+                          ? replacementCandidates.map((candidate) => ({ ...entityOptionMetadata(candidate),
                               value: candidate.id,
                               label: `${placeholderText(candidate.varKey)} — ${candidate.value || '（空）'}`,
                             }))

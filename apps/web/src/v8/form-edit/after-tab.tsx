@@ -4,6 +4,7 @@
  * 「答え終わったあと」のタブ（XXFT4）。お礼の画面と、答え終わったら行うこと。
  * 行うことは上から順に動く。行の「…」で直す・並べ替える・消す。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useState } from 'react'
 import { FileText, IdCard, MessageSquare, Bell, Tag, Workflow } from 'lucide-react'
 import type { FormAction, FormOptions } from '@line-crm/shared'
@@ -15,7 +16,7 @@ import { TextField } from '@/components/shared/text-field'
 import { RowActions } from '@/components/shared/row-actions'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import Segmented from '@/components/shared/segmented'
-import Select from '@/components/shared/select'
+
 import { ACTION_ADDERS, describeAfterAction, emptyAction } from './model'
 import styles from './edit.module.css'
 
@@ -161,11 +162,11 @@ export function AfterTab({ readOnly, options, refs, onSubmitTagId, onChangeOptio
         <h2 id="fe-tag-title" className={styles.cardTitle}>回答したときに付けるタグ</h2>
         <p className={styles.cardNote}>このフォームに答えた人を、あとから絞り込めます。</p>
         <span className={styles.saveSelect}>
-          <Select
+          <EntitySelect kind="tag"
             aria-label="回答したときに付けるタグ"
             value={onSubmitTagId}
             onChange={onChangeSubmitTag}
-            options={[{ value: '', label: '付けない' }, ...refs.tags.map((t) => ({ value: t.id, label: t.name }))]}
+            options={[{ value: '', label: '付けない' }, ...refs.tags.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))]}
           />
         </span>
       </section>

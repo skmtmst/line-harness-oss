@@ -1,6 +1,7 @@
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({
@@ -290,9 +291,7 @@ describe('N-411 項目別権限と画面の一致（実React）', () => {
     fireEvent.click(screen.getByText('編集'))
     await screen.findByText('スタッフ編集')
     // 共有 Select（button + listbox）。開いて選択肢のボタンを押す。
-    fireEvent.click(await screen.findByRole('button', { name: 'ログインユーザーとの紐づけ' }))
-    const option = await screen.findByRole('option', { name: '山田（yamada@example.com）' })
-    fireEvent.click(within(option).getByRole('button'))
+    await pickEntity('ログインユーザーとの紐づけ', '山田（yamada@example.com）')
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateStaff).toHaveBeenCalledWith(
       'account-a', 'staff-1', expect.objectContaining({ staff_member_id: 'member-1' }),

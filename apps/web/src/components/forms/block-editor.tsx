@@ -12,6 +12,7 @@
  * という運用が実際にあるため。
  */
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import type {
   FormBlock,
   FormInputBlock,
@@ -340,7 +341,7 @@ export default function BlockEditor({
                       <span className="text-ink-secondary mb-1 block text-xs font-medium">
                         予約メニュー
                       </span>
-                      <Select
+                      <EntitySelect kind="booking_menu"
                         aria-label="予約メニュー"
                         value={block.booking?.menuId ?? ''}
                         onChange={(value) =>
@@ -354,7 +355,7 @@ export default function BlockEditor({
                         }
                         options={[
                           { value: '', label: '選んでください' },
-                          ...(refs.bookingMenus ?? []).map((menu) => ({
+                          ...(refs.bookingMenus ?? []).map((menu) => ({ ...entityOptionMetadata(menu),
                             value: menu.id,
                             label: `${menu.name}・${menu.durationMinutes}分`,
                           })),
@@ -365,7 +366,7 @@ export default function BlockEditor({
                       <span className="text-ink-secondary mb-1 block text-xs font-medium">
                         担当
                       </span>
-                      <Select
+                      <EntitySelect
                         aria-label="担当"
                         value={block.booking?.staffId ?? ''}
                         disabled={!block.booking?.menuId}
@@ -383,7 +384,7 @@ export default function BlockEditor({
                           ...(block.booking?.menuId
                             ? (refs.bookingMenuStaff?.[block.booking.menuId] ?? [])
                             : []
-                          ).map((staff) => ({ value: staff.id, label: staff.name })),
+                          ).map((staff) => ({ ...entityOptionMetadata(staff), value: staff.id, label: staff.name })),
                         ]}
                       />
                     </label>
@@ -428,7 +429,7 @@ export default function BlockEditor({
                   テンプレートで差し込めます。
                 </p>
                 <div className="flex flex-wrap items-center gap-3">
-                  <Select
+                  <EntitySelect
                     value=""
                     onChange={(value) => {
                       if (!value) return
@@ -444,7 +445,7 @@ export default function BlockEditor({
                     aria-label="友だち情報欄を足す"
                     options={[
                       { value: '', label: '＋ 友だち情報欄' },
-                      ...refs.friendFields.map((f) => ({
+                      ...refs.friendFields.map((f) => ({ ...entityOptionMetadata(f),
                         value: f.id,
                         label: f.ecIsMaster ? `${f.name}（EC側が正）` : f.name,
                         disabled: f.ecIsMaster,
@@ -712,7 +713,7 @@ export default function BlockEditor({
 
                   {block.reminder && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <Select
+                      <EntitySelect kind="reminder"
                         aria-label="リマインダ"
                         value={block.reminder.reminderId}
                         onChange={(value) =>
@@ -722,7 +723,7 @@ export default function BlockEditor({
                         }
                         options={[
                           { value: '', label: '— リマインダ —' },
-                          ...refs.reminders.map((r) => ({ value: r.id, label: r.name })),
+                          ...refs.reminders.map((r) => ({ ...entityOptionMetadata(r), value: r.id, label: r.name })),
                         ]}
                       />
                       <span className="text-ink-faint text-xs">

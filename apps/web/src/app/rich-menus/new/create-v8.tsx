@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
@@ -51,7 +52,7 @@ import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
-import Select from '@/components/shared/select'
+
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import SegmentedControl from '@/components/shared/segmented'
 import Toggle from '@/components/shared/toggle'
@@ -2496,14 +2497,14 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                 />
               </span>
               <span>に終わり、</span>
-              <Select
+              <EntitySelect kind="rich_menu"
                 aria-label="終わったらどうする"
                 value={publishPlan.restoreGroupId}
                 onChange={(v) => setPublishPlan({ ...publishPlan, restoreGroupId: v })}
                 disabled={!endEnabled}
                 options={[
                   { value: '', label: '前のメニューに戻す（実行開始時に確定）' },
-                  ...restoreMenus.map((item) => ({ value: item.id, label: item.name })),
+                  ...restoreMenus.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name })),
                 ]}
               />
               <span>に戻す</span>

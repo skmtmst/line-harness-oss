@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { PageHeading } from '@/components/templates/page-frame'
@@ -1103,13 +1104,13 @@ export default function BookingsPage() {
                   今週
                 </Button>
                 {/* N-398: 担当者と種別（予約経路）の絞り込み。一覧と件数の両方に効く。 */}
-                <Select
+                <EntitySelect
                   aria-label="担当者で絞り込む"
                   value={staffFilter}
                   onChange={setStaffFilter}
                   options={[
                     { value: 'all', label: '担当: すべて' },
-                    ...staffList.map((item) => ({ value: item.id, label: item.display_name })),
+                    ...staffList.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.display_name })),
                   ]}
                 />
                 <Select

@@ -5,11 +5,12 @@
  * （src/v8 は @/app を import できない）。決まり（受付期間・上限・数える期間）の欄は
  * offer-terms.tsx（同じく写し）を使う。動きは写し元と同じ。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { LineAccount, Scenario, Tag } from '@line-crm/shared'
 import { api, type AffiliateOffer } from '@/lib/api'
 import Dialog from '@/components/shared/dialog'
-import Select from '@/components/shared/select'
+
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import Toggle from '@/components/shared/toggle'
 import { Field } from '@/components/shared/form-controls'
@@ -269,11 +270,11 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
 
         <div>
           <label className="text-ink-secondary mb-1 block text-xs font-medium">誘導 LINE アカウント</label>
-          <Select
+          <EntitySelect
             aria-label="誘導 LINE アカウント"
             value={lineAccountId}
             onChange={(value) => setLineAccountId(value)}
-            options={[{ value: '', label: '— 選択しない —' }, ...accounts.map((acc) => ({ value: acc.id, label: acc.name }))]}
+            options={[{ value: '', label: '— 選択しない —' }, ...accounts.map((acc) => ({ ...entityOptionMetadata(acc), value: acc.id, label: acc.name }))]}
             className="w-full"
             size="full"
           />

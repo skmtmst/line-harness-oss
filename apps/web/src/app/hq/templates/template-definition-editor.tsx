@@ -1,5 +1,7 @@
 'use client'
 
+import EntitySelect from '@/components/shared/entity-select'
+
 import { useEffect, useRef, useState } from 'react'
 import { parseHqMessageCard, type HqMessageCard, type HqMessageReference } from '@line-crm/shared'
 import { hqTemplatesApi } from '@/lib/hq-templates-api'
@@ -137,7 +139,7 @@ export function CardEditor({ value, disabled, onChange, onBusyChange, onReceipt 
         <label className={styles.field}>ボタン{index + 1}の文字<input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={event => updateButton(button.id, { label: event.target.value })} /></label>
         <label className={styles.field}>押したとき<select className={styles.input} aria-label={`ボタン${index + 1}を押したとき`} disabled={disabled} value={button.action} onChange={event => updateButton(button.id, { action: event.target.value as typeof button.action, value: '' })}><option value="url">URLを開く</option><option value="message">メッセージを送る</option><option value="form">フォームを開く</option><option value="scenario">シナリオを開始</option></select></label>
         {button.action === 'form' || button.action === 'scenario'
-          ? <label className={styles.field}>参照先<select className={styles.input} aria-label={`ボタン${index + 1}の参照先`} disabled={disabled || !!referenceError} value={button.value} onChange={event => updateButton(button.id, { value: event.target.value })}><option value="">選択してください</option>{button.value && !references.some(row => row.kind === button.action && row.id === button.value) && <option value={button.value}>保存済みの参照先（候補を確認してください）</option>}{references.filter(row => row.kind === button.action).map(row => <option key={row.id} value={row.id}>{row.name}（{row.accountName}）</option>)}</select></label>
+          ? <div className={styles.field}><span>参照先</span><EntitySelect aria-label={`ボタン${index + 1}の参照先`} disabled={disabled || !!referenceError} value={button.value} onChange={value => updateButton(button.id, { value })} options={[{ value: '', label: '選択してください' }, ...(button.value && !references.some(row => row.kind === button.action && row.id === button.value) ? [{ value: button.value, label: '保存済みの参照先（候補を確認してください）', disabled: true }] : []), ...references.filter(row => row.kind === button.action).map(row => ({ value: row.id, label: `${row.name}（${row.accountName}）` }))]} /></div>
           : <label className={styles.field}>{button.action === 'url' ? 'URL' : 'メッセージ'}<input className={styles.input} aria-label={`ボタン${index + 1}の内容`} maxLength={button.action === 'message' ? 300 : 2000} disabled={disabled} value={button.value} onChange={event => updateButton(button.id, { value: event.target.value })} /></label>}
         <button type="button" disabled={disabled} onClick={() => update({ ...card, buttons: card.buttons.filter(row => row.id !== button.id) })}>ボタン{index + 1}を外す</button>
       </div>)}

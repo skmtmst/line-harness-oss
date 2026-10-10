@@ -11,6 +11,7 @@
  * 読み書きは統括の一括配信の口（API-7 の hq-broadcasts）。店の口（承認・テスト送信・分散・配信後のアクション・
  * 除くタグ・詳細条件）は統括の口に無いので出さない（BEHAVIOR.md の「今の口で出せないもの」）。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import BroadcastAccountPicker, { type BroadcastAccount } from './account-picker'
 import { EntityPickerField, EntityPickerSummary } from '@/components/shared/entity-picker'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
@@ -18,7 +19,7 @@ import { Steps } from '@/components/templates/steps'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { AlertTriangle, ArrowDown, ArrowRight, Building2, CheckCircle2, Eye, Send, Tag as TagIcon, Workflow } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Building2, CheckCircle2, Eye, Send, Tag as TagIcon, Workflow } from 'lucide-react'
 import type { Folder, HqBroadcastInput, HqBroadcastPreflight, HqBroadcastRun, MessageTemplateDefinition, SegmentCondition } from '@line-crm/shared'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import Dialog from '@/components/shared/dialog'
@@ -39,7 +40,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { RequiredBadge } from '@/components/shared/form-controls'
-import Select from '@/components/shared/select'
+
 import FolderSelect from '@/components/shared/folder-select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -933,7 +934,7 @@ export default function HqBroadcastCreate() {
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-ink-faint text-xs">ブロック中の友だちを自動で除外しています</p>
                   <span className={formStyles.excludeTag}>
-                    <Select
+                    <EntitySelect
                       aria-label="保存した条件から選ぶ"
                       value={savedName}
                       onChange={(value) => { setSavedName(value); if (value) setAudience('advanced') }}
@@ -977,7 +978,7 @@ export default function HqBroadcastCreate() {
                   onPickTemplate={(index, kind) => { setPickerKind(kind); setOpenBubble(index); setPickerOpen(true) }}
                   onSaveTemplate={(index) => { setOpenBubble(index); setSaveTplName(String(bubbles[index].content.templateName ?? bubbles[index].content.assetName ?? '') || title.trim()); setSaveTplError(''); setSaveTplOpen(true) }}
                   onCompose={(index, kind) => { setOpenBubble(index); setCarouselError(''); setComposer(kind === 'carousel' ? 'carousel' : 'rich') }}
-                  extraFields={(index, item) => item.type === 'coupon' ? <Select aria-label="クーポンを選ぶ" value={String(item.content.assetId ?? '')} onChange={(id) => { const asset = (assets ?? []).find((a) => a.id === id); setBubbles((items) => items.map((current, i) => i === index ? { ...current, content: asset ? assetContent(asset) : {} } : current)) }} options={[{ value: '', label: '選んでください' }, ...(assets ?? []).filter((a) => a.kind === 'coupon').map((a) => ({ value: a.id, label: a.name }))]} size="full" /> : item.type === 'flex' ? <p>選んだテンプレートのカードをそのまま送ります。</p> : null}
+                  extraFields={(index, item) => item.type === 'coupon' ? <EntitySelect aria-label="クーポンを選ぶ" value={String(item.content.assetId ?? '')} onChange={(id) => { const asset = (assets ?? []).find((a) => a.id === id); setBubbles((items) => items.map((current, i) => i === index ? { ...current, content: asset ? assetContent(asset) : {} } : current)) }} options={[{ value: '', label: '選んでください' }, ...(assets ?? []).filter((a) => a.kind === 'coupon').map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: a.name }))]} size="full" /> : item.type === 'flex' ? <p>選んだテンプレートのカードをそのまま送ります。</p> : null}
                 />
               </section>
             ) : null}

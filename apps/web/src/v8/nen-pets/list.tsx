@@ -6,6 +6,7 @@
  * 表は「見出し 36・行 56」。1152 では 年齢・避妊去勢・運動量 を隠し、年齢は種類の後ろへ寄せる。
  * 取得の口・指定は今の画面と同じ（GET /api/nen/pets）。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
@@ -103,14 +104,14 @@ export default function PetsListV8({
           onChange={(value) => change({ species: value })}
           options={[{ value: '', label: '種別：すべて' }, { value: 'dog', label: '種別：犬' }, { value: 'cat', label: '種別：猫' }, { value: 'other', label: '種別：その他' }]}
         />
-        <Select
+        <EntitySelect
           aria-label="主食で絞り込む"
           width={140}
           value={query.product}
           onChange={(value) => change({ product: value })}
           options={[
             { value: '', label: '主食：すべて' },
-            ...(data?.products ?? []).map((p) => ({ value: p.id, label: `主食：${p.name}` })),
+            ...(data?.products ?? []).map((p) => ({ ...entityOptionMetadata(p), value: p.id, label: `主食：${p.name}` })),
             { value: 'none', label: '主食：未設定' },
           ]}
         />

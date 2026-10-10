@@ -8,6 +8,7 @@
  * 動き（読み込み・切り替え時の捨て方・人数の数え直し・保存前の検査・複製・削除・未保存の確認）は
  * 今の画面（app/tags/search-editor-v8）と同じ。条件の部品と検査はそこから写した。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -260,13 +261,13 @@ function ConditionControls({
         </>
       ) : condition.kind === 'field' ? (
         <>
-          <Select
+          <EntitySelect
             aria-label="友だち情報の項目"
             value={condition.key ?? ''}
             disabled={referenceErrors.fields}
             onChange={(key) => onChange({ ...condition, key })}
             options={optionsWithCurrent(
-              fields.map((field) => ({ value: field.fieldKey, label: field.name })),
+              fields.map((field) => ({ ...entityOptionMetadata(field), value: field.fieldKey, label: field.name })),
               condition.key ?? '',
               '選択済みの友だち情報',
               referenceErrors.fields ? '友だち情報を読み込めませんでした' : fields.length ? '友だち情報を選ぶ' : '友だち情報がありません',
@@ -303,13 +304,13 @@ function ConditionControls({
           )}
         </>
       ) : condition.kind === 'mark' ? (
-        <Select
+        <EntitySelect
           aria-label="対応マーク"
           value={rawValue}
           disabled={referenceErrors.marks}
           onChange={(value) => onChange({ ...condition, value })}
           options={optionsWithCurrent(
-            marks.map((mark) => ({ value: mark.id, label: mark.name })),
+            marks.map((mark) => ({ ...entityOptionMetadata(mark), value: mark.id, label: mark.name })),
             rawValue,
             '選択済みの対応マーク',
             referenceErrors.marks ? '対応マークを読み込めませんでした' : marks.length ? '対応マークを選ぶ' : '対応マークがありません',
@@ -362,13 +363,13 @@ function ConditionControls({
             options={[{ value: 'exists', label: '回答がある' }, { value: 'not_exists', label: '回答がない' }]}
             width={120}
           />
-          <Select
+          <EntitySelect kind="form"
             aria-label="回答フォーム"
             value={rawValue}
             disabled={referenceErrors.forms}
             onChange={(value) => onChange({ ...condition, value })}
             options={optionsWithCurrent(
-              forms.map((form) => ({ value: form.id, label: form.name })),
+              forms.map((form) => ({ ...entityOptionMetadata(form), value: form.id, label: form.name })),
               rawValue,
               '選択済みの回答フォーム',
               referenceErrors.forms ? '回答フォームを読み込めませんでした' : 'すべての回答フォーム',

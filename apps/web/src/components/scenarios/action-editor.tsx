@@ -29,6 +29,7 @@
  *     既にある設定を黙って上書きすることになる
  */
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { Bell, Calendar, FileText, Flag, MessageSquare, Tag, User, Variable, Workflow } from 'lucide-react'
@@ -1067,23 +1068,9 @@ export function ActionConfigEditor({
               />
             ))}
           </RadioCardGroup>
-          <div className="flex flex-wrap gap-1.5">
-            {tags.map((tag) => {
-              const on = selected.includes(tag.id)
-              return (
-                <Button variant="primary" className={(`rounded-pill v7:h-8 px-3 text-xs transition-colors ${
-                    on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border'
-                  }`) + ' whitespace-normal'} key={tag.id} type="button" onClick={() =>
-                    onChange({
-                      ...c,
-                      tagIds: on ? selected.filter((id) => id !== tag.id) : [...selected, tag.id],
-                    })
-                  }>
-                  {tag.name}
-                </Button>
-              )
-            })}
-          </div>
+          <EntitySelect kind="tag" aria-label="行うことのタグ" size="full" values={selected}
+            options={tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))}
+            onChange={(tagIds) => onChange({ ...c, tagIds })} />
         </>
       )
     }
@@ -1091,13 +1078,13 @@ export function ActionConfigEditor({
     case 'friend_field':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <Select
+          <EntitySelect
             aria-label="友だち情報の項目"
             value={String(c.fieldId ?? '')}
             onChange={(value) => onChange({ ...c, fieldId: value })}
             options={[
               { value: '', label: '項目を選ぶ' },
-              ...fields.map((f) => ({ value: f.id, label: f.name })),
+              ...fields.map((f) => ({ ...entityOptionMetadata(f), value: f.id, label: f.name })),
             ]}
           />
           <span className="text-ink-secondary text-sm">に</span>
@@ -1128,13 +1115,13 @@ export function ActionConfigEditor({
       return (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink text-sm font-semibold">対応マーク</span>
-          <Select
+          <EntitySelect
             aria-label="対応マーク"
             value={String(c.markId ?? '')}
             onChange={(value) => onChange({ ...c, markId: value || null })}
             options={[
               { value: '', label: 'マークを外す' },
-              ...marks.map((m) => ({ value: m.id, label: m.name })),
+              ...marks.map((m) => ({ ...entityOptionMetadata(m), value: m.id, label: m.name })),
             ]}
           />
         </div>
@@ -1196,13 +1183,13 @@ export function ActionConfigEditor({
     case 'common_var':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <Select
+          <EntitySelect
             aria-label="共通情報"
             value={String(c.varKey ?? '')}
             onChange={(value) => onChange({ ...c, varKey: value })}
             options={[
               { value: '', label: '共通情報を選ぶ' },
-              ...vars.map((v) => ({ value: v.varKey, label: v.name })),
+              ...vars.map((v) => ({ ...entityOptionMetadata(v), value: v.varKey, label: v.name })),
             ]}
           />
           <span className="text-ink-secondary text-sm">に</span>

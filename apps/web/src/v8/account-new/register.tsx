@@ -9,6 +9,7 @@
  * api.lineAccountTags、api.lineAccounts.list・api.staff.list）。違いは見せ方だけ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, CircleCheck, CircleDashed, CircleX,
@@ -23,10 +24,10 @@ import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import StickyBar from '@/components/shared/sticky-bar'
-import { TagToggle } from '@/components/shared/tag-pill'
+
 import { DataTable, Tr, Td } from '@/components/shared/table'
 import Checkbox from '@/components/shared/checkbox'
-import Select from '@/components/shared/select'
+
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import Radio from '@/components/shared/radio'
@@ -532,12 +533,7 @@ export default function AccountRegisterV8() {
               <div className={styles.field}>
                 <span className={styles.groupLabel}>タグ</span>
                 <div className={styles.tagRow}>
-                  {(tags ?? []).map((tag) => {
-                    const on = form.tagIds.includes(tag.id)
-                    return (
-                      <TagToggle key={tag.id} name={tag.name} selected={on} onToggle={() => toggleTag(tag.id)} />
-                    )
-                  })}
+                  <EntitySelect aria-label="タグ" noun="タグ" values={form.tagIds} onChange={(ids) => update('tagIds', ids)} options={(tags ?? []).map((tag) => ({ value: tag.id, label: tag.name }))} />
                   {tagInputOpen ? (
                     <span className={styles.tagAdd}>
                       <TextField value={newTagName} onChange={(event) => setNewTagName(event.target.value)} placeholder="新しいタグの名前" aria-label="新しいタグの名前" maxLength={100} autoFocus />
@@ -555,12 +551,12 @@ export default function AccountRegisterV8() {
               {moreOpen && (
                 <div className={styles.moreBox}>
                   <div className={styles.twoCol}>
-                    <div className={styles.field}><span className={styles.label}>親アカウント</span><Select aria-label="親アカウント" value={form.parentId} onChange={(value) => update('parentId', value)} options={[{ value: '', label: '親なし' }, ...parents.map((a) => ({ value: a.id, label: a.name }))]} /></div>
+                    <div className={styles.field}><span className={styles.label}>親アカウント</span><EntitySelect aria-label="親アカウント" value={form.parentId} onChange={(value) => update('parentId', value)} options={[{ value: '', label: '親なし' }, ...parents.map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: a.name }))]} /></div>
                     <div className={styles.field}><label className={styles.label} htmlFor="v8-existing-liff">既存のLIFF ID（任意）</label><TextField id="v8-existing-liff" value={form.liffId} onChange={(event) => update('liffId', event.target.value)} placeholder="未入力なら自動で用意します" /></div>
                   </div>
                   <fieldset className={styles.fieldset}>
                     <legend className={styles.label}>このアカウントを担当範囲に追加する人</legend>
-                    <div className={styles.tagRow}>{staffOptions.map((member) => <Checkbox key={member.id} aria-label={member.name} checked={form.staffIds.includes(member.id)} onCheckedChange={(checked) => update('staffIds', checked ? [...form.staffIds, member.id] : form.staffIds.filter((id) => id !== member.id))}>{member.name}</Checkbox>)}</div>
+                    <EntitySelect aria-label="このアカウントを担当範囲に追加する人" noun="スタッフ" values={form.staffIds} onChange={(ids) => update('staffIds', ids)} options={staffOptions.map((member) => ({ value: member.id, label: member.name }))} />
                     <p className={styles.help}>全アカウント担当者は追加操作なしで閲覧できます。</p>
                   </fieldset>
                   {optionsError ? <p role="alert" className={styles.fieldError}>{optionsError}</p> : null}

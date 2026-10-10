@@ -11,6 +11,7 @@
  * - 競合（vWJEm）：発行が 409（見分けるための文字が使用中）で返ったら、板の頭の下に帯を出す
  * - 違いを比べる（E14GFm）：違う項目だけを並べた窓。「最新を取り込んで直す」で保存されている値を入力へ写す
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ArrowLeftRight, Link2, RefreshCw, TriangleAlert } from 'lucide-react'
@@ -487,7 +488,7 @@ function InflowCreate() {
                 : '画面上部でLINEアカウントを選んでください。'}
             </HelpTip>
           </span>
-          <Select
+          <EntitySelect
             id="ir-pool"
             value={poolId}
             onChange={(next) => setPoolId(next)}
@@ -495,7 +496,7 @@ function InflowCreate() {
             size="full"
             options={[
               { value: '', label: 'メインプールで自動振り分け' },
-              ...pools.map((pool) => ({ value: pool.id, label: pool.name })),
+              ...pools.map((pool) => ({ ...entityOptionMetadata(pool), value: pool.id, label: pool.name })),
             ]}
           />
         </div>
@@ -515,7 +516,7 @@ function InflowCreate() {
           onToggleOpen: () => setShowTagPick((current) => !current),
           pickLabel: '付けるタグ',
           picker: (
-            <Select
+            <EntitySelect kind="tag"
               id="ir-tag"
               value={tagId}
               onChange={(next) => { setTagId(next); setShowTagPick(false) }}
@@ -523,7 +524,7 @@ function InflowCreate() {
               size="full"
               options={[
                 { value: '', label: '（付けない）' },
-                ...tagOptionGroups.flatMap((group) => group.tags.map((tag) => ({ value: tag.id, label: group.label ? `${group.label} / ${tag.name}` : tag.name }))),
+                ...tagOptionGroups.flatMap((group) => group.tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: group.label ? `${group.label} / ${tag.name}` : tag.name }))),
               ]}
             />
           ),

@@ -19,6 +19,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
+import EntitySelect from '@/components/shared/entity-select'
 import { api, ApiError, type AnalyticsCrossAxis, type AnalyticsCrossResult } from '@/lib/api'
 import { formatNumber, formatTime } from '@/lib/format'
 import { downloadCsv, periodCaption, useRegisterExport } from './parts'
@@ -344,10 +345,10 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
           <Select id="cross-measure-event" value={measureEventType} onChange={setMeasureEventType} aria-label="数えるイベント" size="full" options={MEASURE_EVENTS} />
         </label> : null}
         <label className={styles.field} data-w="axis"><span className={styles.fieldLabel}>たての軸</span>
-          <Select aria-label="たての軸" value={rowAxis} onChange={setRowAxis} size="full" options={axisOptions(ROW_AXES)} />
+          <EntitySelect aria-label="たての軸" value={rowAxis} onChange={setRowAxis} size="full" options={axisOptions(ROW_AXES)} />
         </label>
         <label className={styles.field} data-w="axis"><span className={styles.fieldLabel}>よこの軸</span>
-          <Select id="cross-field" aria-label="よこの軸" value={columnAxis} onChange={setColumnAxis} size="full" options={axisOptions(COLUMN_AXES)} />
+          <EntitySelect id="cross-field" aria-label="よこの軸" value={columnAxis} onChange={setColumnAxis} size="full" options={axisOptions(COLUMN_AXES)} />
         </label>
         <label className={styles.field} data-w="period"><span className={styles.fieldLabel}>期間</span>
           <Select aria-label="期間" value={String(crossDays)} onChange={(value) => setCrossDays(Number(value))} size="full" options={PERIODS.map((days) => ({ value: String(days), label: `この${days}日` }))} />

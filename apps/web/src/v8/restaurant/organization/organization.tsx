@@ -9,6 +9,7 @@
  * 「変更」の窓の中へ移した（機能は落とさない）。
  * 閲覧のみ（変える権限が無い人）には、作る・編集・停止・発行のボタンを置かない。動きは BEHAVIOR.md。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
 import { Copy, Eye, MailPlus, Plus } from 'lucide-react'
@@ -264,7 +265,7 @@ function LoginConnection({ member, logins, busy, save }: { member: RestaurantMem
       <p className={styles.muted}>{loginSummary(member)}</p>
       {logins.length ? (
         <div className={styles.loginRow}>
-          <Select aria-label={`${member.staff_name}のログインメンバー`} value={selected} onChange={setSelected} size="full" options={[{ value: '', label: '連携しない' }, ...logins.map((l) => ({ value: l.id, label: l.name }))]} />
+          <EntitySelect aria-label={`${member.staff_name}のログインメンバー`} value={selected} onChange={setSelected} size="full" options={[{ value: '', label: '連携しない' }, ...logins.map((l) => ({ ...entityOptionMetadata(l), value: l.id, label: l.name }))]} />
           <Button disabled={busy || selected === (member.staff_id || '')} onClick={() => save(selected || null)}>ログインと連携</Button>
         </div>
       ) : null}

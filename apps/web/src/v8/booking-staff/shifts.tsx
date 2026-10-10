@@ -12,6 +12,7 @@
  * 動き（読み込み・保存・版の競合・権限・失敗時の扱い）は今までの
  * app/booking/staff/shifts/staff-detail-v8.tsx から写した。BEHAVIOR.md を参照。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
@@ -1033,12 +1034,12 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               <div className={styles.switcherField}>
                 <span className={layout.smallLabel} id="bks-switch-label">担当者を切り替える</span>
                 <span className={styles.selectBox}>
-                  <Select
+                  <EntitySelect
                     aria-label="担当者を切り替える"
                     size="full"
                     value={staffId}
                     onChange={(value) => router.push(`/booking/staff/shifts?staff_id=${value}`)}
-                    options={staffList.map((item) => ({ value: item.id, label: staffLabel(item) }))}
+                    options={staffList.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: staffLabel(item) }))}
                   />
                 </span>
               </div>

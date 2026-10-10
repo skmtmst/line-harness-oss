@@ -4,6 +4,7 @@
  * 個別操作から開く2つの窓：対応状況を編集（N-035）・シナリオに登録する（NEXT-09）。
  * 今の画面では左の欄・下の操作の中に開いていた入力を、V8 では窓にした（中身・送る口は同じ）。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Chat, Scenario } from '@line-crm/shared'
 import Dialog from '@/components/shared/dialog'
@@ -148,13 +149,13 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
         </label>
         <label className={styles.dialogLabel}>
           担当者
-          <Select
+          <EntitySelect
             size="full"
             value={operatorId}
             disabled={busy}
             onChange={(value) => setOperatorId(value)}
             aria-label="担当者を変える"
-            options={[{ value: '', label: '未割り当て' }, ...operators.map((o) => ({ value: o.id, label: o.name }))]}
+            options={[{ value: '', label: '未割り当て' }, ...operators.map((o) => ({ ...entityOptionMetadata(o), value: o.id, label: o.name }))]}
           />
         </label>
       </div>

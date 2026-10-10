@@ -1,5 +1,7 @@
 'use client'
 
+import EntitySelect from '@/components/shared/entity-select'
+
 /*
  * ★V8 運用者へのお知らせを作る・なおす（板 `gjUz3` 作る・`hiBO8` なおす、公開前の確認 `sDXNy`）。
  *
@@ -561,34 +563,14 @@ function OperatorEditInner() {
                         <Link href="/staff" className={styles.linkItem}>ログインユーザーでスタッフを確認する</Link>
                       </div>
                     ) : (
-                      <ul className={styles.staffList}>
-                        {/* 閲覧のみ：選ぶチェックは置かず、受け取る人の名前だけを並べる（2026-10-06 オーナー決定）。 */}
-                        {(canWrite ? items : items.filter((recipient) => recipientIds.includes(recipient.id))).map((recipient) => (
-                          <li key={recipient.id} className={styles.staffRow}>
-                            {canWrite ? (
-                              <Checkbox
-                                checked={recipientIds.includes(recipient.id)}
-                                onCheckedChange={(checked) => {
-                                  teamTouchedRef.current = true
-                                  teamIdRef.current = ''
-                                  setTeamId('')
-                                  setRecipientsFieldError('')
-                                  setRecipientIds((current) => checked
-                                    ? [...current, recipient.id]
-                                    : current.filter((id) => id !== recipient.id))
-                                }}
-                              >
-                                {recipient.name}
-                              </Checkbox>
-                            ) : <span>{recipient.name}</span>}
-                            <span className={styles.staffSpacer} />
-                            <StatusBadge tone={recipient.channels.line ? 'success' : 'neutral'}>
-                              {recipient.channels.line ? 'LINE' : 'LINE 未ログイン'}
-                            </StatusBadge>
-                            <StatusBadge tone={recipient.channels.dashboard ? 'success' : 'neutral'}>管理画面</StatusBadge>
-                          </li>
-                        ))}
-                      </ul>
+                      <EntitySelect aria-label="受け取るスタッフ" noun="スタッフ" values={recipientIds} readOnly={!canWrite}
+                        onChange={(ids) => {
+                          teamTouchedRef.current = true
+                          teamIdRef.current = ''
+                          setTeamId('')
+                          setRecipientsFieldError('')
+                          setRecipientIds(ids)
+                        }} options={items.map((recipient) => ({ value: recipient.id, label: recipient.name, description: `${recipient.channels.line ? 'LINE' : 'LINE 未ログイン'}・${recipient.channels.dashboard ? '管理画面' : '管理画面 未対応'}` }))} />
                     ))
                     : recipientsError !== null
                       ? (

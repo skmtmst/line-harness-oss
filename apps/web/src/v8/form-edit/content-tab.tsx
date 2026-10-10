@@ -1,5 +1,7 @@
 'use client'
 
+import EntitySelect from '@/components/shared/entity-select'
+
 /*
  * 「中身」のタブ（m1cWEy・ITBAB・ijxur・J1pdB・Z9wXm の左の列）。
  * ページの札、ページのブロック（畳んだ行と開いた設定）、ブロックを足す欄。
@@ -396,7 +398,7 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
     <div className={styles.saveTo}>
       <span className={styles.fieldLabel}>答えを保存する先</span>
       <span className={styles.saveSelect}>
-        <Select
+        <EntitySelect
           aria-label="答えを保存する先"
           value={current}
           onChange={(value) => {

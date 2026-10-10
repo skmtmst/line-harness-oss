@@ -12,6 +12,7 @@
  *   まだ無いので、見え方の確認だけに使う（保存されるのは今の作りのまま）。
  * ・きっかけは配信ごとに決まっているので変えられない（見せるだけ）。
  */
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ApiError, api, describeSaveFailure, type NenCampaignAfterAction, type NenCampaignSetting } from '@/lib/api'
@@ -19,11 +20,11 @@ import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import Combobox from '@/components/shared/combobox'
+
 import LinePreview from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
 import { TimeField } from '@/components/shared/date-time-field'
-import Select from '@/components/shared/select'
+
 import StickyBar from '@/components/shared/sticky-bar'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { TextInput } from '@/components/shared/form-controls'
@@ -405,12 +406,12 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
             ) : (
               <label className={styles.fieldLabel}>
                 回答フォームを開かせる（任意）
-                <Combobox
+                <EntitySelect clearable size="full" kind="form"
                   aria-label="回答フォームを開かせる（任意）"
                   placeholder="回答フォームを選ぶ"
                   value=""
                   onChange={(formId) => addFormAction(formId)}
-                  options={forms.map((form) => ({ value: form.id, label: form.name, dot: form.isActive ? 'green' : 'gray', disabled: !form.isActive, hint: form.isActive ? undefined : '公開されていないため選べません' }))}
+                  options={forms.map((form) => ({ ...entityOptionMetadata(form), value: form.id, label: form.name, dot: form.isActive ? 'green' : 'gray', disabled: !form.isActive, hint: form.isActive ? undefined : '公開されていないため選べません' }))}
                 />
               </label>
             )}
