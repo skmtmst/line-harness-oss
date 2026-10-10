@@ -4,14 +4,11 @@ import { describe, expect, it } from 'vitest'
 
 const APP = resolve(import.meta.dirname, '../../app')
 const GRID_PAGES = [
-  'contents/page.tsx',
-  'contents/vars/page.tsx',
   'rich-menus/page.tsx',
 ]
 /* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る（幅は CSS の `.split` で付ける）。 */
 const V8_FOLDER_PAGES = [
   'reminders/list-v8.tsx',
-  'webinars/list-v8.tsx',
   'templates/list-v8.tsx',
 ]
 /*
@@ -25,9 +22,22 @@ const NEW_V8_FOLDER_PAGES = [
   'broadcasts/list.tsx',
   'friend-add/list.tsx',
   'forms/list.tsx',
+  'webinars/list.tsx',
 ]
+const SWITCHED_GRID_PAGES = ['contents/list.tsx', 'common-vars/list.tsx']
 
 describe('オーナー指示 #582 のフォルダ欄', () => {
+  it.each(SWITCHED_GRID_PAGES)('src/v8/%s は型の共通の列幅を使う', (relativePath) => {
+    const page = readFileSync(resolve(SRC_V8, relativePath), 'utf8')
+    expect(page).toMatch(/<ListPage[\s\S]*?folders=\{/)
+    const templateCss = readFileSync(resolve(import.meta.dirname, '../templates/page-templates.module.css'), 'utf8')
+    expect(templateCss).toMatch(/\.folders \{[^}]*width: var\(--tpl-folder-width\)/)
+  })
+
+  it.each(SWITCHED_GRID_PAGES)('src/v8/%s は追加の権限を共通のフォルダ欄へ渡す', (relativePath) => {
+    const page = readFileSync(resolve(SRC_V8, relativePath), 'utf8')
+    expect(page).toMatch(/<ManagedFolderPanel[\s\S]*?canManage=/)
+  })
   it.each(GRID_PAGES)('%s は共通幅を使う', (relativePath) => {
     const page = readFileSync(resolve(APP, relativePath), 'utf8')
     expect(page).toContain('lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]')
@@ -74,7 +84,7 @@ describe('オーナー指示 #582 のフォルダ欄', () => {
   })
 
   it('V8のイベント一覧はイベント専用のフォルダを取得・作成する', () => {
-    const events = readFileSync(resolve(APP, 'events/events-list-v8.tsx'), 'utf8')
+    const events = readFileSync(resolve(SRC_V8, 'events/list.tsx'), 'utf8')
     // フォルダの列・追加の窓・「…」は共通の ManagedFolderPanel（kind="event"）が持ち、変えたら読み直す（B-136）。
     expect(events).toContain("api.folders.list('event', selectedAccountId)")
     expect(events).toMatch(/<ManagedFolderPanel[\s\S]*?kind="event"[\s\S]*?onChanged=\{loadFolders\}[\s\S]*?canManage=/)
