@@ -188,23 +188,6 @@
   "app/mileage/page.tsx": {
     "arbitrary-value": 7
   },
-  "app/mileage/v8-balances-tab.tsx": {
-    "direct-th": 7
-  },
-  "app/mileage/v8-earning-rules-tab.tsx": {
-    "direct-th": 7
-  },
-  "app/mileage/v8-history-tab.tsx": {
-    "direct-th": 6
-  },
-  "app/mileage/v8-rewards-tab.tsx": {
-    "direct-th": 12,
-    "unresolved-classname": 1
-  },
-  "app/mileage/v8-score-tab.tsx": {
-    "direct-th": 10,
-    "unresolved-classname": 1
-  },
   "app/nen/pets/pets-v8.tsx": {
     "direct-th": 3
   },

@@ -184,11 +184,6 @@
     "height": 6,
     "font": 19
   },
-  "app/mileage/mileage-v8.module.css": {
-    "spacing": 46,
-    "height": 17,
-    "font": 34
-  },
   "app/nen-campaigns/columns/new/column-new-v8.module.css": {
     "spacing": 15,
     "height": 4,

@@ -52,7 +52,6 @@ const GUARDED = [
   /* 入口 page.tsx は V8 の画面を出すだけ。番兵は src/v8 の画面が持つ。 */
   'v8/mileage/reward-edit.tsx',
   'v8/mileage/earning-rules.tsx',
-  'app/mileage/v8-earning-rules-tab.tsx',
   'app/nen-campaigns/columns/new/column-new-v8.tsx',
   'app/nen-campaigns/columns/new/page.tsx',
   'app/nen-campaigns/edit/campaign-editor-v8.tsx',
@@ -288,8 +287,6 @@ const EXEMPTIONS: Record<string, string> = {
     '転送先の編集は保存ボタン確定式。下書き・dirty 管理がなく番兵の扱いは別途検討',
   'app/mileage/score-rules/page.tsx':
     '下書き保存式の編集画面。番兵の扱いは別途検討',
-  'app/mileage/v8-score-tab.tsx':
-    '★V8 の行動スコア一覧（IRPw8）。点数の変更・ルールの公開停止・できごとの除外は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。名前・できごとの検索欄は絞り込みで閉じると戻る',
   'components/friend-fields/tags-page-v4.tsx':
     '一覧上の操作（表示切替・分類・並び替え）は押した直後に即時保存し、下書きを持たない',
   'app/tags/tags-tab-v8.tsx':

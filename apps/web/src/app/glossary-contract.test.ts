@@ -114,8 +114,6 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
     'app/line-notifications/customer-kpis.ts',
     'app/line-notifications/page.tsx',
     'app/mileage/page.tsx',
-    'app/mileage/v8-balances-tab.tsx',
-    'app/mileage/v8-earning-rules-tab.tsx',
     'app/nen-campaigns/nen-campaigns-v8.tsx',
     'app/nen-campaigns/nen-overview.tsx',
     'app/nen-members/photo-review-v8.tsx',
