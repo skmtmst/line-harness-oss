@@ -207,7 +207,6 @@ shared-button-importer app/templates/template-asset-editor.tsx
 shared-button-importer app/users/users-v8.tsx
 shared-button-importer app/webhooks/edit/page.tsx
 shared-button-importer app/webinars/edit/analytics-v8.tsx
-shared-button-importer app/webinars/edit/notifications-v8.tsx
 shared-button-importer app/webinars/edit/participants-v8.tsx
 shared-button-importer app/webinars/edit/scheduled-session-row.tsx
 shared-button-importer app/webinars/edit/video-stages.tsx
@@ -322,7 +321,6 @@ shared-button-importer components/templates/create-parts.tsx
 shared-button-importer components/templates/message-template-editor.tsx
 shared-button-importer components/tenant-suspended.tsx
 shared-button-importer components/ui/kpi-collapse.tsx
-shared-button-importer components/webinars/webinar-notifications.tsx
 shared-button-importer lib/unsaved-leave-dialog.tsx
 
 shared-button-importer app/inflow-links/ad-connection-dialog.tsx
@@ -664,3 +662,4 @@ shared-button-importer v8/booking-bookings/day-list.tsx
 shared-button-importer v8/booking-bookings/visit-actions.tsx
 shared-button-importer app/emergency/control-feedback-v8.tsx
 shared-button-importer v8/settings/emergency/history-details.tsx
+shared-button-importer test-utils/webinar-notifications.tsx
