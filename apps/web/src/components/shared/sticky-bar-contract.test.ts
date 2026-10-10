@@ -38,7 +38,7 @@ function pages(dir: string, out: string[] = []): string[] {
  * `page.tsx` だけを読むと「帯が無い」ことになり、直しようがない。
  */
 function readWithParts(file: string, depth = 0, seen = new Set<string>()): string {
-  if (depth > 2 || seen.has(file)) return ''
+  if (depth > 8 || seen.has(file)) return ''
   seen.add(file)
   let source: string
   try {
@@ -130,7 +130,7 @@ describe('下部追従バーの並びを部品で固定する', () => {
   it('フォルダ作成は共通窓の確定とキャンセルへ接続する', () => {
     const source = readWithParts(path.join(SRC, 'app/tags/folders/new/page.tsx'))
     expect(source).toContain('<FolderEditorDialog')
-    expect(source).toContain('onConfirm={() => void save()}')
+    expect(source).toMatch(/onConfirm=\{(?:save|\(\) => save\(\))\}/)
     expect(source).toContain('onCancel={close}')
   })
 

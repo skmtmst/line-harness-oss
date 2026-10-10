@@ -307,7 +307,7 @@ test('アカウントを切り替えて集計が403になっても、前のア�
   await expect(overviewNumbers(page, 111)).toBeVisible()
 
   await switchAccount(page, ACCOUNT_B)
-  await expect(page.getByText('集計を表示する権限がありません。一覧は取得できた範囲で表示しています。')).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: 'この操作の権限がありません。オーナーか管理者に頼んでください。' })).toBeVisible()
   await expect(overviewNumbers(page, 111)).toHaveCount(0)
   await expectNoOverviewNumbers(page)
   /* 権限が無いので取り直しは出さない。 */
@@ -363,6 +363,8 @@ test('Aで再試行の応答を待つ間にBへ切り替えても、Bの一覧�
   }
   let retryRequested = false
   let retryResolved = false
+  let releaseRetry
+  const retryGate = new Promise((resolve) => { releaseRetry = resolve })
 
   await page.route('**/api/ec-commerce/overview*', (route) => (
     accountOf(route) === ACCOUNT_A ? route.fulfill({ json: overviewFor(111) }) : route.fulfill({ json: overviewFor(7) })
@@ -375,7 +377,7 @@ test('Aで再試行の応答を待つ間にBへ切り替えても、Bの一覧�
   await page.route('**/api/ec-commerce/action-executions/*/retry', async (route) => {
     retryRequested = true
     /* Bへ切り替わったあとに届く、遅いAの再試行応答を模す。 */
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    await retryGate
     retryResolved = true
     return route.fulfill({
       json: { success: true, data: { ...failedRecord, status: 'pending', retryAvailable: false, version: 2 } },
@@ -388,9 +390,11 @@ test('Aで再試行の応答を待つ間にBへ切り替えても、Bの一覧�
   await page.getByRole('button', { name: 'この行のその他操作' }).click()
   await page.getByRole('menuitem', { name: 'もう一度やる' }).click()
   await expect.poll(() => retryRequested).toBe(true)
-  /* 再試行中はメニューの文言が「戻しています…」に変わる */
+  /* B-157: 操作名はそのまま、処理中は押せないことを確かめる。 */
+  await expect(page.getByRole('menu')).toBeHidden()
   await page.getByRole('button', { name: 'この行のその他操作' }).click()
-  await expect(page.getByRole('menuitem', { name: '戻しています…' })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: 'もう一度やる' })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: 'もう一度やる' })).toBeDisabled()
   await page.keyboard.press('Escape')
 
   /* Aの再試行応答(2秒後)が届く前にBへ切り替える。 */
@@ -401,8 +405,8 @@ test('Aで再試行の応答を待つ間にBへ切り替えても、Bの一覧�
   await expect(page.getByText('取り込みの記録を読み込めませんでした')).toHaveCount(0)
 
   /* Aの遅い再試行応答が届いたあとも、Bの表示は崩れない。 */
-  await page.waitForTimeout(2500)
-  expect(retryResolved).toBe(true)
+  releaseRetry()
+  await expect.poll(() => retryResolved).toBe(true)
   await expect(page.getByText('商品77 × 1')).toBeVisible()
   await expect(overviewNumbers(page, 7)).toBeVisible()
   await expect(overviewNumbers(page, 111)).toHaveCount(0)

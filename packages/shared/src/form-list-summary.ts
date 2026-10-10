@@ -107,7 +107,7 @@ export function displayFormName(name: string): string {
   return name.replace(/\\n/g, " ").replace(/\s+/g, " ").trim();
 }
 
-export type FormListFilter = "all" | "published" | "draft" | "stored" | "pending";
+export type FormListFilter = "all" | "published" | "draft" | "stored" | "pending" | "archived";
 export type FormListSort = "latest-answer" | "answers" | "updated" | "name";
 
 /**
@@ -115,6 +115,7 @@ export type FormListSort = "latest-answer" | "answers" | "updated" | "name";
  * Worker の serializeForm 応答も画面の Form 型もこの形を満たす。
  */
 export interface FormListItemLike {
+  status?: 'active' | 'archived';
   id: string;
   name: string;
   fields: Array<{ label?: unknown }>;
@@ -165,6 +166,8 @@ function compareDatesNewest(first: string | null | undefined, second: string | n
 
 /** 保存した検索（公開中 / 下書き / 情報欄に保存している / 後処理未完）の判定。 */
 export function formMatchesListFilter(form: FormListItemLike, filter: FormListFilter): boolean {
+  if (filter === "archived") return form.status === "archived";
+  if (form.status === "archived") return false;
   if (filter === "published") return form.isActive;
   if (filter === "draft") return !form.isActive;
   if (filter === "stored") return hasStoredDestination(form.layout, form.onSubmitTagId);

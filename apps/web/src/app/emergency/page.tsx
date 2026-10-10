@@ -4,13 +4,13 @@ import '@/app/notifications/readonly-v8.css'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import EmergencyScreen from '@/v8/settings/emergency/screen'
-
 import { X } from 'lucide-react'
 import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Link from 'next/link'
+import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import React, { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
@@ -46,11 +46,13 @@ import {
   describeRestoreResult,
 } from './restore-drift'
 import type { OperationRestoreDrift } from '@/lib/api'
-// 全文（release-log.json）ではなく要約を読む。全文は未反映の行が数千件あり、
-// 同梱するとこの画面だけ最初の読み込みが他の2倍になった（V6R-S3-a）。
 import releaseLog from '@/generated/release-log-summary.json'
 import { useAccount } from '@/contexts/account-context'
 import { collectRecentUpdates, RECENT_UPDATES_LIMIT, releaseEntryCount, type UpdateRelease } from './update-history'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+// 全文（release-log.json）ではなく要約を読む。全文は未反映の行が数千件あり、
+// 同梱するとこの画面だけ最初の読み込みが他の2倍になった（V6R-S3-a）。
 
 /** 板 Y4LkX1 の並び。健全性チェック・更新履歴・緊急コントロール。 */
 const TABS = [
@@ -402,7 +404,7 @@ function OperationPageHeader({ description, action }: { description: string; act
     <PageHeader
       breadcrumb={[{ label: '設定' }, { label: '運用状態' }]}
       title="運用状態"
-      description={description}
+      help={description}
       actions={action}
     />
   )
@@ -1284,6 +1286,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
 
   return (
     <div className="space-y-4" data-design="V3 Emergency control">
+      <FormLeaveGuard dirty={!isStopped && Boolean(reasonDetail || reason !== '障害対応' || targetAccountId !== 'all' || JSON.stringify(targets) !== JSON.stringify({ broadcasts: true, scenarios: true, reminders: true, automations: false }))} busy={mutationLocked} />
       <EmergencyControlFeedback message={message} needsReload={needsReload} reloading={reloading} previewSettled={previewSettled} stopBlockers={stopBlockers} onReload={() => void reloadControl()} />
       <div className="flex flex-col items-start gap-4 xl:flex-row">
         <div className="min-w-0 flex-1 space-y-4">
@@ -1294,7 +1297,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
 
           <section className={`border-hairline rounded-card border bg-canvas p-4 ${isStopped || needsReload ? 'pointer-events-none opacity-50' : ''}`}>
             <h2 className="text-base font-bold text-ink">どのアカウントを、なぜ止めますか</h2>
-            <div className="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-2"><div><label className="text-xs font-medium text-ink-secondary" htmlFor="emergency-account">対象アカウント</label><Select size="full" id="emergency-account" value={targetAccountId} onChange={(value) => handleTargetAccountChange(value)} disabled={mutationLocked || isStopped} aria-label="緊急停止の対象アカウント" className="mt-2" options={[{ value: 'all', label: 'すべてのアカウント' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></div><div><label className="text-xs font-medium text-ink-secondary" htmlFor="emergency-reason">停止理由</label><Select size="full" id="emergency-reason" value={reason} onChange={(value) => setReason(value)} disabled={mutationLocked || isStopped} aria-label="緊急停止の理由" className="mt-2" options={['障害対応', '誤配信の防止', 'アカウント異常', 'メンテナンス', 'その他'].map((label) => ({ value: label, label }))} /></div></div>
+            <div className="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-2"><div><label className="text-xs font-medium text-ink-secondary" htmlFor="emergency-account">対象アカウント</label><EntitySelect size="full" id="emergency-account" value={targetAccountId} onChange={(value) => handleTargetAccountChange(value)} disabled={mutationLocked || isStopped} aria-label="緊急停止の対象アカウント" className="mt-2" options={[{ value: 'all', label: 'すべてのアカウント' }, ...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name }))]} /></div><div><label className="text-xs font-medium text-ink-secondary" htmlFor="emergency-reason">停止理由</label><Select size="full" id="emergency-reason" value={reason} onChange={(value) => setReason(value)} disabled={mutationLocked || isStopped} aria-label="緊急停止の理由" className="mt-2" options={['障害対応', '誤配信の防止', 'アカウント異常', 'メンテナンス', 'その他'].map((label) => ({ value: label, label }))} /></div></div>
           </section>
 
           <section className={`border-hairline rounded-card border bg-canvas p-4 ${isStopped || needsReload ? 'pointer-events-none opacity-50' : ''}`}>

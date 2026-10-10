@@ -30,6 +30,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /* ------------------------------------------------------------------ 差し替え */
 
+const notifySaved = vi.hoisted(() => vi.fn())
+vi.mock('@/components/shared/toast', async original => ({ ...await original<typeof import('@/components/shared/toast')>(), notifySaved }))
+
 const friendsList = vi.hoisted(() => vi.fn())
 const affiliatesCreate = vi.hoisted(() => vi.fn())
 const affiliatesUpdate = vi.hoisted(() => vi.fn())
@@ -222,7 +225,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     // 1ページ目は20件（＋「結びつけない」の空欄）。45件を全部は出さない。
     const select = byLabel<HTMLSelectElement>('LINEの友だちと結びつける')
     expect(select.options.length).toBe(21)
-    expect(hasText('全45件')).toBe(true)
+    expect(hasText('全45 件')).toBe(true)
 
     // 検索は選択中のLINEアカウントへ固定して投げている。
     expect(friendsList).toHaveBeenCalledWith(
@@ -237,7 +240,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     expect(hasText('本店の友だち21')).toBe(true)
 
     // 名前で絞り込む。
-    await type(byLabel<HTMLInputElement>('友だちの名前で検索'), '本店の友だち25')
+    await type(byLabel<HTMLInputElement>("友だちの名前で探す"), '本店の友だち25')
     await click(buttonByText('検索'))
     expect(friendsList).toHaveBeenLastCalledWith(
       expect.objectContaining({ accountId: 'account-a', search: '本店の友だち25', offset: '0' }),
@@ -309,7 +312,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     // やり直しの前にオフへ変えても、保存済みの真実は変わらない。
     // 知らせは「既に始まっています」のまま、再開の送り先だけを言う。
     // 「まだ始まっていない」とは言わない（R525残部）。
-    const tracking = container.querySelector<HTMLButtonElement>('[role=switch][aria-label="すぐに計測を始める"]')
+    const tracking = container.querySelector<HTMLInputElement>('input[type=checkbox][aria-label="すぐに計測を始める"]')
     if (!tracking) throw new Error('「すぐに計測を始める」が見つかりません')
     await act(async () => { fireEvent.click(tracking) })
     expect(hasText('計測は既に始まっています')).toBe(true)
@@ -331,7 +334,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     affiliatesUpdate.mockRejectedValueOnce(new Error('一時的に保存できません'))
     await mount(<NewAffiliatePage />)
 
-    const tracking = container.querySelector<HTMLButtonElement>('[role=switch][aria-label="すぐに計測を始める"]')
+    const tracking = container.querySelector<HTMLInputElement>('input[type=checkbox][aria-label="すぐに計測を始める"]')
     if (!tracking) throw new Error('「すぐに計測を始める」が見つかりません')
     await act(async () => { fireEvent.click(tracking) })
 
@@ -430,7 +433,8 @@ describe('案件登録の実操作（#686）', () => {
     })
     expect(typeof offersCreate.mock.calls[0][0].operationId).toBe('string')
     expect(offersUpdate).not.toHaveBeenCalled()
-    expect(hasText('下書きに保存しました。続けて作れます。')).toBe(true)
+    expect(notifySaved).toHaveBeenCalledOnce()
+    expect(notifySaved).toHaveBeenCalledWith('下書きに保存しました。続けて作れます。')
   })
 
   it('作成応答が読めなくても、押し直しは同じ操作UUIDで案件を増やさない', async () => {
@@ -453,7 +457,8 @@ describe('案件登録の実操作（#686）', () => {
     expect(offersCreate.mock.calls[1][0].operationId)
       .toBe(offersCreate.mock.calls[0][0].operationId)
     expect(offersCreate.mock.calls[1][0]).toMatchObject({ isActive: false })
-    expect(hasText('下書きに保存しました。続けて作れます。')).toBe(true)
+    expect(notifySaved).toHaveBeenCalledOnce()
+    expect(notifySaved).toHaveBeenCalledWith('下書きに保存しました。続けて作れます。')
   })
 
   it('再送で回収した行の公開状態が画面と違うときは、明示した状態へ1回だけ直す', async () => {
@@ -470,7 +475,8 @@ describe('案件登録の実操作（#686）', () => {
     expect(offersUpdate).toHaveBeenCalledTimes(1)
     expect(offersUpdate.mock.calls[0][0]).toBe('offer-1')
     expect(offersUpdate.mock.calls[0][1]).toEqual({ isActive: false })
-    expect(hasText('下書きに保存しました。続けて作れます。')).toBe(true)
+    expect(notifySaved).toHaveBeenCalledOnce()
+    expect(notifySaved).toHaveBeenCalledWith('下書きに保存しました。続けて作れます。')
   })
 
   it('作成だけ済んだ状態でLINEアカウントを切り替えたら、前の店の案件を更新しない', async () => {
@@ -515,3 +521,6 @@ describe('案件登録の実操作（#686）', () => {
     expect(offersCreate.mock.calls[1][0].operationId).not.toBe(operationA)
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

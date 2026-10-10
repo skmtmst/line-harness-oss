@@ -74,6 +74,7 @@ afterEach(async () => {
 })
 
 async function flush(times = 8) {
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
   for (let i = 0; i < times; i += 1) {
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
   }

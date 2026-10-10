@@ -1,14 +1,9 @@
 'use client'
 
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import Notice from '@/components/shared/notice'
-
-/*
- * ★V8 LINE通知 運用者へのお知らせ（板 u8xibp）。
- *
- * 並び（絵）：数のマス4つ → 宛先の帯 → 探す・並び → 表（お知らせ・きっかけ・受け取る人・送る時間・今日・状態・操作）。
- * 「CSVで書き出す」「運用者へのお知らせを作る」は板の頭の右（screen.tsx が置く）。書き出しの理由の窓はここが持つ。
- * 口・動き（公開・止める・自分にテスト・CSV の理由）は今の部品（app/line-notifications/operator-notification-rules.tsx）と同じ。
- */
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, CircleX, Send, Users } from 'lucide-react'
@@ -30,6 +25,18 @@ import { ApiError, api, type OperatorNotificationRule } from '@/lib/api'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { EVENT_OPTIONS } from '../../line-notifications/operator-words'
 import styles from './screen.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 LINE通知 運用者へのお知らせ（板 u8xibp）。
+ *
+ * 並び（絵）：数のマス4つ → 宛先の帯 → 探す・並び → 表（お知らせ・きっかけ・受け取る人・送る時間・今日・状態・操作）。
+ * 「CSVで書き出す」「運用者へのお知らせを作る」は板の頭の右（screen.tsx が置く）。書き出しの理由の窓はここが持つ。
+ * 口・動き（公開・止める・自分にテスト・CSV の理由）は今の部品（app/line-notifications/operator-notification-rules.tsx）と同じ。
+ */
 
 type LoadState = 'loading' | 'ready' | 'error' | 'forbidden'
 type DraftConditions = { recipientLabel?: string; scheduleLabel?: string }
@@ -72,7 +79,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
   const [rules, setRules] = useState<OperatorNotificationRule[]>([])
   const [summary, setSummary] = useState<OperatorNotificationSummary | null>(null)
   const [state, setState] = useState<LoadState>('loading')
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null)
   const [exportReason, setExportReason] = useState('')
@@ -148,7 +155,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `operator-notifications-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("担当者へのお知らせ")
       anchor.click()
       URL.revokeObjectURL(url)
       setNotice({ text: '実行記録をCSVで書き出しました。', error: false })
@@ -177,7 +184,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
         <SearchField aria-label="お知らせを検索" placeholder="お知らせ名・きっかけで探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
       </div>
       <div className={styles.opSort}>
-        <Select aria-label="並び順" value="frequent" onChange={() => undefined} options={[{ value: 'frequent', label: 'よく届く順' }]} />
+        <ListToolbarSort aria-label="並び順" value="frequent" onChange={() => undefined} options={[{ value: 'frequent', label: 'よく届く順' }]} />
       </div>
     </div>
 
@@ -187,7 +194,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
       {!lineAccountId ? <ListState kind="empty" title="LINEアカウントを選択してください" description="選択したアカウントごとに分けて管理します。" />
         : state === 'loading' ? <ListState kind="loading" title="運用者へのお知らせを読み込んでいます" />
         : state === 'error' ? <ListState kind="error" title="運用者へのお知らせを表示できませんでした" onRetry={() => void load()} />
-        : state === 'forbidden' ? <ListState kind="forbidden" />
+        : state === 'forbidden' ? <ListState kind="forbidden" onRetry={() => void load()} />
         : rules.length === 0 ? <ListState kind="empty" title="運用者へのお知らせがまだありません" action={canManage ? <Button href="/line-notifications/operator/new" variant="primary">運用者へのお知らせを作る</Button> : undefined} />
         : visible.length === 0 ? <ListState kind="empty" emptyPreset="filtered" title="条件に合うお知らせはありません" description="検索語を変えてください。" action={<Button variant="secondary" onClick={() => setQuery('')}>検索を消す</Button>} />
         : <DataTable label="運用者へのお知らせ" grid={{ columns: 'var(--tpl-rest3-op-cols)', compactColumns: 'minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) var(--tpl-sb-ln-col-count) var(--tpl-sb-ln-col-status) var(--tpl-ml-col-ops-wide)', padding: 'var(--tpl-rest3-run-row-pad)', headPadding: 'var(--tpl-rest3-op-head-pad)' }}>
@@ -205,19 +212,19 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
           <tbody>
             {visible.map((rule) => {
               const published = rule.status === 'published'
-              const recipients = conditionsOf(rule).recipientLabel ?? (rule.recipientCount > 0 ? `${rule.recipientCount}人` : '受け取れる人なし')
+              const recipients = conditionsOf(rule).recipientLabel ?? (rule.recipientCount > 0 ? `${rule.recipientCount} 人` : '受け取れる人なし')
               const schedule = conditionsOf(rule).scheduleLabel ?? 'いつでも'
-              return <Tr key={rule.id}>
+              return <Tr key={rule.id} data-row-id={rule.id}>
                 <Td className={styles.opName}>
                   {/* 名前から編集画面へ。保存したお知らせを開き直して直せる。 */}
-                  <Link href={`/line-notifications/operator/new?id=${encodeURIComponent(rule.id)}`} className={styles.opNameLink} title={rule.name}>{rule.name}</Link>
+                  <Link href={`/line-notifications/operator/new?id=${encodeURIComponent(rule.id)}`} className={styles.opNameLink} ><TruncatedText value={String(rule.name ?? '')} /></Link>
                   <span className={styles.opSub}>{importanceWords(rule)}</span>
                 </Td>
                 <Td className={styles.cell} title={eventWords(rule.eventType)}>{eventWords(rule.eventType)}</Td>
                 <Td className={styles.cell} title={recipients}>{recipients}</Td>
                 <Td className={`${styles.cell} ${styles.opSchedule}`} title={schedule}>{schedule}</Td>
-                <Td><span className={`${styles.opNum} ${rule.occurredToday > 0 ? styles.numStrong : styles.numFaint}`}>{rule.occurredToday > 0 ? `${rule.occurredToday}` : '—'}</span></Td>
-                <Td><StatusBadge tone={published ? 'success' : 'neutral'}>{published ? '出している' : '止めている'}</StatusBadge></Td>
+                <Td><span className={`${styles.opNum} ${rule.occurredToday > 0 ? styles.numStrong : styles.numFaint}`}>{rule.occurredToday > 0 ? `${rule.occurredToday}` : emptyValue('unknown')}</span></Td>
+                <Td><StatusBadge tone={published ? 'success' : 'neutral'}>{published ? '出している' : '停止中'}</StatusBadge></Td>
                 <Td className={styles.opActions}>
                   {canManage ? <>
                     <Button variant="secondary" onClick={() => void testSend(rule)} disabled={busy === rule.id}>自分にテスト</Button>
@@ -240,15 +247,15 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
 
     <ConfirmDialog
       open={exportOpen && canManage}
-      title="CSVを書き出す理由"
+      title="CSVで書き出す理由"
       description="個人情報を含むため、確認した目的を記録します。"
       confirmLabel="書き出す"
       busy={busy === 'csv'}
       error={exportError || undefined}
-      onConfirm={() => void exportCsv()}
+      onConfirm={() => exportCsv()}
       onCancel={closeExport}
     >
-      <Field htmlFor="operator-export-reason" label="書き出す理由" error={exportReasonError}><TextField ref={exportReasonRef} id="operator-export-reason" value={exportReason} onChange={(event) => { setExportReasonError(''); setExportReason(event.target.value) }} placeholder="例：月次の運用確認" autoFocus /></Field>
+      <Field htmlFor="operator-export-reason" label="書き出す理由" error={exportReasonError}><SaveErrorField names={["exportReason","exportReasonError","export_reason","export_reason_error"]}><TextField ref={exportReasonRef} id="operator-export-reason" value={exportReason} onChange={(event) => { setExportReasonError(''); setExportReason(event.target.value) }} placeholder="例：月次の運用確認" autoFocus /></SaveErrorField></Field>
     </ConfirmDialog>
   </>
 }

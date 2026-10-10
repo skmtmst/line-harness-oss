@@ -129,7 +129,7 @@
 }
 
 .input:focus-visible {
-  outline: var(--tpl-bm-2) solid var(--color-action);
+  outline: var(--tpl-bm-2) solid var(--color-focus-ring);
   outline-offset: calc(var(--tpl-bm-1) * -1);
 }
 
@@ -163,7 +163,7 @@
 }
 
 .unitField:focus-within {
-  outline: var(--tpl-bm-2) solid var(--color-action);
+  outline: var(--tpl-bm-2) solid var(--color-focus-ring);
 }
 
 .unitField input {
@@ -458,11 +458,7 @@
   outline-offset: calc(var(--tpl-bm-5) * -1);
 }
 
-.saveError {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--tpl-bm-13);
-}
+
 
 .saveNote {
   margin: 0;

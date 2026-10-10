@@ -1,11 +1,10 @@
 'use client'
-
 import { BadgeCheck, CircleHelp, Clock, MessageSquareText } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpsKnowledgeArticle } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
-import { KNOWLEDGE_ARTICLE_KINDS, KNOWLEDGE_KINDS, knowledgeDate, knowledgeState } from '@/components/ops/knowledge-format'
+import { KNOWLEDGE_ARTICLE_KINDS, KNOWLEDGE_KINDS, knowledgeState } from '@/components/ops/knowledge-format'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import KpiCard from '@/components/shared/kpi-card'
@@ -20,6 +19,10 @@ import { OpsHead } from './shell'
 import KnowledgeArticleV8 from './knowledge-article'
 import parts from './parts.module.css'
 import styles from './ops-knowledge-v8.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営のナレッジ V8（絵 `h114s`・記事 `R5ckwJ`）。
@@ -42,7 +45,7 @@ function loadDescription(err: unknown): string | undefined {
 
 /** 表の「種類」は短い名前で出す（使い方について → 使い方）。 */
 function shortKind(kind: string): string {
-  const label = KNOWLEDGE_KINDS.find((v) => v.value === kind)?.label ?? '—'
+  const label = KNOWLEDGE_KINDS.find((v) => v.value === kind)?.label ?? emptyValue('unknown')
   return label.replace(/について$/, '').replace('料金・契約', '料金・請求')
 }
 
@@ -110,37 +113,37 @@ export default function OpsKnowledgeV8() {
           <KpiCard presentation="cell" icon={<BadgeCheck size={13} aria-hidden="true" />} title="承認済み" value={count((row) => knowledgeState(row).label === '承認済み')} unit="件" detail="AI の返信に使う" help={pageHelp} loading={!loaded} />
           <KpiCard presentation="cell" icon={<Clock size={13} aria-hidden="true" />} title="承認待ち" value={count((row) => row.reviewState === 'pending')} unit="件" detail="根拠が揃った下書き" help={pageHelp} loading={!loaded} />
           <KpiCard presentation="cell" icon={<CircleHelp size={13} aria-hidden="true" />} title="要確認" value={count((row) => row.reviewState === 'needs_review')} unit="件" detail="運営の回答がない" help={pageHelp} loading={!loaded} />
-          <KpiCard presentation="cell" icon={<MessageSquareText size={13} aria-hidden="true" />} title="使われた回数" value={ready ? rows.reduce((sum, row) => sum + row.usedCount, 0) : null} unit="回" detail={ready ? `役に立った ${rows.reduce((sum, row) => sum + row.helpfulCount, 0)}` : '—'} help="このページの記事の累計です。" loading={!loaded} />
+          <KpiCard presentation="cell" icon={<MessageSquareText size={13} aria-hidden="true" />} title="使われた回数" value={ready ? rows.reduce((sum, row) => sum + row.usedCount, 0) : null} unit="回" detail={ready ? `役に立った ${rows.reduce((sum, row) => sum + row.helpfulCount, 0)}` : emptyValue('unknown')} help="このページの記事の累計です。" loading={!loaded} />
         </div>
 
         <div className={styles.tools}>
           <div className={styles.search}>
-            <SearchField value={q} onChange={(value) => { setQ(value); setOffset(0) }} placeholder="タイトル・質問・キーワードで検索" aria-label="タイトル・質問・キーワードで検索" />
+            <SearchField value={q} onChange={(value) => { setQ(value); setOffset(0) }} placeholder="タイトル・質問・キーワードで探す" aria-label="タイトル・質問・キーワードで探す" />
           </div>
           <div className={styles.select}>
-            <Select aria-label="種類" value={kind} onChange={(value) => { setKind(value); setOffset(0) }} options={[{ value: '', label: '種類：すべて' }, ...KNOWLEDGE_KINDS]} />
+            <SaveErrorField names={["kind"]}><Select aria-label="種類" value={kind} onChange={(value) => { setKind(value); setOffset(0) }} options={[{ value: '', label: '種類：すべて' }, ...KNOWLEDGE_KINDS]} /></SaveErrorField>
           </div>
           <div className={styles.select}>
-            <Select aria-label="状態" value={state} onChange={(value) => { setState(value); setOffset(0) }} options={[{ value: '', label: '状態：すべて' }, { value: 'pending', label: '承認待ち' }, { value: 'approved', label: '承認済み' }, { value: 'needs_review', label: '要確認' }, { value: 'dismissed', label: '見送り' }]} />
+            <SaveErrorField names={["state"]}><Select aria-label="状態" value={state} onChange={(value) => { setState(value); setOffset(0) }} options={[{ value: '', label: '状態：すべて' }, { value: 'pending', label: '承認待ち' }, { value: 'approved', label: '承認済み' }, { value: 'needs_review', label: '要確認' }, { value: 'dismissed', label: '見送り' }]} /></SaveErrorField>
           </div>
           <div className={styles.select}>
-            <Select aria-label="記事の種類" value={articleKind} onChange={(value) => { setArticleKind(value); setOffset(0) }} options={[{ value: '', label: '記事：すべて' }, ...KNOWLEDGE_ARTICLE_KINDS]} />
+            <SaveErrorField names={["articleKind","article_kind"]}><Select aria-label="記事の種類" value={articleKind} onChange={(value) => { setArticleKind(value); setOffset(0) }} options={[{ value: '', label: '記事：すべて' }, ...KNOWLEDGE_ARTICLE_KINDS]} /></SaveErrorField>
           </div>
           <span className={styles.spacer} />
-          <span className={styles.count}>{ready && total > 0 ? <ListRange total={total} first={offset + 1} last={Math.min(offset + rows.length, total)} /> : ready ? '0件' : '—'}</span>
+          <span className={styles.count}>{ready && total > 0 ? <ListRange total={total} first={offset + 1} last={Math.min(offset + rows.length, total)} /> : ready ? '0件' : emptyValue('unknown')}</span>
         </div>
 
-        {actionError ? <p role="alert" className={parts.alert}>{actionError}</p> : null}
+        {actionError ? <Notice tone="danger" className={parts.alertNoticePlacement} >{actionError}</Notice> : null}
 
         {!loaded && rows.length === 0 ? (
-          <ListState kind="loading" />
+          <ListState permissionScope="hq" kind="loading" />
         ) : error ? (
           <div className={parts.panel}>
-            <ListState kind="error" description={loadDescription(error)} error={error ?? undefined} onRetry={() => void load()} />
+            <ListState permissionScope="hq" kind="error" description={loadDescription(error)} error={error ?? undefined} onRetry={() => void load()} />
           </div>
         ) : rows.length === 0 ? (
           <div className={parts.panel}>
-            <ListState kind="empty" emptyPreset="readonly" title="記事はありません" description="解決した問い合わせの確認結果がここに並びます。" />
+            <ListState permissionScope="hq" kind="empty" emptyPreset="readonly" title="記事はありません" description="解決した問い合わせの確認結果がここに並びます。" />
           </div>
         ) : (
           <div className={parts.mini} role="table" aria-label="ナレッジの記事">
@@ -160,11 +163,11 @@ export default function OpsKnowledgeV8() {
                   <span className={parts.grow} role="cell" title={article.title}>{article.title}</span>
                   <span className={`${parts.fixed} ${styles.colKind}`} role="cell">{shortKind(article.kind)}</span>
                   <span className={`${parts.fixed} ${styles.colKind}`} role="cell"><StatusBadge tone={STATE_TONE[label] ?? 'neutral'}>{label}</StatusBadge></span>
-                  <span className={`${parts.num} ${styles.colKind}`} role="cell">{article.usedCount ? article.usedCount : '—'}</span>
-                  <span className={`${parts.num} ${styles.colShort}`} role="cell">{article.helpfulCount ? article.helpfulCount : '—'}</span>
+                  <span className={`${parts.num} ${styles.colKind}`} role="cell">{article.usedCount ? article.usedCount : emptyValue('unknown')}</span>
+                  <span className={`${parts.num} ${styles.colShort}`} role="cell">{article.helpfulCount ? article.helpfulCount : emptyValue('unknown')}</span>
                   <span className={`${parts.fixed} ${styles.colShort}`} role="cell">{shortDate(article.updatedAt)}</span>
                   <span className={`${parts.fixed} ${styles.colShort}`} role="cell">
-                    <Button disabled={busy} onClick={() => void open(article)} aria-label={`「${article.title}」を開く`}>開く</Button>
+                    <Button disabled={busy} onClick={() => void open(article)} aria-label={`「${article.title}」を開く`} busy={Boolean(busy)} busyLabel="処理中…">開く</Button>
                   </span>
                 </div>
               )
@@ -181,7 +184,5 @@ export default function OpsKnowledgeV8() {
 
 /** 10/1 の形（年は出さない）。読めない日付は —。 */
 function shortDate(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.valueOf())) return knowledgeDate(value)
-  return date.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' })
+  return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }

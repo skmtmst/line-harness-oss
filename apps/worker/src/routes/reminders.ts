@@ -41,7 +41,7 @@ import {
 } from '@line-crm/db';
 import { describeReminderTiming, LEAP_YEAR_POLICIES, REMINDER_NAME_MAX_LENGTH, REMINDER_NAME_TOO_LONG_MESSAGE, resolveReminderSendAt } from '@line-crm/shared';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   completeOutboundSendStatement,
@@ -574,7 +574,7 @@ function readTargetCondition(
   };
 }
 
-function readDraftSettings(
+export function readDraftSettings(
   raw: unknown,
 ): { ok: true; value: ReminderDraftSettings } | { ok: false; error: string; status?: number } {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -714,7 +714,7 @@ function readDraftSettings(
   };
 }
 
-async function validateReminderDraftReferences(
+export async function validateReminderDraftReferences(
   db: D1Database,
   settings: ReminderDraftSettings,
 ): Promise<string | null> {
@@ -791,7 +791,7 @@ function versionResponse(row: ReminderVersionRow, fallbackLeapYearPolicy?: 'feb2
  * 経路が /api/reminders/:id より前にあるのは、:id に "reorder" として
  * 吸われるのを避けるため（シナリオと同じ並べ方）。
  */
-reminders.patch('/api/reminders/reorder', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+reminders.patch('/api/reminders/reorder', requireDeliveryAccess('reminders'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ ids?: unknown }>();
     if (!Array.isArray(body.ids) || body.ids.some((v) => typeof v !== 'string')) {
@@ -992,7 +992,7 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
 });
 
 /** V6 7-1-B: 定義と初版下書きを一度に作る。 */
-reminders.post('/api/reminders/drafts', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+reminders.post('/api/reminders/drafts', requireDeliveryAccess('reminders'), inputJsonBoundary(), async (c) => {
   try {
     const parsed = readDraftSettings(await c.req.json<unknown>());
     if (!parsed.ok) return inputError(c, { success: false, error: parsed.error }, parsed.status === 422 ? 422 : 400, ["name","triggerType","triggerConfig"]);
@@ -1085,7 +1085,7 @@ reminders.get('/api/reminders/:id/draft', async (c) => {
   }
 });
 
-reminders.put('/api/reminders/:id/draft', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+reminders.put('/api/reminders/:id/draft', requireDeliveryAccess('reminders'), inputJsonBoundary(), async (c) => {
   try {
     const rawBody = await c.req.json<unknown>();
     const parsed = readDraftSettings(rawBody);
@@ -1136,7 +1136,7 @@ reminders.put('/api/reminders/:id/draft', requireRole('owner', 'admin'), inputJs
   }
 });
 
-reminders.post('/api/reminders/:id/validate', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+reminders.post('/api/reminders/:id/validate', requireDeliveryAccess('reminders'), inputJsonBoundary(), async (c) => {
   try {
     const draft = await getReminderDraftVersion(c.env.DB, c.req.param('id'));
     if (!draft) return c.json({ success: false, error: '下書きが見つかりません' }, 404);
@@ -1157,7 +1157,7 @@ reminders.post('/api/reminders/:id/validate', requireRole('owner', 'admin'), inp
  * 下書きは触らない。顔ぶれ (先頭20人) も同じ条件・範囲で切る。
  * 権限は検証の口と同じ (owner/admin + この店舗が見えること)。
  */
-reminders.post('/api/reminders/:id/audience', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+reminders.post('/api/reminders/:id/audience', requireDeliveryAccess('reminders'), inputJsonBoundary(), async (c) => {
   try {
     const draft = await getReminderDraftVersion(c.env.DB, c.req.param('id'));
     if (!draft) return c.json({ success: false, error: '下書きが見つかりません' }, 404);
@@ -1249,7 +1249,7 @@ reminders.get('/api/reminders/:id/test-recipient', async (c) => {
   }
 });
 
-reminders.post('/api/reminders/:id/test-send', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+reminders.post('/api/reminders/:id/test-send', requireDeliveryAccess('reminders'), inputJsonBoundary(), async (c) => {
   const draft = await getReminderDraftVersion(c.env.DB, c.req.param('id'));
   if (!draft) return c.json({ success: false, error: '下書きが見つかりません' }, 404);
   const requestKey = c.req.header('Idempotency-Key')?.trim();
@@ -1303,7 +1303,7 @@ reminders.post('/api/reminders/:id/test-send', requireRole('owner', 'admin'), in
   }
 });
 
-reminders.post('/api/reminders/:id/publish', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+reminders.post('/api/reminders/:id/publish', requireDeliveryAccess('reminders'), inputJsonBoundary(), async (c) => {
   try {
     const reminderId = c.req.param('id');
     const draft = await getReminderDraftVersion(c.env.DB, reminderId);
@@ -1441,7 +1441,7 @@ reminders.get('/api/reminders/:id/runs', async (c) => {
   }
 });
 
-reminders.post('/api/reminders', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"description":["string"],"lineAccountId":["null","string"]}), async (c) => {
+reminders.post('/api/reminders', requireDeliveryAccess('reminders'), inputJsonBoundary({"name":["string"],"description":["string"],"lineAccountId":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       name: string;
@@ -1492,7 +1492,7 @@ reminders.post('/api/reminders', requireRole('owner', 'admin'), inputJsonBoundar
   }
 });
 
-reminders.put('/api/reminders/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+reminders.put('/api/reminders/:id', requireDeliveryAccess('reminders'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<Record<string, unknown>>();
@@ -1537,7 +1537,7 @@ reminders.put('/api/reminders/:id', requireRole('owner', 'admin'), inputJsonBoun
   }
 });
 
-reminders.delete('/api/reminders/:id', requireRole('owner', 'admin'), async (c) => {
+reminders.delete('/api/reminders/:id', requireDeliveryAccess('reminders'), async (c) => {
   try {
     await deleteReminder(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
@@ -1554,7 +1554,7 @@ reminders.delete('/api/reminders/:id', requireRole('owner', 'admin'), async (c) 
  * 削除時に取り消した登録・配信予定は戻さない（日時が過ぎた相手へ
  * いきなり送らないため）。消していない行・無い行は 404。
  */
-reminders.post('/api/reminders/:id/restore', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+reminders.post('/api/reminders/:id/restore', requireDeliveryAccess('reminders'), inputJsonBoundary(), async (c) => {
   try {
     const restored = await restoreReminder(c.env.DB, c.req.param('id'));
     if (!restored) {
@@ -1572,7 +1572,7 @@ reminders.post('/api/reminders/:id/restore', requireRole('owner', 'admin'), inpu
 
 // ========== リマインダステップ ==========
 
-reminders.post('/api/reminders/:id/steps', requireRole('owner', 'admin'), inputJsonBoundary({"offsetMinutes":["number"],"messageType":["string"],"messageContent":["string"],"offsetDays":["null","number"],"sendAtTime":["null","string"],"templateId":["null","string"]}), async (c) => {
+reminders.post('/api/reminders/:id/steps', requireDeliveryAccess('reminders'), inputJsonBoundary({"offsetMinutes":["number"],"messageType":["string"],"messageContent":["string"],"offsetDays":["null","number"],"sendAtTime":["null","string"],"templateId":["null","string"]}), async (c) => {
   try {
     const reminderId = c.req.param('id');
     const body = await c.req.json<{
@@ -1631,7 +1631,7 @@ reminders.post('/api/reminders/:id/steps', requireRole('owner', 'admin'), inputJ
   }
 });
 
-reminders.delete('/api/reminders/:id/steps/:stepId', requireRole('owner', 'admin'), async (c) => {
+reminders.delete('/api/reminders/:id/steps/:stepId', requireDeliveryAccess('reminders'), async (c) => {
   try {
     const deleted = await deleteReminderStep(c.env.DB, c.req.param('id'), c.req.param('stepId'));
     if (!deleted) {
@@ -1918,7 +1918,7 @@ reminders.delete('/api/friend-reminders/:id', requireRole('owner', 'admin', 'sta
 });
 
 /** 失敗した1通だけを、同じ依頼の二重受付なしで再試行する。 */
-reminders.post('/api/reminder-runs/:runId/retry', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+reminders.post('/api/reminder-runs/:runId/retry', requireDeliveryAccess('reminders'), inputJsonBoundary(), async (c) => {
   try {
     const run = await getReminderDeliveryRunById(c.env.DB, c.req.param('runId'));
     if (!run) return c.json({ success: false, error: '実行結果が見つかりません' }, 404);

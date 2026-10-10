@@ -1,25 +1,10 @@
 'use client'
-
-/*
- * ★V8 外部連携「こちらで受け取る」タブ（Pencil `gW0F2`、作る窓 `H031gC`）。
- *
- * 左に受け取り口の列（上に「受け取り口を作る」）、右に選んだ口の設定カード
- * （どこから受け取るか・だれの出来事か・届いたらすること・人が見つからなかった
- * 届物・届いたつもりで試す）。データの口は v7 と同じ（一覧・詳細・未照合の箱・
- * 試し・作成・動かす/止める・合言葉・名前・削除）。
- * 絵と今の作りが合わない所は BEHAVIOR.md に書いた。
- */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSearchParams } from 'next/navigation'
-import { Copy, LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical, Inbox } from 'lucide-react'
+import { LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical, Inbox } from 'lucide-react'
 import type { IncomingWebhook } from '@line-crm/shared'
-import {
-  api,
-  ApiError,
-  type IncomingWebhookDetail as DetailType,
-  type IncomingWebhookTestResult,
-  type IncomingWebhookUnmatchedItem,
-} from '@/lib/api'
+import { api, ApiError, type IncomingWebhookDetail as DetailType, type IncomingWebhookTestResult, type IncomingWebhookUnmatchedItem } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { useOnAccountSwitch } from '@/components/shared/list-url-state'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -35,6 +20,7 @@ import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
@@ -42,20 +28,25 @@ import InlineEdit from '@/components/shared/inline-edit'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { notifyToast } from '@/components/shared/toast'
 import { withViewTransition } from '@/components/shared/view-transition'
-import { describeApiFailure } from '@/components/shared/api-error-message'
+import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
-import {
-  MANAGE_REASON,
-  ViewerBand,
-  WEBHOOKS_DESCRIPTION,
-  WebhookBand,
-  WebhookTabs,
-  overviewBandCells,
-  useWebhookOverview,
-} from './shell'
+import { MANAGE_REASON, ViewerBand, WEBHOOKS_DESCRIPTION, WebhookBand, WebhookTabs, overviewBandCells, useWebhookOverview } from './shell'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import { shortDateTime } from './words'
 import styles from './incoming.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import IncomingActions from './incoming-actions'
+
+/*
+ * ★V8 外部連携「こちらで受け取る」タブ（Pencil `gW0F2`、作る窓 `H031gC`）。
+ *
+ * 左に受け取り口の列（上に「受け取り口を作る」）、右に選んだ口の設定カード
+ * （どこから受け取るか・だれの出来事か・届いたらすること・人が見つからなかった
+ * 届物・届いたつもりで試す）。データの口は v7 と同じ（一覧・詳細・未照合の箱・
+ * 試し・作成・動かす/止める・合言葉・名前・削除）。
+ * 絵と今の作りが合わない所は BEHAVIOR.md に書いた。
+ */
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -118,6 +109,7 @@ function maskedSampleText(fields: NonNullable<DetailType['latestSample']>['field
 }
 
 export default function WebhooksIncomingV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('外部連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const { selectedAccountId, accounts } = useAccount()
@@ -127,14 +119,16 @@ export default function WebhooksIncomingV8() {
   if (accountScopeRef.current.accountId !== selectedAccountId) accountScopeRef.current = { accountId: selectedAccountId }
   const staffRole = useStaffRole()
   /* 受け取り口の変更は統括だけ（R32）。届物の結び付けは管理者も使える。 */
-  const canManage = staffRole === null || staffRole === 'owner'
-  const canResolveUnmatched = staffRole === null || staffRole === 'owner' || staffRole === 'admin'
+  const canManage = staffRole === 'owner'
+  const canResolveUnmatched = staffRole === 'owner' || staffRole === 'admin'
   const searchParams = useSearchParams()
 
   const overview = useWebhookOverview()
   const { incoming, incomingStatus, loadedAccountId, reload } = overview
 
   const [error, setError] = useState('')
+  const actionsGuard = useRef<((action: () => void) => void) | null>(null)
+  const onActionsGuardReady = useCallback((guard: ((action: () => void) => void) | null) => { actionsGuard.current = guard }, [])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<DetailType | null>(null)
   const [detailStatus, setDetailStatus] = useState<LoadStatus>('loading')
@@ -269,7 +263,7 @@ export default function WebhooksIncomingV8() {
     setUnmatchedStatus('ready')
   }, [selectedAccountId, selectedDetailId])
 
-  const selectInlet = (id: string) => withViewTransition(() => setSelectedId(id))
+  const selectInlet = (id: string) => { const select = () => withViewTransition(() => setSelectedId(id)); if (actionsGuard.current) actionsGuard.current(select); else select() }
   const moveSelection = (delta: -1 | 1) => {
     if (displayed.length === 0) return
     const current = selected ? displayed.findIndex((item) => item.id === selected.id) : -1
@@ -335,9 +329,11 @@ export default function WebhooksIncomingV8() {
       })
     } catch (caught) {
       if (!isCurrent()) return
+      saveErrors.capture(caught);
+
       const forbidden = caught instanceof ApiError && caught.status === 403
       fail(forbidden
-        ? `「${item.name}」は統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。`
+        ? permissionDeniedMessage('store')
         : `「${item.name}」は切り替えに失敗しました。状態は変わっていません。時間をおいて、もう一度お試しください。`)
     } finally {
       if (isCurrent()) {
@@ -365,10 +361,13 @@ export default function WebhooksIncomingV8() {
       await reload()
     } catch (caught) {
       if (accountRef.current !== accountId) return
+      const fieldFailure = saveErrors.capture(caught);
+
       const forbidden = caught instanceof ApiError && caught.status === 403
+      { if (!fieldFailure)
       setDeleteError(forbidden
-        ? 'この受け取り口の削除は統括だけができます。必要なときは統括に頼んでください。'
-        : 'この受け取り口を削除できませんでした。状態を読み直してから、もう一度お試しください。')
+        ? permissionDeniedMessage('store')
+        : 'この受け取り口を削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
@@ -400,14 +399,18 @@ export default function WebhooksIncomingV8() {
       setRotateSecret('')
       void reload()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (!stepUpToken && isStepUpRequired(caught)) {
-        setStepUp({ purpose: 'webhook.secret', action: 'シークレットを更新する', retry: (token) => runRotate(token) })
+        setStepUp({ purpose: 'webhook.secret', action: 'シークレットを更新する', retry: (token) => runRotate(token) });
+
         return
       }
       if (accountRef.current !== accountId) return
+      { if (!fieldFailure)
       setRotateError(describeApiFailure(caught, 'シークレットの更新', {
-        forbidden: '合言葉の更新は統括だけができます。必要なときは統括に頼んでください。',
-      }))
+        scope: 'store',
+      })) }
     } finally {
       setRotating(false)
     }
@@ -458,16 +461,20 @@ export default function WebhooksIncomingV8() {
       setShowCreate(false)
       await reload()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (!stepUpToken && isStepUpRequired(caught)) {
-        setStepUp({ purpose: 'webhook.secret', action: '受け取り口を登録する', retry: (token) => runCreate(token) })
+        setStepUp({ purpose: 'webhook.secret', action: '受け取り口を登録する', retry: (token) => runCreate(token) });
+
         return
       }
       if (accountRef.current !== accountId) return
+      { if (!fieldFailure)
       setCreateFieldError({
         form: describeApiFailure(caught, '作成', {
-          forbidden: '受け取り口の作成は統括だけができます。必要なときは統括に頼んでください。',
+          scope: 'store',
         }),
-      })
+      }) }
     } finally {
       if (accountRef.current === accountId) setCreating(false)
     }
@@ -494,22 +501,27 @@ export default function WebhooksIncomingV8() {
       }
       reloadUnmatchedBox()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 409) {
         reloadUnmatchedBox()
-        setUnmatchedActionError({ id: item.id, message: 'すでに処理済みです。最新の状態を読み直しました。' })
+        { if (!fieldFailure)
+        setUnmatchedActionError({ id: item.id, message: 'すでに処理済みです。最新の状態を読み直しました。' }) }
         return
       }
       if (caught instanceof ApiError) {
+        { if (!fieldFailure)
         setUnmatchedActionError({
           id: item.id,
           message: describeApiFailure(caught, '確認', {
-            forbidden: 'この操作は統括または管理者だけができます。必要なときは統括に頼んでください。',
+            scope: 'store',
           }),
-        })
+        }) }
         return
       }
       reloadUnmatchedBox()
-      setUnmatchedActionError({ id: item.id, message: '結果が分かりませんでした。一覧を読み直しました。残っていれば、もう一度お試しください。' })
+      { if (!fieldFailure)
+      setUnmatchedActionError({ id: item.id, message: '結果が分かりませんでした。一覧を読み直しました。残っていれば、もう一度お試しください。' }) }
     } finally {
       setDismissingId(null)
     }
@@ -522,8 +534,11 @@ export default function WebhooksIncomingV8() {
     let payload: unknown
     try {
       payload = JSON.parse(testJson) as unknown
-    } catch {
-      setTestError('JSONの形が正しくありません。見本を確かめてください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setTestError('JSONの形が正しくありません。見本を確かめてください。') }
       return
     }
     setTestBusy(true)
@@ -537,8 +552,12 @@ export default function WebhooksIncomingV8() {
       }
       setTestResult(res.data)
     } catch (caught) {
-      setTestError(describeApiFailure(caught, '試し', { forbidden: 'この操作を行う権限がありません。統括に頼んでください。' }))
-      setTestResult(null)
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setTestError(describeApiFailure(caught, '試し', { scope: 'store' })) }
+      { if (!fieldFailure)
+      setTestResult(null) }
     } finally {
       setTestBusy(false)
     }
@@ -583,7 +602,7 @@ export default function WebhooksIncomingV8() {
         </div>
       ) : null}
       {incomingStatus === 'error' ? (
-        <ListState kind="error" title="受け取り口を読み込めませんでした" action={<Button onClick={() => void reload()}>もう一度読み込む</Button>} />
+        <ListState kind="error" title="受け取り口を読み込めませんでした" onRetry={() => void reload()} />
       ) : null}
       {displayed.map((item) => {
         const isSelected = selected?.id === item.id
@@ -600,7 +619,7 @@ export default function WebhooksIncomingV8() {
             <span className={styles.inletRow}>
               <span className={styles.inletName}>{item.name}</span>
               <span className={styles.spacer} aria-hidden="true" />
-              <span className={styles.inletState}>{item.isActive ? '動いている' : '止めている'}</span>
+              <span className={styles.inletState}>{item.isActive ? '有効' : '停止中'}</span>
             </span>
             <span className={styles.inletSub}>{sourceName(item.sourceType)}から</span>
           </button>
@@ -612,7 +631,7 @@ export default function WebhooksIncomingV8() {
   /* ===== 右の設定 ===== */
   let rightColumn
   if (!selectedAccountId) {
-    rightColumn = <ListState kind="empty" title={accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'} />
+    rightColumn = <AccountRequiredState hasAccounts={accounts.length > 0} />
   } else if (incomingStatus === 'ready' && !selected) {
     /* 修正案 D-2：空の一覧。 */
     rightColumn = (
@@ -642,7 +661,7 @@ export default function WebhooksIncomingV8() {
           {canManage ? (
             <>
               <span className={styles.toggleLabel}>動かす</span>
-              <Toggle checked={selected.isActive} label={`${selected.name}を動かす`} onChange={() => void handleToggle(selected, selected.isActive)} />
+              <SaveErrorField names={["isActive","selected.isActive","is_active","selected.is_active"]}><Toggle checked={selected.isActive} label={`${selected.name}を動かす`} onChange={() => void handleToggle(selected, selected.isActive)} /></SaveErrorField>
             </>
           ) : null}
         </div>
@@ -655,11 +674,9 @@ export default function WebhooksIncomingV8() {
           <div className={styles.fieldRow}>
             <div className={styles.field}>
               <span className={styles.fieldLabel}>受け取る URL（相手のサービスに貼る）</span>
-              <span className={styles.valueBox} title={endpointUrl(selected.id)}>{endpointUrl(selected.id)}</span>
+              <span className={styles.valueBox} ><TruncatedText value={String(endpointUrl(selected.id) ?? '')} url /></span>
             </div>
-            <Button onClick={() => { void navigator.clipboard.writeText(endpointUrl(selected.id)); notifyToast('受け取る URL を写しました') }}>
-              <Copy size={15} aria-hidden="true" />写す
-            </Button>
+            <CopyTextButton value={endpointUrl(selected!.id)} aria-label="受け取るURLをコピー"  />
           </div>
           <div className={styles.fieldRow}>
             <div className={styles.field}>
@@ -707,20 +724,11 @@ export default function WebhooksIncomingV8() {
           {detailStatus === 'loading' ? (
             <p className={styles.cardNote}>保存されている処理を読み込んでいます。</p>
           ) : detailStatus === 'error' ? (
-            <ListState kind="error" title="届いた後の処理を表示できませんでした" action={<Button onClick={() => setDetailReloadKey((key) => key + 1)}>詳細を読み直す</Button>} />
-          ) : detail && detail.actions.length > 0 ? (
-            detail.actions.map((action, index) => (
-              <div key={`${action.refKind}-${index}`} className={styles.actionRow}>
-                <span className={styles.actionName}>{`${index + 1} ${incomingActionLabel(action.refKind)}`}</span>
-                <span className={styles.spacer} aria-hidden="true" />
-                <span className={styles.actionTarget}>{`「${action.displayName}」`}</span>
-              </div>
-            ))
-          ) : (
-            <p className={styles.cardNote}>届いた後に動かす処理は、まだ決めていません。</p>
-          )}
-          {/* 絵の「＋ すること を足す」。設定の口（PATCH …/config）はあるが画面の配線がまだ無いので、押せる形にせず一言で伝える。 */}
-          {detailStatus === 'ready' ? <p className={styles.addNote}>すること の追加・入れ替えは、この画面ではまだできません</p> : null}
+            <ListState kind="error" title="届いた後の処理を表示できませんでした" onRetry={() => setDetailReloadKey((key) => key + 1)} />
+          ) : detail && selectedAccountId ? (
+              <IncomingActions key={`${selectedAccountId}:${detail.id}:${detail.version}`} detail={detail} accountId={selectedAccountId} readOnly={staffRole !== 'owner'} onGuardReady={onActionsGuardReady} onSaved={() => setDetailReloadKey(key => key + 1)}/>
+            ) :
+            <p className={styles.cardNote}>届いた後に動かす処理は、まだ決めていません。</p>}
           {detail?.actionExecution.state === 'needs_attention' && detail.actionExecution.reason ? (
             <p className={styles.smallNote}>{detail.actionExecution.reason}</p>
           ) : null}
@@ -756,7 +764,7 @@ export default function WebhooksIncomingV8() {
                 </thead>
                 <tbody>
                 {unmatched.map((item) => (
-                  <Tr key={item.id} data-table-layout="columns">
+                  <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.miniWhen}>{shortDateTime(item.receivedAt)}</Td>
                     <Td className={styles.miniValue} title={item.identityAttempts.map((attempt: { kind: string; value: string }) => `${identityKindLabel(attempt.kind)}：${attempt.value}`).join('、')}>
                       {item.identityAttempts.length > 0
@@ -767,7 +775,7 @@ export default function WebhooksIncomingV8() {
                       {item.kind === 'candidate'
                         ? '1人の友だちに一致'
                         : item.kind === 'ambiguous'
-                          ? item.candidates.length > 0 ? `${item.candidates.length}人の友だちに一致` : '2人以上に一致'
+                          ? item.candidates.length > 0 ? `${item.candidates.length} 人の友だちに一致` : '2人以上に一致'
                           : '一致する友だちがいません'}
                     </Td>
                     <Td className={styles.miniOps}>
@@ -781,7 +789,7 @@ export default function WebhooksIncomingV8() {
                         )
                       ) : null}
                     {unmatchedActionError && unmatchedActionError.id === item.id ? (
-                      <p role="alert" className={styles.fieldError}>{unmatchedActionError.message}</p>
+                      <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >{unmatchedActionError.message}</Notice>
                     ) : null}
                     </Td>
                   </Tr>
@@ -790,7 +798,7 @@ export default function WebhooksIncomingV8() {
                 </DataTable>
                 {(unmatchedTotal ?? detail.pendingUnmatched ?? 0) > unmatched.length ? (
                   <div className={styles.moreRow}>
-                    <span className={styles.cardNote}>ほか{(unmatchedTotal ?? detail.pendingUnmatched ?? 0) - unmatched.length}件あります。</span>
+                    <span className={styles.cardNote}>ほか{(unmatchedTotal ?? detail.pendingUnmatched ?? 0) - unmatched.length} 件あります。</span>
                     <Button disabled={unmatchedMoreBusy} busy={unmatchedMoreBusy} onClick={() => { setUnmatchedMoreBusy(true); setUnmatchedShown((shown) => shown + UNMATCHED_PAGE_SIZE) }}>さらに表示</Button>
                   </div>
                 ) : null}
@@ -831,11 +839,11 @@ export default function WebhooksIncomingV8() {
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId="gW0F2"
       headingSize="regular"
       title="外部連携"
-      description={WEBHOOKS_DESCRIPTION}
+      help={WEBHOOKS_DESCRIPTION}
       actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button> : undefined}
       tabs={<WebhookTabs active="incoming" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
@@ -858,22 +866,22 @@ export default function WebhooksIncomingV8() {
           busy={creating}
           error={createFieldError.form}
           onCancel={() => { if (!creating) setShowCreate(false) }}
-          onConfirm={() => void runCreate()}
+          onConfirm={() => runCreate()}
           confirmLabel="作る"
           confirmIcon={<Plus size={15} aria-hidden="true" />}
         >
           <div className={`${styles.form} ${styles.formTight}`}>
             <Field label="名前" htmlFor="wh-incoming-name" error={createFieldError.name}>
-              <TextField
+              <SaveErrorField names={["createName","name","create_name"]}><TextField
                 value={createName}
                 onChange={(event) => setCreateName(event.target.value)}
                 placeholder="体験申込フォーム（自社サイト）"
                 aria-invalid={Boolean(createFieldError.name) || undefined}
-              />
+              /></SaveErrorField>
               </Field>
             <div className={styles.formField}>
               <span className={styles.pickLabel}>どこから来るか</span>
-              <Select
+              <SaveErrorField names={["createSource","create_source"]}><Select
                 aria-label="どこから来るか"
                 size="full"
                 value={createSource}
@@ -882,25 +890,25 @@ export default function WebhooksIncomingV8() {
                   ...SOURCE_PRESETS.map((preset) => ({ value: preset.value, label: preset.label })),
                   { value: SOURCE_OTHER, label: 'その他（自分で書く）' },
                 ]}
-              />
+              /></SaveErrorField>
               {createSource === SOURCE_OTHER ? (
-                <TextField
+                <SaveErrorField names={["createSourceFree","create_source_free"]}><TextField
                   value={createSourceFree}
                   onChange={(event) => setCreateSourceFree(event.target.value)}
                   placeholder="見本に無いものを自由に書けます"
                   aria-label="どこから来るか（自由入力）"
-                />
+                /></SaveErrorField>
               ) : null}
             </div>
             <div className={styles.fieldRow}>
               <div className={styles.grow}>
                 <Field label="シークレット" htmlFor="wh-incoming-secret" error={createFieldError.secret}>
-                <TextField
+                <SaveErrorField names={["createSecret","secret","create_secret"]}><TextField
                   value={createSecret}
                   onChange={(event) => setCreateSecret(event.target.value)}
                   placeholder="相手と決めた合言葉（32文字以上）"
                   aria-invalid={Boolean(createFieldError.secret) || undefined}
-                />
+                /></SaveErrorField>
               </Field>
           </div>
               <Button type="button" onClick={() => setCreateSecret(generateSecret())}><RefreshCw size={15} aria-hidden="true" />自動生成</Button>
@@ -918,11 +926,8 @@ export default function WebhooksIncomingV8() {
           busy={testBusy}
           confirmLabel="試す"
         >
-          <label className={styles.formField}>
-            <span className={styles.fieldLabel}>届いたつもりのJSON</span>
-            <TextArea value={testJson} onChange={(event) => setTestJson(event.target.value)} placeholder='{"friendId": "…"}' />
-          </label>
-          {testError ? <p className={styles.fieldError} role="alert">{testError}</p> : null}
+          <Field label="届いたつもりのJSON"><SaveErrorField names={["testJson","test_json"]}><TextArea value={testJson} onChange={(event) => setTestJson(event.target.value)} placeholder='{"friendId": "…"}' /></SaveErrorField></Field>
+          {testError ? <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >{testError}</Notice> : null}
           {testResult ? (
             <div className={styles.form}>
               <span className={styles.fieldLabel}>だれに届くか</span>
@@ -930,7 +935,7 @@ export default function WebhooksIncomingV8() {
                 {testResult.match.status === 'matched'
                   ? '1人の友だちに一致しました'
                   : testResult.match.status === 'ambiguous'
-                    ? `同じ値の友だちが${testResult.match.friendIds.length}人います。実際に届くと保留になり、人が選びます。`
+                    ? `同じ値の友だちが${testResult.match.friendIds.length} 人います。実際に届くと保留になり、人が選びます。`
                     : '一致する友だちがいません'}
               </p>
               <span className={styles.fieldLabel}>動く予定の処理</span>
@@ -938,7 +943,7 @@ export default function WebhooksIncomingV8() {
                 <div key={action.refIndex} className={styles.actionRow}>
                   <span className={styles.actionName}>{incomingActionLabel(action.refKind)}：{action.displayName}</span>
                   <span className={styles.spacer} aria-hidden="true" />
-                  <span className={styles.actionTarget}>{action.ok ? `(${action.plan?.length ?? 0}件の処理)` : action.error}</span>
+                  <span className={styles.actionTarget}>{action.ok ? `(${action.plan?.length ?? 0} 件の処理)` : action.error}</span>
                 </div>
               )) : <p className={styles.cardNote}>動く処理はまだ決めていません</p>}
             </div>
@@ -953,7 +958,7 @@ export default function WebhooksIncomingV8() {
           destructive
           busy={deleting}
           error={deleteError || undefined}
-          onConfirm={() => void runDelete()}
+          onConfirm={() => runDelete()}
           onCancel={() => { if (!deleting) { setDeleteTarget(null); setDeleteError('') } }}
         />
 
@@ -964,17 +969,17 @@ export default function WebhooksIncomingV8() {
           description="新しい合言葉を設定します。保存したあとは二度と全部は表示されません。前の合言葉は24時間だけ使えるので、相手側の切り替え中も受け取りは止まりません。"
           error={rotateError || undefined}
           onCancel={() => { setRotateTarget(null); setRotateSecret('') }}
-          onConfirm={() => void runRotate()}
+          onConfirm={() => runRotate()}
           confirmLabel="保存する"
         >
           <div className={styles.fieldRow}>
-            <TextField
+            <SaveErrorField names={["rotateSecret","secret","rotate_secret"]}><TextField
               value={rotateSecret}
               onChange={(event) => setRotateSecret(event.target.value)}
               placeholder="ランダムな英数字32文字以上"
               aria-label="新しい合言葉"
               autoFocus
-            />
+            /></SaveErrorField>
             <Button type="button" onClick={() => setRotateSecret(generateSecret())}>自動生成</Button>
           </div>
         </Dialog>
@@ -991,7 +996,7 @@ export default function WebhooksIncomingV8() {
             <span className={styles.fieldLabel}>合言葉（今回だけ表示）</span>
             <div className={styles.fieldRow}>
               <p className={`${styles.valueBox} ${styles.grow}`}>{createdSecret.secret}</p>
-              <Button onClick={() => { void navigator.clipboard.writeText(createdSecret.secret); notifyToast('合言葉を写しました') }}><Copy size={15} aria-hidden="true" />写す</Button>
+              <CopyTextButton value={createdSecret!.secret} aria-label="合言葉をコピー"  />
             </div>
           </Dialog>
         ) : null}
@@ -1004,6 +1009,6 @@ export default function WebhooksIncomingV8() {
         {leftColumn}
         <div className={styles.main}>{rightColumn}</div>
       </div>
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

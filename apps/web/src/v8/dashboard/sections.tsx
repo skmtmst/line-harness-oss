@@ -20,6 +20,8 @@ import type { AccountWithStats } from '@/contexts/account-context'
 import { connectionReasonLine } from '@/v8/hq/connection-reasons'
 import { RetryLabel } from '@/components/shared/retry-label'
 import styles from './dashboard.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Section = NonNullable<DashboardOverview['sections']>[keyof NonNullable<DashboardOverview['sections']>]
 
@@ -116,13 +118,13 @@ export function SendQuota({ delivery, metric, section, onRetry, overviewFailed }
           {unlimited ? (
             <>
               <span className={styles.quotaPre}>LINE公式 使用</span>
-              <span className={styles.quotaNum}>{used === null ? '—' : formatNumber(used)}</span>
+              <span className={styles.quotaNum}>{used === null ? emptyValue('unknown') : formatNumber(used)}</span>
               <span className={styles.quotaPre}>通（上限なし）</span>
             </>
           ) : (
             <>
               <span className={styles.quotaPre}>LINE公式 残り</span>
-              <span className={styles.quotaNum}>{remaining === null ? '—' : formatNumber(remaining)}</span>
+              <span className={styles.quotaNum}>{remaining === null ? emptyValue('unknown') : formatNumber(remaining)}</span>
               <span className={styles.quotaPre}>{limit === null ? '' : `/ ${formatNumber(limit)}通`}</span>
             </>
           )}
@@ -166,12 +168,12 @@ export function OperationalAlerts({ risk, healthIssues, oldestWaitMinutes, twoFa
       <SectionHeader title="運用アラート" href="/emergency" linkLabel="運用状態を見る" />
       <p className={styles.alertHead}>
         <span className={failed || count === null ? styles.faintStrong : styles.strong}>
-          {failed ? '未取得' : count === null ? '—' : `接続・自動処理 ${count}件`}
+          {failed ? '未取得' : count === null ? emptyValue('unknown') : `接続・自動処理 ${count}件`}
         </span>
         {!failed && count !== null ? <Tag tone={count > 0 ? 'warning' : 'success'}>{count > 0 ? '要確認' : '正常'}</Tag> : null}
       </p>
-      <p className={styles.item}>{`・最も古い未対応：${oldestWaitMinutes === null ? '—' : formatWaitRough(oldestWaitMinutes)}`}</p>
-      <p className={styles.item}>{`・組織全体の二段階認証：${twoFactor === null ? '—' : `${twoFactor.enabled} / ${twoFactor.total}人`}`}</p>
+      <p className={styles.item}>{`・最も古い未対応：${oldestWaitMinutes === null ? emptyValue('unknown') : formatWaitRough(oldestWaitMinutes)}`}</p>
+      <p className={styles.item}>{`・組織全体の二段階認証：${twoFactor === null ? emptyValue('unknown') : `${twoFactor.enabled} / ${twoFactor.total}人`}`}</p>
       <Updated>{dashboardLocalUpdatedAt(updatedAt)}</Updated>
     </div>
   )
@@ -185,7 +187,7 @@ export function SupportStatus({ inbox, autoOnInbound }: { inbox: DashboardOvervi
     { label: '保留', value: inbox?.onHold ?? null, href: '/chats?status=on_hold', dot: 'faint' },
     { label: '対応済み', value: inbox?.resolved ?? null, href: '/chats?status=resolved', dot: 'success' },
   ] as const
-  const autoText = `メッセージ受信時の自動変更：${autoOnInbound === null ? '—' : autoOnInbound ? '有効' : '無効'}`
+  const autoText = `メッセージ受信時の自動変更：${autoOnInbound === null ? emptyValue('unknown') : autoOnInbound ? '有効' : '無効'}`
   return (
     <div className={styles.asideBlock}>
       <SectionHeader
@@ -199,7 +201,7 @@ export function SupportStatus({ inbox, autoOnInbound }: { inbox: DashboardOvervi
         <KeyValue
           key={row.label}
           label={<StatusPill tone={row.dot === 'faint' ? 'neutral' : row.dot}>{row.label}</StatusPill>}
-          value={row.value === null ? '—' : `${formatNumber(row.value)}件`}
+          value={row.value === null ? emptyValue('unknown') : `${formatNumber(row.value)}件`}
           tone={row.label === '未対応' && (row.value ?? 0) > 0 ? 'danger' : 'default'}
           href={row.href}
           title={`${row.label}で絞った受信箱を開く`}
@@ -241,8 +243,8 @@ export function ConnectionStatus({ account, canCheck, onChecked, risk, activeFri
   const [checkError, setCheckError] = useState('')
   const state = webhookState(account)
   const webhookLabel = checking ? '確認中' : state.label
-  const autoLabel = healthFailed ? '未取得' : risk === 'normal' ? '稼働中' : risk ? '要確認' : '確認中'
-  const dotOf = (label: string) => (label === '正常' || label === '稼働中' ? 'success' : label === '要確認' ? 'danger' : 'faint') as 'success' | 'danger' | 'faint'
+  const autoLabel = healthFailed ? '未取得' : risk === 'normal' ? '有効' : risk ? '要確認' : '確認中'
+  const dotOf = (label: string) => (label === '正常' || label === '有効' ? 'success' : label === '要確認' ? 'danger' : 'faint') as 'success' | 'danger' | 'faint'
   /* Webhook の要確認は黄の丸と理由（統括のアカウントの接続と同じ）。 */
   const webhookDot = webhookLabel === '要確認' ? 'warning' : dotOf(webhookLabel)
   const revision = account?.revision
@@ -279,7 +281,7 @@ export function ConnectionStatus({ account, canCheck, onChecked, risk, activeFri
       {state.label === '要確認' && state.reason && !checking ? <p className={styles.stale} title={state.reason.title}>{state.reason.text}</p> : null}
       {checkError ? <p className={styles.alert} role="alert">{checkError}</p> : null}
       <KeyValue label="自動処理" value={autoLabel} dot={dotOf(autoLabel)} tone={autoLabel === '要確認' ? 'danger' : 'default'} />
-      <KeyValue label="有効友だち" value={activeFriends === null ? '—' : `${formatNumber(activeFriends)}人`} />
+      <KeyValue label="有効友だち" value={activeFriends === null ? emptyValue('unknown') : `${formatNumber(activeFriends)}人`} />
     </div>
   )
 }
@@ -289,13 +291,13 @@ export function FriendStatus({ friends }: { friends: DashboardOverview['friends'
   const blocked = friends.blockedByThem + friends.hiddenByUs + friends.blockedBoth
   const base = friends.active + blocked
   const rate = base > 0 ? (blocked / base) * 100 : 0
-  const breakdown = `相手から ${formatNumber(friends.blockedByThem)}人・自分から ${formatNumber(friends.hiddenByUs)}人・相互に ${formatNumber(friends.blockedBoth)}人`
+  const breakdown = `相手から ${formatNumber(friends.blockedByThem)} 人・自分から ${formatNumber(friends.hiddenByUs)} 人・相互に ${formatNumber(friends.blockedBoth)} 人`
   return (
     <>
       <SectionHeader title="友だちの状態" note="現在" href="/friends" linkLabel="友だちを見る" />
-      <KeyValue label="友だち総数" value={`${formatNumber(friends.total)}人`} />
-      <KeyValue label="有効" value={`${formatNumber(friends.active)}人`} />
-      <KeyValue label="ブロック・非表示" value={`${formatNumber(blocked)}人（${rate.toFixed(1)}%）`} />
+      <KeyValue label="友だち総数" value={`${formatNumber(friends.total)} 人`} />
+      <KeyValue label="有効" value={`${formatNumber(friends.active)} 人`} />
+      <KeyValue label="ブロック・非表示" value={`${formatNumber(blocked)} 人（${rate.toFixed(1)}%）`} />
       <p className={styles.small} title={breakdown}>{breakdown}</p>
     </>
   )
@@ -372,8 +374,8 @@ export function Upcoming({ accountId, bookings, loading, today, jstDay, startLoa
       ) : legacy.slice(0, 3).map((booking) => (
         <div key={booking.id} className={styles.plan}>
           <span className={styles.planText}>
-            <span className={styles.planTitle} title={booking.menu_name}>{booking.menu_name}</span>
-            <span className={styles.planKind} title={booking.friend_name ?? '名前未設定'}>{booking.friend_name ?? '名前未設定'}</span>
+            <span className={styles.planTitle} ><TruncatedText value={String(booking.menu_name ?? '')} /></span>
+            <span className={styles.planKind} ><TruncatedText value={String(booking.friend_name ?? '名前未設定')} /></span>
           </span>
           <span className={styles.planTime}>{upcomingTime(booking.starts_at, today, jstDay)}</span>
         </div>
@@ -417,7 +419,7 @@ export function DeliveryFailures({ accountId, startLoad }: { accountId: string |
       {origins ? (
         <p className={styles.figure}><span className={styles.bigNum}>{formatNumber(origins.total)}</span><span className={styles.unit}>件</span></p>
       ) : failed ? (
-        <p className={styles.figure}><span className={styles.bigNum}>—</span></p>
+        <p className={styles.figure}><span className={styles.bigNum}>{emptyValue('unknown')}</span></p>
       ) : <Loading label="今日の配信の失敗" />}
       <p className={styles.note}>{failed ? '読み込めませんでした。' : '送れなかった理由と送り直しは、配信の詳細で確かめる'}</p>
       <Updated>{dashboardLocalUpdatedAt(fetchedAt)}</Updated>
@@ -430,7 +432,7 @@ export function MonthlyDelivery({ delivery, section }: { delivery: DashboardOver
   const fig = (label: string, value: number | null) => (
     <div className={styles.fig}>
       <span className={styles.figKey}>{label}</span>
-      <span className={styles.figure}><span className={styles.midNum}>{value === null ? '—' : formatNumber(value)}</span><span className={styles.unitSmall}>通</span></span>
+      <span className={styles.figure}><span className={styles.midNum}>{value === null ? emptyValue('unknown') : formatNumber(value)}</span><span className={styles.unitSmall}>通</span></span>
     </div>
   )
   return (
@@ -479,7 +481,7 @@ export function Metric({ title, period, href, linkLabel, value, unit = '件', de
     <>
       <SectionHeader title={title} note={period} help={help} helpLabel={help ? `${title}の説明` : undefined} href={href} linkLabel={linkLabel} />
       {loading && value === null ? <Loading label={title} /> : (
-        <p className={styles.figure}><span className={styles.bigNum}>{value === null ? '—' : formatNumber(value)}</span>{value === null ? null : <span className={styles.unit}>{unit}</span>}</p>
+        <p className={styles.figure}><span className={styles.bigNum}>{value === null ? emptyValue('unknown') : formatNumber(value)}</span>{value === null ? null : <span className={styles.unit}>{unit}</span>}</p>
       )}
       {detail ? <p className={styles.note}>{detail}</p> : null}
       <Updated>{sectionUpdated(section)}</Updated>

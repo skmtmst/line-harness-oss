@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import React, { act } from 'react'
+import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { fireEvent } from '@testing-library/react'
@@ -135,7 +135,7 @@ test('名前が空なら保存せず、理由を1回だけ出し、赤い名前�
   await eventually(() => expect(document.activeElement).toBe(name))
   expect(name.getAttribute('aria-invalid')).toBe('true')
   expect(host.querySelectorAll('[role="alert"]')).toHaveLength(1)
-  expect(document.getElementById(name.getAttribute('aria-describedby')!)?.textContent).toBe('設定名を入力してください。')
+  expect(name.getAttribute('aria-describedby')?.split(' ').map(id=>document.getElementById(id)).find(node=>node?.getAttribute('role')==='alert')?.textContent).toBe('設定名を入力してください。')
   expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'center' })
   expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
   await act(async () => fireEvent.change(name, { target: { value: '初回案内' } }))
@@ -171,7 +171,7 @@ test('シナリオが未選択なら選べる赤い欄へ移り、選ぶと誤�
   const field = () => host.querySelector<HTMLElement>('#fa-scenario')!
   const open = () => host.querySelector<HTMLButtonElement>('button[aria-label="実際に配信するシナリオ：選ぶ"]')!
   await eventually(() => expect(document.activeElement).toBe(open()))
-  expect(field().getAttribute('data-invalid')).toBe('true')
+  expect(field().getAttribute('aria-invalid')).toBe('true')
   expect(host.querySelectorAll('[role="alert"]')).toHaveLength(1)
   await act(async () => open().click())
   await act(async () => document.querySelector<HTMLInputElement>('input[type="radio"][aria-label="新規登録7日間フォロー"]')!.click())

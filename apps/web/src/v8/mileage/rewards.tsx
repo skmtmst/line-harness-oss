@@ -1,16 +1,7 @@
 'use client'
 
-/*
- * ★V8 マイル「使い道」（板 `S35pO`、状態は見本帳 `zaqP9`）。
- *
- * app/mileage/v8-rewards-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
- * 表は「使い道・必要なマイル・交換すると渡るもの・今月交換された・状態・
- * 操作（中身を見る・…）」。止める／出すは行の「…」。頭の CSV は見えている
- * 表の中身を出す。要対応の交換（届かなかった分のやり直し）は表の下に残す。
- *
- * フォルダの列に割り当てる API は無いので、渡すものの種類で分けた
- * 見え方の切り替えとして持つ（保存はしない）。
- */
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, ArrowLeftRight, CircleDot, Download, FilePen, Gift, Plus, Star } from 'lucide-react'
@@ -46,6 +37,23 @@ import { CreateButton, MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 マイル「使い道」（板 `S35pO`、状態は見本帳 `zaqP9`）。
+ *
+ * app/mileage/v8-rewards-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
+ * 表は「使い道・必要なマイル・交換すると渡るもの・今月交換された・状態・
+ * 操作（中身を見る・…）」。止める／出すは行の「…」。頭の CSV は見えている
+ * 表の中身を出す。要対応の交換（届かなかった分のやり直し）は表の下に残す。
+ *
+ * フォルダの列に割り当てる API は無いので、渡すものの種類で分けた
+ * 見え方の切り替えとして持つ（保存はしない）。
+ */
 
 const KIND_LABEL: Record<MileageRewardKind, string> = {
   coupon: 'クーポン',
@@ -130,6 +138,7 @@ const PRESETS: Array<{ value: string; label: string }> = [
 ]
 
 export default function RewardsTab() {
+  const saveErrors = useSaveFormErrors()
   const { readonly, narrow, setCount } = useMileageShell()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const accountId = selectedAccountId
@@ -147,7 +156,7 @@ export default function RewardsTab() {
   const [failed, setFailed] = useState<FailedRedemption[]>([])
   const [redemptionsVisible, setRedemptionsVisible] = useState(false)
   const [redemptionsLoad, setRedemptionsLoad] = useState<LoadStatus>('loading')
-  const [redemptionsPage, setRedemptionsPage] = useState(1)
+  const [redemptionsPage, setRedemptionsPage] = useListUrlValue('redemptionsPage', 1)
   const [redemptionsTotal, setRedemptionsTotal] = useState(0)
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [retryError, setRetryError] = useState('')
@@ -156,14 +165,14 @@ export default function RewardsTab() {
   const [testBusyId, setTestBusyId] = useState<string | null>(null)
   const [duplicateId, setDuplicateId] = useState<string | null>(null)
   const [menuNotice, setMenuNotice] = useState('')
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [folder, setFolder] = useState<Folder>('すべて')
-  const [publishedOnly, setPublishedOnly] = useState(false)
-  const [draftOnly, setDraftOnly] = useState(false)
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [folder, setFolder] = useListUrlValue<Folder>('folder', 'すべて')
+  const [publishedOnly, setPublishedOnly] = useListUrlValue('publishedOnly', false)
+  const [draftOnly, setDraftOnly] = useListUrlValue('draftOnly', false)
   const [preset, setPreset] = useState('default')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const requestRef = useRef(0)
 
   const load = useCallback(async () => {
@@ -194,10 +203,12 @@ export default function RewardsTab() {
       setStatus('ready')
     } catch (reason) {
       if (request !== requestRef.current) return
-      setRewards([])
+      saveErrors.capture(reason)
+      setRewards([]);
+
       setStatus(reason instanceof Error && reason.message === 'forbidden' ? 'forbidden' : 'error')
     }
-  }, [accountId])
+  }, [accountId, saveErrors])
 
   useEffect(() => {
     if (accountLoading) return
@@ -232,13 +243,15 @@ export default function RewardsTab() {
       setRedemptionsVisible(true)
       setRedemptionsLoad('ready')
     } catch (reason) {
+      saveErrors.capture(reason)
       setFailed([])
       setRedemptionsVisible(true)
-      setRedemptionsTotal(0)
+      setRedemptionsTotal(0);
+
       const forbidden = reason instanceof ApiError && (reason.status === 403 || reason.code === 'forbidden')
       setRedemptionsLoad(forbidden ? 'forbidden' : 'error')
     }
-  }, [accountId])
+  }, [accountId, saveErrors])
 
   useEffect(() => {
     void loadFailed(redemptionsPage)
@@ -248,7 +261,7 @@ export default function RewardsTab() {
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearch(searchInput.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
@@ -275,8 +288,11 @@ export default function RewardsTab() {
       }
       await loadFailed(redemptionsPage)
       await load()
-    } catch {
-      setRetryError('やり直せませんでした。時間をおいてもう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setRetryError('やり直せませんでした。時間をおいてもう一度お試しください。') }
       await loadFailed(redemptionsPage)
     } finally {
       setRetryingId(null)
@@ -308,15 +324,18 @@ export default function RewardsTab() {
         if (saved && typeof saved === 'object' && saved.id === reward.id) {
           setRewards((current) => current.map((item) => (item.id === reward.id ? { ...item, ...saved } : item)))
         }
-      } catch {
+      } catch (saveFailure) {
+        const fieldFailure = saveErrors.capture(saveFailure);
+
         setStatus(before)
+        { if (!fieldFailure)
         notifyToast(before === 'published'
           ? `「${reward.name}」を止められませんでした。元に戻しました。`
           : `「${reward.name}」をまた出せませんでした。元に戻しました。`, {
           tone: 'error',
           actionLabel: 'もう一度',
           onAction: () => { void changeState({ ...reward, status: before }) },
-        })
+        }) }
       } finally {
         setBusyId(null)
       }
@@ -333,8 +352,11 @@ export default function RewardsTab() {
       )
       if (!response.success) throw new Error(response.error)
       await load()
-    } catch {
-      setActionError('使い道を公開できませんでした。内容を確認してもう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('使い道を公開できませんでした。内容を確認してもう一度お試しください。') }
     } finally {
       setBusyId(null)
     }
@@ -353,8 +375,11 @@ export default function RewardsTab() {
       setMenuNotice(response.data?.canDeliver
         ? 'この内容で交換できます。残高・在庫は動いていません。'
         : (warning || 'この内容では交換できません。内容を確認してください。'))
-    } catch {
-      setActionError('交換のテストができませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('交換のテストができませんでした。もう一度お試しください。') }
     } finally {
       setTestBusyId(null)
     }
@@ -391,8 +416,11 @@ export default function RewardsTab() {
       if (!response.success) throw new Error(response.error)
       setMenuNotice(`「${reward.name} のコピー」を下書きで作りました。`)
       await load()
-    } catch {
-      setActionError('複製できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('複製できませんでした。もう一度お試しください。') }
     } finally {
       setDuplicateId(null)
     }
@@ -448,7 +476,7 @@ export default function RewardsTab() {
     setPage(1)
   }
 
-  /* 頭の「CSV で書き出す」。使い道の書き出し口は無いので、今見えている表の中身をそのまま出す。 */
+  /* 頭の「CSVで書き出す」。使い道の書き出し口は無いので、今見えている表の中身をそのまま出す。 */
   const canExport = !accountLoading && !!accountId && loadedAccountId === accountId && status === 'ready' && shown.length > 0
   const exportCsv = useCallback(() => {
     if (!canExport) return
@@ -459,7 +487,7 @@ export default function RewardsTab() {
         String(reward.currentVersion?.requiredMiles ?? ''),
         reward.benefitName ? `${KIND_LABEL[reward.rewardKind]}「${reward.benefitName}」` : KIND_LABEL[reward.rewardKind],
         benefitSub(reward) ?? '',
-        `${reward.exchangedThisMonth}件`,
+        `${reward.exchangedThisMonth} 件`,
         statusPill(reward.status).text,
       ])
       const csv = [['使い道', '必要なマイル', '交換すると渡るもの', '残り・期限', '今月交換された', '状態'], ...rows]
@@ -468,13 +496,17 @@ export default function RewardsTab() {
       const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-rewards-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("マイルの特典")
       anchor.click()
       URL.revokeObjectURL(url)
-    } catch {
-      setActionError('CSVを書き出せませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('CSVを書き出せませんでした。もう一度お試しください。') }
     }
-  }, [canExport, shown])
+  }, [canExport, shown, saveErrors]);
+
 
   const ready = status === 'ready'
   const failedReason = failed[0] ? (failed[0].failureMessage || failed[0].rewardName) : null
@@ -487,7 +519,7 @@ export default function RewardsTab() {
         icon={<Gift size={14} aria-hidden="true" />}
         value={ready ? rewards.length : null}
         unit="件"
-        detail={ready ? `出している ${formatMileageNumber(publishedCount)}・下書き ${formatMileageNumber(draftCount)}` : '—'}
+        detail={ready ? `出している ${formatMileageNumber(publishedCount)}・下書き ${formatMileageNumber(draftCount)}` : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -495,7 +527,7 @@ export default function RewardsTab() {
         icon={<ArrowLeftRight size={14} aria-hidden="true" />}
         value={ready ? exchangedCount ?? 0 : null}
         unit="件"
-        detail={ready ? `${formatMileageNumber(redeemedMiles ?? 0)} マイル` : '—'}
+        detail={ready ? `${formatMileageNumber(redeemedMiles ?? 0)} マイル` : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -504,7 +536,7 @@ export default function RewardsTab() {
         value={ready && popularName ? 0 : null}
         valueText={ready && popularName ? popularName : undefined}
         unit=""
-        detail={ready ? (popularName ? `今月 ${formatMileageNumber(popularCount ?? 0)}件` : 'まだ交換されていません') : '—'}
+        detail={ready ? (popularName ? `今月 ${formatMileageNumber(popularCount ?? 0)}件` : 'まだ交換されていません') : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -535,12 +567,12 @@ export default function RewardsTab() {
   )
   const kindSelect = (
     <div className={styles.narrowFolder}>
-      <Select
+      <SaveErrorField names={["folder","page"]}><Select
         aria-label="種類"
         value={folder}
         options={FOLDERS.map((key) => ({ value: key, label: key === 'すべて' ? '種類：すべて' : `${key === '未分類' ? 'そのほか' : key} ${formatMileageNumber(folderCounts.get(key) ?? 0)}` }))}
         onChange={(value) => { setPage(1); setFolder(value as Folder) }}
-      />
+      /></SaveErrorField>
     </div>
   )
 
@@ -634,8 +666,8 @@ export default function RewardsTab() {
             {
               id: 'open',
               label: readonly ? '中身を見る' : '編集',
-              external: true,
-              onSelect: () => router.push(`/mileage/rewards/edit?id=${encodeURIComponent(reward.id)}`),
+              external: false,
+              href: `/mileage/rewards/edit?id=${encodeURIComponent(reward.id)}`, onSelect: () => router.push(`/mileage/rewards/edit?id=${encodeURIComponent(reward.id)}`),
             },
             /* 閲覧のみの人には、変える操作を出さない（押せない形で残さない）。 */
             ...(readonly ? [] : [
@@ -686,15 +718,13 @@ export default function RewardsTab() {
             const reach = reachMetrics.find((metric) => metric.rewardId === reward.id)
             const sub = benefitSub(reward)
             return (
-              <Tr key={reward.id} className={styles.row} data-table-layout="columns">
+              <Tr key={reward.id} className={styles.row} data-table-layout="columns" data-row-id={reward.id}>
                 <Td className={styles.colName}>
                   {/* 名前の前にフォルダの丸（左のフォルダの列と同じ分け方。未分類は輪）。補足は名前の頭にそろえる。 */}
                   <FolderDotName folder={null}>
-                    <span className={styles.rowName} title={reward.name}>{reward.name}</span>
+                    <span className={styles.rowName} ><TruncatedText value={String(reward.name ?? '')} /></span>
                   </FolderDotName>
-                  <span className={`${styles.rowSub} ${styles.dotIndent}`}>
-                    {reach ? `今すぐ交換できる人 ${formatMileageNumber(reach.reachableFriendCount)}` : '今すぐ交換できる人 —'}
-                  </span>
+
                 </Td>
                 <Td className={`${styles.colNeed} ${styles.num}`}>
                   <span className={styles.cellMain}>{formatMileageNumber(reward.currentVersion?.requiredMiles)}</span>
@@ -706,7 +736,7 @@ export default function RewardsTab() {
                   {sub ? <span className={styles.cellSub}>{sub}</span> : null}
                 </Td>
                 <Td className={`${styles.colMonth} ${styles.num}`}>
-                  <span className={styles.cellMain}>{`${formatMileageNumber(reward.exchangedThisMonth)}件`}</span>
+                  <span className={styles.cellMain}>{`${formatMileageNumber(reward.exchangedThisMonth)} 件`}</span>
                 </Td>
                 <Td className={styles.colStateWide}>
                   <span className={styles.pill} data-tone={pill.tone}>
@@ -738,7 +768,7 @@ export default function RewardsTab() {
         <ListState
           kind={redemptionsLoad}
           description={redemptionsLoad === 'forbidden'
-            ? '要対応の交換を見る権限がありません。オーナーか管理者に確認してください。'
+            ? permissionDeniedMessage('store')
             : '要対応の交換を読み込めませんでした。'}
           onRetry={redemptionsLoad === 'error' ? () => void loadFailed(redemptionsPage) : undefined}
         />
@@ -756,8 +786,8 @@ export default function RewardsTab() {
           </thead>
           <tbody>
             {failed.map((item) => (
-              <Tr key={item.id} className={styles.row} data-table-layout="columns">
-                <Td className={styles.colName}><span className={styles.cellMain} title={item.rewardName}>{item.rewardName}</span></Td>
+              <Tr data-row-id={item.id} key={item.id} className={styles.row} data-table-layout="columns">
+                <Td className={styles.colName}><FolderDotName><span className={styles.cellMain} title={item.rewardName}>{item.rewardName}</span></FolderDotName></Td>
                 <Td className={styles.colStateWide}>
                   {item.status === 'delivering' ? (
                     <span className={styles.cellMain}>
@@ -771,7 +801,7 @@ export default function RewardsTab() {
                   )}
                 </Td>
                 <Td className={styles.colGives}><span className={styles.cellMain}>{item.failureMessage || item.failureCode || '理由を確認できませんでした'}</span></Td>
-                <Td className={`${styles.colMonth} ${styles.num}`}><span className={styles.cellMain}>{`${formatNumber(item.attemptCount)}回`}</span></Td>
+                <Td className={`${styles.colMonth} ${styles.num}`}><span className={styles.cellMain}>{`${formatNumber(item.attemptCount)} 回`}</span></Td>
                 <Td className={styles.colGives}><span className={styles.cellMain}>{formatMileageDate(item.updatedAt)}</span></Td>
                 <Td className={styles.colOpsWide}>
                   {!readonly ? (
@@ -793,7 +823,7 @@ export default function RewardsTab() {
       )}
       {Math.ceil(redemptionsTotal / REDEMPTIONS_PAGE_SIZE) > 1 ? (
         <div className={styles.subPager}>
-          <span className={styles.pagerCount}>{`要対応の交換 ${formatNumber(redemptionsTotal)}件`}</span>
+          <span className={styles.pagerCount}>{`要対応の交換 ${formatNumber(redemptionsTotal)} 件`}</span>
           <Pagination
             page={redemptionsPage}
             pageCount={Math.ceil(redemptionsTotal / REDEMPTIONS_PAGE_SIZE)}
@@ -808,7 +838,7 @@ export default function RewardsTab() {
   const body = status === 'loading' ? (
     <ListState kind="loading" title="使い道を読み込んでいます" />
   ) : status === 'forbidden' ? (
-    <StateCard title="使い道を見る権限がありません" description="オーナーか管理者に確認してください。" />
+    <StateCard title="使い道を見る権限がありません" description={permissionDeniedMessage('store')} />
   ) : status === 'error' ? (
     <StateCard tone="error" title="使い道を読み込めませんでした" description="数の帯は「—」にしています。道具はそのまま使えます。" action={<RetryButton onRetry={() => void load()} />} />
   ) : visible.length === 0 ? (
@@ -831,17 +861,17 @@ export default function RewardsTab() {
 
   const pager = ready && visible.length > 0 && pageCount > 1 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{`${shown.length}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, shown.length)}件`}</span>
+      <span className={styles.pagerCount}>{`${shown.length} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, shown.length)} 件`}</span>
       <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
     </ListPagePagination>
   ) : undefined
 
   return (
-    <MileageFrame
+    <SaveErrorScope errors={saveErrors}><MileageFrame
       help="行の「…」から 編集・自分で交換をテスト・出すのを止める・複製。"
       actions={
         <Button variant="secondary" onClick={exportCsv} disabled={!canExport}>
-          <Download size={15} aria-hidden="true" /> CSV で書き出す
+          <Download size={15} aria-hidden="true" /> CSVで書き出す
         </Button>
       }
       stats={stats}
@@ -852,6 +882,6 @@ export default function RewardsTab() {
     >
       {body}
       {failedSection}
-    </MileageFrame>
+    </MileageFrame></SaveErrorScope>
   )
 }

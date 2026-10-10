@@ -43,7 +43,7 @@
   border: 0;
   border-radius: var(--radius-segment);
   background: transparent;
-  font-size: var(--text-label);
+  font-size: var(--text-body);
   font-weight: 500;
   line-height: 1.5;
   color: var(--color-ink-secondary);
@@ -71,7 +71,7 @@
 }
 
 .item:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -88,7 +88,7 @@
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
 [data-theme='v8'] .root { background: var(--color-shell); box-shadow: none; }
-[data-theme='v8'] .item { line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+[data-theme='v8'] .item { font-size: var(--text-body); line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 
 /*
  * 小型（d8X09 グラフ／表）。器 r8・項目 3/10・文 12/18・
@@ -133,11 +133,24 @@
   box-shadow: var(--shadow-segment-ring);
 }
 /* rm92Y の探し方。既定の切り替えの寸法・動きは変えない。 */
-[data-theme='v8'] .root[data-appearance='choices'] { padding: 0; gap: 8px; background: transparent; }
-[data-theme='v8'] .root[data-appearance='choices'] .item { min-height: 0; padding: 6px 12px; border-radius: var(--radius-pill); outline: 1px solid var(--color-hairline); outline-offset: -0.5px; font-size: var(--text-caption); font-weight: 400; line-height: 17px; }
-[data-theme='v8'] .root[data-appearance='choices'] .selected { outline-color: transparent; background: var(--color-accent-soft); color: var(--color-accent-deep); font-weight: 600; }
-[data-theme='v8'] .root[data-appearance='choices'] .item:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+[data-theme='v8'] .root:is([data-appearance='choices'],[data-appearance='reservation']) { padding: 0; gap: 8px; background: transparent; }
+[data-theme='v8'] .root:is([data-appearance='choices'],[data-appearance='reservation']) .item { min-height: 0; padding: 6px 12px; border-radius: var(--radius-pill); outline: 1px solid var(--color-hairline); outline-offset: -0.5px; font-size: var(--text-caption); font-weight: 400; line-height: 17px; }
+[data-theme='v8'] .root:is([data-appearance='choices'],[data-appearance='reservation']) .selected { outline-color: transparent; background: var(--color-accent-soft); color: var(--color-accent-deep); font-weight: 600; }
+[data-theme='v8'] .root:is([data-appearance='choices'],[data-appearance='reservation']) .item:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 }
 
 [data-theme='v8'] .root[data-size='sticker'] { height: var(--seg-timing-h); max-width: 100%; gap: 0; }
-[data-theme='v8'] .root[data-size='sticker'] .item { padding: var(--tpl-msg-composer-sticker-switch-pad); font-size: var(--text-label); line-height: var(--tpl-msg-composer-text-lh); white-space: nowrap; }
+[data-theme='v8'] .root[data-size='sticker'] .item { padding: var(--tpl-msg-composer-sticker-switch-pad); font-size: var(--text-body); line-height: var(--tpl-msg-composer-text-lh); white-space: nowrap; }
+
+/* B-152②：役割ごとの文字の段。 */
+[data-theme='v8'] .item, [data-theme='v8'] .selected, html[data-theme='v8'] .root[data-size] .item, html[data-theme='v8'] .root[data-appearance] .selected { font-weight: var(--polish-weight-body); }
+
+/* B-152⑨：切り替える各ボタンの角丸。 */
+html[data-theme='v8'] .root .item, html[data-theme='v8'] .root .thumb, html[data-theme='v8'] .root[data-size] .thumb { border-radius: var(--polish-radius-control); }
+
+/* 予約の表示切替。数は別の文字として添え、4つの項目を絵の幅へそろえる。 */
+[data-theme='v8'] .root[data-size='booking'] { padding: 0; gap: 0; }
+[data-theme='v8'] .root[data-size='booking'] .item { display: flex; align-items: center; justify-content: center; gap: var(--tpl-chip-gap); width: var(--tpl-booking-seg-item-width); height: var(--tpl-chip-h); padding: 0; white-space: nowrap; }
+[data-theme='v8'] .root[data-size='booking'] .item:last-child { width: var(--tpl-booking-seg-last-width); }
+[data-theme='v8'] .root[data-size='booking'] .count { font-size: var(--text-caption); }
+@layer components { html[data-theme='v8'] .root[data-appearance='reservation'] .item{padding:6px 13px;min-height:36px;border-radius:var(--radius-pill);} html[data-theme='v8'] .root[data-appearance='reservation'] .selected{outline-color:var(--color-accent);font-weight:600;} }

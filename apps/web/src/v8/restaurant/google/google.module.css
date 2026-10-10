@@ -536,3 +536,6 @@
   flex-direction: column;
   gap: var(--tpl-rt-chip-row-gap);
 }
+
+.postCompose { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-slot-w-compact); align-items: start; gap: var(--tpl-rt-half-gap); min-width: 0; }
+@container v8-page (max-width: 600px) { .postCompose { grid-template-columns: minmax(0, 1fr); } }

@@ -384,6 +384,78 @@ it('壊れた設定・署名済みの壊れた本文・偽のページ候補を�
   expect(vi.mocked(fetch).mock.calls).toHaveLength(calls);
 });
 
+/**
+ * Meta のエラー説明文（`error.message`）は Meta が書く自由な文章で、こちらが送った値
+ * （合鍵・アプリシークレット・認可コード）がそのまま、あるいは URL エンコード・二重エンコード
+ * など様々な形で混ざって返ることがある。表現の形を網羅して伏せ字にするやり方は新しい形が
+ * 見つかるたびに後追いになるため、`message` 自体を記録に出さないようにした。
+ * どんな形で秘密値が混ざっていても記録に一切残らないこと、原因調べに使う種別・番号
+ * （`status` / `type` / `code` / `subcode`）は残ることを確かめる。
+ */
+it('Metaのエラー説明文は、秘密値がどんな形で混ざっていても一切サーバー記録に出さない', async () => {
+  const longToken = 'EAAI9x+9ZaOp/ZBdBO1234567890ABCDEFG=';
+  const doubleEncoded = encodeURIComponent(encodeURIComponent(longToken));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: URL | string) =>
+      Response.json(
+        {
+          error: {
+            type: 'OAuthException',
+            code: 100,
+            error_subcode: 33,
+            // Meta がこちらの送った値を、そのまま・URLエンコード・二重エンコードと
+            // 混在した形で返してきた最悪の場合を模す。
+            message:
+              `Invalid request: ${String(url)} ` +
+              `client_secret=${config.META_APP_SECRET} code=mock_code ` +
+              `access_token=${longToken} ` +
+              `access_token_encoded=${doubleEncoded}`,
+          },
+        },
+        { status: 400 },
+      ),
+    ),
+  );
+  const logged: string[] = [];
+  const spy = vi
+    .spyOn(console, 'error')
+    .mockImplementation((...args: unknown[]) => {
+      logged.push(args.map(String).join(' '));
+    });
+  try {
+    const start = await read(await req('/api/instagram/oauth/start', {})),
+      state = new URL(start.data.url).searchParams.get('state')!;
+    const callback = await req(
+      '/api/instagram/oauth/callback?' +
+        new URLSearchParams({ state, code: 'mock_code' }),
+    );
+    expect(callback.status).toBe(302);
+    expect(callback.headers.get('location')).toContain('instagram=failed');
+  } finally {
+    spy.mockRestore();
+  }
+  const record = logged.find((line) =>
+    line.includes('instagram_oauth_callback_failed'),
+  );
+  expect(record).toBeDefined();
+  // 原因調べに使う種別・番号は残る。
+  expect(record).toContain('type=OAuthException');
+  expect(record).toContain('code=100');
+  expect(record).toContain('subcode=33');
+  // 説明文（message）自体を記録に出さないため、どの表現も残らない。
+  expect(record).not.toContain('message=');
+  for (const secret of [
+    config.META_APP_SECRET,
+    'mock_code',
+    longToken,
+    encodeURIComponent(longToken),
+    doubleEncoded,
+    config.META_TOKEN_ENCRYPTION_KEY,
+  ])
+    expect(logged.join('\n')).not.toContain(secret);
+});
+
 it('写真DMと受信時刻の順、別アカウントのカーソルを守る', async () => {
   await connect();
   const messages = [

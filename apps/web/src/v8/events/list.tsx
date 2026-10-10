@@ -1,16 +1,11 @@
 'use client'
 
-/*
- * ★V8 イベント予約の一覧（Pencil `e2ekFu`）。
- *
- * 型（ListPage）に、数の帯（これからの回・申込・あと少しで満席・申し込みが少ない）、
- * 左のフォルダの列（上に「イベントを作る」）、案内の帯と道具の段、表、ページ送りをはめる。
- * データの口（取得・絞り込み・並び・ページ送り・名前の変更・削除・フォルダ）は今の V8
- * （src/app/events/events-list-v8.tsx）と同じ。行の名前の前にフォルダの色の丸（2026-10-07 オーナー）。
- */
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useFolderMove } from '@/components/shared/use-folder-move'
+import { moveEventToFolder } from '@/lib/move-to-folder'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Bookmark, CalendarClock, CalendarX, Eye, Hourglass, Plus, TrendingDown, TriangleAlert, Users } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, eventsApi, fetchApi, type EventListItem, type EventListSummary } from '@/lib/api'
@@ -38,6 +33,7 @@ import DetailPanel from '@/components/shared/detail-panel'
 import InlineEdit from '@/components/shared/inline-edit'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { notifyToast } from '@/components/shared/toast'
 import { RowMenu } from '@/components/shared/row-actions'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Pagination from '@/components/shared/pagination'
@@ -46,13 +42,29 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { daysUntilIso, eventRowState, isLowApplication, summarizeEventAttention, type EventRowState } from './attention'
 import { jstDay, jstTime } from './shared'
 import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import StatusBadge from '@/components/shared/status-badge'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
+
+/*
+ * ★V8 イベント予約の一覧（Pencil `e2ekFu`）。
+ *
+ * 型（ListPage）に、数の帯（これからの回・申込・あと少しで満席・申し込みが少ない）、
+ * 左のフォルダの列（上に「イベントを作る」）、案内の帯と道具の段、表、ページ送りをはめる。
+ * データの口（取得・絞り込み・並び・ページ送り・名前の変更・削除・フォルダ）は今の V8
+ * （src/app/events/events-list-v8.tsx）と同じ。行の名前の前にフォルダの色の丸（2026-10-07 オーナー）。
+ */
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /** 未分類を表す印。裏側（events.ts）が `__ungrouped__` で受ける。 */
 const UNFILED = '__ungrouped__'
-const PAGE_SIZES = [10, 20, 50]
-const VIEWER_NOTE = '閲覧のみで見ています。イベントを作る・直す・消す操作は管理者に頼んでください。'
+const PAGE_SIZES = STANDARD_PAGE_SIZES
+const VIEWER_NOTE = '閲覧のみで見ています。イベントを作る・直す・消す操作はオーナーか管理者に頼んでください。'
 
 /*
  * よく使う絞り込み（絵の選ぶ欄）。並びと「満席の回がある」をここから選ぶ。
@@ -66,7 +78,7 @@ const SAVED_OPTIONS = [
 
 const STATE_LABEL: Record<EventRowState, string> = {
   draft: '下書き',
-  paused: '一時停止',
+  paused: '停止中',
   cancelled: '中止',
   ended: '終了',
   full: '満席',
@@ -83,7 +95,7 @@ function toContextMenuItems(menuItems: ActionMenuItem[]): ContextMenuItem[] {
     label: item.label,
     danger: item.tone === 'danger',
     disabled: item.disabled,
-    onSelect: () => item.onSelect(),
+    onSelect: () => item.onSelect?.(),
   }))
 }
 
@@ -94,17 +106,23 @@ export default function EventsListV8() {
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
   /* 作る・名前の変更・削除・フォルダの追加は統括と管理者だけ（Worker も同じ権限）。 */
-  const canEdit = role === null || role === 'owner' || role === 'admin'
+  const canEdit = role === 'owner' || role === 'admin'
+  const [highlightedId, setHighlightedId] = useState<string | null>(useSearchParams().get('highlight'))
+  const activeAccountRef = useRef(selectedAccountId)
+  activeAccountRef.current = selectedAccountId
+  const duplicateLock = useRef(false)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+  const [duplicateError, setDuplicateError] = useState('')
   const [items, setItems] = useState<EventListItem[]>([])
   const [listTotal, setListTotal] = useState(0)
   const [summary, setSummary] = useState<EventListSummary | null>(null)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<'all' | 'open' | 'pending' | 'full'>('all')
-  const [sort, setSort] = useState<'soon' | 'name'>('soon')
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(20)
-  const [folderFilter, setFolderFilter] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<'all' | 'open' | 'pending' | 'full'>('filter', 'all')
+  const [sort, setSort] = useListUrlValue<'soon' | 'name'>('sort', 'soon')
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [perPage, setPerPage] = useListUrlValue('perPage', 20)
+  const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', '')
   const [folders, setFolders] = useState<Folder[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [foldersError, setFoldersError] = useState(false)
@@ -136,7 +154,6 @@ export default function EventsListV8() {
     }
   }, [selectedAccountId])
 
-
   useEffect(() => {
     void loadFolders()
   }, [loadFolders])
@@ -159,6 +176,7 @@ export default function EventsListV8() {
       params.set('sort', sort)
       if (folderFilter) params.set('folderId', folderFilter)
       params.set('account_id', selectedAccountId)
+      if (highlightedId) params.set('highlight', highlightedId)
       const res = await withRequestTimeout(
         fetchApi<{ items: EventListItem[]; total?: number; summary?: EventListSummary | null }>(`/api/events/admin/events?${params}`),
       )
@@ -175,7 +193,7 @@ export default function EventsListV8() {
       // 403 は権限不足（管理者への依頼）、それ以外は通信失敗（もう一度）。
       setLoadStatus(cause instanceof ApiError && cause.status === 403 ? 'forbidden' : 'error')
     }
-  }, [selectedAccountId, page, perPage, query, filter, sort, folderFilter])
+  }, [selectedAccountId, page, perPage, query, filter, sort, folderFilter, highlightedId])
 
   useEffect(() => {
     void refresh()
@@ -251,12 +269,35 @@ export default function EventsListV8() {
     setDeleteTarget(target)
   }, [])
 
+  const duplicateEvent = async (event: EventListItem) => {
+    if (!selectedAccountId || !canEdit || duplicateLock.current) return
+    const accountId = selectedAccountId
+    duplicateLock.current = true
+    setDuplicatingId(event.id); setDuplicateError('')
+    try {
+      const copied = await eventsApi.duplicate(accountId, event.id, event.version)
+      if (activeAccountRef.current !== accountId) return
+      setHighlightedId(copied.id)
+      setFilter('all'); setQuery(''); setPage(1)
+      setItems((current) => [{ ...event, id: copied.id, name: `${event.name}（複製）`, is_published: 0, lifecycle_status: 'draft', version: 1, total_active: 0, pending_count: 0 }, ...current])
+      notifyToast('複製した下書きを追加しました')
+      await loadFolders()
+    } catch { if (activeAccountRef.current === accountId) setDuplicateError('複製できませんでした。一覧を読み直してお試しください。') }
+    finally { duplicateLock.current = false; setDuplicatingId(null) }
+  }
+
+  const folderMove = useFolderMove({
+    accountId: selectedAccountId, canEdit: canEdit, items: items, folders,
+    move: (item, folderId) => moveEventToFolder(item.id, selectedAccountId!, item.version, folderId),
+    onChanged: async () => { await refresh(); await loadFolders() },
+  })
+
   const rowMenuItems = (e: EventListItem): ActionMenuItem[] => [
     { id: 'detail', label: '中身を見る', onSelect: () => router.push(`/events/edit?id=${e.id}`) },
     { id: 'applicants', label: '申込者を見る', onSelect: () => router.push(`/events/bookings?id=${e.id}`) },
     { id: 'change', label: '日時・定員を変える', onSelect: () => router.push(`/events/change-review?id=${e.id}`) },
     { id: 'preview', label: 'プレビュー', onSelect: () => router.push(`/events/preview?id=${e.id}`) },
-    ...(canEdit ? [{ id: 'delete-event', label: '削除する', tone: 'danger' as const, dividerBefore: true, onSelect: () => requestDelete(e) }] : []),
+    ...(canEdit ? [{ id: 'duplicate', label: '複製する', disabled: duplicatingId !== null, onSelect: () => void duplicateEvent(e) }, { id: 'move', label: 'フォルダへ移す', onSelect: () => folderMove.open(e) }, { id: 'delete-event', label: '削除する', tone: 'danger' as const, dividerBefore: true, onSelect: () => requestDelete(e) }] : []),
   ]
 
   const folderDotOf = (folderId: string | null | undefined) => {
@@ -277,7 +318,7 @@ export default function EventsListV8() {
   const filterActive = Boolean(query.trim() || filter !== 'all' || folderFilter)
   const pageCount = Math.max(1, Math.ceil(listTotal / perPage))
   const current = Math.min(page, pageCount)
-  const kpiDetail = (ready: string) => (!selectedAccountId ? 'アカウントを選択' : loadStatus === 'loading' ? '—' : loadStatus === 'ready' ? ready : '読み込めませんでした')
+  const kpiDetail = (ready: string) => (!selectedAccountId ? 'アカウントを選択' : loadStatus === 'loading' ? emptyValue('unknown') : loadStatus === 'ready' ? ready : '読み込めませんでした')
 
   const kpis = [
     {
@@ -286,7 +327,7 @@ export default function EventsListV8() {
     },
     {
       key: 'active', title: '申込', icon: Users, value: dataReady ? kpi.upcoming_active : null, unit: '人',
-      detail: kpiDetail(kpi.fill_rate === null ? '今後の回への申込' : `定員 ${kpi.upcoming_capacity ?? '—'} 人に対して ${kpi.fill_rate}%`),
+      detail: kpiDetail( '今後の回への申込'),
     },
     {
       key: 'nearly-full', title: 'あと少しで満席', icon: Hourglass, value: dataReady ? kpi.nearly_full : null, unit: '回',
@@ -294,9 +335,7 @@ export default function EventsListV8() {
     },
     {
       key: 'low', title: '申し込みが少ない', icon: TrendingDown, value: dataReady ? kpi.low_applications : null, unit: '回',
-      detail: kpiDetail(kpi.nearest_low_starts_at
-        ? `${jstDay(kpi.nearest_low_starts_at)}の回。あと ${daysUntilIso(kpi.nearest_low_starts_at) ?? '—'} 日`
-        : '声をかけると埋まります'),
+      detail: kpiDetail( '声をかけると埋まります'),
     },
   ]
 
@@ -327,10 +366,8 @@ export default function EventsListV8() {
       placeholder="例：教室"
     >
       {foldersError ? (
-        <p role="alert" className={styles.folderNote}>
-          フォルダを読み込めませんでした。
-          <button type="button" onClick={() => void loadFolders()} className={styles.textButton}>もう一度</button>
-        </p>
+        <Notice tone="danger" className={styles.folderNoteNoticePlacement} >フォルダを読み込めませんでした。
+          <button type="button" onClick={() => void loadFolders()} className={styles.textButton}>もう一度</button></Notice>
       ) : null}
     </ManagedFolderPanel>
   )
@@ -361,7 +398,7 @@ export default function EventsListV8() {
         trailing={(
           <>
             <div className={styles.savedBox}>
-              <Select
+              <SaveErrorField names={["savedValue","filter","saved_value"]}><Select
                 aria-label="よく使う絞り込み"
                 icon={<Bookmark aria-hidden="true" />}
                 size="full"
@@ -378,16 +415,16 @@ export default function EventsListV8() {
                     if (filter === 'full') setFilter('all')
                   }
                 }}
-              />
+              /></SaveErrorField>
             </div>
             <div className={styles.perPageBox}>
-              <Select
+              <SaveErrorField names={["perPage","per_page"]}><Select
                 aria-label="表示件数"
                 size="page-size"
                 value={String(perPage)}
-                options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
+                options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
                 onChange={(value) => setPerPage(Number(value))}
-              />
+              /></SaveErrorField>
             </div>
           </>
         )}
@@ -407,11 +444,11 @@ export default function EventsListV8() {
       </colgroup>
       <thead>
         <TableHeadRow>
-          <Th className={`${styles.headName} ${styles.firstCell}`}>イベント名（場所）</Th>
+          <Th className={styles.headName}>{folderMove.pageCheckbox}イベント名（場所）</Th>
           <Th>開催日時</Th>
           <Th align="right">予約／定員</Th>
           <Th align="right">承認待ち</Th>
-          <Th className={styles.stateCell}>
+          <Th>
             <span className={styles.headWithTip}>
               状態
               <HelpTip label="状態の見方の説明">
@@ -426,12 +463,7 @@ export default function EventsListV8() {
   )
 
   const stateCard = (icon: ReactNode, title: string, desc: string, action?: ReactNode, error = false) => (
-    <div className={styles.stateCard}>
-      <span className={styles.stateIcon} data-tone={error ? 'error' : undefined}>{icon}</span>
-      <p className={styles.stateTitle}>{title}</p>
-      <p className={styles.stateDesc}>{desc}</p>
-      {action}
-    </div>
+    <ListState kind={error ? 'error' : 'empty'} title={title} description={desc} icon={icon} action={<>{action}</>} />
   )
 
   let listBody: ReactNode
@@ -444,7 +476,7 @@ export default function EventsListV8() {
         <DelayedSkeleton
           loading
           skeleton={(
-            <DataTable>
+            <DataTable presentation="event-list">
               {tableHead}
               <tbody aria-hidden="true">
                 {[0, 1, 2, 3].map((index) => (
@@ -464,13 +496,13 @@ export default function EventsListV8() {
       </div>
     )
   } else if (loadStatus === 'forbidden') {
-    listBody = stateCard(<TriangleAlert size={18} aria-hidden="true" />, 'イベントを見る権限がありません', '選んでいるアカウントでは見られません。管理者に権限を確かめてください。', undefined, true)
+    listBody = stateCard(<TriangleAlert size={18} aria-hidden="true" />, 'イベントを見る権限がありません', '選んでいるアカウントでは見られません。管理者に権限を確かめてください。', <Button onClick={() => refresh()} busyLabel="読み込み中…">もう一度読み込む</Button>, true)
   } else if (loadStatus === 'error') {
     listBody = stateCard(
       <TriangleAlert size={18} aria-hidden="true" />,
       'イベントを読み込めませんでした',
       '登録したイベントは消えていません。もう一度読み込んでも直らない場合はエラー報告へ。',
-      <Button onClick={() => void refresh()}>もう一度読み込む</Button>,
+      <Button onClick={() => refresh()} busyLabel="処理中…">もう一度読み込む</Button>,
       true,
     )
   } else if (items.length === 0) {
@@ -489,7 +521,7 @@ export default function EventsListV8() {
   } else {
     listBody = (
       <div className={styles.tableBox}>
-        <DataTable>
+        <DataTable presentation="event-list">
           {tableHead}
           <tbody>
             {items.map((e) => {
@@ -498,45 +530,40 @@ export default function EventsListV8() {
               const low = state === 'open' && isLowApplication(e)
               const when = whenText(e.next_slot_starts_at)
               return (
-                <Tr key={e.id} data-row-id={e.id}>
-                  <NameCell
-                    className={styles.firstCell}
-                    name={(
+                <Tr key={e.id} data-row-id={e.id} selected={highlightedId === e.id}>
+                  <NameCell name={(
                       <ContextMenu label={`「${e.name}」の操作`} items={toContextMenuItems(menuItems)}>
-                        <FolderDotName folder={folderDotOf(e.folderId)}>
-                          <button
-                            type="button"
-                            onClick={() => openDetail(e.id)}
+                        <>{folderMove.checkbox(e)}
+                          <Link
+                            href={`/events/edit?id=${encodeURIComponent(e.id)}`}
                             title={`${e.name}の詳細を見る`}
                             aria-label={`「${e.name}」の詳細を見る`}
                             className={styles.nameButton}
                           >
                             {e.name}
-                          </button>
-                        </FolderDotName>
+                          </Link>
+                        </>
                       </ContextMenu>
-                    )}
-                    sub={<span className={styles.cellSub} title={e.venue_name ?? '場所は未設定'}>{e.venue_name ?? '場所は未設定'}</span>}
+                    )} folder={folderDotOf(e.folderId)}
                   />
                   <Td>
                     <span className={styles.whenMain} title={when}>{when}</span>
-                    <span className={styles.whenSub}>{e.next_slot_starts_at ? '次の回' : '—'}</span>
+                    <span className={styles.whenSub}>{e.next_slot_starts_at ? '次の回' : emptyValue('unknown')}</span>
                   </Td>
-                  <Td align="right" className={styles.num}>{`${e.total_active} / ${e.total_capacity ?? '—'}`}</Td>
+                  <Td align="right" className={styles.num}>{`${e.total_active} / ${e.total_capacity ?? emptyValue('unknown')}`}</Td>
                   <Td align="right" className={styles.num}>
                     {e.pending_count > 0 ? (
                       <Link href={`/events/bookings?id=${e.id}`} className={styles.pendingLink}>{e.pending_count}</Link>
-                    ) : <span className={styles.faint}>—</span>}
+                    ) : <span className={styles.faint}>{emptyValue('unknown')}</span>}
                   </Td>
-                  <Td className={styles.stateCell}>
+                  <Td>
                     <span className={styles.stateLine}>
-                      {low ? <span className={`${styles.pill} ${styles.pillLow}`}>申し込みが少ない</span>
+                      {low ? <StatusBadge tone="warning">申し込みが少ない</StatusBadge>
                         : state === 'open' && (e.total_capacity ?? 0) - e.total_active > 0 && (e.total_capacity ?? 0) - e.total_active <= 3
-                          ? <span className={`${styles.pill} ${styles.pillWarn}`}>あと少しで満席</span>
-                          : state === 'open' ? <span className={`${styles.pill} ${styles.pillOn}`}>公開中</span>
-                            : state === 'full' ? <span className={`${styles.pill} ${styles.pillWarn}`}>満席</span>
-                              : state === 'paused' ? <span className={`${styles.pill} ${styles.pillWarn}`}>一時停止</span>
-                                : <span className={`${styles.pill} ${styles.pillOff}`}>{STATE_LABEL[state]}</span>}
+                          ? <StatusBadge tone="warning">あと少しで満席</StatusBadge>
+                          : <StatusBadge tone={ state === 'open' ? 'success'
+                            : state === 'full' ? 'danger'
+                              : 'neutral'}>{STATE_LABEL[state]}</StatusBadge>}
                       {e.visible_tag_id ? (
                         <TagPill name={e.visible_tag_name ?? '消えたタグ'} size="sm" />
                       ) : null}
@@ -578,6 +605,7 @@ export default function EventsListV8() {
 
   const overlays = (
     <>
+      {folderMove.overlays}
       <DetailPanel
         open={active !== null}
         title={active?.name ?? ''}
@@ -590,7 +618,7 @@ export default function EventsListV8() {
         footer={active ? (
           <div className={styles.panelActions}>
             <Button href={`/events/edit?id=${active.id}`}>中身を見る</Button>
-            {canEdit ? <Button variant="danger" onClick={() => { closeDetail(); requestDelete(active) }}>削除する</Button> : null}
+            {canEdit ? <Button variant="danger" onClick={() => { const transition = closeDetail(); requestDelete(active); return transition }} busyLabel="処理中…">削除する</Button> : null}
           </div>
         ) : undefined}
       >
@@ -604,7 +632,7 @@ export default function EventsListV8() {
             <p className={styles.panelLabel}>状態</p>
             <p className={styles.panelText}>{STATE_LABEL[eventRowState(active)]}</p>
             <p className={styles.panelLabel}>予約・承認待ち</p>
-            <p className={styles.panelText}>{`予約 ${active.total_active} / ${active.total_capacity ?? '—'}　承認待ち ${active.pending_count > 0 ? active.pending_count : '—'}`}</p>
+            <p className={styles.panelText}>{`予約 ${active.total_active} / ${active.total_capacity ?? emptyValue('unknown')}　承認待ち ${active.pending_count > 0 ? active.pending_count : emptyValue('unknown')}`}</p>
             <div className={styles.panelActions}>
               <Button onClick={() => router.push(`/events/bookings?id=${active.id}`)}>申込者を見る</Button>
               <Button onClick={() => router.push(`/events/preview?id=${active.id}`)}>プレビュー</Button>
@@ -621,7 +649,7 @@ export default function EventsListV8() {
         confirmLabel="削除する"
         busy={deleteBusy}
         error={deleteError}
-        onConfirm={() => void confirmDeleteEvent()}
+        onConfirm={() => confirmDeleteEvent()}
         onCancel={() => {
           if (deleteBusy) return
           setDeleteError('')
@@ -633,16 +661,16 @@ export default function EventsListV8() {
 
   return (
     <ListPage
-      help="行の「…」から 中身を見る・申込者を見る・日時と定員を変える・プレビュー・削除。申込中・キャンセル待ちがいるイベントは削除できません。"
+      skeleton
       boardId="e2ekFu"
       headingSize="regular"
       title="イベント予約"
-      description="教室・体験会・相談会など、回ごとに定員のあるイベントの申込を受けます。"
+      layout="event-list"
+      help="教室・体験会・相談会など、回ごとに定員のあるイベントの申込を受けます。"
+      folderWidth={200}
+
       tabs={!canEdit ? (
-        <div className={styles.viewerBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>{VIEWER_NOTE}</span>
-        </div>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div>
       ) : undefined}
       stats={(
         <KpiBand data-design="KPIs">
@@ -661,7 +689,7 @@ export default function EventsListV8() {
       )}
       folders={<>{createButton}{folderPanel}</>}
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: canEdit ? createButton : undefined }}
-      toolbar={toolbar}
+      toolbar={<>{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}{toolbar}</>}
       pagination={pager}
       overlays={overlays}
     >

@@ -1,15 +1,4 @@
 'use client'
-
-/*
- * ★V8 シナリオを作る①：シナリオ情報・配信方式（Pencil `dnzqC`）。
- *
- * v7（mode/page.tsx の ScenarioModePageV7）と動きは同じ。変えるのは置き場だけ：
- * 手順の帯は見出しの下、操作は追従バーの真ん中
- * （キャンセル・あとで決める・この方式で保存する。オーナー決定 2026-10-01）。
- *
- * `id` なしで開いたときはまだ行を作らない。方式の確定か
- * 「あとで決める」ではじめて作成する（#949 N-055）。
- */
 import { useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
@@ -28,8 +17,23 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import styles from './mode-v8.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 シナリオを作る①：シナリオ情報・配信方式（Pencil `dnzqC`）。
+ *
+ * v7（mode/page.tsx の ScenarioModePageV7）と動きは同じ。変えるのは置き場だけ：
+ * 手順の帯は見出しの下、操作は追従バーの真ん中
+ * （キャンセル・あとで決める・この方式で保存する。オーナー決定 2026-10-01）。
+ *
+ * `id` なしで開いたときはまだ行を作らない。方式の確定か
+ * 「あとで決める」ではじめて作成する（#949 N-055）。
+ */
 
 export default function ScenarioModeV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('シナリオを作成')
   usePageCrumbs([{ label: 'シナリオ配信', href: '/scenarios' }])
   const router = useRouter()
@@ -87,8 +91,13 @@ export default function ScenarioModeV8() {
         setFolderId(res.data.folderId ?? '')
         return true
       } catch (cause) {
-        setError(scenarioSaveError(cause))
-        setFolderId(scenario.folderId ?? '')
+        const fieldFailure = saveErrors.capture(cause)
+
+        { if (!fieldFailure)
+
+        setError(scenarioSaveError(cause)) }
+        setFolderId(scenario.folderId ?? '');
+
         return false
       } finally {
         setDetailsSaving(false)
@@ -245,7 +254,11 @@ export default function ScenarioModeV8() {
       // 3段目へ。設計の帯が3段なので、2段で編集画面へ放り出さない。
       router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
     } catch (cause) {
-      setError(id ? scenarioModeError(cause) : 'シナリオを作成できませんでした。時間をおいてもう一度お試しください。')
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+
+      setError(id ? scenarioModeError(cause) : 'シナリオを作成できませんでした。時間をおいてもう一度お試しください。') }
       setSaving(null)
     }
   }
@@ -287,7 +300,7 @@ export default function ScenarioModeV8() {
   const disabled = (Boolean(id) && !scenario) || detailsSaving || saving !== null
 
   return (
-    <div className={styles.board} data-design-node="dnzqC" data-list-state={scenarioState} aria-busy={scenarioState === 'loading'}>
+    <SaveErrorScope errors={saveErrors}><div className={styles.board} data-design-node="dnzqC" data-list-state={scenarioState} aria-busy={scenarioState === 'loading'}>
       <div className={styles.head} data-design="Head">
         <div>
           <h2 className={styles.headTitle}>{id ? '配信方式を変える' : 'シナリオを作る'}</h2>
@@ -353,15 +366,15 @@ export default function ScenarioModeV8() {
         <div className={styles.sectionBody}>
           <div className={styles.field} ref={nameWrapRef}>
             <span className={styles.fieldLabel}>シナリオ名 <RequiredBadge /></span>
-            <TextField
+            <SaveErrorField names={["name"]}><TextField
               value={name}
               disabled={disabled}
               onChange={(e) => { setName(e.target.value); if (nameError) setNameError('') }}
               onBlur={() => void saveDetails()}
-              placeholder="例: 友だち追加ウェルカム"
+              placeholder="例：友だち追加ウェルカム"
               invalid={Boolean(nameError)}
               aria-describedby={nameError ? 'scenario-name-error' : undefined}
-            />
+            /></SaveErrorField>
             {nameError ? (
               <span id="scenario-name-error" className={styles.fieldError}>
                 {nameError}
@@ -372,7 +385,7 @@ export default function ScenarioModeV8() {
           <div className={styles.field}>
             <span className={styles.fieldLabel}>フォルダ</span>
             <span title={selectedFolderName} className="block">
-              <Select
+              <SaveErrorField names={["folderId","folder_id"]}><Select
                 value={folderId}
                 disabled={(Boolean(id) && !scenario) || folderState !== 'ready' || detailsSaving || saving !== null}
                 onChange={(value) => {
@@ -387,7 +400,7 @@ export default function ScenarioModeV8() {
                   ...(selectedFolderMissing ? [{ value: folderId, label: '名前を確認できません' }] : []),
                   ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
                 ]}
-              />
+              /></SaveErrorField>
             </span>
             {folderState !== 'ready' || detailsSaving ? (
               <span className={styles.fieldHint}>
@@ -476,7 +489,7 @@ export default function ScenarioModeV8() {
           </>
         )}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }
 
@@ -484,7 +497,7 @@ export default function ScenarioModeV8() {
 
 function scenarioSaveError(cause: unknown): string {
   if (cause instanceof ApiError) {
-    if (cause.status === 403) return 'シナリオ情報を変更する権限がありません。'
+    if (cause.status === 403) return permissionDeniedMessage('store')
     if (cause.status === 404) return 'シナリオが見つかりませんでした。一覧から開き直してください。'
   }
   return 'シナリオ情報を保存できませんでした。時間をおいてもう一度お試しください。'
@@ -493,7 +506,7 @@ function scenarioSaveError(cause: unknown): string {
 function scenarioModeError(cause: unknown): string {
   if (cause instanceof ApiError) {
     if (cause.status === 400 && !cause.message.startsWith('API error:')) return cause.message
-    if (cause.status === 403) return '配信方式を変更する権限がありません。'
+    if (cause.status === 403) return permissionDeniedMessage('store')
     if (cause.status === 404) return 'シナリオが見つかりませんでした。一覧から開き直してください。'
   }
   return '配信方式を保存できませんでした。時間をおいてもう一度お試しください。'
@@ -530,7 +543,7 @@ function ModeCardV8({
 }) {
   return (
     <label className={`${styles.modeCard} ${selected ? styles.modeCardOn : ''}`}>
-      <input
+      <SaveErrorField names={["delivery-mode","mode","selected","deliveryMode"]}><input
         type="radio"
         name="delivery-mode"
         value={mode}
@@ -538,7 +551,7 @@ function ModeCardV8({
         disabled={disabled}
         onChange={() => onSelect(mode)}
         className="sr-only"
-      />
+      /></SaveErrorField>
       <div className={styles.modeHead}>
         {/* 絵文字は使わない。線の記号にする。 */}
         <span className={styles.modeIcon} aria-hidden="true">

@@ -52,7 +52,9 @@ function handler(url: URL) {
   }
   if (url.pathname === '/api/templates') return response({ success: true, data: [] })
   if (url.pathname === '/api/folders') return response({ success: true, data: [], unfiledCount: 0 })
-  if (url.pathname === '/api/staff/me') return response({ success: false, error: 'not needed' })
+  if (url.pathname === '/api/staff/me') return response({ success: true, data: {
+    role: 'owner', permissions: [], viewPermissions: [],
+  } })
   return response({ success: true, data: {} })
 }
 async function settle() {

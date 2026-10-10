@@ -34,6 +34,8 @@ describe('R568 cancelled or replaced uploads are reclaimed', () => {
     fireEvent.change(screen.getByLabelText('リッチメニュー画像を選ぶ'), { target: { files: [new File(['a'], 'a.png', { type: 'image/png' })] } })
     await waitFor(() => expect(calls.uploadImage).toHaveBeenCalled())
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    const discard = screen.queryByRole('button', { name: /^(破棄する|保存せずに移る)$/ })
+    if (discard) fireEvent.click(discard)
     await waitFor(() => expect(calls.deleteImage).toHaveBeenCalledWith(KEY_A))
   })
   it('cancelling a shared message template create deletes its uploaded image', async () => {
@@ -42,6 +44,8 @@ describe('R568 cancelled or replaced uploads are reclaimed', () => {
     fireEvent.change(screen.getByLabelText('画像を追加（ファイル）'), { target: { files: [new File(['m'], 'm.png', { type: 'image/png' })] } })
     await waitFor(() => expect(calls.uploadImage).toHaveBeenCalled())
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    const discard = screen.queryByRole('button', { name: /^(破棄する|保存せずに移る)$/ })
+    if (discard) fireEvent.click(discard)
     await waitFor(() => expect(calls.deleteImage).toHaveBeenCalledWith(KEY_M))
   })
   it('saving deletes only the replaced image and keeps the adopted one', async () => {
@@ -63,6 +67,6 @@ describe('R568 cancelled or replaced uploads are reclaimed', () => {
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [], selectedAccountId: null, selectedAccount: null, setSelectedAccountId: vi.fn(), loading: false }) }))
 
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => true, useStaffRole: () => 'owner', canManageRole: () => true }))
 
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))

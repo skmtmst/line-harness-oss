@@ -1,12 +1,4 @@
 'use client'
-
-/*
- * ★V8 タグ「保存した検索」タブの一覧（Pencil `IWnYX`、状態 `U0aKD`）。
- *
- * ここは管理だけ。条件を作るのは友だち一覧の絞り込みで、そこから
- * 「この条件を保存」で増える（v7 と同じ考え方）。作る口は見出しの右の
- * 「友だち一覧で条件を作る」（page 側の headAction）。
- */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -39,6 +31,18 @@ import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { TagRowsSkeleton } from './tag-rows-skeleton'
 import styles from './list-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 タグ「保存した検索」タブの一覧（Pencil `IWnYX`、状態 `U0aKD`）。
+ *
+ * ここは管理だけ。条件を作るのは友だち一覧の絞り込みで、そこから
+ * 「この条件を保存」で増える（v7 と同じ考え方）。作る口は見出しの右の
+ * 「友だち一覧で条件を作る」（page 側の headAction）。
+ */
 
 export default function SearchesTabV8({ accountId, canEdit }: { accountId: string | null; canEdit: boolean }) {
   const router = useRouter()
@@ -206,7 +210,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   const rowMenuItems = (search: SavedSearch): ActionMenuItem[] => {
@@ -266,7 +270,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
         {kpisCards.map((kpi) => (
           <div key={kpi.title} className={styles.kpi}>
             <span className={styles.kpiLabel}><kpi.icon size={13} aria-hidden="true" />{kpi.title}</span>
-            <p className={styles.kpiValue}>{kpi.value ?? '—'}<span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span></p>
+            <p className={styles.kpiValue}>{kpi.value ?? emptyValue('unknown')}<span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span></p>
             <p className={styles.kpiDetail}>{kpi.detail}</p>
           </div>
         ))}
@@ -284,14 +288,14 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
         <div className={styles.toolbar}>
           <div className={styles.searchWrap}>
             <SearchField
-              aria-label="条件名で検索"
-              placeholder="条件名で検索"
+              aria-label="条件名で探す"
+              placeholder="条件名で探す"
               value={query}
               onChange={setQuery}
               onClear={() => setQuery('')}
             />
           </div>
-          <Select
+          <SaveErrorField names={["usageFilter","usage_filter"]}><Select
             value={usageFilter}
             onChange={(value) => setUsageFilter(value as SavedSearchUsageFilter)}
             aria-label="使用先"
@@ -300,8 +304,8 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
               { value: 'used', label: '使用中' },
               { value: 'unused', label: '未使用' },
             ]}
-          />
-          <Select
+          /></SaveErrorField>
+          <SaveErrorField names={["matchFilter","match_filter"]}><Select
             value={matchFilter}
             onChange={(value) => setMatchFilter(value as typeof matchFilter)}
             aria-label="該当人数"
@@ -311,7 +315,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
               { value: 'zero', label: '0人' },
               { value: 'unknown', label: '未集計' },
             ]}
-          />
+          /></SaveErrorField>
         </div>
 
         {error ? (
@@ -341,7 +345,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
             </span>
             <p className={styles.stateTitle}>保存した検索を読み込めませんでした</p>
             <p className={styles.stateDesc}>{loadError}</p>
-            <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+            <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度試す</Button>
           </div>
         ) : items.length === 0 ? (
           <div className={styles.stateCard}>
@@ -413,14 +417,14 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                               <Link
                                 href={editHref}
                                 className={styles.cellTitle}
-                                title={search.name}
+
                                 aria-label={`${search.name} を編集`}
                                 onClick={(event) => event.stopPropagation()}
                               >
-                                {search.name}
+                                <TruncatedText value={String(search.name ?? '')} />
                               </Link>
                             ) : (
-                              <span className={styles.cellTitle} title={search.name}>{search.name}</span>
+                              <span className={styles.cellTitle} ><TruncatedText value={String(search.name ?? '')} /></span>
                             )}
                             {!search.lineAccountId && (
                               <span className={`${styles.miniBadge} ${styles.miniBadgeWarn}`}>対象アカウント未割り当て</span>
@@ -434,7 +438,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                         <td className={styles.cellMuted}>
                           {all.length > 0 ? <span className={styles.cellTruncate} title={all.join('・')}>{all.join('・')}・AND</span> : null}
                           {any.length > 0 ? <span className={styles.cellTruncate} title={any.join('・')}>いずれか1つ以上：{any.join('・')}・OR</span> : null}
-                          {all.length === 0 && any.length === 0 ? <span>指定なし</span> : null}
+                          {all.length === 0 && any.length === 0 ? <span>{emptyValue('unconfigured')}</span> : null}
                           {note ? <span className={styles.cellTruncate} title={note}>{note}</span> : null}
                         </td>
                         {/* 人数は、その条件で絞った友だち一覧へのリンク（行の「…」にも同じ口）。 */}
@@ -444,7 +448,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                               {formatNumber(search.matchCount)}人
                             </Link>
                           ) : (
-                            <span className={styles.cellMuted}>—</span>
+                            <span className={styles.cellMuted}>{emptyValue('unknown')}</span>
                           )}
                         </td>
                         <td>
@@ -453,12 +457,12 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                           </span>
                         </td>
                         <td className={styles.cellMuted}>
-                          <span className={styles.cellTruncate} title={search.usedIn === undefined ? '—' : search.usedIn.length === 0 ? '未使用' : search.usedIn.map((u) => `${USAGE_KIND_LABELS[u.kind]}「${u.name}」`).join('・')}>
-                            {search.usedIn === undefined ? '—' : search.usedIn.length === 0 ? '未使用' : search.usedIn.map((u) => `${USAGE_KIND_LABELS[u.kind]}「${u.name}」`).join('・')}
+                          <span className={styles.cellTruncate} >
+                            <TruncatedText value={String(search.usedIn === undefined ? '—' : search.usedIn.length === 0 ? '未使用' : search.usedIn.map((u) => `${USAGE_KIND_LABELS[u.kind]}「${u.name}」`).join('・') ?? '')} />
                           </span>
                         </td>
                         <td className={styles.cellMuted}>
-                          <span className={styles.cellText}>{search.updatedBy ?? search.createdBy ?? '—'}</span>
+                          <span className={styles.cellText}>{search.updatedBy ?? search.createdBy ?? emptyValue('unknown')}</span>
                           <span className={styles.cellSub}>{formatDateTime(search.updatedAt ?? search.createdAt)}</span>
                         </td>
                         <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
@@ -492,7 +496,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                 {filteredList.length}件中 {filteredList.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}〜{Math.min(currentPage * pageSize, filteredList.length)}件
               </span>
               <div className={styles.pagerRight}>
-                <Select
+                <SaveErrorField names={["pageSize","page_size"]}><Select
                   aria-label="表示件数"
                   size="page-size"
                   value={String(pageSize)}
@@ -501,7 +505,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                     { value: '20', label: '20件表示' },
                     { value: '50', label: '50件表示' },
                   ]}
-                />
+                /></SaveErrorField>
                 <Pagination
                   page={currentPage}
                   pageCount={pages}
@@ -560,7 +564,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                     ...(any.length > 0 ? [`いずれか1つ以上：${any.join('・')}・OR`] : []),
                     ...(note ? [note] : []),
                   ]
-                  return parts.length > 0 ? parts.join('／') : '指定なし'
+                  return parts.length > 0 ? parts.join('／') : emptyValue('unconfigured')
                 })()}
               </dd>
             </div>
@@ -572,20 +576,20 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                     {formatNumber(activeSearch.matchCount)}人
                   </Link>
                 ) : (
-                  <span className={styles.cellMuted}>—</span>
+                  <span className={styles.cellMuted}>{emptyValue('unknown')}</span>
                 )}
               </dd>
             </div>
             <div>
               <dt className={styles.cellMuted}>使用先</dt>
               <dd className={styles.cellText}>
-                {activeSearch.usedIn === undefined ? '—' : activeSearch.usedIn.length === 0 ? '未使用' : activeSearch.usedIn.map((u) => `${USAGE_KIND_LABELS[u.kind]}「${u.name}」`).join('・')}
+                {activeSearch.usedIn === undefined ? emptyValue('unknown') : activeSearch.usedIn.length === 0 ? '未使用' : activeSearch.usedIn.map((u) => `${USAGE_KIND_LABELS[u.kind]}「${u.name}」`).join('・')}
               </dd>
             </div>
             <div>
               <dt className={styles.cellMuted}>更新者・日時</dt>
               <dd className={styles.cellText}>
-                {activeSearch.updatedBy ?? activeSearch.createdBy ?? '—'}・{formatDateTime(activeSearch.updatedAt ?? activeSearch.createdAt)}
+                {activeSearch.updatedBy ?? activeSearch.createdBy ?? emptyValue('unknown')}・{formatDateTime(activeSearch.updatedAt ?? activeSearch.createdAt)}
               </dd>
             </div>
           </dl>

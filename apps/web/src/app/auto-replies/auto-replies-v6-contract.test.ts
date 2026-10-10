@@ -58,7 +58,7 @@ describe('V6 自動応答一覧の契約', () => {
   })
 
   it('取得できなかった過去28日の数を0件に見せない', () => {
-    expect(PUBLISH).toContain("matchedLast28Days == null ? '—'")
+    expect(PUBLISH).toContain("matchedLast28Days == null ? emptyValue('unknown')")
     expect(PUBLISH).toContain('`${formatNumber(matchedLast28Days)}件`')
   })
 
@@ -89,7 +89,7 @@ describe('V6 自動応答一覧の契約', () => {
     for (const word of ['orderedRules', 'このルール', '試す', '後の処理', "同じ人へ続けて返さない"]) {
       expect(PUBLISH).toContain(word)
     }
-    expect(PUBLISH).toContain("conflicts.map((conflict)")
+    expect(PUBLISH).toMatch(/conflicts\.map\(\(conflict(?:,\s*\w+)?\)/)
     // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
     expect(PUBLISH).toContain('<LinePreview')
   })

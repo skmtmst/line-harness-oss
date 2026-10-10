@@ -1,53 +1,30 @@
 'use client'
-
-/*
- * ★V8 一斉配信の一覧（Pencil `l5V9a`・1152 は `jjFNi`・閲覧のみは `NtCE3`）。
- *
- * 今までの V8 一覧（app/broadcasts/list-v8.tsx）の動きを写し、見た目は
- * 型（ListPage）と共通部品で一から組み直した。データの口・保存先は今と同じ。
- * 動きの一覧は同じ場所の BEHAVIOR.md。
- */
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar'
+import SharedStatusBadge from '@/components/shared/status-badge'
+import SharedStatusPill from '@/components/shared/status-pill'
+import { useListUrlValue, useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  AlertCircle,
-  ArrowUpDown,
-  Bookmark,
-  CalendarClock,
-  CalendarDays,
-  ChevronDown,
-  Copy,
-  Eye,
-  FilePen,
-  FileText,
-  Gauge,
-  List as ListIcon,
-  Lock,
-  MailOpen,
-  Plus,
-  Send,
-  SendHorizontal,
-  UserCheck,
-} from 'lucide-react'
+import { AlertCircle, Bookmark, CalendarClock, CalendarDays, ChevronDown, Copy, FilePen, FileText, Gauge, List as ListIcon, Lock, MailOpen, Plus, Send, SendHorizontal, UserCheck } from 'lucide-react'
 import type { Folder, Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastListKpis, type BroadcastSavedView } from '@/lib/api'
-import { loadFailureNotice } from '@/components/shared/api-error-message'
+import { loadFailureNotice, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
-import DetailPanel from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Select from '@/components/shared/select'
@@ -63,10 +40,22 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
 import { runOptimistic } from '@/lib/undoable'
-import { useDeferredDelete } from '@/lib/use-deferred-delete'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import { formatDateTime, formatNumber, formatListDateTime as polishFormatListDateTime } from '@/lib/format'
 import QuickSendV8 from './quick-send'
 import styles from './list.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+
+/*
+ * ★V8 一斉配信の一覧（Pencil `l5V9a`・1152 は `jjFNi`・閲覧のみは `NtCE3`）。
+ *
+ * 今までの V8 一覧（app/broadcasts/list-v8.tsx）の動きを写し、見た目は
+ * 型（ListPage）と共通部品で一から組み直した。データの口・保存先は今と同じ。
+ * 動きの一覧は同じ場所の BEHAVIOR.md。
+ */
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -133,10 +122,7 @@ function StatusBadge({ broadcast }: { broadcast: ApiBroadcast }) {
   const key = broadcast.displayStatus ?? broadcast.status
   const label = broadcast.displayStatusLabel ?? key
   return (
-    <span className={styles.badge} data-tone={BADGE_TONE[key] ?? 'neutral'}>
-      <span className={styles.badgeDot} aria-hidden="true" />
-      {label}
-    </span>
+    <SharedStatusPill tone={BADGE_TONE[key] ?? 'neutral'}>{label}</SharedStatusPill>
   )
 }
 
@@ -178,6 +164,7 @@ function HqMark() {
 }
 
 export default function BroadcastListV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('一斉配信')
   const router = useRouter()
   const { selectedAccountId } = useAccount()
@@ -190,7 +177,7 @@ export default function BroadcastListV8() {
    * 役割が読めていない間は今までどおり出す（最後の守りはサーバの 403）。
    * 管理者・オーナーと、配信の編集キーを持つ運用担当が変えられる（役割はサーバの答え）。
    */
-  const canEdit = staffRole === null || canManageRole(staffRole) || hasStaffEditKey(EDIT_KEY)
+  const canEdit = useFeatureAccess('broadcasts')
 
   const [broadcasts, setBroadcasts] = useState<ApiBroadcast[]>([])
   const [listKpis, setListKpis] = useState<BroadcastListKpis | null | undefined>(undefined)
@@ -218,8 +205,8 @@ export default function BroadcastListV8() {
   const createAnchorRef = useRef<HTMLElement | null>(null)
   const [titleQuery, setTitleQuery] = useListUrlParam('q')
   const [savedViewId, setSavedViewId] = useState('')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const [dateFrom, setDateFrom] = useListUrlValue('dateFrom', '')
+  const [dateTo, setDateTo] = useListUrlValue('dateTo', '')
   const [datePopoverOpen, setDatePopoverOpen] = useState(false)
   const datePopoverRef = useRef<HTMLDivElement>(null)
   const [folders, setFolders] = useState<Folder[]>([])
@@ -231,15 +218,15 @@ export default function BroadcastListV8() {
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderError, setFolderError] = useState('')
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
-  const [pageSize, setPageSize] = useState(20)
-  const [sortKey, setSortKey] = useState<'newest' | 'oldest'>('newest')
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [sortKey, setSortKey] = useListUrlValue<'newest' | 'oldest'>('sortKey', 'newest')
+  const [page, setPage] = useListUrlValue('page', 1)
   const [listTotal, setListTotal] = useState<number | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ApiBroadcast | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const [panelId, setPanelId] = useState<string | null>(null)
+  const [panelId, setPanelId] = useDetailPanelUrl('broadcast')
   const [menuMoveFor, setMenuMoveFor] = useState<string | null>(null)
   /* 「フォルダへ移す」を選んだ直後の onClose は2段目への切り替えなので閉じない。 */
   const keepMenuOpenRef = useRef(false)
@@ -282,12 +269,17 @@ export default function BroadcastListV8() {
       } else {
         setFolderError('フォルダを読み込めませんでした。')
       }
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
       setFolderError('フォルダを読み込めませんでした。')
     }
-  }, [])
+  }
+  }, [saveErrors])
 
-  useEffect(() => { void loadFolders() }, [loadFolders])
+  useEffect(() => { void loadFolders() }, [loadFolders]);
+
 
   const moveFolderOrder = async (index: number, direction: -1 | 1) => {
     const target = folders[index]
@@ -299,8 +291,11 @@ export default function BroadcastListV8() {
       const result = await api.folders.swapOrder(target.id, neighbor.id)
       if (!result.success) throw new Error(result.error)
       await loadFolders()
-    } catch {
-      setFolderError('並び順を変えられませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setFolderError('並び順を変えられませんでした。') }
     } finally {
       setFolderBusy(false)
     }
@@ -317,8 +312,11 @@ export default function BroadcastListV8() {
       setDeletingFolder(null)
       if (folderFilter === targetId) setFolderFilter('')
       await loadFolders()
-    } catch {
-      setFolderError('フォルダを削除できませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setFolderError('フォルダを削除できませんでした。') }
     } finally {
       setFolderBusy(false)
     }
@@ -381,12 +379,17 @@ export default function BroadcastListV8() {
       }
     } catch (err) {
       if (seq !== loadSeqRef.current) return
+      const fieldFailure = saveErrors.capture(err);
+
       if (err instanceof ApiError && err.status === 403) setForbidden(true)
-      else setError(searchError || loadFailureNotice(err, '一斉配信'))
+      else { if (!fieldFailure)
+
+
+ setError(searchError || loadFailureNotice(err, '一斉配信')) }
     } finally {
       if (seq === loadSeqRef.current) setLoading(false)
     }
-  }, [selectedAccountId, pageSize, sortKey, statusFilter, folderFilter, dateFrom, dateTo, titleQuery])
+  }, [selectedAccountId, pageSize, sortKey, statusFilter, folderFilter, dateFrom, dateTo, titleQuery, saveErrors])
   /* 戻ってきたら前のスクロール位置へ（中身が描けてから）。 */
   useListScrollMemory(!loading)
 
@@ -401,10 +404,11 @@ export default function BroadcastListV8() {
       if (scenariosRes && scenariosRes.success) {
         setScenarios(scenariosRes.data.map((item) => ({ id: item.id, name: item.name })))
       }
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       // 名前が引けない行はID表示に倒す（一覧の取得とは別物）。
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     setPage(1)
@@ -501,33 +505,18 @@ export default function BroadcastListV8() {
       setSavedViews((current) => [...current, res.data])
       setSavedViewName('')
       setSavedViewOpen(false)
-    } catch {
-      setSavedViewError('この検索条件を保存できませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setSavedViewError('この検索条件を保存できませんでした。') }
     } finally {
       setSavedViewBusy(false)
     }
   }
 
-  /*
-   * 下書きの削除は、まだ誰にも届いていない・予約もしていないので影響が無い。確かめの窓を出さずに
-   * 一覧から外し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。予約・送信済みなどは今までどおり窓。
-   */
-  const deferredDelete = useDeferredDelete()
-  const requestDelete = (broadcast: ApiBroadcast) => {
-    setDeleteError('')
-    if (broadcast.status !== 'draft') {
-      setDeleteTarget(broadcast)
-      return
-    }
-    if (panelId === broadcast.id) setPanelId(null)
-    deferredDelete.schedule({
-      ids: [broadcast.id],
-      message: `下書き「${broadcast.title}」を削除しました`,
-      commit: () => api.broadcasts.delete(broadcast.id),
-      onCommitted: () => loadList((page - 1) * pageSize),
-      failureMessage: 'この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。',
-    })
-  }
+  /* 削除は、利用状況にかかわらず確認してから実行する。 */
+  const requestDelete = (broadcast: ApiBroadcast) => { setDeleteError(''); setDeleteTarget(broadcast) }
 
   const handleDelete = async () => {
     if (!deleteTarget || deleting) return
@@ -539,8 +528,11 @@ export default function BroadcastListV8() {
       if (!res.success) throw new Error(res.error)
       setDeleteTarget(null)
       await loadList((page - 1) * pageSize)
-    } catch {
-      setDeleteError('この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDeleteError('この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
@@ -572,7 +564,6 @@ export default function BroadcastListV8() {
 
   /* タイトル・内容は手元で絞る。フォルダも手元で当て直す（移動の重ねをすぐ表へ出すため）。 */
   const matchingBroadcasts = broadcasts.filter((b) => {
-    if (deferredDelete.isHidden(b.id)) return false
     if (folderFilter === UNFILED && b.folderId) return false
     if (folderFilter && folderFilter !== UNFILED && b.folderId !== folderFilter) return false
     const query = titleQuery.trim().toLowerCase()
@@ -640,7 +631,7 @@ export default function BroadcastListV8() {
       icon: Send,
       value: kpiPending ? null : (listKpis?.thisMonth ?? null),
       unit: '件',
-      detail: `${listKpis?.delivered == null ? '—' : `${formatNumber(listKpis.delivered)}人`}に届いた`,
+      detail: `${listKpis?.delivered == null ? emptyValue('unknown') : `${formatNumber(listKpis.delivered)}人`}に届いた`,
     },
     {
       key: 'openRate',
@@ -694,8 +685,8 @@ export default function BroadcastListV8() {
      */
     if (isFromHeadquarters(broadcast)) {
       return [
-        { id: 'view', label: '見る', external: true, onSelect: () => goDetail(broadcast.id) },
-        ...(canEdit ? [{ id: 'duplicate', label: '複製', external: true, icon: <Copy size={14} aria-hidden="true" />, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`) }] : []),
+        { id: 'view', label: '見る', external: false, href: `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`, onSelect: () => goDetail(broadcast.id) },
+        ...(canEdit ? [{ id: 'duplicate', label: '複製', external: false, icon: <Copy size={14} aria-hidden="true" />, href: `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`) }] : []),
       ]
     }
     // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。この「…」は変える項目だけなので空になる。
@@ -705,16 +696,16 @@ export default function BroadcastListV8() {
       items.push({
         id: 'resume',
         label: '編集を続ける',
-        external: true,
-        onSelect: () => router.push(`/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`),
+        external: false,
+        href: `/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`),
       })
     }
     items.push({
       id: 'duplicate',
       label: '複製',
-      external: true,
+      external: false,
       icon: <Copy size={14} aria-hidden="true" />,
-      onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`),
+      href: `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`),
     })
     items.push({
       id: 'move-folder',
@@ -742,6 +733,7 @@ export default function BroadcastListV8() {
       id: item.id,
       label: item.label,
       external: item.external,
+      href: item.href,
       dividerBefore: item.dividerBefore,
       icon: item.icon,
       danger: item.tone === 'danger',
@@ -762,7 +754,7 @@ export default function BroadcastListV8() {
   /* ===== 部品（広い板・1152 で同じものを並べ替えて使う） ===== */
   /* 閲覧のみには押せない「配信を作る」を置かずに隠す（2026-10-06 オーナー決定）。
      広い板では場所だけ空けて、フォルダの列の並びを絵（NtCE3）どおりに保つ。 */
-  const createButton = (full: boolean) => (!canEdit ? (full ? <span className={styles.viewerCreateSpace} aria-hidden="true" /> : null) : (
+  const createButton = (full: boolean) => (!canEdit ? null : (
     <Button
       type="button"
       variant="primary"
@@ -777,7 +769,7 @@ export default function BroadcastListV8() {
   ))
 
   const searchBox = (
-    <div className={narrow ? `${styles.searchBox} ${styles.searchNarrow}` : styles.searchBox}>
+    <ListToolbarSearchSlot>
       <SearchField
         aria-label="タイトル・内容で探す"
         placeholder="タイトル・内容で探す"
@@ -785,7 +777,7 @@ export default function BroadcastListV8() {
         onChange={setTitleQuery}
         onClear={() => setTitleQuery('')}
       />
-    </div>
+    </ListToolbarSearchSlot>
   )
 
   const dateBox = (
@@ -803,8 +795,8 @@ export default function BroadcastListV8() {
       {datePopoverOpen ? (
         <div className={styles.datePopover} role="dialog" aria-label="配信日で絞る">
           <p className={styles.datePopoverLabel}>配信日で絞る（開始〜終了）</p>
-          <DateField value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} aria-label="配信日（開始）" placeholder="開始日" />
-          <DateField value={dateTo} onChange={setDateTo} min={dateFrom || undefined} aria-label="配信日（終了）" placeholder="終了日" />
+          <SaveErrorField names={["dateFrom","from","date_from"]}><DateField value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} aria-label="配信日（開始）" placeholder="開始日" /></SaveErrorField>
+          <SaveErrorField names={["dateTo","to","date_to"]}><DateField value={dateTo} onChange={setDateTo} min={dateFrom || undefined} aria-label="配信日（終了）" placeholder="終了日" /></SaveErrorField>
           <div className={styles.datePopoverActions}>
             {(dateFrom || dateTo) ? (
               <Button type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>外す</Button>
@@ -885,7 +877,7 @@ export default function BroadcastListV8() {
 
   const statusSelect = (
     <div className={styles.statusSelect}>
-      <Select
+      <SaveErrorField names={["statusFilter","status_filter"]}><Select
         aria-label="状態で絞る"
         value={statusFilter}
         onChange={(value) => setStatusFilter(value as StatusChipKey)}
@@ -893,13 +885,13 @@ export default function BroadcastListV8() {
           value: chip.key,
           label: `状態：${chipText(chip.label, chipCount(statusCounts, chip.key))}`,
         }))}
-      />
+      /></SaveErrorField>
     </div>
   )
 
   const pageSizeBox = (
     <div className={styles.pageSizeBox}>
-      <Select
+      <SaveErrorField names={["pageSize","page_size"]}><Select
         aria-label="表示件数"
         size="page-size"
         value={String(pageSize)}
@@ -910,32 +902,24 @@ export default function BroadcastListV8() {
           { value: '50', label: '50件表示' },
           ...(pageSize === 100 ? [{ value: '100', label: '100件表示' }] : []),
         ]}
-      />
+      /></SaveErrorField>
     </div>
   )
 
   const sortButton = (
-    <button
-      type="button"
-      className={styles.sortButton}
-      aria-label={`並び順：${sortKey === 'newest' ? '新しい順' : '古い順'}（押すと入れ替え）`}
-      onClick={() => setSortKey((current) => (current === 'newest' ? 'oldest' : 'newest'))}
-    >
-      <ArrowUpDown size={14} aria-hidden="true" />
-      {sortKey === 'newest' ? '新しい順' : '古い順'}
-    </button>
+<ListToolbarSort value={sortKey} onChange={(value) => { setSortKey(value as typeof sortKey); setPage(1) }} options={[{ value: 'newest', label: '新しい順' }, { value: 'oldest', label: '古い順' }]} />
   )
 
   const folderSelect = (
     <div className={styles.folderSelect}>
-      <Select aria-label="フォルダ" value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} />
+      <SaveErrorField names={["folderFilter","activeId","folder_filter"]}><Select aria-label="フォルダ" value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} /></SaveErrorField>
     </div>
   )
 
   /* 道具の段：1440 は「探す・配信日・保存 … 保存した検索」／「札 … 件数・並び」。1152 は作る・フォルダが前に入り、札は選ぶ欄。 */
   const toolbar = (
-    <div className={styles.tools}>
-      <div className={styles.toolRow}>
+    <ListToolbarFrame>
+      <ListToolbarRow>
         {narrow ? createButton(false) : null}
         {narrow ? folderSelect : null}
         {searchBox}
@@ -943,33 +927,31 @@ export default function BroadcastListV8() {
         {narrow ? null : saveCurrentButton}
         <span className={styles.spacer} aria-hidden="true" />
         {savedSearchBox}
-      </div>
-      <div className={styles.toolRow}>
+      </ListToolbarRow>
+      <ListToolbarRow>
         {narrow ? statusSelect : statusChips}
         <span className={styles.spacer} aria-hidden="true" />
         {pageSizeBox}
         {sortButton}
-      </div>
+      </ListToolbarRow>
       {savedViewOpen ? (
         <div className={styles.saveRow}>
-          <input
+          <SaveErrorField names={["savedViewName","name","saved_view_name"]}><input
             aria-label="保存する検索の名前"
             placeholder="検索条件の名前"
             value={savedViewName}
             onChange={(event) => setSavedViewName(event.target.value)}
             className={styles.saveInput}
-          />
+          /></SaveErrorField>
           <Button type="button" variant="primary" disabled={!savedViewName.trim() || savedViewBusy} onClick={() => void saveCurrentView()} busy={savedViewBusy} busyLabel="保存中">保存する</Button>
           <Button type="button" onClick={() => setSavedViewOpen(false)}>閉じる</Button>
         </div>
       ) : null}
       {savedViewError ? (
-        <p role="alert" className={styles.note}>
-          {savedViewError}
-          <button type="button" onClick={() => setSavedViewsSeq((n) => n + 1)} className={styles.inlineRetry}>もう一度</button>
-        </p>
+        <Notice tone="danger" className={styles.noteNoticePlacement} >{savedViewError}
+          <button type="button" onClick={() => setSavedViewsSeq((n) => n + 1)} className={styles.inlineRetry}>もう一度</button></Notice>
       ) : null}
-    </div>
+    </ListToolbarFrame>
   )
 
   /* ===== 表 ===== */
@@ -1010,12 +992,7 @@ export default function BroadcastListV8() {
   )
 
   const stateCard = (icon: React.ReactNode, title: string, desc: string | null, action: React.ReactNode, danger = false) => (
-    <div className={styles.stateCard}>
-      {icon ? <span className={danger ? `${styles.stateIcon} ${styles.stateIconError}` : styles.stateIcon}>{icon}</span> : null}
-      <p className={styles.stateTitle}>{title}</p>
-      {desc ? <p className={styles.stateDesc}>{desc}</p> : null}
-      {action}
-    </div>
+    <ListState kind={danger ? 'error' : 'empty'} title={title} description={desc ?? undefined} icon={icon} action={action} />
   )
 
   const listBody = loading ? (
@@ -1023,10 +1000,10 @@ export default function BroadcastListV8() {
       <DelayedSkeleton loading skeleton={loadingSkeleton} />
     </div>
   ) : forbidden ? (
-    stateCard(<AlertCircle size={20} aria-hidden="true" />, '配信を見る権限がありません', '見るには権限が要ります。オーナーか管理者に追加を依頼してください。', null, true)
+    stateCard(<AlertCircle size={20} aria-hidden="true" />, '配信を見る権限がありません', permissionDeniedMessage('store'), <Button onClick={() => loadList((page - 1) * pageSize)} busyLabel="処理中…">もう一度読み込む</Button>, true)
   ) : error ? (
     stateCard(<AlertCircle size={20} aria-hidden="true" />, '一斉配信を読み込めませんでした', error,
-      <Button type="button" onClick={() => void loadList((page - 1) * pageSize)}>もう一度試す</Button>, true)
+      <Button type="button" onClick={() => loadList((page - 1) * pageSize)} busyLabel="処理中…">もう一度読み込む</Button>, true)
   ) : visibleBroadcasts.length === 0 ? (
     /* 修正案 D-2：空の一覧。閲覧のみには作るボタンを出さない（2026-10-06 オーナー決定）。 */
     <EmptyList
@@ -1076,31 +1053,29 @@ export default function BroadcastListV8() {
                   event.preventDefault()
                   setPanelId(broadcast.id)
                 }
-              }}
+              }} data-row-id={broadcast.id}
             >
               <Td>
-                {/* 左にフォルダの列がある広い板は、名前の前にフォルダの色の丸（絵 l5V9a・NtCE3）。1152（jjFNi）は列が無いので出さない。 */}
-                {narrow ? (isFromHeadquarters(broadcast) ? <div className={styles.titleLine}>{titleLink}<HqMark /></div> : titleLink) : <div className={styles.titleLine}><FolderDotName folder={folderDotOf(broadcast.folderId)}>{titleLink}</FolderDotName>{isFromHeadquarters(broadcast) ? <HqMark /> : null}</div>}
-                <span className={narrow ? styles.cellSub : `${styles.cellSub} ${styles.dotIndent}`}>{messageTypeLabel(broadcast.messageType)}</span>
+                <FolderDotName folder={folderDotOf(broadcast.folderId)}>{titleLink}</FolderDotName>
               </Td>
-              <Td><StatusBadge broadcast={broadcast} /></Td>
+              <Td><StatusBadge broadcast={broadcast} />{isFromHeadquarters(broadcast) ? <HqMark /> : null}</Td>
               {narrow ? null : (
                 <Td><span className={styles.audience} title={audience}>{audience}</span></Td>
               )}
               <Td>
                 <span className={styles.cellMain}>
                   {broadcast.status === 'sent'
-                    ? (broadcast.sentAt ? formatDateTime(broadcast.sentAt) : '—')
-                    : (broadcast.scheduledAt ? formatDateTime(broadcast.scheduledAt) : '未設定')}
+                    ? (broadcast.sentAt ? polishFormatListDateTime(broadcast.sentAt) : emptyValue('unknown'))
+                    : (broadcast.scheduledAt ? polishFormatListDateTime(broadcast.scheduledAt) : emptyValue('unconfigured'))}
                 </span>
                 {broadcast.status === 'scheduled' && broadcast.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
               </Td>
               <Td>
                 {broadcast.status !== 'sent' ? (
-                  <span className={styles.cellMain}>—</span>
+                  <span className={styles.cellMain}>{emptyValue('unknown')}</span>
                 ) : (
                   <>
-                    <span className={styles.resultMain}>{formatNumber(insight?.delivered ?? broadcast.successCount)}人に届いた</span>
+                    <span className={styles.resultMain}>{formatNumber(insight?.delivered ?? broadcast.successCount)} 人に届いた</span>
                     {insight && (insight.openRate != null || insight.clickRate != null) ? (
                       <span className={styles.cellSub}>
                         {[
@@ -1150,8 +1125,8 @@ export default function BroadcastListV8() {
     <ListPagePagination>
       <span className={styles.pagerCount}>
         {pageCount > 1
-          ? `${formatNumber(resultTotal ?? visibleBroadcasts.length)}件中 ${rangeFirst}〜${rangeLast}件`
-          : `${formatNumber(resultTotal ?? visibleBroadcasts.length)}件`}
+          ? `${formatNumber(resultTotal ?? visibleBroadcasts.length)} 件中 ${rangeFirst}〜${rangeLast} 件`
+          : `${formatNumber(resultTotal ?? visibleBroadcasts.length)} 件`}
       </span>
       {pageCount > 1 ? (
         <Pagination page={page} pageCount={pageCount} onPageChange={goPage} ariaLabel="一斉配信のページ送り" />
@@ -1162,17 +1137,15 @@ export default function BroadcastListV8() {
   const boardId = narrow ? 'jjFNi' : canEdit ? 'l5V9a' : 'NtCE3'
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId={boardId}
       headingSize="compact"
       title="一斉配信"
-      description="友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
+      help="友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
       stats={<>
         {canEdit ? null : (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。{permissionDeniedMessage('store')}</ReadOnlyNotice></div>
         )}
         <KpiBand>
           {kpis.map((kpi) => (
@@ -1192,7 +1165,7 @@ export default function BroadcastListV8() {
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
       folders={narrow ? undefined : (
         <FolderPanel
-          createAction={createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
+          createAction={createButton(true)}
           activeId={folderFilter}
           onSelect={setFolderFilter}
           onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
@@ -1201,12 +1174,10 @@ export default function BroadcastListV8() {
         >
           {/* 閲覧のみ：「フォルダを追加」は置かず、場所だけ空ける */}
           {canEdit ? null : <span className={styles.viewerAddSpace} aria-hidden="true" />}
-          <p className={styles.note}>フォルダを消しても、入っていたものは未分類に残ります</p>
+          <FolderPanelNote>フォルダを消しても、入っていたものは未分類に残ります</FolderPanelNote>
           {folderError ? (
-            <p role="alert" className={styles.note}>
-              {folderError}
-              <button type="button" onClick={() => void loadFolders()} className={styles.inlineRetry}>もう一度</button>
-            </p>
+            <Notice tone="danger" className={styles.noteNoticePlacement} >{folderError}
+              <button type="button" onClick={() => void loadFolders()} className={styles.inlineRetry}>もう一度</button></Notice>
           ) : null}
         </FolderPanel>
       )}
@@ -1236,7 +1207,7 @@ export default function BroadcastListV8() {
           <FolderAddDialog
             kind="broadcast"
             note="配信を分けてしまう箱です。消しても、入っていた配信は未分類として残ります。"
-            placeholder="例: 01_キャンペーン"
+            placeholder="例：01_キャンペーン"
             onClose={() => setFolderDialogOpen(false)}
             onAdded={() => void loadFolders()}
           />
@@ -1246,7 +1217,7 @@ export default function BroadcastListV8() {
             kind="broadcast"
             folder={editingFolder}
             note="配信を分けてしまう箱です。削除しても、中の配信は未分類に残ります。"
-            placeholder="例: 01_キャンペーン"
+            placeholder="例：01_キャンペーン"
             onClose={() => setEditingFolder(null)}
             onAdded={() => { setEditingFolder(null); void loadFolders() }}
           />
@@ -1273,7 +1244,7 @@ export default function BroadcastListV8() {
                   <Button
                     variant="secondary"
                     onClick={() => withViewTransition(() => { router.push(`/broadcasts/new?draft=${encodeURIComponent(panelRow.id)}`) })}
-                  >
+                   busyLabel="移動中…">
                     編集を続ける
                   </Button>
                 ) : null}
@@ -1282,7 +1253,7 @@ export default function BroadcastListV8() {
                   <Button
                     variant="secondary"
                     onClick={() => withViewTransition(() => { router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(panelRow.id)}`) })}
-                  >
+                   busyLabel="移動中…">
                     複製する
                   </Button>
                   {fromHq ? null : (
@@ -1300,7 +1271,7 @@ export default function BroadcastListV8() {
                 {panelRow.status === 'sent'
                   ? (panelRow.sentAt ? `送信済み：${formatDateTime(panelRow.sentAt)}` : '送信済み')
                   : (panelRow.scheduledAt ? `予約：${formatDateTime(panelRow.scheduledAt)}` : '下書き')}
-                {panelRow.status === 'sent' ? ` ／ ${formatNumber(insight?.delivered ?? panelRow.successCount)}人に届いた` : ''}
+                {panelRow.status === 'sent' ? ` ／ ${formatNumber(insight?.delivered ?? panelRow.successCount)} 人に届いた` : ''}
               </p>
             </DetailPanel>
           )
@@ -1310,12 +1281,12 @@ export default function BroadcastListV8() {
           title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
           description={`削除しても、中の配信は未分類に残ります。いまこのフォルダに入っているのは${
             deletingFolder ? broadcasts.filter((b) => b.folderId === deletingFolder.id).length : 0
-          }件です。`}
+          } 件です。`}
           confirmLabel="削除する"
           destructive
           busy={folderBusy}
           error={folderError || undefined}
-          onConfirm={() => void removeFolder()}
+          onConfirm={() => removeFolder()}
           onCancel={() => {
             if (folderBusy) return
             setDeletingFolder(null)
@@ -1330,7 +1301,7 @@ export default function BroadcastListV8() {
           destructive
           busy={deleting}
           error={deleteError}
-          onConfirm={() => void handleDelete()}
+          onConfirm={() => handleDelete()}
           onCancel={() => {
             if (deleting) return
             setDeleteTarget(null)
@@ -1351,6 +1322,6 @@ export default function BroadcastListV8() {
         </div>
       ) : null}
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

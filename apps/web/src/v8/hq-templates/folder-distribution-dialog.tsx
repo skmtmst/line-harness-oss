@@ -12,10 +12,12 @@ import TagPill from '@/components/shared/tag-pill'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { HqAccountPickerField } from '@/components/shared/hq-account-picker'
 import styles from './folder-distribution-dialog.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { EntityPickerField } from '@/components/shared/entity-picker'
 
 export function distributionKind(row: HqTemplate) {
   if (row.template_type === 'template' && (row.kind ?? 'message') === 'message' && row.content_summary) return row.content_summary.replace(/\s+\d+$/u, '')
-  return row.template_type === 'template' ? ({ message: 'メッセージ', carousel: 'カルーセル', rich_message: 'リッチメッセージ', question: '質問', coupon: 'クーポン', research: 'リサーチ' }[row.kind ?? 'message'])
+  return row.template_type === 'template' ? ({ message: 'メッセージ', carousel: 'カルーセル', rich_message: 'リッチメッセージ', rich_video: 'リッチビデオ', question: '質問', coupon: 'クーポン', research: 'リサーチ' }[row.kind ?? 'message'])
     : ({ tag: 'タグ', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }[row.template_type])
 }
 export default function FolderDistributionDialog({ name, templates, templateFolders = [], accounts, busy, error, onCancel, onConfirm }: {
@@ -24,7 +26,7 @@ export default function FolderDistributionDialog({ name, templates, templateFold
 }) {
   const [picked, setPicked] = useState(templates.map((row) => row.id))
   const [selected, setSelected] = useState<string[]>([])
-  return <Dialog open designNode="JSirC" designWidth={620} title={`フォルダ「${name}」の ${templates.length} 件を配る`}
+  return <Dialog open designNode="JSirC" designWidth={720} title={`フォルダ「${name}」の ${templates.length} 件を配る`}
     description="フォルダの中のひな形をまとめて、選んだアカウントへ配ります。"
     busy={busy} error={error} onCancel={onCancel}
     designHeaderPadding="24px 24px 8px" designContentPadding="8px 24px 20px"
@@ -38,15 +40,8 @@ export default function FolderDistributionDialog({ name, templates, templateFold
     <div className={styles.sections}>
       <section className={styles.section} aria-label="配るひな形">
         <div className={styles.heading}><strong>配るひな形</strong><span>{`${picked.length} / ${templates.length} 件を選択`}</span></div>
-        <div className={styles.list}>
-          {templates.map((row) => {
-            const folder = templateFolders.find((folder) => folder.id === row.folder_id)
-            return <div className={styles.row} key={row.id}>
-            <Checkbox checked={picked.includes(row.id)} disabled={busy} onCheckedChange={(checked) => setPicked((ids) => checked ? [...ids, row.id] : ids.filter((id) => id !== row.id))}>{row.template_type === 'tag' ? <TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} size="sm" /> : row.name}</Checkbox>
-            <StatusBadge size="compact" tone="neutral">{distributionKind(row)}</StatusBadge>
-          </div>
-          })}
-        </div>
+        <EntityPickerField label="配るひな形" noun="ひな形" multiple value={picked} onChange={setPicked} disabled={busy} folders={templateFolders} items=
+          {templates.map((row) =>({ id:row.id, name : row.name, folderId: row.folder_id, meta:distributionKind(row)}))}/>
       </section>
       <section className={styles.section} aria-label="配る先">
         <div className={styles.heading}><strong>配る先</strong><span>{`${selected.length} アカウントを選択`}</span></div>

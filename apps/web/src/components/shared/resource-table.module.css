@@ -1,0 +1,14 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.references { width: var(--tpl-htn-col-ref); }
+.updated { width: var(--tpl-htn-col-date); }
+.destinations { width: var(--tpl-htn-col-dest); }
+.actions { width: var(--tpl-htn-col-actions); }
+@container v8-page (max-width: 1099px) {
+  .references { width: var(--tpl-distribution-compact-version); }
+  .actions { width: var(--tpl-distribution-compact-item); }
+}
+
+.summary { display: block; font-size: var(--polish-text-support); color: var(--color-ink-secondary); }
+
+}

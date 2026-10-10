@@ -19,6 +19,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/restaurant-test/reservations',
   useSearchParams: () => new URLSearchParams(),
 }))
+vi.mock('@/lib/staff-role',()=>({useStaffRole:()=>'owner',canManageRole:(role:string)=>role==='owner'}))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
   selectedAccountId: 'account-a', selectedAccount: null, accounts: [], loading: false,
 }) }))
@@ -65,6 +66,7 @@ const json = (data: unknown, status = 200) => new Response(
 )
 
 beforeEach(() => {
+  window.history.replaceState({}, '', '/restaurant-test/reservations')
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -90,7 +92,7 @@ function text() {
 }
 
 function click(label: string) {
-  const button = [...host.querySelectorAll('button')].find((element) => (element.textContent || '').includes(label))
+  const button = [...host.querySelectorAll('button')].find((element) => (element.textContent || '').trim() === label)
   if (!button) throw new Error(`ボタンが無い: ${label}`)
   act(() => { button.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
 }
@@ -99,7 +101,8 @@ test('v8 では今日（時間×卓）が出て、表の列と操作は出ない
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   expect(text()).toContain('予約台帳')
-  expect(text()).toContain('時間と卓で確認します')
+  await act(async () => { (host.querySelector('button[aria-label="予約台帳の説明"]') as HTMLButtonElement).click() })
+  expect(text()).toContain('予約台帳')
   expect(host.querySelector('[aria-label$="時間×卓"]')).not.toBeNull()
   expect(text()).toContain('電話の予約を入れる')
   expect(host.querySelector('[data-design-node="l9NlC0"]')).not.toBeNull()
@@ -110,7 +113,7 @@ test('v8 の一覧に切り替えると予約タイムラインと顧客カル�
   await renderPage()
   click('一覧')
   await act(async () => {})
-  expect(text()).toContain('予約タイムライン')
+  expect(host.querySelector('[data-reservation-board][data-axis="list"]')).not.toBeNull()
   expect(text()).toContain('佐藤 花子')
   expect(text()).toContain('顧客カルテ')
   expect(host.querySelector('[data-design-node="Z3FoM"]')).not.toBeNull()
@@ -139,6 +142,7 @@ test('V8の枠だけ押さえる操作は有効で、期限を入力できる', 
 
 test('見方を続けて変えても、先に出した古い問い合わせの返事で一覧が上書きされない', async () => {
   document.documentElement.dataset.theme = 'v8'
+  window.history.replaceState({}, '', '/restaurant-test/reservations?view=list')
   const named = (name: string) => ({ ...snapshot, reservations: [{ ...snapshot.reservations[0], customer_name: name }] })
   const releaseOld: Array<() => void> = []
   vi.stubGlobal('fetch', async (url: string) => {
@@ -153,6 +157,8 @@ test('見方を続けて変えても、先に出した古い問い合わせの�
     return json({ success: true, data: snapshot })
   })
   await renderPage()
+  click('月')
+  await act(async () => {})
   click('一覧')
   await act(async () => {})
   await act(async () => {})

@@ -1,10 +1,7 @@
 'use client'
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, fetchApi } from '@/lib/api'
-
-type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import MergedTabs from '@/components/layout/merged-tabs'
@@ -32,6 +29,11 @@ import {
   type Automation as SharedAutomation,
 } from '@line-crm/shared'
 import styles from './automation-api-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+
+type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 
 /*
  * ★V8 オートメーション一覧（板 `LWQXd`）。
@@ -106,6 +108,7 @@ function actionSummary(item: Automation): { title: string; detail: string } {
 }
 
 export default function AutomationListV8() {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const canManage = useCanManageAutomations()
@@ -235,12 +238,16 @@ export default function AutomationListV8() {
       if (!res.success) throw new Error(res.error)
       setPending(null)
       await load()
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
+
+      if (!fieldFailure) {
       setActionError(
         pending.kind === 'archive'
           ? 'このルールを削除できませんでした。状態を読み直してから、もう一度お試しください。'
           : '稼働を切り替えられませんでした。状態を読み直してから、もう一度お試しください。',
-      )
+      ) }
     } finally {
       setWorking(false)
     }
@@ -273,24 +280,24 @@ export default function AutomationListV8() {
     setTestDone(false)
   }
 
-  if (accountLoading) return <ListState kind="loading" title="オートメーションを読み込んでいます" />
+  if (accountLoading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="オートメーションを読み込んでいます" /></SaveErrorScope>
   if (!selectedAccountId) {
-    return <ListState kind="empty" title="LINE公式アカウントを選んでください" description="選んだアカウントのルールだけを表示します。" />
+    return <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="LINE公式アカウントを選んでください" description="選んだアカウントのルールだけを表示します。" /></SaveErrorScope>
   }
 
   const tabs = [
-    { key: 'rules', label: `ルール ${loadStatus === 'ready' ? items.length : '—'}` },
-    { key: 'common-actions', label: `共通アクション ${commonActionCount ?? '—'}`, href: '/common-actions' },
+    { key: 'rules', label: `ルール ${loadStatus === 'ready' ? items.length : emptyValue('unknown')}` },
+    { key: 'common-actions', label: `共通アクション ${commonActionCount ?? emptyValue('unknown')}`, href: '/common-actions' },
     { key: 'runs', label: '動いた記録', href: '/automations/runs' },
-    { key: 'templates', label: `見本 ${templateCount ?? '—'}`, href: '/automations?tab=templates' },
+    { key: 'templates', label: `見本 ${templateCount ?? emptyValue('unknown')}`, href: '/automations?tab=templates' },
   ]
 
   return (
-    <div className={styles.board} data-design-node="LWQXd">
+    <SaveErrorScope errors={saveErrors}><div className={styles.board} data-design-node="LWQXd">
       <div className={styles.head}>
         <div>
-          <h1 className={styles.title}>オートメーション</h1>
-          <p className={styles.lead}>「○○したら△△する」を決めておくと、友だちの動きに合わせて自動で動きます。</p>
+          <PageHeading title="オートメーション" help={<> 「○○したら△△する」を決めておくと、友だちの動きに合わせて自動で動きます。</>} />
+
         </div>
         <Button href="/automations?tab=templates" variant="secondary">見本から作る</Button>
       </div>
@@ -311,7 +318,7 @@ export default function AutomationListV8() {
           kind="error"
           title="ルールを表示できませんでした"
           description="ルールは消えていません。通信を確かめて、もう一度お試しください。"
-          action={<Button variant="secondary" onClick={() => void load()}>もう一度読み込む</Button>}
+          onRetry={() => void load()}
         />
       ) : null}
 
@@ -360,16 +367,16 @@ export default function AutomationListV8() {
               </FilterChip>
               <div className={styles.toolbarSpice}>
                 <div className={styles.selectWrap}>
-                  <Select
+                  <SaveErrorField names={["sort"]}><Select
                     aria-label="よく使う絞り込み"
                     label="よく使う絞り込み"
                     value={sort}
                     options={SORT_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
                     onChange={(value) => { setSort(value as SortKey); setPage(1) }}
-                  />
+                  /></SaveErrorField>
                 </div>
                 <div className={styles.pageSizeWrap}>
-                  <Select
+                  <SaveErrorField names={["pageSize","page_size"]}><Select
                     aria-label="表示件数"
                     label="表示件数"
                     value={String(pageSize)}
@@ -379,7 +386,7 @@ export default function AutomationListV8() {
                       { value: '50', label: '50件表示' },
                     ]}
                     onChange={(value) => { setPageSize(Number(value) || 20); setPage(1) }}
-                  />
+                  /></SaveErrorField>
                 </div>
               </div>
             </div>
@@ -497,13 +504,13 @@ export default function AutomationListV8() {
         {testing ? (
           <div>
             <Field label="試す友だちのID">
-              <TextInput
+              <SaveErrorField names={["testFriendId","test_friend_id"]}><TextInput
                 aria-label="試す友だちのID"
                 value={testFriendId}
                 onChange={(event) => setTestFriendId(event.target.value)}
                 placeholder="試す友だちID"
                 disabled={testBusy || testDone}
-              />
+              /></SaveErrorField>
             </Field>
             <p className={styles.subLine}>
               すること：{testing.actions.map((action) => automationActionLabel(action.type)).join('・') || '登録した処理'}
@@ -515,6 +522,6 @@ export default function AutomationListV8() {
       </Dialog>
 
       {viewerOnly ? <p className={styles.subLine}>閲覧のみのため、作る・変える操作は出していません。</p> : null}
-    </div>
+    </div></SaveErrorScope>
   )
 }

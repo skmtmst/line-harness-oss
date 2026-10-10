@@ -3,19 +3,14 @@
 
 /* 上の段：操作・数・絞り込み（段の間12・左右24・下16）。 */
 .actions,
-.cards,
-.filters,
-.error { margin: 0 var(--tpl-head-pad-side); }
+.metrics,
+.filters { margin: 0 var(--tpl-head-pad-side); }
 
 .actions { display: flex; justify-content: flex-end; gap: var(--tpl-toolbar-gap); }
-.error { margin-top: var(--tpl-fr-stack-gap); color: var(--color-danger); font-size: var(--text-caption); }
 
-.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--tpl-fr-stack-gap); margin-top: var(--tpl-fr-stack-gap); }
 
-:global([data-theme='v8']) .card.card { gap: var(--tpl-fr-stack-gap); padding: var(--tpl-fr-card-pad); }
-:global([data-theme='v8']) .card.card > div:first-child { min-height: 0; }
-:global([data-theme='v8']) .card.card > p:last-child { display: none; } /* 補足は「？」へ移したので3段目の空の行を出さない */
-:global([data-theme='v8']) .card.card [data-kpi-number] { font-size: var(--tpl-fr-card-num-size); font-weight: 700; line-height: var(--tpl-fr-title-lh); }
+.metrics { margin-top: var(--tpl-fr-stack-gap); }
+
 
 .filters { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); margin-top: var(--tpl-fr-stack-gap); margin-bottom: var(--tpl-fr-head-pad-bottom); }
 
@@ -30,7 +25,8 @@
   gap: var(--tpl-fr-stack-gap);
   padding: var(--tpl-fr-panel-pad);
   border-radius: var(--radius-card);
-  box-shadow: var(--tpl-fr-shadow-outline);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 
 .panelHead { display: flex; flex-direction: column; gap: var(--tpl-compact-gap); }
@@ -113,3 +109,5 @@ button.name:hover { text-decoration: underline; }
 
 /* 行（乗せたときの地の変化は共通の動きの速さ）。 */
 .row { transition: background-color var(--motion-fast) var(--motion-ease-out); }
+
+.alertPlacement { margin: var(--tpl-fr-stack-gap) var(--tpl-head-pad-side) 0; }

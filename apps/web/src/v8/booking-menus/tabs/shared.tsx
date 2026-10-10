@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { type BookingMenu, type BookingSettings } from '@/lib/api'
 import styles from '../settings.module.css'
+import ListState from '@/components/shared/list-state'
 
 export type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -95,12 +96,7 @@ export function StateCard({ icon, title, description, action }: {
   action?: ReactNode
 }) {
   return (
-    <div className={styles.stateCard} data-design-node="xCoDe">
-      <span className={styles.stateIcon} aria-hidden="true">{icon}</span>
-      <p className={styles.stateTitle}>{title}</p>
-      <p className={styles.stateDesc}>{description}</p>
-      {action ? <div className={styles.stateActions}>{action}</div> : null}
-    </div>
+    <ListState kind={title.includes('読み込めません') ? 'error' : title.includes('読み込み') ? 'loading' : 'empty'} title={title} description={description} data-design-node="xCoDe" icon={icon} action={action} />
   )
 }
 

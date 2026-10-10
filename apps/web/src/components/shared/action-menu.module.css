@@ -18,11 +18,11 @@
   flex-direction: column;
   gap: 2px;
   overflow-y: auto;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
   box-shadow: var(--shadow-float);
-  padding: 6px;
+  padding: 8px;
 }
 
 .inline {
@@ -34,11 +34,11 @@
   width: 100%;
   height: 36px;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   border: 0;
-  border-radius: var(--radius-icon);
+  border-radius: var(--radius-segment);
   background: transparent;
-  padding: 0 10px;
+  padding: 0 12px;
   color: var(--color-ink);
   font-size: var(--text-body);
   font-weight: 400;
@@ -122,7 +122,7 @@
 }
 
 .danger {
-  color: var(--color-status-danger);
+  color: var(--color-menu-danger);
 }
 
 .danger .icon,
@@ -154,7 +154,7 @@
   margin: 0;
   padding: 4px 8px 2px;
   color: var(--color-ink-faint);
-  font-size: var(--text-nano);
+  font-size: var(--text-micro);
   line-height: 1.5;
 }
 
@@ -242,3 +242,6 @@
 [data-theme='v8'] .menu[data-closing] { animation: action-menu-v8-leave var(--motion-instant) var(--motion-ease-out) forwards; pointer-events: none; }
 @keyframes action-menu-v8-leave { from { opacity: 1; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { [data-theme='v8'] .menu[data-closing] { animation: none; opacity: 0; } }
+
+/* B-161：浮く面の影と薄い縁を共通化。 */
+[data-theme='v8'] .menu { border: 0; outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--shadow-controls-pop); }

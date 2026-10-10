@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * 予約設定（V8）の「サクサク感」。
  * メニューの公開・並びは先に画面を変えて裏で保存する。
@@ -135,8 +137,9 @@ function rowOrder(): string[] {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   fixture.tab = 'menus'
-  window.localStorage.setItem('lh_staff_role', 'owner')
+  window.localStorage.setItem('lh_staff_role', 'owner'); rememberStaffIdentity({ role: 'owner' } as StaffMember)
   clearToastsForTest()
   fixture.updateMenu = vi.fn(async () => ({ ok: true }))
   fixture.patchMenu = vi.fn(async () => ({ ok: true }))
@@ -159,7 +162,7 @@ describe('メニューの公開・並びは先に画面を変える', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: '止める' }))
     // 確認の窓は出さず、札がすぐ変わる。
     expect(screen.queryByText(/ますか？/)).toBeNull()
-    expect(screen.getByText('止めている')).toBeTruthy()
+    expect(screen.getByText('停止中')).toBeTruthy()
     await waitFor(() => { expect(fixture.patchMenu).toHaveBeenCalled() })
     expect(fixture.patchMenu).toHaveBeenCalledWith(
       'account-a', 'menu-1', 1, expect.objectContaining({ is_active: false }),
@@ -184,14 +187,14 @@ describe('メニューの公開・並びは先に画面を変える', () => {
     await waitFor(() => { expect(fixture.patchMenu).toHaveBeenCalledTimes(2) })
   })
 
-  test('保存帯は保存中から✓保存しましたになる', async () => {
+  test('保存中は二重押しを止め、成功はトーストで知らせる', async () => {
     fixture.tab = 'rules'
     await openSettings()
-    fireEvent.click(await screen.findByRole('switch', { name: 'お店が承認してから確定する' }))
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'お店が承認してから確定する' }))
     const save = await screen.findByRole('button', { name: 'ルールを保存' })
     fireEvent.click(save)
     await waitFor(() => { expect(fixture.saveSettings).toHaveBeenCalled() })
-    await screen.findByText('保存しました')
+    await screen.findByText(/予約.*ルールを保存しました。/)
   })
 
   test('上へで並びがすぐ変わり、一括APIへ保存する', async () => {

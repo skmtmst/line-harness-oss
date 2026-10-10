@@ -1,4 +1,5 @@
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { validateTapExtraReferences } from '../services/tap-extras.js';
 import { prepareImagemapImages, IMAGEMAP_WIDTHS } from '../services/imagemap-images.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
@@ -296,6 +297,8 @@ broadcastMessageAssets.post('/api/broadcast-message-assets', requireRole('owner'
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId ?? null])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
+  const extrasError = await validateTapExtraReferences(c.env.DB, body.payload, body.lineAccountId ?? null);
+  if (extrasError) return c.json({ success: false, error: extrasError, code: 'TAP_EXTRA_INVALID', field: 'tapExtras' }, 422);
   const payloadError = validatePayload(body.kind, body.payload);
   if (payloadError) return inputError(c, { success: false, error: payloadError }, 400, ["kind","payload"]);
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
@@ -320,6 +323,8 @@ broadcastMessageAssets.put('/api/broadcast-message-assets/:id', requireRole('own
   if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
   const body = await c.req.json<{ name?: string; payload?: unknown; folderId?: string | null; expectedVersion?: unknown; expectedDraftRevision?: unknown }>();
   if (!body.name?.trim()) return inputError(c, { success: false, error: 'name is required' }, 400, ["name"]);
+  const extrasError = await validateTapExtraReferences(c.env.DB, body.payload, existing.line_account_id);
+  if (extrasError) return c.json({ success: false, error: extrasError, code: 'TAP_EXTRA_INVALID', field: 'tapExtras' }, 422);
   const payloadError = validatePayload(existing.kind, body.payload);
   if (payloadError) return inputError(c, { success: false, error: payloadError }, 400, ["payload"]);
   // 呼び出し側の期待版。指定があれば古い期待を409で拒否する。

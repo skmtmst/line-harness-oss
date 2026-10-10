@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import type { HqTemplateFolder, Tag, TagGroup } from '@line-crm/shared'
 import type { TagDefinition } from '@/lib/hq-templates-api'
 import { TagEditForm } from '@/v8/tag-edit/edit'
@@ -13,7 +14,7 @@ import styles from './tag-editor.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 
 /** 店のV8編集フォームの入力・並べ替え・マイルと、統括の保存先をつなぐ。店のAPIは呼ばない。 */
-export default function HqTagEditorV8({ definition, folders = [], onCreateFolder, editing, saving, readOnly = false, conflict = false, error, notice, onReloadLatest, onCancel, onSave, onSaveDraft }: {
+export default function HqTagEditorV8({ definition, folders = [], onCreateFolder, editing, saving, readOnly = false, conflict = false, error, notice, conflictNotice, onDraftChange, onReloadLatest, onCancel, onSave, onSaveDraft }: {
   definition: TagDefinition
   /** 統括のフォルダ（左の列と同じ）。所属フォルダはここから選ぶ。 */
   folders?: HqTemplateFolder[]
@@ -23,6 +24,8 @@ export default function HqTagEditorV8({ definition, folders = [], onCreateFolder
   saving: boolean
   readOnly?: boolean
   conflict?: boolean
+  conflictNotice?: ReactNode
+  onDraftChange?: (definition: TagDefinition) => void
   onReloadLatest?: () => void
   error?: string
   notice?: string
@@ -58,12 +61,13 @@ export default function HqTagEditorV8({ definition, folders = [], onCreateFolder
     await onSave(withFolder(hqTagEditorToDefinition(definition, values)), another)
   }
   const preview = (values: TagEditorValues) => {
+    onDraftChange?.(withFolder(hqTagEditorToDefinition(definition, values)))
     const folder = groups.find((group) => group.id === values.groupId)
     const steps = [
       definition.tag.manualAssignmentAllowed === false ? 'このタグは手で付けず、連携や自動処理から付けます。' : '一覧・チャット・CSV から、このタグを手で付けられます。',
       values.linked ? 'タグが付いたら、設定したマイルと連動アクションが動きます。' : '連動はOFFなので、付いてもマイル付与やメッセージ送信は動きません。',
       values.linked && values.multiplierBps ? `今後の獲得マイルは ${values.multiplierBps / 10000} 倍になります。` : '今後の獲得マイルは変わりません。',
-      values.linked && values.actions.length ? `${values.actions.length}件の連動アクションを上から順に実行します。` : '配信の絞り込み・シナリオの開始条件・自動応答の付与先として選べます。',
+      values.linked && values.actions.length ? `${values.actions.length} 件の連動アクションを上から順に実行します。` : '配信の絞り込み・シナリオの開始条件・自動応答の付与先として選べます。',
     ]
     return <div className={styles.preview}>
       <h3 className={styles.title}>できあがるタグ</h3>
@@ -82,7 +86,7 @@ export default function HqTagEditorV8({ definition, folders = [], onCreateFolder
     host={{ initialValues, title: editing ? 'タグのひな形を編集' : 'タグのひな形を作る',
       saveLabel: onSaveDraft ? '保存する' : editing ? '変更を保存する' : 'タグを作る',
       onSaveDraft: onSaveDraft ? (values) => { void onSaveDraft(withFolder(hqTagEditorToDefinition(definition, values))) } : undefined,
-      notice: conflict && error ? <Notice tone="warn" message={error} action={onReloadLatest ? <Button disabled={saving} onClick={onReloadLatest}>最新の内容を読み込む</Button> : undefined} /> : undefined,
+      notice: conflictNotice ?? (conflict && error ? <Notice tone="warn" message={error} action={onReloadLatest ? <Button disabled={saving} onClick={onReloadLatest}>最新の内容を読み込む</Button> : undefined} /> : undefined),
       description: notice ?? '保存したひな形は、一覧の［配る］で各 LINE アカウントへ配ります。',
       preview, onSaveAnother: (values) => { void save(values, true) }, allowedActionTypes: ['テキスト送信', 'マイル付与'] }}
   />

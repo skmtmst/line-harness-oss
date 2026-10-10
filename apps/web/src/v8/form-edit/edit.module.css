@@ -26,7 +26,9 @@
 .card {
   display: flex; flex-direction: column; gap: var(--tpl-fe-card-gap); min-width: 0;
   padding: var(--tpl-fe-card-pad); border-radius: var(--tpl-fe-card-radius);
-  box-shadow: var(--tpl-fe-ring); background: var(--color-canvas);
+   background: var(--color-canvas);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 .cardHead { display: flex; align-items: flex-start; gap: var(--tpl-fe-row-gap); }
 .cardHeadText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-fe-head-gap); }
@@ -161,7 +163,10 @@
 
 .rail { display: flex; flex-direction: column; gap: var(--tpl-fe-card-gap); width: 100%; }
 .previewOpen { display: none; }
-.urlBox { display: flex; flex-direction: column; gap: var(--tpl-fe-field-gap); padding: var(--tpl-fe-open-pad); border-radius: var(--tpl-fe-card-radius); box-shadow: var(--tpl-fe-ring); background: var(--color-canvas); }
+.urlBox { display: flex; flex-direction: column; gap: var(--tpl-fe-field-gap); padding: var(--tpl-fe-open-pad); border-radius: var(--tpl-fe-card-radius);  background: var(--color-canvas);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+}
 .urlTitle { margin: 0; font-size: var(--tpl-fe-body-size); font-weight: 700; line-height: var(--tpl-fe-body-lh); color: var(--color-ink); }
 .urlRow { display: flex; align-items: center; gap: var(--tpl-fe-field-gap); }
 .urlValue {
@@ -172,7 +177,7 @@
 .urlNote { margin: 0; font-size: var(--tpl-fe-small-size); line-height: var(--tpl-fe-small-lh); color: var(--color-ink-faint); }
 .urlTest { display: flex; }
 .testNarrow { display: none; }
-.urlError { margin: 0; font-size: var(--tpl-fe-note-size); color: var(--color-danger); white-space: pre-wrap; }
+.urlError { font-size: var(--tpl-fe-note-size); color: var(--color-danger); white-space: pre-wrap; }
 .urlLink { font-size: var(--tpl-fe-note-size); color: var(--color-action); word-break: break-all; }
 .phoneArea { display: flex; justify-content: center; }
 .phoneDialog { display: flex; justify-content: center; }
@@ -249,3 +254,5 @@
 
 .phoneChoices { display: flex; flex-direction: column; gap: var(--tpl-fe-field-gap); }
 .phoneChoices[data-inline] { flex-direction: row; flex-wrap: wrap; }
+
+.urlError, .urlErrorNoticePlacement { margin: 0; }

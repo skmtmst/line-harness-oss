@@ -23,6 +23,7 @@ import {
   type SavedSearchUsageFilter,
 } from './saved-search-kpis'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export function isSavedSearchCondition(item: unknown): item is SavedSearchCondition {
   if (!item || typeof item !== 'object') return false
@@ -289,15 +290,15 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
         新しい口は要らないので、条件が増えたときに探せない状態を先に直す。
       */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <input
+        <SaveErrorField names={["query"]}><input
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="条件名で検索"
           aria-label="条件名で検索"
           className="h-9 w-40 rounded-control border border-hairline bg-canvas px-3 text-label"
-        />
-        <Select
+        /></SaveErrorField>
+        <SaveErrorField names={["usageFilter","usage_filter"]}><Select
           value={usageFilter}
           onChange={(value) => setUsageFilter(value as SavedSearchUsageFilter)}
           aria-label="使用先"
@@ -306,8 +307,8 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
             { value: 'used', label: '使用中' },
             { value: 'unused', label: '未使用' },
           ]}
-        />
-        <Select
+        /></SaveErrorField>
+        <SaveErrorField names={["matchFilter","match_filter"]}><Select
           value={matchFilter}
           onChange={(value) => setMatchFilter(value as typeof matchFilter)}
           aria-label="該当人数"
@@ -318,7 +319,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
             // ATTR-08: 未集計・集計失敗は「0人」とは別の状態として探せる。
             { value: 'unknown', label: '未集計' },
           ]}
-        />
+        /></SaveErrorField>
         <span className="flex-1" />
         {/*
           作る導線はタブの右に1個だけ（#1014 ATTR-22）。
@@ -341,7 +342,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
         <ListState
           kind="error"
           description={loadError}
-          action={<Button type="button" onClick={() => void load()}>保存した検索を読み直す</Button>}
+          onRetry={() => void load()}
         />
       ) : items.length === 0 ? (
         /*

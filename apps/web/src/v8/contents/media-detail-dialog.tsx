@@ -1,7 +1,4 @@
 'use client'
-
-/* ★V8 写し：src/app/contents/media-detail-dialog.tsx から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
-
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
 import { ApiError, api, type MediaVersionBlocker, type MediaVersionPreview } from '@/lib/api'
@@ -12,21 +9,16 @@ import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { formatMediaSize } from './media-usage-display'
 import { checkedAtText, referenceKindText, referenceNameText } from './media-delete-impact'
-import {
-  setMediaUsageReference,
-  type MediaUsageImpact,
-  type MediaUsageReferenceItem,
-  type MediaUsageReferenceState,
-  type MediaUsageReferenceTarget,
-} from './media-usage-references'
-import {
-  extractMediaMetadata,
-  fileMatchesMediaKind,
-  mediaAcceptForKind,
-  putMediaFile,
-  validateMediaFile,
-} from './media-direct-upload'
-import { formatDateTime } from '@/lib/format'
+import { setMediaUsageReference, type MediaUsageImpact, type MediaUsageReferenceItem, type MediaUsageReferenceState, type MediaUsageReferenceTarget } from './media-usage-references'
+import { extractMediaMetadata, fileMatchesMediaKind, mediaAcceptForKind, putMediaFile, validateMediaFile } from './media-direct-upload'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/* ★V8 写し：src/app/contents/media-detail-dialog.tsx から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
 
 /** 版追加を止めた理由を、互換基準ごとに運用者へ説明する。 */
 function versionBlockerText(blockers: MediaVersionBlocker[]): string {
@@ -48,9 +40,7 @@ function versionBlockerText(blockers: MediaVersionBlocker[]): string {
 }
 
 function formatDate(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—（未取得）'
-  return formatDateTime(date)
+  return polishFormatDate(value, { style: 'detail', fallback: '—（未取得）' })
 }
 
 function mediaKind(item: MediaItem): string {
@@ -148,6 +138,8 @@ export default function MediaDetailDialog({
   /** 利用期限・同意の記録を保存したとき、一覧側の表示を新しい行へ追従させる。 */
   onItemUpdated?: (item: MediaItem) => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const fileInputId = useId()
   const requestRef = useRef(0)
   const [impact, setImpact] = useState<MediaUsageImpact | null>(null)
@@ -191,7 +183,10 @@ export default function MediaDetailDialog({
       anchor.click()
       URL.revokeObjectURL(href)
     } catch (caught) {
-      setDownloadError(caught instanceof Error ? caught.message : 'ダウンロードできませんでした')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setDownloadError(caught instanceof Error ? caught.message : 'ダウンロードできませんでした') }
     } finally {
       setDownloading(false)
     }
@@ -211,7 +206,10 @@ export default function MediaDetailDialog({
       anchor.click()
       URL.revokeObjectURL(href)
     } catch (caught) {
-      setVersionDownloadError(caught instanceof Error ? caught.message : 'この版をダウンロードできませんでした')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setVersionDownloadError(caught instanceof Error ? caught.message : 'この版をダウンロードできませんでした') }
     } finally {
       setDownloadingVersion(null)
     }
@@ -239,9 +237,12 @@ export default function MediaDetailDialog({
       setTermsEditing(false)
       onItemUpdated?.(response.data)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
       setTermsError(caught instanceof ApiError || caught instanceof Error
         ? caught.message
-        : '利用期限・同意の記録を保存できませんでした')
+        : '利用期限・同意の記録を保存できませんでした') }
     } finally {
       setTermsBusy(false)
     }
@@ -265,10 +266,12 @@ export default function MediaDetailDialog({
       // 応答には使用先ごとの参照モードと版一覧が足されている。
       setImpact(response.data as MediaUsageImpact)
       setPhase('ready')
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure);
+
       if (requestRef.current === request) setPhase('error')
     }
-  }, [accountId, item])
+  }, [accountId, item, saveErrors])
 
   /** 1つの使用先だけを、ライブ参照または指定した版へ切り替える。 */
   async function switchUsageReference(reference: MediaUsageReferenceItem, value: string) {
@@ -291,9 +294,12 @@ export default function MediaDetailDialog({
       if (!response.success) throw new Error(response.error)
       await loadImpact()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
       setUsageError(caught instanceof ApiError || caught instanceof Error
         ? caught.message
-        : '参照方法を切り替えられませんでした')
+        : '参照方法を切り替えられませんでした') }
     } finally {
       setUsageSwitching(null)
     }
@@ -377,10 +383,12 @@ export default function MediaDetailDialog({
       setVersionPreview(previewed.data)
       setVersionPhase('preview')
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       setVersionPhase('error')
+      { if (!fieldFailure)
       setVersionError(caught instanceof ApiError || caught instanceof Error
         ? caught.message
-        : '差し替え内容を確認できませんでした')
+        : '差し替え内容を確認できませんでした') }
     }
   }
 
@@ -398,17 +406,19 @@ export default function MediaDetailDialog({
       if (!response.success) throw new Error(response.error)
       onVersionCreated(`「${item.filename}」へ第${response.data.versionNo}版を追加しました。使用先の固定版は変えていません。`)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       setVersionPhase('preview')
+      { if (!fieldFailure)
       setVersionError(caught instanceof ApiError || caught instanceof Error
         ? caught.message
-        : '新しい版を追加できませんでした')
+        : '新しい版を追加できませんでした') }
     }
   }
 
   if (!item) return null
 
   return (
-    <div data-design-node="voJtX" className="space-y-4">
+    <SaveErrorScope errors={saveErrors}><div data-design-node="voJtX" className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <nav aria-label="現在位置" className="text-action flex flex-wrap items-center gap-2 text-xs font-semibold">
@@ -425,14 +435,14 @@ export default function MediaDetailDialog({
             <span aria-hidden="true">›</span>
             <span>{folderName}</span>
             <span aria-hidden="true">›</span>
-            <span className="text-ink-faint max-w-md truncate" title={item.filename}>{item.filename}</span>
+            <span className="text-ink-faint max-w-md truncate" ><TruncatedText value={String(item.filename ?? '')} /></span>
           </nav>
           <h2 className="text-ink mt-3 truncate text-xl font-bold" title={item.filename}>{item.filename}</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" onClick={() => void downloadItem()} disabled={downloading} busy={downloading} busyLabel="取得中…">ダウンロード
           </Button>
-          {downloadError ? <p className="text-danger text-xs" role="alert">{downloadError}</p> : null}
+          {downloadError ? <Notice tone="danger" >{downloadError}</Notice> : null}
           {impact && impact.usageCount > 0 ? (
             <Button type="button" variant="primary" onClick={() => onOpenReplacement(item)}>使用先を差し替える</Button>
           ) : null}
@@ -450,11 +460,11 @@ export default function MediaDetailDialog({
             ) : item.kind === 'audio' ? (
               <audio src={displaySrc} controls />
             ) : (
-              <a href={displaySrc} target="_blank" rel="noreferrer" className="text-action text-sm font-semibold">PDFを開く</a>
+              <TextLink external href={displaySrc}   className="text-action text-sm font-semibold">PDFを開く</TextLink>
             )}
           </div>
 
-          <section className="border-hairline rounded-card border bg-canvas p-4">
+          <section className="content-card rounded-card border bg-canvas p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="text-ink text-sm font-bold">この{item.kind === 'image' ? '画像' : 'メディア'}を差し替える</h3>
@@ -467,7 +477,7 @@ export default function MediaDetailDialog({
                 kind={item.kind}
                 title={`新しい${item.kind === 'image' ? '画像' : item.kind === 'video' ? '動画' : item.kind === 'audio' ? '音声' : 'ファイル'}を追加`}
                 accept={mediaAcceptForKind(item.kind)}
-                limitText="いまのメディアと同じ種類"
+                help="いまのメディアと同じ種類"
                 busy={versionPhase === 'uploading'}
                 progress={versionPhase === 'uploading' ? versionProgress : undefined}
                 onFile={(file) => chooseVersionFile(file)}
@@ -482,10 +492,7 @@ export default function MediaDetailDialog({
               </div>
             ) : null}
             {versionPreview?.canReplace ? (
-              <div className="mt-3">
-                <label htmlFor={`${fileInputId}-reason`} className="text-ink-secondary block text-xs font-semibold">変更理由</label>
-                <input id={`${fileInputId}-reason`} value={changeReason} onChange={(event) => setChangeReason(event.target.value)} maxLength={500} className="border-hairline rounded-control mt-1 min-h-10 w-full border px-3 text-sm" placeholder="例：秋の写真へ更新" />
-              </div>
+              <div className="mt-3"><Field label="変更理由" htmlFor={`${fileInputId}-reason`}><SaveErrorField names={["changeReason","change_reason"]}><input id={`${fileInputId}-reason`} value={changeReason} onChange={(event) => setChangeReason(event.target.value)} maxLength={500} className="border-hairline rounded-control mt-1 min-h-10 w-full border px-3 text-sm" placeholder="例：秋の写真へ更新" /></SaveErrorField></Field></div>
             ) : null}
             {versionError ? <Notice tone="danger" message={versionError} className="mt-3" /> : null}
             {impact && impact.usageCount > 0 ? (
@@ -507,7 +514,7 @@ export default function MediaDetailDialog({
         </div>
 
         <aside className="space-y-4">
-          <section className="border-hairline rounded-card border bg-canvas p-4">
+          <section className="content-card rounded-card border bg-canvas p-4">
             <h3 className="text-ink text-sm font-bold">ファイルのこと</h3>
             <dl className="mt-4 space-y-3 text-xs">
               {[
@@ -528,7 +535,7 @@ export default function MediaDetailDialog({
             </dl>
           </section>
 
-          <section className="border-hairline rounded-card border bg-canvas p-4">
+          <section className="content-card rounded-card border bg-canvas p-4">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-ink text-sm font-bold">利用の期限・同意</h3>
               {canManage && !termsEditing ? (
@@ -557,18 +564,13 @@ export default function MediaDetailDialog({
             </p>
             {termsEditing ? (
               <div className="border-hairline mt-3 space-y-3 border-t pt-3">
-                <div>
-                  <label htmlFor={`${fileInputId}-expires`} className="text-ink-secondary block text-xs font-semibold">利用期限（分かる場合だけ）</label>
-                  <DateField
+                <div><Field label="利用期限（分かる場合だけ）" htmlFor={`${fileInputId}-expires`}><SaveErrorField names={["termsExpiresAt","usageExpiresAt","terms_expires_at"]}><DateField
                     id={`${fileInputId}-expires`}
                     value={termsExpiresAt}
                     onChange={setTermsExpiresAt}
                     className="mt-1"
-                  />
-                </div>
-                <div>
-                  <label htmlFor={`${fileInputId}-consent`} className="text-ink-secondary block text-xs font-semibold">同意・権利の記録（確認した内容だけ）</label>
-                  <input
+                  /></SaveErrorField></Field></div>
+                <div><Field label="同意・権利の記録（確認した内容だけ）" htmlFor={`${fileInputId}-consent`}><SaveErrorField names={["termsConsentNote","usageConsentNote","terms_consent_note"]}><input
                     id={`${fileInputId}-consent`}
                     type="text"
                     value={termsConsentNote}
@@ -576,8 +578,7 @@ export default function MediaDetailDialog({
                     maxLength={500}
                     className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm"
                     placeholder="例：出演者の同意書を確認済み（2026-01-10）"
-                  />
-                </div>
+                  /></SaveErrorField></Field></div>
                 {termsError ? <Notice tone="danger" message={termsError} /> : null}
                 <div className="flex justify-end gap-2">
                   <Button type="button" onClick={() => setTermsEditing(false)} disabled={termsBusy}>キャンセル</Button>
@@ -588,23 +589,20 @@ export default function MediaDetailDialog({
             ) : null}
           </section>
 
-          <section className="border-hairline rounded-card border bg-canvas p-4">
+          <section className="content-card rounded-card border bg-canvas p-4">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-ink text-sm font-bold">使われている場所</h3>
               {/* R34: 未確認の0件は「0か所」にしない。件数は「—」で出す。 */}
               <span className="text-action text-xs font-medium">
                 {impact && (impact.verified !== false || impact.references.length > 0)
                   ? `${impact.usageCount}か所`
-                  : '—'}
+                  : emptyValue('unknown')}
               </span>
             </div>
             {phase === 'loading' ? (
               <p className="text-ink-faint mt-3 text-xs">使われている場所を確認しています…</p>
             ) : phase === 'error' ? (
-              <div className="mt-3 space-y-2" role="alert">
-                <p className="text-danger text-xs">使われている場所を確認できませんでした。</p>
-                <Button type="button" onClick={() => void loadImpact()}>読み直す</Button>
-              </div>
+              <Notice tone="danger" className="mt-3" action={<Button type="button" onClick={() => loadImpact()} busyLabel="処理中…">もう一度読み込む</Button>}>使われている場所を確認できませんでした。</Notice>
             ) : impact ? (
               <>
                 {/*
@@ -619,7 +617,7 @@ export default function MediaDetailDialog({
                         ? 'ほかに確認できていない場所があります。'
                         : '使われている場所を確かめられませんでした。'}
                     </p>
-                    <Button type="button" onClick={() => void loadImpact()}>読み直す</Button>
+                    <Button type="button" onClick={() => loadImpact()} busyLabel="処理中…">もう一度読み込む</Button>
                   </div>
                 ) : null}
                 {impact.references.length > 0 ? (
@@ -647,13 +645,13 @@ export default function MediaDetailDialog({
                       <p className="text-ink-faint mt-1">{usageModeText(usage.reference)}</p>
                       {canSwitch ? (
                         <div className="mt-2">
-                          <Select
+                          <SaveErrorField names={["selectValue","select_value"]}><Select
                             aria-label="この場所の参照方法"
                             value={selectValue}
                             options={options}
                             onChange={(value) => void switchUsageReference(usage, value)}
                             disabled={usageSwitching !== null}
-                          />
+                          /></SaveErrorField>
                           {usageSwitching === itemKey ? (
                             <p className="text-ink-faint mt-1" aria-live="polite">切り替えています…</p>
                           ) : null}
@@ -669,7 +667,7 @@ export default function MediaDetailDialog({
                 )}
               </>
             ) : null}
-            {usageError ? <p className="text-danger mt-3 text-xs" role="alert">{usageError}</p> : null}
+            {usageError ? <Notice tone="danger" className="mt-3" >{usageError}</Notice> : null}
             {impact ? <p className="text-ink-faint mt-3 text-xs">{checkedAtText(impact.checkedAt)} 時点で確認</p> : null}
             {impact && impact.verified === false ? (
               <p className="text-ink-secondary mt-3 text-xs leading-5">確かめられないため削除できません。読み直してから、もう一度お試しください。</p>
@@ -679,7 +677,7 @@ export default function MediaDetailDialog({
           </section>
 
           {impact && impact.versions.length > 0 ? (
-            <section className="border-hairline rounded-card border bg-canvas p-4">
+            <section className="content-card rounded-card border bg-canvas p-4">
               <h3 className="text-ink text-sm font-bold">版と元ファイル</h3>
               <p className="text-ink-faint mt-1 text-xs leading-5">
                 第1版は登録時の元ファイルです。差し替えても各版は残り、ここから取り戻せます。
@@ -708,11 +706,11 @@ export default function MediaDetailDialog({
                   </li>
                 ))}
               </ul>
-              {versionDownloadError ? <p className="text-danger mt-2 text-xs" role="alert">{versionDownloadError}</p> : null}
+              {versionDownloadError ? <Notice tone="danger" className="mt-2" >{versionDownloadError}</Notice> : null}
             </section>
           ) : null}
         </aside>
       </div>
-    </div>
+    </div></SaveErrorScope>
   )
 }

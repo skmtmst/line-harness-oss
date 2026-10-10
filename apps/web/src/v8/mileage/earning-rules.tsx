@@ -1,16 +1,7 @@
 'use client'
 
-/*
- * ★V8 マイル「たまる決めごと」（板 `OC0gy`・1152 `ZJIyl`・閲覧のみ `E2Any`、
- * 状態は見本帳 `zaqP9`）。
- *
- * app/mileage/v8-earning-rules-tab.tsx から動きを写し、見た目を一覧の型
- * （ListPage）で組み直した。データの口・操作は今と同じ（編集・テスト・
- * 止める／再開・公開・複製・削除・並び順の保存・CSV）。
- *
- * フォルダの列に割り当てる API は無いので、きっかけの種類で分けた
- * 見え方の切り替えとして持つ（保存はしない）。
- */
+import { jstDateOffset } from '@/lib/jst-datetime'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowDown, ArrowUp, Bookmark, CircleDot, Clock3, Coins, Download, Gift, ListOrdered, Plus, Wallet } from 'lucide-react'
@@ -18,13 +9,7 @@ import { useAccount } from '@/contexts/account-context'
 import { adminSessionHeaders } from '@/lib/admin-session'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import {
-  api,
-  type MileageAdminHistory,
-  type MileageEarningRuleTestResult,
-  type MileageEarningRuleV6,
-  type MileageEarningRulesV6Overview,
-} from '@/lib/api'
+import { api, type MileageAdminHistory, type MileageEarningRuleTestResult, type MileageEarningRuleV6, type MileageEarningRulesV6Overview } from '@/lib/api'
 import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
@@ -44,17 +29,27 @@ import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { ListPagePagination } from '@/components/templates'
-import {
-  describeMileageCsvExportFailure,
-  formatMileageDate,
-  formatMileageMonthDay,
-  formatMileageNumber,
-  isMileageFriendsV6Overview,
-  ruleEventLabel,
-} from './display'
+import { describeMileageCsvExportFailure, formatMileageDate, formatMileageMonthDay, formatMileageNumber, isMileageFriendsV6Overview, ruleEventLabel } from './display'
 import { CreateButton, MileageFrame, useMileageShell } from './frame'
 import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
+
+/*
+ * ★V8 マイル「たまる決めごと」（板 `OC0gy`・1152 `ZJIyl`・閲覧のみ `E2Any`、
+ * 状態は見本帳 `zaqP9`）。
+ *
+ * app/mileage/v8-earning-rules-tab.tsx から動きを写し、見た目を一覧の型
+ * （ListPage）で組み直した。データの口・操作は今と同じ（編集・テスト・
+ * 止める／再開・公開・複製・削除・並び順の保存・CSV）。
+ *
+ * フォルダの列に割り当てる API は無いので、きっかけの種類で分けた
+ * 見え方の切り替えとして持つ（保存はしない）。
+ */
 
 const EVENT_LABELS: Record<string, string> = {
   friend_added: '友だち追加',
@@ -126,9 +121,7 @@ function isOverview(value: unknown): value is MileageEarningRulesV6Overview {
 }
 
 function dateOnlyDaysAgo(days: number) {
-  const date = new Date()
-  date.setDate(date.getDate() - days)
-  return date.toISOString().slice(0, 10)
+  return jstDateOffset(-days)
 }
 
 function grantedMiles30d(rule: MileageEarningRuleV6) {
@@ -155,9 +148,10 @@ const PRESETS: Array<{ value: string; label: string; active: boolean; pending: b
   { value: 'pending', label: '確定待ちありのみ', active: false, pending: true, stopped: false, sort: 'order' },
 ]
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((size) => ({ value: String(size), label: `${size}件表示` }))
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 export default function EarningRulesTab() {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const { readonly, narrow, setCount } = useMileageShell()
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -175,15 +169,15 @@ export default function EarningRulesTab() {
   const [friendTotal, setFriendTotal] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [folder, setFolder] = useState<FolderKey>('all')
-  const [activeOnly, setActiveOnly] = useState(false)
-  const [pendingOnly, setPendingOnly] = useState(false)
-  const [stoppedOnly, setStoppedOnly] = useState(false)
-  const [sort, setSort] = useState<SortKey>('order')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [folder, setFolder] = useListUrlValue<FolderKey>('folder', 'all')
+  const [activeOnly, setActiveOnly] = useListUrlValue('activeOnly', false)
+  const [pendingOnly, setPendingOnly] = useListUrlValue('pendingOnly', false)
+  const [stoppedOnly, setStoppedOnly] = useListUrlValue('stoppedOnly', false)
+  const [sort, setSort] = useListUrlValue<SortKey>('sort', 'order')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [menuId, setMenuId] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
@@ -254,14 +248,16 @@ export default function EarningRulesTab() {
       setRuleOrder(items.map((rule) => rule.id))
       setOrderDirty(false)
       setPage(1)
-    } catch {
+    } catch (saveFailure) {
       if (isStale()) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       setRules([])
-      setLoadError(true)
+      { if (!fieldFailure)
+      setLoadError(true) }
     } finally {
       if (!isStale()) setLoading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     if (accountLoading) return
@@ -272,7 +268,7 @@ export default function EarningRulesTab() {
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearch(searchInput.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
@@ -305,15 +301,18 @@ export default function EarningRulesTab() {
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-earning-rules-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("マイルの獲得ルール")
       anchor.click()
       URL.revokeObjectURL(url)
-    } catch {
-      setActionError(describeMileageCsvExportFailure(exportStatus))
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError(describeMileageCsvExportFailure(exportStatus)) }
     } finally {
       setExporting(false)
     }
-  }, [exporting, selectedAccountId])
+  }, [exporting, selectedAccountId, saveErrors])
 
   const activeRules = useMemo(() => rules.filter((rule) => rule.published.status === 'published'), [rules])
   const pendingRules = useMemo(() => rules.filter((rule) => rule.draft.initialStatus === 'pending'), [rules])
@@ -374,8 +373,11 @@ export default function EarningRulesTab() {
       const response = await api.mileage.saveEarningRulesOrder({ accountId: selectedAccountId, ids: ruleOrder })
       if (!response.success) throw new Error(response.error)
       await load()
-    } catch {
-      setActionError('並び順を保存できませんでした。最新の状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('並び順を保存できませんでした。最新の状態を読み直してから、もう一度お試しください。') }
       await load().catch(() => {})
     } finally {
       setSavingOrder(false)
@@ -399,13 +401,16 @@ export default function EarningRulesTab() {
     try {
       const res = await api.mileage.updateRule(rule.id, { isActive: next === 'published' })
       if (!res.success) throw new Error(res.error)
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
       setStatus(before)
+      { if (!fieldFailure)
       notifyToast(`「${rule.draft.name}」を${next === 'published' ? '再開' : '停止'}できませんでした。元に戻しました。`, {
         tone: 'error',
         actionLabel: 'もう一度',
         onAction: () => { void toggleRule({ ...rule, published: { ...rule.published, status: before } }) },
-      })
+      }) }
     } finally {
       setSavingId(null)
     }
@@ -421,9 +426,12 @@ export default function EarningRulesTab() {
       setDeleteTarget(null)
       await load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
       setDeleteError(caught instanceof Error && caught.message && !/^API error/.test(caught.message)
         ? caught.message
-        : '削除できませんでした。もう一度お試しください。')
+        : '削除できませんでした。もう一度お試しください。') }
     } finally {
       setSavingId(null)
     }
@@ -442,8 +450,11 @@ export default function EarningRulesTab() {
       if (!res.success) throw new Error(res.error)
       setPublishTarget(null)
       await load()
-    } catch {
-      setPublishError('公開できませんでした。下書きを読み直して内容を確かめてから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setPublishError('公開できませんでした。下書きを読み直して内容を確かめてから、もう一度お試しください。') }
     } finally {
       setSavingId(null)
     }
@@ -478,8 +489,11 @@ export default function EarningRulesTab() {
       if (!drafted.success) throw new Error(drafted.error)
       setMenuNotice(`「${name}」を止めた状態で作りました。`)
       await load()
-    } catch {
-      setActionError('複製できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('複製できませんでした。もう一度お試しください。') }
     } finally {
       setSavingId(null)
     }
@@ -496,7 +510,10 @@ export default function EarningRulesTab() {
       if (!response.success) throw new Error(response.error)
       setTestResult(response.data)
     } catch (caught) {
-      setTestError(caught instanceof Error ? caught.message : 'テストできませんでした。もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setTestError(caught instanceof Error ? caught.message : 'テストできませんでした。もう一度お試しください。') }
     } finally {
       setTestBusy(false)
     }
@@ -514,7 +531,7 @@ export default function EarningRulesTab() {
   }
 
   const ready = !loading && !loadError
-  const dash = (text: string) => (ready ? text : '—')
+  const dash = (text: string) => (ready ? text : emptyValue('unknown'))
 
   /* ===== 数の帯（4マス） ===== */
   const stats = (
@@ -533,7 +550,7 @@ export default function EarningRulesTab() {
         icon={<Coins size={14} aria-hidden="true" />}
         value={ready ? grantedMiles ?? 0 : null}
         unit=""
-        detail={dash(`${formatMileageNumber(grantedCount ?? 0)}件`)}
+        detail={dash(`${formatMileageNumber(grantedCount ?? 0)} 件`)}
       />
       <KpiCard
         presentation="band"
@@ -541,7 +558,7 @@ export default function EarningRulesTab() {
         icon={<Gift size={14} aria-hidden="true" />}
         value={ready ? spentMiles ?? 0 : null}
         unit=""
-        detail={dash(`交換 ${formatMileageNumber(spentCount ?? 0)}件`)}
+        detail={dash(`交換 ${formatMileageNumber(spentCount ?? 0)} 件`)}
       />
       <KpiCard
         presentation="band"
@@ -549,7 +566,7 @@ export default function EarningRulesTab() {
         icon={<Wallet size={14} aria-hidden="true" />}
         value={ready ? balanceTotal ?? 0 : null}
         unit=""
-        detail={dash(`友だち ${formatMileageNumber(friendTotal ?? 0)}人`)}
+        detail={dash(`友だち ${formatMileageNumber(friendTotal ?? 0)} 人`)}
       />
     </KpiBand>
   )
@@ -580,12 +597,12 @@ export default function EarningRulesTab() {
   /* きっかけで絞る（固定の分け方）。件数も添える。 */
   const folderSelect = (
     <div className={styles.narrowFolder}>
-      <Select
+      <SaveErrorField names={["folder"]}><Select
         aria-label="きっかけ"
         value={folder}
         options={FOLDERS.map((item) => ({ value: item.key, label: item.key === 'all' ? item.label : `${item.label} ${formatMileageNumber(folderCounts.get(item.key) ?? 0)}` }))}
         onChange={(value) => resetPage(() => setFolder(value as FolderKey))}
-      />
+      /></SaveErrorField>
     </div>
   )
 
@@ -635,7 +652,7 @@ export default function EarningRulesTab() {
   const savedBox = (
     <div className={styles.savedBox}>
       <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-      <Select
+      <SaveErrorField names={["presetValue","page","preset_value"]}><Select
         aria-label="よく使う絞り込み"
         value={presetValue}
         options={[
@@ -651,19 +668,19 @@ export default function EarningRulesTab() {
           setStoppedOnly(preset.stopped)
           setSort(preset.sort)
         }}
-      />
+      /></SaveErrorField>
     </div>
   )
 
   const perPageBox = (
     <div data-per-page-select>
-      <Select
+      <SaveErrorField names={["pageSize","page","page_size"]}><Select
         aria-label="1ページに出す件数"
         size="page-size"
         value={String(pageSize)}
         onChange={(value) => { setPage(1); setPageSize(Number(value)) }}
         options={PAGE_SIZE_OPTIONS}
-      />
+      /></SaveErrorField>
     </div>
   )
 
@@ -734,8 +751,8 @@ export default function EarningRulesTab() {
               {
                 id: 'edit',
                 label: '編集',
-                external: true,
-                onSelect: () => router.push(`/mileage/earning-rules/edit?id=${encodeURIComponent(rule.id)}`),
+                external: false,
+                href: `/mileage/earning-rules/edit?id=${encodeURIComponent(rule.id)}`, onSelect: () => router.push(`/mileage/earning-rules/edit?id=${encodeURIComponent(rule.id)}`),
               },
               {
                 id: 'test',
@@ -806,16 +823,14 @@ export default function EarningRulesTab() {
             const active = rule.published.status === 'published'
             const orderIndex = ruleOrder.indexOf(rule.id)
             return (
-              <Tr key={rule.id} className={styles.row} data-table-layout="columns">
+              <Tr key={rule.id} className={styles.row} data-table-layout="columns" data-row-id={rule.id}>
                 <Td className={styles.colName}>
                   <div className={styles.rowNameLine}>
                     <FolderDotName folder={null}>
-                      <span className={styles.rowName} title={rule.draft.name}>{rule.draft.name}</span>
+                      <span className={styles.rowName} ><TruncatedText value={String(rule.draft.name ?? '')} /></span>
                     </FolderDotName>
                   </div>
-                  <span className={narrow ? styles.rowSub : `${styles.rowSub} ${styles.dotIndent}`}>
-                    {`${rule.draft.targetConditions ? '条件あり' : '全員'}・${rule.publishedVersion == null ? `下書き v${rule.draftVersion}` : `公開版 v${rule.publishedVersion}`}`}
-                  </span>
+
                 </Td>
                 <Td className={styles.colEvent}>
                   <span className={styles.cellMain}>{ruleEventLabel(rule.draft.eventType, EVENT_LABELS)}</span>
@@ -825,7 +840,7 @@ export default function EarningRulesTab() {
                 <Td className={styles.colValidity}><span className={styles.cellMain}>{validityText(rule)}</span></Td>
                 <Td className={`${styles.colRecent} ${styles.num}`}>
                   <span className={styles.cellMain}>{formatMileageNumber(grantedMiles30d(rule))}</span>
-                  <span className={styles.cellSub}>{`対象外 ${formatMileageNumber(rule.metrics30d.excluded)}回`}</span>
+                  <span className={styles.cellSub}>{`対象外 ${formatMileageNumber(rule.metrics30d.excluded)} 回`}</span>
                 </Td>
                 <Td className={styles.colState}>
                   <span className={styles.pill} data-tone={active ? 'active' : 'neutral'}>
@@ -870,7 +885,7 @@ export default function EarningRulesTab() {
     <ListState kind="error"
       title="たまる決めごとを読み込めませんでした"
       description="数の帯は「—」にしています。道具はそのまま使えます。"
-      action={<Button type="button" onClick={() => void load()}>もう一度試す</Button>}
+      onRetry={() => void load()}
     />
   ) : visible.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
@@ -893,18 +908,18 @@ export default function EarningRulesTab() {
   const pager = ready && visible.length > 0 && pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {`${shown.length}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, shown.length)}件`}
+        {`${shown.length} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, shown.length)} 件`}
       </span>
       <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
     </ListPagePagination>
   ) : undefined
 
   return (
-    <MileageFrame
+    <SaveErrorScope errors={saveErrors}><MileageFrame
       help="行の「…」から 編集・止める・複製・この決めごとの履歴を見る。"
       actions={
         <Button onClick={() => void exportCsv()} disabled={exporting || rules.length === 0}>
-          <Download size={15} aria-hidden="true" /> CSV で書き出す
+          <Download size={15} aria-hidden="true" /> CSVで書き出す
         </Button>
       }
       stats={stats}
@@ -948,8 +963,8 @@ export default function EarningRulesTab() {
             <Notice tone="danger" message={testError} />
           ) : testResult ? (
             <dl className={styles.testList}>
-              <div><dt>条件に合う行動</dt><dd>{formatMileageNumber(testResult.matchedEvents)}回</dd></div>
-              <div><dt>対象になる友だち</dt><dd>{formatMileageNumber(testResult.matchedFriends)}人</dd></div>
+              <div><dt>条件に合う行動</dt><dd>{formatMileageNumber(testResult.matchedEvents)} 回</dd></div>
+              <div><dt>対象になる友だち</dt><dd>{formatMileageNumber(testResult.matchedFriends)} 人</dd></div>
               <div><dt>付与見込みの合計</dt><dd>{formatMileageNumber(testResult.estimatedTotalMiles)} マイル</dd></div>
               <div><dt>1人あたり最大</dt><dd>{formatMileageNumber(testResult.maxPerFriend)} マイル</dd></div>
               <div><dt>付いた直後の状態</dt><dd>{testResult.initialStatus === 'pending' ? '確定待ち' : 'すぐ使える'}</dd></div>
@@ -972,6 +987,6 @@ export default function EarningRulesTab() {
       </>}
     >
       {body}
-    </MileageFrame>
+    </MileageFrame></SaveErrorScope>
   )
 }

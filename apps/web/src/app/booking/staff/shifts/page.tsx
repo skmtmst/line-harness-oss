@@ -1,5 +1,7 @@
 'use client'
 
+import { useStaffRole } from '@/lib/staff-role'
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -20,7 +22,7 @@ import {
   type BookingStaff,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
+import { canViewFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -274,8 +276,8 @@ export default function StaffShiftsPage() {
 function StaffShiftsPageContent() {
   const staffId = useSearchParams().get('staff_id') ?? ''
   const theme = useAdminTheme()
-  const [isStaffRole] = useState(() =>
-    typeof window !== 'undefined' && window.localStorage.getItem('lh_staff_role') === 'staff')
+  const verifiedRole = useStaffRole()
+  const isStaffRole = verifiedRole === 'staff'
   usePageTitle('予約設定')
   // ★V8：板 d5fmnM（管理者）・E3YDK（本人）・wvGke（ひも付けなし）。役割はサーバーから読み、
   // 管理者が staff_id 無しで来たときは「受付枠」タブ（いつもの店の時間）へ送る（src/v8/booking-staff）。
@@ -291,6 +293,7 @@ function StaffShiftsPageContent() {
 // R579: 2経路とも通信失敗したら「紐づけ無し」と断定しない。同画面での
 // 再試行の口を出し、復旧後は本人勤務へ進める。
 function OwnShiftEntry() {
+  const verifiedRole = useStaffRole()
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [resolved, setResolved] = useState<'loading' | 'store' | 'missing' | 'error'>('loading')
@@ -327,13 +330,13 @@ function OwnShiftEntry() {
         setResolved('error')
         return
       }
-      const canSeeStore = canViewFeature('/booking/bookings')
-        || canViewFeature('booking.settings')
-        || canViewFeature('/booking/menus')
+      const canSeeStore = canViewFeature('/booking/bookings', verifiedRole)
+        || canViewFeature('booking.settings', verifiedRole)
+        || canViewFeature('/booking/menus', verifiedRole)
       setResolved(canSeeStore ? 'store' : 'missing')
     })()
     return () => { cancelled = true }
-  }, [router, selectedAccountId, attempt])
+  }, [router, selectedAccountId, attempt, verifiedRole])
 
   function retry() {
     setLoadError(null)
@@ -782,10 +785,10 @@ function StoreShiftsView() {
   const [deleteTarget, setDeleteTarget] = useState<BookingException | null>(null)
   const [exceptionBusy, setExceptionBusy] = useState(false)
   const [exceptionError, setExceptionError] = useState<string | null>(null)
-  const [canManageResources, setCanManageResources] = useState(false)
+  const canManageResources = usePermissionAccess('booking.settings')
   // N-411: 受付枠・休業日・設備の変更はすべて 'booking.settings' の実効permission。
   // 閲覧のみの人には入力を無効化し、保存ボタンを出さない（API側も403で拒否）。
-  const [canEditSettings, setCanEditSettings] = useState(false)
+  const canEditSettings = usePermissionAccess('booking.settings')
   const requestRef = useRef(0)
   const loadedAccountRef = useRef<string | null>(null)
   const activeAccountRef = useRef(selectedAccountId)
@@ -805,11 +808,6 @@ function StoreShiftsView() {
     || editingExceptionId !== null
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: exceptionFormDirty, busy: savingClosed || exceptionBusy })
 
-  useEffect(() => {
-    const canEdit = canEditFeature('booking.settings')
-    setCanManageResources(canEdit)
-    setCanEditSettings(canEdit)
-  }, [])
 
   useEffect(() => {
     const requestId = ++requestRef.current
@@ -1018,7 +1016,7 @@ function StoreShiftsView() {
           kind="error"
           title="受付時間と休業日を表示できませんでした"
           description="保存済みの設定は消えていません。時間をおいて、もう一度読み込んでください。"
-          action={<Button onClick={() => setReloadKey((value) => value + 1)}>受付時間と休業日を再読み込み</Button>}
+          onRetry={() => setReloadKey((value) => value + 1)}
         />
       ) : loadStatus === 'loading' || loadedAccountRef.current !== selectedAccountId || !settings ? (
         <ListState kind="loading" title="受付時間と休業日を読み込んでいます" />
@@ -1199,6 +1197,7 @@ function StoreShiftsView() {
       <ConfirmDialog
         open={deleteTarget !== null}
         title="この休業日を消しますか？"
+        deleteName={deleteTarget?.reason || deleteTarget?.dateFrom || deleteTarget?.date || undefined}
         description="削除すると、その期間は曜日の決めごとどおりの受付に戻ります。すでに入っている予約はそのまま残ります。"
         confirmLabel="休業日を削除する"
         destructive

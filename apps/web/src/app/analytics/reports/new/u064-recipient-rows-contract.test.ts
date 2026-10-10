@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
+const PICKER = readFileSync(new URL('../../../../components/shared/entity-picker.tsx', import.meta.url), 'utf8')
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 
 /**
@@ -15,13 +16,13 @@ describe('レポート通知先の行リスト（#975 U064）', () => {
   })
 
   it('氏名は主情報として幅を確保し、省略時も title で全文を見られる', () => {
-    expect(PAGE).toContain('block truncate text-sm')
-    expect(PAGE).toContain('title={person.name}')
+    expect(PICKER).toContain('title={item.name}')
+    expect(PICKER).toContain('styles.multiNameText')
     expect(PAGE).toContain('ROLE_LABEL[person.role]')
   })
 
   it('選択中の行は色以外にもチェックの状態を持つ', () => {
-    expect(PAGE).toContain('checked={checked}')
-    expect(PAGE).toContain("checked ? 'report-v8-recipient bg-accent-soft'")
+    expect(PICKER).toContain('checked={checked}')
+    expect(PICKER).toContain('data-selected={checked || undefined}')
   })
 })

@@ -1,5 +1,4 @@
 'use client'
-
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -19,8 +18,11 @@ import { petAnimalTypeLabel } from '@/lib/nen-pets-api'
 import { photoReviewReasonLabel, mileStatusLabel, text } from './text'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import { formatDay, formatNumber } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
-const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? formatNumber(Number(value)) : '—'
+const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? formatNumber(Number(value)) : emptyValue('unknown')
 
 export function PhotoReviewDetail({
   canEdit = true, photo, position, total, loading, loadKind, reviewing, notice, accountNotice, assetStatus, derivatives, assetsFailed, onReloadAssets, onReloadPhoto, assetProcessing, rotationSaving,
@@ -75,8 +77,8 @@ export function PhotoReviewDetail({
   /* V-1: 2段階認証を使っている人は6桁、無い人はパスワードで確認する。 */
   const stepUpMethod = readSessionSnapshot()?.stepUpMethod ?? 'totp'
   const downloadReady = stepUpMethod === 'password' ? downloadCode.length > 0 : /^\d{6}$/.test(downloadCode)
-  if (loading) return <div><ListState kind="loading" title="写真を読み込んでいます" /></div>
-  if (loadKind === 'forbidden') return <div><ListState kind="forbidden" /></div>
+  if (loading) return <div><DetailLoading label="写真を読み込んでいます" /></div>
+  if (loadKind === 'forbidden') return <div><ListState kind="forbidden" onRetry={onReloadPhoto} /></div>
   if (loadKind === 'error') return <div><ListState kind="error" title="写真を読み込めませんでした" description="通信状態を確認して、もう一度読み込んでください。" onRetry={onReloadPhoto} /></div>
   if (!photo || loadKind === 'empty') return <div><ListState kind="empty" title="確認する写真はありません" /></div>
 
@@ -125,7 +127,7 @@ export function PhotoReviewDetail({
         <h2 className="mt-1 text-2xl font-extrabold text-ink">{photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })} の写真</h2>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-2 text-xs font-medium text-ink-secondary">{total > 0 ? `${total}枚のうち ${position + 1}枚目` : '—'}</span>
+        <span className="mr-2 text-xs font-medium text-ink-secondary">{total > 0 ? `${total}枚のうち ${position + 1}枚目` : emptyValue('unknown')}</span>
         <Button disabled={position <= 0} onClick={() => onMove(-1)}>前の写真</Button>
         <Button disabled={position >= total - 1} onClick={() => onMove(1)}>次の写真</Button>
         <Button onClick={onBack}>並べて見るへ戻る</Button>
@@ -210,7 +212,7 @@ export function PhotoReviewDetail({
       <aside className="flex flex-col gap-3">
         <Card padding="default">
           <dl>
-            <div><dt className="text-xs font-medium text-ink-faint">送ってくれた人</dt><dd className="mt-1 text-xs font-medium text-ink">{text(photo.owner_name) || '名前未取得'}</dd><small className="mt-1 block text-xs text-ink-faint">投稿 {numberOrDash(photo.submission_count)}回目 ／ 見送ったこと {numberOrDash(photo.returned_count)}回</small></div>
+            <div><dt className="text-xs font-medium text-ink-faint">送ってくれた人</dt><dd className="mt-1 text-xs font-medium text-ink">{text(photo.owner_name) || '名前未取得'}</dd><small className="mt-1 block text-xs text-ink-faint">投稿 {numberOrDash(photo.submission_count)} 回目 ／ 見送ったこと {numberOrDash(photo.returned_count)} 回</small></div>
             <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-medium text-ink-faint">ペット</dt><dd className="mt-1 text-xs font-medium text-ink">{photoPetDisplayName(photo.pet_name, { fallback: '未取得', callName: photo.pet_call_name, gender: photo.pet_gender })}（{petAnimalTypeLabel(text(photo.animal_type))}・{text(photo.breed) || '品種未取得'}）</dd></div>
             <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-medium text-ink-faint">届いた日時</dt><dd className="mt-1 text-xs font-medium text-ink">{formatPhotoReceivedAt(photo.created_at)}</dd></div>
             <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-medium text-ink-faint">そえられた言葉</dt><dd className="mt-1 text-xs font-medium text-ink">{text(photo.caption) ? `「${text(photo.caption)}」` : 'コメントなし'}</dd></div>
@@ -312,8 +314,8 @@ export function PhotoReviewDetail({
     <div className="mt-4">
       <StickyBar
         status={duplicate
-          ? `${total}枚のうち ${position + 1}枚目。重複のため、却下か報酬なしで採用を選んでください。`
-          : `${total}枚のうち ${position + 1}枚目。あと${Math.max(0, total - position - 1)}枚あります。`}
+          ? `${total} 枚のうち ${position + 1} 枚目。重複のため、却下か報酬なしで採用を選んでください。`
+          : `${total} 枚のうち ${position + 1} 枚目。あと${Math.max(0, total - position - 1)} 枚あります。`}
         actions={!canEdit ? undefined : duplicate ? <>
         <Button disabled={reviewing} onClick={onReturn}>却下する</Button>
         <Button disabled title="切り取り版の生成口を接続後に使えます">切り取ってから採用</Button>
@@ -340,7 +342,7 @@ export function PhotoReviewDetail({
         if (!downloadReady) { setDownloadError(stepUpMethod === 'password' ? 'パスワードを入力してください。' : '6桁の再認証コードを入力してください。'); return }
         setDownloadBusy(true)
         setDownloadError('')
-        void onDownloadOriginal(downloadCode)
+        return onDownloadOriginal(downloadCode)
           .then(() => setDownloadOpen(false))
           .catch((error: unknown) => setDownloadError(error instanceof Error ? error.message : '原本を保存できませんでした。'))
           .finally(() => setDownloadBusy(false))
@@ -348,11 +350,11 @@ export function PhotoReviewDetail({
     >
       {stepUpMethod === 'none' ? null : stepUpMethod === 'password' ? (
         <Field label="パスワード" htmlFor="photo-download-password">
-          <TextField id="photo-download-password" type="password" value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value); setDownloadError('') }} autoComplete="current-password" />
+          <SaveErrorField names={["downloadCode","download_code"]}><TextField id="photo-download-password" type="password" value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value); setDownloadError('') }} autoComplete="current-password" /></SaveErrorField>
         </Field>
       ) : (
         <Field label="再認証コード" htmlFor="photo-download-code">
-          <TextField id="photo-download-code" value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setDownloadError('') }} inputMode="numeric" autoComplete="one-time-code" placeholder="6桁のコード" />
+          <SaveErrorField names={["downloadCode","download_code"]}><TextField id="photo-download-code" value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setDownloadError('') }} inputMode="numeric" autoComplete="one-time-code" placeholder="6桁のコード" /></SaveErrorField>
         </Field>
       )}
     </Dialog>

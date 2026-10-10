@@ -3,25 +3,8 @@
  * カード：余白20・段の間10・角12・細い輪郭。頭の段は間8（札・状態・店舗・…・ボタン）。
  */
 
-/* 閲覧のみの帯（n4DT7「帯/案内」）：上下10・左右14・間10・青い地・印16・文13/20。 */
-.readOnly {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
+/* 閲覧のみの案内は ReadOnlyNotice が持つ。 */
 
-.readOnlyIcon {
-  width: var(--tpl-rt-icon-16);
-  height: var(--tpl-rt-icon-16);
-  flex-shrink: 0;
-  color: var(--color-status-info);
-}
 
 .card {
   display: flex;

@@ -1,4 +1,6 @@
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { validateTapExtraReferences } from '../services/tap-extras.js';
+import { tapExtrasError } from '@line-crm/shared';
 import { Hono } from 'hono';
 import { prepareRichVideoTemplate } from '../services/rich-video-template.js';
 import {
@@ -25,7 +27,7 @@ import {
 } from '@line-crm/db';
 import type { TemplateRow } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { validateCarousel } from '../services/carousel-validation.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -106,6 +108,10 @@ function readQuestionPayload(body: Record<string, unknown>):
   }
   if (question.choices.some((choice) => typeof choice.behavior !== 'string' || !QUESTION_BEHAVIORS.has(choice.behavior))) {
     return { ok: false, error: '選択後の動きを確認してください' };
+  }
+  for (const choice of question.choices) {
+    const error = tapExtrasError({ tagIds: choice.addTagIds, scoreChange: choice.scoreChange });
+    if (error) return { ok: false, error };
   }
   return { ok: true, question, questionJson: raw };
 }
@@ -544,7 +550,7 @@ function isBlankText(value: unknown): boolean {
   return typeof value !== 'string' || !value.trim();
 }
 
-templates.post('/api/templates', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"name":["string"],"category":["string"],"messageType":["string"],"messageContent":["string"],"questionStatus":["string"],"folderId":["null","string"]}), async (c) => {
+templates.post('/api/templates', requireDeliveryAccess('templates'), inputJsonBoundary({"accountId":["string"],"name":["string"],"category":["string"],"messageType":["string"],"messageContent":["string"],"questionStatus":["string"],"folderId":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       accountId?: string;
@@ -599,6 +605,9 @@ templates.post('/api/templates', requireRole('owner', 'admin'), inputJsonBoundar
     const folderScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const folder = await readFolderId(c.env.DB, body as unknown as Record<string, unknown>, body.accountId, folderScope.canSeeUnassigned);
     if (!folder.ok) return inputError(c, { success: false, error: folder.error }, 422, ["folderId"]);
+    const extraTree = { question: question.question?.choices.map(choice => ({ tapExtras: { tagIds: choice.addTagIds, scoreChange: choice.scoreChange } })), content: !question.question && body.messageType !== 'text' && body.messageContent ? JSON.parse(body.messageContent) : null };
+    const extrasError = await validateTapExtraReferences(c.env.DB, extraTree, body.accountId ?? null);
+    if (extrasError) return c.json({ success: false, error: extrasError, code: 'TAP_EXTRA_INVALID', field: 'tapExtras', fieldErrors: { tapExtras: extrasError } }, 422);
     const item = await createTemplate(c.env.DB, {
       ...body,
       folderId: folder.folderId ?? null,
@@ -623,7 +632,7 @@ templates.post('/api/templates', requireRole('owner', 'admin'), inputJsonBoundar
   }
 });
 
-templates.put('/api/templates/:id', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"category":["string"],"messageType":["string"],"messageContent":["string"],"questionStatus":["string"],"folderId":["null","string"]}), async (c) => {
+templates.put('/api/templates/:id', requireDeliveryAccess('templates'), inputJsonBoundary({"name":["string"],"category":["string"],"messageType":["string"],"messageContent":["string"],"questionStatus":["string"],"folderId":["null","string"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -706,6 +715,13 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), inputJsonBoun
     const folderScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const folder = await readFolderId(c.env.DB, body as unknown as Record<string, unknown>, existing.line_account_id, folderScope.canSeeUnassigned);
     if (!folder.ok) return inputError(c, { success: false, error: folder.error }, 422, ["folderId"]);
+    if (hasContentEdit) {
+      const savedQuestion = 'question' in body ? question.question : questionValue(draftQuestionJsonOf(existing));
+      const extraTree: unknown[] = (savedQuestion?.choices ?? []).map(choice => ({ tapExtras: { tagIds: choice.addTagIds, scoreChange: choice.scoreChange } }));
+      if (baseMessageType !== 'text') { try { extraTree.push(JSON.parse(baseMessageContent)); } catch { /* 既存の本文検査で扱う */ } }
+      const extrasError = await validateTapExtraReferences(c.env.DB, extraTree, existing.line_account_id);
+      if (extrasError) return c.json({ success: false, error: extrasError, code: 'TAP_EXTRA_INVALID', fieldErrors: { tapExtras: extrasError } }, 422);
+    }
     const metadataUpdates: {
       name?: string;
       category?: string;
@@ -778,7 +794,7 @@ function validPublishKey(value: string | null | undefined): value is string {
  * 別の下書きを公開しない。公開版・下書き版の両方を確認できる(自動応答の
  * POST /api/auto-replies/:id/publish より厳しい約束)。
  */
-templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+templates.post('/api/templates/:id/publish', requireDeliveryAccess('templates'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const requestKey = c.req.header('Idempotency-Key');
@@ -913,7 +929,7 @@ templates.get('/api/templates/:id/versions', async (c) => {
  * 466: この版に戻す。過去の版は変えず、その中身で新しい版を作る
  * （下書きへ写して公開する）。公開口と同じ確認キーと版確認を使う。
  */
-templates.post('/api/templates/:id/revert', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+templates.post('/api/templates/:id/revert', requireDeliveryAccess('templates'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const requestKey = c.req.header('Idempotency-Key');
@@ -976,7 +992,7 @@ templates.post('/api/templates/:id/revert', requireRole('owner', 'admin'), input
   }
 });
 
-templates.delete('/api/templates/:id', requireRole('owner', 'admin'), async (c) => {
+templates.delete('/api/templates/:id', requireDeliveryAccess('templates'), async (c) => {
   try {
     const id = c.req.param('id');
     const existing = await getTemplateById(c.env.DB, id);

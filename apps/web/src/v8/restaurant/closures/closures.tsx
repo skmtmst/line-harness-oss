@@ -1,12 +1,4 @@
 'use client'
-
-/*
- * ★V8 予約枠・在庫 ›「休業日・貸切」タブ（提案 E-10 `UVnvR`。採用 2026-10-07）。
- *
- * 上：他の予約サイトの枠を閉じる知らせ（休業・貸切の分）→ 左：月のカレンダー（臨時休業・貸切・定休）
- * ｜右：これからの休業・貸切（「…」から変える・消す）と Google の営業時間。
- * 足す・変える窓（`nVvXy`）は closure-dialog.tsx。動きは BEHAVIOR.md。
- */
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Bell, Check, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -29,6 +21,18 @@ import {
   scopeText, shiftMonth, statusLine, tablesText, tasksFor, timeText, upcoming,
 } from './format'
 import styles from './closures.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 予約枠・在庫 ›「休業日・貸切」タブ（提案 E-10 `UVnvR`。採用 2026-10-07）。
+ *
+ * 上：他の予約サイトの枠を閉じる知らせ（休業・貸切の分）→ 左：月のカレンダー（臨時休業・貸切・定休）
+ * ｜右：これからの休業・貸切（「…」から変える・消す）と Google の営業時間。
+ * 足す・変える窓（`nVvXy`）は closure-dialog.tsx。動きは BEHAVIOR.md。
+ */
 
 type MediaLink = { code: string; name: string; loginUrl: string | null; closeOnBooking: boolean }
 
@@ -48,8 +52,8 @@ function inGoogle(closure: RestaurantClosure, special: GoogleSpecialDay[]): bool
 
 function deleteMessage(error: unknown): string {
   if (error instanceof ApiError && error.code === 'version_conflict') return 'ほかの人が先に変えました。読み直したので、もう一度確かめてください。'
-  if (error instanceof ApiError && error.status === 403) return 'この店舗の予約枠を変える権限がありません。'
-  return describeSaveFailure(error)
+  if (error instanceof ApiError && error.status === 403) return permissionDeniedMessage('store')
+  return withPermissionFailure(error, describeSaveFailure(error), 'store')
 }
 
 export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoogle, dialog, onDialog }: {
@@ -64,6 +68,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   dialog: ClosureDialogTarget | null
   onDialog: (target: ClosureDialogTarget | null) => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const store = ctx.store
   const storeId = ctx.selectedStoreId
@@ -180,7 +185,11 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
       await restaurantTestApi.completeChannelCloseTask(accountId, task.id)
       notifyToast(`${nameOf(task.channel)}の枠を閉じた印を付けました。`)
     } catch (caught) {
-      notifyToast(describeSaveFailure(caught), { tone: 'error' })
+      const fieldFailure = saveErrors.capture(caught);
+
+
+      if (!fieldFailure) {
+      notifyToast(withPermissionFailure(caught, describeSaveFailure(caught), 'store'), { tone: 'error' }) }
     } finally {
       await loadTasks()
       setBusy('')
@@ -220,7 +229,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   const saved = (result: ClosureSaved) => {
     const editing = dialog?.mode === 'edit'
     onDialog(null)
-    const tail = result.reservations > 0 ? `重なる予約 ${result.reservations}件は取り消していません。1件ずつ連絡してください。` : ''
+    const tail = result.reservations > 0 ? `重なる予約 ${result.reservations} 件は取り消していません。1件ずつ連絡してください。` : ''
     const google = result.google === 'made' ? 'Google の営業時間の案も作りました。' : result.google === 'failed' ? 'Google の案は作れませんでした。右の列からもう一度作れます。' : ''
     notifyToast(`${editing ? '変えました。' : `${rangeTitle(result.closure)}を閉じました。`}${tail}${google}`, result.google === 'failed' ? { tone: 'error' } : undefined)
     if (result.google === 'made') setMadeGoogle((ids) => [...ids, result.closure.id])
@@ -234,29 +243,29 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   }
 
   if (loadError !== null && closures === null) {
-    return <div className={styles.state}><ListState kind="error" error={loadError} onRetry={() => void loadClosures()} /></div>
+    return <SaveErrorScope errors={saveErrors}><div className={styles.state}><ListState kind="error" error={loadError} onRetry={() => void loadClosures()} /></div></SaveErrorScope>
   }
 
   const weeks = monthWeeks(month)
   const closeMedia = media.filter((m) => m.closeOnBooking)
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       {first && firstItem ? (
         <div className={styles.bandRow}>
           <div className={styles.band} role="status" data-closure-band="">
             <Bell size={18} aria-hidden="true" className={styles.bandIcon} />
             <div className={styles.bandText}>
-              <p className={styles.bandTitle}>{`${dayTitle(first.closure.startDate)}の${KIND_LABEL[first.closure.kind]}：他の予約サイトの枠を閉じてください（未対応 ${first.t.open.length}件）`}</p>
+              <p className={styles.bandTitle}>{`${dayTitle(first.closure.startDate)}の${KIND_LABEL[first.closure.kind]}：他の予約サイトの枠を閉じてください（未対応 ${first.t.open.length} 件）`}</p>
               <p className={styles.bandDetail}>
                 {`LINE の受付は止めました → ${first.t.open.map((t) => nameOf(t.channel)).join('・')}の ${first.closure.startDate === first.closure.endDate ? dayShort(first.closure.startDate) : rangeTitle(first.closure)} を${first.closure.allDay ? '終日' : ` ${timeText(first.closure)} `}閉じてください`}
               </p>
             </div>
             {firstMedium?.loginUrl ? (
-              <Button href={firstMedium.loginUrl} target="_blank" rel="noopener noreferrer">{`${firstMedium.name}の管理画面を開く ↗`}</Button>
+              <Button external href={firstMedium.loginUrl}  >{`${firstMedium.name}の管理画面を開く`}</Button>
             ) : null}
             {canWrite ? (
-              <Button onClick={() => void closeOne(firstItem)} disabled={busy === firstItem.id} aria-label={`${nameOf(firstItem.channel)}の枠を閉じた`}>
+              <Button onClick={() => void closeOne(firstItem)} disabled={busy === firstItem.id} aria-label={`${nameOf(firstItem.channel)}の枠を閉じた`} busy={Boolean(busy === firstItem.id)} busyLabel="処理中…">
                 <Check size={15} aria-hidden="true" />閉じた
               </Button>
             ) : null}
@@ -303,8 +312,8 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
                         <>
                           <span className={`${styles.mark} ${tone === 'closed' ? styles.markClosed : ''}`}>{KIND_LABEL[hit.kind]}</span>
                           <span className={styles.cellNote}>{hit.allDay ? `終日・${tablesText(hit.tableIds, tables)}` : timeText(hit)}</span>
-                          <span className={styles.cellNote}>{hit.allDay ? (count === null ? '' : `予約 ${count}件`) : tablesText(hit.tableIds, tables)}</span>
-                          {hits.length > 1 ? <span className={styles.cellNote}>{`ほか ${hits.length - 1}件`}</span> : null}
+                          <span className={styles.cellNote}>{hit.allDay ? (count === null ? '' : `予約 ${count} 件`) : tablesText(hit.tableIds, tables)}</span>
+                          {hits.length > 1 ? <span className={styles.cellNote}>{`ほか ${hits.length - 1} 件`}</span> : null}
                         </>
                       ) : holiday ? (
                         <span className={`${styles.mark} ${styles.markHoliday}`}>定休</span>
@@ -367,7 +376,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
                   </li>
                 )
               })}
-              {list.length > UPCOMING_LIMIT ? <li className={styles.sideEmpty}>{`ほか ${list.length - UPCOMING_LIMIT}件（カレンダーの月を進めると見られます）`}</li> : null}
+              {list.length > UPCOMING_LIMIT ? <li className={styles.sideEmpty}>{`ほか ${list.length - UPCOMING_LIMIT} 件（カレンダーの月を進めると見られます）`}</li> : null}
             </ul>
           )}
 
@@ -391,7 +400,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
               {madeGoogle.includes(googleTarget.id) ? (
                 <TextLink href="/restaurant-test/google">Google ビジネスで確かめる</TextLink>
               ) : canGoogle ? (
-                <Button className={styles.sideButton} onClick={() => void proposeGoogle(googleTarget)} disabled={busy === `google-${googleTarget.id}`}>
+                <Button className={styles.sideButton} onClick={() => void proposeGoogle(googleTarget)} disabled={busy === `google-${googleTarget.id}`} busy={Boolean(busy === `google-${googleTarget.id}`)} busyLabel="処理中…">
                   {`Google にも${KIND_LABEL[googleTarget.kind]}を入れる案を作る`}
                 </Button>
               ) : null}
@@ -427,9 +436,9 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
         confirmLabel="消して開ける"
         busy={removing !== null && busy === `remove-${removing.id}`}
         error={removeError || undefined}
-        onConfirm={() => void remove()}
+        onConfirm={() => remove()}
         onCancel={() => setRemoving(null)}
       />
-    </>
+    </></SaveErrorScope>
   )
 }

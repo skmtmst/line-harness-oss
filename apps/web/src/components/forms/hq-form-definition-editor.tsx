@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { newBlockId, type FormBlock, type FormInputType, type FormLayout, type FormOptions, type FormSection } from '@line-crm/shared'
 import type { FormDefinition } from '@/lib/hq-templates-api'
@@ -14,7 +15,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Select from '@/components/shared/select'
+
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
 import {
   formJumpsInto,
@@ -208,10 +209,10 @@ export default function HqFormDefinitionEditor({
 
   return <div>
     {(localError || error) && <Notice className="mb-4" tone="danger" message={localError || error} />}
-    <div className="mb-4 grid gap-4 rounded-card border border-hairline bg-canvas p-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="mb-4 grid gap-4 rounded-card border content-card bg-canvas p-4 sm:grid-cols-2 xl:grid-cols-4">
       <Field label="フォーム名" htmlFor="hq-form-name" required><TextInput id="hq-form-name" value={value.name} onChange={event => setValue(current => ({ ...current, name: event.target.value }))} /></Field>
       <Field label="公開状態"><p className="rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-sm">配布先へ非公開の下書きとして保存</p></Field>
-      <Field label="回答したときに付けるタグ" htmlFor="hq-form-tag"><Select aria-label="回答したときに付けるタグ" id="hq-form-tag" value={value.onSubmitTagId} onChange={tagId => setValue(current => ({ ...current, onSubmitTagId: tagId }))} options={[{ value: '', label: '— 付けない —' }, ...portableRefs.tags.map(tag => ({ value: tag.id, label: tag.name }))]} /></Field>
+      <Field label="回答したときに付けるタグ" htmlFor="hq-form-tag"><EntitySelect kind="tag" aria-label="回答したときに付けるタグ" id="hq-form-tag" value={value.onSubmitTagId} onChange={tagId => setValue(current => ({ ...current, onSubmitTagId: tagId }))} options={[{ value: '', label: '— 付けない —' }, ...portableRefs.tags.map(tag => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))]} /></Field>
       <Field label="回答用URL"><p className="rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-sm text-ink-faint">配布先で発行</p></Field>
     </div>
     <div className="grid gap-4 xl:grid-cols-3">
@@ -230,7 +231,7 @@ export default function HqFormDefinitionEditor({
           <Button type="button" onClick={() => setShowOptions(true)}>オプション設定</Button>
         </div></div>
         <div className="space-y-3">{blocks.length === 0 ? <p className="rounded-card border border-dashed border-hairline bg-canvas p-8 text-center text-sm text-ink-faint">「ブロックを追加」から作ってください</p> : blocks.map((block, index) => <BlockEditor key={block.id} block={block} index={index} sections={layout.sections} refs={portableRefs} inHeader={tab === HEADER_TAB} selected={block.id === selectedBlockId} onSelect={() => setSelectedBlockId(block.id)} onChange={patch => patchBlock(block.id, patch)} />)}</div>
-        <div className="mt-4 rounded-card border border-hairline bg-canvas p-4"><Field label="説明" htmlFor="hq-form-description"><TextArea id="hq-form-description" rows={2} value={value.description} onChange={event => setValue(current => ({ ...current, description: event.target.value }))} /></Field></div>
+        <div className="mt-4 rounded-card border content-card bg-canvas p-4"><Field label="説明" htmlFor="hq-form-description"><TextArea id="hq-form-description" rows={2} value={value.description} onChange={event => setValue(current => ({ ...current, description: event.target.value }))} /></Field></div>
       </section>
     </div>
     <StickyBar actions={<div className="flex gap-2"><Button type="button" onClick={onCancel}>キャンセル</Button><Button type="button" variant="primary" disabled={saving} onClick={() => void save()} busy={saving} busyLabel="保存中...">フォームを保存する</Button></div>} />

@@ -144,6 +144,16 @@ function json(route: Route, body: unknown, status = 200) {
 
 /** この画面の合否に関係しない、共通の下ごしらえ（在席・店の一覧・機能表）。 */
 async function serveSharedStubs(route: Route, pathname: string): Promise<boolean> {
+  if (pathname === '/api/staff/me') {
+    await json(route, { success: true, data: { name: '試験担当', role: 'owner', permissionKeys: [], accountScope: 'all' } })
+    return true
+  }
+  if (pathname === '/api/friends') {
+    const accountId = new URL(route.request().url()).searchParams.get('lineAccountId')
+    const ids = accountId === ACCOUNT_B ? [FRIEND_B] : [FRIEND_A, 'friend-a', 'friend-001']
+    await json(route, { success: true, data: { items: ids.map((id) => ({ id, displayName: `試験-${id}` })), total: ids.length } })
+    return true
+  }
   if (pathname === '/api/auth/session') {
     await json(route, { success: true, data: { name: '試験担当', role: 'owner', permissionKeys: [] }, csrfToken: 'csrf-test' })
     return true
@@ -213,6 +223,15 @@ async function attachApiMock(page: Page, options: { slowCreate?: boolean; slowTe
 
     if (await serveSharedStubs(route, url.pathname)) return
 
+    // V8の共通タグ選択は、窓を開いたときに店のタグとフォルダを読み直す。
+    if (url.pathname === '/api/tags') {
+      await json(route, { success: true, data: [{ id: 'tag-vip', name: 'VIP', lineAccountId: url.searchParams.get('accountId') ?? ACCOUNT_A, groupId: null }] })
+      return
+    }
+    if (url.pathname === '/api/tag-groups') {
+      await json(route, { success: true, data: [] })
+      return
+    }
     if (url.pathname === '/api/automation-draft-resources') {
       await json(route, { success: true, data: { tags: [{ id: 'tag-vip', name: 'VIP' }], scenarios: [] } })
       return
@@ -543,26 +562,27 @@ async function switchAccount(page: Page, accountId: string) {
   await expect.poll(() => page.evaluate(() => localStorage.getItem('lh_selected_account'))).toBe(accountId)
 }
 
-/** V8は行の「…」から中身を直す窓を開く。入力を隠したまま保存しない。 */
+/** B-169: 行の設定をその場で開き、閉じても入力を保つ。 */
 async function editFirstAction(page: Page) {
-  await page.getByRole('button', { name: /^1つめのすること「.+」の操作$/ }).click()
-  await page.getByRole('menuitem', { name: '中身を直す' }).click()
-  const dialog = page.getByRole('dialog', { name: '1つめのすること', exact: true })
-  await dialog.waitFor()
-  return dialog
+  const row = page.locator('[data-action-row]').first()
+  if (await row.locator('button[aria-expanded="true"]').count() === 0) {
+    await row.getByRole('button', { name: '1つ目の行うことのその他操作' }).click()
+    await page.getByRole('menuitem', { name: '設定を変える' }).click()
+  }
+  return row
 }
 
 async function closeActionEditor(page: Page) {
-  // V8の窓はEscでも入力を保ったまま閉じる。
-  await page.keyboard.press('Escape')
-  await page.getByRole('dialog', { name: '1つめのすること', exact: true }).waitFor({ state: 'hidden' })
+  const row = page.locator('[data-action-row]').first()
+  await row.getByRole('button', { name: '1つ目の行うことのその他操作' }).click()
+  await page.getByRole('menuitem', { name: '設定を閉じる' }).click()
 }
 
 async function pickTag(page: Page, label: string) {
   await page.getByRole('button', { name: new RegExp(`^${label}：(選ぶ|変える)$`) }).click()
   const picker = page.getByRole('dialog', { name: 'タグを選ぶ', exact: true })
-  await picker.getByRole('radio', { name: 'VIP', exact: true }).check()
-  await picker.getByRole('button', { name: '選ぶ', exact: true }).click()
+  await picker.getByRole('checkbox', { name: 'VIP', exact: true }).check()
+  await picker.getByRole('button', { name: '選ぶ（1件）', exact: true }).click()
   await picker.waitFor({ state: 'hidden' })
 }
 
@@ -578,14 +598,16 @@ async function fillTagRule(page: Page, name: string) {
 
 async function fillMessageRule(page: Page, name: string, message: string) {
   await page.locator('#v8-rule-name').fill(name)
-  const dialog = await editFirstAction(page)
-  const current = await dialog.getByLabel('すること', { exact: true }).innerText()
-  if (!current.includes('メッセージを送る')) {
-    await dialog.getByLabel('すること', { exact: true }).click()
-    // 選択候補は窓の外の共通ポータルへ出る。
-    await page.getByRole('listbox').getByRole('button', { name: 'メッセージを送る', exact: true }).click()
+  let row = page.locator('[data-action-row]').first()
+  if (!(await row.innerText()).includes('メッセージを送る')) {
+    await row.getByRole('button', { name: '1つ目の行うことのその他操作' }).click()
+    await page.getByRole('menuitem', { name: '削除する' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: '削除する', exact: true }).click()
+    await page.getByRole('button', { name: '行うことを足す' }).click()
+    await page.getByRole('menuitem', { name: 'メッセージを送る', exact: true }).click()
   }
-  await dialog.getByLabel('送る文面').fill(message)
+  row = await editFirstAction(page)
+  await row.getByLabel('送る文面').fill(message)
   await closeActionEditor(page)
 }
 
@@ -607,8 +629,15 @@ async function storedDraftsOf(page: Page): Promise<StoredDrafts> {
   return page.evaluate((key) => JSON.parse(sessionStorage.getItem(key) ?? '{}') as StoredDrafts, DRAFT_STORAGE_KEY)
 }
 
+async function chooseTestFriend(page: Page, friendId: string) {
+  await page.getByRole('button', { name: /試す友だち：(選ぶ|変える)/ }).click()
+  const picker = page.getByRole('dialog', { name: '友だちを選ぶ' })
+  await picker.getByRole('radio', { name: `試験-${friendId}`, exact: true }).check()
+  await picker.getByRole('button', { name: '選ぶ', exact: true }).click()
+}
+
 async function openTestConfirmation(page: Page, friendId: string) {
-  await page.getByLabel('1人テストの友だちID').fill(friendId)
+  await chooseTestFriend(page, friendId)
   await page.getByRole('button', { name: '1人で試す', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '1人テストの確認' })
   await dialog.waitFor()
@@ -616,6 +645,38 @@ async function openTestConfirmation(page: Page, friendId: string) {
 }
 
 describe('V8 ルールを作る（M4torY）の誤操作防止（#679）', () => {
+  it('保存の422を名前の下へ出して移り、1440・1152幅でも直した欄だけ消す（B-154）', async () => {
+    for (const width of [1440, 1152]) {
+      const { page } = await openPage()
+      await page.setViewportSize({ width, height: 1000 })
+      await fillTagRule(page, '入力を残すルール')
+      await page.route(`${API_ORIGIN}/api/automation-drafts/**`, async (route) => {
+        if (route.request().method() === 'OPTIONS') return answerPreflight(route)
+        if (route.request().method() !== 'PUT') return route.fallback()
+        await json(route, { success: false, error: '入力を確認してください', fields: { name: 'この名前は使われています' } }, 422)
+      })
+      await page.getByRole('button', { name: '下書きを保存', exact: true }).click()
+      const input = page.locator('#v8-rule-name')
+      const reason = page.getByText('この名前は使われています', { exact: true })
+      await reason.waitFor()
+      await expect.poll(() => input.evaluate((node) => document.activeElement === node)).toBe(true)
+      expect(await input.inputValue()).toBe('入力を残すルール')
+      expect(await input.getAttribute('aria-invalid')).toBe('true')
+      expect(await input.getAttribute('aria-describedby')).toContain(await reason.getAttribute('id'))
+      const inputBox = (await input.boundingBox())!
+      const reasonBox = (await reason.boundingBox())!
+      expect(reasonBox.y).toBeGreaterThanOrEqual(inputBox.y + inputBox.height - 1)
+      expect(reasonBox.x + reasonBox.width).toBeLessThanOrEqual(width)
+      expect(await page.getByText('入力を確認してください', { exact: true }).count()).toBe(0)
+      await input.fill('直した名前')
+      await expect.poll(() => reason.count()).toBe(0)
+      expect(await input.getAttribute('aria-invalid')).not.toBe('true')
+      const context = page.context()
+      await context.close()
+      contexts.delete(context)
+    }
+  }, 60_000)
+
   it('遅い新規保存を連打しても1件だけ作り、再読込・戻るでも同じ下書きを更新する', async () => {
     const { page, api } = await openPage({ slowCreate: true })
     await fillTagRule(page, '来店後フォロー')
@@ -627,7 +688,8 @@ describe('V8 ルールを作る（M4torY）の誤操作防止（#679）', () => 
       button.click()
     })
     await waitUntil(() => api.createCalls.length === 1, '新規下書きAPIが呼ばれませんでした')
-    expect(await save.isDisabled()).toBe(true)
+    // 保存中は共通Buttonが処理中の文言へ切り替わる。連打防止はそのボタンで確かめる。
+    expect(await page.getByRole('button', { name: '処理中…', exact: true }).isDisabled()).toBe(true)
     api.releaseCreate()
     await page.getByText('下書きに保存しました。見込み人数を確認して、1人で試せます。').last().waitFor()
     expect(api.createCalls).toHaveLength(1)
@@ -718,13 +780,13 @@ describe('V8 ルールを作る（M4torY）の誤操作防止（#679）', () => 
     // V8は保存中の店舗切替を止める。Bの応答をAへ混ぜない。
     await requestAccountSwitch(page, ACCOUNT_A)
     expect(await page.evaluate(() => localStorage.getItem('lh_selected_account'))).toBe(ACCOUNT_B)
-    expect(await page.getByRole('button', { name: '下書きを保存', exact: true }).isDisabled()).toBe(true)
+    expect(await page.getByRole('button', { name: '処理中…', exact: true }).isDisabled()).toBe(true)
     api.releaseCreate()
     await waitUntil(() => api.updateCalls.some((call) => call.pathname === '/api/automation-drafts/draft-account-b-1'), '店舗Bの保存が終わりませんでした')
     await waitUntil(() => page.getByRole('button', { name: '下書きを保存', exact: true }).isEnabled({ timeout: 200 }).catch(() => false), '保存中の状態が終わりませんでした')
 
     await switchAccount(page, ACCOUNT_A)
-    await page.getByLabel('1人テストの友だちID').fill('friend-a')
+    await chooseTestFriend(page, 'friend-a')
     expect(await page.getByRole('button', { name: '1人で試す', exact: true }).isEnabled()).toBe(true)
     await fillTagRule(page, '既存Aを更新')
     await saveDraft(page)
@@ -916,11 +978,13 @@ describe('V8 ルールを作る（M4torY）を本物のWorkerに繋いだとき�
     // 店舗Bには、店舗Aの下書きも見込み人数も引き継がない。
     expect(await page.getByRole('button', { name: '1人で試す', exact: true }).isDisabled()).toBe(true)
 
-    // 失敗する1人テスト（この店にいない友だち）でも、返事を店舗Bへ残さない。
-    const failing = await openWorkerPage({ slowTest: true })
+    // 候補を選んだあとに所属が変わって失敗しても、返事を店舗Bへ残さない。
+    const failing = await openWorkerPage({ slowTest: true, beforeTest: (harness) => {
+      harness.raw.prepare('UPDATE friends SET line_account_id = ? WHERE id = ?').run(ACCOUNT_B, FRIEND_A)
+    } })
     await fillMessageRule(failing.page, '予約返信', '失敗する側の文面です。')
     await saveDraft(failing.page)
-    const failingDialog = await openTestConfirmation(failing.page, FRIEND_B)
+    const failingDialog = await openTestConfirmation(failing.page, FRIEND_A)
     await failingDialog.getByRole('button', { name: 'この内容で送る' }).click()
     await waitUntil(() => failing.worker.testCalls.length === 1, '失敗させる1人テストが呼ばれませんでした')
 

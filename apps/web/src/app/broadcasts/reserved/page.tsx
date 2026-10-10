@@ -1,5 +1,6 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -19,7 +20,6 @@ import type { Tag } from '@line-crm/shared'
 import { audienceSummary } from '@/lib/broadcast-summary'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { useStaffRole } from '@/lib/staff-role'
-import { canEditFeature } from '@/lib/staff-capability'
 import ReservedV8 from '@/v8/broadcast-detail/reserved'
 
 type AudienceEstimate = {
@@ -69,7 +69,7 @@ function ReservedBroadcastContent() {
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
   // 閲覧のみ（夕18）：V8 の右の欄の操作を押せない形にする。
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canEditFeature('broadcast.definition.edit')
+  const canEdit = useFeatureAccess('broadcasts')
   const [broadcast, setBroadcast] = useState<ApiBroadcast | null>(null)
   const [estimate, setEstimate] = useState<AudienceEstimate | null>(null)
   // BROADCAST-15: 宛先の条件に出すタグ名・シナリオ名。一覧・詳細と同じ

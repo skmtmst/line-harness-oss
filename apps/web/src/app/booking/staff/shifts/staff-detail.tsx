@@ -1,5 +1,7 @@
 'use client'
 
+import { useStaffRole } from '@/lib/staff-role'
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -13,7 +15,6 @@ import {
   type BookingStaff,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { canEditFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -99,11 +100,10 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
   // N-411 本人勤務: staff ロールは自分に紐づく予約スタッフだけを対象にする。
   // 他人の staff_id を直指定しても Worker 側が 403 で拒否するが、
   // 画面側でも「見せない」に揃える。
-  const [isStaffRole] = useState(() =>
-    typeof window !== 'undefined' && window.localStorage.getItem('lh_staff_role') === 'staff')
+  const verifiedRole = useStaffRole()
+  const isStaffRole = verifiedRole === 'staff'
   const [ownStaffId, setOwnStaffId] = useState<string | null>(null)
-  const [canEditOwn] = useState(() =>
-    typeof window === 'undefined' ? true : canEditFeature('booking.staff.own'))
+  const canEditOwn = usePermissionAccess('booking.staff.own')
   const [timeZone, setTimeZone] = useState('Asia/Tokyo')
   const [storeExceptions, setStoreExceptions] = useState<Array<{ dateFrom: string; dateTo: string; kind: string }>>([])
   const [menuId, setMenuId] = useState<string | null>(null)
@@ -772,7 +772,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
           kind="error"
           title="担当者の勤務とシフトを表示できませんでした"
           description="保存済みの内容は消えていません。時間をおいて、もう一度読み込んでください。"
-          action={<Button onClick={() => setReloadKey((value) => value + 1)}>勤務とシフトを再読み込み</Button>}
+          onRetry={() => setReloadKey((value) => value + 1)}
         />
       </div>
     )

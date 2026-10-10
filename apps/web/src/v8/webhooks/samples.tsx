@@ -21,6 +21,7 @@ import {
   useWebhookOverview,
 } from './shell'
 import styles from './samples.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /* 受け取る側の見本（どこから来るか）。 */
 export const INCOMING_SAMPLES = [
@@ -47,14 +48,14 @@ export default function WebhooksSamplesV8() {
   usePageTitle('外部連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || staffRole === 'owner'
+  const canManage = staffRole === 'owner'
   const overview = useWebhookOverview()
   return (
-    <ListPage help="見本に書いたことだけを送ります。「すべての出来事を送る」設定は見本からは作られません。"
+    <ListPage help={<>{WEBHOOKS_DESCRIPTION}{"見本に書いたことだけを送ります。「すべての出来事を送る」設定は見本からは作られません。"}</>}
       boardId="SAUCs"
       headingSize="regular"
       title="外部連携"
-      description={WEBHOOKS_DESCRIPTION}
+
       actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button> : undefined}
       tabs={<WebhookTabs active="notify" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
@@ -117,7 +118,7 @@ export default function WebhooksSamplesV8() {
             ))}
           </ul>
         </section>
-        {!canManage ? <p className={styles.askNote}>見本から作るのは統括だけができます。必要なときは統括に頼んでください。</p> : null}
+        {!canManage ? <p className={styles.askNote}>{permissionDeniedMessage('store')}</p> : null}
       </div>
     </ListPage>
   )

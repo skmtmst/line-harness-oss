@@ -45,8 +45,8 @@ vi.mock('@/components/shared/confirm-dialog', () => ({
   ),
 }))
 vi.mock('@/components/shared/button', () => ({
-  default: ({ children, href, ...props }: React.ComponentProps<'button'> & { href?: string }) => (
-    href !== undefined ? <a href={href} {...props}>{children}</a> : <button {...props}>{children}</button>
+  default: ({ children, href, busy, disabled, ...props }: React.ComponentProps<'button'> & { href?: string; busy?: boolean }) => (
+    href !== undefined ? <a href={href} {...props}>{children}</a> : <button disabled={Boolean(disabled || busy)} {...props}>{children}</button>
   ),
 }))
 vi.mock('@/components/shared/list-state', () => ({
@@ -207,8 +207,14 @@ const mountedRoots: Root[] = []
 beforeAll(async () => {
   documentStub = new FakeDocument()
   const windowStub = documentStub.defaultView
+  const events = new EventTarget()
   Object.assign(windowStub, {
     document: documentStub,
+    location: new URL('http://localhost/events/bookings?id=event-1'),
+    history: { replaceState: vi.fn() },
+    addEventListener: events.addEventListener.bind(events),
+    removeEventListener: events.removeEventListener.bind(events),
+    dispatchEvent: events.dispatchEvent.bind(events),
     Node: FakeNode,
     Element: FakeElement,
     HTMLElement: FakeElement,
@@ -1131,3 +1137,6 @@ describe('Issue #684 イベント予約の実操作', () => {
     expect(pressable.length).toBeGreaterThan(0)
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

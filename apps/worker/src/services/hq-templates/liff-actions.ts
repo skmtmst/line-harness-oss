@@ -65,6 +65,9 @@ export async function resolveHqLiffActions(db: D1Database, authority: HqTemplate
 export function messageLiffActions(definition: MessageTemplateDefinition): Map<string, LiffAction> {
   const actions = definition.card ? new Map<string, LiffAction>() : collectLiffActionLocators(definition);
   for (const button of definition.card?.buttons ?? []) {
+    if (button.action === 'url') {
+      for (const [locator, action] of collectLiffActionLocators({ uri: button.value })) actions.set(locator, action);
+    }
     if (!isLiffActionKind(button.action)) continue;
     const spec: LiffAction = button.action === 'form' ? { kind: 'form', formId: button.value }
       : button.action === 'booking' ? { kind: 'booking', ...(button.value ? { menuId: button.value } : {}) }

@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8 統括のメンバー（Pencil `r4ARpV`。招待の窓 `yLKwV`・権限を変える窓 `BHEl9`・
- * 変える前の確認 `M4jS9`）。
- *
- * v7 の画面（app/hq/members/page.tsx）と読み書きの口・権限・失敗時の扱いは同じ。
- * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左の「統括の設定」の列
- * （型のフォルダの列）・数のカード4枚・権限者の表・役割の説明。
- */
 import { Plus } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
@@ -25,6 +16,19 @@ import { canResendInvite, lastLoginShort, memberKpis, memberStatus, sortMembersB
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import MemberDialogV8, { MemberChangeConfirmV8, type MemberDialogValue } from './member-dialog'
 import styles from './members.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
+
+/*
+ * ★V8 統括のメンバー（Pencil `r4ARpV`。招待の窓 `yLKwV`・権限を変える窓 `BHEl9`・
+ * 変える前の確認 `M4jS9`）。
+ *
+ * v7 の画面（app/hq/members/page.tsx）と読み書きの口・権限・失敗時の扱いは同じ。
+ * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左の「統括の設定」の列
+ * （型のフォルダの列）・数のカード4枚・権限者の表・役割の説明。
+ */
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -52,7 +56,7 @@ const STATUS_TONES: Record<MemberStatus, StatusBadgeTone> = {
   inactive: 'neutral',
 }
 
-const VIEWER_NOTE = '閲覧のみで見ています。権限者の招待・変更はオーナーか管理者に頼んでください。'
+const VIEWER_NOTE = '閲覧のみで見ています。権限者の招待・変更は統括の管理者に頼んでください。'
 
 export default function HqMembersV8() {
   return (
@@ -63,6 +67,7 @@ export default function HqMembersV8() {
 }
 
 function MembersInner() {
+  const saveErrors = useSaveFormErrors()
   // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」（絵 `V8-B/r4ARpV`）。
   usePageTitle('メンバー')
   usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
@@ -109,19 +114,22 @@ function MembersInner() {
       if (loginRes?.success) setLastLogins(loginRes.data)
       setStatus('ready')
     } catch (caught) {
+      saveErrors.capture(caught);
+
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
-  }, [])
+  }, [saveErrors])
 
   useEffect(() => {
     void load()
-  }, [load])
+  }, [load]);
+
 
   const accountNames = useMemo(() => new Map(accounts.map((a) => [a.id, a.name])), [accounts])
   /* 絵 `r4ARpV` の並び：状態→役割（オーナー→管理者→担当者→閲覧のみ）→名前。 */
   const rows = sortMembersByRole(members)
   const kpis = useMemo(() => memberKpis(members), [members])
-  const canManage = me?.role === 'owner' || me?.role === 'admin'
+  const canManage = !me?.readOnly && me?.accountScope !== 'accounts' && (me?.role === 'owner' || me?.role === 'admin')
   const restricted = me?.accountScope === 'accounts'
 
   const submitDialog = async (value: MemberDialogValue, stepUpToken?: string) => {
@@ -160,14 +168,18 @@ function MembersInner() {
       setDialog({ open: false, member: null })
       await load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (!stepUpToken && caught instanceof ApiError && caught.code === 'STEP_UP_REQUIRED') {
-        setStepUp({ retry: (token) => submitDialog(value, token) })
+        setStepUp({ retry: (token) => submitDialog(value, token) });
+
         return
       }
       // M026：原文のまま出さず、共通の状態別案内へ渡す（本人確認の分岐は先に残す）。
+      { if (!fieldFailure)
       setDialogError(japaneseDetailOf(caught) || describeApiFailure(caught, '保存', {
-        forbidden: '権限者の招待・変更はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。',
-      }))
+        scope: 'hq',
+      })) }
     } finally {
       setDialogBusy(false)
     }
@@ -182,10 +194,12 @@ function MembersInner() {
       if (!res.success) throw new Error(res.error)
       setNotice(`${member.email} へ招待メールを送り直しました。`)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       // M026：再試行の言葉がない代替文にしない。共通の状態別案内へ渡す。
+      { if (!fieldFailure)
       setActionError(japaneseDetailOf(caught) || describeApiFailure(caught, '招待メールの再送', {
-        forbidden: '招待メールの再送はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。',
-      }))
+        scope: 'hq',
+      })) }
     } finally {
       setResendingId(null)
     }
@@ -196,10 +210,10 @@ function MembersInner() {
   const ready = status === 'ready' && !restricted
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId="r4ARpV"
       title="メンバー"
-      description="統括の画面に入れる人です。役割と、見られるアカウント（担当範囲）を決めます。"
+      help="統括の画面に入れる人です。役割と、見られるアカウント（担当範囲）を決めます。"
       actions={ready && canManage ? (
         <Button variant="primary" onClick={openInvite}>
           <Plus aria-hidden="true" className={styles.buttonIcon} />
@@ -209,18 +223,18 @@ function MembersInner() {
       folders={<HqSettingsNavV8 active="members" />} folderNav={settingsNav}
     >
       <div className={styles.body}>
-        {ready && !canManage ? <p className={styles.viewerBand} role="status">{VIEWER_NOTE}</p> : null}
+        {ready && !canManage ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div> : null}
         {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-        {actionError ? <p className={styles.error} role="alert">{actionError}</p> : null}
+        {actionError ? <Notice tone="danger" >{actionError}</Notice> : null}
 
         {status === 'loading' ? (
-          <ListState kind="loading" title="権限者を読み込んでいます" />
+          <ListState permissionScope="hq" kind="loading" title="権限者を読み込んでいます" />
         ) : status === 'forbidden' ? (
-          <ListState kind="forbidden" />
+          <ListState permissionScope="hq" kind="forbidden" />
         ) : status === 'error' ? (
-          <ListState kind="error" title="権限者を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
+          <ListState permissionScope="hq" kind="error" title="権限者を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
         ) : restricted ? (
-          <ListState kind="forbidden" title="全アカウントの担当者だけが権限者を管理できます" description="担当アカウントが限定されているため、権限者の一覧と変更はできません。" />
+          <ListState permissionScope="hq" kind="forbidden" title="全アカウントの担当者だけが権限者を管理できます" permissionReason="担当アカウントが限定されているため、権限者の一覧と変更はできません。" />
         ) : (
           <>
             <KpiBand aria-label="権限者の数">
@@ -249,21 +263,21 @@ function MembersInner() {
                 return (
                   <div key={member.id} className={styles.row} role="row">
                     <span role="cell" className={styles.cell} title={member.name}>{member.name}{isSelf ? '（あなた）' : ''}</span>
-                    <span role="cell" className={styles.cell} title={member.email ?? ''}>{member.email ?? '—'}</span>
+                    <span role="cell" className={styles.cell} title={member.email ?? ''}>{member.email ?? emptyValue('unknown')}</span>
                     <span role="cell" className={styles.cell}>{ROLE_WORDS[member.role] ?? member.role}</span>
                     <span role="cell" className={styles.cell} title={scope}>{scope}</span>
                     <span role="cell"><StatusBadge tone={STATUS_TONES[state]}>{STATUS_WORDS[state]}</StatusBadge></span>
                     <span role="cell" className={styles.cell}>{lastLoginShort(lastLogins[member.id])}</span>
                     <span role="cell" className={styles.actions}>
                       {canManage && canResendInvite(member) ? (
-                        <button
+                        <Button
                           type="button"
-                          className={styles.textButton}
+                          variant="text" size="inline"
                           disabled={resendingId === member.id}
                           onClick={() => void resend(member)}
-                        >
-                          {resendingId === member.id ? '送信中…' : '再送'}
-                        </button>
+                         busy={resendingId === member.id} busyLabel="送信中…">
+                          再送
+                        </Button>
                       ) : null}
                       {canManage ? (
                         <Button onClick={() => openChange(member)} aria-label={`${member.name}さんの権限を変更`}>変更</Button>
@@ -308,7 +322,7 @@ function MembersInner() {
           onConfirm={() => {
             const pending = confirmChange
             setConfirmChange(null)
-            void submitDialog(pending.value)
+            return submitDialog(pending.value)
           }}
         />
       ) : null}
@@ -319,6 +333,6 @@ function MembersInner() {
           onClose={() => setStepUp(null)}
         />
       ) : null}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

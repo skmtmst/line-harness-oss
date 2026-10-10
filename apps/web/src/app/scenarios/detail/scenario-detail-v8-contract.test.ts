@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
  * ★V8 シナリオ配信の編集・配信結果の契約（#1161）。
  *
  * 文字の契約ではなく「Pencil の板と受け口が繋がっているか」の契約。
- * - detail-v8.tsx … `PMLkX`（稼働中）/ `nMSiE`（始めた直後）/ `ARuZ4`（停止中）、
+ * - detail-v8.tsx … `PMLkX`（有効）/ `nMSiE`（始めた直後）/ `ARuZ4`（停止中）、
  *   小窓 `F1LK4e`（開始の確認）・`OPGU2`（停止の確認）・`Al4Ek`（複製）
  * - results-v8.tsx … `X4STXS`（配信結果）
  * - page.tsx 2 つ … data-theme="v8" のときだけ V8 を描く

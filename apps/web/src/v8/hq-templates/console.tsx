@@ -1,18 +1,9 @@
 'use client'
 
-/*
- * ★V8-B 統括のテンプレート（一覧 LRc93・メッセージのひな形を作る X4JcOf・アカウントへ配る meBRB）。
- *
- * 2026-10-07 src/v8 に一から書いた。読み書き・権限・失敗時の扱いは今の画面
- * （app/hq/templates/template-console.tsx）と同じ：一覧・分類（フォルダ）・複製・削除、
- * 新規保存の依頼ID（応答不明は同じ依頼を固定して「前回の保存を再確認」）、配る前の確認
- * （preflight）と重複の配り方、配る（preflightId＝配布番号・応答不達は GET で復元・再POSTしない）、
- * URL の hash からの復元、失敗アカウントだけの再確認。動きの一覧は同じ場所の BEHAVIOR.md。
- *
- * メッセージ（type=template）の作る画面は絵どおりに書き直した（message-form.tsx）。
- * タグ・リッチメニュー・回答フォーム・シナリオのひな形の中身は、入口（app/hq/templates/page.tsx）
- * が今の編集部品を `DefinitionEditor` として渡す（src/v8 から @/app を読まないため）。
- */
+import { canManageRole, useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
@@ -21,35 +12,27 @@ import { templateKind, type HqTemplateFolder, type HqTemplateListStats, type HqT
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { ListPageBody } from '@/components/templates/list-page'
-import { FolderDotName } from '@/components/shared/folder-dot'
+import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import StatusBadge from '@/components/shared/status-badge'
 import Notice from '@/components/shared/notice'
 import TagPill from '@/components/shared/tag-pill'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
 import Select from '@/components/shared/select'
 import FolderSelect from '@/components/shared/folder-select'
 import { Th } from '@/components/shared/table'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
 import { freshDefinition } from '@/lib/hq-template-authoring'
 import { clearCreationAttempt, loadCreationAttempt, persistCreationAttempt, sameCreationScope, type CreationAttempt, type CreationScope } from '@/lib/hq-template-create-attempt'
-import {
-  hqTemplatesApi, type DistributionMode, type DistributionResult, type HqAccount, type HqTemplate, type HqTemplateListItem, type MessageTemplateDefinition,
-  type Preflight, type TemplateDefinition, type FormDefinition, type TemplateDetail, type TemplateInput, type TemplateType,
-} from '@/lib/hq-templates-api'
-import {
-  choiceKey, contentSummary, definitionError, definitionForName, definitionName, failedStores, referenceCount, resolvedItems,
-  uploadedKeysIn, type TemplateMedia,
-} from './definition'
+import { hqTemplatesApi, type DistributionMode, type DistributionResult, type HqAccount, type HqTemplate, type HqTemplateListItem, type MessageTemplateDefinition, type Preflight, type TemplateDefinition, type FormDefinition, type TemplateDetail, type TemplateInput, type TemplateType } from '@/lib/hq-templates-api'
+import { choiceKey, contentSummary, definitionError, definitionForName, definitionName, failedStores, referenceCount, resolvedItems, uploadedKeysIn, type TemplateMedia } from './definition'
 import MessageForm from './message-form'
 import { useFormErrors } from '@/lib/use-form-errors'
 import TemplateMessageEditor from '@/v8/template-edit/message'
 import TemplateAssetEditor from '@/v8/template-edit/asset'
 import TemplateRichEditor from '@/v8/template-edit/rich'
+import TemplateRichVideoEditor from '@/v8/template-edit/rich-video'
+import { hqMediaApi } from '@/lib/api-hq-media'
 import CarouselV8 from '@/v8/templates/carousel'
 import QuestionNewV8 from '@/v8/templates/question-new'
 import type { TemplateEditHost, TemplateHostContent } from '@/v8/template-edit/host'
@@ -73,7 +56,31 @@ import { useAttributeTab } from './attribute-tabs'
 import HqStoreList from './store-list'
 import HqTagEditorV8 from './tag-editor'
 import HqTemplateDetail, { inUseVersionOf } from './detail'
+import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import styles from './console.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { DistributionPage } from '@/components/templates/distribution-page'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import { DistributionTable, DistributionProgress, DistributionAccountName, DistributionToolbar } from '@/components/shared/distribution-table'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+/*
+ * ★V8-B 統括のテンプレート（一覧 LRc93・メッセージのひな形を作る X4JcOf・アカウントへ配る meBRB）。
+ *
+ * 2026-10-07 src/v8 に一から書いた。読み書き・権限・失敗時の扱いは今の画面
+ * （app/hq/templates/template-console.tsx）と同じ：一覧・分類（フォルダ）・複製・削除、
+ * 新規保存の依頼ID（応答不明は同じ依頼を固定して「前回の保存を再確認」）、配る前の確認
+ * （preflight）と重複の配り方、配る（preflightId＝配布番号・応答不達は GET で復元・再POSTしない）、
+ * URL の hash からの復元、失敗アカウントだけの再確認。動きの一覧は同じ場所の BEHAVIOR.md。
+ *
+ * メッセージ（type=template）の作る画面は絵どおりに書き直した（message-form.tsx）。
+ * タグ・リッチメニュー・回答フォーム・シナリオのひな形の中身は、入口（app/hq/templates/page.tsx）
+ * が今の編集部品を `DefinitionEditor` として渡す（src/v8 から @/app を読まないため）。
+ */
 
 const PAGE_TITLES: Record<TemplateType, string> = { tag: 'タグ', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }
 /** 一覧の段の住所（上の帯のパンくずの行き先）。シナリオのひな形はテンプレートの住所の中にある。 */
@@ -83,7 +90,6 @@ const MODE_LABELS: Record<DistributionMode, string> = { create: '新しく作る
 
 type Stage = 'saved' | 'list' | 'detail' | 'edit' | 'accounts' | 'duplicates' | 'result'
 const errorText = (error: unknown) => error instanceof Error ? error.message : '処理できませんでした。時間をおいて再確認してください。'
-
 
 /** 種類ごとの中身の編集部品（タグ・リッチメニュー・回答フォーム・シナリオ）。入口が今の部品を渡す。 */
 export interface DefinitionEditorProps {
@@ -120,8 +126,9 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   /** 店のリッチメニューの作る画面（入口が渡す。src/v8 は @/app を読まないため）。host 付きで統括のひな形を作る（gobhu〜gQabc）。 */
   RichMenuCreate?: ComponentType<{ host: RichMenuCreateHost }>
 }) {
+  const saveErrors = useSaveFormErrors()
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const canEdit = useTenantWideAccess()
   const router = useRouter()
   const { setSelectedAccountId } = useAccount()
   const [folderDistribution, setFolderDistribution] = useState<{ name: string; templates: HqTemplate[] } | null>(null)
@@ -132,7 +139,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const [folders, setFolders] = useState<HqTemplateFolder[]>([])
   const [folderLoadFailed, setFolderLoadFailed] = useState(false)
   const [folderId, setFolderId] = useState<string | null>(null)
-  const [folderFilter, setFolderFilter] = useState<string>('all')
+  const [folderFilter, setFolderFilter] = useListUrlValue<string>('folderFilter', 'all')
   const [textOverrides, setTextOverrides] = useState<Record<string, string>>({})
   const [overrideOpen, setOverrideOpen] = useState<string | null>(null)
   const duplicateAttempts = useRef(new Map<string, string>())
@@ -142,11 +149,12 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [definition, setDefinition] = useState<TemplateDefinition>(() => freshDefinition(type))
+  const editBaseline = useRef(JSON.stringify({ name, description, definition, folderId }))
   const [selected, setSelected] = useState<string[]>([])
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [accountFolder, setAccountFolder] = useState(ALL_ACCOUNTS)
   const accountFolders = useDistributionFolders(stage === 'accounts' || stage === 'duplicates' || stage === 'result' || stage === 'saved' || folderDistribution !== null)
-  /* テンプレートの6種類（店と同じ上のタブ・API-17）。タブを替えたらその種類だけ読む。 */
+  /* テンプレートの7種類（店と同じ上のタブ・API-17）。タブを替えたらその種類だけ読む。 */
   const [kind, setKind] = useState<TemplateKind>('message')
   const [kindRows, setKindRows] = useState<HqTemplate[] | null>(null)
   const [kindCounts, setKindCounts] = useState<Partial<Record<TemplateKind, number>> | null>(null)
@@ -162,9 +170,9 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const [choices, setChoices] = useState<Record<string, DistributionMode>>({})
   const [bulkMode, setBulkMode] = useState<'' | DistributionMode>('')
   const [result, setResult] = useState<DistributionResult | null>(null)
+  const [resultDialogFor, setResultDialogFor] = useState<string | null>(null)
   const [pendingRun, setPendingRun] = useState<string | null>(null)
   /** 配った結果の窓（★V8-B dEvJM）。結果が出たら開く。閉じても同じ画面の進み具合と操作は残る。 */
-  const [resultDialogFor, setResultDialogFor] = useState<string | null>(null)
   const [requestBusy, setBusy] = useState(false)
   const [uploadBusy, setUploadBusy] = useState(false)
   const busy = requestBusy || uploadBusy
@@ -272,13 +280,40 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     return () => clearInterval(timer)
   }, [stage])
 
+  const tagDraft = useRef<TemplateDefinition | null>(null)
+  const conflictScope = JSON.stringify([type, detail?.template.id, creationScope.current?.tenantId])
+  const conflictScopeRef = useRef(conflictScope)
+  conflictScopeRef.current = conflictScope
+  const collision = useSaveConflict<TemplateDetail>({
+    contextKey: conflictScope,
+    fetchLatest: async () => detail ? hqTemplatesApi.get(detail.template.id) : null,
+    reload: async () => {
+      if (!detail) return
+      const scope = conflictScope
+      const latest = await hqTemplatesApi.get(detail.template.id)
+      if (!alive.current || scope !== conflictScopeRef.current) return
+      loadDetailIntoForm(latest)
+      tagDraft.current = null
+      setFormKey(key => key + 1)
+      setConflict(false); setError(''); collision.clear()
+    },
+  })
+
   const perform = async (action: () => Promise<void>) => {
     if (lock.current || !ready) return
     lock.current = true; setBusy(true); setError(''); setConflict(false); setMessage('')
     try { await action() } catch (e) {
+      const fieldFailure = saveErrors.capture(e);
+
       if (alive.current) {
-        setError(errorText(e))
-        setConflict(Boolean(e && typeof e === 'object' && 'status' in e && e.status === 409))
+        { if (!fieldFailure)
+
+        setError(errorText(e));
+
+        const collided = Boolean(e && typeof e === 'object' && 'status' in e && e.status === 409)
+        setConflict(collided)
+        if (collided) collision.mark()
+        }
       }
     } finally { lock.current = false; if (alive.current) setBusy(false) }
   }
@@ -303,6 +338,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const referenceOptions = (kind: TemplateType) => (catalog ?? []).filter((item) => item.template_type === kind).map((item) => ({ id: item.id, name: item.name }))
   const loadDetailIntoForm = (loaded: TemplateDetail) => {
     if (loaded.template.template_type !== type || loaded.definition.schemaVersion !== 1 || !definitionName(type, loaded.definition)) throw new Error('ひな形の種類または保存内容を確認できません。')
+    editBaseline.current = JSON.stringify({ name: loaded.template.name, description: loaded.template.description ?? '', definition: loaded.definition, folderId: loaded.template.folder_id ?? null })
     setFolderId(loaded.template.folder_id ?? null); setDetail(loaded); setName(loaded.template.name); setDescription(loaded.template.description ?? ''); setDefinition(loaded.definition)
   }
   const open = (id: string, next: Stage) => void perform(async () => {
@@ -313,7 +349,9 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   })
   const startCreate = () => {
     createAttempt.current = null; sessionUploads.current = []; setMenuTargets([])
-    setDetail(null); setFolderId(folderFilter !== 'all' && folderFilter !== 'none' ? folderFilter : null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setStage('edit'); setError(''); setConflict(false)
+    const fresh = freshDefinition(type), nextFolder = folderFilter !== 'all' && folderFilter !== 'none' ? folderFilter : null
+    editBaseline.current = JSON.stringify({ name: '', description: '', definition: fresh, folderId: nextFolder })
+    setDetail(null); setFolderId(nextFolder); setName(''); setDescription(''); setDefinition(fresh); setStage('edit'); setError(''); setConflict(false)
   }
   /* 店のひな形（テキスト・カード）の保存で落ちた欄（B-139）。MessageForm が欄ごとに検査し、1つ目へ移る。 */
   const messageFields = useFormErrors()
@@ -321,7 +359,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const sharedEditorRef = useRef(false)
   const sharedEditorNow = () => sharedEditorRef.current
   const usesMessageForm = () => stage === 'edit' && type === 'template' && 'template' in definition && !sharedEditorNow()
-  const save = (distribute: boolean, sourceDefinition = definition, sourceName = name, sourceDescription = description, andAnother = false, options: { folderId?: string | null; preselect?: string[] } = {}) => (usesMessageForm() && messageFields.submit().length > 0 ? Promise.resolve() : perform(async () => {
+  const save = (distribute: boolean, sourceDefinition = definition, sourceName = name, sourceDescription = description, andAnother = false, options: { folderId?: string | null; preselect?: string[]; onSaved?: () => void } = {}) => (usesMessageForm() && messageFields.submit().length > 0 ? Promise.resolve() : perform(async () => {
     const preparedDefinition = definitionForName(type, sourceDefinition, sourceName.trim(), sourceDescription.trim())
     const validation = !sourceName.trim() ? 'ひな形の名前を入力してください。' : definitionError(type, preparedDefinition, creationScope.current?.tenantId)
     if (validation) throw new Error(validation)
@@ -343,7 +381,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         setName(attempt.input.name); setDescription(attempt.input.description ?? ''); setDefinition(attempt.input.definition)
       }
       const clearReceipt = () => {
-        try { clearCreationAttempt(window.sessionStorage, scope, type, attempt.requestId) } catch (cause) { retainAttempt(); throw cause }
+        try { clearCreationAttempt(window.sessionStorage, scope, type, attempt.requestId) } catch (cause) {
+          saveErrors.capture(cause); retainAttempt(); throw cause }
       }
       if (createSettlement.current?.kind === 'rejected') {
         clearReceipt()
@@ -357,6 +396,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           // 応答が失われたら、同じ鍵と同じ中身で送り直す。
           saved = await hqTemplatesApi.create(attempt.input, attempt.requestId)
         } catch (cause) {
+          saveErrors.capture(cause);
+
           if (!createUncertain && cause && typeof cause === 'object' && 'requestNotApplied' in cause && cause.requestNotApplied === true) {
             createSettlement.current = { kind: 'rejected' }
             clearReceipt()
@@ -380,7 +421,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     setCreateUncertain(false)
     setTemplates((current) => [saved.template, ...current.filter((row) => row.id !== saved.template.id)])
     refreshStats()
-    setMessage(continueToAccounts ? '' : 'ひな形を保存しました。')
+    options.onSaved?.()
+    notifySaved(continueToAccounts ? '' : 'ひな形を保存しました。')
     if (continueToAccounts) {
       setSelected(options.preselect ?? []); setTextOverrides({}); setSearch('')
       setAccountFolder(ALL_ACCOUNTS)
@@ -424,6 +466,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         if (alive.current) setFolderBatch(next)
       })
     } catch (cause) {
+      saveErrors.capture(cause)
       throw new Error(`${errorText(cause)} 配布結果が未確認の行は再配布せず「結果を再確認」を押してください。`)
     }
   }
@@ -496,17 +539,25 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       const completed = await hqTemplatesApi.distribute(detail.template.id, preflight.preflightId, resolutions)
       if (completed.runId !== preflight.preflightId) throw new Error('配布番号が一致しません。結果を再確認してください。')
       if (alive.current) setResult(completed)
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
       // 途切れた POST は結果不明。送り直さず、成功・失敗を作らない。
       try {
-        const recovered = await hqTemplatesApi.result(detail.template.id, preflight.preflightId)
+        const recovered = await hqTemplatesApi.result(detail.template.id, preflight.preflightId);
+
         if (recovered.runId !== preflight.preflightId) throw new Error('配布番号が一致しません。')
-        if (alive.current) setResult(recovered)
-      } catch { throw new Error('配布結果をまだ確認できません。再配布せず「結果を再確認」を押してください。') }
+        if (alive.current) { if (!fieldFailure) setResult(recovered)
+      }
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure); throw new Error('配布結果をまだ確認できません。再配布せず「結果を再確認」を押してください。') }
     }
-  })
+  });
+
   const refreshResult = () => void perform(async () => {
-    if (!detail || !pendingRun) return
+    if (!detail || !pendingRun)
+
+
+ return
     const loaded = await hqTemplatesApi.result(detail.template.id, pendingRun)
     if (loaded.runId !== pendingRun) throw new Error('配布番号が一致しません。')
     if (alive.current) setResult(loaded)
@@ -546,10 +597,6 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     // 権限のある一覧・アカウントを読んだあとに一度だけ戻す。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready])
-
-  useEffect(() => {
-    if (result && result.status !== 'running') setResultDialogFor(`${result.runId}:${result.status}`)
-  }, [result])
   const reloadFolders = async () => setFolders(await hqTemplatesApi.folders.list())
   /* フォルダを選ぶ欄からその場で作る（dLffh）。左の列の「フォルダを追加」と同じ口。名前と色を保存する。 */
   const createFolder = async (folderName: string, color: string | null) => {
@@ -571,6 +618,9 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const resolutions = preflight ? resolvedItems(preflight, choices) : null
   const shownAccounts = accountsInFolder(accounts, accountFolder, accountFolders.membership).filter((account) => account.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
   const accountFolderRows = distributionFolderRows({ accounts, ...accountFolders, selected, onChange: setSelected, disabled: busy || stage !== 'accounts' })
+  useEffect(() => {
+    if (result && result.status !== 'running') setResultDialogFor(`${result.runId}:${result.status}`)
+  }, [result])
   const done = result && result.status !== 'running'
   const failures = result ? failedStores(result) : []
   const successes = result?.stores.filter((store) => store.status === 'succeeded') ?? []
@@ -590,9 +640,20 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const colorFolder = folders.find((folder) => folder.id === tagFolder?.id) ?? tagFolder ?? templateFolder
   const tagColor = colorFolder ? folderDisplayColor(colorFolder) : null
 
+  const conflictNotice = conflict && detail ? <>
+    <SaveConflictBand title="ほかの人が統括のひな形を先に保存しました" description={error || undefined} compareBusy={collision.compareBusy} onCompare={collision.compare} onReload={collision.reloadLatest} />
+    <SaveConflictCompareDialog open={collision.compareOpen} busy={collision.compareBusy} error={collision.compareError} onCancel={collision.closeCompare} onReload={collision.reloadLatest}
+      lines={collision.latest ? [
+        { text: `名前：入力 ${type === 'tag' && tagDraft.current ? definitionName(type, tagDraft.current) : name} ／ 最新 ${collision.latest.template.name}` },
+        { text: `説明：入力 ${description} ／ 最新 ${collision.latest.template.description ?? ''}` },
+        { text: `内容：入力 ${JSON.stringify(type === 'tag' ? tagDraft.current ?? definition : definition)} ／ 最新 ${JSON.stringify(collision.latest.definition)}` },
+      ] : null} />
+  </> : null
+
   const notices = <>
-    {!canEdit && stage === 'list' ? <p className={styles.readonlyBand} role="note">閲覧のみで見ています。変える操作は管理者に頼んでください。</p> : null}
-    {error && stage !== 'saved' ? <Notice tone="danger" message={error} action={conflict && detail ? <Button disabled={busy} onClick={() => open(detail.template.id, 'edit')}>最新の内容を読み込む</Button> : undefined} /> : null}
+    {!canEdit && stage === 'list' ? <div className={styles.readonlyBand}><ReadOnlyNotice role="note">閲覧のみで見ています。変える操作は統括の管理者に頼んでください。</ReadOnlyNotice></div> : null}
+    {conflictNotice}
+    {error && !conflictNotice && stage !== 'saved' ? <Notice tone="danger" message={error} /> : null}
     {message ? <Notice tone="success" message={message} onClose={() => setMessage('')} /> : null}
   </>
 
@@ -610,7 +671,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       setMessage('ひな形を複製しました。')
     })
     return (
-      <HqStoreList
+      <SaveErrorScope errors={saveErrors}><HqStoreList
         type={type}
         rows={listRows}
         ready={ready}
@@ -662,12 +723,13 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           <ConfirmDialog
             open={!!remove}
             title="ひな形を削除"
+            deleteName={remove?.name ?? ''}
             description={`「${remove?.name ?? ''}」を削除します。配布済みのアカウントデータは残ります。`}
             destructive
             confirmLabel="削除する"
             busy={busy}
             onCancel={() => { if (!busy) setRemove(null) }}
-            onConfirm={() => void perform(async () => {
+            onConfirm={() => perform(async () => {
               if (!remove) return
               await hqTemplatesApi.remove(remove.id, remove.revision)
               setTemplates((current) => current.filter((t) => t.id !== remove.id))
@@ -677,7 +739,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           />
           </>
         )}
-      />
+      /></SaveErrorScope>
     )
   }
 
@@ -685,7 +747,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   if (stage === 'detail' && detail) {
     const listRow = [...(kindRows ?? []), ...templates].find((item) => item.id === detail.template.id) as HqTemplateListItem | undefined
     return (
-      <HqTemplateDetail
+      <SaveErrorScope errors={saveErrors}><HqTemplateDetail
         detail={detail}
         row={listRow}
         accounts={accounts}
@@ -717,7 +779,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           setMessage('ひな形を複製しました。')
         })}
         onEnterAccount={(accountId) => { setSelectedAccountId(accountId); router.push('/templates') }}
-      />
+      /></SaveErrorScope>
     )
   }
 
@@ -731,7 +793,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const current = ('template' in definition ? definition : freshDefinition('template')) as MessageTemplateDefinition
   /* 編集で中身を店の画面の形に戻せないもの（古い形のカード等）は、空で開いて上書きしないよう今の画面（X4JcOf）で直す。 */
   const editContent = detail && type === 'template' && editKind !== 'message' ? hostContentOf(editKind, name, current) : undefined
-  const sharedEditor = type === 'template' && !createUncertain && ['message', 'coupon', 'research', 'carousel', 'question', 'rich_message'].includes(editKind)
+  const sharedEditor = type === 'template' && !createUncertain && ['message', 'coupon', 'research', 'carousel', 'question', 'rich_message', 'rich_video'].includes(editKind)
     && (!detail || editKind === 'message' || Boolean(editContent))
   sharedEditorRef.current = sharedEditor
   if (stage === 'edit' && sharedEditor) {
@@ -745,10 +807,12 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       createFolder: canEdit ? createFolder : undefined,
       busy,
       notice: notices,
-      onSave: (content, distribute) => {
+      onSave: async (content, distribute) => {
         const next = hostDefinition(current, content)
         setName(content.name); setDefinition(next)
-        void save(distribute, next, content.name, description)
+        let saved = false
+        await save(distribute, next, content.name, description, false, {onSaved: () => {saved = true}})
+        return saved
       },
       onCancel: toList,
       initialMessage: detail && editKind === 'message' ? { name, messageType: current.template.messageType, messageContent: current.template.messageContent } : undefined,
@@ -761,6 +825,26 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           const media = await hqTemplatesApi.uploadImage(file, 'message')
           noteSessionUpload(media)
           return media
+        } finally {
+          if (alive.current) setUploadBusy(false)
+        }
+      },
+      uploadRichVideo: async (file) => {
+        setUploadBusy(true)
+        try {
+          const media = await hqMediaApi.upload(file, 'video')
+          noteSessionUpload(media)
+          return media
+        } finally {
+          if (alive.current) setUploadBusy(false)
+        }
+      },
+      uploadRichVideoPreview: async (file) => {
+        setUploadBusy(true)
+        try {
+          const preview = await hqMediaApi.uploadRichVideoPreview(file)
+          for (const media of preview.media) noteSessionUpload(media)
+          return preview
         } finally {
           if (alive.current) setUploadBusy(false)
         }
@@ -778,11 +862,12 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       },
     }
     const editorKey = `${editKind}-${detail?.template.id ?? 'new'}-${formKey}`
-    if (editKind === 'rich_message') return <TemplateRichEditor key={editorKey} host={host} />
-    if (editKind === 'message') return <TemplateMessageEditor key={editorKey} id={null} visual={false} host={host} />
-    if (editKind === 'carousel') return <CarouselV8 key={editorKey} host={host} />
-    if (editKind === 'question') return <QuestionNewV8 key={editorKey} host={host} />
-    return <TemplateAssetEditor key={editorKey} kind={editKind as 'coupon' | 'research'} host={host} />
+    if (editKind === 'rich_video') return <TemplateRichVideoEditor key={editorKey} host={host} />
+    if (editKind === 'rich_message') return <SaveErrorScope errors={saveErrors}><TemplateRichEditor key={editorKey} host={host} /></SaveErrorScope>
+    if (editKind === 'message') return <SaveErrorScope errors={saveErrors}><TemplateMessageEditor key={editorKey} id={null} visual={false} host={host} /></SaveErrorScope>
+    if (editKind === 'carousel') return <SaveErrorScope errors={saveErrors}><CarouselV8 key={editorKey} host={host} /></SaveErrorScope>
+    if (editKind === 'question') return <SaveErrorScope errors={saveErrors}><QuestionNewV8 key={editorKey} host={host} /></SaveErrorScope>
+    return <SaveErrorScope errors={saveErrors}><TemplateAssetEditor key={editorKey} kind={editKind as 'coupon' | 'research'} host={host} /></SaveErrorScope>
   }
 
   /*
@@ -840,14 +925,18 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         try {
           next = hqRichMenuDefinitionFromSeed(seed)
         } catch (cause) {
-          setError(cause instanceof HqRichMenuCompatibilityError ? cause.reason : japaneseDetailOf(cause) || 'リッチメニューの中身を保存できる形にできませんでした。ボタンの動きと画像を確かめてください。')
+          const fieldFailure = saveErrors.capture(cause)
+
+          { if (!fieldFailure)
+
+          setError(cause instanceof HqRichMenuCompatibilityError ? cause.reason : japaneseDetailOf(cause) || 'リッチメニューの中身を保存できる形にできませんでした。ボタンの動きと画像を確かめてください。') }
           return
         }
         setDefinition(next); setName(seed.name); setFolderId(seed.folderId)
         void save(distribute, next, seed.name, description, false, { folderId: seed.folderId, preselect: distribute ? menuTargets : undefined })
       },
     }
-    return <RichMenuCreate key={`menu-${detail?.template.id ?? 'new'}-${formKey}`} host={host} />
+    return <SaveErrorScope errors={saveErrors}><RichMenuCreate key={`menu-${detail?.template.id ?? 'new'}-${formKey}`} host={host} /></SaveErrorScope>
   }
 
   /*
@@ -872,7 +961,11 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         try {
           next = hqFormEditorToDefinition({ ...value, ...content })
         } catch (cause) {
-          setError(errorText(cause))
+          const fieldFailure = saveErrors.capture(cause)
+
+          { if (!fieldFailure)
+
+          setError(errorText(cause)) }
           return
         }
         setDefinition(next); setName(next.form.name); setDescription(next.form.description ?? '')
@@ -881,32 +974,33 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       onCancel: toList,
       readOnly: !canEdit,
     }
-    return <FormEditV8 key={`form-${detail?.template.id ?? 'new'}-${formKey}`} host={host} />
+    return <SaveErrorScope errors={saveErrors}><FormEditV8 key={`form-${detail?.template.id ?? 'new'}-${formKey}`} host={host} /></SaveErrorScope>
   }
 
   /* ───── 作る・編集（X4JcOf：前回の保存の再確認・カード型・カルーセル・質問・リッチメッセージ） ───── */
   if (stage === 'edit' && type === 'tag' && 'tag' in definition && !createUncertain) {
     /* 所属フォルダは統括のフォルダ（左の列）から選ぶ。選んだフォルダに、一覧でもこのひな形を置く。 */
     const folderOf = (next: TagDefinition) => folders.some((folder) => folder.id === next.tag.folderId) ? next.tag.folderId ?? null : next.tag.folderId ? folderId : null
-    return <HqTagEditorV8 key={formKey} definition={definition} folders={folders} onCreateFolder={canEdit ? createFolder : undefined} editing={Boolean(detail)} saving={busy} readOnly={!canEdit}
+    return <SaveErrorScope errors={saveErrors}><HqTagEditorV8 key={formKey} definition={definition} folders={folders} onCreateFolder={canEdit ? createFolder : undefined} editing={Boolean(detail)} saving={busy} readOnly={!canEdit}
       onSaveDraft={async (next) => { const nextName = definitionName(type, next); const nextFolder = folderOf(next); setDefinition(next); setName(nextName); setFolderId(nextFolder); await save(false, next, nextName, description, false, { folderId: nextFolder }) }}
-      conflict={conflict} onReloadLatest={detail ? () => { void open(detail.template.id, 'edit') } : undefined}
-      error={error} notice={message || undefined} onCancel={toList} onSave={async (next) => { const nextName = definitionName(type, next); const nextFolder = folderOf(next); setDefinition(next); setName(nextName); setFolderId(nextFolder); await save(true, next, nextName, description, false, { folderId: nextFolder }) }} />
+      conflictNotice={conflictNotice} onDraftChange={(next) => { tagDraft.current = next }} conflict={conflict} onReloadLatest={detail ? () => { void open(detail.template.id, 'edit') } : undefined}
+      error={error} notice={message || undefined} onCancel={toList} onSave={async (next) => { const nextName = definitionName(type, next); const nextFolder = folderOf(next); setDefinition(next); setName(nextName); setFolderId(nextFolder); await save(true, next, nextName, description, false, { folderId: nextFolder }) }} /></SaveErrorScope>
   }
 
   if (stage === 'edit') {
     const uncertainNotice = createUncertain ? <Notice tone="warn" message="前回の保存結果がまだ確定していません。重複を防ぐため入力を固定しています。同じ依頼を再確認し、保存済みならその結果を読み込みます。" /> : null
     const footer = createUncertain
-      ? <Button variant="primary" disabled={busy} onClick={() => save(false)}>前回の保存を再確認</Button>
+      ? <Button variant="primary" disabled={busy} onClick={() => save(false)} busy={Boolean(busy)} busyLabel="処理中…">前回の保存を再確認</Button>
       : canonicalEditorOwnsSave ? null : <>
         <Button disabled={busy} onClick={toList}>キャンセル</Button>
         {/* テキスト・カードは押せるままにし、足りない欄は保存で欄ごとに知らせる（B-139）。 */}
-        <Button disabled={busy || (Boolean(validation) && !usesMessageForm())} onClick={() => save(false)}>下書きを保存</Button>
-        <Button variant="primary" disabled={busy || (Boolean(validation) && !usesMessageForm())} onClick={() => save(true)}>保存する</Button>
+        <Button disabled={busy || (Boolean(validation) && !usesMessageForm())} onClick={() => save(false)} busy={Boolean(busy)} busyLabel="処理中…">下書きを保存</Button>
+        <Button variant="primary" disabled={busy || (Boolean(validation) && !usesMessageForm())} onClick={() => save(true)} busy={Boolean(busy)} busyLabel="処理中…">保存する</Button>
       </>
     return (
-      <PageFrame kind="wizard" boardId="X4JcOf">
-        <PageHeading title={type === 'template' ? editTitle : editTitle} description="保存したひな形は、一覧の「配る」で各 LINE アカウントへ配ります。" />
+      <SaveErrorScope errors={saveErrors}><PageFrame kind="wizard" boardId="X4JcOf">
+        <FormLeaveGuard dirty={JSON.stringify({ name, description, definition, folderId }) !== editBaseline.current} busy={busy} />
+        <PageHeading title={type === 'template' ? editTitle : editTitle} help="保存したひな形は、一覧の「配る」で各 LINE アカウントへ配ります。" />
         <div className={styles.body}>
           {notices}
           {type === 'template' && 'template' in definition ? (
@@ -933,16 +1027,16 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
             <section className={styles.editPanel} aria-label="ひな形の中身">
               <div className={styles.twoCol}>
                 {(createUncertain || !canonicalEditorOwnsSave) && type !== 'rich_menu' ? (
-                  <label className={styles.field}><span className={styles.label}>ひな形の名前</span><input aria-label="ひな形の名前" className={styles.input} value={name} maxLength={200} disabled={busy || createUncertain} onChange={(event) => setName(event.target.value)} /></label>
+                  <Field label="ひな形の名前"><SaveErrorField names={["name"]}><input aria-label="ひな形の名前" className={styles.input} value={name} maxLength={200} disabled={busy || createUncertain} onChange={(event) => setName(event.target.value)} /></SaveErrorField></Field>
                 ) : null}
                 {/* タグは中の「所属フォルダ」で分けるので、上のフォルダは出さない（同じ物が2つに見える・オーナー 10-08）。一覧での分けは「…」の「フォルダへ移す」。 */}
                 {type !== 'tag' ? <div className={styles.field}>
                   <span className={styles.label}>フォルダ</span>
-                  <FolderSelect aria-label="フォルダ" size="full" value={folderId ?? ''} disabled={busy || createUncertain || folderLoadFailed} onChange={(next) => setFolderId(next || null)} folders={folders.map((folder) => ({ value: folder.id, label: folder.name, color: folder.color }))} onCreate={canEdit ? createFolder : undefined} />
+                  <SaveErrorField names={["folderId","folder","folder_id"]}><FolderSelect aria-label="フォルダ" size="full" value={folderId ?? ''} disabled={busy || createUncertain || folderLoadFailed} onChange={(next) => setFolderId(next || null)} folders={folders.map((folder) => ({ value: folder.id, label: folder.name, color: folder.color }))} onCreate={canEdit ? createFolder : undefined} /></SaveErrorField>
                 </div> : null}
               </div>
               {(createUncertain || !canonicalEditorOwnsSave) && type !== 'rich_menu' ? (
-                <label className={styles.field}><span className={styles.label}>説明</span><textarea className={styles.textarea} value={description} maxLength={2000} rows={2} disabled={busy || createUncertain} onChange={(event) => setDescription(event.target.value)} /></label>
+                <Field label="説明"><SaveErrorField names={["description"]}><textarea className={styles.textarea} value={description} maxLength={2000} rows={2} disabled={busy || createUncertain} onChange={(event) => setDescription(event.target.value)} /></SaveErrorField></Field>
               ) : null}
               {catalogFailed ? <Notice tone="warn" message="参照先の候補を読み込めませんでした。タグ・テンプレート・回答フォームは選べません。" action={<Button onClick={reloadCatalog}>もう一度読み込む</Button>} /> : null}
               {canonicalEditorOwnsSave && createUncertain ? uncertainNotice : DefinitionEditor ? (
@@ -962,21 +1056,21 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                   richMenuReferences={{ tags: referenceOptions('tag'), templates: referenceOptions('template'), forms: referenceOptions('form') }}
                   formReferences={{ tags: referenceOptions('tag'), friendFields: [], scenarios: [], reminders: [], templates: [] }}
                 />
-              ) : <p role="alert">この種類のひな形は、ここでは編集できません。</p>}
+              ) : <Notice tone="danger" >この種類のひな形は、ここでは編集できません。</Notice>}
               {!canonicalEditorOwnsSave ? uncertainNotice : null}
-              {!canonicalEditorOwnsSave ? <p className={styles.note}>{`参照先 ${referenceCount(type, definition)}件を含めて配布します。`}</p> : null}
+              {!canonicalEditorOwnsSave ? <p className={styles.note}>{`参照先 ${referenceCount(type, definition)} 件を含めて配布します。`}</p> : null}
             </section>
           )}
           {footer ? <div className={styles.footer}>{footer}</div> : null}
         </div>
-      </PageFrame>
+      </PageFrame></SaveErrorScope>
     )
   }
 
-  if (stage === 'result' && folderBatch) return <FolderDistributionResult name={folderBatch.name} runs={[...folderBatch.history, ...folderBatch.runs]}
+  if (stage === 'result' && folderBatch) return <SaveErrorScope errors={saveErrors}><FolderDistributionResult name={folderBatch.name} runs={[...folderBatch.history, ...folderBatch.runs]}
     accounts={accounts} folders={folders} busy={busy} error={error}
     onBack={toList} onRefresh={() => void perform(() => executeFolder(folderBatch))}
-    onRetry={() => retryFolder()} onRecheck={() => retryFolder(true)} />
+    onRetry={() => retryFolder()} onRecheck={() => retryFolder(true)} /></SaveErrorScope>
 
   /* ───── アカウントへ配る（meBRB）：選ぶ → 重複の配り方 → 配る（進み具合） ───── */
   const storeOf = (accountId: string) => preflight?.stores.find((store) => store.accountId === accountId)
@@ -1008,50 +1102,65 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const shortName = (accountName: string) => accountName.replace(/^然\s*-NEN-\s*/, '')
 
   return (
-    <PageFrame kind="wizard" boardId={stage === 'result' ? 'dEvJM' : 'meBRB'}>
-      <PageHeading title={type === 'tag' ? <>アカウントへ配る：<TagPill name={name} color={tagColor} /></> : pageTitle} help="1つのアカウントだけ、または複数のアカウントを選んで一括で配れます。一括設定のあと、必要な項目だけアカウントごとに変えられます。" />
-      {folderBatch ? <p className={styles.distributionNotice}>{`フォルダ「${folderBatch.name}」：${folderBatch.index + 1} / ${folderBatch.runs.length} 件目の配布方法を確かめています。すべて確かめてから配ります。`}</p> : null}
-      {error || message ? <div className={styles.distributionNotice}>{notices}</div> : null}
-      <ListPageBody
-        contentInset
-        folders={<DistributionFolderPanel rows={accountFolderRows} activeId={accountFolder} onSelect={setAccountFolder} failed={accountFolders.failed} />}
-        collapsedFolders={<>
-          <Select aria-label="アカウントのフォルダ" value={accountFolder} onChange={setAccountFolder} options={accountFolderRows.map((row) => ({ value: row.id, label: row.label }))} />
-          {accountFolderRows.find((row) => row.id === accountFolder)?.leading}
+    <DistributionPage boardId={stage === 'result' && done ? 'dEvJM' : 'meBRB'} title={type === 'tag' ? <>アカウントへ配る：<TagPill name={name} color={tagColor} /></> : pageTitle}
+        help="1つのアカウントだけ、または複数のアカウントを選んで一括で配れます。アカウントのフォルダで絞り込むこともできます。"
+      stats={<KpiBand>
+        <KpiCard title="配布先" value={accounts.length} unit="アカウント" detail="配ることのできるアカウント" />
+        <KpiCard title="選んだアカウント" value={selected.length} unit="アカウント" detail="この内容を配る先" />
+        <KpiCard title="配る版" value={detail?.template.revision} unit="版" detail="保存済みのひな形" />
+        <KpiCard title="配布完了" value={result ? successes.length : null} unit="アカウント" detail={result? '今回の配布結果': '配布前'}
+      />
+    </KpiBand>}
+      notices={ <>
+      {folderBatch ? <p className={styles.note}>{`フォルダ「${folderBatch.name}」：${folderBatch.index + 1} / ${folderBatch.runs.length} 件目の配布方法を確かめています。`}</p> : null}
+      {error || message ?notices : null}
         </>}
-        toolbar={<div className={styles.toolbar}>
-          <span className={styles.selectedTools}>
-            <strong className={styles.selectedCount}>{`選んだ ${selected.length} アカウント`}</strong>
-          <label className={styles.search} data-size="account">
-            <Search size={14} aria-hidden="true" />
-            <input aria-label="アカウントを検索" placeholder="アカウント名で探す" value={search} onChange={(event) => setSearch(event.target.value)} />
-          </label>
-          </span>
+        toolbar={<DistributionToolbar>
+          <Field label={<><Search size={14} aria-hidden="true" /></>}><SaveErrorField names={["search"]}><input aria-label="アカウントを検索" placeholder="アカウント名で探す" value={search} onChange={(event) => setSearch(event.target.value)} /></SaveErrorField></Field>
           <span className={styles.bulkPick}>
-            <Select
+            <SaveErrorField names={["bulkMode","bulk_mode"]}><Select
               aria-label="一括の配布方法"
               size="full"
               disabled={stage !== 'duplicates' || busy}
               value={bulkMode}
               onChange={(next) => applyBulk(next as '' | DistributionMode)}
               options={[{ value: '', label: '一括の配布方法：選ぶ' }, { value: 'overwrite', label: '一括の配布方法：上書き' }, { value: 'alias', label: '一括の配布方法：別名で作る' }]}
-            />
+            /></SaveErrorField>
           </span>
-        </div>}
+        <Select aria-label="アカウントのフォルダ" value={accountFolder} onChange={setAccountFolder} options={accountFolderRows.map((row) => ({ value: row.id, label: row.label }))}/>
+          {accountFolderRows.find((row) => row.id === accountFolder)?.leading}
+          {accountFolders.failed ? <Notice tone="warn" message="フォルダを読み込めませんでした。" /> : null}
+        </DistributionToolbar>}
+      actions={<>
+{stage === 'accounts' ? <>
+            <Button disabled={busy} onClick={toList}>キャンセル</Button>
+            <Button aria-label={`${selected.length}アカウントの重複を確認`} variant="primary" disabled={busy || !selected.length} onClick={() => checkStores(selected)}><Check size={15} aria-hidden="true" />{selected.length === 1 ? '選んだ1アカウントを確かめる' : `選んだ${selected.length}アカウントを確かめる`}</Button>
+          </> : stage === 'duplicates' && preflight ? <>
+            <Button disabled={busy} onClick={() => { if (folderBatch) toList(); else { setPreflight(null); setStage('accounts') } }}><ArrowLeft size={15} aria-hidden="true" />戻る</Button>
+            {expired ? <Button disabled={busy} onClick={() => checkStores(selected)}>現在版を再確認</Button> : null}
+            <Button variant="primary" disabled={busy || expired || !resolutions || !!pendingRun} onClick={folderBatch ? confirmFolder : run}><Send size={15} aria-hidden="true" /> < TruncatedText value ={folderBatch && folderBatch.index + 1 < folderBatch.runs.length ? `次のひな形を確かめる（${folderBatch.index + 1}/${folderBatch.runs.length}）` : folderBatch ? `${folderBatch.runs.length} 件を ${selected.length} アカウントへ配る` : `この内容で${preflight.stores.length}アカウントへ配る`}/></Button>
+          </> : <>
+            <Button disabled={busy} onClick={toList}>{done ? 'ひな形一覧へ' : 'キャンセル'}</Button>
+            {!done ? <Button variant="primary" disabled><Plus size={15} aria-hidden="true" />{`配っています（${finished}/${progressTotal}）`}</Button> : null}
+            {done || !result ? <Button disabled={busy} onClick={refreshResult } busyLabel = "処理中…">結果を再確認</Button> : null}
+            {done && failures.length > 0 ? <Button variant="primary" disabled={busy} onClick={() => checkStores(failures.map((s) => s.accountId))}>{`失敗${failures.length}アカウントを再確認`}</Button> : null}
+          </>}
+      </>}
+      overlays={<DistributionResultDialog
+        open={Boolean(result && done && resultDialogFor === `${result.runId}:${result.status}`)}
+        title={`配った結果：${detail?.template.name ?? ''}`}
+        tag={type === 'tag' ? { name, color: tagColor } : undefined}
+        summary={result ? `${result.stores.length} アカウントへ配りました。成功 ${successes.length}・失敗 ${failures.length}。${successes.length ? '成功した所はもう使えます。' : ''}` : ''}
+        rows={(result?.stores ?? []).map((store) => ({ key: store.accountId, name: store.accountName ?? accountName(accounts, store.accountId), store }))}
+        busy={busy} onClose={() => setResultDialogFor(null)}
+        onRetry={() => { setResultDialogFor(null); checkStores(failures.map((store) => store.accountId)) }}
+      />}
       >
         <div className={styles.distributionContent}>
-        <div className={styles.tableBox}>
-          <table className={styles.table} data-kind="distribute">
-            <colgroup><col className={styles.colCheck} /><col /><col className={styles.colItem} /><col className={styles.colVersion} /><col className={styles.colMode} /></colgroup>
-            <thead><tr>
-              {/* G-4：表示中をまとめて選ぶ。一部選択は横棒。 */}
-              <Th><Checkbox aria-label="表示中のアカウントをすべて選ぶ" checked={shownAccounts.length > 0 && shownAccounts.every((account) => selected.includes(account.id))}
+        <DistributionTable selectAll={<SaveErrorField names={["length","shownAccounts.length","selected","shown_accounts.length"]}><Checkbox aria-label="表示中のアカウントをすべて選ぶ" checked={shownAccounts.length > 0 && shownAccounts.every((account) => selected.includes(account.id))}
                 indeterminate={shownAccounts.some((account) => selected.includes(account.id)) && !shownAccounts.every((account) => selected.includes(account.id))}
                 disabled={busy || stage !== 'accounts' || shownAccounts.length === 0}
-                onCheckedChange={(checked) => setSelected((current) => checked ? [...new Set([...current, ...shownAccounts.map((account) => account.id)])] : current.filter((id) => !shownAccounts.some((account) => account.id === id)))} /></Th>
-              <Th>アカウント</Th><Th>項目</Th><Th>配布先の版</Th><Th>配布方法</Th>
-            </tr></thead>
-            <tbody>
+                onCheckedChange={(checked) => setSelected((current) => checked ? [...new Set([...current, ...shownAccounts.map((account) => account.id)])] : current.filter((id) => !shownAccounts.some((account) => account.id === id)))} /></SaveErrorField>}>
               {rowsForTable.map((account) => {
                 const on = selected.includes(account.id)
                 const store = storeOf(account.id)
@@ -1060,12 +1169,9 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                 const allowed = store ? [...new Set(store.items.filter((item) => item.duplicate).flatMap((item) => item.allowedModes))] : []
                 return [
                   <tr key={account.id} data-selected={on || undefined}>
-                    <td><Checkbox id={`hq-dist-${account.id}`} aria-label={account.name} checked={on} disabled={busy || stage !== 'accounts'} onCheckedChange={(checked) => setSelected((current) => checked ? [...current, account.id] : current.filter((id) => id !== account.id))} /></td>
+                    <td><SaveErrorField names={["on","selected"]}><Checkbox id={`hq-dist-${account.id}`} aria-label={account.name} checked={on} disabled={busy || stage !== 'accounts'} onCheckedChange={(checked) => setSelected((current) => checked ? [...current, account.id] : current.filter((id) => id !== account.id))} /></SaveErrorField></td>
                     <td>
-                      <label className={styles.nameLabel} htmlFor={`hq-dist-${account.id}`}>
-                        <FolderDotName folder={accountFolders.membership?.get(account.id)?.folder}><span className={styles.name} title={account.name}>{account.name}</span></FolderDotName>
-                        <span className={styles.sub}>{on ? (stage === 'result' ? progressLabel(account.id) || '配る' : '配る') : '配らない'}</span>
-                      </label>
+                      <DistributionAccountName name={account.name} folder={accountFolders.membership?.get(account.id)?.folder} htmlFor={`hq-dist-${account.id}`} note={on ? (stage === 'result' ? progressLabel(account.id) || '配る' : '配る') : '配らない'} />
                     </td>
                     <td>
                       {on ? <span className={styles.cellLine}>
@@ -1077,21 +1183,19 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                     <td>
                       {!on ? <span className={`${styles.cell} ${styles.cellEmpty}`}>—</span> : !store ? <span className={styles.cell}>確認のあとで選ぶ</span>
                         : allowed.length === 0 ? <span className={styles.modePick}><Select aria-label={`${account.name}の配布方法`} size="full" disabled value="create" onChange={() => undefined} options={[{ value: 'create', label: MODE_LABELS.create }]} /></span>
-                        : <span className={styles.modePick}><Select
+                        : <span className={styles.modePick}><SaveErrorField names={["mode"]}><Select
                           aria-label={`${account.name}の配布方法`}
                           size="full"
                           disabled={busy || stage !== 'duplicates'}
                           value={mode}
                           onChange={(next) => chooseForStore(account.id, next as DistributionMode)}
                           options={[{ value: '', label: '選んでください' }, ...(['overwrite', 'alias'] as const).filter((m) => allowed.includes(m)).map((m) => ({ value: m, label: store.items.some((item) => item.operation === 'reuse') && m === 'overwrite' ? '既存を使う' : MODE_LABELS[m] }))]}
-                        /></span>}
+                        /></SaveErrorField></span>}
                     </td>
                   </tr>,
                   overrideOpen === account.id && on && textMessage && stage === 'accounts' ? (
                     <tr key={`${account.id}-text`} className={styles.subRow}><td /><td colSpan={4}>
-                      <label className={styles.field}><span className={styles.label}>{`${account.name}に配る本文`}</span>
-                        <textarea aria-label={`${account.name}に配る本文`} className={styles.textarea} disabled={busy} maxLength={5000} value={textOverrides[account.id] ?? ('template' in definition ? definition.template.messageContent : '')} onChange={(event) => setTextOverrides((current) => ({ ...current, [account.id]: event.target.value }))} />
-                      </label>
+                      < label className={styles.field}><span className={styles.label}>{`${account.name}に配る本文`}</span><SaveErrorField names={["messageContent","definition.template.messageContent","template.messageContent","textOverrides","message_content","definition.template.message_content","template.message_content","text_overrides"]}><textarea aria-label={`${account.name}に配る本文`} className={styles.textarea} disabled={busy} maxLength={5000} value={textOverrides[account.id] ?? ('template' in definition ? definition.template.messageContent : '')} onChange={(event) => setTextOverrides((current) => ({ ...current, [account.id]: event.target.value }))} /></SaveErrorField></label>
                     </td></tr>
                   ) : null,
                   ...extraItems.map((item) => (
@@ -1099,57 +1203,25 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                       <td /><td><span className={styles.sub}>参照先：{item.itemKind === 'tag' ? <TagPill name={item.name} size="sm" /> : item.name}</span></td>
                       <td><span className={styles.cell}>{item.itemKind === 'folder' ? 'タググループ' : item.itemKind === 'rich_menu' ? 'リッチメニュー' : item.itemKind === 'form' ? '回答フォーム' : item.itemKind === 'media' ? '登録メディア' : item.itemKind === 'template' ? 'テンプレート' : item.itemKind}</span></td>
                       <td><span className={styles.cell}>{item.expectedRevision != null ? `版 ${item.expectedRevision}` : '新規'}</span></td>
-                      <td><span className={styles.modePick}><Select aria-label={`${account.name} ${item.name}の配布方法`} size="full" disabled={busy || stage !== 'duplicates'} value={choices[choiceKey(account.id, item.sourceId)] ?? ''} onChange={(next) => setChoices((current) => ({ ...current, [choiceKey(account.id, item.sourceId)]: next as DistributionMode }))} options={[{ value: '', label: '選んでください' }, ...(item.operation === 'reuse' ? ['overwrite'] as const : ['overwrite', 'alias'] as const).filter((m) => item.allowedModes.includes(m)).map((m) => ({ value: m, label: item.operation === 'reuse' && m === 'overwrite' ? '既存を使う' : MODE_LABELS[m] }))]} /></span></td>
+                      <td><span className={styles.modePick}><SaveErrorField names={["choices"]}><Select aria-label={`${account.name} ${item.name}の配布方法`} size="full" disabled={busy || stage !== 'duplicates'} value={choices[choiceKey(account.id, item.sourceId)] ?? ''} onChange={(next) => setChoices((current) => ({ ...current, [choiceKey(account.id, item.sourceId)]: next as DistributionMode }))} options={[{ value: '', label: '選んでください' }, ...(item.operation === 'reuse' ? ['overwrite'] as const : ['overwrite', 'alias'] as const).filter((m) => item.allowedModes.includes(m)).map((m) => ({ value: m, label: item.operation === 'reuse' && m === 'overwrite' ? '既存を使う' : MODE_LABELS[m] }))]} /></SaveErrorField></span></td>
                     </tr>
                   )),
                 ]
               })}
-            </tbody>
-          </table>
+            </DistributionTable>
           {!rowsForTable.length && <p className={styles.empty}>選択できるアカウントがありません。</p>}
-        </div>
         {stage === 'duplicates' && expired ? <Notice tone="warn" message="確認の有効期限が切れました。アカウントの現在版をもう一度確認してください。" /> : null}
         {stage === 'result' || stage === 'duplicates' ? (
-          <section className={styles.progressPanel} aria-label="配布の進み具合">
-            <h2>配布の進み具合</h2>
-            <div className={styles.progressRow}>
-              <span className={styles.progressTrack} aria-hidden="true"><span className={styles.progressFill} style={{ width: `${progressTotal ? Math.round((finished / progressTotal) * 100) : 0}%` }} /></span>
-              <strong>{`${finished} / ${progressTotal}`}</strong>
-            </div>
+          <DistributionProgress finished={finished} total={progressTotal} action={stage=== 'result' && !done && result ?<Button size="inline" variant="text" disabled={busy} onClick={refreshResult } busy = { Boolean ( busy )} busyLabel = "処理中…">結果を再確認</Button> : undefined}>
             <p className={styles.note}>{stage === 'duplicates'
               ? '配布直前に版を再確認します。配布先で編集があれば、そのアカウントの変更を取り消します。成功したアカウントは保持され、失敗分だけ再確認できます。'
               : (result ? result.stores.map((store) => `${shortName(store.accountName ?? accountName(accounts, store.accountId))}：${store.status === 'succeeded' ? '完了' : failures.includes(store) ? '失敗' : '作成中'}`).join(' ・ ') : `配布番号：${pendingRun ?? '—'} の結果を確認しています。確認できるまでは再配布しません。`)}</p>
             {result && failures.length ? failures.map((store) => <Notice key={store.accountId} tone="danger" message={`${store.accountName ?? accountName(accounts, store.accountId)}：${store.reason || '配布できませんでした。アカウントの現在版を再確認してください。'}${store.cleanupPending ? '（画像の後片付けを自動で再試行中です）' : ''}`} action={done ? <Button disabled={busy} onClick={() => checkStores([store.accountId])}>このアカウントだけ再確認して配布</Button> : undefined} />) : null}
             {result && done ? <p className={styles.note}>{`新規 ${formatNumber(successes.reduce((sum, s) => sum + s.counts.created, 0))}件・上書き ${formatNumber(successes.reduce((sum, s) => sum + s.counts.overwritten, 0))}件・別名 ${formatNumber(successes.reduce((sum, s) => sum + s.counts.aliased, 0))}件`}</p> : null}
-          </section>
+          </DistributionProgress>
         ) : null}
         </div>
-      </ListPageBody>
-        <div className={styles.footer}>
-          {stage === 'accounts' ? <>
-            <Button disabled={busy} onClick={toList}>キャンセル</Button>
-            <Button aria-label={`${selected.length}アカウントの重複を確認`} variant="primary" disabled={busy || !selected.length} onClick={() => checkStores(selected)}><Check size={15} aria-hidden="true" />{selected.length === 1 ? '選んだ1アカウントを確かめる' : `選んだ${selected.length}アカウントを確かめる`}</Button>
-          </> : stage === 'duplicates' && preflight ? <>
-            <Button disabled={busy} onClick={() => { if (folderBatch) toList(); else { setPreflight(null); setStage('accounts') } }}><ArrowLeft size={15} aria-hidden="true" />戻る</Button>
-            {expired ? <Button disabled={busy} onClick={() => checkStores(selected)}>現在版を再確認</Button> : null}
-            <Button variant="primary" disabled={busy || expired || !resolutions || !!pendingRun} onClick={folderBatch ? confirmFolder : run}><Send size={15} aria-hidden="true" />{folderBatch && folderBatch.index + 1 < folderBatch.runs.length ? `次のひな形を確かめる（${folderBatch.index + 1}/${folderBatch.runs.length}）` : folderBatch ? `${folderBatch.runs.length} 件を ${selected.length} アカウントへ配る` : `この内容で${preflight.stores.length}アカウントへ配る`}</Button>
-          </> : <>
-            <Button disabled={busy} onClick={toList}>{done ? 'ひな形一覧へ' : 'キャンセル'}</Button>
-            {!done ? <Button variant="primary" disabled><Plus size={15} aria-hidden="true" />{`配っています（${finished}/${progressTotal}）`}</Button> : null}
-            {done ? <Button disabled={busy} onClick={refreshResult}>結果を再確認</Button> : <Button disabled={busy} onClick={refreshResult}>結果を再確認</Button>}
-            {done && failures.length > 0 ? <Button variant="primary" disabled={busy} onClick={() => checkStores(failures.map((s) => s.accountId))}>{`失敗${failures.length}アカウントを再確認`}</Button> : null}
-          </>}
-        </div>
-      <DistributionResultDialog
-        open={Boolean(result && done && resultDialogFor === `${result.runId}:${result.status}`)}
-        title={`配った結果：${detail?.template.name ?? ''}`}
-        tag={type === 'tag' ? { name, color: tagColor } : undefined}
-        summary={result ? `${result.stores.length} アカウントへ配りました。成功 ${successes.length}・失敗 ${failures.length}。${successes.length ? '成功した所はもう使えます。' : ''}` : ''}
-        rows={(result?.stores ?? []).map((store) => ({ key: store.accountId, name: store.accountName ?? accountName(accounts, store.accountId), store }))}
-        busy={busy} onClose={() => setResultDialogFor(null)}
-        onRetry={() => { setResultDialogFor(null); checkStores(failures.map((store) => store.accountId)) }}
-      />
-    </PageFrame>
+      </DistributionPage>
   )
 }
 
@@ -1181,6 +1253,13 @@ function accountName(accounts: HqAccount[], id: string): string {
 
 /** 保存してある統括のひな形を、店の作る画面へ渡す中身（保存と同じ形）に戻す。読めなければ undefined（空から）。 */
 export function hostContentOf(kind: TemplateKind, name: string, definition: MessageTemplateDefinition): TemplateHostContent | undefined {
+  if (kind === 'rich_video' && definition.template.messageType === 'imagemap') {
+    try {
+      const payload = JSON.parse(definition.template.messageContent)
+      if (!payload.video) return undefined
+      return { kind, name, messageContent: definition.template.messageContent, media: [...definition.media] }
+    } catch { return undefined }
+  }
   const asset = definition.asset
   if ((kind === 'coupon' || kind === 'research' || kind === 'rich_message') && asset?.kind === kind) {
     const payload = asset.payload as Record<string, unknown>
@@ -1202,6 +1281,9 @@ export function hostDefinition(current: MessageTemplateDefinition, content: Temp
   const base = { ...current, template: { ...current.template, name: content.name } }
   const { card: _card, asset: _asset, ...rest } = base
   void _card; void _asset
+  if (content.kind === 'rich_video') {
+    return { ...rest, media: content.media, template: { ...rest.template, messageType: 'imagemap', messageContent: content.messageContent, carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null } }
+  }
   if (content.kind === 'message') {
     return { ...rest, template: { ...rest.template, messageType: content.messageType as MessageTemplateDefinition['template']['messageType'], messageContent: content.messageContent, questionJson: null } }
   }

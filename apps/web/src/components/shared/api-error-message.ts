@@ -5,7 +5,7 @@ import { ApiError, describeSaveFailure } from '@/lib/api'
  *
  * どの失敗も「通信を確かめて」に畳むと、権限不足の人が通信環境を
  * 調べたり同じ操作を繰り返したりする。ここでは5つに分ける。
- * - forbidden … 権限がない（403）。統括への依頼を案内する
+ * - forbidden … 権限がない（403）。店舗と統括それぞれの頼む先を案内する
  * - invalid … 入力の直しが要る（400/422）。欄の下の直し方と組み合わせる
  * - missing … 見つからない（404）。開き直しを案内する
  * - rateLimited … 混み合っている（429）。待ち秒数を添えて待つ案内にする
@@ -14,9 +14,19 @@ import { ApiError, describeSaveFailure } from '@/lib/api'
  * 401・409・428 は `describeSaveFailure` の言い方をそのまま使う
  * （二重の正本を作らない）。
  */
+export type PermissionScope = 'store' | 'hq'
+const PERMISSION_REQUEST = { store: 'オーナーか管理者に頼んでください。', hq: '統括の管理者に頼んでください。' } as const
+/** 403を記録ではなく状態の名前で持つ画面も、同じ入口から文を出す。 */
+export const permissionDeniedMessage = (scope: PermissionScope = 'store') => describeApiFailure({ status: 403 }, '表示', { scope })
+
+export function withPermissionFailure(err: unknown, fallback: string, scope: PermissionScope = 'store'): string {
+  return classifyApiFailure(err) === 'forbidden' ? describeApiFailure(err, '保存', { scope }) : fallback
+}
+
 export type ApiFailureKind = 'forbidden' | 'invalid' | 'missing' | 'rateLimited' | 'retryable'
 
 export function classifyApiFailure(err: unknown): ApiFailureKind {
+  if (err && typeof err === 'object' && 'status' in err && err.status === 403) return 'forbidden'
   if (err instanceof ApiError) {
     if (err.status === 403) return 'forbidden'
     if (err.status === 400 || err.status === 422) return 'invalid'
@@ -53,7 +63,7 @@ export function describeRateLimited(seconds: number | undefined): string {
 
 /** 日本語の本文だけを運用者に見せる。英語の検証文は欄の直し方へ回す。 */
 export function japaneseDetailOf(err: unknown): string {
-  if (err instanceof ApiError && err.message && !/^API error: /.test(err.message)
+  if (err instanceof ApiError && err.status !== 403 && err.message && !/^API error: /.test(err.message)
     && /[ぁ-んァ-ヶ一-龠]/u.test(err.message)) {
     return err.message
   }
@@ -63,11 +73,11 @@ export function japaneseDetailOf(err: unknown): string {
 export function describeApiFailure(
   err: unknown,
   action: string,
-  options?: { forbidden?: string },
+  options?: { scope?: PermissionScope; /** @deprecated 頼む先はscopeで決まる */ forbidden?: string },
 ): string {
   const kind = classifyApiFailure(err)
   if (kind === 'forbidden') {
-    return options?.forbidden ?? 'この操作は統括だけができます。必要なときは統括に頼んでください。'
+    return `この操作の権限がありません。${PERMISSION_REQUEST[options?.scope ?? 'store']}`
   }
   if (kind === 'invalid') {
     const detail = japaneseDetailOf(err)
@@ -98,12 +108,13 @@ export function describeApiFailure(
 export function loadFailureCopy(
   err: unknown,
   target: string,
+  scope: PermissionScope = 'store',
 ): { title: string; description: string; retryable: boolean } {
   const kind = classifyApiFailure(err)
   if (kind === 'forbidden') {
     return {
       title: `${target}を見る権限がありません`,
-      description: '見るには権限が要ります。オーナーか管理者に追加を依頼してください。',
+      description: describeApiFailure(err, '表示', { scope }),
       retryable: false,
     }
   }
@@ -144,7 +155,7 @@ export function isForbidden(err: unknown): boolean {
  * 帯（Notice）や赤字1行に出す読み込み失敗の1行（m23m）。
  * 生の `API error: NNN` を出さず、見出しと案内をつなげた1行にする。
  */
-export function loadFailureNotice(err: unknown, target: string): string {
-  const view = loadFailureCopy(err, target)
+export function loadFailureNotice(err: unknown, target: string, scope: PermissionScope = 'store'): string {
+  const view = loadFailureCopy(err, target, scope)
   return `${view.title}。${view.description}`
 }

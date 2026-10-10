@@ -1,5 +1,6 @@
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
-import React, { act } from 'react'
+import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MediaItem } from '@line-crm/shared'
@@ -174,11 +175,7 @@ describe('差し替え候補の名前検索（N-205）', () => {
     await waitForDialogText('絞り込み中')
 
     // 検索で絞った候補を選ぶと、従来どおり影響確認へ進む。
-    const trigger = [...dialog().querySelectorAll<HTMLButtonElement>('button')].find((b) => b.getAttribute('aria-label') === '差し替え先')!
-    await act(async () => { trigger.click(); await settle() })
-    // 候補は最上層（MenuPortal→document.body）に出る。窓の中にはいない。
-    const option = [...document.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '夏セール候補.png')!
-    await act(async () => { option.click(); await settle() })
+    await pickEntity('差し替え先', '夏セール候補.png')
     expect(fixture.impactCalls).toEqual([{ id: 'src-1', replacementId: 'hit-1', accountId: 'account-a' }])
   })
 
@@ -228,7 +225,7 @@ describe('差し替え候補の名前検索（N-205）', () => {
     const trigger = [...dialog().querySelectorAll<HTMLButtonElement>('button')].find((b) => b.getAttribute('aria-label') === '差し替え先')!
     await act(async () => { trigger.click(); await settle() })
     // 候補は最上層（MenuPortal→document.body）に出る。窓の中にはいない。
-    const listbox = document.querySelector<HTMLElement>('[role="listbox"]')!
+    const listbox = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!
     expect(listbox.textContent).toContain('Bの候補.png')
     expect(listbox.textContent).not.toContain('Aの古い候補')
   })

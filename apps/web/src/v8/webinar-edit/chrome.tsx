@@ -6,17 +6,12 @@
  * - 作る手順の帯（作る型 CreatePage の steps に渡す）：5段、済みの段へ戻れる（型の共通部品 Steps）。
  */
 import type { ReactNode } from 'react'
-import Link from 'next/link'
 import { Steps } from '@/components/templates/steps'
 import { PageHeading } from '@/components/templates/page-frame'
 import { STEPS, type PaneKey, type StepKey } from './helpers'
 import styles from './chrome.module.css'
 
-export function BackLink() {
-  return (
-    <Link href="/webinars" className={styles.back}>← ウェビナーへ</Link>
-  )
-}
+export function BackLink() { return null }
 
 const DETAIL_TABS: ReadonlyArray<{ key: PaneKey; label: string }> = [
   { key: 'basic', label: '設定' },
@@ -44,7 +39,7 @@ export function DetailHead({
 }) {
   return (
     <>
-      <PageHeading title={title} description={subtitle} actions={actions || menuActions ? <>{actions}{menuActions}</> : undefined} />
+      <PageHeading title={title} help={subtitle} actions={actions || menuActions ? <>{actions}{menuActions}</> : undefined} />
       <div className={styles.tabsRow}>
         <nav className={styles.tabs} aria-label="設定・参加者・分析・コメント演出" data-wc-tabs="true">
           {DETAIL_TABS.map((tab) => {

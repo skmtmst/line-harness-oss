@@ -1,12 +1,5 @@
 'use client'
-
-/*
- * ★V8 統括のアカウント（ホーム）（Pencil `JKjsE`。カードの「設定」で開く窓が `HMpVx`）。
- *
- * v7 の画面（app/hq/page.tsx と account-browser-v8.tsx）と読み書きの口・失敗時の扱いは同じ。
- * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左のフォルダの列（型のフォルダの列＋共通 FolderPanel。2026-10-08 タグ→フォルダ・API-17）・
- * 数のカード4枚・探す欄と状態の札・カード／表の切り替え・並び・件数・アカウントのカード・件数と注。
- */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { CircleDot, Inbox, LogIn, Plus, RotateCcw, Settings, Star, MessageCircle } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -14,12 +7,12 @@ import { ListPage } from '@/components/templates'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
-import { FolderDot, FolderDotName } from '@/components/shared/folder-dot'
+import { FolderDot, FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
 import { brandInitial } from '@/components/layout/brand-initial'
 import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
@@ -41,8 +34,20 @@ import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8, accountHandle } from './account-dialogs'
 import { connectionReasonLine } from './connection-reasons'
 import styles from './home.module.css'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/folder-colors'
+import StatusPill from '@/components/shared/status-pill'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
+
+/*
+ * ★V8 統括のアカウント（ホーム）（Pencil `JKjsE`。カードの「設定」で開く窓が `HMpVx`）。
+ *
+ * v7 の画面（app/hq/page.tsx と account-browser-v8.tsx）と読み書きの口・失敗時の扱いは同じ。
+ * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左のフォルダの列（型のフォルダの列＋共通 FolderPanel。2026-10-08 タグ→フォルダ・API-17）・
+ * 数のカード4枚・探す欄と状態の札・カード／表の切り替え・並び・件数・アカウントのカード・件数と注。
+ */
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 type View = 'cards' | 'table'
@@ -64,7 +69,7 @@ const SORT_OPTIONS = [
   { value: 'display', label: '並び：登録順' },
 ]
 
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 
 function isArchived(account: AccountWithStats) {
   return Boolean(account.archivedAt)
@@ -87,6 +92,7 @@ function statusOf(account: AccountWithStats): { label: string; tone: 'ok' | 'war
 }
 
 export default function HqHomeV8() {
+  const saveErrors = useSaveFormErrors()
   // 左のメニューと同じ名前を見出しにする（バナー生成・課金プランなどと同じ書き方）。
   usePageTitle('アカウント')
   const router = useRouter()
@@ -112,13 +118,13 @@ export default function HqHomeV8() {
   const [connectionProgress, setConnectionProgress] = useState('')
   const [connectionResult, setConnectionResult] = useState('')
 
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [folder, setFolder] = useState<string>(ALL)
-  const [view, setView] = useState<View>('cards')
-  const [sort, setSort] = useState('friends')
+  const [view, setView] = useListUrlValue<View>('view', 'cards')
+  const [sort, setSort] = useListUrlValue('sort', 'friends')
   const [size, setSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [folders, setFolders] = useState<(Folder & { itemCount?: number })[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   /* フォルダの追加・名前と色を変える窓（同じ窓。editing があれば変える）。 */
@@ -143,10 +149,11 @@ export default function HqHomeV8() {
         setFolders([...res.data.folders].sort((a, b) => a.displayOrder - b.displayOrder))
         setUnfiledCount(typeof res.data.unclassifiedCount === 'number' ? res.data.unclassifiedCount : null)
       }
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       // フォルダが読めなくても一覧は出す
     }
-  }, [])
+  }, [saveErrors])
 
   useEffect(() => {
     let cancelled = false
@@ -174,7 +181,8 @@ export default function HqHomeV8() {
     setReloadFailed(false)
     try {
       await Promise.all([load(), refreshAccounts(), loadFolders()])
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       setReloadFailed(true)
     }
   }
@@ -199,17 +207,21 @@ export default function HqHomeV8() {
           body: JSON.stringify({ expectedRevision }),
         })
         succeeded += 1
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
         failed += 1
       }
     }
     try {
       await Promise.all([load(), refreshAccounts()])
       setConnectionResult(failed === 0
-        ? `${succeeded}件のLINE IDと接続状態を更新しました。`
-        : `${succeeded}件を更新し、${failed}件は更新できませんでした。`)
-    } catch {
-      setConnectionResult(`${succeeded}件を確認しましたが、一覧を再読み込みできませんでした。`)
+        ? `${succeeded} 件のLINE IDと接続状態を更新しました。`
+        : `${succeeded} 件を更新し、${failed} 件は更新できませんでした。`)
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setConnectionResult(`${succeeded} 件を確認しましたが、一覧を再読み込みできませんでした。`) }
     } finally {
       setConnectionProgress('')
       setCheckingConnections(false)
@@ -294,7 +306,10 @@ export default function HqHomeV8() {
       await loadFolders()
       void reloadAfterSave()
     } catch (caught) {
-      setFolderError(caught instanceof Error ? caught.message : 'フォルダを保存できませんでした')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setFolderError(caught instanceof Error ? caught.message : 'フォルダを保存できませんでした') }
     } finally {
       setFolderSaving(false)
     }
@@ -309,7 +324,8 @@ export default function HqHomeV8() {
     try {
       await api.lineAccountFolders.update(a.id, { displayOrder: b.displayOrder === a.displayOrder ? index + delta : b.displayOrder })
       await api.lineAccountFolders.update(b.id, { displayOrder: b.displayOrder === a.displayOrder ? index : a.displayOrder })
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       // 並びが変わらなかったときは読み直した結果を見せる
     } finally {
       setFolderSaving(false)
@@ -330,7 +346,10 @@ export default function HqHomeV8() {
       await loadFolders()
       void reloadAfterSave()
     } catch (caught) {
-      setFolderError(caught instanceof Error ? caught.message : 'フォルダを消せませんでした')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setFolderError(caught instanceof Error ? caught.message : 'フォルダを消せませんでした') }
     } finally {
       setFolderSaving(false)
     }
@@ -363,7 +382,7 @@ export default function HqHomeV8() {
     <div className={styles.folderBox}>
       <FolderPanel
         /* 閲覧のみで登録ボタンを隠したときも、その場所は空けておく（下のフォルダの列が上へ詰まらない。絵 VtJQ6）。 */
-        createAction={createAccount ?? <span className={styles.createSpace} aria-hidden="true" />}
+        createAction={createAccount}
         heading="フォルダ"
         rows={folderRows}
         activeId={folder}
@@ -371,7 +390,7 @@ export default function HqHomeV8() {
         onAddFolder={canManage ? () => openFolderDialog(null) : undefined}
         addFolderLabel="フォルダを追加"
       >
-        <p className={styles.folderNote}>フォルダを消しても、アカウントは消えません</p>
+        <FolderPanelNote>フォルダを消しても、アカウントは消えません</FolderPanelNote>
       </FolderPanel>
     </div>
   )
@@ -420,13 +439,13 @@ export default function HqHomeV8() {
   const body = loadError ? (
     <Notice
       tone="danger"
-      message={loadFailureNotice(loadError, '統括のアカウント情報')}
+      message={loadFailureNotice(loadError, '統括のアカウント情報', 'hq')}
       action={classifyApiFailure(loadError) === 'forbidden' ? undefined : (
-        <Button type="button" onClick={() => { setLoading(true); setReloadKey((key) => key + 1) }}>再読み込み</Button>
+        <Button type="button" onClick={() => { setLoading(true); setReloadKey((key) => key + 1) }}>もう一度読み込む</Button>
       )}
     />
   ) : loading ? (
-    <ListState kind="loading" title="アカウントを読み込んでいます" />
+    <ListState permissionScope="hq" kind="loading" loadingShape={view === 'cards' ? 'cards' : 'list'} title="アカウントを読み込んでいます" />
   ) : accounts.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
     <EmptyList
@@ -464,20 +483,20 @@ export default function HqHomeV8() {
             ))}
           </div>
           <span className={styles.spacer} />
-          <SegmentedControl<View>
+          <SaveErrorField names={["view"]}><SegmentedControl<View>
             aria-label="表示の切り替え"
             value={view}
             onChange={setView}
             options={[{ value: 'cards', label: 'カード' }, { value: 'table', label: '表' }]}
-          />
-          <Select aria-label="アカウントの並び順" value={sort} width={134} onChange={(value) => { setSort(value); resetPage() }} options={SORT_OPTIONS} />
-          <Select
+          /></SaveErrorField>
+          <SaveErrorField names={["sort"]}><Select aria-label="アカウントの並び順" value={sort} width={134} onChange={(value) => { setSort(value); resetPage() }} options={SORT_OPTIONS} /></SaveErrorField>
+          <SaveErrorField names={["size"]}><Select
             aria-label="アカウントの表示件数"
             value={String(size)}
             width={110}
             onChange={(value) => { setSize(Number(value)); resetPage() }}
-            options={PAGE_SIZES.map((value) => ({ value: String(value), label: `${value}件表示` }))}
-          />
+            options={PAGE_SIZES.map((value) => ({ value: String(value), label: `${value} 件表示` }))}
+          /></SaveErrorField>
         </div>
       </div>
 
@@ -487,7 +506,7 @@ export default function HqHomeV8() {
         <Notice
           tone="warn"
           message="保存はできましたが、一覧を読み直せませんでした。"
-          action={<Button type="button" onClick={() => void reloadAfterSave()}>読み直す</Button>}
+          action={<Button type="button" onClick={() => reloadAfterSave()} busyLabel="処理中…">もう一度読み込む</Button>}
         />
       ) : null}
 
@@ -518,12 +537,12 @@ export default function HqHomeV8() {
                     {/* B-31：名前の下は1行で省略し、全文は title。 */}
                     <p className={styles.meta} title={metaOf(account)}>{metaOf(account)}</p>
                   </div>
-                  <span className={state.tone === 'ok' ? `${styles.pill} ${styles.pill_ok}` : state.tone === 'warn' ? `${styles.pill} ${styles.pill_warn}` : `${styles.pill} ${styles.pill_idle}`}><span className={styles.dot} aria-hidden="true" />{state.label}</span>
+                  <StatusPill tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusPill>
                 </div>
                 <dl className={styles.stats}>
                   <div className={styles.stat}>
                     <dt>友だち</dt>
-                    <dd>{isArchived(account) && !account.stats?.friendCount ? '—' : formatNumber(account.stats?.friendCount ?? 0)}</dd>
+                    <dd>{isArchived(account) && !account.stats?.friendCount ? emptyValue('unknown') : formatNumber(account.stats?.friendCount ?? 0)}</dd>
                   </div>
                   <div className={styles.stat}>
                     <dt>今月の配信</dt>
@@ -560,11 +579,11 @@ export default function HqHomeV8() {
                 <span role="cell" className={styles.rowName}>
                   <span className={styles.logo} aria-hidden="true">{brandInitial(tenantName || name)}</span>
                   <span className={styles.cardName}>
-                    <span className={styles.name} title={name}>{name}</span>
+                    <span className={styles.name} ><TruncatedText value={String(name ?? '')} /></span>
                     <span className={styles.meta}>{metaOf(account)}</span>
                   </span>
                 </span>
-                <span role="cell"><span className={state.tone === 'ok' ? `${styles.pill} ${styles.pill_ok}` : state.tone === 'warn' ? `${styles.pill} ${styles.pill_warn}` : `${styles.pill} ${styles.pill_idle}`}><span className={styles.dot} aria-hidden="true" />{state.label}</span></span>
+                <span role="cell"><StatusPill tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusPill></span>
                 <span role="cell" className={styles.num}>{formatNumber(account.stats?.friendCount ?? 0)}</span>
                 <span role="cell" className={styles.num}>{formatNumber(account.stats?.messagesThisMonth ?? 0)}</span>
                 <span role="cell">{cardActions(account)}</span>
@@ -576,7 +595,7 @@ export default function HqHomeV8() {
 
       <div className={styles.footer}>
         <span className={styles.range}>
-          {filtered.length === 0 ? '0件' : `${formatNumber(filtered.length)}件中 ${formatNumber((current - 1) * size + 1)}〜${formatNumber((current - 1) * size + shown.length)}件`}
+          {filtered.length === 0 ? '0件' : `${formatNumber(filtered.length)} 件中 ${formatNumber((current - 1) * size + 1)}〜${formatNumber((current - 1) * size + shown.length)} 件`}
         </span>
 
         {pageCount > 1 ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="アカウントのページ送り" /> : null}
@@ -585,11 +604,11 @@ export default function HqHomeV8() {
   )
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId="JKjsE"
       title="統括のアカウント"
-      help="カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「詳細」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。"
-      description={`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}
+      help={<>{`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}{"カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「詳細」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。"}</>}
+
       folders={folderColumn}
       folderInset
       folderWidth={200}
@@ -646,11 +665,11 @@ export default function HqHomeV8() {
         description="アカウントは1つのフォルダに入ります。フォルダを消しても、アカウントは消えません。"
         name={folderName} onNameChange={setFolderName} nameId="hq-account-folder-name" nameLabel="フォルダの名前"
         color={folderColor} onColorChange={setFolderColor} colors={FOLDER_SELECT_COLORS}
-        placeholder="例: 渋谷エリア" maxLength={100}
+        placeholder="例：渋谷エリア" maxLength={100}
         onCancel={() => { if (!folderSaving) setFolderDialog(null) }}
         designNode="JKjsE" busy={folderSaving} error={folderError || undefined}
         confirmLabel={folderDialog?.editing ? '保存する' : '追加する'} cancelLabel="やめる"
-        onConfirm={() => void saveFolder()}
+        onConfirm={() => saveFolder()}
       />
 
       {deleteFolder ? (
@@ -663,10 +682,10 @@ export default function HqHomeV8() {
           destructive
           busy={folderSaving}
           error={folderError || undefined}
-          onConfirm={() => void removeFolder(deleteFolder)}
+          onConfirm={() => removeFolder(deleteFolder)}
           onCancel={() => { if (!folderSaving) setDeleteFolder(null) }}
         />
       ) : null}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

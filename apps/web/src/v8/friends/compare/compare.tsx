@@ -1,23 +1,11 @@
 'use client'
-
-/*
- * ★V8 重複候補を比べて決める（Pencil `fcg2D`：判定の小窓を開いた形、1152 は `p15At`：閉じた形）。
- * /friends/identity-candidates（`?id=` で候補を指定。無ければ未判定の先頭）。
- *
- * 読み込み・判定は今と同じ口（components/identity の useIdentityReview：
- * 一覧・詳細・判定・版の照合）。判定の中身も今と同じ（理由は必須・結び付けるときは
- * 採用する値と3つの確認）。違いは見せ方だけ：
- * - 判定は窓ではなく「結び付けた人に使う値」の中に開く小窓。下の帯の3つのボタンが開く
- * - 採用する値は表の「使う値」で選ぶ（小窓はその要約）
- * - 判定の履歴は小窓の右に出す
- */
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CircleHelp, Link2, UserX } from 'lucide-react'
 import type { IdentityCandidateDecision } from '@line-crm/shared'
 import type { IdentityCandidateWithProfiles } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { PageFrame } from '@/components/templates/page-frame'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Radio from '@/components/shared/radio'
@@ -30,6 +18,22 @@ import { useIdentityReview } from '@/components/identity/identity-review'
 import { canSubmitDecision } from '@/components/identity/identity-view'
 import { CONFIDENCE_WORD, STATUS_WORD, slashDateTime } from '../duplicates/words'
 import styles from './compare.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
+
+/*
+ * ★V8 重複候補を比べて決める（Pencil `fcg2D`：判定の小窓を開いた形、1152 は `p15At`：閉じた形）。
+ * /friends/identity-candidates（`?id=` で候補を指定。無ければ未判定の先頭）。
+ *
+ * 読み込み・判定は今と同じ口（components/identity の useIdentityReview：
+ * 一覧・詳細・判定・版の照合）。判定の中身も今と同じ（理由は必須・結び付けるときは
+ * 採用する値と3つの確認）。違いは見せ方だけ：
+ * - 判定は窓ではなく「結び付けた人に使う値」の中に開く小窓。下の帯の3つのボタンが開く
+ * - 採用する値は表の「使う値」で選ぶ（小窓はその要約）
+ * - 判定の履歴は小窓の右に出す
+ */
 
 const STRENGTH_WORD = { strong: '決め手', medium: '手がかり', weak: '参考' } as const
 const ATTRIBUTE_WORD: Record<string, string> = { メールアドレス: 'メール', 電話番号: '電話' }
@@ -112,17 +116,13 @@ function CompareInner() {
   const firstSelection = profileCandidates[0]
   const firstChosen = firstSelection?.options.find((option) => option.sourceFriendId === selections[firstSelection.fieldKey])
   const selectionSummary = firstChosen
-    ? `採用する値：表で選んだ値（${sideLetter(firstChosen.sourceFriendId)}：${firstChosen.valuePreview ?? '未登録'}${profileCandidates.length > 1 ? ' ほか' : ''}）`
+    ? `採用する値：表で選んだ値（${sideLetter(firstChosen.sourceFriendId)}：${firstChosen.valuePreview ?? emptyValue('unconfigured')}${profileCandidates.length > 1 ? ' ほか' : ''}）`
     : '採用する値：表で選んだ値'
 
   return (
     <PageFrame kind="detail" boardId="fcg2D">
-      <header className={styles.head}>
-        <h2 className={styles.title}>{detail ? `${detail.left.label} ↔ ${detail.right.label}` : '重複候補を比べて決める'}</h2>
-        <p className={styles.description}>
-          {detail ? `確からしさ：${CONFIDENCE_WORD[detail.confidence.label]}${decisive ? `・根拠：${decisive.label}` : ''}` : '同じ人かどうかを、根拠を見て決めます'}
-        </p>
-      </header>
+      <PageHeading title={detail ? `${detail.left.label} ↔ ${detail.right.label}` : '重複候補を比べて決める'}
+        help={<>{detail ? `確からしさ：${CONFIDENCE_WORD[detail.confidence.label]}${decisive ? `・根拠：${decisive.label}` : ''}` : '同じ人かどうかを、根拠を見て決めます'}</>} />
 
       <div className={styles.body}>
         <IdentityStateBlock
@@ -151,7 +151,7 @@ function CompareInner() {
                 <section key={side} className={styles.subject} aria-label={side}>
                   <p className={styles.side}>{side}</p>
                   <p className={styles.subjectName}>{subject.label}</p>
-                  <p className={styles.subjectSub}>{[subject.detail, subject.lineAccountName].filter(Boolean).join('・') || '—'}</p>
+                  <p className={styles.subjectSub}>{[subject.detail, subject.lineAccountName].filter(Boolean).join('・') || emptyValue('unknown')}</p>
                   <dl className={styles.attrs}>
                     {subject.attributes.map((attribute) => (
                       <div key={attribute.label} className={styles.attr}>
@@ -198,48 +198,45 @@ function CompareInner() {
 
               {panelOpen ? (
                 <div className={styles.pair}>
-                  <div ref={panelRef} className={styles.panel} role="group" aria-labelledby="compare-decide">
-                    <p id="compare-decide" className={styles.panelTitle}>「この2件を判定する」の小窓</p>
-                    <div className={styles.radios} role="radiogroup" aria-label="判定">
+                  <div ref={panelRef} className={styles.panel} role="group" aria-labelledby="compare-decide"><Field label={<>判定の理由</>} htmlFor="compare-reason" required><p id="compare-decide" className={styles.panelTitle}>「この2件を判定する」の小窓</p>
+<div className={styles.radios} role="radiogroup" aria-label="判定">
                       {DECISIONS.map((item) => (
-                        <Radio key={item.value} name="compare-decision" value={item.value} checked={decision === item.value} onChange={() => setDecision(item.value)}>
+                        <SaveErrorField names={["compare-decision","value","item.value","decision"]} key={item.value}><Radio key={item.value} name="compare-decision" value={item.value} checked={decision === item.value} onChange={() => setDecision(item.value)}>
                           {item.label}
-                        </Radio>
+                        </Radio></SaveErrorField>
                       ))}
                     </div>
-                    {decision === 'linked' ? (
+{decision === 'linked' ? (
                       <>
                         <p className={styles.fieldBox}>過去の扱い：これまでの履歴を1人分にまとめる</p>
                         <p className={styles.fieldBox}>{selectionSummary}</p>
                         <div className={styles.checks}>
                           {CONSENTS.map((label, index) => (
-                            <Checkbox
+                            <SaveErrorField names={["consents"]} key={label}><Checkbox
                               key={label}
                               checked={consents[index]}
                               onCheckedChange={(checked) => setConsents((current) => current.map((value, itemIndex) => (itemIndex === index ? checked : value)))}
                             >
                               {label}
-                            </Checkbox>
+                            </Checkbox></SaveErrorField>
                           ))}
                         </div>
                       </>
                     ) : null}
-                    <label className={styles.fieldLabel} htmlFor="compare-reason">判定の理由（必須）</label>
-                    <TextField
+<SaveErrorField names={["reason"]}><TextField
                       id="compare-reason"
                       value={reason}
                       onChange={(event) => setReason(event.target.value)}
                       placeholder={decisive ? `${decisive.label}` : '何を見てそう判断したか'}
-                    />
-                    {review.decideError ? <p className={styles.error} role="alert">{review.decideError}</p> : null}
-                    {!ready && reason.trim() !== '' && decision === 'linked' && !linkedReady ? (
+                    /></SaveErrorField>
+{review.decideError ? <Notice tone="danger" >{review.decideError}</Notice> : null}
+{!ready && reason.trim() !== '' && decision === 'linked' && !linkedReady ? (
                       <p className={styles.note} role="status">3つの確認をそろえると判定できます。</p>
                     ) : null}
-                    <div className={styles.panelActions}>
+<div className={styles.panelActions}>
                       <Button type="button" variant="secondary" onClick={() => setPanelOpen(false)} disabled={review.deciding}>キャンセル</Button>
                       <Button type="button" variant="primary" onClick={submit} disabled={!ready} busy={review.deciding} busyLabel="処理中…">判定する</Button>
-                    </div>
-                  </div>
+                    </div></Field></div>
                   <div className={styles.historyCard}>
                     <p className={styles.panelTitle}>判定の履歴</p>
                     <ul className={styles.lines}>
@@ -281,10 +278,10 @@ function CompareInner() {
                     return (
                       <Tr key={field.fieldKey} className={styles.row}>
                         <Td className={styles.td}><span className={styles.itemName}>{field.fieldLabel === 'メールアドレス' ? 'メール' : field.fieldLabel}</span></Td>
-                        <Td className={styles.td}>{left?.valuePreview ?? '—'}</Td>
-                        <Td className={styles.td}>{right?.valuePreview ?? '—'}</Td>
+                        <Td className={styles.td}>{left?.valuePreview ?? emptyValue('unknown')}</Td>
+                        <Td className={styles.td}>{right?.valuePreview ?? emptyValue('unknown')}</Td>
                         <Td className={styles.td}>
-                          <Select
+                          <SaveErrorField names={["selections"]}><Select
                             aria-label={`${field.fieldLabel}に使う値`}
                             size="full"
                             value={selections[field.fieldKey] ?? ''}
@@ -292,9 +289,9 @@ function CompareInner() {
                             onChange={(value) => setSelections((current) => ({ ...current, [field.fieldKey]: value }))}
                             options={field.options.map((option, index) => ({
                               value: option.sourceFriendId,
-                              label: same && index === 0 ? '同じ' : `${sideLetter(option.sourceFriendId) || option.sourceLabel}：${option.valuePreview ?? '未登録'}`,
+                              label: same && index === 0 ? '同じ' : `${sideLetter(option.sourceFriendId) || option.sourceLabel}：${option.valuePreview ?? emptyValue('unconfigured')}`,
                             }))}
-                          />
+                          /></SaveErrorField>
                         </Td>
                       </Tr>
                     )
@@ -302,8 +299,8 @@ function CompareInner() {
                   {tagCandidates.length > 0 ? (
                     <Tr className={styles.rowPlain}>
                       <Td className={styles.td}><span className={styles.itemName}>タグ</span></Td>
-                      <Td className={styles.td}>{tagCandidates.filter((tag) => tag.sourceFriendIds.includes(detail.left.id)).map((tag) => tag.name).join('・') || '—'}</Td>
-                      <Td className={styles.td}>{tagCandidates.filter((tag) => tag.sourceFriendIds.includes(detail.right.id) && !tag.sourceFriendIds.includes(detail.left.id)).map((tag) => tag.name).join('・') || '—'}</Td>
+                      <Td className={styles.td}>{tagCandidates.filter((tag) => tag.sourceFriendIds.includes(detail.left.id)).map((tag) => tag.name).join('・') || emptyValue('unknown')}</Td>
+                      <Td className={styles.td}>{tagCandidates.filter((tag) => tag.sourceFriendIds.includes(detail.right.id) && !tag.sourceFriendIds.includes(detail.left.id)).map((tag) => tag.name).join('・') || emptyValue('unknown')}</Td>
                       <Td className={styles.td}><span className={styles.faint}>元の友だちに残す</span></Td>
                     </Tr>
                   ) : null}

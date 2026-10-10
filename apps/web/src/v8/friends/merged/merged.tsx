@@ -1,21 +1,9 @@
 'use client'
 
-/*
- * ★V8 統合ユーザー（Pencil `ADjK8`）。/friends?tab=merged。
- *
- * データの口は今と同じ（/api/users-grouped・/api/duplicates/stats・CSV の全件書き出し）。
- * 詳細（`Hn9eE`）は今と同じく一覧の面を差し替える。URL の `?person=<id>` でも開ける。
- *
- * 絵の列「配信に使うアカウント」「結び付けた日」の値は一覧の API に無い。
- * 出せる分だけ出す：配信に使うアカウントは、友だちが1つだけの人はその名前、
- * 2つ以上の人は決め方が詳細にあるので「—」。結び付けた日は一覧の API に無いので「—」
- * （友だちの登録日は結び付けた日ではないので代わりに出さない。詳細の linkedAt を一覧にも足す依頼は Codex へ）。
- * 「複数アカウントのみ」の絞り込みは絵に口が無いので、所属アカウントの選びの末尾に入れた。
- */
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { ChevronUp, Download, RotateCw } from 'lucide-react'
+import { Inbox, ChevronUp, Download, RotateCw } from 'lucide-react'
 import { api } from '@/lib/api'
 import { formatDay, formatNumber, formatYmd } from '@/lib/format'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
@@ -25,6 +13,7 @@ import Button from '@/components/shared/button'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
 import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -37,6 +26,23 @@ import { FriendsSectionHead } from '../shared/head'
 import MergedPersonV8 from './person'
 import { useMergedUsers, USERS_PAGE_SIZES } from './use-merged-users'
 import styles from './merged.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
+
+/*
+ * ★V8 統合ユーザー（Pencil `ADjK8`）。/friends?tab=merged。
+ *
+ * データの口は今と同じ（/api/users-grouped・/api/duplicates/stats・CSV の全件書き出し）。
+ * 詳細（`Hn9eE`）は今と同じく一覧の面を差し替える。URL の `?person=<id>` でも開ける。
+ *
+ * 絵の列「配信に使うアカウント」「結び付けた日」の値は一覧の API に無い。
+ * 出せる分だけ出す：配信に使うアカウントは、友だちが1つだけの人はその名前、
+ * 2つ以上の人は決め方が詳細にあるので「—」。結び付けた日は一覧の API に無いので「—」
+ * （友だちの登録日は結び付けた日ではないので代わりに出さない。詳細の linkedAt を一覧にも足す依頼は Codex へ）。
+ * 「複数アカウントのみ」の絞り込みは絵に口が無いので、所属アカウントの選びの末尾に入れた。
+ */
 
 /** 所属アカウントの選びの「複数アカウントのみ」（絞り込みの口は今と同じ onlyDups）。 */
 const MULTI_ACCOUNTS = '__multi'
@@ -46,12 +52,12 @@ function linkedDay(row: UserRowData): string {
   const linkedAt = (row as UserRowData & { linkedAt?: string | null }).linkedAt
   if (!linkedAt) return '—'
   const [, m, d] = formatYmd(linkedAt).split('-')
-  return m && d ? `${Number(m)}/${Number(d)}` : '—'
+  return m && d ? `${Number(m)}/${Number(d)}` : emptyValue('unknown')
 }
 
 /** 配信に使うアカウント：友だちが1つだけの人は、そのアカウントだけに届く。 */
 function deliveryAccount(row: UserRowData): string {
-  return row.accounts.length === 1 ? `${row.accounts[0].accountName}だけ` : '—'
+  return row.accounts.length === 1 ? `${row.accounts[0].accountName}だけ` : emptyValue('unknown')
 }
 
 export default function MergedUsersV8() {
@@ -84,7 +90,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
   usePageTitle('友だち')
   const u = useMergedUsers()
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || canManageRole(staffRole)
+  const canManage = canManageRole(staffRole)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [menuFor, setMenuFor] = useState<string | null>(null)
 
@@ -137,27 +143,26 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
             </Button>
           ) : null}
         </div>
-        {u.exportError ? <p className={styles.error} role="alert">{u.exportError}</p> : null}
+        {u.exportError ? <Notice tone="danger" className={styles.alertPlacement}>{u.exportError}</Notice> : null}
 
-        <div className={styles.cards}>
+        <KpiBand gridClassName="grid grid-cols-3" className={styles.metrics}>
           {kpis.map((kpi) => (
             <KpiCard
               key={kpi.key}
-              presentation="card"
-              icon={null}
+              presentation="band"
+              icon={<Inbox size={14} />}
               title={kpi.title}
               value={kpi.value}
-              valueText={kpi.value == null ? '—' : `${formatNumber(kpi.value)} 人`}
+              valueText={kpi.value == null ? emptyValue('unknown') : `${formatNumber(kpi.value)} 人`}
               unit="人"
               detail={null}
               help={kpi.help}
-              className={styles.card}
             />
           ))}
-        </div>
+        </KpiBand>
 
         <div className={styles.filters}>
-          <Select
+          <SaveErrorField names={["uid","u.uid"]}><Select
             aria-label="UID連携で絞り込む"
             width={180}
             value={u.uid}
@@ -167,8 +172,8 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
               { value: 'linked', label: 'UID連携：連携済み' },
               { value: 'unlinked', label: 'UID連携：未連携・要確認' },
             ]}
-          />
-          <Select
+          /></SaveErrorField>
+          <SaveErrorField names={["MULTI_ACCOUNTS","account","u.account","_m_u_l_t_i__a_c_c_o_u_n_t_s"]}><EntitySelect
             aria-label="所属アカウントで絞り込む"
             width={200}
             value={u.onlyDups ? MULTI_ACCOUNTS : u.account}
@@ -183,10 +188,10 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
             }}
             options={[
               { value: '', label: '所属アカウント：すべて' },
-              ...u.accountOptions.map((a) => ({ value: a.id, label: `所属アカウント：${a.name}` })),
+              ...u.accountOptions.map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: `所属アカウント：${a.name}` })),
               { value: MULTI_ACCOUNTS, label: '所属アカウント：複数アカウントのみ' },
             ]}
-          />
+          /></SaveErrorField>
         </div>
 
         <div className={styles.listArea}>
@@ -194,19 +199,19 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
             <div className={styles.search}>
               <SearchField aria-label="統合ユーザーを探す" value={u.q} onChange={u.setQ} onClear={() => u.setQ('')} placeholder="名前・メール・電話で探す" />
             </div>
-            <Select
+            <SaveErrorField names={["pageSize","u.pageSize","page_size","u.page_size"]}><Select
               aria-label="表示件数"
               width={96}
               value={String(u.pageSize)}
               onChange={(value) => u.setPageSize(Number(value))}
-              options={USERS_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
-            />
+              options={USERS_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
+            /></SaveErrorField>
           </div>
 
           <section className={styles.panel} aria-labelledby="merged-users-title">
             <div className={styles.panelHead}>
               <h3 id="merged-users-title" className={styles.panelTitle}>統合ユーザー</h3>
-              <p className={styles.panelSub}>{u.loading && u.total === 0 ? '更新中…' : `${formatNumber(u.total)}人`}</p>
+              <p className={styles.panelSub}>{u.loading && u.total === 0 ? '更新中…' : `${formatNumber(u.total)} 人`}</p>
             </div>
             <DataTable className={styles.table}>
               <colgroup>
@@ -244,15 +249,15 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
                     { id: 'accounts', label: open ? '登録アカウントを閉じる' : '登録アカウントを見る', onSelect: () => setExpanded(open ? null : row.identityKey) },
                   ]
                   const main = (
-                    <Tr key={row.identityKey} className={styles.row}>
+                    <Tr key={row.identityKey} className={styles.row} onOpen={personId ? () => onOpen(personId) : undefined}>
                       <Td className={styles.td}>
                         <div className={styles.person}>
                           {personId ? (
                             <button type="button" className={styles.name} onClick={() => onOpen(personId)} data-qa-open="Hn9eE">{row.displayName || '名前なし'}</button>
                           ) : (
-                            <span className={`${styles.name} ${styles.nameStatic}`}>{row.displayName || '—'}</span>
+                            <span className={`${styles.name} ${styles.nameStatic}`}>{row.displayName || emptyValue('unknown')}</span>
                           )}
-                          <span className={styles.contact}>{row.emails[0] ?? row.phones[0] ?? '—'}</span>
+                          <span className={styles.contact}>{row.emails[0] ?? row.phones[0] ?? emptyValue('unknown')}</span>
                         </div>
                       </Td>
                       <Td className={styles.td}>
@@ -275,7 +280,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
             {u.total > 0 && !u.error ? (
               <div className={styles.pager}>
                 <span className={styles.pagerCount}>
-                  {`${formatNumber(u.total)}人中 ${formatNumber((u.page - 1) * u.pageSize + 1)}〜${formatNumber(Math.min(u.page * u.pageSize, u.total))}人`}
+                  {`${formatNumber(u.total)} 人中 ${formatNumber((u.page - 1) * u.pageSize + 1)}〜${formatNumber(Math.min(u.page * u.pageSize, u.total))} 人`}
                 </span>
                 {pageCount > 1 ? <Pagination page={u.page} pageCount={pageCount} onPageChange={u.setPage} disabled={u.loading} ariaLabel="統合ユーザーのページ" /> : null}
               </div>

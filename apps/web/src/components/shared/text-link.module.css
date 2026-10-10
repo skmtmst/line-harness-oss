@@ -35,7 +35,7 @@
 }
 
 .root:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
   border-radius: var(--radius-mini);
 }
@@ -48,3 +48,8 @@
 [data-theme='v8'] .root { font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 [data-theme='v8'] .label { line-height: 18px; }
 }
+
+/* B-152②：役割ごとの文字の段。 */
+[data-theme='v8'] .label { font-weight: var(--polish-weight-body); }
+
+@layer components { .root[data-tone='action']{color:var(--color-accent-deep);} }

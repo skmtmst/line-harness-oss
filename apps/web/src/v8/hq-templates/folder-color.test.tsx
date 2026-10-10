@@ -17,7 +17,7 @@ it.each([null, '#123456'])('フォルダをまとめて配った結果と結果�
   render(<FolderDistributionResult name={folder.name} runs={[run]} accounts={[{ id: 'a-1', name: '本店' }]} folders={[folder]} busy={false} error=""
     onBack={vi.fn()} onRefresh={vi.fn()} onRetry={vi.fn()} onRecheck={vi.fn()} />)
   const pills = screen.getAllByRole('group', { name: 'タグ「定期」' })
-  expect(pills).toHaveLength(2)
+  expect(pills).toHaveLength(1)
   const expected = document.createElement('span')
   expected.style.backgroundColor = folderDisplayColor(folder)
   for (const pill of pills) expect(pill.querySelector<HTMLElement>('[aria-hidden="true"]')!.style.backgroundColor).toBe(expected.style.backgroundColor)

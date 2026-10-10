@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8 臨時休業・貸切を足す／変える窓（提案 E-10 `nVvXy`）。
- *
- * 種類 → はじめの日〜おわりの日 → 時間（終日／時間帯だけ）→ 閉じる卓（全部／選ぶ）→ メモ
- * → 重なる予約（保存しても取り消さない・1件ずつ「LINE で連絡する」）→ 他の予約サイトと Google。
- * 入力が変わるたびに少し待って preview を呼び、重なる予約を出す。保存は予約を取り消さず、お客さまへ送信もしない。
- * 動きは BEHAVIOR.md。
- */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Phone } from 'lucide-react'
 import type { RestaurantClosure, RestaurantClosureInput, RestaurantClosureKind, RestaurantClosurePreview } from '@line-crm/shared'
@@ -27,6 +18,19 @@ import {
   KIND_LABEL, KIND_ORDER, clock, conflictsOf, dayOfIso, dayShort, emptyInput, inputError, inputOf, overlapMessage, overlapping, sourceLabel,
 } from './format'
 import styles from './closures.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 臨時休業・貸切を足す／変える窓（提案 E-10 `nVvXy`）。
+ *
+ * 種類 → はじめの日〜おわりの日 → 時間（終日／時間帯だけ）→ 閉じる卓（全部／選ぶ）→ メモ
+ * → 重なる予約（保存しても取り消さない・1件ずつ「LINE で連絡する」）→ 他の予約サイトと Google。
+ * 入力が変わるたびに少し待って preview を呼び、重なる予約を出す。保存は予約を取り消さず、お客さまへ送信もしない。
+ * 動きは BEHAVIOR.md。
+ */
 
 export type ClosureDialogTarget = { mode: 'add'; day: string } | { mode: 'edit'; closure: RestaurantClosure }
 
@@ -51,9 +55,9 @@ function saveMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.code === 'closure_overlap') return overlapMessage(conflictsOf(error.data))
     if (error.code === 'version_conflict') return 'ほかの人が先に変えました。閉じて、読み直してからもう一度変えてください。'
-    if (error.status === 403) return 'この店舗の予約枠を変える権限がありません。'
+    if (error.status === 403) return permissionDeniedMessage('store')
   }
-  return describeSaveFailure(error)
+  return withPermissionFailure(error, describeSaveFailure(error), 'store')
 }
 
 export default function ClosureDialog({
@@ -75,6 +79,7 @@ export default function ClosureDialog({
   onClose: () => void
   onSaved: (result: ClosureSaved) => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const open = target !== null
   const editing = target?.mode === 'edit' ? target.closure : null
   const [input, setInput] = useState<RestaurantClosureInput>(() => emptyInput(storeId, today))
@@ -156,13 +161,18 @@ export default function ClosureDialog({
         try {
           await restaurantGoogleApi.proposeClosureHours(accountId, saved.id, saved.version, saved.kind === 'private_event')
           googleResult = 'made'
-        } catch {
+        } catch (saveFailure) {
+          saveErrors.capture(saveFailure)
           googleResult = 'failed'
         }
       }
       onSaved({ closure: saved, reservations: res.data.reservations.length, google: googleResult })
     } catch (caught) {
-      setError(saveMessage(caught))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
+      setError(saveMessage(caught)) }
     } finally {
       setBusy(false)
     }
@@ -173,7 +183,7 @@ export default function ClosureDialog({
   const mediaNames = media.map((m) => m.name).join('・')
 
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open={open}
       designNode="nVvXy"
       designWidth={600}
@@ -185,51 +195,51 @@ export default function ClosureDialog({
       busy={busy}
       error={error || undefined}
       confirmLabel={editing ? '変更を保存' : days === 'この日' ? 'この日を閉じる' : 'この期間を閉じる'}
-      onConfirm={() => void save()}
+      onConfirm={() => save()}
       onCancel={onClose}
     >
       <div className={styles.form} ref={formRef}>
         <div className={styles.field}>
           <span className={styles.label} id="e10-kind">種類</span>
-          <SegmentedControl<RestaurantClosureKind>
+          <SaveErrorField names={["kind","input.kind","google"]}><SegmentedControl<RestaurantClosureKind>
             aria-label="種類"
             className={styles.kinds}
             options={KIND_ORDER.map((kind) => ({ value: kind, label: KIND_LABEL[kind] }))}
             value={input.kind}
             onChange={(kind) => { set({ kind }); if (!editing) setGoogle(kind !== 'private_event') }}
-          />
+          /></SaveErrorField>
         </div>
 
         <div className={styles.dates}>
           <Field label="はじめの日" htmlFor="e10-start" error={fieldErrors.start}>
-            <DateField
+            <SaveErrorField names={["startDate","input.startDate","start_date","input.start_date"]}><DateField
               id="e10-start"
               aria-label="はじめの日"
               invalid={Boolean(fieldErrors.start)}
               value={input.startDate}
               min={today}
               onChange={(value) => set({ startDate: value, endDate: input.endDate < value ? value : input.endDate })}
-            />
+            /></SaveErrorField>
           </Field>
           <span className={styles.wave} aria-hidden="true">〜</span>
           <Field label="おわりの日" htmlFor="e10-end" error={fieldErrors.end}>
-            <DateField id="e10-end" aria-label="おわりの日" invalid={Boolean(fieldErrors.end)} value={input.endDate} min={input.startDate || today} onChange={(value) => set({ endDate: value })} />
+            <SaveErrorField names={["endDate","input.endDate","end_date","input.end_date"]}><DateField id="e10-end" aria-label="おわりの日" invalid={Boolean(fieldErrors.end)} value={input.endDate} min={input.startDate || today} onChange={(value) => set({ endDate: value })} /></SaveErrorField>
           </Field>
         </div>
 
         <Field label="時間" error={fieldErrors.time}>
           <div role="radiogroup" aria-label="時間">
           <div className={styles.choices}>
-            <Radio name="e10-time" checked={input.allDay} onChange={() => set({ allDay: true, startTime: null, endTime: null })}>終日</Radio>
-            <Radio name="e10-time" checked={!input.allDay} onChange={() => set({ allDay: false, startTime: input.startTime ?? '18:00', endTime: input.endTime ?? '22:00' })}>
+            <SaveErrorField names={["e10-time","allDay","input.allDay"]}><Radio name="e10-time" checked={input.allDay} onChange={() => set({ allDay: true, startTime: null, endTime: null })}>終日</Radio></SaveErrorField>
+            <SaveErrorField names={["e10-time"]}><Radio name="e10-time" checked={!input.allDay} onChange={() => set({ allDay: false, startTime: input.startTime ?? '18:00', endTime: input.endTime ?? '22:00' })}>
               時間帯だけ（例：18:00〜22:00）
-            </Radio>
+            </Radio></SaveErrorField>
           </div>
           {!input.allDay ? (
             <div className={styles.times}>
-              <TimeField aria-label="閉じる時間の始まり" invalid={Boolean(fieldErrors.time)} minuteStep={30} size="field" value={input.startTime ?? ''} onChange={(value) => set({ startTime: value })} />
+              <SaveErrorField names={["startTime","input.startTime","start_time","input.start_time"]}><TimeField aria-label="閉じる時間の始まり" invalid={Boolean(fieldErrors.time)} minuteStep={30} size="field" value={input.startTime ?? ''} onChange={(value) => set({ startTime: value })} /></SaveErrorField>
               <span className={styles.wave} aria-hidden="true">〜</span>
-              <TimeField aria-label="閉じる時間の終わり" invalid={Boolean(fieldErrors.time)} allowEndOfDay minuteStep={30} size="field" value={input.endTime ?? ''} onChange={(value) => set({ endTime: value })} />
+              <SaveErrorField names={["endTime","input.endTime","end_time","input.end_time"]}><TimeField aria-label="閉じる時間の終わり" invalid={Boolean(fieldErrors.time)} allowEndOfDay minuteStep={30} size="field" value={input.endTime ?? ''} onChange={(value) => set({ endTime: value })} /></SaveErrorField>
             </div>
           ) : null}
           </div>
@@ -238,31 +248,28 @@ export default function ClosureDialog({
         <Field label="閉じる卓" error={fieldErrors.tables}>
           <div role="radiogroup" aria-label="閉じる卓" aria-invalid={Boolean(fieldErrors.tables)} tabIndex={-1}>
           <div className={styles.choices}>
-            <Radio name="e10-tables" checked={!pickTables} onChange={() => { setPickTables(false); set({ tableIds: [] }) }}>
+            <SaveErrorField names={["e10-tables","pickTables"]}><Radio name="e10-tables" checked={!pickTables} onChange={() => { setPickTables(false); set({ tableIds: [] }) }}>
               {`全部の卓（${active.length}卓・${seats}席）`}
-            </Radio>
-            <Radio name="e10-tables" checked={pickTables} onChange={() => setPickTables(true)}>卓を選ぶ（貸切の一部など）</Radio>
+            </Radio></SaveErrorField>
+            <SaveErrorField names={["e10-tables","pickTables"]}><Radio name="e10-tables" checked={pickTables} onChange={() => setPickTables(true)}>卓を選ぶ（貸切の一部など）</Radio></SaveErrorField>
           </div>
           {pickTables ? (
             <div className={styles.tablePicks}>
-              {active.map((t) => (
-                <Checkbox
+              {active.map((t, saveFieldIndex) => (
+                <SaveErrorField names={[`active.${saveFieldIndex}.id`,"id","t.id"]} key={t.id}><Checkbox
                   key={t.id}
                   checked={(input.tableIds ?? []).includes(t.id)}
                   onCheckedChange={(on) => set({ tableIds: on ? [...(input.tableIds ?? []), t.id] : (input.tableIds ?? []).filter((id) => id !== t.id) })}
                 >
                   {`${t.code}（${t.max_capacity}席）`}
-                </Checkbox>
+                </Checkbox></SaveErrorField>
               ))}
             </div>
           ) : null}
           </div>
         </Field>
 
-        <label className={styles.field}>
-          <span className={styles.label}>メモ<OptionalBadge /></span>
-          <TextField value={input.memo ?? ''} maxLength={200} placeholder="例：設備点検のため" onChange={(event) => set({ memo: event.target.value })} />
-        </label>
+        <Field label="メモ"><SaveErrorField names={["memo","input.memo"]}><TextField value={input.memo ?? ''} maxLength={200} placeholder="例：設備点検のため" onChange={(event) => set({ memo: event.target.value })} /></SaveErrorField></Field>
 
         {problem ? null : preview === null ? (
           <p className={styles.hint} aria-live="polite">{`${days}の予約を調べています。`}</p>
@@ -275,7 +282,7 @@ export default function ClosureDialog({
               <div className={styles.affected} data-affected="">
                 <p className={styles.affectedTitle}>
                   <AlertTriangle size={16} aria-hidden="true" />
-                  {`${days}の予約が ${rows.length}件あります（保存しても取り消しません${editing && preview.contacted > 0 ? `・連絡済み ${preview.contacted}件` : ''}）`}
+                  {`${days}の予約が ${rows.length} 件あります（保存しても取り消しません${editing && preview.contacted > 0 ? `・連絡済み ${preview.contacted} 件` : ''}）`}
                 </p>
                 {rows.map((row) => (
                   <div key={row.id} className={styles.affectedRow}>
@@ -293,7 +300,7 @@ export default function ClosureDialog({
                     )}
                   </div>
                 ))}
-                {preview.waitlist > 0 ? <p className={styles.hint}>{`キャンセル待ちの ${preview.waitlist}件には、閉じた時間帯の空きを案内しません。`}</p> : null}
+                {preview.waitlist > 0 ? <p className={styles.hint}>{`キャンセル待ちの ${preview.waitlist} 件には、閉じた時間帯の空きを案内しません。`}</p> : null}
               </div>
             ) : (
               <p className={styles.hint}>{`${days}の予約はありません。`}</p>
@@ -305,29 +312,29 @@ export default function ClosureDialog({
           <span className={styles.label}>他の予約サイトと Google</span>
           <div className={styles.checks}>
             {media.length > 0 ? (
-              <Checkbox
+              <SaveErrorField names={["notifyMedia","input.notifyMedia","notify_media","input.notify_media"]}><Checkbox
                 checked={input.notifyMedia !== false}
                 onCheckedChange={(on) => set({ notifyMedia: on })}
                 description={input.notifyMedia === false ? '知らせを出しません。他の予約サイトの枠は、それぞれの管理画面で閉じてください。' : undefined}
               >
                 {`${mediaNames}に「閉じる知らせ」を出す（媒体ごとに［閉じた］を押す）`}
-              </Checkbox>
+              </Checkbox></SaveErrorField>
             ) : (
               <p className={styles.hint}>閉じる知らせを出す予約サイトはありません（予約経路の連携で選べます）。</p>
             )}
             {canGoogle && !editing ? (
-              <Checkbox
+              <SaveErrorField names={["google"]}><Checkbox
                 checked={google && !partial}
                 disabled={partial}
                 onCheckedChange={setGoogle}
                 description={partial ? '卓を選んだ貸切は、Google では店全体の休みになるので案を作りません。' : undefined}
               >
                 Google の営業時間にも臨時休業を入れる案を作る
-              </Checkbox>
+              </Checkbox></SaveErrorField>
             ) : null}
           </div>
         </div>
       </div>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }

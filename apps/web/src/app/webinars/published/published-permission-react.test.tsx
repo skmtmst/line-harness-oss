@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * D001: 閲覧だけの担当者には変更系の口（公開の一時停止・通知テスト・
  * 複製）を出さない。対応APIは owner/admin のみ（Worker の requireRole）
@@ -71,6 +73,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'staff' } as StaffMember);
   fixture.get.mockReset()
   fixture.editor.mockReset()
   fixture.pause.mockReset()
@@ -110,7 +113,7 @@ describe('公開完了画面の権限表示（D001）', () => {
   })
 
   it('オーナーには変更系ボタンを全部出す', async () => {
-    window.localStorage.setItem('lh_staff_role', 'owner')
+    window.localStorage.setItem('lh_staff_role', 'owner'); rememberStaffIdentity({ role: 'owner' } as StaffMember)
     await render()
 
     for (const label of MUTATING_LABELS) {
@@ -119,7 +122,7 @@ describe('公開完了画面の権限表示（D001）', () => {
   })
 
   it('管理者には変更系ボタンを全部出す', async () => {
-    window.localStorage.setItem('lh_staff_role', 'admin')
+    window.localStorage.setItem('lh_staff_role', 'admin'); rememberStaffIdentity({ role: 'admin' } as StaffMember)
     await render()
 
     for (const label of MUTATING_LABELS) {
@@ -129,8 +132,8 @@ describe('公開完了画面の権限表示（D001）', () => {
 })
 
 describe('公開を止めたあと（W158）', () => {
-  it('止めたら「稼働中」「公開を一時停止」を残さず、止めた状態を出す', async () => {
-    window.localStorage.setItem('lh_staff_role', 'owner')
+  it('止めたら「有効」「公開を一時停止」を残さず、止めた状態を出す', async () => {
+    window.localStorage.setItem('lh_staff_role', 'owner'); rememberStaffIdentity({ role: 'owner' } as StaffMember)
     fixture.pause.mockResolvedValue({ data: { ...webinar, status: 'draft' } })
     await render()
     const pause = Array.from(host.querySelectorAll('button')).find((button) => button.textContent?.includes('公開を一時停止'))!
@@ -138,7 +141,7 @@ describe('公開を止めたあと（W158）', () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
     expect(host.textContent).toContain('公開を止めました')
     expect(host.textContent).toContain('止めている（下書き）')
-    expect(host.textContent).not.toContain('稼働中')
+    expect(host.textContent).not.toContain('有効')
     expect(host.textContent).not.toContain('公開を一時停止')
   })
 })

@@ -1,8 +1,9 @@
-// @vitest-environment happy-dom
-import React, { useState } from 'react'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+
+import React, { act, useState } from 'react'
+import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EntityMultiPickerDialog, EntityPickerField, type EntityPickerItem } from './entity-picker'
+// @vitest-environment happy-dom
 
 afterEach(cleanup)
 
@@ -25,9 +26,10 @@ describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
   it('欄は空なら［選ぶ］、選ぶと名前とフォルダ＋［変える］。窓の中で押しただけでは変わらない', async () => {
     const onChange = vi.fn()
     render(<Single onChange={onChange} />)
-    expect(screen.getByText('（回答フォームを選んでください）')).toBeTruthy()
+    expect(screen.getByText('回答フォームを選ぶ')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '回答フォーム：選ぶ' }))
     const dialog = await screen.findByRole('dialog', { name: '回答フォームを選ぶ' })
+    expect(dialog.style.getPropertyValue('--dialog-design-width')).toBe('640px')
     // フォルダの列で絞る
     fireEvent.click(within(within(dialog).getByRole('navigation', { name: 'フォルダ' })).getByRole('button', { name: /アンケート/ }))
     expect(within(dialog).queryByRole('radio', { name: '初回カウンセリング' })).toBeNull()
@@ -40,6 +42,7 @@ describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))
     expect(onChange).toHaveBeenCalledWith('a')
     expect(screen.queryByRole('dialog')).toBeNull()
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(screen.getByText('来店アンケート')).toBeTruthy()
     expect(screen.getByText('フォルダ：アンケート')).toBeTruthy()
     expect(screen.getByRole('button', { name: '回答フォーム：変える' })).toBeTruthy()
@@ -52,6 +55,7 @@ describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
     const dialog = await screen.findByRole('dialog')
     expect((within(dialog).getByRole('radio', { name: '初回カウンセリング' }) as HTMLInputElement).checked).toBe(true)
     fireEvent.change(within(dialog).getByRole('searchbox'), { target: { value: '施術' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
     expect(within(dialog).getAllByRole('radio').map((row) => row.getAttribute('aria-label'))).toEqual(['施術後アンケート'])
     fireEvent.click(within(dialog).getByRole('radio', { name: '施術後アンケート' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
@@ -64,6 +68,7 @@ describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
     fireEvent.click(screen.getByRole('button', { name: '回答フォーム：見る' }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).queryByRole('button', { name: '選ぶ' })).toBeNull()
+    expect(within(dialog).queryByRole('link', { name: /作る画面へ/ })).toBeNull()
     expect(within(dialog).getAllByRole('button', { name: '閉じる' })).toHaveLength(2)
   })
 
@@ -103,14 +108,16 @@ describe('まとめて選ぶ窓', () => {
     let dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '分類なし' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
-    expect(screen.getByText('（タグを選んでください）')).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(screen.getByText('タグを選ぶ')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'タグ：選ぶ' }))
     dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '分類なし' }))
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '来店アンケート' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'この 2件にする' }))
-    expect(screen.getByText('2件')).toBeTruthy()
-    expect(screen.getByText('来店アンケート・分類なし')).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(screen.getByText('来店アンケート')).toBeTruthy()
+    expect(screen.getByText('分類なし')).toBeTruthy()
   })
 })
 

@@ -1,16 +1,8 @@
 'use client'
-
-/*
- * ★V8 成果とアフィリエイト「アフィリエイター」（板 `nJlxX`・1152 `KdFRI`・
- * 閲覧のみ `v9JWQ`、状態は見本帳 `rRk0C`、行を押すと引き出し `tnTn9`）。
- *
- * app/affiliates/v8-affiliates-tab.tsx から動きを写し、見た目を一覧の型
- * （ListPage）で組み直した。データの口・操作は今と同じ（一覧・集計・承認待ち・
- * 今回の締めの見込み・紹介リンクのコピー・紹介を止める・まとめて止める・CSV）。
- *
- * フォルダの列：アフィリエイターを分けて保存する口は無いので、報酬の決め方で
- * 分けた見え方の切り替えとして持つ（保存しない）。
- */
+import { useListUrlJsonValue } from '@/components/shared/list-url-state'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Banknote, CircleDot, CircleHelp, Download, Plus, Trophy, Users } from 'lucide-react'
@@ -63,6 +55,22 @@ import {
   ToolbarNotices,
 } from './parts'
 import styles from './affiliates.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 成果とアフィリエイト「アフィリエイター」（板 `nJlxX`・1152 `KdFRI`・
+ * 閲覧のみ `v9JWQ`、状態は見本帳 `rRk0C`、行を押すと引き出し `tnTn9`）。
+ *
+ * app/affiliates/v8-affiliates-tab.tsx から動きを写し、見た目を一覧の型
+ * （ListPage）で組み直した。データの口・操作は今と同じ（一覧・集計・承認待ち・
+ * 今回の締めの見込み・紹介リンクのコピー・紹介を止める・まとめて止める・CSV）。
+ *
+ * フォルダの列：アフィリエイターを分けて保存する口は無いので、報酬の決め方で
+ * 分けた見え方の切り替えとして持つ（保存しない）。
+ */
 
 type FilterKey = 'active' | 'reward'
 type SortKey = 'conversions' | 'reward' | 'name' | 'newest'
@@ -88,11 +96,11 @@ const GROUPS: Array<{ key: GroupKey; label: string; match: (row: AffiliateListRo
   { key: 'rate', label: '売上の割合で払う', match: (row) => row.isActive && (row.rewardMode === 'rate' || (!row.rewardMode && row.commissionRate > 0)) },
   { key: 'fixed', label: '1件ごとに払う', match: (row) => row.isActive && (row.rewardMode === 'fixed' || (!row.rewardMode && row.commissionRate <= 0 && row.rewardAmount > 0)) },
   { key: 'none', label: '報酬なし（計測のみ）', match: (row) => row.isActive && (row.rewardMode === 'none' || (!row.rewardMode && row.commissionRate <= 0 && row.rewardAmount <= 0)) },
-  { key: 'stopped', label: '止めている', match: (row) => !row.isActive },
+  { key: 'stopped', label: '停止中', match: (row) => !row.isActive },
 ]
 
-
 export default function AffiliatorsTab() {
+  const saveErrors = useSaveFormErrors()
   const samePageUrl = useSamePageUrl()
   const { readonly, narrow, accountId, setCount, focusAffiliateId } = useAffiliateShell()
   const settlementPeriod = useMemo(() => currentSettlementPeriod(), [])
@@ -111,16 +119,19 @@ export default function AffiliatorsTab() {
   const [monthlyState, setMonthlyState] = useState<LoadState>('loading')
 
   /* ===== 見せ方 ===== */
-  const [query, setQuery] = useState('')
-  const [filters, setFilters] = useState<FilterKey[]>([])
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filters, setFilters] = useListUrlJsonValue<FilterKey[]>('filters', [])
   const [group, setGroup] = useState<GroupKey>('all')
-  const [sort, setSort] = useState<SortKey>('conversions')
+  const [sort, setSort] = useListUrlValue<SortKey>('sort', 'conversions')
   const [saved, setSaved] = useState('')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
 
   /* ===== 操作 ===== */
   const [archiveTarget, setArchiveTarget] = useState<{ id: string; name: string } | null>(null)
+  const [resumeTarget, setResumeTarget] = useState<{ id: string; name: string } | null>(null)
+  const [resuming, setResuming] = useState(false)
+  const [resumeError, setResumeError] = useState('')
   const [drawerId, setDrawerId] = useState<string | null>(null)
   const [drawerEdit, setDrawerEdit] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
@@ -207,13 +218,16 @@ export default function AffiliatorsTab() {
       }
       setPaymentTotal(res.data.totalAmount)
       setPaymentState('ready')
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure);
+
       if (mounted.current) {
         setPaymentState('error')
         setPaymentTotal(null)
       }
     }
-  }, [accountId, settlementPeriod])
+  }, [accountId, settlementPeriod, saveErrors]);
+
 
   const loadMonthly = useCallback(async () => {
     setMonthlyState('loading')
@@ -316,19 +330,13 @@ export default function AffiliatorsTab() {
       const links = res.data as unknown as AffiliateLink[]
       const link = links.find((item) => Boolean(item.is_active)) ?? links[0]
       if (!link) {
-        notifyToast('この人には紹介リンクがまだありません。詳細から発行できます。')
-        return
+        throw new Error('この人には紹介リンクがまだありません。')
       }
       const url = distributionUrl(link.ref_code, linkBaseUrl)
-      if (!url) return
-      try {
-        await navigator.clipboard.writeText(url)
-        notifyToast('紹介リンクをコピーしました。')
-      } catch {
-        openDrawer(row.id, false)
-      }
+      if (!url) throw new Error('URLを読み込めませんでした')
+      return url
     } catch {
-      notifyToast('紹介リンクを読み込めませんでした。もう一度お試しください。')
+      throw new Error('紹介リンクを読み込めませんでした。')
     }
   }, [linkBaseUrl, openDrawer])
 
@@ -342,10 +350,10 @@ export default function AffiliatorsTab() {
       const failed = results.filter((r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success)).length
       const done = bulkTargets.length - failed
       if (failed === 0) {
-        notifyToast(`${formatNumber(done)}人の紹介を止めました。`)
+        notifyToast(`${formatNumber(done)} 人の紹介を止めました。`)
         setSelected(new Set())
       } else {
-        notifyToast(`${formatNumber(done)}人を止めました。${formatNumber(failed)}人は止められませんでした。`)
+        notifyToast(`${formatNumber(done)} 人を止めました。${formatNumber(failed)} 人は止められませんでした。`)
       }
       setBulkConfirm(false)
       void loadList()
@@ -355,7 +363,7 @@ export default function AffiliatorsTab() {
   }, [bulkTargets, bulkBusy, loadList])
 
   const exportCsv = () => {
-    downloadCsv(`affiliates-${new Date().toISOString().slice(0, 10)}.csv`, [
+    downloadCsv(csvFileName("アフィリエイター"), [
       ['名前', '紹介コード', '紹介リンク数', '友だち追加', '成果', '承認済み報酬'],
       ...shownRows.map((row) => [row.name, row.code, row.linkCount, row.friendAdds, row.totalConversions, Math.round(row.rewardAmount)]),
     ])
@@ -387,7 +395,7 @@ export default function AffiliatorsTab() {
         title="今月の報酬"
         icon={<Banknote size={14} aria-hidden="true" />}
         value={null}
-        valueText={paymentState === 'ready' && paymentTotal != null ? formatYen(paymentTotal) : '—'}
+        valueText={paymentState === 'ready' && paymentTotal != null ? formatYen(paymentTotal) : emptyValue('unknown')}
         unit=""
         detail={paymentState === 'ready' ? `承認待ち ${formatNumber(pendingCount)} 件は入っていない` : paymentState === 'loading' ? loadingWord : errorWord}
       />
@@ -425,12 +433,12 @@ export default function AffiliatorsTab() {
 
   const folderSelect = (
     <div className={styles.narrowFolder}>
-      <Select
+      <SaveErrorField names={["group"]}><Select
         aria-label="報酬の決め方"
         value={group}
         options={GROUPS.map((item) => ({ value: item.key, label: item.key === 'all' || !ready ? item.label : `${item.label} ${groupCount(item.key)}` }))}
         onChange={(value) => resetPage(() => setGroup(value as GroupKey))}
-      />
+      /></SaveErrorField>
     </div>
   )
 
@@ -509,14 +517,15 @@ export default function AffiliatorsTab() {
           <TableHeadRow className={styles.headRow} data-table-layout="columns">
             <Th className={styles.colCheck}>
               {readonly ? null : (
-                <Checkbox
+                <SaveErrorField names={["allChecked","checked","all_checked"]}><Checkbox
                   aria-label="このページの全員を選ぶ"
                   checked={allChecked}
                   onCheckedChange={(checked) => setChecked(pagedRows.map((row) => row.id), checked)}
-                />
+                /></SaveErrorField>
               )}
             </Th>
             <Th className={styles.colName}>アフィリエイター</Th>
+            <Th>状態</Th>
             <Th className={`${styles.colLinks} ${styles.num}`}>紹介リンク</Th>
             <Th className={`${styles.colFriends} ${styles.num}`}>友だち追加</Th>
             <Th className={`${styles.colConv} ${styles.num}`}>成果</Th>
@@ -525,15 +534,15 @@ export default function AffiliatorsTab() {
           </TableHeadRow>
         </thead>
         <tbody>
-          {pagedRows.map((row) => (
-            <Tr key={row.id} className={styles.row} data-table-layout="columns">
+          {pagedRows.map((row, saveFieldIndex) => (
+            <Tr key={row.id} className={styles.row} data-table-layout="columns" data-row-id={row.id}>
               <Td className={styles.colCheck}>
                 {readonly ? null : (
-                  <Checkbox
+                  <SaveErrorField names={[`pagedRows.${saveFieldIndex}.id`,"id","row.id","checked"]}><Checkbox
                     aria-label={`${row.name}を選ぶ`}
                     checked={selected.has(row.id)}
                     onCheckedChange={(checked) => setChecked([row.id], checked)}
-                  />
+                  /></SaveErrorField>
                 )}
               </Td>
               <Td className={styles.colName}>
@@ -541,14 +550,13 @@ export default function AffiliatorsTab() {
                   <FolderDotName folder={null}>
                     {nameButton(row)}
                   </FolderDotName>
-                  <span className={styles.rowCode} title={row.code}>{row.code}</span>
-                  <span className={styles.rowPlan}>{planText(row)}</span>
-                  <StatusPill tone={row.isActive ? 'active' : 'neutral'}>{row.isActive ? '計測中' : '停止中'}</StatusPill>
+
                 </span>
               </Td>
+              <Td><StatusPill tone={row.isActive ? 'active' : 'neutral'}>{row.isActive ? '計測中' : '停止中'}</StatusPill></Td>
               <Td className={`${styles.colLinks} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.linkCount)}本`}</span></Td>
-              <Td className={`${styles.colFriends} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.friendAdds)}人`}</span></Td>
-              <Td className={`${styles.colConv} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.totalConversions)}件`}</span></Td>
+              <Td className={`${styles.colFriends} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.friendAdds)} 人`}</span></Td>
+              <Td className={`${styles.colConv} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.totalConversions)} 件`}</span></Td>
               <Td className={`${styles.colReward} ${styles.num}`}><span className={styles.cellNum}>{formatYen(row.rewardAmount)}</span></Td>
               <Td className={styles.colOps}>
                 <span className={styles.rowActions}>
@@ -556,10 +564,10 @@ export default function AffiliatorsTab() {
                   <RowMenu
                     label={`${row.name}の操作`}
                     items={[
-                      { id: 'copy', label: '紹介リンクをコピー', onSelect: () => { void copyFirstLink(row) } },
+                      { id: 'copy', label: '紹介リンクをコピー', content: <CopyTextButton role="menuitem" label="紹介リンクをコピー" value={row.id} getValue={() => copyFirstLink(row)} aria-label="紹介リンクをコピー" />, onSelect: () => {} },
                       ...(readonly ? [] : [
                         { id: 'edit', label: '編集', onSelect: () => openDrawer(row.id, true) },
-                        ...(row.isActive ? [{ id: 'archive', label: '紹介を止める', tone: 'danger' as const, dividerBefore: true, onSelect: () => setArchiveTarget({ id: row.id, name: row.name }) }] : []),
+                        ...(row.isActive ? [{ id: 'archive', label: '紹介を止める', tone: 'danger' as const, dividerBefore: true, onSelect: () => setArchiveTarget({ id: row.id, name: row.name }) }] : [{ id: 'resume', label: '紹介を再開する', onSelect: () => { setResumeError(''); setResumeTarget({ id: row.id, name: row.name }) } }]),
                       ]),
                     ]}
                   />
@@ -595,7 +603,7 @@ export default function AffiliatorsTab() {
   ) : (
     <>
       {table}
-      <BulkBar count={readonly ? 0 : selected.size} unit="人" hint="対象を確認してから操作を選んでください">
+      <BulkBar count={readonly ? 0 : selected.size} total={shownRows.length} onSelectAll={() => setSelected(new Set(shownRows.map(item => item.id)))} unit="人" hint="対象を確認してから操作を選んでください">
         <Button type="button" onClick={() => setBulkConfirm(true)} disabled={bulkTargets.length === 0}>まとめて紹介を止める</Button>
         <Button type="button" onClick={() => setSelected(new Set())}>選ぶのをやめる</Button>
       </BulkBar>
@@ -605,15 +613,28 @@ export default function AffiliatorsTab() {
   const pager = ready && shownRows.length > 0 && pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {`${formatNumber(shownRows.length)}人中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shownRows.length)}人`}
+        {`${formatNumber(shownRows.length)} 人中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shownRows.length)} 人`}
       </span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} />
     </ListPagePagination>
   ) : undefined
 
+  async function resumeReferral() {
+    if (!resumeTarget || resuming || readonly) return
+    setResuming(true); setResumeError('')
+    try {
+      const result = await api.affiliates.update(resumeTarget.id, { isActive: true })
+      if (!result.success) throw new Error(result.error)
+      setResumeTarget(null)
+      notifyToast('紹介を再開しました')
+      await loadList()
+    } catch (cause) { if (!saveErrors.capture(cause)) setResumeError('紹介を再開できませんでした。状態を読み直してお試しください。') }
+    finally { setResuming(false) }
+  }
+
   function nameButton(row: { id: string; name: string }) {
     return (
-      <button type="button" className={styles.rowName} title={row.name} onClick={() => openDrawer(row.id, false)}>
+      <button type="button" className={styles.rowName} title={row.name}  onClick={() => openDrawer(row.id, false)}>
         {row.name}
       </button>
     )
@@ -621,10 +642,10 @@ export default function AffiliatorsTab() {
   const drawerRow = drawerId ? rows.find((row) => row.id === drawerId) ?? null : null
 
   return (
-    <AffiliateFrame
+    <SaveErrorScope errors={saveErrors}><AffiliateFrame
       actions={
         <Button onClick={exportCsv} disabled={shownRows.length === 0}>
-          <Download size={15} aria-hidden="true" /> CSV で書き出す
+          <Download size={15} aria-hidden="true" /> CSVで書き出す
         </Button>
       }
       stats={stats}
@@ -633,6 +654,7 @@ export default function AffiliatorsTab() {
       toolbar={toolbar}
       pagination={pager}
       overlays={<>
+        <ConfirmDialog open={resumeTarget !== null} title={`「${resumeTarget?.name ?? ''}」の紹介を再開しますか？`} description="紹介リンクからの成果を再び数えます。" confirmLabel="紹介を再開する" busy={resuming} error={resumeError} onConfirm={() => void resumeReferral()} onCancel={() => { if (!resuming) setResumeTarget(null) }} />
         <AffiliateArchiveDialog
           target={archiveTarget}
           onClose={() => setArchiveTarget(null)}
@@ -640,12 +662,12 @@ export default function AffiliatorsTab() {
         />
         <ConfirmDialog
           open={bulkConfirm}
-          title={`${formatNumber(bulkTargets.length)}人の紹介をまとめて止めますか？`}
+          title={`${formatNumber(bulkTargets.length)} 人の紹介をまとめて止めますか？`}
           description="止めると、その人たちの紹介リンクからの成果はこれから数えません。認めるのを待っている成果がある人は、行の「…」の紹介を止めるで中身を確かめてから止めてください。"
           confirmLabel="まとめて止める"
           destructive
           busy={bulkBusy}
-          onConfirm={() => { void runBulkArchive() }}
+          onConfirm={() => { return runBulkArchive() }}
           onCancel={() => setBulkConfirm(false)}
         />
         {drawerRow ? (
@@ -666,6 +688,6 @@ export default function AffiliatorsTab() {
       </>}
     >
       {body}
-    </AffiliateFrame>
+    </AffiliateFrame></SaveErrorScope>
   )
 }

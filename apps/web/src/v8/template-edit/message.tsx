@@ -1,62 +1,36 @@
 'use client'
 
-/*
- * ★V8「メッセージを作る／編集」（絵 u5YC6・1152 は a1k3d・競合は NCbYn）。
- *
- * 左：名前とフォルダ／中身（本文・差し込む）／本文の中のURL。
- * 右：送るときの名前／届き方（本物のスマホ）。1152 ではスマホを窓で開く。
- * 下の帯：キャンセル／下書きを保存／保存して公開。
- * 動き（読み込み・保存・公開・409・利用先の確認）は BEHAVIOR.md。
- */
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { notifySaved, notifyToast } from '@/components/shared/toast'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CircleAlert, GitCompare, Link2, RotateCcw, Send } from 'lucide-react'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
+import { GitCompare, Link2, Send } from 'lucide-react'
 import { validateFlexContent, type Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
 import { useFormErrors } from '@/lib/use-form-errors'
 import ValidationSummary from '@/components/shared/validation-summary'
-import { FieldError } from '@/components/shared/form-controls'
+import { FieldError, Field } from '@/components/shared/form-controls'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
+import LinePreview, { LinePreviewMessage, LinePreviewFlex as FlexPreview } from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
 import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
-import { notifyToast } from '@/components/shared/toast'
-import FlexPreview from '@/components/flex-preview'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { buildTemplatePreview, extractMessageUrls, LEGACY_MESSAGE_NOTICE } from '@/components/templates/message-template-editor'
-import {
-  ACCOUNT_MISMATCH_MESSAGE,
-  EMPTY_REFERENCES,
-  TEMPLATE_LOAD_FAILED_MESSAGE,
-  conflictTime,
-  describeTemplateDiff,
-  draftFromDetail,
-  isTemplateDetailData,
-  loadTemplateReferences,
-  newTemplateEditorState,
-  requestTemplateReferences,
-  resolveEditorAccountId,
-  saveTemplateEdit,
-  validateTemplateSave,
-  templateAccountMismatch,
-  templateSaveGuard,
-  templateUsageEntries,
-  type TemplateDraft,
-  type TemplateEditorState,
-  type TemplateReferenceState,
-  type TemplateReferences,
-} from './core'
+import { ACCOUNT_MISMATCH_MESSAGE, EMPTY_REFERENCES, TEMPLATE_LOAD_FAILED_MESSAGE, conflictTime, describeTemplateDiff, draftFromDetail, isTemplateDetailData, loadTemplateReferences, newTemplateEditorState, requestTemplateReferences, resolveEditorAccountId, saveTemplateEdit, validateTemplateSave, templateAccountMismatch, templateSaveGuard, templateUsageEntries, type TemplateDraft, type TemplateEditorState, type TemplateReferenceState, type TemplateReferences } from './core'
 import { TemplateEditFrame } from './frame'
 import type { TemplateEditHost } from './host'
 import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
@@ -65,6 +39,17 @@ import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared
 import { referenceTokenNames } from '@/components/shared/insert-tokens'
 import { loadTemplateExamples } from '@/v8/templates/examples'
 import styles from './edit.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8「メッセージを作る／編集」（絵 u5YC6・1152 は a1k3d・競合は NCbYn）。
+ *
+ * 左：名前とフォルダ／中身（本文・差し込む）／本文の中のURL。
+ * 右：送るときの名前／届き方（本物のスマホ）。1152 ではスマホを窓で開く。
+ * 下の帯：キャンセル／下書きを保存／保存して公開。
+ * 動き（読み込み・保存・公開・409・利用先の確認）は BEHAVIOR.md。
+ */
 
 const snapshot = (draft: TemplateDraft) => JSON.stringify(draft)
 
@@ -76,10 +61,12 @@ type Conflict = { name: string; at: string; latest: TemplateDraft | null }
  * 読み込み・自動保存・公開・店の差し込み候補（友だち情報・共通情報）は使わない。
  */
 export default function TemplateMessageEditor({ id, visual, example = null, host }: { id: string | null; visual: boolean; example?: string | null; host?: TemplateEditHost }) {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const role = useStaffRole()
   // 役割の確認が済むまでは操作を出す（最後の守りはサーバの 403）。staff と分かったら隠す。
-  const canMutate = host ? !host.readOnly : role === null || canManageRole(role)
+  const featureAccess = useFeatureAccess('templates')
+  const canMutate = host ? !host.readOnly : featureAccess
   const narrow = useNarrowViewport(1351)
   const { accounts, selectedAccountId } = useAccount()
 
@@ -272,7 +259,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         setConflict({ name: latest.data.name, at: conflictTime(latest.data.updatedAt), latest: draftFromDetail(latest.data) })
         return
       }
-    } catch { /* 読めなくても帯は出す */ }
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure) /* 読めなくても帯は出す */ }
     setConflict({ name: editor.draft.name, at: '', latest: null })
   }
 
@@ -302,7 +290,9 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
       const res = await request
       if (!res.ok) {
         if (res.conflict && target.templateId) await raiseConflict(target.templateId)
-        else if (!silent) setError(res.error)
+        else if (!silent && !saveErrors.apply(res.fields ?? {}))
+ setError(res.error);
+
         return null
       }
       if (!id && !target.templateId) {
@@ -329,9 +319,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     save: async () => (await saveNow({ silent: true })) !== null,
   })
 
-  const leave = () => {
-    disarm()
-    router.push('/templates')
+  const leave = (savedId: string) => {
+    if (!id) { disarm(); router.push(createPageReturnHref('/templates', savedId)) }
   }
 
   const publishNow = async (templateId: string): Promise<boolean> => {
@@ -351,8 +340,11 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
       }
       return true
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 409) await raiseConflict(templateId)
-      else setError('公開できませんでした。もう一度お試しください。')
+      else { if (!fieldFailure)
+ setError('公開できませんでした。もう一度お試しください。') }
       return false
     }
   }
@@ -372,8 +364,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     const savedId = await saveNow()
     if (savedId) autosave.markSaved()
     if (savedId) {
-      notifyToast('下書きを保存しました')
-      leave()
+      notifySaved('下書きを保存しました')
+      leave(savedId)
     }
   }
 
@@ -396,7 +388,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
       }
       if (await publishNow(savedId)) {
         notifyToast('公開しました')
-        leave()
+        leave(savedId)
       }
     } finally {
       setPublishing(false)
@@ -424,8 +416,11 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         return
       }
       setConflict((prev) => (prev ? { ...prev, latest: draftFromDetail(detail.data) } : prev))
-    } catch {
-      setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setCompareError('最新の内容を取れませんでした。もう一度お試しください。') }
     } finally {
       setCompareBusy(false)
     }
@@ -437,18 +432,18 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   /* 閲覧のみ：作る・保存の操作は置かず、帯で知らせる。 */
   if (!canMutate) {
     return (
-      <TemplateEditFrame
+      <SaveErrorScope errors={saveErrors}><TemplateEditFrame
         boardId={boardId}
         title={title}
         description={description}
-        band={<p className={styles.readonly} role="status">閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</p>}
+        band={<ReadOnlyNotice>閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</ReadOnlyNotice>}
         side={<SenderCard />}
       >
         <Card padding="none" layout="vertical" className={styles.card}>
           <p className={styles.cardNote}>中身の確認は一覧の行を開くと読めます。</p>
-          <Link href="/templates" className={styles.back}>一覧へ戻る</Link>
+          <></>
         </Card>
-      </TemplateEditFrame>
+      </TemplateEditFrame></SaveErrorScope>
     )
   }
 
@@ -468,7 +463,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     >
       {messageType === 'flex' ? (
         flexError ? (
-          <p role="alert" className={styles.error}>{flexError}このままでは保存できません。</p>
+          <Notice tone="danger" >{flexError}このままでは保存できません。</Notice>
         ) : !messageContent.trim() ? (
           <p className={styles.hint}>カードの内容を入力すると、ここに表示されます。</p>
         ) : (
@@ -480,37 +475,21 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         </LinePreviewMessage>
       )}
       {preview.unresolved.length > 0 ? (
-        <p role="alert" className={styles.error}>値を確認できない差し込みがあります：{preview.unresolved.map((key) => `{{${key}}}`).join('、')}</p>
+        <Notice tone="danger" >値を確認できない差し込みがあります：{preview.unresolved.map((key) => `{{${key}}}`).join('、')}</Notice>
       ) : null}
     </LinePreview>
   )
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <TemplateEditFrame
         boardId={boardId}
         title={title}
         description={description}
         band={conflict ? (
-          <div className={styles.band} role="alert" data-design-node="NCbYn">
-            <CircleAlert size={18} aria-hidden="true" className={styles.bandIcon} />
-            <div className={styles.bandText}>
-              <p className={styles.bandTitle} title={conflict.name}>
-                {`ほかの人が${conflict.at ? ` ${conflict.at} に` : '先に'}テンプレート「${conflict.name}」を保存しました`}
-              </p>
-              <p className={styles.bandDesc}>あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。</p>
-            </div>
-            <div className={styles.bandActions}>
-              <Button type="button" onClick={() => void openCompare()} disabled={compareBusy}>
-                <GitCompare size={15} aria-hidden="true" />
-                違いを比べる
-              </Button>
-              <Button type="button" variant="primary" onClick={reloadLatest}>
-                <RotateCcw size={15} aria-hidden="true" />
-                最新を読み込んで続ける
-              </Button>
-            </div>
-          </div>
+          <SaveConflictBand designNode="NCbYn"
+            title={`ほかの人が${conflict.at ? ` ${conflict.at} に` : '先に'}テンプレート「${conflict.name}」を保存しました`}
+            compareBusy={compareBusy} onCompare={openCompare} onReload={reloadLatest} />
         ) : undefined}
         side={(
           <>
@@ -560,7 +539,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
           <>
             {host?.notice}
             {messageType === 'flex' || messageType === 'image' ? <Notice tone="warn" message={LEGACY_MESSAGE_NOTICE} /> : null}
-            {error || loadFailed ? <p role="alert" className={styles.error}>{loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error}</p> : null}
+            {error || loadFailed ? <Notice tone="danger" >{loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error}</Notice> : null}
             {exampleNote && !id ? <p role="status" className={styles.error}>{exampleNote}</p> : null}
             <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
             <Card padding="none" layout="vertical" className={styles.card}>
@@ -569,14 +548,9 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                 <p className={styles.cardNote}>一覧に出る名前です。友だちには見えません。</p>
               </div>
               <div className={styles.pair}>
-                <div className={`${styles.field} ${styles.grow}`}>
-                  <label htmlFor="te-name" className={styles.label}>テンプレート名</label>
-                  <TextField {...fields.bind('name')} id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-name-error' : undefined} />
-                  <FieldError id="te-name-error">{fields.error('name')}</FieldError>
-                </div>
-                <div className={`${styles.field} ${styles.folderField}`}>
-                  <label htmlFor="te-folder" className={styles.labelSmall}>フォルダ</label>
-                  <FolderSelect
+                <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="te-name"><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-name-error' : undefined} /></SaveErrorField>
+<FieldError id="te-name-error">{fields.error('name')}</FieldError></Field></div>
+                <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="te-folder"><SaveErrorField names={["folder","host.folder","folderId","folder_id"]}><FolderSelect
                     id="te-folder"
                     aria-label="フォルダ"
                     value={host ? host.folder : folderId ?? ''}
@@ -588,8 +562,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                       : canMutate && editorAccountId
                         ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: editorAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
                         : undefined}
-                  />
-                </div>
+                  /></SaveErrorField></Field></div>
               </div>
             </Card>
 
@@ -598,7 +571,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                 <h2 className={styles.cardTitle}>中身</h2>
               </div>
               <div className={styles.bodyBox} {...fields.bind('content')}>
-                <InsertTextField
+                <SaveErrorField names={["messageContent","message_content"]}><InsertTextField
                   id="te-content"
                   ref={contentRef}
                   aria-invalid={fields.invalid('content') || undefined}
@@ -611,13 +584,13 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                   onValueChange={(next) => updateDraft({ messageContent: next })}
                   tokenNames={tokenNames}
                   placeholder={messageType === 'flex' ? '{"type":"bubble", …}' : '例：いつもご利用ありがとうございます。今月のおすすめをお知らせします。'}
-                />
+                /></SaveErrorField>
                 <span className={styles.bodySpacer} aria-hidden="true" />
                 <InsertRow accountId={editorAccountId} state={referenceState} references={references} length={messageContent.length} onInsert={insert} />
               </div>
               <FieldError id="te-content-error">{fields.error('content')}</FieldError>
               {messageType === 'flex' && flexError && messageContent.trim() && !fields.invalid('content') ? (
-                <p role="alert" className={styles.error}>{flexError}このままでは保存できません。</p>
+                <Notice tone="danger" >{flexError}このままでは保存できません。</Notice>
               ) : null}
               <p className={styles.hint}>
                 {messageType === 'flex'
@@ -625,13 +598,13 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                   : '名前と友だち情報は受け取る人ごと、共通情報と配信日は送る時点の値に置き換わります。回答フォームの答えは、答えを保存した友だち情報から差し込みます。'}
                 {messageContent.length > 4500 ? ' 約4,500文字を超えると複数のメッセージに分かれて届きます。' : ''}
               </p>
-              {referenceState === 'failed' ? <p role="alert" className={styles.error}>差し込み項目を読み込めませんでした。画面を再読み込みしてください。</p> : null}
+              {referenceState === 'failed' ? <Notice tone="danger" >差し込み項目を読み込めませんでした。画面を再読み込みしてください。</Notice> : null}
               {host ? <p className={styles.hint}>統括のテンプレートで差し込めるのは、名前・配信日・その他です（友だち情報・共通情報はアカウントごとに違うため）。</p>
                 : !editorAccountId && !loading ? <p className={styles.hint}>LINE公式アカウントを選ぶと、友だち情報と共通情報を選べます。</p> : null}
               {accountMismatch ? (
-                <div role="alert" className={styles.readonly}>
+                <Notice tone="warn" role="alert">
                   {ACCOUNT_MISMATCH_MESSAGE}（このテンプレートは「{accountName(editor.templateAccountId) ?? editor.templateAccountId}」のものです。差し込み候補もそのアカウントのまま出しています）
-                </div>
+                </Notice>
               ) : null}
             </Card>
 
@@ -646,9 +619,9 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                   {urls.map((url) => (
                     <div key={url} className={styles.urlRow}>
                       <Link2 size={14} aria-hidden="true" className={styles.urlIcon} />
-                      <span className={styles.urlText} title={url}>{url}</span>
+                      <span className={styles.urlText} ><TruncatedText value={String(url ?? '')} url /></span>
                       <span className={styles.urlNote}>短縮して、押された数を数える</span>
-                      <Toggle checked locked label={`${url}を短縮して数える（いつもオン）`} />
+                      <SettingCheckbox checked locked label={`${url}を短縮して数える（いつもオン）`} />
                     </div>
                   ))}
                   <p className={styles.hint}>リンク名（計測に出る名前）と短縮URLは、配信のときに自動で付きます。</p>
@@ -697,7 +670,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
             if (await publishNow(publishCheck.id)) {
               setPublishCheck(null)
               notifyToast('公開しました')
-              leave()
+              leave(publishCheck.id)
             }
           } finally {
             setPublishing(false)
@@ -713,7 +686,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
       </ConfirmDialog>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="テンプレートの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }
 

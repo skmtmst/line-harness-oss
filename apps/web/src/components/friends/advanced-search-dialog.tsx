@@ -1,5 +1,6 @@
 'use client'
 
+import TagOverflow from '@/components/shared/tag-overflow'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import TagPill from '@/components/shared/tag-pill'
@@ -26,6 +27,8 @@ import Select from '@/components/shared/select'
 import HelpTip from '@/components/shared/help-tip'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { formatNumber } from '@/lib/format'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /**
  * V4の詳細検索。既存APIが受け取れる条件だけを実行対象にする。
@@ -88,7 +91,7 @@ const OR_AXES: Array<{
   { label: '回答フォーム', input: null, make: () => ({ kind: 'form', op: 'exists' }) },
   { label: '最終反応日', input: 'date', make: (value) => value ? { kind: 'last_activity', op: 'after', value } : null },
   { label: 'リマインダ', input: null, make: () => ({ kind: 'reminder', op: 'exists' }) },
-  { label: '個別メモ', input: null, make: () => ({ kind: 'memo', op: 'exists' }) },
+  { label: 'メモ', input: null, make: () => ({ kind: 'memo', op: 'exists' }) },
   { label: 'ステータスメッセージ', input: 'text', placeholder: '含む文字', make: (value) => value.trim() ? { kind: 'status_message', op: 'contains', value: value.trim() } : null },
   { label: '友だち登録日', input: 'date', make: (value) => value ? { kind: 'created_at', op: 'after', value } : null },
   { label: 'その他', input: 'text', placeholder: 'イベント種別（例：conversion）', make: (value) => value.trim() ? { kind: 'common_event', op: 'exists', value: value.trim() } : null },
@@ -167,6 +170,8 @@ export default function AdvancedSearchDialog({
   initialSort: 'recent' | 'oldest'
   initialLimit: number
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const savedSearchEnabled = features?.savedSearch !== false
   const marksFeatureEnabled = features?.marks !== false
   const fieldsFeatureEnabled = features?.fields !== false
@@ -364,14 +369,15 @@ export default function AdvancedSearchDialog({
       if (requestId !== countRequestRef.current) return
       setCount(res.success ? res.data.total : null)
       setCountFailed(!res.success)
-    } catch {
+    } catch (saveFailure) {
       if (requestId !== countRequestRef.current) return
+      saveErrors.capture(saveFailure)
       setCount(null)
       setCountFailed(true)
     } finally {
       if (requestId === countRequestRef.current) setCounting(false)
     }
-  }, [accountId, params])
+  }, [accountId, params, saveErrors])
 
   useEffect(() => {
     if (!open) return
@@ -438,14 +444,16 @@ export default function AdvancedSearchDialog({
       setSaveOpen(false)
       setSavedNotice('条件を保存しました')
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : '条件を保存できませんでした')
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure) setSaveError(error instanceof Error ? error.message : '条件を保存できませんでした') }
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div
+    <SaveErrorScope errors={saveErrors}><div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-scrim p-4"
       data-design-node="CYJ0L"
       onClick={onClose}
@@ -514,7 +522,7 @@ export default function AdvancedSearchDialog({
             </div>
           </section>
 
-          <section className="rounded-card border border-hairline bg-canvas p-3">
+          <section className="rounded-card border content-card bg-canvas p-3">
           <div className="flex items-center gap-2 px-1 pb-2">
             <span className="bg-surface-pearl text-ink-secondary rounded-pill px-2 py-0.5 text-xs font-medium">
               すべて
@@ -534,12 +542,12 @@ export default function AdvancedSearchDialog({
 
               <div className="min-w-0 sm:col-span-8">
                 {b.kind === 'name' && (
-                  <TextInput
+                  <SaveErrorField names={[`blocks.${i}.keyword`,"keyword","b.keyword"]}><TextInput
                     value={b.keyword}
                     onChange={(e) => patch(i, { ...b, keyword: e.target.value })}
                     placeholder="キーワードを入力"
                     aria-label="名前のキーワード"
-                  />
+                  /></SaveErrorField>
                 )}
 
                 {b.kind === 'tag' && (
@@ -564,12 +572,12 @@ export default function AdvancedSearchDialog({
                   <div className="flex flex-col items-stretch gap-2 @3xl:flex-row @3xl:items-end">
                     <label className="min-w-0 @3xl:flex-1">
                       <span className="text-caption mb-1 block font-semibold text-ink-secondary">項目</span>
-                      <TextInput
+                      <SaveErrorField names={[`blocks.${i}.key`,"key","b.key"]}><TextInput
                         list="friend-field-names"
                         value={b.key}
                         onChange={(e) => patch(i, { ...b, key: e.target.value })}
                         placeholder="例：誕生日"
-                      />
+                      /></SaveErrorField>
                     </label>
                     <datalist id="friend-field-names">
                       {fieldNames.map((n) => (
@@ -578,7 +586,7 @@ export default function AdvancedSearchDialog({
                     </datalist>
                     <label className="@3xl:shrink-0">
                       <span className="text-caption mb-1 block font-semibold text-ink-secondary">比較方法</span>
-                      <Select
+                      <SaveErrorField names={[`blocks.${i}.op`,"op","b.op"]}><Select
                         aria-label="比較方法"
                         value={b.op}
                         onChange={(value) => patch(i, { ...b, op: value as 'eq' | 'ne' })}
@@ -586,42 +594,42 @@ export default function AdvancedSearchDialog({
                           { value: 'eq', label: '等しい' },
                           { value: 'ne', label: '等しくない' },
                         ]}
-                      />
+                      /></SaveErrorField>
                     </label>
                     <label className="min-w-0 @3xl:flex-1">
                       <span className="text-caption mb-1 block font-semibold text-ink-secondary">値</span>
-                      <TextInput
+                      <SaveErrorField names={[`blocks.${i}.value`,"value","b.value"]}><TextInput
                         value={b.value}
                         onChange={(e) => patch(i, { ...b, value: e.target.value })}
                         placeholder="例：1990-01-01"
-                      />
+                      /></SaveErrorField>
                     </label>
                   </div>
                 )}
 
                 {b.kind === 'status_message' && (
-                  <TextInput
+                  <SaveErrorField names={[`blocks.${i}.keyword`,"keyword","b.keyword"]}><TextInput
                     value={b.keyword}
                     onChange={(e) => patch(i, { ...b, keyword: e.target.value })}
                     placeholder="ひとことに含む文字"
                     aria-label="ひとことに含む文字"
-                  />
+                  /></SaveErrorField>
                 )}
 
                 {b.kind === 'created_at' && (
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <DateField
+                      <SaveErrorField names={[`blocks.${i}.from`,"from","b.from"]}><DateField
                         value={b.from}
                         onChange={(v) => patch(i, { ...b, from: v })}
                         aria-label="友だち登録日の開始"
-                      />
+                      /></SaveErrorField>
                       <span className="text-ink-secondary text-sm">〜</span>
-                      <DateField
+                      <SaveErrorField names={[`blocks.${i}.to`,"to","b.to"]}><DateField
                         value={b.to}
                         onChange={(v) => patch(i, { ...b, to: v })}
                         aria-label="友だち登録日の終了"
-                      />
+                      /></SaveErrorField>
                     </div>
                     {/* R183: 逆転期間は保存・実行のどちらも断られる。欄で先に知らせる。 */}
                     {b.from && b.to && b.from > b.to ? (
@@ -633,7 +641,7 @@ export default function AdvancedSearchDialog({
                 {b.kind === 'chat_status' && (
                   <>
                     {/* FRIEND-05: 説明どおり固定4状態。保留も検索できる。 */}
-                    <Select
+                    <SaveErrorField names={[`blocks.${i}.value`,"value","b.value"]}><Select
                       aria-label="対応状況"
                       value={b.value}
                       onChange={(value) =>
@@ -645,7 +653,7 @@ export default function AdvancedSearchDialog({
                         { value: 'on_hold', label: '保留' },
                         { value: 'resolved', label: '対応済み' },
                       ]}
-                    />
+                    /></SaveErrorField>
                   </>
                 )}
               </div>
@@ -732,7 +740,7 @@ export default function AdvancedSearchDialog({
               「対象」プルダウンの2か所が同じ変数へ別の意味で書き込み、
               「すべて」が非表示だけを検索していた。
             */}
-            <RadioCardGroup legend="表示する友だち" className="mt-2 flex flex-wrap gap-4">
+            <SaveErrorField names={["friend-search-visibility","value","item.value","visibility"]}><RadioCardGroup legend="表示する友だち" className="mt-2 flex flex-wrap gap-4">
               {VISIBILITY_OPTIONS.map((item) => (
                 <RadioCard
                   key={item.value}
@@ -743,7 +751,7 @@ export default function AdvancedSearchDialog({
                   title={item.label}
                 />
               ))}
-            </RadioCardGroup>
+            </RadioCardGroup></SaveErrorField>
             <label className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold text-ink-secondary">
               友だちの状態
               {/* 共通Selectはvalue/onChange必須のため、操作なしの固定表示として値と空の変更受けを付ける。disabledの見た目・文言は変えない。 */}
@@ -759,9 +767,9 @@ export default function AdvancedSearchDialog({
           </section>
 
           <div className="grid gap-2 sm:grid-cols-2">
-            <label className="rounded-card border border-hairline bg-canvas px-3 py-2">
+            <label className="rounded-card border content-card bg-canvas px-3 py-2">
               <span className="text-nano text-ink-faint">並び順</span>
-                <Select
+                <SaveErrorField names={["sort"]}><Select
                   aria-label="並び順"
                   value={sort}
                   onChange={(value) => setSort(value as 'recent' | 'oldest')}
@@ -771,19 +779,19 @@ export default function AdvancedSearchDialog({
                   ]}
                   size="full"
                   className="mt-0.5"
-                />
+                /></SaveErrorField>
             </label>
             {/* FRIEND-04: 表示件数も条件の一部として適用する。 */}
-            <label className="rounded-card border border-hairline bg-canvas px-3 py-2">
+            <label className="rounded-card border content-card bg-canvas px-3 py-2">
               <span className="text-nano text-ink-faint">表示件数</span>
-              <Select
+              <SaveErrorField names={["limit"]}><Select
                 aria-label="表示件数"
                 value={String(limit)}
                 onChange={(value) => setLimit(Number(value))}
                 options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size}件` }))}
                 size="page-size"
                 className="mt-0.5"
-              />
+              /></SaveErrorField>
             </label>
           </div>
         </div>
@@ -844,7 +852,7 @@ export default function AdvancedSearchDialog({
             <p className="mt-1 text-xs leading-5 text-ink-faint">保存後は「保存した検索」から何度でも呼び出せます。</p>
             <label className="mt-4 block text-sm font-semibold text-ink-secondary">
               条件名
-              <TextInput autoFocus value={saveName} onChange={(event) => setSaveName(event.target.value)} maxLength={80} placeholder="例：VIPかつ未契約" className="mt-2" />
+              <SaveErrorField names={["saveName","name","save_name"]}><TextInput autoFocus value={saveName} onChange={(event) => setSaveName(event.target.value)} maxLength={80} placeholder="例：VIPかつ未契約" className="mt-2" /></SaveErrorField>
             </label>
             {saveError ? <p className="mt-3 text-sm text-danger">{saveError}</p> : null}
             <div className="mt-5 flex justify-end gap-2">
@@ -854,7 +862,7 @@ export default function AdvancedSearchDialog({
           </section>
         </div>
       ) : null}
-    </div>
+    </div></SaveErrorScope>
   )
 }
 
@@ -884,31 +892,31 @@ function OrAxisPicker({
       <span className="text-xs font-semibold text-ink-secondary">{axis.label}</span>
       <div className="flex items-center gap-1.5">
         {axis.input === 'mark' || axis.input === 'scenario' ? (
-          <Combobox
+          <SaveErrorField names={["draft"]}><EntitySelect clearable size="full"
             aria-label={`${axis.label}を選ぶ`}
             placeholder="選ぶ"
             value={draft}
             onChange={setDraft}
             disabled={waitingForOptions}
-            options={options.map((option) => ({ value: option.id, label: option.name }))}
+            options={options.map((option) => ({ ...entityOptionMetadata(option), value: option.id, label: option.name }))}
             className="min-w-0 flex-1"
-          />
+          /></SaveErrorField>
         ) : axis.input === 'date' ? (
-          <DateField
+          <SaveErrorField names={["draft"]}><DateField
             value={draft}
             onChange={setDraft}
             aria-label={`${axis.label}の日付（この日以降）`}
             className="min-w-0 flex-1"
-          />
+          /></SaveErrorField>
         ) : axis.input === 'text' ? (
-          <input
+          <SaveErrorField names={["draft"]}><input
             type="text"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             placeholder={axis.placeholder}
             aria-label={`${axis.label}の値`}
             className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-2 py-1.5 text-xs"
-          />
+          /></SaveErrorField>
         ) : null}
         <button
           type="button"
@@ -952,7 +960,7 @@ function TagPicker({
         同じ行に並べると狭いパネルでタグ名が数文字に切れて読めなかった。
         選んだタグの札は下で複数行に広がり、全文を確認できる。
       */}
-      <Combobox
+      <SaveErrorField names={["pick"]}><EntitySelect clearable size="full" kind="tag"
         aria-label="タグ名を選ぶ"
         placeholder="タグ名を選ぶ"
         value={pick}
@@ -965,11 +973,11 @@ function TagPicker({
           }
           setPick('')
         }}
-        options={tags.map((t) => ({ value: t.id, label: t.name }))}
+        options={tags.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))}
         className="w-full"
-      />
+      /></SaveErrorField>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <Select
+        <SaveErrorField names={["mode"]}><Select
           aria-label="タグの含め方"
           value={mode}
           onChange={(value) => setMode(value as 'include' | 'exclude')}
@@ -977,7 +985,7 @@ function TagPicker({
             { value: 'include', label: '付いている' },
             { value: 'exclude', label: '付いていない' },
           ]}
-        />
+        /></SaveErrorField>
         {/* 設計の「タグフォルダで指定」。フォルダからタグを引く口が無い。 */}
         <button
           type="button"
@@ -989,7 +997,7 @@ function TagPicker({
         </button>
       </div>
       <div className="mt-2 flex flex-wrap gap-2">
-        {include.map((id) => isV8 ? (
+        <TagOverflow>{include.map((id) => isV8 ? (
           <TagPill key={id} name={label(id)} color={tags.find((tag) => tag.id === id)?.color}
             onRemove={() => onChange(include.filter((value) => value !== id), exclude)} />
         ) : (
@@ -1006,8 +1014,8 @@ function TagPicker({
               ✕
             </button>
           </span>
-        ))}
-        {exclude.map((id) => isV8 ? (
+        ))}</TagOverflow>
+        <TagOverflow>{exclude.map((id) => isV8 ? (
           <span key={id} className="inline-flex items-center gap-1.5">
             <TagPill name={label(id)} color={tags.find((tag) => tag.id === id)?.color}
               onRemove={() => onChange(include, exclude.filter((value) => value !== id))} />
@@ -1027,7 +1035,7 @@ function TagPicker({
               ✕
             </button>
           </span>
-        ))}
+        ))}</TagOverflow>
       </div>
     </div>
   )

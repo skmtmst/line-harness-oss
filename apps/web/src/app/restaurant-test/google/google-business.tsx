@@ -320,7 +320,7 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
           <p className="text-ink-secondary text-sm leading-relaxed">このLINEアカウントとGoogleビジネスプロフィールを接続します。</p>
         </header>
         <div className="flex justify-center pt-4 sm:pt-8">
-          <section className="border-hairline bg-canvas flex w-full flex-col gap-5 rounded-card border p-5 sm:p-8" style={{ maxWidth: 680 }} aria-labelledby="google-connect-title">
+          <section className="content-card bg-canvas flex w-full flex-col gap-5 rounded-card border p-5 sm:p-8" style={{ maxWidth: 680 }} aria-labelledby="google-connect-title">
             <div className="flex items-center gap-4">
               <span className="bg-accent-soft flex h-12 w-12 shrink-0 items-center justify-center rounded-card text-accent-deep" aria-hidden="true"><Link2 size={24} /></span>
               <div className="min-w-0">
@@ -352,7 +352,7 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
           <p className="text-ink-secondary text-sm leading-relaxed">このLINEアカウントとGoogleビジネスプロフィールを接続します。</p>
         </header>
         <div className="flex justify-center pt-2 sm:pt-4">
-          <section className="border-hairline bg-canvas flex w-full flex-col gap-4 rounded-card border p-5 sm:p-7" style={{ maxWidth: 880 }} aria-labelledby="google-location-title">
+          <section className="content-card bg-canvas flex w-full flex-col gap-4 rounded-card border p-5 sm:p-7" style={{ maxWidth: 880 }} aria-labelledby="google-location-title">
             <div className="flex items-center gap-4">
               <span className="bg-accent-soft flex h-12 w-12 shrink-0 items-center justify-center rounded-card text-accent-deep" aria-hidden="true"><Link2 size={24} /></span>
               <div className="min-w-0">
@@ -419,7 +419,7 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
       {connection.status === 'expired' ? <NoteBar tone="danger" className="mb-4">Googleとの接続を確認してください。認可が切れています。店舗を管理するGoogleアカウントで再接続してください。保存中の返信の下書きはいま残っていますが、Googleから取得した口コミは最終更新から30日以内に削除するため、再接続しないままだと下書きも一緒に消えます。</NoteBar> : null}
       {connection.status === 'no_permission' ? <NoteBar tone="danger" className="mb-4">この店舗を操作する権限がありません。接続済み店舗の管理権限をGoogle側で確認してください。</NoteBar> : null}
       <div className="flex justify-center pt-4 sm:pt-8">
-        <section className="border-hairline bg-canvas flex w-full flex-col gap-5 rounded-card border p-5 sm:p-8" style={{ maxWidth: 680 }} aria-labelledby="google-connected-title">
+        <section className="content-card bg-canvas flex w-full flex-col gap-5 rounded-card border p-5 sm:p-8" style={{ maxWidth: 680 }} aria-labelledby="google-connected-title">
           <div className="flex items-center gap-4">
             <span className="bg-accent-soft flex h-12 w-12 shrink-0 items-center justify-center rounded-card text-accent-deep" aria-hidden="true"><Link2 size={24} /></span>
             <div className="min-w-0">
@@ -580,7 +580,7 @@ function ReviewsTab({ accountId, data, canPublish, onOpen, onSynced }: { account
               const actionable = review.replyStatus === 'unreplied' || review.replyStatus === 'draft' || review.replyStatus === 'pending_confirm'
               return (
                 <Tr key={review.id}>
-                  <NameCell name={review.reviewerDisplayName ?? '匿名'} sub={<Stars rating={review.starRating} />} />
+                  <NameCell name={review.reviewerDisplayName ?? '匿名'} />
                   <Td><span className="line-clamp-2 text-sm" title={review.comment ?? undefined}>{review.comment ?? '（本文なし・評価のみ）'}</span></Td>
                   <Td><span className="text-ink-secondary whitespace-nowrap text-sm">{formatDateTime(reviewReceivedAt(review))}</span></Td>
                   <Td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>

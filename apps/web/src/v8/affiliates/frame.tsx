@@ -9,11 +9,13 @@
  * 数の帯・フォルダの列・道具の段・表は各タブが一覧の型（ListPage）の枠へ渡す。
  */
 import { createContext, useContext, type ReactNode } from 'react'
-import { Eye } from 'lucide-react'
+
 import { ListPage, type ListFolderNav } from '@/components/templates'
 import { Tabs } from '@/components/shared/tabs'
 import Button from '@/components/shared/button'
 import styles from './affiliates.module.css'
+
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export const AFFILIATE_TABS = [
   { key: 'affiliates', label: 'アフィリエイター', board: 'nJlxX' },
@@ -61,10 +63,7 @@ export function useAffiliateShell(): AffiliateShellContext {
 /** 閲覧のみの帯（v9JWQ）。数の帯の上。 */
 export function ViewerBand() {
   return (
-    <p className={styles.viewerBand} role="note">
-      <Eye size={16} aria-hidden="true" />
-      <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
-    </p>
+    <div className={styles.viewerBand}><ReadOnlyNotice role="note"></ReadOnlyNotice></div>
   )
 }
 
@@ -117,11 +116,11 @@ export function AffiliateFrame({ help, actions, stats, folders, folderNav, toolb
       : AFFILIATE_TABS.find((item) => item.key === tab)?.board
   return (
     <ListPage
-      help={help}
+      help={<>{"紹介してくれる人（アフィリエイター）と案件を登録し、成果を認めて報酬を払います。成果の数え方はコンバージョンで決めます。"}{help}</>}
       boardId={board}
       headingSize="regular"
       title="成果とアフィリエイト"
-      description="紹介してくれる人（アフィリエイター）と案件を登録し、成果を認めて報酬を払います。成果の数え方はコンバージョンで決めます。"
+
       actions={actions}
       tabs={
         <div className={styles.tabsBox}>

@@ -160,6 +160,10 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     },
     api: {
       ...actual.api,
+      staff: {
+        ...actual.api.staff,
+        me: async () => ({ success: true, data: { role: 'admin', permissionKeys: [] } }),
+      },
       friends: {
         ...actual.api.friends,
         upcoming: (...args: unknown[]) => {
@@ -307,7 +311,7 @@ describe('NEXT-11 遅い補助パネルが顧客名の表示を止めない', ()
 
     state.mileage = () => Promise.resolve({ success: true, data: fixtures.mileageData })
     await act(async () => {
-      buttonByText('もう一度試す').click()
+      buttonByText('もう一度読み込む').click()
     })
     await eventually(() => expect(document.body.textContent).toContain('120'))
     expect(document.body.textContent).not.toContain('マイルを読み込めませんでした')
@@ -448,14 +452,14 @@ describe('NEXT-10 履歴は実際の活動履歴につながっている', () =>
     state.timeline = () => Promise.resolve({ success: false, error: 'failed' })
     await render('history')
     await eventually(() => expect(document.body.textContent).toContain('履歴を読み込めませんでした'))
-    expect(buttonByText('もう一度試す')).toBeTruthy()
+    expect(buttonByText('もう一度読み込む')).toBeTruthy()
     // 0件表示とは違う文面
     expect(document.body.textContent).not.toContain('活動履歴はまだありません')
   })
 
   it('名寄せ件数は固定文ではなく実際の統合情報から出す', async () => {
     await render()
-    await eventually(() => expect(document.body.textContent).toContain('2件のLINEアカウントで同じ人としてつながっています'))
+    await eventually(() => expect(document.body.textContent).toContain('2 件のLINEアカウントで同じ人としてつながっています'))
     expect(document.body.textContent).toContain('支店アカウント')
     expect(document.body.textContent).not.toContain('現在は1アカウントのみ')
   })
@@ -493,3 +497,6 @@ describe('概要の次の予定', () => {
     await eventually(() => expect(document.body.textContent).toContain('確定した配信予定はありません'))
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

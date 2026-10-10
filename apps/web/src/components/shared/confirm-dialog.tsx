@@ -1,14 +1,20 @@
 'use client'
 
-import React, { type ReactNode } from 'react'
+import React, { useRef, useState, type ReactNode } from 'react'
 import { CircleCheck, Trash2, TriangleAlert } from 'lucide-react'
 import Dialog from './dialog'
+import { deleteConfirmationTitle, isDeleteConfirmation, normalizeDeleteTitle } from './delete-confirmation'
+import { CONFIRM_WIDTH } from './destination-policy'
 
 interface ConfirmDialogProps {
   open: boolean
   title: string
+  /** 削除の対象名。削除の題と実行ボタンの文言は共通部品が持つ。 */
+  deleteName?: string
   description: string
   confirmLabel?: string
+  /** 実行中の文字。Buttonのbusyへ渡す。 */
+  busyLabel?: string
   cancelLabel?: string
   destructive?: boolean
   /**
@@ -66,12 +72,16 @@ interface ConfirmDialogProps {
   onCancel: () => void
 }
 
+export { deleteConfirmationTitle, normalizeDeleteTitle } from './delete-confirmation'
+
 /** ブラウザ標準 confirm の代わりに使う、管理画面共通の確認ダイアログ。 */
 export default function ConfirmDialog({
   open,
   title,
+  deleteName,
   description,
   confirmLabel = '実行する',
+  busyLabel = '処理中…',
   cancelLabel = 'キャンセル',
   destructive = false,
   warning = false,
@@ -84,7 +94,7 @@ export default function ConfirmDialog({
   designNode,
   designHeaderPadding,
   designHeaderHeight,
-  designWidth,
+  designWidth = CONFIRM_WIDTH,
   designLayout,
   footerAlign,
   designFooterGap,
@@ -95,6 +105,27 @@ export default function ConfirmDialog({
   confirmDisabled = false,
   onCancel,
 }: ConfirmDialogProps) {
+  const [executing, setExecuting] = useState(false)
+  const [executionError, setExecutionError] = useState('')
+  const lock = useRef(false)
+  const runConfirm = onConfirm ? async () => {
+    if (lock.current || busy) return
+    lock.current = true
+    setExecutionError('')
+    try {
+      const pending = onConfirm() as unknown
+      if (pending && typeof (pending as PromiseLike<unknown>).then === 'function') {
+        setExecuting(true)
+        await pending
+      }
+    } catch {
+      setExecutionError('実行できませんでした。もう一度お試しください。')
+    } finally {
+      lock.current = false
+      setExecuting(false)
+    }
+  } : undefined
+
   /*
    * 未保存の離脱確認（主が取消）は印を付けない。緑のチェックは
    * 「完了・成功」の意味なので、まだ何も済んでいない窓には出さない。
@@ -110,15 +141,16 @@ export default function ConfirmDialog({
   return (
     <Dialog
       open={open}
-      title={title}
+      title={deleteName !== undefined ? deleteConfirmationTitle(deleteName) : isDeleteConfirmation(confirmLabel) ? normalizeDeleteTitle(title) : title}
       description={description}
       tone={destructive ? 'destructive' : 'default'}
       descriptionBand={dangerBand ? 'danger' : warning ? 'warning' : undefined}
-      confirmLabel={confirmLabel}
+      confirmLabel={deleteName !== undefined || isDeleteConfirmation(confirmLabel) ? '削除する' : confirmLabel}
+      busyLabel={busyLabel}
       cancelLabel={cancelLabel}
-      busy={busy}
+      busy={busy || executing}
       confirmDisabled={confirmDisabled}
-      error={error}
+      error={error || executionError}
       primaryAction={primaryAction}
       titleIcon={shownTitleIcon}
       confirmIcon={shownConfirmIcon}
@@ -133,8 +165,8 @@ export default function ConfirmDialog({
       designTop={designTop}
       confirmation
       compact={!children}
-      onConfirm={onConfirm}
-      onCancel={onCancel}
+      onConfirm={runConfirm}
+      onCancel={() => { if (!lock.current && !busy) onCancel() }}
     >
       {children}
     </Dialog>

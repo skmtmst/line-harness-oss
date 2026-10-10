@@ -6,6 +6,8 @@
  */
 import type { MileageAdminHistoryItem, MileageConnectedAccount, MileageFriendsV6Overview, MileageHistoryItem } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 const ENTRY_TYPE_LABELS: Record<MileageHistoryItem['entryType'], string> = {
   grant: '付与',
@@ -176,10 +178,7 @@ export function mileageRankProgress(input: {
 }
 
 export function formatMileageDate(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return formatDateTime(date)
+  return polishFormatDate(value, { style: 'detail', fallback: '—' })
 }
 
 /*
@@ -188,20 +187,11 @@ export function formatMileageDate(value: string | null): string {
  */
 /* 月日だけ（絵は「9/30」。時刻なし）。日本時間に直して出す。 */
 export function formatMileageMonthDay(value: string | null): string {
-  if (!value) return '—'
-  const time = new Date(value).getTime()
-  if (Number.isNaN(time)) return '—'
-  const jst = new Date(time + 9 * 60 * 60 * 1000)
-  return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()}`
+  return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }
 
 export function formatMileageShortDateTime(value: string | null): string {
-  if (!value) return '—'
-  const time = new Date(value).getTime()
-  if (Number.isNaN(time)) return '—'
-  const jst = new Date(time + 9 * 60 * 60 * 1000)
-  const minutes = String(jst.getUTCMinutes()).padStart(2, '0')
-  return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${jst.getUTCHours()}:${minutes}`
+  return polishFormatDate(value, { style: 'detail', fallback: '—' })
 }
 
 function finiteNonNegativeNumber(value: unknown): number | null {

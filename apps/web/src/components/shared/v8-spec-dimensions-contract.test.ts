@@ -26,12 +26,12 @@ describe('V8 寸法契約（見本との突き合わせ）', () => {
     expect(cell).toMatch(/padding:\s*10px 16px/)
     expect(cell).toMatch(/gap:\s*4px/)
     // 数は 22 の段（--text-metric）のまま。見本の例の数は書かない。
-    expect(read('../../app/globals.css')).toMatch(/--text-metric:\s*22px/)
+    expect(read('../../app/globals.css')).toMatch(/--tpl-band-number-size:\s*22px/)
   })
 
   it('ボタンの高さ：V8 は 36（見本どおり・直し不要の確認）', () => {
     const css = read('./button.module.css')
-    expect(css).toMatch(/\[data-theme='v8'\] \.standard,\s*\[data-theme='v8'\] \.field \{\s*height:\s*36px/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.standard,\s*\[data-theme='v8'\] \.field \{\s*height:\s*var\(--tpl-button-h\)/s)
     // 行内 32・アイコン 36 も見本どおり。
     expect(css).toMatch(/\.compact\s*\{[^}]*height:\s*32px/s)
     expect(read('./icon-button.module.css')).toMatch(/\[data-theme='v8'\] \.button \{[^}]*height:\s*36px/s)

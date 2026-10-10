@@ -57,7 +57,7 @@ export default function MobileTableCards({ items }: { items: MobileTableCard[] }
           if (!item.onSelect || event.target !== event.currentTarget) return
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
-            item.onSelect()
+            item.onSelect?.()
           }
         }
         return (
@@ -68,7 +68,7 @@ export default function MobileTableCards({ items }: { items: MobileTableCard[] }
             aria-label={item.onSelect ? (title ? `${title}の詳細を開く` : item.onSelectLabel ?? '詳細を開く') : undefined}
             onClick={item.onSelect}
             onKeyDown={item.onSelect ? openOnKey : undefined}
-            className="flex min-w-0 flex-col gap-2 rounded-card border border-hairline bg-canvas p-3.5"
+            className="flex min-w-0 flex-col gap-2 rounded-card border content-card bg-canvas p-3.5"
             style={item.onSelect ? { cursor: 'pointer' } : undefined}
           >
             <div className="flex min-w-0 items-start gap-2">

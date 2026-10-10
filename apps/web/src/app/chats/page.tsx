@@ -1,11 +1,12 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { PageTitle } from '@/components/templates/page-frame'
 
 import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton'
 import Avatar from '@/components/shared/avatar'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
@@ -63,20 +64,20 @@ import {
 import type { ChatAttachment } from '@line-crm/shared'
 import SegmentedControl from '@/components/shared/segmented'
 import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window'
-import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
+import { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import { Suspense } from 'react'
 import EmailThread from '@/components/support/email-thread'
 import Button from '@/components/shared/button'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import DateTimeField from '@/components/shared/date-time-field'
-import HelpTip from '@/components/shared/help-tip'
+
+
 import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
-import { Bookmark, CheckCircle2, Clock3, ListFilter, Reply, FileText, Image as ImageIcon, Link2, NotebookPen, Bot, PanelRightClose, PanelRightOpen, Paperclip, Search, Send, Settings2, Star, X } from 'lucide-react'
+import { Bookmark, CheckCircle2, Clock3, ListFilter, Reply, FileText, Link2, NotebookPen, Bot, Send, Settings2, X } from 'lucide-react'
 
 type Chat = ChatListItem
 
@@ -130,7 +131,7 @@ import { savedViewFailureMessage } from './saved-view-failure'
 import { savedViewSummary } from './saved-view-summary'
 import { buildOutgoingMessage, refreshChatListAfterSend } from './send-optimistic'
 import { describeSendFailure } from './send-failure'
-import { formatDateTime, formatNumber, formatRelative, formatTime } from '@/lib/format'
+import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 
 type InboxSavedView = {
   id: string
@@ -263,8 +264,6 @@ function formatInboxDatetime(iso: string | null): string {
   if (!iso) return '—'
   return formatDateTime(iso)
 }
-
-
 
 /*
  * 予約時刻は「日本時間」が約束(INBOX-21)。入力欄も一覧も端末の
@@ -2706,8 +2705,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         </div>
       )}
 
-
-
       <div
         ref={panesRef}
         data-design="Panes" data-design-node="M0393"
@@ -2880,7 +2877,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               quickFilter === filter.key
                 ? 'border-accent-deep bg-accent-soft text-accent-deep'
                 : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
-            } ${styles.chip}`} key={filter.key} type="button" onClick={() => { setQuickFilter(filter.key); dropSavedViewParam() }} aria-pressed={quickFilter === filter.key} title={filter.title}>
+            } ${styles.chip}`} key={filter.key} type="button" onClick={() => { setQuickFilter(filter.key); dropSavedViewParam() }} aria-pressed={quickFilter === filter.key} title={filter.title} >
             {/* V8 の絵の札は 要返信＝reply・1時間以上待ち＝clock-3 の印を文字の前に置く。v7 では出さない。 */}
             {filter.icon ? <filter.icon aria-hidden className={styles.chipIcon} /> : null}
             {filter.label}
@@ -2969,16 +2966,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 */}
 {(
                   /* ★V8：共通の選ぶ欄（選んだ行は ✓ だけ）。担当者ごとの未読数は名前の後ろの（）に添える（未取得は「—」）。 */
-                  <Select
+                  <EntitySelect
                     aria-label="担当者で絞り込む"
                     label="担当者"
                     size="full"
                     value={assigneeFilter}
                     onChange={(next) => { setAssigneeFilter(next); dropSavedViewParam() }}
                     options={buildOperatorRows(operators, true).map((row) => {
-                      if (row.id === 'all') return { value: row.id, label: row.name }
+                      if (row.id === 'all') return { ...entityOptionMetadata(row), value: row.id, label: row.name }
                       const unread = assigneeUnreadStatus === 'error' ? null : unreadLookup(assigneeUnread)(row.id)
-                      return { value: row.id, label: `${row.name}（${unread === null ? '—' : unread}）` }
+                      return { ...entityOptionMetadata(row), value: row.id, label: `${row.name}（${unread === null ? '—' : unread}）` }
                     })}
                   />
                 )}

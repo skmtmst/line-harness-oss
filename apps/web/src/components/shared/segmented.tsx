@@ -1,7 +1,9 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import styles from './segmented.module.css'
+import { useFieldContext } from './field-context'
 
 /**
  * 切り替え（3つ）（Pencil ★V8 `dtJVi`）。
@@ -12,6 +14,8 @@ import styles from './segmented.module.css'
  * 排他的な切り替えに使う。
  */
 export default function SegmentedControl<T extends string>({
+  id,
+  invalid,
   options,
   value,
   onChange,
@@ -22,7 +26,9 @@ export default function SegmentedControl<T extends string>({
   appearance = 'track',
   equalWidth = false,
 }: {
-  options: { value: T; label: string }[]
+  id?: string
+  invalid?: boolean
+  options: { value: T; label: ReactNode; ariaLabel?: string; count?: number }[]
   value: T
   onChange: (value: T) => void
   'aria-label': string
@@ -36,14 +42,16 @@ export default function SegmentedControl<T extends string>({
    * 'panel' は脇のパネル内（★BG-B `SLgY5` つくる枚数：器 余白3・r8・
    * 横いっぱい・項目 5/12・文 12/17・選択中 700・つまみ r6）。v8 だけで効く。
    */
-  size?: 'medium' | 'small' | 'compact' | 'panel' | 'timing' | 'sticker'
+  size?: 'medium' | 'small' | 'compact' | 'panel' | 'timing' | 'sticker' | 'booking'
   /** 操作を止める（生成中など）。項目すべてを押せなくする。 */
   disabled?: boolean
   /** 電話予約の探し方（rm92Y）：各項目が独立した丸い選択肢。 */
-  appearance?: 'track' | 'choices'
+  appearance?: 'track' | 'choices' | 'reservation'
   /** 選択肢を器の幅へ均等に並べる（統括の生成枚数）。 */
   equalWidth?: boolean
 }) {
+  const field = useFieldContext()
+  const bad = invalid || field?.invalid
   const rootRef = useRef<HTMLDivElement>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   const [thumb, setThumb] = useState({ left: 0, width: 0 })
@@ -75,6 +83,10 @@ export default function SegmentedControl<T extends string>({
   return (
     <div
       ref={rootRef}
+      id={id ?? field?.controlId}
+      data-invalid={bad || undefined}
+      aria-describedby={field?.describedBy}
+      style={bad ? { outline: '1px solid var(--color-danger)' } : undefined}
       role="group"
       aria-label={ariaLabel}
       className={[styles.root, className].filter(Boolean).join(' ')}
@@ -99,10 +111,11 @@ export default function SegmentedControl<T extends string>({
           className={[styles.item, option.value === value ? styles.selected : null]
             .filter(Boolean)
             .join(' ')}
+          aria-label={option.ariaLabel}
           aria-pressed={option.value === value}
           onClick={() => onChange(option.value)}
         >
-          {option.label}
+          {option.label}{option.count !== undefined ? <span className={styles.count}>{option.count}</span> : null}
         </button>
       ))}
     </div>

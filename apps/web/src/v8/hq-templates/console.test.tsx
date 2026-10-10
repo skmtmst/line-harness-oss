@@ -1,10 +1,11 @@
+import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 /*
  * 統括のテンプレート（B-29・B-36）：作るは店のテンプレートの作る画面（メッセージ HfK0O・クーポン C3qMCz）を使い、
  * 下の帯の主ボタンは［保存する］。保存は統括の口（ひな形）へ、配るは「アカウントへ配る」へ進む。
  * 詳細（pQ4fH）は「配った先」（API-14 の配った先のアカウント名）と［配る］（読み上げは「〇〇を配る」）。
  */
-import React from 'react'
+
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -26,7 +27,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
   usePathname: () => '/hq/templates',
 }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => true, useStaffRole: () => 'owner', canManageRole: () => true }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [], selectedAccountId: null, selectedAccount: null, setSelectedAccountId: selectAccount, loading: false }) }))
 const chrome = vi.hoisted(() => ({ crumbs: null as Array<{ label: string; href?: string; onSelect?: () => void }> | null }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: (crumbs: typeof chrome.crumbs) => { chrome.crumbs = crumbs } }))
@@ -61,9 +62,22 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('統括のテンプレートを作る（店の作る画面＋保存後に配り先を選ぶ）', () => {
+  it('リッチビデオの種類から店と同じ編集部品を統括で開ける', async () => {
+    render(<HqTemplatesV8 type="template" />)
+    fireEvent.click(await screen.findByRole('tab', { name: /リッチビデオ/ }))
+    await waitFor(() => expect(calls.listByKind).toHaveBeenCalledWith('rich_video'))
+    fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    expect(await screen.findByRole('heading', { name: 'リッチビデオを作る' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '下書きを保存' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '保存する' })).toBeTruthy()
+    expect(screen.getByLabelText('テンプレート名')).toBeTruthy()
+    expect(calls.create).not.toHaveBeenCalled()
+  })
+
   it('作る画面から一覧へは、上の帯のパンくず「テンプレート」で戻る（同じ URL のまま段を替える）', async () => {
     render(<HqTemplatesV8 type="template" />)
     fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    fireEvent.click(await screen.findByRole('button', { name: "メッセージを作るの説明" }))
     expect(await screen.findByText('保存後に、配るアカウントを選べます。一覧の「…」からも配れます。')).toBeTruthy()
     const crumb = chrome.crumbs?.find((item) => item.label === 'テンプレート')
     expect(crumb?.href).toBe('/hq/templates')
@@ -77,6 +91,7 @@ describe('統括のテンプレートを作る（店の作る画面＋保存後�
   it('作る画面から一覧へは、下の帯の［キャンセル］でも戻る', async () => {
     render(<HqTemplatesV8 type="template" />)
     fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    fireEvent.click(await screen.findByRole('button', { name: "メッセージを作るの説明" }))
     expect(await screen.findByText('保存後に、配るアカウントを選べます。一覧の「…」からも配れます。')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     await waitFor(() => expect(screen.queryByText('保存後に、配るアカウントを選べます。一覧の「…」からも配れます。')).toBeNull())
@@ -85,6 +100,7 @@ describe('統括のテンプレートを作る（店の作る画面＋保存後�
   it('メッセージは店の作る画面で作り、［保存する］で統括のひな形を作ってアカウントへ配るへ進む', async () => {
     render(<HqTemplatesV8 type="template" />)
     fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    fireEvent.click(await screen.findByRole('button', { name: "メッセージを作るの説明" }))
     expect(await screen.findByText('保存後に、配るアカウントを選べます。一覧の「…」からも配れます。')).toBeTruthy()
     // 板の頭の「← テンプレートへ」は無くした（2026-10-08）。一覧へは上の帯のパンくずで戻る。
     expect(screen.queryByText('← テンプレートへ')).toBeNull()
@@ -334,6 +350,28 @@ describe('統括のテンプレートを直す（質問・クーポン：店の�
     expect(JSON.parse(input.definition.template.questionJson)).toMatchObject({ text: 'どのお肉が好きですか？', choices: [{ label: '鹿肉' }, { label: '馬肉' }] })
   })
 
+  it('リッチビデオは保存済みの動画と画像の組から開き、統括へ保存して配り先を選べる', async () => {
+    const videoUrl='https://worker.test/images/hq-templates/tenant-a/video.mp4'
+    const previewUrl='https://worker.test/images/hq-templates/tenant-a/preview.jpg'
+    const payload={altText:'動画の通知',baseUrl:'https://worker.test/images/hq-templates/tenant-a/map',baseSize:{width:1040,height:520},actions:[],video:{originalContentUrl:videoUrl,previewImageUrl:previewUrl,area:{x:0,y:0,width:1040,height:520}}}
+    const video={id:'v',kind:'video',filename:'video.mp4',mimeType:'video/mp4',sizeBytes:3,width:null,height:null,durationMs:1000,r2Key:'hq-templates/tenant-a/video.mp4',publicUrl:videoUrl,versionId:'v',versionNo:1,contentHash:'a'.repeat(64)}
+    const media=[video,{...video,id:'p',kind:'image',mimeType:'image/jpeg',publicUrl:previewUrl,r2Key:'hq-templates/tenant-a/preview.jpg',width:1040,height:520}]
+    const definition={...message,template:{...message.template,messageType:'imagemap',name:'統括の動画',messageContent:JSON.stringify(payload)},media}
+    await open(definition,'rich_video','統括の動画')
+    expect(await screen.findByRole('heading',{name:'リッチビデオを作る'})).toBeTruthy()
+    calls.update.mockRejectedValueOnce(new Error('保存できませんでした。もう一度お試しください。'))
+    fireEvent.change(screen.getByLabelText('通知に出る文'),{target:{value:'直した通知'}})
+    fireEvent.click(screen.getByRole('button',{name:'保存する'}))
+    await screen.findByText('保存できませんでした。もう一度お試しください。')
+    expect(screen.getByDisplayValue('直した通知')).toBeTruthy()
+    expect(screen.queryByRole('checkbox',{name:/然 -NEN- 本店/})).toBeNull()
+    fireEvent.click(screen.getByRole('button',{name:'保存する'}))
+    await waitFor(()=>expect(calls.update).toHaveBeenCalledTimes(2))
+    const saved=calls.update.mock.calls[0][1].definition
+    expect(saved.media).toEqual(media);expect(saved.asset).toBeUndefined();expect(saved.template.messageType).toBe('imagemap')
+    expect(JSON.parse(saved.template.messageContent)).toEqual({...payload,altText:'直した通知'})
+    expect(await screen.findByRole('checkbox',{name:/然 -NEN- 本店/})).toBeTruthy()
+  })
   it('クーポンは保存してある期間・説明で店のクーポンの画面が開き、そのまま保存しても期間を落とさない', async () => {
     await open(couponDefinition, 'coupon', '冬の10%オフ')
     expect(await screen.findByRole('heading', { name: 'クーポンを作る' })).toBeTruthy()
@@ -345,6 +383,12 @@ describe('統括のテンプレートを直す（質問・クーポン：店の�
   })
 })
 
+
+const distributionScreen = () => {
+  const frame = document.querySelector<HTMLElement>('[data-page-template="distribution"]')
+  expect(frame).not.toBeNull()
+  return frame!
+}
 
 describe('G-3：保存が済んでから配るか選ぶ', () => {
   const author = async () => {
@@ -397,7 +441,9 @@ describe('G-3：保存が済んでから配るか選ぶ', () => {
     expect(within(dialog).getByText('選んだ 2 アカウント')).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: '2 アカウントへ配る' }))
     await waitFor(() => expect(calls.preflight).toHaveBeenCalledWith('t-new', ['a-1', 'a-2']))
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(distributionScreen()).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: '保存しました。アカウントに配りますか？' })).toBeNull()
     expect(screen.queryByText('ひな形を保存しました。')).toBeNull()
     expect(calls.distribute).not.toHaveBeenCalled()
     expect(calls.create).toHaveBeenCalledOnce()
@@ -416,7 +462,9 @@ describe('G-3：保存が済んでから配るか選ぶ', () => {
     expect((within(dialog).getByRole('checkbox', { name: '然 -NEN- 本店' }) as HTMLInputElement).checked).toBe(true)
     fireEvent.click(within(dialog).getByRole('button', { name: '1 アカウントへ配る' }))
     await waitFor(() => expect(calls.preflight).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(distributionScreen()).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: '保存しました。アカウントに配りますか？' })).toBeNull()
     expect(calls.create).toHaveBeenCalledOnce()
   })
   it('下書きは保存して一覧へ戻る。配布状況が取れなくても未配布にはしない', async () => {
@@ -468,13 +516,15 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
   it('全種類のフォルダ内ひな形は全選択で始まり、片方0なら配れない', async () => {
     render(<HqTemplatesV8 type="template" />)
     const dialog = await selectFolder()
-    expect((within(dialog).getByRole('checkbox', { name: '別の種類のひな形' }) as HTMLInputElement).checked).toBe(true)
-    expect(within(dialog).getByText('本文')).toBeTruthy()
-    expect(within(dialog).getByText('カルーセル')).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('button', { name: '配るひな形：変える' }))
+    const picker = screen.getAllByRole('dialog').at(-1)!
+    expect((within(picker).getByRole('checkbox', { name: '別の種類のひな形' }) as HTMLInputElement).checked).toBe(true)
+    expect(within(picker).getByText('本文')).toBeTruthy()
+    expect(within(picker).getByText('カルーセル')).toBeTruthy()
+    fireEvent.click(within(picker).getByRole('button', { name: 'キャンセル' }))
     expect(within(dialog).getByRole('button', { name: '2 件を 0 アカウントへ配る' }).hasAttribute('disabled')).toBe(true)
     await pickStores(dialog, ['然 -NEN- 本店'])
-    fireEvent.click(within(dialog).getByRole('checkbox', { name: '予約前日のご案内' }))
-    fireEvent.click(within(dialog).getByRole('checkbox', { name: '別の種類のひな形' }))
+    await pickEntities('配るひな形', ['予約前日のご案内', '別の種類のひな形'])
     expect(within(dialog).getByRole('button', { name: '0 件を 1 アカウントへ配る' }).hasAttribute('disabled')).toBe(true)
     expect(calls.preflight).not.toHaveBeenCalled()
   })
@@ -484,10 +534,14 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
     await pickStores(dialog, ['然 -NEN- 本店'])
     fireEvent.click(within(dialog).getByRole('button', { name: '2 件を 1 アカウントへ配る' }))
     fireEvent.click(await screen.findByRole('button', { name: '次のひな形を確かめる（1/2）' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(distributionScreen()).toBeTruthy()
     await waitFor(() => expect(calls.preflight).toHaveBeenCalledWith('t-2', ['a-1']))
     expect(calls.distribute).not.toHaveBeenCalled()
     fireEvent.click(await screen.findByRole('button', { name: '2 件を 1 アカウントへ配る' }))
     const result = await screen.findByRole('dialog', { name: '配った結果：フォルダ「予約」' })
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(result.style.getPropertyValue('--dialog-design-width')).toBe('720px')
     expect(within(result).getByText('1 アカウントへ配りました。成功 2・失敗 0。成功した所はもう使えます。')).toBeTruthy()
     expect(calls.distribute.mock.calls.map((call) => call[0])).toEqual(['t-1', 't-2'])
   })
@@ -533,15 +587,17 @@ describe('統括タグの札は詳細から配布結果まで同じ色を保つ'
     fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「予約」の操作' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'このフォルダを配る' }))
     const folderDialog = await screen.findByRole('dialog', { name: 'フォルダ「予約」の 1 件を配る' })
-    expect((within(folderDialog).getByRole('checkbox', { name: 'タグ「VIP」' }) as HTMLInputElement).checked).toBe(true)
+    expect(within(folderDialog).getByRole('button', { name: 'VIPを外す' })).toBeTruthy()
     expect(within(folderDialog).getByRole('group', { name: 'タグ「VIP」' }).querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)
     fireEvent.click(within(folderDialog).getByRole('button', { name: 'キャンセル' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'タグ「VIP」', exact: true }))
+    const listName = await screen.findByRole('button', { name: 'VIP', exact: true })
+    expect(listName.closest('[data-list-name]')?.querySelector('[data-folder-dot]')?.getAttribute('style')).toContain(expectedColor)
+    fireEvent.click(listName)
     const body = await screen.findByRole('region', { name: '本文' })
     const pill = within(body).getByRole('group', { name: 'タグ「VIP」' })
     expect(pill.querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)
     fireEvent.click(screen.getByRole('button', { name: 'VIPを配る' }))
-    expect(screen.getByRole('heading', { name: /アカウントへ配る：/ }).querySelector('[role="group"]')).toBeTruthy()
+    expect(within(distributionScreen()).getAllByRole('group', { name: 'タグ「VIP」' }).length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('checkbox', { name: '然 -NEN- 本店', exact: true }))
     fireEvent.click(screen.getByRole('button', { name: '1アカウントの重複を確認' }))
     fireEvent.click(await screen.findByRole('button', { name: 'この内容で1アカウントへ配る' }))

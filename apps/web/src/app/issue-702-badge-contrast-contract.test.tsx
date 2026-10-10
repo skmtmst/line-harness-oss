@@ -32,8 +32,15 @@ function ratio(fg: string, bg: string): number {
 function tokenMap(): Map<string, string> {
   const css = read('globals.css')
   const map = new Map<string, string>()
-  for (const match of css.matchAll(/--color-([\w-]+):\s*(#[0-9a-fA-F]{6})/g)) {
-    map.set(match[1], match[2].toLowerCase())
+  for (const match of css.matchAll(/--color-([\w-]+):\s*(#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?)/g)) {
+    const hex = match[2].slice(1)
+    const alpha = hex.length === 8 ? parseInt(hex.slice(6), 16) / 255 : 1
+    const color = [0, 2, 4].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * alpha + 255 * (1 - alpha)).toString(16).padStart(2, '0')).join('')
+    map.set(match[1], '#' + color)
+  }
+  for (const match of css.matchAll(/--color-([\w-]+):\s*var\(--color-([\w-]+)\)/g)) {
+    const resolved = map.get(match[2])
+    if (resolved) map.set(match[1], resolved)
   }
   return map
 }
@@ -54,7 +61,7 @@ describe('Issue #702: 札の文字色と背景の組み合わせは 4.5:1 以上
     ['success', 'success-bg', '公開中バッジ（濃緑 on 薄緑）'],
     ['warning', 'warning-bg', '停止中・アーカイブ札（濃黄土 on 薄黄）'],
     ['accent-deep', 'accent-soft', '成功バッジ（濃緑 on 薄緑）'],
-    ['status-info', 'status-info-soft', '情報バッジ（濃青 on 薄青）'],
+    ['status-info-deep', 'status-info-soft', '情報バッジ（濃青 on 薄青）'],
     ['status-warn-deep', 'status-warn-soft', '注意バッジ（濃飴 on 薄飴）'],
     ['ink-faint', 'canvas-sunken', '停止中・薄い札（グレー on 沈み面）'],
   ] as const
@@ -79,6 +86,12 @@ describe('Issue #702: 危険バッジは濃い赤のトークンを指す', () =
     expect(css).toContain('color: var(--color-danger)')
     expect(css).not.toContain('color: var(--color-status-danger);')
   })
+
+  it('V8の情報札は案内の濃い青を使う（§6.5-4）', () => {
+    expect(css).toMatch(/\[data-tone='info'\][^}]*color:\s*var\(--polish-status-info-ink\)/)
+    expect(read('globals.css')).toContain('--polish-status-info-ink: #1d4ed8')
+    expect(read('globals.css')).toContain('--color-status-info-deep: #1d4ed8')
+  })
 })
 
 describe('Issue #702: 4画面の札・タブはトークンで書く', () => {
@@ -99,18 +112,22 @@ describe('Issue #702: 4画面の札・タブはトークンで書く', () => {
     expect(page).not.toMatch(/bg-(?:gray|green|amber)-100/)
   })
 
-  it('自動応答V8の状態の札は薄い背景と濃い文字のトークンを使う', () => {
+  it('自動応答V8の状態は共通の札を使い、採用した5色すべて濃さを保つ', () => {
     const page = read('../v8/auto-replies/list.tsx')
-    const css = read('../v8/auto-replies/list.module.css')
-    expect(page).toContain('styles.statePill')
-    for (const [name, bg, fg] of [
-      ['statePillActive', 'success-bg', 'success'],
-      ['statePillStopped', 'canvas-sunken', 'ink-faint'],
-    ]) {
-      expect(page).toContain(`styles.${name}`)
-      const rule = css.match(new RegExp(`\\.${name}\\s*\\{[^}]*\\}`))?.[0]
-      expect(rule).toContain(`background: var(--color-${bg});`)
-      expect(rule).toContain(`color: var(--color-${fg});`)
+    const css = read('../components/shared/status-pill.module.css')
+    const globals = read('globals.css')
+    expect(page).toContain("<SharedStatusPill tone={r.isActive ? 'success' : 'neutral'}")
+    for (const tone of ['success', 'warning', 'danger', 'info', 'neutral']) {
+      const ink = globals.match(new RegExp(`--polish-status-${tone}-ink:\\s*(#[0-9a-fA-F]{6})`))?.[1]
+      const bg = globals.match(new RegExp(`--polish-status-${tone}-bg:\\s*#([0-9a-fA-F]{8})`))?.[1]
+      expect(ink).toBeDefined()
+      expect(bg).toBeDefined()
+      expect(css).toContain(`var(--polish-status-${tone}-ink)`)
+      expect(css).toContain(`var(--polish-status-${tone}-bg)`)
+      // 半透明の地を、白い板へ重ねた色で比べる。
+      const alpha = parseInt(bg!.slice(6, 8), 16) / 255
+      const blended = [0, 2, 4].map(i => Math.round(parseInt(bg!.slice(i, i + 2), 16) * alpha + 255 * (1 - alpha)).toString(16).padStart(2, '0')).join('')
+      expect(ratio(ink!.slice(1), blended), tone).toBeGreaterThanOrEqual(4.5)
     }
     expect(page).not.toContain('text-green-700')
     expect(page).not.toContain('bg-amber-50 text-amber-700')
@@ -134,7 +151,7 @@ describe('Issue #702: 4画面の札・タブはトークンで書く', () => {
 describe('Issue #702: 共通バッジは5つの調子すべて実Reactで描ける', () => {
   it.each([
     ['neutral', '下書き'],
-    ['info', '配信待ち'],
+    ['info', '予約中'],
     ['warning', '停止中'],
     ['success', '配信中'],
     ['danger', '設定不足'],

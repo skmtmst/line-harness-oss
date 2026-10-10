@@ -11,8 +11,8 @@ const API = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'lib', 'api.t
 describe('V6 7-1-H リマインダ実行結果', () => {
   it('一覧から予定と履歴を選べ、予定は公開APIのplannedで絞る', () => {
     expect(LIST_PAGE).toContain('status=planned')
-    expect(LIST_PAGE).toContain('<ActionMenu')
-    expect(LIST_PAGE).toContain('MoreHorizontal')
+    expect(LIST_PAGE).toContain('<RowMenu')
+    expect(LIST_PAGE).toContain('items={rowMenuItems(row)}')
     // 削除は行に直に置かず、メニューの中の危ない操作にする。
     expect(LIST_PAGE).not.toContain('<Trash2 />')
     expect(LIST_PAGE).toContain("tone: 'danger'")
@@ -53,7 +53,7 @@ describe('V6 7-1-H リマインダ実行結果', () => {
   })
 
   it('読込・失敗・空を区別し、失敗した1通だけ再試行できる', () => {
-    expect(PAGE).toContain('<ListState kind="loading"')
+    expect(PAGE).toContain('<DetailLoading')
     // 対象の取得失敗は ★V7 TargetMissing の error（取り直し口つき）。
     expect(PAGE).toContain('kind="error"')
     expect(PAGE).toContain('onRetry={() => void load()}')

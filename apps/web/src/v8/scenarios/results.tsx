@@ -1,15 +1,6 @@
 'use client'
-
-/*
- * ★V8 シナリオ配信の配信結果（Pencil `X4STXS`）。
- *
- * 型（DetailPage）に、戻る・題・説明・右上の操作（シナリオの編集へ・CSVで書き出す）と、
- * 中身（数の帯・通ごとの反応・参加中の友だちの表）を渡す。
- * 取得口・操作（止める・再開・失敗を再送・別のシナリオへ移す・予定を見る・CSV）は
- * 今までの V8（app/scenarios/results/results-v8.tsx）と v7（results/page.tsx）から写した。
- */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Download, Eye, PencilLine } from 'lucide-react'
 import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared'
@@ -17,7 +8,7 @@ import { api, ApiError, type ScenarioRuns } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { DetailPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
@@ -35,6 +26,19 @@ import { scenarioReferenceData } from '@/components/scenarios/scenario-reference
 import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import styles from './results.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
+
+/*
+ * ★V8 シナリオ配信の配信結果（Pencil `X4STXS`）。
+ *
+ * 型（DetailPage）に、戻る・題・説明・右上の操作（シナリオの編集へ・CSVで書き出す）と、
+ * 中身（数の帯・通ごとの反応・参加中の友だちの表）を渡す。
+ * 取得口・操作（止める・再開・失敗を再送・別のシナリオへ移す・予定を見る・CSV）は
+ * 今までの V8（app/scenarios/results/results-v8.tsx）と v7（results/page.tsx）から写した。
+ */
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 type Subscription = ScenarioRuns['subscriptions'][number]
@@ -78,7 +82,7 @@ function subscriptionState(sub: Subscription): { label: string; tone: StatusBadg
 function nextLabel(sub: Subscription): string {
   if (sub.status === 'completed') return '—'
   if (sub.status === 'paused') return '—（止めている）'
-  return sub.nextDeliveryAt ? formatDateTime(sub.nextDeliveryAt) : '—'
+  return sub.nextDeliveryAt ? formatDateTime(sub.nextDeliveryAt) : emptyValue('unknown')
 }
 
 export default function ScenarioResultsV8() {
@@ -87,7 +91,8 @@ export default function ScenarioResultsV8() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const role = useStaffRole()
   // 役割が読めるまでは出す（最後の守りはサーバー）。閲覧のみは購読を変える操作（…）を隠す。
-  const canEdit = role === null || canManageRole(role)
+  const featureAccess = useFeatureAccess('scenarios')
+  const canEdit = featureAccess
   const [scenario, setScenario] = useState<ScenarioWithSteps | null>(null)
   const [stats, setStats] = useState<ScenarioStats | null>(null)
   /*
@@ -267,8 +272,8 @@ export default function ScenarioResultsV8() {
       ...sortedSteps.map((step) => {
         const result = statsByOrder.get(step.stepOrder)
         return [
-          `${step.stepOrder}通目`, scheduleLabel(step), result?.reachedCount ?? '—',
-          result ? percentLabel(result.reachedCount, stats.enrolledTotal) : '—', '—', '—',
+          `${step.stepOrder}通目`, scheduleLabel(step), result?.reachedCount ?? emptyValue('unknown'),
+          result ? percentLabel(result.reachedCount, stats.enrolledTotal) : emptyValue('unknown'), '—', '—',
         ]
       }),
     ]
@@ -276,7 +281,7 @@ export default function ScenarioResultsV8() {
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `scenario-results-${id}.csv`
+    anchor.download = csvFileName("シナリオ配信の結果")
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -427,9 +432,9 @@ export default function ScenarioResultsV8() {
   return (
     <DetailPage
       boardId="X4STXS"
-      identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
+
       title={scenario ? `配信結果：${scenario.name}` : '配信結果'}
-      description="始まった・読み終えた・どの通まで届いたかを見ます。"
+      help="始まった・読み終えた・どの通まで届いたかを見ます。"
       actions={(
         <span className={styles.headActions}>
           <Button href={`/scenarios/detail?id=${encodeURIComponent(id)}`}>
@@ -455,7 +460,7 @@ export default function ScenarioResultsV8() {
               title="読み終えた"
               value={completedCount}
               unit="人"
-              detail={enrolled && completedCount !== null ? percentLabel(completedCount, enrolled) : '—'}
+              detail={enrolled && completedCount !== null ? percentLabel(completedCount, enrolled) : emptyValue('unknown')}
             />
             <KpiCard icon={null} title="途中" value={inProgress} unit="人" detail="いま途中にいる人" />
             <KpiCard
@@ -464,7 +469,7 @@ export default function ScenarioResultsV8() {
               title="離れた"
               value={leftCount}
               unit="人"
-              detail={drop ? `${drop.order}通目で多い` : '終わらずに抜けた人'}
+              detail={drop ? `${drop.order} 通目で多い` : '終わらずに抜けた人'}
             />
           </KpiBand>
           </div>
@@ -473,7 +478,7 @@ export default function ScenarioResultsV8() {
             <div className={styles.sectionHead}>
               <h2 id="scenario-results-steps" className={styles.sectionTitle}>通ごとの反応</h2>
               {deliveringCount > 0 ? (
-                <span className={styles.sectionNote} role="status">いま送っています（送信中 {formatNumber(deliveringCount)}人）</span>
+                <span className={styles.sectionNote} role="status">いま送っています（送信中 {formatNumber(deliveringCount)} 人）</span>
               ) : null}
             </div>
             <NoteBar tone="info">
@@ -489,22 +494,22 @@ export default function ScenarioResultsV8() {
                   const pct = reached !== null && stats.enrolledTotal > 0
                     ? Math.min(100, (reached / stats.enrolledTotal) * 100)
                     : 0
-                  const opened = run?.opened.state === 'available' && run.opened.value !== null ? `${formatNumber(run.opened.value)}人` : '—'
-                  const clicked = run?.clicked.state === 'available' && run.clicked.value !== null ? `${formatNumber(run.clicked.value)}人` : '—'
+                  const opened = run?.opened.state === 'available' && run.opened.value !== null ? `${formatNumber(run.opened.value)}人` : emptyValue('unknown')
+                  const clicked = run?.clicked.state === 'available' && run.clicked.value !== null ? `${formatNumber(run.clicked.value)}人` : emptyValue('unknown')
                   return (
                     <li key={step.id} className={styles.stepRow}>
                       <div className={styles.stepTop}>
-                        <span className={styles.stepNo}>{step.stepOrder}通目</span>
+                        <span className={styles.stepNo}>{step.stepOrder} 通目</span>
                         <span className={styles.stepWhen}>{scheduleLabel(step)}</span>
-                        <span className={styles.stepReach}>{reached === null ? '—' : `${formatNumber(reached)}人に届いた`}</span>
+                        <span className={styles.stepReach}>{reached === null ? emptyValue('unknown') : `${formatNumber(reached)}人に届いた`}</span>
                         <span className={styles.stepMeta}>
-                          {`届いた率 ${reached === null ? '—' : percentLabel(reached, stats.enrolledTotal)}・開いた ${opened}・押した ${clicked}`}
+                          {`届いた率 ${reached === null ? emptyValue('unknown') : percentLabel(reached, stats.enrolledTotal)}・開いた ${opened}・押した ${clicked}`}
                         </span>
                         {drop && drop.order === step.stepOrder ? (
-                          <span className={styles.stepDrop}>{`ここで ${formatNumber(drop.count)}人（${Math.round((drop.count / drop.base) * 100)}%）離れた`}</span>
+                          <span className={styles.stepDrop}>{`ここで ${formatNumber(drop.count)} 人（${Math.round((drop.count / drop.base) * 100)}%）離れた`}</span>
                         ) : null}
                       </div>
-                      <progress className={styles.stepBar} max={100} value={pct} aria-label={`${step.stepOrder}通目の届いた率`} />
+                      <progress className={styles.stepBar} max={100} value={pct} aria-label={`${step.stepOrder} 通目の届いた率`} />
                     </li>
                   )
                 })}
@@ -521,7 +526,7 @@ export default function ScenarioResultsV8() {
               <h2 id="scenario-results-friends" className={styles.sectionTitle}>参加中の友だち</h2>
               {failedTotal > 0 ? (
                 <button type="button" className={styles.sectionLink} onClick={() => setSubscriptionStatus('paused')}>
-                  {`送れずに止まった人が ${formatNumber(failedTotal)}人・止まっている人だけを見る`}
+                  {`送れずに止まった人が ${formatNumber(failedTotal)} 人・止まっている人だけを見る`}
                 </button>
               ) : null}
             </div>
@@ -529,7 +534,7 @@ export default function ScenarioResultsV8() {
             <div className={styles.tools}>
               {/* 状態の絞り込みはサーバーへ渡して全件へ掛ける（SCENARIO-12）。 */}
               <span className={styles.statusSelect}>
-                <Select
+                <SaveErrorField names={["subscriptionStatus","status","subscription_status"]}><Select
                   value={subscriptionStatus}
                   onChange={(value) => setSubscriptionStatus(value)}
                   aria-label="購読の状態で絞り込む"
@@ -540,10 +545,10 @@ export default function ScenarioResultsV8() {
                     { value: 'paused', label: '購読の状態：止まっている' },
                     { value: 'completed', label: '購読の状態：読み終えた' },
                   ]}
-                />
+                /></SaveErrorField>
               </span>
               {runs ? (
-                <span className={styles.count}>{`${formatNumber(runs.subscriptions.length)} / ${formatNumber(runs.pagination.total)}人`}</span>
+                <span className={styles.count}>{`${formatNumber(runs.subscriptions.length)} / ${formatNumber(runs.pagination.total)} 人`}</span>
               ) : null}
               <span className={styles.toolsSpacer} />
               <Button
@@ -591,7 +596,7 @@ export default function ScenarioResultsV8() {
                     if (sub.status === 'active') {
                       items.push({
                         id: 'pause',
-                        label: opBusy === `${sub.id}:pause` ? '止めています…' : '止める',
+                        label: '止める',
                         disabled: opBusy !== null,
                         onSelect: () => void runSubscriptionOp(sub, 'pause'),
                       })
@@ -599,14 +604,14 @@ export default function ScenarioResultsV8() {
                     if (sub.status === 'paused') {
                       items.push({
                         id: 'resume',
-                        label: opBusy === `${sub.id}:resume` ? '再開しています…' : '再開する',
+                        label: '再開する',
                         disabled: opBusy !== null,
                         onSelect: () => void runSubscriptionOp(sub, 'resume'),
                       })
                       if (pausedByFailure) {
                         items.push({
                           id: 'retry',
-                          label: opBusy === `${sub.id}:retry` ? '再送しています…' : '失敗を再送',
+                          label: '失敗を再送',
                           disabled: opBusy !== null,
                           onSelect: () => void runSubscriptionOp(sub, 'retry'),
                         })
@@ -625,7 +630,7 @@ export default function ScenarioResultsV8() {
                         <span className={styles.colState} role="cell">
                           <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge>
                         </span>
-                        <span className={styles.colNow} role="cell">{`${sub.currentStepOrder}通目まで`}</span>
+                        <span className={styles.colNow} role="cell">{`${sub.currentStepOrder} 通目まで`}</span>
                         <span className={styles.colNext} role="cell">{nextLabel(sub)}</span>
                         <span className={styles.colPlan} role="cell">
                           <Button
@@ -656,10 +661,8 @@ export default function ScenarioResultsV8() {
                 </div>
                 {/* 続きを読めるかぎり読む。読み込み中の失敗は一覧を消さず、再試行口だけ出す。 */}
                 {runsMoreError ? (
-                  <p className={styles.moreError} role="alert">
-                    {runsMoreError}
-                    <button type="button" className={styles.sectionLink} onClick={loadMoreRuns}>もう一度読み込む</button>
-                  </p>
+                  <Notice tone="danger" className={styles.moreErrorNoticePlacement} >{runsMoreError}
+                    <button type="button" className={styles.sectionLink} onClick={loadMoreRuns}>もう一度読み込む</button></Notice>
                 ) : null}
                 {runs.pagination.nextCursor ? (
                   <div className={styles.more}>
@@ -682,7 +685,7 @@ export default function ScenarioResultsV8() {
         />
       ) : null}
 
-      {/* 「別のシナリオへ移す」の窓。移し先は稼働中の別シナリオだけ選べる。 */}
+      {/* 「別のシナリオへ移す」の窓。移し先は有効の別シナリオだけ選べる。 */}
       <Dialog
         open={moveTarget !== null}
         title={moveTarget ? `${moveTarget.friendName} を別のシナリオへ移す` : ''}
@@ -708,14 +711,12 @@ export default function ScenarioResultsV8() {
       >
         {/* 候補の取得失敗は「移せるシナリオがありません」と分ける（SCENARIO-10 と同じ分け方）。 */}
         {moveOptionsError ? (
-          <p className={styles.moreError} role="alert">
-            移し先の候補を読み込めませんでした。
+          <Notice tone="danger" className={styles.moreErrorNoticePlacement} >移し先の候補を読み込めませんでした。
             <button type="button" className={styles.sectionLink} onClick={() => void loadMoveOptions()} disabled={opBusy !== null}>
               もう一度読み込む
-            </button>
-          </p>
+            </button></Notice>
         ) : (
-          <EntityKindField
+          <SaveErrorField names={["moveScenarioId"]}><EntityKindField
             kind="scenario"
             label="移し先のシナリオ"
             value={moveScenarioId}
@@ -724,10 +725,10 @@ export default function ScenarioResultsV8() {
             placeholder={moveOptions === null
               ? '（読み込んでいます）'
               : moveChoices.length === 0
-                ? '（稼働中の他のシナリオがありません）'
+                ? '（有効の他のシナリオがありません）'
                 : '（シナリオを選んでください）'}
             options={moveChoices}
-          />
+          /></SaveErrorField>
         )}
       </Dialog>
     </DetailPage>

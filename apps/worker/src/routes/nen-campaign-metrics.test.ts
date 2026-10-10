@@ -139,7 +139,7 @@ describe('NEN campaign V6 metric routes', () => {
     expect(metricsMocks.getNenColumnMetrics).not.toHaveBeenCalled();
   });
 
-  it('staffは閲覧できるが手動再送できない', async () => {
+  it('編集権限があるstaffは閲覧と手動再送ができる', async () => {
     const detail = await app('staff').request(
       '/api/nen-campaigns/deliveries/job-1?lineAccountId=account-a',
     );
@@ -149,8 +149,8 @@ describe('NEN campaign V6 metric routes', () => {
       '/api/nen-campaigns/deliveries/job-1/retry',
       post({ lineAccountId: 'account-a', expectedVersion: 1, reason: '確認済み' }),
     );
-    expect(retry.status).toBe(403);
-    expect(metricsMocks.retryNenDelivery).not.toHaveBeenCalled();
+    expect(retry.status).toBe(200);
+    expect(metricsMocks.retryNenDelivery).toHaveBeenCalledTimes(1);
   });
 
   it('ownerの再送を監査し、版競合409をそのまま返す', async () => {

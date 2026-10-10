@@ -190,3 +190,29 @@ describe('シナリオ変更の共通境界(N-051)', () => {
     expect(res.status).toBe(404);
   });
 });
+
+
+test('編集鍵のあるstaffも別シナリオの通をIDだけでは変えられない', async () => {
+  sqlite.raw.prepare(`INSERT INTO scenario_steps (id, scenario_id, step_order, delay_minutes, message_type, message_content)
+    VALUES ('foreign-step', 'sc-2', 1, 0, 'text', '他の通')`).run();
+  for (const [method, id] of [['DELETE', 'sc-1'], ['PUT', 'sc-1'], ['DELETE', 'missing']] as const) {
+    const res = await app(editStaff).request(`/api/scenarios/${id}/steps/foreign-step`, {
+      method, headers: { 'Content-Type': 'application/json' }, body: method === 'PUT' ? JSON.stringify({ delayMinutes: 30 }) : undefined,
+    });
+    expect(res.status).toBe(404);
+    expect(sqlite.raw.prepare("SELECT message_content FROM scenario_steps WHERE id='foreign-step'").get()).toEqual({ message_content: '他の通' });
+  }
+});
+
+
+test('編集できるstaffの一覧の並べ替えも、全件の担当範囲を確認してから保存する', async () => {
+  sqlite.raw.prepare("UPDATE scenarios SET display_order=9 WHERE id='sc-1'").run();
+  const reorder = (ids: string[], staff: AuthenticatedStaff) => app(staff).request('/api/scenarios/reorder', {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }),
+  });
+  expect((await reorder(['sc-1', 'sc-2'], scopedEditStaff)).status).toBe(404);
+  expect(sqlite.raw.prepare("SELECT display_order FROM scenarios WHERE id='sc-1'").get()).toEqual({ display_order: 9 });
+  expect((await reorder(['sc-1', 'missing'], editStaff)).status).toBe(404);
+  expect((await reorder(['sc-1'], scopedEditStaff)).status).toBe(200);
+  expect(sqlite.raw.prepare("SELECT display_order FROM scenarios WHERE id='sc-1'").get()).toEqual({ display_order: 0 });
+});

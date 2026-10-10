@@ -1,18 +1,7 @@
 'use client'
 
-/*
- * ★V8 一斉配信の詳細（2026-10-06 一から書き直し）。
- * 絵：下書き `cgiGB`（再撮 `dK1aE`）・承認待ち `pNiUk`（`wfHIE`）・送った後 `F3X1Mo`（`tPm3e`）・
- * ほかの人が更新した `Q28Gb`・予約の取り消しの窓 `BeNtj`。
- *
- * 白い板いっぱいに 板の頭（題＋札・1行の説明・進みの帯／右に操作）→（競合の帯）→ タブ →
- * 左の本文（余白 20・28、段の間 22）と右の欄（幅 380、配信した設定 → メッセージのスマホ）。
- * カードで囲まず、線で分ける（絵 `cgiGB` ほか）。
- *
- * 読み込み・承認・集計・競合の見張りは入口（app/broadcasts/detail/page.tsx）が持ち、
- * ここは見せ方と、この画面だけの操作（テスト送信・削除・予約の取り消し）を持つ。
- * 宛先・記録のタブの中身は入口から差し込む（古い画面の部品を import しないため）。
- */
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useState, type ReactNode, type RefObject } from 'react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -64,12 +53,31 @@ import {
   rateText,
 } from './display'
 import styles from './detail.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { PageHeading } from '@/components/templates/page-frame'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 一斉配信の詳細（2026-10-06 一から書き直し）。
+ * 絵：下書き `cgiGB`（再撮 `dK1aE`）・承認待ち `pNiUk`（`wfHIE`）・送った後 `F3X1Mo`（`tPm3e`）・
+ * ほかの人が更新した `Q28Gb`・予約の取り消しの窓 `BeNtj`。
+ *
+ * 白い板いっぱいに 板の頭（題＋札・1行の説明・進みの帯／右に操作）→（競合の帯）→ タブ →
+ * 左の本文（余白 20・28、段の間 22）と右の欄（幅 380、配信した設定 → メッセージのスマホ）。
+ * カードで囲まず、線で分ける（絵 `cgiGB` ほか）。
+ *
+ * 読み込み・承認・集計・競合の見張りは入口（app/broadcasts/detail/page.tsx）が持ち、
+ * ここは見せ方と、この画面だけの操作（テスト送信・削除・予約の取り消し）を持つ。
+ * 宛先・記録のタブの中身は入口から差し込む（古い画面の部品を import しないため）。
+ */
 
 /** 送るまでの6段階。承認が絡まない・予約しない配信はその段を省く。 */
 const DELIVERY_STEPS: ReadonlyArray<{ key: string; label: string }> = [
   { key: 'draft', label: '下書き' },
   { key: 'pending_approval', label: '承認待ち' },
-  { key: 'scheduled', label: '予約済み' },
+  { key: 'scheduled', label: '予約中' },
   { key: 'preparing', label: '送信準備' },
   { key: 'sending', label: '送信中' },
   { key: 'sent', label: '送信済み' },
@@ -78,7 +86,7 @@ const DELIVERY_STEPS: ReadonlyArray<{ key: string; label: string }> = [
 const BRANCH_LABELS: Record<string, string> = {
   partial_failed: '一部失敗',
   failed: '失敗',
-  stopped: '停止',
+  stopped: '停止中',
   expired: '期限切れ',
 }
 
@@ -159,6 +167,8 @@ export default function BroadcastDetail({
   conflict = false,
   onConflictReload,
 }: BroadcastDetailProps) {
+  const canTestSend = useFeatureAccess('broadcasts', 'test')
+  const canExport = useFeatureAccess('broadcasts', 'export')
   const router = useRouter()
   const { status: displayStatus, label: statusLabel } = displayStatusOf(broadcast)
   const isDraft = broadcast.status === 'draft'
@@ -172,6 +182,14 @@ export default function BroadcastDetail({
   const [cancelError, setCancelError] = useState('')
   const [testing, setTesting] = useState(false)
 
+  const collision = useSaveConflict<ApiBroadcast>({
+    contextKey: broadcast.id,
+    fetchLatest: async () => {
+      const response = await api.broadcasts.get(broadcast.id)
+      return response.success ? response.data : null
+    },
+    reload: () => onConflictReload?.(),
+  })
   const editHref = `/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`
   const duplicateHref = `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`
   /* 下書きの現在地＝ `draft_step`（止まった手順）。なければ1つ目。 */
@@ -193,12 +211,13 @@ export default function BroadcastDetail({
   }
 
   const sendTest = async () => {
+    if (!canTestSend) return
     if (testing) return
     setTesting(true)
     try {
       const res = await api.broadcasts.testSend(broadcast.id)
       if (!res.success) throw new Error(res.error)
-      notifyToast(`テスト送信が完了しました（成功 ${res.sent ?? 0}件・失敗 ${res.failed ?? 0}件）。`)
+      notifyToast(`テスト送信が完了しました（成功 ${res.sent ?? 0} 件・失敗 ${res.failed ?? 0} 件）。`)
     } catch {
       notifyToast('テスト送信できませんでした。テスト送信先の設定と配信内容を確認してください。', { tone: 'error' })
     } finally {
@@ -229,8 +248,8 @@ export default function BroadcastDetail({
       id: 'duplicate',
       label: '複製して作る',
       icon: <Copy size={14} aria-hidden="true" />,
-      external: true,
-      onSelect: () => router.push(duplicateHref),
+      external: false,
+      href: duplicateHref, onSelect: () => router.push(duplicateHref),
     },
   ]
   if (isScheduled) {
@@ -251,28 +270,22 @@ export default function BroadcastDetail({
 
   const total = broadcast.totalCount
   const bubbleCount = broadcast.messageBubbles?.length ?? (broadcast.messageContent ? 1 : 0)
-  const messageText = `${messageTypeLabel(broadcast.messageType)} ${bubbleCount}通`
+  const messageText = `${messageTypeLabel(broadcast.messageType)} ${bubbleCount} 通`
   const scheduledLabel = broadcast.scheduledAt ? formatBroadcastDateTime(broadcast.scheduledAt) : null
   const approvalStatus = approval.state?.approval.status ?? null
 
   return (
     <PageFrame kind="detail" boardId="cgiGB pNiUk F3X1Mo Q28Gb dK1aE wfHIE tPm3e">
-      <header className={styles.head}>
-        <div className={styles.name}>
-          <div className={styles.titleRow}>
-            <h2 className={styles.title} title={broadcast.title}>{broadcast.title}</h2>
-            <span className={styles.badge} data-tone={BADGE_TONE[displayStatus]}>
+      <PageHeading title={broadcast.title}
+        crumbs={<><p className={styles.meta}>{metaLine(broadcast, audienceLabel)}</p></>}
+        steps={<>{isDraft
+            ? <DraftStepRail broadcastId={broadcast.id} draftStep={broadcast.draftStep} canEdit={canEdit} />
+            : <DeliveryRail broadcast={broadcast} approvalInvolved={approvalInvolved(broadcast, approval.state)} />}</>}
+        titleAccessory={<><span className={styles.badge} data-tone={BADGE_TONE[displayStatus]}>
               <span className={styles.dot} aria-hidden="true" />
               {statusLabel}
-            </span>
-          </div>
-          <p className={styles.meta}>{metaLine(broadcast, audienceLabel)}</p>
-          {isDraft
-            ? <DraftStepRail broadcastId={broadcast.id} draftStep={broadcast.draftStep} canEdit={canEdit} />
-            : <DeliveryRail broadcast={broadcast} approvalInvolved={approvalInvolved(broadcast, approval.state)} />}
-        </div>
-        <div className={styles.actions}>
-          {canEdit ? (
+            </span></>}
+        actions={<>{canEdit ? (
             <>
               <RowMenu
                 className={styles.iconButton}
@@ -281,54 +294,44 @@ export default function BroadcastDetail({
               />
             </>
           ) : null}
-          {/* CSV は見るだけの操作。閲覧のみにも出す。 */}
-          <Button size="field" onClick={onExportCsv}>
+          {/* CSVは閲覧権限に加えて書き出しの鍵が要る。 */}
+          {canExport ? <Button size="field" onClick={onExportCsv}>
             <Download aria-hidden="true" />
             CSVで書き出す
-          </Button>
-          {canEdit && !isSent && broadcast.status !== 'sending' ? (
+          </Button> : null}
+          {canTestSend && !isSent && broadcast.status !== 'sending' ? (
             <Button size="field" onClick={() => void sendTest()} disabled={testing} busy={testing} busyLabel="テスト送信中…">
               <Send aria-hidden="true" />
               テストを送る
             </Button>
-          ) : null}
-          {canEdit && isDraft ? (
+          ) : null}{canEdit && isDraft ? (
             <Button size="field" variant="primary" href={`${editHref}&step=${resumeStep.key}`}>
               <Pencil aria-hidden="true" />
               {resumeStep.order} {resumeStep.label}から続ける
             </Button>
-          ) : null}
-          {canEdit && isScheduled ? (
+          ) : null}{canEdit && isScheduled ? (
             <Button size="field" href={editHref}>
               <Pencil aria-hidden="true" />
               編集を続ける
             </Button>
-          ) : null}
-          {canEdit && isSent ? (
+          ) : null}{canEdit && isSent ? (
             <Button size="field" variant="primary" href={duplicateHref}>
               <Copy aria-hidden="true" />
               複製して作る
             </Button>
-          ) : null}
-        </div>
-      </header>
+          ) : null}</>} />
 
       {conflict ? (
         <div className={styles.conflictWrap} data-design-node="Q28Gb">
-          <div className={styles.conflict} role="alert">
-            <CircleAlert className={styles.conflictIcon} aria-hidden="true" />
-            <div className={styles.conflictText}>
-              {/* だれが・いつ更新したかは口（配信の詳細）に無いので出さない。 */}
-              <p className={styles.conflictTitle}>{`ほかの人が配信「${broadcast.title}」を更新しました`}</p>
-              <p className={styles.conflictDesc}>
-                この画面は古い内容です。読み直すと最新の設定と見本が出ます（この画面では書き換えません）。
-              </p>
-            </div>
-            <Button size="field" variant="primary" onClick={onConflictReload}>
-              <RefreshCw aria-hidden="true" />
-              読み直す
-            </Button>
-          </div>
+          <SaveConflictBand title={`ほかの人が配信「${broadcast.title}」を更新しました`}
+            description="この画面は古い内容です。読み直すと最新の設定と見本が出ます（この画面では書き換えません）。"
+            compareBusy={collision.compareBusy} onCompare={collision.compare} onReload={collision.reloadLatest} />
+          <SaveConflictCompareDialog open={collision.compareOpen} busy={collision.compareBusy} error={collision.compareError} onCancel={collision.closeCompare} onReload={collision.reloadLatest}
+            lines={collision.latest ? [
+              { text: `題：表示 ${broadcast.title} ／ 最新 ${collision.latest.title}` },
+              { text: `状態：表示 ${broadcast.status} ／ 最新 ${collision.latest.status}` },
+              { text: `予約時刻：表示 ${broadcast.scheduledAt ?? '未設定'} ／ 最新 ${collision.latest.scheduledAt ?? '未設定'}` },
+            ] : null} />
         </div>
       ) : null}
 
@@ -364,7 +367,7 @@ export default function BroadcastDetail({
         <aside className={styles.side} aria-label="配信した設定とメッセージ">
           <h3 className={styles.secTitle}>配信した設定</h3>
           <dl className={styles.rows}>
-            <Row label="対象" value={`${audienceLabel} ${formatNumber(total)}人`} />
+            <Row label="対象" value={`${audienceLabel} ${formatNumber(total)} 人`} />
             <Row
               label={isSent ? '送った日時' : '送る日時'}
               value={
@@ -407,18 +410,18 @@ export default function BroadcastDetail({
         destructive
         busy={deleting}
         error={deleteError || undefined}
-        onConfirm={() => void deleteBroadcast()}
+        onConfirm={() => deleteBroadcast()}
         onCancel={() => { if (!deleting) setDeleteOpen(false) }}
       />
       <CancelReservationDialog
         open={cancelOpen}
         title={broadcast.title}
         description={broadcast.scheduledAt
-          ? `${formatBroadcastDateTime(broadcast.scheduledAt)} に送る予定の ${formatNumber(total)}人 に送らなくなります。取り消すと下書きに戻り、もう一度予約できます。${approvalStatus && approvalStatus !== 'none' ? '承認はやり直しになります。' : ''}`
+          ? `${formatBroadcastDateTime(broadcast.scheduledAt)} に送る予定の ${formatNumber(total)} 人 に送らなくなります。取り消すと下書きに戻り、もう一度予約できます。${approvalStatus && approvalStatus !== 'none' ? '承認はやり直しになります。' : ''}`
           : '予約が取り消され、この配信は送られなくなります。書いた内容は下書きとして残るので、作り直しにはなりません。'}
         busy={cancelling}
         error={cancelError}
-        onConfirm={() => void cancelReservation()}
+        onConfirm={() => cancelReservation()}
         onClose={() => { if (!cancelling) setCancelOpen(false) }}
       />
     </PageFrame>
@@ -478,7 +481,7 @@ export function CancelReservationDialog({
 /** 見出しの下の1行：種類・対象（人数）・送る/送った日時。 */
 function metaLine(broadcast: ApiBroadcast, audienceLabel: string): string {
   const kind = messageTypeLabel(broadcast.messageType)
-  const audience = broadcast.status === 'sent' ? audienceLabel : `${audienceLabel}（${formatNumber(broadcast.totalCount)}人）`
+  const audience = broadcast.status === 'sent' ? audienceLabel : `${audienceLabel}（${formatNumber(broadcast.totalCount)} 人）`
   const when = broadcast.status === 'sent'
     ? (broadcast.sentAt ? `${formatBroadcastDateTime(broadcast.sentAt)} に送信` : '送信済み')
     : broadcast.status === 'sending'
@@ -491,7 +494,7 @@ function metaLine(broadcast: ApiBroadcast, audienceLabel: string): string {
 
 function timeOf(value: string | null | undefined): string {
   const short = formatShortDateTime(value)
-  return short ? short.slice(short.indexOf('）') + 1) : '—'
+  return short ? short.slice(short.indexOf('）') + 1) : emptyValue('unknown')
 }
 
 /** 承認が絡む配信か（承認の段を進みの帯に出すか）。 */
@@ -649,7 +652,7 @@ function Overview({
         <section aria-label="承認の依頼" className={styles.section}>
           <h3 className={styles.secTitle}>承認を依頼する</h3>
           <p className={styles.desc}>
-            {formatNumber(state.gate.recipientCount)}人への配信です。承認されるまで送られません。
+            {formatNumber(state.gate.recipientCount)} 人への配信です。承認されるまで送られません。
           </p>
           <ApprovalRequestFields
             recipientCount={state.gate.recipientCount}
@@ -726,11 +729,11 @@ function Overview({
                     <div className={styles.linkTop}>
                       <div className={styles.linkText}>
                         <p className={styles.linkTitle} title={link.label}>{link.label}</p>
-                        <p className={styles.linkUrl} title={link.url}>{link.url}</p>
+                        <p className={styles.linkUrl} ><TruncatedText value={String(link.url ?? '')} url /></p>
                       </div>
                       <p className={styles.linkCount}>
-                        {`押した ${formatNumber(link.uniqueClickCount)}人（${rateText(link.clickRate)}）`}
-                        {link.clickCount != null ? `・押された回数 ${formatNumber(link.clickCount)}回` : ''}
+                        {`押した ${formatNumber(link.uniqueClickCount)} 人（${rateText(link.clickRate)}）`}
+                        {link.clickCount != null ? `・押された回数 ${formatNumber(link.clickCount)} 回` : ''}
                       </p>
                     </div>
                     <progress
@@ -820,7 +823,7 @@ function ApprovalBox({
           <p className={styles.boxTitle}>{status === 'rejected' ? '差し戻されました' : '期限切れです'}</p>
           <p className={styles.desc}>
             {status === 'rejected'
-              ? `理由：${rejectReason || '—'}。内容を直して、もう一度承認を依頼してください。`
+              ? `理由：${rejectReason || emptyValue('unknown')}。内容を直して、もう一度承認を依頼してください。`
               : '承認されないまま予約の時刻を過ぎたため、送っていません。送るには作り直してください。'}
           </p>
         </div>
@@ -830,7 +833,7 @@ function ApprovalBox({
   if (status !== 'pending') return null
   const mine = state.viewer.isApprover
   const request = [
-    `依頼：${approval.requesterName ?? '—'}・${formatBroadcastDateTime(requestedAt)}`,
+    `依頼：${approval.requesterName ?? emptyValue('unknown')}・${formatBroadcastDateTime(requestedAt)}`,
     note ? `ひとこと「${note}」` : '',
   ].filter(Boolean).join('　')
   return (
@@ -841,22 +844,19 @@ function ApprovalBox({
       </p>
       <p className={styles.approvalRequest}>{request}</p>
       <dl className={styles.facts}>
-        <div className={styles.fact}><dt>送る相手</dt><dd>{formatNumber(state.gate.recipientCount)}人</dd></div>
+        <div className={styles.fact}><dt>送る相手</dt><dd>{formatNumber(state.gate.recipientCount)} 人</dd></div>
         <div className={styles.fact}><dt>送る日時</dt><dd>{scheduledLabel ?? '今すぐ送る'}</dd></div>
         <div className={styles.fact}><dt>メッセージ</dt><dd>{`${messageText}（右のスマホ）`}</dd></div>
       </dl>
       {mine ? (
         <>
-          <div className={styles.field}>
-            <label htmlFor="approval-reject-reason" className={styles.fieldLabel}>差し戻すときの理由</label>
-            <TextField
+          <div className={styles.field}><Field label="差し戻すときの理由" htmlFor="approval-reject-reason"><SaveErrorField names={["reason"]}><TextField
               id="approval-reject-reason"
               maxLength={1000}
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder="例：日時を 10 月にずらしてください"
-            />
-          </div>
+            /></SaveErrorField></Field></div>
           {approval.message ? <p className={styles.error}>{approval.message}</p> : null}
           <div className={styles.approvalButtons}>
             <Button

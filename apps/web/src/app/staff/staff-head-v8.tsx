@@ -1,6 +1,8 @@
-import Link from 'next/link'
+import { Tabs } from '@/components/shared/tabs'
 
-import Notice from '@/components/shared/notice'
+
+import { PageHeading } from '@/components/templates/page-frame'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export const STAFF_TAB_KEYS = [
   { key: 'members', label: 'いまいる人' }, { key: 'invited', label: '招待中' },
@@ -15,14 +17,10 @@ export const STAFF_TAB_KEYS = [
 export default function StaffHeadV8({ tab, administrator }: { tab: string; administrator: boolean }) {
   return (
     <div>
-      <h1 className="text-ink text-xl font-bold">ログインユーザー</h1>
-      <p className="text-ink-secondary mt-1 text-sm">管理画面に入る人と、その人ができることを決めます（管理者の設定はここ）</p>
-      <nav className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label="ログインユーザーの切り替え">
-        {STAFF_TAB_KEYS.map((item) => (
-          <Link key={item.key} href={`/staff?tab=${item.key}`} aria-current={tab === item.key ? 'page' : undefined} className={tab === item.key ? 'border-b-2 border-ink pb-1 font-bold text-ink no-underline' : 'pb-1 text-ink-secondary no-underline hover:underline'}>{item.label}</Link>
-        ))}
-      </nav>
-      {!administrator ? <Notice tone="info" className="mt-3">閲覧のみで見ています。変える操作は管理者に頼んでください。</Notice> : null}
+      <PageHeading title="ログインユーザー" help={<> 管理画面に入る人と、その人ができることを決めます（管理者の設定はここ）</>} />
+
+      <Tabs label="ログインユーザーの切り替え" items={STAFF_TAB_KEYS.map(item => ({label:item.label, href:`/staff?tab=${item.key}`, current:tab===item.key}))} />
+      {!administrator ? <div className="mt-3"><ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></div> : null}
     </div>
   )
 }

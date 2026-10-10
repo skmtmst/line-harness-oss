@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * Devin 監査：重い入力画面（時間・料金・担当・タグ）なのに、キャンセルで
  * 確認なしに入力が消えていた。入力後にキャンセルを押すと共通窓で止め、
@@ -63,6 +65,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   fixture.push.mockClear()
   memStorage.clear()
   memStorage.setItem('lh_staff_role', 'owner')

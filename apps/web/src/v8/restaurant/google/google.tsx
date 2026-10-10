@@ -1,14 +1,5 @@
 'use client'
 
-/*
- * ★V8 Googleビジネス（Pencil：口コミ `j0Wcg`・返信を作る `x9HIR`・投稿 `Cfed0`・投稿を作る `T1j2Sw`・
- * パフォーマンス `SrmVs`・プロフィール `JUTGz`・設定 `CuHXG`）。
- *
- * 板の頭（題・説明・店舗を選ぶ欄）→ 検証環境の帯 → タブ（口コミ・投稿・パフォーマンス・プロフィール・設定）
- * → タブの中身。受け付ける URL は今の画面と同じ（?tab=・?view=・?id=・?kind=・?google=）。
- * 営業時間の変更・変更の確認・変更履歴・プロフィールの編集（?tab=profile&view=hours|confirm|history|edit）は
- * 入口の page.tsx が今の画面へ渡す（V8 の絵がまだ無い）。動きは BEHAVIOR.md。
- */
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -29,6 +20,19 @@ import PerformanceBoard from './performance'
 import ProfileBoard from './profile'
 import SettingsBoard from './settings'
 import styles from './google.module.css'
+import StoreFilterTabs from '@/components/shared/store-filter-tabs'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+/*
+ * ★V8 Googleビジネス（Pencil：口コミ `j0Wcg`・返信を作る `x9HIR`・投稿 `Cfed0`・投稿を作る `T1j2Sw`・
+ * パフォーマンス `SrmVs`・プロフィール `JUTGz`・設定 `CuHXG`）。
+ *
+ * 板の頭（題・説明・店舗を選ぶ欄）→ 検証環境の帯 → タブ（口コミ・投稿・パフォーマンス・プロフィール・設定）
+ * → タブの中身。受け付ける URL は今の画面と同じ（?tab=・?view=・?id=・?kind=・?google=）。
+ * 営業時間の変更・変更の確認・変更履歴・プロフィールの編集（?tab=profile&view=hours|confirm|history|edit）は
+ * 入口の page.tsx が今の画面へ渡す（V8 の絵がまだ無い）。動きは BEHAVIOR.md。
+ */
 
 export type { MediaUploadHelpers } from './posts'
 
@@ -53,6 +57,7 @@ const RETURN_MESSAGES: Record<string, { tone: 'info' | 'warn' | 'danger'; text: 
 }
 
 function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('Googleビジネス')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const samePageUrl = useSamePageUrl()
@@ -76,14 +81,19 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
       setData(connection)
       setStores(snapshot?.data.stores ?? [])
     } catch (err) {
+      const fieldFailure = saveErrors.capture(err)
       setData(null)
+      { if (!fieldFailure)
+
+
       setError(err instanceof ApiError && err.status === 404
         ? 'このLINEアカウントには店舗が紐付いていません。先に店舗管理でLINEアカウントを割り当ててください。'
         : errorMessage(err, 'Googleビジネスの状態を読み込めませんでした。'))
+    }
     } finally {
       setLoading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -125,16 +135,16 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     ?? stores.find((item) => item.id === data?.store.id)?.id ?? '', [stores, selectedAccountId, data])
 
   const picker = stores.length > 0 ? (
-    <Select
-      aria-label="店舗を選ぶ"
-      width={STORE_PICKER_WIDTH}
+    <SaveErrorField names={["currentStoreId","selectedAccountId"]}><StoreFilterTabs
+
+
       value={currentStoreId}
       onChange={(value) => {
         const next = stores.find((item) => item.id === value)
         if (next?.line_account_id && next.line_account_id !== selectedAccountId) setSelectedAccountId(next.line_account_id)
       }}
-      options={stores.map((item) => ({ value: item.id, label: `店舗：${item.name}`, disabled: !item.line_account_id }))}
-    />
+      options={stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}`, disabled: !item.line_account_id }))}
+    /></SaveErrorField>
   ) : null
 
   const body = (() => {
@@ -185,7 +195,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
   })()
 
   return (
-    <RestaurantPage
+    <SaveErrorScope errors={saveErrors}><RestaurantPage
       boardId={boardId}
       title="Googleビジネス"
       description="Google の口コミ・投稿・営業時間を、店舗ごとに管理します。"
@@ -193,7 +203,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     >
       <BoundaryBanner note={boardId === 'j0Wcg' ? REVIEWS_BANNER_NOTE : undefined} />
       {body}
-    </RestaurantPage>
+    </RestaurantPage></SaveErrorScope>
   )
 }
 

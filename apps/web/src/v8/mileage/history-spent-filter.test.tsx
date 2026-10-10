@@ -5,7 +5,7 @@
  */
 import React from 'react'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, expect, test, vi } from 'vitest'
+import { beforeEach, afterEach, expect, test, vi } from 'vitest'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: () => {} }),
@@ -39,6 +39,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import HistoryTab from './history'
+import { flushListUrlState } from '@/components/shared/list-url-state'
+beforeEach(() => { flushListUrlState(); window.history.replaceState(null, '', '/mileage?tab=history') })
 afterEach(cleanup)
 
 test('使った・取り消しで、このページに無くても「まだありません」と言わず、ページ送りを残す', async () => {
@@ -47,7 +49,7 @@ test('使った・取り消しで、このページに無くても「まだあ�
   await act(async () => { screen.getByRole('button', { name: /使った・取り消し/ }).click() })
   await waitFor(() => expect(screen.getByText('このページには、使った・取り消しの履歴がありません')).toBeTruthy())
   expect(screen.queryByText('条件に合う履歴はありません')).toBeNull()
-  expect(screen.getByText(/使った・取り消し 0件/)).toBeTruthy()
+  expect(screen.getByText(/使った・取り消し 0 件/)).toBeTruthy()
 })
 
  test('WEB-073：履歴の帯は直近30日を別集計し、回数を件で示す', async () => {

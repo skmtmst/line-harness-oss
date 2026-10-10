@@ -1,11 +1,5 @@
 'use client'
 
-/*
- * ★V8 統括のアカウントの3つの窓（板 `HMpVx` 設定・`D6ljr` アーカイブ・`HFsO9` 戻す）。
- * 統括ホームのカードの「設定」・「戻す」から開く。
- * 読み書きの口・本人確認は v7（app/hq/account-settings-dialogs.tsx）と同じ（import できないので写した）。
- * 設定の窓だけ、見た目を絵 `HMpVx` どおりに組み直した。
- */
 import { useEffect, useState } from 'react'
 import { CircleHelp, RotateCcw, Users } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
@@ -20,6 +14,16 @@ import type { AccountWithStats } from '@/contexts/account-context'
 import head from './dialog-head.module.css'
 import styles from './account-dialogs.module.css'
 import { FALLBACK_REASON, connectionReasons, lineHandle } from './connection-reasons'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+/*
+ * ★V8 統括のアカウントの3つの窓（板 `HMpVx` 設定・`D6ljr` アーカイブ・`HFsO9` 戻す）。
+ * 統括ホームのカードの「設定」・「戻す」から開く。
+ * 読み書きの口・本人確認は v7（app/hq/account-settings-dialogs.tsx）と同じ（import できないので写した）。
+ * 設定の窓だけ、見た目を絵 `HMpVx` どおりに組み直した。
+ */
 
 /** 絵 `HMpVx` の窓の幅と上からの位置（px）。 */
 const SETTINGS_WIDTH = 560
@@ -54,6 +58,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
   /** その場でフォルダを作ったとき（左の列を読み直す）。 */
   onFolderCreated?: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const [name, setName] = useState(account.name)
   const [nameError, setNameError] = useState('')
   const [parent, setParent] = useState('')
@@ -109,8 +114,13 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
         }
       }
       onSaved()
-    } catch {
-      setError('保存できませんでした。通信を確認して、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+
+
+      setError('保存できませんでした。通信を確認して、もう一度お試しください。') }
     } finally {
       setBusy(false)
     }
@@ -120,7 +130,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
   const currentParent = (account as { parentLineAccountId?: string | null }).parentLineAccountId ?? null
   const parentName = currentParent ? accounts.find((item) => item.id === currentParent) : null
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open
       title="アカウントの設定"
       description={`${account.displayName || account.name}（${accountHandle(account)}）`}
@@ -143,9 +153,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
       }
     >
       <div className={head.head}>
-        <div className={styles.field}>
-          <label htmlFor="hq-account-settings-name" className={styles.labelLarge}>名前</label>
-          <TextField
+        <div className={styles.field}><Field label="名前" htmlFor="hq-account-settings-name"><SaveErrorField names={["name"]}><TextField
             id="hq-account-settings-name"
             value={name}
             maxLength={100}
@@ -154,12 +162,9 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
             invalid={Boolean(nameError)}
             aria-describedby={nameError ? 'hq-account-settings-name-error' : undefined}
             className={styles.full}
-          />
-          {nameError ? <p id="hq-account-settings-name-error" className={styles.error} role="alert">{nameError}</p> : null}
-        </div>
-        <div className={styles.field}>
-          <label htmlFor="hq-account-settings-parent" className={styles.label}>親アカウント</label>
-          <Select
+          /></SaveErrorField>
+{nameError ? <p id="hq-account-settings-name-error" className={styles.error} role="alert">{nameError}</p> : null}</Field></div>
+        <div className={styles.field}><Field label="親アカウント" htmlFor="hq-account-settings-parent"><SaveErrorField names={["parent"]}><EntitySelect
             id="hq-account-settings-parent"
             aria-label="親アカウント"
             size="full"
@@ -169,13 +174,10 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
             options={[
               { value: '', label: parentName ? (parentName.displayName || parentName.name) : '変えない' },
               { value: 'none', label: 'なしにする' },
-              ...accounts.filter((item) => item.id !== account.id && item.id !== currentParent).map((item) => ({ value: item.id, label: item.displayName || item.name })),
+              ...accounts.filter((item) => item.id !== account.id && item.id !== currentParent).map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.displayName || item.name })),
             ]}
-          />
-        </div>
-        <div className={styles.field}>
-          <label htmlFor="hq-account-folder" className={styles.label}>フォルダ</label>
-          <FolderSelect
+          /></SaveErrorField></Field></div>
+        <div className={styles.field}><Field note={<>アカウントは1つのフォルダに入ります。アカウント一覧の左の列で絞り込みに使います</>} label="フォルダ" htmlFor="hq-account-folder"><SaveErrorField names={["folderId","folder_id"]}><FolderSelect
             id="hq-account-folder"
             aria-label="フォルダ"
             size="full"
@@ -189,9 +191,8 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
                 onFolderCreated?.()
               })
               : undefined}
-          />
-          <p className={styles.note}>アカウントは1つのフォルダに入ります。アカウント一覧の左の列で絞り込みに使います</p>
-        </div>
+          /></SaveErrorField>
+</Field></div>
         {!archived && account.connection?.status === 'warn' ? (
           /* 要確認のときだけ：引っかかった確認ごとの理由（URL は折り返して全文）。 */
           <div className={styles.field}>
@@ -214,7 +215,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
           </div>
         </div>
       </div>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }
 
@@ -271,9 +272,7 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
     >
       <div className={head.head}>
         <p className={styles.lead}>一覧から外します。送受信は止まり、友だちと履歴は残ります。あとで「戻す」で戻せます（オーナーのみ）。</p>
-        <div className={styles.field}>
-          <label htmlFor="hq-account-archive-reason" className={styles.labelLarge}>アーカイブの理由（任意）</label>
-          <TextField
+        <div className={styles.field}><Field label="アーカイブの理由" htmlFor="hq-account-archive-reason"><SaveErrorField names={["reason"]}><TextField
             id="hq-account-archive-reason"
             value={reason}
             maxLength={200}
@@ -281,11 +280,10 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
             placeholder="例：テスト用。使わなくなったため"
             onChange={(event) => setReason(event.target.value)}
             className={styles.full}
-          />
-        </div>
+          /></SaveErrorField></Field></div>
         <div className={styles.field}>
           <span className={styles.stepLabel}>本人確認（認証アプリの6桁）</span>
-          <OtpInput visualLabel="認証コード（6桁）" label="認証コード" value={typedCode} onChange={(next) => { setCode(next); if (next && error) setError('') }} onComplete={(entered) => void archive(entered)} invalid={Boolean(error)} busy={busy} />
+          <SaveErrorField names={["typedCode","code"]}><OtpInput visualLabel="認証コード（6桁）" label="認証コード" value={typedCode} onChange={(next) => { setCode(next); if (next && error) setError('') }} onComplete={(entered) => void archive(entered)} invalid={Boolean(error)} busy={busy} /></SaveErrorField>
         </div>
       </div>
     </Dialog>
@@ -348,7 +346,7 @@ export function AccountRestoreDialogV8({ account, onClose, onDone }: {
         <p className={styles.lead}>戻した直後は「止まっている」状態です。送受信を始めるときは、アカウントの詳細で「動かす」を押します。</p>
         <div className={styles.field}>
           <span className={styles.stepLabel}>本人確認（認証アプリの6桁）</span>
-          <OtpInput visualLabel="認証コード（6桁）" label="認証コード" value={typedCode} onChange={(next) => { setCode(next); if (next && error) setError('') }} onComplete={(entered) => void restore(entered)} invalid={Boolean(error)} busy={busy} />
+          <SaveErrorField names={["typedCode","code"]}><OtpInput visualLabel="認証コード（6桁）" label="認証コード" value={typedCode} onChange={(next) => { setCode(next); if (next && error) setError('') }} onComplete={(entered) => void restore(entered)} invalid={Boolean(error)} busy={busy} /></SaveErrorField>
         </div>
       </div>
     </Dialog>

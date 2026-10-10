@@ -7,7 +7,7 @@
  *   - 二段階認証の操作はログイン中の本人にだけ出す
  *   - 「この人を外す」は確認後に一度だけ停止口を呼び、失敗理由を窓に残す
  */
-import React from 'react'
+
 import { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -136,7 +136,8 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'ほかの人と同じにする' }))
     fireEvent.click(screen.getByRole('button', { name: 'コピー元のログインユーザー' }))
-    fireEvent.click(screen.getByRole('button', { name: 'コピー元さん（閲覧のみ）' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'コピー元さん（閲覧のみ）' }))
+    fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))
 
     expect(fixture.updateStaff).not.toHaveBeenCalled()
     // 画面の中の知らせ（role=status）。置き場所の知らせの入れ物も role=status なので、全部の中から文で見る
@@ -176,8 +177,8 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ほかの人と同じにする' }))
     fireEvent.click(screen.getByRole('button', { name: 'コピー元のログインユーザー' }))
 
-    expect(screen.queryByRole('button', { name: '対象者（スタッフ）' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'コピー元さん（閲覧のみ）' })).toBeTruthy()
+    expect(screen.queryByRole('radio', { name: '対象者（スタッフ）' })).toBeNull()
+    expect(screen.getByRole('radio', { name: 'コピー元さん（閲覧のみ）' })).toBeTruthy()
   })
 
   it('見せる範囲の保存を同一render内で二度押ししても更新は1回だけになる', async () => {
@@ -260,7 +261,7 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     try {
       await mount()
 
-      expect(screen.getByRole('link', { name: 'いまいる人' })).toBeTruthy()
+      expect(screen.getByRole('tab', { name: /いまいる人/ })).toBeTruthy()
       expect(screen.queryByText('利用停止中の人')).toBeNull()
       expect(screen.getByText('ログインユーザー 3人中 3人を表示')).toBeTruthy()
     } finally {

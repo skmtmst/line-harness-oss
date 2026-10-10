@@ -1,9 +1,10 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Checkbox from '@/components/shared/checkbox'
-import Combobox from '@/components/shared/combobox'
+
 import Select from '@/components/shared/select'
 import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -267,14 +268,14 @@ export default function SavedViewDialog({
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
                   <dt className="text-ink-secondary text-xs">担当</dt>
                   <dd className="w-40">
-                    <Combobox
+                    <EntitySelect clearable size="full"
                       aria-label="保存する担当者"
                       placeholder="すべて"
                       value={assignee === 'all' ? '' : assignee}
                       onChange={(next) => setAssignee(next || 'all')}
                       options={[
                         { value: 'unassigned', label: '未割り当て' },
-                        ...operators.map((operator) => ({ value: operator.id, label: operator.name })),
+                        ...operators.map((operator) => ({ ...entityOptionMetadata(operator), value: operator.id, label: operator.name })),
                       ]}
                       className="w-full"
                     />
@@ -330,7 +331,7 @@ export default function SavedViewDialog({
               <Button variant="secondary" className="text-ink-secondary whitespace-nowrap px-4 py-2 h-auto" type="button" onClick={onClose}>
                 キャンセル
               </Button>
-              <Button variant="primary" className="whitespace-nowrap px-5 py-2 font-bold border-0 h-auto" type="button" onClick={() => void submit()} disabled={saving || nameMissing} title={nameMissing ? '検索名を入力してください' : undefined}>
+              <Button variant="primary" className="whitespace-nowrap px-5 py-2 font-bold border-0 h-auto" type="button" onClick={() => void submit()} disabled={saving || nameMissing} title={nameMissing ? '検索名を入力してください' : undefined} >
                 {saving ? '保存中' : '検索条件を保存する'}
               </Button>
             </>

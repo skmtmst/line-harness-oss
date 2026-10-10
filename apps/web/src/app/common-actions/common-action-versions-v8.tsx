@@ -27,6 +27,9 @@ import { sumBindingCount, usageSummaryDetail } from './usage-summary'
 import { ACTION_LABELS, describeVersionChanges, versionChangeLines, versionChangeSummary } from './version-diff'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import styles from '@/app/automations/automations-v8.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const CONSUMER_LABELS: Record<string, string> = {
   scenario: 'シナリオ配信',
@@ -117,7 +120,7 @@ function VersionsV8Inner() {
         setError('この共通アクションは削除されたか、別のLINEアカウントのものです。')
         setLoadFailure('missing')
       } else if (caught instanceof ApiError && caught.status === 403) {
-        setError('この共通アクションを表示する権限がありません。')
+        setError(permissionDeniedMessage('store'))
         setLoadFailure('forbidden')
       } else {
         setError(caught instanceof Error && caught.message && !caught.message.startsWith('API error:')
@@ -250,10 +253,10 @@ function VersionsV8Inner() {
       <div className={styles.head}>
         <div className={styles.headText}>
           <Link href="/common-actions" className={styles.backLink}>← 共通アクション一覧へ戻る</Link>
-          <h1 className={styles.headTitle}>{detail.name}（版と使われている場所）</h1>
-          <p className={styles.headDescription}>
+          <PageHeading title={<>{detail.name}（版と使われている場所）</>} help={<>
             公開した版は書き換えられません。公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。
-          </p>
+          </>} />
+
         </div>
         <div className={styles.headActions}>
           {manualHref ? <Button href={manualHref}>マニュアル</Button> : null}
@@ -287,7 +290,7 @@ function VersionsV8Inner() {
       <div className={styles.kpis}>
         <div className={styles.kpi}>
           <p className={styles.kpiLabel}>いまの版</p>
-          <p className={styles.kpiValue}>v{published?.versionNumber ?? '—'}</p>
+          <p className={styles.kpiValue}>v{published?.versionNumber ?? emptyValue('unknown')}</p>
           <p className={styles.kpiSub}>{published?.publishedAt ? `${formatDay(published.publishedAt)}公開` : 'まだ公開していません'}</p>
         </div>
         <div className={styles.kpi}>
@@ -303,7 +306,7 @@ function VersionsV8Inner() {
         <div className={styles.kpi}>
           <p className={styles.kpiLabel}>今月動いた回数</p>
           <p className={styles.kpiValue}><MetricValue value={summary?.executionCountThisMonth ?? null} unit="回" /></p>
-          <p className={styles.kpiSub}>失敗 {summary ? formatNumber(summary.failureCountThisMonth) : '—'}回</p>
+          <p className={styles.kpiSub}>失敗 {summary ? formatNumber(summary.failureCountThisMonth) : emptyValue('unknown')}回</p>
         </div>
       </div>
 
@@ -393,13 +396,13 @@ function VersionsV8Inner() {
                     <td><span className={styles.num}>v{binding.versionNumber}</span></td>
                     <td>
                       <span className={styles.num} title={binding.runningCount === null ? '未取得' : undefined}>
-                        {binding.runningCount ?? '—'}
+                        {binding.runningCount ?? emptyValue('unknown')}
                       </span>
                       {binding.olderRunningCount ? <span className={styles.cellSub}> 旧版{binding.olderRunningCount}</span> : null}
                     </td>
                     <td>
                       <span className={styles.num} title={binding.waitingCount === null ? '未取得' : undefined}>
-                        {binding.waitingCount ?? '—'}
+                        {binding.waitingCount ?? emptyValue('unknown')}
                       </span>
                       {binding.olderWaitingCount ? <span className={styles.cellSub}> 旧版{binding.olderWaitingCount}</span> : null}
                     </td>
@@ -421,7 +424,7 @@ function VersionsV8Inner() {
                           >
                             v{published.versionNumber}へ更新する
                           </Button>
-                        ) : <span className={styles.footnote}>{binding.hasNewerVersion ? '編集権限が必要' : '—'}</span>}
+                        ) : <span className={styles.footnote}>{binding.hasNewerVersion ? '編集権限が必要' : emptyValue('unknown')}</span>}
                       </div>
                     </td>
                   </tr>
@@ -465,12 +468,12 @@ function VersionsV8Inner() {
         <div className={styles.detailGrid}>
           <section className={styles.detailCell}>
             <p className={styles.detailLabel}>現在の版</p>
-            <p className={styles.detailValue}>v{pendingBinding?.versionNumber ?? '—'}・{pendingVersion?.actions.length ?? '—'}個の処理</p>
+            <p className={styles.detailValue}>v{pendingBinding?.versionNumber ?? emptyValue('unknown')}・{pendingVersion?.actions.length ?? emptyValue('unknown')}個の処理</p>
             <p className={styles.footnote}>{pendingVersion?.actions.map((action) => ACTION_LABELS[action.type] ?? action.type).join(' → ') || '未取得'}</p>
           </section>
           <section className={styles.detailCell}>
             <p className={styles.detailLabel}>更新後</p>
-            <p className={styles.detailValue}>v{published?.versionNumber ?? '—'}・{published?.actions.length ?? '—'}個の処理</p>
+            <p className={styles.detailValue}>v{published?.versionNumber ?? emptyValue('unknown')}・{published?.actions.length ?? emptyValue('unknown')}個の処理</p>
             <p className={styles.footnote}>{published?.actions.map((action) => ACTION_LABELS[action.type] ?? action.type).join(' → ') || '未取得'}</p>
           </section>
         </div>
@@ -485,7 +488,7 @@ function VersionsV8Inner() {
           </section>
         ) : null}
         <p className={styles.footnote}>
-          影響：実行中 {pendingBinding?.runningCount ?? '—'}件、待機中 {pendingBinding?.waitingCount ?? '—'}件は現在の版のまま完了します。
+          影響：実行中 {pendingBinding?.runningCount ?? emptyValue('unknown')}件、待機中 {pendingBinding?.waitingCount ?? emptyValue('unknown')}件は現在の版のまま完了します。
         </p>
         {dialogError ? <p className={styles.stepError} role="alert">{dialogError}</p> : null}
       </Dialog>

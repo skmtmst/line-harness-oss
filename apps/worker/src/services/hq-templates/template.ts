@@ -1,4 +1,5 @@
-import { parseHqMessageCard, composeHqMessageCard, type HqMessageCard, isLiffActionKind, collectLiffActionLocators, replaceLiffActionLocators } from '@line-crm/shared';
+import { parseHqMessageCard, composeHqMessageCard, validateImagemapMessage, type HqMessageCard, isLiffActionKind, collectLiffActionLocators, replaceLiffActionLocators } from '@line-crm/shared';
+import { HQ_MEDIA_MAX_BYTES, type HqMediaStreamSource } from '../hq-media-stream.js';
 import type { HqTemplateBinding, HqTemplateStatement } from '@line-crm/db';
 import {
   VERSION_CONFLICT_MESSAGE,
@@ -24,7 +25,7 @@ export class TemplateHqTemplateError extends Error {
 }
 
 export type { MessageTemplateDefinition, MessageTemplateMediaDefinition } from '@line-crm/shared';
-import { type MessageTemplateDefinition, type MessageTemplateMediaDefinition, validateAssetPayload, isBroadcastAssetKind, convertBroadcastAsset, templateKind } from '@line-crm/shared';
+import { type MessageTemplateDefinition, type MessageTemplateMediaDefinition, validateAssetPayload, validateTapExtrasTree, tapExtrasError, isBroadcastAssetKind, convertBroadcastAsset, templateKind } from '@line-crm/shared';
 import { parseQuestion } from '../scenario-question.js';
 export type MessageTemplateTargetSnapshot = Readonly<{
   tenantId: string;
@@ -94,6 +95,7 @@ export type MessageTemplatePreflightItem = Readonly<{
 }>;
 
 export interface MessageTemplateAdapterDependencies {
+  stageSourceObject?: (media: MessageTemplateMediaDefinition, binding: MessageTemplateSourceMediaBinding) => Promise<HqMediaStreamSource>;
   /** Trusted runtime resolutions of card references, checked against the preflight snapshot. */
   cardTargets?: Readonly<Record<string, string>>;
   liffTargets?: Readonly<Record<string, string>>;
@@ -187,16 +189,19 @@ function jsonText(value: unknown, max: number): string | null {
   return text;
 }
 
-function assertMediaBudget(media: readonly { sizeBytes: number }[]): void {
-  let total = 0;
+function assertMediaBudget(media: readonly { sizeBytes: number; kind: string; mimeType: string }[]): void {
+  let total = 0, bufferedTotal = 0;
   if (media.length > 50) throw new TemplateHqTemplateError('MEDIA_SIZE_LIMIT', 422);
   for (const item of media) {
     if (!Number.isSafeInteger(item.sizeBytes) || item.sizeBytes < 0
-      || item.sizeBytes > MESSAGE_TEMPLATE_MEDIA_MAX_BYTES) {
+      || item.sizeBytes > (item.kind === 'video' || item.kind === 'audio' ? HQ_MEDIA_MAX_BYTES : MESSAGE_TEMPLATE_MEDIA_MAX_BYTES)) {
       throw new TemplateHqTemplateError('MEDIA_SIZE_LIMIT', 422);
     }
     total += item.sizeBytes;
-    if (total > MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES) {
+    if (!['video','audio'].includes(item.kind)) bufferedTotal += item.sizeBytes;
+    if (bufferedTotal > MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES) throw new TemplateHqTemplateError('MEDIA_SIZE_LIMIT', 422);
+    if ((item.kind === 'video' && item.mimeType !== 'video/mp4') || (item.kind === 'audio' && item.mimeType !== 'audio/mp4')) throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
+    if (total > HQ_MEDIA_MAX_BYTES + MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES) {
       throw new TemplateHqTemplateError('MEDIA_SIZE_LIMIT', 422);
     }
   }
@@ -236,7 +241,7 @@ export function parseMessageTemplateDefinition(value: unknown): MessageTemplateD
     throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
   }
   const messageType = template.messageType;
-  if (!['text', 'image', 'flex', 'carousel'].includes(String(messageType))) {
+  if (!['text', 'image', 'flex', 'carousel', 'imagemap'].includes(String(messageType))) {
     throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
   }
   const tapLimitMode = template.carouselTapLimitMode ?? 'none';
@@ -303,6 +308,18 @@ export function parseMessageTemplateDefinition(value: unknown): MessageTemplateD
     }
   }
   const questionJson=jsonText(template.questionJson,1_000_000);
+  if (messageType === 'imagemap') {
+    if (asset || card || questionJson) throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
+    let payload: import('@line-crm/shared').HqRichVideoPayload;
+    try { payload = JSON.parse(requiredText(template.messageContent, 1_000_000)); }
+    catch { throw new TemplateHqTemplateError('INVALID_DEFINITION', 422); }
+    if (!payload!.video || validateImagemapMessage(payload!)) throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
+    const video = media.find(m => m.publicUrl === payload!.video.originalContentUrl && m.kind === 'video');
+    const preview = media.find(m => m.publicUrl === payload!.video.previewImageUrl && m.kind === 'image' && ['image/png','image/jpeg'].includes(m.mimeType));
+    if (!video || !preview || preview.sizeBytes > 1024 * 1024 || !preview.width || !preview.height
+      || payload!.baseSize.height !== Math.round(preview.height / preview.width * 1040)
+      || ![240,300,460,700,1040].every(width => media.some(m => m.kind === 'image' && m.publicUrl === `${payload!.baseUrl}/${width}` && m.width === width && m.height === Math.max(1,Math.round(payload!.baseSize.height * width/1040))))) throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
+  }
   if(questionJson) {
     const q=parseQuestion(questionJson);
     if(!q || q.text.length>160 || q.choices.length>13 || q.choices.some(c=>!c || typeof c.label!=='string' || !c.label.trim() || c.label.length>20 || !['none','url','tel','add_friend','mail','form','scenario'].includes(c.behavior))) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
@@ -328,7 +345,18 @@ export function parseMessageTemplateDefinition(value: unknown): MessageTemplateD
     },
     media,
   };
-  try { collectLiffActionLocators(parsed); } catch { throw new TemplateHqTemplateError('INVALID_DEFINITION', 422); }
+  try {
+    collectLiffActionLocators(parsed);
+    for (const button of parsed.card?.buttons ?? []) if (button.action === 'url') collectLiffActionLocators({ uri: button.value });
+  } catch { throw new TemplateHqTemplateError('INVALID_DEFINITION', 422); }
+  const extrasError = validateTapExtrasTree(parsed.asset?.payload ?? parsed.card ?? {});
+  let contentExtras: string | null = null;
+  try { contentExtras = validateTapExtrasTree(JSON.parse(parsed.template.messageContent)); } catch { /* text */ }
+  if (extrasError || contentExtras) throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
+  if (parsed.template.questionJson) {
+    const q = parseQuestion(parsed.template.questionJson);
+    if (q?.choices.some(choice => tapExtrasError({ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }))) throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
+  }
   referencedMedia(parsed);
   return parsed;
 }
@@ -375,7 +403,7 @@ function assertAuthorizedSource(
   const { authority, version, definition, media: bindings } = source;
   const expectedSourcePrefix = sourceR2Prefix(authority.tenantId);
   assertMediaBudget(definition.media);
-  assertMediaBudget([...bindings.values()]);
+  assertMediaBudget([...bindings.values()].map(binding => ({...binding,kind:definition.media.find(m=>m.id===binding.mediaId)?.kind ?? 'file',mimeType:definition.media.find(m=>m.id===binding.mediaId)?.mimeType ?? ''})));
   if (authority.tenantId !== expectedTenantId
     || version.tenantId !== authority.tenantId
     || version.sourceAccountId !== authority.sourceAccountId
@@ -465,6 +493,10 @@ function exactStringValues(value: string): readonly string[] {
 export function referencedMedia(definition: MessageTemplateDefinition): readonly MessageTemplateMediaDefinition[] {
   const exactValues = new Set(templateTextFields(definition).flatMap(exactStringValues));
   if(definition.asset?.kind==='rich_message') for(const width of [240,300,460,700,1040]) exactValues.add(`${definition.asset.payload.baseUrl}/${width}`);
+  if (definition.template.messageType === 'imagemap') {
+    const payload = JSON.parse(definition.template.messageContent);
+    for (const width of [240,300,460,700,1040]) exactValues.add(`${payload.baseUrl}/${width}`);
+  }
   const references = definition.media.filter((media) =>
     [media.id, media.r2Key, media.publicUrl].some((locator) => locator !== null && exactValues.has(locator)),
   );
@@ -702,32 +734,28 @@ export async function planMessageTemplateDistribution(input: {
     plannedTargetR2Keys.add(targetR2Key);
     const binding = source.media.get(media.id);
     if (!binding) throw new TemplateHqTemplateError('SOURCE_MEDIA_AUTHORITY_MISMATCH', 422);
-    const maxBytes = Math.min(media.sizeBytes, MESSAGE_TEMPLATE_MEDIA_MAX_BYTES, MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES - stagedBytes);
-    const sourceObject = await dependencies.readSourceObjectIfUnchanged({
-      authority: source.authority,
-      templateVersionId: source.version.templateVersionId,
-      media,
-      binding,
-      maxBytes,
-    });
-    if (sourceObject && sourceObject.bytes.byteLength > maxBytes)
-      throw new TemplateHqTemplateError('MEDIA_SIZE_LIMIT', 422);
-    const declaredHash = normalizeSha256(media.contentHash);
-    if (!sourceObject
-      || (binding.etag !== null && sourceObject.etag !== binding.etag)
-      || sourceObject.bytes.byteLength !== media.sizeBytes
-      || declaredHash === null
-      || await sha256Hex(sourceObject.bytes) !== declaredHash
-      || (media.publicUrl !== null && targetPublicUrl === null)) {
-      throw new TemplateHqTemplateError('MEDIA_COPY_INVALID', 422);
+    if (['video', 'audio'].includes(media.kind) && dependencies.stageSourceObject) {
+      const streamSource = await dependencies.stageSourceObject(media, binding);
+      if (streamSource.r2Key !== binding.r2Key || streamSource.etag !== binding.etag || streamSource.sizeBytes !== media.sizeBytes || streamSource.contentHash !== normalizeSha256(media.contentHash)) throw new TemplateHqTemplateError('MEDIA_COPY_INVALID', 422);
+      stage.push({ key: targetR2Key, ownerToken, bytes: new Uint8Array(), streamSource, contentType: media.mimeType });
+    } else {
+      const maxBytes = Math.min(media.sizeBytes, MESSAGE_TEMPLATE_MEDIA_MAX_BYTES, MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES - stagedBytes);
+      const sourceObject = await dependencies.readSourceObjectIfUnchanged({ authority: source.authority, templateVersionId: source.version.templateVersionId, media, binding, maxBytes });
+      if (sourceObject && sourceObject.bytes.byteLength > maxBytes) throw new TemplateHqTemplateError('MEDIA_SIZE_LIMIT', 422);
+      const declaredHash = normalizeSha256(media.contentHash);
+      if (!sourceObject || (binding.etag !== null && sourceObject.etag !== binding.etag) || sourceObject.bytes.byteLength !== media.sizeBytes || declaredHash === null || await sha256Hex(sourceObject.bytes) !== declaredHash || (media.publicUrl !== null && targetPublicUrl === null)) throw new TemplateHqTemplateError('MEDIA_COPY_INVALID', 422);
+      stagedBytes += sourceObject.bytes.byteLength;
+      stage.push({ key: targetR2Key, ownerToken, bytes: sourceObject.bytes, contentType: media.mimeType });
     }
-    stagedBytes += sourceObject.bytes.byteLength;
-    stage.push({ key: targetR2Key, ownerToken, bytes: sourceObject.bytes, contentType: media.mimeType });
+    if (media.publicUrl !== null && targetPublicUrl === null) throw new TemplateHqTemplateError('MEDIA_COPY_INVALID', 422);
     compensateOnDbFailure.push({ key: targetR2Key, ownerToken });
     reconcile.push({ key: targetR2Key, ownerToken });
     replacements.set(media.id, targetId);
     replacements.set(media.r2Key, targetR2Key);
-    if (media.publicUrl && targetPublicUrl) replacements.set(media.publicUrl, targetPublicUrl);
+    if (media.publicUrl && targetPublicUrl) {
+      replacements.set(media.publicUrl, targetPublicUrl);
+      if (definition.template.messageType === 'imagemap' && media.publicUrl === `${JSON.parse(definition.template.messageContent).baseUrl}/1040`) replacements.set(media.publicUrl.slice(0, -5), targetPublicUrl.slice(0, -5));
+    }
 
     if (resolution.mode === 'overwrite') {
       if (!target) throw new TemplateHqTemplateError(VERSION_CONFLICT_MESSAGE, 409);
@@ -773,7 +801,10 @@ export async function planMessageTemplateDistribution(input: {
     const image = definition.media.find(item => item.id === definition.card!.imageMediaId);
     template = { ...template, ...composeHqMessageCard(definition.card, targetTemplateId, image?.publicUrl ?? undefined, dependencies.cardTargets) };
   }
-  for (const locator of (definition.card ? new Map<string, never>() : collectLiffActionLocators(definition)).keys()) {
+  const liffLocators = definition.card
+    ? collectLiffActionLocators(definition.card.buttons.filter(button => button.action === 'url').map(button => ({ uri: button.value })))
+    : collectLiffActionLocators(definition);
+  for (const locator of liffLocators.keys()) {
     if (!dependencies.liffTargets?.[locator]) throw new TemplateHqTemplateError('REFERENCE_UNAVAILABLE', 422);
   }
   const messageContent = replaceExactLocators(replaceLiffActionLocators(template, dependencies.liffTargets ?? {}).messageContent, replacements)!;

@@ -10,6 +10,7 @@ import {
   convertBroadcastAsset,
   isBroadcastAssetKind,
   type BroadcastAssetKind,
+  type TapExtras,
 } from '@line-crm/shared'
 import {
   serializeMessageKind,
@@ -93,8 +94,8 @@ export function messageTemplateToBubble(template: BroadcastTemplateOption): Broa
     try {
       const parsed = JSON.parse(template.messageContent)
       if (parsed.video) return { id: bubbleId(), type: 'rich_video', content: { ...parsed, templateId: template.id, templateName: template.name } }
-      const p = parsed as {baseUrl:string;baseSize:{width:number;height:number};altText?:string;actions:Array<{type:string;area:Record<string,number>;linkUri?:string;text?:string}>}
-      return {id:bubbleId(),type:'rich_message',content:{assetId:template.id,assetName:template.name,imageUrl:`${p.baseUrl}/1040`,baseUrl:p.baseUrl,baseSize:p.baseSize,description:p.altText,coordinateUnit:'px',tapAreas:p.actions.map(a=>({...a.area,actionType:a.type,uri:a.linkUri,text:a.text}))}}
+      const p = parsed as {baseUrl:string;baseSize:{width:number;height:number};altText?:string;actions:Array<{type:string;area:Record<string,number>;linkUri?:string;text?:string;tapExtras?:TapExtras}>}
+      return {id:bubbleId(),type:'rich_message',content:{assetId:template.id,assetName:template.name,imageUrl:`${p.baseUrl}/1040`,baseUrl:p.baseUrl,baseSize:p.baseSize,description:p.altText,coordinateUnit:'px',tapAreas:p.actions.map(a=>({...a.area,actionType:a.type,uri:a.linkUri,text:a.text,...(a.tapExtras?{tapExtras:a.tapExtras}:{})}))}}
     } catch { return null }
   }
 
@@ -119,10 +120,12 @@ export function messageTemplateToBubble(template: BroadcastTemplateOption): Broa
 }
 
 export function contentTemplateToBubble(asset: BroadcastMessageAsset): BroadcastBubble {
+  // 質問の押下は公開版へ固定する。下書きの選択肢と公開版の番号を混ぜない。
+  const payload = asset.kind === 'research' ? asset.publishedPayload ?? asset.payload : asset.payload
   return {
     id: bubbleId(),
     type: asset.kind,
-    content: { assetId: asset.id, assetName: asset.name, ...asset.payload },
+    content: { ...payload, assetId: asset.id, assetName: asset.name, ...(asset.kind === 'research' ? { assetVersion: asset.publishedVersion, ...(asset.publishedVersion === 0 ? { assetId: '' } : {}) } : {}) },
   }
 }
 

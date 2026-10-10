@@ -20,6 +20,8 @@ import MergedDeliveryDialog from './merged-delivery-dialog'
 import MergedProfileDialog from './merged-profile-dialog'
 import { useMergedPerson } from './use-merged-person'
 import styles from '@/app/friends/friends-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 function shortDate(iso: string): string {
   const d = new Date(iso)
@@ -36,7 +38,7 @@ export default function MergedPersonDetailViewV8({
 }) {
   const m = useMergedPerson(personId)
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || canManageRole(staffRole)
+  const canManage = canManageRole(staffRole)
 
   if (m.phase === 'loading') return <ListState kind="loading" />
   if (m.phase === 'forbidden') {
@@ -92,12 +94,10 @@ export default function MergedPersonDetailViewV8({
 
       {/* 版競合や保存失敗は面の上に残す（窓を閉じても消えない）。 */}
       {m.saveError ? (
-        <p className={styles.errorBand} role="alert">
-          {m.saveError}{' '}
+        <Notice tone="danger" className={styles.errorBandNoticePlacement} >{m.saveError}{' '}
           <button type="button" className={styles.infoBandRetry} onClick={m.reload}>
             読み直す
-          </button>
-        </p>
+          </button></Notice>
       ) : null}
 
       <div className={styles.detailGrid}>
@@ -291,12 +291,12 @@ export default function MergedPersonDetailViewV8({
         </p>
         <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--color-ink)' }}>
           <span>解除する理由<RequiredBadge /></span>
-          <textarea
+          <SaveErrorField names={["unlinkReason","m.unlinkReason","unlink_reason","m.unlink_reason"]}><textarea
             value={m.unlinkReason}
             onChange={(event) => m.setUnlinkReason(event.target.value)}
             placeholder="確認した根拠を書いてください"
             className={styles.reasonArea}
-          />
+          /></SaveErrorField>
         </label>
       </Dialog>
     </div>

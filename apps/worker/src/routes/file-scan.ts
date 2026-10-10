@@ -1,3 +1,4 @@
+import { purgeUnsafeFormDocuments } from '../services/form-documents.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
@@ -6,6 +7,9 @@ import { recordAuditEvent } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
   FILE_SCAN_REASON_LABELS,
+  FORM_FILE_SCAN_MAX_ATTEMPTS,
+  isPrivateFormDocumentScan,
+  markFileScanRejected,
   claimDueFileScans,
   createFileScan,
   getFileScanBySubject,
@@ -85,7 +89,7 @@ async function findR2Key(
     if (photo) return { key: photo.r2_key, width: photo.image_width, height: photo.image_height };
   }
   if (
-    scan.subject_kind === 'form_file'
+    isPrivateFormDocumentScan(scan)
     || scan.subject_kind === 'broadcast_asset'
     || scan.subject_kind === 'generic_image'
   ) {
@@ -95,7 +99,7 @@ async function findR2Key(
   return null;
 }
 
-/** 期限切れの pending を拾って内蔵＋外部の検査を回す。失敗は pending のまま。 */
+/** pending を再検査する。回答の書類は5回で却下する。 */
 export async function processDueFileScans(
   env: Env['Bindings'],
   limit = 20,
@@ -105,10 +109,13 @@ export async function processDueFileScans(
   let stillPending = 0;
   for (const scan of due) {
     try {
+      if (isPrivateFormDocumentScan(scan) && scan.attempts >= FORM_FILE_SCAN_MAX_ATTEMPTS) {
+        await markFileScanRejected(env.DB, scan.id, 'scan_attempts_exhausted', '検査を5回試しても終わりませんでした');
+        continue;
+      }
       const target = await findR2Key(env.DB, scan);
       if (!target) {
-        await markFileScanPendingRetry(env.DB, scan.id, scan.attempts);
-        stillPending += 1;
+        if (await markFileScanPendingRetry(env.DB, scan.id, scan.attempts, isPrivateFormDocumentScan(scan) ? FORM_FILE_SCAN_MAX_ATTEMPTS : undefined) === 'pending') stillPending += 1;
         continue;
       }
       const config = await getFileScanConfig(env.DB, scan.line_account_id);
@@ -117,7 +124,8 @@ export async function processDueFileScans(
       );
       if (external) {
         // 外の検査は設定があれば使う。鍵は設定の secret_ref が指す環境値から。
-        const head = await env.IMAGES.get(target.key, { range: { offset: 0, length: 256 * 1024 } });
+        const head = await env.IMAGES.get(target.key, target.key.startsWith('private/form-documents/') ? undefined : { range: { offset: 0, length: 256 * 1024 } });
+        if (isPrivateFormDocumentScan(scan) && !head) throw new ScanRetryableError('document_missing');
         const bytes = head ? new Uint8Array(await head.arrayBuffer()) : new Uint8Array();
         try {
           const verdict = await external.scan(bytes, {
@@ -127,12 +135,12 @@ export async function processDueFileScans(
             await markFileScanClean(env.DB, scan.id);
           } else {
             await markFileScanQuarantined(env.DB, scan.id, 'external_flagged', '外部の検査で問題が見つかりました');
+            if (isPrivateFormDocumentScan(scan)) await purgeUnsafeFormDocuments(env.DB, env.IMAGES, scan.id);
           }
           continue;
         } catch (err) {
           if (err instanceof ScanRetryableError) {
-            await markFileScanPendingRetry(env.DB, scan.id, scan.attempts);
-            stillPending += 1;
+            if (await markFileScanPendingRetry(env.DB, scan.id, scan.attempts, isPrivateFormDocumentScan(scan) ? FORM_FILE_SCAN_MAX_ATTEMPTS : undefined) === 'pending') stillPending += 1;
             continue;
           }
           throw err;
@@ -147,8 +155,7 @@ export async function processDueFileScans(
       if (next.status === 'pending') stillPending += 1;
     } catch (err) {
       console.error('processDueFileScans error:', scan.id, err);
-      await markFileScanPendingRetry(env.DB, scan.id, scan.attempts);
-      stillPending += 1;
+      if (await markFileScanPendingRetry(env.DB, scan.id, scan.attempts, isPrivateFormDocumentScan(scan) ? FORM_FILE_SCAN_MAX_ATTEMPTS : undefined) === 'pending') stillPending += 1;
     }
   }
   return { processed: due.length, stillPending };
@@ -297,6 +304,9 @@ fileScan.post('/api/file-scans/:id/retry', requireRole('owner', 'admin'), inputJ
   if (!scan || scan.line_account_id !== accountId) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
+  if (isPrivateFormDocumentScan(scan) && (scan.status !== 'pending' || scan.attempts >= FORM_FILE_SCAN_MAX_ATTEMPTS)) {
+    return c.json({ success: false, error: 'この書類は検査をやり直せません。別のファイルを選んでください' }, 409);
+  }
   // 二重実行は行の状態で抑える。pending の再試行は時刻だけ前倒しする。
   const now = new Date().toISOString();
   await c.env.DB.prepare(
@@ -331,6 +341,7 @@ fileScan.post('/api/file-scans/:id/release', requireRole('owner', 'admin'), inpu
   if (!scan || scan.line_account_id !== accountId) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
+  if (isPrivateFormDocumentScan(scan)) return c.json({ success: false, error: '回答の書類は戻せません。別のファイルを選んでください' }, 409);
   if (scan.status !== 'quarantined') {
     return c.json({ success: false, code: 'file_scan_not_quarantined', error: 'しまったファイルだけ戻せます' }, 409);
   }
@@ -370,14 +381,16 @@ fileScan.delete('/api/file-scans/:id', requireRole('owner', 'admin'), async (c) 
     return c.json({ success: false, code: 'file_scan_not_disposable', error: 'しまった・使えないファイルだけ消せます' }, 409);
   }
   const target = await findR2Key(c.env.DB, scan);
-  if (target) await c.env.IMAGES.delete(target.key).catch(() => {});
+  if (isPrivateFormDocumentScan(scan)) {
+    if (!await purgeUnsafeFormDocuments(c.env.DB, c.env.IMAGES, scan.id)) return c.json({ success: false, error: '書類を消せませんでした。もう一度お試しください' }, 503);
+  } else if (target) await c.env.IMAGES.delete(target.key).catch(() => {});
   if (scan.media_id) {
     await c.env.DB.prepare(
       `UPDATE media SET archived_at = ?, archived_by = ?, archive_reason = ?
         WHERE id = ? AND line_account_id = ?`,
     ).bind(new Date().toISOString(), c.get('staff')?.id ?? null, '検査でしまったため', scan.media_id, accountId).run();
   }
-  await c.env.DB.prepare(`DELETE FROM media_file_scans WHERE id = ?`).bind(scan.id).run();
+  if (!isPrivateFormDocumentScan(scan)) await c.env.DB.prepare(`DELETE FROM media_file_scans WHERE id = ?`).bind(scan.id).run();
   await recordAuditEvent(c.env.DB, {
     lineAccountId: accountId,
     category: 'business',

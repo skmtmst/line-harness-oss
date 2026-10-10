@@ -1,5 +1,6 @@
 'use client'
 
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import { useEffect, useState } from 'react'
 import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '@line-crm/shared'
 import { api, bookingApi, type BookingMenu } from '@/lib/api'
@@ -18,7 +19,6 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { menuPriceLabel } from '../../lib/menu-price'
 import Select from '@/components/shared/select'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
-import { canEditFeature } from '@/lib/staff-capability'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import StaffNewV8 from '@/v8/booking-staff/staff-new'
@@ -147,8 +147,7 @@ function NewBookingStaffV7() {
   }
 
   // N-411: 予約スタッフ登録は 'booking.settings' の実効permission必須。
-  const [canManageStaff] = useState(() =>
-    typeof window === 'undefined' ? true : canEditFeature('booking.settings'))
+  const canManageStaff = usePermissionAccess('booking.settings')
 
   /*
    * 登録途中の離脱確認。名前・表示名・肩書き・写真・紹介文・メニュー割当・
@@ -189,7 +188,7 @@ function NewBookingStaffV7() {
     <>
     <CreatePage
       title="予約スタッフを追加する"
-      description="お客様が予約するときに指名できるスタッフを追加します。"
+      help="お客様が予約するときに指名できるスタッフを追加します。"
       showHeader={false}
       parent={['予約設定', '/booking/menus?tab=staff']}
       saveLabel={createdStaffId ? '割当をやり直す' : 'スタッフを追加する'}

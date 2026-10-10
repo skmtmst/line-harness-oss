@@ -56,10 +56,11 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePa
 
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
-  return { ...actual, useStaffRole: () => roleBox.role }
+  return { ...actual, useTenantWideAccess: () => ['owner', 'admin'].includes(roleBox.role), useStaffRole: () => roleBox.role }
 })
 
 import HqBannersListV8 from './list'
+import { flushListUrlState } from '@/components/shared/list-url-state'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -78,6 +79,8 @@ const image = (n: number) => ({
 })
 
 beforeEach(() => {
+  flushListUrlState()
+  window.history.replaceState(null, '', '/hq/banners')
   document.documentElement.dataset.theme = 'v8'
   nav.query = ''
   roleBox.role = 'owner'
@@ -116,7 +119,7 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     expect(host.textContent).toContain('今月の残り')
     expect(host.textContent).toContain('上限 150枚')
     expect(host.textContent).toContain('秋のキャンペーン')
-    expect(host.textContent).toContain('3 枚 ・ 9/30 更新')
+    expect(host.textContent).toContain('3 枚 ・ 09/30 更新')
     expect(host.textContent).toContain('— ・ いま作成中')
     expect(host.querySelector('[aria-label="秋のキャンペーン を開く"]')).toBeTruthy()
   })
@@ -129,14 +132,14 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     const submit = buttonNamed('作って開く') as HTMLButtonElement
     expect(submit, '作って開くがありません').toBeTruthy()
     expect(submit.disabled).toBe(true)
-    const name = document.querySelector('input[placeholder="例: 春の感謝祭 2周年"]') as HTMLInputElement
+    const name = document.querySelector('input[placeholder="例：春の感謝祭 2周年"]') as HTMLInputElement
     fireEvent.change(name, { target: { value: '新しい案件' } })
     await flush()
     expect(submit.disabled).toBe(false)
     act(() => { submit.click() })
     await flush()
     expect(createProject).toHaveBeenCalledWith({ name: '新しい案件', description: null })
-    expect(push).toHaveBeenCalledWith('/hq/banners/project?id=p9')
+    expect(push).toHaveBeenCalledWith('/hq/banners?highlight=p9')
   })
 
   it('星を押すとお気に入りを切り替える', async () => {

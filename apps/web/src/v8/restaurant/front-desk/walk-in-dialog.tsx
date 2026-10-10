@@ -7,6 +7,7 @@
  * 人数を変えると座れる卓だけに絞り直す。満席のときは「いま座れる卓はありません」と次に空く目安。
  * 入れる口は walk-in.ts の1か所（予約なしの来店の口ができたら差し替える）。動きは BEHAVIOR.md。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useMemo, useState } from 'react'
 import { Armchair, LogIn, Minus, Plus } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
@@ -16,12 +17,12 @@ import { restaurantTestApi, type RestaurantReservation, type RestaurantTable } f
 import { freeTables, pad2, tableBusy, tableNote, toYmd } from './slots'
 import { seatWalkIn } from './walk-in'
 import styles from './front-desk.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const MAX_GUESTS = 100
 
 function hm(value: number | Date): string {
-  const day = typeof value === 'number' ? new Date(value) : value
-  return `${pad2(day.getHours())}:${pad2(day.getMinutes())}`
+  return polishFormatDate(value, { style: 'time' })
 }
 
 /** 満席のとき、人数が入る卓がいちばん早く空く時刻（今の予約の終わり）。 */
@@ -46,6 +47,8 @@ export default function WalkInDialog({ open, accountId, storeId, tables, onClose
   onClose: () => void
   onSaved: (result: { seated: boolean }) => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [now, setNow] = useState(() => new Date())
   const [guests, setGuests] = useState(2)
   const [tableId, setTableId] = useState('')
@@ -83,14 +86,16 @@ export default function WalkInDialog({ open, accountId, storeId, tables, onClose
       const result = await seatWalkIn(accountId, { storeId, guestCount: guests, tableId, now: new Date() })
       onSaved({ seated: result.seated })
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : '入店にできませんでした。もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setError(caught instanceof Error && caught.message ? caught.message : '入店にできませんでした。もう一度お試しください。') }
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open={open}
       designNode="nNujj"
       designWidth={560}
@@ -103,7 +108,7 @@ export default function WalkInDialog({ open, accountId, storeId, tables, onClose
       error={error || undefined}
       confirmLabel="入店にする"
       confirmIcon={<LogIn size={15} aria-hidden="true" />}
-      onConfirm={tableId ? () => void save() : undefined}
+      onConfirm={tableId ? () => save() : undefined}
       onCancel={onClose}
     >
       <div className={styles.walkIn}>
@@ -124,7 +129,7 @@ export default function WalkInDialog({ open, accountId, storeId, tables, onClose
           </div>
         ) : (
           <div className={styles.cardsWrap}>
-          <RadioCardGroup legend={`今すぐ座れる卓（${guests}名が座れる卓だけ）`} legendVisible className={styles.tableCards}>
+          <SaveErrorField names={["walk-in-table","id","table.id","tableId"]}><RadioCardGroup legend={`今すぐ座れる卓（${guests}名が座れる卓だけ）`} legendVisible className={styles.tableCards}>
             {free.map((table) => (
               <RadioCard
                 key={table.id}
@@ -139,10 +144,10 @@ export default function WalkInDialog({ open, accountId, storeId, tables, onClose
                 disabled={busy}
               />
             ))}
-          </RadioCardGroup>
+          </RadioCardGroup></SaveErrorField>
           </div>
         )}
       </div>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }

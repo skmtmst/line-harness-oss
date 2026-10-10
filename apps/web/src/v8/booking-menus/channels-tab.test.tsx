@@ -18,7 +18,7 @@ const api = vi.hoisted(() => ({
 }))
 
 vi.mock('./lib/booking-channels', () => ({ bookingChannelsApi: api }))
-vi.mock('@/components/shared/toast', () => ({ notifyToast: vi.fn() }))
+vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
 
 import ChannelsTabV8 from './channels-tab'
 

@@ -25,6 +25,7 @@ import {
   ZERO_TOLERANCE,
   BASELINE,
   SRC,
+  partFiles,
 } from '../../scripts/design-debt.mjs'
 
 const baseline = JSON.parse(readFileSync(BASELINE, 'utf8')) as Record<string, Record<string, number>>
@@ -32,6 +33,17 @@ const { counts } = countDebt()
 const { worse } = compare(counts, baseline)
 
 describe('共通部品を通らない直書き', () => {
+  it('画素照合待ちの共通部品も持ち主として扱い、画面側・担当未定の調査は除外しない', () => {
+    const data = { parts: {}, investigations: {
+      owner: { role: 'canonical', status: 'active', code: 'src/components/shared/page-size-select.tsx', components: ['PageSizeSelect'] },
+      screen: { role: 'canonical', status: 'active', code: 'src/v8/demo.tsx', components: ['Demo'] },
+      undecided: { role: 'sample', status: 'active', code: 'src/components/shared/probe.tsx', components: ['Probe'] },
+    } }
+    const files = partFiles(data)
+    expect(files.has(join(SRC, 'components/shared/page-size-select.tsx'))).toBe(true)
+    expect(files.has(join(SRC, 'v8/demo.tsx'))).toBe(false)
+    expect(files.has(join(SRC, 'components/shared/probe.tsx'))).toBe(false)
+  })
   it('design-parts.jsonに登録した正本部品自身は負債へ数えない', () => {
     for (const file of [
       'components/app-shell.tsx',

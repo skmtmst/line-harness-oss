@@ -22,9 +22,6 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ accounts: [], selectedAccountId: 'account-1', loading: false }),
 }))
-vi.mock('@/lib/staff-capability', () => ({
-  isOwnerOrAdmin: () => (globalThis as unknown as { __staffRole?: string }).__staffRole !== 'staff',
-}))
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
   usePageCrumbs: () => {},
@@ -32,6 +29,7 @@ vi.mock('@/components/shell/page-chrome', () => ({
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
   api: {
+    staff: { me: async () => ({ success: true, data: { role: (globalThis as unknown as { __staffRole?: string }).__staffRole ?? 'owner' } }) },
     templates: {
       list: () => Promise.resolve({ success: true, data: [] }),
     },

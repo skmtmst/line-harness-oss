@@ -55,6 +55,7 @@ describe('切替のつながりV8（wxIQ7）', () => {
     await render()
     expect(host.querySelector('[data-design-node="wxIQ7"]')).not.toBeNull()
     expect(host.textContent).toContain('切替のつながり：会員ランク上位')
+    await act(async () => { host.querySelector<HTMLButtonElement>('[data-template-region=heading] button[aria-expanded]')!.click() })
     expect(host.textContent).toContain('タブで行き来できるメニューの関係')
     expect(host.textContent).toContain('いまの状態')
     expect(host.textContent).toContain('公開中')

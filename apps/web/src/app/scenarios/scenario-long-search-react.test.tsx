@@ -70,7 +70,7 @@ async function eventually(check: () => void, timeout = 2000) {
   }
 }
 async function typeQuery(value: string) {
-  const input = host.querySelector<HTMLInputElement>('input[aria-label="シナリオ名で検索"]')!
+  const input = host.querySelector<HTMLInputElement>("input[aria-label=\"シナリオ名で探す\"]")!
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
   await act(async () => {
     setter.call(input, value)
@@ -78,6 +78,7 @@ async function typeQuery(value: string) {
   })
 }
 beforeEach(() => {
+  window.history.replaceState(null, '', '/scenarios')
   calls = []; handler = base
   const values = new Map<string, string>()
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -158,7 +159,7 @@ test('一覧口が落ちても失敗表示＋再読み込みが出て、無限�
   // 読み直しで同じ検索語のまま取り直せる。
   fail = false
   const retry = [...host.querySelectorAll('button')]
-    .find((item) => item.textContent?.trim() === 'もう一度試す')
+    .find((item) => item.textContent?.trim() === 'もう一度読み込む')
   expect(retry).toBeTruthy()
   await act(async () => { retry!.click() })
   await eventually(() => {

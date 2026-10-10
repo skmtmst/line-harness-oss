@@ -28,26 +28,19 @@ import {
   eventStoppedStage,
 } from './ec-failure'
 import styles from './order-drawer.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type DetailState = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /** 日本時間の「10/1 21:02」。 */
 function shortTime(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.valueOf())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 /** 日本時間の「10/4」。 */
 function shortDay(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.valueOf())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')}`
+  return polishFormatDate(value, { style: 'detail' })
 }
 
 function money(currency: string, amount: number | null): string | null {
@@ -105,8 +98,8 @@ function EventRow({ event, retryingId, onRetry, canEdit }: { event: EcOrderDetai
                       : action.status === 'pending' || action.status === 'processing' ? '処理中です'
                         : '失敗しました。通信を確かめて、もう一度お試しください。')}
                   {kind ? `（${kind.label}）` : ''}
-                  {action.attemptCount > 0 ? `・${action.attemptCount}/${action.maxAttempts}回` : '・まだ試していません'}
-                  {action.attempts.length > 1 ? `・手動で戻した ${action.attempts.filter((attempt) => attempt.triggerKind === 'manual').length}回` : ''}
+                  {action.attemptCount > 0 ? `・${action.attemptCount}/${action.maxAttempts} 回` : '・まだ試していません'}
+                  {action.attempts.length > 1 ? `・手動で戻した ${action.attempts.filter((attempt) => attempt.triggerKind === 'manual').length} 回` : ''}
                 </span>
                 {kind && (action.status === 'retryable_failed' || action.status === 'permanent_failed' || action.status === 'skipped') ? <span className={styles.hint}>{kind.hint}</span> : null}
                 {canEdit && action.retryAvailable ? (
@@ -214,7 +207,7 @@ export default function OrderDrawer({
       onClose={onClose}
       footer={order ? <>
         <Button href="/ec-commerce/identity-candidates"><Link2 size={14} aria-hidden="true" />会員のつき合わせへ</Button>
-        {order.detailUrl ? <Button href={order.detailUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} aria-hidden="true" />ECの管理画面で開く</Button> : null}
+        {order.detailUrl ? <Button external href={order.detailUrl}  >ECの管理画面で開く</Button> : null}
       </> : undefined}
     >
           {state === 'loading' ? (
@@ -232,7 +225,7 @@ export default function OrderDrawer({
                     <dt>中身</dt>
                     <dd>{order.orderLines.length ? order.orderLines.map((line) => `${line.productName} ×${line.quantity}`).join('・') : '商品明細は未取得'}</dd>
                   </div>
-                  <div className={styles.fact}><dt>金額</dt><dd>{amount ?? '—'}</dd></div>
+                  <div className={styles.fact}><dt>金額</dt><dd>{amount ?? emptyValue('unknown')}</dd></div>
                   <div className={styles.fact}>
                     <dt>EC側の注文</dt>
                     <dd>

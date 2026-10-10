@@ -1,3 +1,6 @@
+import { applyTapExtras } from './tap-extras.js';
+import { researchGateProblem, runResearchAnswerAction, validateResearchActionScope } from './research-forms.js';
+import type { Env } from '../index.js';
 /**
  * 回答フォーム（レイアウト版）の、受け付け判定と送信後の処理。
  *
@@ -15,7 +18,10 @@
 import type { Message } from '@line-crm/line-sdk';
 import {
   collectReachableInputs,
+  fixedFieldForBlock,
+  formatAddressValue,
   formChoiceIsSelected,
+  formatAnswerValue,
   hasChoices,
   isCalendarDateString,
   isFormAnswerEmpty,
@@ -31,7 +37,9 @@ import {
   enrollFriendInReminder,
   enrollFriendInScenario,
   getFriendFieldById,
+  getFixedFriendField,
   getMessageTemplateById,
+  getTemplateById,
   jstNow,
   removeTagFromFriend,
   setFriendFieldValue,
@@ -73,6 +81,10 @@ export async function checkFormGates(input: FormGateInput): Promise<string | nul
   const { db, formId, layout, friendId, submitCount, answers } = input;
   const options = layout.options ?? {};
   const now = input.now ?? new Date();
+  if (input.layout.options.researchGate && !input.resumeSavedAnswer) {
+    const problem = await researchGateProblem(input.db, input.layout.options.researchGate, input.friendId, now);
+    if (problem) return problem;
+  }
   const isTest = input.isTest === true;
 
   // 回答期限
@@ -177,7 +189,7 @@ export function collectCapacitySlots(layout: FormLayout, answers: FormAnswers): 
  *
  * 時差が書いてある文字列（`Z` や `+09:00`）は、そのまま信じる。
  */
-function parseJstDateTime(value: string): Date | null {
+export function parseJstDateTime(value: string): Date | null {
   const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(value);
   const normalized = hasZone ? value : `${value.length === 16 ? value : value.slice(0, 16)}:00+09:00`;
   const parsed = new Date(normalized);
@@ -243,6 +255,7 @@ export interface FormEffectInput {
   answers: FormAnswers;
   /** 解決失敗の台帳に残す出所（フォームID）。無いときは回答IDを使う */
   formId?: string;
+  env?: Env['Bindings'];
   /** タグ付与に伴うシナリオの即時配信で使う */
   push?: { defaultAccessToken: string; workerUrl?: string };
   /** テキスト送信・テンプレート送信で使う。無ければその動作は飛ばす */
@@ -308,6 +321,7 @@ export async function applyFormLayoutEffects(input: FormEffectInput): Promise<Fo
       value,
       friendId,
       destinationWrites,
+      input.formId,
     ));
 
     if (hasChoices(block)) {
@@ -333,6 +347,7 @@ export async function applyFormLayoutEffects(input: FormEffectInput): Promise<Fo
     const action = afterActions[index];
     await runEffectStep(input, failedEffects, destinationWrites, `afterAction:${index}`, () =>
       runFormAction(input, action, destinationWrites, index, `afterAction:${index}`));
+    if (action.kind === 'research_action' && action.onFailure === 'stop' && failedEffects.includes(`afterAction:${index}`)) break;
   }
 
   return { destinationWrites, failedEffects };
@@ -450,16 +465,31 @@ async function writeDestinations(
   value: unknown,
   friendId: string,
   stats: FormDestinationWriteStats,
+  formId?: string,
 ): Promise<void> {
   const dest = block.destinations;
-  if (!dest) return;
+  const fixedKey = fixedFieldForBlock(block);
+  if (!dest && !fixedKey) return;
   // 未回答（空文字・空白だけ・空の選択肢）は「更新しない」。
   // 空欄を登録先へ流すと空文字での上書き＝既存の登録を消してしまうため、
   // 書き込みを始める前にここで止める。明示的に消す操作は設けない。
   if (isFormAnswerEmpty(value)) return;
-  const text = toText(value);
+  const text = formatAnswerValue(block, value);
 
-  for (const fieldId of dest.friendFieldIds ?? []) {
+  if (fixedKey) {
+    await trackDestinationWrite(stats, 1, async () => {
+      const target = await getFixedFriendField(db, fixedKey);
+      if (!target) throw new Error('fixed friend field mapping missing');
+      const fixedValue = fixedKey === 'address' ? formatAddressValue(value) : text;
+      await setFriendFieldValue(db, {
+        friendId, fieldId: target.id, value: fixedValue, updatedBy: 'form',
+        field: target, ...(formId ? { sourceType: 'form', sourceId: formId } : {}),
+      });
+      return true;
+    });
+  }
+
+  for (const fieldId of dest?.friendFieldIds ?? []) {
     // 書けない相手(EC正・削除済み)は数えない。数えると「失敗」になり、
     // 再送しても直らない工程が未完のまま残る。
     const target = await getFriendFieldById(db, fieldId);
@@ -477,6 +507,7 @@ async function writeDestinations(
         value: checked.value,
         updatedBy: 'form',
         field: target,
+        ...(formId ? { sourceType: 'form', sourceId: formId } : {}),
       });
       return true;
     });
@@ -484,17 +515,27 @@ async function writeDestinations(
 
   const columns: string[] = [];
   const values: string[] = [];
-  if (dest.realName) {
+  if (dest?.realName && fixedKey !== 'name') {
     columns.push('real_name = ?');
     values.push(text);
   }
-  if (dest.displayName) {
+  if (dest?.displayName) {
     columns.push('system_display_name = ?');
     values.push(text);
   }
-  if (dest.note) {
-    columns.push('private_memo = ?');
-    values.push(text);
+  if (dest?.note && text !== '') {
+    // 受信箱の既存メモを残して回答を追記する。担当・対応状況・受信日時は動かさない。
+    await trackDestinationWrite(stats, 1, async () => {
+      const now = jstNow();
+      await db.prepare(`INSERT INTO chats (id, friend_id, notes, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(friend_id) DO UPDATE SET
+          notes = CASE WHEN COALESCE(TRIM(chats.notes), '') = '' THEN excluded.notes
+            ELSE chats.notes || char(10) || excluded.notes END,
+          updated_at = excluded.updated_at, revision = chats.revision + 1`)
+        .bind(crypto.randomUUID(), friendId, text, now, now).run();
+      return true;
+    });
   }
   if (columns.length === 0 || text === '') return;
 
@@ -535,6 +576,12 @@ async function runChoiceEffects(
 
   const chosen = (block.choices ?? []).filter((c) => formChoiceIsSelected(block, c, selected));
   for (const choice of chosen) {
+    if (input.layout.options.researchGate && choice.tapExtras) {
+      if (!input.idempotencyPrefix) throw new Error('回答の受付番号を確認できませんでした');
+      const friend = await input.db.prepare('SELECT line_account_id FROM friends WHERE id=?').bind(input.friendId).first<{line_account_id: string | null}>();
+      if (!friend?.line_account_id) throw new Error('回答者のアカウントを確認できませんでした');
+      await applyTapExtras(input.db, input.friendId, friend.line_account_id, choice.tapExtras, `${input.idempotencyPrefix}:research:${block.id}:${choice.id}`);
+    }
     switch (block.choiceMode) {
       case 'tag':
         await applyChoiceTag(input, choice);
@@ -614,6 +661,42 @@ export async function runFormAction(
   const { db, friendId } = input;
 
   switch (action.kind) {
+    case 'research_action': {
+      const friend = await db.prepare('SELECT line_account_id FROM friends WHERE id=?').bind(friendId).first<{ line_account_id: string | null }>();
+      if (!friend?.line_account_id) throw new Error('回答者のアカウントを確認できませんでした');
+      await validateResearchActionScope(db, action, friend.line_account_id);
+      if (action.actionType === 'tag') {
+        const ids = Array.isArray(action.config.tagIds) ? action.config.tagIds.map(String) : [];
+        if (action.config.folderId) {
+          const rows = await db.prepare("SELECT id FROM tags WHERE folder_id=? AND (line_account_id=? OR line_account_id IS NULL) AND status='active'").bind(action.config.folderId,friend.line_account_id).all<{id:string}>();
+          ids.push(...rows.results.map(row => row.id));
+        }
+        await runFormAction(input, {kind:'tag',op:action.config.op==='remove'?'remove':'add',tagIds:[...new Set(ids)]},destinationWrites,actionIndex,pushSuffix);
+        return;
+      }
+      if (action.actionType === 'send_message' || action.actionType === 'send_template' || action.actionType === 'reminder') {
+        if (action.actionType !== 'reminder' && !input.pushText) throw new Error('回答後の送信を利用できません');
+        if (action.actionType === 'send_template') {
+          const template = await getTemplateById(db, String(action.config.templateId));
+          if (!template || !template.published_version) throw new Error('公開済みのテンプレートを選んでください');
+          const { expandSendCommonVars } = await import('./interpolation-context.js');
+          const content = await expandSendCommonVars(db, template.message_content, { kind: 'form_reply', id: input.formId ?? friendId }, { friendId, messageType: template.message_type });
+          if (template.message_type === 'text') await input.pushText!(content, pushSuffix ?? `research-template:${template.id}`);
+          else {
+            if (!input.pushMessage) throw new Error('回答後の送信を利用できません');
+            await input.pushMessage(buildMessage(template.message_type, content, template.name), pushSuffix ?? `research-template:${template.id}`);
+          }
+          return;
+        }
+        const mapped: FormAction = action.actionType === 'send_message' ? { kind: 'send_text', text: String(action.config.content ?? '') }
+
+          : { kind: 'reminder', reminderId: String(action.config.reminderId ?? '') };
+        await runFormAction(input, mapped, destinationWrites, actionIndex, pushSuffix);
+        return;
+      }
+      await runResearchAnswerAction(input.db, action, input.friendId, `${input.idempotencyPrefix ?? input.formId}:${pushSuffix ?? actionIndex}`, input.env);
+      return;
+    }
     case 'send_text':
       if (input.pushText && action.text) {
         const { expandSendCommonVars } = await import('./interpolation-context.js');

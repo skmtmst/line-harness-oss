@@ -137,7 +137,7 @@ export function usageRows(detail: UsageDetail): UsageRow[] {
     ...(detail.scenarioSteps ?? []).map((u) => ({
       key: `scenario-${u.stepId}`,
       kind: 'シナリオ配信',
-      name: `${u.scenarioName}・${u.stepOrder}通目`,
+      name: `${u.scenarioName}・${u.stepOrder} 通目`,
       href: `/scenarios/detail?id=${u.scenarioId}`,
     })),
     ...(detail.reminderSteps ?? []).map((u) => ({

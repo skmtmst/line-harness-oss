@@ -17,6 +17,8 @@ import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
 import { Th } from '@/components/shared/table'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -126,14 +128,14 @@ export function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, sa
           {loading ? <p className="rounded-control bg-surface-soft p-3 text-sm text-ink-faint">影響を確認しています…</p> : impact && needsReplacement ? (
             <div>
               <label className="block text-sm font-semibold text-ink">置き換え先
-                <Select
+                <SaveErrorField names={["replacementMarkId","replacement_mark_id"]}><EntitySelect
                   aria-label="置き換え先"
                   value={replacementMarkId}
                   onChange={onReplacement}
-                  options={[{ value: '', label: '選んでください' }, ...impact.replacementOptions.map((option) => ({ value: option.id, label: `${option.name}${option.isDefault ? '（初期値）' : ''}` }))]}
+                  options={[{ value: '', label: '選んでください' }, ...impact.replacementOptions.map((option) => ({ ...entityOptionMetadata(option), value: option.id, label: `${option.name}${option.isDefault ? '（初期値）' : ''}` }))]}
                   size="full"
                   className="mt-1.5"
-                />
+                /></SaveErrorField>
               </label>
               {selected ? <p className="mt-2 text-xs text-ink-faint">{impact.friendCount}人を「{selected.name}」へ置き換えます。</p> : null}
             </div>
@@ -399,8 +401,8 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
       </NoteBar>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="マーク名で検索" aria-label="マーク名で検索" className="h-9 w-[150px] rounded-control border border-hairline bg-canvas px-3 text-label" />
-        <Select
+        <SaveErrorField names={["query"]}><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="マーク名で検索" aria-label="マーク名で検索" className="h-9 w-[150px] rounded-control border border-hairline bg-canvas px-3 text-label" /></SaveErrorField>
+        <SaveErrorField names={["usage"]}><Select
           label="利用状態"
           aria-label="利用状態"
           value={usage}
@@ -410,7 +412,7 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
             { value: 'used', label: '使用中' },
             { value: 'unused', label: '未使用' },
           ]}
-        />
+        /></SaveErrorField>
         <span className="flex-1" />
         {/* 追加ボタンはタブの右に1個だけ（#1014 ATTR-22）。一覧の中には置かない。 */}
       </div>

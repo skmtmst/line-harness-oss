@@ -1,10 +1,6 @@
 'use client'
-
-/*
- * ★V8 ウェビナーを作る ①基本設定（Pencil j7PP04。入口 app/webinars/new/page.tsx。V8 のときだけここ）。
- * 下書きとして作り、「動画の設定へ」で編集の ②動画へ進む。
- * 口・確かめ・離れる前の確かめは app/webinars/new/new-v8.tsx と同じ（BEHAVIOR.md）。
- */
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight } from 'lucide-react'
@@ -16,11 +12,20 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { describeSaveFailure, webinarApi, type WebinarFolder } from '@/lib/api'
 import { BackLink, WizardSteps } from './chrome'
 import { folderById, folderCreator } from '@/components/shared/folder-select'
 import { BasicForm, BasicPreview, SLUG_PATTERN, type BasicValues } from './basic-form'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+/*
+ * ★V8 ウェビナーを作る ①基本設定（Pencil j7PP04。入口 app/webinars/new/page.tsx。V8 のときだけここ）。
+ * 下書きとして作り、「動画の設定へ」で編集の ②動画へ進む。
+ * 口・確かめ・離れる前の確かめは app/webinars/new/new-v8.tsx と同じ（BEHAVIOR.md）。
+ */
 
 const FOLDERS_BLOCKED = 'フォルダを読み込めていないため、下書きを保存できません。フォルダをもう一度読み込んでください。'
 const TITLE_EMPTY = 'ウェビナー名を入力してください'
@@ -44,12 +49,13 @@ export default function WebinarNewV8() {
 }
 
 function NewInner() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('ウェビナー')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
   const { selectedAccountId, selectedAccount } = useAccount()
   const role = useStaffRole()
-  const readOnly = role !== null && !canManageRole(role)
+  const readOnly = !useFeatureAccess('webinars')
   const [values, setValues] = useState<BasicValues>({ title: '', slug: '', folderId: '', description: '', deliveryKind: 'on_demand' })
   const [folders, setFolders] = useState<WebinarFolder[]>([])
   const [folderState, setFolderState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -73,14 +79,18 @@ function NewInner() {
       setFolders(response.data)
       setFolderState('ready')
       setError((previous) => (previous === FOLDERS_BLOCKED ? null : previous))
-    } catch {
+    } catch (saveFailure) {
       if (request !== folderRequest.current) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       setFolders([])
+      { if (!fieldFailure)
       setFolderState('error')
     }
-  }, [selectedAccountId])
+  }
+  }, [selectedAccountId, saveErrors])
   useEffect(() => {
-    void loadFolders()
+    void loadFolders();
+
     return () => { folderRequest.current += 1 }
   }, [loadFolders])
 
@@ -114,9 +124,13 @@ function NewInner() {
         viewingCondition: { kind: 'registered', label: '申込者向け' },
         publicDescription: values.description.trim() || undefined,
       })
-      router.push(next === 'video' ? `/webinars/edit?id=${created.data.id}&pane=video` : '/webinars')
+      router.push(next === 'video' ? `/webinars/edit?id=${created.data.id}&pane=video` : createPageReturnHref('/webinars', created.data.id))
     } catch (cause) {
-      setError(describeSaveFailure(cause))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+
+      setError(withPermissionFailure(cause, describeSaveFailure(cause), 'store')) }
       savingRef.current = false
       setSaving(false)
     }
@@ -127,13 +141,13 @@ function NewInner() {
   const accountName = selectedAccount?.displayName ?? selectedAccount?.name ?? '公式アカウント'
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <CreatePage
         boardId="j7PP04"
         title="ウェビナーを作る"
         identity={<BackLink />}
         steps={<WizardSteps current="basic" stateOf={(key) => (key === 'basic' ? 'current' : 'todo')} />}
-        description="管理名と公開ページの基本、開催形式を決めます。保存しても、まだ誰にも公開されません。"
+        help="管理名と公開ページの基本、開催形式を決めます。保存しても、まだ誰にも公開されません。"
         status="下書き（まだ誰にも公開されません）"
         footerActions={<>
           <Button href="/webinars">キャンセル</Button>
@@ -142,9 +156,9 @@ function NewInner() {
             <Button variant="primary" disabled={blocked} title={blockedReason} busy={saving === 'video'} onClick={() => void save('video')}><ArrowRight size={15} aria-hidden="true" />動画の設定へ</Button>
           </>}
         </>}
-        preview={<BasicPreview title={values.title} description={values.description} accountName={accountName} />}
+        preview={<BasicPreview title={values.title} description={values.description} accountName={accountName} />} dirty={false}
       >
-        {readOnly ? <Notice tone="info">閲覧のみで見ています。ウェビナーを作るのはオーナーか管理者です。</Notice> : null}
+        {readOnly ? <ReadOnlyNotice >閲覧のみで見ています。ウェビナーを作るのはオーナーか管理者です。</ReadOnlyNotice> : null}
         {error ? <Notice tone="danger">{error}</Notice> : null}
         {/* 閲覧のみと分かったら、押せない入力の欄は置かず閲覧のみの帯だけを出す（作る画面なので見せる中身は無い。2026-10-06 オーナー決定）。 */}
         {readOnly ? null : <BasicForm
@@ -169,6 +183,6 @@ function NewInner() {
         />}
       </CreatePage>
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }

@@ -1,16 +1,6 @@
 'use client'
-
-/*
- * ★V8 成果とアフィリエイト「支払い」（板 `aINnz`、期間を締めるの確かめは `usDpO`）。
- *
- * app/affiliates/v8-payment-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で組み直した。
- * 決まりは今と同じ：
- * - 締めは日本時間の暦月で固定する
- * - 締め済みの台帳があれば settlementCurrent で再開する
- * - アカウント切替の遅い応答は世代番号で捨てる
- * - 明細発行・銀行用CSVは合言葉（冪等キー）つき、CSV 書き出しは本人確認を通してから
- * - 0円で外れた成果・持ち越し・取消の差し引きは案内に出す
- */
+import { FolderDotName } from '@/components/shared/folder-dot'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarClock, CalendarDays, FileText, Landmark, Lock, ReceiptText, TriangleAlert, Users, Wallet } from 'lucide-react'
 import {
@@ -38,6 +28,20 @@ import { AffiliateFrame, useAffiliateShell } from './frame'
 import { PayoutStepUpDialog, SettlementCloseDialog } from './payment-dialogs'
 import { AffiliateToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, StatusPill, ToolbarNotices } from './parts'
 import styles from './affiliates.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 成果とアフィリエイト「支払い」（板 `aINnz`、期間を締めるの確かめは `usDpO`）。
+ *
+ * app/affiliates/v8-payment-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で組み直した。
+ * 決まりは今と同じ：
+ * - 締めは日本時間の暦月で固定する
+ * - 締め済みの台帳があれば settlementCurrent で再開する
+ * - アカウント切替の遅い応答は世代番号で捨てる
+ * - 明細発行・銀行用CSVは合言葉（冪等キー）つき、CSV 書き出しは本人確認を通してから
+ * - 0円で外れた成果・持ち越し・取消の差し引きは案内に出す
+ */
 
 type PaymentFilter = 'all' | 'bank_missing' | 'bank_ok'
 
@@ -61,18 +65,19 @@ const SAVED_VIEWS = [
 ]
 
 export default function PaymentTab() {
+  const saveErrors = useSaveFormErrors()
   const { readonly, narrow, accountId } = useAffiliateShell()
   const period = useMemo(() => currentSettlementPeriod(), [])
   const [items, setItems] = useState<AffiliatePaymentSummary[]>([])
   const [preview, setPreview] = useState<AffiliateAccountSettlementPreview | null>(null)
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<PaymentFilter>('all')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<PaymentFilter>('filter', 'all')
   const [saved, setSaved] = useState('')
   /* 「今回払う人」の札を押したか（絞りは全員のまま。押した形だけ残す）。 */
   const [allPicked, setAllPicked] = useState(false)
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null)
   const [closeOpen, setCloseOpen] = useState(false)
   const [closed, setClosed] = useState<AffiliateAccountSettlementResult | null>(null)
@@ -121,13 +126,15 @@ export default function PaymentTab() {
         })
       }
       setLoadState('ready')
-    } catch {
+    } catch (saveFailure) {
       if (seq !== loadSeq.current) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       setItems([])
       setPreview(null)
-      setLoadState('error')
+      { if (!fieldFailure)
+      setLoadState('error') }
     }
-  }, [accountId, period])
+  }, [accountId, period, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -169,16 +176,19 @@ export default function PaymentTab() {
         else failedNames.push(statementTargets[index].affiliateName)
       })
       if (failedNames.length === 0) {
-        notifyToast(`${formatNumber(statementTargets.length)}人分の支払明細を発行し、LINE通知を依頼しました。`)
+        notifyToast(`${formatNumber(statementTargets.length)} 人分の支払明細を発行し、LINE通知を依頼しました。`)
       } else {
-        if (succeeded > 0) notifyToast(`${formatNumber(succeeded)}人分の支払明細を発行しました。`)
+        if (succeeded > 0) notifyToast(`${formatNumber(succeeded)} 人分の支払明細を発行しました。`)
         const names = failedNames.slice(0, 5).join('、')
-        const rest = failedNames.length > 5 ? `ほか${failedNames.length - 5}人` : ''
-        setOperationError(`${failedNames.length}人分を発行できませんでした（${names}${rest}）。もう一度押すと失敗分を試し直せます。`)
+        const rest = failedNames.length > 5 ? `ほか${failedNames.length - 5} 人` : ''
+        setOperationError(`${failedNames.length} 人分を発行できませんでした（${names}${rest}）。もう一度押すと失敗分を試し直せます。`)
       }
       if (resumed && succeeded > 0) void load()
     } catch (cause) {
-      setOperationError(cause instanceof Error ? cause.message : '支払明細を発行できませんでした')
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+      setOperationError(cause instanceof Error ? cause.message : '支払明細を発行できませんでした') }
     } finally {
       setOperationBusy(false)
     }
@@ -195,7 +205,10 @@ export default function PaymentTab() {
       if (!response.success) throw new Error(response.error)
       setBatch(response.data)
     } catch (cause) {
-      setOperationError(cause instanceof Error ? cause.message : '振込先を確認できませんでした')
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+      setOperationError(cause instanceof Error ? cause.message : '振込先を確認できませんでした') }
     } finally {
       setOperationBusy(false)
     }
@@ -226,16 +239,16 @@ export default function PaymentTab() {
         title="今回 払う額"
         icon={<Wallet size={14} aria-hidden="true" />}
         value={null}
-        valueText={ready && preview ? formatYen(preview.totalAmount) : '—'}
+        valueText={ready && preview ? formatYen(preview.totalAmount) : emptyValue('unknown')}
         unit=""
-        detail={ready && preview ? `${formatNumber(rows.length)}人・${formatNumber(preview.conversionCount)}件` : loadState === 'loading' ? loadingWord : errorWord}
+        detail={ready && preview ? `${formatNumber(rows.length)} 人・${formatNumber(preview.conversionCount)} 件` : loadState === 'loading' ? loadingWord : errorWord}
       />
       <KpiCard
         presentation="band"
         title="次の締め"
         icon={<CalendarDays size={14} aria-hidden="true" />}
         value={null}
-        valueText={ready && preview ? formatMonthDay(preview.periodTo) : '—'}
+        valueText={ready && preview ? formatMonthDay(preview.periodTo) : emptyValue('unknown')}
         unit=""
         detail={ready ? (closeInDays == null ? '締めると金額が固定されます' : closeInDays < 0 ? '締め日を過ぎています' : `あと ${formatNumber(closeInDays)}日`) : loadState === 'loading' ? loadingWord : errorWord}
       />
@@ -272,7 +285,7 @@ export default function PaymentTab() {
         </div>
         <div className={styles.closeCell}>
           <span className={styles.closeLabel}>対象</span>
-          <span className={styles.closeValue}>{`${formatNumber(rows.length)}人・${formatNumber(preview.conversionCount)}件`}</span>
+          <span className={styles.closeValue}>{`${formatNumber(rows.length)} 人・${formatNumber(preview.conversionCount)} 件`}</span>
         </div>
         <div className={styles.closeCell}>
           <span className={styles.closeLabel}>合計</span>
@@ -297,20 +310,20 @@ export default function PaymentTab() {
     <>
       <ToolbarNotices error={operationError || undefined}>
         {preview?.carriedOver && preview.carriedOver.count > 0 ? (
-          <div className={styles.fullRow}><Notice tone="info">{`前の締めから持ち越した分 ${formatNumber(preview.carriedOver.count)}件・${formatYen(preview.carriedOver.amount)} を含んでいます。締める期間は ${formatDate(preview.periodFrom)}〜${formatDate(preview.periodTo)} です。`}</Notice></div>
+          <div className={styles.fullRow}><Notice tone="info">{`前の締めから持ち越した分 ${formatNumber(preview.carriedOver.count)} 件・${formatYen(preview.carriedOver.amount)} を含んでいます。締める期間は ${formatDate(preview.periodFrom)}〜${formatDate(preview.periodTo)} です。`}</Notice></div>
         ) : null}
         {(preview?.totalDeduction ?? 0) > 0 || (preview?.carriedDeduction?.amount ?? 0) > 0 ? (
           <div className={styles.fullRow}><Notice tone="info">{`締めたあとに取り消された分 ${formatYen(preview?.totalDeduction ?? 0)} を差し引いています。${(preview?.carriedDeduction?.amount ?? 0) > 0 ? `今回引ききれない ${formatYen(preview?.carriedDeduction?.amount ?? 0)} は次回へ繰り越し、正の振込はその分だけ減ります。` : ''}`}</Notice></div>
         ) : null}
         {preview?.excludedZeroAmount && preview.excludedZeroAmount.count > 0 ? (
-          <div className={styles.fullRow}><Notice tone="warn">{`報酬が0円の成果 ${formatNumber(preview.excludedZeroAmount.count)}件は、支払えないため今回の締め対象から外れています。対象は「期間を締める」の確かめで見られます。`}</Notice></div>
+          <div className={styles.fullRow}><Notice tone="warn">{`報酬が0円の成果 ${formatNumber(preview.excludedZeroAmount.count)} 件は、支払えないため今回の締め対象から外れています。対象は「期間を締める」の確かめで見られます。`}</Notice></div>
         ) : null}
         {closed ? (
           <div className={styles.fullRow}>
             <Notice tone="success">
               {resumed
-                ? `${formatDate(closed.closedAt)} に締めた記録を読み出しました。${issuedCount > 0 ? `明細は ${formatNumber(resumed.affiliates.length)}人中 ${formatNumber(issuedCount)}人分が発行済みです。` : ''}${resumed.batch ? '振込用CSVの準備も作成済みです。' : '明細と銀行用CSVの準備を続けられます。'}`
-                : `${formatDate(closed.closedAt)} に ${formatYen(closed.totalAmount)}・${formatNumber(closed.conversionCount)}件を締めました。明細と銀行用CSVを準備できます。`}
+                ? `${formatDate(closed.closedAt)} に締めた記録を読み出しました。${issuedCount > 0 ? `明細は ${formatNumber(resumed.affiliates.length)} 人中 ${formatNumber(issuedCount)} 人分が発行済みです。` : ''}${resumed.batch ? '振込用CSVの準備も作成済みです。' : '明細と銀行用CSVの準備を続けられます。'}`
+                : `${formatDate(closed.closedAt)} に ${formatYen(closed.totalAmount)}・${formatNumber(closed.conversionCount)} 件を締めました。明細と銀行用CSVを準備できます。`}
             </Notice>
           </div>
         ) : null}
@@ -319,7 +332,7 @@ export default function PaymentTab() {
         <div className={styles.noticeStack}>
           {ready && missingBanks.length > 0 ? (
             <Notice tone="warn">
-              {`振込先が登録されていない人が ${formatNumber(missingBanks.length)} 人います（${missingBanks.slice(0, 3).map((item) => item.affiliateName).join('・')}${missingBanks.length > 3 ? ` ほか${formatNumber(missingBanks.length - 3)}人` : ''}）。締める前に、本人に登録をお願いしてください。`}
+              {`振込先が登録されていない人が ${formatNumber(missingBanks.length)} 人います（${missingBanks.slice(0, 3).map((item) => item.affiliateName).join('・')}${missingBanks.length > 3 ? ` ほか${formatNumber(missingBanks.length - 3)} 人` : ''}）。締める前に、本人に登録をお願いしてください。`}
             </Notice>
           ) : null}
           {closeBox}
@@ -375,19 +388,19 @@ export default function PaymentTab() {
             const gross = item.grossAmount ?? item.amount + (item.deduction ?? 0)
             return (
               <Tr key={item.affiliateId} className={styles.row} data-table-layout="columns">
-                <Td className={styles.colName}>
+                <Td className={styles.colName}><FolderDotName>
                   <span className={styles.stack}>
                     <button type="button" className={styles.rowName} title={item.affiliateName} onClick={() => setConfirmTarget({ id: item.affiliateId, name: item.affiliateName })}>{item.affiliateName}</button>
-                    <span className={styles.rowPlan}>{`コード ${item.code}`}</span>
+
                   </span>
-                </Td>
+                </FolderDotName></Td>
                 <Td className={`${styles.colPayAmount} ${styles.num}`}>
                   <span className={styles.stackEnd}>
                     <span className={styles.cellNum}>{formatYen(item.amount)}</span>
                     <span className={styles.rowWrapEnd}>{`元の報酬 ${formatYen(gross)} − 取消 ${formatYen(item.deduction ?? 0)}`}</span>
                   </span>
                 </Td>
-                <Td className={`${styles.colPayCount} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(item.conversionCount)}件`}</span></Td>
+                <Td className={`${styles.colPayCount} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(item.conversionCount)} 件`}</span></Td>
                 <Td className={styles.colPayBank}>
                   {item.bankProfileRegistered ? (
                     <span className={styles.stack}>
@@ -431,7 +444,7 @@ export default function PaymentTab() {
 
   const pager = ready && shown.length > 0 && pageCount > 1 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{`${formatNumber(shown.length)}人中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shown.length)}人`}</span>
+      <span className={styles.pagerCount}>{`${formatNumber(shown.length)} 人中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shown.length)} 人`}</span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} />
     </ListPagePagination>
   ) : undefined
@@ -442,7 +455,7 @@ export default function PaymentTab() {
         type="button"
         onClick={() => { void preparePayout() }}
         disabled={!closed || operationBusy || Boolean(resumed?.batch)}
-        title={!closed ? '期間を締めると書き出せます' : resumed?.batch ? '銀行用CSVの準備は作成済みです' : undefined}
+        title={!closed ? '期間を締めると書き出せます' : resumed?.batch ? '銀行用CSVの準備は作成済みです' : undefined} busy={Boolean(operationBusy)} busyLabel="処理中…"
       >
         <Landmark size={15} aria-hidden="true" /> 銀行用 CSV…
       </Button>
@@ -450,15 +463,15 @@ export default function PaymentTab() {
         type="button"
         onClick={() => { void issueStatements() }}
         disabled={!closed || operationBusy || statementTargets.length === 0}
-        title={!closed ? '期間を締めると出せます' : undefined}
+        title={!closed ? '期間を締めると出せます' : undefined} busy={Boolean(operationBusy)} busyLabel="処理中…"
       >
-        <FileText size={15} aria-hidden="true" /> {resumed && issuedCount > 0 ? `支払明細をまとめて出す（残り${formatNumber(statementTargets.length)}人）` : '支払明細をまとめて出す'}
+        <FileText size={15} aria-hidden="true" /> {resumed && issuedCount > 0 ? `支払明細をまとめて出す（残り${formatNumber(statementTargets.length)} 人）` : '支払明細をまとめて出す'}
       </Button>
     </span>
   )
 
   return (
-    <AffiliateFrame
+    <SaveErrorScope errors={saveErrors}><AffiliateFrame
       help="口座番号は本人だけに表示します。銀行用 CSV（口座情報を含む）は、6桁コードかパスワードで本人確認したときだけ書き出せます（15分で期限切れ）。"
       actions={actions}
       stats={stats}
@@ -488,6 +501,6 @@ export default function PaymentTab() {
       </> : null}
     >
       {body}
-    </AffiliateFrame>
+    </AffiliateFrame></SaveErrorScope>
   )
 }

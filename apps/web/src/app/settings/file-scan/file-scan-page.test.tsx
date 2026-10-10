@@ -93,6 +93,9 @@ function ready() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // 一覧のページ・検索語はURLに残る。別の試験の操作を持ち越さない。
+  window.history.replaceState(null, '', '/settings/file-scan')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   mocks.accountId = 'acc-1'
   // ★V8 の画面は白い板の中に「設定の中のメニュー」を置き、手元の役割（localStorage）を読む。
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
@@ -270,14 +273,14 @@ describe('ファイルの検査の設定画面', () => {
     fireEvent.click(screen.getByRole('button', { name: 'invoice.pdfのその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
     await waitFor(() => {
-      expect(screen.getByText('ファイルを削除する')).toBeTruthy()
+      expect(screen.getByText('「invoice.pdf」を削除しますか？')).toBeTruthy()
     })
     confirmInDialog('削除する')
     const message = 'しまった・使えないファイルだけ消せます。一覧を読み直してください。'
     await waitFor(() => {
       expect(screen.getByText(message)).toBeTruthy()
     })
-    expect(screen.getByText('ファイルを削除する')).toBeTruthy()
+    expect(screen.getByText('「invoice.pdf」を削除しますか？')).toBeTruthy()
     expect(container.querySelector('p[role="alert"]')).toBeNull()
   })
 

@@ -38,14 +38,24 @@ export function inputError<T extends Record<string, unknown>>(
 }
 
 /** パーサー例外が各ルートの500に飲み込まれる前に、壊れたJSONを400にする。 */
-export function inputJsonBoundary(shape: InputShape = {}): MiddlewareHandler {
+export function inputJsonBoundary(shape: InputShape = {}, options: { maxBytes?: number; tooLarge?: { error: string; code?: string } } = {}): MiddlewareHandler {
   return async (c, next) => {
     if (['POST', 'PUT', 'PATCH'].includes(c.req.method)
-      && c.req.raw.body !== null
+      && (c.req.raw.body !== null || options.maxBytes !== undefined)
       && !/\/(receive|webhook|callback|ingest)(?:\/|$)|^\/api\/integrations\/(eccube|ai-loop|codex-slack|slack|stripe)(?:\/|$)/.test(c.req.path)
-      && /^application\/(?:[\w.+-]+\+)?json(?:\s*;|$)/i.test(c.req.header('content-type') ?? '')) {
+      && (options.maxBytes !== undefined || /^application\/(?:[\w.+-]+\+)?json(?:\s*;|$)/i.test(c.req.header('content-type') ?? ''))) {
       try {
-        const body = await c.req.raw.clone().json();
+        // 上限のある口では clone へ全文を貯めず、元のストリームを上限まで読む。
+        // 上限内の本文だけを後続の Hono json()/text() に渡す。
+        let body: unknown;
+        if (options.maxBytes !== undefined) {
+          const text = await readBoundedText(c.req.raw, options.maxBytes);
+          if (text === null) return c.json({ success: false, ...(options.tooLarge ?? { error: '送信内容が大きすぎます' }) }, 413);
+          c.req.raw = new Request(c.req.raw, { body: text || '{}' });
+          body = text === '' ? {} : JSON.parse(text);
+        } else {
+          body = await c.req.raw.clone().json();
+        }
         if (!body || typeof body !== 'object' || Array.isArray(body)) {
           return inputError(c, { success: false, error: '入力内容はJSONのオブジェクトで指定してください' }, 400);
         }
@@ -58,6 +68,35 @@ export function inputJsonBoundary(shape: InputShape = {}): MiddlewareHandler {
     }
     await next();
   };
+}
+
+/** 宣言値でも実バイト数でも止める。超過時は残りを読まず、本文を保持しない。 */
+export async function readBoundedText(request: Request, maxBytes: number): Promise<string | null> {
+  const declared = Number(request.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > maxBytes) return null;
+  const reader = request.body?.getReader();
+  if (!reader) return '';
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxBytes) {
+        // cancel の完了を待つと tee 済みの本文で停滞することがある。
+        void reader.cancel().catch(() => {});
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  return new TextDecoder().decode(bytes);
 }
 
 export type InputKind = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null';

@@ -27,7 +27,7 @@ export default function FriendAddDoneV8({ ruleId, ruleName, routeNames, priority
       <PageHeading
         title="初回案内を作る"
         steps={<Steps label="初回案内の作る手順" steps={PUBLISH_STEPS.map((label, index) => ({ label, state: 'done' as const, onSelect: ruleId ? () => router.push(editStepHref(ruleId, index)) : undefined }))} />}
-        description={`名前：${ruleName}`}
+        help={`名前：${ruleName}`}
       />
       <div className={styles.doneBody}>
         <section className={styles.doneCard} aria-label="有効化の完了">

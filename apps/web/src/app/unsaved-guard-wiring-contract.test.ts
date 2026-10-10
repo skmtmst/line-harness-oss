@@ -20,6 +20,9 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  'v8/hq-deliveries/console.tsx',
+  'v8/webhooks/incoming-actions.tsx',
+  'components/shared/restaurant-floor-editor.tsx',
   'app/booking/bookings/detail/page.tsx',
   'v8/automations/create/create.tsx',
   'v8/settings/pools/create.tsx',
@@ -165,6 +168,8 @@ const GUARDED = [
   'v8/template-edit/rich-video.tsx',
   'v8/templates/carousel.tsx',
   'v8/templates/question-new.tsx',
+  'v8/settings/manual-links/screen.tsx',
+  'components/shared/form-leave-guard.tsx',
 ] as const
 
 /*
@@ -172,6 +177,16 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string> = {
+  // 動き1：画面のdirtyは型／共通の番兵が守る。
+  'app/emergency/page.tsx': 'components/shared/form-leave-guard.tsx',
+  'components/templates/create-page.tsx': 'components/shared/form-leave-guard.tsx',
+  'v8/dashboard/dashboard-editor.tsx': 'components/templates/create-page.tsx',
+  'v8/hq/settings.tsx': 'components/shared/form-leave-guard.tsx',
+  'v8/restaurant/google/settings.tsx': 'components/shared/form-leave-guard.tsx',
+  'v8/tag-edit/edit-form.tsx': 'components/templates/create-page.tsx',
+  'v8/template-edit/frame.tsx': 'v8/template-edit/message.tsx',
+  // リンクの見え方も含め、入力は親のスナップショットへ即時反映する。窓を閉じても残り、離脱は親の番兵が守る。
+  'v8/form-edit/appearance-tab.tsx': 'v8/form-edit/edit.tsx',
   'app/webinars/edit/basic-v8.tsx': 'app/webinars/edit/page.tsx',
   'app/templates/edit-v8.tsx': 'app/templates/editor-v8.tsx',
   'app/templates/asset-editor-v8.tsx': 'app/templates/editor-v8.tsx',
@@ -214,6 +229,8 @@ const COVERED_BY_PARENT: Record<string, string> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'components/shared/entity-picker.tsx': '選ぶ窓の候補は仮選択で、選ぶを押したときだけ親へ渡す。閉じる操作は仮選択を破棄し、親の保存前の値を変えない。',
+  'app/affiliates/tabs.tsx': '一覧の作成窓は共通Dialogが入力を守り、作成済みの結果だけdirty=falseで閉じる。',
   'components/chats/friend-info-sidebar.tsx':
     '受信箱の右の欄（B-26 その場で直す）。対応状況・担当・タグは押した瞬間に保存し、メモは書くのをやめて1秒で保存する。保存待ちの入力を溜めないので番兵の対象外（失敗は知らせで戻してもう一度試す）',
   'components/hq/account-menu.tsx':
@@ -450,8 +467,6 @@ const EDITOR_MIN_INPUTS = 3
  * **ここへの追加は禁止。** 新しい編集画面は最初から GUARDED か EXEMPTIONS に入れる。
  */
 const UNTRIAGED: Record<string, string> = {
-  'app/affiliates/tabs.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/analytics/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   /* 予約設定V8化でスタッフ編集窓を staff-edit-dialog.tsx へ切り出し、page.tsx から編集画面の印が無くなったので行を消した。 */
@@ -579,7 +594,9 @@ describe('未保存の編集がある画面は離脱の番兵を持つ契約（D
     const hooks = readdirSync(dir)
       .filter((name) => /^use-[^/]+\.ts$/.test(name) && !name.includes('.test.'))
       .map((name) => readFileSync(join(dir, name), 'utf8'))
-    return [readUiSource(join(SRC, file), 'utf8'), ...hooks].join('\n')
+    const own = readUiSource(join(SRC, file), 'utf8')
+    const commonGuard = own.includes('FormLeaveGuard') ? readFileSync(join(SRC, 'components/shared/form-leave-guard.tsx'), 'utf8') : ''
+    return [own, commonGuard, ...hooks].join('\n')
   }
 
   it('番兵を持つ画面は共通フックと離脱確認ダイアログを配線している', () => {

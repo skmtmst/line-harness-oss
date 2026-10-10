@@ -341,7 +341,7 @@ describe('POST /api/booking/admin/bookings', () => {
 
   function happyCustomerDb(insertChanges = 1) {
     return scriptedDb([
-      ['FROM booking_customers', { first: { id: 'customer-1', friend_id: null } }],
+      ['SELECT id, friend_id FROM booking_customers', { first: { id: 'customer-1', friend_id: null } }],
       ['FROM staff WHERE', { first: { ok: 1 } }],
       [
         'FROM menus m',
@@ -1523,5 +1523,34 @@ describe('GET /api/booking/admin/requests-summary のタブ件数', () => {
     } finally {
       sqlite.close();
     }
+  });
+});
+
+describe('飲食1 人の予約の共通表示', () => {
+  test('日時・アカウント・ページを絞り、既存の版と担当者を返す', async () => {
+    const { createTestD1 } = await import('../test-utils/d1-sqlite.js');
+    const fixture = createTestD1();
+    try {
+      fixture.raw.exec(`
+        INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','ca','店','t','s'),('b','cb','別店','t','s');
+        INSERT INTO staff(id,line_account_id,name,display_name) VALUES('sa','a','担当の内部名','担当A'),('sb','b','別','担当B');
+        INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price) VALUES('ma','a','相談',60,1000),('mb','b','別店',60,1000);
+        INSERT INTO booking_customers(id,line_account_id,display_name,phone_normalized_hash,phone_encrypted,phone_last4) VALUES('cust','a','予約者','hash','enc','1234'),('cust-b','b','別店客','hash-b','enc','4321');
+        INSERT INTO bookings(id,line_account_id,booking_customer_id,staff_id,menu_id,starts_at,ends_at,block_ends_at,status,price_at_booking,requested_at,lock_version) VALUES
+          ('r1','a','cust','sa','ma','2027-01-01T01:00:00Z','2027-01-01T02:00:00Z','2027-01-01T02:00:00Z','confirmed',1000,'2026-10-01',3),
+          ('r2','a','cust','sa','ma','2027-01-01T02:00:00Z','2027-01-01T03:00:00Z','2027-01-01T03:00:00Z','confirmed',1000,'2026-10-01',0),
+          ('foreign','b','cust-b','sb','mb','2027-01-01T01:00:00Z','2027-01-01T02:00:00Z','2027-01-01T02:00:00Z','confirmed',1000,'2026-10-01',1);
+      `);
+      const { app, env } = makeApp(fixture.db);
+      const url='/api/booking/admin/board?account_id=a&from=2027-01-01T01:00:00Z&to=2027-01-01T03:00:00Z&limit=1';
+      const res=await app.request(url,{},env as never);
+      expect(res.status).toBe(200);
+      const body=await res.json() as {data:{entries:unknown[];total:number}};
+      expect(body.data).toMatchObject({total:2,entries:[{id:'r1',kind:'people',version:3,scopeId:'a',customerName:'予約者',resourceIds:['sa'],resourceLabel:'担当A'}]});
+      const next=await app.request(url+'&offset=1',{},env as never);
+      expect((await next.json() as {data:{entries:Array<{id:string;version:number}>}}).data.entries[0]).toMatchObject({id:'r2',version:0});
+      expect((await app.request('/api/booking/admin/board/r2?account_id=a',{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({kind:'people',expectedVersion:-1,startsAt:'2027-01-01T03:00:00Z'})},env as never)).status).toBe(400);
+      expect((await app.request('/api/booking/admin/board?account_id=a&from=bad&to=bad',{},env as never)).status).toBe(400);
+    } finally {fixture.raw.close();}
   });
 });

@@ -1,5 +1,8 @@
 'use client'
 
+import { statusLabel } from '@/lib/status-labels'
+
+
 /*
  * ★V8 健康日記の小さな部品（言葉・日付・行の「…」・札・体重の棒）。
  * 今の画面（app/nen/health の summary-drawer.tsx・health-tab.tsx）から写した。
@@ -12,6 +15,7 @@ import { formatNumber } from '@/lib/format'
 import type { NenHealthChangeFilter, NenHealthLastFilter, NenHealthRow, NenHealthSort } from '@/lib/nen-pets-api'
 import StatusBadge from '@/components/shared/status-badge'
 import styles from './health.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export type HealthTabKey = 'logs' | 'concern' | 'items'
 export type HealthFilters = { q: string; change: NenHealthChangeFilter; last: NenHealthLastFilter; sort: NenHealthSort }
@@ -22,7 +26,7 @@ export const TEAR_LABELS: Record<string, string> = { normal: '問題なし', mil
 
 export function countText(counts: Record<string, number>, labels: Record<string, string>): string {
   const entries = Object.entries(counts).sort((a, b) => b[1] - a[1])
-  return entries.length ? entries.map(([key, n]) => `${labels[key] ?? key} ${n}回`).join('・') : '—'
+  return entries.length ? entries.map(([key, n]) => `${labels[key] ?? key} ${n}回`).join('・') : emptyValue('unknown')
 }
 
 /** 「2026-09-30」→「9/30」。 */
@@ -34,7 +38,7 @@ export function md(date: string | null | undefined): string {
 /** 件数の文（「6件中 1〜6件」）。 */
 export function rangeText(total: number, page: number, size: number): string {
   if (total === 0) return '0件'
-  return `${formatNumber(total)}件中 ${(page - 1) * size + 1}〜${Math.min(total, page * size)}件`
+  return `${formatNumber(total)} 件中 ${(page - 1) * size + 1}〜${Math.min(total, page * size)} 件`
 }
 
 /**
@@ -79,7 +83,7 @@ export function RowMenu({ subject, items }: { subject: string; items: ActionMenu
         label={`「${subject}」の操作`}
         open={open}
         onOpenChange={setOpen}
-        items={items.map((item) => ({ ...item, onSelect: () => { setOpen(false); item.onSelect() } }))}
+        items={items.map((item) => ({ ...item, onSelect: () => { setOpen(false); item.onSelect?.() } }))}
       />
     </span>
   )
@@ -91,7 +95,7 @@ export function RowMenu({ subject, items }: { subject: string; items: ActionMenu
  */
 export function WeightBars({ series, warn }: { series: Array<number | null>; warn: boolean }) {
   const known = series.filter((v): v is number => v != null)
-  if (known.length === 0) return <span className={styles.cell}>—</span>
+  if (known.length === 0) return <span className={styles.cell}>{emptyValue('unknown')}</span>
   const min = Math.min(...known)
   const max = Math.max(...known)
   const label = known.length >= 2 ? `${known[0]}kg → ${known[known.length - 1]}kg` : `${known[0]}kg`

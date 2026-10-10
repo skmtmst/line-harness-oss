@@ -1,5 +1,8 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { RowActions } from '@/components/shared/row-actions'
+
 import Select from '@/components/shared/select'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -36,7 +39,6 @@ import { templateDeleteDescription } from './template-delete-message'
 import { messageTypeText } from './template-message-type'
 import styles from './templates-v6.module.css'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import TemplatesListV8 from '@/v8/templates/list'
 import { ArrowRight, Bot, MessageCircle, Star, TriangleAlert, Workflow, X } from 'lucide-react'
@@ -152,8 +154,7 @@ function TemplatesPageV7() {
    * 'admin') で閉じている。staff へ操作を見せると押しても 403 になるだけ
    * なので、ここで操作ごと出さない。閲覧（一覧・詳細の閲覧）は残す。
    */
-  const [canMutateTemplates] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canMutateTemplates = useFeatureAccess('templates')
   const activeAccountRef = useRef<string | null>(selectedAccountId)
   const [activeSection, setActiveSection] = useState<'message' | BroadcastAssetKind>('message')
   const [templates, setTemplates] = useState<Template[]>([])
@@ -859,7 +860,6 @@ function TemplatesPageV7() {
         }
       />
 
-
       {/*
         ★V7 `x63W5x`：一覧の失敗でページ上の帯は出さない。一覧の場所の
         ListState error だけにまとめる。入力・保存の失敗の知らせは別に残す。
@@ -1139,15 +1139,9 @@ function TemplatesPageV7() {
                         onClick={(e) => e.stopPropagation()}
                       >
                         {canMutateTemplates && (
-                          <Button
-                            href={
-                              t.question
+                          <RowActions edit={{ href: t.question
                                 ? `/templates/questions/new?id=${encodeURIComponent(t.id)}`
-                                : `/templates/edit?id=${encodeURIComponent(t.id)}`
-                            }
-                          >
-                            編集
-                          </Button>
+                                : `/templates/edit?id=${encodeURIComponent(t.id)}` }} />
                         )}
                         <MoreAction
                           label={`${t.name}のその他操作`}

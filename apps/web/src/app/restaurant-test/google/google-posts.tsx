@@ -636,7 +636,7 @@ export function PostConfirmScreen({ accountId, id, go }: { accountId: string; id
       {writeEnabled && !canPublish ? <NoteBar tone="warn">Googleへの投稿は店舗管理者以上が行います。この下書きは保存されているので、管理者が確認して投稿できます。</NoteBar> : null}
       {actionError ? <NoteBar tone="danger">{actionError}</NoteBar> : null}
 
-      <section className="border-hairline bg-canvas flex flex-col gap-4 rounded-card border p-5">
+      <section className="content-card bg-canvas flex flex-col gap-4 rounded-card border p-5">
         <dl className="grid grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
           <dt className="text-ink-secondary">投稿先</dt><dd className="font-semibold">{storeName}</dd>
           <dt className="text-ink-secondary">種類</dt><dd className="font-semibold">{KIND_LABELS[post.kind]}</dd>
@@ -652,7 +652,7 @@ export function PostConfirmScreen({ accountId, id, go }: { accountId: string; id
       </section>
 
       {!done && post.status !== 'cancelled' ? (
-        <section className="border-hairline bg-canvas flex flex-col gap-3 rounded-card border p-5">
+        <section className="content-card bg-canvas flex flex-col gap-3 rounded-card border p-5">
           <Checkbox checked={checked} onCheckedChange={setChecked} description={null}>
             <span className="text-sm font-semibold">公開先・本文・画像・リンク・日時を確認しました</span>
           </Checkbox>

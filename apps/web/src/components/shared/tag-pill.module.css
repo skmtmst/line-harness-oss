@@ -79,9 +79,20 @@
 .remove svg { width: var(--tag-pill-font); height: var(--tag-pill-font); }
 .remove:hover { background: var(--color-shell); }
 .link:focus-visible, .remove:focus-visible, .toggle:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 .toggle { cursor: pointer; }
 .toggle[data-selected='false'] { background: var(--color-shell); color: var(--color-ink-secondary); }
+}
+
+/* B-180：表・要点の欄・編集の札はすべて同じ24px。 */
+[data-theme='v8'] .pill,
+[data-theme='v8'] .pill[data-size] {
+  box-sizing: border-box;
+  height: var(--tpl-tag-pill-h);
+  --tag-pill-font: var(--text-caption);
+  --tag-pill-dot: 6px;
+  --tag-pill-pad: 0 8px;
+  --tag-pill-gap: 6px;
 }

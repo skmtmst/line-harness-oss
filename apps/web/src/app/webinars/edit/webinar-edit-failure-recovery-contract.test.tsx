@@ -208,6 +208,14 @@ class FakeDocument extends FakeNode {
     this.defaultView = {}
   }
 
+  getElementById(id: string): FakeElement | null {
+    const find = (node: FakeNode): FakeElement | null => {
+      if (node instanceof FakeElement && node.getAttribute('id') === id) return node
+      for (const child of node.childNodes) { const hit = find(child); if (hit) return hit }
+      return null
+    }
+    return find(this.documentElement)
+  }
   createElement(tagName: string): FakeElement { return new FakeElement(tagName, this) }
   createElementNS(_namespace: string, tagName: string): FakeElement { return this.createElement(tagName) }
   createTextNode(value: string): FakeText { return new FakeText(value, this) }
@@ -478,7 +486,7 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
     expect(view.container.textContent).toContain('視聴開始直後')
     expect(view.container.textContent).toContain('未視聴')
     expect(view.container.textContent).toContain('下書き')
-    expect(view.container.textContent).not.toContain('稼働中')
+    expect(view.container.textContent).not.toContain('有効')
 
     apiMocks.get.mockResolvedValue({ data: { ...webinar, id: 'webinar-active', status: 'active' } })
     navigationMocks.query = 'id=webinar-active&pane=participants'
@@ -642,3 +650,6 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
     expect(elements(view.container).some((element) => element.getAttribute('aria-label') === 'この段の見出しへ移動')).toBe(false)
     expect(view.container.textContent).not.toContain('設定サマリー')
   })})
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

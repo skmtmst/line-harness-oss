@@ -1,4 +1,6 @@
+import { SESSION_LOST_EVENT } from './session-events'
 import type { ApiFieldErrors } from '@line-crm/shared'
+import { csvFileName } from './csv-file-name'
 import { getFeatureDisabledContext } from './feature-disabled-context'
 import type {QuestionAnswerRecovery,ResumeQuestionAnswerRequest,ResumeQuestionAnswerResponse} from '@line-crm/shared';
 import type { AutomationTabCounts, MediaTabCounts, ConversionApprovalCounts } from '@line-crm/shared';
@@ -80,7 +82,6 @@ import type {
   ConversionPoint,
   ConversionMeasureMethod,
   Affiliate,
-  Template,
   Automation,
   AutomationLog,
   Chat,
@@ -1965,6 +1966,8 @@ export type { BroadcastBubbleType, BroadcastBubble } from '@line-crm/shared';
 import type { BroadcastBubble } from '@line-crm/shared';
 export type BroadcastAssetKind = 'rich_message' | 'card_message' | 'coupon' | 'research';
 export type BroadcastMessageAsset = {
+  publishedPayload?: Record<string, unknown>;
+  publishedVersion?: number;
   id: string;
   lineAccountId: string | null;
   kind: BroadcastAssetKind;
@@ -2003,7 +2006,7 @@ export type CommonActionSummary = {
 export type AutomationListItem = Automation & {
   folderId?: string | null
   triggerConfig: Record<string, unknown>;
-  status: 'draft' | 'active' | 'stopped';
+  status: 'draft' | 'active' | 'stopped' | 'archived';
   versionId: string;
   version: number;
   executionCount30d: number;
@@ -2485,7 +2488,7 @@ export const CSRF_STORAGE_KEY = 'lh_csrf'
  * 残っているかどうかを見て、案内を出すか、ただの未ログインとして
  * 見送るかを決める。
  */
-export const SESSION_LOST_EVENT = 'lh-session-lost'
+export { SESSION_LOST_EVENT } from './session-events'
 
 /** 機能設定でオフになっている API を開いたとき、共通 shell へ知らせる合図。 */
 export const FEATURE_DISABLED_EVENT = 'lh-feature-disabled'
@@ -2958,6 +2961,25 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
   return res.json() as Promise<T>
 }
 
+const sharedReads = new Map<string, Promise<unknown>>()
+
+/** 同時に出る請求表示だけ共有する。完了後は捨て、保存後の読み直しは必ず通信する。 */
+function fetchSharedRead<T>(path: string): Promise<T> {
+  const csrf = getCsrfToken()
+  // Cookie だけでセッションの世代が分からない場合は共有しない。
+  if (!csrf) return fetchApi<T>(path)
+  const key = JSON.stringify([path, adminSessionHeaders(), csrf])
+  let pending = sharedReads.get(key)
+  if (!pending) {
+    pending = fetchApi<T>(path)
+    sharedReads.set(key, pending)
+    const forget = () => { if (sharedReads.get(key) === pending) sharedReads.delete(key) }
+    pending.then(forget, forget)
+  }
+  // 呼び出し側で表示用に並べ替え・加工しても、もう一方の表示へ伝えない。
+  return (pending as Promise<T>).then((response) => structuredClone(response))
+}
+
 /**
  * よく開く一覧の取り方（前のデータをすぐ出して裏で取り直す用）。
  *
@@ -2997,12 +3019,13 @@ export async function refreshCachedList<T>(path: string): Promise<T> {
   return body
 }
 
-export async function fetchApiBlob(path: string, init?: { method?: string; accountId?: string | null }): Promise<Blob> {
+export async function fetchApiBlob(path: string, init?: { method?: string; accountId?: string | null; body?: string }): Promise<Blob> {
   const context = apiAccountContext(path, init)
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     method: init?.method ?? 'GET',
     credentials: 'include',
-    headers: adminSessionHeaders(),
+    headers: { ...adminSessionHeaders(), ...(init?.body ? { 'Content-Type': 'application/json' } : {}) },
+    body: init?.body,
   })
   if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) {
@@ -3087,7 +3110,7 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
   try {
     const anchor = document.createElement('a')
     anchor.href = href
-    anchor.download = named ? decodeURIComponent(named) : fallbackFilename
+    anchor.download = /\.csv$/i.test(fallbackFilename) ? csvFileName(fallbackFilename) : named ? decodeURIComponent(named) : fallbackFilename
     anchor.click()
   } finally {
     URL.revokeObjectURL(href)
@@ -3220,6 +3243,8 @@ export type FriendFormSubmission = {
   createdAt: string
 }
 export type FriendDetail = FriendWithTags & {
+  realName?: string | null
+  systemDisplayName?: string | null
   formSubmissions: FriendFormSubmission[]
   /** フォーム回答の総数。submissions=0 の軽い応答でも返る（PERF-13）。 */
   formSubmissionTotal?: number | null
@@ -3894,8 +3919,6 @@ export function friendAddStopIdempotencyKey(ruleId: string, version: number): st
   return `friend-add-rule-stop:${encodeURIComponent(ruleId)}:v${version}`
 }
 
-
-
 /** 一覧画面の上部に出す数（タグ・テンプレート・シナリオ・リマインダ）。 */
 export type ListStats = {
   tags: { total: number; unused: number; taggedFriends: number; assignedThisMonth: number }
@@ -4094,6 +4117,7 @@ export type TemplateQuestion = {
     reply?: string
     repeatReply?: string
     addTagIds?: string[]
+    scoreChange?: number | null
     removeTagIds?: string[]
     field?: { fieldId: string; value: string }
   }>
@@ -6622,7 +6646,7 @@ export const api = {
       body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
     }),
     // 色は受け取らない。印の色はフォルダ（tagGroups）に付く。
-    create: (data: { name: string; groupId?: string | null }) =>
+    create: (data: { name: string; groupId?: string | null; lineAccountId?: string }) =>
       fetchApi<ApiResponse<Tag>>('/api/tags', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -6676,6 +6700,10 @@ export const api = {
       ),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/tags/${id}`, { method: 'DELETE' }),
+    restore: (id: string, accountId: string, expectedVersion: number) =>
+      fetchApi<ApiResponse<{ restored: true; version: number }>>(`/api/tags/${encodeURIComponent(id)}/restore?lineAccountId=${encodeURIComponent(accountId)}`, {
+        method: 'POST', body: JSON.stringify({ expectedVersion }),
+      }),
     archive: (id: string, accountId: string, data: {
       expectedVersion: number
       impactRevision: string
@@ -6834,11 +6862,15 @@ export const api = {
   },
   /** 対応マーク。友だちの対応状況を運用側の言葉で持つ。 */
   supportMarks: {
-    list: (accountId: string, options?: FetchApiOptions) =>
+    list: (accountId: string, options?: FetchApiOptions & { includeArchived?: boolean }) =>
       fetchApi<ApiResponse<SupportMarkListItem[]>>(
-        `/api/support-marks?lineAccountId=${encodeURIComponent(accountId)}`,
+        `/api/support-marks?lineAccountId=${encodeURIComponent(accountId)}${options?.includeArchived ? '&includeArchived=1' : ''}`,
         options,
       ),
+    restore: (id: string, accountId: string, expectedVersion: number) =>
+      fetchApi<ApiResponse<{ restored: true; version: number }>>(`/api/support-marks/${encodeURIComponent(id)}/restore?lineAccountId=${encodeURIComponent(accountId)}`, {
+        method: 'POST', body: JSON.stringify({ expectedVersion }),
+      }),
     /**
      * R512: 応答だけ失った再試行で二重に作らないため、要求キーを付ける。
      * 同じ作成のやり直しは同じキーを送り、内容を変えたら新しいキーにする。
@@ -9116,7 +9148,7 @@ export const api = {
         amountDueYen: number; prorationDifferenceYen: number; nextBillingAt: string | null;
         estimatedAt: string; isEstimate: true; notice: string }>>(
         `/api/hq/billing/preview?${new URLSearchParams({ planKey, interval })}`),
-    summary: () => fetchApi<ApiResponse<BillingSummary>>('/api/hq/billing/summary'),
+    summary: () => fetchSharedRead<ApiResponse<BillingSummary>>('/api/hq/billing/summary'),
     /** Stripe の申込画面の URL。オーナーだけ。 */
     checkout: (planKey: PlanKey, interval: BillingInterval = 'month') =>
       fetchApi<ApiResponse<{ url: string }>>('/api/hq/billing/checkout', { method: 'POST', body: JSON.stringify({ planKey, interval }) }),
@@ -10710,13 +10742,14 @@ export const api = {
   automations: {
     counts: (accountId: string) => fetchApi<ApiResponse<AutomationTabCounts>>(
       `/api/automations/counts?account_id=${encodeURIComponent(accountId)}`),
-    list: (params?: { accountId?: string; limit?: number; offset?: number }) => {
+    list: <IncludeArchived extends boolean = false>(params?: { accountId?: string; limit?: number; offset?: number; includeArchived?: IncludeArchived }) => {
       const query = new URLSearchParams()
+      if (params?.includeArchived) query.set('includeArchived', '1')
       if (params?.accountId) query.set('lineAccountId', params.accountId)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       if (params?.offset !== undefined) query.set('offset', String(params.offset))
       const suffix = query.size ? `?${query}` : ''
-      return fetchApi<ApiResponse<AutomationListItem[]> & {
+      return fetchApi<ApiResponse<Array<IncludeArchived extends true ? AutomationListItem : AutomationListItem & { status: Exclude<AutomationListItem['status'], 'archived'> }>> & {
         summary?: { active: number; stopped: number; executionCount30d: number; failureCount30d: number }
         freshness?: 'available'
         pagination?: { total: number; limit: number | null; offset: number }
@@ -10820,7 +10853,9 @@ export const api = {
         `/api/automations/${encodeURIComponent(id)}/duplicate`,
         { method: 'POST', body: '{}' },
       ),
-    // #942 N-352: 稼働切替と「保管」。保管は一方通行。実行記録は残る。
+    restore: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<{ id: string; status: 'draft' | 'active' | 'stopped' }>>(`/api/automations/${encodeURIComponent(id)}/restore?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'POST', body: '{}' }),
+    // 稼働切替と「保管」。実行記録は残る。
     setStatus: (id: string, status: 'active' | 'stopped' | 'archived') =>
       fetchApi<ApiResponse<{ id: string; status: 'active' | 'stopped' | 'archived' }>>(
         `/api/automations/${encodeURIComponent(id)}/status`,
@@ -10858,12 +10893,14 @@ export const api = {
       accountId: string;
       status?: 'all' | 'draft' | 'published' | 'archived' | 'old_version' | 'unused';
       query?: string;
+      folderId?: string;
       limit?: number;
       offset?: number;
     }) => {
       const query = new URLSearchParams({ account_id: params.accountId });
       if (params.status && params.status !== 'all') query.set('status', params.status);
       if (params.query) query.set('query', params.query);
+      if (params.folderId) query.set('folder_id', params.folderId);
       if (params.limit !== undefined) query.set('limit', String(params.limit));
       if (params.offset !== undefined) query.set('offset', String(params.offset));
       return fetchApi<ApiResponse<CommonActionSummary[]> & {
@@ -11249,6 +11286,14 @@ export const api = {
    * 以後はこの V6 rules/runs 契約だけを使う。
    */
   friendAddRules: {
+    restore: (accountId: string, id: string, expectedVersion: number) => fetchApi<ApiResponse<{ id: string; status: 'draft'; version: number }>>(
+      `/api/friend-add-rules/${encodeURIComponent(id)}/unarchive?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'POST', body: JSON.stringify({ expectedVersion }) },
+    ),
+    duplicate: (accountId: string, id: string, expectedVersion: number, idempotencyKey: string) => fetchApi<ApiResponse<{ id: string; status: 'draft' }>>(
+      `/api/friend-add-rules/${encodeURIComponent(id)}/duplicate?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify({ expectedVersion }) },
+    ),
     list: (accountId: string, kind: FriendAddRuleKind, params?: {
       status?: FriendAddRuleStatus
       cursor?: string
@@ -11257,6 +11302,8 @@ export const api = {
       q?: string
       /** フォルダ名での絞り込み。未分類は '__uncategorized'。 */
       folder?: string
+      /** 複製直後の行を先頭へ。ページ送りにも同じ値を渡す。 */
+      highlightId?: string
     }) => {
       const query = new URLSearchParams({ account_id: accountId, kind })
       if (params?.status) query.set('status', params.status)
@@ -11264,6 +11311,7 @@ export const api = {
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       if (params?.q) query.set('q', params.q)
       if (params?.folder) query.set('folder', params.folder)
+      if (params?.highlightId) query.set('highlight', params.highlightId)
       return fetchApi<ApiResponse<FriendAddRuleListData>>(`/api/friend-add-rules?${query}`)
     },
     get: (accountId: string, ruleId: string) =>
@@ -11755,7 +11803,6 @@ export const api = {
     }),
     friendOverview: (friendId: string) => fetchApi<ApiResponse<NenFriendOverview>>(`/api/nen-members/friends/${encodeURIComponent(friendId)}`),
     ranks: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/ranks'),
-    consultations: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/consultations'),
     installRichMenu: (accountId: string) => fetchApi<ApiResponse<{ richMenuId: string; liffId: string }>>('/api/nen-members/rich-menu/install', { method: 'POST', body: JSON.stringify({ accountId }) }),
   },
   instagram: {
@@ -12555,6 +12602,14 @@ export const api = {
   },
   webhooks: {
     incoming: {
+      saveConfig: (id: string, lineAccountId: string, data: {
+        expectedVersion: number;
+        identityMatching: IncomingWebhookDetail['identityMatching'];
+        actions: Array<Pick<IncomingWebhookDetail['actions'][number], 'refKind' | 'refId' | 'refVersionId'>>;
+      }) => fetchApi<ApiResponse<{ id: string; version: number }>>(
+        `/api/webhooks/incoming/${encodeURIComponent(id)}/config?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        { method: 'PATCH', body: JSON.stringify(data) },
+      ),
       list: (lineAccountId: string) =>
         fetchApi<ApiResponse<IncomingWebhook[]>>(
           `/api/webhooks/incoming?lineAccountId=${encodeURIComponent(lineAccountId)}`,
@@ -13494,8 +13549,10 @@ export const api = {
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/entry-routes/${id}`, { method: 'DELETE' }),
     /** M (止めた経路のQR): 印刷用PDFをサーバーで作る。止めた経路は409。 */
-    qrPdf: (id: string): Promise<Blob> =>
-      fetchApiBlob(`/api/entry-routes/${encodeURIComponent(id)}/qr-pdf`, { method: 'POST' }),
+    qrPdf: (id: string, paper: 'A4' | 'A5' = 'A4'): Promise<Blob> =>
+      fetchApiBlob(`/api/entry-routes/${encodeURIComponent(id)}/qr-pdf`, { method: 'POST', body: JSON.stringify({ paper }) }),
+    qrImage: (id: string, format: 'png' | 'svg', size: 'small' | 'medium' | 'large'): Promise<Blob> =>
+      fetchApiBlob(`/api/entry-routes/${encodeURIComponent(id)}/qr-image`, { method: 'POST', body: JSON.stringify({ format, size }) }),
     funnel: (id: string) =>
       fetchApi<ApiResponse<EntryRouteFunnel>>(`/api/entry-routes/${id}/funnel`),
     /** クリックがどこから来ているか。utm_source > 参照元のホスト > 直接アクセス */
@@ -13521,7 +13578,7 @@ export const api = {
   // 同ページから参照する。Worker の applyRefAttribution は entry_routes → tracked_links
   // の順でフォールバックするので、tracked_links 登録済み ref は実際にはシナリオ発火している。
   trackedLinks: {
-    list: () =>
+    list: (accountId?: string) =>
       fetchApi<
         ApiResponse<
           Array<{
@@ -13539,7 +13596,7 @@ export const api = {
             updatedAt: string
           }>
         >
-      >('/api/tracked-links'),
+      >(`/api/tracked-links${accountId ? `?lineAccountId=${encodeURIComponent(accountId)}` : ''}`),
   },
   pools: {
     list: (options?: FetchApiOptions) =>
@@ -14282,6 +14339,8 @@ export interface BookingVisitMark {
 
 /** 今日の予約の人（スタッフ）の行。 */
 export interface BookingTodayStaffRow {
+  line_account_id?: string;
+  lock_version?: number;
   kind: 'staff';
   id: string;
   starts_at: string;
@@ -14300,6 +14359,10 @@ export interface BookingTodayStaffRow {
 
 /** 今日の予約の席（卓）の行。 */
 export interface BookingTodaySeatRow {
+  customer_version?: number;
+  table_id?: string | null;
+  table_ids_json?: string;
+  source?: string;
   kind: 'seat';
   id: string;
   store_id: string;
@@ -15458,6 +15521,7 @@ export interface EventQuestion {
 }
 
 export interface EventDetail {
+  folderId?: string | null;
   venue_address?: string | null;
   id: string;
   name: string;
@@ -15779,6 +15843,10 @@ export interface EventLifecycleResult {
 }
 
 export const eventsApi = {
+  duplicate: (accountId: string, id: string, expectedVersion: number) => fetchApi<{ id: string; lifecycle_status: 'draft' }>(
+    withAccount(`/api/events/admin/events/${encodeURIComponent(id)}/duplicate`, accountId),
+    { method: 'POST', body: JSON.stringify({ expectedVersion }) },
+  ),
   applicationPreview: (accountId: string, body: Partial<EventDetail> & { slot: { starts_at: string; ends_at: string; capacity: number } }) =>
     fetchApi<import('@line-crm/shared').EventApplicationPreview>(withAccount('/api/events/admin/application-preview', accountId), { method: 'POST', body: JSON.stringify(body) }),
   listEvents: (

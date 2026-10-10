@@ -95,7 +95,7 @@ describe('ランク設定の絵合わせ（板 `fb9NJ`・`e5yBLx`）', () => {
       )
     })
     const labels = [...host.querySelectorAll('button')].map((element) => element.textContent)
-    expect(labels).toContain('CSV で書き出す')
+    expect(labels).toContain("CSVで書き出す")
     /* SETTINGS の末尾はしきい値 0 のブロンズ＝基準ランク。 */
     expect(host.textContent ?? '').toContain('円〜（固定）')
   })

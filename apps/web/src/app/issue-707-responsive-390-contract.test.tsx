@@ -59,6 +59,7 @@ beforeEach(() => {
   })
   vi.stubGlobal('fetch', async (input: string | URL | Request) => {
     const path = String(input)
+    if (path.includes('/api/staff/me')) return response({ success: true, data: { role: 'owner' } })
     if (path.includes('/api/settings/features')) {
       return response({
         success: true,
@@ -147,7 +148,7 @@ describe('32: 狭幅で1列へ落ち、スイッチが域内に残る', () => {
     expect(list).not.toBeNull()
     expect(list!.className).toContain('cardCol')
     // 切替スイッチは狭幅でも描かれ、押せる状態で残る。
-    const switches = [...host.querySelectorAll('[role="switch"]')]
+    const switches = [...host.querySelectorAll('[type="checkbox"]')]
     expect(switches.length).toBeGreaterThan(0)
     // ★V8 ywFJT の言い方は「まとめて」（読み上げ名は「〇〇をまとめてオン／オフにする」）。
     expect(host.textContent).toContain('まとめて')

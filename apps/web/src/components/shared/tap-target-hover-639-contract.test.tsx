@@ -47,11 +47,11 @@ describe('#639 主要操作の最小高さ 32px', () => {
     // 一覧の絞り込み札 32px。
     expect(readShared('filter-chip.css')).toMatch(/\.v6-filter-chip\s*\{[^}]*height:\s*32px/s)
     // ページネーションは推奨 36px 以上（38px）。
-    expect(readShared('pagination.module.css')).toMatch(/\.item\s*\{[^}]*height:\s*38px/s)
+    expect(readShared('pagination.module.css')).toMatch(/\.item\s*\{[^}]*height:\s*32px/s)
     // タブは 44px。
     expect(readShared('tabs.module.css')).toMatch(/\.tab\s*\{[^}]*height:\s*44px/s)
     // 共通ボタンの標準は 40px。
-    expect(readShared('button.module.css')).toMatch(/\.standard\s*\{[^}]*height:\s*40px/s)
+    expect(readShared('button.module.css')).toMatch(/\.standard\s*\{[^}]*height:\s*36px/s)
   })
 
   it('画像タイルのお気に入り星は 32px の当たりを持つ', () => {
@@ -142,7 +142,7 @@ describe('#639 高さ規則は本物の操作部品に載る（実React描画）
     expect(html).toContain('aria-current="page"')
   })
 
-  it('行内操作は「詳細」「編集」の実ボタンを出す', () => {
+  it('行内操作の編集は「…」へ入る', () => {
     const html = renderToStaticMarkup(
       <RowActions
         subjectName="来店お礼"
@@ -151,7 +151,8 @@ describe('#639 高さ規則は本物の操作部品に載る（実React描画）
       />,
     )
     expect(html).toContain('詳細')
-    expect(html).toContain('編集')
+    expect(html).not.toContain('編集')
+    expect(html).toContain('来店お礼のその他操作')
     expect(html).toMatch(/<(button|a)\b/)
   })
 

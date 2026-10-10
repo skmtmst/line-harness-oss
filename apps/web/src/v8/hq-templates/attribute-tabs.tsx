@@ -17,6 +17,7 @@ import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import { Tabs } from '@/components/shared/tabs'
 import styles from '../templates/list.module.css'
+import ListState from '@/components/shared/list-state'
 
 export const ATTRIBUTE_TABS = [
   ['tags', 'タグ'],
@@ -86,13 +87,10 @@ export function OtherTabPanel({ tab, title, description, onSelect }: {
       boardId={tab === 'fields' ? 'y0sapC' : tab === 'marks' ? 'Qgjmc' : undefined}
       headingSize="regular"
       title={title}
-      description={description}
+      help={description}
       tabs={<AttributeTabs tab={tab} onSelect={onSelect} />}
     >
-      <div className={styles.stateCard} role="status">
-        <p className={styles.stateTitle}>{OTHER_TAB_LINE[tab]}</p>
-        <Button href={hqOpenHref('tags')}><LogIn size={15} aria-hidden="true" />アカウントを選んで開く</Button>
-      </div>
+      <ListState kind="empty" title={OTHER_TAB_LINE[tab]}   action={<><Button href={hqOpenHref('tags')}><LogIn size={15} aria-hidden="true" />アカウントを選んで開く</Button></>} />
     </ListPage>
   )
 }

@@ -1,7 +1,7 @@
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { CloudOff, FileSearch, List, RotateCw, SearchX } from 'lucide-react'
 import Button from './button'
-import { loadFailureCopy } from './api-error-message'
+import { loadFailureCopy, type PermissionScope } from './api-error-message'
 import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 import styles from './target-missing.module.css'
 
@@ -44,6 +44,7 @@ const ICONS = {
 } as const
 
 export type TargetMissingProps = {
+  permissionScope?: PermissionScope
   kind: TargetMissingKind
   /** 「何が」＋「どうなっているか」の1文。 */
   title: string
@@ -63,6 +64,8 @@ export type TargetMissingProps = {
   error?: unknown
   /** 読み直している間。二度押しを止める。 */
   retrying?: boolean
+  /** 既存の再試行や権限確認の操作。渡したときは既定の再試行と重ねない。 */
+  action?: ReactNode
   /**
    * いまの LINE アカウント名（`not-found` のみ・任意）。
    * 渡すと説明のあとに「いまの LINE アカウントは「◯◯」です。」を足す
@@ -73,6 +76,7 @@ export type TargetMissingProps = {
 
 export default function TargetMissing({
   kind,
+  permissionScope = 'store',
   title,
   description,
   backHref,
@@ -80,6 +84,7 @@ export default function TargetMissing({
   onRetry,
   error,
   retrying = false,
+  action: suppliedAction,
   accountName,
 }: TargetMissingProps) {
   const Icon = ICONS[kind]
@@ -92,10 +97,11 @@ export default function TargetMissing({
    */
   const shownTitle = v8 && kind === 'error' ? title.replace(/表示できませんでした$/, '読み込めませんでした') : title
   const showBack = (kind === 'unspecified' || kind === 'not-found') && backHref && backLabel
-  // 403 は押しても直らないので、再試行の口は出さない。
+  // 権限の案内を残し、権限変更後にも同じ口から読み直せる。
   // 文言は画面の指定どおり（出し分け文言が要るときは ListState の `error` を使う）。
-  const failure = kind === 'error' && error !== undefined ? loadFailureCopy(error, 'この画面') : null
-  const showRetry = kind === 'error' && (failure && !failure.retryable ? undefined : onRetry)
+  const failure = kind === 'error' && error !== undefined ? loadFailureCopy(error, 'この画面', permissionScope) : null
+  const retry = onRetry ?? (() => window.location.reload())
+  const showRetry = kind === 'error'
   const accountLine =
     kind === 'not-found' && accountName ? `いまの LINE アカウントは「${accountName}」です。` : null
 
@@ -112,11 +118,13 @@ export default function TargetMissing({
     /* RqO7O：v8 の絵は「もう一度試す」。v7（x5cgUH）は読み込むのまま。 */
     /* 読み上げ名は見えている文字と同じにする（別の名前を付けると、声で操作する人が呼べない）。 */
     action = (
-      <Button type="button" variant="secondary" onClick={onRetry} disabled={retrying} busy={retrying} busyLabel="読み込んでいます">
-        <RotateCw aria-hidden="true" size={16} />{v8 ? 'もう一度試す' : 'もう一度読み込む'}
+      <Button type="button" variant="secondary" onClick={retry} disabled={retrying} busy={retrying} busyLabel="読み込んでいます">
+        <RotateCw aria-hidden="true" size={16} />もう一度読み込む
       </Button>
     )
   }
+
+  const finalAction = suppliedAction !== undefined ? suppliedAction : action
 
   return (
     <div
@@ -130,10 +138,10 @@ export default function TargetMissing({
       </div>
       <p className={styles.title}>{shownTitle}</p>
       <p className={styles.description}>
-        {description}
+        {failure && !failure.retryable ? failure.description : description}
         {accountLine ? <span> {accountLine}</span> : null}
       </p>
-      {action ? <div className={styles.action}>{action}</div> : null}
+      {finalAction ? <div className={styles.action}>{finalAction}</div> : null}
     </div>
   )
 }

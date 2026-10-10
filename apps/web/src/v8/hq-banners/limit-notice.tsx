@@ -23,7 +23,7 @@ export function bannerLimitWords(usage: BannerUsage | null): { kind: BannerLimit
   const title =
     kind === 'blocked'
       ? usage.planState === 'canceled' ? '契約が終了しているため、生成は止まっています' : '無料トライアルが終了したため、生成は止まっています'
-      : kind === 'paused' ? '失敗が続いたため一時停止しています' : kind === 'month' ? `今月の生成上限（${usage.month.limit}枚）に達しました` : '今日の生成上限に達しました'
+      : kind === 'paused' ? '失敗が続いたため一時停止しています' : kind === 'month' ? `今月の生成上限（${usage.month.limit} 枚）に達しました` : '今日の生成上限に達しました'
   const body =
     kind === 'blocked'
       ? usage.blockedReason ?? '課金プランからプランを選ぶと再開します。'
@@ -31,7 +31,7 @@ export function bannerLimitWords(usage: BannerUsage | null): { kind: BannerLimit
         ? usage.pausedReason ?? '15分ほど待ってから、もう一度お試しください。何度も続く場合はお問い合わせから知らせてください。'
         : kind === 'month'
           ? `来月1日（${nextMonthResetLabel()}）に戻ります。急ぐときはプランを変えると、すぐに続けられます。`
-          : `1日の上限 ${usage.today.limit}枚のうち ${usage.today.used}枚を使いました。明日以降にお試しください。`
+          : `1日の上限 ${usage.today.limit} 枚のうち ${usage.today.used} 枚を使いました。明日以降にお試しください。`
   return { kind, title, body }
 }
 

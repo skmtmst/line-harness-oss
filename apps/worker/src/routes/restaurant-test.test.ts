@@ -121,6 +121,11 @@ function requestAs(path: string, token: string, body?: unknown) {
 }
 
 function requestWithMethod(path: string, method: string, body?: unknown, token = 'owner-key') {
+  if((method==='PUT'&&path.includes('/tables/layout')||method==='PATCH'&&path.includes('/tables/'))&&body&&typeof body==='object'&&!('expectedVersion' in body)){const table=path.match(/\/tables\/([^/?]+)/)?.[1];const floor=table?testDb.raw.prepare('SELECT f.version FROM rt_floors f JOIN rt_tables t ON t.floor_id=f.id WHERE t.id=?').get(table):testDb.raw.prepare("SELECT version FROM rt_floors WHERE store_id=?").get((body as {storeId:string}).storeId);body={...body,expectedVersion:(floor as {version:number}|undefined)?.version??1}}
+
+  const id=path.match(/^\/api\/restaurant-test\/reservations\/([^/?]+)(?:\?|$)/)?.[1];
+  if(method==='PATCH'&&id&&body&&typeof body==='object'&&!('expectedVersion' in body))body={...body,expectedVersion:((testDb.raw.prepare('SELECT customer_version FROM rt_reservations WHERE id=?').get(id)) as {customer_version:number}|undefined)?.customer_version??1};
+
   return app().request(path, {
     method,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -1531,14 +1536,34 @@ describe('V8 店の名簿とログイン権限',()=>{
 });
 
 describe('V8 フロア配置と結合グループ',()=>{
+ it('座標を省略した卓追加は空き位置に置き、重なり・店の外への変更を保存しない',async()=>{
+  seedRestaurantFixture();
+  const url='/api/restaurant-test/tables?account_id=account-1';
+  const input={storeId:'store-ginza',code:'T2',label:'新しい卓',seatType:'table',minCapacity:1,maxCapacity:2};
+  const added=await request(url,input);expect(added.status).toBe(201);
+  const id=(await added.json() as any).data.id;
+  const placed=testDb.raw.prepare('SELECT floor_x,floor_y FROM rt_tables WHERE id=?').get(id);
+  const original=testDb.raw.prepare("SELECT width FROM rt_tables WHERE id='table-ginza'").get() as {width:number};
+  expect((placed as {floor_x:number}).floor_x).toBeGreaterThanOrEqual(original.width);
+  expect(placed).toMatchObject({floor_y:0});
+  const version=testDb.raw.prepare("SELECT version FROM rt_floors WHERE id='floor-store-ginza'").get();
+  expect(version).toEqual({version:2});
+  expect((await request(url,{...input,code:'T3',floorX:0,floorY:0})).status).toBe(400);
+  for(const floorX of [0,10000])expect((await requestWithMethod(`/api/restaurant-test/tables/${id}?account_id=account-1`,'PATCH',{floorX,floorY:0})).status).toBe(400);
+  expect((await requestWithMethod('/api/restaurant-test/tables/layout?account_id=account-1','PUT',{storeId:'store-ginza',tables:[{id,floorX:0,floorY:0,joinGroup:null}]})).status).toBe(400);
+  expect(testDb.raw.prepare('SELECT floor_x,floor_y FROM rt_tables WHERE id=?').get(id)).toEqual(placed);
+  expect(testDb.raw.prepare("SELECT version FROM rt_floors WHERE id='floor-store-ginza'").get()).toEqual(version);
+  expect(testDb.raw.prepare("SELECT count(*) n FROM rt_tables WHERE store_id='store-ginza'").get()).toEqual({n:2});
+ });
+
  it('追加と変更で座標・結合を保存し、再取得しても同じ配置を返す',async()=>{
   seedRestaurantFixture();
-  const added=await request('/api/restaurant-test/tables?account_id=account-1',{storeId:'store-ginza',code:'T2',label:'試験卓',seatType:'table',minCapacity:1,maxCapacity:2,floorX:2,floorY:1,joinGroup:' A '});
+  const added=await request('/api/restaurant-test/tables?account_id=account-1',{storeId:'store-ginza',code:'T2',label:'試験卓',seatType:'table',minCapacity:1,maxCapacity:2,floorX:200,floorY:100,joinGroup:' A '});
   expect(added.status).toBe(201);const id=(await added.json() as any).data.id;
-  const updated=await requestWithMethod(`/api/restaurant-test/tables/${id}?account_id=account-1`,'PATCH',{floorX:0,floorY:2,joinGroup:'B'});
+  const updated=await requestWithMethod(`/api/restaurant-test/tables/${id}?account_id=account-1`,'PATCH',{floorX:0,floorY:120,joinGroup:'B'});
   expect(updated.status).toBe(200);
   const snapshot=await request('/api/restaurant-test/snapshot?account_id=account-1');
-  expect((await snapshot.json() as any).data.tables.find((t:any)=>t.id===id)).toMatchObject({floor_x:0,floor_y:2,join_group:'B'});
+  expect((await snapshot.json() as any).data.tables.find((t:any)=>t.id===id)).toMatchObject({floor_x:0,floor_y:120,join_group:'B'});
   await requestWithMethod(`/api/restaurant-test/tables/${id}?account_id=account-1`,'PATCH',{joinGroup:null});
   expect(testDb.raw.prepare('SELECT join_group FROM rt_tables WHERE id=?').get(id)).toEqual({join_group:null});
  });
@@ -1682,4 +1707,34 @@ it('店の遅刻案内を版付きで保存・維持・解除し、他店・閲�
   authMocks.getStaffByApiKey.mockResolvedValueOnce({id:'viewer',name:'閲覧',role:'admin',access_level:'read_only',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:1});
   expect((await requestWithMethod(path,'PUT',{storeId:'store-ginza',hours,expectedVersion:3,lateArrivalPolicy:policy},'viewer-key')).status).toBe(403);
   expect((await requestWithMethod('/api/restaurant-test/opening-hours?account_id=account-2','PUT',{storeId:'store-yokohama',hours,expectedVersion:0,lateArrivalPolicy:policy})).status).toBe(400);
+});
+
+describe('飲食1 共通盤と予約の版',()=>{
+ it('読んだ版で一度だけ変更でき、古い画面と版なしは予約を上書きしない',async()=>{
+  seedRestaurantFixture();const url='/api/restaurant-test/reservations/reservation-ginza?account_id=account-1';
+  const initial=testDb.raw.prepare("SELECT customer_version FROM rt_reservations WHERE id='reservation-ginza'").get() as {customer_version:number};
+  expect((await requestWithMethod(url,'PATCH',{expectedVersion:initial.customer_version,note:'先に保存'})).status).toBe(200);
+  expect((await requestWithMethod(url,'PATCH',{expectedVersion:initial.customer_version,note:'古い画面'})).status).toBe(409);
+  const noVersion=await app().request(url,{method:'PATCH',headers:{Authorization:'Bearer owner-key','Content-Type':'application/json'},body:JSON.stringify({note:'版なし'})},env);
+  expect(noVersion.status).toBe(400);expect(testDb.raw.prepare("SELECT note FROM rt_reservations WHERE id='reservation-ginza'").get()).toEqual({note:'先に保存'});
+ });
+ it('共通表示は日時・店舗を絞り、版と旧予約の注意を返す',async()=>{
+  seedRestaurantFixture();const row=testDb.raw.prepare("SELECT starts_at,ends_at FROM rt_reservations WHERE id='reservation-ginza'").get() as {starts_at:string;ends_at:string};
+  const query=new URLSearchParams({account_id:'account-1',storeId:'store-ginza',from:row.starts_at,to:row.ends_at});
+  const result=await request('/api/restaurant-test/board?'+query);expect(result.status).toBe(200);const body=await result.json() as any;
+  expect(body.data.entries).toHaveLength(1);expect(body.data.entries[0]).toMatchObject({kind:'seats',id:'reservation-ginza',version:1,scopeId:'store-ginza',resourceIds:['table-ginza'],dining:{courseId:'menu-ginza'}});
+  query.set('from','2090-01-01T00:00:00Z');query.set('to','2090-01-02T00:00:00Z');expect((await (await request('/api/restaurant-test/board?'+query)).json() as any).data.total).toBe(0);
+  query.set('storeId','wrong');expect((await request('/api/restaurant-test/board?'+query)).status).toBe(404);
+ });
+ it('図面の保存は閲覧者・別の店舗を拒み、版ずれでは座標を保つ',async()=>{
+  seedRestaurantFixture();const floors=await request('/api/restaurant-test/floors?account_id=account-1&storeId=store-ginza');const f=(await floors.json() as any).data[0];
+  const body={...f,expectedVersion:f.version,tables:f.tables.map((t:any)=>({...t,x:100,y:100}))};
+  const url='/api/restaurant-test/floors/'+f.id+'?account_id=account-1';
+  expect((await requestWithMethod(url,'PUT',body)).status).toBe(200);expect((await requestWithMethod(url,'PUT',{...body,tables:body.tables.map((t:any)=>({...t,x:200}))})).status).toBe(409);
+  expect(testDb.raw.prepare("SELECT floor_x FROM rt_tables WHERE id='table-ginza'").get()).toEqual({floor_x:100});
+  authMocks.getStaffByApiKey.mockResolvedValue({id:'viewer',role:'admin',name:'閲覧',access_level:'read_only',permission_keys:'[]'} as never);
+  expect((await requestWithMethod(url,'PUT',body,'reader-key')).status).toBe(403);
+  authMocks.getStaffByApiKey.mockResolvedValue(null);
+  expect((await requestWithMethod(url,'PUT',{...body,storeId:'wrong'})).status).toBe(404);
+ });
 });

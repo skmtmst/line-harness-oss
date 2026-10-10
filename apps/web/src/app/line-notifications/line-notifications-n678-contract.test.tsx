@@ -126,6 +126,8 @@ vi.mock('@/lib/api', () => {
 })
 
 import { ApiError, type EcNotificationSetting, type LineNotificationDefinition } from '@/lib/api'
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
+
 import LineNotificationsPage from './page'
 
 const {
@@ -1219,7 +1221,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
     expect(screen.getByText('今日送った')).toBeTruthy()
   })
 
-  it('403: 顧客のお知らせは「表示する権限がありません」を出し、読み直す口は出さない', async () => {
+  it('403: 顧客のお知らせは「表示する権限がありません」を出し、権限変更後に読み直せる', async () => {
     fixture.settings.mockRejectedValue(new ApiError(403))
     fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
     fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
@@ -1227,7 +1229,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
     render(<LineNotificationsPage />)
 
     await waitFor(() => expect(screen.getByText('表示する権限がありません')).toBeTruthy())
-    expect(screen.queryByRole('button', { name: 'もう一度読み込む' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
   })
 
   it('500: 「表示できませんでした」を出し、実物の読み直すボタンを押すと実物のfetchをやり直して復旧する', async () => {
@@ -1257,11 +1259,11 @@ describe('#678 実DOMへマウントした画面全体', () => {
 
     const { unmount } = render(<LineNotificationsPage />)
     await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
-    // M031: 403は「取得失敗」と混ぜない。押しても直らない再試行も出さない。
+    // M031: 403は「取得失敗」と混ぜない。権限が変わった後も読み直せるようにする。
     expect(screen.getByText('運用者へのお知らせ 権限なし')).toBeTruthy()
     expect(screen.queryByText('運用者へのお知らせ 取得失敗')).toBeNull()
     expect(screen.getByText(/見る権限がありません/)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'もう一度' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
     unmount()
   })
 
@@ -1470,4 +1472,13 @@ describe('#988 条件説明と表示例は実際の意味に合わせる', () =>
       expect(link.getAttribute('href')).toBe(href)
     }
   })
+})
+
+it('B-154：通知の共通保存関数は422の欄の理由を呼び出した画面へ残す', async () => {
+  const { saveCustomerNotification: saveV8 } = await import('@/v8/settings/line-notifications/screen')
+  const sent = setting()
+  fixture.updateDraft.mockRejectedValueOnce({ status: 422, fields: { introText: 'ご案内文を短くしてください' } })
+  const outcome = await saveV8({ api: mutationApi(), accountId: 'account-a', setting: sent,
+    definition: definition(), enabled: sent.isEnabled, guard: steadyGuard(sent) })
+  expect(outcome).toMatchObject({ kind: 'failed', fields: { introText: 'ご案内文を短くしてください' }, contentSaved: false, settleDraft: false })
 })

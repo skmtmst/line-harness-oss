@@ -7,9 +7,9 @@
  * 今の画面（app/notifications/page.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import Link from 'next/link'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCheck, Sparkles, TriangleAlert } from 'lucide-react'
 import type { NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
@@ -190,7 +190,7 @@ export default function NotificationsV8() {
     <ListPage
       boardId="y8QQV"
       title="通知"
-      description="musubo からのお知らせです。エラーやメンテナンス、新しい版のお知らせが届きます。"
+      help="musubo からのお知らせです。エラーやメンテナンス、新しい版のお知らせが届きます。"
       actions={(
         <Button variant="secondary" onClick={() => { void markAllRead() }} disabled={!counts || counts.unread === 0}>
           <CheckCheck aria-hidden="true" className={styles.buttonIcon} />
@@ -237,10 +237,10 @@ export default function NotificationsV8() {
             <ul className={styles.list}>
               {orderedItems.map((item) => (
                 <li key={item.id} className={styles.item} data-unread={!item.isRead}>
-                  <button
-                    type="button"
+                  <Link
+                    href={notificationDestination(item)}
                     className={styles.row}
-                    onClick={() => openNotification(item)}
+                    onClick={() => markRead(item)}
                     title={item.body || undefined}
                   >
                     <span className={styles.icon} data-category={item.category} aria-hidden="true">
@@ -255,7 +255,7 @@ export default function NotificationsV8() {
                       <span className={styles.time}>{notificationTime(item.createdAt)}</span>
                     </span>
                     <span className={styles.go}>{`${notificationLinkLabel(item)} →`}</span>
-                  </button>
+                  </Link>
                 </li>
               ))}
             </ul>

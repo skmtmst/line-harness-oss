@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * 追加発見: ログインユーザー一覧の取得失敗と「誰もいない」を言い分ける。
  *
@@ -94,6 +96,7 @@ const MEMBERS = [
 ]
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   memStorage.setItem('lh_staff_role', 'owner')
   fixture.listMenus = async () => ({ menus: MENUS })
   fixture.memberList = async () => ({ success: true, data: MEMBERS })

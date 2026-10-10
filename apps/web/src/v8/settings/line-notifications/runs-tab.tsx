@@ -1,13 +1,6 @@
 'use client'
 
-/*
- * ★V8 LINE通知 送れなかったもの（板 DrwMm）・記録（板 PZBVb）。
- *
- * 並び（絵）：送れなかったものだけ数のマス4つ → 探す・対象・期間（記録は「クリック記録あり」）・右に再読み込み →
- * 表（日時・お知らせ・対象者・状態・理由・対応・試行・クリック。1行 53）→ 下の1行（送れなかったものは帯）。
- * 試行の履歴・受信箱で連絡・再試行・対応済みは、お知らせの名前を押して開く「記録の詳細」に置く（行は1段のまま）。
- * 読み込み・再試行・対応済みの口と世代の守りは今の部品（components/line-notifications/notification-run-list）の関数を使う。
- */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Ban, CircleX, Mail, RotateCw } from 'lucide-react'
 import {
@@ -39,6 +32,18 @@ import Select from '@/components/shared/select'
 import { api, fetchApi, type EcNotificationRun } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import styles from './screen.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 LINE通知 送れなかったもの（板 DrwMm）・記録（板 PZBVb）。
+ *
+ * 並び（絵）：送れなかったものだけ数のマス4つ → 探す・対象・期間（記録は「クリック記録あり」）・右に再読み込み →
+ * 表（日時・お知らせ・対象者・状態・理由・対応・試行・クリック。1行 53）→ 下の1行（送れなかったものは帯）。
+ * 試行の履歴・受信箱で連絡・再試行・対応済みは、お知らせの名前を押して開く「記録の詳細」に置く（行は1段のまま）。
+ * 読み込み・再試行・対応済みの口と世代の守りは今の部品（components/line-notifications/notification-run-list）の関数を使う。
+ */
 
 const PAGE_SIZE = 20
 
@@ -65,29 +70,20 @@ const STATUS: Record<EcNotificationRun['status'], { label: string; tone: 'good' 
   failed: { label: '送れなかった', tone: 'danger' },
 }
 
-const JST = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', hourCycle: 'h23' })
-
 /** 「10/1 21:30」。オフセットの無い古い行は既に日本時間として読む（今の部品と同じ決まり）。 */
 function shortJst(value: string | null | undefined): string {
-  if (!value) return '—'
-  if (!/[zZ]|[+-]\d{2}:\d{2}$/.test(value)) {
-    const m = value.match(/^\d{4}-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/)
-    return m ? `${Number(m[1])}/${Number(m[2])} ${Number(m[3])}:${m[4]}` : '—'
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = Object.fromEntries(JST.formatToParts(date).map((p) => [p.type, p.value]))
-  return `${parts.month}/${parts.day} ${parts.hour}:${parts.minute}`
+  const normalized = value && !/[zZ]|[+-]\d{2}:\d{2}$/.test(value) ? `${value.replace(' ', 'T')}+09:00` : value
+  return polishFormatDate(normalized, { style: 'list', fallback: '—' })
 }
 
 function reasonWords(item: RunItem): string {
   const reason = item.reason?.trim() || ''
   if (item.nextRetryAt && !reason.includes('再試行')) return `${reason || '一時的なエラー'} → 次の再試行 ${shortJst(item.nextRetryAt)}`
-  return reason || '—'
+  return reason || emptyValue('unknown')
 }
 
 export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string | null; mode: 'history' | 'failures' }) {
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const currentScopeKey = `${lineAccountId ?? 'none'}:${mode}`
   const [scope, setScope] = useState<NotificationRunScope>(() => ({ key: currentScopeKey, generation: 0 }))
   /* 世代はレンダー中に進める（今の部品と同じ。古い応答を新しい画面へ漏らさない）。 */
@@ -97,10 +93,10 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
   const generation = scope.generation
 
   const [loaded, setLoaded] = useState<ScopedLoadState>({ generation: -1, state: 'loading', result: null, total: 0 })
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<RunFilter>('all')
-  const [recipientFilter, setRecipientFilter] = useState<RecipientFilter>('all')
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<RunFilter>('filter', 'all')
+  const [recipientFilter, setRecipientFilter] = useListUrlValue<RecipientFilter>('recipientFilter', 'all')
+  const [periodFilter, setPeriodFilter] = useListUrlValue<PeriodFilter>('periodFilter', 'all')
   const [retrying, setRetrying] = useState<ScopedRetrying>({ generation: -1, id: null })
   const [notice, setNotice] = useState<ScopedNotice>({ generation: -1, notice: null })
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -195,28 +191,28 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
 
     <div className={styles.toolbar}>
       <div className={styles.runSearch}>
-        <SearchField aria-label="お客様の名前・注文番号で検索" placeholder="お客様の名前・注文番号で検索" value={query} onChange={setQuery} onClear={() => setQuery('')} />
+        <SearchField aria-label="お客様の名前・注文番号で探す" placeholder="お客様の名前・注文番号で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
       </div>
       <div className={styles.runRecipient}>
-        <Select aria-label="対象を絞り込み" label="対象" value={recipientFilter} onChange={(value) => setRecipientFilter(value as RecipientFilter)} options={[
+        <SaveErrorField names={["recipientFilter","recipient","recipient_filter"]}><Select aria-label="対象を絞り込み" label="対象" value={recipientFilter} onChange={(value) => setRecipientFilter(value as RecipientFilter)} options={[
           { value: 'all', label: 'すべて' }, { value: 'customer', label: '顧客' }, { value: 'operator', label: '運用者' },
-        ]} />
+        ]} /></SaveErrorField>
       </div>
       <div className={styles.runPeriod}>
-        <Select aria-label="期間を絞り込み" value={periodFilter} onChange={(value) => setPeriodFilter(value as PeriodFilter)} options={[
+        <SaveErrorField names={["periodFilter","period","period_filter"]}><Select aria-label="期間を絞り込み" value={periodFilter} onChange={(value) => setPeriodFilter(value as PeriodFilter)} options={[
           { value: 'all', label: 'すべての期間' }, { value: '24h', label: '24時間以内' }, { value: '7d', label: '7日以内' }, { value: '30d', label: '30日以内' },
-        ]} />
+        ]} /></SaveErrorField>
       </div>
       {mode === 'history' ? <FilterChip selected={filter === 'clicked'} onChange={() => setFilter(filter === 'clicked' ? 'all' : 'clicked')}>クリック記録あり</FilterChip> : null}
       <span className={styles.runSpacer} />
-      <Button onClick={() => void load()}><RotateCw size={15} aria-hidden="true" />記録を再読み込み</Button>
+      <Button onClick={() => load()} busyLabel="処理中…"><RotateCw size={15} aria-hidden="true" />記録を再読み込み</Button>
     </div>
 
     <section className={styles.table} data-design-node={mode === 'failures' ? 'DrwMm-table' : 'PZBVb-table'} data-list-state={listState} aria-label={title}>
       {!lineAccountId ? <ListState kind="empty" title="LINEアカウントを選択してください" description="上のアカウント切り替えから、確認するLINEアカウントを選んでください。" />
         : visibleState === 'loading' ? <ListState kind="loading" title={`${title}を読み込んでいます`} />
-        : visibleState === 'error' ? <ListState kind="error" title={`${title}を表示できませんでした`} description="登録済みの記録は消えていません。時間をおいて読み直してください。" action={<Button onClick={() => void load()}><RotateCw size={15} aria-hidden="true" />記録を再読み込み</Button>} />
-        : visibleState === 'forbidden' ? <ListState kind="forbidden" />
+        : visibleState === 'error' ? <ListState kind="error" title={`${title}を表示できませんでした`} description="登録済みの記録は消えていません。時間をおいて読み直してください。" onRetry={() => void load()} />
+        : visibleState === 'forbidden' ? <ListState kind="forbidden" onRetry={() => void load()} />
         : items.length === 0 ? <ListState kind="empty" title={mode === 'failures' ? '送れなかったお知らせはありません' : 'お知らせの記録はまだありません'} description={mode === 'failures' ? '現在の表示範囲には、確認が必要な失敗はありません。' : 'ECからのお知らせを処理すると、ここに記録が残ります。'} />
         : visibleItems.length === 0 ? <ListState kind="empty" emptyPreset="filtered" title="条件に合う記録はありません" description="検索語か絞り込みを変えてください。" />
         : <DataTable label="お知らせの記録" grid={{ columns: 'var(--tpl-rest3-run-cols)', compactColumns: 'minmax(0, .8fr) minmax(0, 1fr) minmax(0, .8fr) var(--tpl-an-col-130) minmax(0, 1.5fr) var(--tpl-an-col-88)', padding: 'var(--tpl-rest3-run-row-pad)', headPadding: 'var(--tpl-rest3-op-head-pad)' }}>
@@ -235,10 +231,10 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
               const status = STATUS[item.status]
               const who = item.recipientType === 'customer' ? `顧客${item.orderNumber ? `・${item.orderNumber}` : ''}` : '運用者'
               const reason = reasonWords(item)
-              return <Tr key={item.id}>
+              return <Tr key={item.id} data-row-id={item.id}>
                 <Td className={`${styles.cell} ${styles.runWhen}`}><span className={styles.runWhen}>{shortJst(item.receivedAt)}</span></Td>
                 <Td className={styles.cell}>
-                  <button type="button" className={styles.runOpen} onClick={() => setDetailId(item.id)} title={`${item.notificationName}の記録の詳細を開く`}>{item.notificationName}</button>
+                  <button type="button" className={styles.runOpen} onClick={() => setDetailId(item.id)} title={`${item.notificationName}の記録の詳細を開く`} >{item.notificationName}</button>
                 </Td>
                 <Td className={styles.runWhoCell}>
                   <span className={`${styles.cell} ${styles.runWho}`}>{item.friendName || '名前は未取得'}</span>
@@ -246,7 +242,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
                 </Td>
                 <Td><StatusBadge tone={status.tone === 'good' ? 'success' : status.tone === 'muted' ? 'neutral' : status.tone}>{status.label}</StatusBadge></Td>
                 <Td className={styles.cell} title={reason}>{item.resolved ? `対応済み・${reason}` : reason}</Td>
-                <Td className={styles.cell}>{`${item.attemptCount == null ? '—' : `${item.attemptCount}回`}・${item.clickedAt ? 'クリックあり' : '—'}`}</Td>
+                <Td className={styles.cell}>{`${item.attemptCount == null ? emptyValue('unknown') : `${item.attemptCount}回`}・${item.clickedAt ? 'クリックあり' : emptyValue('unknown')}`}</Td>
               </Tr>
             })}
           </tbody>
@@ -257,7 +253,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
       <div className={styles.runFoot}>
         {mode === 'failures'
           ? <Notice tone="info" icon={null}>個人の既読は見られません。試行回数と次の再試行予定は送信台帳の記録を表示します。検索と絞り込みは表示中のページの中だけに効きます。</Notice>
-          : <p className={styles.minor}>{`表示中の20件を絞り込み・${formatNumber(total)}件中 ${(page - 1) * PAGE_SIZE + 1}〜${Math.min(page * PAGE_SIZE, total)}件`}</p>}
+          : <p className={styles.minor}>{`表示中の20件を絞り込み・${formatNumber(total)} 件中 ${(page - 1) * PAGE_SIZE + 1}〜${Math.min(page * PAGE_SIZE, total)} 件`}</p>}
         {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
       </div>
     ) : null}
@@ -276,7 +272,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
           {(detail.attemptHistory?.length ?? 0) > 0 ? (
             <ul className={styles.runAttempts} aria-label="試行の履歴">
               {detail.attemptHistory!.map((attempt) => (
-                <li key={`${detail.id}-${attempt.number}`}>{`${attempt.number}回目 ${shortJst(attempt.attemptedAt)}／${attempt.outcome === 'provider_accepted' ? 'LINE API受付済み' : attempt.error || '送信失敗'}`}</li>
+                <li key={`${detail.id}-${attempt.number}`}>{`${attempt.number} 回目 ${shortJst(attempt.attemptedAt)}／${attempt.outcome === 'provider_accepted' ? 'LINE API受付済み' : attempt.error || '送信失敗'}`}</li>
               ))}
             </ul>
           ) : <p className={styles.minor}>試行の履歴はまだありません。</p>}

@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Gift, MessageSquare, Newspaper, Package, RotateCw, Send } from 'lucide-react'
@@ -186,7 +187,7 @@ export function TestRecipientPicker({ friends, value, onChange, accountId }: {
       </span>
     )
   }
-  return <Select aria-label="テスト送信先" value={value} onChange={onChange} options={friends.map((friend) => ({ value: friend.id, label: friend.displayName || '名前未取得' }))} />
+  return <EntitySelect aria-label="テスト送信先" value={value} onChange={onChange} options={friends.map((friend) => ({ ...entityOptionMetadata(friend), value: friend.id, label: friend.displayName || '名前未取得' }))} />
 }
 
 function Kpis({ kpis, loading, failed }: { kpis: NenKpis | null; loading: boolean; failed: boolean }) {
@@ -916,7 +917,7 @@ function ColumnsPanel({
         </div>
 
         <aside data-design="Panel" data-design-node="nen-column-panel" className="flex flex-col gap-4">
-          <section className="flex flex-col gap-3 rounded-card border border-hairline bg-canvas p-4">
+          <section className="flex flex-col gap-3 rounded-card border content-card bg-canvas p-4">
             <div className="flex items-baseline justify-between gap-3">
               <h2 className="text-label font-semibold text-ink">LINEに届くカード</h2>
               <span className="text-micro text-ink-faint">選んだコラムから自動で作られます</span>
@@ -939,7 +940,7 @@ function ColumnsPanel({
             )}
           </section>
 
-          <section className="flex flex-col gap-3 rounded-card border border-hairline bg-canvas p-4">
+          <section className="flex flex-col gap-3 rounded-card border content-card bg-canvas p-4">
             <h2 className="text-label font-semibold text-ink">誰に・いつ送るか</h2>
             {/* #934 N-295: コラム配信の停止・再開は自動配信タブに出ないため、ここに置く。 */}
             <div className="flex items-center justify-between gap-3">

@@ -1,5 +1,6 @@
 'use client'
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, api, fetchApi } from '@/lib/api'
@@ -47,8 +48,8 @@ export function InboxSection({ onSummaryChange }: {
   const [loadFailure, setLoadFailure] = useState<null | 'error' | 'forbidden'>(null)
   const [loading, setLoading] = useState(true)
   const [lastSuccessAt, setLastSuccessAt] = useState<Date | null>(null)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', DEFAULT_PAGE_SIZE)
   const loadSeq = useRef(0)
   const total = summary?.total ?? 0
   const pageCount = Math.max(1, Math.ceil(total / pageSize))

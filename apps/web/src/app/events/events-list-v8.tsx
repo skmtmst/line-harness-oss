@@ -1,15 +1,5 @@
 'use client'
 
-/*
- * ★V8-B イベント予約の一覧（板 `e2ekFu`）。
- *
- * v7 の一覧（`page.tsx` 内の EventsListPageV7）とは別の部品として持つ。
- * データの口（取得・絞り込み・並び・ページ送り・削除）は同じ。
- * 違いは置き場と見せ方だけ——「イベントを作る」は左のフォルダの列の上、
- * 数の帯は白い板いっぱいの帯、行の右端は「…」1つ。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
- */
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -43,6 +33,20 @@ import HelpTip from '@/components/shared/help-tip'
 import { daysUntilIso, eventRowState, isLowApplication, summarizeEventAttention } from './event-attention'
 import { formatDateTime, formatDay } from '@/lib/format'
 import styles from './events-list-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8-B イベント予約の一覧（板 `e2ekFu`）。
+ *
+ * v7 の一覧（`page.tsx` 内の EventsListPageV7）とは別の部品として持つ。
+ * データの口（取得・絞り込み・並び・ページ送り・削除）は同じ。
+ * 違いは置き場と見せ方だけ——「イベントを作る」は左のフォルダの列の上、
+ * 数の帯は白い板いっぱいの帯、行の右端は「…」1つ。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ */
 
 /*
  * R601: 読み込みの失敗は「権限不足」と「通信失敗」を分ける。
@@ -108,7 +112,7 @@ function toContextMenuItems(menuItems: ActionMenuItem[]): ContextMenuItem[] {
     label: item.label,
     danger: item.tone === 'danger',
     disabled: item.disabled,
-    onSelect: () => item.onSelect(),
+    onSelect: () => item.onSelect?.(),
   }))
 }
 
@@ -126,6 +130,8 @@ function EventFolderPanelForm({
   onCancel: () => void
   onAdded: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [name, setName] = useState('')
   const [color, setColor] = useState(FOLDER_COLORS[0])
   const [saving, setSaving] = useState(false)
@@ -144,21 +150,22 @@ function EventFolderPanelForm({
       }
       onAdded()
       onCancel()
-    } catch {
-      setError('フォルダを追加できませんでした')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+
+
+      setError('フォルダを追加できませんでした') }
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div>
+    <SaveErrorScope errors={saveErrors}><div>
       <p className="text-ink-faint mt-1 text-xs leading-relaxed">イベントを整理するフォルダです。</p>
-      <label className="mt-4 block">
-        <span className="text-ink-secondary mb-1 block text-xs font-medium">
-          フォルダ名 <span className="text-danger">*</span>
-        </span>
-        <input
+      <Field label="フォルダ名" required><SaveErrorField names={["name"]}><input
           type="text"
           value={name}
           onChange={(event) => setName(event.target.value)}
@@ -166,9 +173,8 @@ function EventFolderPanelForm({
             if (event.key === 'Enter' && name.trim()) void add()
           }}
           placeholder="例：教室"
-          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
-        />
-      </label>
+          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        /></SaveErrorField></Field>
       <div className="mt-3">
         <span className="text-ink-secondary mb-1 block text-xs font-medium">色</span>
         <div className="flex flex-wrap gap-2">
@@ -195,7 +201,7 @@ function EventFolderPanelForm({
         <Button variant="primary" onClick={() => void add()} disabled={!name.trim() || saving} busy={saving}>追加する</Button>
       </div>
       <p className="text-ink-faint mt-3 text-xs">フォルダを消しても、中のイベントは未分類に残ります。</p>
-    </div>
+    </div></SaveErrorScope>
   )
 }
 
@@ -519,7 +525,7 @@ export default function EventsListV8() {
             <span className={styles.kpiLabel}>これからの回</span>
           </div>
           <span className={styles.kpiValue}>
-            {dataReady ? kpi.upcoming_slots : '—'}<span className={styles.kpiUnit}>回</span>
+            {dataReady ? kpi.upcoming_slots : emptyValue('unknown')}<span className={styles.kpiUnit}>回</span>
           </span>
           <span className={styles.kpiDetail}>
             {loadDetail(
@@ -535,7 +541,7 @@ export default function EventsListV8() {
             <span className={styles.kpiLabel}>申込</span>
           </div>
           <span className={styles.kpiValue}>
-            {dataReady ? kpi.upcoming_active : '—'}<span className={styles.kpiUnit}>人</span>
+            {dataReady ? kpi.upcoming_active : emptyValue('unknown')}<span className={styles.kpiUnit}>人</span>
           </span>
           <span className={styles.kpiDetail}>
             {loadDetail(
@@ -551,7 +557,7 @@ export default function EventsListV8() {
             <span className={styles.kpiLabel}>あと少しで満席</span>
           </div>
           <span className={styles.kpiValue}>
-            {dataReady ? kpi.nearly_full : '—'}<span className={styles.kpiUnit}>回</span>
+            {dataReady ? kpi.nearly_full : emptyValue('unknown')}<span className={styles.kpiUnit}>回</span>
           </span>
           <span className={styles.kpiDetail}>
             {loadDetail(Boolean(selectedAccountId), loadStatus, kpi.nearly_full > 0 ? '残り1〜3席' : '該当する回はありません')}
@@ -563,14 +569,14 @@ export default function EventsListV8() {
             <span className={styles.kpiLabel}>申し込みが少ない</span>
           </div>
           <span className={styles.kpiValue}>
-            {dataReady ? kpi.low_applications : '—'}<span className={styles.kpiUnit}>回</span>
+            {dataReady ? kpi.low_applications : emptyValue('unknown')}<span className={styles.kpiUnit}>回</span>
           </span>
           <span className={styles.kpiDetail}>
             {loadDetail(
               Boolean(selectedAccountId),
               loadStatus,
               kpi.nearest_low_starts_at
-                ? `${formatShortJpDate(kpi.nearest_low_starts_at)}の回。あと${daysUntilIso(kpi.nearest_low_starts_at) ?? '—'}日です`
+                ? `${formatShortJpDate(kpi.nearest_low_starts_at)}の回。あと${daysUntilIso(kpi.nearest_low_starts_at) ?? emptyValue('unknown')}日です`
                 : '該当する回はありません',
             )}
           </span>
@@ -665,7 +671,7 @@ export default function EventsListV8() {
               <ListState
                 kind="error"
                 description="登録したイベントは消えていません。再読み込みしても直らない場合はエラー報告へ。"
-                action={<Button onClick={() => void refresh()}>イベントを再読み込み</Button>}
+                onRetry={() => void refresh()}
               />
             </div>
           ) : items.length === 0 && !filterActive ? (
@@ -706,16 +712,14 @@ export default function EventsListV8() {
                                 </button>
                               </FolderDotName>
                             </ContextMenu>
-                            {e.venue_name ? (
-                              <span className={`${styles.venue} ${styles.nameSub}`} title={e.venue_name}>{e.venue_name}</span>
-                            ) : null}
+
                           </td>
                           <td className="truncate px-2 py-3 tabular-nums" title={formatJpDate(e.next_slot_starts_at)}>
                             {formatJpDate(e.next_slot_starts_at)}
                           </td>
                           <td className="px-2 py-3 text-right tabular-nums">
                             {e.total_active}
-                            <span className="text-ink-faint"> / {e.total_capacity ?? '—'}</span>
+                            <span className="text-ink-faint"> / {e.total_capacity ?? emptyValue('unknown')}</span>
                           </td>
                           <td className="px-2 py-3 text-right tabular-nums">
                             {e.pending_count > 0 ? (
@@ -723,7 +727,7 @@ export default function EventsListV8() {
                                 {e.pending_count}
                               </Link>
                             ) : (
-                              <span className="text-ink-faint">—</span>
+                              <span className="text-ink-faint">{emptyValue('unknown')}</span>
                             )}
                           </td>
                           <td className="px-2 py-3">
@@ -741,7 +745,7 @@ export default function EventsListV8() {
                               {state === 'draft'
                                 ? '下書き'
                                 : state === 'paused'
-                                  ? '一時停止'
+                                  ? '停止中'
                                   : state === 'cancelled'
                                     ? '中止'
                                     : state === 'ended'
@@ -758,8 +762,8 @@ export default function EventsListV8() {
                             {!e.visible_tag_id ? (
                               <span className="text-ink-faint mt-1 block max-w-32 truncate text-xs">全員</span>
                             ) : e.visible_tag_name ? (
-                              <span className="text-ink-faint mt-1 block max-w-32 truncate text-xs" title={e.visible_tag_name}>
-                                {e.visible_tag_name}
+                              <span className="text-ink-faint mt-1 block max-w-32 truncate text-xs" >
+                                <TruncatedText value={String(e.visible_tag_name ?? '')} />
                               </span>
                             ) : (
                               <span className="text-warning mt-1 block max-w-32 truncate text-xs">消えたタグ</span>
@@ -796,9 +800,9 @@ export default function EventsListV8() {
           <div className={styles.footer} data-design="tf">
             <span className={styles.footerCount}>
               {!selectedAccountId || loadStatus === 'error' || loadStatus === 'forbidden'
-                ? '—'
+                ? emptyValue('unknown')
                 : loadStatus === 'loading'
-                  ? '—'
+                  ? emptyValue('unknown')
                   : listTotal === 0
                     ? '0件'
                     : `${(current - 1) * perPage + 1}〜${Math.min(current * perPage, listTotal)}件 / 全${listTotal}件`}
@@ -856,7 +860,7 @@ export default function EventsListV8() {
                 {activeState === 'draft'
                   ? '下書き'
                   : activeState === 'paused'
-                    ? '一時停止'
+                    ? '停止中'
                     : activeState === 'cancelled'
                       ? '中止'
                       : activeState === 'ended'
@@ -868,7 +872,7 @@ export default function EventsListV8() {
             </p>
             <p className="text-ink-secondary mb-1 mt-4 block text-xs font-medium">予約・承認待ち</p>
             <p className="text-ink text-sm tabular-nums">
-              予約 {active.total_active} / {active.total_capacity ?? '—'}　承認待ち {active.pending_count > 0 ? active.pending_count : '—'}
+              予約 {active.total_active} / {active.total_capacity ?? emptyValue('unknown')}　承認待ち {active.pending_count > 0 ? active.pending_count : emptyValue('unknown')}
             </p>
             <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
               <Button variant="secondary" onClick={() => router.push(`/events/bookings?id=${active.id}`)}>申込者を見る</Button>

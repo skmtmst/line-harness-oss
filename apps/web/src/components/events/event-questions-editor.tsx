@@ -4,6 +4,7 @@ import type { EventQuestion } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const TYPE_LABELS: Record<EventQuestion['type'], string> = {
   text: '1行テキスト',
@@ -64,14 +65,14 @@ export default function EventQuestionsEditor({
               <label htmlFor={`eq-label-${q.id}`} className="sr-only">
                 質問{index + 1}の文面
               </label>
-              <input
+              <SaveErrorField names={[`questions.${index}.label`,"label","q.label","at"]}><input
                 id={`eq-label-${q.id}`}
                 value={q.label}
                 onChange={(e) => setAt(index, { label: e.target.value })}
                 maxLength={100}
                 placeholder={`質問${index + 1}（例：アレルギーはありますか）`}
                 className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-              />
+              /></SaveErrorField>
             </div>
             <Button
               variant="danger"
@@ -85,7 +86,7 @@ export default function EventQuestionsEditor({
             <label htmlFor={`eq-type-${q.id}`} className="text-ink-faint text-xs">
               回答の形
             </label>
-            <Select
+            <SaveErrorField names={[`questions.${index}.type`,"type","q.type","at"]}><Select
               aria-label="回答の形"
               id={`eq-type-${q.id}`}
               value={q.type}
@@ -97,11 +98,11 @@ export default function EventQuestionsEditor({
                 value: t,
                 label: TYPE_LABELS[t],
               }))}
-            />
-            <Checkbox
+            /></SaveErrorField>
+            <SaveErrorField names={[`questions.${index}.required`,"required","q.required","at"]}><Checkbox
               checked={q.required}
               onCheckedChange={(checked) => setAt(index, { required: checked })}
-            >必須にする</Checkbox>
+            >必須にする</Checkbox></SaveErrorField>
           </div>
           {NEEDS_OPTIONS.has(q.type) && (
             <div className="space-y-1.5">
@@ -110,7 +111,7 @@ export default function EventQuestionsEditor({
                   <label htmlFor={`eq-opt-${q.id}-${oi}`} className="sr-only">
                     選択肢{oi + 1}
                   </label>
-                  <input
+                  <SaveErrorField names={["opt","at"]}><input
                     id={`eq-opt-${q.id}-${oi}`}
                     value={opt}
                     onChange={(e) =>
@@ -121,7 +122,7 @@ export default function EventQuestionsEditor({
                     maxLength={100}
                     placeholder={`選択肢${oi + 1}`}
                     className="border-hairline rounded-control flex-1 border px-3 py-1.5 text-sm"
-                  />
+                  /></SaveErrorField>
                   <button
                     type="button"
                     onClick={() =>

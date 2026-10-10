@@ -11,7 +11,7 @@
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({
   operatorList: vi.fn(),
@@ -75,6 +75,8 @@ vi.mock('@/lib/api', () => {
   }
 })
 
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
+
 import LineNotificationsPage from './page'
 
 beforeEach(() => {
@@ -109,7 +111,8 @@ describe('#634 運用者タブ件数の取得失敗から読み直せる', () =>
     await waitFor(() => expect(screen.getByText(/運用者へのお知らせの件数を読み込めませんでした/)).toBeTruthy())
 
     // ★V7 `x63W5x`：黄色の帯ではなく、その場所の小さな1行から読み直す。
-    fireEvent.click(screen.getByRole('button', { name: 'もう一度' }))
+    const notice = screen.getByText(/運用者へのお知らせの件数を読み込めませんでした/).closest('[role="alert"]') as HTMLElement
+    fireEvent.click(within(notice).getByRole('button', { name: 'もう一度読み込む' }))
 
     // 件数の取得がもう一度走り、届けば実数に戻り帯は消える。
     await waitFor(() => expect(fixture.operatorList).toHaveBeenCalledTimes(2))

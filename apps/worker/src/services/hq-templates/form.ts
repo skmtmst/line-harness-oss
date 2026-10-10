@@ -1,5 +1,5 @@
 import { normalizeScopedTagName } from '@line-crm/db';
-import { layoutToFields, normalizeLayout, type FormLayout } from '@line-crm/shared';
+import { layoutToFields, normalizeLayout, validateFormDefinition, type FormLayout } from '@line-crm/shared';
 import { unsupportedHqTemplateAdapter, requireHqTemplateAuthority, type HqTemplateAdapter, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAuthority, type HqTemplateReference, type HqTemplateStatement, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan, } from './contract.js';
 import { bindScenarioGraphRevision, loadScenarioReferenceGraph, scenarioGraphSnapshotToken, ScenarioGraphError } from './scenario-graph.js';
 /** Unbound callers remain closed until the common executor provides dependencies. */
@@ -96,8 +96,10 @@ function visitLayout(value: unknown, resolve: (kind: 'tag' | 'scenario', id: str
         return value;
     const result: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(value)) {
-        if (['url', 'linkUrl', 'thanksUrl'].includes(key)) validatePortableUrl(item);
-        if (['friendFieldId', 'friendFieldIds', 'choiceFriendFieldId', 'fieldId', 'templateId', 'reminderId', 'mediaUrl', 'backgroundImageUrl'].includes(key) && item != null && item !== '' && !(Array.isArray(item) && !item.length))
+        if (['url', 'linkUrl', 'thanksUrl', 'mediaUrl'].includes(key)) validatePortableUrl(item);
+        if (key === 'mediaUrl' && typeof item === 'string' && /\/(?:images\/(?:media|form-uploads)|api\/media|media)\//i.test(item))
+            throw new FormTemplateError('UNSUPPORTED_REFERENCE');
+        if (['friendFieldId', 'friendFieldIds', 'choiceFriendFieldId', 'fieldId', 'templateId', 'reminderId', 'backgroundImageUrl'].includes(key) && item != null && item !== '' && !(Array.isArray(item) && !item.length))
             throw new FormTemplateError('UNSUPPORTED_REFERENCE');
         if ((key === 'tagId' || key === 'scenarioId') && item != null && item !== '')
             result[key] = resolve(key === 'tagId' ? 'tag' : 'scenario', text(item, 160));
@@ -131,8 +133,10 @@ export function parseFormTemplateDefinition(input: HqTemplateAdapterInput): Form
     const layout = form.layout == null ? null : normalizeLayout(form.layout);
     if (form.layout != null && !layout)
         throw new FormTemplateError('INVALID_DEFINITION');
-    if (layout)
+    if (layout) {
         visitLayout(layout, (_kind, id) => id);
+        if (validateFormDefinition(layout)) throw new FormTemplateError('INVALID_DEFINITION');
+    }
     let fields: Record<string, unknown>[];
     if (layout)
         fields = layoutToFields(layout) as unknown as Record<string, unknown>[];
@@ -400,7 +404,7 @@ export function createFormHqTemplateAdapter(deps: FormTemplateDependencies): HqT
             }
             const values = [name, def!.form.description, JSON.stringify(fields), layout ? JSON.stringify(layout) : null, tagId, scenarioId, def!.form.save_to_metadata ? 1 : 0];
             if (selection.mode === 'overwrite')
-                statements.push({ sql: `UPDATE forms SET name=?,description=?,fields=?,layout=?,on_submit_tag_id=?,on_submit_scenario_id=?,save_to_metadata=?,is_active=0,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1,content_revision=content_revision+1 WHERE id=? AND content_revision=?`, bindings: [...values, id, found!.content_revision] });
+                statements.push({ sql: `UPDATE forms SET name=?,description=?,fields=?,layout=?,on_submit_tag_id=?,on_submit_scenario_id=?,save_to_metadata=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1,content_revision=content_revision+1 WHERE id=? AND content_revision=?`, bindings: [...values, id, found!.content_revision] });
             else
                 statements.push({ sql: `INSERT INTO forms(id,name,description,fields,layout,on_submit_tag_id,on_submit_scenario_id,save_to_metadata,is_active) VALUES (?,?,?,?,?,?,?,?,0)`, bindings: [id, ...values] }, { sql: `INSERT INTO form_accounts(form_id,line_account_id) VALUES (?,?)`, bindings: [id, context.targetAccountId] });
             planned = { tenantId: context.tenantId, targetAccountId: context.targetAccountId, preflightId: context.preflightId, idempotencyFingerprint: context.idempotencyFingerprint, snapshotToken: context.snapshotToken, mode: context.mode, resolutions: context.resolutions.map(r => {

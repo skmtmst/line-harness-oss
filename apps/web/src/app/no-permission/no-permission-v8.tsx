@@ -11,8 +11,10 @@
  * 戻り先はダッシュボードが既定。画面の中へ戻るときは onBack を渡す。
  */
 import { Lock } from 'lucide-react'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import styles from './no-permission-v8.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 export type NoPermissionV8Props = {
   /** 機能名。「○○を開く権限がありません」になる。 */
@@ -48,8 +50,8 @@ export default function NoPermissionV8({
     : ''
   return (
     <div data-design-node="O5tUeE" className={styles.board}>
-      <h1 className={styles.headTitle}>{featureName}</h1>
-      <p className={styles.headDescription}>この機能は、あなたの役割では開けません。</p>
+      <PageHeading title={featureName} help={<> この機能は、あなたの役割では開けません。</>} />
+
 
       <div className={styles.card}>
         <span className={styles.lockWrap} aria-hidden="true">
@@ -59,7 +61,7 @@ export default function NoPermissionV8({
         <p className={styles.description}>
           {roleLabel ? `いまの役割は「${roleLabel}」です。` : 'この画面を開く権限がありません。'}
           {requiredPart}
-          必要なら、管理者に役割の変更を頼んでください。
+          {permissionDeniedMessage('store')}
         </p>
         {roleLabel || adminName ? (
           <p className={styles.roleRow}>

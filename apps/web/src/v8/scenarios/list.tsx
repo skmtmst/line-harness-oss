@@ -1,4 +1,69 @@
 'use client'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+import StatusBadge from '@/components/shared/status-badge'
+import SharedStatusPill from '@/components/shared/status-pill'
+import { collectListRows } from '@/components/shared/collect-list-rows'
+import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
+import { useListUrlValue, readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { RovingTbody } from '@/components/shared/row-roving'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { Bookmark, CalendarPlus, Copy, Folder as FolderIcon, Lightbulb, ListVideo, Pause, Play, Plus, Send, ShieldCheck, Square, UserCheck, Users, Workflow } from 'lucide-react'
+import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
+import { api, type ListStats } from '@/lib/api'
+import { useOffsetServerList } from '@/lib/use-server-list'
+import { clampSearchQuery } from '@/lib/search-query'
+import { completeReorder } from '@/lib/complete-reorder'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { ROLE_LABELS } from '@/lib/hq-members'
+import { isForbidden, permissionDeniedMessage } from '@/components/shared/api-error-message'
+import NoPermissionBoard from '@/v8/no-permission/no-permission'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import { formatNumber } from '@/lib/format'
+import { runUndoable, runOptimistic } from '@/lib/undoable'
+import { useLiveReorder } from '@/lib/use-live-reorder'
+import { ListPage, ListPagePagination } from '@/components/templates'
+import SearchField from '@/components/shared/search-field'
+import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
+import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
+import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
+import Notice from '@/components/shared/notice'
+import Checkbox from '@/components/shared/checkbox'
+import Select from '@/components/shared/select'
+import PageSizeSelect from '@/components/shared/page-size-select'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
+import FilterChip from '@/components/shared/filter-chip'
+import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import InlineEdit from '@/components/shared/inline-edit'
+import { TextField } from '@/components/shared/text-field'
+import { withViewTransition } from '@/components/shared/view-transition'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import Pagination from '@/components/shared/pagination'
+import ReorderHandle from '@/components/shared/reorder-handle'
+import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs'
+import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario'
+import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
+import { notifyToast } from '@/components/shared/toast'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
 
 /*
  * ★V8 シナリオ配信の一覧（Pencil「★V8 画面の地図」のシナリオ配信の行：
@@ -10,88 +75,17 @@
  * 「シナリオを作る」は左のフォルダの列の上、行の右端は「…」（複製・配信結果・削除）、
  * 行の左の □ を選ぶと表の下にまとめての帯（止める・再開・フォルダへ移す）。
  */
-import { RovingTbody } from '@/components/shared/row-roving'
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
-import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import {
-  Bookmark,
-  CalendarPlus,
-  Copy,
-  Eye,
-  Folder as FolderIcon,
-  Lightbulb,
-  ListVideo,
-  Pause,
-  Play,
-  Plus,
-  Send,
-  ShieldCheck,
-  Square,
-  TriangleAlert,
-  UserCheck,
-  Users,
-  Workflow,
-} from 'lucide-react'
-import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
-import { api, type ListStats } from '@/lib/api'
-import { useOffsetServerList } from '@/lib/use-server-list'
-import { clampSearchQuery } from '@/lib/search-query'
-import { completeReorder } from '@/lib/complete-reorder'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { ROLE_LABELS } from '@/lib/hq-members'
-import { isForbidden } from '@/components/shared/api-error-message'
-import NoPermissionBoard from '@/v8/no-permission/no-permission'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { formatNumber } from '@/lib/format'
-import { runUndoable } from '@/lib/undoable'
-import { useDeferredDelete } from '@/lib/use-deferred-delete'
-import { useLiveReorder } from '@/lib/use-live-reorder'
-import { ListPage, ListPagePagination } from '@/components/templates'
-import ListToolbar from '@/components/shared/list-toolbar'
-import SearchField from '@/components/shared/search-field'
-import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
-import Button from '@/components/shared/button'
-import EmptyList from '@/components/shared/empty-list'
-import KpiCard from '@/components/shared/kpi-card'
-import KpiBand from '@/components/shared/kpi-band'
-import Notice from '@/components/shared/notice'
-import Checkbox from '@/components/shared/checkbox'
-import Select from '@/components/shared/select'
-import PageSizeSelect from '@/components/ui/page-size-select'
-import FilterChip from '@/components/shared/filter-chip'
-import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
-import { FolderDotName } from '@/components/shared/folder-dot'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import type { ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
-import DetailPanel from '@/components/shared/detail-panel'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import InlineEdit from '@/components/shared/inline-edit'
-import { TextField } from '@/components/shared/text-field'
-import { withViewTransition } from '@/components/shared/view-transition'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import Pagination from '@/components/shared/pagination'
-import ReorderHandle from '@/components/shared/reorder-handle'
-import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs'
-import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario'
-import styles from './list.module.css'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
 
 /** 1ページに出す件数の選択肢（表示は PageSizeSelect が「N件表示」にする）。 */
-const PAGE_SIZE_OPTIONS = [20, 50, 100]
+const PAGE_SIZE_OPTIONS = STANDARD_PAGE_SIZES
 
-/** よく使う絞り込み（数えられるものだけ）。札の「停止中のみ」と対になる「稼働中のみ」。 */
+/** よく使う絞り込み（数えられるものだけ）。札の「停止中のみ」と対になる「有効のみ」。 */
 const SAVED_FILTER_OPTIONS = [
   { value: '', label: 'よく使う絞り込み' },
-  { value: 'active', label: '稼働中のみ' },
+  { value: 'active', label: '有効のみ' },
 ]
 
 type ScenarioRow = Scenario & {
@@ -126,10 +120,12 @@ function currentMonthStart(now = new Date()): string {
 }
 
 export default function ScenariosListV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('シナリオ配信')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
 
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const router = useRouter()
   // 1152 の板（`wjfLe`）。板IDと道具の段の並びだけを切り替える。
   const narrow = useNarrowViewport()
@@ -140,12 +136,13 @@ export default function ScenariosListV8() {
    * 押せる見た目にしておく（最後の守りはサーバの 403）。
    */
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const featureAccess = useFeatureAccess('scenarios')
+  const canEdit = featureAccess
 
   /* 絞り込み・検索語・ページは URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
   const [nameQuery, setNameQuery] = useListUrlParam('q')
   const [serverQuery, setServerQuery] = useState(() => clampSearchQuery(readListUrlParam('q').trim()))
-  /** よく使う絞り込み。いま数えられるのは「停止中のみ」「今月作った」「稼働中のみ」。 */
+  /** よく使う絞り込み。いま数えられるのは「停止中のみ」「今月作った」「有効のみ」。 */
   const [stoppedOnly, setStoppedOnly] = useListUrlFlag('stopped')
   const [createdThisMonthOnly, setCreatedThisMonthOnly] = useListUrlFlag('thisMonth')
   const [savedFilter, setSavedFilter] = useListUrlParam('view')
@@ -174,15 +171,16 @@ export default function ScenariosListV8() {
   const [deleteError, setDeleteError] = useState('')
 
   /* 複製の窓（★V8 `Al4Ek`）。 */
-  const [duplicateTarget, setDuplicateTarget] = useState<ScenarioRow | null>(null)
-  const [duplicateName, setDuplicateName] = useState('')
+  const duplicateLock = useRef(false)
   const [duplicating, setDuplicating] = useState(false)
-  const [duplicateError, setDuplicateError] = useState('')
+  const setDuplicateError =(message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
 
   /* 行の「…」。開いている行のID。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。開いている行のID。 */
-  const [panelId, setPanelId] = useState<string | null>(null)
+  const [pendingStop, setPendingStop] = useState<string[] | null>(null)
+  const toggleBusyRef = useRef(false)
+  const [panelId, setPanelId] = useDetailPanelUrl('scenario')
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
   const [dragId, setDragId] = useState<string | null>(null)
   /** キーボードで動かした結果を読み上げる（live 領域）。 */
@@ -206,6 +204,8 @@ export default function ScenariosListV8() {
     setStats(null)
     setStatsFailed(false)
     setSelectedIds(new Set())
+    setPendingStop(null)
+    toggleBusyRef.current = false
   }, [selectedAccountId])
 
   const loadFolders = useCallback(async () => {
@@ -219,7 +219,6 @@ export default function ScenariosListV8() {
       // 置き場が取れなくても一覧は出す。
     }
   }, [selectedAccountId])
-
 
   useEffect(() => {
     void loadFolders()
@@ -265,11 +264,10 @@ export default function ScenariosListV8() {
   }, [loadStats])
 
   useEffect(() => {
-    const timer = setTimeout(() => setServerQuery(clampSearchQuery(nameQuery.trim())), 300)
-    return () => clearTimeout(timer)
+    setServerQuery(clampSearchQuery(nameQuery.trim()))
   }, [nameQuery])
 
-  /* 「停止中のみ」と「稼働中のみ」は同時に掛からない（札が勝つ）。 */
+  /* 「停止中のみ」と「有効のみ」は同時に掛からない（札が勝つ）。 */
   const activeParam: 0 | 1 | undefined = stoppedOnly ? 0 : savedFilter === 'active' ? 1 : undefined
 
   const loadScenarioPage = useCallback(async (
@@ -291,7 +289,7 @@ export default function ScenariosListV8() {
   }, [accountLoading, activeParam, createdThisMonthOnly, folderFilter, selectedAccountId, serverQuery])
 
   /* 板 `axFrW`：右端は「20件表示」。 */
-  const [perPage, setPerPage] = useState(20)
+  const [perPage, setPerPage] = useListUrlValue('perPage', 20)
   const scenarioList = useOffsetServerList<ScenarioRow>({
     requestKey: JSON.stringify({
       ready: !accountLoading,
@@ -321,11 +319,10 @@ export default function ScenariosListV8() {
     page: scenarioList.page,
   })
   /* 取り消し待ちの削除（5秒）の行は一覧から外して描く（動きの点検 17 番）。 */
-  const deferredDelete = useDeferredDelete()
   const shownRows = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : scenarioList.items
   const scenarios = useMemo(
-    () => (deferredDelete.hiddenCount === 0 ? shownRows : shownRows.filter((s) => !deferredDelete.isHidden(s.id))),
-    [deferredDelete, shownRows],
+    () => shownRows,
+    [shownRows],
   )
   /* 戻ってきたら前のスクロール位置へ（中身が描けてから）。 */
   useListScrollMemory(scenarioList.loaded)
@@ -403,41 +400,8 @@ export default function ScenariosListV8() {
     }
   }
 
-  /*
-   * 影響の無い削除だけ、確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる
-   * （動きの点検 17 番）。止まっていて・購読中が 0 人で・このアカウントだけのもので・
-   * ほかのシナリオの終了後の移動先になっていないもの。どれか分からないときは今までどおり窓。
-   */
-  const requestDelete = async (s: ScenarioRow) => {
-    setDeleteError('')
-    const candidate = !s.isActive && s.subscriberCount === 0 && s.lineAccountId !== null
-    let unreferenced = false
-    if (candidate) {
-      try {
-        const res = await api.scenarios.moveReferrers(s.id)
-        unreferenced = res.success && res.data.items.length === 0
-      } catch {
-        unreferenced = false
-      }
-    }
-    if (!unreferenced) {
-      setDeleteTarget(s)
-      return
-    }
-    if (panelId === s.id) setPanelId(null)
-    deferredDelete.schedule({
-      ids: [s.id],
-      message: `シナリオ「${s.name}」を削除しました`,
-      commit: () => api.scenarios.delete(s.id),
-      onCommitted: () => {
-        void loadFolders()
-        void loadOverallTotal()
-        void loadStats()
-        return loadScenarios()
-      },
-      failureMessage: 'シナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。',
-    })
-  }
+  /* 削除は、利用状況にかかわらず確認してから実行する。 */
+  const requestDelete = (s: ScenarioRow) => { setDeleteError(''); setDeleteTarget(s) }
 
   /* ===== まとめて「止める／再開」 ===== */
 
@@ -446,7 +410,14 @@ export default function ScenariosListV8() {
   /* 選んでいる間は Esc で選択を外す（動きの点検 12 番）。 */
   const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
   useEscapeToClearSelection(selectedCount > 0, clearSelection)
-  const selectedRows = scenarios.filter((s) => selectedIds.has(s.id))
+  const [selectionRows, setSelectionRows] = useState<ScenarioRow[]>([])
+  const selectedRows = [...new Map([...scenarios, ...selectionRows].map(row => [row.id, row])).values()].filter(row => selectedIds.has(row.id))
+  const selectAllScenarios = async () => {
+    const account = selectedAccountId
+    const rows = await collectListRows(scenarioList.total, (offset, limit) => loadScenarioPage({ page: Math.floor(offset / limit) + 1, limit }, new AbortController().signal))
+    if (activeAccountRef.current !== account) return
+    setSelectionRows(rows); setSelectedIds(new Set(rows.map(row => row.id)))
+  }
   const stoppableIds = selectedRows.filter((s) => s.isActive).map((s) => s.id)
   const resumableIds = selectedRows.filter((s) => !s.isActive).map((s) => s.id)
 
@@ -473,24 +444,28 @@ export default function ScenariosListV8() {
    * 「元に戻す」で送らずに戻せる。1本ずつの開始前チェックは詳細画面で行う。
    */
   const runBulkToggle = (next: boolean, ids: string[]) => {
-    if (ids.length === 0 || !canEdit) return
+    if (ids.length === 0 || !canEdit || toggleBusyRef.current) return
+    toggleBusyRef.current = true
+    const account = selectedAccountId
     const key = listContextKey
     setOptimisticRows({
       key,
       rows: scenarios.map((s) => (ids.includes(s.id) ? { ...s, isActive: next } : s)),
     })
-    runUndoable({
-      message: next ? `${ids.length}件の配信を始めました` : `${ids.length}件を停止しました`,
-      commit: async () => {
+    runOptimistic({
+      isCurrent: () => activeAccountRef.current === account,
+      request: async () => {
         const results = await Promise.all(
-          ids.map((id) => api.scenarios.update(id, { isActive: next }).catch(() => null)),
-        )
+          ids.map((id) => api.scenarios.update(id, { isActive: next }).catch((saveFailure) => { saveErrors.capture(saveFailure); return null })),
+        );
+
         const failed = results.filter((res) => !res || !res.success).length
-        if (failed > 0) throw new Error(`${failed}件の保存に失敗しました`)
+        if (failed > 0) throw new Error(`${failed} 件の保存に失敗しました`)
       },
-      undo: () => setOptimisticRows(null),
+      revert: () => { toggleBusyRef.current = false; setOptimisticRows(null); void loadScenarios() },
       failureMessage: next ? '配信を始められませんでした。' : '停止できませんでした。',
-      onCommitted: () => {
+      onSuccess: () => {
+        toggleBusyRef.current = false
         setOptimisticRows(null)
         setSelectedIds(new Set())
         void loadScenarios()
@@ -525,10 +500,11 @@ export default function ScenariosListV8() {
       message: folderId ? 'フォルダへ移しました' : 'フォルダから外しました',
       commit: async () => {
         const results = await Promise.all(
-          ids.map((id) => api.scenarios.update(id, { folderId }).catch(() => null)),
-        )
+          ids.map((id) => api.scenarios.update(id, { folderId }).catch((saveFailure) => { saveErrors.capture(saveFailure); return null })),
+        );
+
         const failed = results.filter((res) => !res || !res.success).length
-        if (failed > 0) throw new Error(`${failed}件のフォルダ移動に失敗しました`)
+        if (failed > 0) throw new Error(`${failed} 件のフォルダ移動に失敗しました`)
       },
       undo: () => setOptimisticRows(null),
       failureMessage: 'フォルダを移動できませんでした。',
@@ -567,24 +543,24 @@ export default function ScenariosListV8() {
 
   /* ===== 複製（★V8 `Al4Ek`） ===== */
 
-  const openDuplicate = (s: ScenarioRow) => {
-    setDuplicateName(`${s.name} のコピー`)
-    setDuplicateError('')
-    setDuplicateTarget(s)
+  const openDuplicate = (s: ScenarioRow) => { void runDuplicate(s)
   }
 
-  const runDuplicate = async () => {
+  const runDuplicate = async (duplicateTarget: ScenarioRow) => {
+    if (duplicateLock.current) return
     if (!duplicateTarget || duplicating) return
-    const name = duplicateName.trim() || `${duplicateTarget.name} のコピー`
+    duplicateLock.current = true
+    const name = `${duplicateTarget.name}のコピー`
     setDuplicating(true)
     setDuplicateError('')
     try {
       const copyId = await duplicateScenario(duplicateTarget.id, name)
-      setDuplicateTarget(null)
+
+      notifyToast('複製しました', { tone: 'success' })
       void loadScenarios()
       void loadOverallTotal()
       void loadStats()
-      router.push(`/scenarios/detail?id=${copyId}`)
+      duplicateFeedback.mark(duplicateTarget.id, copyId)
     } catch (e) {
       if (e instanceof DuplicateAborted) {
         setDuplicateError(`複製が「${e.stage}」で止まりました。途中まで作成されたコピーが一覧に残っています。`)
@@ -593,22 +569,10 @@ export default function ScenariosListV8() {
       }
       void loadScenarios()
     } finally {
+      duplicateLock.current = false
       setDuplicating(false)
     }
   }
-
-  /** 複製の窓の「引き継ぐもの」：通の数と配信方式は対象のシナリオから書く。 */
-  const duplicateCarries = duplicateTarget
-    ? [
-        `メッセージ ${duplicateTarget.stepCount === undefined ? '' : `${duplicateTarget.stepCount}通`}（質問を含む）`,
-        '開始のきっかけ',
-        'アクション',
-        '配信対象の条件',
-        '最後の1通の後',
-        `配信方式（${deliveryModeLabels[duplicateTarget.deliveryMode ?? 'relative']}）`,
-        'フォルダ',
-      ].join('・')
-    : ''
 
   /* ===== 並び替え ===== */
 
@@ -688,11 +652,11 @@ export default function ScenariosListV8() {
       unfiledId={UNFILED}
       allCount={overallTotal}
       unfiledCount={unfiledCount}
-      placeholder="例: 01_新規フォロー"
+      placeholder="例：01_新規フォロー"
     >
       {sharedScenarioCount > 0 ? (
         <p className={styles.folderNote}>
-          全アカウントに共通で適用されるシナリオが{sharedScenarioCount}件あります。「すべて」の件数には含まれますが、フォルダ別の件数と「未分類」には含まれません。
+          全アカウントに共通で適用されるシナリオが{sharedScenarioCount} 件あります。「すべて」の件数には含まれますが、フォルダ別の件数と「未分類」には含まれません。
         </p>
       ) : null}
     </ManagedFolderPanel>
@@ -700,7 +664,7 @@ export default function ScenariosListV8() {
 
   /* ===== 数の帯（4つ） ===== */
 
-  /* 板 `axFrW`：1つ目の補足は「稼働中 3・停止中 2」。止めた数は合計から出す。 */
+  /* 板 `axFrW`：1つ目の補足は「有効 3・停止中 2」。止めた数は合計から出す。 */
   const scenarioStopped = stats ? Math.max(0, stats.scenarios.total - stats.scenarios.active) : null
   const kpis = [
     {
@@ -708,7 +672,7 @@ export default function ScenariosListV8() {
       icon: Workflow,
       value: overallTotal,
       unit: '件',
-      detail: `稼働中 ${stats ? stats.scenarios.active : '—'}・停止中 ${scenarioStopped ?? '—'}`,
+      detail: `有効 ${stats ? stats.scenarios.active : emptyValue('unknown')}・停止中 ${scenarioStopped ?? emptyValue('unknown')}`,
     },
     {
       title: '購読中',
@@ -722,7 +686,7 @@ export default function ScenariosListV8() {
       icon: UserCheck,
       value: statsFailed ? null : stats?.scenarios.completed ?? null,
       unit: '人',
-      detail: stats ? scenarioCompletionDetail(stats.scenarios.subscribers, stats.scenarios.completed) : '—',
+      detail: stats ? scenarioCompletionDetail(stats.scenarios.subscribers, stats.scenarios.completed) : emptyValue('unknown'),
     },
     {
       title: '今週送った数',
@@ -773,7 +737,7 @@ export default function ScenariosListV8() {
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   const panelIndex = panelId === null ? -1 : scenarios.findIndex((s) => s.id === panelId)
@@ -858,14 +822,7 @@ export default function ScenariosListV8() {
       </div>
     ) : scenarioList.error ? (
       /* 板 `BxGhV`「読み込めなかった」。数の帯は「—」のまま。 */
-      <div className={styles.stateCard} role="alert" data-design-node="BxGhV">
-        <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
-          <TriangleAlert size={16} aria-hidden="true" />
-        </span>
-        <p className={styles.stateTitle}>シナリオを読み込めませんでした</p>
-        <p className={styles.stateDesc}>作ったシナリオは消えていません。通信を確かめて、もう一度試してください。</p>
-        <Button type="button" onClick={() => void loadScenarios()}>もう一度試す</Button>
-      </div>
+      <ListState kind="error" title="シナリオを読み込めませんでした" description="作ったシナリオは消えていません。通信を確かめて、もう一度試してください。" data-design-node="BxGhV" action={<><Button type="button" onClick={() => void loadScenarios()}>もう一度読み込む</Button></>} />
     ) : scenarios.length === 0 ? (
       /* 修正案 D-2（2026-10-07 採用）：空の一覧は次の一歩へ導く。 */
       <EmptyList
@@ -891,18 +848,18 @@ export default function ScenariosListV8() {
             <thead>
               <TableHeadRow>
                 <Th className={styles.selectCell} aria-label="選択">
-                  {canEdit && <Checkbox
+                  {canEdit && <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
                     checked={allOnPageSelected}
                     indeterminate={!allOnPageSelected && selectedCount > 0}
                     onCheckedChange={() => toggleAllOnPage()}
                     aria-label="このページのシナリオをすべて選択"
-                  />}
+                  /></SaveErrorField>}
                 </Th>
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
-            <RovingTbody reorderKey={liveOrder.shown.map((s) => s.id).join(',')}>
-              {liveOrder.shown.map((s) => {
+            <RovingTbody reorderKey={duplicateFeedback.order(liveOrder.shown, scenarios).map((s) => s.id).join(',')}>
+              {duplicateFeedback.order(liveOrder.shown, scenarios).map((s, saveFieldIndex) => {
                 const rowFolder = s.folderId ? folders.find((f) => f.id === s.folderId) : undefined
                 const folderName = s.folderId
                   ? rowFolder?.name ?? 'フォルダ'
@@ -910,15 +867,16 @@ export default function ScenariosListV8() {
                 const showFolder = folders.length > 0 || s.folderId
                 const meta = [
                   deliveryModeLabels[s.deliveryMode ?? 'relative'],
-                  s.stepCount === undefined ? '—通' : `${s.stepCount}通`,
+                  s.stepCount === undefined ? '—通' : `${s.stepCount} 通`,
                   ...(showFolder ? [folderName] : []),
                 ].join('・')
                 /* 絵：送り方・通数・フォルダのあとに全角の間を空けて説明。1つの文字列で書く。 */
                 const sub = s.description ? `${meta}　${s.description}` : meta
-                const subscribers = s.subscriberCount === undefined ? '—' : formatNumber(s.subscriberCount)
+                const subscribers = s.subscriberCount === undefined ? emptyValue('unknown') : formatNumber(s.subscriberCount)
                 return (
                   <Tr
                     interactive
+                    highlighted={duplicateFeedback.highlightedId === s.id}
                     key={s.id}
                     data-reorder-id={s.id}
                     onDragEnter={() => liveOrder.enter(s.id)}
@@ -933,14 +891,14 @@ export default function ScenariosListV8() {
                         event.preventDefault()
                         setPanelId(s.id)
                       }
-                    }}
+                    }} data-row-id={s.id}
                   >
                     <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
-                      {canEdit && <Checkbox
+                      {canEdit && <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","s.id"]}><Checkbox
                         checked={selectedIds.has(s.id)}
                         onCheckedChange={() => toggleOne(s.id)}
                         aria-label={`${s.name}を選択`}
-                      />}
+                      /></SaveErrorField>}
                     </Td>
                     <Td
                       className={styles.gripCell}
@@ -959,13 +917,12 @@ export default function ScenariosListV8() {
                         <span aria-hidden>⠿</span>
                       </ReorderHandle>}
                     </Td>
-                    <NameCell
-                      name={
+                    <NameCell name={
                         <div className={styles.nameRow}>
-                          <FolderDotName folder={rowFolder ? { name: rowFolder.name, color: rowFolder.color } : null}>
+                          <>
                             <Link
                               href={`/scenarios/detail?id=${s.id}`}
-                              title={s.name}
+
                               className={styles.cellTitle}
                               onClick={(event) => {
                                 event.stopPropagation()
@@ -974,30 +931,26 @@ export default function ScenariosListV8() {
                                 goDetail(s.id)
                               }}
                             >
-                              {s.name}
+                              <TruncatedText value={String(s.name ?? '')} />
                             </Link>
-                          </FolderDotName>
+                          </>
                           {s.lineAccountId === null && (
                             <span className={styles.miniBadge} title="全アカウントに適用されるシナリオです">
                               全アカウント共通
                             </span>
                           )}
                         </div>
-                      }
-                      sub={<span className={styles.cellSub} title={sub}>{sub}</span>}
+                      } folder={rowFolder ? { name: rowFolder.name, color: rowFolder.color } : null}
                     />
                     <Td
                       className={styles.countCell}
-                      title={`購読中 ${subscribers}人 ／ 読み終えた ${formatNumber(s.completedCount ?? 0)}人`}
+                      title={`購読中 ${subscribers} 人 ／ 読み終えた ${formatNumber(s.completedCount ?? 0)} 人`}
                     >
-                      <div className={styles.countMain}>{`${subscribers}人`}</div>
-                      <div className={styles.countSub}>{`読み終えた ${formatNumber(s.completedCount ?? 0)}人`}</div>
+                      <div className={styles.countMain}>{`${subscribers} 人`}</div>
+                      <div className={styles.countSub}>{`読み終えた ${formatNumber(s.completedCount ?? 0)} 人`}</div>
                     </Td>
                     <Td>
-                      <span className={`${styles.statePill} ${s.isActive ? styles.statePillActive : styles.statePillStopped}`}>
-                        <span className={styles.stateDot} aria-hidden="true" />
-                        {s.isActive ? '稼働中' : '停止中'}
-                      </span>
+                      <SharedStatusPill tone={s.isActive ? 'success' : 'neutral'}>{s.isActive ? '有効' : '停止中'}</SharedStatusPill>
                     </Td>
                     <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
                       {/* 横並びにして、メニューの位置の目印（空の span）が行を1段増やさないようにする。 */}
@@ -1021,19 +974,16 @@ export default function ScenariosListV8() {
 
         {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
         {canEdit && selectedCount > 0 ? (
-          <div className={styles.bulkRow} role="region" aria-label="選択中のまとめ操作">
-            <span className={styles.bulkCount} aria-live="polite" aria-atomic="true">{selectedCount}件を選択中</span>
-            <Button
+          <BulkBar count={selectedCount} total={scenarioList.total} onSelectAll={selectAllScenarios} onClear={clearSelection}><Button
               type="button"
               variant="secondary"
               disabled={stoppableIds.length === 0}
-              title={stoppableIds.length === 0 ? '稼働中のシナリオが選ばれていません' : undefined}
-              onClick={() => runBulkToggle(false, stoppableIds)}
+              title={stoppableIds.length === 0 ? '有効のシナリオが選ばれていません' : undefined}
+              onClick={() => setPendingStop(stoppableIds)}
             >
               <Square size={13} aria-hidden="true" />
               止める
-            </Button>
-            <Button
+            </Button><Button
               type="button"
               variant="secondary"
               disabled={resumableIds.length === 0}
@@ -1042,19 +992,16 @@ export default function ScenariosListV8() {
             >
               <Play size={13} aria-hidden="true" />
               再開
-            </Button>
-            <Button
+            </Button><Button
               type="button"
               variant="secondary"
               onClick={() => openMove([...selectedIds])}
             >
               <FolderIcon size={13} aria-hidden="true" />
               フォルダへ移す
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
+            </Button><Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
               選択を外す
-            </Button>
-          </div>
+            </Button></BulkBar>
         ) : null}
       </>
     )
@@ -1063,7 +1010,7 @@ export default function ScenariosListV8() {
   const listPager = scenarioList.pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {(scenarioList.page - 1) * scenarioList.limit + 1}〜{Math.min(scenarioList.page * scenarioList.limit, scenarioList.total)} / {formatNumber(scenarioList.total)}件
+        {(scenarioList.page - 1) * scenarioList.limit + 1}〜{Math.min(scenarioList.page * scenarioList.limit, scenarioList.total)} / {formatNumber(scenarioList.total)} 件
       </span>
       <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage} />
     </ListPagePagination>
@@ -1104,7 +1051,7 @@ export default function ScenariosListV8() {
   const savedBox = (
     <div className={styles.savedBox}>
       <Bookmark size={14} aria-hidden="true" className={styles.savedIcon} />
-      <Select
+      <SaveErrorField names={["savedFilter","saved_filter"]}><Select
         aria-label="よく使う絞り込み"
         value={savedFilter}
         onChange={(value) => {
@@ -1112,7 +1059,7 @@ export default function ScenariosListV8() {
           if (value === 'active') setStoppedOnly(false)
         }}
         options={SAVED_FILTER_OPTIONS}
-      />
+      /></SaveErrorField>
     </div>
   )
 
@@ -1136,12 +1083,12 @@ export default function ScenariosListV8() {
   )
 
   const folderSelect = (
-    <Select aria-label="フォルダ" value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} />
+    <SaveErrorField names={["folderFilter","folderId","folder","folder_filter"]}><Select aria-label="フォルダ" value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} /></SaveErrorField>
   )
 
   const filteredCount =
     scenarioFilterActive && scenarioList.loaded ? (
-      <p className={styles.filteredCount}>条件に一致したシナリオ：{formatNumber(scenarioList.total)}件</p>
+      <p className={styles.filteredCount}>条件に一致したシナリオ：{formatNumber(scenarioList.total)} 件</p>
     ) : null
 
   /*
@@ -1149,29 +1096,29 @@ export default function ScenariosListV8() {
    * 部品は広い板と同じもの（動きは同じ）。並びと段だけを変える。
    */
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
+    <ListToolbarFrame>
       {noteBand}
-      <div className={styles.narrowRow}>
+      <ListToolbarRow>
         {createButton(false)}
         <div className={styles.narrowFolder}>{folderSelect}</div>
-        <div className={styles.narrowSearch}>
+        <ListToolbarSearchSlot>
           <SearchField
             placeholder="シナリオ名で探す"
-            aria-label="シナリオ名で検索"
+            aria-label="シナリオ名で探す"
             value={nameQuery}
             onChange={(value) => setNameQuery(clampSearchQuery(value))}
             onClear={() => setNameQuery('')}
           />
-        </div>
+        </ListToolbarSearchSlot>
         <span className={styles.narrowSpacer} aria-hidden="true" />
         {perPageBox}
-      </div>
-      <div className={styles.narrowRow}>
+      </ListToolbarRow>
+      <ListToolbarRow>
         {filterChips}
         <div className={styles.savedIconOnly} title="よく使う絞り込み">{savedBox}</div>
-      </div>
+      </ListToolbarRow>
       {filteredCount}
-    </div>
+    </ListToolbarFrame>
   )
 
   const wideToolbar = (
@@ -1181,7 +1128,7 @@ export default function ScenariosListV8() {
       <ListToolbar
         search={{
           placeholder: 'シナリオ名で探す',
-          label: 'シナリオ名で検索',
+          label: 'シナリオ名で探す',
           width: 240,
           value: nameQuery,
           onChange: (value) => setNameQuery(clampSearchQuery(value)),
@@ -1199,28 +1146,26 @@ export default function ScenariosListV8() {
   /* 板 `O5tUeE`：一覧の口が 403（この役割では開けない）なら、画面ごと権限なしの板にする。 */
   if (scenarioList.error && isForbidden(scenarioList.error)) {
     return (
-      <NoPermissionBoard
+      <SaveErrorScope errors={saveErrors}><NoPermissionBoard
         featureName="シナリオ配信"
         roleLabel={staffRole && staffRole in ROLE_LABELS ? ROLE_LABELS[staffRole as keyof typeof ROLE_LABELS] : null}
         capabilitiesHref="/staff"
-      />
+      /></SaveErrorScope>
     )
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId={narrow ? 'wjfLe' : canEdit ? 'axFrW' : 'X0QrW0'}
       headingSize="regular"
       title="シナリオ配信"
-      description="きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。"
-      help="左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除。"
+
+      help={<>{"きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。"}{"左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除。"}</>}
       stats={<>
         {/* 板 `X0QrW0`：閲覧のみの帯。数の帯の上。 */}
         {!canEdit && (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。{permissionDeniedMessage('store')}</ReadOnlyNotice></div>
         )}
         <KpiBand data-design="KPIs">
           {kpis.map((kpi) => (
@@ -1245,7 +1190,7 @@ export default function ScenariosListV8() {
             title={panelRow.name}
             description={[
               deliveryModeLabels[panelRow.deliveryMode ?? 'relative'],
-              panelRow.stepCount === undefined ? '—通' : `${panelRow.stepCount}通`,
+              panelRow.stepCount === undefined ? '—通' : `${panelRow.stepCount} 通`,
             ].join('・')}
             onClose={() => setPanelId(null)}
             onPrev={panelIndex > 0 ? () => setPanelId(scenarios[panelIndex - 1].id) : undefined}
@@ -1264,7 +1209,7 @@ export default function ScenariosListV8() {
                       router.push(`/scenarios/results?id=${encodeURIComponent(panelRow.id)}`)
                     })
                   }
-                >
+                 busyLabel="移動中…">
                   配信結果を見る
                 </Button>
                 {canEdit && <Button variant="secondary" onClick={() => openDuplicate(panelRow)}>
@@ -1283,8 +1228,8 @@ export default function ScenariosListV8() {
             }
           >
             <p>
-              {panelRow.isActive ? '稼働中' : '停止中'} ／ 購読{' '}
-              {panelRow.subscriberCount === undefined ? '—' : formatNumber(panelRow.subscriberCount)}人 ／
+              {panelRow.isActive ? '有効' : '停止中'} ／ 購読{' '}
+              {panelRow.subscriberCount === undefined ? emptyValue('unknown') : formatNumber(panelRow.subscriberCount)}人 ／
               読了 {formatNumber(panelRow.completedCount ?? 0)}人
             </p>
             {panelRow.description && <p>{panelRow.description}</p>}
@@ -1305,7 +1250,7 @@ export default function ScenariosListV8() {
           title={
             moveIds && moveIds.length === 1
               ? `「${scenarios.find((s) => s.id === moveIds[0])?.name ?? 'シナリオ'}」のフォルダを移動`
-              : `${moveIds?.length ?? 0}件のシナリオのフォルダを移動`
+              : `${moveIds?.length ?? 0} 件のシナリオのフォルダを移動`
           }
           description="移動先のフォルダを選んでください。「未分類」を選ぶとフォルダから外れます。"
           confirmLabel="移動する"
@@ -1314,7 +1259,7 @@ export default function ScenariosListV8() {
         >
           <div className={styles.moveBody}>
             <span className={styles.moveLabel}>移動先のフォルダ</span>
-            <Select
+            <SaveErrorField names={["moveDraft","move_draft"]}><Select
               aria-label="移動先のフォルダ"
               size="full"
               value={moveDraft}
@@ -1323,7 +1268,7 @@ export default function ScenariosListV8() {
                 { value: '', label: '未分類' },
                 ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
               ]}
-            />
+            /></SaveErrorField>
           </div>
         </ConfirmDialog>
 
@@ -1336,7 +1281,7 @@ export default function ScenariosListV8() {
           destructive
           busy={deleting}
           error={deleteError}
-          onConfirm={targetStillListed ? () => void runDelete() : undefined}
+          onConfirm={targetStillListed ? () => runDelete() : undefined}
           onCancel={() => {
             if (deleting) return
             setDeleteTarget(null)
@@ -1347,8 +1292,8 @@ export default function ScenariosListV8() {
             <div className={styles.deleteBody}>
               <MoveReferrersNotice scenarioId={deleteTarget.id} />
               <p>
-                購読中 {formatNumber(deleteTarget.subscriberCount ?? 0)}人 ／ 通数{' '}
-                {deleteTarget.stepCount === undefined ? '— 読み込めませんでした' : `${deleteTarget.stepCount}通`}
+                購読中 {formatNumber(deleteTarget.subscriberCount ?? 0)} 人 ／ 通数{' '}
+                {deleteTarget.stepCount === undefined ? '— 読み込めませんでした' : `${deleteTarget.stepCount} 通`}
               </p>
               {deleteTarget.lineAccountId === null && (
                 <p className={styles.deleteWarn}>全アカウント共通のシナリオです。すべてのアカウントから消えます。</p>
@@ -1357,59 +1302,20 @@ export default function ScenariosListV8() {
                 回答フォーム・流入経路・計測リンクからの参照は数えられていません。消したあとに参照が外れることがあります。
               </p>
               {!targetStillListed && (
-                <p className={styles.deleteWarn}>
+                <SaveErrorField names={["duplicateName","duplicate_name"]}><p className={styles.deleteWarn}>
                   このシナリオが一覧から外れました（LINEアカウントの切り替えなど）。この窓を閉じて、いまの一覧から選び直してください。
-                </p>
+                </p></SaveErrorField>
               )}
             </div>
           )}
         </ConfirmDialog>
 
         {/* 複製の窓（★V8 `Al4Ek`：新しい名前・引き継ぐもの・引き継がないもの・停止中で作られる）。題の左に印は置かない（絵どおり）。 */}
-        <Dialog
-          open={duplicateTarget !== null}
-          title="このシナリオを複製する"
-          confirmation
-          designNode="Al4Ek"
-          confirmLabel={duplicating ? '複製中…' : '複製する'}
-          confirmIcon={<Copy size={14} aria-hidden="true" />}
-          busy={duplicating}
-          error={duplicateError}
-          onConfirm={() => void runDuplicate()}
-          onCancel={() => {
-            if (duplicating) return
-            setDuplicateTarget(null)
-            setDuplicateError('')
-          }}
-        >
-          <div className={styles.dupBody}>
-            <label className={styles.dupField}>
-              <span className={styles.dupLabel}>新しい名前</span>
-              <TextField
-                value={duplicateName}
-                onChange={(event) => setDuplicateName(event.target.value)}
-                disabled={duplicating}
-                maxLength={80}
-                aria-label="新しい名前"
-              />
-            </label>
-            <div className={styles.dupBox}>
-              <p className={styles.dupBoxTitle}>引き継ぐもの</p>
-              <p className={styles.dupBoxText}>{`・${duplicateCarries}`}</p>
-            </div>
-            <div className={styles.dupBox}>
-              <p className={styles.dupBoxTitle}>引き継がないもの</p>
-              <p className={styles.dupBoxText}>・購読中の人・配信の記録</p>
-            </div>
-            <div className={styles.dupNote}>
-              <ShieldCheck size={16} aria-hidden="true" />
-              <span>複製は「停止中」で作られます。開始のきっかけも写しますが、配信を始めるまで誰にも届きません。</span>
-            </div>
-          </div>
-        </Dialog>
+        <></>
       </>}
       folders={<>
-        {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
+        <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" onCancel={() => setPendingStop(null)} onConfirm={() => { const ids = pendingStop; setPendingStop(null); if (ids) runBulkToggle(false, ids) }} />
+      {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
         {createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
         {folderPanel}
       </>}
@@ -1418,12 +1324,9 @@ export default function ScenariosListV8() {
       pagination={listPager}
     >
       {actionError ? (
-        <p className={styles.errorBand} role="alert">
-          {actionError}
-          <button type="button" onClick={() => setActionError('')}>閉じる</button>
-        </p>
+        <Notice tone="danger" >{actionError}<button type="button" onClick={() => setActionError('')}>閉じる</button></Notice>
       ) : null}
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

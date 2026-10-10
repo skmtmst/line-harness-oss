@@ -1,3 +1,4 @@
+import { tapExtrasError } from '@line-crm/shared'
 /*
  * 「押したら」の共通の決まり（オーナー採用 B-129・Pen YPzmo・2026-10-09）。
  *
@@ -9,7 +10,7 @@
  * 画面と部品（components/shared/tap-action-field.tsx）はここを読む。
  */
 
-import { liffActionUrl, liffActionFromUrl, type LiffAction } from '@line-crm/shared'
+import { type TapExtras, liffActionUrl, liffActionFromUrl, type LiffAction } from '@line-crm/shared'
 
 export type TapActionKind = 'uri' | 'message' | 'booking' | 'form' | 'booking_history' | 'visit_stamp'
 
@@ -76,6 +77,7 @@ export function tapActionFromUri(uri: string): { kind: TapActionKind; refId: str
 
 /** 押したら1つぶんの値（画面の間で持ち回る形）。保存の形は画面ごとに今のまま組み立てる。 */
 export interface TapActionValue {
+  tapExtras?: TapExtras
   /** 6つのどれか、または画面が足した種類（リッチメニューの「テンプレートを送る」など）。 */
   kind: string
   uri: string
@@ -105,6 +107,8 @@ export function tapActionFromSavedUri(uri: string): TapActionValue {
 
 /** 保存の前に止める問題（無ければ null）。where は「カード1のボタン1」など。 */
 export function tapActionProblem(value: TapActionValue, opts: { where: string; hasLiff: boolean; textMax?: number }): string | null {
+  const extrasError = tapExtrasError(value.tapExtras)
+  if (extrasError) return extrasError
   const def = tapActionDef(value.kind)
   if (!def) return null
   if (def.kind === 'uri' && !value.uri.trim()) return `${opts.where}のURLを入力してください`
@@ -115,4 +119,9 @@ export function tapActionProblem(value: TapActionValue, opts: { where: string; h
   if (def.target?.required && !value.refId) return `${opts.where}の${def.target.noun}を選んでください`
   if (def.needsLiff && !opts.hasLiff) return `${opts.where}：このアカウントに LIFF が設定されていないため、「${def.label}」は開けません`
   return null
+}
+
+/** 追加処理の保存で落ちた理由を、その欄へ戻すための符号。 */
+export function tapExtraSaveError(error: unknown): string | null {
+  return error instanceof Error && (error as Error & { code?: string }).code === 'TAP_EXTRA_INVALID' ? error.message : null
 }

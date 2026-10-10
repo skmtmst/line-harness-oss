@@ -34,7 +34,7 @@ import type {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { currentMonthRange } from '../lib/jst-range.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -588,7 +588,7 @@ type DraftReadResult =
   | { ok: false; error: string; field?: string };
 
 /** 既存の作成・更新と同じ制約で、公開前の定義だけを読む。 */
-async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftReadResult> {
+export async function readDraftSettings(db: D1Database, raw: unknown, checkReferences = true): Promise<DraftReadResult> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return { ok: false, error: '設定の形式が正しくありません' };
   }
@@ -634,16 +634,16 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
       return { ok: false, error: `${label}が大きすぎます` , field: key };
     }
   }
-  const folderError = await validateAutoReplyFolder(db, extras.value.folderId);
-  if (folderError) return { ok: false, error: folderError , field: "folderId" };
+  const folderError = checkReferences ? await validateAutoReplyFolder(db, extras.value.folderId) : null;
+  if (folderError) return { ok: false, error: folderError, field: "folderId" };
   if (extras.value.actions) {
     const parsedActions = parseAutoReplyActions(JSON.stringify(extras.value.actions));
     if (parsedActions.length !== extras.value.actions.length) {
       return { ok: false, error: '応答したあとにすることの設定を確認してください' , field: "actions" };
     }
     for (const action of parsedActions) {
-      const error = await validateAutoReplyOperatorAction(db,action,body.lineAccountId as string,false);
-      if (error) return {ok:false,error, field: "actions" };
+      const error = checkReferences ? await validateAutoReplyOperatorAction(db,action,body.lineAccountId as string,false) : null;
+      if (error) return {ok:false,error, field: "actions"};
     }
     // 失敗したら止めるか続けるかは stop/continue のどちらかだけ受け付ける。
     // 読めない値は実行側が続けるに倒すが、保存時には書き直しを促す。
@@ -660,7 +660,7 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
   let responseType = typeof body.responseType === 'string' && body.responseType ? body.responseType : 'text';
   let responseContent = typeof body.responseContent === 'string' ? body.responseContent : '';
   let templateLineAccountId: string | null = null;
-  if (templateId) {
+  if (templateId && checkReferences) {
     const template = await getTemplateById(db, templateId);
     if (!template) return { ok: false, error: '選んだテンプレートを確認できません' , field: "templateId" };
     templateLineAccountId = template.line_account_id ?? null;
@@ -1263,7 +1263,7 @@ autoReplies.get('/api/auto-replies/conflicts', async (c) => {
 });
 
 /** V6: 新規設定は下書きだけを作り、この時点では返信を始めない。 */
-autoReplies.post('/api/auto-replies/drafts', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+autoReplies.post('/api/auto-replies/drafts', requireDeliveryAccess('autoReplies'), inputJsonBoundary(), async (c) => {
   try {
     const parsed = await readDraftSettings(c.env.DB, await c.req.json());
     if (!parsed.ok) return inputError(c, { success: false, error: parsed.error, field: parsed.field }, 400, []);
@@ -1343,7 +1343,7 @@ autoReplies.get('/api/auto-replies/:id/draft', async (c) => {
   }
 });
 
-autoReplies.put('/api/auto-replies/:id/draft', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+autoReplies.put('/api/auto-replies/:id/draft', requireDeliveryAccess('autoReplies'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>();
     if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 1) {
@@ -1415,7 +1415,7 @@ autoReplies.put('/api/auto-replies/:id/draft', requireRole('owner', 'admin'), in
 // validate と conflicts は公開判断に使う管理操作なので、下書きを書ける人だけ。
 // test は本番状態を変えない試運転で、実施結果と担当者だけを監査用に記録する。
 // staff にはこの test だけを許可し、作成・更新・公開の権限は広げない。
-autoReplies.post('/api/auto-replies/:id/validate', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+autoReplies.post('/api/auto-replies/:id/validate', requireDeliveryAccess('autoReplies'), inputJsonBoundary(), async (c) => {
   try {
     const version = await getAutoReplyDraftVersion(c.env.DB, c.req.param('id'));
     if (!version) return c.json({ success: false, error: '公開する下書きがありません' }, 404);
@@ -1426,7 +1426,7 @@ autoReplies.post('/api/auto-replies/:id/validate', requireRole('owner', 'admin')
   }
 });
 
-autoReplies.get('/api/auto-replies/:id/conflicts', requireRole('owner', 'admin'), async (c) => {
+autoReplies.get('/api/auto-replies/:id/conflicts', requireDeliveryAccess('autoReplies'), async (c) => {
   try {
     // m26c R558: 公開後は下書きが無い。下書き取得と同じく公開版へ読み替え、
     // 404 で完了 URL を壊さない。読み替えたことは source で区別する。
@@ -1553,7 +1553,7 @@ autoReplies.post('/api/auto-replies/:id/test', requireRole('owner', 'admin', 'st
   }
 });
 
-autoReplies.post('/api/auto-replies/:id/publish', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+autoReplies.post('/api/auto-replies/:id/publish', requireDeliveryAccess('autoReplies'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const requestKey = c.req.header('Idempotency-Key');
@@ -1663,7 +1663,7 @@ autoReplies.post('/api/auto-replies/:id/publish', requireRole('owner', 'admin'),
 // F7: isActive: true の指定があっても、作る前に既存の有効ルールと当てる。
 // 当たれば有効化せず停止中で作り、理由を社内メモへ残す（応答にも返す）。
 // 当たらなければ要求どおりすぐ有効にする。
-autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), inputJsonBoundary({"keyword":["string"],"matchType":["string"],"responseType":["string"],"responseContent":["string"],"templateId":["null","string"],"lineAccountId":["null","string"],"respondToAll":["boolean"],"name":["null","string"],"keywordMatchMode":["string"],"normalizeKeywords":["boolean"],"folderId":["null","string"]}), async (c) => {
+autoReplies.post('/api/auto-replies', requireDeliveryAccess('autoReplies'), inputJsonBoundary({"keyword":["string"],"matchType":["string"],"responseType":["string"],"responseContent":["string"],"templateId":["null","string"],"lineAccountId":["null","string"],"respondToAll":["boolean"],"name":["null","string"],"keywordMatchMode":["string"],"normalizeKeywords":["boolean"],"folderId":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       keyword: string;
@@ -1877,7 +1877,7 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), inputJsonBo
 });
 
 // PUT /api/auto-replies/:id — update
-autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), inputJsonBoundary({"keyword":["string"],"matchType":["string"],"responseType":["string"],"responseContent":["string"],"templateId":["null","string"],"lineAccountId":["null","string"],"isActive":["boolean"]}), async (c) => {
+autoReplies.put('/api/auto-replies/:id', requireDeliveryAccess('autoReplies'), inputJsonBoundary({"keyword":["string"],"matchType":["string"],"responseType":["string"],"responseContent":["string"],"templateId":["null","string"],"lineAccountId":["null","string"],"isActive":["boolean"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -2090,7 +2090,7 @@ const AUTO_REPLY_STOP_REASON_MAX = 500;
  * 停止は運用の判断なので、理由（任意）・担当者・日時を記録する。
  * 確認キー（Idempotency-Key）必須。同じキーの再送は新しい停止として残さない。
  */
-autoReplies.post('/api/auto-replies/:id/stop', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+autoReplies.post('/api/auto-replies/:id/stop', requireDeliveryAccess('autoReplies'), inputJsonBoundary(), async (c) => {
   try {
     const requestKey = c.req.header('Idempotency-Key');
     if (!validIdempotencyKey(requestKey)) {
@@ -2135,7 +2135,7 @@ autoReplies.post('/api/auto-replies/:id/stop', requireRole('owner', 'admin'), in
 // DELETE /api/auto-replies/:id
 // 物理削除ではなく履歴を残す方式（機能08 点検 N-085）。設定と担当者を残し、
 // 一覧・評価・集計からは外れる。過去の一致記録と実行台帳はそのまま残る。
-autoReplies.delete('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c) => {
+autoReplies.delete('/api/auto-replies/:id', requireDeliveryAccess('autoReplies'), async (c) => {
   try {
     const id = c.req.param('id');
     const item = await getAutoReplyById(c.env.DB, id);
@@ -2157,7 +2157,7 @@ autoReplies.delete('/api/auto-replies/:id', requireRole('owner', 'admin'), async
  * （is_active = 0）で送り出さない。再開は画面の再開操作で行う。
  * 消していない行・無い行は 404。
  */
-autoReplies.post('/api/auto-replies/:id/restore', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+autoReplies.post('/api/auto-replies/:id/restore', requireDeliveryAccess('autoReplies'), inputJsonBoundary(), async (c) => {
   try {
     const restored = await restoreAutoReply(c.env.DB, c.req.param('id'));
     if (!restored) {

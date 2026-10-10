@@ -9,28 +9,38 @@
  * プール一覧・LINEアカウント一覧・プールごとの所属アカウント・追加・外す・削除。
  * 「新規プール」は V8 の作る画面（/pools/new・`D0AOyx`）へ移る。
  */
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Copy, Info, Plus } from 'lucide-react'
+import { Info, Plus } from 'lucide-react'
 import type { LineAccount, PoolAccount, TrafficPool } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
+import { notifyToast } from '@/components/shared/toast'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { RowMenu } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
 import frame from '../sa-frame.module.css'
 import styles from './pools.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+
+import Notice from '@/components/shared/notice'
 
 type AccountWithStats = LineAccount & { stats?: { friendCount: number } }
 
 const TITLE = 'プール管理'
-const DESCRIPTION = '来たお客さまを振り分ける LINE アカウントをまとめる入れ物です。公開 URL から来た人を、稼働中の所属アカウントからランダムに振り分けます。'
+const DESCRIPTION = '来たお客さまを振り分ける LINE アカウントをまとめる入れ物です。公開 URL から来た人を、有効の所属アカウントからランダムに振り分けます。'
 
 /** 既定のプール（main）を先頭に、あとは作った順。 */
 export function orderPools(pools: readonly TrafficPool[]): TrafficPool[] {
@@ -44,8 +54,8 @@ export function orderPools(pools: readonly TrafficPool[]): TrafficPool[] {
 export default function PoolsV8() {
   usePageTitle(TITLE)
   const role = useStaffRole()
-  // 役割が読めるまでは今までどおり出し、見るだけと分かったら操作を隠す（最後の守りはサーバの 403）。
-  const canManage = role === null || canManageRole(role)
+  // APIと同じくオーナーだけ。役割の確認中も変更操作を隠す。
+  const canManage = role === 'owner'
   const [pools, setPools] = useState<TrafficPool[]>([])
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [loading, setLoading] = useState(true)
@@ -85,7 +95,7 @@ export default function PoolsV8() {
   if (featureOff) {
     return (
       <div className={frame.screen}>
-        <SettingsPage layout="accounts" boardId="u3iab3" title={TITLE} description={DESCRIPTION} navigation={<SettingsInnerNav inline />}>
+        <SettingsPage layout="accounts" boardId="u3iab3" title={TITLE} help={DESCRIPTION} navigation={<SettingsInnerNav inline />}>
           <FeatureDisabledScreen featureId="multi_store_hierarchy" />
         </SettingsPage>
       </div>
@@ -106,7 +116,7 @@ export default function PoolsV8() {
       <SettingsPage layout="accounts"
         boardId="u3iab3"
         title={TITLE}
-        description={DESCRIPTION}
+        help={DESCRIPTION}
         actions={canManage && !isEmpty ? createButton : undefined}
         navigation={<SettingsInnerNav inline />}
       >
@@ -143,9 +153,16 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
   canManage: boolean
   onChange: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const isMain = pool.slug === 'main'
   const apiBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const publicUrl = `${apiBase}/pool/${pool.slug}`
+  const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState(pool.name)
+  const [editBusy, setEditBusy] = useState(false)
+  const [editError, setEditError] = useState('')
+  const [nameError, setNameError] = useState('')
+  const [discardOpen, setDiscardOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [copyError, setCopyError] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -153,16 +170,23 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
-  const onCopy = async () => {
-    try {
-      setCopyError('')
-      await navigator.clipboard.writeText(publicUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1200)
-    } catch {
-      setCopyError('コピーできませんでした。公開URLを選んでコピーしてください。')
-    }
+  const closeEdit = () => {
+    if (editBusy) return
+    if (editName !== pool.name) setDiscardOpen(true)
+    else setEditing(false)
   }
+  const saveEdit = async () => {
+    if (!canManage || editBusy) return
+    if (!editName.trim()) { setNameError('名前を入力してください'); return }
+    setEditBusy(true); setEditError('')
+    try {
+      const response = await api.pools.update(pool.id, { name: editName.trim() })
+      if (!response.success) throw new Error(response.error)
+      setEditing(false); notifyToast('プールを保存しました'); onChange()
+    } catch (cause) { if (!saveErrors.capture(cause)) setEditError('保存できませんでした。入力は残っています。もう一度お試しください。') }
+    finally { setEditBusy(false) }
+  }
+
 
   const onDelete = async () => {
     // 押している間は受け付けない（二度押しの2回目は404になり、消えているのに失敗と出る）。
@@ -188,27 +212,31 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
           <h2 className={styles.cardTitle} title={pool.name}>{pool.name}</h2>
           <p className={styles.slug} title={pool.slug}>slug：{pool.slug}{isMain ? '・既定' : ''}</p>
         </div>
-        {canManage && !isMain ? (
+        {canManage ? (
           <div className={styles.menuBox}>
             <RowMenu
               label={`${pool.name}の操作`}
               menuLabel="操作"
               open={menuOpen}
               onOpenChange={setMenuOpen}
-              items={[{ id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setMenuOpen(false); setDeleteError(''); setConfirmOpen(true) } }]}
+              items={[{ id: 'edit', label: '編集する', onSelect: () => { setMenuOpen(false); setEditName(pool.name); setEditError(''); setNameError(''); setEditing(true) } }, ...(!isMain ? [{ id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setMenuOpen(false); setDeleteError(''); setConfirmOpen(true) } } as const] : [])]}
             />
           </div>
         ) : null}
       </div>
       <div className={styles.urlRow}>
-        <span className={styles.url} title={publicUrl}>{publicUrl}</span>
-        <Button variant="secondary" onClick={() => void onCopy()}>
-          <Copy size={15} aria-hidden="true" />{copied ? 'コピー済' : '公開 URL コピー'}
-        </Button>
+        <span className={styles.url} ><TruncatedText value={String(publicUrl ?? '')} url /></span>
+        <CopyTextButton value={publicUrl} aria-label="公開URLをコピー"  />
       </div>
-      {copyError ? <p role="alert" className={styles.inlineError}>{copyError}</p> : null}
+      {copyError ? <Notice tone="danger" >{copyError}</Notice> : null}
       <PoolMembers poolId={pool.id} accounts={accounts} canManage={canManage} onChange={onChange} />
 
+      <SaveErrorScope errors={saveErrors}><Dialog open={editing} title="プールを編集" designWidth={560} busy={editBusy} error={editError} onCancel={closeEdit} onConfirm={() => void saveEdit()} confirmLabel="保存する">
+        <Field label="プール名" htmlFor={`pool-name-${pool.id}`} required error={nameError}>
+          <SaveErrorField names={["name"]}><TextField id={`pool-name-${pool.id}`} value={editName} maxLength={100} onChange={(event) => { setEditName(event.target.value); setNameError('') }} /></SaveErrorField>
+        </Field>
+      </Dialog></SaveErrorScope>
+      <ConfirmDialog open={discardOpen} title="入力を破棄しますか？" description="変更したプール名は保存されません。" confirmLabel="破棄する" onConfirm={() => { setDiscardOpen(false); setEditing(false) }} onCancel={() => setDiscardOpen(false)} />
       <ConfirmDialog
         open={confirmOpen}
         title={`プール「${pool.name}」を削除しますか？`}
@@ -217,7 +245,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
         destructive
         busy={deleting}
         error={deleteError}
-        onConfirm={() => void onDelete()}
+        onConfirm={() => onDelete()}
         onCancel={() => {
           if (deleting) return
           setConfirmOpen(false)
@@ -300,10 +328,10 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
         {members.map((m) => {
           const acc = accounts.find((a) => a.id === m.lineAccountId)
           const name = acc?.name ?? m.lineAccountId
-          const friends = acc?.stats?.friendCount == null ? '—' : acc.stats.friendCount.toLocaleString('ja-JP')
+          const friends = acc?.stats?.friendCount == null ? '—' : polishFormatNumber(acc.stats.friendCount)
           return (
             <li key={m.id} className={styles.member}>
-              <span className={styles.memberName} title={name}>{name}</span>
+              <span className={styles.memberName} ><TruncatedText value={String(name ?? '')} /></span>
               <span className={styles.memberFriends}>{`友だち ${friends}`}</span>
               {canManage ? (
                 <Button variant="secondary" onClick={() => { setRemoveError(''); setRemoveTarget({ id: m.id, name }) }}>外す</Button>
@@ -314,10 +342,7 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
         {members.length === 0 && !listError ? <li className={styles.empty}>所属アカウントなし</li> : null}
       </ul>
       {listError ? (
-        <p role="alert" className={styles.inlineError}>
-          {listError}{' '}
-          <button type="button" className={styles.textButton} onClick={() => void reload()}>読み直す</button>
-        </p>
+        <Notice tone="danger" >{listError}{' '}<button type="button" className={styles.textButton} onClick={() => void reload()}>もう一度読み込む</button></Notice>
       ) : null}
       {canManage && candidates.length > 0 ? (
         <div className={styles.menuBox}>
@@ -348,7 +373,7 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
         confirmLabel="外す"
         busy={removing}
         error={removeError}
-        onConfirm={() => void onRemove()}
+        onConfirm={() => onRemove()}
         onCancel={() => {
           if (removing) return
           setRemoveTarget(null)

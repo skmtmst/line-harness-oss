@@ -121,3 +121,17 @@ test('N-170 未割当legacyの更新は鍵持ちstaffに許可しない', async 
   expect(r.status).toBe(404);
   t.raw.close();
 });
+
+
+test('配信の編集鍵を持つstaffだけが削除前の影響を確認できる', async () => {
+  const { t, req, J } = setup();
+  try {
+    const created = await createAs(req, J, 'key-staff', 'acc-a');
+    const id = ((await created.json()) as any).data.id;
+    const path = `/api/forms/${id}/delete-impact?account_id=acc-a`;
+    expect((await req(path, 'key-staff')).status).toBe(200);
+    expect((await req(path, 'key-nokey')).status).toBe(403);
+    expect((await req(path, 'key-ro')).status).toBe(403);
+    expect((await req(`/api/forms/${id}/delete-impact?account_id=acc-a2`, 'key-scoped')).status).toBe(404);
+  } finally { t.raw.close(); }
+});

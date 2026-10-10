@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8 外部連携「Google Sheets」タブ（Pencil `DxAAA`、解除の窓 `YZ57z`）。
- *
- * 左に書き出しのカード（いまの状態・Googleアカウント・書き出し先・前回の同期・
- * 今すぐ同期／出力先を変更／接続を解除する）と同期の記録、右に気をつけること。
- * データの口は v7 と同じ（接続・出力先・同期・解除・記録）。OAuth の戻り先
- * （?tab=sheets&sheets=…）の知らせも今と同じ言葉で出す。
- */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { LayoutTemplate, RefreshCw, Sheet } from 'lucide-react'
@@ -25,6 +16,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
 import Notice from '@/components/shared/notice'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import {
@@ -37,6 +29,20 @@ import {
 } from './shell'
 import { shortDateTime } from './words'
 import styles from './sheets.module.css'
+import { Field } from '@/components/shared/form-controls'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 外部連携「Google Sheets」タブ（Pencil `DxAAA`、解除の窓 `YZ57z`）。
+ *
+ * 左に書き出しのカード（いまの状態・Googleアカウント・書き出し先・前回の同期・
+ * 今すぐ同期／出力先を変更／接続を解除する）と同期の記録、右に気をつけること。
+ * データの口は v7 と同じ（接続・出力先・同期・解除・記録）。OAuth の戻り先
+ * （?tab=sheets&sheets=…）の知らせも今と同じ言葉で出す。
+ */
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -94,11 +100,12 @@ export function syncResultProblem(data: { status: string; results?: Array<{ stat
 }
 
 export default function WebhooksSheetsV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('外部連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const { selectedAccountId, selectedAccount, accounts } = useAccount()
   const staffRole = useStaffRole()
-  const isOwner = staffRole === null || staffRole === 'owner'
+  const isOwner = staffRole === 'owner'
   const searchParams = useSearchParams()
   const callbackResult = searchParams.get('sheets')
   const overview = useWebhookOverview()
@@ -137,13 +144,15 @@ export default function WebhooksSheetsV8() {
       } else {
         setRunsError('同期の記録を読み込めませんでした。')
       }
-    } catch {
+    } catch (saveFailure) {
       if (runsGenerationRef.current !== generation || accountRef.current !== accountId) return
-      setRunsError('同期の記録を読み込めませんでした。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure)
+      setRunsError('同期の記録を読み込めませんでした。') }
     } finally {
       if (runsGenerationRef.current === generation && accountRef.current === accountId) setRunsLoading(false)
     }
-  }, [])
+  }, [saveErrors])
 
   const load = useCallback(async () => {
     const generation = ++loadGenerationRef.current
@@ -211,9 +220,11 @@ export default function WebhooksSheetsV8() {
         return
       }
       window.location.assign(res.data.authorizeUrl)
-    } catch {
+    } catch (saveFailure) {
       if (accountRef.current !== accountId) return
-      setActionError('接続を始められませんでした。時間をおいて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure)
+      setActionError('接続を始められませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       if (accountRef.current === accountId) setBusy(null)
     }
@@ -238,9 +249,11 @@ export default function WebhooksSheetsV8() {
       const loaded = await load()
       if (accountRef.current !== accountId) return
       if (!loaded) setSaveNotice('出力先を保存しましたが、最新の状態を読み込めませんでした。「もう一度読み込む」で状態を確かめてください。')
-    } catch {
+    } catch (saveFailure) {
       if (accountRef.current !== accountId) return
-      setActionError('出力先を保存できませんでした。通信を確かめて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure)
+      setActionError('出力先を保存できませんでした。通信を確かめて、もう一度お試しください。') }
     } finally {
       if (accountRef.current === accountId) setBusy(null)
     }
@@ -262,9 +275,11 @@ export default function WebhooksSheetsV8() {
       await load()
       if (accountRef.current !== accountId) return
       if (problem) setActionError(problem)
-    } catch {
+    } catch (saveFailure) {
       if (accountRef.current !== accountId) return
-      setActionError('同期を始められませんでした。時間をおいて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure)
+      setActionError('同期を始められませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       if (accountRef.current === accountId) setBusy(null)
     }
@@ -288,9 +303,11 @@ export default function WebhooksSheetsV8() {
         setDisconnectNotice('このアプリ側の連携は解除しましたが、Google側の許可の取り消しに失敗しました。Googleアカウントの「セキュリティ」設定から、このアプリへのアクセスを取り消してください。')
       }
       await load()
-    } catch {
+    } catch (saveFailure) {
       if (accountRef.current !== accountId) return
-      setActionError('接続を解除できませんでした。時間をおいて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure)
+      setActionError('接続を解除できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       if (accountRef.current === accountId) setBusy(null)
     }
@@ -308,7 +325,7 @@ export default function WebhooksSheetsV8() {
   const lastKind = runs.find((run) => run.startedAt === connection?.lastSyncedAt)?.kind
   const lastSyncText = connection?.lastSyncedAt
     ? `${shortDateTime(connection.lastSyncedAt)}${lastKind ? ` ${RUN_KIND_LABEL[lastKind]}` : ''}・${connection.lastSyncStatus === 'partial' ? '一部だけ完了' : connection.lastSyncStatus === 'error' ? '失敗' : '完了'}`
-    : '—'
+    : emptyValue('unknown')
 
   /* ===== 左：書き出しのカード ===== */
   let mainCard
@@ -340,15 +357,15 @@ export default function WebhooksSheetsV8() {
         <div className={styles.statusRow}>
           <span className={styles.statusLabel}>接続しているGoogleアカウント</span>
           <span className={styles.spacer} aria-hidden="true" />
-          <span className={styles.statusValue}>{connection?.googleAccountEmail ?? '—'}</span>
+          <span className={styles.statusValue}>{connection?.googleAccountEmail ?? emptyValue('unknown')}</span>
         </div>
         <div className={styles.statusRow}>
           <span className={styles.statusLabel}>書き出し先</span>
           <span className={styles.spacer} aria-hidden="true" />
           {connection?.spreadsheetUrl ? (
-            <a href={connection.spreadsheetUrl} target="_blank" rel="noopener noreferrer" className={styles.statusValue}>
+            <TextLink external href={connection.spreadsheetUrl}   className={styles.statusValue}>
               {`${connection.spreadsheetTitle ?? connection.spreadsheetUrl}（シート：友だち・フォーム回答）`}
-            </a>
+            </TextLink>
           ) : (
             <span className={styles.statusValue}>まだ決めていません</span>
           )}
@@ -397,12 +414,12 @@ export default function WebhooksSheetsV8() {
         )}
         {showTargetForm && canManage && connStatus !== 'expired' ? (
           <form onSubmit={handleSaveTarget} className={styles.targetForm}>
-            <label className={styles.fieldLabel} htmlFor="wh-sheets-target">スプレッドシートのURLまたはID</label>
+
             <p className={styles.cardNote}>
               共有設定で「{connection?.googleAccountEmail ?? '接続したGoogleアカウント'}」に編集権限を付けたシートを指定してください。指定したシート内に「友だち」「フォーム回答」のタブを自動で作ります。
             </p>
             <div className={styles.targetRow}>
-              <TextField id="wh-sheets-target" value={targetInput} onChange={(event) => setTargetInput(event.target.value)}  placeholder="https://docs.google.com/spreadsheets/d/…" required />
+              <SaveErrorField names={["targetInput","target_input"]}><Field label="スプレッドシートのURLまたはID" htmlFor="wh-sheets-target"><TextField id="wh-sheets-target" value={targetInput} onChange={(event) => setTargetInput(event.target.value)}  placeholder="https://docs.google.com/spreadsheets/d/…" required /></Field></SaveErrorField>
               <Button type="submit" variant="primary" disabled={busy !== null} busy={busy === 'target'} busyLabel="確認しています…">保存する</Button>
             </div>
           </form>
@@ -413,7 +430,7 @@ export default function WebhooksSheetsV8() {
 
   let body
   if (!selectedAccountId) {
-    body = <ListState kind="empty" title={accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'} />
+    body = <AccountRequiredState hasAccounts={accounts.length > 0} />
   } else if (status === 'loading') {
     body = (
       <div aria-busy="true" aria-label="連携の状態を読み込んでいます">
@@ -434,7 +451,7 @@ export default function WebhooksSheetsV8() {
         kind="error"
         title="連携の状態を読み込めませんでした"
         description="連携の内容は変わっていません。上で選んでいるLINEアカウントが合っているか確かめてください。"
-        action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+        onRetry={() => void load()}
       />
     )
   } else {
@@ -477,7 +494,7 @@ export default function WebhooksSheetsV8() {
                   <Tr key={group.key} data-table-layout="columns">
                     <Td className={styles.colWhen}>{shortDateTime(group.startedAt)}</Td>
                     <Td className={styles.colKind}>{RUN_KIND_LABEL[group.kind] ?? group.kind}</Td>
-                    <Td className={styles.colWhat} title={group.parts.join('・')}>{group.parts.join('・') || '—'}</Td>
+                    <Td className={styles.colWhat} title={group.parts.join('・')}>{group.parts.join('・') || emptyValue('unknown')}</Td>
                     <Td className={styles.colResult}>
                       <StatusBadge tone={group.status === 'ok' ? 'success' : group.status === 'partial' ? 'warning' : group.status === 'running' ? 'neutral' : 'danger'}>{RUN_STATUS_LABEL[group.status] ?? group.status}</StatusBadge>
                     </Td>
@@ -494,11 +511,11 @@ export default function WebhooksSheetsV8() {
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId="DxAAA"
       headingSize="regular"
       title="外部連携"
-      description={WEBHOOKS_DESCRIPTION}
+      help={WEBHOOKS_DESCRIPTION}
       actions={isOwner ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button> : undefined}
       tabs={<WebhookTabs active="sheets" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
@@ -525,7 +542,7 @@ export default function WebhooksSheetsV8() {
           designTop={280}
           busy={busy === 'disconnect'}
           confirmLabel="接続を解除する"
-          onConfirm={() => void handleDisconnect()}
+          onConfirm={() => handleDisconnect()}
           onCancel={() => { if (busy !== 'disconnect') setDisconnectFor(null) }}
         />
       )}
@@ -536,7 +553,7 @@ export default function WebhooksSheetsV8() {
           {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
           {disconnectNotice ? <Notice tone="warn">{disconnectNotice}</Notice> : null}
           {saveNotice ? (
-            <Notice tone="warn" action={<Button onClick={() => void load()}>もう一度読み込む</Button>}>{saveNotice}</Notice>
+            <Notice tone="warn" action={<Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>}>{saveNotice}</Notice>
           ) : null}
           {body}
         </div>
@@ -550,6 +567,6 @@ export default function WebhooksSheetsV8() {
           </p>
         </Card>
       </div>
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

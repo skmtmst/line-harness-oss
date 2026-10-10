@@ -599,7 +599,7 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
           kind="error"
           title="支払いの集計を表示できませんでした"
           description="締め対象や金額を0とは扱っていません。状態を読み直してください。"
-          action={<Button onClick={() => { void load() }}>再読み込み</Button>}
+          onRetry={() => { void load() }}
         />
       ) : rows.length === 0 ? (
         <ListState
@@ -626,7 +626,7 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
               const summary = summaries.get(item.affiliateId)
               return (
                 <Tr key={item.affiliateId}>
-                  <NameCell name={item.affiliateName} sub={`コード ${item.code}`} />
+                  <NameCell name={item.affiliateName} />
                   <Td align="right" className="font-semibold tabular-nums">
                     {yen(item.amount)}
                     {(item.deduction ?? 0) > 0 ? (

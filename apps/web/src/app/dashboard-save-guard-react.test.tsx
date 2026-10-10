@@ -121,6 +121,6 @@ describe('N-006 ダッシュボード保存の連打防止 (#758)', () => {
     expect(pending).toHaveLength(1)
     expect(button('ダッシュボードに反映').disabled).toBe(false)
     expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
-    expect(document.body.textContent).toContain('ほかの人が配置を変えました。最新の配置を読み込んでから直してください。')
+    expect(document.body.textContent).toContain('ほかの人が先にダッシュボードの配置を保存しました')
   })
 })

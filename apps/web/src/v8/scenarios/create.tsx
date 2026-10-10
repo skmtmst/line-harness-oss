@@ -1,18 +1,6 @@
 'use client'
-
-/*
- * ★V8 シナリオを作る①：シナリオ情報・配信方式（Pencil `dnzqC`）。
- *
- * 型（CreatePage）に、戻る・題・手順の輪と、左の段（シナリオ情報・配信方式）、
- * 下の帯（キャンセル・あとで決める・この方式で保存する）を渡す。右の列は無い。
- *
- * 動き（読み込み・保存・失敗時）は今までの V8（app/scenarios/mode-v8.tsx）と
- * v7（app/scenarios/mode/page.tsx）と同じ。写して型に載せ直した。
- * `id` なしで開いたときはまだ行を作らない。方式の確定か
- * 「あとで決める」ではじめて作成する（N-055）。
- */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CalendarClock, Check, Timer } from 'lucide-react'
 import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
@@ -26,26 +14,36 @@ import Card from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
 import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
-import {
-  forgetNewScenarioDraftKey,
-  newScenarioDraftKey,
-  scenarioDraftKey,
-  useScenarioDraft,
-} from '@/v8/autosave/use-scenario-draft'
+import { forgetNewScenarioDraftKey, newScenarioDraftKey, scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import HelpTip from '@/components/shared/help-tip'
 import { TextField } from '@/components/shared/text-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
-import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
+import { isForbiddenOrRateLimited, loadFailureCopy, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import TargetMissing from '@/components/shared/target-missing'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import styles from './create.module.css'
 import DeliveryModeDiagram from './delivery-mode-diagram'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+/*
+ * ★V8 シナリオを作る①：シナリオ情報・配信方式（Pencil `dnzqC`）。
+ *
+ * 型（CreatePage）に、戻る・題・手順の輪と、左の段（シナリオ情報・配信方式）、
+ * 下の帯（キャンセル・あとで決める・この方式で保存する）を渡す。右の列は無い。
+ *
+ * 動き（読み込み・保存・失敗時）は今までの V8（app/scenarios/mode-v8.tsx）と
+ * v7（app/scenarios/mode/page.tsx）と同じ。写して型に載せ直した。
+ * `id` なしで開いたときはまだ行を作らない。方式の確定か
+ * 「あとで決める」ではじめて作成する（N-055）。
+ */
 
 export default function ScenarioCreateV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('シナリオを作成')
   usePageCrumbs([{ label: 'シナリオ配信', href: '/scenarios' }])
   const router = useRouter()
@@ -54,7 +52,8 @@ export default function ScenarioCreateV8() {
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
   // 役割が読めるまでは出す（最後の守りはサーバー）。閲覧のみと分かったら作る操作を隠す。
-  const canEdit = role === null || canManageRole(role)
+  const featureAccess = useFeatureAccess('scenarios')
+  const canEdit = featureAccess
   const [scenario, setScenario] = useState<Scenario | null>(null)
   // id なしは「これから作る」。読み込む行が無いので最初から入力できる。
   const [scenarioState, setScenarioState] = useState<'loading' | 'ready' | 'error'>(
@@ -105,8 +104,13 @@ export default function ScenarioCreateV8() {
         setFolderId(res.data.folderId ?? '')
         return true
       } catch (cause) {
-        setError(scenarioSaveError(cause))
-        setFolderId(scenario.folderId ?? '')
+        const fieldFailure = saveErrors.capture(cause)
+
+        { if (!fieldFailure)
+
+        setError(scenarioSaveError(cause)) }
+        setFolderId(scenario.folderId ?? '');
+
         return false
       } finally {
         setDetailsSaving(false)
@@ -258,7 +262,11 @@ export default function ScenarioCreateV8() {
       // 3段目へ。手順の帯が3段なので、2段で編集画面へ放り出さない。
       router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
     } catch (cause) {
-      setError(id ? scenarioModeError(cause) : 'シナリオを作成できませんでした。時間をおいてもう一度お試しください。')
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+
+      setError(id ? scenarioModeError(cause) : 'シナリオを作成できませんでした。時間をおいてもう一度お試しください。') }
       setSaving(null)
     }
   }
@@ -277,9 +285,12 @@ export default function ScenarioCreateV8() {
           finishDraft()
           router.push(`/scenarios/first-step?id=${encodeURIComponent(createdId)}`)
         }
-      } catch {
+      } catch (saveFailure) {
+        const fieldFailure = saveErrors.capture(saveFailure)
         // WEB226：通信の失敗（例外）も、方式を選んだときと同じ言葉で出す（黙って何も起きない、にしない）。
-        setError('シナリオを作成できませんでした。時間をおいてもう一度お試しください。')
+        { if (!fieldFailure)
+
+        setError('シナリオを作成できませんでした。時間をおいてもう一度お試しください。') }
       } finally {
         setDetailsSaving(false)
       }
@@ -358,11 +369,11 @@ export default function ScenarioCreateV8() {
   const useCommonReason = scenarioError ? isForbiddenOrRateLimited(scenarioError) : false
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       stepsSpacing="compact"
       boardId="dnzqC"
       title="シナリオを作る"
-      identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
+
       steps={(
         <Steps
           label="シナリオ作成の進み方"
@@ -380,7 +391,7 @@ export default function ScenarioCreateV8() {
           <Button type="button" onClick={cancel}>キャンセル</Button>
           {canEdit ? (
             <>
-              <Button disabled={locked} onClick={() => void continueAsDraft()}>
+              <Button disabled={locked} onClick={() => void continueAsDraft()} busy={Boolean(detailsSaving)} busyLabel="処理中…">
                 あとで決める（下書きとして保存）
               </Button>
               <Button
@@ -399,7 +410,7 @@ export default function ScenarioCreateV8() {
     >
       <div className={styles.notices} data-list-state={scenarioState} aria-busy={scenarioState === 'loading'}>
         {!canEdit ? (
-          <p className={styles.viewerBand} role="status">閲覧のみで見ています。シナリオを作る操作は管理者に頼んでください。</p>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。シナリオを作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>
         ) : null}
         {scenarioState === 'loading' ? <Notice tone="info">シナリオを読み込んでいます。</Notice> : null}
         {scenarioState === 'ready' && scenario ? (
@@ -433,22 +444,22 @@ export default function ScenarioCreateV8() {
         <div className={styles.infoRow}>
           <div className={styles.nameField} ref={nameWrapRef}>
             <span className={styles.fieldLabel}>シナリオ名 <RequiredBadge /></span>
-            <TextField
+            <SaveErrorField names={["name"]}><TextField
               value={name}
               disabled={fieldsDisabled}
               onChange={(e) => { setName(e.target.value); if (nameError) setNameError('') }}
               onBlur={() => void saveDetails()}
-              placeholder="例: 友だち追加ウェルカム"
+              placeholder="例：友だち追加ウェルカム"
               invalid={Boolean(nameError)}
               aria-label="シナリオ名"
               aria-describedby={nameError ? 'scenario-name-error' : undefined}
-            />
+            /></SaveErrorField>
             {nameError ? <span id="scenario-name-error" className={styles.fieldError}>{nameError}</span> : null}
           </div>
           <div className={styles.folderField}>
             <span className={styles.fieldLabelStrong}>フォルダ</span>
             <span title={selectedFolderName} className={styles.folderSelect}>
-              <FolderSelect
+              <SaveErrorField names={["folderId","folder_id"]}><FolderSelect
                 value={folderId}
                 disabled={fieldsDisabled || folderState !== 'ready'}
                 onChange={(value) => {
@@ -465,7 +476,7 @@ export default function ScenarioCreateV8() {
                 onCreate={canEdit && !locked
                   ? folderCreator((name, color) => api.folders.create({ kind: 'scenario', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
                   : undefined}
-              />
+              /></SaveErrorField>
             </span>
             {folderState !== 'ready' || detailsSaving ? (
               <span className={styles.fieldHint}>
@@ -491,7 +502,7 @@ export default function ScenarioCreateV8() {
           <h2 className={styles.cardTitle}>配信方式</h2>
           <HelpTip label="配信方式の説明">作ったあとは変えられません</HelpTip>
         </div>
-        <RadioCardGroup legend="配信方式" className={styles.modeRow}>
+        <SaveErrorField names={["delivery-mode","selectedMode"]}><RadioCardGroup legend="配信方式" className={styles.modeRow}>
           <RadioCard
             name="delivery-mode"
             value="absolute_time"
@@ -516,15 +527,15 @@ export default function ScenarioCreateV8() {
           >
             <DeliveryModeDiagram mode="elapsed" selected={selectedMode === 'elapsed'} />
           </RadioCard>
-        </RadioCardGroup>
+        </RadioCardGroup></SaveErrorField>
       </Card>
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }
 
 function scenarioSaveError(cause: unknown): string {
   if (cause instanceof ApiError) {
-    if (cause.status === 403) return 'シナリオ情報を変更する権限がありません。'
+    if (cause.status === 403) return permissionDeniedMessage('store')
     if (cause.status === 404) return 'シナリオが見つかりませんでした。一覧から開き直してください。'
   }
   return 'シナリオ情報を保存できませんでした。時間をおいてもう一度お試しください。'
@@ -533,7 +544,7 @@ function scenarioSaveError(cause: unknown): string {
 function scenarioModeError(cause: unknown): string {
   if (cause instanceof ApiError) {
     if (cause.status === 400 && !cause.message.startsWith('API error:')) return cause.message
-    if (cause.status === 403) return '配信方式を変更する権限がありません。'
+    if (cause.status === 403) return permissionDeniedMessage('store')
     if (cause.status === 404) return 'シナリオが見つかりませんでした。一覧から開き直してください。'
   }
   return '配信方式を保存できませんでした。時間をおいてもう一度お試しください。'

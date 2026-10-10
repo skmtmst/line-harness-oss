@@ -153,13 +153,14 @@
   padding: var(--tpl-nm-card-pad);
   border-radius: var(--tpl-nm-card-radius);
   background: var(--color-canvas);
-  box-shadow: var(--tpl-nm-card-line);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 .cardAdopted {
   gap: var(--tpl-nm-card-adopted-inner-gap);
 }
 .cardSelected {
-  box-shadow: var(--tpl-nm-card-line-selected);
+  box-shadow: var(--tpl-nm-card-line-selected), var(--card-shadow);
 }
 .cardPhoto {
   position: relative;
@@ -300,7 +301,8 @@
   padding: var(--tpl-nm-rail-pad);
   border-radius: var(--tpl-nm-card-radius);
   background: var(--color-canvas);
-  box-shadow: var(--tpl-nm-card-line);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 .railTitle {
   margin: 0;
@@ -573,7 +575,8 @@
   padding: var(--tpl-nm-rail-pad);
   border-radius: var(--tpl-nm-card-radius);
   background: var(--color-canvas);
-  box-shadow: var(--tpl-nm-card-line);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 .historyReserved {
   display: flex;
@@ -639,11 +642,7 @@
   gap: var(--tpl-nm-action-gap);
   font-size: var(--text-label);
 }
-.errorText {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--tpl-nm-row-size);
-}
+
 
 /* 公式サイト掲載（SyQA1）：写真の表＋右に幅190の決めごと。 */
 .publicationsGrid {

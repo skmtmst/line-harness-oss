@@ -1,13 +1,6 @@
 'use client'
-
-/*
- * ★V8 マイル「友だちのマイル詳細」（板 `R6kIG`、手で増やす・減らす `M8zhjL`）。
- *
- * app/mileage/friends/detail/v8-friend-detail.tsx から動きを写し、詳細の型（DetailPage）で組み直した。
- * 頭に名前と操作（トークを開く・減らす・増やす）、数の帯は4マス、明細の箱（探す・札・期間・件数・
- * 表「日時・内容・きっかけ・使い道・種類・担当・増減・…」・ページ送り）、下に「たまったきっかけ・
- * 交換した使い道」の2枚。確定待ちの確定・取消・通知の再送は行末の「…」から。
- */
+import { FolderDotName } from '@/components/shared/folder-dot'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -58,6 +51,17 @@ import {
 import { PerPageSelect } from './parts'
 import MileageAdjustDialog from './adjust-dialog'
 import styles from './mileage.module.css'
+import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 マイル「友だちのマイル詳細」（板 `R6kIG`、手で増やす・減らす `M8zhjL`）。
+ *
+ * app/mileage/friends/detail/v8-friend-detail.tsx から動きを写し、詳細の型（DetailPage）で組み直した。
+ * 頭に名前と操作（トークを開く・減らす・増やす）、数の帯は4マス、明細の箱（探す・札・期間・件数・
+ * 表「日時・内容・きっかけ・使い道・種類・担当・増減・…」・ページ送り）、下に「たまったきっかけ・
+ * 交換した使い道」の2枚。確定待ちの確定・取消・通知の再送は行末の「…」から。
+ */
 
 type MileageDetail = {
   summary: MileageSummary
@@ -113,12 +117,12 @@ function FriendDetailInner() {
   const [pendingError, setPendingError] = useState('')
   const [notificationRetryId, setNotificationRetryId] = useState<string | null>(null)
   const [notificationRetryError, setNotificationRetryError] = useState('')
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [kindFilter, setKindFilter] = useState<'all' | Kind>('all')
-  const [period, setPeriod] = useState('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [kindFilter, setKindFilter] = useListUrlValue<'all' | Kind>('kindFilter', 'all')
+  const [period, setPeriod] = useListUrlValue('period', 'all')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [menuId, setMenuId] = useState<string | null>(null)
   usePageTitle(friend?.displayName ? `${friend.displayName}のマイル明細` : null)
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'マイル', href: '/mileage?tab=balances' }])
@@ -189,7 +193,7 @@ function FriendDetailInner() {
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearch(searchInput.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
@@ -256,7 +260,7 @@ function FriendDetailInner() {
   }), [displayedHistory])
 
   if (accountLoading || loading) {
-    return <div data-design-node="R6kIG"><ListState kind="loading" title="マイル明細を読み込んでいます" /></div>
+    return <div data-design-node="R6kIG"><DetailLoading label="マイル明細を読み込んでいます" /></div>
   }
   if (!friendId) {
     return (
@@ -341,7 +345,7 @@ function FriendDetailInner() {
       const retrying = notificationRetryId === item.id
       items.push({
         id: 'retry',
-        label: retrying ? '通知を送り直しています…' : '通知を再送',
+        label: '通知を再送',
         disabled: retrying,
         disabledReason: '通知を送り直しています',
         onSelect: () => void retryNotification(item.id, item.lineAccountId ?? selectedAccountId ?? ''),
@@ -361,7 +365,7 @@ function FriendDetailInner() {
     <DetailPage
       boardId="R6kIG"
       title={displayName}
-      description={[joinedAt ? `友だちになった日 ${joinedAt}` : null, `会員ランク ${rankLabel}`, lastActive ? `最後に動いた日 ${lastActive}` : null].filter(Boolean).join('・')}
+      help={[joinedAt ? `友だちになった日 ${joinedAt}` : null, `会員ランク ${rankLabel}`, lastActive ? `最後に動いた日 ${lastActive}` : null].filter(Boolean).join('・')}
       actions={<div className={styles.headActions}>
         <Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>
           <MessageCircle size={15} aria-hidden="true" /> トークを開く
@@ -385,12 +389,12 @@ function FriendDetailInner() {
             detail={v6Friend ? `今月の増減 ${v6Friend.monthChange > 0 ? '+' : ''}${formatNumber(v6Friend.monthChange)}` : `生涯 ${formatNumber(mileage.summary.lifetimeEarned)}・使用 ${formatNumber(mileage.summary.spent)}`} />
           <KpiCard presentation="band" density="compact" icon={null} title="確定待ち" value={pendingMiles} unit="マイル"
             detail={historyPartial
-              ? `最新${formatNumber(displayedHistory.length)}件のうち ${pendingItems.length}件が確定待ち`
-              : pendingItems.length > 0 ? `${pendingItems.length}件が確定待ち` : '確定待ちはありません'} />
+              ? `最新${formatNumber(displayedHistory.length)} 件のうち ${pendingItems.length} 件が確定待ち`
+              : pendingItems.length > 0 ? `${pendingItems.length} 件が確定待ち` : '確定待ちはありません'} />
           <KpiCard presentation="band" density="compact" icon={null} title="今月たまった" value={monthComplete ? earnedSum : null} unit="マイル"
             detail={monthComplete
-              ? `できごと ${earnedThisMonth.length} 回${rewardedActions === null ? '' : `・付与記録 ${formatNumber(rewardedActions)}回`}`
-              : `最新${formatNumber(displayedHistory.length)}件だけでは数えられません`} />
+              ? `できごと ${earnedThisMonth.length} 回${rewardedActions === null ? '' : `・付与記録 ${formatNumber(rewardedActions)} 回`}`
+              : `最新${formatNumber(displayedHistory.length)} 件だけでは数えられません`} />
           <KpiCard presentation="band" density="compact" icon={null} title="期限が近い" value={expiring ?? null} unit="マイル" detail={expiringSub} />
         </KpiBand>
       </div>
@@ -422,12 +426,12 @@ function FriendDetailInner() {
           </div>
           <span className={styles.spacer} aria-hidden="true" />
           <div className={styles.periodBox}>
-            <Select
+            <SaveErrorField names={["period","page"]}><Select
               aria-label="期間"
               value={period}
               options={[{ value: 'all', label: 'すべて' }, { value: 'month', label: '今月' }]}
               onChange={(value) => { setPage(1); setPeriod(value) }}
-            />
+            /></SaveErrorField>
           </div>
           <PerPageSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next) }} />
         </div>
@@ -461,7 +465,7 @@ function FriendDetailInner() {
                 const menu = rowMenuOf(item)
                 const note = mileageSourceNoteText({ sourceReferenceId: item.sourceReferenceId, hasSourceEvent: mileageDetailHasSourceEvent(item) })
                 return (
-                  <Tr key={item.id} className={styles.row} data-table-layout="columns">
+                  <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colWhen}>
                       <time className={styles.cellSub} dateTime={item.occurredAt}>{formatMileageShortDateTime(item.occurredAt)}</time>
                     </Td>
@@ -483,7 +487,7 @@ function FriendDetailInner() {
                         {pill.text}
                       </span>
                     </Td>
-                    <Td className={styles.colName}><span className={styles.cellMain}>{assignee(item)}</span></Td>
+                    <Td className={styles.colName}><FolderDotName><span className={styles.cellMain}>{assignee(item)}</span></FolderDotName></Td>
                     <Td className={styles.colDeltaDetail}>
                       <span className={styles.cellMain} title={'balanceAfter' in item && typeof item.balanceAfter === 'number' ? `残高 ${formatNumber(item.balanceAfter)}` : undefined}>
                         {formatMileageChange(item.amount)}
@@ -512,8 +516,8 @@ function FriendDetailInner() {
           <div className={styles.historyPager}>
             <span className={styles.pagerCount}>
               {historyPartial
-                ? `最新${formatNumber(displayedHistory.length)}件（全${formatNumber(historyTotal ?? 0)}件）のうち ${formatNumber(filtered.length)}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)}件`
-                : `${formatNumber(filtered.length)}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)}件`}
+                ? `最新${formatNumber(displayedHistory.length)} 件（全${formatNumber(historyTotal ?? 0)} 件）のうち ${formatNumber(filtered.length)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)} 件`
+                : `${formatNumber(filtered.length)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)} 件`}
             </span>
             {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
           </div>
@@ -523,13 +527,13 @@ function FriendDetailInner() {
       <div className={styles.summaryRow}>
         <section className={styles.summaryBox} aria-label="この人がたまったきっかけ">
           <h2 className={styles.summaryTitle}>この人がたまったきっかけ</h2>
-          {historyPartial ? <p className={styles.cellSub}>{`最新${formatNumber(displayedHistory.length)}件から数えています`}</p> : null}
+          {historyPartial ? <p className={styles.cellSub}>{`最新${formatNumber(displayedHistory.length)} 件から数えています`}</p> : null}
           {earnedReasons.length === 0 ? (
             <p className={styles.cellSub}>付与理由の記録はありません</p>
           ) : earnedReasons.map((reason) => (
             <div key={reason.reason} className={styles.summaryLine}>
               <span className={styles.summaryKey} title={reason.reason}>{reason.reason}</span>
-              <span className={styles.summaryValue}>{`${reason.count}回・${formatMileageNumber(reason.amount)}`}</span>
+              <span className={styles.summaryValue}>{`${reason.count} 回・${formatMileageNumber(reason.amount)}`}</span>
             </div>
           ))}
         </section>
@@ -540,7 +544,7 @@ function FriendDetailInner() {
           ) : spentReasons.map((reason) => (
             <div key={reason.reason} className={styles.summaryLine}>
               <span className={styles.summaryKey} title={reason.reason}>{reason.reason}</span>
-              <span className={styles.summaryValue}>{`${reason.count}回・${formatMileageChange(reason.amount)}`}</span>
+              <span className={styles.summaryValue}>{`${reason.count} 回・${formatMileageChange(reason.amount)}`}</span>
             </div>
           ))}
           {lastSpend?.occurredAt ? (
@@ -579,7 +583,7 @@ function FriendDetailInner() {
         error={pendingError}
         confirmLabel={pendingAction?.kind === 'void' ? 'この理由で取消す' : 'この理由で確定する'}
         cancelLabel="キャンセル"
-        onConfirm={() => void runPendingAction()}
+        onConfirm={() => runPendingAction()}
         onCancel={() => { if (!pendingBusy) { setPendingAction(null); setPendingReason(''); setPendingError('') } }}
       >
         <div className={styles.dlgBody}>
@@ -590,7 +594,7 @@ function FriendDetailInner() {
             </div>
           </div>
           <Field label="理由" htmlFor="mileage-pending-reason" required>
-            <TextArea id="mileage-pending-reason" rows={3} value={pendingReason} onChange={(event) => setPendingReason(event.target.value)} />
+            <SaveErrorField names={["pendingReason","pending_reason"]}><TextArea id="mileage-pending-reason" rows={3} value={pendingReason} onChange={(event) => setPendingReason(event.target.value)} /></SaveErrorField>
           </Field>
           <Notice tone="info">理由は履歴に残り、あとから実行者と一緒に確認できます。</Notice>
         </div>
@@ -601,7 +605,7 @@ function FriendDetailInner() {
 
 export default function FriendDetailV8() {
   return (
-    <Suspense fallback={<div data-design-node="R6kIG"><ListState kind="loading" title="マイル明細を読み込んでいます" /></div>}>
+    <Suspense fallback={<div data-design-node="R6kIG"><DetailLoading label="マイル明細を読み込んでいます" /></div>}>
       <FriendDetailInner />
     </Suspense>
   )

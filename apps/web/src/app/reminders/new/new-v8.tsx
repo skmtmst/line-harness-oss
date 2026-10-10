@@ -33,6 +33,7 @@ import { SummaryCardV8, WizardFooterV8, ReminderV8Stepper } from '../wizard-v8-u
 import styles from '../wizard-v8.module.css'
 import { humanizeErrorText } from '@/components/shared/human-error-text'
 import { describeReminderDiff } from '../edit/reminder-conflict-diff'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /**
  * ★V8 リマインダを作る・手順1「基本設定」（板 VE1u5）。
@@ -40,6 +41,8 @@ import { describeReminderDiff } from '../edit/reminder-conflict-diff'
  * 手順2以降は下書きの id が要るため。
  */
 export default function NewReminderV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('リマインダを作成・基本設定')
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -91,8 +94,10 @@ export default function NewReminderV8() {
         setSaving('saved')
         saveConflict.clear()
         notifyToast('最新の内容を読み込みました')
-      } catch {
-        setError('最新の内容を読み込めませんでした。もう一度お試しください。')
+      } catch (saveFailure) {
+        const fieldFailure = saveErrors.capture(saveFailure)
+
+        { if (!fieldFailure) setError('最新の内容を読み込めませんでした。もう一度お試しください。') }
       }
     },
   })
@@ -262,6 +267,8 @@ export default function NewReminderV8() {
       if (!silent) notifyToast('下書きを保存しました')
       return res.data.reminderId
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (!silent) setSaving('failed')
       // 作った下書きが別の画面で先に保存されていた（409）。入力は捨てず、比べる・読み込むを選んでもらう。
       if (savedId && caught instanceof ApiError && caught.status === 409) {
@@ -270,7 +277,7 @@ export default function NewReminderV8() {
         return null
       }
       // 機械の文（API error: 500）は出さず、何が起きた・どうすればよいかを出す（動きの点検 7 番）。
-      if (!silent) setError(caught instanceof Error ? humanizeErrorText(caught.message) : '下書きを保存できませんでした')
+      if (!silent) { if (!fieldFailure) setError(caught instanceof Error ? humanizeErrorText(caught.message) : '下書きを保存できませんでした') }
       return null
     } finally {
       saveInFlight.current = null
@@ -286,7 +293,7 @@ export default function NewReminderV8() {
   const autosave = useDraftAutosave({
     fingerprint,
     dirty: unsaved,
-    active: role === null || canManageRole(role),
+    active: canManageRole(role),
     enabled: validate() === null && !candidatesPending && !saveConflict.conflict,
     paused: leaveTarget !== null || saving === 'saving' || pendingTemplate !== null,
     save: async () => (await save({ silent: true })) !== null,
@@ -312,11 +319,11 @@ export default function NewReminderV8() {
         </>
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
     <CreatePage
       boardId="VE1u5"
       title="リマインダを作る"
-      description="いまは下書きとして作ります。最後の「確認」で有効にします。"
+      help="いまは下書きとして作ります。最後の「確認」で有効にします。"
       identity={<Link href="/reminders" className={styles.backLink}><ChevronLeft size={14} aria-hidden="true" />リマインダへ</Link>}
       steps={<ReminderV8Stepper current="basics" reminderId={savedId} />}
       status={autosave.label ? <span aria-live="polite" data-autosave-status>{autosave.label}</span> : undefined}
@@ -383,6 +390,6 @@ export default function NewReminderV8() {
       />
     </CreatePage>
     <DetailPanel open={previewOpen} title="設定内容" onClose={() => setPreviewOpen(false)}>{preview}</DetailPanel>
-    </>
+    </></SaveErrorScope>
   )
 }

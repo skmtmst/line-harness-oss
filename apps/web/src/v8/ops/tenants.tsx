@@ -1,5 +1,6 @@
 'use client'
-
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { createPageReturnHref } from '@/components/shared/create-page'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { BadgeCheck, CircleDot, CreditCard, Hourglass, Pause, Plus, Star } from 'lucide-react'
@@ -22,6 +23,11 @@ import { OpsHead } from './shell'
 import { useOpsReadOnly } from './use-ops-read-only'
 import parts from './parts.module.css'
 import styles from './tenants.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
  * 運営の契約先アカウント V8（絵 `XWtYC`・作る窓 `i0FTN`）。
@@ -43,13 +49,13 @@ const STATUS_FILTERS: Array<{ key: string; label: string }> = [
   { key: 'active', label: '契約中' },
   { key: 'trialing', label: 'トライアル' },
   { key: 'past_due', label: '決済失敗' },
-  { key: 'suspended', label: '停止' },
+  { key: 'suspended', label: '停止中' },
   { key: 'archived', label: '解約' },
 ]
 
 /** 状態の札（利用の状態と請求の状態を1枚に：停止・解約が先、あとは請求）。 */
 function tenantState(row: OpsTenantRow): { label: string; tone: StatusBadgeTone } {
-  if (row.status === 'suspended') return { label: '停止', tone: 'neutral' }
+  if (row.status === 'suspended') return { label: '停止中', tone: 'neutral' }
   if (row.status === 'archived') return { label: '解約', tone: 'neutral' }
   if (row.plan_status === 'trialing') return { label: 'トライアル', tone: 'info' }
   if (row.plan_status === 'past_due') return { label: '決済失敗', tone: 'danger' }
@@ -60,10 +66,7 @@ function tenantState(row: OpsTenantRow): { label: string; tone: StatusBadgeTone 
 
 /** 10/4 の形。 */
 function monthDay(value: string | null | undefined): string {
-  if (!value) return '—'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' })
+  return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }
 
 export default function OpsTenantsV8() {
@@ -71,7 +74,7 @@ export default function OpsTenantsV8() {
   const [rows, setRows] = useState<OpsTenantRow[]>([])
   const [summary, setSummary] = useState<OpsTenantSummary | null>(null)
   const [q, setQ] = useState('')
-  const [filter, setFilter] = useState('')
+  const [filter, setFilter] = useListUrlValue('filter', '')
   const [loading, setLoading] = useState(true)
   const [listLoadError, setListLoadError] = useState<unknown>(null)
   const readOnly = useOpsReadOnly()
@@ -132,7 +135,7 @@ export default function OpsTenantsV8() {
     setNewName('')
     setNewRestaurant(false)
     setCreating(false)
-    router.push(tenantDetailHref(res.data.id))
+    router.push(createPageReturnHref('/ops/tenants', res.data.id))
   }
 
   const first = (fn: (row: OpsTenantRow) => boolean) => rows.find(fn)
@@ -174,14 +177,14 @@ export default function OpsTenantsV8() {
         </div>
 
         {loading && rows.length === 0 ? (
-          <ListState kind="loading" title="契約先を読み込んでいます" />
+          <ListState permissionScope="hq" kind="loading" title="契約先を読み込んでいます" />
         ) : listLoadError && rows.length === 0 ? (
           <div className={parts.panel}>
-            <ListState kind="error" title="契約先を表示できませんでした" description={loadDescription(listLoadError)} error={listLoadError ?? undefined} onRetry={() => void load()} />
+            <ListState permissionScope="hq" kind="error" title="契約先を表示できませんでした" description={loadDescription(listLoadError)} error={listLoadError ?? undefined} onRetry={() => void load()} />
           </div>
         ) : visible.length === 0 ? (
           <div className={parts.panel}>
-            <ListState kind="empty" title="該当する契約先がありません" description="検索の言葉や絞り込みを変えてください。" />
+            <ListState permissionScope="hq" kind="empty" title="該当する契約先がありません" description="検索の言葉や絞り込みを変えてください。" />
           </div>
         ) : (
           <div className={parts.mini} role="table" aria-label="契約先">
@@ -201,7 +204,7 @@ export default function OpsTenantsV8() {
               return (
                 <div key={row.id} className={`${parts.miniRow} ${styles.row}`} role="row">
                   <span className={parts.grow} role="cell">
-                    <Link href={tenantDetailHref(row.id)} className={parts.link} title={row.name}>{row.name}</Link>
+                    <Link href={tenantDetailHref(row.id)} className={parts.link} ><TruncatedText value={String(row.name ?? '')} /></Link>
                   </span>
                   <span className={`${parts.fixed} ${styles.col90}`} role="cell">{row.plan_status === 'trialing' && !row.plan_key ? 'トライアル' : planLabel(row.plan_key)}</span>
                   <span className={`${parts.fixed} ${styles.col90}`} role="cell"><StatusBadge tone={state.tone}>{state.label}</StatusBadge></span>
@@ -209,11 +212,11 @@ export default function OpsTenantsV8() {
                   <span className={`${parts.num} ${styles.colStaff}`} role="cell">{row.staff_count}</span>
                   <span className={`${parts.fixed} ${styles.colBilling} ${styles.billing}`} role="cell">
                     <span className={styles.billingMain}>{row.plan_status === 'trialing' ? 'トライアル' : planLabel(row.plan_key)}</span>
-                    <span className={styles.billingSub}>{row.trial_ends_at ? `期限 ${monthDay(row.trial_ends_at)}` : row.current_period_ends_at ? `次回 ${monthDay(row.current_period_ends_at)}` : '—'}</span>
+                    <span className={styles.billingSub}>{row.trial_ends_at ? `期限 ${monthDay(row.trial_ends_at)}` : row.current_period_ends_at ? `次回 ${monthDay(row.current_period_ends_at)}` : emptyValue('unknown')}</span>
                   </span>
                   <span className={`${parts.fixed} ${styles.col90}`} role="cell">{formatDate(row.created_at).replace(/-/g, '/')}</span>
                   <span className={`${parts.fixed} ${styles.col90}`} role="cell">{monthDay(row.last_login_at)}</span>
-                  <span className={`${parts.fixed} ${styles.colFeature}`} role="cell">{row.featurePacks.includes('restaurant') ? '使う' : '—'}</span>
+                  <span className={`${parts.fixed} ${styles.colFeature}`} role="cell">{row.featurePacks.includes('restaurant') ? '使う' : emptyValue('unknown')}</span>
                 </div>
               )
             })}
@@ -232,18 +235,15 @@ export default function OpsTenantsV8() {
         busy={createBusy}
         error={createError || undefined}
         designNode="i0FTN"
-        onConfirm={() => void create()}
+        onConfirm={() => create()}
         onCancel={closeCreate}
       >
         <div className={parts.dialogBody}>
-          <label className={styles.field}>
-            <span className={styles.label}>統括名（会社名）</span>
-            <TextField value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="株式会社 然" maxLength={100} aria-label="統括名（会社名）" />
-          </label>
+          <Field label="統括名（会社名）"><SaveErrorField names={["newName","new_name"]}><TextField value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="株式会社 然" maxLength={100} aria-label="統括名（会社名）" /></SaveErrorField></Field>
           <div className={styles.field}>
             <span className={styles.smallLabel}>飲食店機能</span>
             <div className={styles.fullSelect}>
-              <Select aria-label="飲食店機能" value={newRestaurant ? 'use' : 'skip'} onChange={(value) => setNewRestaurant(value === 'use')} size="full" options={[{ value: 'skip', label: '使わない' }, { value: 'use', label: '使う' }]} />
+              <SaveErrorField names={["newRestaurant","new_restaurant"]}><Select aria-label="飲食店機能" value={newRestaurant ? 'use' : 'skip'} onChange={(value) => setNewRestaurant(value === 'use')} size="full" options={[{ value: 'skip', label: '使わない' }, { value: 'use', label: '使う' }]} /></SaveErrorField>
             </div>
           </div>
           <p className={parts.dialogNote}>作ると、統括の最初の権限者へ招待を送れるようになります。プランは契約先の詳細で決めます。</p>

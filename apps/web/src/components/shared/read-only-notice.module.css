@@ -1,0 +1,18 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+.band {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  /* 閲覧のみの13枚の正本HTMLは同じ青の地と12/16の余白。Notice一般の寸法とは別に持つ。 */
+  background: var(--tpl-ro-band-bg);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-body);
+  font-weight: 400;
+  line-height: var(--tpl-ro-band-lh);
+}
+.band > svg { flex-shrink: 0; color: var(--color-action); }
+.band > span { min-width: 0; }
+}

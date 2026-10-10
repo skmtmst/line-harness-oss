@@ -365,16 +365,16 @@ describe('DASH-15 配置の遅延GETが編集中の変更を上書きしない',
     await render()
     await openEditor()
 
-    const toggle = dialog().querySelector<HTMLButtonElement>('button[aria-label="写真審査を表示"]')
-    expect(toggle?.getAttribute('aria-checked')).toBe('true')
+    const toggle = dialog().querySelector<HTMLInputElement>('input[aria-label="写真審査を表示"]')
+    expect(toggle ? String(toggle.checked) : undefined).toBe('true')
     await act(async () => { toggle!.click() })
-    expect(toggle!.getAttribute('aria-checked')).toBe('false')
+    expect(String(toggle!.checked)).toBe('false')
 
     // 遅れて届いたGET（既定配置＝写真審査ON）でdraftを初期化しない
     await act(async () => {
       resolvePreferences?.(ok({ success: true, data: { version: 5, cards: null } }))
     })
-    expect(toggle!.getAttribute('aria-checked')).toBe('false')
+    expect(String(toggle!.checked)).toBe('false')
   })
 })
 
@@ -443,7 +443,10 @@ describe('A01-02 初期状態に戻すは確認なしに実行しない', () => 
     await render()
     await openEditor()
     await act(async () => { button('初期状態に戻す').click() })
-    await act(async () => { button('削除して初期状態へ戻す').click() })
+    await act(async () => { button('削除する').click() })
     expect(net.deletes).toBe(1)
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

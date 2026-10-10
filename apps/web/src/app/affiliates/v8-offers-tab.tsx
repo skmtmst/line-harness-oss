@@ -36,6 +36,8 @@ import OfferTermsDialog from './offer-terms'
 import { confirmedThisMonth, confirmedTotals, confirmedValue, confirmedUnit, confirmedDetail, type ConfirmedState } from './offer-kpi'
 import { KpiStrip, KpiCell, NoticeBar, EmptyState, ZeroResultState, LoadingRows, LoadError } from './v8-shared'
 import './list-v8.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function formatYen(n: number): string {
   return `¥${formatNumber(Math.round(n))}`
@@ -191,7 +193,7 @@ export default function OffersTabV8({
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const a = document.createElement('a')
     a.href = url
-    a.download = `affiliate-offers-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = csvFileName("アフィリエイト案件")
     a.click()
     URL.revokeObjectURL(url)
   }, [shown, accountMap, tagMap, scenarioMap])
@@ -199,7 +201,7 @@ export default function OffersTabV8({
   useEffect(() => {
     registerHeaderActions(
       <Button key="csv" type="button" onClick={exportCsv} disabled={shown.length === 0}>
-        <Download size={15} aria-hidden="true" /> CSV で書き出す
+        <Download size={15} aria-hidden="true" /> CSVで書き出す
       </Button>,
     )
     return () => registerHeaderActions(null)
@@ -430,7 +432,7 @@ export default function OffersTabV8({
                           </span>
                         </td>
                         <td className="af-list-numRight">
-                          <strong>{offer.rewardAmount != null ? formatYen(offer.rewardAmount) : '—'}</strong>
+                          <strong>{offer.rewardAmount != null ? formatYen(offer.rewardAmount) : emptyValue('unknown')}</strong>
                           {offer.rewardMiles > 0 ? (
                             <span className="af-list-cellSub">＋{formatNumber(offer.rewardMiles)}マイル</span>
                           ) : null}
@@ -447,15 +449,7 @@ export default function OffersTabV8({
                         </td>
                         <td>
                           <div className="af-list-rowActions">
-                            <Button
-                              type="button"
-                              size="compact"
-                              onClick={() => { setEditTarget(offer); setFormOpen(true) }}
-                              disabled={!canEdit}
-                              title={!canEdit ? '閲覧のみのため変更できません' : undefined}
-                            >
-                              編集
-                            </Button>
+
                             <span className={`af-list-statusBadge ${offer.isActive ? 'af-list-statusOk' : 'af-list-statusNeutral'}`}>
                               <span className="af-list-statusDot" aria-hidden="true" />
                               {offer.isActive ? '公開中' : '下書き'}
@@ -471,13 +465,13 @@ export default function OffersTabV8({
                                 ariaLabel={`${offer.name}の操作`}
                                 onClose={() => setRowMenuId(null)}
                                 items={([
-                                  {
+                                  ...(canEdit ? [{
                                     id: 'edit',
                                     label: '編集',
                                     onSelect: () => { setEditTarget(offer); setFormOpen(true) },
                                     disabled: !canEdit,
                                     disabledReason: !canEdit ? '閲覧のみのため変更できません' : undefined,
-                                  },
+                                  }] : []),
                                   {
                                     id: 'terms',
                                     label: '決まり',

@@ -1557,6 +1557,9 @@
       "parentColumn": "id"
     }
   },
+  "friend_fixed_fields": {
+    "category": "global"
+  },
   "friend_identity_links": {
     "category": "purge",
     "scope": {
@@ -3196,6 +3199,33 @@
       "parentColumn": "id"
     }
   },
+  "rt_floors": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_reservation_table_links": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "reservation_id",
+      "parent": "rt_reservations",
+      "parentColumn": "id"
+    }
+  },
+  "rt_seat_waitlist_table_links": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "waitlist_id",
+      "parent": "rt_seat_waitlist",
+      "parentColumn": "id"
+    }
+  },
   "saved_search_references": {
     "category": "purge",
     "scope": {
@@ -4295,6 +4325,20 @@
     "scope": {
       "by": "tenant",
       "column": "tenant_id"
+    }
+  },
+  "entry_route_coupon_receipts": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "form_submission_files": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
     }
   }
 }

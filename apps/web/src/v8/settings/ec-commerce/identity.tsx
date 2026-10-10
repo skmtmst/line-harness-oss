@@ -1,15 +1,6 @@
 'use client'
-
-/*
- * ★V8-B `w1W8h`：EC連携 会員のつき合わせ（/ec-commerce/identity-candidates）。
- *
- * 外側は取り込みの記録（GmVR5）と同じ設定の板（narrow-nav）と中の切り替え。中身は絵の順：
- * 数の帯（自動で結びついた・候補が見つかった・結びついていない・結びついていない注文の金額）→
- * 自動で結びつく条件の帯 → 並び（と絞り込み）・注意 → 候補の表（「候補を見る」「決める」、候補なしは「友だちを探す」）。
- * 動きは今の画面（app/ec-commerce/identity-candidates/page.tsx）と同じ：候補は本人照合の口、
- * 件数と金額はEC運用の集計の口（アカウントの切り替えで古い応答を捨てる・集計だけの失敗は数の帯だけ）、
- * 「候補を見る」で表の下に根拠・影響・両方の中身・これまでの判断、「決める」で判定の窓。
- */
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ArrowUpRight, Link2, Plug, Search, Unlink, UserSearch } from 'lucide-react'
 import { ORDER_IMPACT_KEYS, REVENUE_IMPACT_KEYS, type IdentityCandidateImpactMetric } from '@line-crm/shared'
@@ -33,6 +24,21 @@ import shared from './screen.module.css'
 import styles from './identity.module.css'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B `w1W8h`：EC連携 会員のつき合わせ（/ec-commerce/identity-candidates）。
+ *
+ * 外側は取り込みの記録（GmVR5）と同じ設定の板（narrow-nav）と中の切り替え。中身は絵の順：
+ * 数の帯（自動で結びついた・候補が見つかった・結びついていない・結びついていない注文の金額）→
+ * 自動で結びつく条件の帯 → 並び（と絞り込み）・注意 → 候補の表（「候補を見る」「決める」、候補なしは「友だちを探す」）。
+ * 動きは今の画面（app/ec-commerce/identity-candidates/page.tsx）と同じ：候補は本人照合の口、
+ * 件数と金額はEC運用の集計の口（アカウントの切り替えで古い応答を捨てる・集計だけの失敗は数の帯だけ）、
+ * 「候補を見る」で表の下に根拠・影響・両方の中身・これまでの判断、「決める」で判定の窓。
+ */
 
 type View = 'all' | 'candidate' | 'none' | 'conflict'
 type Sort = 'newest' | 'confidence'
@@ -71,13 +77,13 @@ function confidenceTone(label: string): StatusBadgeTone {
 export default function EcIdentityCandidatesScreen() {
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
-  const canEdit = role === null || canManageRole(role)
+  const canEdit = canManageRole(role)
   const review = useIdentityReview('ec_member', { lineAccountId: selectedAccountId })
   const detail = review.detail
   const [operations, setOperations] = useState<EcIdentityCandidateOperationsList | null>(null)
   const [operationsState, setOperationsState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
-  const [view, setView] = useState<View>('all')
-  const [sort, setSort] = useState<Sort>('confidence')
+  const [view, setView] = useListUrlValue<View>('view', 'all')
+  const [sort, setSort] = useListUrlValue<Sort>('sort', 'confidence')
 
   /* アカウントを切り替えたら、前のアカウントの遅れた応答は採らない（R600）。 */
   const operationsReqRef = useRef(0)
@@ -182,16 +188,16 @@ export default function EcIdentityCandidatesScreen() {
 
         <div className={styles.toolbar}>
           <span className={styles.sortBox}>
-            <Select aria-label="候補の並び順" value={sort} onChange={(value) => setSort(value as Sort)} options={[{ value: 'confidence', label: '確からしさが高い順' }, { value: 'newest', label: '注文が新しい順' }]} />
+            <SaveErrorField names={["sort"]}><ListToolbarSort aria-label="候補の並び順" value={sort} onChange={(value) => setSort(value as Sort)} options={[{ value: 'confidence', label: '確からしさが高い順' }, { value: 'newest', label: '注文が新しい順' }]} /></SaveErrorField>
           </span>
           {/* 絵に無い絞り込み（候補あり・候補なし・同じ人が2人いる疑い）は、並びの横に小さく残す。 */}
           <span className={styles.sortBox}>
-            <Select
+            <SaveErrorField names={["view"]}><Select
               aria-label="候補の絞り込み"
               value={view}
               onChange={(value) => setView(value as View)}
               options={VIEW_OPTIONS.map((option) => ({ value: option.value, label: viewCount[option.value] == null ? option.label : `${option.label} ${formatNumber(viewCount[option.value] ?? 0)}` }))}
-            />
+            /></SaveErrorField>
           </span>
           <span className={shared.spacer} />
           <span className={styles.note}>結び付けても元の注文と LINE の友だちは残り、過去の LINE 送信は再送しません。</span>
@@ -213,9 +219,9 @@ export default function EcIdentityCandidatesScreen() {
             const hasCandidate = Boolean(item.right.label)
             const selected = review.selectedId === item.id
             return (
-              <Tr key={item.id} selected={selected}>
+              <Tr key={item.id} selected={selected} data-row-id={item.id}>
                 <Td><span className={shared.stack}>
-                  <span className={styles.name} title={item.left.label}>{item.left.label}</span>
+                  <span className={styles.name} ><TruncatedText value={String(item.left.label ?? '')} /></span>
                   <span className={shared.sub} title={leftSub}>{leftSub}</span>
                 </span></Td>
                 <Td><span className={shared.stack}>
@@ -228,7 +234,7 @@ export default function EcIdentityCandidatesScreen() {
                 <Td>
                   {hasCandidate ? (
                     <StatusBadge tone={confidenceTone(item.confidence.label)} size="compact">{confidenceText(item.confidence.label)}</StatusBadge>
-                  ) : '—'}
+                  ) : emptyValue('unknown')}
                 </Td>
                 <Td><span className={styles.ops}>
                   {hasCandidate ? (
@@ -287,7 +293,7 @@ export default function EcIdentityCandidatesScreen() {
       boardId="w1W8h"
       layout="narrow-nav"
       title="EC連携"
-      description="ネットショップから注文・発送・定期便の出来事を取り込み、LINE の友だちと結びつけます。"
+      help="ネットショップから注文・発送・定期便の出来事を取り込み、LINE の友だちと結びつけます。"
       actions={<Button href="/ec-commerce?tab=connector" variant="secondary"><Plug className={shared.btnIcon} aria-hidden="true" />つなぎ先の設定</Button>}
     >
       <EcTabsV8 accountId={selectedAccountId} active="identity" />

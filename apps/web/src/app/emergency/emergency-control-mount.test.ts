@@ -21,7 +21,8 @@
  */
 import { act } from 'react'
 import { createElement } from 'react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 import type { LineAccount } from '@line-crm/shared'
 import type { OperationControl, OperationImpactPreview } from '@/lib/api'
 
@@ -105,6 +106,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     ...actual,
     api: {
       ...actual.api,
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: 'owner' } }) },
       operations: {
         ...actual.api.operations,
         preview: (accountId: string | null) => {
@@ -731,6 +733,8 @@ type Host = {
   unmount: () => void
 }
 
+const activeHosts = new Set<Host>()
+
 async function installReactHost(accounts: LineAccount[]): Promise<Host> {
   const document = new FakeDocument()
   const window = new FakeWindow(document)
@@ -769,7 +773,7 @@ async function installReactHost(accounts: LineAccount[]): Promise<Host> {
     root.render(createElement(EmergencyControlPanel, { accounts }))
   })
 
-  return {
+  const host: Host = {
     container,
     text: () => container.textContent,
     visibleText: () => visibleText(container),
@@ -777,8 +781,11 @@ async function installReactHost(accounts: LineAccount[]): Promise<Host> {
       act(() => {
         root.unmount()
       })
+      activeHosts.delete(host)
     },
   }
+  activeHosts.add(host)
+  return host
 }
 
 // ---------------------------------------------------------------------------
@@ -853,6 +860,13 @@ async function runStopFlow(host: Host) {
   await type(byId(host.container, 'emergency-step-up-code'), '123456')
   expect(await click(button(host.container, '本人確認して停止'))).toBe(true)
 }
+
+// 最初の動的importは準備段階で待つ。各操作の5秒制限へコンパイル時間を混ぜない。
+beforeAll(async () => {
+  const host = await installReactHost(ACCOUNTS)
+  host.unmount()
+}, 30_000)
+afterEach(() => { for (const host of [...activeHosts]) host.unmount() })
 
 beforeEach(() => {
   bench.previewCalls.length = 0
@@ -1152,3 +1166,6 @@ describe('EmergencyControlPanel を実際に mount して操作する', () => {
     host.unmount()
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

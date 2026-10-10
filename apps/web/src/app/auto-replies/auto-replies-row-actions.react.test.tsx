@@ -103,7 +103,7 @@ async function flush() {
 }
 
 describe('自動応答一覧の行操作', () => {
-  it('「編集」が枠つきボタン、停止・削除は「・・・」メニューの中', async () => {
+  it('B-193：編集・停止・削除は「・・・」メニューの中', async () => {
     await act(async () => { root.render(<AutoRepliesPage />) })
     await flush()
 

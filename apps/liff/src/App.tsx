@@ -12,10 +12,12 @@ const EventDone = lazy(() => import('./pages/EventDone.js'));
 const EventBookings = lazy(() => import('./pages/EventBookings.js'));
 const Affiliate = lazy(() => import('./pages/Affiliate.js'));
 const Webinar = lazy(() => import('./pages/Webinar.js'));
+const Research = lazy(() => import('./pages/Research.js'));
 const Form = lazy(() => import('./pages/Form.js'));
 const EventWaitlistOffer = lazy(() => import('./pages/EventWaitlistOffer.js'));
 const VisitStamps = lazy(() => import('./pages/VisitStamps.js'));
 const SeatReserve = lazy(() => import('./pages/seat/SeatReserve.js'));
+const EntryRouteCoupon = lazy(() => import('./pages/EntryRouteCoupon.js'));
 const NotFound = lazy(() => import('./pages/NotFound.js'));
 
 function Loading() {
@@ -25,6 +27,7 @@ function Loading() {
 export default function App() {
   const [search] = useSearchParams();
   const location = useLocation();
+  if (search.get('couponRef')) return <Suspense fallback={<Loading />}><EntryRouteCoupon /></Suspense>;
   const waitlistToken = search.get('eventWaitlistToken');
   if (waitlistToken) {
     return (
@@ -32,6 +35,14 @@ export default function App() {
         <EventWaitlistOffer token={waitlistToken} />
       </Suspense>
     );
+  }
+
+  if (location.pathname === '/' && search.get('page') === 'webinar' && search.get('slug')) {
+    return <Navigate to={{ pathname: `/webinar/${encodeURIComponent(search.get('slug')!)}`, search: location.search }} replace />;
+  }
+
+  if (location.pathname === '/' && search.get('page') === 'research' && search.get('researchId')) {
+    return <Navigate to={{ pathname: `/research/${encodeURIComponent(search.get('researchId')!)}`, search: location.search }} replace />;
   }
 
   const action = liffActionFromUrl(`https://liff.line.me/entry/${location.search}`);
@@ -54,6 +65,7 @@ export default function App() {
         <Route path="/affiliate" element={<Affiliate />} />
         <Route path="/visit-stamps" element={<VisitStamps />} />
         <Route path="/webinar/:slug" element={<Webinar />} />
+        <Route path="/research/:id" element={<Research />} />
         <Route path="/forms/:id" element={<Form />} />
         <Route path="/restaurant/reserve/:token" element={<SeatReserve />} />
         <Route path="/" element={<Navigate to={{ pathname: '/booking', search: location.search }} replace />} />

@@ -1,3 +1,4 @@
+
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,19 +18,23 @@ const render = (props: Partial<React.ComponentProps<typeof Dialog>>) => renderTo
 )
 
 describe('V8 の窓：絵の幅を画面が渡せる', () => {
-  it('designWidth を渡すと、面にその幅が乗る', () => {
+  it('designWidth を渡すと、4段のうち入れられる幅へそろえる', () => {
     const html = render({ designWidth: 600 })
     expect(html).toContain('data-design-width=""')
-    expect(html).toContain('--dialog-design-width:600px')
+    expect(html).toContain('--dialog-design-width:560px')
     expect(css).toMatch(/\[data-theme='v8'\] \.panel\[data-design-width\] \{\s*width: min\(var\(--dialog-design-width\), 100%\);/)
     // 層（@layer components）の外で、「幅 560」「大きい窓 800」の規則より後ろに置く（前に置くと負けて効かない）。
     expect(css.indexOf("[data-theme='v8'] .panel[data-design-width]")).toBeGreaterThan(css.indexOf("[data-theme='v8'] .panel[data-size='large']"))
   })
 
-  it('渡さなければ今までどおり（幅の印も付かない）', () => {
+  it.each([[844, 720], [640, 560], [480, 480], [960, 960]])('幅 %i は %i で描く', (given, expected) => {
+    expect(render({ designWidth: given })).toContain(`--dialog-design-width:${expected}px`)
+  })
+
+  it('省略時も共通の560pxの段を持つ', () => {
     const html = render({})
-    expect(html).not.toContain('data-design-width')
-    expect(html).not.toContain('--dialog-design-width')
+    expect(html).toContain('data-design-width')
+    expect(html).toContain('--dialog-design-width:560px')
   })
 
   it('上からの位置は背景（overlay）で受ける', () => {

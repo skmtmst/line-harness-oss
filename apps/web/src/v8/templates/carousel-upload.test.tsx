@@ -15,7 +15,7 @@ vi.mock('../contents/media-direct-upload', async (original) => ({
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a-1', selectedAccount: { name: '店' }, accounts: [] }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
-vi.mock('@/lib/staff-capability', () => ({ isOwnerOrAdmin: () => true }))
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
 vi.mock('@/components/auto-replies/inline-action-list', () => ({ useActionOptions: () => ({ tags: [], fields: [], marks: [], scenarios: [], vars: [] }) }))
 import Carousel from './carousel'
 
@@ -96,7 +96,7 @@ describe('カルーセルに手元の画像を入れる', () => {
     const upload = vi.fn().mockResolvedValue(image), save = vi.fn()
     render(<Carousel host={host({ uploadCarouselImage: upload, onSave: save })} />); fill()
     const tooLarge = file(); Object.defineProperty(tooLarge, 'size', { value: 8 * 1024 * 1024 + 1 })
-    choose(tooLarge); expect(screen.getByRole('alert').textContent).toContain('8MB'); expect(upload).not.toHaveBeenCalled()
+    choose(tooLarge); expect(screen.getByRole('alert').textContent).toContain('8.0MB'); expect(upload).not.toHaveBeenCalled()
     choose(file()); await waitFor(() => expect(screen.getByAltText('カードの画像')).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ kind: 'carousel', media: [image] }), false)

@@ -46,6 +46,8 @@
   outline-offset: -1px;
 }
 
+.blockConfirmed{background:var(--color-status-info-soft);outline:1px solid var(--color-status-info);outline-offset:-1px;}
+.blockSeated{background:var(--color-accent-soft);outline:1px solid var(--color-accent);outline-offset:-1px;}
 .slotAdd {
   position: absolute;
   top: var(--tpl-rs-rsv-add-top);
@@ -101,5 +103,5 @@
   opacity: 1;
 }
 
-.block:focus-visible, .slotAdd:focus-visible, .phoneTable:focus-visible { outline: 2px solid var(--color-action); outline-offset: 1px; }
+.block:focus-visible, .slotAdd:focus-visible, .phoneTable:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 1px; }
 }

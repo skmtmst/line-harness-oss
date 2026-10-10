@@ -1,15 +1,6 @@
 'use client'
-
-/*
- * ★V8 広告とのつなぎ（Pencil `FDBsG`・`/inflow-links?tab=connections`）。
- *
- * 2026-10-07 src/v8 に一から書いた（今の V8 は 13%）。頭は広告連携（qSTVR）と同じ形。
- * 本文（間14）：返すしくみの3枚 → 数の4枚（共通の数の帯）→ 成果地点と広告に返す名前の対応（F-21）→ 注。
- * 呼ぶ口：送信記録の30日の集計（今と同じ）・対応表 `GET /api/ad-platforms/mappings`（F-21）・
- * 結びつける `PUT /api/ad-platforms/mappings/:pointId`（owner・admin）。BEHAVIOR.md の「広告とのつなぎ」。
- */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Clock, Eye, History, RotateCw, Send, XCircle } from 'lucide-react'
+import { Clock, History, RotateCw, Send, XCircle } from 'lucide-react'
 import type { AdEventMapping } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -23,6 +14,20 @@ import StatusBadge from '@/components/shared/status-badge'
 import { adMappingReturns, groupAdMappings, useAdLogs, type AdMappingRow } from './ad-shared'
 import adsStyles from './ads.module.css'
 import styles from './ad-pages.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
+
+/*
+ * ★V8 広告とのつなぎ（Pencil `FDBsG`・`/inflow-links?tab=connections`）。
+ *
+ * 2026-10-07 src/v8 に一から書いた（今の V8 は 13%）。頭は広告連携（qSTVR）と同じ形。
+ * 本文（間14）：返すしくみの3枚 → 数の4枚（共通の数の帯）→ 成果地点と広告に返す名前の対応（F-21）→ 注。
+ * 呼ぶ口：送信記録の30日の集計（今と同じ）・対応表 `GET /api/ad-platforms/mappings`（F-21）・
+ * 結びつける `PUT /api/ad-platforms/mappings/:pointId`（owner・admin）。BEHAVIOR.md の「広告とのつなぎ」。
+ */
 
 const STEPS = [
   { title: 'クリックの目印を持ち帰る', text: '広告から中継リンクを通った人の目印を残します。中継リンクを通らないと広告と結びつきません。' },
@@ -33,6 +38,7 @@ const STEPS = [
 type MappingState = { kind: 'loading' } | { kind: 'ready'; rows: AdMappingRow[] } | { kind: 'error' }
 
 export default function AdConnectionsV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('広告とのつなぎ')
   usePageCrumbs([
     { label: 'ホーム', href: '/' },
@@ -60,13 +66,16 @@ export default function AdConnectionsV8() {
       const res = await api.adPlatforms.mappings(accountId)
       if (generation !== generationRef.current) return
       setMapping(res.success ? { kind: 'ready', rows: groupAdMappings(res.data) } : { kind: 'error' })
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure);
+
       if (generation === generationRef.current) setMapping({ kind: 'error' })
     }
-  }, [accountId])
+  }, [accountId, saveErrors])
 
   useEffect(() => {
-    void loadMappings()
+    void loadMappings();
+
     return () => { generationRef.current += 1 }
   }, [loadMappings])
 
@@ -100,9 +109,11 @@ export default function AdConnectionsV8() {
       if (moved()) return
       if (!res.success) setSaveError(res.error ?? '対応を保存できませんでした。読み直してからもう一度お試しください。')
       await loadMappings()
-    } catch {
+    } catch (saveFailure) {
       if (moved()) return
-      setSaveError('対応を保存できませんでした。通信状態を確かめて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure)
+      setSaveError('対応を保存できませんでした。通信状態を確かめて、もう一度お試しください。') }
     } finally {
       if (!moved()) setSavingKey(null)
     }
@@ -125,11 +136,11 @@ export default function AdConnectionsV8() {
         />
       )
     }
-    return <span className={styles.cellFaint}>—</span>
+    return <span className={styles.cellFaint}>{emptyValue('unknown')}</span>
   }
 
   if (!accountId) {
-    return <ListState kind="empty" title="LINEアカウントを選択してください" description="選んだLINEアカウントの広告とのつなぎだけを表示します。" />
+    return <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="LINEアカウントを選択してください" description="選んだLINEアカウントの広告とのつなぎだけを表示します。" /></SaveErrorScope>
   }
 
   let table
@@ -141,7 +152,7 @@ export default function AdConnectionsV8() {
         kind="error"
         title="対応表を読み込めませんでした"
         description="対応は消えていません。読み直して、もう一度お試しください。"
-        action={<Button onClick={() => void loadMappings()}>対応表を読み直す</Button>}
+        onRetry={() => void loadMappings()}
       />
     )
   } else if (mapping.rows.length === 0) {
@@ -173,17 +184,13 @@ export default function AdConnectionsV8() {
   }
 
   return (
-    <div className={adsStyles.board} data-design-node="FDBsG">
-      <header className={adsStyles.head}>
-        <div className={adsStyles.headText}>
-          <h1 className={adsStyles.title}>広告とのつなぎ</h1>
-          <p className={adsStyles.description}>LINE で出た成果を広告へ返し、広告の配信を賢くします。お客様の名前やメールアドレスは広告へ送りません。</p>
-        </div>
-        <Button href="/inflow-links?tab=connections&view=history"><History size={15} aria-hidden="true" />送信履歴を見る</Button>
-      </header>
+    <SaveErrorScope errors={saveErrors}><div className={adsStyles.board} data-design-node="FDBsG">
+      <PageHeading title={<>広告とのつなぎ</>}
+        help={<>LINE で出た成果を広告へ返し、広告の配信を賢くします。お客様の名前やメールアドレスは広告へ送りません。</>}
+        actions={<><Button href="/inflow-links?tab=connections&view=history"><History size={15} aria-hidden="true" />送信履歴を見る</Button></>} />
       <div className={adsStyles.body}>
         {readonly ? (
-          <p className={adsStyles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作は管理者に頼んでください。</p>
+          <div className={adsStyles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
         <h2 className={adsStyles.sectionTitle}>返すしくみ</h2>
         <ol className={styles.steps} aria-label="返すしくみ">
@@ -202,7 +209,7 @@ export default function AdConnectionsV8() {
             kind="error"
             title="広告への送信の数を表示できませんでした"
             description="送信の記録は消えていません。読み直して、もう一度お試しください。"
-            action={<Button onClick={() => void model.reload()}>数を読み直す</Button>}
+            onRetry={() => void model.reload()}
           />
         ) : (
           <KpiBand aria-label="広告への送信の概要">
@@ -214,12 +221,12 @@ export default function AdConnectionsV8() {
           </KpiBand>
         )}
         <h2 className={adsStyles.sectionTitle}>成果地点と、広告に返す名前の対応</h2>
-        {saveError ? <p className={adsStyles.error} role="alert">{saveError}</p> : null}
+        {saveError ? <Notice tone="danger" className={adsStyles.errorNoticePlacement} >{saveError}</Notice> : null}
         {table}
         <p className={adsStyles.notice}>
           気をつけること：広告側で成果の名前を先に作ってから対応を決めてください。失敗した送信のやり直しは、送信履歴から行えます。
         </p>
       </div>
-    </div>
+    </div></SaveErrorScope>
   )
 }

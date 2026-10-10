@@ -80,7 +80,7 @@ describe('V6 シナリオ編集の契約', () => {
 
   it('「今月作成」は日本時間の月初を共通一覧APIへ渡して絞り込む', () => {
     expect(LIST).toContain("timeZone: 'Asia/Tokyo'")
-    // 新しい一覧は「停止中のみ」（0）と「稼働中のみ」（1）を1つの値にまとめて口へ渡す。
+    // 新しい一覧は「停止中のみ」（0）と「有効のみ」（1）を1つの値にまとめて口へ渡す。
     expect(LIST).toContain("stoppedOnly ? 0 : savedFilter === 'active' ? 1 : undefined")
     expect(LIST).toContain('active: activeParam,')
     // m13i: 札は共通 FilterChip になった（選択表示は部品が持つ）。絞りの動きは同じ。

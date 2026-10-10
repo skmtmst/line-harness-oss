@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8 お問い合わせのやり取り（Pencil `OhguS`）。
- *
- * v7 の画面（app/hq/support/detail/page.tsx）と読み書きの口・失敗時の扱いは同じ。
- * 見た目だけを絵どおりに一から組んだ：頭（題＝件名・説明＝受付番号・種類・店舗・送った日時）・
- * 左の「統括の設定」の列・状態の札・やり取りのカード（自分は右の緑、運営は左の灰）・
- * 続きを送るカード・右に送信者とこれまでの問い合わせ。
- * 静的書き出しのため動的セグメントは使わず `?id=` で受ける（v7 と同じ）。
- */
 import StatusPill from '@/components/shared/status-pill'
 import { Paperclip, Send, X } from 'lucide-react'
 import Link from 'next/link'
@@ -19,22 +9,32 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import type { StaffMember } from '@line-crm/shared'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
-import MediaSlot from '@/components/shared/media-slot'
 import TargetMissing from '@/components/shared/target-missing'
 import { TextArea } from '@/components/shared/text-field'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError } from '@/lib/api'
 import { readFileAsBase64 } from '@/lib/hq-banners'
-import {
-  SUPPORT_ATTACHMENT_MAX,
-  SUPPORT_BODY_MAX,
-  validateSupportAttachment,
-  type HqSupportDetail,
-  type HqSupportRequest,
-} from '@/lib/hq-support'
+import { SUPPORT_ATTACHMENT_MAX, SUPPORT_BODY_MAX, validateSupportAttachment, type HqSupportDetail, type HqSupportRequest } from '@/lib/hq-support'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
 import styles from './support-detail.module.css'
+import ImageFrame from '@/components/shared/image-frame'
+import { Field } from '@/components/shared/form-controls'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
+
+/*
+ * ★V8 お問い合わせのやり取り（Pencil `OhguS`）。
+ *
+ * v7 の画面（app/hq/support/detail/page.tsx）と読み書きの口・失敗時の扱いは同じ。
+ * 見た目だけを絵どおりに一から組んだ：頭（題＝件名・説明＝受付番号・種類・店舗・送った日時）・
+ * 左の「統括の設定」の列・状態の札・やり取りのカード（自分は右の緑、運営は左の灰）・
+ * 続きを送るカード・右に送信者とこれまでの問い合わせ。
+ * 静的書き出しのため動的セグメントは使わず `?id=` で受ける（v7 と同じ）。
+ */
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -187,13 +187,13 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
     : '問い合わせの内容と運営からの返事を確認します。'
 
   return (
-    <ListPage boardId="OhguS" title={title} description={description} folders={<HqSettingsNavV8 active="contact" />} folderNav={settingsNav}>
+    <ListPage boardId="OhguS" title={title} help={description} folders={<HqSettingsNavV8 active="contact" />} folderNav={settingsNav}>
       <div className={styles.body}>
         <div className={styles.main}>
           {idMissing ? (
             <TargetMissing kind="unspecified" title="開くお問い合わせが指定されていません" description="一覧から開くお問い合わせを選び直してください。" backHref="/hq/support" backLabel="問い合わせの一覧へ戻る" />
           ) : detailLoading || id === undefined ? (
-            <p className={styles.faint}>読み込んでいます…</p>
+            <DetailLoading />
           ) : detailMissing || (!loadError && !detail) ? (
             <TargetMissing kind="not-found" title="このお問い合わせは見つかりません" description="削除されたか、別の記録です。一覧から選び直してください。" backHref="/hq/support" backLabel="問い合わせの一覧へ戻る" />
           ) : loadError || !detail ? (
@@ -212,9 +212,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                 ))}
               </ol>
 
-              <div className={styles.compose}>
-                <label htmlFor={`${uid}-body`} className={styles.composeTitle}>続きを送る</label>
-                <TextArea
+              <div className={styles.compose}><Field label="続きを送る" htmlFor={`${uid}-body`}><SaveErrorField names={["body"]}><TextArea
                   id={`${uid}-body`}
                   value={body}
                   onChange={(event) => { setBody(event.target.value); setNotice('') }}
@@ -222,8 +220,8 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                   maxLength={SUPPORT_BODY_MAX}
                   disabled={sending}
                   className={styles.textarea}
-                />
-                {attachments.length > 0 ? (
+                /></SaveErrorField>
+{attachments.length > 0 ? (
                   <ul className={styles.thumbs}>
                     {attachments.map((a, i) => (
                       <li key={`${a.name}-${i}`} className={styles.thumb}>
@@ -236,28 +234,27 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                     ))}
                   </ul>
                 ) : null}
-                {attachments.length < SUPPORT_ATTACHMENT_MAX ? (
+{attachments.length < SUPPORT_ATTACHMENT_MAX ? (
                 <div className={styles.attachSlot}>
-                  <MediaSlot
-                    size="compact"
+                  <ImageFrame
+
                     title="画像を添える"
                     accept="image/png,image/jpeg"
-                    limitText={`PNG・JPEG、1枚 5MB まで（${SUPPORT_ATTACHMENT_MAX}枚まで）`}
+                    maxBytes={5 * 1024 * 1024} help={`${SUPPORT_ATTACHMENT_MAX}枚まで`}
                     disabled={sending}
                     onFile={(file) => void addFile(file)}
                   />
                 </div>
               ) : null}
-                <div className={styles.composeRow}>
+<div className={styles.composeRow}>
                   <span className={styles.spacer} />
                   <span className={styles.sendNote}>{blocked && body ? <span className={styles.warn}>{blocked}</span> : SEND_NOTE}</span>
                   <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked) || !detail} busy={sending} busyLabel="送信中…">
                     <Send aria-hidden="true" className={styles.buttonIcon} />送る
                   </Button>
                 </div>
-                {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-                {error ? <p className={styles.error} role="alert">{error}</p> : null}
-              </div>
+{notice ? <p className={styles.notice} role="status">{notice}</p> : null}
+{error ? <Notice tone="danger" >{error}</Notice> : null}</Field></div>
             </>
           )}
         </div>
@@ -266,16 +263,16 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
           <section className={styles.sender} aria-label="送信者">
             <h2 className={styles.senderTitle}>送信者</h2>
             <p className={styles.senderLines} title={hasSenderEmail ? 'この内容が続きに添えられます。返信はこのメールアドレスに届きます。' : 'この内容が続きに添えられます。返信はこの画面のやり取りに届きます。'}>
-              {`名前：${me?.name ?? '—'}`}<br />
-              {`メール：${me?.email ?? '—'}`}<br />
-              {`統括：${tenantName || '—'}`}
+              {`名前：${me?.name ?? emptyValue('unknown')}`}<br />
+              {`メール：${me?.email ?? emptyValue('unknown')}`}<br />
+              {`統括：${tenantName || emptyValue('unknown')}`}
             </p>
           </section>
 
           <section className={styles.history} aria-label="これまでの問い合わせ">
             <h2 className={styles.historyTitle}>これまでの問い合わせ</h2>
             {history === null ? (
-              <p className={styles.historyEmpty}>読み込んでいます…</p>
+              <DetailLoading />
             ) : !Array.isArray(history) ? (
               <p className={styles.historyEmpty}>これまでの問い合わせを読み込めませんでした。</p>
             ) : history.length === 0 ? (
@@ -313,10 +310,10 @@ function Message({ mine, author, at, body, attachments }: { mine: boolean; autho
       {files.length > 0 ? (
         <span className={styles.files}>
           {files.map((a) => (
-            <a key={a.key} href={a.url} target="_blank" rel="noreferrer" className={styles.file}>
+            <TextLink external key={a.key} href={a.url}   className={styles.file}>
               <Paperclip aria-hidden="true" className={styles.smallIcon} />
               {(a.key ?? '').split('/').pop()}
-            </a>
+            </TextLink>
           ))}
         </span>
       ) : null}

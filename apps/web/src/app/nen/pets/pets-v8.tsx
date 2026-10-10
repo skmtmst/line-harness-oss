@@ -1,21 +1,4 @@
 'use client'
-
-/*
- * ★V8-B マイペット（Pencil「★V8-B 画面の地図」専用機能の組：
- * 一覧 `wTIej`、一覧1152 `t2SMXX`、ごはんの目安 `h7A2F`、
- * ペットの情報を直す `eLjeQ`、状態の板 `dzx5D`）。
- *
- * v7（page.tsx 内の PetsInner と pets-tab / feeding-tab / pet-editor）
- * とは別の部品として持ち、data-theme="v8" のときだけこちらが出る。
- * データの口（pets・feeding・saveFeeding・updatePet・CSV）は同じ。
- * 違いは置き場と見せ方だけ——
- * ・数の帯は1枚の白い板に区切り線で4つ（離したカードにしない）。
- * ・行末の操作は「…」に集約（ペットの情報を直す・飼い主を開く）。
- * ・1152 では 年齢・避妊去勢・運動量 を隠す（t2SMXX。直す窓で見られる）。
- * ・ごはんの目安は左に節のカード2枚＋おやつの上限、右に計算のカード。
- * ・ペットの情報を直すは真ん中の小窓（eLjeQ）。版つき保存・競合はそのまま。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
- */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Calculator, History, PawPrint, Sparkles } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -51,6 +34,30 @@ import { nenRanksApi, type NenFeedingData, type NenFeedingKind } from '@/lib/nen
 import { birthdayDraft, normalizeBirthdayInput } from './pet-editor'
 import type { PetTab } from './page'
 import styles from './pets-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
+import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B マイペット（Pencil「★V8-B 画面の地図」専用機能の組：
+ * 一覧 `wTIej`、一覧1152 `t2SMXX`、ごはんの目安 `h7A2F`、
+ * ペットの情報を直す `eLjeQ`、状態の板 `dzx5D`）。
+ *
+ * v7（page.tsx 内の PetsInner と pets-tab / feeding-tab / pet-editor）
+ * とは別の部品として持ち、data-theme="v8" のときだけこちらが出る。
+ * データの口（pets・feeding・saveFeeding・updatePet・CSV）は同じ。
+ * 違いは置き場と見せ方だけ——
+ * ・数の帯は1枚の白い板に区切り線で4つ（離したカードにしない）。
+ * ・行末の操作は「…」に集約（ペットの情報を直す・飼い主を開く）。
+ * ・1152 では 年齢・避妊去勢・運動量 を隠す（t2SMXX。直す窓で見られる）。
+ * ・ごはんの目安は左に節のカード2枚＋おやつの上限、右に計算のカード。
+ * ・ペットの情報を直すは真ん中の小窓（eLjeQ）。版つき保存・競合はそのまま。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ */
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -111,8 +118,8 @@ export default function PetsPageV8({
     <div data-design-node={BOARD_NODE[tab]} className={styles.board}>
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>マイペット</h1>
-          <p className={styles.headDesc}>お客さまがマイページで登録したペットです。体重と主食から、1日のごはんの目安を出します。</p>
+          <PageHeading title="マイペット" help={<> お客さまがマイページで登録したペットです。体重と主食から、1日のごはんの目安を出します。</>} />
+
         </div>
       </div>
       <div data-design="Tabs" data-design-node="pets-tabs-v8">
@@ -169,7 +176,7 @@ function PetsKpiBand({
         <span className={styles.kpiLabel}>{label}</span>
         <button type="button" className={styles.kpiHelp} title={help} aria-label={`${label}：${help}`}>…</button>
       </div>
-      <p className={styles.kpiValue}>{value === null ? '—' : <>{formatNumber(value)}<span className={styles.kpiUnit}>匹</span></>}</p>
+      <p className={styles.kpiValue}>{value === null ? emptyValue('unknown') : <>{formatNumber(value)}<span className={styles.kpiUnit}>匹</span></>}</p>
       <p className={styles.kpiSub}>{sub}</p>
     </li>
   )
@@ -247,7 +254,7 @@ function PetsListV8({
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `nen-pets-${new Date().toISOString().slice(0, 10)}.csv`
+      a.download = csvFileName("ペット")
       a.click()
       URL.revokeObjectURL(url)
     } catch {
@@ -264,20 +271,20 @@ function PetsListV8({
           className={styles.searchGrow}
           onSubmit={(event) => { event.preventDefault(); change({ q: draft.trim() }) }}
         >
-          <TextField
+          <SaveErrorField names={["draft","q"]}><TextField
             aria-label="ペットを検索"
             placeholder="ペット名・飼い主で探す"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-          />
+          /></SaveErrorField>
         </form>
-        <Select
+        <SaveErrorField names={["species","query.species"]}><Select
           aria-label="種別で絞り込む"
           value={query.species}
           onChange={(value) => change({ species: value })}
           options={[{ value: '', label: '種別：すべて' }, { value: 'dog', label: '種別：犬' }, { value: 'cat', label: '種別：猫' }, { value: 'other', label: '種別：その他' }]}
-        />
-        <Select
+        /></SaveErrorField>
+        <SaveErrorField names={["product","query.product"]}><Select
           aria-label="主食で絞り込む"
           value={query.product}
           onChange={(value) => change({ product: value })}
@@ -286,14 +293,14 @@ function PetsListV8({
             ...(data?.products ?? []).map((p) => ({ value: p.id, label: `主食：${p.name}` })),
             { value: 'none', label: '主食：未設定' },
           ]}
-        />
-        <Select
+        /></SaveErrorField>
+        <SaveErrorField names={["weight","query.weight"]}><Select
           aria-label="体重の更新で絞り込む"
           value={query.weight}
           onChange={(value) => change({ weight: value === 'stale' || value === 'fresh' ? value : '' })}
           options={[{ value: '', label: '体重更新：すべて' }, { value: 'fresh', label: '体重更新：90日以内' }, { value: 'stale', label: '体重更新：90日以上前' }]}
-        />
-        <Select
+        /></SaveErrorField>
+        <SaveErrorField names={["sort","query.sort"]}><Select
           aria-label="並び順"
           value={query.sort}
           onChange={(value) => change({ sort: value as NenPetSort })}
@@ -303,9 +310,9 @@ function PetsListV8({
             { value: 'weight_desc', label: '並び：体重が重い順' },
             { value: 'age_desc', label: '並び：年齢が高い順' },
           ]}
-        />
+        /></SaveErrorField>
         <span className={styles.toolsTail}>
-          <span className={styles.rangeLabel}>{data ? headCountLabel(data.total, data.page, data.pageSize) : '—'}</span>
+          <span className={styles.rangeLabel}>{data ? headCountLabel(data.total, data.page, data.pageSize) : emptyValue('unknown')}</span>
           <PageSizeSelect
             value={pageSize}
             options={[10, 20, 50]}
@@ -422,7 +429,7 @@ function PetRowV8({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; 
         <span className={styles.petSub}>{pet.owner.customerId ? `EC会員 ${pet.owner.customerId}` : 'EC未連携'}</span>
       </Td>
       <Td className={styles.colAge}><span className="text-label text-ink-secondary">{pet.ageLabel}</span></Td>
-      <Td align="right"><span className="text-label tabular-nums text-ink">{pet.weightKg == null ? '—' : `${pet.weightKg}kg`}</span></Td>
+      <Td align="right"><span className="text-label tabular-nums text-ink">{pet.weightKg == null ? emptyValue('unknown') : `${pet.weightKg}kg`}</span></Td>
       <Td>
         {pet.feeding?.dailyGrams != null ? (
           <>
@@ -431,12 +438,12 @@ function PetRowV8({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; 
           </>
         ) : pet.feeding ? (
           <>
-            <span className="block text-label text-ink-secondary">—</span>
+            <span className="block text-label text-ink-secondary">{emptyValue('unknown')}</span>
             <span className="block text-micro text-ink-faint">{`約${pet.feeding.dailyKcal}kcal・主食が未設定`}</span>
           </>
         ) : (
           <>
-            <span className="block text-label text-ink-secondary">—</span>
+            <span className="block text-label text-ink-secondary">{emptyValue('unknown')}</span>
             {/* #999 DEEP-24: 犬・猫以外はNRC/FEDIAFの計算対象外。犬の式で出した数値を見せない。 */}
             <span className="block text-micro text-ink-faint">{pet.animalType === 'other' ? '犬・猫以外は目安の計算対象外' : pet.weightKg == null ? '体重が未登録' : '誕生日が未登録'}</span>
           </>
@@ -479,6 +486,8 @@ type FeedingDraft = { id: string | null; name: string; kcal: string; isDefault: 
  * 右に今日の目安の計算。保存は下の帯。離脱の番兵つき。
  */
 function FeedingV8({ accountId }: { accountId: string }) {
+  const saveErrors = useSaveFormErrors()
+
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
   const [data, setData] = useState<NenFeedingData | null>(null)
   const [drafts, setDrafts] = useState<FeedingDraft[]>([])
@@ -524,9 +533,11 @@ function FeedingV8({ accountId }: { accountId: string }) {
       setStatus('ready')
     } catch (caught) {
       if (generationRef.current !== generation) return
+      saveErrors.capture(caught);
+
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
-  }, [accountId])
+  }, [accountId, saveErrors])
 
   useEffect(() => {
     void load()
@@ -582,21 +593,25 @@ function FeedingV8({ accountId }: { accountId: string }) {
         ? `主食を保存し、登録済みのペット ${formatNumber(res.data.refreshedPets)}頭の目安を計算し直しました。`
         : '主食を保存しました。')
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
       setError(describeApiFailure(caught, '主食の保存', {
-        forbidden: '主食を保存する権限がありません。権限を確認してください。',
-      }))
+        scope: 'store',
+      })) }
     } finally {
       setBusy(false)
     }
   }
 
-  if (status === 'loading' && !data) return <ListState kind="loading" title="主食のカロリー表を読み込んでいます" />
-  if (status === 'forbidden') return <ListState kind="forbidden" />
-  if (status === 'error') return <ListState kind="error" title="主食のカロリー表を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
-  if (!data) return <ListState kind="loading" title="主食のカロリー表を読み込んでいます" />
+  if (status === 'loading' && !data) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="主食のカロリー表を読み込んでいます" /></SaveErrorScope>
+  if (status === 'forbidden') return <SaveErrorScope errors={saveErrors}><ListState kind="forbidden" /></SaveErrorScope>
+  if (status === 'error') return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="主食のカロリー表を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} /></SaveErrorScope>
+  if (!data) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="主食のカロリー表を読み込んでいます" /></SaveErrorScope>
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
       {error ? <p className={styles.errorText} role="alert">{error}</p> : null}
 
@@ -636,15 +651,7 @@ function FeedingV8({ accountId }: { accountId: string }) {
               onAdd={() => add('nen')}
               disabledAdd={drafts.length >= MAX_PRODUCTS}
             />
-            <div className={styles.treatRow}>
-              <label className={styles.fieldLabel}>
-                おやつの上限（%）
-                <span className={styles.treatInput}>
-                  <TextField aria-label="おやつの上限（%）" inputMode="numeric" value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); setDirty(true); setNotice('') }} />
-                </span>
-              </label>
-              <p className={styles.treatNote}>1日の必要カロリーのうち、おやつに回す割合</p>
-            </div>
+            <div className={styles.treatRow}><Field note={<>1日の必要カロリーのうち、おやつに回す割合</>} label="おやつの上限"><SaveErrorField names={["treatLimit","treat_limit"]}><NumberInput unit="%" aria-label="おやつの上限（%）" inputMode="numeric" numericText value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); setDirty(true); setNotice('') }} /></SaveErrorField></Field></div>
           </section>
         </div>
 
@@ -698,7 +705,7 @@ function FeedingV8({ accountId }: { accountId: string }) {
       />
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="ごはんの目安への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }
 
@@ -737,11 +744,11 @@ function FeedingTableV8({
           {rows.map(({ row, index }) => (
             <Tr key={row.id ?? `new-${index}`}>
               <Td>
-                <TextField aria-label={`商品名 ${index + 1}`} value={row.name} maxLength={40} placeholder={kind === 'nen' ? '例：然 鹿肉ジャーキー' : '例：ドライフード'} onChange={(event) => onUpdate(index, { name: event.target.value })} />
+                <SaveErrorField names={["name","row.name"]}><TextField aria-label={`商品名 ${index + 1}`} value={row.name} maxLength={40} placeholder={kind === 'nen' ? '例：然 鹿肉ジャーキー' : '例：ドライフード'} onChange={(event) => onUpdate(index, { name: event.target.value })} /></SaveErrorField>
               </Td>
               <Td>
                 <span className="flex items-center gap-2">
-                  <TextField aria-label={`100gあたりのカロリー ${index + 1}`} inputMode="decimal" value={row.kcal} placeholder="360" onChange={(event) => onUpdate(index, { kcal: event.target.value })} />
+                  <SaveErrorField names={["kcal","row.kcal"]}><TextField aria-label={`100gあたりのカロリー ${index + 1}`} inputMode="decimal" value={row.kcal} placeholder="360" onChange={(event) => onUpdate(index, { kcal: event.target.value })} /></SaveErrorField>
                   <span className="shrink-0 text-caption font-semibold text-ink-faint">kcal</span>
                 </span>
               </Td>
@@ -778,7 +785,7 @@ function FeedingTableV8({
 
 /**
  * ペットの情報を直す（eLjeQ）。真ん中の小窓。
- * 誕生日を変えると、予約済みの誕生日クーポン配信は新しい誕生日で組み直される。
+ * 誕生日を変えると、予約中の誕生日クーポン配信は新しい誕生日で組み直される。
  * 版つき保存：ほかの人が先に直していたら止めて、入力は残したまま保存し直せる。
  */
 function PetEditorV8({ accountId, pet, onClose, onSaved }: {
@@ -787,6 +794,8 @@ function PetEditorV8({ accountId, pet, onClose, onSaved }: {
   onClose: () => void
   onSaved: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [name, setName] = useState(pet.name)
   const [animalType, setAnimalType] = useState(pet.animalType)
   const [gender, setGender] = useState(pet.gender)
@@ -833,14 +842,18 @@ function PetEditorV8({ accountId, pet, onClose, onSaved }: {
       onSaved()
       onClose()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 409 && caught.code === 'VERSION_CONFLICT') {
         const latest = (caught.data as { latest?: { updatedAt?: string } } | null)?.latest
         if (latest?.updatedAt) setVersion(latest.updatedAt)
-        setError('ほかの人が先にペットの情報を変えました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。')
+        { if (!fieldFailure)
+        setError('ほかの人が先にペットの情報を変えました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。') }
         onSaved()
         return
       }
-      setError(describeApiFailure(caught, 'ペットの保存', {}))
+      { if (!fieldFailure)
+      setError(describeApiFailure(caught, 'ペットの保存', {})) }
     } finally {
       setSaving(false)
     }
@@ -862,12 +875,12 @@ function PetEditorV8({ accountId, pet, onClose, onSaved }: {
   )
 
   return (
-    <div className={styles.dialogOverlay} data-design-node="eLjeQ" onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
+    <SaveErrorScope errors={saveErrors}><div className={styles.dialogOverlay} data-design-node="eLjeQ" onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="ペットの情報を直す">
         <div className={styles.dialogHead}>
           <div>
             <h2 className={styles.dialogTitle}>ペットの情報を直す</h2>
-            <p className={styles.dialogDesc}>間違っている項目を直して保存します。誕生日を変えると、予約済みの誕生日クーポン配信は新しい誕生日で組み直されます。</p>
+            <p className={styles.dialogDesc}>間違っている項目を直して保存します。誕生日を変えると、予約中の誕生日クーポン配信は新しい誕生日で組み直されます。</p>
           </div>
           <button type="button" className={styles.dialogClose} onClick={onClose} aria-label="閉じる">✕</button>
         </div>
@@ -885,14 +898,8 @@ function PetEditorV8({ accountId, pet, onClose, onSaved }: {
           {pill('種別', 'other', 'その他', animalType, (next) => setAnimalType(next as typeof animalType))}
         </fieldset>
         <div className={styles.fieldGrid}>
-          <label className={styles.fieldLabel}>
-            ペットの名前
-            <TextField aria-label="ペットの名前" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} />
-          </label>
-          <label className={styles.fieldLabel}>
-            品種
-            <TextField aria-label="品種" value={breed} maxLength={80} onChange={(event) => setBreed(event.target.value)} />
-          </label>
+          <Field label="ペットの名前"><SaveErrorField names={["name"]}><TextField aria-label="ペットの名前" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} /></SaveErrorField></Field>
+          <Field label="品種"><SaveErrorField names={["breed"]}><TextField aria-label="品種" value={breed} maxLength={80} onChange={(event) => setBreed(event.target.value)} /></SaveErrorField></Field>
         </div>
         <fieldset className={styles.pillGroup}>
           <legend className={styles.fieldLabel}>性別</legend>
@@ -901,14 +908,8 @@ function PetEditorV8({ accountId, pet, onClose, onSaved }: {
           {pill('性別', 'unknown', 'わからない', gender, (next) => setGender(next as typeof gender))}
         </fieldset>
         <div className={styles.fieldGrid}>
-          <label className={styles.fieldLabel}>
-            誕生日
-            <TextField aria-label="誕生日" placeholder="2022-04-03" value={birthday} onChange={(event) => setBirthday(event.target.value)} />
-          </label>
-          <label className={styles.fieldLabel}>
-            体重
-            <TextField aria-label="体重" inputMode="decimal" placeholder="9.2 kg" value={weight} onChange={(event) => setWeight(event.target.value)} />
-          </label>
+          <Field label="誕生日"><SaveErrorField names={["birthday"]}><TextField aria-label="誕生日" placeholder="2022-04-03" value={birthday} onChange={(event) => setBirthday(event.target.value)} /></SaveErrorField></Field>
+          <Field label="体重"><SaveErrorField names={["weight"]}><TextField aria-label="体重" inputMode="decimal" placeholder="9.2 kg" value={weight} onChange={(event) => setWeight(event.target.value)} /></SaveErrorField></Field>
         </div>
         <p className={styles.fieldHint}>生まれた年が分からないときは「03-15」のように月日だけを入れます。空欄は未登録です。</p>
         {error ? <p className={styles.errorText} role="alert">{error}</p> : null}
@@ -917,6 +918,6 @@ function PetEditorV8({ accountId, pet, onClose, onSaved }: {
           <Button variant="primary" onClick={() => void save()} disabled={saving || !name.trim()} busy={saving} busyLabel="保存しています…">保存する</Button>
         </div>
       </div>
-    </div>
+    </div></SaveErrorScope>
   )
 }

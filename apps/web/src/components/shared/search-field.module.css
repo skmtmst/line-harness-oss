@@ -5,13 +5,14 @@
   display: flex;
   min-width: 0;
   /* #976 U083: 42px だった高さを入力欄・ボタンと同じ40pxへそろえる */
-  height: 40px;
+  height: 36px;
   align-items: center;
-  gap: 10px;
-  padding: 0 14px;
-  border: 1px solid var(--color-hairline);
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--color-field-border);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
+  box-shadow: var(--shadow-field);
 }
 
 .search[hidden] {
@@ -20,7 +21,7 @@
 
 .searchIcon {
   width: 17px;
-  height: 17px;
+  height: 16px;
   flex: 0 0 17px;
   color: var(--color-ink-faint);
 }
@@ -51,12 +52,12 @@
  * 色・太さ・余白は #804 と同じ（2px・action 色・offset 2px）。
  */
 .input:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
 .clear:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -131,7 +132,7 @@
 
 /* 複合欄の焦点は外枠へ。内側の入力の輪郭を重ねない。 */
 [data-theme='v8'] .search:has(:focus-visible) {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 [data-theme='v8'] .input:focus-visible { outline: none; }
@@ -164,3 +165,14 @@
 
 [data-theme='v8'] .search:has(.input[aria-invalid='true']) { outline-color: var(--color-danger); }
 }
+/* B-152・仕上げ5 */
+[data-theme='v8'] .searchIcon { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); color: var(--color-ink-secondary); }
+
+/* B-152・仕上げ7：輪は検索欄の外側だけに出す。 */
+html[data-theme='v8'] .search:has(.input:focus-visible) { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+html[data-theme='v8'] .search .input:focus-visible { outline: none; }
+html[data-theme='v8'] .disabled { opacity: var(--polish-disabled-opacity); }
+html[data-theme='v8'] .disabled .input:disabled { opacity: 1; }
+
+/* B-152・仕上げ8：検索の読み込みは aria-busy で伝え、回る印は保存ボタンだけにする。 */
+[data-theme='v8'] .loadingIcon { display: none; animation: none; }

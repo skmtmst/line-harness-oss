@@ -1,4 +1,6 @@
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { receiveEntryRouteCoupon } from '../services/entry-route-coupon.js';
+import { redeemCoupon } from '../services/coupon-redemption.js';
 import { Hono, type Context } from 'hono';
 import {
   getFriendByLineUserIdForAccount,
@@ -1327,6 +1329,59 @@ liffRoutes.post('/api/liff/profile', inputJsonBoundary(), async (c) => {
     });
   } catch (err) {
     console.error('POST /api/liff/profile error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// クーポン画面用。本人以外・別アカウント・未フォローには渡さない。
+liffRoutes.post('/api/liff/entry-route-coupon', async (c) => {
+  try {
+    const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+    if (!identity) return c.json({ success: false, error: 'Invalid ID token' }, 401);
+    const stopped = await stoppedLineAccountResponse(c, identity.lineAccountId);
+    if (stopped) return stopped;
+    const body = await c.req.json<{ ref?: unknown }>();
+    if (typeof body.ref !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(body.ref)) {
+      return c.json({ success: false, error: 'ref が正しくありません' }, 400);
+    }
+    const route = await getEntryRouteByRefCode(c.env.DB, body.ref);
+    if (!identity.lineAccountId || !route || route.line_account_id !== identity.lineAccountId) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const friend = await getFriendByLineUserIdForAccount(c.env.DB, identity.lineUserId, identity.lineAccountId);
+    if (!friend || friend.is_following !== 1) return c.json({ success: false, error: '友だち追加が必要です' }, 409);
+    const coupon = await receiveEntryRouteCoupon(c.env.DB, route, friend);
+    if (!coupon) return c.json({ success: false, error: 'このクーポンは現在受け取れません', code: 'ENTRY_COUPON_UNAVAILABLE' }, 409);
+    return c.json({ success: true, data: coupon });
+  } catch (error) {
+    console.error('POST /api/liff/entry-route-coupon error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// 本人確認したクーポン画面からの使用。requestIdで通信の再試行も同じ結果にする。
+liffRoutes.post('/api/liff/entry-route-coupon/use', async (c) => {
+  try {
+    const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+    if (!identity) return c.json({ success: false, error: 'Invalid ID token' }, 401);
+    const stopped = await stoppedLineAccountResponse(c, identity.lineAccountId);
+    if (stopped) return stopped;
+    const body = await c.req.json<{ receiptId?: unknown; requestId?: unknown }>();
+    if (typeof body.receiptId !== 'string' || body.receiptId.length > 64
+      || typeof body.requestId !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(body.requestId)) {
+      return c.json({ success: false, error: '受け取りまたは操作の番号が正しくありません' }, 400);
+    }
+    const friend = await getFriendByLineUserIdForAccount(c.env.DB, identity.lineUserId, identity.lineAccountId);
+    if (!friend || friend.is_following !== 1 || !identity.lineAccountId) return c.json({ success: false, error: 'Not found' }, 404);
+    const receipt = await c.env.DB.prepare('SELECT asset_id FROM entry_route_coupon_receipts WHERE id = ? AND friend_id = ? AND line_account_id = ?')
+      .bind(body.receiptId, friend.id, identity.lineAccountId).first<{ asset_id: string }>();
+    if (!receipt) return c.json({ success: false, error: 'Not found' }, 404);
+    const result = await redeemCoupon(c.env.DB, friend, identity.lineAccountId, receipt.asset_id,
+      `liff-entry-coupon:${friend.id}:${body.requestId}`, new Date(), body.receiptId);
+    if (!result.ok) return c.json({ success: false, error: result.message }, 409);
+    return c.json({ success: true, data: { message: result.message, replayed: result.replayed ?? false } });
+  } catch (error) {
+    console.error('POST /api/liff/entry-route-coupon/use error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

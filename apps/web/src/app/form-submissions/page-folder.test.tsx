@@ -29,15 +29,15 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-/* 役割はサーバへ聞かず、手元の値（lh_staff_role）で決める。新しい一覧は答えが来るまで手元の値を使う。 */
+/* 操作の試験は、本人確認が済んだ管理者として行う。 */
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
-  return { ...actual, useStaffRole: () => null }
+  return { ...actual, useStaffRole: () => 'owner' }
 })
 
 vi.mock('next/link', () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) =>
-    React.createElement('a', { href }, children),
+  default: ({ children, ...props }: React.ComponentProps<'a'>) =>
+    React.createElement('a', props, children),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -288,10 +288,11 @@ describe('行の編集は質問の編集へ行く（R27・実マウント）', (
       root.render(<FormSubmissionsPage />)
     })
     // 名前自体が編集画面への行き先になっている。
-    const nameLink = [...host.querySelectorAll('button[aria-label="「箱フォーム」の詳細を見る"]')].find(
+    const nameLink = [...host.querySelectorAll('a[aria-label="「箱フォーム」の詳細を見る"]')].find(
       (a) => a.textContent === '箱フォーム',
     )
     expect(nameLink).toBeTruthy()
+    expect(nameLink?.getAttribute('href')).toBe('/form-submissions/edit?id=f-a1&tab=basic')
     await openRowMenu('箱フォーム')
     const items = [...document.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent)
     expect(items).toContain('編集')

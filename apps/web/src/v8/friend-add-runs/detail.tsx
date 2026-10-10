@@ -1,5 +1,7 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
+
 /*
  * ★V8 友だち追加時の配信の実行の詳細（Pencil `N43uVX`・失敗あり）。
  *
@@ -11,7 +13,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { AlertCircle, CheckCircle2, Clock, MessageCircle, RotateCcw, Settings2, XCircle } from 'lucide-react'
+import { CheckCircle2, Clock, MessageCircle, RotateCcw, Settings2, XCircle } from 'lucide-react'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -20,11 +22,14 @@ import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import { useAccount } from '@/contexts/account-context'
 import { api, type FriendAddRunDetail } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { describeFriendAddFailure } from '@/v8/friend-add/failure'
 import { MESSAGE_TYPE_LABEL } from '@/v8/friend-add/flow'
 import { DELIVERY_UNKNOWN_CODE, jstClock, jstShortDateTime, jstTitleDate, routingAction } from './status'
 import styles from './detail.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
+import Notice from '@/components/shared/notice'
 
 type ActionRun = FriendAddRunDetail['actionRuns'][number]
 
@@ -85,7 +90,7 @@ function shortId(id: string): string {
 
 export default function FriendAddRunDetailV8() {
   return (
-    <Suspense fallback={<ListState kind="loading" />}>
+    <Suspense fallback={<DetailLoading />}>
       <FriendAddRunDetailInner />
     </Suspense>
   )
@@ -109,7 +114,7 @@ function FriendAddRunDetailInner() {
   usePageCrumbs([{ label: '友だち追加時の配信', href: '/friend-add-settings' }, { label: '実行結果', href: listHref }])
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const role = useStaffRole()
-  const canManage = role === null || canManageRole(role)
+  const canManage = useFeatureAccess('friendAdd')
   const [detail, setDetail] = useState<FriendAddRunDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -173,7 +178,7 @@ function FriendAddRunDetailInner() {
         setNotice('失敗した処理を再試行できませんでした。状態を読み直してください。')
         return
       }
-      setNotice(`${response.data.retried}件の失敗処理を再試行しました。`)
+      setNotice(`${response.data.retried} 件の失敗処理を再試行しました。`)
       await load()
     } catch (caught) {
       // M011：409 は応答が消えたあとの再送（実際は通っている）ことがあるので、読み直してから文を出す。
@@ -185,7 +190,7 @@ function FriendAddRunDetailInner() {
     }
   }
 
-  if (accountLoading || loading) return <ListState kind="loading" title="実行詳細を読み込んでいます" />
+  if (accountLoading || loading) return <DetailLoading label="実行詳細を読み込んでいます" />
   if (!runId) {
     return (
       <TargetMissing
@@ -234,7 +239,7 @@ function FriendAddRunDetailInner() {
   const routeName = detail.attribution.status === 'captured'
     ? detail.attribution.routeName || detail.attribution.reason || '選択した経路'
     : '経路が分からない'
-  const ruleLabel = detail.rule ? `${detail.rule.name ?? '名前は未取得'}（第${detail.rule.versionNumber ?? '—'}版）` : '使用ルールは未取得'
+  const ruleLabel = detail.rule ? `${detail.rule.name ?? '名前は未取得'}（第${detail.rule.versionNumber ?? emptyValue('unknown')}版）` : '使用ルールは未取得'
   const messageType = detail.rule?.definition?.messageType
   const messageLabel = messageType ? MESSAGE_TYPE_LABEL[messageType] ?? '案内' : '案内'
   const deliveryUnknown = detail.errorCode === DELIVERY_UNKNOWN_CODE
@@ -257,18 +262,12 @@ function FriendAddRunDetailInner() {
     <PageFrame kind="detail" boardId="N43uVX">
       <PageHeading
         title={`${displayName}さんの友だち追加`}
-        description={`${jstTitleDate(detail.receivedAt)} に追加・${friendKindLabel}`}
+        help={`${jstTitleDate(detail.receivedAt)} に追加・${friendKindLabel}`}
       />
       <div className={styles.split}>
         <div className={styles.main}>
           {failedActions.length > 0 || runFailed || deliveryUnknown ? (
-            <div className={styles.failBand} role="alert">
-              <AlertCircle size={18} className={styles.failIcon} aria-hidden="true" />
-              <div className={styles.failText}>
-                <p className={styles.failTitle}>{bandTitle}</p>
-                <p className={styles.failNote}>{bandNote}</p>
-              </div>
-              {canManage && !deliveryUnknown && (failedActions.length > 0 || runFailed) ? (
+            <Notice tone="danger" heading={<> {bandTitle} </>} action={<> {canManage && !deliveryUnknown && (failedActions.length > 0 || runFailed) ? (
                 <Button
                   variant="primary"
                   disabled={retrying}
@@ -278,8 +277,7 @@ function FriendAddRunDetailInner() {
                 >
                   <RotateCcw size={14} aria-hidden="true" />失敗した処理をもう一度
                 </Button>
-              ) : null}
-            </div>
+              ) : null} </>} >{bandNote}</Notice>
           ) : null}
 
           <section className={styles.card} aria-labelledby="friend-add-run-steps">
@@ -311,7 +309,7 @@ function FriendAddRunDetailInner() {
                     <span className={styles.stepText}>
                       <span className={styles.stepTitle}>{actionTitle(action, detail.configuredActions)}</span>
                       <span className={styles.stepSub} data-kind={message || state === 'wait' ? undefined : 'time'}>
-                        {message ?? (state === 'wait' ? `${time}・実行を待っています` : action.attemptCount > 1 ? `${time}・${action.attemptCount}回目` : time)}
+                        {message ?? (state === 'wait' ? `${time}・実行を待っています` : action.attemptCount > 1 ? `${time}・${action.attemptCount} 回目` : time)}
                       </span>
                     </span>
                   </li>
@@ -352,7 +350,7 @@ function FriendAddRunDetailInner() {
         description="届かなかった処理だけをもう一度行います。相手には新しく届きます。"
         confirmLabel="もう一度行う"
         busy={retrying}
-        onConfirm={() => void retry()}
+        onConfirm={() => retry()}
         onCancel={() => { if (!retrying) setResendConfirmOpen(false) }}
       />
     </PageFrame>

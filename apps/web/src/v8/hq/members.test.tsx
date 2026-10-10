@@ -36,6 +36,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         resendInvite: vi.fn(),
       },
       lineAccounts: { ...actual.api.lineAccounts, list: accounts },
+      lineAccountFolders: { ...actual.api.lineAccountFolders, list: vi.fn(async () => ({ success: true, data: { folders: [] } })) },
     },
   }
 })
@@ -100,7 +101,7 @@ describe('V8 統括のメンバーの窓', () => {
     expect(dialogTitles()).toContain('権限者を招待')
     const radios = Array.from(document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]'))
     expect(radios.find((r) => r.value === 'accounts')?.checked).toBe(true)
-    const checks = Array.from(document.querySelectorAll('[role="dialog"] [aria-label="担当するアカウント"] input[type="checkbox"]')).map((l) => l.getAttribute('aria-label'))
+    const checks = Array.from(document.querySelectorAll('[role="dialog"] [aria-label="担当するアカウント"] input[type="checkbox"]')).map((l) => l.getAttribute('aria-label')).filter((label) => !label?.endsWith('をまとめて選ぶ'))
     expect(checks).toEqual(['然 -NEN- 本店', '然 -NEN- 渋谷店'])
     expect(document.querySelector('[role="dialog"]')!.textContent).toContain('閲覧のみ（見るだけ）')
   })
@@ -111,7 +112,7 @@ describe('V8 統括のメンバーの窓', () => {
     const dialog = document.querySelector('[role="dialog"]')!
     const email = dialog.querySelector('input[type="email"]') as HTMLInputElement
     await act(async () => { fireEvent.change(email, { target: { value: 'staff@example.com' } }) })
-    const first = dialog.querySelector('[aria-label="担当するアカウント"] input[type="checkbox"]') as HTMLInputElement
+    const first = dialog.querySelector('[aria-label="担当するアカウント"] input[aria-label="然 -NEN- 本店"]') as HTMLInputElement
     await act(async () => { first.click() })
     await act(async () => { buttonByText('招待メールを送る')!.click() })
     await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })

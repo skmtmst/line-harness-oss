@@ -1,4 +1,41 @@
 'use client'
+import TagPill from '@/components/shared/tag-pill'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useMemo, useState, type ReactNode } from 'react'
+import { CircleDashed, ClipboardList, Copy, FileText, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Inbox, Link2, MessageSquare, Pencil, Plus, Send, Sparkles, Ticket, Trash2, Unlink, Users } from 'lucide-react'
+import type { HqTemplateFolder, HqTemplateListStats, TemplateKind } from '@line-crm/shared'
+import { ListPage } from '@/components/templates'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
+import { describeFolderFailure } from '@/components/shared/folder-failure'
+import { notifyToast } from '@/components/shared/toast'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
+import EmptyList from '@/components/shared/empty-list'
+import FilterChip from '@/components/shared/filter-chip'
+import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
+import { deleteFolderDescription } from '@/components/shared/folder-row-actions'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import ListToolbar from '@/components/shared/list-toolbar'
+import Pagination from '@/components/shared/pagination'
+import { RowMenu, RowQuickAction } from '@/components/shared/row-actions'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
+import Select from '@/components/shared/select'
+import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { Tabs } from '@/components/shared/tabs'
+import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
+import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
+import { distributedAccountsLine, templateSubLine } from './list-row'
+import { AttributeTabs, OtherTabPanel, assignmentMethods, cleanupTagCount, matchesTagFilters, unusedTagCount, useAttributeTab, type TagUsageFilter } from './attribute-tabs'
+import storeStyles from '../templates/list.module.css'
+import hqStyles from './store-list.module.css'
+import attributeStyles from './attribute-tabs.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 統括のひな形の一覧を「店の同じ機能の一覧と同じ形」で出す（オーナー 2026-10-08・B-27〜B-29・B-34・B-36）。
@@ -11,48 +48,13 @@
  *   - 数の帯は配ったアカウントの数
  * 読み書き（一覧・分類・複製・削除・配る）は呼ぶ側（console.tsx）が今までどおり持つ。ここは見せ方と押した知らせだけ。
  */
-import { useMemo, useState, type ReactNode } from 'react'
-import {
-  CircleDashed, ClipboardList, Copy, FileText, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Inbox, Link2,
-  MessageSquare, Pencil, Plus, Send, Sparkles, Ticket, Trash2, Unlink, Users,
-} from 'lucide-react'
-import type { HqTemplateFolder, HqTemplateListStats, TemplateKind } from '@line-crm/shared'
-import { ListPage } from '@/components/templates'
-import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
-import { describeFolderFailure } from '@/components/shared/folder-failure'
-import { notifyToast } from '@/components/shared/toast'
-import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
-import EmptyList from '@/components/shared/empty-list'
-import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import { FolderDotName } from '@/components/shared/folder-dot'
-import TagPill from '@/components/shared/tag-pill'
-import { deleteFolderDescription } from '@/components/shared/folder-row-actions'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import ListToolbar from '@/components/shared/list-toolbar'
-import Pagination from '@/components/shared/pagination'
-import { RowMenu, RowQuickAction } from '@/components/shared/row-actions'
-import type { ActionMenuItem } from '@/components/shared/action-menu'
-import Select from '@/components/shared/select'
-import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { Tabs } from '@/components/shared/tabs'
-import { formatNumber } from '@/lib/format'
-import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
-import { distributedAccountsLine, templateSubLine } from './list-row'
-import { AttributeTabs, OtherTabPanel, assignmentMethods, cleanupTagCount, matchesTagFilters, unusedTagCount, useAttributeTab, type TagUsageFilter } from './attribute-tabs'
-import storeStyles from '../templates/list.module.css'
-import hqStyles from './store-list.module.css'
-import attributeStyles from './attribute-tabs.module.css'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
 
 /** 店のテンプレートと同じ6種類（上のタブ）。 */
 export const KIND_TABS: { kind: TemplateKind; label: string; icon: typeof MessageSquare }[] = [
   { kind: 'message', label: 'メッセージ', icon: MessageSquare },
   { kind: 'carousel', label: 'カルーセル', icon: GalleryHorizontalEnd },
   { kind: 'rich_message', label: 'リッチメッセージ', icon: ImageIcon },
+  { kind: 'rich_video', label: 'リッチビデオ', icon: ImageIcon },
   { kind: 'question', label: '質問', icon: HelpCircle },
   { kind: 'coupon', label: 'クーポン', icon: Ticket },
   { kind: 'research', label: 'リサーチ', icon: ClipboardList },
@@ -76,9 +78,7 @@ const PAGE_SIZE_OPTIONS = [
 
 /** M月D日（店の一覧と同じ。時刻は title）。 */
 function monthDay(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'long', day: 'numeric' }).format(date)
+  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
 }
 
 /**
@@ -99,7 +99,7 @@ function sumOrNull(values: Array<number | null | undefined>): number | null {
 
 /** 今月送った数（API-18）。取れない種類（別資産のクーポン等）は null＝「—」。0 は「0通」。 */
 export function sentLabel(count: number | null | undefined): string {
-  return count == null ? '—' : `${formatNumber(count)}通`
+  return count == null ? emptyValue('unknown') : `${formatNumber(count)}通`
 }
 
 export interface HqStoreListProps {
@@ -140,19 +140,20 @@ export interface HqStoreListProps {
 }
 
 export default function HqStoreList(props: HqStoreListProps) {
+  const saveErrors = useSaveFormErrors()
   const {
     type, rows, ready, busy, canEdit, accountTotal, stats, kind, kindCounts, onKindChange, folders, folderLoadFailed, folderFilter, onFolderFilter,
     onAddFolder, onRenameFolder, onDeleteFolder, onReloadFolders, onCreate, onEdit, onOpen, onDistribute, onDistributeFolder, folderContents, onDuplicate, onRemove, notices, overlays,
   } = props
   const words = WORDS[type]
-  const [query, setQuery] = useState('')
-  const [undistributedOnly, setUndistributedOnly] = useState(false)
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [undistributedOnly, setUndistributedOnly] = useListUrlValue('undistributedOnly', false)
   /* タグ（DzdC3）だけ：上のタブ（タグ・友だち情報欄・対応マーク・保存した検索）と、使用状態・付け方の絞り込み。 */
   const attribute = useAttributeTab('/hq/friend-attributes')
   const [tagUsage, setTagUsage] = useState<TagUsageFilter>('all')
   const [tagMethod, setTagMethod] = useState('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 分類（フォルダ）の窓：足す・名前を変える（統括のひな形の分類は色を持たない）・消す。 */
   const [folderDialog, setFolderDialog] = useState<{ editing: HqTemplateFolder | null } | null>(null)
@@ -191,16 +192,16 @@ export default function HqStoreList(props: HqStoreListProps) {
   const namesComplete = rows.every((row) => (row.distributed_account_more ?? 0) === 0)
   const outdated = stats ? stats.outdatedTemplateCount : rows.filter((row) => (row.outdated_account_count ?? 0) > 0).length
   const kpis = [
-    { key: 'templates', title: 'ひな形', icon: FileText, value: ready ? rows.length : null, unit: '件', detail: ready ? `下書き ${rows.length - distributed}件` : '—' },
-    { key: 'accounts', title: '配ったアカウント', icon: Link2, value: ready && namesComplete ? accountNames.size : null, unit: '件', detail: ready ? (namesComplete ? `全 ${formatNumber(accountTotal)} アカウントのうち` : '数え切れないアカウントがあります') : '—' },
+    { key: 'templates', title: 'ひな形', icon: FileText, value: ready ? rows.length : null, unit: '件', detail: ready ? `下書き ${rows.length - distributed}件` : emptyValue('unknown') },
+    { key: 'accounts', title: '配ったアカウント', icon: Link2, value: ready && namesComplete ? accountNames.size : null, unit: '件', detail: ready ? (namesComplete ? `全 ${formatNumber(accountTotal)} アカウントのうち` : '数え切れないアカウントがあります') : emptyValue('unknown') },
     type === 'rich_menu'
-      ? { key: 'taps', title: '今月押された', icon: Send, value: ready ? sumOrNull(rows.map((row) => row.tap_count)) : null, unit: '回', detail: ready ? '配った先でボタンが押された回数' : '—' }
+      ? { key: 'taps', title: '今月押された', icon: Send, value: ready ? sumOrNull(rows.map((row) => row.tap_count)) : null, unit: '回', detail: ready ? '配った先でボタンが押された回数' : emptyValue('unknown') }
       : type === 'tag'
-      ? { key: 'friends', title: '付けている友だち', icon: Users, value: ready ? sumOrNull(rows.map((row) => row.friend_count)) : null, unit: '人', detail: ready ? '配った先の合計' : '—' }
+      ? { key: 'friends', title: '付けている友だち', icon: Users, value: ready ? sumOrNull(rows.map((row) => row.friend_count)) : null, unit: '人', detail: ready ? '配った先の合計' : emptyValue('unknown') }
       : type === 'template'
-      ? { key: 'sent', title: '今月送った数', icon: Send, value: ready && stats ? stats.thisMonthSentCount : null, unit: '通', detail: ready ? '配った先の合計' : '—' }
-      : { key: 'distributed', title: '配ったひな形', icon: Send, value: ready ? distributed : null, unit: '件', detail: ready ? '1つ以上のアカウントへ配った' : '—' },
-    { key: 'outdated', title: '新しい版を未配布', icon: Users, value: ready ? outdated : null, unit: '件', detail: ready ? '直したあと配っていない' : '—' },
+      ? { key: 'sent', title: '今月送った数', icon: Send, value: ready && stats ? stats.thisMonthSentCount : null, unit: '通', detail: ready ? '配った先の合計' : emptyValue('unknown') }
+      : { key: 'distributed', title: '配ったひな形', icon: Send, value: ready ? distributed : null, unit: '件', detail: ready ? '1つ以上のアカウントへ配った' : emptyValue('unknown') },
+    { key: 'outdated', title: '新しい版を未配布', icon: Users, value: ready ? outdated : null, unit: '件', detail: ready ? '直したあと配っていない' : emptyValue('unknown') },
   ]
 
   /*
@@ -208,10 +209,10 @@ export default function HqStoreList(props: HqStoreListProps) {
    * 今月付けた回数は統括の一覧の受け口に無いので出さない（見た目だけ置かない）。
    */
   const tagKpis = [
-    { key: 'unused', title: '未使用', icon: CircleDashed, value: ready ? unusedTagCount(rows) : null, unit: '件', detail: ready ? '配った先で付いている友だちが0人' : '—' },
-    { key: 'friends', title: '付けている友だち', icon: Users, value: ready ? sumOrNull(rows.map((row) => row.friend_count)) : null, unit: '人', detail: ready ? '配った先の合計' : '—' },
-    { key: 'outdated', title: '新しい版を未配布', icon: Send, value: ready ? outdated : null, unit: '件', detail: ready ? '直したあと配っていない' : '—' },
-    { key: 'cleanup', title: '整理の候補', icon: Sparkles, value: ready ? cleanupTagCount(rows) : null, unit: '件', detail: ready ? '未使用・名前が重なっている' : '—' },
+    { key: 'unused', title: '未使用', icon: CircleDashed, value: ready ? unusedTagCount(rows) : null, unit: '件', detail: ready ? '配った先で付いている友だちが0人' : emptyValue('unknown') },
+    { key: 'friends', title: '付けている友だち', icon: Users, value: ready ? sumOrNull(rows.map((row) => row.friend_count)) : null, unit: '人', detail: ready ? '配った先の合計' : emptyValue('unknown') },
+    { key: 'outdated', title: '新しい版を未配布', icon: Send, value: ready ? outdated : null, unit: '件', detail: ready ? '直したあと配っていない' : emptyValue('unknown') },
+    { key: 'cleanup', title: '整理の候補', icon: Sparkles, value: ready ? cleanupTagCount(rows) : null, unit: '件', detail: ready ? '未使用・名前が重なっている' : emptyValue('unknown') },
   ]
   const bandKpis = type === 'tag' ? tagKpis : kpis
 
@@ -260,19 +261,19 @@ export default function HqStoreList(props: HqStoreListProps) {
     { kind: 'unfiled' as const, id: 'none', label: '未分類', count: ready ? countIn('none') : null, leadingActions: leadingActions('none', '未分類') },
   ]
   const selectFolder = (id: string) => { onFolderFilter(id); setPage(1) }
-  const folderPanel = folderLoadFailed ? (
-    <p role="alert" className={storeStyles.folderNote}>フォルダを読み込めませんでした。ページを再読み込みしてください。</p>
-  ) : (
+  const folderPanel = (
     <FolderPanel
+      createAction={createButton(true)}
+      showHeading={!folderLoadFailed}
       activeId={folderFilter}
       onSelect={selectFolder}
-      onAddFolder={canEdit ? () => { setFolderError(''); setFolderNameError(''); setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setFolderDialog({ editing: null }) } : undefined}
+      onAddFolder={!folderLoadFailed && canEdit ? () => { setFolderError(''); setFolderNameError(''); setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setFolderDialog({ editing: null }) } : undefined}
       addFolderLabel="フォルダを追加"
-      rows={folderRows}
+      rows={folderLoadFailed ? [] : folderRows}
     >
-      <p className={storeStyles.folderNote}>
+      {folderLoadFailed ? <Notice tone="danger" className={storeStyles.folderNoteNoticePlacement}>フォルダを読み込めませんでした。ページを再読み込みしてください。</Notice> : <p className={storeStyles.folderNote}>
         {type === 'template' ? 'フォルダは種類のタブをまたいで使えます。消しても、中のテンプレートは未分類に残ります' : `フォルダを消しても、中の${words.item}は未分類に残ります`}
-      </p>
+      </p>}
     </FolderPanel>
   )
 
@@ -287,8 +288,10 @@ export default function HqStoreList(props: HqStoreListProps) {
       else await onAddFolder(name, folderColor)
       setFolderDialog(null)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       // 理由ごとに言い分ける（共通の describeFolderFailure）。入力した名前と色は残す。
-      const failure = describeFolderFailure(caught, 'save')
+      const failure = describeFolderFailure(caught, 'save');
+
       if (failure.kind === 'missing') {
         notifyToast(failure.message, { tone: 'error' })
         await onReloadFolders?.().catch(() => undefined)
@@ -296,8 +299,8 @@ export default function HqStoreList(props: HqStoreListProps) {
         return
       }
       if (failure.kind === 'conflict') await onReloadFolders?.().catch(() => undefined)
-      if (failure.nameError) setFolderNameError(failure.nameError)
-      else setFolderError(failure.message)
+      if (failure.nameError) { if (!fieldFailure) setFolderNameError(failure.nameError) }
+      else { if (!fieldFailure) setFolderError(failure.message) }
     } finally {
       setFolderBusy(false)
     }
@@ -310,7 +313,10 @@ export default function HqStoreList(props: HqStoreListProps) {
       await onDeleteFolder(latestFolder(deletingFolder))
       setDeletingFolder(null)
     } catch (caught) {
-      const failure = describeFolderFailure(caught, 'delete')
+      const fieldFailure = saveErrors.capture(caught);
+
+      const failure = describeFolderFailure(caught, 'delete');
+
       if (failure.kind === 'missing') {
         notifyToast(failure.message, { tone: 'error' })
         await onReloadFolders?.().catch(() => undefined)
@@ -318,7 +324,8 @@ export default function HqStoreList(props: HqStoreListProps) {
         return
       }
       if (failure.kind === 'conflict') await onReloadFolders?.().catch(() => undefined)
-      setFolderError(failure.message)
+      { if (!fieldFailure)
+      setFolderError(failure.message) }
     } finally {
       setFolderBusy(false)
     }
@@ -339,15 +346,15 @@ export default function HqStoreList(props: HqStoreListProps) {
           <>
           {type === 'tag' ? (
             <>
-              <Select aria-label="使用状態で絞り込む" width={145} value={tagUsage} onChange={(value) => { setTagUsage(value as TagUsageFilter); setPage(1) }} options={[
+              <SaveErrorField names={["tagUsage","tag_usage"]}><Select aria-label="使用状態で絞り込む" width={145} value={tagUsage} onChange={(value) => { setTagUsage(value as TagUsageFilter); setPage(1) }} options={[
                 { value: 'all', label: '使用状態：すべて' },
                 { value: 'used', label: '使用状態：付いている' },
                 { value: 'unused', label: '使用状態：未使用' },
-              ]} />
-              <Select aria-label="付け方で絞り込む" width={132} value={tagMethod} onChange={(value) => { setTagMethod(value); setPage(1) }} options={[
+              ]} /></SaveErrorField>
+              <SaveErrorField names={["tagMethod","tag_method"]}><Select aria-label="付け方で絞り込む" width={132} value={tagMethod} onChange={(value) => { setTagMethod(value); setPage(1) }} options={[
                 { value: 'all', label: '付け方：すべて' },
                 ...assignmentMethods(rows).map((method) => ({ value: method, label: `付け方：${method}` })),
-              ]} />
+              ]} /></SaveErrorField>
             </>
           ) : null}
           <div role="group" aria-label="配ったかで絞り込む" className={storeStyles.chipGroup}>
@@ -359,7 +366,7 @@ export default function HqStoreList(props: HqStoreListProps) {
         )}
         trailing={(
           <div className={storeStyles.perPageBox}>
-            <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZE_OPTIONS} />
+            <SaveErrorField names={["pageSize","page_size"]}><Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZE_OPTIONS} /></SaveErrorField>
           </div>
         )}
       />
@@ -381,7 +388,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   const destCell = (row: HqTemplate) => {
     const destLine = distributedAccountsLine(row)
     return row.distributed_account_count === undefined ? (
-      <span className={storeStyles.cellFaint}>—</span>
+      <span className={storeStyles.cellFaint}>{emptyValue('unknown')}</span>
     ) : row.distributed_account_count > 0 ? (
       <span className={storeStyles.hqDest}>
         <span className={storeStyles.usageLink}>{`${formatNumber(row.distributed_account_count)} アカウント`}</span>
@@ -411,14 +418,14 @@ export default function HqStoreList(props: HqStoreListProps) {
     { key: 'sent', head: '今月送った数', col: <col key="sent" className={storeStyles.colMonthly} />, cell: (row) => plainTd('sent', sentLabel(row.this_month_sent_count), row.this_month_sent_count == null ? '今月送った数は、この種類では数えていません' : undefined) },
     { key: 'updated', head: '更新', col: <col key="updated" className={storeStyles.colUpdated} />, cell: (row) => plainTd('updated', monthDay(row.updated_at), row.updated_at) },
   ] : type === 'tag' ? [
-    { key: 'friends', head: '人数', col: <col key="friends" className={storeStyles.colKind} />, cell: (row) => plainTd('friends', row.friend_count == null ? '—' : `${formatNumber(row.friend_count)}人`, '配った先のアカウントで、このタグが付いている友だちの合計') },
-    { key: 'method', head: '付け方', col: <col key="method" className={storeStyles.colKind} />, cell: (row) => plainTd('method', row.assignment_method ?? '—') },
+    { key: 'friends', head: '人数', col: <col key="friends" className={storeStyles.colKind} />, cell: (row) => plainTd('friends', row.friend_count == null ? emptyValue('unknown') : `${formatNumber(row.friend_count)}人`, '配った先のアカウントで、このタグが付いている友だちの合計') },
+    { key: 'method', head: '付け方', col: <col key="method" className={storeStyles.colKind} />, cell: (row) => plainTd('method', row.assignment_method ?? emptyValue('unknown')) },
     { key: 'dest', head: '配布先', col: <col key="dest" className={storeStyles.colHqDest} />, cell: (row) => boxedTd('dest', destCell(row)) },
   ] : type === 'rich_menu' ? [
-    { key: 'audience', head: '誰に出すか', col: <col key="audience" className={storeStyles.colPublish} />, cell: (row) => plainTd('audience', row.display_audience ?? '—', row.display_audience ?? undefined) },
+    { key: 'audience', head: '誰に出すか', col: <col key="audience" className={storeStyles.colPublish} />, cell: (row) => plainTd('audience', row.display_audience ?? emptyValue('unknown'), row.display_audience ?? undefined) },
     { key: 'state', head: '状態', col: <col key="state" className={storeStyles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
     { key: 'dest', head: '配布先', col: <col key="dest" className={storeStyles.colUsage} />, cell: (row) => boxedTd('dest', destCell(row)) },
-    { key: 'taps', head: '今月押された', col: <col key="taps" className={storeStyles.colMonthly} />, cell: (row) => plainTd('taps', row.tap_count == null ? '—' : `${formatNumber(row.tap_count)}回`, '配った先のアカウントで押された回数の合計') },
+    { key: 'taps', head: '今月押された', col: <col key="taps" className={storeStyles.colMonthly} />, cell: (row) => plainTd('taps', row.tap_count == null ? emptyValue('unknown') : `${formatNumber(row.tap_count)}回`, '配った先のアカウントで押された回数の合計') },
   ] : type === 'form' ? [
     { key: 'storage', head: '保存先', col: <col key="storage" className={hqStyles.colFormStorage} />, cell: () => plainTd('storage', '—', '保存先の情報は未取得です') },
     { key: 'state', head: '状態', col: <col key="state" className={hqStyles.colFormState} />, cell: (row) => boxedTd('state', stateCell(row)) },
@@ -467,23 +474,15 @@ export default function HqStoreList(props: HqStoreListProps) {
             const folder = folderOf(row.folder_id)
             const sub = templateSubLine(row, KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? words.item)
             return (
-              <Tr key={row.id} data-row-id={row.id} density="template">
-                {type === 'rich_menu' ? <Td className={storeStyles.cellPlain}>{rankOf.get(row.id) ?? '—'}</Td> : null}
-                <NameCell
-                  name={(
+              <Tr key={row.id} data-row-id={row.id} density="template" onOpen={() => (onOpen ?? onEdit)(row)}>
+                {type === 'rich_menu' ? <Td className={storeStyles.cellPlain}>{rankOf.get(row.id) ?? emptyValue('unknown')}</Td> : null}
+                <NameCell name={(
                     <div className={storeStyles.dotLine}>
-                      {type === 'tag' ? (
-                        canEdit ? <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>
-                          <TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} size="sm" />
-                        </button> : <TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} size="sm" />
-                      ) : <FolderDotName folder={folder ? { name: folder.name, color: folder.color } : null}>
-                        {canEdit ? (
-                          <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{row.name}</button>
-                        ) : <span className={storeStyles.cellTitle} title={row.name}>{row.name}</span>}
-                      </FolderDotName>}
+                      {canEdit ? (
+                        <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{row.name}</button>
+                      ) : <span className={storeStyles.cellTitle} title={row.name}>{row.name}</span>}
                     </div>
-                  )}
-                  sub={<span className={`${storeStyles.cellSub} ${storeStyles.dotIndent}`} title={sub}>{sub}</span>}
+                  )} folder={folder ? { name: folder.name, color: folder.color } : null}
                 />
                 {columns.map((column) => column.cell(row))}
                 {canEdit ? (
@@ -508,31 +507,32 @@ export default function HqStoreList(props: HqStoreListProps) {
     </div>
   )
 
-  const summary = `${formatNumber(filtered.length)}件中 ${(current - 1) * pageSize + 1}〜${Math.min(current * pageSize, filtered.length)}件`
+  const summary = `${formatNumber(filtered.length)} 件中 ${(current - 1) * pageSize + 1}〜${Math.min(current * pageSize, filtered.length)} 件`
   const pager = !ready || filtered.length === 0 ? null : pageCount > 1 ? (
     <Pagination page={current} pageCount={pageCount} onPageChange={setPage} summary={<span className={storeStyles.pagerCount}>{summary}</span>} />
   ) : <p className={storeStyles.pagerSolo}>{summary}</p>
 
   if (type === 'tag' && attribute.tab !== 'tags') {
-    return <OtherTabPanel tab={attribute.tab} title={words.title} description={words.description} onSelect={(key) => { attribute.select(key); setPage(1) }} />
+    return <SaveErrorScope errors={saveErrors}><OtherTabPanel tab={attribute.tab} title={words.title} description={words.description} onSelect={(key) => { attribute.select(key); setPage(1) }} /></SaveErrorScope>
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId={type === 'template' ? 'i0Ao0R' : type === 'form' ? 'wZPua' : type === 'tag' ? 'DzdC3' : type === 'rich_menu' ? 'noVq4' : 'LRc93'}
       headingSize="regular"
       title={words.title}
-      description={words.description}
+      help={words.description}
       tabs={type === 'tag' ? <AttributeTabs tab={attribute.tab} onSelect={(key) => { attribute.select(key); setPage(1) }} /> : tabs}
       stats={(
         <KpiBand data-design="KPIs" className={storeStyles.kpiStrip}>
           {bandKpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={<span className={storeStyles.kpiDetailWrap}>{kpi.detail}</span>} />
+            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} />
           ))}
         </KpiBand>
       )}
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: selectFolder, createAction: createButton(false) ?? undefined }}
-      folders={<>{createButton(true) ?? <span className={storeStyles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
+      folders={folderPanel}
       toolbar={toolbar}
       pagination={pager}
       overlays={(
@@ -549,7 +549,7 @@ export default function HqStoreList(props: HqStoreListProps) {
             confirmLabel={folderDialog?.editing ? '保存する' : '追加する'}
             cancelLabel="やめる"
             onCancel={() => { if (!folderBusy) setFolderDialog(null) }}
-            onConfirm={() => void saveFolder()}
+            onConfirm={() => saveFolder()}
           />
           <ConfirmDialog
             open={deletingFolder !== null}
@@ -561,13 +561,13 @@ export default function HqStoreList(props: HqStoreListProps) {
             busy={folderBusy}
             error={folderError || undefined}
             onCancel={() => { if (!folderBusy) setDeletingFolder(null) }}
-            onConfirm={() => void removeFolder()}
+            onConfirm={() => removeFolder()}
           />
         </>
       )}
     >
       {notices}
       {body}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

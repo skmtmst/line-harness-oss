@@ -1,20 +1,14 @@
 'use client'
 
-/*
- * ★V8 テンプレート「質問を作る・編集」（Pencil `l87p1J`）。
- *
- * 外枠はテンプレートの作る画面と同じ（src/v8/template-edit/frame）。左に段「名前とフォルダ」「質問」「選択肢」、
- * 右の列に「この質問を使う場所」と「届き方」（本物のスマホ）。下の帯はキャンセル・下書きを保存・保存して公開。
- * 読み込み・保存・公開（使用先があれば確認の窓）・離れる確認は今の V8（app/templates/questions/question-v8.tsx）と同じ。
- * 見せ方を絵に合わせた：選択肢は横に並ぶカード（ボタンの文字・押されたら・押したときの返信）。
- * 「押されたら」は今の質問の部品（QuestionEditor）を窓で開いて決める（タグ・友だち情報・シナリオ・URL などの全部の設定が残る）。
- * 受け付ける URL：`/templates/questions/new`・`?id=<テンプレート>`（直す）。
- */
+import { isOwnerOrAdmin } from '@/lib/staff-capability';
+import TapExtrasField from '@/components/shared/tap-extras-field'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronDown, Plus, Send, Trash2 } from 'lucide-react'
-import type { Folder, Scenario, Tag } from '@line-crm/shared'
+import { tapExtrasError, type Folder, type Scenario, type Tag } from '@line-crm/shared'
+import { tapExtraSaveError } from '@/lib/tap-actions'
 import { api } from '@/lib/api'
 import { describeApiFailure, isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import QuestionEditor, { emptyQuestion, newChoiceKey, type QuestionChoice, type ScenarioQuestion } from '@/components/scenarios/question-editor'
@@ -30,13 +24,26 @@ import { useAccount } from '@/contexts/account-context'
 import { useFormErrors } from '@/lib/use-form-errors'
 import ValidationSummary from '@/components/shared/validation-summary'
 import { FieldError } from '@/components/shared/form-controls'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { TemplateEditFrame } from '../template-edit/frame'
 import type { TemplateEditHost } from '../template-edit/host'
 import te from '../template-edit/edit.module.css'
 import styles from './question-new.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import InlineSettings from '@/components/shared/inline-settings'
+
+/*
+ * ★V8 テンプレート「質問を作る・編集」（Pencil `l87p1J`）。
+ *
+ * 外枠はテンプレートの作る画面と同じ（src/v8/template-edit/frame）。左に段「名前とフォルダ」「質問」「選択肢」、
+ * 右の列に「この質問を使う場所」と「届き方」（本物のスマホ）。下の帯はキャンセル・下書きを保存・保存して公開。
+ * 読み込み・保存・公開（使用先があれば確認の窓）・離れる確認は今の V8（app/templates/questions/question-v8.tsx）と同じ。
+ * 見せ方を絵に合わせた：選択肢は横に並ぶカード（ボタンの文字・押されたら・押したときの返信）。
+ * 「押されたら」は今の質問の部品（QuestionEditor）を窓で開いて決める（タグ・友だち情報・シナリオ・URL などの全部の設定が残る）。
+ * 受け付ける URL：`/templates/questions/new`・`?id=<テンプレート>`（直す）。
+ */
 
 const MAX_CHOICES = 4
 
@@ -79,6 +86,7 @@ export function choiceActionText(choice: QuestionChoice, tags: Array<Pick<Tag, '
 }
 
 function QuestionNew({ host }: { host?: TemplateEditHost }) {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const params = useSearchParams()
   /* 統括の入口（host）では店のテンプレートを読まない（新しく作るだけ）。 */
@@ -96,7 +104,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [folderId, setFolderId] = useState<string | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [tags, setTags] = useState<Tag[]>([])
-  const [scenarios, setScenarios] = useState<Scenario[]>([])
+  const [, setScenarios] = useState<Scenario[]>([])
   const [templateAccountId, setTemplateAccountId] = useState<string | null>(null)
   const [initialQuestion] = useState<ScenarioQuestion>(() => hostInitial?.question ?? emptyQuestion())
   const [question, setQuestion] = useState<ScenarioQuestion>(initialQuestion)
@@ -106,8 +114,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState('')
   const [publishConfirm, setPublishConfirm] = useState(false)
-  const [actionsOpen, setActionsOpen] = useState(false)
-  const [canMutate] = useState(() => (typeof window === 'undefined' ? true : isOwnerOrAdmin()))
+  const canMutate = useFeatureAccess('templates')
   const [savedSnapshot, setSavedSnapshot] = useState(() => snapshotOf({ name: hostInitial?.name ?? '', category: '未分類', folderId: null, question: initialQuestion }))
 
   const folderAccountId = id ? templateAccountId : selectedAccountId
@@ -166,6 +173,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'テンプレート名を入力してください。'))
   fields.define('text', '質問文', () => (question.text.trim() ? null : '質問文を入力してください。'))
   question.choices.forEach((choice, index) => {
+    fields.define(`extras-${index}`, `選択肢 ${index + 1} の追加処理`, () => tapExtrasError({ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }))
     fields.define(`choice-${index}`, `選択肢 ${index + 1} のボタンの文字`, () => (choice.label.trim() ? null : 'ボタンの文字を入力してください。'))
   })
   const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
@@ -197,7 +205,12 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       if (!result.success) { setError(result.error || '保存できませんでした。'); return false }
       return true
     } catch (caught) {
-      setError(describeApiFailure(caught, '保存', { forbidden: '質問テンプレートの作成・変更はオーナーと管理者だけができます。' }))
+      const extraError = tapExtraSaveError(caught)
+      if (extraError) { fields.setServerErrors(Object.fromEntries(question.choices.map((_, ci) => [`extras-${ci}`, extraError]))); return false }
+      if (!saveErrors.capture(caught, fields))
+
+ setError(describeApiFailure(caught, '保存', { scope: 'store' }));
+
       return false
     } finally {
       setSaving(false)
@@ -218,16 +231,15 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     setQuestion((current) => ({ ...current, choices: current.choices.filter((_, i) => i !== index) }))
   const addChoice = () =>
     setQuestion((current) => ({ ...current, choices: [...current.choices, { key: newChoiceKey(), label: '', behavior: 'none' }] }))
-  const summaryOf = useMemo(() => (choice: QuestionChoice) => choiceActionText(choice, tags, scenarios), [tags, scenarios])
 
-  if (loading || (accountLoading && !host)) return <ListState kind="loading" title="質問テンプレートを読み込んでいます" />
+  if (loading || (accountLoading && !host)) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="質問テンプレートを読み込んでいます" /></SaveErrorScope>
 
   if (host ? host.readOnly : !canMutate) {
     return (
-      <TemplateEditFrame boardId="l87p1J" title="質問テンプレート" description="質問テンプレートの作成・変更はオーナーと管理者だけができます" side={null}>
+      <SaveErrorScope errors={saveErrors}><TemplateEditFrame boardId="l87p1J" title="質問テンプレート" description="質問テンプレートの作成・変更はオーナーと管理者だけができます" side={null}>
         <p className={styles.note}>一覧で中身を確認できます。</p>
-        <Link href="/templates" className={styles.back}>一覧へ戻る</Link>
-      </TemplateEditFrame>
+        <></>
+      </TemplateEditFrame></SaveErrorScope>
     )
   }
 
@@ -245,7 +257,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   )
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <TemplateEditFrame
         boardId="l87p1J"
         title={id ? '質問を編集' : '質問を作る'}
@@ -275,14 +287,11 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         <section className={styles.card} aria-labelledby="q-name">
           <h2 className={styles.cardTitle} id="q-name">名前とフォルダ</h2>
           <div className={styles.row}>
-            <label className={`${styles.field} ${styles.grow}`}>
-              <span className={styles.label}>テンプレート名</span>
-              <input {...fields.bind('name')} className={styles.input} value={name} maxLength={120} placeholder="例：継続の意思をうかがう" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'q-name-error' : undefined} onChange={(event) => setName(event.target.value)} />
-            </label>
+            <Field label="テンプレート名"><SaveErrorField names={["name"]}><input {...fields.bind('name')} className={styles.input} value={name} maxLength={120} placeholder="例：継続の意思をうかがう" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'q-name-error' : undefined} onChange={(event) => setName(event.target.value)} /></SaveErrorField></Field>
             <FieldError id="q-name-error">{fields.error('name')}</FieldError>
             <div className={`${styles.field} ${styles.folder}`}>
               <span className={styles.pickLabel}>フォルダ</span>
-              <FolderSelect
+              <SaveErrorField names={["folder","host.folder","folderId","folder_id"]}><FolderSelect
                 size="full"
                 aria-label="フォルダ"
                 value={host ? host.folder : folderId ?? ''}
@@ -299,21 +308,15 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                   : canMutate && folderAccountId
                     ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: folderAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
                     : undefined}
-              />
+              /></SaveErrorField>
             </div>
           </div>
         </section>
 
         <section className={styles.card} aria-labelledby="q-question">
           <h2 className={styles.cardTitle} id="q-question">質問</h2>
-          <label className={styles.field}>
-            <span className={styles.label}>前文（空なら送らない）<span className={styles.optional}>任意</span></span>
-            <input className={styles.input} value={question.intro ?? ''} maxLength={4500} placeholder="いつもありがとうございます。" onChange={(event) => setQuestion((current) => ({ ...current, intro: event.target.value }))} />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.label}>質問文（160文字まで）</span>
-            <input {...fields.bind('text')} className={styles.input} value={question.text} maxLength={160} placeholder="来月も定期便を続けますか？" aria-invalid={fields.invalid('text') || undefined} aria-describedby={fields.invalid('text') ? 'q-text-error' : undefined} onChange={(event) => setQuestion((current) => ({ ...current, text: event.target.value }))} />
-          </label>
+          <Field label="前文（空なら送らない）"><SaveErrorField names={["intro","question.intro"]}><input className={styles.input} value={question.intro ?? ''} maxLength={4500} placeholder="いつもありがとうございます。" onChange={(event) => setQuestion((current) => ({ ...current, intro: event.target.value }))} /></SaveErrorField></Field>
+          <Field label="質問文（160文字まで）"><SaveErrorField names={["text","question.text"]}><input {...fields.bind('text')} className={styles.input} value={question.text} maxLength={160} placeholder="来月も定期便を続けますか？" aria-invalid={fields.invalid('text') || undefined} aria-describedby={fields.invalid('text') ? 'q-text-error' : undefined} onChange={(event) => setQuestion((current) => ({ ...current, text: event.target.value }))} /></SaveErrorField></Field>
           <FieldError id="q-text-error">{fields.error('text')}</FieldError>
           <div className={styles.inline}>
             <span className={styles.pickLabel} id="q-mode">答え方</span>
@@ -337,22 +340,11 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                   <span className={styles.choiceNo}>{`選択肢 ${index + 1}`}</span>
                   <Button type="button" variant="text" disabled={question.choices.length <= 1} onClick={() => removeChoice(index)} aria-label={`選択肢 ${index + 1} を消す`}><Trash2 size={14} aria-hidden="true" />消す</Button>
                 </div>
-                <label className={styles.field}>
-                  <span className={styles.label}>ボタンの文字（20文字まで）</span>
-                  <input {...fields.bind(`choice-${index}`)} className={styles.input} value={choice.label} maxLength={20} aria-invalid={fields.invalid(`choice-${index}`) || undefined} aria-describedby={fields.invalid(`choice-${index}`) ? `q-choice-${index}-error` : undefined} onChange={(event) => setChoice(index, { label: event.target.value })} />
-                </label>
+                <Field label="ボタンの文字（20文字まで）"><SaveErrorField names={[`choices.${index}.label`,"label","choice.label"]}><input {...fields.bind(`choice-${index}`)} className={styles.input} value={choice.label} maxLength={20} aria-invalid={fields.invalid(`choice-${index}`) || undefined} aria-describedby={fields.invalid(`choice-${index}`) ? `q-choice-${index}-error` : undefined} onChange={(event) => setChoice(index, { label: event.target.value })} /></SaveErrorField></Field>
                 <FieldError id={`q-choice-${index}-error`}>{fields.error(`choice-${index}`)}</FieldError>
-                {host ? null : <div className={styles.inline}>
-                  <span className={styles.smallLabel}>押されたら</span>
-                  <button type="button" className={styles.pick} title="押したときの動き（タグ・友だち情報・シナリオ・URL など）を決める" onClick={() => setActionsOpen(true)}>
-                    <span className={styles.pickText}>{summaryOf(choice)}</span>
-                    <ChevronDown className={styles.pickIcon} aria-hidden="true" />
-                  </button>
-                </div>}
-                <label className={styles.field}>
-                  <span className={styles.label}>押したときの返信<span className={styles.optional}>任意</span></span>
-                  <input className={styles.input} value={choice.reply ?? ''} maxLength={4500} onChange={(event) => setChoice(index, { reply: event.target.value })} />
-                </label>
+                {host ? null : <QuestionEditor value={question} onChange={setQuestion} choiceOnly={index} choiceColumns/>}
+                <div {...fields.bind(`extras-${index}`)}><TapExtrasField error={fields.error(`extras-${index}`)} name={`選択肢${index + 1}`} unavailable={choice.behavior === 'tel' || choice.behavior === 'mail' ? '電話・メールを開く動きではタグ・加点を使えません。' : undefined} value={{ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }} tags={tags} accountId={host ? null : selectedAccountId} onChange={extra => setChoice(index, { addTagIds: extra.tagIds, scoreChange: extra.scoreChange })} /></div>
+                <Field label="押したときの返信"><SaveErrorField names={[`choices.${index}.reply`,"reply","choice.reply"]}><input className={styles.input} value={choice.reply ?? ''} maxLength={4500} onChange={(event) => setChoice(index, { reply: event.target.value })} /></SaveErrorField></Field>
               </div>
             ))}
           </div>
@@ -365,9 +357,6 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       </TemplateEditFrame>
 
       {/* 押したときの動きは今の部品で決める（全部の選択肢をまとめて直せる）。 */}
-      <Dialog open={actionsOpen} size="large" title="押したときの動き" onCancel={() => setActionsOpen(false)}>
-        {actionsOpen ? <QuestionEditor value={question} onChange={setQuestion} choiceColumns /> : null}
-      </Dialog>
       <ConfirmDialog
         open={publishConfirm}
         title="この質問を公開しますか？"
@@ -387,7 +376,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         onCancel={() => setPublishConfirm(false)}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="質問への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }
 

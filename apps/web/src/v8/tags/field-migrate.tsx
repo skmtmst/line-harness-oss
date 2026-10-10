@@ -1,17 +1,6 @@
 'use client'
 
-/*
- * ★V8 友だち情報欄の移行（種類を変える。Pencil `GobMd`）。
- *
- * 読み込み・移行先の作成（R519）・事前確認・実行・結果の見守り（R547・R548）・アカウント切替の扱いは
- * 今の画面（app/tags/field-migrate-v8.tsx）から写した。見せ方を絵に合わせた：
- * 頭は「「〇〇」の種類を変える」と今の種類・人数、注意の帯、段「移行の先」に移行後の種類と見本の表
- * （今の値 → 移したあと・人数。種類だけで読む事前確認＝何も書き込まない）、その下に移行先の名前など。
- * 事前確認したあとは、結果・切り替わる使用先・実行の結果の段を足す。
- * 受け付ける URL：`/tags/fields/migrate?id=<移行元の項目>`。
- */
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ArrowRight, TriangleAlert } from 'lucide-react'
 import type { FriendField, FriendFieldType } from '@line-crm/shared'
@@ -32,6 +21,22 @@ import { FIELD_TYPE_HINTS } from '@/components/friend-fields/field-list'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { FIELD_TYPE_WORDS } from './field-editor'
 import styles from './create.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage, withPermissionFailure } from '@/components/shared/api-error-message'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+/*
+ * ★V8 友だち情報欄の移行（種類を変える。Pencil `GobMd`）。
+ *
+ * 読み込み・移行先の作成（R519）・事前確認・実行・結果の見守り（R547・R548）・アカウント切替の扱いは
+ * 今の画面（app/tags/field-migrate-v8.tsx）から写した。見せ方を絵に合わせた：
+ * 頭は「「〇〇」の種類を変える」と今の種類・人数、注意の帯、段「移行の先」に移行後の種類と見本の表
+ * （今の値 → 移したあと・人数。種類だけで読む事前確認＝何も書き込まない）、その下に移行先の名前など。
+ * 事前確認したあとは、結果・切り替わる使用先・実行の結果の段を足す。
+ * 受け付ける URL：`/tags/fields/migrate?id=<移行元の項目>`。
+ */
 
 const TYPES = Object.keys(FIELD_TYPE_WORDS) as FriendFieldType[]
 
@@ -72,6 +77,7 @@ export default function FieldMigrateV8() {
 }
 
 function FieldMigrate() {
+  const saveErrors = useSaveFormErrors()
   const staffRole = useStaffRole()
   usePageTitle('種類を変える')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }, { label: '友だち情報欄', href: '/tags?tab=fields' }])
@@ -147,7 +153,7 @@ function FieldMigrate() {
         // ATTR-11: 失敗は loadError へ。項目未発見（!source）と混ぜない。
         if (!active) return
         if (reason instanceof ApiError && reason.status === 403) {
-          setLoadError('友だち情報欄を見る権限がありません。オーナーか管理者に確認してください。')
+          setLoadError(permissionDeniedMessage('store'))
           setLoadForbidden(true)
         } else {
           setLoadError('項目を読み込めませんでした')
@@ -230,8 +236,10 @@ function FieldMigrate() {
       setFields((current) => (current.some((item) => item.id === created.data.id) ? current : [...current, created.data]))
       return created.data
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
       try {
-        const res = await api.friendFields.list(account)
+        const res = await api.friendFields.list(account);
+
         if (res.success) {
           const existing = res.data.find((item) => item.fieldKey === params.fieldKey) ?? null
           if (existing && existing.name === params.name && existing.type === params.type) {
@@ -241,13 +249,20 @@ function FieldMigrate() {
             return existing
           }
         }
-      } catch { /* 取り直せないときは下の説明へ */ }
-      if (!gateRef.current.current(token) || accountRef.current !== account) return null
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure) /* 取り直せないときは下の説明へ */ }
+      if (!gateRef.current.current(token) || accountRef.current !== account)
+
+
+ return null
       const status = (reason as { status?: number } | null)?.status
       if (status === 409) {
+        { if (!fieldFailure)
         setError(`同じ差し込み名「${params.fieldKey}」の別の項目があります。一覧を確認してください`)
+      }
       } else {
-        setError(describeSaveFailure(reason))
+        { if (!fieldFailure)
+        setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store')) }
       }
       return null
     }
@@ -268,7 +283,7 @@ function FieldMigrate() {
         if (!targetField) return
       }
       if (!targetField) {
-        setError('移行先の項目を選んでください')
+        saveErrors.fail('existingTargetId','移行先の項目を選んでください')
         return
       }
       const res = await api.friendFields.migrationPreview(source.id, account, { targetFieldId: targetField.id })
@@ -278,7 +293,10 @@ function FieldMigrate() {
       setIdempotencyKey(crypto.randomUUID())
     } catch (reason) {
       if (!gateRef.current.current(token) || accountRef.current !== account) return
-      setError(reason instanceof ApiError ? reason.message : '事前確認を実行できませんでした')
+      const fieldFailure = saveErrors.capture(reason)
+      { if (!fieldFailure)
+
+      setError(reason instanceof ApiError ? reason.message : '事前確認を実行できませんでした') }
     } finally {
       if (gateRef.current.current(token) && accountRef.current === account) setChecking(false)
     }
@@ -328,7 +346,10 @@ function FieldMigrate() {
       pollRun(res.data.runId, account, token, 0)
     } catch (reason) {
       if (!gateRef.current.current(token) || accountRef.current !== account) return
-      setError(reason instanceof ApiError ? reason.message : '移行を開始できませんでした。事前確認からやり直してください。')
+      const fieldFailure = saveErrors.capture(reason)
+      { if (!fieldFailure)
+
+      setError(reason instanceof ApiError ? reason.message : '移行を開始できませんでした。事前確認からやり直してください。') }
     } finally {
       if (gateRef.current.current(token) && accountRef.current === account) setExecuting(false)
     }
@@ -359,16 +380,22 @@ function FieldMigrate() {
       pollRun(res.data.runId, account, token, 0)
     } catch (reason) {
       if (!gateRef.current.current(token) || accountRef.current !== account) return
+      const fieldFailure = saveErrors.capture(reason)
       try {
-        const current = await api.friendFields.migrationRun(executedRunId, account)
+        const current = await api.friendFields.migrationRun(executedRunId, account);
+
         if (!gateRef.current.current(token) || accountRef.current !== account) return
         if (current.success) {
           setRun(current.data)
-          setPollProblem('')
+          { if (!fieldFailure)
+          setPollProblem('') }
           return
         }
-      } catch { /* 下の説明へ */ }
-      setError(reason instanceof ApiError ? reason.message : '移行を再開できませんでした。事前確認からやり直してください。')
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure) /* 下の説明へ */ }
+      { if (!fieldFailure)
+
+      setError(reason instanceof ApiError ? reason.message : '移行を再開できませんでした。事前確認からやり直してください。') }
     } finally {
       if (gateRef.current.current(token) && accountRef.current === account) setExecuting(false)
     }
@@ -408,50 +435,50 @@ function FieldMigrate() {
       })
   }, [source, selectedAccountId, sampleType])
 
-  if (loading) return <ListState kind="loading" description="友だち情報欄を読み込んでいます" />
+  if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" description="友だち情報欄を読み込んでいます" /></SaveErrorScope>
   if (!sourceId) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="unspecified"
         title="移行する項目が指定されていません"
         description="一覧から移行する項目を選び直してください。"
         backHref="/tags?tab=fields"
         backLabel="友だち情報欄の一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
   if (!selectedAccountId) return (
-    <Notice tone="warn" action={<Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button>}>
+    <SaveErrorScope errors={saveErrors}><Notice tone="warn" action={<Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button>}>
       LINE公式アカウントを選んでください。
-    </Notice>
+    </Notice></SaveErrorScope>
   )
   /* 「読み込めなかった」と「移行元が無い」を分ける（ATTR-11）。 */
   if (loadForbidden) {
     return (
-      <ListState
+      <SaveErrorScope errors={saveErrors}><ListState
         kind="forbidden"
         title="友だち情報欄を見る権限がありません"
-        description="オーナーか管理者に確認してください。"
+        description={permissionDeniedMessage('store')}
         action={<Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button>}
-      />
+      /></SaveErrorScope>
     )
   }
   if (loadError) return (
-    <TargetMissing
+    <SaveErrorScope errors={saveErrors}><TargetMissing
       kind="error"
       title="項目を読み込めませんでした"
       description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
       onRetry={() => setReloadTick((tick) => tick + 1)}
-    />
+    /></SaveErrorScope>
   )
   if (!source) return (
-    <TargetMissing
+    <SaveErrorScope errors={saveErrors}><TargetMissing
       kind="not-found"
       title="移行元の項目が見つかりません"
       description="削除されたか、リンクが古くなっています。友だち情報欄の一覧から選び直してください。"
       backHref="/tags?tab=fields"
       backLabel="友だち情報欄の一覧へ戻る"
-    />
+    /></SaveErrorScope>
   )
 
   const confirmed = Boolean(preview?.previewToken)
@@ -460,24 +487,24 @@ function FieldMigrate() {
   const needsPollAction = executedRunId !== null && !executing && pollProblem !== ''
     && (!run || RUN_RUNNING.has(run.status))
   const pollAttention = pollProblem !== '' && (!run || RUN_RUNNING.has(run.status))
-  const status = pollAttention ? pollProblem : run ? RUN_STATUS_LABELS[run.status] : executedRunId ? '実行を受け付けました。結果を確認しています' : confirmed ? `事前確認済み：${preview?.summary.total ?? 0}人` : undefined
-  const usage = typeof source.usageCount === 'number' ? `${formatNumber(source.usageCount)}人に値が入っている` : '値が入っている人数は未集計'
-  const back = <Link href="/tags?tab=fields" className={styles.backLink}>← 友だち情報欄へ</Link>
+  const status = pollAttention ? pollProblem : run ? RUN_STATUS_LABELS[run.status] : executedRunId ? '実行を受け付けました。結果を確認しています' : confirmed ? `事前確認済み：${preview?.summary.total ?? 0} 人` : undefined
+  const usage = typeof source.usageCount === 'number' ? `${formatNumber(source.usageCount)} 人に値が入っている` : '値が入っている人数は未集計'
+  const back = <></>
   const rows = sample ? sampleRows(sample) : []
 
-  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></SaveErrorScope>
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       boardId="GobMd"
       title={`「${source.name}」の種類を変える`}
-      description={`今の種類：${FIELD_TYPE_WORDS[source.type]}・${usage}`}
+      help={`今の種類：${FIELD_TYPE_WORDS[source.type]}・${usage}`}
       identity={back}
       status={status}
       footerActions={<>
         <Button href="/tags?tab=fields">キャンセル</Button>
         {confirmed && !executedRunId ? (
-          <Button type="button" onClick={() => void runPreview()} disabled={checking || running}>確認をやり直す</Button>
+          <Button type="button" onClick={() => void runPreview()} busyLabel="確認しています…" disabled={checking || running}>確認をやり直す</Button>
         ) : null}
         {confirmed && !executedRunId ? (
           <Button variant="primary" type="button" onClick={() => void execute()} disabled={executing || running} busy={running} busyLabel="実行中…">移行を実行する</Button>
@@ -486,7 +513,7 @@ function FieldMigrate() {
           <Button type="button" onClick={() => void refetchRun()} disabled={executing}>結果を確認する</Button>
         ) : null}
         {needsPollAction ? (
-          <Button variant="primary" type="button" onClick={() => void resume()} disabled={executing}>{executing ? '再開中…' : '続きから再開する'}</Button>
+          <Button variant="primary" type="button" onClick={() => void resume()} disabled={executing} busy={executing} busyLabel="再開中…">続きから再開する</Button>
         ) : null}
         {!confirmed ? (
           <Button variant="primary" type="button" onClick={() => void runPreview()} disabled={checking || (!target && targetMode === 'existing' && !existingTargetId)} busy={checking} busyLabel="確認しています…">
@@ -508,13 +535,13 @@ function FieldMigrate() {
           <div className={styles.field}>
             <span className={styles.labelStrong}>移行後の種類</span>
             <span className={styles.selectBox}>
-              <Select
+              <SaveErrorField names={["targetType","type","target_type"]}><Select
                 value={targetType}
                 onChange={(value) => { setTargetType(value as FriendFieldType); resetConfirmation() }}
                 aria-label="移行後の種類"
                 size="full"
                 options={TYPES.map((type) => ({ value: type, label: FIELD_TYPE_WORDS[type] }))}
-              />
+              /></SaveErrorField>
             </span>
           </div>
         ) : null}
@@ -532,7 +559,7 @@ function FieldMigrate() {
             <div key={`${row.from}:${row.to}`} className={styles.sampleRow} role="row">
               <span role="cell" title={row.from}>{row.from}</span>
               <span role="cell" title={row.to}>{row.to}</span>
-              <span role="cell" className={styles.sampleCount}>{`${formatNumber(row.count)}人`}</span>
+              <span role="cell" className={styles.sampleCount}>{`${formatNumber(row.count)} 人`}</span>
             </div>
           ))}
         </div>
@@ -547,37 +574,31 @@ function FieldMigrate() {
           </div>
         ) : (
           <>
-            <SegmentedControl
+            <SaveErrorField names={["targetMode"]}><SegmentedControl
               aria-label="移行先の決め方"
               options={[{ value: 'new' as const, label: '新しい項目を作る' }, { value: 'existing' as const, label: '今ある項目へ移す' }]}
               value={targetMode}
               onChange={(value) => { setTargetMode(value); resetConfirmation() }}
-            />
+            /></SaveErrorField>
             {targetMode === 'new' ? (
               <div className={styles.twoCols}>
-                <label className={styles.field}>
-                  <span className={styles.label}>新しい項目の名前</span>
-                  <input className={styles.input} value={targetName} onChange={(event) => { setTargetName(event.target.value); resetConfirmation() }} />
-                </label>
-                <label className={styles.field}>
-                  <span className={styles.label}>差し込みの名前</span>
-                  <input className={styles.input} value={targetKey} onChange={(event) => { setTargetKey(event.target.value); resetConfirmation() }} />
-                </label>
+                <Field label="新しい項目の名前"><SaveErrorField names={["targetName","name","target_name"]}><input className={styles.input} value={targetName} onChange={(event) => { setTargetName(event.target.value); resetConfirmation() }} /></SaveErrorField></Field>
+                <Field label="差し込みの名前"><SaveErrorField names={["targetKey","fieldKey","target_key"]}><input className={styles.input} value={targetKey} onChange={(event) => { setTargetKey(event.target.value); resetConfirmation() }} /></SaveErrorField></Field>
               </div>
             ) : (
               <div className={styles.field}>
                 <span className={styles.label}>移行先</span>
                 <span className={styles.selectBox}>
-                  <Select
+                  <SaveErrorField names={["existingTargetId","targetFieldId","existing_target_id"]}><EntitySelect
                     value={existingTargetId}
                     onChange={(value) => { setExistingTargetId(value); resetConfirmation() }}
                     aria-label="移行先の既存項目"
                     size="full"
                     options={[
                       { value: '', label: '項目を選ぶ' },
-                      ...fields.filter((field) => field.id !== source.id).map((field) => ({ value: field.id, label: `${field.name}（${FIELD_TYPE_WORDS[field.type]}）` })),
+                      ...fields.filter((field) => field.id !== source.id).map((field) => ({ ...entityOptionMetadata(field), value: field.id, label: `${field.name}（${FIELD_TYPE_WORDS[field.type]}）` })),
                     ]}
-                  />
+                  /></SaveErrorField>
                 </span>
               </div>
             )}
@@ -593,10 +614,10 @@ function FieldMigrate() {
             <p className={styles.cardNote}>登録済みの値を読み取り、移せる数だけを確かめました。まだ何も変えていません。</p>
           </div>
           <dl className={styles.placeList}>
-            <div className={styles.placeRow}><dt>値がある友だち</dt><dd>{`${preview.summary.total}人`}</dd></div>
-            <div className={styles.placeRow}><dt>そのまま移せる</dt><dd>{`${preview.summary.convertible}人`}</dd></div>
-            <div className={styles.placeRow}><dt>人が確認する</dt><dd>{`${preview.summary.review}人`}</dd></div>
-            <div className={styles.placeRow}><dt>空欄</dt><dd>{`${preview.summary.invalid}人`}</dd></div>
+            <div className={styles.placeRow}><dt>値がある友だち</dt><dd>{`${preview.summary.total} 人`}</dd></div>
+            <div className={styles.placeRow}><dt>そのまま移せる</dt><dd>{`${preview.summary.convertible} 人`}</dd></div>
+            <div className={styles.placeRow}><dt>人が確認する</dt><dd>{`${preview.summary.review} 人`}</dd></div>
+            <div className={styles.placeRow}><dt>空欄</dt><dd>{`${preview.summary.invalid} 人`}</dd></div>
           </dl>
           <div className={styles.cardHead}><h3 className={styles.labelStrong}>切り替わる使用先</h3></div>
           {preview.usageTargets.length > 0 ? (
@@ -624,9 +645,9 @@ function FieldMigrate() {
             <p className={styles.cardNote}>{RUN_STATUS_LABELS[run.status]}</p>
           </div>
           <dl className={styles.placeList}>
-            <div className={styles.placeRow}><dt>移行できた</dt><dd>{`${run.summary.succeeded}人`}</dd></div>
-            <div className={styles.placeRow}><dt>移行できなかった</dt><dd>{`${run.summary.failed}人`}</dd></div>
-            <div className={styles.placeRow}><dt>確認が必要なまま</dt><dd>{`${run.summary.review + run.summary.invalid}人`}</dd></div>
+            <div className={styles.placeRow}><dt>移行できた</dt><dd>{`${run.summary.succeeded} 人`}</dd></div>
+            <div className={styles.placeRow}><dt>移行できなかった</dt><dd>{`${run.summary.failed} 人`}</dd></div>
+            <div className={styles.placeRow}><dt>確認が必要なまま</dt><dd>{`${run.summary.review + run.summary.invalid} 人`}</dd></div>
           </dl>
           {run.rows.filter((row) => row.status === 'failed').map((row) => (
             <p key={row.friendId} className={styles.fieldError}>{`${row.sourceValue || '（空欄）'}：${row.reason ?? '失敗しました。通信を確かめて、もう一度お試しください。'}`}</p>
@@ -636,6 +657,6 @@ function FieldMigrate() {
           {run.rollbackDeadline ? <p className={styles.fieldNote}>{`元の項目の値は ${formatDateTime(run.rollbackDeadline)} まで残ります。元に戻す必要がある場合は、この期限前に運用へ相談してください。`}</p> : null}
         </section>
       ) : null}
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }

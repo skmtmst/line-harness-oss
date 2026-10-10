@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, type ClipboardEvent, type KeyboardEvent } from 'react'
 import { Check } from 'lucide-react'
+import { joinDescribedBy, useFieldContext } from './field-context'
 import styles from './otp-input.module.css'
 
 /**
@@ -86,6 +87,8 @@ export default function OtpInput({
   /** 確かめを送っている間。枠を押せない形にして輪を出す（disabled と同じく入力を止める）。 */
   busy?: boolean
 }) {
+  const field = useFieldContext()
+  describedBy = joinDescribedBy(describedBy, field?.describedBy)
   const refs = useRef<Array<HTMLInputElement | null>>([])
   /**
    * 値を変えたあとに移るマス。値が画面に反映される前に移ると、移った先が
@@ -116,7 +119,8 @@ export default function OtpInput({
     }
     if (digits.length > 0) {
       pendingFocus.current = 0
-      onChange('')
+      if (field?.onInvalidReset) field.onInvalidReset()
+      else onChange('')
     } else {
       focusSlot(0)
     }

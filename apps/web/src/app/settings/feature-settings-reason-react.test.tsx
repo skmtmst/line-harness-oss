@@ -60,6 +60,7 @@ beforeEach(() => {
   })
   vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
     const path = String(input)
+    if (path.includes('/api/staff/me')) return Promise.resolve(response({ success: true, data: { role: 'owner' } }))
     const accountId = new URL(path, 'http://localhost').searchParams.get('account_id') ?? 'account-a'
     if (path.includes('/api/settings/features') && init?.method === 'PUT') {
       network.puts.push({
@@ -113,9 +114,9 @@ function reasonInput(): HTMLInputElement | null {
 }
 
 async function makeDirty() {
-  const toggle = [...host.querySelectorAll<HTMLButtonElement>('[role="switch"]')]
-    .find((item) => !item.disabled && item.getAttribute('aria-checked') === 'false')
-    ?? [...host.querySelectorAll<HTMLButtonElement>('[role="switch"]')].find((item) => !item.disabled)
+  const toggle = [...host.querySelectorAll<HTMLButtonElement>('[type="checkbox"]')]
+    .find((item) => !item.disabled && String((item as HTMLInputElement).checked) === 'false')
+    ?? [...host.querySelectorAll<HTMLButtonElement>('[type="checkbox"]')].find((item) => !item.disabled)
   if (!toggle) throw new Error('切替可能な機能がありません')
   await act(async () => { toggle.click(); await Promise.resolve() })
   expect(button('機能設定を保存').disabled).toBe(false)

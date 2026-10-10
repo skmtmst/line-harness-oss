@@ -1,11 +1,4 @@
 'use client'
-
-/*
- * ★V8 タグ「対応マーク」タブの一覧（Pencil `vKDj5`、状態 `U0aKD`）。
- *
- * フォルダを持たないタブなので、作る口は見出しの右（page 側の headAction）。
- * 数え方・並べ替え・保管の確認窓は v7（`mark-list.tsx`）と同じ関数を使う。
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -31,6 +24,16 @@ import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { TagRowsSkeleton } from './tag-rows-skeleton'
 import styles from './list-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 タグ「対応マーク」タブの一覧（Pencil `vKDj5`、状態 `U0aKD`）。
+ *
+ * フォルダを持たないタブなので、作る口は見出しの右（page 側の headAction）。
+ * 数え方・並べ替え・保管の確認窓は v7（`mark-list.tsx`）と同じ関数を使う。
+ */
 
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -262,7 +265,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   const rowMenuItems = (mark: MarkRow): ActionMenuItem[] => {
@@ -317,7 +320,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
         {kpis.map((kpi) => (
           <div key={kpi.title} className={styles.kpi}>
             <span className={styles.kpiLabel}><kpi.icon size={13} aria-hidden="true" />{kpi.title}</span>
-            <p className={styles.kpiValue}>{kpi.value ?? '—'}<span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span></p>
+            <p className={styles.kpiValue}>{kpi.value ?? emptyValue('unknown')}<span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span></p>
             <p className={styles.kpiDetail}>{kpi.detail}</p>
           </div>
         ))}
@@ -331,14 +334,14 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
         <div className={styles.toolbar}>
           <div className={styles.searchWrap}>
             <SearchField
-              aria-label="マーク名で検索"
-              placeholder="マーク名で検索"
+              aria-label="マーク名で探す"
+              placeholder="マーク名で探す"
               value={query}
               onChange={setQuery}
               onClear={() => setQuery('')}
             />
           </div>
-          <Select
+          <SaveErrorField names={["usage"]}><Select
             aria-label="利用状態"
             value={usage}
             onChange={(value) => setUsage(value as typeof usage)}
@@ -347,7 +350,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
               { value: 'used', label: '使用中' },
               { value: 'unused', label: '未使用' },
             ]}
-          />
+          /></SaveErrorField>
         </div>
 
         {actionError ? (
@@ -376,7 +379,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
             </span>
             <p className={styles.stateTitle}>対応マークを読み込めませんでした</p>
             <p className={styles.stateDesc}>{error || '再読み込みしてください。'}</p>
-            <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+            <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度試す</Button>
           </div>
         ) : items.length === 0 ? (
           <div className={styles.stateCard}>
@@ -457,7 +460,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
                           </ContextMenu>
                         </td>
                         <td className={styles.cellText} style={{ fontVariantNumeric: 'tabular-nums' }}>{mark.friendCount}人</td>
-                        <td className={styles.cellText}>{mark.isDefault ? '新着時の初期値' : '—'}</td>
+                        <td className={styles.cellText}>{mark.isDefault ? '新着時の初期値' : emptyValue('unknown')}</td>
                         <td className={styles.cellMuted}><span className={styles.cellTruncate} title={autoRuleLabel(mark)}>{autoRuleLabel(mark)}</span></td>
                         <td className={styles.cellMuted}><span className={styles.cellTruncate} title={usageLabel(mark)}>{usageLabel(mark)}</span></td>
                         <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
@@ -502,7 +505,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
                 {visible.length}件中 {visible.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}〜{Math.min(currentPage * pageSize, visible.length)}件
               </span>
               <div className={styles.pagerRight}>
-                <Select
+                <SaveErrorField names={["pageSize","page_size"]}><Select
                   aria-label="表示件数"
                   size="page-size"
                   value={String(pageSize)}
@@ -512,7 +515,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
                     { value: '50', label: '50件表示' },
                     { value: '100', label: '100件表示' },
                   ]}
-                />
+                /></SaveErrorField>
                 <Pagination
                   page={currentPage}
                   pageCount={pages}
@@ -574,7 +577,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
             </div>
             <div>
               <dt className={styles.cellMuted}>初期値</dt>
-              <dd className={styles.cellText}>{activeMark.isDefault ? '新着時の初期値' : '—'}</dd>
+              <dd className={styles.cellText}>{activeMark.isDefault ? '新着時の初期値' : emptyValue('unknown')}</dd>
             </div>
             <div>
               <dt className={styles.cellMuted}>自動変更</dt>

@@ -251,7 +251,7 @@ function CommonActionsPageV7() {
           { label: '共通アクション' },
         ]}
         title="共通アクション"
-        description=""
+        help=""
         actions={(
           <>
             {manualHref ? <Button href={manualHref}>マニュアル</Button> : null}
@@ -406,7 +406,7 @@ function CommonActionsPageV7() {
             <tbody>
               {items.map((item) => (
                 <Tr key={item.id}>
-                  <NameCell name={<span className="truncate" title={item.name}>{item.name}</span>} sub={<span className="truncate" title={item.description ?? undefined}>{item.description || '説明はありません'}</span>} />
+                  <NameCell name={<span className="truncate" title={item.name}>{item.name}</span>} />
                   <Td>
                     <StatusBadge tone={item.status === 'published' ? 'success' : 'neutral'} size="compact">
                       {STATUS_LABEL[item.status]}

@@ -3,6 +3,12 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// 日付の見本を作る前に日本時間で固定し、待ち合わせのタイマーは動かす。
+vi.hoisted(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
+})
+
 const api = vi.hoisted(() => ({
   createReservation: vi.fn(), postSeatVisitMark: vi.fn(), reservationsDay: vi.fn(), openingHours: vi.fn(), customerSearch: vi.fn(),
 }))
@@ -19,13 +25,15 @@ const T = tables as unknown as RestaurantTable[]
 const today = (hour: number, minute = 0) => { const d = new Date(); d.setHours(hour, minute, 0, 0); return d }
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
   api.createReservation.mockResolvedValue({ success: true, data: { id: 'new-1', tableId: 't1', lineNotice: { sent: true, reason: null } } })
   api.postSeatVisitMark.mockResolvedValue({ success: true, data: { status: 'seated' } })
   api.reservationsDay.mockResolvedValue({ success: true, data: { date: '', reservations: [] } })
   api.openingHours.mockResolvedValue({ success: true, data: { hours: null } })
   api.customerSearch.mockResolvedValue({ success: true, data: [{ name: '鈴木 美咲', phone: '090-1234-5678', lineUid: 'U-1' }] })
 })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 
 describe('空いている時刻・卓の決まり', () => {
   it('人数が入る空いた卓を、余る席が少ない順に出す（重なる予約・停止中の卓は除く）', () => {
@@ -97,7 +105,7 @@ describe('電話予約（E-2）', () => {
     expect((screen.getByRole('textbox', { name: 'お名前' }) as HTMLInputElement).value).toBe('鈴木 美咲')
     fireEvent.click(screen.getByText(/明日/))
     fireEvent.click(await screen.findByRole('button', { name: '19:00' }))
-    expect(screen.getByRole('switch', { name: 'LINE で確認を送る' })).not.toBeNull()
+    expect(screen.getByRole('checkbox', { name: 'LINE で確認を送る' })).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /予約を入れる/ }))
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith({ lineFailed: false }))
     expect(api.createReservation).toHaveBeenCalledWith('acc', expect.objectContaining({

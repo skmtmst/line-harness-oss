@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * 予約メニューの作成・編集（V8）の「その場で確かめる入力」。
  * 名前・かかる時間・後の空き時間の欄を離れたとき（blur）に直し方を
@@ -56,7 +58,7 @@ vi.stubGlobal('localStorage', memStorage)
 memStorage.setItem('lh_staff_role', 'owner')
 
 const TAGS = [
-  { id: 'tag-1', name: '予約済み', lineAccountId: 'account-a', status: 'active' },
+  { id: 'tag-1', name: '予約中', lineAccountId: 'account-a', status: 'active' },
 ]
 
 vi.mock('@/lib/api', async (importOriginal) => {
@@ -94,6 +96,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 import NewBookingMenuPage from './page'
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   fixture.push = vi.fn()
   fixture.tagsList = async () => ({ success: true, data: TAGS })
   fixture.listMenus = async () => ({ menus: [] })
@@ -113,7 +116,7 @@ async function renderForm() {
 describe('メニュー作成（V8）の欄を離れたときの確かめ', () => {
   test('空の名前欄を離れると保存前に欄の下へ直し方が出る', async () => {
     await renderForm()
-    const name = screen.getByPlaceholderText('例: トリミング（小型犬）')
+    const name = screen.getByPlaceholderText("例：トリミング（小型犬）")
 
     fireEvent.change(name, { target: { value: '' } })
     fireEvent.blur(name)
@@ -123,7 +126,7 @@ describe('メニュー作成（V8）の欄を離れたときの確かめ', () =>
 
   test('名前を入れ直すと直し方が消える', async () => {
     await renderForm()
-    const name = screen.getByPlaceholderText('例: トリミング（小型犬）')
+    const name = screen.getByPlaceholderText("例：トリミング（小型犬）")
 
     fireEvent.change(name, { target: { value: '' } })
     fireEvent.blur(name)

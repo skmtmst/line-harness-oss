@@ -571,6 +571,7 @@ const ChipEditor = forwardRef<InsertTextFieldHandle, InsertTextFieldProps>(funct
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) { event.stopPropagation(); return }
     rest.onKeyDown?.(event as unknown as KeyboardEvent<HTMLTextAreaElement>)
     if (event.defaultPrevented || !editable) return
     /* 変換中（IME）の Enter・Backspace は変換のもの。触らない。 */

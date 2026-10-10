@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8 対応マークを作る・編集（Pencil `ulq9Y`、保管の小窓は `fy5dz`）。
- *
- * v7（components/friend-fields/support-mark-editor.tsx）と動きは同じで、
- * 置き場だけを V8 の絵へ合わせる。段は「基本」「自動で変えるきまり」。
- * 右の欄に「出す場所と数」。追従バーは「保管する」＝左端、
- * キャンセル・保存＝真ん中（オーナー決定 2026-10-01）。
- * 初期値・共有・使用先ありのマークは「保管する」を押せない形にして理由を出す。
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -32,6 +22,19 @@ import { EVENT_LABELS, eventLabel } from '@/components/friend-fields/support-mar
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 import { ArchiveMarkDialog } from '@/components/friend-fields/mark-list'
 import styles from './mark-editor-v8.module.css'
+import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 対応マークを作る・編集（Pencil `ulq9Y`、保管の小窓は `fy5dz`）。
+ *
+ * v7（components/friend-fields/support-mark-editor.tsx）と動きは同じで、
+ * 置き場だけを V8 の絵へ合わせる。段は「基本」「自動で変えるきまり」。
+ * 右の欄に「出す場所と数」。追従バーは「保管する」＝左端、
+ * キャンセル・保存＝真ん中（オーナー決定 2026-10-01）。
+ * 初期値・共有・使用先ありのマークは「保管する」を押せない形にして理由を出す。
+ */
 
 const COLORS = [
   { value: '#EF4B55', name: '赤' },
@@ -67,6 +70,7 @@ function referenceCount(mark: MarkRow): number {
 }
 
 export default function MarkEditorV8({ markId }: { markId?: string }) {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const editing = Boolean(markId)
@@ -215,13 +219,20 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
       }
     } catch (reason) {
       if (loadSeqRef.current !== seq) return
+      const fieldFailure = saveErrors.capture(reason);
+
       const status = (reason as { status?: number } | null)?.status
       if (status === 403) {
-        setLoadMessage('')
+        { if (!fieldFailure)
+        setLoadMessage('') }
+        { if (!fieldFailure)
         setLoadState('forbidden')
+      }
       } else {
-        setLoadMessage('対応マークを読み込めませんでした。入力内容はそのままです。')
-        setLoadState('error')
+        { if (!fieldFailure)
+        setLoadMessage('対応マークを読み込めませんでした。入力内容はそのままです。') }
+        { if (!fieldFailure)
+        setLoadState('error') }
       }
     } finally {
       if (loadSeqRef.current === seq) {
@@ -229,7 +240,7 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
         setReloading(false)
       }
     }
-  }, [editing, markId, selectedAccountId])
+  }, [editing, markId, selectedAccountId, saveErrors])
 
   useEffect(() => {
     initialLoadRef.current = true
@@ -262,11 +273,15 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
       if (!result.success) throw new Error(result.error)
       router.push('/tags?tab=marks')
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason);
+
+
       const status = (reason as { status?: number } | null)?.status
       const code = (reason as { code?: string } | null)?.code
       if (status === 403) {
         setSaveForbidden(true)
-        setError(describeSaveFailure(reason))
+        { if (!fieldFailure)
+        setError(describeSaveFailure(reason)) }
         return
       }
       if (status === 409 && code === 'SUPPORT_MARK_VERSION_CONFLICT') {
@@ -286,10 +301,12 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
             : mark))
           setBaseline({ name: next.name, color: next.color, displayOrder: next.displayOrder, isDefault: selected?.isDefault ?? isDefault })
         }
-        setError('ほかの担当者が先に変更しました。最新の内容を確認してから保存し直してください。')
+        { if (!fieldFailure)
+        setError('ほかの担当者が先に変更しました。最新の内容を確認してから保存し直してください。') }
         return
       }
-      setError(describeSaveFailure(reason))
+      { if (!fieldFailure)
+      setError(describeSaveFailure(reason)) }
     } finally {
       setSaving(false)
     }
@@ -309,8 +326,11 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
       if (!res.success) throw new Error(res.error)
       setArchiveImpact(res.data)
       setReplacementMarkId(res.data.replacementOptions.find((option) => option.isDefault)?.id ?? res.data.replacementOptions[0]?.id ?? '')
-    } catch {
-      setArchiveError('保管の影響を確認できませんでした。画面を閉じて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setArchiveError('保管の影響を確認できませんでした。画面を閉じて、もう一度お試しください。') }
     } finally {
       setImpactLoading(false)
     }
@@ -331,8 +351,11 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
       setArchiveOpen(false)
       setArchiveImpact(null)
       router.push('/tags?tab=marks')
-    } catch {
-      setArchiveError('対応マークを保管できませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setArchiveError('対応マークを保管できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setArchiving(false)
     }
@@ -359,11 +382,11 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
   }
 
   if (loadState === 'loading') {
-    return <DelayedSkeleton loading skeleton={<TagFormSkeleton />} />
+    return <SaveErrorScope errors={saveErrors}><DelayedSkeleton loading skeleton={<TagFormSkeleton />} /></SaveErrorScope>
   }
 
   return (
-    <div className={styles.board}>
+    <SaveErrorScope errors={saveErrors}><div className={styles.board}>
       <div className={styles.head} data-design="Head">
         <div>
           <Link href="/tags?tab=marks" className={styles.backLink}>← 対応マークへ</Link>
@@ -417,7 +440,7 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
                 <div className={styles.sectionBody}>
                   <div className={styles.field}>
                     <span className={styles.fieldLabel}>マーク名</span>
-                    <input className={styles.input} value={name} onChange={(event) => setName(event.target.value)} placeholder="例：要確認" />
+                    <SaveErrorField names={["name"]}><input className={styles.input} value={name} onChange={(event) => setName(event.target.value)} placeholder="例：要確認" /></SaveErrorField>
                     <DuplicateNameNote duplicates={nameDuplicates} kindLabel="対応マーク" />
                   </div>
                   <fieldset className={styles.field} style={{ margin: 0, padding: 0, border: 'none' }}>
@@ -439,14 +462,14 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
                   </fieldset>
                   <div className={styles.field}>
                     <span className={styles.fieldLabel}>並び順</span>
-                    <input type="number" min={0} value={displayOrder} onChange={(event) => setDisplayOrder(Number(event.target.value))} className={styles.inputNarrow} />
+                    <SaveErrorField names={["displayOrder","display_order"]}><NumberInput type="number" min={0} value={displayOrder} onChange={(event) => setDisplayOrder(Number(event.target.value))} className={styles.inputNarrow} /></SaveErrorField>
                   </div>
                   <div>
-                    <Checkbox
+                    <SaveErrorField names={["isDefault","is_default"]}><Checkbox
                       checked={isDefault}
                       disabled={selected?.isDefault}
                       onCheckedChange={setIsDefault}
-                    >新しい友だちに最初から付ける</Checkbox>
+                    >新しい友だちに最初から付ける</Checkbox></SaveErrorField>
                     <p className={styles.fieldHint}>最初から付けるマークは1つだけ選べます</p>
                   </div>
                   <AttributeKindGuide current="mark" />
@@ -467,19 +490,19 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
                           <div className={styles.ruleBoxBody}>
                             <div className={styles.field}>
                               <span className={styles.fieldLabel}>きっかけ</span>
-                              <Select
+                              <SaveErrorField names={["ruleEvent","event","rule_event"]}><Select
                                 aria-label="きっかけ"
                                 value={ruleEvent}
                                 onChange={(value) => setRuleEvent(value as SupportMarkAutomationEvent)}
                                 options={EVENT_LABELS.map((item) => ({ value: item.value, label: item.label }))}
                                 size="full"
-                              />
+                              /></SaveErrorField>
                             </div>
                             <p aria-hidden="true" className={styles.ruleArrow}>↓</p>
                             <p className={styles.ruleTarget}>「{name || 'このマーク'}」に変更</p>
                             <div className={styles.field}>
                               <span className={styles.fieldLabel}>手動で変更した直後の保護</span>
-                              <Select
+                              <SaveErrorField names={["ruleProtectionMinutes","manualProtectionMinutes","rule_protection_minutes"]}><Select
                                 aria-label="手動変更の保護時間"
                                 value={String(ruleProtectionMinutes)}
                                 onChange={(value) => setRuleProtectionMinutes(Number(value))}
@@ -490,12 +513,12 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
                                   { value: '1440', label: '1日は手動の変更を守る' },
                                 ]}
                                 size="full"
-                              />
+                              /></SaveErrorField>
                             </div>
-                            <Checkbox
+                            <SaveErrorField names={["ruleActive","isActive","rule_active"]}><Checkbox
                               checked={ruleActive}
                               onCheckedChange={setRuleActive}
-                            >このルールを有効にして登録する</Checkbox>
+                            >このルールを有効にして登録する</Checkbox></SaveErrorField>
                             <div>
                               <Button type="button" onClick={() => setCreateRule(false)}>ルールを外す</Button>
                             </div>
@@ -585,6 +608,6 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
           onConfirm={() => void confirmArchive(selected)}
         />
       ) : null}
-    </div>
+    </div></SaveErrorScope>
   )
 }

@@ -189,35 +189,19 @@ describe('NEN-07: つなぐ回答フォームが使えない設定（実mount）
     })
     await mount()
 
-    const input = container.querySelector('input[role="combobox"]')
-    expect(input).not.toBeNull()
-    const toggle = Array.from(container.querySelectorAll('button')).find(
-      (element) => element.getAttribute('aria-label') === '候補を開く',
-    )
-    expect(toggle).toBeDefined()
-    await click(toggle!)
-
-    // 候補は最上層（MenuPortal→document.body）に出る。器の中にはいない。
-    const options = Array.from(document.querySelectorAll('[role="option"]'))
-    const live = options.find((option) => option.textContent?.includes('公開中のフォーム'))
-    const draft = options.find((option) => option.textContent?.includes('下書きフォーム'))
-    expect(live?.getAttribute('aria-disabled')).toBeNull()
-    expect(draft?.getAttribute('aria-disabled')).toBe('true')
-    expect(draft?.textContent).toContain('公開されていないため選べません')
-    // 緑の点は「使える」の意味だけ。下書きは灰色の点。
-    expect(live?.querySelector('[data-dot="green"]')).not.toBeNull()
-    expect(draft?.querySelector('[data-dot="gray"]')).not.toBeNull()
-
-    // 公開されていない候補を押しても動作は足されない。
-    await click(draft as HTMLElement)
-    await settle()
+    const toggle = container.querySelector<HTMLButtonElement>('button[aria-label="回答フォームを開かせる（任意）"]')!
+    expect(toggle).toBeTruthy()
+    await click(toggle)
+    const options = [...document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]')]
+    const live = options.find((option) => option.getAttribute('aria-label') === '公開中のフォーム')!
+    const draft = options.find((option) => option.getAttribute('aria-label') === '下書きフォーム')!
+    expect(live.disabled).toBe(false)
+    expect(draft.disabled).toBe(true)
+    expect(draft.closest('label')?.textContent).toContain('公開されていないため選べません')
+    await click(draft)
     expect(container.textContent).not.toContain('回答フォーム「下書きフォーム」を開かせる')
-
-    // キーボードだけで公開中の候補を選ぶと動作が足される。
-    await act(async () => {
-      (input as HTMLInputElement).focus()
-      ;(input as HTMLInputElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-    })
+    await click(live)
+    await click([...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent === '選ぶ')!)
     await settle()
     expect(container.textContent).toContain('回答フォーム「公開中のフォーム」を開かせる')
   })

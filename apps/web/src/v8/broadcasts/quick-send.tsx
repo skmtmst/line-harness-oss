@@ -1,13 +1,5 @@
 'use client'
 
-/*
- * ★V8 一斉配信 かんたんに送る（板 `P6vbxn`・小窓 640）。
- *
- * 今の部品（app/broadcasts/quick-send-dialog.tsx。一覧から開く口が無かった）の動きを写して一から書いた。
- * 本文・相手・いつ・人数の見込み・承認の順。1,000人以上に送るときは承認する人を選んで頼む。
- * 口は今と同じ（tags.list・approval.candidates・preflight・create・send・approval.request）。
- * 入口：一斉配信一覧の「配信を作る ▾」の「かんたんに送る」（絵 `Xr6eu` の分け方）。
- */
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ListOrdered, Send, Users } from 'lucide-react'
@@ -25,6 +17,18 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './quick-send.module.css'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+/*
+ * ★V8 一斉配信 かんたんに送る（板 `P6vbxn`・小窓 640）。
+ *
+ * 今の部品（app/broadcasts/quick-send-dialog.tsx。一覧から開く口が無かった）の動きを写して一から書いた。
+ * 本文・相手・いつ・人数の見込み・承認の順。1,000人以上に送るときは承認する人を選んで頼む。
+ * 口は今と同じ（tags.list・approval.candidates・preflight・create・send・approval.request）。
+ * 入口：一斉配信一覧の「配信を作る ▾」の「かんたんに送る」（絵 `Xr6eu` の分け方）。
+ */
 
 /** 承認を頼む境目（絵の文どおり）。 */
 /** 「名前」を押して入る文字。送るときに友だちの名前へ置き換わる形（{{name}}）。 */
@@ -37,8 +41,8 @@ type Estimate = { count: number; blocked: number; remaining: number | null }
 
 /** 見込みの1文。今月の残りが読めたときだけ足す。 */
 export function estimateText(estimate: Estimate): string {
-  const base = `${formatNumber(estimate.count)}人に届く見込み（ブロック中 ${formatNumber(estimate.blocked)}人を除く）`
-  return estimate.remaining === null ? base : `${base}・今月あと ${formatNumber(estimate.remaining)}通 送れます`
+  const base = `${formatNumber(estimate.count)} 人に届く見込み（ブロック中 ${formatNumber(estimate.blocked)} 人を除く）`
+  return estimate.remaining === null ? base : `${base}・今月あと ${formatNumber(estimate.remaining)} 通 送れます`
 }
 
 export default function QuickSendV8({
@@ -53,6 +57,7 @@ export default function QuickSendV8({
   /** 送った・予約した・承認を頼んだあと、一覧を読み直す。 */
   onSent: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const [text, setText] = useState('')
   const [target, setTarget] = useState<'all' | 'tag'>('all')
   const [tags, setTags] = useState<Tag[]>([])
@@ -131,18 +136,20 @@ export default function QuickSendV8({
           if (!cancelled && res.success) {
             setEstimate({ count: res.data.audienceCount, blocked: res.data.hiddenExcluded, remaining: res.data.quota?.remaining ?? null })
           }
-        } catch {
+        } catch (saveFailure) {
+          saveErrors.capture(saveFailure)
           // 見積もれなくても入力は続けられる。送る前に止めない。
         } finally {
           if (!cancelled) setEstimating(false)
         }
       })()
-    }, 500)
+    }, 500);
+
     return () => {
       cancelled = true
       if (estimateTimer.current) clearTimeout(estimateTimer.current)
     }
-  }, [open, accountId, text, target, tagId])
+  }, [open, accountId, text, target, tagId, saveErrors])
 
   const needsCountConfirmation = estimate !== null && approvalConfig !== null && estimate.count >= approvalConfig.threshold && approvalConfig.singleOperator
   const needsApproval = estimate !== null && approvalConfig !== null && estimate.count >= approvalConfig.threshold && !approvalConfig.singleOperator
@@ -232,7 +239,12 @@ export default function QuickSendV8({
       onSent()
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '送れませんでした。もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure)
+
+
+      setError(e instanceof Error ? e.message : '送れませんでした。もう一度お試しください。') }
     } finally {
       sendingRef.current = false
       setBusy(false)
@@ -242,7 +254,7 @@ export default function QuickSendV8({
   const sendLabel = needsApproval ? '承認を頼む' : scheduledAt ? '予約する' : '送る'
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
     <Dialog
       open={open}
       confirmation
@@ -269,9 +281,7 @@ export default function QuickSendV8({
         </div>
       )}
     >
-      <div className={styles.body}>
-        <label className={styles.label} htmlFor="quick-send-v8-text">本文</label>
-        <InsertTextField
+      <div className={styles.body}><Field label="本文" htmlFor="quick-send-v8-text"><SaveErrorField names={["text","messageContent"]}><InsertTextField
           id="quick-send-v8-text"
           ref={textRef}
           className={styles.textarea}
@@ -279,16 +289,15 @@ export default function QuickSendV8({
           maxLength={TEXT_LIMIT}
           disabled={busy || pending}
           onValueChange={(next) => setText(next)}
-        />
-        <div className={styles.metaRow}>
+        /></SaveErrorField>
+<div className={styles.metaRow}>
           <span className={styles.meta}>差し込む：</span>
           <button type="button" className={styles.insert} disabled={busy || pending} onClick={insertName}>名前</button>
           <span className={styles.spacer} aria-hidden="true" />
           <span className={styles.meta}>{`${formatNumber(text.length)} / ${formatNumber(TEXT_LIMIT)}`}</span>
         </div>
-
-        <p className={styles.label} id="quick-send-v8-target">送る相手</p>
-        <div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-target">
+<p className={styles.label} id="quick-send-v8-target">送る相手</p>
+<div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-target">
           {([['all', '友だち全員'], ['tag', 'タグで絞る']] as const).map(([value, label]) => (
             <button key={value} type="button" role="radio" disabled={busy || pending} aria-checked={target === value} className={styles.chip} onClick={() => setTarget(value)}>
               {label}
@@ -296,13 +305,12 @@ export default function QuickSendV8({
           ))}
           {target === 'tag' ? (
             <div className={styles.tagPick}>
-              <EntityKindField kind="tag" label="タグ" disabled={busy || pending} value={tagId} onChange={setTagId} options={tags} />
+              <SaveErrorField names={["tagId"]}><EntityKindField kind="tag" label="タグ" disabled={busy || pending} value={tagId} onChange={setTagId} options={tags} /></SaveErrorField>
             </div>
           ) : null}
         </div>
-
-        <p className={styles.label} id="quick-send-v8-when">いつ</p>
-        <div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-when">
+<p className={styles.label} id="quick-send-v8-when">いつ</p>
+<div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-when">
           {([['now', '今すぐ'], ['scheduled', '日時を決める']] as const).map(([value, label]) => (
             <button key={value} type="button" role="radio" disabled={busy || pending} aria-checked={when === value} className={styles.chip} onClick={() => setWhen(value)}>
               {label}
@@ -310,12 +318,11 @@ export default function QuickSendV8({
           ))}
           {when === 'scheduled' ? (
             <div className={styles.whenPick}>
-              <DateTimeField disabled={busy || pending} value={scheduledValue} onChange={setScheduledValue} aria-label="送る日時" />
+              <SaveErrorField names={["scheduledValue","scheduled_value"]}><DateTimeField disabled={busy || pending} value={scheduledValue} onChange={setScheduledValue} aria-label="送る日時" /></SaveErrorField>
             </div>
           ) : null}
         </div>
-
-        <div className={styles.estimateBox}>
+<div className={styles.estimateBox}>
           <div className={styles.estimate} aria-live="polite">
             <Users size={16} aria-hidden="true" className={styles.estimateIcon} />
             <span>
@@ -325,21 +332,20 @@ export default function QuickSendV8({
           {needsCountConfirmation && estimate ? <SingleOperatorFields recipientCount={estimate.count} value={countInput} onChange={setCountInput} /> : null}
           {needsApproval ? (
             <div className={styles.approval}>
-              <p className={styles.approvalTitle}>{`${formatNumber(approvalConfig?.threshold ?? APPROVAL_THRESHOLD)}人以上に送るときは承認が要ります。承認する人を選んで頼んでください。`}</p>
-              <Select
+              <p className={styles.approvalTitle}>{`${formatNumber(approvalConfig?.threshold ?? APPROVAL_THRESHOLD)} 人以上に送るときは承認が要ります。承認する人を選んで頼んでください。`}</p>
+              <SaveErrorField names={["approverId","approverStaffId","approver_id"]}><EntitySelect
                 aria-label="承認する人"
                 size="full"
                 value={approverId}
                 onChange={setApproverId}
-                options={[{ value: '', label: '承認する人を選ぶ' }, ...candidates.map((item) => ({ value: item.id, label: `承認する人：${item.name}${ROLE_LABELS[item.role] ? `（${ROLE_LABELS[item.role]}）` : ''}` }))]}
-              />
+                options={[{ value: '', label: '承認する人を選ぶ' }, ...candidates.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `承認する人：${item.name}${ROLE_LABELS[item.role] ? `（${ROLE_LABELS[item.role]}）` : ''}` }))]}
+              /></SaveErrorField>
               <p className={styles.approvalNote}>1人で運用しているときは、人数を確かめるチェックだけで送れます。</p>
             </div>
           ) : null}
-        </div>
-      </div>
+        </div></Field></div>
     </Dialog>
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }

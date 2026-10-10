@@ -113,6 +113,8 @@ export interface FormWithStats extends Form {
 }
 
 export interface FormAccountScope {
+  /** 復元用一覧だけアーカイブを取得する。既定は通常一覧。 */
+  status?: 'active' | 'archived';
   lineAccountIds?: string[];
   includeUnassigned?: boolean;
   /** N-175 (#805): 指定フォルダだけに絞る。 */
@@ -126,14 +128,15 @@ export async function getFormsWithStats(
   scope: FormAccountScope = {},
 ): Promise<FormWithStats[]> {
   const accountIds = [...new Set(scope.lineAccountIds ?? [])].filter(Boolean);
-  let scopeClause = `WHERE f.status = 'active'`;
+  const statusClause = scope.status === 'archived' ? "f.status = 'archived'" : "f.status = 'active'";
+  let scopeClause = `WHERE ${statusClause}`;
   if (scope.lineAccountIds !== undefined && accountIds.length === 0) {
     scopeClause = scope.includeUnassigned
-      ? `WHERE f.status = 'active'
+      ? `WHERE ${statusClause}
            AND NOT EXISTS (SELECT 1 FROM form_accounts visible WHERE visible.form_id = f.id)`
       : 'WHERE 0';
   } else if (scope.lineAccountIds !== undefined) {
-    scopeClause = `WHERE f.status = 'active' AND (
+    scopeClause = `WHERE ${statusClause} AND (
            EXISTS (
              SELECT 1 FROM form_accounts visible
              WHERE visible.form_id = f.id
@@ -1085,6 +1088,8 @@ export interface CreateFormSubmissionInput {
   data: string; // JSON string
   /** P（試し回答）：true は公開前の試し。集計に入れず、後処理もしない。 */
   isTest?: boolean;
+  /** Privately uploaded files claimed atomically with this answer. */
+  fileIds?: string[];
 }
 
 /**
@@ -1099,6 +1104,25 @@ export async function insertFormSubmissionRecord(
 ): Promise<FormSubmission> {
   const id = input.id ?? crypto.randomUUID();
   const now = jstNow();
+  const fileIds = [...new Set(input.fileIds ?? [])];
+  if (fileIds.length) {
+    const placeholders = fileIds.map(() => '?').join(',');
+    // D1 batch is a transaction: two concurrent answers cannot claim one upload.
+    const results = await db.batch([
+      db.prepare(`INSERT INTO form_submissions (id, form_id, friend_id, form_version_id, is_test, data, destination_write_status, created_at)
+        SELECT ?, ?, ?, ?, ?, ?, 'pending', ?
+        WHERE (SELECT COUNT(*) FROM form_submission_files f JOIN media_file_scans s ON s.id = f.scan_id
+          WHERE f.id IN (${placeholders}) AND f.friend_id = ? AND f.form_id = ? AND f.submission_id IS NULL
+            AND f.deleted_at IS NULL AND (f.expires_at IS NULL OR julianday(f.expires_at) > julianday(?)) AND s.status = 'clean') = ?`)
+        .bind(id, input.formId, input.friendId ?? null, input.formVersionId ?? null, input.isTest ? 1 : 0, input.data, now,
+          ...fileIds, input.friendId ?? null, input.formId, now, fileIds.length),
+      db.prepare(`UPDATE form_submission_files SET submission_id = ? WHERE id IN (${placeholders}) AND submission_id IS NULL
+        AND EXISTS (SELECT 1 FROM form_submissions WHERE id = ?)`)
+        .bind(id, ...fileIds, id),
+    ]);
+    if (results[0].meta.changes !== 1 || results[1].meta.changes !== fileIds.length) throw new Error('document_attachment_conflict');
+    return (await db.prepare('SELECT * FROM form_submissions WHERE id = ?').bind(id).first<FormSubmission>())!;
+  }
 
   await db
     .prepare(

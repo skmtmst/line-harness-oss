@@ -55,7 +55,7 @@
 }
 
 .textarea:focus-visible {
-  outline: var(--tpl-ms-focus-w) solid var(--color-action);
+  outline: var(--tpl-ms-focus-w) solid var(--color-focus-ring);
   outline-offset: var(--tpl-ms-focus-offset);
 }
 
@@ -117,14 +117,14 @@
 }
 
 .chip[aria-checked='true'] {
-  outline-color: var(--color-action);
+  outline-color: var(--color-focus-ring);
   background: var(--color-success-bg);
   color: var(--color-action);
   font-weight: 600;
 }
 
 .chip:focus-visible {
-  outline: var(--tpl-ms-focus-w) solid var(--color-action);
+  outline: var(--tpl-ms-focus-w) solid var(--color-focus-ring);
   outline-offset: var(--tpl-ms-focus-offset);
 }
 

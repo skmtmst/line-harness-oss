@@ -1,4 +1,30 @@
 'use client'
+import { useEffect, useMemo, useState } from 'react'
+import { api } from '@/lib/api'
+import type { ConversionDefinitionDeleteImpact, ConversionDefinitionFilter, ConversionDefinitionListItem } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { formatNumber } from '@/lib/format'
+import { deduplicationLabel } from './dedup'
+import { STATE_LABELS, sourceTriggerLabel, usageLabel, type ConversionDetailDialogProps, type ConversionEditDialogProps, type ConversionReversalDialogProps, type ConversionStopAction } from './_components/conversion-dialogs'
+import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
+import ListRange from '@/components/ui/list-range'
+import Notice from '@/components/shared/notice'
+import Pagination from '@/components/shared/pagination'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import { RowActions } from '@/components/shared/row-actions'
+import { TableHeadRow, Th } from '@/components/shared/table'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import { inputClass, Field } from '@/components/shared/form-controls'
+import styles from './conversion-points-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
 
 /*
  * ★V8-B コンバージョンの一覧（Pencil「★V8-B 画面の地図」：一覧 `r6dJFy`、
@@ -15,39 +41,6 @@
  * v7 の既定（件数が多い順）のまま変えられない。月前半との比較は
  * 出さない（表の行の合計を正本にする）。
  */
-import { useEffect, useMemo, useState } from 'react'
-import { api } from '@/lib/api'
-import type {
-  ConversionDefinitionDeleteImpact,
-  ConversionDefinitionFilter,
-  ConversionDefinitionListItem,
-} from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { formatNumber } from '@/lib/format'
-import { deduplicationLabel } from './dedup'
-import {
-  STATE_LABELS,
-  sourceTriggerLabel,
-  usageLabel,
-  type ConversionDetailDialogProps,
-  type ConversionEditDialogProps,
-  type ConversionReversalDialogProps,
-  type ConversionStopAction,
-} from './_components/conversion-dialogs'
-import Button from '@/components/shared/button'
-import FilterChip from '@/components/shared/filter-chip'
-import ListRange from '@/components/ui/list-range'
-import Notice from '@/components/shared/notice'
-import Pagination from '@/components/shared/pagination'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import { RowActions } from '@/components/shared/row-actions'
-import { TableHeadRow, Th } from '@/components/shared/table'
-import SearchField from '@/components/shared/search-field'
-import Select from '@/components/shared/select'
-import { inputClass } from '@/components/shared/form-controls'
-import styles from './conversion-points-v8.module.css'
 
 /** V8 の絞り込み。`all` を含む以外は v7 の `StatusFilter` と同じ。 */
 export type ConversionPointsV8Status = 'all' | ConversionDefinitionFilter
@@ -113,8 +106,8 @@ const READONLY_REASON = 'この操作にはオーナーか管理者の権限が�
 
 const CHIPS: Array<{ value: ConversionPointsV8Status; label: string }> = [
   { value: 'all', label: 'すべて' },
-  { value: 'active', label: '動いている' },
-  { value: 'stopped', label: '止めている' },
+  { value: 'active', label: '有効' },
+  { value: 'stopped', label: '停止中' },
   { value: 'draft', label: '下書き' },
   { value: 'invalid', label: '入力不良' },
   { value: 'sourceStopped', label: '起点停止' },
@@ -155,6 +148,7 @@ function rowSub(point: ConversionDefinitionListItem): string {
 const PAGE_SIZES = [20, 50, 100]
 
 export default function ConversionPointsV8({ model }: { model: ConversionPointsV8Model }) {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('コンバージョン')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const role = useStaffRole()
@@ -228,21 +222,24 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
       if (!res.success) throw new Error(res.error)
       setNotice(`「${point.name}」のコピーを作りました。使う場所は引き継がないので、要れば足してください。`)
       model.onReload()
-    } catch {
-      setActionError('コピーを作れませんでした。読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('コピーを作れませんでした。読み直してから、もう一度お試しください。') }
     } finally {
       setDuplicatingId(null)
     }
   }
 
   return (
-    <div className={styles.board} data-design-node="r6dJFy">
+    <SaveErrorScope errors={saveErrors}><div className={styles.board} data-design-node="r6dJFy">
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>コンバージョン</h1>
-          <p className={styles.headDescription}>
+          <PageHeading title="コンバージョン" help={<>
             成果として数えるできごと（成果地点）を決めます。配信・流入・アフィリエイトの成果は、この数え方で集計します。
-          </p>
+          </>} />
+
         </div>
         <Button
           onClick={() => model.onExportCsv()}
@@ -253,48 +250,48 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
           CSVで書き出す
         </Button>
       </div>
-      {model.exportError ? <p className={styles.panelError} role="alert">{model.exportError}</p> : null}
+      {model.exportError ? <Notice tone="danger" className={styles.panelErrorNoticePlacement} >{model.exportError}</Notice> : null}
 
       {!canEdit ? (
-        <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+        <ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice>
       ) : null}
       <Notice tone="info" message="成果地点は、配信・流入リンク・アフィリエイトの成果を数えるときに使います。止めると、使っている所でも数えなくなります。" />
       {notice ? <Notice tone="success" message={notice} /> : null}
       {highlightedPoint ? (
         <Notice tone="info" message={`「${highlightedPoint.name}」を保存しました。色の付いた行です。`} />
       ) : null}
-      {actionError ? <p className={styles.panelError} role="alert">{actionError}</p> : null}
+      {actionError ? <Notice tone="danger" className={styles.panelErrorNoticePlacement} >{actionError}</Notice> : null}
 
       <ul className={styles.kpis} aria-label="数の帯">
         <li className={styles.kpi}>
           <span className={styles.kpiLabel}>成果地点</span>
           <div className={styles.kpiValue}>
-            {model.total == null ? '—' : <>{formatNumber(model.total)}<span className={styles.kpiValueSmall}> 件</span></>}
+            {model.total == null ? emptyValue('unknown') : <>{formatNumber(model.total)}<span className={styles.kpiValueSmall}> 件</span></>}
           </div>
           <div className={styles.kpiNote}>
             {model.stateCounts == null
-              ? '—'
+              ? emptyValue('unknown')
               : <>動いている {formatNumber(model.stateCounts.active)}・止めている {formatNumber(model.stateCounts.stopped)}</>}
           </div>
         </li>
         <li className={styles.kpi}>
           <span className={styles.kpiLabel}>この30日の成果</span>
           <div className={styles.kpiValue}>
-            {model.loadFailed ? '—' : <>{formatNumber(totalCount)}<span className={styles.kpiValueSmall}> 件</span></>}
+            {model.loadFailed ? emptyValue('unknown') : <>{formatNumber(totalCount)}<span className={styles.kpiValueSmall}> 件</span></>}
           </div>
           <div className={styles.kpiNote}>表の行の合計です{model.listTruncated ? '（直近5000件まで）' : ''}</div>
         </li>
         <li className={styles.kpi}>
           <span className={styles.kpiLabel}>この30日の金額</span>
           <div className={styles.kpiValue}>
-            {model.loadFailed ? '—' : <>¥{formatNumber(totalValue)}</>}
+            {model.loadFailed ? emptyValue('unknown') : <>¥{formatNumber(totalValue)}</>}
           </div>
           <div className={styles.kpiNote}>表の行の合計です{model.listTruncated ? '（直近5000件まで）' : ''}</div>
         </li>
         <li className={styles.kpi}>
           <span className={styles.kpiLabel}>どこからも使われていない</span>
           <div className={styles.kpiValue}>
-            {model.stateCounts == null ? '—' : <>{formatNumber(model.stateCounts.unused)}<span className={styles.kpiValueSmall}> 件</span></>}
+            {model.stateCounts == null ? emptyValue('unknown') : <>{formatNumber(model.stateCounts.unused)}<span className={styles.kpiValueSmall}> 件</span></>}
           </div>
           <div className={styles.kpiNote}>配信・流入・アフィリエイトで未使用</div>
         </li>
@@ -322,7 +319,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
             <li>
               <span className={`${styles.railRow} ${styles.railRowActive}`} aria-current="true">
                 <span className={styles.railName}>すべて</span>
-                <span className={styles.railCount}>{model.total == null ? '—' : formatNumber(model.total)}</span>
+                <span className={styles.railCount}>{model.total == null ? emptyValue('unknown') : formatNumber(model.total)}</span>
               </span>
             </li>
           </ul>
@@ -368,12 +365,12 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
           </div>
           <div className={styles.toolbarSecond}>
             <span className={styles.pageSizeWrap}>
-              <Select
+              <SaveErrorField names={["pageSize","page_size"]}><Select
                 aria-label="1ページの件数"
                 value={String(pageSize)}
                 options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
                 onChange={(value) => setPageSize(Number(value))}
-              />
+              /></SaveErrorField>
             </span>
           </div>
 
@@ -396,15 +393,11 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
               ))}
             </div>
           ) : model.loadFailed ? (
-            <div className={styles.stateBox} role="alert">
-              <p className={styles.stateBoxTitle}>成果地点を読み込めませんでした</p>
-              <p className={styles.stateBoxNote}>数の帯は「—」です。道具はそのまま使えます。</p>
-              <div className={styles.stateBoxAction}>
+            <ListState kind="error" title="成果地点を読み込めませんでした" description="数の帯は「—」です。道具はそのまま使えます。" action={<><div className={styles.stateBoxAction}>
                 <Button variant="secondary" onClick={() => model.onReload()}>
                   もう一度読む
                 </Button>
-              </div>
-            </div>
+              </div></>} />
           ) : model.points.length === 0 ? (
             <div className={styles.stateBox}>
               <p className={styles.stateBoxTitle}>まだ成果地点がありません</p>
@@ -462,7 +455,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                         </button>
                         <span className={`${styles.statePill} ${PILL_CLASS[point.state]}`}>
                           <span className={styles.statePillDot} aria-hidden="true" />
-                          {point.state === 'active' ? '動いている' : STATE_LABELS[point.state]}
+                          {point.state === 'active' ? '有効' : STATE_LABELS[point.state]}
                         </span>
                       </td>
                       <td>
@@ -473,11 +466,11 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                       </td>
                       <td className={styles.numeric}>{formatNumber(point.metrics.netCount)}件</td>
                       <td className={styles.numeric}>
-                        {point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : <span className={styles.cellMuted}>—</span>}
+                        {point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : <span className={styles.cellMuted}>{emptyValue('unknown')}</span>}
                       </td>
                       <td>
                         {point.usageCount === 0
-                          ? <span className={styles.cellMuted}>—</span>
+                          ? <span className={styles.cellMuted}>{emptyValue('unknown')}</span>
                           : <span title={usageLabel(point)}>{usageLabel(point)}</span>}
                       </td>
                       <td className={styles.opCell} onClick={(event) => event.stopPropagation()}>
@@ -565,7 +558,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
               <p className={styles.panelLead}>
                 <span className={`${styles.statePill} ${PILL_CLASS[panelPoint.state]}`}>
                   <span className={styles.statePillDot} aria-hidden="true" />
-                  {panelPoint.state === 'active' ? '動いている' : STATE_LABELS[panelPoint.state]}
+                  {panelPoint.state === 'active' ? '有効' : STATE_LABELS[panelPoint.state]}
                 </span>{' '}
                 {sourceTriggerLabel(panelPoint)}・{deduplicationLabel(panelPoint.deduplicationMode, panelPoint.deduplicationWindowDays)}
               </p>
@@ -583,7 +576,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                   発行した鍵（この表示でだけ見られます。連携先へ渡してください）：{model.issuedSecret}
                 </p>
               ) : null}
-              {model.ingestError ? <p className={styles.panelError} role="alert">{model.ingestError}</p> : null}
+              {model.ingestError ? <Notice tone="danger" className={styles.panelErrorNoticePlacement} >{model.ingestError}</Notice> : null}
               <div className={styles.panelButtons}>
                 {panelPoint.measureMethod === 'webhook' && panelPoint.status !== 'stopped' ? (
                   <Button
@@ -682,7 +675,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                     ? `${model.stopImpact.stopImpact.affectedUsageCount}か所で使われています。どうしますか。`
                     : '利用先と影響を読み込めませんでした。'}
               </p>
-              <RadioCardGroup legend="どうしますか？" legendVisible>
+              <SaveErrorField names={["conversion-v8-stop-action","stopAction","model.stopAction"]}><RadioCardGroup legend="どうしますか？" legendVisible>
                 <RadioCard
                   name="conversion-v8-stop-action"
                   value="stop"
@@ -713,10 +706,10 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                     ? '成果0件・利用先0件のため、この成果地点だけを削除できます。'
                     : '成果または利用先があるため、物理削除は選べません。'}
                 />
-              </RadioCardGroup>
+              </RadioCardGroup></SaveErrorField>
               {model.stopAction === 'replace' ? (
                 <span className={styles.reasonField}>
-                  <Select
+                  <SaveErrorField names={["replacementId","model.replacementId","replacement_id","model.replacement_id"]}><Select
                     aria-label="差し替え先の成果地点"
                     value={model.replacementId}
                     options={[
@@ -724,21 +717,18 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                       ...(model.stopImpact?.replacementCandidates ?? []).map((item) => ({ value: item.id, label: item.name })),
                     ]}
                     onChange={model.onReplacementIdChange}
-                  />
+                  /></SaveErrorField>
                 </span>
               ) : null}
-              <label className={styles.reasonField}>
-                <span className={styles.reasonLabel}>理由（必須）</span>
-                <input
+              <Field label="理由" required><SaveErrorField names={["stopReason","model.stopReason","stop_reason","model.stop_reason"]}><input
                   aria-label="止める理由"
                   className={inputClass}
                   value={model.stopReason}
                   maxLength={500}
                   placeholder="計測の仕方を変えるため"
                   onChange={(event) => model.onStopReasonChange(event.target.value)}
-                />
-              </label>
-              {model.stopError ? <p className={styles.panelError} role="alert">{model.stopError}</p> : null}
+                /></SaveErrorField></Field>
+              {model.stopError ? <Notice tone="danger" className={styles.panelErrorNoticePlacement} >{model.stopError}</Notice> : null}
               <div className={styles.panelButtons}>
                 <Button variant="secondary" onClick={() => model.onCancelStop()} disabled={model.stopping}>
                   キャンセル
@@ -757,6 +747,6 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
           ) : null}
         </div>
       ) : null}
-    </div>
+    </div></SaveErrorScope>
   )
 }

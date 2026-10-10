@@ -65,10 +65,10 @@ describe('友だち情報欄の時刻', () => {
       const bootstrap = readFileSync(new URL('../bootstrap.sql', import.meta.url), 'utf8');
       legacy.exec(bootstrap.replace(/, type_v8 TEXT\s+CHECK \(type_v8 IS NULL OR type_v8 = 'time'\)/, ''));
       legacy.exec("INSERT INTO friend_fields (id, name, field_key, type, type_v6) VALUES ('old', '日付', 'old_date', 'date', 'date');");
-      const before = legacy.prepare('SELECT * FROM friend_fields').get() as object;
+      const before = legacy.prepare("SELECT * FROM friend_fields WHERE id='old'").get() as object;
       legacy.exec(readFileSync(new URL('../migrations/591_friend_field_time.sql', import.meta.url), 'utf8'));
-      expect(legacy.prepare('SELECT * FROM friend_fields').get()).toEqual({ ...before, type_v8: null });
-      expect(() => legacy.prepare('UPDATE friend_fields SET type_v8 = ?').run('unknown')).toThrow(/CHECK/);
+      expect(legacy.prepare("SELECT * FROM friend_fields WHERE id='old'").get()).toEqual({ ...before, type_v8: null });
+      expect(() => legacy.prepare("UPDATE friend_fields SET type_v8 = ? WHERE id='old'").run('unknown')).toThrow(/CHECK/);
       expect(legacy.pragma('foreign_key_check')).toEqual([]);
     } finally { legacy.close(); }
   });

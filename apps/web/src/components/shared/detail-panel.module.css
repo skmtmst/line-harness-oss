@@ -2,7 +2,7 @@
 @layer components {
 /*
  * 右から出る詳細パネル（V8「サクサク感」C①）。窓の埋め込み面と
- * 同じ白・角丸・影で、一覧の右に置く。幅は右の列と同じ 340〜380。
+ * 同じ白・角丸・影で、一覧の右に置く。幅は決まり8の 360px。
  * 開閉の動きは窓の V8 規定に任せ、ここでは付けない。
  * v7 の画面では使わない部品のため v7 側の規定は持たない。
  */
@@ -24,13 +24,13 @@
   max-height: 100%;
   overflow: hidden;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-panel);
   background: var(--color-canvas);
   box-shadow: var(--shadow-float);
 }
 
 .panel:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: -2px;
 }
 
@@ -99,7 +99,7 @@
 }
 
 .navButton:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 

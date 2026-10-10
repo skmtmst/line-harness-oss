@@ -89,7 +89,7 @@ describe('aINnz 支払いタブの絵合わせ', () => {
       expect(screen.getByText('確定できる')).toBeTruthy()
     })
     expect(screen.getByText('振込先待ち')).toBeTruthy()
-    expect(screen.getByText('未登録')).toBeTruthy()
+    expect(screen.getByText('未設定')).toBeTruthy()
     expect(screen.getAllByRole('button', { name: '明細を見る' }).length).toBe(2)
     expect(screen.queryByRole('button', { name: 'この人を確定' })).toBeNull()
   })

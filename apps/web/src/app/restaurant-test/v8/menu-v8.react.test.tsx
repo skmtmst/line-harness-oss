@@ -35,7 +35,7 @@ afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 /*
  * ★V8-B メニュー管理（板 `MJoJR`）の契約。
- * 数5・決まりの帯・一覧の表（行末は「…」・保管済みだけ再開）が出て、
+ * 数5・決まりの帯・一覧の表（行末は「…」・アーカイブだけ再開）が出て、
  * 操作が今の口へ届くことを固定する。
  */
 describe('MJoJR メニュー管理のV8', () => {
@@ -51,7 +51,7 @@ describe('MJoJR メニュー管理のV8', () => {
     expect(board.textContent).toContain('ランチ・ディナー')
   })
 
-  it('保管済みだけ再開ボタンが出る', async () => {
+  it('アーカイブだけ再開ボタンが出る', async () => {
     render(<MenuV8 />)
     await screen.findByText('メニュー一覧')
     expect(screen.getAllByRole('button', { name: '再開' })).toHaveLength(1)

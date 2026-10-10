@@ -16,7 +16,9 @@
   min-width: 0;
   padding: var(--tpl-sa-pool-pad);
   border-radius: var(--radius-card);
-  box-shadow: var(--tpl-sa-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 
 .cardHead {
@@ -154,11 +156,7 @@
   outline-offset: var(--tpl-sa-focus-w);
 }
 
-.inlineError {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-}
+
 
 .textButton {
   padding: 0;

@@ -1,19 +1,22 @@
 'use client'
-
-/*
- * ★V8「予約して送る」（M0393 段2「6. 予約して送る（書く欄から・テンプレートと画像も）」）。
- *
- * 前は書く欄の上に「送る日時 ［日時を選ぶ］［この日時で予約する］」の段が出ていた
- * （オーナー指摘：嫌）。書く欄の下の［予約］から窓で開く。送るもの・すぐ選ぶ・
- * 日時を決める・夜中の注意・予約済みの一覧（時刻を直す・取り消す）を1つの窓に置く。
- * 予約そのものの動き（口・二度押し止め・日本時間）は画面側の今の処理をそのまま呼ぶ。
- */
 import { Clock3, FileText } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import DateTimeField from '@/components/shared/date-time-field'
 import FilterChip from '@/components/shared/filter-chip'
 import { isNightJst, schedulePresets, shortJst } from './schedule-presets'
 import styles from './inbox-chat.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8「予約して送る」（M0393 段2「6. 予約して送る（書く欄から・テンプレートと画像も）」）。
+ *
+ * 前は書く欄の上に「送る日時 ［日時を選ぶ］［この日時で予約する］」の段が出ていた
+ * （オーナー指摘：嫌）。書く欄の下の［予約］から窓で開く。送るもの・すぐ選ぶ・
+ * 日時を決める・夜中の注意・予約中の一覧（時刻を直す・取り消す）を1つの窓に置く。
+ * 予約そのものの動き（口・二度押し止め・日本時間）は画面側の今の処理をそのまま呼ぶ。
+ */
 
 export type ScheduledRowView = {
   id: string
@@ -103,23 +106,20 @@ export default function ScheduleSendDialog({
           ))}
         </div>
       </div>
-      <div className={styles.schGroup}>
-        <label htmlFor="schedule-at" className={styles.schLabel}>日時を決める</label>
-        <DateTimeField id="schedule-at" value={value} onChange={onChange} className={styles.schField} />
-        <p className={styles.schNote}>日本時間です。相手が夜中（22時〜8時）になる日時は、選ぶと注意が出ます。</p>
-        {night ? (
+      <div className={styles.schGroup}><Field note={<>日本時間です。相手が夜中（22時〜8時）になる日時は、選ぶと注意が出ます。</>} label="日時を決める" htmlFor="schedule-at"><SaveErrorField names={["value"]}><DateTimeField id="schedule-at" value={value} onChange={onChange} className={styles.schField} /></SaveErrorField>
+
+{night ? (
           <p className={styles.schWarn} role="status">相手が夜中の時間です。送ってよいか確かめてください。</p>
-        ) : null}
-      </div>
+        ) : null}</Field></div>
       {rowsFailed ? (
         <p className={styles.schError}>
           予約の一覧を読み込めませんでした。
-          <button type="button" data-inbox-v6="scheduled-retry" className={styles.schLink} onClick={onRetryRows}>再読み込み</button>
+          <button type="button" data-inbox-v6="scheduled-retry" className={styles.schLink} onClick={onRetryRows}>もう一度読み込む</button>
         </p>
       ) : null}
       {rows.length > 0 ? (
         <div className={styles.schGroup}>
-          <p className={styles.schLabel}>予約済み（{rows.length}）</p>
+          <p className={styles.schLabel}>予約中（{rows.length}）</p>
           <ul className={styles.schRows}>
             {rows.map((row) => (
               <li key={row.id} data-inbox-v6="scheduled-row" className={styles.schRow}>

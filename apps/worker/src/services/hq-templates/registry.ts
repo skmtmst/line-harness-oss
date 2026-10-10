@@ -15,6 +15,9 @@ export const hqTemplateAdapterRegistry: HqTemplateAdapterRegistry = Object.freez
   scenario: unsupportedHqTemplateAdapter('scenario'),
   friend_field: unsupportedHqTemplateAdapter('friend_field'),
   mark: unsupportedHqTemplateAdapter('mark'),
+  auto_reply: unsupportedHqTemplateAdapter('auto_reply'),
+  friend_add_rule: unsupportedHqTemplateAdapter('friend_add_rule'),
+  reminder: unsupportedHqTemplateAdapter('reminder'),
 });
 
 export function getHqTemplateAdapter(type: HqTemplateType, binding?: { db: D1Database; authority: HqTemplateAuthority }): HqTemplateAdapter {

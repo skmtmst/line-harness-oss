@@ -50,6 +50,20 @@ describe('api.audit attention filter', () => {
   })
 })
 
+describe('クーポンQRの書き出し', () => {
+  it('画像の形式・大きさと紙の大きさを認証付きJSONでサーバーへ渡す', async () => {
+    const fetchSpy = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response('file'))
+    vi.stubGlobal('fetch', fetchSpy)
+    await api.entryRoutes.qrImage('route/a', 'svg', 'large')
+    await api.entryRoutes.qrPdf('route/a', 'A5')
+    expect(fetchSpy.mock.calls.map(([url, init]) => [url, init?.method, init?.credentials, init?.body])).toEqual([
+      ['https://worker.example.com/api/entry-routes/route%2Fa/qr-image', 'POST', 'include', JSON.stringify({ format: 'svg', size: 'large' })],
+      ['https://worker.example.com/api/entry-routes/route%2Fa/qr-pdf', 'POST', 'include', JSON.stringify({ paper: 'A5' })],
+    ])
+    expect(fetchSpy.mock.calls[0][1]?.headers).toMatchObject({ 'Content-Type': 'application/json' })
+  })
+})
+
 describe('bookingApi 予約設備CRUD', () => {
   it('accountをqueryへ固定し、版付きPATCH/DELETEを送る', async () => {
     const fetchSpy = vi.fn(async (_url: string | URL | Request) => new Response(
@@ -1989,3 +2003,16 @@ describe('フォルダAPIの追加呼び口',()=>{
   expect(fetchSpy.mock.calls[6][0]).toBe('https://worker.example.com/api/mileage/reward-folders?accountId=a%2F1');
  });
 });
+
+describe('B-169 受信Webhookの行うこと', () => {
+  it('版と照合方法を保って既存のconfig保存口へ送る', async () => {
+    const fetchSpy = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({ success: true, data: {} }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchSpy)
+    const identityMatching = { methods: [{ kind: 'harness_friend_id' as const, path: 'friend_id' }], onNotFound: 'unmatched_box' as const }
+    await api.webhooks.incoming.saveConfig('inlet-1', 'account-1', { expectedVersion: 7, identityMatching,
+      actions: [{ refKind: 'tag', refId: 'tag-1', refVersionId: null }] })
+    expect(fetchSpy).toHaveBeenCalledWith('https://worker.example.com/api/webhooks/incoming/inlet-1/config?lineAccountId=account-1', expect.objectContaining({ method: 'PATCH' }))
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toEqual({ expectedVersion: 7, identityMatching,
+      actions: [{ refKind: 'tag', refId: 'tag-1', refVersionId: null }] })
+  })
+})

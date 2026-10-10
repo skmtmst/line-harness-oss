@@ -1,9 +1,10 @@
 'use client'
-
+import SegmentedControl from '@/components/shared/segmented'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { Fragment, useState, type ReactNode } from 'react'
-import { Calendar, Eye, Image as ImageIcon, Inbox, Package, Plus, SlidersHorizontal } from 'lucide-react'
+import { Calendar, Image as ImageIcon, Inbox, Package, Plus, SlidersHorizontal } from 'lucide-react'
 import type { DashboardCardId } from '@line-crm/shared'
 import { DashboardColumns, DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
 import Button from '@/components/shared/button'
@@ -12,7 +13,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import SectionHeader from './head'
-import SegmentedControl from '@/components/shared/segmented'
+import PeriodPicker from '@/components/shared/period-picker'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import ShipmentPanel from '@/components/dashboard/shipment-panel'
 import { dashboardPeriodLabel, formatDashboardAsOf } from '@/components/dashboard/freshness'
@@ -27,24 +28,11 @@ import { FirstStepsCard, useFirstSteps } from './first-steps'
 import { FriendTrend, trendRangeNote } from './trend'
 import { InboxSection } from './inbox'
 import { FriendAddLink } from './friend-add'
-import {
-  ConnectionStatus,
-  DeliveryFailures,
-  FriendStatus,
-  Loading,
-  Metric,
-  MonthlyDelivery,
-  OperationalAlerts,
-  RecentActivity,
-  RecentResults,
-  SendQuota,
-  SupportStatus,
-  Tag,
-  Unavailable,
-  Upcoming,
-} from './sections'
+import { ConnectionStatus, DeliveryFailures, FriendStatus, Loading, Metric, MonthlyDelivery, OperationalAlerts, RecentActivity, RecentResults, SendQuota, SupportStatus, Tag, Unavailable, Upcoming } from './sections'
 import { RetryLabel } from '@/components/shared/retry-label'
 import styles from './dashboard.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /* 編集の引き出し（mcOqK・dnd-kit を含む重い部品）は開くまで読まない。V8 だけの作り（v7 の部品は使わない）。 */
 const DashboardEditor = dynamic(() => import('./dashboard-editor').then((module) => module.default), {
@@ -98,7 +86,7 @@ export default function DashboardV8() {
   const role = useStaffRole()
   const { refreshAccounts } = useAccount()
   /* 役割が読めるまでは出し、閲覧のみと分かったら隠す（サーバの 403 が最後の守り）。 */
-  const canManage = role === null || canManageRole(role)
+  const canManage = canManageRole(role)
   const canEditLayout = canEditDashboardLayout(role)
   /* 修正案 D-3：はじめにやること（今の「はじめの設定」の帯の場所に置き換える）。 */
   const start = useFirstSteps(d.selectedAccountId, role)
@@ -113,7 +101,7 @@ export default function DashboardV8() {
         title={title}
         items={[
           { id: 'detail', label: openDetail === id ? '内訳を閉じる' : '内訳を見る', onSelect: () => setOpenDetail((current) => (current === id ? null : id)) },
-          { id: 'go', label, external: true, onSelect: () => router.push(href) },
+          { id: 'go', label, external: false, href: href, onSelect: () => router.push(href) },
           ...(canEditLayout ? [{ id: 'edit', label: 'ダッシュボード編集', dividerBefore: true, onSelect: d.openEditor }] : []),
         ]}
       />
@@ -139,7 +127,7 @@ export default function DashboardV8() {
         detail: <>
           <span>{`LINEの未対応：${d.lineUnread === null ? '未取得' : `${formatNumber(d.lineUnread)}件`}`}</span>
           <span>{`メールの未対応：${d.mailUnread === null ? '未取得' : `${formatNumber(d.mailUnread)}件`}`}</span>
-          <span>{`最も古い未対応：${d.pendingOldest === null ? '—' : formatWaitRough(d.pendingOldest)}`}</span>
+          <span>{`最も古い未対応：${d.pendingOldest === null ? emptyValue('unknown') : formatWaitRough(d.pendingOldest)}`}</span>
         </>,
       }
     }
@@ -149,7 +137,7 @@ export default function DashboardV8() {
       const state = override != null ? 'ready' : d.pendingPhotosState
       const forbidden = state === 'forbidden'
       const href = forbidden ? '/staff' : '/nen-members?tab=photos&status=pending_review'
-      const action = forbidden ? '権限を確認する' : '審査する'
+      const action = forbidden ? permissionDeniedMessage('store') : '審査する'
       return {
         node: <KpiCard
           key={id}
@@ -161,13 +149,13 @@ export default function DashboardV8() {
           unit="件"
           loading={state === 'loading'}
           delta={state === 'ready' ? <Tag>ポイント付与あり</Tag> : forbidden ? <Tag tone="danger">権限なし</Tag> : null}
-          detail={forbidden ? '写真を見る権限がありません' : state === 'error' ? STATE_TEXT.error : value === null ? STATE_TEXT.loading : `確認待ち ${value}件`}
+          detail={forbidden ? permissionDeniedMessage('store') : state === 'error' ? STATE_TEXT.error : value === null ? STATE_TEXT.loading : `確認待ち ${value}件`}
           action={{ label: action, href }}
         />,
         detail: <span>{forbidden
-          ? '写真を見る権限がありません。権限を確認してください。'
+          ? permissionDeniedMessage('store')
           : state === 'ready' && value !== null && value > 0
-            ? `確認待ちが${formatNumber(value)}件あります。審査するとポイントが付きます。`
+            ? `確認待ちが${formatNumber(value)} 件あります。審査するとポイントが付きます。`
             : '確認待ちの写真はありません。'}</span>,
       }
     }
@@ -208,12 +196,12 @@ export default function DashboardV8() {
           value={state === 'ready' ? (s?.soon ?? null) : null}
           unit="件"
           loading={state === 'loading'}
-          detail={state === 'error' ? STATE_TEXT.error : state === 'ready' ? ((s?.soon ?? 0) > 0 ? `今日 ${s?.today ?? 0}件・明日 ${(s?.soon ?? 0) - (s?.today ?? 0)}件` : '未処理はありません') : STATE_TEXT.loading}
+          detail={state === 'error' ? STATE_TEXT.error : state === 'ready' ? ((s?.soon ?? 0) > 0 ? `今日 ${s?.today ?? 0} 件・明日 ${(s?.soon ?? 0) - (s?.today ?? 0)} 件` : '未処理はありません') : STATE_TEXT.loading}
           action={{ label: 'ECを見る', href: '/ec-commerce' }}
         />,
         detail: <span>{state !== 'ready' || !s
           ? (state === 'error' ? STATE_TEXT.error : STATE_TEXT.loading)
-          : `今日の出荷 ${formatNumber(s.today)}件・今日と明日 ${formatNumber(s.soon)}件（${s.scanLimited ? `直近${s.scanLimit}件のEC通知から算出` : 'EC通知から算出'}）`}</span>,
+          : `今日の出荷 ${formatNumber(s.today)} 件・今日と明日 ${formatNumber(s.soon)} 件（${s.scanLimited ? `直近${s.scanLimit} 件のEC通知から算出` : 'EC通知から算出'}）`}</span>,
       }
     }
     return null
@@ -244,11 +232,11 @@ export default function DashboardV8() {
     const ops = d.sectionAvailable('operations') ? data?.operations : undefined
     const opsDetail = (text: string | null) => text ?? (data ? STATE_TEXT.error : STATE_TEXT.loading)
     if (id === 'booking-status') return <Metric title="予約状況" period="現在" href="/booking/bookings?view=list&status=requested" linkLabel="予約を見る" value={ops?.bookings?.pending ?? null} detail={opsDetail(ops?.bookings ? `今後の予約 ${ops.bookings.upcoming}件` : null)} section={data?.sections?.operations} loading={d.loading} />
-    if (id === 'inflow-top') return <Metric title="流入経路TOP3" period={dashboardPeriodLabel(d.period) ?? undefined} href="/analytics?tab=routes" linkLabel="経路別の内訳を見る" value={ops?.inflowTop?.[0]?.count ?? (ops?.inflowTop ? 0 : null)} detail={opsDetail(ops?.inflowTop ? ops.inflowTop.map((item) => `${item.name ?? '—'} ${item.count}`).join('、') || '期間内の追加なし' : null)} section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'inflow-top') return <Metric title="流入経路TOP3" period={dashboardPeriodLabel(d.period) ?? undefined} href="/analytics?tab=routes" linkLabel="経路別の内訳を見る" value={ops?.inflowTop?.[0]?.count ?? (ops?.inflowTop ? 0 : null)} detail={opsDetail(ops?.inflowTop ? ops.inflowTop.map((item) => `${item.name ?? emptyValue('unknown')} ${item.count}`).join('、') || '期間内の追加なし' : null)} section={data?.sections?.operations} loading={d.loading} />
     if (id === 'funnel-alert') return <Metric title="ファネル要注意" period={dashboardPeriodLabel(d.period) ?? undefined} href="/analytics?tab=funnel" linkLabel="ファネルを見る" value={ops?.funnelAlerts ?? null} detail="" help="3人以上追加され、成果が0件の経路です" section={data?.sections?.operations} loading={d.loading} />
     if (id === 'automation-failures') return <Metric title="オートメーション失敗" period={dashboardPeriodLabel(d.period) ?? undefined} href="/automations/runs?status=problems" linkLabel="実行状況を見る" value={ops?.automationFailures ?? null} detail="" help="期間内の失敗と一部失敗の合計です" section={data?.sections?.operations} loading={d.loading} />
-    if (id === 'scenario-status') return <Metric title="シナリオ配信状況" period="現在" href="/scenarios" linkLabel="シナリオを見る" value={ops?.scenarios?.active ?? null} detail={opsDetail(ops?.scenarios ? `一時停止 ${ops.scenarios.paused}件` : null)} section={data?.sections?.operations} loading={d.loading} />
-    if (id === 'uid-migration') return <Metric title="UID移行状況" period="現在" href="/accounts?tab=migration" linkLabel="移行状況を見る" value={ops?.migrations?.active ?? null} detail={opsDetail(ops?.migrations ? `完了 ${ops.migrations.completed}件` : null)} section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'scenario-status') return <Metric title="シナリオ配信状況" period="現在" href="/scenarios" linkLabel="シナリオを見る" value={ops?.scenarios?.active ?? null} detail={opsDetail(ops?.scenarios ? `一時停止 ${ops.scenarios.paused} 件` : null)} section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'uid-migration') return <Metric title="UID移行状況" period="現在" href="/accounts?tab=migration" linkLabel="移行状況を見る" value={ops?.migrations?.active ?? null} detail={opsDetail(ops?.migrations ? `完了 ${ops.migrations.completed} 件` : null)} section={data?.sections?.operations} loading={d.loading} />
     return null
   }
 
@@ -339,7 +327,7 @@ export default function DashboardV8() {
     return <><SectionHeader title="友だち数の推移" /><Unavailable section={data?.sections?.trend} onRetry={() => void d.load()} /></>
   }
 
-  const viewer = role !== null && !canManageRole(role)
+  const viewer = !canManageRole(role)
   /* 部品の中で自分のエラーを出すものは帯に重ねない。出し先の無いものだけ日本語の名前で帯に出す。 */
   const shownCardIds = new Set<string>([
     ...d.preferences.main.filter((item) => item.visible).map((item) => item.id),
@@ -349,24 +337,18 @@ export default function DashboardV8() {
   const notice = start.summary || viewer || d.error || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
-        <div className={styles.viewerBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
-        </div>
+        <ReadOnlyNotice />
       ) : null}
       {start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} /> : null}
       {d.error ? (
-        <div className={styles.errorBand} role="alert">
-          <span>{d.error}</span>
-          <Button type="button" onClick={() => void d.load()}><RetryLabel /></Button>
-        </div>
+        <Notice tone="danger" role="alert" action={<Button type="button" onClick={() => d.load()} busyLabel="処理中…"><RetryLabel /></Button>}>{d.error}</Notice>
       ) : null}
       {looseFailures.length ? (
         <Notice
           tone="warn"
           role="status"
           message={`${partialFailureLabels(looseFailures)}を${STATE_TEXT.error}。0件としては表示していません。`}
-          action={<Button type="button" onClick={() => void d.load()}><RetryLabel /></Button>}
+          action={<Button type="button" onClick={() => d.load()} busyLabel="処理中…"><RetryLabel /></Button>}
         />
       ) : null}
     </div>
@@ -377,14 +359,9 @@ export default function DashboardV8() {
       boardId="WQmep"
       headingSize="compact"
       title={greeting(d.staffName)}
-      description={headline(data?.asOf, d.displayedHealthRisk)}
+      help={headline(data?.asOf, d.displayedHealthRisk)}
       actions={<>
-        <SegmentedControl<PeriodKey>
-          aria-label="集計の期間"
-          value={d.period}
-          onChange={d.selectPeriod}
-          options={PERIODS.map((item) => ({ value: item.key, label: item.label }))}
-        />
+        <PeriodPicker days={d.period === 'today' ? 1 : d.period === 'last7' ? 7 : 28} supportedDays={[1,7,28]} choices={PERIODS.map((item) => ({ days: item.key === 'today' ? 1 : item.key === 'last7' ? 7 : 28, label: item.label }))} onChange={(value) => d.selectPeriod(value === 1 ? 'today' : value === 7 ? 'last7' : 'last28')} />
         {canEditLayout ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={15} aria-hidden="true" />ダッシュボード編集</Button> : null}
         {canManage ? <Button variant="primary" href="/broadcasts/new"><Plus size={15} aria-hidden="true" />配信を作る</Button> : null}
       </>}
@@ -395,6 +372,7 @@ export default function DashboardV8() {
         saving={d.preferenceSaving}
         saveError={d.preferenceSaveError?.message ?? null}
         saveConflict={d.preferenceSaveError?.conflict ?? false}
+        onComparePreferences={d.comparePreferences}
         onReloadPreferences={d.reloadPreferences}
         onCancel={d.closeEditor}
         onApply={d.applyPreferences}

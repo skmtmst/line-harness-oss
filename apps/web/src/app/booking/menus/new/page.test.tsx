@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * E-03 #657: 予約メニュー作成画面の「予約後に付けるタグ」を、実物の React で描いて操作する。
  *
@@ -129,7 +131,7 @@ import NewBookingMenuPage from './page'
 
 /** 同アカウントの有効タグ／同アカウントの整理済み／別アカウントの有効タグ。 */
 const TAGS = [
-  { id: 'tag-active', name: '予約済み', color: '#111111', createdAt: '2026-09-01T00:00:00Z', lineAccountId: 'account-a', status: 'active' },
+  { id: 'tag-active', name: '予約中', color: '#111111', createdAt: '2026-09-01T00:00:00Z', lineAccountId: 'account-a', status: 'active' },
   { id: 'tag-active-2', name: '常連さん', color: '#444444', createdAt: '2026-09-01T00:00:00Z', lineAccountId: 'account-a', status: 'active' },
   { id: 'tag-archived', name: '旧キャンペーン', color: '#222222', createdAt: '2026-09-01T00:00:00Z', lineAccountId: 'account-a', status: 'archived' },
   { id: 'tag-other-account', name: 'B店のタグ', color: '#333333', createdAt: '2026-09-01T00:00:00Z', lineAccountId: 'account-b', status: 'active' },
@@ -145,7 +147,7 @@ function deferredTags(): DeferredTags {
 
 /** メニュー名の入力欄。 */
 function nameInput(): HTMLInputElement {
-  return screen.getByPlaceholderText('例: トリミング（小型犬）') as HTMLInputElement
+  return screen.getByPlaceholderText("例: トリミング（小型犬）") as HTMLInputElement
 }
 
 /** 選べる中身。プルダウンの option をそのまま読む。 */
@@ -154,6 +156,7 @@ function optionLabels(select: HTMLSelectElement): string[] {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   fixture.selectedAccountId = 'account-a'
   fixture.tagsList = async () => ({ success: true, data: TAGS })
   fixture.createMenu = vi.fn(async () => ({ id: 'menu-new', version: 1 }))
@@ -170,7 +173,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
   async function renderNew() {
     render(<NewBookingMenuPage />)
     // 取得が終わるまでは読み込み中の文言を出し、プルダウンは出さない。
-    return screen.findByLabelText('予約後に付けるタグ') as Promise<HTMLSelectElement>
+    return screen.findByRole('combobox', {name:'予約後に付けるタグ'}) as Promise<HTMLSelectElement>
   }
 
   test('タグ取得が遅れて返る間も入力は消えず、返った後に候補が出る', async () => {
@@ -193,8 +196,8 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
 
     // 遅れて返った後も、待っている間の入力はそのまま残る。
     expect(nameInput().value).toBe('トリミング')
-    const select = await screen.findByLabelText('予約後に付けるタグ') as HTMLSelectElement
-    expect(optionLabels(select)).toEqual(['— なし —', '予約済み', '常連さん'])
+    const select = await screen.findByRole('combobox', {name:'予約後に付けるタグ'}) as HTMLSelectElement
+    expect(optionLabels(select)).toEqual(['— なし —', '予約中', '常連さん'])
   })
 
   test('取得に失敗しても保存はできる文言を出し、プルダウンは出さない', async () => {
@@ -210,7 +213,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
   test('候補は対象アカウントの有効タグだけ。整理済みも別アカウントも出さない', async () => {
     const select = await renderNew()
     const labels = optionLabels(select)
-    expect(labels).toContain('予約済み')
+    expect(labels).toContain('予約中')
     expect(labels).not.toContain('旧キャンペーン')
     expect(labels).not.toContain('B店のタグ')
   })
@@ -219,6 +222,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
     const select = await renderNew()
 
     fireEvent.change(screen.getByLabelText('タグを検索'), { target: { value: '常連' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
     expect(optionLabels(select)).toEqual(['— なし —', '常連さん'])
 
     fireEvent.change(select, { target: { value: 'tag-active-2' } })
@@ -227,7 +231,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
     // 検索を消しても選択は残る。
     fireEvent.click(screen.getByLabelText('検索語を消す'))
     expect(select.value).toBe('tag-active-2')
-    expect(optionLabels(select)).toEqual(['— なし —', '予約済み', '常連さん'])
+    expect(optionLabels(select)).toEqual(['— なし —', '予約中', '常連さん'])
 
     // 「なし」へ戻せる。
     fireEvent.change(select, { target: { value: '' } })
@@ -238,6 +242,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
     const select = await renderNew()
     fireEvent.change(select, { target: { value: 'tag-active' } })
     fireEvent.change(screen.getByLabelText('タグを検索'), { target: { value: 'ありえない語' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
 
     expect(screen.getByText('「ありえない語」に合うタグがありません。')).toBeTruthy()
     // 選んだタグは隠れても外れない。
@@ -251,7 +256,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
 
     switchAccount('account-b')
 
-    const afterSwitch = await screen.findByLabelText('予約後に付けるタグ') as HTMLSelectElement
+    const afterSwitch = await screen.findByRole('combobox', {name:'予約後に付けるタグ'}) as HTMLSelectElement
     expect(afterSwitch.value).toBe('')
     expect(optionLabels(afterSwitch)).toEqual(['— なし —', 'B店のタグ', 'B店だけの分類'])
 
@@ -313,7 +318,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
     })
     // 入力は消えない。選び直してもう一度出せる。
     expect(nameInput().value).toBe('トリミング')
-    const again = screen.getByLabelText('予約後に付けるタグ') as HTMLSelectElement
+    const again = screen.getByRole('combobox', {name:'予約後に付けるタグ'}) as HTMLSelectElement
     fireEvent.change(again, { target: { value: 'tag-active-2' } })
     expect(again.value).toBe('tag-active-2')
   })
@@ -323,7 +328,7 @@ describe('R306/R307 予約時マイルの設定リンク', () => {
   async function renderNew() {
     render(<NewBookingMenuPage />)
     // タグ欄が出れば画面の読み込みは終わっている。
-    await screen.findByLabelText('予約後に付けるタグ')
+    await screen.findByRole('combobox', {name:'予約後に付けるタグ'})
   }
 
   function settingsLink(): HTMLAnchorElement {
@@ -366,3 +371,6 @@ describe('R306/R307 予約時マイルの設定リンク', () => {
     await waitFor(() => expect(screen.getByText('マイルを 50 付ける')).toBeTruthy())
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

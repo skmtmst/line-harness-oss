@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * Issue #709残件: 28予約メニューの「⠿」は掴めない飾りだったので置かず、
  * 並び順の変更は操作列の「…」の中の上へ・下へで行うことを、
@@ -120,7 +122,8 @@ function menuBase(id: string, name: string, sortOrder: number) {
 const MENUS = [menuBase('menu-1', 'カット', 0), menuBase('menu-2', 'カラー', 1)]
 
 beforeEach(() => {
-  window.localStorage.setItem('lh_staff_role', 'owner')
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
+  window.localStorage.setItem('lh_staff_role', 'owner'); rememberStaffIdentity({ role: 'owner' } as StaffMember)
   clearToastsForTest()
   fixture.selectedAccountId = 'account-a'
   fixture.activeTab = 'menus'

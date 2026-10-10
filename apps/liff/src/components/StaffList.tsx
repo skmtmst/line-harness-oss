@@ -1,3 +1,5 @@
+import { bookingPriceText } from '../lib/booking-price.js';
+import Button from './ui/Button.js';
 import { useEffect, useState } from 'react';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
@@ -55,7 +57,7 @@ export default function StaffList({
         <h2 className="text-xl font-bold text-ink">担当を選んでください</h2>
         <p className="mt-3.5 text-xs leading-[18px] text-liff-sub">
           {`${menu.name}・${menu.duration_minutes}分・${
-            menu.base_price === 0 ? '無料' : `¥${menu.base_price.toLocaleString()}`
+            bookingPriceText(menu.base_price, menu.price_mode)
           }`}
         </p>
       </div>
@@ -71,15 +73,10 @@ export default function StaffList({
                 .join('・');
           return (
             <li key={s.id}>
-              <button
+              <Button variant="option" selected={selected}
                 type="button"
                 onClick={() => onSelect(s)}
                 aria-pressed={selected}
-                className={`liff-press flex w-full items-center gap-3 rounded-(--liff-radius-lg) p-3.5 text-left outline focus-visible:outline-2 focus-visible:outline-ink ${
-                  selected
-                    ? 'bg-liff-soft outline-2 -outline-offset-1 outline-liff-primary'
-                    : 'bg-canvas outline-1 -outline-offset-1 outline-liff-line'
-                }`}
               >
                 {s.profile_image_url ? (
                   <img
@@ -115,7 +112,7 @@ export default function StaffList({
                 ) : (
                   <Icon name="chevron-right" className="h-[18px] w-[18px] shrink-0 text-liff-idle" />
                 )}
-              </button>
+              </Button>
             </li>
           );
         })}

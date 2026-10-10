@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -62,6 +64,7 @@ function ensureStorage() {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   ensureStorage()
   document.documentElement.dataset.theme = 'v8'
   window.localStorage.setItem('lh_staff_role', 'admin')
@@ -132,7 +135,7 @@ test('公開の前に確認の窓（sDXNy）で宛先と届く人数を確かめ
 })
 
 test('staff では閲覧のみの帯が出て、保存・公開・テスト送信のボタンは置かない（2026-10-06 オーナー決定）', async () => {
-  window.localStorage.setItem('lh_staff_role', 'staff')
+  window.localStorage.setItem('lh_staff_role', 'staff'); rememberStaffIdentity({ role: 'staff' } as StaffMember)
   await renderPage()
   expect(host?.textContent).toContain('閲覧のみで見ています')
   const labels = Array.from(host?.querySelectorAll('button') ?? []).map((button) => button.textContent ?? '')
@@ -186,7 +189,7 @@ test('作るときはチームがあれば最初のチームを選び、スタ�
     return response({ success: true, data: { id: 'rule-1', version: 1 } })
   }))
   await renderPage()
-  expect(host?.textContent).toContain('中目黒店（2人）')
+  expect(host?.textContent).toContain('中目黒店（2 人）')
   expect(host?.textContent).not.toContain('受け取るスタッフ')
   await act(async () => {
     Array.from(host!.querySelectorAll('button')).find((button) => button.textContent?.includes('運用者へのお知らせを公開'))!.click()

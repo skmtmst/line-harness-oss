@@ -5,28 +5,14 @@
  */
 
 /* 閲覧のみの帯（NtCE3）。数の帯の上。薄い青の地・目の印・枠なし。 */
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  margin: 0 var(--tpl-head-pad-side) var(--tpl-ro-band-after);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
-.viewerBand > svg { color: var(--color-action); flex-shrink: 0; }
+.viewerBand { margin: 0 var(--tpl-head-pad-side) var(--tpl-ro-band-after); }
 
 .createFull { width: 100%; }
 /* 閲覧のみ（NtCE3）：押せない「配信を作る」「フォルダを追加」「この条件を保存する」は置かず、場所だけ空ける。 */
-.viewerCreateSpace { display: block; height: var(--tpl-fx4-viewer-create-h); }
 .viewerAddSpace { display: block; height: var(--tpl-fx4-viewer-add-h); }
 .viewerSpace { visibility: hidden; }
 
 .note {
-  margin: 0;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   line-height: var(--tpl-bc-note-lh);
@@ -105,7 +91,7 @@
   cursor: pointer;
 }
 .dateButton > svg { color: var(--color-ink-faint); }
-.dateButton[data-active='true'] { outline-color: var(--color-action); color: var(--color-action); }
+.dateButton[data-active='true'] { outline-color: var(--color-focus-ring); color: var(--color-action); }
 
 .datePopover {
   position: absolute;
@@ -365,4 +351,5 @@
 .stateDesc { margin: 0; color: var(--color-ink-faint); font-size: var(--text-label); }
 
 /* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
-.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-h); }
+
+.note, .noteNoticePlacement { margin: 0; }

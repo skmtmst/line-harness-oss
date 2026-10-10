@@ -15,9 +15,9 @@ describe('利用規約の同意の決まり（V8 の写し）', () => {
     expect(canSubmitTerms(true, false)).toBe(false)
     expect(canSubmitTerms(true, true)).toBe(true)
   })
-  it('同意した日時（D1 の UTC）を日本時間の「月/日 時:分」にする', () => {
-    expect(formatAgreedAt('2026-10-02 14:41:00')).toBe('10/2 23:41')
-    expect(formatAgreedAt('2026-10-02T14:41:00Z')).toBe('10/2 23:41')
+  it('同意した日時（D1 の UTC）を日本時間の「月日（曜日）時:分」にする', () => {
+    expect(formatAgreedAt('2026-10-02 14:41:00')).toBe('10月2日（金）23:41')
+    expect(formatAgreedAt('2026-10-02T14:41:00Z')).toBe('10月2日（金）23:41')
     expect(formatAgreedAt(null)).toBeNull()
     expect(formatAgreedAt('こわれた値')).toBeNull()
   })

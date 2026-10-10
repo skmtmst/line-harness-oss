@@ -4,20 +4,20 @@
   display: flex;
   flex-wrap: wrap; /* 幅320で「次へ」が右に切れていた（★V7 修正方針 §3） */
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .item {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 38px;
+  height: 32px;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-segment);
   background: var(--color-canvas);
   color: var(--color-ink);
-  font-size: var(--text-caption);
-  font-weight: 600;
+  font-size: var(--text-body);
+  font-weight: 500;
   line-height: 1;
   white-space: nowrap;
 }
@@ -50,7 +50,7 @@ button.item:focus-visible {
 }
 
 [data-theme='v8'] button.item:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -72,9 +72,9 @@ button.item:disabled {
  * `$accent`(#06c755) に白文字は 2.26:1 で、13px の数字が読めない。
  */
 .current {
-  border-color: var(--color-accent-deep);
-  background: var(--color-accent-deep);
-  color: var(--color-on-accent);
+  border-color: transparent;
+  background: var(--color-ink);
+  color: var(--color-canvas);
   font-weight: 500;
 }
 
@@ -148,8 +148,8 @@ button.item:disabled {
 }
 
 [data-theme='v8'] .item {
-  border: 0; border-radius: 8px; color: var(--color-ink-secondary);
-  outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
+  border: 0; border-radius: var(--polish-radius-control); color: var(--color-ink-secondary);
+  outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow);
   font-family: var(--font-inter), Inter, sans-serif; line-height: 20px;
 }
 [data-theme='v8'] .current {
@@ -159,6 +159,13 @@ button.item:disabled {
 [data-theme='v8'] .summary { font-family: var(--font-inter), Inter, system-ui, sans-serif; line-height: 20px; }
 
 [data-theme='v8'] .summary { flex: 1; gap: 0; }
+[data-theme='v8'] .pagination[data-spacing='restaurant']{padding:8px 0;gap:8px;}
+[data-theme='v8'] .pagination[data-spacing='restaurant'] .current{background:var(--color-accent-deep);color:var(--color-canvas);}
+
 [data-theme='v8'] .pagination[data-spacing='roomy'] { padding: calc(var(--tpl-rs-stat-pad) + var(--tpl-rs-rsv-head-row-gap)) calc(var(--tpl-rs-stat-pad) + var(--tpl-rs-cell-side)); }
 
 }
+
+/* B-178：一覧の余白は型が持つ。件数と送り先を1つの右寄せの組にする。 */
+[data-theme='v8'] :global([data-list-skeleton]) .pagination { width: auto; justify-content: flex-end; padding: 0; }
+[data-theme='v8'] :global([data-list-skeleton]) .summary { flex: none; margin-right: var(--space-16); }

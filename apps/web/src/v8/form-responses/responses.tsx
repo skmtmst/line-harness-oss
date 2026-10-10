@@ -1,4 +1,38 @@
 'use client'
+import { HorizontalBarChart } from '@/components/shared/charts'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { AlertCircle, ArrowLeft, ArrowRight, Download, Pencil, RotateCw, Search, User } from 'lucide-react'
+import type { FormBlock, FormInputType, FormLayout } from '@line-crm/shared'
+import { fetchApi, ApiError } from '@/lib/api'
+import { formAnswerText } from '@/lib/form-answer'
+import { csvCell } from '@/lib/presentation'
+import { formatDateTime, formatNumber, formatDate as polishFormatDate } from '@/lib/format'
+import { useAccount } from '@/contexts/account-context'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import Notice from '@/components/shared/notice'
+import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { DetailPage, DetailColumns } from '@/components/templates'
+import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
+import Button from '@/components/shared/button'
+import FormFileAttachments from '@/components/shared/form-file-attachments'
+import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import TargetMissing from '@/components/shared/target-missing'
+import { TableHeadRow, Th } from '@/components/shared/table'
+import { Tabs } from '@/components/shared/tabs'
+import ListRange from '@/components/ui/list-range'
+import { postActionStepLabel, ratingAverageText, type DestinationWrite, type FormSubmissionSummary, type SubmissionPostActions } from './summary'
+import styles from './responses.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 回答フォーム「集まった回答」（Pencil まとめて見る `v0SbYR`・1件ずつ見る `MKQyJ`）。
@@ -6,36 +40,6 @@
  * 型（DetailPage）の頭とタブに、左の本文（まとめ／表）と右の列（フォームを編集・CSV・絞り込み・回答の詳細）をはめる。
  * 読み込み・検索・CSV・後処理のやり直しは今の作り（src/app/form-submissions/responses/page.tsx）と同じ口と同じ文。
  */
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
-import { AlertCircle, ArrowLeft, ArrowRight, Download, Pencil, RotateCw, Search, User } from 'lucide-react'
-import type { FormBlock, FormInputType, FormLayout } from '@line-crm/shared'
-import { fetchApi, ApiError } from '@/lib/api'
-import { csvCell } from '@/lib/presentation'
-import { formatDateTime, formatNumber } from '@/lib/format'
-import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
-import Notice from '@/components/shared/notice'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { DetailPage, DetailColumns } from '@/components/templates'
-import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
-import Button from '@/components/shared/button'
-import ListState from '@/components/shared/list-state'
-import Pagination from '@/components/shared/pagination'
-import TargetMissing from '@/components/shared/target-missing'
-import { TableHeadRow, Th } from '@/components/shared/table'
-import { Tabs } from '@/components/shared/tabs'
-import ListRange from '@/components/ui/list-range'
-import {
-  postActionStepLabel,
-  ratingAverageText,
-  type DestinationWrite,
-  type FormSubmissionSummary,
-  type SubmissionPostActions,
-} from './summary'
-import styles from './responses.module.css'
 
 type Submission = {
   id: string
@@ -55,11 +59,9 @@ type InputBlock = Extract<FormBlock, { kind: 'input' }>
 const MAX_EXPORT_ROWS = 5000
 const EXPORT_PAGE_LIMIT = 200
 
-function valueText(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—'
-  if (Array.isArray(value)) return value.length ? value.map(String).join('、') : '—'
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
+function valueText(value: unknown, block?: InputBlock): string {
+  if (Array.isArray(value) && value.some(v => v && typeof v === 'object' && 'fileId' in v)) return value.map(v => v && typeof v === 'object' && 'fileId' in v ? v.state === 'expired' ? '期限で消しました' : v.state === 'restricted' ? '見る権限がありません' : v.filename || '書類' : formAnswerText(v)).join('、')
+  return formAnswerText(value, block) || '—'
 }
 function normalizedSubmission(item: Submission): Submission {
   if (typeof item.data !== 'string') return item
@@ -69,12 +71,12 @@ function normalizedSubmission(item: Submission): Submission {
     return { ...item, data: {} }
   }
 }
-function saveCsv(filename: string, rows: Submission[], fieldKeys: string[], labels: Record<string, string>) {
+function saveCsv(filename: string, rows: Submission[], fieldKeys: string[], labels: Record<string, string>, blocks: InputBlock[]) {
   const header = ['回答ID', '答えた人', '答えた日時', ...fieldKeys.map((key) => labels[key] ?? key)]
   const lines = [header.map(csvCell).join(',')]
   for (const row of rows) {
     const data = row.data as Record<string, unknown>
-    lines.push([row.id, row.friendName ?? '不明', formatDateTime(row.createdAt), ...fieldKeys.map((key) => data[key])].map(csvCell).join(','))
+    lines.push([row.id, row.friendName ?? '不明', formatDateTime(row.createdAt), ...fieldKeys.map((key) => valueText(data[key], blocks.find(block => block.name === key || block.id === key)))].map(csvCell).join(','))
   }
   const url = URL.createObjectURL(new Blob([`﻿${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8' }))
   const anchor = document.createElement('a')
@@ -86,7 +88,7 @@ function saveCsv(filename: string, rows: Submission[], fieldKeys: string[], labe
 function retryEffectsFailureText(error: unknown): string {
   if (error instanceof ApiError) {
     return describeApiFailure(error, '後処理の再実行', {
-      forbidden: '後処理を再実行する権限がありません。選んでいるアカウントと権限を確認してください。',
+      scope: 'store',
     })
   }
   if (error instanceof Error && error.message && error.message !== 'retry_failed' && /[ぁ-んァ-ヶ一-龠]/u.test(error.message)) {
@@ -96,10 +98,7 @@ function retryEffectsFailureText(error: unknown): string {
 }
 /** 「9/30 17:40」（日本時間）。絵どおり年と曜日は出さない。 */
 function shortWhen(iso: string): string {
-  const time = Date.parse(iso)
-  if (!Number.isFinite(time)) return '—'
-  const jst = new Date(time + 9 * 3600_000)
-  return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${jst.toISOString().slice(11, 16)}`
+  return polishFormatDate(iso, { style: 'list', fallback: '—' })
 }
 function shortDay(iso: string): string {
   return shortWhen(iso).split(' ')[0] ?? ''
@@ -133,7 +132,7 @@ export default function FormResponsesV8() {
 
 function Responses() {
   const role = useStaffRole()
-  const canEditForm = role ? canManageRole(role) || (role === 'staff' && !isOwnerOrAdmin() && canEditFeature('/form-submissions')) : canEditFeature('/form-submissions')
+  const canEditForm = useFeatureAccess('forms')
   const canRetry = canEditForm
   const searchParams = useSearchParams()
   const formId = searchParams.get('id') ?? ''
@@ -142,13 +141,13 @@ function Responses() {
   const [items, setItems] = useState<Submission[]>([])
   const [summary, setSummary] = useState<FormSubmissionSummary | null>(null)
   const [total, setTotal] = useState<number | null>(null)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [formMissing, setFormMissing] = useState(false)
   const [formForbidden, setFormForbidden] = useState(false)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   /* 絵（v0SbYR）は「まとめて見る」が先頭。 */
   const [view, setView] = useState<'rows' | 'summary'>('summary')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -215,7 +214,7 @@ function Responses() {
       return
     }
     if (!selectedAccountId || !formId) return
-    const timer = setTimeout(() => { void load(1, pageSize, query) }, 300)
+    const timer = setTimeout(() => { void load(1, pageSize, query) }, 0)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
@@ -243,7 +242,7 @@ function Responses() {
   const summaries = useMemo(() => fieldKeys.map((key) => {
     const counts = new Map<string, number>()
     for (const item of items) {
-      const value = valueText((item.data as Record<string, unknown>)[key])
+      const value = valueText((item.data as Record<string, unknown>)[key], blockByKey(key))
       if (value === '—') continue
       counts.set(value, (counts.get(value) ?? 0) + 1)
     }
@@ -259,7 +258,7 @@ function Responses() {
   const exportAll = async () => {
     if (!selectedAccountId || !form || exporting) return
     if (total !== null && total > MAX_EXPORT_ROWS) {
-      setExportError(`回答が${formatNumber(total)}件あり、一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)}件）を超えています。`)
+      setExportError(`回答が${formatNumber(total)} 件あり、一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)} 件）を超えています。`)
       return
     }
     setExporting(true)
@@ -279,15 +278,15 @@ function Responses() {
         expected = result.data.total
         if (expected > MAX_EXPORT_ROWS) throw new Error('export_too_many')
         all.push(...result.data.items.map(normalizedSubmission))
-        setExportProgress(`${formatNumber(Math.min(all.length, expected))} / ${formatNumber(expected)}件を取得中`)
+        setExportProgress(`${formatNumber(Math.min(all.length, expected))} / ${formatNumber(expected)} 件を取得中`)
         currentPage += 1
       } while (all.length < expected && currentPage <= 1001)
       if (all.length < expected) throw new Error('export_incomplete')
       const keys = [...new Set([...fieldKeys, ...all.flatMap((item) => Object.keys(item.data as Record<string, unknown>))])]
-      saveCsv(`${form.name}-回答.csv`, all, keys, labels)
+      saveCsv(csvFileName("フォーム回答"), all, keys, labels, inputBlocks)
     } catch (caught) {
       setExportError(caught instanceof Error && caught.message === 'export_too_many'
-        ? `回答が一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)}件）を超えています。`
+        ? `回答が一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)} 件）を超えています。`
         : 'CSVを書き出せませんでした。もう一度お試しください。')
     } finally {
       setExporting(false)
@@ -366,7 +365,7 @@ function Responses() {
   const pageCount = Math.max(1, Math.ceil((total ?? 0) / pageSize))
   const firstKey = fieldKeys[0]
   const headLine = [
-    total === null ? '—' : `${formatNumber(total)}件`,
+    total === null ? emptyValue('unknown') : `${formatNumber(total)}件`,
     rate != null ? `答え終えた割合 ${formatNumber(rate)}%` : null,
   ].filter(Boolean).join('・')
   const longKey = fieldKeys.find((key) => blockByKey(key)?.type === 'textarea'
@@ -383,11 +382,11 @@ function Responses() {
               <dd>{shortWhen(selected.createdAt)}</dd>
             </div>
             {fieldKeys.map((key) => {
-              const value = valueText((selected.data as Record<string, unknown>)[key])
+              const value = valueText((selected.data as Record<string, unknown>)[key], blockByKey(key))
               return (
                 <div key={key} className={styles.detailRow}>
                   <dt title={labels[key] ?? key}>{labels[key] ?? key}</dt>
-                  <dd title={value}>{blockByKey(key)?.type === 'rating' && value !== '—' ? `★${value}` : value}</dd>
+                  <dd title={value}>{blockByKey(key)?.type === 'rating' && value !== '—' ? `★${value}` : <FormFileAttachments value={(selected.data as Record<string, unknown>)[key]} block={blockByKey(key)} />}</dd>
                 </div>
               )
             })}
@@ -430,17 +429,14 @@ function Responses() {
       {exporting && exportProgress ? <p className={styles.railNote} role="status">{exportProgress}</p> : null}
       <section className={styles.railCard} aria-labelledby="fr-filter">
         <h2 className={styles.railTitle} id="fr-filter">絞り込み</h2>
-        <p className={styles.railNote}>{total === null ? '—' : `全 ${formatNumber(total)}件から、名前と答えで探します`}</p>
-        <label className={styles.search}>
-          <Search size={15} aria-hidden="true" />
-          <input
+        <p className={styles.railNote}>{total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件から、名前と答えで探します`}</p>
+        <Field label={<><Search size={15} aria-hidden="true" /></>}><SaveErrorField names={["query"]}><input
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="名前・答えで探す（全件から）"
             aria-label="名前・答えで探す（全件から）"
-          />
-        </label>
+          /></SaveErrorField></Field>
       </section>
     </div>
   )
@@ -449,9 +445,9 @@ function Responses() {
     <DetailPage
       boardId={view === 'summary' ? 'v0SbYR' : 'MKQyJ'}
       tabSpacing="compact"
-      identity={<Link href="/form-submissions" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />回答フォームへ</Link>}
+      identity={<></>}
       title={`集まった回答：${form.name}`}
-      description={headLine}
+      help={headLine}
       tabs={(
         <Tabs
           className={styles.tabsPlain}
@@ -463,7 +459,7 @@ function Responses() {
         />
       )}
     >
-      {!canEditForm && !canRetry ? <Notice tone="info" message="閲覧のみで見ています。フォームの編集や後処理の再実行には変更権限が必要です。" /> : null}
+      {!canEditForm && !canRetry ? <ReadOnlyNotice >閲覧のみで見ています。フォームの編集や後処理の再実行には変更権限が必要です。</ReadOnlyNotice> : null}
       <DetailColumns aside={rail} asideLabel="回答の詳細・絞り込み" expanded={asideExpanded} onExpandedChange={setAsideExpanded}>
           {total === 0 && !query.trim() ? (
             <ListState kind="empty" title="まだ回答がありません" description="フォームが回答されると、ここに1件ずつ並びます。" />
@@ -473,10 +469,10 @@ function Responses() {
                 <div className={styles.alert} role="status">
                   <AlertCircle size={18} aria-hidden="true" className={styles.alertIcon} />
                   <div className={styles.alertText}>
-                    <p className={styles.alertTitle}>{`後処理が終わっていない回答が ${incompleteItems.length}件あります`}</p>
+                    <p className={styles.alertTitle}>{`後処理が終わっていない回答が ${incompleteItems.length} 件あります`}</p>
                     <p className={styles.alertNote}>{`答えは保存されています。${failedSteps.join('・') || '後処理'}が終わっていません${(total ?? 0) > items.length ? '（表示中のページから数えています）' : ''}。`}</p>
                   </div>
-                  <Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}>{`その${incompleteItems.length}件を見る`}</Button>
+                  <Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}>{`その${incompleteItems.length} 件を見る`}</Button>
                 </div>
               ) : null}
               {summaries.map((fieldSummary) => {
@@ -487,7 +483,7 @@ function Responses() {
                 const rating = block?.type === 'rating' ? summary?.ratingFields?.find((field) => field.key === fieldSummary.key) : undefined
                 const sub = rating
                   ? `5段階・平均 ${ratingAverageText(rating.average)}`
-                  : `${kind ? `${kind}・` : ''}${answered === 0 ? 'まだ答えがありません' : `${formatNumber(answered)}件が答えた`}`
+                  : `${kind ? `${kind}・` : ''}${answered === 0 ? 'まだ答えがありません' : `${formatNumber(answered)} 件が答えた`}`
                 /* 5段階は ★5・★4・★3以下 の3段にまとめる（絵 v0SbYR）。 */
                 const values: Array<[string, number]> = block?.type === 'rating'
                   ? [
@@ -505,17 +501,7 @@ function Responses() {
                       <p className={styles.cardNote}>{sub}</p>
                     </div>
                     {answered > 0 ? (
-                      <dl className={styles.bars}>
-                        {top.map(([value, count]) => (
-                          <div key={value} className={styles.barRow}>
-                            <dt title={value}>{block?.type === 'rating' ? `★${value}` : value}</dt>
-                            <dd className={styles.barTrack} aria-hidden="true">
-                              <meter className={styles.meter} min={0} max={Math.max(1, max)} value={count} />
-                            </dd>
-                            <dd className={styles.barCount}>{`${formatNumber(count)}件（${formatNumber(Math.round((count / answered) * 100))}%）`}</dd>
-                          </div>
-                        ))}
-                      </dl>
+                      <HorizontalBarChart label={labels[fieldSummary.key] ?? fieldSummary.key} unit="件" items={top.map(([value,count])=>({key:value,label:block?.type==='rating'?`★${value}`:value,value:count,detail:<span>{`${formatNumber(Math.round(count/answered*100))}%`}</span>}))} />
                     ) : null}
                   </section>
                 )
@@ -526,7 +512,7 @@ function Responses() {
                   <section className={`${styles.card} ${styles.quoteCard}`} aria-label={labels[longKey] ?? longKey}>
                     <div className={styles.cardHead}>
                       <h2 className={styles.cardTitle}>{labels[longKey] ?? longKey}</h2>
-                      <p className={styles.cardNote}>{`複数行・${formatNumber(recents.length)}件`}</p>
+                      <p className={styles.cardNote}>{`複数行・${formatNumber(recents.length)} 件`}</p>
                     </div>
                     <ul className={styles.quotes}>
                       {recents.slice(0, 2).map((item) => {
@@ -556,7 +542,7 @@ function Responses() {
             <section className={styles.card} aria-labelledby="fr-rows">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle} id="fr-rows">回答</h2>
-                <p className={styles.cardNote}>{total === null ? '—' : `全 ${formatNumber(total)}件`}</p>
+                <p className={styles.cardNote}>{total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件`}</p>
               </div>
               <table className={styles.table}>
                 <thead>
@@ -570,7 +556,7 @@ function Responses() {
                 <tbody>
                   {items.map((item) => {
                     const incomplete = incompleteOf(item)
-                    const first = firstKey ? valueText((item.data as Record<string, unknown>)[firstKey]) : '—'
+                    const first = firstKey ? valueText((item.data as Record<string, unknown>)[firstKey], blockByKey(firstKey)) : emptyValue('unknown')
                     const isSelected = selected?.id === item.id
                     return (
                       <tr
@@ -581,13 +567,13 @@ function Responses() {
                       >
                         <td className={styles.when}>{shortWhen(item.createdAt)}</td>
                         <td>
-                          <button type="button" className={styles.who} title={item.friendName ?? '不明'} onClick={() => selectAnswer(item.id)}>
+                          <button type="button" className={styles.who} title={item.friendName ?? '不明'}  onClick={() => selectAnswer(item.id)}>
                             {item.friendName ?? '不明'}
                           </button>
                         </td>
                         <td className={styles.ellipsis} title={first}>{first}</td>
                         <td>
-                          {incomplete === null ? <span className={styles.faint}>—</span>
+                          {incomplete === null ? <span className={styles.faint}>{emptyValue('unknown')}</span>
                             : incomplete ? <span className={`${styles.chip} ${styles.chipNg}`}>未完</span>
                               : <span className={`${styles.chip} ${styles.chipOk}`}>済み</span>}
                         </td>
@@ -598,7 +584,7 @@ function Responses() {
               </table>
               <div className={styles.pager}>
                 <span className={styles.range}>
-                  {total === null ? '—' : <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />}
+                  {total === null ? emptyValue('unknown') : <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />}
                 </span>
                 <Pagination page={page} pageCount={pageCount} disabled={loading} ariaLabel="回答一覧のページ送り" onPageChange={(next) => void load(next, pageSize)} />
               </div>

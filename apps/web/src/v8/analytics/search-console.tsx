@@ -1,12 +1,5 @@
 'use client'
-
-/*
- * ★V8 Search Console（Pencil `h1G4d`・`/search-console`）。
- * 板の頭（CSV）→ 数の帯（合計クリック数・合計表示回数・平均CTR・平均掲載順位）→ 道具の段
- * （対象プロパティ・連携中・期間・連携を設定）→ 検索クリックの推移 → キーワード・ページ上位・デバイス別 → 見かたの注意。
- * つないでいないとき・閲覧権限が無いときは設定の案内。
- * 呼ぶ口（`api.searchConsole.performance(days)`）・403 とそれ以外の失敗の言い分け・CSV は今の画面（app/search-console/page.tsx）と同じ。
- */
+import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
 import { useEffect, useState } from 'react'
 import { Download, Eye, ListOrdered, MousePointerClick, Percent, SlidersHorizontal } from 'lucide-react'
 import { ListPage } from '@/components/templates'
@@ -14,7 +7,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import SegmentedControl from '@/components/shared/segmented'
+import PeriodPicker from '@/components/shared/period-picker'
 import Select from '@/components/shared/select'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -23,6 +16,18 @@ import { csvCell } from '@/lib/presentation'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { StatePill, shortDay } from './common'
 import styles from './analytics.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 Search Console（Pencil `h1G4d`・`/search-console`）。
+ * 板の頭（CSV）→ 数の帯（合計クリック数・合計表示回数・平均CTR・平均掲載順位）→ 道具の段
+ * （対象プロパティ・連携中・期間・連携を設定）→ 検索クリックの推移 → キーワード・ページ上位・デバイス別 → 見かたの注意。
+ * つないでいないとき・閲覧権限が無いときは設定の案内。
+ * 呼ぶ口（`api.searchConsole.performance(days)`）・403 とそれ以外の失敗の言い分け・CSV は今の画面（app/search-console/page.tsx）と同じ。
+ */
 
 const RANGES = [7, 28, 90] as const
 type RangeDays = typeof RANGES[number]
@@ -56,8 +61,8 @@ function SetupCard({ setup, denied }: { setup: SearchConsoleSetup | null; denied
   return <section className={styles.flowCard} data-w="full" aria-labelledby="sc-setup-title">
     <h2 id="sc-setup-title" className={styles.hoursTitle}>{denied ? '閲覧権限の確認が必要です' : 'Search Consoleとつなぐ設定'}</h2>
     <p className={styles.observation}>Search Consoleで対象プロパティを開き、サービスアカウントを「制限付きユーザー」として追加すると、検索データを読み取り専用で表示できます。</p>
-    <div className={styles.compareRow}><span className={styles.flowLabel} data-size="row">対象プロパティ</span><span className={styles.spacer} /><strong title={setup?.siteUrl ?? ''}>{setup?.siteUrl ?? '未設定'}</strong></div>
-    <div className={styles.compareRow}><span className={styles.flowLabel} data-size="row">追加するアカウント</span><span className={styles.spacer} /><strong title={setup?.serviceAccountEmail ?? ''}>{setup?.serviceAccountEmail ?? '未設定'}</strong></div>
+    <div className={styles.compareRow}><span className={styles.flowLabel} data-size="row">対象プロパティ</span><span className={styles.spacer} /><strong title={setup?.siteUrl ?? ''}>{setup?.siteUrl ?? emptyValue('unconfigured')}</strong></div>
+    <div className={styles.compareRow}><span className={styles.flowLabel} data-size="row">追加するアカウント</span><span className={styles.spacer} /><strong title={setup?.serviceAccountEmail ?? ''}>{setup?.serviceAccountEmail ?? emptyValue('unconfigured')}</strong></div>
   </section>
 }
 
@@ -109,22 +114,22 @@ export default function SearchConsoleV8() {
     const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `search-console-${data.startDate}_${data.endDate}.csv`
+    anchor.download = csvFileName("Search Console")
     anchor.click()
     URL.revokeObjectURL(url)
   }
   const settingsSiteUrl = data?.siteUrl ?? setup?.siteUrl
   const settingsHref = settingsSiteUrl ? `https://search.google.com/search-console/users?resource_id=${encodeURIComponent(settingsSiteUrl)}` : null
-  const periodControl = <SegmentedControl aria-label="集計期間" value={String(days)} options={RANGES.map((range) => ({ value: String(range), label: `${range}日` }))} onChange={(value) => setDays(Number(value) as RangeDays)} />
-  const settingsButton = settingsHref ? <Button variant="secondary" href={settingsHref} target="_blank" rel="noreferrer"><SlidersHorizontal size={15} aria-hidden="true" />連携を設定</Button> : null
+  const periodControl = <SaveErrorField names={["days"]}><PeriodPicker days={days} onChange={(value) => setDays(value as RangeDays)} supportedDays={RANGES} /></SaveErrorField>
+  const settingsButton = settingsHref ? <Button external variant="secondary" href={settingsHref}  ><SlidersHorizontal size={15} aria-hidden="true" />連携を設定</Button> : null
   const maxDaily = Math.max(1, ...(data?.daily ?? []).map((row) => row.clicks))
   const middle = data ? data.daily[Math.floor(data.daily.length / 2)] : null
 
   return <ListPage
     boardId="h1G4d"
     title="Search Console"
-    description={<span className={styles.description}>Google の検索から、どのキーワード・どのページで人が来たかを見ます。サイトスクリプトとつなぐと、検索から友だち追加までを結べます。</span>}
-    actions={<Button variant="secondary" onClick={exportCsv} disabled={!data || loading}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>}
+    help={<span className={styles.description}>Google の検索から、どのキーワード・どのページで人が来たかを見ます。サイトスクリプトとつなぐと、検索から友だち追加までを結べます。</span>}
+    actions={<Button variant="secondary" onClick={exportCsv} disabled={!data || loading}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>}
   >
     {loading ? <div className={styles.body} data-gap="tab"><DelayedSkeleton loading skeleton={<Skeleton className="block h-36 w-full rounded-card" />} /></div>
       : loadError ? <div className={styles.body} data-gap="tab"><ListState kind="error" error={loadError} onRetry={() => setAttempt((current) => current + 1)} /></div>
@@ -145,9 +150,7 @@ export default function SearchConsoleV8() {
         </KpiBand>
         <div className={styles.body} data-gap="tab">
           <div className={styles.controls} data-gap="narrow">
-            <label className={styles.field} data-w="property"><span className={styles.fieldLabel}>対象プロパティ</span>
-              <Select id="search-property" aria-label="対象プロパティ" size="full" value={data.siteUrl} disabled onChange={() => {}} options={[{ value: data.siteUrl, label: data.siteUrl }]} />
-            </label>
+            <Field label="対象プロパティ"><SaveErrorField names={["siteUrl","data.siteUrl","site_url","data.site_url"]}><Select id="search-property" aria-label="対象プロパティ" size="full" value={data.siteUrl} disabled onChange={() => {}} options={[{ value: data.siteUrl, label: data.siteUrl }]} /></SaveErrorField></Field>
             <span className={styles.pillSlot}><StatePill tone="ok">連携中</StatePill></span>
             {periodControl}
             <span className={styles.spacer} />
@@ -156,7 +159,7 @@ export default function SearchConsoleV8() {
           <section className={styles.flowCard} data-w="full" aria-labelledby="sc-trend-title">
             <h2 id="sc-trend-title" className={styles.hoursTitle}>検索クリックの推移（日別クリック数）</h2>
             {data.daily.length === 0 ? <ListState kind="empty" title="期間内のデータがありません" description="集計期間を変えると、ここに推移が出ます。" /> : <>
-              <div className={styles.hourBars} role="img" aria-label="日別クリック数の推移">{data.daily.map((row) => <span key={row.key} className={styles.hourBar} data-empty={row.clicks === 0 || undefined} title={`${row.key}：${formatNumber(row.clicks)}クリック`} style={{ height: `${Math.max(2, row.clicks / maxDaily * 100)}%` }} />)}</div>
+              <ValueBarChart label="日別クリック数の推移" unit="クリック" items={data.daily.map(row=>({key:row.key,label:row.key,value:row.clicks}))} />
               <div className={styles.scAxis}><span>{shortDay(data.daily[0].key)}</span><span>{middle ? shortDay(middle.key) : ''}</span><span>{`${shortDay(data.daily[data.daily.length - 1].key)}（反映待ち）`}</span></div>
             </>}
           </section>

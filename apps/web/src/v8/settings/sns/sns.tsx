@@ -1,16 +1,6 @@
 'use client'
-
-/**
- * ★V8-B 設定 › SNS 連携（`YINmJ` 未接続 ／ `DFnll` Instagram 接続済み、2026-10-07 利用者承認）。
- *
- * Googleビジネスと Instagram を1列のカードで縦に並べる。
- * Instagram は「Instagram にログインして接続」だけで繋がる（ページを選ぶ段は無い）。
- * 繋ぐ目的は Googleビジネスの投稿を Instagram へ同時に出すこと。
- */
-
 import React, { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-/* lucide には Instagram の印が無いので、写真の印（Camera）を使う。 */
 import { Camera, RefreshCw, Settings } from 'lucide-react'
 import type { InstagramConnectionStatus } from '@line-crm/shared'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -24,6 +14,20 @@ import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant
 import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import styles from './sns.module.css'
+import { formatDate } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/**
+ * ★V8-B 設定 › SNS 連携（`YINmJ` 未接続 ／ `DFnll` Instagram 接続済み、2026-10-07 利用者承認）。
+ *
+ * Googleビジネスと Instagram を1列のカードで縦に並べる。
+ * Instagram は「Instagram にログインして接続」だけで繋がる（ページを選ぶ段は無い）。
+ * 繋ぐ目的は Googleビジネスの投稿を Instagram へ同時に出すこと。
+ */
+
+/* lucide には Instagram の印が無いので、写真の印（Camera）を使う。 */
 
 const GOOGLE_STATE: Record<string, string> = {
   connected: '接続しています',
@@ -57,6 +61,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function SnsSettingsPage() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('SNS 連携')
   usePageCrumbs([{ label: '設定', href: '/settings' }])
   useHideSettingsNav()
@@ -64,7 +69,7 @@ export default function SnsSettingsPage() {
   const searchParams = useSearchParams()
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
-  const canManage = role === null || canManageRole(role)
+  const canManage = canManageRole(role)
 
   const [google, setGoogle] = useState<GoogleConnectionData | null>(null)
   const [googleError, setGoogleError] = useState<unknown>(null)
@@ -109,9 +114,11 @@ export default function SnsSettingsPage() {
       const res = await api.instagram.start(selectedAccountId)
       if (!res.success) throw new Error(res.error)
       window.location.href = res.data.url
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
       setBusy(false)
-      setActionError('Instagram のログイン画面を開けませんでした。もう一度お試しください。')
+      { if (!fieldFailure)
+      setActionError('Instagram のログイン画面を開けませんでした。もう一度お試しください。') }
     }
   }
 
@@ -122,8 +129,11 @@ export default function SnsSettingsPage() {
     try {
       await api.instagram.refresh(selectedAccountId)
       await load()
-    } catch {
-      setActionError('接続を確かめられませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('接続を確かめられませんでした。もう一度お試しください。') }
     } finally {
       setBusy(false)
     }
@@ -141,17 +151,20 @@ export default function SnsSettingsPage() {
       }
       setConfirm(null)
       await load()
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
       setActionError(confirm === 'google'
         ? 'Googleビジネスの接続を解除できませんでした。もう一度お試しください。'
-        : 'Instagram の接続を解除できませんでした。もう一度お試しください。')
+        : 'Instagram の接続を解除できませんでした。もう一度お試しください。') }
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <PageFrame kind="list" boardId="y3GGTs">
+    <SaveErrorScope errors={saveErrors}><PageFrame kind="list" boardId="y3GGTs">
       <PageHeading
         headingSize="compact"
         title="SNS 連携"
@@ -178,9 +191,10 @@ export default function SnsSettingsPage() {
             <>
               <Row label="いまの状態" value={GOOGLE_STATE[google.connection.status] ?? '—'} />
               <Row label="接続しているビジネス" value={google.connection.locationTitle ?? '—'} />
+              <Row label="最終同期" value={formatDate(google.connection.lastSyncedAt, { style: 'detail', fallback: '—' })} />
               <div className={styles.actions}>
                 <Button variant="secondary" href="/restaurant-test/google?tab=settings">
-                  <Settings size={15} />
+                  <Settings size={16} />
                   Googleビジネスの設定を開く
                 </Button>
                 {googleConnected && canManage ? (
@@ -212,7 +226,7 @@ export default function SnsSettingsPage() {
                 <>
                   <Row
                     label="接続しているアカウント"
-                    value={igConnection.username ? `@${igConnection.username}（ビジネス）` : igConnection.pageName || '—'}
+                    value={igConnection.username ? `@${igConnection.username}（ビジネス）` : igConnection.pageName || emptyValue('unknown')}
                   />
                   <Row label="できること" value="写真つき投稿の同時公開" />
                 </>
@@ -227,12 +241,12 @@ export default function SnsSettingsPage() {
               {canManage && igState !== 'unconfigured' ? (
                 <div className={styles.actions}>
                   {igState === 'connected' ? (
-                    <Button variant="secondary" onClick={() => void checkInstagram()} disabled={busy}>
+                    <Button variant="secondary" onClick={() => void checkInstagram()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
                       <RefreshCw size={15} />
                       接続を確かめる
                     </Button>
                   ) : (
-                    <Button variant="primary" onClick={() => void connectInstagram()} disabled={busy}>
+                    <Button variant="primary" onClick={() => void connectInstagram()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
                       <Camera size={15} aria-hidden />
                       Instagram にログインして接続
                     </Button>
@@ -259,7 +273,7 @@ export default function SnsSettingsPage() {
         description="解除すると、口コミの取り込みと投稿の公開が止まります。あとでもう一度つなぎ直せます。"
         confirmLabel="解除する"
         busy={busy}
-        onConfirm={() => void runDisconnect()}
+        onConfirm={() => runDisconnect()}
         onCancel={() => setConfirm(null)}
       />
       <ConfirmDialog
@@ -269,9 +283,9 @@ export default function SnsSettingsPage() {
         description="解除すると、Googleビジネスの投稿を Instagram へ同時に出せなくなります。あとでもう一度つなぎ直せます。"
         confirmLabel="解除する"
         busy={busy}
-        onConfirm={() => void runDisconnect()}
+        onConfirm={() => runDisconnect()}
         onCancel={() => setConfirm(null)}
       />
-    </PageFrame>
+    </PageFrame></SaveErrorScope>
   )
 }

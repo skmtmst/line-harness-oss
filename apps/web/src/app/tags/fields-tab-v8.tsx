@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8 タグ「友だち情報欄」タブの一覧（Pencil `q5gbcM`、状態 `U0aKD`）。
- *
- * 項目もフォルダを持つので、タグと同じく左にフォルダの列を出す
- * （folders.kind = 'friend_field'。こちらは共通の folders 表なので
- * FolderAddDialog がそのまま使える）。
- * 数え方・並べ替え・削除の安全確認は v7（`field-list.tsx`）と同じ関数を使う。
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -42,6 +33,18 @@ import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { TagRowsSkeleton } from './tag-rows-skeleton'
 import styles from './list-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 タグ「友だち情報欄」タブの一覧（Pencil `q5gbcM`、状態 `U0aKD`）。
+ *
+ * 項目もフォルダを持つので、タグと同じく左にフォルダの列を出す
+ * （folders.kind = 'friend_field'。こちらは共通の folders 表なので
+ * FolderAddDialog がそのまま使える）。
+ * 数え方・並べ替え・削除の安全確認は v7（`field-list.tsx`）と同じ関数を使う。
+ */
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -277,7 +280,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   /** 行の「…」。編集・移行・削除。 */
@@ -360,7 +363,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
         {kpis.map((kpi) => (
           <div key={kpi.title} className={styles.kpi}>
             <span className={styles.kpiLabel}><kpi.icon size={13} aria-hidden="true" />{kpi.title}</span>
-            <p className={styles.kpiValue}>{kpi.value ?? '—'}<span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span></p>
+            <p className={styles.kpiValue}>{kpi.value ?? emptyValue('unknown')}<span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span></p>
             <p className={styles.kpiDetail}>{kpi.detail}</p>
           </div>
         ))}
@@ -409,28 +412,28 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
               <Button type="button" variant="primary" className={styles.toolbarCreate} disabled>＋ 項目を作る</Button>
             )}
             <div className={styles.folderSelectWrap}>
-              <Select
+              <SaveErrorField names={["folderFilter","folder_filter"]}><Select
                 aria-label="フォルダ"
                 value={folderFilter}
                 onChange={setFolderFilter}
                 options={folderSelectOptions}
-              />
+              /></SaveErrorField>
             </div>
             <div className={styles.searchWrap}>
               <SearchField
-                aria-label="項目名で検索"
-                placeholder="項目名で検索"
+                aria-label="項目名で探す"
+                placeholder="項目名で探す"
                 value={query}
                 onChange={setQuery}
                 onClear={() => setQuery('')}
               />
             </div>
-            <Select
+            <SaveErrorField names={["type"]}><Select
               aria-label="項目の種類"
               value={type}
               onChange={(value) => setType(value as typeof type)}
               options={[{ value: 'all', label: '種類：すべて' }, ...Object.entries(FIELD_TYPE_LABELS).map(([value, label]) => ({ value, label }))]}
-            />
+            /></SaveErrorField>
           </div>
 
           {actionError ? (
@@ -459,7 +462,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
               </span>
               <p className={styles.stateTitle}>友だち情報欄を読み込めませんでした</p>
               <p className={styles.stateDesc}>{error || '再読み込みしても直らない場合はエラー報告へ。'}</p>
-              <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+              <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度試す</Button>
             </div>
           ) : items.length === 0 ? (
             <div className={styles.stateCard}>
@@ -533,9 +536,9 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
                             </ContextMenu>
                           </td>
                           <td className={styles.cellText}>{FIELD_TYPE_LABELS[field.type] ?? field.type}</td>
-                          <td className={styles.cellText} style={{ fontVariantNumeric: 'tabular-nums' }}>{knownUsageCount(field) ?? '—'}{knownUsageCount(field) === null ? '' : '人'}</td>
+                          <td className={styles.cellText} style={{ fontVariantNumeric: 'tabular-nums' }}>{knownUsageCount(field) ?? emptyValue('unknown')}{knownUsageCount(field) === null ? '' : '人'}</td>
                           <td className={styles.cellMuted} title={field.formUsageCount === undefined ? '回答フォームの使用数は未集計' : undefined}>
-                            {field.formUsageCount === undefined ? '—' : `${field.formUsageCount}個`}
+                            {field.formUsageCount === undefined ? emptyValue('unknown') : `${field.formUsageCount}個`}
                           </td>
                           <td className={styles.cellMuted}><span className={styles.cellTruncate} title={destinationLabel(field)}>{destinationLabel(field)}</span></td>
                           <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
@@ -574,7 +577,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
                   {visible.length}件中 {visible.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}〜{Math.min(currentPage * pageSize, visible.length)}件
                 </span>
                 <div className={styles.pagerRight}>
-                  <Select
+                  <SaveErrorField names={["pageSize","page_size"]}><Select
                     aria-label="表示件数"
                     size="page-size"
                     value={String(pageSize)}
@@ -586,7 +589,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
                       { value: '50', label: '50件表示' },
                       { value: '100', label: '100件表示' },
                     ]}
-                  />
+                  /></SaveErrorField>
                   <Pagination
                     page={currentPage}
                     pageCount={pages}
@@ -654,11 +657,11 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
             </div>
             <div>
               <dt className={styles.cellMuted}>使っている友だち</dt>
-              <dd className={styles.cellText}>{knownUsageCount(activeField) === null ? '—' : `${knownUsageCount(activeField)}人`}</dd>
+              <dd className={styles.cellText}>{knownUsageCount(activeField) === null ? emptyValue('unknown') : `${knownUsageCount(activeField)}人`}</dd>
             </div>
             <div>
               <dt className={styles.cellMuted}>回答フォームの使用数</dt>
-              <dd className={styles.cellText}>{activeField.formUsageCount === undefined ? '—' : `${activeField.formUsageCount}個`}</dd>
+              <dd className={styles.cellText}>{activeField.formUsageCount === undefined ? emptyValue('unknown') : `${activeField.formUsageCount}個`}</dd>
             </div>
             <div>
               <dt className={styles.cellMuted}>移行先</dt>
@@ -674,7 +677,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
           folder={folderDialog === 'new' ? undefined : folderDialog}
           accountId={accountId}
           note="項目を分けてしまう箱です。消しても、入っていた項目は未分類として残ります。"
-          placeholder="例: 基本情報"
+          placeholder="例：基本情報"
           onClose={() => setFolderDialog(null)}
           onAdded={() => { setFolderDialog(null); void loadFolders() }}
         />

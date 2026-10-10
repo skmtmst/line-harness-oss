@@ -14,6 +14,7 @@ import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import { formatNumber } from '@/lib/format'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /**
  * 一覧の `DeleteTagDialog` (`tags-page-v4.tsx`) と同じ分け方。
@@ -87,7 +88,7 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
         </dl>
       </div>
       <Notice tone="danger" className="mt-4">アフィリエイトや外部連携で使用中の場合は削除できません。削除後は元に戻せません。</Notice>
-      <label className="mt-5 block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため「{tag.name}」と入力してください</span><input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={blocked || deleting} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-danger disabled:bg-canvas-sunken" /></label>
+      <label className="mt-5 block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため「{tag.name}」と入力してください</span><SaveErrorField names={["confirmation"]}><input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={blocked || deleting} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-danger disabled:bg-canvas-sunken" /></SaveErrorField></label>
     </Dialog>
   )
 }
@@ -109,6 +110,8 @@ export function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
   onCancel: () => void
   onSaved: (updated: Tag) => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [name, setName] = useState(tag.name)
   const [description, setDescription] = useState(tag.description ?? '')
   const [saving, setSaving] = useState(false)
@@ -129,31 +132,35 @@ export function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
       notifyToast(result.data.replayed ? '保存済みでした。' : '保存しました。')
       onSaved(result.data.tag)
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
       // 500等は ApiError の内部文（API error: 500）を出さず、既存の保存失敗案内へ。
-      setError(describeSaveFailure(reason))
+      { if (!fieldFailure) setError(describeSaveFailure(reason)) }
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div className="mx-auto max-w-[680px] space-y-4 p-6">
+    <SaveErrorScope errors={saveErrors}><div className="mx-auto max-w-[680px] space-y-4 p-6">
       <Notice tone="warn">
         <p className="font-bold">このタグは保管済みです</p>
         <p className="mt-1 text-xs leading-5">保管済みのタグは、あとから元に戻す機能がありません。誤字などの表示名の訂正だけできます。フォルダ・付与のしかた・マイル・連動アクションなどの設定は変更できません。</p>
       </Notice>
       {error && <Notice tone="danger">{error}</Notice>}
-      <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名</span><input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm" /></label>
-      <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">説明</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm" /></label>
+      <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名</span><SaveErrorField names={["name"]}><input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm" /></SaveErrorField></label>
+      <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">説明</span><SaveErrorField names={["description"]}><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm" /></SaveErrorField></label>
       <div className="flex justify-end gap-2">
         <Button onClick={onCancel}>キャンセル</Button>
         <Button variant="primary" onClick={() => void save()} disabled={saving || !name.trim()} busy={saving}>保存する</Button>
       </div>
-    </div>
+    </div></SaveErrorScope>
   )
 }
 
 export default function EditTagPageV4() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('タグを編集')
   const router = useRouter()
   const params = useSearchParams()
@@ -201,10 +208,12 @@ export default function EditTagPageV4() {
       setDefinition(detail.data)
       setTag({ ...detail.data.tag, friendCount: dependenciesResult.success ? dependenciesResult.data.friendCount : detail.data.tag.friendCount })
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (caught instanceof ApiError && caught.status === 404) {
         setTagMissing(true)
       } else {
-        setError('読み込みに失敗しました。もう一度読み込んでください。')
+        { if (!fieldFailure) setError('読み込みに失敗しました。もう一度読み込んでください。') }
       }
       // 参照だけ取れていたのに消すと、窓が「取れていない」扱いになる。
       // 取れていた分は残し、まだ無いときだけ失敗にする。
@@ -212,7 +221,7 @@ export default function EditTagPageV4() {
     } finally {
       setLoading(false)
     }
-  }, [tagId, selectedAccountId])
+  }, [tagId, selectedAccountId, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -254,8 +263,10 @@ export default function EditTagPageV4() {
       }
       await load()
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
       // 500等は ApiError の内部文（API error: 500）を出さず、既存の保存失敗案内へ。
-      setError(describeSaveFailure(reason))
+      { if (!fieldFailure) setError(describeSaveFailure(reason)) }
     } finally {
       setSaving(false)
     }
@@ -269,53 +280,55 @@ export default function EditTagPageV4() {
       if (!result.success) throw new Error(result.error)
       router.push('/tags')
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure) setError(reason instanceof Error ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。') }
       setDeleteOpen(false)
     } finally {
       setDeleting(false)
     }
   }
 
-  if (loading) return <p className="p-6 text-sm text-ink-faint">読み込み中…</p>
+  if (loading) return <SaveErrorScope errors={saveErrors}><p className="p-6 text-sm text-ink-faint">読み込み中…</p></SaveErrorScope>
   if (!tagId) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="unspecified"
         title="編集するタグが指定されていません"
         description="一覧から編集するタグを選び直してください。"
         backHref="/tags"
         backLabel="タグ一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
-  if (!selectedAccountId) return <Notice tone="warn">LINE公式アカウントを選んでください。</Notice>
+  if (!selectedAccountId) return <SaveErrorScope errors={saveErrors}><Notice tone="warn">LINE公式アカウントを選んでください。</Notice></SaveErrorScope>
   if ((!tag || !definition) && (tagMissing || !error)) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="not-found"
         title="このタグは見つかりません"
         description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。"
         accountName={selectedAccount?.name}
         backHref="/tags"
         backLabel="タグ一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
   if (!tag || !definition) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="error"
         title="タグを読み込めませんでした"
         description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
         onRetry={() => void load()}
-      />
+      /></SaveErrorScope>
     )
   }
 
   // 保管済み(archived)タグは、通常の編集フォームを出さない(#710)。
   if (tag.status === 'archived') {
     return (
-      <ArchivedTagEditor
+      <SaveErrorScope errors={saveErrors}><ArchivedTagEditor
         tag={tag}
         accountId={selectedAccountId}
         onCancel={() => router.push('/tags')}
@@ -324,14 +337,14 @@ export default function EditTagPageV4() {
         // （画面が全部作り直されるため）。保存直後は PATCH の戻り値で
         // その場を更新するだけにする。
         onSaved={(updated) => setTag((current) => (current ? { ...current, ...updated } : current))}
-      />
+      /></SaveErrorScope>
     )
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <TagEditorV4 key={`${tag.id}:${tag.version ?? 1}`} mode="edit" groups={groups} tag={tag} accountId={selectedAccountId} initialApplyToExisting={retroactiveReference} initialRetroactiveOpen={retroactiveReference} referenceRetroactiveState={retroactiveReference} initialValues={{ reapplyPolicy: tag.reapplyPolicy ?? 'first_only', actions: (definition.automation?.actions ?? []).map((action) => linkedActionFromDefinition(action, tag.linkedActions?.find((saved) => saved.id === action.id))) }} saving={saving} error={error} notice={notice} onCancel={() => router.push('/tags')} onSave={save} onDelete={() => setDeleteOpen(true)} />
       {deleteOpen && <DeleteDialog tag={tag} dependencies={dependencies} dependenciesStatus={dependenciesStatus} deleting={deleting} onCancel={() => setDeleteOpen(false)} onDelete={() => void remove()} />}
-    </>
+    </></SaveErrorScope>
   )
 }

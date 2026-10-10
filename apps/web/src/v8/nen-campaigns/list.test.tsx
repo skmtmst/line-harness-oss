@@ -18,10 +18,7 @@ const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 
 // 行の「…」の移動は router.push（画面を丸ごと読み直さない）。
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }) }))
-vi.mock('next/link', () => ({
-  default: ({ children, href, className, title }: { children: React.ReactNode; href: string; className?: string; title?: string }) =>
-    React.createElement('a', { href, className, title }, children),
-}))
+vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a> }))
 
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
@@ -116,7 +113,7 @@ describe('V8 NEN配信の一覧', () => {
     expect(rowNames()).toEqual(['注文ありがとうございます', '口コミのお願い', 'お誕生日クーポン', '困っていませんか'])
     expect(host.textContent).toContain('自動配信 4')
     expect(host.textContent).toContain('停止中 1')
-    expect(host.textContent).toContain('4件中 1〜4件')
+    expect(host.textContent).toContain('4 件中 1〜4 件')
   })
 
   it('札「止めている」で止めている配信だけになり、もう一度押すと戻る', async () => {
@@ -182,7 +179,7 @@ describe('V8 NEN配信の一覧', () => {
     const props = baseProps({ couponOpen: true })
     await render(props)
     expect(document.body.textContent).toContain('誕生日クーポンの決めごと')
-    expect(document.body.textContent).toContain('お誕生日月限定クーポン 500円引き')
+    expect(document.body.textContent).toContain('お誕生日月限定クーポン ¥500引き')
     await act(async () => { fireEvent.click(button('設定を保存する')!) })
     expect(props.onSaveCoupon).toHaveBeenCalled()
     await act(async () => { fireEvent.click(button('キャンセル')!) })

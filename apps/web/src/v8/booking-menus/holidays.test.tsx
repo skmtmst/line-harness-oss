@@ -45,7 +45,7 @@ describe('休業日の削除の失敗（WEB055）', () => {
     const settings = { exceptions: [item] } as unknown as BookingSettings
     render(<HolidaysTabV8 accountId="a" settings={settings} status="ready" error={null} exceptions={[item]} closedWeekdays={[]} bookingCountOnClosed={0} canEdit onSaved={() => undefined} onReload={() => undefined} />)
     await act(async () => { screen.getByRole('button', { name: '削除' }).click() })
-    await act(async () => { screen.getByRole('button', { name: '休業日を削除する' }).click() })
+    await act(async () => { screen.getByRole('button', { name: '削除する', exact: true }).click() })
     await waitFor(() => expect(net.deleteException).toHaveBeenCalled())
     const dialog = await screen.findByRole('alertdialog').catch(() => screen.getByRole('dialog'))
     expect(dialog.textContent).toContain('削除')

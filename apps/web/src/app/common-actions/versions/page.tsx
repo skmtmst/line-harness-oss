@@ -276,7 +276,7 @@ function CommonActionVersionsInner() {
           { label: '版と使われている場所' },
         ]}
         title="版と使われている場所"
-        description={`「${detail.name}」の公開履歴と、版を固定している利用先を確認します。`}
+        help={`「${detail.name}」の公開履歴と、版を固定している利用先を確認します。`}
         actions={(
           <>
             {canManage && draft ? (
@@ -369,7 +369,6 @@ function CommonActionVersionsInner() {
                     */}
                     <NameCell
                       name={<span className="block truncate" title={binding.consumerId}>{CONSUMER_LABELS[binding.consumerType] ?? binding.consumerType}</span>}
-                      sub={<span className="block truncate" title={binding.consumerPath}>{binding.consumerPath || '全体'}</span>}
                     />
                     <Td>
                       <span className="text-ink-secondary">v{binding.versionNumber}</span>

@@ -1,15 +1,7 @@
 'use client'
 
-/*
- * ★V8 統括のメンバーの窓（Pencil `yLKwV` 権限者を招待・`BHEl9` 権限を変更する・`M4jS9` 変える前の確認）。
- *
- * 読み書きの中身は v7（components/hq/members/member-dialog.tsx）と同じ：
- *   招待＝名前・メール・役割・担当範囲・最初に表示するアカウント
- *   変更＝役割・担当範囲・最初に表示するアカウント・状態（名前とメールは本人が持つ）
- * 見た目だけを絵どおりに組んだ：幅 620・上から 110 の窓、欄は全幅で縦に並べ、担当範囲と状態は
- * 行内のラジオ、担当するアカウントは枠の中に縦1列のチェック、下の帯は線の下で真ん中寄せ。
- * 窓の枠・×・題は共通の Dialog、頭の寸法は dialog-head.module.css。
- */
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { Field } from '@/components/shared/form-controls'
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Send, ShieldCheck } from 'lucide-react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
@@ -26,6 +18,20 @@ import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import head from './dialog-head.module.css'
 import styles from './member-dialog.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+
+/*
+ * ★V8 統括のメンバーの窓（Pencil `yLKwV` 権限者を招待・`BHEl9` 権限を変更する・`M4jS9` 変える前の確認）。
+ *
+ * 読み書きの中身は v7（components/hq/members/member-dialog.tsx）と同じ：
+ *   招待＝名前・メール・役割・担当範囲・最初に表示するアカウント
+ *   変更＝役割・担当範囲・最初に表示するアカウント・状態（名前とメールは本人が持つ）
+ * 見た目だけを絵どおりに組んだ：幅 620・上から 110 の窓、欄は全幅で縦に並べ、担当範囲と状態は
+ * 行内のラジオ、担当するアカウントは枠の中に縦1列のチェック、下の帯は線の下で真ん中寄せ。
+ * 窓の枠・×・題は共通の Dialog、頭の寸法は dialog-head.module.css。
+ */
 
 /** 絵 `yLKwV`・`BHEl9` の窓の幅と上からの位置（px）。 */
 const MEMBER_WIDTH = 620
@@ -50,13 +56,7 @@ export type MemberDialogValue = {
  * 絵 `yLKwV` の「10/9（金）18:40」の形で出す。
  */
 export function inviteExpiryLabel(now: Date = new Date()): string {
-  const at = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric',
-    weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).formatToParts(at)
-  const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${pick('month')}/${pick('day')}（${pick('weekday')}）${pick('hour')}:${pick('minute')}`
+  return polishFormatDate(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), { style: 'detail', now })
 }
 
 /** 担当範囲で選べるアカウント。アーカイブしたものは選ばせない（今の担当範囲に入っているものは残す）。 */
@@ -203,16 +203,20 @@ export default function MemberDialogV8({
         {!member ? (
           <div className={styles.pair}>
             <FormField label="名前" htmlFor={`${uid}-name`} error={fieldErrors.name}>
-              <TextField id={`${uid}-name`} value={value.name} maxLength={100} disabled={busy} autoFocus invalid={Boolean(fieldErrors.name)} onChange={(e) => set('name', e.target.value)} className={styles.full} placeholder="例: 山田 太郎" />
+              <SaveErrorField names={["name","value.name"]}><TextField id={`${uid}-name`} value={value.name} maxLength={100} disabled={busy} autoFocus invalid={Boolean(fieldErrors.name)} onChange={(e) => set('name', e.target.value)} className={styles.full} placeholder="例：山田 太郎" /></SaveErrorField>
+
             </FormField>
             <FormField label="メールアドレス" htmlFor={`${uid}-email`} error={fieldErrors.email}>
-              <TextField id={`${uid}-email`} type="email" value={value.email} disabled={busy} invalid={Boolean(fieldErrors.email)} onChange={(e) => set('email', e.target.value)} className={styles.full} placeholder="例: staff@example.com" />
+
+              <SaveErrorField names={["email","value.email"]}><TextField id={`${uid}-email`} type="email" value={value.email} disabled={busy} invalid={Boolean(fieldErrors.email)} onChange={(e) => set('email', e.target.value)} className={styles.full} placeholder="例：staff@example.com" /></SaveErrorField>
+
             </FormField>
           </div>
         ) : null}
 
         <Field label="役割" htmlFor={`${uid}-role`} note={isSelf ? '自分の役割は変えられません' : undefined}>
-          <Select
+
+          <SaveErrorField names={["role","value.role"]}><Select
             aria-label="役割"
             size="full"
             id={`${uid}-role`}
@@ -220,14 +224,17 @@ export default function MemberDialogV8({
             disabled={busy || isSelf}
             onChange={(next) => set('role', next as MemberRole)}
             options={roleOptions}
-          />
+          /></SaveErrorField>
+
         </Field>
 
         <div className={styles.group} role="group" aria-labelledby={`${uid}-scope-label`}>
           <span id={`${uid}-scope-label`} className={styles.label}>担当範囲</span>
           <div className={styles.radios}>
-            <Radio name={`${uid}-scope`} value="all" checked={value.accountScope === 'all'} disabled={busy} onChange={() => { set('accountScope', 'all'); set('scopedLineAccountIds', []) }}>全アカウント</Radio>
-            <Radio name={`${uid}-scope`} value="accounts" checked={value.accountScope === 'accounts'} disabled={busy} onChange={() => set('accountScope', 'accounts')}>指定したアカウントだけ</Radio>
+
+            <SaveErrorField names={["accountScope","value.accountScope"]}><Radio name={`${uid}-scope`} value="all" checked={value.accountScope === 'all'} disabled={busy} onChange={() => { set('accountScope', 'all'); set('scopedLineAccountIds', []) }}>全アカウント</Radio></SaveErrorField>
+
+            <SaveErrorField names={["accountScope","value.accountScope"]}><Radio name={`${uid}-scope`} value="accounts" checked={value.accountScope === 'accounts'} disabled={busy} onChange={() => set('accountScope', 'accounts')}>指定したアカウントだけ</Radio></SaveErrorField>
           </div>
           {value.accountScope === 'accounts' ? (
             <div id={`${uid}-scope`} className={styles.checks} role="group" aria-label="担当するアカウント" aria-describedby={fieldErrors.scope ? `${uid}-scope-error` : undefined}>
@@ -245,7 +252,7 @@ export default function MemberDialogV8({
         </div>
 
         <Field label="最初に表示するアカウント" htmlFor={`${uid}-assigned`}>
-          <Select
+          <SaveErrorField names={["assignedLineAccountId","value.assignedLineAccountId","assigned_line_account_id","value.assigned_line_account_id"]}><EntitySelect
             aria-label="最初に表示するアカウント"
             size="full"
             id={`${uid}-assigned`}
@@ -253,8 +260,8 @@ export default function MemberDialogV8({
             disabled={busy}
             error={fieldErrors.assigned}
             onChange={(next) => set('assignedLineAccountId', next)}
-            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-          />
+            options={accounts.map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: a.name }))}
+          /></SaveErrorField>
           <FieldError id={`${uid}-assigned-error`}>{fieldErrors.assigned}</FieldError>
         </Field>
 
@@ -262,7 +269,7 @@ export default function MemberDialogV8({
           <div className={styles.group} role="radiogroup" aria-labelledby={`${uid}-active-label`}>
             <span id={`${uid}-active-label`} className={styles.label}>状態{isSelf ? <span className={styles.note}>自分の状態は変えられません</span> : null}</span>
             <div className={styles.radios}>
-              <Radio name={`${uid}-active`} value="active" checked={value.isActive} disabled={busy || isSelf} onChange={() => set('isActive', true)}>有効（ログインできる）</Radio>
+              <SaveErrorField names={["isActive","value.isActive"]}><Radio name={`${uid}-active`} value="active" checked={value.isActive} disabled={busy || isSelf} onChange={() => set('isActive', true)}>有効（ログインできる）</Radio></SaveErrorField>
               <Radio name={`${uid}-active`} value="inactive" checked={!value.isActive} disabled={busy || isSelf} onChange={() => set('isActive', false)}>無効（ログインできない）</Radio>
             </div>
           </div>
@@ -271,18 +278,6 @@ export default function MemberDialogV8({
         {note ? <p className={styles.callout}>{note}</p> : null}
       </form>
     </Dialog>
-  )
-}
-
-function Field({ label, note, htmlFor, children }: { label: string; note?: string; htmlFor: string; children: ReactNode }) {
-  return (
-    <div className={styles.field}>
-      <div className={styles.labelRow}>
-        <label htmlFor={htmlFor} className={styles.label}>{label}</label>
-        {note ? <span className={styles.note}>{note}</span> : null}
-      </div>
-      {children}
-    </div>
   )
 }
 

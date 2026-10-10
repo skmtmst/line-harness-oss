@@ -22,7 +22,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
 let root: Root
 let host: HTMLDivElement
 const calls: { method: string; path: string }[] = []
-let listItems: unknown[] = []
+let listItems: ReturnType<typeof item>[] = []
 
 const response = (data: unknown, status = 200) => new Response(
   JSON.stringify(data),
@@ -47,6 +47,12 @@ beforeEach(() => {
     calls.push({ method: init?.method ?? 'GET', path: url.pathname })
     if (url.pathname === '/api/scenarios' || url.pathname === '/api/scenarios/') {
       return response({ success: true, data: { items: listItems, total: listItems.length, limit: 20, sort: [] } })
+    }
+    if (url.pathname.startsWith('/api/scenarios/') && init?.method === 'PUT') {
+      const id = url.pathname.split('/').pop()
+      const patch = JSON.parse(String(init.body)) as Partial<ReturnType<typeof item>>
+      listItems = listItems.map((row) => row.id === id ? { ...row, ...patch } : row)
+      return response({ success: true, data: {} })
     }
     if (url.pathname === '/api/folders') return response({ success: true, data: [], unfiledCount: 0 })
     if (url.pathname === '/api/list-stats') return response({ success: false, error: 'not needed' })
@@ -86,7 +92,7 @@ function renderPage() {
   })
 }
 
-test('再開は押した瞬間に稼働中になり、元に戻すで送らずに戻る', async () => {
+test('再開は押した瞬間に有効になり、すぐ保存して元に戻すを出さない', async () => {
   renderPage()
   await eventually(() => {
     if (!host.textContent?.includes('止まっている方')) throw new Error('no rows yet')
@@ -98,21 +104,14 @@ test('再開は押した瞬間に稼働中になり、元に戻すで送らず�
   const resume = [...host.querySelectorAll('button')].find((b) => b.textContent === '再開') as HTMLElement
   expect(resume).toBeTruthy()
   await act(async () => { resume.click() })
-  // 押した瞬間に稼働中の札へ（裏の保存を待たない）。
+  // 押した瞬間に有効の札へ（裏の保存を待たない）。
   await eventually(() => {
-    const pills = [...host.querySelectorAll('span')].filter((s) => s.textContent === '稼働中')
+    const pills = [...host.querySelectorAll('span')].filter((s) => s.textContent === '有効')
     if (pills.length < 2) throw new Error('not yet optimistic')
   })
-  // 知らせの「元に戻す」で送らずに戻せる。
-  const undo = [...host.querySelectorAll('button')].find((b) => b.textContent === '元に戻す') as HTMLElement
-  expect(undo).toBeTruthy()
-  await act(async () => { undo.click() })
   await settle()
-  expect(calls.some((c) => c.path.startsWith('/api/scenarios/') && c.method !== 'GET')).toBe(false)
-  await eventually(() => {
-    const stopped = [...host.querySelectorAll('span')].filter((s) => s.textContent === '停止中')
-    if (stopped.length < 1) throw new Error('not yet reverted')
-  })
+  expect(calls.some((c) => c.path.startsWith('/api/scenarios/') && c.method !== 'GET')).toBe(true)
+  expect([...host.querySelectorAll('button')].some((b) => b.textContent === '元に戻す')).toBe(false)
 })
 
 test('読み込み中は出来上がりと同じ形の骨組みを出す', async () => {
@@ -122,6 +121,12 @@ test('読み込み中は出来上がりと同じ形の骨組みを出す', async
     calls.push({ method: init?.method ?? 'GET', path: url.pathname })
     if (url.pathname === '/api/scenarios' || url.pathname === '/api/scenarios/') {
       return new Promise(() => undefined) as unknown as Response
+    }
+    if (url.pathname.startsWith('/api/scenarios/') && init?.method === 'PUT') {
+      const id = url.pathname.split('/').pop()
+      const patch = JSON.parse(String(init.body)) as Partial<ReturnType<typeof item>>
+      listItems = listItems.map((row) => row.id === id ? { ...row, ...patch } : row)
+      return response({ success: true, data: {} })
     }
     if (url.pathname === '/api/folders') return response({ success: true, data: [], unfiledCount: 0 })
     return response({ success: false, error: 'not needed' })

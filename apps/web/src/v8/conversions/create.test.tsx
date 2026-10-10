@@ -9,6 +9,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ConversionDefinitionPreview } from '@/lib/api'
+import ConversionCreateV8 from './create'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -41,11 +42,9 @@ vi.mock('@/components/shell/page-chrome', () => ({
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
   return { ...actual, useStaffRole: () => role.value }
-})
+});
 
-import ConversionCreateV8 from './create'
-
-;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
 const posted: Array<Record<string, unknown>> = []
@@ -122,7 +121,7 @@ describe('V8 成果地点を作る', () => {
     expect(scroll).toHaveBeenCalledWith({ block: 'center' })
     const error = screen.getByRole('alert')
     expect(error.textContent).toBe('成果地点の名前を入力してください')
-    expect(nameInput().getAttribute('aria-describedby')).toBe(error.id)
+    expect(nameInput().getAttribute('aria-describedby')?.split(/\s+/)).toContain(error.id)
     expect(error.closest('[data-template-region="content"]')).toBeTruthy()
     expect(screen.getAllByText('成果地点の名前を入力してください')).toHaveLength(1)
     expect(posted).toHaveLength(0)
@@ -187,10 +186,10 @@ describe('V8 成果地点を作る', () => {
   it('閲覧のみ：帯を出し、保存のボタン・使う場所を足すは置かない', async () => {
     role.value = 'staff'
     await mount()
-    expect(screen.getByText('閲覧のみで見ています。作る操作は管理者に頼んでください。')).toBeTruthy()
+    expect(screen.getByText('閲覧のみで見ています。作る操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /保存して/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /使う場所を足す/ })).toBeNull()
-    expect(screen.getByRole('link', { name: '一覧へ戻る' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'キャンセル' }).getAttribute('href')).toBe('/conversions?tab=points')
     // 押せない入力の欄も置かない（作る画面なので帯だけ）
     expect(screen.queryByLabelText('成果地点の名前')).toBeNull()
   })

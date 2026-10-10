@@ -316,9 +316,7 @@ describe('V8 自動応答の通し：作る→止める→再開する', () => {
 
     openRowMenu()
     fireEvent.click(within(document.querySelector('[role="menu"]') as HTMLElement).getByText('再開する'))
-    const resumeDialog = await screen.findByRole('dialog')
-    expect(resumeDialog.textContent).toContain('を再開しますか？')
-    fireEvent.click(within(resumeDialog).getByRole('button', { name: '再開する' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
     await waitFor(() => expect(updateReply).toHaveBeenCalledTimes(1))
     await screen.findByText('自動応答を再開しました')
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())

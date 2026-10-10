@@ -32,22 +32,22 @@ describe('最後の細かい板の印', () => {
   })
 
   it('一覧から開く窓にCYJ0Lを付ける', () => {
-    expect(ADV_SEARCH).toMatch(/(?:data-design-node|boardId)="CYJ0L"/)
-    expect(SAVED_SEARCH).toMatch(/(?:data-design-node|boardId)="CYJ0L"/)
-    expect(SINGLE_ACTIONS).toMatch(/(?:data-design-node|boardId)="CYJ0L"/)
-    expect(FRIEND_TABLE).toMatch(/(?:data-design-node|boardId)="CYJ0L"/)
+    expect(ADV_SEARCH).toMatch(/(?:data-design-node|boardId|designNode)="CYJ0L"/)
+    expect(SAVED_SEARCH).toMatch(/(?:data-design-node|boardId|designNode)="CYJ0L"/)
+    expect(SINGLE_ACTIONS).toMatch(/(?:data-design-node|boardId|designNode)="CYJ0L"/)
+    expect(FRIEND_TABLE).toMatch(/(?:data-design-node|boardId|designNode)="CYJ0L"/)
   })
 
   it('予約にacRIl・If9Mhを付ける', () => {
-    expect(BOOKINGS).toMatch(/(?:data-design-node|boardId)="acRIl"/)
+    expect(BOOKINGS).toMatch(/(?:data-design-node|boardId|designNode)="acRIl"/)
     expect(BOOKING_NEW).toContain('If9Mh')
-    expect(BOOKING_DETAIL).toMatch(/(?:data-design-node|boardId)="If9Mh"/)
+    expect(BOOKING_DETAIL).toMatch(/(?:data-design-node|boardId|designNode)="If9Mh"/)
   })
 
   it('受信箱にM0393・ダッシュボードにd8X09・mcOqKを付ける', () => {
-    expect(CHATS).toMatch(/(?:data-design-node|boardId)="M0393"/)
-    expect(DASHBOARD).toMatch(/(?:data-design-node|boardId)="WQmep"/)
-    expect(DASHBOARD_EDITOR).toMatch(/(?:data-design-node|boardId)="mcOqK"/)
+    expect(CHATS).toMatch(/(?:data-design-node|boardId|designNode)="M0393"/)
+    expect(DASHBOARD).toMatch(/(?:data-design-node|boardId|designNode)="WQmep"/)
+    expect(DASHBOARD_EDITOR).toMatch(/(?:data-design-node|boardId|designNode)="mcOqK"/)
   })
 
   it('1152の幅違いを動的に選ぶ（a1k3d・r1l0bT・xHpkS）', () => {

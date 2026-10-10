@@ -241,6 +241,28 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
 
   afterEach(() => sqlite.close());
 
+  test.each(['friend', 'phone', 'liff'] as const)('同じ人の上限は %s からの作成でも守り、完了・取消・他店は数えない', async (source) => {
+    insertBooking(sqlite, { id: 'existing', friend: source === 'phone' ? null : 'f1', customer: source === 'phone' ? 'customer-1' : null, startsAt: futureStartsAt(8) });
+    const { app, env } = makeApp(db);
+    if (source === 'liff') {
+      sqlite.prepare('UPDATE line_accounts SET liff_id=? WHERE id=?').run('test-liff', 'acc1');
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ sub: 'U1', iss: 'https://access.line.me', aud: 'channel-1', exp: 4102444800 }), { status: 200 })));
+    }
+    try {
+      const create = (key: string) => app.request(source === 'liff' ? '/api/liff/booking/requests?liffId=test-liff' : '/api/booking/admin/bookings?account_id=acc1', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key, Authorization: 'Bearer mocked_id_token' },
+        body: JSON.stringify({ ...(source === 'phone' ? { booking_customer_id: 'customer-1' } : { friend_id: 'f1' }), menu_id: 'm1', staff_id: 's1', starts_at: futureStartsAt(), send_line_confirmation: false }),
+      }, env as never, execCtx);
+      const result = await create('over-limit');
+      expect(result.status).toBe(422);
+      expect(await result.json()).toMatchObject({ error: 'booking_limit_reached', fields: { [source === 'phone' ? 'booking_customer_id' : 'friend_id']: expect.stringContaining('予約') } });
+      sqlite.prepare("UPDATE bookings SET status='cancelled' WHERE id='existing'").run();
+      expect((await create('after-cancel')).status).toBe(201);
+      expect((await create('after-cancel')).status).toBe(201);
+      expect(sqlite.prepare("SELECT count(*) n FROM bookings WHERE status IN ('requested','confirmed')").get()).toEqual({ n: 1 });
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   test('経路の設定は保存でき、権限なし・他店舗・不正値は拒否する', async () => {
     const { app, env } = makeApp(db);
     const request = (value: unknown) => app.request('/api/booking/admin/channels/settings?account_id=acc1',{ method:'PUT',headers:{ 'Content-Type':'application/json' },body:JSON.stringify({ autoAssign:value }) },env as never,execCtx);

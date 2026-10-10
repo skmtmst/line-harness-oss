@@ -30,7 +30,7 @@
 }
 
 .panel:focus-visible {
-  outline: var(--bell-focus-ring) solid var(--color-action);
+  outline: var(--bell-focus-ring) solid var(--color-focus-ring);
 }
 
 .head {
@@ -142,7 +142,7 @@
 }
 
 .row:focus-visible {
-  outline: var(--bell-focus-ring) solid var(--color-action);
+  outline: var(--bell-focus-ring) solid var(--color-focus-ring);
   outline-offset: var(--bell-focus-offset);
 }
 

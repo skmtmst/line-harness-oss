@@ -1,4 +1,7 @@
+import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * 予約スタッフの登録（V8）の「サクサク感」（V8 のときだけ）。
  * A: メニュー・ログインユーザーの読み込み中は目に見える「読み込み中」の
@@ -55,7 +58,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   return {
     ...actual,
     ApiError,
-    api: { staff: { list: (...args: unknown[]) => fixture.staffList!(...(args as [])) } },
+    api: { staff: { me: async () => ({ success: true, data: { role: 'owner' } }), list: (...args: unknown[]) => fixture.staffList!(...(args as [])) } },
     bookingApi: {
       listMenus: (...args: unknown[]) => fixture.listMenus!(...(args as [])),
       listStaff: (...args: unknown[]) => fixture.listStaff!(...(args as [])),
@@ -91,6 +94,7 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   memStorage.setItem('lh_staff_role', 'owner')
   document.documentElement.dataset.theme = 'v8'
   fixture.listMenus = async () => ({ menus: MENUS })
@@ -123,6 +127,7 @@ describe('スタッフ登録（V8）の読み込みと登録ボタン', () => {
     await waitFor(() => { expect(document.querySelector('[data-skeleton]')).toBeTruthy() })
 
     await act(async () => { gate.resolve({ menus: MENUS }) })
+    fireEvent.click(await screen.findByRole('button', { name: '予約を受けられるメニュー' }))
     expect(await screen.findByRole('checkbox', { name: /カット/ })).toBeTruthy()
   })
 
@@ -144,10 +149,10 @@ describe('スタッフ登録（V8）の読み込みと登録ボタン', () => {
     const gate = deferred<unknown>()
     fixture.createStaff = vi.fn(() => gate.promise)
     render(<NewBookingStaffPage />)
-    await screen.findByRole('checkbox', { name: /カット/ })
+    await screen.findByRole('button', { name: '予約を受けられるメニュー' })
 
     fireEvent.change(screen.getByPlaceholderText('田中 美咲'), { target: { value: '田中' } })
-    fireEvent.click(screen.getByRole('checkbox', { name: /カット/ }))
+    await pickEntities('予約を受けられるメニュー', ['カット'])
     fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録する' }))
 
     // ボタンの内側だけ登録中に変わり、入力欄は触れるまま。
@@ -159,3 +164,5 @@ describe('スタッフ登録（V8）の読み込みと登録ボタン', () => {
     await waitFor(() => { expect(fixture.push).toHaveBeenCalled() })
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。

@@ -13,12 +13,13 @@
  */
 import type { RefObject } from 'react'
 import { CornerDownLeft, FolderOpen, Send } from 'lucide-react'
-import Dialog from '@/components/shared/dialog'
+import { EntityPickerDialog } from '@/components/shared/entity-picker'
 import Button from '@/components/shared/button'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import Toggle from '@/components/shared/toggle'
 import SearchField from '@/components/shared/search-field'
-import styles from './inbox-chat.module.css'
+import styles from '@/components/shared/entity-picker.module.css'
+import Notice from '@/components/shared/notice'
 
 export type TemplatePickerSideKey = 'frequent' | 'all' | 'none' | `folder:${string}`
 
@@ -68,14 +69,31 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
   ]
 
   return (
-    <Dialog
-      open
+    <EntityPickerDialog
       onCancel={props.onClose}
       title="テンプレートを選ぶ"
-      designWidth={640}
-      designHeaderPadding="var(--tpl-inbox-tp-head-pad)"
-      footer={(
-        <>
+      footer={<>
+            <div className={styles.tpFootLead}>
+              {props.canPack ? (
+                <>
+                  <Toggle checked={packMode} label="2通以上を続けて送る" onChange={props.onPackMode} />
+                  <span className={styles.tpFootText}>
+                    <span className={styles.tpFootTitle}>2通以上を続けて送る</span>
+                    <span className={styles.tpFootSub}>最大5通・選んだ順に送る</span>
+                  </span>
+                </>
+              ) : null}
+            </div>
+            <div className={styles.tpFootActions}>
+              <Button onClick={props.onClose}>キャンセル</Button>
+              <Button variant="primary" onClick={props.onConfirm} disabled={props.confirmDisabled}>
+                {packMode
+                  ? <><Send aria-hidden="true" size={15} />{packItems.length}通を続けて送る</>
+                  : <><CornerDownLeft aria-hidden="true" size={15} />入力欄に入れる</>}
+              </Button>
+            </div>
+      </>}
+    >
           <div className={styles.tpBody}>
             <div className={styles.tpSide}>
               <FolderPanel readOnly rows={folderRows} activeId={side.active} onSelect={(key) => props.onPickSide(key as TemplatePickerSideKey)} />
@@ -129,8 +147,8 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
                 </ul>
               )}
               {props.remaining > 0 ? (
-                <Button variant="secondary" size="compact" onClick={props.onLoadMore} disabled={props.loadingMore}>
-                  {props.loadingMore ? '読み込み中...' : `さらに表示（残り${props.remaining}件）`}
+                <Button variant="secondary" size="compact" onClick={props.onLoadMore} disabled={props.loadingMore} busy={props.loadingMore} busyLabel="読み込み中...">
+                  {`さらに表示（残り${props.remaining} 件）`}
                 </Button>
               ) : null}
             </div>
@@ -149,29 +167,6 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
               <span className={styles.tpBandCount}>{packItems.length} / {PACK_MAX}通</span>
             </div>
           ) : null}
-          <div className={styles.tpFoot}>
-            <div className={styles.tpFootLead}>
-              {props.canPack ? (
-                <>
-                  <Toggle checked={packMode} label="2通以上を続けて送る" onChange={props.onPackMode} />
-                  <span className={styles.tpFootText}>
-                    <span className={styles.tpFootTitle}>2通以上を続けて送る</span>
-                    <span className={styles.tpFootSub}>最大5通・選んだ順に送る</span>
-                  </span>
-                </>
-              ) : null}
-            </div>
-            <div className={styles.tpFootActions}>
-              <Button onClick={props.onClose}>キャンセル</Button>
-              <Button variant="primary" onClick={props.onConfirm} disabled={props.confirmDisabled}>
-                {packMode
-                  ? <><Send aria-hidden="true" size={15} />{packItems.length}通を続けて送る</>
-                  : <><CornerDownLeft aria-hidden="true" size={15} />入力欄に入れる</>}
-              </Button>
-            </div>
-          </div>
-        </>
-      )}
-    />
+    </EntityPickerDialog>
   )
 }

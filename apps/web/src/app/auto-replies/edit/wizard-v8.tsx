@@ -1,5 +1,8 @@
 'use client'
+import { canManageRole } from '@/lib/staff-role';
+import Toggle from '@/components/shared/toggle';
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -48,7 +51,7 @@ import type {
 } from '@line-crm/shared'
 import { validateFlexContent } from '@line-crm/shared'
 import { ApiError, api, describeSaveFailure, type FriendListItem } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -67,7 +70,7 @@ import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import TargetMissing from '@/components/shared/target-missing'
@@ -106,6 +109,11 @@ import AutoReplyInsertChips, { insertedLabels } from './insert-chips'
 import styles from './wizard-v8.module.css'
 import InsertTextField from '@/components/shared/insert-text-field'
 import { FieldError } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 自動応答の作成・編集・有効化。
@@ -424,10 +432,12 @@ function readStep(raw: string | null): WizardStep {
 }
 
 function AutoReplyWizardV8Inner() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const params = useSearchParams()
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || canManageRole(staffRole)
+  const canManage = useFeatureAccess('autoReplies')
   const { selectedAccountId, accounts } = useAccount()
 
   const initialId = params.get('id')
@@ -600,10 +610,15 @@ function AutoReplyWizardV8Inner() {
       }
       setLoadState('ready')
     } catch (caught) {
-      setLoadError(caught)
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setLoadError(caught) }
+      { if (!fieldFailure)
       setLoadState(caught instanceof ApiError && caught.status === 404 ? 'not-found' : 'error')
     }
-  }, [autoReplyId, creationAccountId])
+  }
+  }, [autoReplyId, creationAccountId, saveErrors])
 
   useEffect(() => {
     void load()
@@ -650,12 +665,16 @@ function AutoReplyWizardV8Inner() {
       setFriendTotal(typeof res.data.total === 'number' ? res.data.total : res.data.items.length)
       setSelectedFriendId((current) => current || res.data.items[0]?.id || '')
       setFriendLoadState('ready')
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
       setFriends([])
       setFriendTotal(0)
+      { if (!fieldFailure)
       setFriendLoadState('error')
     }
-  }, [])
+  }
+  }, [saveErrors]);
+
 
   const loadPriorityData = useCallback(
     async (ruleId: string, accountId: string | null) => {
@@ -664,12 +683,16 @@ function AutoReplyWizardV8Inner() {
         await loadOrder(ruleId, accountId)
         void loadFriendsInitial(accountId)
         setPriorityState('ready')
-      } catch {
-        setPriorityState('error')
+      } catch (saveFailure) {
+        const fieldFailure = saveErrors.capture(saveFailure)
+
+        { if (!fieldFailure)
+        setPriorityState('error') }
       }
     },
-    [loadOrder, loadFriendsInitial],
-  )
+    [loadOrder, loadFriendsInitial, saveErrors],
+  );
+
 
   const searchFriends = useCallback(
     async (query: string) => {
@@ -686,11 +709,15 @@ function AutoReplyWizardV8Inner() {
         setFriends(res.data.items)
         setFriendTotal(typeof res.data.total === 'number' ? res.data.total : res.data.items.length)
         setFriendLoadState('ready')
-      } catch {
+      } catch (saveFailure) {
+        const fieldFailure = saveErrors.capture(saveFailure)
+
+        { if (!fieldFailure)
         setFriendLoadState('error')
       }
+    }
     },
-    [matchedAccountId],
+    [matchedAccountId, saveErrors],
   )
 
   /* ===== 手順5で読むもの（公開前チェック） ===== */
@@ -704,10 +731,13 @@ function AutoReplyWizardV8Inner() {
       setValidation(res.data)
       setConflicts(res.data.conflicts ?? [])
       setConfirmState('ready')
-    } catch {
-      if (subject === assessmentSubjectRef.current) setConfirmState('error')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
+      if (subject === assessmentSubjectRef.current) { if (!fieldFailure) setConfirmState('error')
     }
-  }, [])
+  }
+  }, [saveErrors])
 
   /*
    * 手順4・5を URL で直接開いた・戻るで戻ったときも、確かめる対象を読む。
@@ -863,17 +893,20 @@ function AutoReplyWizardV8Inner() {
       stepDataRequested.current.delete(`priority:${savedId}`)
       return { id: savedId!, accountId: body.lineAccountId }
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 409) {
         // 帯（頭の下）が知らせるので、本文の上に同じ知らせを重ねない。
         setSaveConflict(true)
       } else {
-        setError(describeSaveFailure(caught))
+        { if (!fieldFailure)
+        setError(describeSaveFailure(caught)) }
       }
       return null
     } finally {
       setSaving(false)
     }
-  }, [buildInput, autoReplyId, versionNumber, form, step, router, showInputIssue])
+  }, [buildInput, autoReplyId, versionNumber, form, step, router, showInputIssue, saveErrors])
 
   // `UGrd2`「最新を読み込んで続ける」。入力中の内容は最新の版で置き換わる。
   const inputFingerprint = JSON.stringify(form)
@@ -926,12 +959,15 @@ function AutoReplyWizardV8Inner() {
         return
       }
       setCompareTarget(formFromSettings(draftRes.data.settings))
-    } catch {
-      setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setCompareError('最新の内容を取れませんでした。もう一度お試しください。') }
     } finally {
       setCompareBusy(false)
     }
-  }, [autoReplyId, compareBusy])
+  }, [autoReplyId, compareBusy, saveErrors])
 
   /* ===== 手順の移動 ===== */
   const goToStep = useCallback(
@@ -1072,12 +1108,17 @@ function AutoReplyWizardV8Inner() {
       }
       setStaleTest(false)
       setDryRun(res.data)
-    } catch {
-      setError('試し送りできませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+
+
+      setError('試し送りできませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setSaving(false)
     }
-  }, [autoReplyId, selectedFriendId, testMessage, dirty, saveDraftNow])
+  }, [autoReplyId, selectedFriendId, testMessage, dirty, saveDraftNow, saveErrors])
 
   /* ===== 手順5：有効にする ===== */
   const gates = useMemo(
@@ -1112,16 +1153,21 @@ function AutoReplyWizardV8Inner() {
       disarm()
       publishKeyRef.current = crypto.randomUUID()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
+
       setError(
         caught instanceof ApiError && caught.status === 409
           ? caught.message || '公開する直前に状態が変わりました。最新の状態を読み直してください。'
           : '自動応答を有効化できませんでした。状態を読み直してからお試しください。',
-      )
+      ) }
       void loadValidation(autoReplyId)
     } finally {
       setSaving(false)
     }
-  }, [autoReplyId, publishReady, saving, acknowledged, form.ruleName, form.keywordRules, disarm, loadValidation])
+  }, [autoReplyId, publishReady, saving, acknowledged, form.ruleName, form.keywordRules, disarm, loadValidation, saveErrors])
 
   /* ===== 手順ごとの内容 ===== */
   const effectiveKeywords = form.keywordRules.filter((r) => r.keyword.trim() !== '')
@@ -1133,10 +1179,13 @@ function AutoReplyWizardV8Inner() {
     try {
       JSON.parse(form.responseContent)
       return true
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure);
+
       return false
     }
-  })()
+  })();
+
   const replyPreviewText =
     form.mode === 'silent'
       ? '返信はせず、設定した処理だけを行います。'
@@ -1191,22 +1240,22 @@ function AutoReplyWizardV8Inner() {
   const myPositionLabel = myIndex >= 0 ? `${myIndex + 1}番目` : 'いちばん下'
 
   /* ===== 読み込み・権限の画面 ===== */
-  if (loadState === 'loading') return <ListState kind="loading" />
+  if (loadState === 'loading') return <SaveErrorScope errors={saveErrors}><ListState kind="loading" /></SaveErrorScope>
   if (loadState === 'not-found') {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="not-found"
         title="この自動応答は見つかりません"
         description="削除されたか、別の記録です。一覧から選び直してください。"
         backHref="/auto-replies"
         backLabel="自動応答の一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
   if (loadState === 'error') {
     const failure = loadError ? loadFailureCopy(loadError, '下書き') : null
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="error"
         title={failure?.title ?? '下書きを読み込めませんでした'}
         description={
@@ -1215,17 +1264,17 @@ function AutoReplyWizardV8Inner() {
         }
         error={loadError ?? undefined}
         onRetry={() => void load()}
-      />
+      /></SaveErrorScope>
     )
   }
   if (!canManage) {
     return (
-      <ListState
+      <SaveErrorScope errors={saveErrors}><ListState
         kind="forbidden"
         title="自動応答の作成・変更はできません"
         description="作成と変更はオーナーと管理者だけができます。必要なときはオーナーか管理者に頼んでください。"
         action={<Button href="/auto-replies">自動応答の一覧へ戻る</Button>}
-      />
+      /></SaveErrorScope>
     )
   }
 
@@ -1235,12 +1284,12 @@ function AutoReplyWizardV8Inner() {
     const doneSteps: StepperStep[] = STEP_ORDER.map((key) => ({ key, label: STEP_LABELS_V8[key], state: 'done' }))
     const doneKeywords = form.respondToAll
       ? 'すべてのメッセージ'
-      : effectiveKeywords.map((r) => r.keyword.trim()).filter(Boolean).join('・') || '—'
+      : effectiveKeywords.map((r) => r.keyword.trim()).filter(Boolean).join('・') || emptyValue('unknown')
     return (
-      <PageFrame kind="create" boardId={DONE_DESIGN_NODE}>
+      <SaveErrorScope errors={saveErrors}><PageFrame kind="create" boardId={DONE_DESIGN_NODE}>
         <PageHeading
           title="ルールを作る"
-          description={`ルール名：${published!.name}`}
+          help={`ルール名：${published!.name}`}
           identity={<Link href="/auto-replies" className={styles.backLink}>
             <ArrowLeft size={14} aria-hidden="true" />
             自動応答へ
@@ -1252,10 +1301,10 @@ function AutoReplyWizardV8Inner() {
             <span className={styles.doneIcon} aria-hidden="true">
               <Check size={24} />
             </span>
-            <h1 id="auto-reply-done-title" className={styles.doneTitle}>{`「${published!.name}」を有効にしました`}</h1>
-            <p className={styles.doneNote}>
+            <PageHeading title={`「${published!.name}」を有効にしました`} titleId="auto-reply-done-title" help={<>
               これから届くメッセージで動き始めます。止めているあいだに届いた分には、さかのぼって返しません。止めたいときは、一覧の「…」から止められます。
-            </p>
+            </>} />
+
             <dl className={styles.doneRows}>
               <div className={styles.doneRow}>
                 <dt>動く順番</dt>
@@ -1279,7 +1328,7 @@ function AutoReplyWizardV8Inner() {
             </div>
           </section>
         </div>
-      </PageFrame>
+      </PageFrame></SaveErrorScope>
     )
   }
 
@@ -1319,7 +1368,7 @@ function AutoReplyWizardV8Inner() {
                 <h2 className={styles.sideTitle}>保存したあとに、過去28日で当たった数が出ます</h2>
                 {/* 絵 A0pDt：数（— 件）→ 説明 → 試しの文2つ（いまの言葉で当たるか）。 */}
                 <p className={styles.countRow} aria-label="当たった受信（過去28日）">
-                  <span className={styles.countNum}>{matchedLast28Days == null ? '—' : formatNumber(matchedLast28Days)}</span>
+                  <span className={styles.countNum}>{matchedLast28Days == null ? emptyValue('unknown') : formatNumber(matchedLast28Days)}</span>
                   <span className={styles.countUnit}>件</span>
                 </p>
                 <p className={styles.sideHint}>
@@ -1365,7 +1414,7 @@ function AutoReplyWizardV8Inner() {
                   </div>
                   <div className={styles.kvRow}>
                     <dt className="text-ink-faint text-xs">後の処理</dt>
-                    <dd className={styles.kvVal}>{form.actions.length > 0 ? `${form.actions.length}つ` : 'なし'}</dd>
+                    <dd className={styles.kvVal}>{form.actions.length > 0 ? `${form.actions.length}つ` : emptyValue('none')}</dd>
                   </div>
                   {(() => {
                     const used = insertedLabels(form.responseContent)
@@ -1406,7 +1455,7 @@ function AutoReplyWizardV8Inner() {
                 {conflicts.length === 0 ? (
                   <p className={styles.conflictDesc}>同時に当たるルールはありません。</p>
                 ) : (
-                  conflicts.map((conflict) => {
+                  conflicts.map((conflict, saveFieldIndex) => {
                     const pos = orderedRules.findIndex((r) => r.id === conflict.autoReplyId)
                     return (
                       <div key={conflict.autoReplyId} className={styles.conflictItem}>
@@ -1416,7 +1465,7 @@ function AutoReplyWizardV8Inner() {
                         <p className={styles.conflictName} title={conflict.reason}>
                           {conflict.name}{pos >= 0 ? `（${pos + 1}番目）` : ''}
                         </p>
-                        <Checkbox
+                        <SaveErrorField names={[`conflicts.${saveFieldIndex}.autoReplyId`,`conflicts.${saveFieldIndex}.auto_reply_id`,"autoReplyId","conflict.autoReplyId","acknowledged","id","auto_reply_id","conflict.auto_reply_id"]}><Checkbox
                           checked={acknowledged.has(conflict.autoReplyId)}
                           onCheckedChange={(on) =>
                             setAcknowledged((current) => {
@@ -1429,7 +1478,7 @@ function AutoReplyWizardV8Inner() {
                           aria-label={`「${conflict.name}」を確かめた`}
                         >
                           確かめた
-                        </Checkbox>
+                        </Checkbox></SaveErrorField>
                       </div>
                     )
                   })
@@ -1441,8 +1490,8 @@ function AutoReplyWizardV8Inner() {
               <CreateSummaryCard
                 title="重なりの確認"
                 rows={[
-                  { label: '同時に当たるルール', value: conflicts.length > 0 ? `${conflicts.length}つ` : 'なし' },
-                  { label: '当たる受信（過去28日）', value: matchedLast28Days == null ? '—' : `${formatNumber(matchedLast28Days)}件` },
+                  { label: '同時に当たるルール', value: conflicts.length > 0 ? `${conflicts.length}つ` : emptyValue('none') },
+                  { label: '当たる受信（過去28日）', value: matchedLast28Days == null ? emptyValue('unknown') : `${formatNumber(matchedLast28Days)}件` },
                   { label: '試した結果', value: dryRun ? (dryRun.draftWon ? 'このルールが返す' : '見送り') : 'まだ試していません' },
                 ]}
               />
@@ -1480,7 +1529,7 @@ function AutoReplyWizardV8Inner() {
                   <div className={styles.kvRow}>
                     <dt className="text-ink-faint text-xs">同時に当たるルール</dt>
                     <dd className={styles.kvVal}>
-                      {conflicts.length > 0 ? `${conflicts.length}つ` : 'なし'}
+                      {conflicts.length > 0 ? `${conflicts.length}つ` : emptyValue('none')}
                     </dd>
                   </div>
                 </dl>
@@ -1497,7 +1546,7 @@ function AutoReplyWizardV8Inner() {
   )
 
   return (
-    <CreatePage boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={<>{autoReplyId && lifecycleStatus !== 'draft' ? 'ルールを編集' : 'ルールを作る'}</>} description={<>
+    <SaveErrorScope errors={saveErrors}><CreatePage boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={autoReplyId && lifecycleStatus !== 'draft' ? 'ルールを編集' : 'ルールを作る'} help={<>
           {step === 'basic' ? (
             'いまは停止中として作ります。最後の「確認」で有効にします。'
           ) : (
@@ -1592,22 +1641,13 @@ function AutoReplyWizardV8Inner() {
                   <p className={styles.cardNote}>一覧に出る名前です。友だちには見えません。</p>
                 </div>
                 <div className={styles.fieldPair}>
-                  <div className={styles.field}>
-                    <label htmlFor="wiz-name" className={styles.label}>
-                      ルール名
-                    </label>
-                    <TextField
+                  <div className={styles.field}><Field label="ルール名" htmlFor="wiz-name"><SaveErrorField names={["ruleName","form.ruleName","rule_name","name","form.rule_name"]}><TextField
                       id="wiz-name"
                       value={form.ruleName}
                       onChange={(e) => patch({ ruleName: e.target.value })}
                       placeholder="例：予約の日程変更"
-                    />
-                  </div>
-                  <div className={styles.field}>
-                    <label htmlFor="wiz-folder" className={styles.label}>
-                      フォルダ
-                    </label>
-                    <FolderSelect
+                    /></SaveErrorField></Field></div>
+                  <div className={styles.field}><Field label="フォルダ" htmlFor="wiz-folder"><SaveErrorField names={["folderId","form.folderId","folder_id","form.folder_id"]}><FolderSelect
                       id="wiz-folder"
                       aria-label="フォルダ"
                       value={form.folderId}
@@ -1618,20 +1658,14 @@ function AutoReplyWizardV8Inner() {
                       onCreate={canManage
                         ? folderCreator((name, color) => api.folders.create({ kind: 'auto_reply', name, color }), folderById, (created) => setFolders((current) => [...current, { id: created.id, name: created.name, color: created.color }]))
                         : undefined}
-                    />
-                  </div>
+                    /></SaveErrorField></Field></div>
                 </div>
-                <div className={styles.field}>
-                  <label htmlFor="wiz-memo" className={styles.label}>
-                    社内メモ<span className={styles.labelOptional}>任意</span>
-                  </label>
-                  <TextField
+                <div className={styles.field}><Field label="社内メモ" htmlFor="wiz-memo"><SaveErrorField names={["internalMemo","form.internalMemo","internal_memo","form.internal_memo"]}><TextField
                     id="wiz-memo"
                     value={form.internalMemo}
                     onChange={(e) => patch({ internalMemo: e.target.value })}
                     placeholder="例：キャンペーン中だけ使う"
-                  />
-                </div>
+                  /></SaveErrorField></Field></div>
               </Card>
 
               <Notice tone="info">
@@ -1666,7 +1700,7 @@ function AutoReplyWizardV8Inner() {
                   <h2 className={styles.cardTitle}>1. どのメッセージに反応するか</h2>
                   <p className={styles.cardDesc}>届いた言葉で決めます。</p>
                 </div>
-                <RadioCardGroup legend="反応するメッセージ" className={styles.radioPair}>
+                <SaveErrorField names={["trigger-kind","respondToAll","form.respondToAll"]}><RadioCardGroup legend="反応するメッセージ" className={styles.radioPair}>
                   <RadioCard
                     name="trigger-kind"
                     value="keyword"
@@ -1685,7 +1719,7 @@ function AutoReplyWizardV8Inner() {
                     icon={<MessagesSquare size={16} />}
                     note="届いたものすべてに返す"
                   />
-                </RadioCardGroup>
+                </RadioCardGroup></SaveErrorField>
 
                 {!form.respondToAll && (
                   <>
@@ -1946,29 +1980,26 @@ function AutoReplyWizardV8Inner() {
                     </button>
                   </div>
                   {/* 祝日の扱いは機能として残す（絵は説明の1行だけ）。場所を取らないよう時間帯の横に小さく。 */}
-                  <label className={styles.inlineSelect}>
-                    祝日
-                    <Select
+                  <Field label="祝日"><SaveErrorField names={["holidayRule","form.holidayRule","holiday_rule","form.holiday_rule"]}><Select
                       aria-label="祝日の扱い"
                       value={form.holidayRule}
                       onChange={(v) => patch({ holidayRule: v as HolidayRuleValue })}
                       options={HOLIDAY_RULE_LABELS.map((o) => ({ value: o.value, label: o.label }))}
-                    />
-                  </label>
+                    /></SaveErrorField></Field>
                   </div>
                   {form.timeMode === 'custom' && (
                     <div className={styles.chips}>
-                      <TimeField
+                      <SaveErrorField names={["activeFrom","form.activeFrom","active_from","form.active_from"]}><TimeField
                         aria-label="始める時刻"
                         value={form.activeFrom}
                         onChange={(v) => patch({ activeFrom: v })}
-                      />
+                      /></SaveErrorField>
                       <span className={styles.weekdayNow}>〜</span>
-                      <TimeField
+                      <SaveErrorField names={["activeUntil","form.activeUntil","active_until","form.active_until"]}><TimeField
                         aria-label="終わる時刻"
                         value={form.activeUntil}
                         onChange={(v) => patch({ activeUntil: v })}
-                      />
+                      /></SaveErrorField>
                     </div>
                   )}
                 </div>
@@ -1976,7 +2007,7 @@ function AutoReplyWizardV8Inner() {
 
               <Card padding="roomy" layout="vertical" className={`${styles.cardContent} ${styles.stepTrigger}`}>
                 <h2 className={styles.cardTitle}>3. 誰に反応するか</h2>
-                <RadioCardGroup legend="反応する相手" className={styles.radioPair}>
+                <SaveErrorField names={["friend-target","friendTarget","form.friendTarget"]}><RadioCardGroup legend="反応する相手" className={styles.radioPair}>
                   <RadioCard
                     name="friend-target"
                     value="all"
@@ -1995,7 +2026,7 @@ function AutoReplyWizardV8Inner() {
                     icon={<ListFilter size={16} />}
                     note="タグ・友だち情報・予約などで絞る"
                   />
-                </RadioCardGroup>
+                </RadioCardGroup></SaveErrorField>
                 {form.friendTarget === 'filtered' ? (
                   <div id="wiz-conditions" role="group" aria-label="反応する友だちの条件" aria-describedby={fieldError('wiz-conditions') ? 'wiz-conditions-error' : undefined} data-invalid={!!fieldError('wiz-conditions') || undefined} className={styles.compositeField}>
                   <ConditionBuilder
@@ -2041,7 +2072,7 @@ function AutoReplyWizardV8Inner() {
 
                 {form.mode === 'inline-text' && (
                   <div className={styles.bodyBox} data-invalid={!!fieldError('wiz-content') || undefined}>
-                    <InsertTextField
+                    <SaveErrorField names={["responseContent","form.responseContent","response_content","form.response_content"]}><InsertTextField
                       id="wiz-content"
                       aria-invalid={!!fieldError('wiz-content') || undefined}
                       aria-describedby={fieldError('wiz-content') ? 'wiz-content-error' : undefined}
@@ -2051,7 +2082,7 @@ function AutoReplyWizardV8Inner() {
                       onValueChange={(next) => patch({ responseContent: next })}
                       placeholder="例：予約の変更を承りました。担当者が確認次第ご連絡します。"
                       maxLength={5000}
-                    />
+                    /></SaveErrorField>
                     <div className={styles.insertChips}>
                       <span className={styles.insertLabel}>差し込む</span>
                       <AutoReplyInsertChips
@@ -2071,7 +2102,7 @@ function AutoReplyWizardV8Inner() {
                     <span className={styles.label}>
                       テンプレート
                     </span>
-                    <EntityKindField
+                    <SaveErrorField names={["templateId","form.templateId"]}><EntityKindField
                       kind="template"
                       id="wiz-template"
                       label="テンプレート"
@@ -2080,27 +2111,22 @@ function AutoReplyWizardV8Inner() {
                       invalid={!!fieldError('wiz-template')}
                       value={form.templateId ?? ''}
                       onChange={(v) => patch({ templateId: v || null })}
-                    />
+                    /></SaveErrorField>
                     {fieldError('wiz-template') ? <FieldError id="wiz-template-error">{fieldError('wiz-template')}</FieldError> : null}
                     <p className={styles.hint}>テンプレートの管理は「ひな形を管理」からできます。</p>
                   </div>
                 )}
 
                 {form.mode === 'inline-flex' && (
-                  <div className={styles.field}>
-                    <label htmlFor="wiz-flex" className={styles.label}>
-                      カードの内容（JSON）
-                    </label>
-                    <TextArea
+                  <div className={styles.field}><Field label="カードの内容（JSON）" htmlFor="wiz-flex"><SaveErrorField names={["responseContent","form.responseContent","response_content","form.response_content"]}><TextArea
                       id="wiz-flex"
                       invalid={!!fieldError('wiz-flex')}
                       aria-describedby={fieldError('wiz-flex') ? 'wiz-flex-error' : undefined}
                       value={form.responseContent}
                       onChange={(e) => patch({ responseContent: e.target.value })}
                       placeholder='{"type":"bubble", ...}'
-                    />
-                    {fieldError('wiz-flex') ? <FieldError id="wiz-flex-error">{fieldError('wiz-flex')}</FieldError> : null}
-                  </div>
+                    /></SaveErrorField>
+{fieldError('wiz-flex') ? <FieldError id="wiz-flex-error">{fieldError('wiz-flex')}</FieldError> : null}</Field></div>
                 )}
 
                 {form.mode === 'inline-image' && (
@@ -2153,12 +2179,12 @@ function AutoReplyWizardV8Inner() {
                   <div className={styles.toggleText}>
                     <p className={styles.toggleTitle}>返すまで待つ時間</p>
                   </div>
-                  <Select
+                  <SaveErrorField names={["replyDelaySeconds","form.replyDelaySeconds","reply_delay_seconds","form.reply_delay_seconds"]}><Select
                     aria-label="返すまで待つ時間"
                     value={form.replyDelaySeconds}
                     onChange={(v) => patch({ replyDelaySeconds: v })}
                     options={[...REPLY_DELAY_OPTIONS]}
-                  />
+                  /></SaveErrorField>
                 </div>
                 <div className={styles.toggleRow}>
                   <div className={styles.toggleText}>
@@ -2168,7 +2194,7 @@ function AutoReplyWizardV8Inner() {
                     {form.cooldownOn ? (
                       <>
                       <span className={styles.toggleUnit}>
-                        <input
+                        <SaveErrorField names={["cooldownMinutes","form.cooldownMinutes","cooldown_minutes","form.cooldown_minutes"]}><NumberInput
                           id="wiz-cooldown"
                           aria-invalid={!!fieldError('wiz-cooldown') || undefined}
                           aria-describedby={fieldError('wiz-cooldown') ? 'wiz-cooldown-error' : undefined}
@@ -2179,18 +2205,18 @@ function AutoReplyWizardV8Inner() {
                           max={10080}
                           value={form.cooldownMinutes}
                           onChange={(e) => patch({ cooldownMinutes: e.target.value })}
-                        />{' '}
+                        /></SaveErrorField>{' '}
                         分あける
                       </span>
                       </>
                     ) : (
                       <span className={styles.toggleNote}>何度でも返す</span>
                     )}
-                    <Toggle
+                    <SaveErrorField names={["cooldownOn","form.cooldownOn","cooldown_on","form.cooldown_on"]}><SettingCheckbox
                       label="同じ人へ続けて返さない"
                       checked={form.cooldownOn}
                       onChange={(on) => patch({ cooldownOn: on })}
-                    />
+                    /></SaveErrorField>
                   </div>
                 </div>
                 {fieldError('wiz-cooldown') ? <FieldError id="wiz-cooldown-error">{fieldError('wiz-cooldown')}</FieldError> : null}
@@ -2198,11 +2224,11 @@ function AutoReplyWizardV8Inner() {
                   <div className={styles.toggleText}>
                     <p className={styles.toggleTitle}>担当者が対応中のトークには返さない</p>
                   </div>
-                  <Toggle
+                  <SaveErrorField names={["skipWhenOperatorActive","form.skipWhenOperatorActive","skip_when_operator_active","form.skip_when_operator_active"]}><SettingCheckbox
                     label="担当者が対応中のトークには返さない"
                     checked={form.skipWhenOperatorActive}
                     onChange={(on) => patch({ skipWhenOperatorActive: on })}
-                  />
+                  /></SaveErrorField>
                 </div>
                 <div className={styles.toggleRow}>
                   <div className={styles.toggleText}>
@@ -2211,16 +2237,16 @@ function AutoReplyWizardV8Inner() {
                       オフのときは、同じ人が何度送っても返します（上の「続けて返さない」の時間は守ります）
                     </p>
                   </div>
-                  <Toggle
+                  <SaveErrorField names={["oncePerFriend","form.oncePerFriend","once_per_friend","form.once_per_friend"]}><SettingCheckbox
                     label="1人につき1回だけ返す"
                     checked={form.oncePerFriend}
                     onChange={(on) => patch({ oncePerFriend: on })}
-                  />
+                  /></SaveErrorField>
                 </div>
                 </div>
                 <div className={styles.field}>
                   <span className={styles.label}>条件に合わなかったとき</span>
-                  <RadioCardGroup legend="条件に合わなかったとき" className={styles.radioPair}>
+                  <SaveErrorField names={["unmatched","unmatchedMode","form.unmatchedMode"]}><RadioCardGroup legend="条件に合わなかったとき" className={styles.radioPair}>
                     <RadioCard
                       name="unmatched"
                       value="none"
@@ -2237,7 +2263,7 @@ function AutoReplyWizardV8Inner() {
                       title="担当者へ引き継ぐ"
                       note="人手で対応するよう知らせます"
                     />
-                  </RadioCardGroup>
+                  </RadioCardGroup></SaveErrorField>
                 </div>
               </Card>
             </>
@@ -2334,7 +2360,7 @@ function AutoReplyWizardV8Inner() {
                 </div>
                 {/* 絵 Guoye：送信者の行 → 届いたメッセージと「試す」の行。友だちを名前で探す欄は機能なので送信者の行の右に残す。 */}
                 <div className={styles.testRow}>
-                  <Select
+                  <SaveErrorField names={["selectedFriendId","friendId","selected_friend_id"]}><EntitySelect
                     id="wiz-test-friend"
                     className={styles.testGrow}
                     aria-label="送信者"
@@ -2345,14 +2371,14 @@ function AutoReplyWizardV8Inner() {
                         ? [{ value: '', label: '友だちを読み込めませんでした' }]
                         : friends.length === 0
                           ? [{ value: '', label: '友だちがいません' }]
-                          : friends.map((f) => ({
+                          : friends.map((f) => ({ ...entityOptionMetadata(f),
                               value: f.id,
                               label: f.id === selectedFriendId
                                 ? `送信者：${f.displayName || '名前なし'}（名前で探す・候補 ${formatNumber(friendTotal)}人中 ${friends.length}人）`
                                 : f.displayName || '名前なし',
                             }))
                     }
-                  />
+                  /></SaveErrorField>
                   <SearchField
                     placeholder="名前で探す"
                     value={friendQuery}
@@ -2364,14 +2390,14 @@ function AutoReplyWizardV8Inner() {
                   />
                 </div>
                 <div className={styles.testRow}>
-                  <TextField
+                  <SaveErrorField names={["testMessage","incomingText","test_message"]}><TextField
                     id="wiz-test-message"
                     className={styles.testGrow}
                     aria-label="届いたメッセージ"
                     value={testMessage}
                     onChange={(e) => setTestMessage(e.target.value)}
                     placeholder={effectiveKeywords[0]?.keyword.trim() ? `${effectiveKeywords[0].keyword.trim()}したいです` : '例：予約変更したいです'}
-                  />
+                  /></SaveErrorField>
                   <Button
                     type="button"
                     variant="primary"
@@ -2434,7 +2460,7 @@ function AutoReplyWizardV8Inner() {
                       ? 'すべてのメッセージ'
                       : effectiveKeywords.length > 0
                         ? `${effectiveKeywords.map((r) => `「${r.keyword.trim()}」`).join('')}（${matchTypeWord(form.matchType)}）`
-                        : '未入力'}
+                        : emptyValue('unconfigured')}
                   </SummaryRow>
                   <SummaryRow label="いつ" onEdit={() => goToStep('trigger')}>
                     {[
@@ -2464,7 +2490,7 @@ function AutoReplyWizardV8Inner() {
                   <SummaryRow label="返したあと" onEdit={() => goToStep('response')}>
                     {form.actions.length > 0
                       ? form.actions.map((a, i) => `${i + 1} ${actionRowTitle(a, actionOptions)}`).join(' → ')
-                      : 'なし'}
+                      : emptyValue('none')}
                   </SummaryRow>
                   <SummaryRow label="細かい決まり" onEdit={() => goToStep('response')}>
                     {[
@@ -2507,7 +2533,7 @@ function AutoReplyWizardV8Inner() {
                           className={`${styles.checkIcon} ${gate.state === 'ok' ? styles.checkIconOk : gate.state === 'blocked' ? styles.checkIconWarn : ''}`}
                           aria-hidden="true"
                         >
-                          {gate.state === 'ok' ? <Check size={14} /> : gate.state === 'blocked' ? <CircleAlert size={14} /> : '—'}
+                          {gate.state === 'ok' ? <Check size={14} /> : gate.state === 'blocked' ? <CircleAlert size={14} /> : emptyValue('unknown')}
                         </span>
                         <div className={styles.checkBody}>
                           <p className={styles.checkTitle}>{gate.label}</p>
@@ -2555,7 +2581,7 @@ function AutoReplyWizardV8Inner() {
           return saved !== null
         }}
       />
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }
 
@@ -2589,9 +2615,7 @@ function KeywordInput({ onAdd, error }: { onAdd: (word: string) => void; error?:
     }
   }
   return (
-    <label className={styles.kwInput} data-invalid={!!error || undefined}>
-      <Search size={14} aria-hidden="true" />
-      <input
+    <Field label={<><Search size={14} aria-hidden="true" /></>}><SaveErrorField names={["value"]}><input
         id="wiz-keywords"
         aria-invalid={!!error || undefined}
         aria-describedby={error ? 'wiz-keywords-error' : undefined}
@@ -2606,8 +2630,7 @@ function KeywordInput({ onAdd, error }: { onAdd: (word: string) => void; error?:
           }
         }}
         onBlur={commit}
-      />
-    </label>
+      /></SaveErrorField></Field>
   )
 }
 

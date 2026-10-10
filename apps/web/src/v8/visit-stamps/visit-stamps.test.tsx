@@ -13,7 +13,7 @@ const fx = vi.hoisted(() => ({
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fx.accountId, accounts: [{ id: 'acc-1', name: '銀座店' }, { id: 'acc-2', name: '渋谷店' }] }) }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fx.role, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
-vi.mock('@/components/shared/toast', () => ({ notifyToast: vi.fn() }))
+vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
 vi.mock('next/navigation', async () => {
   const { useSyncExternalStore } = await import('react')
   return {
@@ -38,6 +38,7 @@ vi.mock('@/lib/api', () => ({
   api: { friends: { list: fx.friendsList, get: fx.friendsGet }, staff: { list: fx.staffList }, uploads: { image: fx.uploadImage } },
   describeSaveFailure: (e: unknown) => (e instanceof Error ? e.message : '保存できませんでした。'),
 }))
+import { flushListUrlState } from '@/components/shared/list-url-state'
 import VisitStampsV8 from './visit-stamps'
 import { notifyToast } from '@/components/shared/toast'
 
@@ -51,6 +52,7 @@ const card = {
 
 beforeEach(() => {
   fx.accountId = 'acc-1'
+  flushListUrlState()
   window.history.replaceState(null, '', '/visit-stamps')
   fx.replace.mockImplementation((href: string) => {
     window.history.replaceState(null, '', href)
@@ -172,11 +174,11 @@ describe('来店スタンプ（管理画面）', () => {
     render(<VisitStampsV8 />)
     fireEvent.click(await screen.findByRole('button', { name: '次のページ' }))
     await waitFor(() => expect(fx.entries).toHaveBeenLastCalledWith({ accountId: 'acc-1', page: 2, pageSize: 20 }))
-    expect(await screen.findByText('88件中 21〜40件')).toBeTruthy()
+    expect(await screen.findByText('88 件中 21〜40 件')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '記録の表示件数' }))
-    fireEvent.click(await screen.findByRole('button', { name: '10件ずつ' }))
+    fireEvent.click(await screen.findByRole('button', { name: '10 件ずつ' }))
     await waitFor(() => expect(fx.entries).toHaveBeenLastCalledWith({ accountId: 'acc-1', page: 1, pageSize: 10 }))
-    expect(await screen.findByText('88件中 1〜10件')).toBeTruthy()
+    expect(await screen.findByText('88 件中 1〜10 件')).toBeTruthy()
   })
 
   it('古い記録の返事が遅れても、操作後に読み直した記録を上書きしない', async () => {
@@ -198,8 +200,8 @@ describe('来店スタンプ（管理画面）', () => {
     await waitFor(() => expect(fx.entries).toHaveBeenCalledTimes(3))
     await act(async () => { finishOld({ success: true, data: { items: [], total: 88, page: 2, pageSize: 20 } }) })
     fireEvent.click(screen.getByRole('tab', { name: '押した・使った記録' }))
-    expect(await screen.findByText('120件中 21〜40件')).toBeTruthy()
-    expect(screen.queryByText(/88件中/)).toBeNull()
+    expect(await screen.findByText('120 件中 21〜40 件')).toBeTruthy()
+    expect(screen.queryByText(/88 件中/)).toBeNull()
   })
 
   it('記録の総数が減って今のページがなくなったら、最後のページを読み直す', async () => {
@@ -210,7 +212,7 @@ describe('来店スタンプ（管理画面）', () => {
     fireEvent.click(await screen.findByRole('button', { name: '次のページ' }))
     await waitFor(() => expect(fx.entries).toHaveBeenCalledTimes(3))
     expect(fx.entries).toHaveBeenLastCalledWith({ accountId: 'acc-1', page: 1, pageSize: 20 })
-    expect(await screen.findByText('2件中 1〜2件')).toBeTruthy()
+    expect(await screen.findByText('2 件中 1〜2 件')).toBeTruthy()
     expect(screen.queryByRole('navigation', { name: '記録のページ送り' })).toBeNull()
   })
 
@@ -246,14 +248,14 @@ describe('来店スタンプ（管理画面）', () => {
   it('説明・受け取りボーナス・間隔を見本と保存に反映する', async () => {
     render(<VisitStampsV8 />)
     await screen.findByDisplayValue('然 来店スタンプカード')
-    fireEvent.change(screen.getByRole('textbox', { name: '使い方の説明' }), { target: { value: 'お店で1個\n特典があります' } })
+    fireEvent.change(screen.getByRole('textbox', { name: '使い方の説明' }), { target: { value: 'お店で1 個\n特典があります' } })
     fireEvent.change(screen.getByRole('spinbutton', { name: 'カードを受け取った時のボーナス' }), { target: { value: '2' } })
     fireEvent.click(screen.getByRole('radio', { name: /同じ日は1回/ }))
-    expect(screen.getByLabelText('お客さまの見え方').textContent).toContain('お店で1個')
+    expect(screen.getByLabelText('お客さまの見え方').textContent).toContain('お店で1 個')
     expect(screen.getByLabelText('お客さまの見え方').textContent).toContain('3 / 10')
     expect(screen.getByLabelText('お客さまの見え方').textContent).toContain('有効期限')
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
-    await waitFor(() => expect(fx.save).toHaveBeenCalledWith('card-1', expect.objectContaining({ settings: expect.objectContaining({ instructions: 'お店で1個\n特典があります', receiptBonus: 2, stampInterval: { mode: 'same_day' } }) })))
+    await waitFor(() => expect(fx.save).toHaveBeenCalledWith('card-1', expect.objectContaining({ settings: expect.objectContaining({ instructions: 'お店で1 個\n特典があります', receiptBonus: 2, stampInterval: { mode: 'same_day' } }) })))
   })
   it('画像は既存のアップロードを使い、3MBを越える画像は預けない', async () => {
     render(<VisitStampsV8 />)
@@ -334,12 +336,12 @@ describe('来店スタンプ（管理画面）', () => {
     fx.cards.mockResolvedValue({ success: true, data: [{ ...card, settings: { ...card.settings, multipliers: [{ name: '火曜の2倍デー', multiplier: 2, weekdays: [2] }] } }] })
     render(<VisitStampsV8 />)
     expect(await screen.findByText('火曜の2倍デー')).toBeTruthy()
-    fireEvent.click(screen.getByRole('switch', { name: '火曜の2倍デーを使う' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '火曜の2倍デーを使う' }))
     expect(screen.getByText(/止めています/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '重ねたときの順番' }))
     fireEvent.click(await screen.findByRole('button', { name: '倍率のあとで初回ボーナス' }))
     fireEvent.click(screen.getByRole('button', { name: '重ねたときの上限' }))
-    fireEvent.click(await screen.findByRole('button', { name: '1回 8個まで' }))
+    fireEvent.click(await screen.findByRole('button', { name: '1回 8 個まで' }))
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fx.save).toHaveBeenCalled())
     const body = fx.save.mock.calls[0][1]

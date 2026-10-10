@@ -22,9 +22,7 @@
 /* 数の帯の「…」は枠なしの小さな印（絵の 16 の印）。 */
 
 /* 閲覧のみの帯（数の帯の上）。 */
-.viewerBand {
-  margin: var(--tpl-nph-viewer-margin);
-}
+.viewerBand { margin: var(--tpl-nph-viewer-margin); }
 
 .noteRow {
   padding: var(--tpl-nph-note-pad);

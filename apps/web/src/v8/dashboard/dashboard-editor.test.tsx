@@ -24,7 +24,7 @@ describe('V8 ダッシュボード編集', () => {
   it('WEB246: 保存中は配置と表示を編集できない', () => {
     renderEditor({ saving: true })
     expect(screen.getByRole('button', { name: '写真審査を1つ上へ移動' }).hasAttribute('disabled')).toBe(true)
-    expect(screen.getByRole('switch', { name: '写真審査を表示' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('checkbox', { name: '写真審査を表示' }).hasAttribute('disabled')).toBe(true)
     expect(screen.queryByRole('button', { name: '写真審査をドラッグして並べ替え' })).toBeNull()
   })
   it('上下ボタンで順番が変わり、反映で同じ形の配置を渡す。結果は日本語で読み上げる', () => {
@@ -45,7 +45,7 @@ describe('V8 ダッシュボード編集', () => {
 
   it('スイッチで表示を切り替え、反映した配置に出る', () => {
     const { onApply } = renderEditor()
-    fireEvent.click(screen.getByRole('switch', { name: 'シナリオ配信状況を表示' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'シナリオ配信状況を表示' }))
     fireEvent.click(screen.getByRole('button', { name: 'ダッシュボードに反映' }))
     const main = onApply.mock.calls[0][0].main as { id: string; visible: boolean }[]
     expect(main.find((i) => i.id === 'scenario-status')?.visible).toBe(true)
@@ -57,15 +57,15 @@ describe('V8 ダッシュボード編集', () => {
     base.today = [{ id: 'shipment', visible: false }, ...base.today.map((item) => ({ ...item, visible: true }))]
     renderEditor({ preferences: base })
     expect(screen.queryByText('「今日やること」は4枠までです')).toBeNull()
-    fireEvent.click(screen.getAllByRole('switch', { name: '出荷予定を表示' })[0])
+    fireEvent.click(screen.getAllByRole('checkbox', { name: '出荷予定を表示' })[0])
     expect(screen.getByText('「今日やること」は4枠までです')).toBeTruthy()
     expect(screen.getByText(/いちばん下の「出荷予定件数」をOFFにしました/)).toBeTruthy()
   })
 
   it('5つ目を ON にしなければ、ON/OFF を何度切り替えても注意は出ない', () => {
     renderEditor()
-    fireEvent.click(screen.getByRole('switch', { name: '写真審査を表示' }))
-    fireEvent.click(screen.getByRole('switch', { name: '写真審査を表示' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '写真審査を表示' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '写真審査を表示' }))
     expect(screen.queryByText('「今日やること」は4枠までです')).toBeNull()
   })
 
@@ -76,7 +76,7 @@ describe('V8 ダッシュボード編集', () => {
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     expect(onReset).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '初期状態に戻す' }))
-    fireEvent.click(screen.getByRole('button', { name: /削除して初期状態へ戻す/ }))
+    fireEvent.click(screen.getByRole('button', { name: '削除する', exact: true }))
     expect(onReset).toHaveBeenCalledTimes(1)
   })
 
@@ -87,14 +87,14 @@ describe('V8 ダッシュボード編集', () => {
     expect(onApply).toHaveBeenCalledTimes(1)
   })
 
-  it('409 は「最新の配置を読み込む」。読み込んだ配置が編集の起点になる', async () => {
+  it('409 は「最新を読み込んで続ける」。読み込んだ配置が編集の起点になる', async () => {
     const latest = prefs()
     latest.today = [...latest.today].reverse()
     const onReloadPreferences = vi.fn(async () => latest)
     const { onApply } = renderEditor({ saveError: 'ほかの人が配置を変えました。', saveConflict: true, onReloadPreferences })
     expect(screen.queryByRole('button', { name: 'もう一度保存する' })).toBeNull()
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '最新の配置を読み込む' }))
+      fireEvent.click(screen.getByRole('button', { name: '最新を読み込んで続ける' }))
     })
     expect(onReloadPreferences).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByRole('button', { name: 'ダッシュボードに反映' }))
@@ -127,7 +127,7 @@ describe('V8 ダッシュボード編集', () => {
 // WEB246：保存する配置の送信後は、入力と移動を止める。
 it('保存中は全カードの表示・上下移動・つまみを操作できない', () => {
   renderEditor({ saving: true })
-  for (const control of screen.getAllByRole('switch')) expect((control as HTMLButtonElement).disabled).toBe(true)
+  for (const control of screen.getAllByRole('checkbox')) expect((control as HTMLButtonElement).disabled).toBe(true)
   for (const control of screen.getAllByRole('button', { name: /1つ上へ移動|1つ下へ移動/ })) expect((control as HTMLButtonElement).disabled).toBe(true)
   expect(document.querySelector('button[data-reorder-handle]')).toBeNull()
 })

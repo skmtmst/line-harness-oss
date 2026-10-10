@@ -12,6 +12,7 @@ import {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { buildMetadata } from '../lib/build-metadata.js';
 
 const health = new Hono<Env>();
 
@@ -21,10 +22,14 @@ const health = new Hono<Env>();
 // (capabilities advertises `/api/health`). Deliberately dependency-free —
 // it exists only to prove the Worker booted and is routing requests.
 
-const LIVENESS_BODY = { success: true, data: { status: 'ok' } } as const;
-
-health.get('/health', (c) => c.json(LIVENESS_BODY));
-health.get('/api/health', (c) => c.json(LIVENESS_BODY));
+health.get('/health', (c) => {
+  c.header('Cache-Control', 'no-store');
+  return c.json({ success: true, data: { status: 'ok', ...buildMetadata(c.env) } });
+});
+health.get('/api/health', (c) => {
+  c.header('Cache-Control', 'no-store');
+  return c.json({ success: true, data: { status: 'ok', ...buildMetadata(c.env) } });
+});
 
 // ========== アカウントヘルス ==========
 

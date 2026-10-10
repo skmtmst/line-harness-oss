@@ -1,5 +1,7 @@
 'use client'
+import { canEditFeature } from '@/lib/staff-capability';
 
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import { Suspense, useEffect, useState } from 'react'
 import { api, ApiError, bookingApi, type BookingSettings, type BookingStaff } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
@@ -17,7 +19,6 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import { canEditFeature } from '@/lib/staff-capability'
 import { classifyApiFailure } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -25,6 +26,7 @@ import { bookingMenuError } from '../menu-validation'
 import { formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import MenuFormV8 from '@/v8/booking-menus/menu-form'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /**
  * メニューを追加する（設計 V6 28-1-B / node GhOb3、★V8 は QqER7）。
@@ -47,8 +49,7 @@ export default function NewBookingMenuPage() {
 function NewBookingMenuPageV7() {
   // N-411: メニュー作成は '/booking/menus' の実効permission必須。
   // 鍵の無い人がフォームを埋めて保存時403になるのを防ぐ。
-  const [canEditMenus] = useState(() =>
-    typeof window === 'undefined' ? true : canEditFeature('/booking/menus'))
+  const canEditMenus = usePermissionAccess('/booking/menus')
   usePageTitle('予約メニューをつくる')
   const { selectedAccountId } = useAccount()
   const [name, setName] = useState('')
@@ -290,7 +291,7 @@ function NewBookingMenuPageV7() {
     <CreatePage
       designNode="GhOb3"
       title="予約メニューをつくる"
-      description="お客様が予約するときに選ぶ内容を登録します。"
+      help="お客様が予約するときに選ぶ内容を登録します。"
       parent={['予約設定', '/booking/menus']}
       saveLabel={
         createdMenuNeedingStaff
@@ -780,7 +781,7 @@ function NewBookingMenuPageV7() {
                 maxLength={100}
                 aria-label="タグを検索"
               />
-              <Select size="full" id="bm-auto-tag" aria-label="予約後に付けるタグ" value={autoTagId ?? ''} onChange={(value) => setAutoTagId(value === '' ? null : value)} options={[{ value: '', label: '— なし —' }, ...tagOptions.map((t) => ({ value: t.id, label: t.name }))]} />
+              <EntitySelect kind="tag" size="full" id="bm-auto-tag" aria-label="予約後に付けるタグ" value={autoTagId ?? ''} onChange={(value) => setAutoTagId(value === '' ? null : value)} options={[{ value: '', label: '— なし —' }, ...tagOptions.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))]} />
               {trimmedQuery !== '' && visibleTagCandidates.length === 0 && (
                 <p className="text-ink-faint text-xs">
                   「{trimmedQuery}」に合うタグがありません。

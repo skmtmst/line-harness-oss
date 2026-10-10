@@ -1,4 +1,43 @@
 'use client'
+import { useStaffRole } from '@/lib/staff-role'
+import { usePermissionAccess } from '@/lib/use-feature-access'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import {
+  ApiError,
+  bookingApi,
+  type BookingAvailabilitySlot,
+  type BookingBreakConflict,
+  type BookingException,
+  type BookingMenu,
+  type BookingShift,
+  type BookingStaff,
+} from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import { canViewFeature } from '@/lib/staff-capability'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import DateField from '@/components/shared/date-field'
+import { TimeField } from '@/components/shared/date-time-field'
+import Select from '@/components/shared/select'
+import { SettingCheckbox } from '@/components/shared/checkbox'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import ListState from '@/components/shared/list-state'
+import { formatDay } from '@/lib/format'
+import { LiffPhoneDatetimeStep } from '../../menus/liff-phone-v8'
+import shell from '../../menus/settings-v8.module.css'
+import styles from './staff-detail-v8.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { DetailLoading } from '@/components/templates/detail-page'
+import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
 
 /*
  * ★V8「勤務とシフト」（板 d5fmnM・管理者用）と「自分の勤務」
@@ -18,34 +57,6 @@
  * v7 の /booking/staff/shifts と同じ。テーマが v7 のときはこのファイルは
  * 読まれず、従来の見た目が出る。
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import {
-  ApiError,
-  bookingApi,
-  type BookingAvailabilitySlot,
-  type BookingBreakConflict,
-  type BookingException,
-  type BookingMenu,
-  type BookingShift,
-  type BookingStaff,
-} from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
-import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import DateField from '@/components/shared/date-field'
-import { TimeField } from '@/components/shared/date-time-field'
-import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
-import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
-import ListState from '@/components/shared/list-state'
-import { formatDay } from '@/lib/format'
-import { LiffPhoneDatetimeStep } from '../../menus/liff-phone-v8'
-import shell from '../../menus/settings-v8.module.css'
-import styles from './staff-detail-v8.module.css'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -86,7 +97,7 @@ function addDays(date: string, days: number): string {
 
 function staffErrorMessage(error: unknown, action: string): string {
   if (error instanceof ApiError) {
-    if (error.status === 403) return `担当者の設定を${action}する権限がありません。オーナーか管理者に頼んでください。`
+    if (error.status === 403) return permissionDeniedMessage('store')
     if (error.status === 404) return '担当者が見つかりませんでした。削除された可能性があります。一覧に戻って選び直してください。'
     if (error.status === 409) return 'ほかの変更と重なりました。最新の状態を読み直したので、確かめてからもう一度保存してください。'
   }
@@ -120,6 +131,7 @@ function exceptionBadge(item: BookingException): string {
 }
 
 export default function StaffDetailV8({ staffId }: { staffId: string }) {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('予約設定')
   const router = useRouter()
   const { selectedAccountId, selectedAccount } = useAccount()
@@ -128,17 +140,15 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
   // N-411 本人勤務: staff ロールは自分に紐づく予約スタッフだけを対象にする。
   // 他人の staff_id を直指定しても Worker 側が 403 で拒否するが、
   // 画面側でも「見せない」に揃える。
-  const [isStaffRole] = useState(() =>
-    typeof window !== 'undefined' && window.localStorage.getItem('lh_staff_role') === 'staff')
+  const verifiedRole = useStaffRole()
+  const isStaffRole = verifiedRole === 'staff'
   const [ownStaffId, setOwnStaffId] = useState<string | null>(null)
-  const [canEditOwn] = useState(() =>
-    typeof window === 'undefined' ? true : canEditFeature('booking.staff.own'))
+  const canEditOwn = usePermissionAccess('booking.staff.own')
   /*
    * 「この日だけの休み」は例外日の口（booking.settings 権限）。
    * 権限が無い人には選ばせない（選んでも 403 で止まる）。
    */
-  const [canEditExceptions] = useState(() =>
-    typeof window === 'undefined' ? true : canEditFeature('booking.settings'))
+  const canEditExceptions = usePermissionAccess('booking.settings')
   const [timeZone, setTimeZone] = useState('Asia/Tokyo')
   const [storeExceptions, setStoreExceptions] = useState<Array<{ dateFrom: string; dateTo: string; kind: string }>>([])
   const [staffExceptions, setStaffExceptions] = useState<BookingException[]>([])
@@ -217,12 +227,16 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
       if (requestId !== requestRef.current) return
       setSlots(availability.by_staff.flatMap((item) => item.slots))
       setPreviewError(false)
-    } catch {
+    } catch (saveFailure) {
       if (requestId !== requestRef.current) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       setSlots([])
+      { if (!fieldFailure)
       setPreviewError(true)
     }
-  }, [staffId])
+  }
+  }, [staffId, saveErrors]);
+
 
   const load = useCallback(async () => {
     const requestId = ++requestRef.current
@@ -349,14 +363,17 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
       }
     } catch (error) {
       if (requestId !== requestRef.current) return
+      saveErrors.capture(error);
+
       if (error instanceof ApiError && error.status === 404) {
         setStaffMissing(true)
-        setLoadStatus('ready')
+        setLoadStatus('ready');
+
         return
       }
       setLoadStatus('error')
     }
-  }, [selectedAccountId, staffId, isStaffRole, loadAvailability])
+  }, [selectedAccountId, staffId, isStaffRole, loadAvailability, saveErrors])
 
   useEffect(() => {
     void load()
@@ -420,9 +437,11 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
       if (menuId) {
         await loadAvailability(selectedAccountId, menuId, timeZone, requestId)
       }
-    } catch {
+    } catch (saveFailure) {
       if (requestId !== requestRef.current) return
-      setPreviewError(true)
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure)
+      setPreviewError(true) }
     }
   }
 
@@ -451,8 +470,10 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
       setRuleError(null)
       await refreshAfterSave()
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error)
       // 保存に失敗しても入力(draft)は消さない。
-      setRuleError(staffErrorMessage(error, '保存'))
+      { if (!fieldFailure)
+      setRuleError(staffErrorMessage(error, '保存')) }
     } finally {
       setSavingRules(false)
     }
@@ -511,6 +532,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
       setBreaksVersion(result.version)
       setBreaksSavedAt(new Date().toISOString())
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error)
       // 409のときだけ最新の状態へ描き直す。それ以外は入力(breakRows)を消さない。
       const conflict = error instanceof ApiError && error.status === 409
         ? asBreakConflict(error.data)
@@ -527,7 +549,8 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
           })))
         setBreaksVersion(conflict.version)
       }
-      setBreakError(staffErrorMessage(error, '保存'))
+      { if (!fieldFailure)
+      setBreakError(staffErrorMessage(error, '保存')) }
     } finally {
       setSavingBreaks(false)
     }
@@ -572,6 +595,9 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
       })))
       setBreakDatesVersion(result.version)
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error);
+
+
       const conflict = error instanceof ApiError && error.status === 409
         ? asBreakConflict(error.data)
         : null
@@ -587,7 +613,8 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
           })))
         setBreakDatesVersion(conflict.version)
       }
-      setShiftError(staffErrorMessage(error, '保存'))
+      { if (!fieldFailure)
+      setShiftError(staffErrorMessage(error, '保存')) }
     } finally {
       setSavingShift(false)
     }
@@ -621,7 +648,10 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
       setEditingDayRow(null)
       await refreshAfterSave()
     } catch (error) {
-      setShiftError(staffErrorMessage(error, '保存'))
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure)
+      setShiftError(staffErrorMessage(error, '保存')) }
     } finally {
       setSavingShift(false)
     }
@@ -668,7 +698,10 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
       setDayAddDate('')
       setDayAddMemo('')
     } catch (error) {
-      setShiftError(staffErrorMessage(error, '追加'))
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure)
+      setShiftError(staffErrorMessage(error, '追加')) }
     } finally {
       setDayAddBusy(false)
     }
@@ -690,7 +723,10 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
       setRemoveTarget(null)
       await refreshAfterSave()
     } catch (error) {
-      setShiftError(staffErrorMessage(error, '削除'))
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure)
+      setShiftError(staffErrorMessage(error, '削除')) }
     } finally {
       setDeleting(false)
     }
@@ -725,7 +761,10 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
       setGeneratedCount(result.inserted)
       await refreshAfterSave()
     } catch (error) {
-      setGenError(staffErrorMessage(error, '作成'))
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure)
+      setGenError(staffErrorMessage(error, '作成')) }
     } finally {
       setGenerating(false)
     }
@@ -750,12 +789,18 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
         await loadAvailability(selectedAccountId, menuId, timeZone, requestRef.current)
       }
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error);
+
       if (error instanceof ApiError && error.status === 503) {
-        setCalendarFormError('Googleの接続設定がまだなのでつなげません。管理者に連絡してください。入力はそのまま残しています。')
+        { if (!fieldFailure)
+        setCalendarFormError('Googleの接続設定がまだなのでつなげません。管理者に連絡してください。入力はそのまま残しています。') }
       } else if (error instanceof ApiError && error.status === 422) {
+        { if (!fieldFailure)
         setCalendarFormError('そのカレンダーに届きませんでした。IDを確かめてください。入力はそのまま残しています。')
+      }
       } else {
-        setCalendarFormError(staffErrorMessage(error, '保存'))
+        { if (!fieldFailure)
+        setCalendarFormError(staffErrorMessage(error, '保存')) }
       }
     } finally {
       setSavingCalendar(false)
@@ -775,7 +820,10 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
         await loadAvailability(selectedAccountId, menuId, timeZone, requestRef.current)
       }
     } catch (error) {
-      setCalendarFormError(staffErrorMessage(error, '削除'))
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure)
+      setCalendarFormError(staffErrorMessage(error, '削除')) }
     } finally {
       setDisconnecting(false)
     }
@@ -842,14 +890,14 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
       {isStaffRole ? null : (
         <Link href="/booking/menus?tab=staff" className={shell.backLink}>← 担当スタッフへ</Link>
       )}
-      <h1 className={shell.headTitle}>{node === 'wvGke' ? '自分の勤務' : headTitle}</h1>
-      <p className={shell.headNote}>{headDesc}</p>
+      <PageHeading title={node === 'wvGke' ? '自分の勤務' : headTitle} help={<> {headDesc}</>} />
+
     </header>
   )
 
   if (!selectedAccountId) {
     return (
-      <div className={shell.shell} data-design-node={isStaffRole ? 'E3YDK' : 'd5fmnM'}>
+      <SaveErrorScope errors={saveErrors}><div className={shell.shell} data-design-node={isStaffRole ? 'E3YDK' : 'd5fmnM'}>
         {boardHead('')}
         <div className={shell.body} data-design="Body">
           <div className={shell.main}>
@@ -859,29 +907,28 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
             </div>
           </div>
         </div>
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
   if (loadStatus === 'loading') {
     return (
-      <div className={shell.shell} data-design-node={isStaffRole ? 'E3YDK' : 'd5fmnM'}>
+      <SaveErrorScope errors={saveErrors}><div className={shell.shell} data-design-node={isStaffRole ? 'E3YDK' : 'd5fmnM'}>
         {boardHead('')}
         <div className={shell.body} data-design="Body">
           <div className={shell.main}>
             <div className={shell.stateCard}>
-              <p className={shell.stateTitle}>読み込み中</p>
-              <p className={shell.stateDesc}>担当者の勤務とシフトを読み込んでいます。</p>
+              <DetailLoading label="担当者の勤務とシフトを読み込んでいます" />
             </div>
           </div>
         </div>
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
   if (loadStatus === 'error') {
     return (
-      <div className={shell.shell} data-design-node={isStaffRole ? 'E3YDK' : 'd5fmnM'}>
+      <SaveErrorScope errors={saveErrors}><div className={shell.shell} data-design-node={isStaffRole ? 'E3YDK' : 'd5fmnM'}>
         {boardHead('')}
         <div className={shell.body} data-design="Body">
           <div className={shell.main}>
@@ -894,7 +941,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
             </div>
           </div>
         </div>
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
@@ -902,7 +949,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
     // N-411: staff ロールで本人の予約スタッフ以外が指定された場合。
     if (isStaffRole) {
       return (
-        <div className={shell.shell} data-design-node="wvGke">
+        <SaveErrorScope errors={saveErrors}><div className={shell.shell} data-design-node="wvGke">
           {boardHead('wvGke')}
           <div className={shell.body} data-design="Body">
             <div className={shell.main}>
@@ -919,11 +966,11 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
               </div>
             </div>
           </div>
-        </div>
+        </div></SaveErrorScope>
       )
     }
     return (
-      <div className={shell.shell} data-design-node="d5fmnM">
+      <SaveErrorScope errors={saveErrors}><div className={shell.shell} data-design-node="d5fmnM">
         {boardHead('')}
         <div className={shell.body} data-design="Body">
           <div className={shell.main}>
@@ -936,12 +983,12 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
             </div>
           </div>
         </div>
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
   return (
-    <div className={shell.shell} data-design-node={isStaffRole ? 'E3YDK' : 'd5fmnM'}>
+    <SaveErrorScope errors={saveErrors}><div className={shell.shell} data-design-node={isStaffRole ? 'E3YDK' : 'd5fmnM'}>
       {boardHead('')}
 
       <div className={shell.body} data-design="Body">
@@ -956,19 +1003,13 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
               </span>
             </p>
           ) : (
-            <div className={styles.switcherRow}>
-              <label className={styles.switcherField}>
-                <span className={styles.switcherLabel}>担当者を切り替える</span>
-                <Select
+            <div className={styles.switcherRow}><Field note={<>保存すると、右の予約画面にすぐ出ます。</>} label="担当者を切り替える"><SaveErrorField names={["staffId","scopeId","staff_id"]}><Select
                   aria-label="担当者を切り替える"
                   size="full"
                   value={staffId}
                   onChange={(value) => router.push(`/booking/staff/shifts?staff_id=${value}`)}
                   options={staffList.map((item) => ({ value: item.id, label: item.display_name }))}
-                />
-              </label>
-              <p className={styles.switcherNote}>保存すると、右の予約画面にすぐ出ます。</p>
-            </div>
+                /></SaveErrorField></Field></div>
           )}
 
           {/* N-411: 本人勤務が閲覧のみのときは全編集部品をまとめて無効化する。
@@ -989,25 +1030,25 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
                   return (
                     <div className={styles.dayRow} key={day.weekday}>
                       <strong className={styles.dayName}>{day.label.slice(0, 1)}</strong>
-                      <Toggle
+                      <SaveErrorField names={["active","row.active"]}><SettingCheckbox
                         label={`${day.label}は出勤する`}
                         checked={row.active}
                         onChange={(checked) => updateDraft(day.weekday, { active: checked })}
-                      />
+                      /></SaveErrorField>
                       {row.active ? (
                         <>
                           <span className={styles.dayState}>出る</span>
-                          <TimeField
+                          <SaveErrorField names={["start","row.start","start_time"]}><TimeField
                             aria-label={`${day.label}の始まり`}
                             value={row.start}
                             onChange={(v) => updateDraft(day.weekday, { start: v })}
-                          />
+                          /></SaveErrorField>
                           <span className={styles.dayTilde}>〜</span>
-                          <TimeField
+                          <SaveErrorField names={["end","row.end","end_time"]}><TimeField
                             aria-label={`${day.label}の終わり`}
                             value={row.end}
                             onChange={(v) => updateDraft(day.weekday, { end: v })}
-                          />
+                          /></SaveErrorField>
                         </>
                       ) : (
                         <>
@@ -1037,26 +1078,26 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
               <div className={styles.rowList}>
                 {breakRows.length === 0 ? (
                   <p className={shell.sectionDesc}>休憩はありません。</p>
-                ) : breakRows.map((row) => (
+                ) : breakRows.map((row, saveFieldIndex) => (
                   <div key={row.key} className={styles.listRow}>
-                    <Select
+                    <SaveErrorField names={[`breakRows.${saveFieldIndex}.weekday`,"weekday","row.weekday"]}><Select
                       aria-label="休憩の曜日"
                       value={String(row.weekday)}
                       onChange={(value) => updateBreakRow(row.key, { weekday: Number(value) })}
                       options={STAFF_DAYS.map((day) => ({ value: String(day.weekday), label: day.label }))}
                       size="page-size"
-                    />
-                    <TimeField
+                    /></SaveErrorField>
+                    <SaveErrorField names={[`breakRows.${saveFieldIndex}.start`,"start","row.start","start_time"]}><TimeField
                       aria-label="休憩の始まり"
                       value={row.start}
                       onChange={(v) => updateBreakRow(row.key, { start: v })}
-                    />
+                    /></SaveErrorField>
                     <span className={styles.dayTilde}>〜</span>
-                    <TimeField
+                    <SaveErrorField names={[`breakRows.${saveFieldIndex}.end`,"end","row.end","end_time"]}><TimeField
                       aria-label="休憩の終わり"
                       value={row.end}
                       onChange={(v) => updateBreakRow(row.key, { end: v })}
-                    />
+                    /></SaveErrorField>
                     <button
                       type="button"
                       onClick={() => setBreakRows((current) => current.filter((item) => item.key !== row.key))}
@@ -1131,33 +1172,33 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
                       </div>
                       {isEditing && row.kind === 'shift' ? (
                         <div className={styles.dayEntryEdit}>
-                          <TimeField
+                          <SaveErrorField names={["start","shiftRows[row.item.id]?.start","item.id]?.start","start_time","row.item.start_time","item.start_time","shift_rows[row.item.id]?.start"]}><TimeField
                             aria-label={`${formatDay(row.item.work_date)}の始まり`}
                             value={shiftRows[row.item.id]?.start ?? row.item.start_time}
                             onChange={(v) => updateShiftRow(row.item.id, { start: v })}
-                          />
+                          /></SaveErrorField>
                           <span className={styles.dayTilde}>〜</span>
-                          <TimeField
+                          <SaveErrorField names={["end","shiftRows[row.item.id]?.end","item.id]?.end","end_time","row.item.end_time","item.end_time","shift_rows[row.item.id]?.end"]}><TimeField
                             aria-label={`${formatDay(row.item.work_date)}の終わり`}
                             value={shiftRows[row.item.id]?.end ?? row.item.end_time}
                             onChange={(v) => updateShiftRow(row.item.id, { end: v })}
-                          />
+                          /></SaveErrorField>
                           <Button variant="secondary" onClick={() => void saveShiftRow(row.item)} disabled={savingShift} busy={savingShift}>更新する</Button>
                         </div>
                       ) : null}
                       {isEditing && row.kind === 'break' ? (
                         <div className={styles.dayEntryEdit}>
-                          <TimeField
+                          <SaveErrorField names={["start","row.item.start","item.start"]}><TimeField
                             aria-label={`${formatDay(row.date)}の休憩の始まり`}
                             value={row.item.start}
                             onChange={(v) => updateDateRow(row.item.key, { start: v })}
-                          />
+                          /></SaveErrorField>
                           <span className={styles.dayTilde}>〜</span>
-                          <TimeField
+                          <SaveErrorField names={["end","row.item.end","item.end"]}><TimeField
                             aria-label={`${formatDay(row.date)}の休憩の終わり`}
                             value={row.item.end}
                             onChange={(v) => updateDateRow(row.item.key, { end: v })}
-                          />
+                          /></SaveErrorField>
                           <Button variant="secondary" onClick={() => { setEditingDayRow(null); void saveBreakDates(dateRows) }} disabled={savingShift} busy={savingShift}>更新する</Button>
                         </div>
                       ) : null}
@@ -1167,7 +1208,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
               </div>
               {dayAddOpen ? (
                 <div className={styles.dayAddForm}>
-                  <Select
+                  <SaveErrorField names={["dayAddKind","day_add_kind"]}><Select
                     aria-label="足す種別"
                     value={dayAddKind}
                     onChange={(value) => setDayAddKind(value as DayAddKind)}
@@ -1176,23 +1217,23 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
                       { value: 'break', label: 'この日だけの休憩' },
                       ...(canEditExceptions ? [{ value: 'closed', label: 'この日だけの休み' }] : []),
                     ]}
-                  />
-                  <DateField aria-label="この日の日付" value={dayAddDate} onChange={setDayAddDate} />
+                  /></SaveErrorField>
+                  <SaveErrorField names={["dayAddDate","dateFrom","dateTo","work_date","date","day_add_date"]}><DateField aria-label="この日の日付" value={dayAddDate} onChange={setDayAddDate} /></SaveErrorField>
                   {dayAddKind !== 'closed' ? (
                     <>
-                      <TimeField aria-label="この日の始まり" value={dayAddStart} onChange={setDayAddStart} />
+                      <SaveErrorField names={["dayAddStart","start_time","start","day_add_start"]}><TimeField aria-label="この日の始まり" value={dayAddStart} onChange={setDayAddStart} /></SaveErrorField>
                       <span className={styles.dayTilde}>〜</span>
-                      <TimeField aria-label="この日の終わり" value={dayAddEnd} onChange={setDayAddEnd} />
+                      <SaveErrorField names={["dayAddEnd","end_time","end","day_add_end"]}><TimeField aria-label="この日の終わり" value={dayAddEnd} onChange={setDayAddEnd} /></SaveErrorField>
                     </>
                   ) : (
-                    <input
+                    <SaveErrorField names={["dayAddMemo","reason","day_add_memo"]}><input
                       type="text"
                       value={dayAddMemo}
                       onChange={(e) => setDayAddMemo(e.target.value)}
-                      placeholder="理由（任意・例: 研修のため）"
+                      placeholder="理由（任意・例：研修のため）"
                       aria-label="休みの理由"
                       className={styles.input}
-                    />
+                    /></SaveErrorField>
                   )}
                   <Button variant="primary" onClick={() => void addDayEntry()} disabled={dayAddBusy || savingShift} busy={dayAddBusy}>足す</Button>
                 </div>
@@ -1213,12 +1254,9 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
               <div className={styles.genRow}>
                 <span className={styles.fieldLabel}>
                   開始日
-                  <DateField aria-label="まとめて作り始める日" value={genFrom} onChange={setGenFrom} className="mt-1" />
+                  <SaveErrorField names={["genFrom","from_date","gen_from"]}><DateField aria-label="まとめて作り始める日" value={genFrom} onChange={setGenFrom} className="mt-1" /></SaveErrorField>
                 </span>
-                <label className={styles.fieldLabel}>
-                  週の数（1〜12）
-                  <input aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className={`${styles.input} mt-1`} />
-                </label>
+                <Field label="週の数（1〜12）"><SaveErrorField names={["genWeeks","gen_weeks"]}><NumberInput aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className={`${styles.input} mt-1`} /></SaveErrorField></Field>
                 <div className={styles.genAction}>
                   <Button variant="primary" onClick={() => void generateFromRules()} disabled={generating} busy={generating} busyLabel="作成中…">作る</Button>
                 </div>
@@ -1236,10 +1274,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
               {!serviceConfigured ? (
                 <p className={shell.warnBand} role="status">Googleの接続設定がまだなのでつなげません。管理者に連絡してください。</p>
               ) : null}
-              <div className={styles.calendarRow}>
-                <label className={styles.calendarField}>
-                  <span className={styles.fieldLabel}>カレンダーの ID</span>
-                  <input
+              <div className={styles.calendarRow}><Field label="カレンダーの ID"><SaveErrorField names={["calendarInput","calendarId","calendar_input","calendar_id"]}><input
                     aria-label="カレンダーのID"
                     value={calendarId ? (calendarInput || calendarId) : calendarInput}
                     onChange={(event) => {
@@ -1250,20 +1285,17 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
                         setCalendarInput(event.target.value)
                       }
                     }}
-                    placeholder="例: example@example.invalid"
+                    placeholder="例：example@example.invalid"
                     className={styles.input}
-                  />
-                </label>
-                {calendarId ? (
+                  /></SaveErrorField>{calendarId ? (
                   <span className={styles.connectedBadge}>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="5" /><path d="M3.8 6.2l1.4 1.4 3-3.2" /></svg>
                     つながっている
                   </span>
-                ) : null}
-              </div>
+                ) : null}</Field></div>
               {calendarId ? (
                 <p className={styles.calendarMeta}>
-                  最後に読んだ {calendarVerifiedAt ? formatDay(calendarVerifiedAt) : '—'}
+                  最後に読んだ {calendarVerifiedAt ? formatDay(calendarVerifiedAt) : emptyValue('unknown')}
                   {calendarError ? <span className={styles.fieldError}>　最新の確認で失敗しています：{calendarError}</span> : null}
                 </p>
               ) : null}
@@ -1300,7 +1332,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
           </div>
           <p className={shell.sideLineLink}>
             {previewUrl
-              ? <a href={previewUrl} target="_blank" rel="noreferrer">実際の画面で確かめる ↗</a>
+              ? <TextLink external href={previewUrl}  >実際の画面で確かめる</TextLink>
               : 'このアカウントには予約画面のURLがまだありません'}
           </p>
           {!hasActiveMenu ? (
@@ -1348,7 +1380,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
         onCancel={() => setConfirmDisconnect(false)}
         onConfirm={() => void disconnectCalendar()}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }
 
@@ -1367,6 +1399,7 @@ function TrashIcon() {
  * （動きは v7 の OwnShiftEntry と同じ。R579 の再試行も同じ。）
  */
 export function OwnShiftEntryV8() {
+  const verifiedRole = useStaffRole()
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [resolved, setResolved] = useState<'loading' | 'store' | 'missing' | 'error'>('loading')
@@ -1403,13 +1436,13 @@ export function OwnShiftEntryV8() {
         setResolved('error')
         return
       }
-      const canSeeStore = canViewFeature('/booking/bookings')
-        || canViewFeature('booking.settings')
-        || canViewFeature('/booking/menus')
+      const canSeeStore = canViewFeature('/booking/bookings', verifiedRole)
+        || canViewFeature('booking.settings', verifiedRole)
+        || canViewFeature('/booking/menus', verifiedRole)
       setResolved(canSeeStore ? 'store' : 'missing')
     })()
     return () => { cancelled = true }
-  }, [router, selectedAccountId, attempt])
+  }, [router, selectedAccountId, attempt, verifiedRole])
 
   // 店舗の受付枠を見られる権限がある人は、★V8 では予約設定の「受付枠」タブが同じ中身。
   useEffect(() => {
@@ -1426,8 +1459,8 @@ export function OwnShiftEntryV8() {
 
   const head = (
     <header className={shell.boardHead} data-design="Head">
-      <h1 className={shell.headTitle}>自分の勤務</h1>
-      <p className={shell.headNote}>あなたの出勤・休憩・この日だけのシフトを決めます。</p>
+      <PageHeading title="自分の勤務" help={<> あなたの出勤・休憩・この日だけのシフトを決めます。</>} />
+
     </header>
   )
 
@@ -1476,7 +1509,7 @@ export function OwnShiftEntryV8() {
       <div className={shell.body} data-design="Body">
         <div className={shell.main}>
           <div className={shell.stateCard}>
-            <p className={shell.stateTitle}>読み込み中</p>
+            <DetailLoading />
             <p className={shell.stateDesc}>自分の勤務を探しています。</p>
           </div>
         </div>

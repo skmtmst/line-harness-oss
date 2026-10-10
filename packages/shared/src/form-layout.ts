@@ -1,3 +1,7 @@
+import type { TapExtras } from './tap-extras.js';
+import type { ResearchAnswerAction, ResearchGate } from './research-form.js';
+import { FIXED_FRIEND_FIELDS, ageFromBirthday, type FixedFriendFieldKey } from "./fixed-friend-fields";
+
 /**
  * 回答フォームの中身（レイアウト）。
  *
@@ -36,6 +40,21 @@ export type FormInputType =
   | "address" // 住所（F11・郵便番号から補完）
   | "booking"; // 予約を入れる（フォームの中で空き枠を選ぶ）
 
+/** 保存するブロックの許可一覧。画面・Workerで同じ一覧を使う。 */
+export const FORM_INPUT_TYPES: readonly FormInputType[] = [
+  "text", "textarea", "radio", "checkbox", "select", "file", "date", "prefecture", "rating", "address", "booking",
+];
+const FORM_BLOCK_KINDS = ["input", "image", "heading", "text", "button"];
+
+/** 旧い fields だけを受け取る口でも未知の種類を通さない。 */
+export function legacyFormFieldTypeError(fields: unknown): string | null {
+  if (!Array.isArray(fields)) return "入力欄の形を確認してください";
+  const allowed = [...FORM_INPUT_TYPES, "email", "tel", "number", "heading"];
+  return fields.some(field => !field || typeof field !== "object" ||
+    !allowed.includes(String((field as Record<string, unknown>).type ?? "text")))
+    ? "この入力欄の種類は保存できません" : null;
+}
+
 /** 単一行の入力制限。空欄や「指定なし」は検証しない。 */
 export type FormInputFormat =
   | "none"
@@ -60,7 +79,7 @@ export interface FormDestinations {
   realName?: boolean;
   /** friends.display_name（システム表示名）に入れる */
   displayName?: boolean;
-  /** friends.note（個別メモ）に追記する */
+  /** 受信箱のメモ（chats.notes）に追記する */
   note?: boolean;
 }
 
@@ -82,6 +101,8 @@ export interface FormInputLimit {
  * がどの列を使うかを決める。
  */
 export interface FormChoice {
+  /** リサーチで選んだ答えの追加処理。回答を送信した後に実行する。 */
+  tapExtras?: TapExtras;
   id: string;
   label: string;
   /** choiceMode = 'tag' のとき付けるタグ */
@@ -108,6 +129,7 @@ export interface FormChoice {
  * 仕様を決めてから足す。型に無い動作は保存時に落とす。
  */
 export type FormAction =
+  | ({ kind: "research_action" } & ResearchAnswerAction)
   | { kind: "send_text"; text: string }
   | { kind: "send_template"; templateId: string }
   | { kind: "tag"; op: "add" | "remove"; tagIds: string[] }
@@ -158,6 +180,8 @@ export interface FormInputBlock {
   placeholder?: string;
   defaultValue?: string;
   destinations?: FormDestinations;
+  /** 7つの基本項目への自動保存。統括から配っても同じ意味を持つ。 */
+  fixedField?: FixedFriendFieldKey;
   limit?: FormInputLimit;
   /** 選択肢系（radio / checkbox / select）で、選んだときに何をするか */
   choiceMode?: "tag" | "friendField" | "action";
@@ -172,10 +196,43 @@ export interface FormInputBlock {
   dateStyle?: "calendar" | "ymd";
   /** 入力された日付を起点にリマインダを動かす */
   reminder?: { reminderId: string; time: string } | null;
-  /** ファイルの種類。いまは画像だけ */
-  fileKind?: "image";
+  /** ファイルの種類。未設定の既存ブロックは写真。 */
+  fileKind?: "image" | "pdf" | "identity";
+  fileKinds?: ("image" | "pdf" | "identity")[];
+  fileBothSides?: boolean;
+  fileMaxCount?: number;
   /** type = 'booking' のときの「予約を入れる」の設定 */
   booking?: FormBookingConfig | null;
+}
+
+/** A block accepting identity documents protects every attachment at the strictest level. */
+export function formFileKinds(block: FormInputBlock): ("image" | "pdf" | "identity")[] {
+  return block.fileKinds ?? [block.fileKind ?? "image"];
+}
+export function formFileKind(block: FormInputBlock): "image" | "pdf" | "identity" {
+  const kinds = formFileKinds(block);
+  return kinds.includes("identity") ? "identity" : kinds.includes("image") ? "image" : "pdf";
+}
+
+export const FORM_DOCUMENT_SCAN_NOTE = '危ないファイルの検査は内蔵の検査が標準です。外部の検査は設定した店だけで行います。';
+
+export interface FormFileAnswer {
+  fileId: string;
+  kind?: "image" | "pdf" | "identity";
+  side?: "single" | "front" | "back";
+  filename?: string;
+  mimeType?: string;
+  state?: "ready" | "pending" | "quarantined" | "rejected" | "restricted" | "expired";
+}
+
+/** 既存のメール・電話・住所・本名のブロックも同じ基本欄へ保存する。 */
+export function fixedFieldForBlock(block: FormInputBlock): FixedFriendFieldKey | undefined {
+  if (block.fixedField) return block.fixedField;
+  if (block.destinations?.realName) return "name";
+  if (block.type === "address") return "address";
+  if (block.type === "text" && block.limit?.format === "email") return "email";
+  if (block.type === "text" && block.limit?.format === "tel") return "tel";
+  return undefined;
 }
 
 /** 飾りのブロック（入力欄ではないもの）。 */
@@ -184,6 +241,7 @@ export type FormDecorationBlock =
       id: string;
       kind: "image";
       mediaUrl: string;
+      alt?: string;
       size?: "normal" | "full";
       linkUrl?: string;
     }
@@ -237,6 +295,8 @@ export interface FormOptions {
   totalLimit?: { enabled: boolean; max?: number; message?: string };
   /** 送信できたあとに動かす動作 */
   afterActions?: FormAction[];
+  /** リサーチの公開版から作る回答フォームの受付条件。 */
+  researchGate?: ResearchGate;
   /** 回答者に見せるフォームの色・書体・角丸。任意のCSSは保存しない。 */
   theme?: FormTheme;
 }
@@ -616,6 +676,7 @@ function safeJsonArray(raw: string): unknown[] {
 export function normalizeLayout(input: unknown): FormLayout | null {
   if (!input || typeof input !== "object") return null;
   const raw = input as Record<string, unknown>;
+  if (formBlockTypeError(input)) return null;
 
   const sections = Array.isArray(raw.sections)
     ? raw.sections
@@ -1024,6 +1085,16 @@ export function validateAnswer(
   }
   if (isEmpty) return null;
 
+  if (block.fixedField) {
+    if (block.fixedField === "birthday" && ageFromBirthday(String(value)) === null) return `${block.label} は過去の存在する日付で入力してください`;
+    if (block.fixedField === "age" && (!/^\d{1,3}$/.test(String(value)) || Number(value) > 150)) return `${block.label} は0〜150の整数で入力してください`;
+    const spec = FIXED_FRIEND_FIELDS.find(f => f.key === block.fixedField);
+    if (spec && spec.format !== "none") {
+      const problem = validateAnswer({ ...block, fixedField: undefined, limit: { ...block.limit, format: spec.format } }, value);
+      if (problem) return problem;
+    }
+  }
+
   // 選択肢系
   if (hasChoices(block)) {
     const selected = Array.isArray(value) ? value.map(String) : [String(value)];
@@ -1064,6 +1135,12 @@ export function validateAnswer(
   }
 
   if (block.type === "file") {
+    if (Array.isArray(value)) {
+      const max = formFileKind(block) === "identity" && block.fileBothSides ? 2 : Math.min(10, Math.max(1, block.fileMaxCount ?? 1));
+      if (value.length > max || value.some(v => !v || typeof v !== "object" || typeof v.fileId !== "string" || !/^[0-9a-f-]{36}$/i.test(v.fileId))) return `${block.label} の添付を確認してください`;
+      if (value.length && formFileKind(block) === "identity" && block.fileBothSides && value.length !== 2) return `${block.label} の表と裏を送ってください`;
+      return null;
+    }
     // 回答に入るのは、預けた画像のURL。中身そのものは入らない。
     // 別の場所を指すURLを書き込まれても困るので、こちらが返す形だけを通す。
     if (!/^https?:\/\/[^\s]+\/images\/form-uploads\//.test(String(value))) {
@@ -1169,7 +1246,30 @@ function isHttpUrl(value: string): boolean {
  * 動作のように、下書きは許すが公開では止めるものは
  * `validateFormForPublish` が見る。
  */
+/** 保存前に未知のブロックを拒否する。正規化で消してから検証すると誤って保存できてしまう。 */
+export function formBlockTypeError(input: unknown): string | null {
+  if (!input || typeof input !== "object") return null;
+  const raw = input as Record<string, unknown>;
+  const groups = [raw.header, ...(Array.isArray(raw.sections) ? raw.sections.map(s => s && typeof s === "object" ? (s as Record<string, unknown>).blocks : []) : [])];
+  for (const blocks of groups) {
+    if (!Array.isArray(blocks)) continue;
+    for (const block of blocks) {
+      if (!block || typeof block !== "object") return "ブロックの種類を確認してください";
+      const b = block as Record<string, unknown>;
+      if (!FORM_BLOCK_KINDS.includes(String(b.kind))) return "このブロックの種類は保存できません";
+      if (b.kind === "input" && !FORM_INPUT_TYPES.includes(b.type as FormInputType)) return "この入力欄の種類は保存できません";
+      if (b.fixedField !== undefined) {
+        const spec = FIXED_FRIEND_FIELDS.find(f => f.key === b.fixedField);
+        if (b.kind !== "input" || !spec || b.type !== spec.type) return "決まった答えの種類を確認してください";
+      }
+    }
+  }
+  return null;
+}
+
 export function validateFormDefinition(layout: FormLayout): string | null {
+  const typeError = formBlockTypeError(layout);
+  if (typeError) return typeError;
   const seenNames = new Set<string>();
   const groups: { where: string; blocks: FormBlock[] }[] = [
     { where: "共通ヘッダ", blocks: layout.header },
@@ -1208,6 +1308,12 @@ export function validateFormDefinition(layout: FormLayout): string | null {
           return `回答データの見出し「${block.name}」が重複しています`;
         }
         seenNames.add(block.name);
+        if (block.type === "file") {
+          if (block.fileKinds !== undefined && (!Array.isArray(block.fileKinds) || !block.fileKinds.length || block.fileKinds.some(kind => !["image", "pdf", "identity"].includes(kind)))) return `${at}で受け取る種類を1つ以上選んでください`;
+          if (block.fileKind && !["image", "pdf", "identity"].includes(block.fileKind)) return `${at}のファイルの種類を選んでください`;
+          if (block.fileMaxCount !== undefined && (!Number.isInteger(block.fileMaxCount) || block.fileMaxCount < 1 || block.fileMaxCount > 10)) return `${at}の枚数の上限は1〜10枚です`;
+          if (block.fileBothSides !== undefined && typeof block.fileBothSides !== "boolean") return `${at}の表と裏の設定を確認してください`;
+        }
 
         if (hasChoices(block)) {
           const choices = block.choices ?? [];

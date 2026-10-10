@@ -1,5 +1,9 @@
 'use client'
+import { EntityPickerDialog } from '@/components/shared/entity-picker';
 
+import { LinePreviewFlex } from '@/components/shared/line-preview'
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
+import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -102,6 +106,10 @@ import { formatDateTime, formatDay, formatNumber, formatRelative, formatTime } f
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ActionList from '@/components/shared/action-list'
+import { EntityPickerField } from '@/components/shared/entity-picker'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 interface BroadcastFormProps {
   tags: Tag[]
@@ -177,7 +185,6 @@ const UNSENDABLE_TYPES: Partial<Record<BroadcastBubbleType, string>> = {
   rich_message: 'リッチメッセージには未対応です。いまは写真かFlexで作れます',
   card_message: 'カードタイプには未対応です。いまはカルーセルで作れます',
   coupon: 'クーポンには未対応です',
-  research: 'リサーチには未対応です',
 }
 
 /*
@@ -231,7 +238,7 @@ function formatScheduleTime(iso: string): string {
 const TITLE_MAX = 60
 
 const STANDARD_CONDITION_AXES = [
-  '名前', '個別メモ', 'ステータスメッセージ', '友だち登録日', 'タグ',
+  '名前', 'メモ', 'ステータスメッセージ', '友だち登録日', 'タグ',
   '友だち情報', 'シナリオ', 'イベント予約', 'カレンダー予約', '共通情報',
   'リマインダ', '回答フォーム', '最終反応日', 'その他', '対応マーク',
 ] as const
@@ -300,7 +307,7 @@ export function MediaUpload({ bubble, onChange, lineAccountId, mediaAccountId = 
   }
   const setPreview = (url: string) => latest.current.onChange({ ...latest.current.bubble.content, previewImageUrl: url })
   const main = (
-    <MediaSlot
+    <SaveErrorField names={["original","main"]}><MediaSlot
       kind={isVideo ? 'video' : 'image'}
       title={`${noun}を追加`}
       value={original || null}
@@ -317,13 +324,13 @@ export function MediaUpload({ bubble, onChange, lineAccountId, mediaAccountId = 
       scope={scope}
       onChange={(url) => setMain(url ?? '')}
       onMediaPick={pickFrom ? () => setPicking('main') : undefined}
-    />
+    /></SaveErrorField>
   )
   return <div className="space-y-3">
     {isVideo ? (
       <div className={styles.mediaRow}>
         {main}
-        <MediaSlot
+        <SaveErrorField names={["preview"]}><MediaSlot
           size="compact"
           title="プレビュー画像を追加"
           previewAlt="動画のプレビュー画像"
@@ -335,11 +342,11 @@ export function MediaUpload({ bubble, onChange, lineAccountId, mediaAccountId = 
           onChange={(url) => setPreview(url ?? '')}
           onMediaPick={pickFrom ? () => setPicking('preview') : undefined}
           urlEntry={{ value: preview, onChange: setPreview, label: '動画のプレビュー画像のURL', placeholder: 'https://…（JPEG/PNG・1MBまで）' }}
-        />
+        /></SaveErrorField>
       </div>
     ) : main}
     {isVideo ? <p className="text-xs text-ink-faint">プレビュー画像は LINE 側で必須です（https・JPEG/PNG・1MBまで）。</p> : null}
-    {bubble.type === 'rich_video' && <input value={String(content.actionUrl ?? '')} onChange={(e) => onChange({ ...content, actionUrl: e.target.value })} placeholder="再生終了後に開くURL" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" />}
+    {bubble.type === 'rich_video' && <SaveErrorField names={["actionUrl","content.actionUrl","action_url","content.action_url"]}><input value={String(content.actionUrl ?? '')} onChange={(e) => onChange({ ...content, actionUrl: e.target.value })} placeholder="再生終了後に開くURL" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" /></SaveErrorField>}
     <MediaPickerDialog
       open={picking !== null}
       accountId={pickFrom}
@@ -393,7 +400,7 @@ export function BubblePreview({ bubble, buttons = [], accountName, composer = fa
     </div>
   }
   if (bubble.type === 'image') return imageUrl ? <img src={imageUrl} alt="写真プレビュー" className="max-h-52 w-[82%] rounded-card object-cover" /> : <div className="flex h-36 w-[82%] items-center justify-center rounded-card bg-canvas-sunken text-sm text-ink-faint">写真</div>
-  if (bubble.type === 'flex') return <div className="w-[82%] rounded-card bg-canvas p-4 shadow-card"><p className="text-xs font-medium text-info">Flexテンプレート</p><p className="mt-1 truncate text-micro text-ink-faint">{String(bubble.content.templateName ?? 'Flex JSON')}</p></div>
+  if (bubble.type === 'flex') return <LinePreviewFlex content={typeof bubble.content.flexJson === 'string' ? bubble.content.flexJson : JSON.stringify(bubble.content)} />
   if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-card bg-ink text-canvas"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
   if (bubble.type === 'card_message') {
     const cards = Array.isArray(bubble.content.cards) ? bubble.content.cards as Array<Record<string, unknown>> : [{ title: bubble.content.assetName ?? 'カード' }]
@@ -447,8 +454,8 @@ function MessageButtonsSection({ buttons, error, onChange, liffId, accountId }: 
       <div className="mt-3 space-y-2">
         {buttons.map((button, buttonIndex) => (
           <div key={buttonIndex} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)_2rem] items-center gap-2 rounded-control bg-canvas-sunken p-2">
-            <input aria-label={`ボタン${buttonIndex + 1}の名前`} value={button.label} onChange={(event) => onChange(buttons.map((item, i) => i === buttonIndex ? { ...item, label: event.target.value } : item))} placeholder="ボタン名" className="min-w-0 rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs" />
-            <TapActionField
+            <SaveErrorField names={[`buttons.${buttonIndex}.label`,"label","button.label"]}><input aria-label={`ボタン${buttonIndex + 1}の名前`} value={button.label} onChange={(event) => onChange(buttons.map((item, i) => i === buttonIndex ? { ...item, label: event.target.value } : item))} placeholder="ボタン名" className="min-w-0 rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs" /></SaveErrorField>
+            <SaveErrorField names={["button"]}><TapActionField
               name={`ボタン${buttonIndex + 1}`}
               kindLabel={`ボタン${buttonIndex + 1}の種類`}
               value={buttonTapValue(button)}
@@ -459,9 +466,9 @@ function MessageButtonsSection({ buttons, error, onChange, liffId, accountId }: 
               liffSettingsHref={accountId ? `/accounts/detail?id=${encodeURIComponent(accountId)}` : '/accounts'}
               sources={sources}
               renderBody={(kind) => kind !== 'pdf' ? undefined : (
-                <TextField type="url" aria-label={`ボタン${buttonIndex + 1}のURL`} value={button.value} placeholder="https://example.com/guide.pdf" onChange={(event) => patchButton(buttonIndex, { uri: event.target.value })} />
+                <SaveErrorField names={[`buttons.${buttonIndex}.value`,"value","button.value"]}><TextField type="url" aria-label={`ボタン${buttonIndex + 1}のURL`} value={button.value} placeholder="https://example.com/guide.pdf" onChange={(event) => patchButton(buttonIndex, { uri: event.target.value })} /></SaveErrorField>
               )}
-            />
+            /></SaveErrorField>
             <button type="button" aria-label={`ボタン${buttonIndex + 1}を削除`} onClick={() => onChange(buttons.filter((_, i) => i !== buttonIndex))} className="flex justify-center text-danger"><Trash2 size={16} aria-hidden /></button>
           </div>
         ))}
@@ -549,6 +556,7 @@ export default function BroadcastForm({
   onStepChange,
   visualQaAugustCampaign = false,
 }: BroadcastFormProps) {
+  const saveErrors = useSaveFormErrors()
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
   /*
    * テスト送信と本番予約で同じ下書きを使う。
@@ -566,7 +574,6 @@ export default function BroadcastForm({
   const saveInFlightRef = useRef<{ accountId: string | null; promise: Promise<ApiBroadcast | null> } | null>(null)
   const draftSessionsByAccount = useRef(new Map<string | null, BroadcastDraftSession>())
   const createKeyByAccount = useRef(new Map<string | null, string>())
-  const autosaveRetryTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const appliedInitialTemplate = useRef(false)
   // 独立審査(指摘4): テンプレート読み込みの世代照合と選択中アカウントの記録。
   const templateLoadGenerationRef = useRef(createLoadGeneration())
@@ -584,6 +591,24 @@ export default function BroadcastForm({
   const appliedDraftFrom = useRef<string | null>(null)
   const [editingDraft, setEditingDraft] = useState<ApiBroadcast | null>(null)
   const [draftError, setDraftError] = useState('')
+  const [draftReloadKey, setDraftReloadKey] = useState(0)
+  const [draftReloadId, setDraftReloadId] = useState<string | null>(null)
+  const saveConflict = useSaveConflict<ApiBroadcast>({
+    fetchLatest: async () => {
+      const accountId = selectedAccountIdRef.current
+      const id = draftSession.current.draftId
+      if (!id) return null
+      const result = await api.broadcasts.get(id)
+      return result.success && accountId === selectedAccountIdRef.current ? result.data : null
+    },
+    reload: () => {
+      appliedDraftFrom.current = null
+      setDraftReloadId(draftSession.current.draftId)
+      setDraftReloadKey((key) => key + 1)
+    },
+  })
+  useEffect(() => { saveConflict.clear(); setDraftReloadId(null) }, [selectedAccountId, saveConflict.clear])
+
   const [title, setTitle] = useState(visualQaAugustCampaign ? '8月キャンペーンのお知らせ' : '')
   const [internalMemo, setInternalMemo] = useState('')
   const [deliveryMethod, setDeliveryMethod] = useState<'new' | 'template' | 'duplicate'>('new')
@@ -619,10 +644,7 @@ export default function BroadcastForm({
    * (`folders` / kind='broadcast') とは別物なので別に持つ。
    */
   const [templateFolders, setTemplateFolders] = useState<Folder[]>([])
-  const [templatePickerQuery, setTemplatePickerQuery] = useState('')
-  const [templatePickerFolderId, setTemplatePickerFolderId] = useState('')
   const [showTemplatePicker, setShowTemplatePicker] = useState(openTemplatePickerInitially)
-  const [selectedTemplate, setSelectedTemplate] = useState<BroadcastTemplateOption | null>(null)
   const [targetMode, setTargetMode] = useState<TargetMode>(initialCondition ? 'advanced' : 'scenario')
   /** シナリオ購読で絞るときの相手。空なら「どれか1つでも購読している人」。 */
   const [scenarioId, setScenarioId] = useState('')
@@ -668,7 +690,7 @@ export default function BroadcastForm({
   const [folders, setFolders] = useState<Array<{ id: string; name: string; color?: string | null }>>([])
   // フォルダを選ぶ欄からその場で作る（dLffh）。一覧の左の列の「フォルダを追加」と同じ口・同じ権限。
   const staffRoleForFolders = useStaffRole()
-  const canCreateFolder = staffRoleForFolders === null || canEditFeature('broadcast.definition.edit')
+  const canCreateFolder = canEditFeature('broadcast.definition.edit', staffRoleForFolders)
   const createFolder = folderCreator(
     (name, color) => api.folders.create({ kind: 'broadcast', name, color }),
     folderById,
@@ -759,7 +781,7 @@ export default function BroadcastForm({
   usePageTitle(
     preflightDialogOpen
       ? '一斉配信の配信前チェック'
-      : showTemplatePicker || selectedTemplate
+      : showTemplatePicker
         ? '一斉配信を作成・テンプレートを選ぶ'
         : stepTitle[currentStep ?? 'basic'],
   )
@@ -817,7 +839,7 @@ export default function BroadcastForm({
   useEffect(() => {
     // アカウントが確定する前に照合すると「別アカウントの下書き」と誤判定する。
     if (accountLoading) return
-    const draftId = searchParams.get('draft')?.trim()
+    const draftId = searchParams.get('draft')?.trim() || draftReloadId
     if (!draftId) return
     const restoreKey = `${draftId}:${selectedAccountId}`
     if (appliedDraftFrom.current === restoreKey) return
@@ -924,13 +946,14 @@ export default function BroadcastForm({
       }
       draftSessionsByAccount.current.set(draftSession.current.accountId, draftSession.current)
       setEditingDraft(draft)
+      saveConflict.clear()
       // 読み込んだ下書きの形を「保存ずみ」の基準にし直す（★V7 §5 未保存判定）。
       cleanFingerprintRef.current = null
     }).catch(() => {
       if (generation !== accountGenerationRef.current) return
       setDraftError('下書きを読み込めませんでした。一覧から開き直してください。')
     })
-  }, [searchParams, accountLoading, selectedAccountId])
+  }, [searchParams, accountLoading, selectedAccountId, draftReloadKey, draftReloadId])
 
   // 本文や届く時刻を変えたあとは、前の見た目に対する確認を引き継がない。
   useEffect(() => {
@@ -1075,7 +1098,6 @@ export default function BroadcastForm({
   // 独立審査(指摘4): アカウント切替で旧候補・選択・吹き出しを残さない。
   // 持ち主の分かる吹き出しだけ落とし、手書き・素材は保つ。
   useEffect(() => {
-    setSelectedTemplate(null)
     setExcludeTagId('')
     setBubbles((items) => items.filter((bubble) => {
       const owner = bubble.content.templateAccountId
@@ -1205,25 +1227,6 @@ export default function BroadcastForm({
     setBubbles((items) => empty ? [bubble] : [...items, bubble])
   }
   const moveBubble = (index: number, direction: -1 | 1) => setBubbles((items) => { const next = [...items]; const [item] = next.splice(index, 1); next.splice(index + direction, 0, item); return next })
-
-  /*
-   * テンプレート選択窓の候補（IDEA-11）。
-   * 以前は先頭3件だけを出していたので、4件目以降は検索・フォルダでも
-   * 届かなかった。読み込み済みの候補を全部対象に、名前・本文と置き場で絞る。
-   */
-  const pickerTemplates = useMemo(() => {
-    const q = templatePickerQuery.trim().toLowerCase()
-    return messageTemplates.filter((template) => {
-      if (composerTemplateKind && messageTemplateToBubble(template)?.type !== composerTemplateKind) return false
-      if (templatePickerFolderId === '__none__') {
-        if (template.folderId) return false
-      } else if (templatePickerFolderId && template.folderId !== templatePickerFolderId) {
-        return false
-      }
-      if (!q) return true
-      return template.name.toLowerCase().includes(q) || template.messageContent.toLowerCase().includes(q)
-    })
-  }, [messageTemplates, templatePickerQuery, templatePickerFolderId, composerTemplateKind])
   const applyTemplate = async (template: BroadcastTemplateOption) => {
     const accountId = selectedAccountId
     if (templateApplyLock.current) return
@@ -1236,7 +1239,9 @@ export default function BroadcastForm({
         if (selectedAccountIdRef.current !== accountId) return
         if (!detail.success || (detail.data.accountId && detail.data.accountId !== accountId)) { setTemplateApplyError('このアカウントで使えるテンプレートを読み込めませんでした。'); return }
         source = { ...template, carouselActions: detail.data.carouselActions, carouselTapLimitMode: detail.data.carouselTapLimitMode, carouselTapLimitText: detail.data.carouselTapLimitText }
-      } catch { if (selectedAccountIdRef.current === accountId) setTemplateApplyError('テンプレートを読み込めませんでした。もう一度選んでください。'); return }
+      } catch (saveFailure) {
+        const fieldFailure = saveErrors.capture(saveFailure);
+ if (selectedAccountIdRef.current === accountId) { if (!fieldFailure) setTemplateApplyError('テンプレートを読み込めませんでした。もう一度選んでください。'); } return }
       finally { templateApplyLock.current = false; if (selectedAccountIdRef.current === accountId) setComposerBusy(false) }
     }
     const bubble = messageTemplateToBubble(source)
@@ -1245,7 +1250,6 @@ export default function BroadcastForm({
       return
     }
     placeTemplateBubble(bubble)
-    setSelectedTemplate(null)
     setShowTemplatePicker(false)
   }
 
@@ -1387,10 +1391,15 @@ export default function BroadcastForm({
         setPreflightStatus('error')
         if (!silent) setError(res.error)
       }
-    } catch {
+    } catch (saveFailure) {
       if (seq !== preflightSeq.current) return
-      setPreflightStatus('error')
-      if (!silent) setError('確認できませんでした')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      setPreflightStatus('error');
+
+      if (!silent) { if (!fieldFailure)
+
+
+ setError('確認できませんでした') }
     }
   }
 
@@ -1456,6 +1465,7 @@ export default function BroadcastForm({
     scheduledAt: string | null,
     saveAsDraft = false,
     confirmedCount?: number,
+    autosaveStep?: typeof currentStep,
   ): Promise<ApiBroadcast | null> => {
     const accountId = selectedAccountIdRef.current || null
     /*
@@ -1479,12 +1489,17 @@ export default function BroadcastForm({
       if (!latest || latest.accountId !== accountId) break
       try {
         await latest.promise
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
         /* 先行の失敗はこの保存の判断に混ぜない。下で最新を送る。 */
       }
-      if ((selectedAccountIdRef.current || null) !== accountId) return null
+      if ((selectedAccountIdRef.current || null) !== accountId)
+
+
+ return null
     }
     const payload = draftPayload(scheduledAt, saveAsDraft, confirmedCount)
+    if (saveAsDraft && autosaveStep) payload.draftStep = autosaveStep
     /*
      * R627: 作りかけの冪等キーはアカウントごとに1つ。
      * 初期セッション（accountId=null）のまま毎回新しい鍵を作ると、
@@ -1537,6 +1552,8 @@ export default function BroadcastForm({
       settleInFlight(result.broadcast)
       return result.broadcast
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e);
+
       if (e instanceof ApiError && e.status === 409 && sessionForAccount.draftId) {
         /*
          * R626: 古いアカウントの409を今の画面の文言へ混ぜない。
@@ -1546,17 +1563,8 @@ export default function BroadcastForm({
           settleInFlight(null)
           return null
         }
-        const current = await api.broadcasts.get(sessionForAccount.draftId)
-        if (current.success && (selectedAccountIdRef.current || null) === accountId) {
-          const refreshed = { ...sessionForAccount, version: current.data.version ?? null }
-          draftSessionsByAccount.current.set(accountId, refreshed)
-          draftSession.current = refreshed
-        }
-        if ((selectedAccountIdRef.current || null) !== accountId) {
-          settleInFlight(null)
-          return null
-        }
-        setError('別の画面で更新されたため読み直しました')
+        saveConflict.mark()
+        setError('')
         settleInFlight(null)
         return null
       }
@@ -1581,113 +1589,31 @@ export default function BroadcastForm({
     (key, value) => (key === 'lineAccountId' ? undefined : value),
   )
   const cleanFingerprintRef = useRef<string | null>(null)
-  const formFingerprintRef = useRef(formFingerprint)
-  formFingerprintRef.current = formFingerprint
-  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
-  const [autosaving, setAutosaving] = useState(false)
-  const autosavingRef = useRef(false)
-  const [clockTick, setClockTick] = useState(() => Date.now())
-
   // 最初の描画と、下書き適用で内容が入れ替わった直後に「保存ずみの形」を採る。
   useEffect(() => {
     if (cleanFingerprintRef.current === null) cleanFingerprintRef.current = formFingerprint
   })
   const dirty = cleanFingerprintRef.current !== null && formFingerprint !== cleanFingerprintRef.current
   const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: saving })
-  const leaveTargetRef = useRef(leaveTarget)
-  leaveTargetRef.current = leaveTarget
-
-  /*
-   * 入力が2秒止まったら下書きへ静かに保存する。打つたびに送ると
-   * 通信だらけになるので指紋の変化から数える。通せない形（未入力など）、
-   * アカウントが決まっていない間、離脱の確認中は送らない。
-   */
-  const autosaveDraft = async () => {
-    if (autosavingRef.current || saving || testSending) return
-    if (!selectedAccountId || validate()) return
-    const requestAccountId = selectedAccountIdRef.current || null
-    autosavingRef.current = true
-    setAutosaving(true)
-    const fingerprintAtSave = formFingerprint
-    try {
-      const saved = await persistDraft(scheduledAtIso(), true)
-      /*
-       * R626: 別アカウントへ移っていたら今の画面へ混ぜない。
-       * persistDraftがnullで返すのでここでも世代で守る。
-       */
-      if ((selectedAccountIdRef.current || null) !== requestAccountId) return
-      if (saved) {
-        cleanFingerprintRef.current = fingerprintAtSave
-        setDraftSavedAt(Date.now())
-        // BROADCAST-16: 自動でも下書きが増えるので、一覧側へは同じ口で知らせる。
-        onDraftSaved?.(saved)
-      }
-    } catch {
-      /* 静かに未保存のまま。次の変更・手動保存・「保存して移る」でやり直せる。 */
-    } finally {
-      autosavingRef.current = false
-      setAutosaving(false)
-      /*
-       * R625/R626: 保存中に追記されていたら置き去りにしない。
-       * 同じアカウントなら進んだ指紋を2秒後にもう一度静かに送る。
-       * 違うアカウントへ移っていたら、Aの応答でBを保存ずみにはしない
-       * まま、今のアカウントが未保存なら送り直す（Bの間合いが先行の
-       * 保存中に捨てられていても、autosavingの変化だけでは effect が
-       * 起きないため、ここで拾う）。
-       */
-      if (leaveTargetRef.current === null) {
-        const stillSameAccount = (selectedAccountIdRef.current || null) === requestAccountId
-        const pendingFingerprint = stillSameAccount
-          ? formFingerprintRef.current !== fingerprintAtSave
-          : cleanFingerprintRef.current !== null
-            && formFingerprintRef.current !== cleanFingerprintRef.current
-        if (pendingFingerprint) {
-          if (autosaveRetryTimer.current) clearTimeout(autosaveRetryTimer.current)
-          autosaveRetryTimer.current = setTimeout(() => autosaveDraftRef.current(), 2000)
-        }
-      }
-    }
-  }
-
-  /*
-   * R625: 置き去りの再送は最新の入力で送る。
-   * タイマーに閉じ込めた古い autosaveDraft を呼ぶと追記前の本文で
-   * 更新してしまう。毎描画で最新の関数へ付け替えて呼ぶ。
-   */
-  const autosaveDraftRef = useRef(() => {})
-  autosaveDraftRef.current = () => void autosaveDraft()
-
-  useEffect(() => {
-    if (!dirty || leaveTarget !== null) return
-    const timer = setTimeout(() => void autosaveDraft(), 2000)
-    return () => clearTimeout(timer)
-    // autosaveDraft は毎回作り直されるので依存に入れない。見たいのは中身の変化。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formFingerprint, dirty, selectedAccountId, saving, testSending, leaveTarget])
-
-  useEffect(() => () => {
-    if (autosaveRetryTimer.current) clearTimeout(autosaveRetryTimer.current)
-  }, [])
-
-  // 「下書き保存済み・◯秒前」の秒数だけ10秒ごとに進める。
-  useEffect(() => {
-    if (draftSavedAt === null) return
-    const timer = setInterval(() => setClockTick(Date.now()), 10_000)
-    return () => clearInterval(timer)
-  }, [draftSavedAt])
-
-  const draftSavedAgo = draftSavedAt === null
-    ? null
-    : Math.floor((clockTick - draftSavedAt) / 1000) < 60
-      ? `${Math.max(0, Math.floor((clockTick - draftSavedAt) / 1000))}秒前`
-      : formatRelative(draftSavedAt, clockTick)
-  const draftStatusLabel = autosaving
-    ? '下書きを保存しています…'
-    : dirty
-      ? '下書きはまだ保存していません'
-      : draftSavedAgo
-        ? `下書き保存済み・${draftSavedAgo}`
-        : null
+  const queuedAutosave = useRef({ fingerprint: formFingerprint, step: currentStep })
+  if (queuedAutosave.current.fingerprint !== formFingerprint) queuedAutosave.current = { fingerprint: formFingerprint, step: currentStep }
+  const draftAutosave = useDraftAutosave({
+    fingerprint: `${selectedAccountId}:${formFingerprint}`,
+    dirty,
+    enabled: Boolean(selectedAccountId) && !saveConflict.conflict && !validate(),
+    paused: saving || testSending || leaveTarget !== null,
+    save: async () => {
+      if (!selectedAccountId || validate()) return false
+      const account = selectedAccountIdRef.current || null
+      const fingerprint = formFingerprint
+      const saved = await persistDraft(scheduledAtIso(), true, undefined, queuedAutosave.current.step)
+      if (!saved || (selectedAccountIdRef.current || null) !== account) return false
+      cleanFingerprintRef.current = fingerprint
+      onDraftSaved?.(saved)
+      return true
+    },
+  })
+  const draftStatusLabel = draftAutosave.label
 
   const saveDraftNow = async (): Promise<boolean> => {
     /*
@@ -1711,7 +1637,7 @@ export default function BroadcastForm({
       if ((selectedAccountIdRef.current || null) !== requestAccountId) return false
       if (saved) {
         cleanFingerprintRef.current = fingerprintAtSave
-        setDraftSavedAt(Date.now())
+        draftAutosave.markSaved()
         notifyToast('下書きを保存しました。')
         // BROADCAST-16: フォームは閉じない保存なので、背後の一覧と
         // フォルダ件数の読み直しは呼び側に任せる。失敗時は呼ばない。
@@ -1727,7 +1653,10 @@ export default function BroadcastForm({
        * R626: 古いアカウントの失敗を今の画面の文言へ混ぜない。
        */
       if ((selectedAccountIdRef.current || null) !== requestAccountId) return false
-      setError(describeSaveFailure(error))
+      const fieldFailure = saveErrors.capture(error)
+      { if (!fieldFailure)
+
+      setError(describeSaveFailure(error)) }
       return false
     } finally {
       setSaving(false)
@@ -1769,9 +1698,12 @@ export default function BroadcastForm({
           : testSendFailure(at)
       setTestResult(view)
       setTestHistory((history) => [view, ...history])
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
       const view = testSendFailure(at)
-      setTestResult(view)
+      { if (!fieldFailure)
+      setTestResult(view) }
       setTestHistory((history) => [view, ...history])
     } finally {
       setTestSending(false)
@@ -1798,8 +1730,10 @@ export default function BroadcastForm({
       const recipients = res.success && Array.isArray(res.data) ? res.data : []
       setTestRecipients(recipients)
       setTestRecipientState(res.success ? 'ready' : 'error')
-    } catch {
-      if (generation === testRecipientsGeneration.current) setTestRecipientState('error')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
+      if (generation === testRecipientsGeneration.current) { if (!fieldFailure) setTestRecipientState('error') }
     }
   }
 
@@ -2008,7 +1942,9 @@ export default function BroadcastForm({
             if (selectedAccountIdRef.current !== selectedAccountId) return false
             if (!saved.success) throw new Error(saved.error)
             assetId = saved.data.id; payload = saved.data.payload
-          } catch { if (selectedAccountIdRef.current === selectedAccountId) setTemplateSaveError('テンプレートに保存できませんでした。'); return false }
+          } catch (saveFailure) {
+            const fieldFailure = saveErrors.capture(saveFailure);
+ if (selectedAccountIdRef.current === selectedAccountId) { if (!fieldFailure) setTemplateSaveError('テンプレートに保存できませんでした。'); } return false }
           finally { if (selectedAccountIdRef.current === selectedAccountId) setComposerBusy(false) }
         }
         bubble = { id: inlineBubble.id, type: 'rich_message', content: { ...payload, assetId, assetName: content.name, inline: true } }
@@ -2040,7 +1976,9 @@ export default function BroadcastForm({
       if (selectedAccountIdRef.current !== selectedAccountId) return
       if (!result.success) throw new Error(result.error)
       setTemplateSaveIndex(null); notifyToast('テンプレートに保存しました')
-    } catch { if (selectedAccountIdRef.current === selectedAccountId) setTemplateSaveError('テンプレートに保存できませんでした。もう一度お試しください。') }
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+ if (selectedAccountIdRef.current === selectedAccountId) { if (!fieldFailure) setTemplateSaveError('テンプレートに保存できませんでした。もう一度お試しください。') } }
     finally { if (selectedAccountIdRef.current === selectedAccountId) setComposerBusy(false) }
   }
   const shows = (step: BroadcastStepKey) => currentStep === null || currentStep === step
@@ -2145,7 +2083,10 @@ export default function BroadcastForm({
     } catch (caught) {
       // R626: 古いアカウントの失敗を今の画面の文言へ混ぜない。
       if ((selectedAccountIdRef.current || null) !== requestAccountId) return
-      setError(describeSaveFailure(caught))
+      const fieldFailure = saveErrors.capture(caught)
+      { if (!fieldFailure)
+
+      setError(describeSaveFailure(caught)) }
     } finally { submittingRef.current = false; setSaving(false) }
   }
 
@@ -2158,28 +2099,26 @@ export default function BroadcastForm({
   if (draftParam) {
     if (draftError) {
       return (
-        <div className={styles.root}>
+        <SaveErrorScope errors={saveErrors}><div className={styles.root}>
           <div className="rounded-card border border-hairline bg-canvas p-8 text-center">
             <p className="text-ink text-sm font-semibold">{draftError}</p>
             <div className="mt-4 flex items-center justify-center gap-3">
-              <Link href="/broadcasts" className="text-action text-sm font-medium hover:underline">
-                一斉配信一覧へ戻る
-              </Link>
+              <></>
             </div>
           </div>
-        </div>
+        </div></SaveErrorScope>
       )
     }
     if (!editingDraft) {
       return (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
+        <SaveErrorScope errors={saveErrors}><div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           下書きを読み込んでいます…
-        </div>
+        </div></SaveErrorScope>
       )
     }
   }
 
-  return <MessageComposerPage active={v8 && currentStep === 'message'}><div className={styles.root} data-design-node="FU2aU" data-step={currentStep ?? 'all'}>
+  return <SaveErrorScope errors={saveErrors}><MessageComposerPage active={v8 && currentStep === 'message'}><div className={styles.root} data-design-node="FU2aU" data-step={currentStep ?? 'all'}>
     <header className={styles.header} data-steps-below={v8 || undefined}>
       <div className={styles.heading}>
         {showHeadBack ? <Button variant="secondary" className={styles.textButton} size="compact" onClick={() => guarded(onCancel)}>← 一斉配信一覧</Button> : null}
@@ -2197,6 +2136,12 @@ export default function BroadcastForm({
       段ごとに分かれているときはここだけに出し、メッセージの段の中の帯は
       段分けなしの従来フォームのときだけ出す（下の `{!currentStep && ...}`）。
     */}
+    {saveConflict.conflict ? <SaveConflictBand title="ほかの担当者が先に配信を保存しました" onCompare={() => void saveConflict.compare()} compareBusy={saveConflict.compareBusy} onReload={() => void saveConflict.reloadLatest()} /> : null}
+    <SaveConflictCompareDialog open={saveConflict.compareOpen} busy={saveConflict.compareBusy} error={saveConflict.compareError} onCancel={saveConflict.closeCompare} onReload={() => void saveConflict.reloadLatest()} lines={saveConflict.latest ? [
+      { text: `名前：入力 ${title} ／ 最新 ${saveConflict.latest.title}`, kind: title === saveConflict.latest.title ? undefined : 'change' },
+      { text: `本文：入力 ${bubbles.map((bubble) => String(bubble.content.text ?? '')).join(' / ')} ／ 最新 ${saveConflict.latest.messageContent}`, kind: 'change' },
+      { text: `配信時刻：入力 ${scheduledDate} ${scheduledTime} ／ 最新 ${saveConflict.latest.scheduledAt ?? '今すぐ'}`, kind: 'change' },
+    ] : null} />
     {currentStep && error ? (
       <Notice
         tone="danger"
@@ -2219,7 +2164,7 @@ export default function BroadcastForm({
       <div className={`${styles.input} ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
         {preflightDialogOpen ? (
           <section className="broadcast-preflight-page space-y-3">
-            <section className="rounded-card border border-hairline bg-canvas p-5">
+            <section className="rounded-card border content-card bg-canvas p-5">
               <h3 className="text-lg font-bold text-ink">配信内容</h3>
               <p className="mt-1 text-xs text-ink-faint">対象・日時・メッセージの最終確認です。</p>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
@@ -2227,7 +2172,7 @@ export default function BroadcastForm({
                 <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="mt-1 font-medium text-ink">{sendWhenLabel ?? '未設定'}</dd></div>
               </dl>
             </section>
-            <section className="rounded-card border border-hairline bg-canvas p-5">
+            <section className="rounded-card border content-card bg-canvas p-5">
               <h3 className="text-lg font-bold text-ink">確認項目</h3>
               <p className="mt-1 text-xs text-ink-faint">警告が残っている場合は配信できません。</p>
               <dl className="mt-4 divide-y divide-hairline text-sm">
@@ -2240,7 +2185,7 @@ export default function BroadcastForm({
         ) : null}
         <section id="broadcast-step-basic" className={shows('basic') ? styles.section : 'hidden'}>
           <h3>配信方法</h3>
-              <RadioCardGroup legend="配信方法" className={styles.methodCards}>
+              <SaveErrorField names={["broadcast-delivery-method","value","deliveryMethod"]}><RadioCardGroup legend="配信方法" className={styles.methodCards}>
                 {([
                   ['new', '新しいメッセージを作成', 'テキスト・画像・ボタンを組み合わせて一から作ります。'],
                   ['template', 'テンプレートを選択', '保存済みテンプレートを呼び出して手直しします。'],
@@ -2268,15 +2213,15 @@ export default function BroadcastForm({
                       : undefined}
                   />
                 ))}
-              </RadioCardGroup>
+              </RadioCardGroup></SaveErrorField>
           <label className={styles.nameField}>
             <span className={styles.labelRow}><span className="text-ink text-sm font-bold">配信名<RequiredBadge /></span><span className="text-xs text-ink-faint">{title.trim().length} / {TITLE_MAX}文字</span></span>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={styles.textInput} />
+            <SaveErrorField names={["title"]}><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={styles.textInput} /></SaveErrorField>
             <small>友だちには表示されません。一覧で見分けるための名前です</small>
           </label>
           <div className={styles.basicFields}>
-            <label><span className={styles.labelRow}>フォルダ</span><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={folders.map(folderById)} onCreate={canCreateFolder ? createFolder : undefined} size="full" /></label>
-            <label><span className={styles.labelRow}>社内メモ <span className="text-ink-faint text-xs font-normal">任意</span><HelpTip label="社内メモの説明">友だちには表示されません</HelpTip></span><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} className={styles.textInput} placeholder="配信の目的や運用メモ" /></label>
+            <label><span className={styles.labelRow}>フォルダ</span><SaveErrorField names={["folderId","folder_id"]}><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={folders.map(folderById)} onCreate={canCreateFolder ? createFolder : undefined} size="full" /></SaveErrorField></label>
+            <label><span className={styles.labelRow}>社内メモ <span className="text-ink-faint text-xs font-normal">任意</span><HelpTip label="社内メモの説明">友だちには表示されません</HelpTip></span><SaveErrorField names={["internalMemo","internal_memo"]}><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} className={styles.textInput} placeholder="配信の目的や運用メモ" /></SaveErrorField></label>
           </div>
           <div className={styles.recentHeader}><h3>最近の配信</h3><Link href="/broadcasts">一斉配信の一覧を見る →</Link></div>
           <div className={styles.recentList}>
@@ -2291,7 +2236,7 @@ export default function BroadcastForm({
         </section>
         <section id="broadcast-step-audience" className={shows('audience') ? styles.section : 'hidden'}>
           <h3>配信対象</h3>
-          <RadioCardGroup legend="配信対象" className={styles.audienceCards}>
+          <SaveErrorField names={["broadcast-target-mode","value","mode.value","targetMode"]}><RadioCardGroup legend="配信対象" className={styles.audienceCards}>
             {TARGET_MODES.map((mode) => (
               <RadioCard
                 key={mode.value}
@@ -2306,7 +2251,7 @@ export default function BroadcastForm({
                 note={mode.description}
               />
             ))}
-          </RadioCardGroup>
+          </RadioCardGroup></SaveErrorField>
           {audienceNotice && targetMode === 'advanced' && conditionHasAnalyticsAudience(condition) && (
             <div className="bg-accent-soft rounded-card mt-3 flex flex-wrap items-center justify-between gap-2 p-3">
               <p className="text-ink text-sm">
@@ -2340,15 +2285,15 @@ export default function BroadcastForm({
           </div>
           {targetMode === 'scenario' && <div className="mt-4 border-t pt-4">
             <label className="text-ink-secondary block text-xs font-semibold">どのシナリオ</label>
-            <Combobox
+            <SaveErrorField names={["scenarioId","scenario_id"]}><EntitySelect clearable size="full" kind="scenario"
               aria-label="どのシナリオ"
               placeholder="すべてのシナリオ（どれか1つでも購読中）"
               value={scenarioId}
               onChange={setScenarioId}
-              options={scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))}
+              options={scenarios.map((scenario) => ({ ...entityOptionMetadata(scenario), value: scenario.id, label: scenario.name }))}
               loading={scenariosStatus === 'loading'}
               className="mt-1 w-full sm:max-w-sm"
-            />
+            /></SaveErrorField>
             {scenariosStatus === 'loading' && <p className="mt-1 text-xs text-ink-faint">シナリオを読み込んでいます…</p>}
             {scenariosStatus === 'error' && <p className="mt-1 text-xs text-warning">シナリオを読み込めませんでした。別の絞り方を選んで戻ると再取得します。</p>}
           </div>}
@@ -2358,12 +2303,12 @@ export default function BroadcastForm({
               「すべて」は置かない。タグを選ばないままだと絞り込みが消えて
               全員に届く。全員に送るなら上の「友だち全員に配信する」を選ぶ。
             */}
-            <Combobox
+            <SaveErrorField names={["tagId","targetTagId","tag_id"]}><EntitySelect clearable size="full" kind="tag"
               aria-label="どのタグ"
               placeholder="タグを選んでください"
               value={tagId}
               onChange={setTagId}
-              options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+              options={tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))}
               loading={tagsStatus === 'loading'}
               /*
                * R581: 候補が取れていない間は開かせない。空のまま開くと
@@ -2372,7 +2317,7 @@ export default function BroadcastForm({
                */
               disabled={tagsStatus !== 'ready'}
               className="mt-1 w-full sm:max-w-sm"
-            />
+            /></SaveErrorField>
             {/*
               R581: 通信失敗と真の0件を分ける。失敗は赤を使わず注意色で出し、
               同じ画面で再試行できるようにする（失敗・直し方は「？」に入れない）。
@@ -2416,7 +2361,7 @@ export default function BroadcastForm({
             <Checkbox checked onCheckedChange={() => {}} disabled>ブロック中の人を除く</Checkbox>
             <small>ブロック中・非表示・宛先不明の友だちには送りません</small>
           </div>
-          <label className={styles.excludeTag}><span className={styles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><Select aria-label="除くタグ" value={excludeTagId} onChange={setExcludeTagId} disabled={tagsStatus !== 'ready'} options={[{ value: '', label: '除外なし' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} size="full" /></label>
+          <label className={styles.excludeTag}><span className={styles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><SaveErrorField names={["excludeTagId","exclude_tag_id"]}><EntitySelect kind="tag" aria-label="除くタグ" value={excludeTagId} onChange={setExcludeTagId} disabled={tagsStatus !== 'ready'} options={[{ value: '', label: '除外なし' }, ...tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))]} size="full" /></SaveErrorField></label>
           <div className={styles.exclusion}>
             <Checkbox checked={false} onCheckedChange={() => {}} disabled>この1週間に送った人を除く</Checkbox>
             <small>最近送った人を除く機能は、まだ使えません</small>
@@ -2427,130 +2372,84 @@ export default function BroadcastForm({
           {preflight?.audience && <details className={styles.details}><summary>対象プレビュー・除外の内訳</summary><p className="text-xs text-ink-secondary">条件一致 {formatNumber(preflight.audience.matched)}人 ・ 送信可能 {formatNumber(preflight.audience.sendable)}人 ・ {exclusionNote ?? '除外 —'}</p>{preflight.audience.representatives.map((friend) => <Link key={friend.friendId} href={`/friends/detail?id=${encodeURIComponent(friend.friendId)}`} className="block text-xs text-action">{friend.displayName ?? '名前未登録'}　{friend.summary}</Link>)}</details>}
         </section>
         <div className={shows('message') ? 'contents' : 'hidden'}>
-        <section id="broadcast-step-message" className={showTemplatePicker ? 'hidden' : styles.section}>
+        <section id="broadcast-step-message" className={ styles.section}>
           <MessageComposer bubbleErrors={bubbles.map((_, index) => fields.error(`bubble-${index}`))} bubbleFieldProps={(index) => fields.bind(`bubble-${index}`)} bubbles={bubbles} accountId={selectedAccountId} busy={composerBusy} onBusyChange={(value) => { if (selectedAccountIdRef.current === selectedAccountId) setComposerBusy(value) }}
-            unavailable={{ intro: '紹介メッセージは現在利用できません。', research: UNSENDABLE_TYPES.research }}
+            unavailable={{ intro: '紹介メッセージは現在利用できません。' }}
             onChange={updateBubble} onMove={moveBubble} onDelete={(index) => setBubbles((items) => items.filter((_, i) => i !== index))}
             onAdd={() => setBubbles((items) => [...items, emptyBubble()])}
             onPickTemplate={(index, kind) => { setComposerTemplateKind(kind); setComposerTemplateIndex(index); setShowTemplatePicker(true) }}
             onSaveTemplate={(index) => { setTemplateSaveCreatedId(null); setTemplateSaveIndex(index); setTemplateSaveName(String(bubbles[index].content.templateName ?? bubbles[index].content.assetName ?? title)); setTemplateSaveError('') }}
             onCompose={(index, kind) => { setTemplateSaveError(''); setInlineComposer({ index, kind }) }}
-            extraFields={(index, bubble) => bubble.type === 'text' ? null : isContentTemplateType(bubble.type) ? <Combobox aria-label="コンテンツで作成したテンプレートから選択" placeholder="テンプレートを選択してください" value={String(bubble.content.assetId ?? '')} onChange={(id) => { const asset = assets.find((item) => item.id === id); updateBubble(index, { ...bubble, content: asset ? { assetId: asset.id, assetName: asset.name, ...asset.payload } : {} }) }} options={assets.filter((item) => item.kind === bubble.type).map((item) => ({ value: item.id, label: item.name }))} /> : null}
+            extraFields={(index, bubble) => bubble.type === 'text' ? null : isContentTemplateType(bubble.type) ? <SaveErrorField names={["assetId","bubble.content.assetId","content.assetId","asset_id","bubble.content.asset_id","content.asset_id"]}><EntitySelect clearable size="full" aria-label="コンテンツで作成したテンプレートから選択" placeholder="テンプレートを選択してください" value={String(bubble.content.assetId ?? '')} onChange={(id) => { const asset = assets.find((item) => item.id === id); updateBubble(index, { ...bubble, content: asset ? { assetId: asset.id, assetName: asset.name, ...asset.payload } : {} }) }} options={assets.filter((item) => item.kind === bubble.type).map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name }))} /></SaveErrorField> : null}
           />
         </section>
         {showTemplatePicker && (
-          <section className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-card-surface">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-bold text-ink">テンプレート選択</h3>
-                <p className="mt-1 text-xs text-ink-faint">名前・本文・置き場でテンプレートを探します。選ぶと右側に内容が出ます。</p>
-              </div>
-              <button type="button" onClick={() => setShowTemplatePicker(false)} className="text-sm font-semibold text-action hover:underline">メッセージ編集へ戻る</button>
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="block text-xs font-medium text-ink-secondary">名前・本文で検索
-                <input
-                  type="search"
-                  aria-label="テンプレート名・本文で検索"
-                  value={templatePickerQuery}
-                  onChange={(event) => setTemplatePickerQuery(event.target.value)}
-                  placeholder="テンプレート名・本文で検索"
-                  className="mt-2 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal"
-                />
-              </label>
-              <label className="block text-xs font-medium text-ink-secondary">フォルダ
-                <Select
-                  aria-label="テンプレートのフォルダ"
-                  value={templatePickerFolderId}
-                  onChange={setTemplatePickerFolderId}
-                  options={[
-                    { value: '', label: 'すべて' },
-                    ...templateFolders.map((folder) => ({ value: folder.id, label: folder.name })),
-                    { value: '__none__', label: '未分類' },
-                  ]}
-                  size="full"
-                />
-              </label>
-            </div>
-            <div className="mt-4 space-y-3">
-              {assets.filter((asset) => (!composerTemplateKind || asset.kind === composerTemplateKind) && (!asset.lineAccountId || asset.lineAccountId === selectedAccountId) && (!templatePickerQuery.trim() || asset.name.toLowerCase().includes(templatePickerQuery.trim().toLowerCase())) && (!templatePickerFolderId || templatePickerFolderId === '__none__')).map((asset) => <button key={asset.id} type="button" className="broadcast-template-row" onClick={() => { placeTemplateBubble(contentTemplateToBubble(asset)); setSelectedTemplate(null); setShowTemplatePicker(false) }}><span className="min-w-0 flex-1"><strong>{asset.name}</strong><small>{typeLabel(asset.kind)}</small></span><span aria-hidden>›</span></button>)}
-              {pickerTemplates.map((template) => (
-                <button key={template.id} type="button" onClick={() => setSelectedTemplate(template)} className="broadcast-template-row">
-                  <span className="min-w-0 flex-1">
-                    <strong className="break-words">{template.name}</strong>
-                    <small>{template.messageType === 'imagemap' ? (/"video"\s*:/.test(template.messageContent) ? 'リッチビデオ' : 'リッチメッセージ') : typeLabel(template.messageType)}</small>
-                  </span>
-                  <span aria-hidden>›</span>
-                </button>
-              ))}
-              {templateCandidatesStatus === 'loading' && (
-                <div className="rounded-card border border-dashed bg-canvas p-8 text-center text-sm text-ink-faint">
-                  テンプレートを読み込んでいます…
-                </div>
-              )}
-              {templateCandidatesStatus === 'error' && (
-                <div className="rounded-card border border-dashed bg-canvas p-8 text-center text-sm text-warning">
-                  テンプレートを読み込めませんでした。窓を閉じて開き直すと再取得します。
-                </div>
-              )}
-              {templateCandidatesStatus === 'ready' && messageTemplates.length === 0 && assets.length === 0 && (
-                <div className="rounded-card border border-dashed bg-canvas p-8 text-center text-sm text-ink-faint">
-                  テンプレートがありません。「コンテンツ ＞ テンプレート」で作成してください。
-                </div>
-              )}
-              {messageTemplates.length > 0 && pickerTemplates.length === 0 && assets.length === 0 && (
-                <p className="rounded-card border border-dashed bg-canvas p-6 text-center text-sm text-ink-faint">
-                  条件に合うテンプレートはありません。検索文字やフォルダを変えてください。
-                </p>
-              )}
-            </div>
-          </section>
+          <EntityPickerDialog key={selectedAccountId ?? ''} title="テンプレートを選ぶ"
+            folders={templateFolders} busy={composerBusy} error={templateApplyError}
+            state={templateCandidatesStatus === 'loading' ?
+                <p role="status">テンプレートを読み込んでいます…</p> : templateCandidatesStatus === 'error' ? <SaveErrorField names={["templatePickerFolderId","template_picker_folder_id"]}><p role="alert">テンプレートを読み込めませんでした。窓を閉じて開き直すと再取得します。</p></SaveErrorField> : undefined}
+            items={[
+                    ...assets.filter((asset) => (!composerTemplateKind || asset.kind === composerTemplateKind) && (!asset.lineAccountId || asset.lineAccountId === selectedAccountId)).map((asset) =>( { id: `asset:${asset.id}`, name:asset.name, folderId: null, meta:typeLabel(asset.kind)})),
+              ...messageTemplates.filter((template) => !composerTemplateKind || messageTemplateToBubble(template)?.type === composerTemplateKind).map((template) => ({ id:template.id, name:template.name, folderId: template.folderId, content:template.messageType === 'text' ?template.messageContent : undefined, keywords: template.messageContent, meta : typeLabel(messageTemplateToBubble(template)?.type ?? 'unknown')}
+              )),
+            ]}
+            preview=
+              {(item) => { const template = messageTemplates.find((row) => row.id === item?.id
+              ); const asset = assets.find((row) => `asset:${row.id}` === item?.id
+              ); const bubble = template ? messageTemplateToBubble (template
+              ) : asset ? contentTemplateToBubble(asset) : null; return bubble ?
+            <LinePreview accountName={selectedAccount?.name}><BubblePreview bubble={bubble} accountName={selectedAccount?.name}/>
+          </LinePreview> : null }}
+            onCancel={() => setShowTemplatePicker(false)}
+            onConfirm={(id) => { const asset = assets.find((row) => `asset:${row.id}` === id); if (asset) { placeTemplateBubble(contentTemplateToBubble(asset)); setShowTemplatePicker(false); return }; const template = messageTemplates.find((row) => row.id === id); if (template) void applyTemplate(template) }} />
         )}
-        {!showTemplatePicker && <section className="rounded-card border border-hairline bg-canvas p-4">
+        {!showTemplatePicker && <section className="rounded-card border content-card bg-canvas p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div><h4 className="text-sm font-bold text-ink">配信後のアクション</h4>{currentStep !== 'message' && <p className="mt-1 text-xs text-ink-faint">配信後にタグ追加などを実行します。</p>}</div>
-            <Link href="/common-actions" className="text-xs font-semibold text-action hover:underline">＋ アクションを追加する</Link>
-          </div>
-          <div className="mt-3 block text-xs font-medium text-ink-secondary">実行する公開済みアクション
-            <Combobox aria-label="配信後のアクション" placeholder="実行しない" value={afterActionVersionId} onChange={setAfterActionVersionId} options={[{ value: '', label: '実行しない' }, ...publishedActions.map((action) => ({ value: action.versionId, label: `${action.name}（第${action.version}版）` }))]} className="mt-2 w-full font-normal" />
-          </div>
-          {!afterActionVersionId && <p className="mt-2 text-xs text-ink-faint">実行しない</p>}
-          {afterActionVersionId && <p className="mt-2 text-xs text-success">✓ 配信完了後に、選んだ公開版を実行します。</p>}
+            </div>
+          <ActionList
+            <string> value={afterActionVersionId ? [afterActionVersionId] : []} onChange={next =>setAfterActionVersionId(next[next.length - 1] ?? '')}
+            idOf={id => id} titleOf={id => publishedActions.find(action => action.versionId === id)?.name ?? '設定済みの共通アクション'}
+            choices={afterActionVersionId ? [] :[{ id: 'common_action', label: '共通アクションを実行する', make: () => '', picker: {
+              title: '公開済みの共通アクションを選ぶ', items:publishedActions.map(action => ({ id: action.versionId, name: action.name, meta: `第${action.version}版` })), apply: (_, ids) => ids[0],
+            } }]}
+            renderEditor={(id, update) =>
+          <EntityPickerField label="配信後のアクション" noun="共通アクション" items={publishedActions.map(action => ({ id: action.versionId, name: action.name, meta: `第${action.version}版` }))} value={id} onChange={update}/>}/>
         </section>}
-        {!showTemplatePicker && bubbles.some(bubble => bubble.type === 'text') ? <details ref={(el) => { buttonsRef.current = el; fields.bind('buttons').ref(el) }} onBlur={fields.bind('buttons').onBlur}><summary>ほかの設定</summary><Checkbox checked={trackLinks} onCheckedChange={setTrackLinks}>URLを短縮してクリックを数える</Checkbox><MessageButtonsSection buttons={messageButtons} error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })} onChange={setMessageButtons} liffId={selectedAccount?.liffId ?? null} accountId={selectedAccountId ?? null} /></details> : null}
+        {!showTemplatePicker && bubbles.some(bubble => bubble.type === 'text') ? <details ref={(el) => { buttonsRef.current = el; fields.bind('buttons').ref(el) }} onBlur={fields.bind('buttons').onBlur}><summary>ほかの設定</summary><SaveErrorField names={["trackLinks","track_links"]}><Checkbox checked={trackLinks} onCheckedChange={setTrackLinks}>URLを短縮してクリックを数える</Checkbox></SaveErrorField><MessageButtonsSection buttons={messageButtons} error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })} onChange={setMessageButtons} liffId={selectedAccount?.liffId ?? null} accountId={selectedAccountId ?? null} /></details> : null}
         {!currentStep && error && <Notice tone="danger" message={error} />}
         </div>
         <section id="broadcast-step-schedule" className={shows('schedule') ? styles.section : 'hidden'}>
           <h3>配信日</h3>
-          <RadioCardGroup legend="配信日" className={styles.methodCards}>
+          <SaveErrorField names={["broadcast-send-mode","sendMode","spreadMinutes"]}><RadioCardGroup legend="配信日" className={styles.methodCards}>
             <RadioCard name="broadcast-send-mode" value="now" checked={sendMode === 'now' && Number(spreadMinutes) === 0} onChange={() => { setSendMode('now'); setSpreadMinutes('0') }} title="今すぐ配信" note="最終確認で送ると、すぐに届きます" />
             <RadioCard name="broadcast-send-mode" value="scheduled" checked={sendMode === 'scheduled'} onChange={() => setSendMode('scheduled')} title="日時を指定して予約" note="決めた日時に送ります" />
             <RadioCard name="broadcast-send-mode" value="spread" checked={sendMode === 'now' && Number(spreadMinutes) > 0} onChange={() => { setSendMode('now'); setSpreadMinutes(Number(spreadMinutes) > 0 ? spreadMinutes : '30') }} title="時間を分散して送る" note="少しずつ送り、集中を避けます" />
-          </RadioCardGroup>
+          </RadioCardGroup></SaveErrorField>
           {sendMode === 'scheduled' && (
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="bc-date" className="text-ink-secondary mb-1 block text-xs font-medium">
                   配信日（日本時間）
                 </label>
-                <DateField
+                <SaveErrorField names={["scheduledDate","scheduled_date"]}><DateField
                   id="bc-date"
                   value={scheduledDate}
                   onChange={setScheduledDate}
                   aria-label="配信日（日本時間）"
-                />
+                /></SaveErrorField>
               </div>
               <div>
                 <label htmlFor="bc-time" className="text-ink-secondary mb-1 block text-xs font-medium">
                   時刻（日本時間）
                 </label>
-                <TimeField
+                <SaveErrorField names={["scheduledTime","scheduled_time"]}><TimeField
                   id="bc-time"
                   size="field"
                   value={scheduledTime}
                   onChange={setScheduledTime}
                   aria-label="時刻（日本時間）"
-                />
+                /></SaveErrorField>
               </div>
               {/*
                 設計 `Bw0zt` の注意書き。予約は条件を保存するだけで、実際の
@@ -2577,7 +2476,7 @@ export default function BroadcastForm({
         </span>
       </label>
       <div className="flex items-center gap-1.5">
-        <input
+        <SaveErrorField names={["spreadMinutes","spread_minutes"]}><input
           id="bc-spread"
           type="number"
           min={0}
@@ -2585,7 +2484,7 @@ export default function BroadcastForm({
           value={spreadMinutes}
           onChange={(e) => setSpreadMinutes(e.target.value)}
           className="border-hairline rounded-control w-24 border px-3 py-2 text-sm tabular-nums"
-        />
+        /></SaveErrorField>
         <span className="text-ink-faint text-xs">分かけて</span>
       </div>
       <p className="text-ink-faint mt-1 text-xs leading-relaxed">
@@ -2599,7 +2498,7 @@ export default function BroadcastForm({
             <p>{quota?.monthlyUsed == null || quota.monthlyLimit == null ? '送信枠は配信前チェックで確認します' : `使った ${formatNumber(quota.monthlyUsed)} + 今回 ${formatNumber(quota.planned)} / 上限 ${formatNumber(quota.monthlyLimit)}通`}</p>
             {quotaInsufficient && <p className="text-danger">送信枠が不足しています。配信する人数を減らしてください</p>}
           </div>
-          <Checkbox checked={measureOpens} onCheckedChange={setMeasureOpens}>開封数の集計を取る</Checkbox>
+          <SaveErrorField names={["measureOpens","measure_opens"]}><Checkbox checked={measureOpens} onCheckedChange={setMeasureOpens}>開封数の集計を取る</Checkbox></SaveErrorField>
           {sendMode === 'scheduled' && (
             <section className="mt-4 rounded-control border border-hairline p-4">
               <h4 className="text-sm font-bold text-ink">配信スケジュール</h4>
@@ -2668,8 +2567,8 @@ export default function BroadcastForm({
       <aside id="broadcast-line-preview" className={styles.preview} data-open={previewOpen || undefined} aria-label="LINEの見え方">
         <div className={styles.previewHead}><h3>LINE の見え方</h3><div className={styles.deviceSwitch} role="group" aria-label="プレビューの端末"><Button variant="secondary" className={styles.textButton} size="compact" aria-pressed={previewDevice === 'phone'} onClick={() => setPreviewDevice('phone')}>スマホ</Button><Button variant="secondary" className={styles.textButton} size="compact" aria-pressed={previewDevice === 'pc'} onClick={() => setPreviewDevice('pc')}>PC</Button></div><Button ref={previewCloseRef} className={styles.previewClose} size="compact" onClick={() => { setPreviewOpen(false); previewToggleRef.current?.focus() }}>閉じる</Button></div>
         <div className={previewDevice === 'pc' ? styles.pcPreview : styles.phonePreview}>
-          <LinePreview accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={scheduledLabel ? `${scheduledLabel} に届きます` : '配信日時は STEP 4 で設定します'} empty={!selectedTemplate && Boolean(bubblesError(bubbles)) && bubbles.every((bubble) => bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) ? 'メッセージは手順3で作成します' : false}>
-            <div className="flex flex-col gap-3 text-ink">{selectedTemplate ? (() => { const bubble = messageTemplateToBubble(selectedTemplate); return bubble ? <BubblePreview bubble={bubble} accountName={selectedAccount?.name} /> : <p className="whitespace-pre-wrap break-words">{selectedTemplate.messageContent}</p> })() : bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} buttons={index === 0 ? messageButtons : []} />)}</div>
+          <LinePreview accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={scheduledLabel ? `${scheduledLabel} に届きます` : '配信日時は STEP 4 で設定します'} empty={ Boolean(bubblesError(bubbles)) && bubbles.every((bubble) => bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) ? 'メッセージは手順3で作成します' : false}>
+            <div className="flex flex-col gap-3 text-ink">{ bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} buttons={index === 0 ? messageButtons : []} />)}</div>
           </LinePreview>
         </div>
         <p className={styles.previewCaption}>「名前」は相手の名前で置き換えます</p>
@@ -2681,7 +2580,7 @@ export default function BroadcastForm({
         ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
         <div className={styles.previewActions}><Button type="button" disabled={Boolean(validate()) || saving} onClick={() => void openTestDialog()}><Send size={14} aria-hidden /> テストを送る</Button><Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button></div>
         {bubblesError(bubbles) ? <p className="text-xs text-ink-faint">本文を入れるとテストを送れます</p> : null}
-        <Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox>
+        <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
       </aside>
     </div>
 
@@ -2699,7 +2598,7 @@ export default function BroadcastForm({
                     : '配信前チェックへ'}
             </Button>
           ) : (
-            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={openConfirm} busy={saving}>
+            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={openConfirm} busy={saving}>
               {sendMode === 'scheduled' ? 'この内容で予約する' : '今すぐ送る'}
             </Button>
           )}
@@ -2707,8 +2606,8 @@ export default function BroadcastForm({
       ) : (
         <>
           <Button variant="secondary" className="rounded-card px-5 py-3 font-bold h-auto whitespace-normal" onClick={() => guarded(onCancel)}>キャンセル</Button>
-          {(shows('message') || shows('confirm')) && <Button variant="secondary" className="rounded-card px-5 py-3 font-bold disabled:opacity-50 h-auto whitespace-normal" disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void openTestDialog()}>{testSending ? '送信中…' : 'テストを送る'}</Button>}
-          <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}>{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書きを保存する'}</Button>
+          {(shows('message') || shows('confirm')) && <Button variant="secondary" className="rounded-card px-5 py-3 font-bold disabled:opacity-50 h-auto whitespace-normal" disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => void openTestDialog()}>{testSending ? '送信中…' : 'テストを送る'}</Button>}
+          <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}>{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書きを保存する'}</Button>
         </>
       )}
       </>
@@ -2735,25 +2634,6 @@ export default function BroadcastForm({
       いま画面が持っているものだけで、固定値は使わない。人数は
       `runPreflight()` が数えたぶん（`preflight.audienceCount`）。
     */}
-    <ConfirmDialog
-      open={selectedTemplate !== null}
-      busy={composerBusy}
-      error={templateApplyError || undefined}
-      title="テンプレートを選択"
-      description={selectedTemplate ? `「${selectedTemplate.name}」を一斉配信のメッセージに読み込みます。読み込み後も内容を編集できます。` : ''}
-      confirmLabel="このテンプレートを使用"
-      cancelLabel="キャンセル"
-      designNode="p97Tf"
-      titleIcon={<CheckCircle2 size={22} />}
-      onCancel={() => setSelectedTemplate(null)}
-      onConfirm={selectedTemplate ? () => applyTemplate(selectedTemplate) : undefined}
-    >
-      <ul className="space-y-2 rounded-control border border-hairline bg-canvas-sunken p-4 text-sm">
-        <li className="text-success">テンプレートの内容を確認してください</li>
-        <li className="text-success">差し込みの項目がこの配信で使えるか確認してください</li>
-        <li className="text-success">読み込んだあとも内容を直せます</li>
-      </ul>
-    </ConfirmDialog>
 
     <ConfirmDialog
       open={conditionDialogOpen}
@@ -3041,6 +2921,6 @@ export default function BroadcastForm({
     </ConfirmDialog>
 
   {inlineComposer && inlineHost ? inlineComposer.kind === 'carousel' ? <CarouselV8 key={`${selectedAccountId}-${inlineComposer.index}`} host={inlineHost} /> : inlineComposer.kind === 'rich_message' ? <TemplateRichEditor key={`${selectedAccountId}-${inlineComposer.index}`} host={inlineHost} /> : <TemplateRichVideoEditor key={`${selectedAccountId}-${inlineComposer.index}`} host={inlineHost} /> : null}
-  <Dialog open={templateSaveIndex !== null} title="テンプレートにする" description={`${(templateSaveIndex ?? 0) + 1}通目の吹き出しを保存します。ほかの吹き出しは含みません。`} onCancel={() => setTemplateSaveIndex(null)} confirmLabel="保存する" onConfirm={() => void saveComposerTemplate()} busy={composerBusy} error={templateSaveError || undefined}><label>テンプレートの名前<input aria-label="テンプレートの名前" value={templateSaveName} onChange={(event) => setTemplateSaveName(event.target.value)} className={styles.textInput} /></label></Dialog>
-  </div></MessageComposerPage>
+  <Dialog open={templateSaveIndex !== null} title="テンプレートにする" description={`${(templateSaveIndex ?? 0) + 1}通目の吹き出しを保存します。ほかの吹き出しは含みません。`} onCancel={() => setTemplateSaveIndex(null)} confirmLabel="保存する" onConfirm={() => void saveComposerTemplate()} busy={composerBusy} error={templateSaveError || undefined}><label>テンプレートの名前<SaveErrorField names={["templateSaveName","name","template_save_name"]}><input aria-label="テンプレートの名前" value={templateSaveName} onChange={(event) => setTemplateSaveName(event.target.value)} className={styles.textInput} /></SaveErrorField></label></Dialog>
+  </div></MessageComposerPage></SaveErrorScope>
 }

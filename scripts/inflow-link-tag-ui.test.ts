@@ -7,6 +7,7 @@ const page = readFileSync(
   resolve(root, 'apps/web/src/app/inflow-links/page.tsx'),
   'utf8',
 );
+const v8List = readFileSync(resolve(root, 'apps/web/src/v8/inflow-links/list.tsx'), 'utf8');
 const listStyles = readFileSync(
   resolve(root, 'apps/web/src/app/inflow-links/inflow-list-v8.module.css'),
   'utf8',
@@ -39,7 +40,8 @@ describe('inflow link tag auto-assignment UI wiring', () => {
       expect(rule, cell).toContain('text-overflow: ellipsis');
       expect(rule, cell).toContain('white-space: nowrap');
     }
-    expect(page).toContain('title={r.refCode}');
+    expect(page).not.toContain('title={r.refCode}')
+    expect(v8List).toContain('<FolderDotName');
     expect(page).not.toContain('min-w-[1180px]');
     expect(page).not.toContain('font-mono text-blue-600 break-all');
   });
@@ -49,9 +51,10 @@ describe('inflow link tag auto-assignment UI wiring', () => {
     expect(modal).toContain('tags: Tag[]');
     expect(modal).toContain('tagId: route?.tagId ?? null');
     expect(modal).toContain('自動付与タグ（任意）');
-    // Combobox 配線（旧 select の書き方ではない）: 現在値・候補・「なし」表示
+    // V8の共通選択欄: 現在値・候補・「なし」表示を保つ
     expect(modal).toContain('value={form.tagId ?? \'\'}');
-    expect(modal).toContain('options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}');
+    expect(modal).toContain('EntitySelect');
+    expect(modal).toContain('options={tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))}');
     expect(modal).toContain('placeholder="— 設定なし —"');
     // 選んだ id が form に入り、「なし」は null になる。form ごと作成・更新で送る
     // （R39: 新規は選択中アカウントの所属を付けて作る）

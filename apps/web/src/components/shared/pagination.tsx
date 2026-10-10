@@ -16,7 +16,7 @@ export type PaginationProps = {
    */
   summary?: React.ReactNode
   /** 予約台帳の枠内で、絵の広めの件数帯を描く。 */
-  spacing?: 'roomy'
+  spacing?: 'roomy' | 'restaurant'
 }
 
 /** Pencil の5枠に収め、先頭・現在地・末尾を常に辿れる並びを返す。 */

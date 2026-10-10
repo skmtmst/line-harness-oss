@@ -1,13 +1,62 @@
 'use client'
-
-
-import { RovingTbody } from '@/components/shared/row-roving'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
-import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import ListToolbar, { ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
+import { RowMenu } from '@/components/shared/row-actions'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { formatDate as polishFormatDate, formatNumber } from '@/lib/format'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { RovingTbody } from '@/components/shared/row-roving'
+import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
+import { collectListRows } from '@/components/shared/collect-list-rows'
 import { ListPageBody } from '@/components/templates'
-import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
+import { useListScrollMemory, useListUrlParam, useListUrlValue } from '@/components/shared/list-url-state'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { Activity, AlertCircle, ArrowRight, Bell, Calendar, CalendarClock, FilePen, CircleCheck, Copy, Folder as FolderIcon, FolderInput, Pause, Pencil, Play, Plus, Send, Square, Trash2, TriangleAlert, Users } from 'lucide-react'
+import type { ApiResponse, Folder, ReminderTriggerType } from '@line-crm/shared'
+import { api, fetchApi, type ListStats } from '@/lib/api'
+import { useOffsetServerList, type ServerListResponse } from '@/lib/use-server-list'
+import { clampSearchQuery } from '@/lib/search-query'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
+import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
+import Checkbox from '@/components/shared/checkbox'
+import Select from '@/components/shared/select'
+import FilterChip from '@/components/shared/filter-chip'
+import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
+import Pagination from '@/components/shared/pagination'
+import SheetDialog from '@/v8/reminders/sheet-dialog'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
+import { DataTable, TableHeadRow, Tr, Td, Th, NameCell } from '@/components/shared/table'
+import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
+import { runUndoable, runOptimistic } from '@/lib/undoable'
+import PageSizeSelect from '@/components/shared/page-size-select'
+import { completeReorder } from '@/lib/complete-reorder'
+import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
+import { formatTriggerOffset } from './reminder-timing'
+import styles from './list-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
+import { notifyToast } from '@/components/shared/toast'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
+
 /*
  * ★V8 リマインダの一覧（Pencil「★V8 画面の地図」のリマインダの行：
  * 一覧 `apLqS`、行の「…」は `SkY9V`、一時停止は `RwVo5`、削除は `VsSyu`、
@@ -21,68 +70,6 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame'
  * まとめての帯（止める・再開・フォルダへ移す）。
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
-import { useCallback, useDeferredValue, useEffect, useState } from 'react'
-import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import {
-  Activity,
-  AlertCircle,
-  ArrowRight,
-  Bell,
-  Calendar,
-  CalendarClock,
-  FilePen,
-  CircleCheck,
-  Copy,
-  Eye,
-  Folder as FolderIcon,
-  FolderInput,
-  MoreHorizontal,
-  Pause,
-  Pencil,
-  Play,
-  Plus,
-  Send,
-  Square,
-  Trash2,
-  TriangleAlert,
-  Users,
-} from 'lucide-react'
-import type { ApiResponse, Folder, ReminderTriggerType } from '@line-crm/shared'
-import { api, fetchApi, type ListStats } from '@/lib/api'
-import { useOffsetServerList, type ServerListResponse } from '@/lib/use-server-list'
-import { clampSearchQuery } from '@/lib/search-query'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { formatNumber } from '@/lib/format'
-import Button from '@/components/shared/button'
-import EmptyList from '@/components/shared/empty-list'
-import KpiCard from '@/components/shared/kpi-card'
-import KpiBand from '@/components/shared/kpi-band'
-import Checkbox from '@/components/shared/checkbox'
-import Select from '@/components/shared/select'
-import FilterChip from '@/components/shared/filter-chip'
-import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
-import DetailPanel from '@/components/shared/detail-panel'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import { withViewTransition } from '@/components/shared/view-transition'
-import Pagination from '@/components/shared/pagination'
-import SheetDialog from '@/v8/reminders/sheet-dialog'
-import { DelayedSkeleton } from '@/components/shared/skeleton'
-import { DataTable, TableHeadRow, Tr, Td, Th, NameCell } from '@/components/shared/table'
-import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
-import { runUndoable } from '@/lib/undoable'
-import SortSelect from '@/components/ui/sort-select'
-import PageSizeSelect from '@/components/ui/page-size-select'
-import { completeReorder } from '@/lib/complete-reorder'
-import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
-import { formatTriggerOffset } from './reminder-timing'
-import styles from './list-v8.module.css'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -159,35 +146,21 @@ const NEXT_SEND_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as 
 
 /** 「次に送る」の表示（板 `apLqS`：`10/1（水）18:00`）。店舗時間帯（JST）で出す。 */
 function formatNextSend(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric',
-    day: 'numeric',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  const weekday = NEXT_SEND_WEEKDAYS.includes(get('weekday') as (typeof NEXT_SEND_WEEKDAYS)[number])
-    ? get('weekday')
-    : ''
-  return `${get('month')}/${get('day')}（${weekday}）${get('hour')}:${get('minute')}`
+  return polishFormatDate(iso, { style: 'list' })
 }
 
 /** 閲覧のみでも出す行の「…」の項目（見るだけのもの）。 */
 const VIEW_ONLY_MENU_IDS = new Set(['detail', 'registrants', 'planned', 'runs'])
 
 export default function RemindersListV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('リマインダ')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
   const { selectedAccountId } = useAccount()
+  const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const role = useStaffRole()
-  const canEdit = canManageRole(role)
+  const canEdit = useFeatureAccess('reminders')
   const readonlyReason = 'この操作にはオーナーか管理者の権限が要ります'
   // 1152の板（`Iffil`）。折り畳みはCSSのコンテナ問い合わせが担い、
   // ここでは板IDだけを切り替える。
@@ -201,13 +174,13 @@ export default function RemindersListV8() {
   const deferredNameQuery = useDeferredValue(nameQuery.trim())
   const [folderFilter, setFolderFilter] = useListUrlParam('folder')
   const [statusFilter, setStatusFilter] = useListUrlParam('status')
-  const [perPage, setPerPage] = useState(20)
+  const [perPage, setPerPage] = useListUrlValue('limit', 20)
   // apLqS・Iffil の一覧は、次に送る予定が近いものから確認する。
   const [sort, setSort] = useListUrlParam('sort', 'next')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル（V8「サクサク感」C①・D・E）。開いている行のID。 */
-  const [panelId, setPanelId] = useState<string | null>(null)
+  const [panelId, setPanelId] = useDetailPanelUrl('reminder')
   const [actionError, setActionError] = useState('')
   const [foldersError, setFoldersError] = useState(false)
 
@@ -216,16 +189,16 @@ export default function RemindersListV8() {
   const [statsFailed, setStatsFailed] = useState(false)
 
   /* 窓・まとめての帯の状態。 */
+  const [bulkPauseIds, setBulkPauseIds] = useState<string[] | null>(null)
   const [pauseTarget, setPauseTarget] = useState<ReminderRow | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ReminderRow | null>(null)
-  const deferredDelete = useDeferredDelete()
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [moveIds, setMoveIds] = useState<string[] | null>(null)
   const [moveDraft, setMoveDraft] = useState('')
-  const [duplicateTarget, setDuplicateTarget] = useState<ReminderRow | null>(null)
+  const duplicateLock = useRef(false)
   const [duplicating, setDuplicating] = useState(false)
-  const [duplicateError, setDuplicateError] = useState('')
+  const setDuplicateError =(message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
   const [moveNotice, setMoveNotice] = useState('')
 
   const loadFolders = useCallback(async () => {
@@ -238,10 +211,15 @@ export default function RemindersListV8() {
       } else {
         setFoldersError(true)
       }
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
       setFoldersError(true)
     }
-  }, [])
+  }
+  }, [saveErrors]);
+
 
   const loadStats = useCallback(async () => {
     setStatsFailed(false)
@@ -249,10 +227,11 @@ export default function RemindersListV8() {
       const res = await api.listStats.get(selectedAccountId ?? undefined)
       if (res.success) setStats(res.data)
       else setStatsFailed(true)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       setStatsFailed(true)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     void loadFolders()
@@ -317,11 +296,10 @@ export default function RemindersListV8() {
     sort,
     page: reminderList.page,
   })
+  const currentListContext = useRef(listContextKey)
+  currentListContext.current = listContextKey
   const listedReminders = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : reminderList.items
-  // 消して「元に戻す」を待っている行は出さない（動きの点検 17 番）。
-  const reminders = deferredDelete.hiddenCount > 0
-    ? listedReminders.filter((row) => !deferredDelete.isHidden(row.id))
-    : listedReminders
+  const reminders = listedReminders
   const detailHref = (id: string) => `/reminders/detail?id=${encodeURIComponent(id)}`
   const filterActive = Boolean(nameQuery.trim() || folderFilter || statusFilter)
 
@@ -329,8 +307,7 @@ export default function RemindersListV8() {
 
   /*
    * 1件の「一時停止／再開」は押した瞬間に描き換え、裏で保存する
-   * （★V8 サクサク感 B）。5秒のあいだ知らせの「元に戻す」で
-   * 送らずに戻せる。一時停止の窓（`RwVo5`）は残し、確定で即反映する。
+   * （B-157・決まり3）。失敗したら元に戻して知らせる。一時停止の窓（`RwVo5`）は残し、確定で即反映する。
    */
   const runToggle = (row: ReminderRow, next: boolean) => {
     setActionError('')
@@ -343,17 +320,17 @@ export default function RemindersListV8() {
           : item,
       ),
     })
-    runUndoable({
-      message: next ? `「${row.name}」を再開しました` : `「${row.name}」を一時停止しました`,
-      commit: async () => {
+    runOptimistic({
+      isCurrent: () => key === currentListContext.current,
+      request: async () => {
         const res = await api.reminders.update(row.id, { isActive: next })
         if (!res.success) throw new Error(res.error)
       },
-      undo: () => setOptimisticRows(null),
+      revert: () => setOptimisticRows(null),
       failureMessage: next
         ? `「${row.name}」を再開できませんでした。`
         : `「${row.name}」を一時停止できませんでした。`,
-      onCommitted: () => {
+      onSuccess: () => {
         setOptimisticRows(null)
         reminderList.retry()
         void loadStats()
@@ -372,33 +349,10 @@ export default function RemindersListV8() {
 
   /* ===== 削除 ===== */
 
-  /*
-   * 下書きのまま一度も予定を作っていないリマインダは、消しても誰にも影響しない。
-   * 確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。
-   * 公開済み・止めたもの（登録者や予定が消える）は、今までどおり確かめの窓（VsSyu）。
-   */
+  // 下書きも公開済みも、削除は必ず確認する（B-157・決まり2）。
   const requestDelete = (row: ReminderRow) => {
     setDeleteError('')
-    if (statusKeyOf(row) !== 'draft' || (row.plannedDeliveries ?? 0) > 0) {
-      setDeleteTarget(row)
-      return
-    }
-    setSelectedIds((current) => {
-      if (!current.has(row.id)) return current
-      const next = new Set(current)
-      next.delete(row.id)
-      return next
-    })
-    deferredDelete.schedule({
-      ids: [row.id],
-      message: `リマインダ「${row.name}」を削除しました`,
-      commit: () => api.reminders.delete(row.id),
-      onCommitted: () => {
-        reminderList.retry()
-        void loadStats()
-      },
-      failureMessage: 'リマインダを削除できませんでした。もう一度お試しください。',
-    })
+    setDeleteTarget(row)
   }
 
   const deleteStillListed =
@@ -419,8 +373,11 @@ export default function RemindersListV8() {
       })
       reminderList.retry()
       void loadStats()
-    } catch {
-      setDeleteError('このリマインダを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDeleteError('このリマインダを削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
@@ -428,8 +385,10 @@ export default function RemindersListV8() {
 
   /* ===== 複製（下書きとして写す） ===== */
 
-  const runDuplicate = async () => {
+  const runDuplicate = async (duplicateTarget: ReminderRow) => {
+    if (duplicateLock.current) return
     if (!duplicateTarget || duplicating) return
+    duplicateLock.current = true
     setDuplicating(true)
     setDuplicateError('')
     try {
@@ -442,13 +401,18 @@ export default function RemindersListV8() {
       })
       if (!res.success) throw new Error(res.error)
       const newId = String(res.data.reminderId)
-      setDuplicateTarget(null)
+
+      notifyToast('複製しました', { tone: 'success' })
       reminderList.retry()
-      router.push(`/reminders/edit?id=${encodeURIComponent(newId)}&stage=target`)
-    } catch {
-      setDuplicateError('複製できませんでした。通信を確かめて、もう一度お試しください。')
+      duplicateFeedback.mark(duplicateTarget.id, newId)
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDuplicateError('複製できませんでした。通信を確かめて、もう一度お試しください。') }
       reminderList.retry()
     } finally {
+      duplicateLock.current = false
       setDuplicating(false)
     }
   }
@@ -479,8 +443,9 @@ export default function RemindersListV8() {
       message: folderId ? 'フォルダへ移しました' : 'フォルダから外しました',
       commit: async () => {
         const results = await Promise.all(
-          ids.map((id) => api.reminders.update(id, { folderId }).catch(() => null)),
-        )
+          ids.map((id) => api.reminders.update(id, { folderId }).catch((saveFailure) => { saveErrors.capture(saveFailure); return null })),
+        );
+
         const failed = results.filter((res) => !res || !res.success).length
         if (failed > 0) throw new Error(`${failed}件のフォルダを移動できませんでした`)
       },
@@ -502,7 +467,20 @@ export default function RemindersListV8() {
   // 選んでいる間は Esc で選択を外す（動きの点検 12・20 番）。
   const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
   useEscapeToClearSelection(selectedCount > 0, clearSelection)
-  const selectedRows = reminders.filter((row) => selectedIds.has(row.id))
+  const [selectionRows, setSelectionRows] = useState<ReminderRow[]>([])
+  const selectionScope = JSON.stringify([selectedAccountId, deferredNameQuery, folderFilter, statusFilter, sort])
+  useEffect(() => { setSelectedIds(new Set()); setSelectionRows([]) }, [selectionScope])
+  const selectAllReminders = async () => {
+    const key = currentListContext.current
+    const all = await collectListRows(reminderList.total, async (offset, limit) => {
+      const response = await loadReminderPage({ page: offset / limit + 1, limit }, new AbortController().signal)
+      return { items: response.items, total: response.total }
+    })
+    if (key !== currentListContext.current) return
+    setSelectionRows(all)
+    setSelectedIds(new Set(all.map(row => row.id)))
+  }
+  const selectedRows = [...new Map([...selectionRows, ...reminders].map(row => [row.id, row])).values()].filter((row) => selectedIds.has(row.id))
   const stoppableIds = selectedRows.filter((row) => statusKeyOf(row) === 'active').map((row) => row.id)
   const resumableIds = selectedRows.filter((row) => statusKeyOf(row) === 'stopped').map((row) => row.id)
 
@@ -539,18 +517,19 @@ export default function RemindersListV8() {
           : row,
       ),
     })
-    runUndoable({
-      message: next ? `${ids.length}件を再開しました` : `${ids.length}件を一時停止しました`,
-      commit: async () => {
+    runOptimistic({
+      isCurrent: () => key === currentListContext.current,
+      request: async () => {
         const results = await Promise.all(
-          ids.map((id) => api.reminders.update(id, { isActive: next }).catch(() => null)),
-        )
+          ids.map((id) => api.reminders.update(id, { isActive: next }).catch((saveFailure) => { saveErrors.capture(saveFailure); return null })),
+        );
+
         const failed = results.filter((res) => !res || !res.success).length
         if (failed > 0) throw new Error(`${failed}件の保存に失敗しました`)
       },
-      undo: () => setOptimisticRows(null),
+      revert: () => setOptimisticRows(null),
       failureMessage: next ? '再開できませんでした。' : '一時停止できませんでした。',
-      onCommitted: () => {
+      onSuccess: () => {
         setOptimisticRows(null)
         setSelectedIds(new Set())
         reminderList.retry()
@@ -647,7 +626,7 @@ export default function RemindersListV8() {
       icon: Bell,
       value: statsFailed ? null : reminderStats?.total ?? null,
       unit: '件',
-      detail: reminderStats ? `有効 ${reminderStats.active}件` : '—',
+      detail: reminderStats ? `有効 ${reminderStats.active}件` : emptyValue('unknown'),
       link: null as null | (() => void),
     },
     {
@@ -692,7 +671,7 @@ export default function RemindersListV8() {
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   const panelIndex = panelId === null ? -1 : reminders.findIndex((row) => row.id === panelId)
@@ -727,7 +706,7 @@ export default function RemindersListV8() {
         disabledReason: canEdit ? undefined : readonlyReason,
         onSelect: () => {
           setDuplicateError('')
-          setDuplicateTarget(row)
+          void runDuplicate(row)
         },
       },
       status === 'active'
@@ -872,30 +851,31 @@ export default function RemindersListV8() {
               <TableHeadRow>
                 {canEdit ? (
                   <Th className={styles.selectCell} aria-label="選択">
-                    <Checkbox
+                    <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
                       checked={allOnPageSelected}
                       indeterminate={!allOnPageSelected && selectedCount > 0}
                       onCheckedChange={toggleAllOnPage}
                       aria-label="このページのリマインダをすべて選択"
-                    />
+                    /></SaveErrorField>
                   </Th>
                 ) : <Th className={styles.selectCell}><span className="sr-only">選択できません</span></Th>}
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
-            <RovingTbody reorderKey={reorder.shown.map((row) => row.id).join(',')}>
-              {reorder.shown.map((row) => {
+            <RovingTbody reorderKey={duplicateFeedback.order(reorder.shown, reminders).map((row) => row.id).join(',')}>
+              {duplicateFeedback.order(reorder.shown, reminders).map((row, saveFieldIndex) => {
                 const view = rowView(row)
                 const planned =
                   view.status === 'draft' || view.status === 'stopped'
-                    ? '—'
+                    ? emptyValue('unknown')
                     : row.plannedDeliveries == null
-                      ? '—'
+                      ? emptyValue('unknown')
                       : `${formatNumber(row.plannedDeliveries)}通`
                 const nextSend =
-                  view.status === 'active' ? formatNextSend(row.nextScheduledAt) : '—'
+                  view.status === 'active' ? formatNextSend(row.nextScheduledAt) : emptyValue('unknown')
                 return (
                   <Tr interactive
+                    highlighted={duplicateFeedback.highlightedId === row.id}
                     key={row.id}
                     {...reorder.rowProps(row.id)}
                     className={styles.rowClick}
@@ -911,11 +891,11 @@ export default function RemindersListV8() {
                   >
                     {canEdit ? (
                       <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
-                        <Checkbox
+                        <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","row.id"]}><Checkbox
                           checked={selectedIds.has(row.id)}
                           onCheckedChange={() => toggleOne(row.id)}
                           aria-label={`${row.name}を選択`}
-                        />
+                        /></SaveErrorField>
                       </Td>
                     ) : <Td className={styles.selectCell} />}
                     <Td
@@ -929,12 +909,11 @@ export default function RemindersListV8() {
                         <span aria-hidden>⠿</span>
                       </ReorderHandle>
                     </Td>
-                    <NameCell
-                      name={<div className={styles.nameRow}>
-                        <FolderDotName folder={folderDotOf(row)}>
+                    <NameCell name={<div className={styles.nameRow}>
+                        <>
                           <Link
                             href={detailHref(row.id)}
-                            title={row.name}
+
                             className={styles.cellTitle}
                             onClick={(event) => {
                               event.stopPropagation()
@@ -943,9 +922,21 @@ export default function RemindersListV8() {
                               goDetail(detailHref(row.id))
                             }}
                           >
-                            {row.name}
+                            <TruncatedText value={String(row.name ?? '')} />
                           </Link>
-                        </FolderDotName>
+                        </>
+
+                      </div>} folder={folderDotOf(row)}
+                    />
+                    <Td>
+                      <span
+                        className={`${styles.statePill} ${
+                          view.status === 'active' ? styles.statePillActive : styles.statePillStopped
+                        }`}
+                      >
+                        <span className={styles.stateDot} aria-hidden="true" />
+                        {view.status === 'active' ? '有効' : view.status === 'draft' ? '下書き' : '停止中'}
+                      </span>
                         {row.hasFailure || (row.failedCount ?? 0) > 0 ? (
                           <button
                             type="button"
@@ -960,21 +951,6 @@ export default function RemindersListV8() {
                             失敗{row.failedCount != null && row.failedCount > 0 ? ` ${row.failedCount}` : ''}
                           </button>
                         ) : null}
-                      </div>}
-                      sub={<span className={styles.dotIndent} title={view.subtitle}>
-                        <Calendar size={11} aria-hidden="true" className={styles.cellSubIcon} />
-                        {view.subtitle}
-                      </span>}
-                    />
-                    <Td>
-                      <span
-                        className={`${styles.statePill} ${
-                          view.status === 'active' ? styles.statePillActive : styles.statePillStopped
-                        }`}
-                      >
-                        <span className={styles.stateDot} aria-hidden="true" />
-                        {view.status === 'active' ? '有効' : view.status === 'draft' ? '下書き' : '停止中'}
-                      </span>
                     </Td>
                     <Td className={styles.countCell}>
                       <div className={styles.countMain}>{planned}</div>
@@ -989,25 +965,14 @@ export default function RemindersListV8() {
                         label={`リマインダ「${row.name}」の操作`}
                         items={rowContextItems(row)}
                       >
-                        <button
-                          type="button"
-                          className={styles.menuButton}
-                          title={`リマインダ「${row.name}」の操作`}
-                          aria-label={`リマインダ「${row.name}」の操作`}
-                          aria-haspopup="menu"
-                          onClick={() =>
-                            setOpenMenuId((current) => (current === row.id ? null : row.id))
-                          }
-                        >
-                          <MoreHorizontal size={16} aria-hidden="true" />
-                        </button>
+                        <RowMenu
+                          label={`リマインダ「${row.name}」の操作`}
+                          items={rowMenuItems(row)}
+                          size="row"
+                          open={openMenuId === row.id}
+                          onOpenChange={(open) => setOpenMenuId(open ? row.id : null)}
+                        />
                       </ContextMenu>
-                      <ActionMenu
-                        open={openMenuId === row.id}
-                        onClose={() => setOpenMenuId(null)}
-                        ariaLabel={`リマインダ「${row.name}」の操作`}
-                        items={rowMenuItems(row)}
-                      />
                       </div>
                     </Td>
                   </Tr>
@@ -1023,11 +988,11 @@ export default function RemindersListV8() {
             const view = rowView(panelRow)
             const planned =
               view.status === 'draft' || view.status === 'stopped'
-                ? '—'
+                ? emptyValue('unknown')
                 : panelRow.plannedDeliveries == null
-                  ? '—'
+                  ? emptyValue('unknown')
                   : `${formatNumber(panelRow.plannedDeliveries)}通`
-            const nextSend = view.status === 'active' ? formatNextSend(panelRow.nextScheduledAt) : '—'
+            const nextSend = view.status === 'active' ? formatNextSend(panelRow.nextScheduledAt) : emptyValue('unknown')
             return (
               <DetailPanel
                 open
@@ -1060,7 +1025,7 @@ export default function RemindersListV8() {
                           variant="secondary"
                           onClick={() => {
                             setDuplicateError('')
-                            setDuplicateTarget(panelRow)
+                            void runDuplicate(panelRow)
                             setPanelId(null)
                           }}
                         >
@@ -1090,14 +1055,13 @@ export default function RemindersListV8() {
 
         {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
         {canEdit && selectedCount > 0 ? (
-          <div className={styles.bulkRow} role="region" aria-label="選択中のまとめ操作">
-            <span className={styles.bulkCount}>{selectedCount}件を選択中</span>
+          <BulkBar count={selectedCount} total={reminderList.total} onSelectAll={selectAllReminders} onClear={clearSelection}>
             <Button
               type="button"
               variant="secondary"
               disabled={stoppableIds.length === 0}
               title={stoppableIds.length === 0 ? '有効なリマインダが選ばれていません' : undefined}
-              onClick={() => runBulkToggle(false, stoppableIds)}
+              onClick={() => setBulkPauseIds(stoppableIds)}
             >
               <Square size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
               止める
@@ -1120,7 +1084,7 @@ export default function RemindersListV8() {
               <FolderIcon size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
               フォルダへ移す
             </Button>
-          </div>
+          </BulkBar>
         ) : null}
 
         <div className={styles.pagerRow}>
@@ -1141,12 +1105,12 @@ export default function RemindersListV8() {
     )
 
   const folderSelect = (
-    <Select
+    <SaveErrorField names={["folderFilter","folder","folder_filter"]}><Select
       aria-label="フォルダ"
       value={folderFilter}
       onChange={setFolderFilter}
       options={folderSelectOptions}
-    />
+    /></SaveErrorField>
   )
   const statusChips = (
     <div role="group" aria-label="状態で絞り込む">
@@ -1166,17 +1130,14 @@ export default function RemindersListV8() {
   const perPageSelect = <PageSizeSelect value={perPage} onChange={setPerPage} options={PER_PAGE_OPTIONS} label={null} />
 
   return (
-    <PageFrame kind="list" boardId={narrow ? 'Iffil' : 'apLqS'}>
-      <PageHeading headingSize="regular" title={<>リマインダ</>} description={<>
+    <SaveErrorScope errors={saveErrors}><PageFrame skeleton kind="list" boardId={narrow ? 'Iffil' : 'apLqS'}>
+      <PageHeading headingSize="regular" title={<>リマインダ</>} help={<>
             予約日時・誕生日・契約終了日などの「基準日」を決めて、その前や後に自動で送ります。
           </>}  />
 
       {/* 見るだけの人への帯（`a5C1p`）。押せない操作は置かずに隠す（2026-10-06 オーナー決定）。 */}
       {role !== null && !canEdit && (
-        <p className={styles.viewerBand} role="status" data-design-node="a5C1p">
-          <Eye size={16} aria-hidden="true" />
-          閲覧のみで見ています。変える操作は管理者に頼んでください。
-        </p>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="a5C1p">閲覧のみで見ています。{permissionDeniedMessage('store')}</ReadOnlyNotice></div>
       )}
 
       {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
@@ -1187,6 +1148,17 @@ export default function RemindersListV8() {
       </KpiBand>
 
 
+      <ConfirmDialog
+        open={bulkPauseIds !== null}
+        title={`${bulkPauseIds?.length ?? 0}件のリマインダーを停止しますか？`}
+        description="再開するまで、選んだリマインダーの通知は送られません。"
+        confirmLabel="停止する"
+        onCancel={() => setBulkPauseIds(null)}
+        onConfirm={() => {
+          if (bulkPauseIds) runBulkToggle(false, bulkPauseIds)
+          setBulkPauseIds(null)
+        }}
+      />
       {/* 一時停止の窓（★V8 `RwVo5`）。確定で即反映し、裏で保存する。 */}
       <ConfirmDialog
         open={pauseTarget !== null}
@@ -1213,7 +1185,7 @@ export default function RemindersListV8() {
       <SheetDialog
         open={deleteTarget !== null}
         designNode="VsSyu"
-        title={deleteTarget ? `「${deleteTarget.name}」を削除する` : ''}
+        title={deleteTarget ? `「${deleteTarget.name}」を削除しますか？` : ''}
         description="通知の予定と登録者がすべて消えます。すでに送ったメッセージは友だちのトークに残ります。"
         band="削除は元に戻せません。しばらく使わないだけなら「一時停止する」を使ってください。"
         bandTone="danger"
@@ -1256,20 +1228,7 @@ export default function RemindersListV8() {
       />
 
       {/* 複製の窓。下書きとして写し、確認してから有効にする。 */}
-      <ConfirmDialog
-        open={duplicateTarget !== null}
-        title={duplicateTarget ? `「${duplicateTarget.name}」を複製しますか？` : ''}
-        description="設定と通知の中身を写して、新しいリマインダを「下書き」で作ります。登録者と送信履歴は写りません。作ったあとは確認してから有効にしてください。"
-        confirmLabel={duplicating ? '複製中…' : '複製する'}
-        busy={duplicating}
-        error={duplicateError}
-        onConfirm={() => void runDuplicate()}
-        onCancel={() => {
-          if (duplicating) return
-          setDuplicateTarget(null)
-          setDuplicateError('')
-        }}
-      />
+      <></>
 
       {/* フォルダ移動の窓。1件でも複数件でも同じ形。 */}
       <ConfirmDialog
@@ -1287,9 +1246,7 @@ export default function RemindersListV8() {
         }}
       >
         <div className={styles.moveBody}>
-          <label className="block">
-            <span className={styles.moveLabel}>移動先のフォルダ</span>
-            <Select
+          <Field label={<><span className={styles.moveLabel}>移動先のフォルダ</span></>}><SaveErrorField names={["moveDraft","move_draft"]}><Select
               aria-label="移動先のフォルダ"
               size="full"
               value={moveDraft}
@@ -1298,12 +1255,11 @@ export default function RemindersListV8() {
                 { value: '', label: '未分類' },
                 ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
               ]}
-            />
-          </label>
+            /></SaveErrorField></Field>
         </div>
       </ConfirmDialog>
 
-      <ListPageBody folders={<>
+      <ListPageBody skeleton folders={<>
           {canEdit ? (
             <Button href="/reminders/new" variant="primary" className="v8-folder-create w-full">
               ＋ リマインダを作る
@@ -1327,16 +1283,14 @@ export default function RemindersListV8() {
             placeholder="例：予約"
           >
             {foldersError && (reminders.length > 0 || !reminderList.error) ? (
-              <p role="alert" className={styles.folderNote}>
-                フォルダを読み込めませんでした。
+              <Notice tone="danger" className={styles.folderNoteNoticePlacement} >フォルダを読み込めませんでした。
                 <button
                   type="button"
                   onClick={() => void loadFolders()}
                   className="text-action ml-2 font-semibold hover:underline"
                 >
                   もう一度
-                </button>
-              </p>
+                </button></Notice>
             ) : null}
           </ManagedFolderPanel>
         </>}
@@ -1371,7 +1325,7 @@ export default function RemindersListV8() {
                 <Button href="/reminders/new" variant="primary"><Plus size={15} aria-hidden="true" />リマインダを作る</Button>
               ) : null}
               <div className={styles.narrowFolder}>{folderSelect}</div>
-              <div className={styles.narrowSearch}>
+              <ListToolbarSearchSlot>
                 <SearchField
                   placeholder="名前・内容で探す"
                   aria-label="名前・内容で探す"
@@ -1379,7 +1333,7 @@ export default function RemindersListV8() {
                   onChange={(value) => setNameQuery(clampSearchQuery(value))}
                   onClear={() => setNameQuery('')}
                 />
-              </div>
+              </ListToolbarSearchSlot>
               <span className={styles.narrowSpacer} aria-hidden="true" />
               {perPageSelect}
             </div>
@@ -1397,15 +1351,13 @@ export default function RemindersListV8() {
           )}
 
           {actionError && (
-            <p className={styles.errorBand} role="alert">
-              <AlertCircle size={14} aria-hidden="true" />
+            <Notice tone="danger" className={styles.errorBandNoticePlacement} >
               {actionError}
-              <button type="button" onClick={() => setActionError('')}>閉じる</button>
-            </p>
+              <button type="button" onClick={() => setActionError('')}>閉じる</button></Notice>
           )}
 
           {table}
         </ListPageBody>
-    </PageFrame>
+    </PageFrame></SaveErrorScope>
   )
 }

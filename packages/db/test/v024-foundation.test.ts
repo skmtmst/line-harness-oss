@@ -245,8 +245,9 @@ describe('友だち情報欄', () => {
     await createFriendField(db, { name: 'ペットの名前', fieldKey: 'pet_name', type: 'text' });
     const rows = await getFriendFieldsWithValues(db, 'f-1');
     // 空欄も出せてはじめて入力欄として使える。
-    expect(rows).toHaveLength(1);
-    expect(rows[0].value).toBeNull();
+    expect(rows.filter(row => !row.fixed_key)).toHaveLength(1);
+    expect(rows.every(row => row.value === null)).toBe(true);
+    expect(rows.filter(row => row.fixed_key)).toHaveLength(10);
   });
 
   test('書いて読める', async () => {

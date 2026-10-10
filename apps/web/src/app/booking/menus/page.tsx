@@ -1,5 +1,6 @@
 'use client'
 
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import Select from '@/components/shared/select'
 import { TimeField } from '@/components/shared/date-time-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -29,7 +30,6 @@ import {
   type BookingSettings,
 } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
-import { canEditFeature } from '@/lib/staff-capability'
 import { useAccount } from '@/contexts/account-context'
 import { Suspense } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
@@ -116,10 +116,10 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
    */
   const [settingsLoadState, setSettingsLoadState] = useState<SupportingLoadState>('loading')
   const [page, setPage] = useState(1)
-  const [canManageResources, setCanManageResources] = useState(false)
+  const canManageResources = usePermissionAccess('booking.settings')
   // N-411: メニュー編集は '/booking/menus'、予約設定・資源は 'booking.settings' の
   // 実効permissionで出し分ける。役割だけで見せるとAPIが403で落ちる。
-  const [canEditMenus, setCanEditMenus] = useState(false)
+  const canEditMenus = usePermissionAccess('/booking/menus')
   const loadGenerationRef = useRef(0)
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
@@ -188,8 +188,6 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   }, [load])
 
   useEffect(() => {
-    setCanManageResources(canEditFeature('booking.settings'))
-    setCanEditMenus(canEditFeature('/booking/menus'))
   }, [])
 
   useEffect(() => {
@@ -1034,7 +1032,6 @@ function EditMenuModal({
   const resourceSubmitRef = useRef(false)
   const resourceLoadGenerationRef = useRef(0)
   /** 破棄確認の表示。×・Esc・背景・キャンセルは dirty のときだけここへ寄せる。 */
-  const [showDiscard, setShowDiscard] = useState(false)
   /*
    * R305: 未保存の変更があるか。フォームと設備の割当を開いた直後と比べ、
    * 変わっていれば閉じる前に破棄確認を挟む。保存の成否自体は submit 側の
@@ -1054,14 +1051,6 @@ function EditMenuModal({
     resources: [...resourceAssignments.entries()]
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
   }) !== initialSnapshot.current
-  /** 閉じる操作は共通 Dialog（×・Esc・背景）から全部ここへ集まる。 */
-  function requestClose() {
-    if (dirty && !saving) {
-      setShowDiscard(true)
-      return
-    }
-    onClose()
-  }
 
   useEffect(() => {
     const generation = ++resourceLoadGenerationRef.current
@@ -1210,11 +1199,12 @@ function EditMenuModal({
       <Dialog
         open
         title="メニュー編集"
-        onCancel={requestClose}
+        dirty={dirty}
+        onCancel={onClose}
         busy={saving}
         footer={
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button type="button" onClick={requestClose} disabled={saving}>
+            <Button type="button" onClick={onClose} disabled={saving}>
               キャンセル
             </Button>
             <Button
@@ -1471,16 +1461,7 @@ function EditMenuModal({
           )}
         </div>
       </Dialog>
-      <ConfirmDialog
-        open={showDiscard}
-        title="変更を破棄しますか？"
-        description="保存していない変更は消えます。閉じてよければ破棄を選んでください。"
-        confirmLabel="破棄する"
-        cancelLabel="編集に戻る"
-        primaryAction="cancel"
-        onConfirm={onClose}
-        onCancel={() => setShowDiscard(false)}
-      />
+
     </>
   )
 }
@@ -1556,9 +1537,8 @@ function MenusPageHost() {
   // R91: メニューがあるときも作れるよう、見出しに常設の入口を置く。
   // 編集権限の判定は一覧の中と同じ実効permissionで揃える。
   // 緑の塗りは1画面1つ。空のときは空状態が主役なので見出し側は脇役にする。
-  const [canEditMenus, setCanEditMenus] = useState(false)
+  const canEditMenus = usePermissionAccess('/booking/menus')
   useEffect(() => {
-    setCanEditMenus(canEditFeature('/booking/menus'))
   }, [])
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const previewUrl = selectedAccount?.liffId

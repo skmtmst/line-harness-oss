@@ -5,7 +5,7 @@ import './readonly-v8.css'
 
 /** 通知の組の閲覧画面内で使う見出し。共通の枠やメニューは触らない。 */
 export default function ReadonlyHeaderV8({ title, description, actions }: { title: string; description: string; actions?: ReactNode }) {
-  return <PageHeader breadcrumb={[]} title={title} description={description} actions={actions} className="v8-ro-notifications-header" />
+  return <PageHeader breadcrumb={[]} title={title} help={description} actions={actions} className="v8-ro-notifications-header" />
 }
 
 /** V7の要素はそのまま残し、V8だけ板の印を外側に付ける。 */

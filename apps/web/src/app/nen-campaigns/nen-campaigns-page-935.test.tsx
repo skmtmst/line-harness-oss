@@ -38,10 +38,10 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
 }))
-// v8 の一覧は役割を読みに行く。試験では通信させず「役割不明＝編集できる」の既定にする。
+// v8 の一覧は役割を読みに行く。試験では本人確認済みの管理者を返す。
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
-  return { ...actual, useStaffRole: () => null }
+  return { ...actual, useStaffRole: () => 'owner' }
 })
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()

@@ -157,3 +157,15 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* B-152・仕上げ2 */
+.summaryTitle, .starterTitle { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); }
+.rowValue { font-weight: var(--polish-weight-body); }
+
+/* B-180：設定内容・右欄の段の題。欄のラベルはFormFieldが12/500を持つ。 */
+[data-theme='v8'] .summaryTitle,
+[data-theme='v8'] .summary[data-variant='link'] .summaryTitle,
+[data-theme='v8'] .starterTitle {
+  font-size: var(--tpl-section-title-size);
+  font-weight: var(--tpl-section-title-weight);
+}

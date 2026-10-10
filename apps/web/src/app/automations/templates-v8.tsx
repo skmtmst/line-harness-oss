@@ -1,10 +1,7 @@
 'use client'
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, fetchApi, type AutomationTemplateSummary } from '@/lib/api'
-
-type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import MergedTabs from '@/components/layout/merged-tabs'
@@ -16,6 +13,11 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
 import styles from './automation-api-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 
 /*
  * ★V8 オートメーション見本（板 `c7dxp`）。
@@ -24,6 +26,7 @@ import styles from './automation-api-v8.module.css'
  */
 
 export default function AutomationTemplatesV8() {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const canManage = useCanManageAutomations()
@@ -72,14 +75,17 @@ export default function AutomationTemplatesV8() {
       setCommonActionCount(commonRes && commonRes.success ? commonRes.data.length : null)
       setSkipped(runsRes && runsRes.success ? runsRes.data.summary.skipped : null)
       setStatus('ready')
-    } catch {
-      setItems([])
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+      setItems([]);
+
       setStatus('error')
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
-    if (accountLoading) return
+    if (accountLoading)
+ return
     void load()
   }, [accountLoading, load])
 
@@ -105,30 +111,34 @@ export default function AutomationTemplatesV8() {
       if (!response.success) throw new Error(response.error)
       delete operationKeysRef.current[slot]
       router.push(`/automations/drafts?id=${encodeURIComponent(response.data.id)}`)
-    } catch {
-      setActionError('下書きを作れませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('下書きを作れませんでした。状態を読み直してから、もう一度お試しください。') }
       setCreating(null)
     }
   }
 
-  if (accountLoading) return <ListState kind="loading" title="見本を読み込んでいます" />
+  if (accountLoading)
+ return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="見本を読み込んでいます" /></SaveErrorScope>
   if (!selectedAccountId) {
-    return <ListState kind="empty" title="LINE公式アカウントを選んでください" description="見本から作る下書きは、選んだアカウントだけに保存します。" />
+    return <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="LINE公式アカウントを選んでください" description="見本から作る下書きは、選んだアカウントだけに保存します。" /></SaveErrorScope>
   }
 
   const tabs = [
-    { key: 'rules', label: `ルール ${ruleCount ?? '—'}`, href: '/automations' },
-    { key: 'common-actions', label: `共通アクション ${commonActionCount ?? '—'}`, href: '/common-actions' },
+    { key: 'rules', label: `ルール ${ruleCount ?? emptyValue('unknown')}`, href: '/automations' },
+    { key: 'common-actions', label: `共通アクション ${commonActionCount ?? emptyValue('unknown')}`, href: '/common-actions' },
     { key: 'runs', label: '動いた記録', href: '/automations/runs' },
-    { key: 'templates', label: `見本 ${status === 'ready' ? items.length : '—'}` },
+    { key: 'templates', label: `見本 ${status === 'ready' ? items.length : emptyValue('unknown')}` },
   ]
 
   return (
-    <div className={styles.board} data-design-node="c7dxp">
+    <SaveErrorScope errors={saveErrors}><div className={styles.board} data-design-node="c7dxp">
       <div className={styles.head}>
         <div>
-          <h1 className={styles.title}>オートメーション</h1>
-          <p className={styles.lead}>「○○したら△△する」を決めておくと、友だちの動きに合わせて自動で動きます。</p>
+          <PageHeading title="オートメーション" help={<> 「○○したら△△する」を決めておくと、友だちの動きに合わせて自動で動きます。</>} />
+
         </div>
         <Button href="/automations?tab=templates" variant="secondary">見本から作る</Button>
       </div>
@@ -137,7 +147,7 @@ export default function AutomationTemplatesV8() {
 
       {status === 'ready' ? (
         <div data-design="KPIs" className={`${kpiStyles.strip} ${styles.kpis}`}>
-          <KpiCard title="ルール" value={ruleCount} unit="件" detail={`動いている ${activeCount ?? '—'}・止めている ${stoppedCount ?? '—'}`} />
+          <KpiCard title="ルール" value={ruleCount} unit="件" detail={`動いている ${activeCount ?? emptyValue('unknown')}・止めている ${stoppedCount ?? emptyValue('unknown')}`} />
           <KpiCard title="今月動いた" value={exec30d} unit="回" detail="この30日の実行回数です" />
           <KpiCard title="失敗" value={fail30d} unit="件" detail="「動いた記録」からやり直せます" />
           <KpiCard title="条件に外れた" value={skipped} unit="回" detail="だれにも当たらないまま終わった回数です" />
@@ -150,7 +160,7 @@ export default function AutomationTemplatesV8() {
           kind="error"
           title="見本を表示できませんでした"
           description="まだ下書きは作っていません。再読み込みしてから選んでください。"
-          action={<Button variant="secondary" onClick={() => void load()}>見本を再読み込み</Button>}
+          onRetry={() => void load()}
         />
       ) : null}
 
@@ -169,7 +179,7 @@ export default function AutomationTemplatesV8() {
               </FilterChip>
             ))}
             <div className={styles.toolbarSpice}>
-              <Button variant="secondary" onClick={() => void load()}>見本を再読み込み</Button>
+              <Button variant="secondary" onClick={() => load()} busyLabel="処理中…">見本を再読み込み</Button>
             </div>
           </div>
 
@@ -204,6 +214,6 @@ export default function AutomationTemplatesV8() {
           <p className={styles.footnote}>実行まで確認できた見本だけを、ここへ表示します。見本に実データは入っていません。見本から作る下書きは、選んだアカウントだけに保存します。</p>
         </>
       ) : null}
-    </div>
+    </div></SaveErrorScope>
   )
 }

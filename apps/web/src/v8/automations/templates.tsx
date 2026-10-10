@@ -1,12 +1,4 @@
 'use client'
-
-/*
- * ★V8 オートメーションの見本（Pencil `c7dxp`・`/automations?tab=templates`）。
- *
- * 2026-10-07 src/v8 に一から書いた（今の V8 は 8%）。データの口・下書きを作る動き・権限・失敗時の扱いは
- * 今までの V8（app/automations/templates-v8.tsx）と同じ（BEHAVIOR.md）。違いは見せ方だけ——
- * 型（ListPage）に、タブ・数の帯（ルールの一覧と同じ）・きっかけの札の段・4列のカード・注記を渡す。
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
@@ -30,6 +22,17 @@ import {
   type BandCell,
 } from './shell'
 import styles from './templates.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 オートメーションの見本（Pencil `c7dxp`・`/automations?tab=templates`）。
+ *
+ * 2026-10-07 src/v8 に一から書いた（今の V8 は 8%）。データの口・下書きを作る動き・権限・失敗時の扱いは
+ * 今までの V8（app/automations/templates-v8.tsx）と同じ（BEHAVIOR.md）。違いは見せ方だけ——
+ * 型（ListPage）に、タブ・数の帯（ルールの一覧と同じ）・きっかけの札の段・4列のカード・注記を渡す。
+ */
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -58,6 +61,7 @@ export function templateTriggerChips(items: Pick<AutomationTemplateSummary, 'tri
 }
 
 export default function AutomationTemplatesV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('見本から作る')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -102,16 +106,20 @@ export default function AutomationTemplatesV8() {
       setSummary(listRes && listRes.success ? listRes.summary ?? null : null)
       setSkipped(runsRes && runsRes.success ? runsRes.data.summary.skipped : null)
       setStatus('ready')
-    } catch {
+    } catch (saveFailure) {
       if (requestId !== requestRef.current) return
-      setItems([])
+      saveErrors.capture(saveFailure)
+      setItems([]);
+
       setStatus('error')
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
-    if (accountLoading) return
-    void load()
+    if (accountLoading)
+ return
+    void load();
+
     return () => { requestRef.current += 1 }
   }, [accountLoading, load])
   useEffect(() => { setTrigger('') }, [selectedAccountId])
@@ -135,8 +143,11 @@ export default function AutomationTemplatesV8() {
       if (!response.success) throw new Error(response.error)
       delete operationKeysRef.current[slot]
       router.push(`/automations/drafts?id=${encodeURIComponent(response.data.id)}`)
-    } catch {
-      setActionError('下書きを作れませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('下書きを作れませんでした。状態を読み直してから、もう一度お試しください。') }
       setCreating(null)
     }
   }
@@ -146,10 +157,10 @@ export default function AutomationTemplatesV8() {
   const stoppedCount = rules ? rules.length - activeCount : 0
   const neverRunCount = rules ? rules.filter((rule) => rule.isActive && rule.executionCount30d === 0).length : 0
   const cells: BandCell[] = [
-    { key: 'rules', title: 'ルール', icon: <ListChecks size={13} aria-hidden="true" />, value: rules ? rules.length : null, unit: '件', detail: rules ? `動いている ${activeCount}・止めている ${stoppedCount}` : '—' },
+    { key: 'rules', title: 'ルール', icon: <ListChecks size={13} aria-hidden="true" />, value: rules ? rules.length : null, unit: '件', detail: rules ? `動いている ${activeCount}・止めている ${stoppedCount}` : emptyValue('unknown') },
     { key: 'runs', title: '今月動いた', icon: <Activity size={13} aria-hidden="true" />, value: summary?.executionCount30d ?? null, unit: '回', detail: 'この30日に動いた回数' },
     { key: 'failed', title: '失敗', icon: <FileWarning size={13} aria-hidden="true" />, value: summary?.failureCount30d ?? null, unit: '件', detail: '「動いた記録」からやり直せます' },
-    { key: 'skipped', title: '条件に外れた', icon: <Filter size={13} aria-hidden="true" />, value: skipped, unit: '回', detail: rules ? `だれにも当たらないルール ${neverRunCount}` : '—' },
+    { key: 'skipped', title: '条件に外れた', icon: <Filter size={13} aria-hidden="true" />, value: skipped, unit: '回', detail: rules ? `だれにも当たらないルール ${neverRunCount}` : emptyValue('unknown') },
   ]
 
   /* ===== 本文 ===== */
@@ -164,7 +175,7 @@ export default function AutomationTemplatesV8() {
         kind="error"
         title="見本を表示できませんでした"
         description="まだ下書きは作っていません。再読み込みしてから選んでください。"
-        action={<Button variant="secondary" onClick={() => void load()}>見本を再読み込み</Button>}
+        onRetry={() => void load()}
       />
     )
   } else {
@@ -188,7 +199,7 @@ export default function AutomationTemplatesV8() {
             ))}
           </div>
           <span className={styles.spacer} aria-hidden="true" />
-          <Button variant="secondary" onClick={() => void load()}>
+          <Button variant="secondary" onClick={() => load()} busyLabel="処理中…">
             <RefreshCw size={15} aria-hidden="true" />見本を再読み込み
           </Button>
         </div>
@@ -236,11 +247,11 @@ export default function AutomationTemplatesV8() {
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId="c7dxp"
       headingSize="regular"
       title="オートメーション"
-      description={AUTOMATIONS_DESCRIPTION}
+      help={AUTOMATIONS_DESCRIPTION}
       actions={canEdit
         ? <Button href={automationTabHref('templates')}><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button>
         : null}
@@ -251,6 +262,6 @@ export default function AutomationTemplatesV8() {
       </>}
     >
       <div className={styles.body}>{body}</div>
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

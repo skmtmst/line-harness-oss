@@ -3,11 +3,7 @@
 
 .body { display: flex; flex-direction: column; gap: var(--tpl-htn-gap); padding: var(--tpl-htn-body-pad); min-width: 0; color: var(--color-ink); }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.readonlyBand {
-  margin: 0; padding: var(--tpl-htn-info-pad); border-radius: var(--tpl-htn-radius-m);
-  background: var(--color-info-bg); color: var(--color-ink-secondary);
-  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18);
-}
+.readonlyBand { margin: 0; }
 .empty { margin: 0; padding: var(--tpl-htn-empty-pad); text-align: center; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary); }
 .note { margin: 0; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
 .noteStrong { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); }
@@ -18,7 +14,6 @@
 .topCell { vertical-align: top; }
 .tableBox .table tbody td.topCell { vertical-align: top; padding-top: var(--tpl-htn-top-cell-pad); }
 .listArea { display: flex; flex-direction: column; gap: var(--tpl-htn-list-gap); padding: var(--tpl-htn-list-pad); }
-.createSpace { display: block; height: var(--tpl-htn-input-h); }
 .railNote { margin: 0; line-break: anywhere; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-faint); }
 .folderBlock { margin-top: var(--tpl-htn-folder-block-gap); }
 .folderForm { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-htn-chip-gap); }
@@ -81,7 +76,9 @@
 .editSplit { display: flex; align-items: flex-start; gap: var(--tpl-htn-edit-gap); }
 .editPanel {
   flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-htn-panel-gap); padding: var(--tpl-htn-panel-pad);
-  border-radius: var(--tpl-htn-radius-l); box-shadow: var(--tpl-htn-ring); background: var(--color-canvas);
+  border-radius: var(--tpl-htn-radius-l);  background: var(--color-canvas);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 .editTitle { margin: 0; font-size: var(--tpl-htn-text-14); line-height: var(--tpl-htn-lh-20); font-weight: 700; }
 .twoCol { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--tpl-htn-panel-gap); }
@@ -97,7 +94,7 @@
 }
 .input { height: var(--tpl-htn-input-h); padding: var(--tpl-htn-input-pad); }
 .textarea { height: var(--tpl-htn-textarea-h); padding: var(--tpl-htn-textarea-pad); resize: vertical; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); }
-.input:focus-visible, .textarea:focus-visible { outline: var(--tpl-htn-line-2) solid var(--color-action); outline-offset: -1px; }
+.input:focus-visible, .textarea:focus-visible { outline: var(--tpl-htn-line-2) solid var(--color-focus-ring); outline-offset: -1px; }
 .formatRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-panel-gap); height: var(--tpl-htn-seg-h); }
 .folderPick { width: var(--tpl-htn-bulk-w); }
 .folderPick :global(*) { max-width: 100%; }
@@ -129,7 +126,10 @@
 /* 配る（meBRB） */
 .progressPanel {
   display: flex; flex-direction: column; gap: var(--tpl-htn-gap-s); padding: var(--tpl-htn-progress-pad);
-  border-radius: var(--tpl-htn-radius-l); box-shadow: var(--tpl-htn-ring);
+  border-radius: var(--tpl-htn-radius-l);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 .progressPanel h2 { margin: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 700; }
 .progressRow { display: flex; align-items: center; gap: var(--tpl-htn-panel-gap); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); }

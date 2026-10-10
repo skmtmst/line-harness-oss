@@ -170,11 +170,12 @@ afterEach(() => {
 async function openOfferEdit() {
   render(<OffersTab />)
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: '編集' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'そのほかの操作' })).toBeTruthy()
   })
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: '編集' }))
+    fireEvent.click(screen.getByRole('button', { name: 'そのほかの操作' }))
   })
+  await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '編集する' })) })
   const title = await screen.findByText('案件を編集')
   // ★V7: 旧来の div.fixed 直書き窓から共通 Dialog（role=dialog）へ移した。
   const modal = title.closest('[role="dialog"]')

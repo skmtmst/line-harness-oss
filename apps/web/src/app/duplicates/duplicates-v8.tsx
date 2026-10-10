@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8 重複検出（Pencil `hn6Y8`、タブを消した採用版は `sdbsQ` 板1、
- * 状態は `SXCb3`。再撮の板 `G9C4Uw`（1152）を数の帯に付ける）。
- *
- * データの口は v7 と同じ `use-duplicates-data`。違いは見せ方だけ——
- * タブの段を「← 友だち一覧 › データ管理 › 重複検出」と「データ管理 ▾」に
- * 替え、数の帯・道具の段・候補の表を板どおりに組む。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
- */
 import Link from 'next/link'
 import { CircleAlert, Info, RotateCw, SearchX } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -24,6 +14,19 @@ import { CANDIDATE_PAGE_SIZE, formatRelative, useDuplicatesData } from './use-du
 import DuplicatesStatsNotice from './duplicates-stats-notice'
 import { formatDateTime } from '@/lib/format'
 import styles from '@/app/friends/friends-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 重複検出（Pencil `hn6Y8`、タブを消した採用版は `sdbsQ` 板1、
+ * 状態は `SXCb3`。再撮の板 `G9C4Uw`（1152）を数の帯に付ける）。
+ *
+ * データの口は v7 と同じ `use-duplicates-data`。違いは見せ方だけ——
+ * タブの段を「← 友だち一覧 › データ管理 › 重複検出」と「データ管理 ▾」に
+ * 替え、数の帯・道具の段・候補の表を板どおりに組む。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ */
 
 const CONFIDENCE_LABEL = { very_high: '最高', high: '高', medium: '中', low: '低' } as const
 
@@ -87,7 +90,7 @@ export default function DuplicatesV8() {
             <HelpTip label="確認済みの説明">統合ユーザーに紐付け済みの組数です</HelpTip>
           </span>
           <p className={styles.kpiValue}>
-            {d.statusCounts !== null ? `${formatNumber(d.statusCounts.linked ?? 0)}組` : '—'}
+            {d.statusCounts !== null ? `${formatNumber(d.statusCounts.linked ?? 0)}組` : emptyValue('unknown')}
           </p>
           <p className={styles.kpiDetail}>
             {d.statusCounts !== null ? '統合ユーザーに紐付け済みの組数です' : '読み込めませんでした'}
@@ -98,7 +101,7 @@ export default function DuplicatesV8() {
             重複配信の削減
             <HelpTip label="重複配信の削減の説明">配信前プレビューの実績を接続したあと、重複分を除いた削減の見込みをここに表示します。</HelpTip>
           </span>
-          <p className={styles.kpiValue}>—</p>
+          <p className={styles.kpiValue}>{emptyValue('unknown')}</p>
           <p className={styles.kpiDetail}>配信実績の接続を待っています</p>
         </div>
         <div className={styles.kpi}>
@@ -107,7 +110,7 @@ export default function DuplicatesV8() {
             <HelpTip label="1配信あたりの無駄の説明">重複している友だち登録の数に1通あたりの単価を掛けた見積りです。実際に送った配信の実績ではありません。</HelpTip>
           </span>
           <p className={styles.kpiValue}>
-            {d.data ? `¥${formatNumber(d.data.wastedPerBroadcastYen)}` : '—'}
+            {d.data ? `¥${formatNumber(d.data.wastedPerBroadcastYen)}` : emptyValue('unknown')}
           </p>
           <p className={styles.kpiDetail}>
             {d.data ? `¥${formatNumber(d.data.msgUnitYen)}/通の見積り` : '読み込めませんでした'}
@@ -132,15 +135,15 @@ export default function DuplicatesV8() {
         <div className={styles.searchWrap}>
           <SearchField
             className="w-full"
-            aria-label="名前・メール・電話で検索"
+            aria-label="名前・メール・電話で探す"
             value={d.query}
             onChange={d.setQuery}
             onClear={() => d.setQuery('')}
-            placeholder="名前・メール・電話で検索"
+            placeholder="名前・メール・電話で探す"
           />
         </div>
         <div className={styles.selectWrap}>
-          <Select
+          <SaveErrorField names={["status","d.status"]}><Select
             aria-label="状態で絞り込む"
             label="状態"
             size="full"
@@ -153,7 +156,7 @@ export default function DuplicatesV8() {
               { value: 'deferred', label: '保留' },
               { value: 'different', label: '別人' },
             ]}
-          />
+          /></SaveErrorField>
         </div>
         <span className={styles.toolbarSpacer} />
         {d.data?.computedAt ? (
@@ -186,7 +189,7 @@ export default function DuplicatesV8() {
                       <CircleAlert size={20} aria-hidden="true" />
                     </span>
                     <p className={styles.stateTitle}>重複の候補を読み込めませんでした</p>
-                    <Button type="button" variant="primary" onClick={() => void d.loadCandidates()}>
+                    <Button type="button" variant="primary" onClick={() => d.loadCandidates()} busyLabel="処理中…">
                       もう一度試す
                     </Button>
                   </div>
@@ -238,7 +241,7 @@ export default function DuplicatesV8() {
                 <td>
                   {[candidate.left.lineAccountName, candidate.right.lineAccountName]
                     .filter(Boolean)
-                    .join(' ／ ') || '—'}
+                    .join(' ／ ') || emptyValue('unknown')}
                 </td>
                 <td>{formatDateTime(candidate.reviewedAt ?? candidate.detectedAt)}</td>
                 <td>
@@ -269,7 +272,7 @@ export default function DuplicatesV8() {
                     ) : (
                       <>
                         <p className={styles.stateDesc}>同じ人が別の友だちとして登録されていそうなときに、ここに出ます。</p>
-                        <Button type="button" variant="secondary" onClick={() => void d.loadCandidates()}>
+                        <Button type="button" variant="secondary" onClick={() => d.loadCandidates()} busyLabel="処理中…">
                           もう一度見直す
                         </Button>
                       </>
@@ -360,7 +363,7 @@ export default function DuplicatesV8() {
                       </td>
                       {d.data!.perAccount.map((col) => {
                         if (row.accountId === col.accountId) {
-                          return <td key={col.accountId} className="num" style={{ color: 'var(--color-ink-disabled)' }}>—</td>
+                          return <td key={col.accountId} className="num" style={{ color: 'var(--color-ink-disabled)' }}>{emptyValue('unknown')}</td>
                         }
                         const pair = d.data!.pairwiseOverlap!.find(
                           (p) => p.fromAccountId === row.accountId && p.toAccountId === col.accountId,

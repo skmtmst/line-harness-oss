@@ -7,11 +7,9 @@
  */
 import React, { useState } from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import type { FormAction, FormOptions } from '@line-crm/shared'
 import type { FormRefs } from '@/components/forms/form-refs'
-
-vi.mock('@/components/forms/action-editor', () => ({ default: () => null }))
 
 import { AfterTab } from './after-tab'
 
@@ -37,7 +35,7 @@ function Harness() {
 afterEach(cleanup)
 
 function handleOf(body: string) {
-  return screen.getByRole('button', { name: `「テキストを送る「${body}」」を並べ替える` })
+  return screen.getByRole('button', { name: `${latest.indexOf(body) + 1}つ目の行うことを並べ替える` })
 }
 
 describe('答え終わったら行うことの並べ替え', () => {
@@ -48,7 +46,7 @@ describe('答え終わったら行うことの並べ替え', () => {
       const { container } = render(<Harness />)
       if (how === 'key') fireEvent.keyDown(handleOf('A'), { key: 'ArrowDown' })
       if (how === 'menu') {
-        fireEvent.click(screen.getByRole('button', { name: '「テキストを送る「A」」のその他操作' }))
+        fireEvent.click(screen.getByRole('button', { name: '1つ目の行うことのその他操作' }))
         fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /^下へ/ }))
       }
       if (how === 'drag') {

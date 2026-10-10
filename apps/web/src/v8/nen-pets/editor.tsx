@@ -1,12 +1,4 @@
 'use client'
-
-/*
- * ★V8-B ペットの情報を直す（eLjeQ）。真ん中の窓（幅 560・上から 170）。
- * 窓の枠は共通の Dialog。中身は 対象のペット → 種別 → 名前・品種 → 性別 → 誕生日・体重 → 補足。
- * 口は今の画面と同じ（PUT /api/nen-campaigns/pets/:id、版つき保存）。
- * 誕生日を変えると、予約済みの誕生日クーポン配信は新しい誕生日で組み直される（Worker 側）。
- * ほかの人が先に直していたら（409 VERSION_CONFLICT）止めて、入力は残したまま保存し直せる。
- */
 import { useState } from 'react'
 import { Check } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
@@ -19,6 +11,17 @@ import { ApiError, api } from '@/lib/api'
 import type { NenPetRow } from '@/lib/nen-pets-api'
 import { normalizeBirthdayInput } from './parts'
 import styles from './pets.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B ペットの情報を直す（eLjeQ）。真ん中の窓（幅 560・上から 170）。
+ * 窓の枠は共通の Dialog。中身は 対象のペット → 種別 → 名前・品種 → 性別 → 誕生日・体重 → 補足。
+ * 口は今の画面と同じ（PUT /api/nen-campaigns/pets/:id、版つき保存）。
+ * 誕生日を変えると、予約中の誕生日クーポン配信は新しい誕生日で組み直される（Worker 側）。
+ * ほかの人が先に直していたら（409 VERSION_CONFLICT）止めて、入力は残したまま保存し直せる。
+ */
 
 const ANIMALS = [
   { value: 'dog', label: '犬' },
@@ -37,6 +40,7 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
   onClose: () => void
   onSaved: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const [name, setName] = useState(pet.name)
   const [animalType, setAnimalType] = useState<string>(pet.animalType)
   const [gender, setGender] = useState<string>(pet.gender)
@@ -77,23 +81,27 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
       onSaved()
       onClose()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 409 && caught.code === 'VERSION_CONFLICT') {
         const latest = (caught.data as { latest?: { updatedAt?: string } } | null)?.latest
         if (latest?.updatedAt) setVersion(latest.updatedAt)
-        setError('ほかの人が先にペットの情報を変えました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。')
+        { if (!fieldFailure)
+        setError('ほかの人が先にペットの情報を変えました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。') }
         onSaved()
         return
       }
+      { if (!fieldFailure)
       setError(describeApiFailure(caught, 'ペットの保存', {
-        forbidden: 'ペットの情報を変える権限がありません。権限を確認してください。',
-      }))
+        scope: 'store',
+      })) }
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open
       designNode="eLjeQ"
       designWidth={560}
@@ -101,11 +109,12 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
       designHeaderPadding="24px 24px 0"
       confirmIcon={<Check size={15} aria-hidden="true" />}
       title="ペットの情報を直す"
-      description="間違っている項目を直して保存します。誕生日を変えると、予約済みの誕生日クーポン配信は新しい誕生日で組み直されます。"
+      description="間違っている項目を直して保存します。誕生日を変えると、予約中の誕生日クーポン配信は新しい誕生日で組み直されます。"
+      dirty={name !== pet.name || animalType !== pet.animalType || gender !== pet.gender || birthday !== (pet.birthday ?? '') || breed !== pet.breed || weight !== (pet.weightKg == null ? '' : `${pet.weightKg} kg`)}
       busy={saving}
       error={error}
       confirmLabel="保存する"
-      onConfirm={() => void save()}
+      onConfirm={() => save()}
       onCancel={onClose}
     >
       <div className={styles.editor}>
@@ -120,43 +129,31 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
           <span id="pet-animal-label" className={styles.groupLabel}>種別</span>
           <span className={styles.radioRow} role="radiogroup" aria-labelledby="pet-animal-label">
             {ANIMALS.map((item) => (
-              <Radio key={item.value} name="pet-animal" value={item.value} checked={animalType === item.value} onChange={() => setAnimalType(item.value)}>{item.label}</Radio>
+              <SaveErrorField names={["pet-animal","value","item.value","animalType"]} key={item.value}><Radio key={item.value} name="pet-animal" value={item.value} checked={animalType === item.value} onChange={() => setAnimalType(item.value)}>{item.label}</Radio></SaveErrorField>
             ))}
           </span>
         </div>
         <div className={styles.editorPair}>
-          <label className={styles.editorField}>
-            <span className={styles.fieldLabel}>ペットの名前</span>
-            <TextField {...fields.bind('pet-edit-name')} aria-label="ペットの名前" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} />
-            <FieldError id="pet-edit-name-error">{fields.error('pet-edit-name')}</FieldError>
-          </label>
-          <label className={styles.editorField}>
-            <span className={styles.fieldLabel}>品種</span>
-            <TextField aria-label="品種" value={breed} maxLength={80} onChange={(event) => setBreed(event.target.value)} />
-          </label>
+          <Field label="ペットの名前"><SaveErrorField names={["name"]}><TextField {...fields.bind('pet-edit-name')} aria-label="ペットの名前" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} /></SaveErrorField>
+<FieldError id="pet-edit-name-error">{fields.error('pet-edit-name')}</FieldError></Field>
+          <Field label="品種"><SaveErrorField names={["breed"]}><TextField aria-label="品種" value={breed} maxLength={80} onChange={(event) => setBreed(event.target.value)} /></SaveErrorField></Field>
         </div>
         <div className={styles.editorGroup}>
           <span id="pet-gender-label" className={styles.groupLabel}>性別</span>
           <span className={styles.radioRow} role="radiogroup" aria-labelledby="pet-gender-label">
             {GENDERS.map((item) => (
-              <Radio key={item.value} name="pet-gender" value={item.value} checked={gender === item.value} onChange={() => setGender(item.value)}>{item.label}</Radio>
+              <SaveErrorField names={["pet-gender","value","item.value","gender"]} key={item.value}><Radio key={item.value} name="pet-gender" value={item.value} checked={gender === item.value} onChange={() => setGender(item.value)}>{item.label}</Radio></SaveErrorField>
             ))}
           </span>
         </div>
         <div className={styles.editorPair}>
-          <label className={styles.editorField}>
-            <span className={styles.fieldLabel}>誕生日</span>
-            <TextField {...fields.bind('pet-edit-birthday')} aria-label="誕生日" placeholder="2022-04-03" value={birthday} onChange={(event) => setBirthday(event.target.value)} />
-            <FieldError id="pet-edit-birthday-error">{fields.error('pet-edit-birthday')}</FieldError>
-          </label>
-          <label className={styles.editorField}>
-            <span className={styles.fieldLabel}>体重</span>
-            <TextField {...fields.bind('pet-edit-weight')} aria-label="体重" inputMode="decimal" placeholder="9.2 kg" value={weight} onChange={(event) => setWeight(event.target.value)} />
-            <FieldError id="pet-edit-weight-error">{fields.error('pet-edit-weight')}</FieldError>
-          </label>
+          <Field label="誕生日"><SaveErrorField names={["birthday"]}><TextField {...fields.bind('pet-edit-birthday')} aria-label="誕生日" placeholder="2022-04-03" value={birthday} onChange={(event) => setBirthday(event.target.value)} /></SaveErrorField>
+<FieldError id="pet-edit-birthday-error">{fields.error('pet-edit-birthday')}</FieldError></Field>
+          <Field label="体重"><SaveErrorField names={["weight"]}><TextField {...fields.bind('pet-edit-weight')} aria-label="体重" inputMode="decimal" placeholder="9.2 kg" value={weight} onChange={(event) => setWeight(event.target.value)} /></SaveErrorField>
+<FieldError id="pet-edit-weight-error">{fields.error('pet-edit-weight')}</FieldError></Field>
         </div>
         <p className={styles.editorHint}>生まれた年が分からないときは「03-15」のように月日だけを入れます。空欄は未登録です。</p>
       </div>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }

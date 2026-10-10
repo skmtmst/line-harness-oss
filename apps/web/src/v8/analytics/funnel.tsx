@@ -1,13 +1,6 @@
 'use client'
 
-/*
- * ★V8 分析「ファネル」（Pencil `DkRDE`）。
- * 数の帯 → 選ぶ段（ファネル・何日以内・比較する条件・作る・読み直す）→ 左に全体の流れ、
- * 右に選んだ段（到達・止まった・進行中 → 対象者を開く／この対象者へ配信を作成）と比較 → 注。
- * その下に、定義の操作（期間・再集計・編集・停止・保管）・結果の保存・停止中のファネル。
- * 作る／編集のフォームと保存の欄は、入口（app/analytics/page.tsx）が今の部品を渡す。
- * 呼ぶ口・世代の守り・判定不能の扱い・CSV は今の画面（FunnelTab）と同じ。
- */
+import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowDownRight, CalendarClock, Flag, LogIn, Plus, RefreshCw, Send, Users } from 'lucide-react'
@@ -15,6 +8,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { notifyToast } from '@/components/shared/toast'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
 import SegmentedControl from '@/components/shared/segmented'
@@ -24,6 +18,22 @@ import { formatNumber } from '@/lib/format'
 import { RangePickerV8, StatePill } from './common'
 import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, rangeFor, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
+import { useReportPeriod } from '@/components/shared/period-picker'
+import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
+
+/*
+ * ★V8 分析「ファネル」（Pencil `DkRDE`）。
+ * 数の帯 → 選ぶ段（ファネル・何日以内・比較する条件・作る・読み直す）→ 左に全体の流れ、
+ * 右に選んだ段（到達・止まった・進行中 → 対象者を開く／この対象者へ配信を作成）と比較 → 注。
+ * その下に、定義の操作（期間・再集計・編集・停止・保管）・結果の保存・停止中のファネル。
+ * 作る／編集のフォームと保存の欄は、入口（app/analytics/page.tsx）が今の部品を渡す。
+ * 呼ぶ口・世代の守り・判定不能の扱い・CSV は今の画面（FunnelTab）と同じ。
+ */
 
 type FunnelStatus = 'active' | 'stopped' | 'archived'
 type FunnelSummary = { id: string; name: string; windowDays: number; createdAt: string; status: FunnelStatus; currentVersion: { id: string; versionNumber: number; createdAt: string } | null; migrationState: 'ready' | 'needs_migration' }
@@ -84,6 +94,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
   /** 段に置ける種類（入口が正本の一覧から渡す）。 */
   stepKindsLabel?: string
 }) {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const [funnels, setFunnels] = useState<FunnelSummary[]>([])
   const [selected, setSelected] = useState('')
@@ -100,7 +111,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
   useEffect(() => { if (presetConversion?.id && canManage) setCreating(true) }, [presetConversion?.id, canManage])
   const [picked, setPicked] = useState<number | null>(null)
   const [usageNotice, setUsageNotice] = useState('')
-  const [funnelDays, setFunnelDays] = useState(30)
+  const { days: funnelDays, setDays: setFunnelDays, customRange, setRange } = useReportPeriod()
   const [audienceSelection, setAudienceSelection] = useState<'reached' | 'stopped' | 'in_progress'>('stopped')
   const [audienceBusy, setAudienceBusy] = useState(false)
   // アカウント・ファネル・期間を切り替えた瞬間に世代を進め、古い応答を出さない。
@@ -144,14 +155,17 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
     const generation = viewGeneration.current
     setRunning(true); setRunError('')
     try {
-      const response = await api.analytics.v6Funnels.run(accountId, selected, funnelCohortRange(funnelDays))
+      const response = await api.analytics.v6Funnels.run(accountId, selected, (customRange ? { cohortFrom: `${customRange.from}T00:00:00.000+09:00`, cohortTo: new Date(Math.min(Date.now(), Date.parse(`${customRange.to}T23:59:59.999+09:00`))).toISOString() } : funnelCohortRange(funnelDays)))
       if (!response.success) throw new Error(response.error)
       if (generation !== viewGeneration.current) return
       setRun(response.data); setGroupKey(response.data.groups[0]?.key ?? 'all')
     } catch (error) {
       if (generation !== viewGeneration.current) return
+      const fieldFailure = saveErrors.capture(error);
+
       const code = error instanceof Error ? error.message : ''
-      setRunError(explainStartError(code, code || '再集計できませんでした'))
+      { if (!fieldFailure)
+      setRunError(explainStartError(code, code || '再集計できませんでした')) }
     } finally {
       if (generation === viewGeneration.current) setRunning(false)
     }
@@ -184,7 +198,9 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
         steps: version.steps.map((step) => ({ label: step.label, kind: step.kind, value: funnelStepFormValue(step.kind, step.match), match: step.match })),
         segment: version.segment, comparisonGroups: version.comparisonGroups, expectedVersionNumber: version.versionNumber,
       })
-    } catch { setRunError('定義を読み込めませんでした') } finally { setEditLoading(false) }
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+ { if (!fieldFailure) setRunError('定義を読み込めませんでした') } } finally { setEditLoading(false) }
   }
 
   // 停止は再開できる。保管は終端で、一覧と再集計から外れて戻せない。
@@ -197,8 +213,11 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
       const res = await api.analytics.v6Funnels.setStatus(accountId, statusTarget.funnel.id, { status: statusTarget.to, expectedStatus: statusTarget.funnel.status })
       if (!res.success) { setRunError(explainStartError(res.error, '状態を変えられませんでした')); return }
       setStatusTarget(null)
+      notifyToast(statusTarget.to === 'archived' ? '計測の流れを削除しました。過去の結果は残ります。' : '状態を変更しました')
       await reloadFunnels()
-    } catch { setRunError('状態を変えられませんでした') } finally { setStatusBusy(false) }
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+ { if (!fieldFailure) setRunError('状態を変えられませんでした') } } finally { setStatusBusy(false) }
   }
 
   const activeGroup = run?.groups.find((group) => group.key === groupKey) ?? run?.groups[0] ?? null
@@ -240,7 +259,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
   const inactiveFunnels = funnels.filter((f) => f.status !== 'active')
   const exportFunnel = () => {
     if (!result) return
-    downloadCsv('analytics-funnel.csv', [
+    downloadCsv(csvFileName("ファネル"), [
       ...(run && run.state !== 'available' ? [['集計状態', `${STATE_LABELS[run.state]}${run.stateReason ? `（${run.stateReason}）` : ''}`]] : []),
       ...(run?.versionNumber != null ? [['集計した定義版', `${run.versionNumber}`]] : []),
       ['段', '到達した人', '前の段からの通過率', 'ここで止まった人', 'まだ途中の人'],
@@ -262,11 +281,13 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
       router.push(to === 'friends' ? `/friends?audienceId=${id}` : `/broadcasts/new?audienceId=${id}`)
     } catch (error) {
       if (generation !== viewGeneration.current) return
-      setRunError(explainStartError(error instanceof Error ? error.message : '', '対象者を準備できませんでした'))
+      const fieldFailure = saveErrors.capture(error)
+      { if (!fieldFailure)
+      setRunError(explainStartError(error instanceof Error ? error.message : '', '対象者を準備できませんでした')) }
     } finally { setAudienceBusy(false) }
   }
 
-  if (loading) return <div className={styles.body} data-gap="tab"><ListState kind="loading" title="ファネルを読み込んでいます" /></div>
+  if (loading) return <SaveErrorScope errors={saveErrors}><div className={styles.body} data-gap="tab"><ListState kind="loading" title="ファネルを読み込んでいます" /></div></SaveErrorScope>
 
   const pickedStep = shownPick !== null && result ? result[shownPick] ?? null : null
   const nextStep = shownPick !== null && result ? result[shownPick + 1] ?? null : null
@@ -278,11 +299,11 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
   const top = measurable ? (result?.[0]?.reached ?? 0) : 0
   const showForm = creating || editTarget
 
-  return <>
+  return <SaveErrorScope errors={saveErrors}><>
     {funnels.length > 0 ? <KpiBand className={styles.band}>
-      <KpiCard presentation="band" title="入口" icon={<LogIn size={13} aria-hidden="true" />} value={overall?.entry ?? null} unit="人" detail={measurable ? (overall?.entryLabel ?? '—') : run ? '判定不能' : '—'} />
-      <KpiCard presentation="band" title="最後まで" icon={<Flag size={13} aria-hidden="true" />} value={overall?.last ?? null} unit="人" detail={measurable ? (overall?.rate != null ? `入口の ${overall.rate}%` : '—') : run ? '判定不能' : '—'} />
-      <KpiCard presentation="band" title="いちばん落ちる段" icon={<ArrowDownRight size={13} aria-hidden="true" />} value={worst ? -Math.round(worst.rate * 100) : null} unit="%" detail={worst && result ? `${result[worst.index - 1].label} → ${result[worst.index].label}` : run && !measurable ? '判定不能' : '—'} />
+      <KpiCard presentation="band" title="入口" icon={<LogIn size={13} aria-hidden="true" />} value={overall?.entry ?? null} unit="人" detail={measurable ? (overall?.entryLabel ?? emptyValue('unknown')) : run ? '判定不能' : emptyValue('unknown')} />
+      <KpiCard presentation="band" title="最後まで" icon={<Flag size={13} aria-hidden="true" />} value={overall?.last ?? null} unit="人" detail={measurable ? (overall?.rate != null ? `入口の ${overall.rate}%` : emptyValue('unknown')) : run ? '判定不能' : emptyValue('unknown')} />
+      <KpiCard presentation="band" title="いちばん落ちる段" icon={<ArrowDownRight size={13} aria-hidden="true" />} value={worst ? -Math.round(worst.rate * 100) : null} unit="%" detail={worst && result ? `${result[worst.index - 1].label} → ${result[worst.index].label}` : run && !measurable ? '判定不能' : emptyValue('unknown')} />
       {/* 段ごとの到達日時を持っていない（集計は「通ったか」だけを見る）。 */}
       <KpiCard presentation="band" title="平均の到達日数" icon={<CalendarClock size={13} aria-hidden="true" />} value={null} unit="日" detail="到達日時が無く未取得" />
     </KpiBand> : null}
@@ -292,7 +313,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
         presetConversion: editTarget ? null : (presetConversion ?? null),
         onCancel: () => { setCreating(false); setEditTarget(null) },
         onCreated: (id, usageWarnings) => {
-          setCreating(false); setEditTarget(null)
+          if (!editTarget) setCreating(false)
           setUsageNotice(usageWarnings && usageWarnings.length > 0 ? `作成はできましたが、成果地点への利用先記録に失敗しました：${usageWarnings.join('、')}。成果地点側の利用先一覧には出ていません。` : '')
           void reloadFunnels(id)
         },
@@ -301,22 +322,16 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
         : funnels.length === 0 ? <ListState kind="empty" title="ファネルがまだありません" description={canManage ? '段を2つ以上つないで、どこで離れているかを見られます。' : '段を2つ以上つないで、どこで離れているかを見られます。作成は統括・管理者へ依頼してください。'} action={canManage ? <Button variant="secondary" onClick={() => setCreating(true)}><Plus size={15} aria-hidden="true" />ファネルを作る</Button> : undefined} />
         : <>
           <div className={styles.controls}>
-            <label className={styles.field} data-w="funnel"><span className={styles.fieldLabel}>ファネル</span>
-              <Select id="funnel-select" value={selected} onChange={(value) => setSelected(value)} aria-label="ファネル" size="full" options={funnels.some((f) => f.status === 'active' || f.id === selected)
-                ? funnels.filter((f) => f.status === 'active' || f.id === selected).map((f) => ({ value: f.id, label: f.status === 'active' ? f.name : `${f.name}（${f.status === 'stopped' ? '停止中' : '保管済み'}）` }))
-                : [{ value: '', label: '使えるファネルがありません' }]} />
-            </label>
-            <label className={styles.field} data-w="window"><span className={styles.fieldLabel}>何日以内の通過で数えるか</span>
-              <Select aria-label="何日以内の通過で数えるか" disabled size="full" onChange={() => {}} value={String(selectedFunnel?.windowDays ?? '')} options={[{ value: String(selectedFunnel?.windowDays ?? ''), label: selectedFunnel ? `${selectedFunnel.windowDays}日以内` : '未取得' }]} />
-            </label>
-            {run ? <label className={styles.field} data-w="group"><span className={styles.fieldLabel}>比較する条件</span>
-              <Select id="funnel-group" value={groupKey} onChange={(value) => { setGroupKey(value); setPicked(null) }} aria-label="比較する条件" size="full" options={run.groups.map((group) => ({ value: group.key, label: `${group.label}（入口 ${formatNumber(group.entrants)}人）` }))} />
-            </label> : null}
+            <Field label="ファネル"><SaveErrorField names={["selected"]}><EntitySelect id="funnel-select" value={selected} onChange={(value) => setSelected(value)} aria-label="ファネル" size="full" options={funnels.some((f) => f.status === 'active' || f.id === selected)
+                ? funnels.filter((f) => f.status === 'active' || f.id === selected).map((f) => ({ ...entityOptionMetadata(f), value: f.id, label: f.status === 'active' ? f.name : `${f.name}（${f.status === 'stopped' ? '停止中' : '保管済み'}）` }))
+                : [{ value: '', label: '使えるファネルがありません' }]} /></SaveErrorField></Field>
+            <Field label="何日以内の通過で数えるか"><SaveErrorField names={["windowDays","selectedFunnel?.windowDays","window_days","selected_funnel?.window_days"]}><Select aria-label="何日以内の通過で数えるか" disabled size="full" onChange={() => {}} value={String(selectedFunnel?.windowDays ?? '')} options={[{ value: String(selectedFunnel?.windowDays ?? ''), label: selectedFunnel ? `${selectedFunnel.windowDays}日以内` : '未取得' }]} /></SaveErrorField></Field>
+            {run ? <Field label="比較する条件"><SaveErrorField names={["groupKey","group_key"]}><Select id="funnel-group" value={groupKey} onChange={(value) => { setGroupKey(value); setPicked(null) }} aria-label="比較する条件" size="full" options={run.groups.map((group) => ({ value: group.key, label: `${group.label}（入口 ${formatNumber(group.entrants)}人）` }))} /></SaveErrorField></Field> : null}
             <span className={styles.spacer} />
             {canManage ? <Button variant="secondary" onClick={() => setCreating(true)}><Plus size={15} aria-hidden="true" />ファネルを作る</Button> : null}
             <Button variant="secondary" disabled={running} onClick={() => setRunReload((n) => n + 1)}><RefreshCw size={15} aria-hidden="true" />最新の結果をもう一度読む</Button>
           </div>
-          {runError ? <p className={styles.inlineError} role="alert">{runError}</p> : null}
+          {runError ? <Notice tone="danger" >{runError}</Notice> : null}
           {noRun && !run ? <p className={styles.caption}>{`まだ集計がありません。下の「定義の操作と集計の詳細」から「この${funnelDays}日を再集計」を押してください`}</p> : null}
           {usageNotice ? <p className={styles.warnText} role="status">{usageNotice}</p> : null}
           {run && !measurable ? <p className={styles.warnText} role="status">{`${STATE_LABELS[run.state]}のため、この結果は判定不能です。人数や割合は実測値ではありません。${run.stateReason ? ` ${run.stateReason}` : ''}`}</p> : null}
@@ -329,29 +344,21 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
             <section className={styles.funnelFlow} aria-labelledby="funnel-flow-title">
               <h2 id="funnel-flow-title" className={styles.hoursTitle}>全体の流れ</h2>
               <p className={styles.caption}>順番どおりに通った人だけを数えます。飛ばした人は含みません。</p>
-              {result.map((step, i) => {
-                const previous = i > 0 ? result[i - 1] : null
-                const dropRate = previous && previous.reached > 0 ? previous.droppedAfter / previous.reached * 100 : null
-                return <button key={step.stepOrder} type="button" className={styles.funnelStep} data-selected={shownPick === i || undefined} disabled={!measurable} onClick={() => setPicked(i)} aria-pressed={shownPick === i} title={previous ? `止まった ${previous.droppedAfter}人・進行中 ${previous.inProgressAfter}人` : undefined}>
-                  <span className={styles.funnelNumber}>{i + 1}</span>
-                  <span className={styles.funnelLabel} title={step.label}>{step.label}</span>
-                  <span className={styles.funnelMeasure}>
-                    <span className={styles.funnelTrack} aria-hidden="true"><span style={{ width: top > 0 && measurable ? `${step.reached / top * 100}%` : '0%' }} /></span>
-                    <span className={styles.funnelValue}>{measurable ? `${formatNumber(step.reached)} 人` : '—'}</span>
-                  </span>
-                  <span className={styles.funnelDrop} data-tone={measurable && dropRate !== null ? 'warn' : undefined}>{measurable && dropRate !== null ? `−${dropRate.toFixed(0)}%` : '—'}</span>
-                </button>
-              })}
+              <FunnelChart label="全体の流れ" disabled={!measurable} selectedKey={String(shownPick)} onSelect={key=>setPicked(Number(key))} items={result.map((step,i)=>{
+                const previous=i>0?result[i-1]:null
+                const dropRate=previous && previous.reached>0?previous.droppedAfter/previous.reached*100:null
+                return {key:String(i),label:step.label,value:measurable?step.reached:null,note:previous?`止まった ${previous.droppedAfter}人・進行中 ${previous.inProgressAfter}人`:undefined,detail:<span>{measurable && dropRate!==null?`−${dropRate.toFixed(0)}%`:emptyValue('unknown')}</span>}
+              })} />
             </section>
             <aside className={styles.funnelSide} aria-labelledby="funnel-picked-title">
               <h2 id="funnel-picked-title" className={styles.hoursTitle}>{pickedStep ? `${circled(shownPick! + 1)} ${pickedStep.label}（選んだ段）` : '段を選んで対象者を確認'}</h2>
               {pickedStep && measurable ? (selectedFunnel?.status === 'active' ? <>
-                <SegmentedControl aria-label="対象者の種類" value={audienceSelection} onChange={setAudienceSelection} options={[{ value: 'reached', label: '到達した人' }, { value: 'stopped', label: '止まった人' }, { value: 'in_progress', label: '進行中の人' }]} />
+                <SaveErrorField names={["audienceSelection"]}><SegmentedControl aria-label="対象者の種類" value={audienceSelection} onChange={setAudienceSelection} options={[{ value: 'reached', label: '到達した人' }, { value: 'stopped', label: '止まった人' }, { value: 'in_progress', label: '進行中の人' }]} /></SaveErrorField>
                 <p className={styles.audienceCount}>{`${audienceTitle} ${formatNumber(audienceCount)} 人`}</p>
                 <p className={styles.caption}>{audienceNote}</p>
                 {canManage ? <>
-                  <span><Button variant="secondary" disabled={audienceBusy || audienceCount === 0} onClick={() => void openAudience('friends')}><Users size={15} aria-hidden="true" />対象者を開く</Button></span>
-                  <span><Button variant="secondary" disabled={audienceBusy || audienceCount === 0} onClick={() => void openAudience('broadcast')}><Send size={15} aria-hidden="true" />この対象者へ配信を作成</Button></span>
+                  <span><Button variant="secondary" disabled={audienceBusy || audienceCount === 0} onClick={() => void openAudience('friends')} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Users size={15} aria-hidden="true" />対象者を開く</Button></span>
+                  <span><Button variant="secondary" disabled={audienceBusy || audienceCount === 0} onClick={() => void openAudience('broadcast')} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Send size={15} aria-hidden="true" />この対象者へ配信を作成</Button></span>
                 </> : <p className={styles.caption}>対象者づくりは統括・管理者が行えます。</p>}
               </> : <p className={styles.caption}>停止中・保管したファネルでは対象者づくりはできません。結果の確認だけができます。</p>)
                 : <p className={styles.caption}>{run && !measurable ? 'この結果は判定不能のため、対象者は選べません。' : '段を押すと、到達・停止・進行中の人を選べます。'}</p>}
@@ -360,9 +367,9 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
                 {run.groups.map((group) => {
                   const rate = measurable && group.entrants > 0 ? group.completed / group.entrants * 100 : null
                   const lowest = measurable && run.groups.every((other) => other.entrants === 0 || other.completed / other.entrants * 100 >= (rate ?? 0))
-                  return <div key={group.key} className={styles.compareRow}><span className={styles.flowLabel} data-size="row">{group.label}</span><span className={styles.spacer} /><strong data-tone={lowest && run.groups.length > 1 ? 'warn' : undefined}>{`通過率 ${rate === null ? '—' : `${Math.round(rate)}%`}`}</strong></div>
+                  return <div key={group.key} className={styles.compareRow}><span className={styles.flowLabel} data-size="row">{group.label}</span><span className={styles.spacer} /><strong data-tone={lowest && run.groups.length > 1 ? 'warn' : undefined}>{`通過率 ${rate === null ? emptyValue('unknown') : `${Math.round(rate)}%`}`}</strong></div>
                 })}
-                <p className={styles.caption}>{`比較で差が大きい段 ${comparisonGap === null ? '—' : `${comparisonGap}pt`}`}</p>
+                <p className={styles.caption}>{`比較で差が大きい段 ${comparisonGap === null ? emptyValue('unknown') : `${comparisonGap}pt`}`}</p>
               </> : null}
             </aside>
           </div> : null}
@@ -370,19 +377,19 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
           {run ? <p className={styles.caption}>{`集計期間 ${formatAnalyticsDate(run.cohortFrom)}〜${formatAnalyticsDate(run.cohortTo)} ／ データ締切 ${formatAnalyticsDateTime(run.dataCutoffAt)}${run.versionNumber != null ? ` ／ 集計した定義版 ${run.versionNumber}` : ''}`}</p> : null}
           <Disclosure title="定義の操作と集計の詳細" size="compact">
             <div className={styles.toolbar}>
-              <RangePickerV8 days={funnelDays} onChange={(days) => { setFunnelDays(days); setPicked(null); setRunning(false) }} />
+              <RangePickerV8 customRange={customRange} onRangeChange={(range) => { setRange(range); setPicked(null); setRunning(false) }} days={funnelDays} onChange={(days) => { setFunnelDays(days); setPicked(null); setRunning(false) }} />
               <Button onClick={() => void runNow()} disabled={running || selectedFunnel?.status !== 'active'} variant="secondary" busy={running} busyLabel="再集計中">{`この${funnelDays}日を再集計`}</Button>
             </div>
-            {selectedFunnel ? <p className={styles.caption}>{`${selectedFunnel.windowDays}日以内に通った人を数えます。${selectedFunnel.currentVersion ? ` 定義版 ${selectedFunnel.currentVersion.versionNumber}` : ' 現行定義の移行が必要です'}${selectedFunnel.status === 'stopped' ? ' 停止中です。再集計や対象者づくりはできません。' : ''}${selectedFunnel.status === 'archived' ? ' 保管済みです。過去の結果だけを見られます。' : ''}`}</p> : null}
+            {selectedFunnel ? <p className={styles.caption}>{`${selectedFunnel.windowDays}日以内に通った人を数えます。${selectedFunnel.currentVersion ? ` 定義版 ${selectedFunnel.currentVersion.versionNumber}` : ' 現行定義の移行が必要です'}${selectedFunnel.status === 'stopped' ? ' 停止中です。再集計や対象者づくりはできません。' : ''}${selectedFunnel.status === 'archived' ? ' アーカイブです。過去の結果だけを見られます。' : ''}`}</p> : null}
             {canManage && selectedFunnel ? <div className={styles.rowActions} data-gap="wide">
               {selectedFunnel.status === 'active' ? <>
                 <Button onClick={() => void startEdit()} disabled={editLoading || !selectedFunnel.currentVersion} variant="secondary" busy={editLoading} busyLabel="定義を読み込み中">定義を編集</Button>
                 <Button onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'stopped' })} variant="secondary">停止</Button>
-                <Button onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'archived' })} variant="secondary">保管</Button>
+                <Button onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'archived' })} variant="secondary">削除する</Button>
               </> : null}
               {selectedFunnel.status === 'stopped' ? <>
                 <Button onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'active' })} variant="secondary">再開</Button>
-                <Button onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'archived' })} variant="secondary">保管</Button>
+                <Button onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'archived' })} variant="secondary">削除する</Button>
               </> : null}
             </div> : null}
           </Disclosure>
@@ -401,11 +408,11 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
             <p className={styles.caption}>停止中は再集計と対象者づくりを止めています。保管したものは戻せません。過去の結果は残っています。</p>
             {inactiveFunnels.map((funnel) => <div key={funnel.id} className={styles.compareRow}>
               <span className={styles.cellStrong}>{funnel.name}</span>
-              <StatePill tone={funnel.status === 'stopped' ? 'warn' : 'neutral'}>{funnel.status === 'stopped' ? '停止中' : '保管済み'}</StatePill>
+              <StatePill tone={funnel.status === 'stopped' ? 'warn' : 'neutral'}>{funnel.status === 'stopped' ? '停止中' : 'アーカイブ'}</StatePill>
               <button type="button" className={styles.linkButton} onClick={() => setSelected(funnel.id)}>結果を見る</button>
               {canManage && funnel.status === 'stopped' ? <>
                 <Button onClick={() => setStatusTarget({ funnel, to: 'active' })} variant="secondary">再開</Button>
-                <Button onClick={() => setStatusTarget({ funnel, to: 'archived' })} variant="secondary">保管</Button>
+                <Button onClick={() => setStatusTarget({ funnel, to: 'archived' })} variant="secondary">削除する</Button>
               </> : null}
               {funnel.status === 'archived' ? <span className={styles.caption}>戻せません</span> : null}
             </div>)}
@@ -414,15 +421,16 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
     </div>
     <ConfirmDialog
       open={statusTarget !== null}
-      title={statusTarget?.to === 'stopped' ? 'ファネルを停止しますか' : statusTarget?.to === 'archived' ? 'ファネルを保管しますか' : 'ファネルを再開しますか'}
+      title={statusTarget?.to === 'stopped' ? 'ファネルを停止しますか' : statusTarget?.to === 'archived' ? `「${statusTarget.funnel.name}」を削除しますか？` : 'ファネルを再開しますか'}
       description={statusTarget?.to === 'stopped' ? `「${statusTarget.funnel.name}」の再集計と対象者づくりを止めます。過去の結果は残り、あとから再開できます。`
-        : statusTarget?.to === 'archived' ? `「${statusTarget.funnel.name}」を保管すると一覧から外れ、あとから戻せません。過去の結果は残ります。`
+        : statusTarget?.to === 'archived' ? `「${statusTarget.funnel.name}」を削除すると、選ぶ一覧から外れ、再集計と対象者づくりはできません。過去の結果は残ります。`
         : statusTarget ? `「${statusTarget.funnel.name}」を再開します。再集計と対象者づくりがまた使えます。` : ''}
-      confirmLabel={statusTarget?.to === 'stopped' ? '停止する' : statusTarget?.to === 'archived' ? '保管する' : '再開する'}
+      confirmLabel={statusTarget?.to === 'stopped' ? '停止する' : statusTarget?.to === 'archived' ? '削除する' : '再開する'}
       destructive={statusTarget?.to === 'archived'}
       busy={statusBusy}
-      onConfirm={() => void applyStatusChange()}
-      onCancel={() => setStatusTarget(null)}
+      error={runError}
+      onConfirm={() => applyStatusChange()}
+      onCancel={() => { if (!statusBusy) setStatusTarget(null) }}
     />
-  </>
+  </></SaveErrorScope>
 }

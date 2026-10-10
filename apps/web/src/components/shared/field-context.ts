@@ -13,10 +13,13 @@ import { createContext, useContext } from 'react'
  * を受け取る。Field を直せば、中に置いた全部の入力欄に行き渡る。
  */
 export type FieldContextValue = {
+  label?: string
   controlId?: string
   describedBy?: string
   invalid: boolean
   required: boolean
+  /** 入力部品の自動リセットは、欄の保存失敗を消さず値だけを戻す。 */
+  onInvalidReset?: () => void
 }
 
 export const FieldContext = createContext<FieldContextValue | null>(null)

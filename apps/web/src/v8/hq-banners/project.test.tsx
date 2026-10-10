@@ -58,7 +58,7 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePa
 
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
-  return { ...actual, useStaffRole: () => roleBox.role }
+  return { ...actual, useTenantWideAccess: () => ['owner', 'admin'].includes(roleBox.role), useStaffRole: () => roleBox.role }
 })
 
 import HqBannerProjectV8 from './project'
@@ -125,13 +125,14 @@ describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）�
     act(() => { root.render(<HqBannerProjectV8 />) })
     await flush()
     expect(host.textContent).toContain('秋のキャンペーン')
+    await act(async () => { (host.querySelector('button[aria-label$="の説明"]') as HTMLButtonElement)?.click() })
     expect(host.textContent).toContain('一斉配信の上の写真・10月。右で用途とテキストを決めて生成し')
     expect(host.textContent).toContain('すべて 2')
     expect(host.textContent).toContain('お気に入り 1')
     expect(host.textContent).toContain('配布済み 1')
     expect(host.textContent).toContain('リッチメッセージ・1:1')
     // 下の帯のボタンは板 `b1So7a`「生成する（2枚）」＝v7 と同じ言葉。
-    expect(buttonNamed('生成する（1枚）') ?? buttonNamed('生成する（4枚）')).toBeTruthy()
+    expect(buttonNamed('生成する（1 枚）') ?? buttonNamed('生成する（4 枚）')).toBeTruthy()
   })
 
   it('絞り込みで見えている画像だけまとめて選び、画像を押すと詳細へ進む', async () => {
@@ -170,7 +171,7 @@ describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）�
     await flush()
     act(() => { buttonNamed('2 枚をアカウントへ配る')!.click() })
     await flush()
-    expect(document.body.textContent).toContain('2枚の画像をアカウントへ配る')
+    expect(document.body.textContent).toContain('2 枚の画像をアカウントへ配る')
     expect(document.body.textContent).not.toContain('閉店')
     expect(deliverImage).not.toHaveBeenCalled()
     act(() => { (document.querySelector('[aria-label="東京をまとめて選ぶ"]') as HTMLInputElement).click() })
@@ -178,15 +179,15 @@ describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）�
     act(() => { buttonNamed('1 アカウントへ配る')!.click() })
     await flush()
     expect(deliverImage.mock.calls).toEqual([['img-1', ['a1']], ['img-2', ['a1']]])
-    expect(document.body.textContent).toContain('2枚中 1枚を1アカウントへ配りました')
-    expect(document.body.textContent).toContain('失敗 1枚')
+    expect(document.body.textContent).toContain('2 枚中 1 枚を1アカウントへ配りました')
+    expect(document.body.textContent).toContain('失敗 1 枚')
     expect((host.querySelector('[aria-label="画像 1 を選ぶ"]') as HTMLInputElement).checked).toBe(true)
     expect((host.querySelector('[aria-label="画像 2 を選ぶ"]') as HTMLInputElement).checked).toBe(false)
     deliverImage.mockResolvedValue({ success: true, data: { image: image(1, { deliveredAccountIds: ['a1'] }), deliveries: [] } })
     act(() => { buttonNamed('1 アカウントへ配る')!.click() })
     await flush()
     expect(deliverImage.mock.calls).toEqual([['img-1', ['a1']], ['img-2', ['a1']], ['img-1', ['a1']]])
-    expect(document.body.textContent).toContain('1枚中 1枚を1アカウントへ配りました')
+    expect(document.body.textContent).toContain('1 枚中 1 枚を1アカウントへ配りました')
     expect((buttonNamed('1 アカウントへ配る') as HTMLButtonElement).disabled).toBe(true)
   })
 
@@ -213,10 +214,10 @@ describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）�
     await flush()
     expect(deliverImage).toHaveBeenCalledTimes(1)
     expect((buttonNamed('あとで') as HTMLButtonElement).disabled).toBe(true)
-    expect(document.body.textContent).toContain('1枚中 1枚目を配っています')
+    expect(document.body.textContent).toContain('1 枚中 1 枚目を配っています')
     await act(async () => finish({ success: true, data: { image: image(2, { deliveredAccountIds: ['a1'] }), deliveries: [] } }))
     await flush()
-    expect(document.body.textContent).toContain('1枚中 1枚を1アカウントへ配りました')
+    expect(document.body.textContent).toContain('1 枚中 1 枚を1アカウントへ配りました')
   })
 
   it('G-7：プロジェクトの操作から全画像を選んで既存の配布窓を開く', async () => {
@@ -226,7 +227,7 @@ describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）�
     await flush()
     act(() => { (Array.from(document.querySelectorAll('[role="menuitem"]')).find((item) => item.textContent === 'このプロジェクトの画像を配る') as HTMLElement).click() })
     await flush()
-    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('2枚の画像をアカウントへ配る')
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('2 枚の画像をアカウントへ配る')
     expect(deliverImage).not.toHaveBeenCalled()
   })
 

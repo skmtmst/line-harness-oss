@@ -278,22 +278,7 @@
 }
 
 /* 閲覧のみの帯（数の帯の上）。薄い青の地・目の印・枠なし。 */
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  margin: var(--tpl-il-ro-gap) var(--tpl-head-pad-side);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
-.viewerBand > svg {
-  flex-shrink: 0;
-  color: var(--color-action);
-}
+.viewerBand { margin: var(--tpl-il-ro-gap) var(--tpl-head-pad-side); }
 
 /* フォルダの窓の中身。 */
 .dialogLabel {
@@ -315,7 +300,6 @@
 }
 
 /* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
-.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }
 /* 名前の前のフォルダの丸（xbHxg「フォルダの丸」）。2行目・札は名前の頭にそろえる（絵の「説明の行」の左 16）。 */
 .nameLine { display: flex; min-width: 0; max-width: 100%; }
 .dotIndentPad { padding-inline-start: var(--tpl-folder-dot-indent); }

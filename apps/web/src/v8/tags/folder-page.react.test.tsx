@@ -35,7 +35,7 @@ it('編集の読み込みが失敗した間は保存・色変更を止め、再�
   await act(async () => { render(<FolderPage />) })
   expect((screen.getByRole('button', { name: 'フォルダを保存する' }) as HTMLButtonElement).disabled).toBe(true)
   expect((screen.getByRole('button', { name: 'フォルダの色：緑' }) as HTMLButtonElement).disabled).toBe(true)
-  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '再読み込み' })) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' })) })
   fireEvent.change(screen.getByRole('textbox', { name: 'フォルダ名' }), { target: { value: '新名' } })
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダを保存する' })) })
   expect(api.tagGroups.update).toHaveBeenCalledWith('g-1', { name: '新名', color: '#123456', accountId: 'acc-1' })
@@ -53,3 +53,5 @@ it('フォルダ名の未入力は欄で知らせ、そこに戻して作成し�
  expect(scroll).toHaveBeenCalledWith({ block: 'center' })
  scroll.mockRestore()
 })
+
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))

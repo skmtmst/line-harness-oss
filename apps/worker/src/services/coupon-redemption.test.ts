@@ -49,3 +49,19 @@ describe('クーポンの使用記録（実SQLite）',()=>{
   expect((await redeemCoupon(test.db,friend,'a','c','e4',now)).ok).toBe(true);
  });
 });
+
+it('使用した時だけ設定した処理を実行し、同じ通知の再送や回数超過では繰り返さない', async () => {
+  test.raw.exec(`INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES ('a','店','ch','token','secret');
+    INSERT INTO friends(id,line_user_id,line_account_id) VALUES ('f','U','a');
+    INSERT INTO tags(id,name,line_account_id) VALUES ('used','利用済み','a'),('foreign','別店','b');`);
+  test.raw.prepare("UPDATE broadcast_message_assets SET payload_json=? WHERE id='c'").run(JSON.stringify({ ...payload, useActions: [
+    { actionType: 'tag', config: { op: 'add', tagIds: ['used'] } },
+    { actionType: 'tag', config: { op: 'add', tagIds: ['foreign'] } },
+  ] }));
+  expect((await redeemCoupon(test.db,friend,'a','c','e1',now)).ok).toBe(true);
+  expect(test.raw.prepare('SELECT tag_id FROM friend_tags').all()).toEqual([{ tag_id: 'used' }]);
+  test.raw.exec("DELETE FROM friend_tags");
+  expect((await redeemCoupon(test.db,friend,'a','c','e1',now)).replayed).toBe(true);
+  expect((await redeemCoupon(test.db,friend,'a','c','e2',now)).ok).toBe(false);
+  expect(test.raw.prepare('SELECT tag_id FROM friend_tags').all()).toEqual([]);
+});

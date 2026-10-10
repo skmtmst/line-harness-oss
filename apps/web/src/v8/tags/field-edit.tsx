@@ -1,4 +1,20 @@
 'use client'
+import Notice from '@/components/shared/notice'
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
+import { notifySaved } from '@/components/shared/toast'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import type { FriendField, Folder } from '@line-crm/shared'
+import { api, ApiError } from '@/lib/api'
+import { isSameFieldContent, type SentFieldContent } from './field-model'
+import { useAccount } from '@/contexts/account-context'
+import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
+import { folderById, folderCreator } from '@/components/shared/folder-select'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import FieldEditor, { type FieldEditorValues } from './field-editor'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8「友だち情報欄を編集」（Pencil `w9zY5` の編集の形）の入口。
@@ -6,21 +22,9 @@
  * 読み込み・版の衝突（R517）・共通項目の保護・保存の動きは今の入口（app/tags/edit-field-page-v8.tsx）と同じ。
  * 中身は src/v8 の FieldEditor。受け付ける URL：`/tags/fields/edit?id=<項目>`。
  */
-import { useCallback, useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import type { FriendField, Folder } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
-import { isSameFieldContent, type SentFieldContent } from './field-model'
-import { useAccount } from '@/contexts/account-context'
-import Button from '@/components/shared/button'
-import Notice from '@/components/shared/notice'
-import ListState from '@/components/shared/list-state'
-import TargetMissing from '@/components/shared/target-missing'
-import { folderById, folderCreator } from '@/components/shared/folder-select'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import FieldEditor, { type FieldEditorValues } from './field-editor'
 
 export default function FieldEdit() {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -31,12 +35,16 @@ export default function FieldEdit() {
   const [folders, setFolders] = useState<Folder[]>([])
   // その場でフォルダを作れるのは、左の列の「フォルダを追加」と同じ人（閲覧のみは作れない）。
   const staffRole = useStaffRole()
-  const canCreateFolder = staffRole === null || canManageRole(staffRole)
+  const canCreateFolder = canManageRole(staffRole)
   const [foldersState, setFoldersState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [foldersReloading, setFoldersReloading] = useState(false)
   /* R517: 版の衝突で返ってきた最新の内容。 */
   const [conflictName, setConflictName] = useState<string | null>(null)
-  const [justSaved, setJustSaved] = useState(false)
+  const latestConflict = useRef<FriendField | null>(null)
+  const context = useRef({ account: selectedAccountId, id })
+  context.current = { account: selectedAccountId, id }
+  const draftValues = useRef<FieldEditorValues | null>(null)
+  const trackDraft = useCallback((values: FieldEditorValues) => { draftValues.current = values }, [])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
@@ -52,13 +60,15 @@ export default function FieldEdit() {
       if (!res.success) throw new Error(res.error)
       setFolders(res.data)
       setFoldersState('ready')
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
       // R516: 失敗を隠さず、所属の選択欄の場所で再試行する。
-      setFoldersState('error')
+      { if (!fieldFailure)
+      setFoldersState('error') }
     } finally {
       setFoldersReloading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     let cancelled = false
@@ -68,7 +78,8 @@ export default function FieldEdit() {
     setField(null)
     setNotFound(false)
     setConflictName(null)
-    setJustSaved(false)
+    latestConflict.current = null
+    collision.clear()
     void Promise.all([
       api.friendFields.list(selectedAccountId, { withUsage: true }),
       api.folders.list('friend_field').catch(() => null),
@@ -110,6 +121,7 @@ export default function FieldEdit() {
     if (!account || !field) return
     try {
       const res = await api.friendFields.list(account, { withUsage: true })
+      if (context.current.account !== account || context.current.id !== field.id) return
       if (!res.success) throw new Error(res.error)
       const latest = res.data.find((item) => item.id === field.id) ?? null
       if (!latest) {
@@ -121,17 +133,21 @@ export default function FieldEdit() {
       if (isSameFieldContent(sent, latest)) {
         setField(latest)
         setConflictName(null)
-        setJustSaved(true)
+        notifySaved('保存されています。入力した内容は最新の保存内容と同じです。', { actionLabel: '一覧で確認する', onAction: () => router.push(`/tags?tab=fields&highlight=${field.id}`) })
         setError('')
       } else {
-        // 版だけ進め、入力は残す。保存し直すと新しい版で送られる。
-        setField(latest)
+        // 入力と読んだ版を守り、取り込みを選んだときだけ進める。
+        latestConflict.current = latest
+        collision.mark()
         setConflictName(latest.name)
-        setJustSaved(false)
-        setError('ほかの担当者が先に変更しました。最新の内容を確認してから保存し直してください。')
+            setError('ほかの担当者が先に変更しました。最新の内容を確認してから保存し直してください。')
       }
-    } catch {
-      setError('最新の内容を確認できませんでした。接続を確かめて、もう一度保存してください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+
+      setError('最新の内容を確認できませんでした。接続を確かめて、もう一度保存してください。') }
     }
   }
 
@@ -150,7 +166,6 @@ export default function FieldEdit() {
     setSaving(true)
     setError('')
     setConflictName(null)
-    setJustSaved(false)
     try {
       const res = await api.friendFields.update(field.id, selectedAccountId, {
         ...sent,
@@ -158,13 +173,20 @@ export default function FieldEdit() {
         version: field.version,
       })
       if (!res.success) throw new Error(res.error)
-      router.push(`/tags?tab=fields&highlight=${res.data.id}`)
+      setField(res.data)
+      setSiblings((rows) => rows.map((row) => row.id === res.data.id ? res.data : row))
+      setConflictName(null)
+      collision.clear()
+      notifySaved()
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason);
+
       if (reason instanceof ApiError && reason.status === 409
         && (reason as { code?: string }).code === 'VERSION_CONFLICT') {
         await handleVersionConflict(sent)
       } else {
-        setError(reason instanceof ApiError ? reason.message : '項目を保存できませんでした')
+        { if (!fieldFailure)
+        setError(reason instanceof ApiError ? reason.message : '項目を保存できませんでした') }
       }
     } finally {
       setSaving(false)
@@ -173,70 +195,69 @@ export default function FieldEdit() {
 
   /* R517: 最新の内容を入力へ取り込む（エディタを初期値へ戻す）。 */
   const applyLatest = () => {
+    if (latestConflict.current) setField(latestConflict.current)
     setConflictName(null)
+    setError('')
+    collision.clear()
     setEditorResetKey((key) => key + 1)
   }
 
-  if (loading) return <ListState kind="loading" />
+  const collision = useSaveConflict<FriendField>({ fetchLatest: async () => latestConflict.current, reload: applyLatest })
+  const comparison = collision.latest ? Object.entries({ 名前: ['name', collision.latest.name], 選択肢: ['options', collision.latest.options], 既定値: ['defaultValue', collision.latest.defaultValue], フォルダ: ['folderId', collision.latest.folderId], 個人情報: ['isPersonal', collision.latest.isPersonal], お気に入り: ['isStarred', collision.latest.isStarred], ECを正とする: ['ecIsMaster', collision.latest.ecIsMaster], ECの項目: ['ecFieldPath', collision.latest.ecFieldPath] }).flatMap(([label, [key, latest]]) => {
+    const current = draftValues.current?.[key as keyof FieldEditorValues] ?? null
+    return JSON.stringify(current) === JSON.stringify(latest ?? null) ? [] : [{ text: `${label}：編集中 ${JSON.stringify(current)} → 最新 ${JSON.stringify(latest ?? null)}` }]
+  }) : null
+
+  if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" /></SaveErrorScope>
   if (!id) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="unspecified"
         title="編集する友だち情報欄が指定されていません"
         description="一覧から編集する項目を選び直してください。"
         backHref="/tags?tab=fields"
         backLabel="友だち情報欄の一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
-  if (!selectedAccountId) return <ListState kind="empty" title="上部でLINE公式アカウントを選んでください" />
+  if (!selectedAccountId) return <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="上部でLINE公式アカウントを選んでください" /></SaveErrorScope>
   if (notFound || (!error && !field)) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="not-found"
         title="この項目は見つかりません"
         description="削除されたか、別のLINEアカウントの項目です。一覧から選び直せます。"
         accountName={selectedAccount?.name}
         backHref="/tags?tab=fields"
         backLabel="友だち情報欄の一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
   if (!field) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="error"
         title="項目を読み込めませんでした"
         description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
         onRetry={() => setReloadKey((k) => k + 1)}
-      />
+      /></SaveErrorScope>
     )
   }
 
-  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></SaveErrorScope>
 
   const notices = (
     <>
-      {/* 応答消失後の再試行で、送った内容が保存済みと分かった（R517）。 */}
-      {justSaved ? (
-        <Notice
-          tone="success"
-          action={<Button type="button" onClick={() => router.push(`/tags?tab=fields&highlight=${field.id}`)}>一覧で確認する</Button>}
-        >
-          保存されています。入力した内容は最新の保存内容と同じです。
-        </Notice>
-      ) : null}
       {/* ほかの担当者の変更と入力を比べて決める。入力は残す（R517）。 */}
       {conflictName !== null ? (
-        <Notice tone="warn" action={<Button type="button" onClick={applyLatest}>最新の内容を取り込む</Button>}>
-          {`最新の保存内容は「${conflictName}」です。入力内容はそのまま残しています。入力のまま保存し直すか、最新の内容を取り込んでください。`}
-        </Notice>
+        <SaveConflictBand title={`ほかの人が先に友だち情報欄「${conflictName}」を保存しました`} compareBusy={collision.compareBusy} onCompare={collision.compare} onReload={collision.reloadLatest} />
       ) : null}
     </>
   )
 
   return (
-    <FieldEditor
+    <>
+    <SaveErrorScope errors={saveErrors}><FieldEditor
       key={editorResetKey}
       mode="edit"
       field={field}
@@ -253,9 +274,12 @@ export default function FieldEdit() {
       saving={saving}
       error={error}
       notices={notices}
+      onDraftChange={trackDraft}
       backHref="/tags?tab=fields"
       onCancel={() => router.push('/tags?tab=fields')}
       onSubmit={(values) => void save(values)}
-    />
+    /></SaveErrorScope>
+    <SaveConflictCompareDialog open={collision.compareOpen} busy={collision.compareBusy} error={collision.compareError} lines={comparison} onReload={collision.reloadLatest} onCancel={collision.closeCompare} />
+    </>
   )
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -14,7 +15,7 @@ import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import Pagination from '@/components/shared/pagination'
-import Select from '@/components/shared/select'
+
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 // #740: 一覧の Kpi と一字一句同じだったため、機能内共有の1部品へ統合した。
@@ -221,7 +222,7 @@ function OccurrenceApplicantsPanel({
                   : 0
                 return (
                   <Tr key={`${applicant.source}:${applicant.id}`}>
-                    <NameCell name={applicant.displayName ?? '友だちは未取得'} sub={`${applicant.partySize}人`} />
+                    <NameCell name={applicant.displayName ?? '友だちは未取得'} />
                     <Td>
                       {applicant.source === 'waitlist'
                         ? applicant.status === 'waiting' ? `キャンセル待ち ${waitlistRank}番` : 'キャンセル待ち'
@@ -304,7 +305,7 @@ function OccurrenceApplicantsPanel({
                   <tbody>
                     {attendance.entries.map((entry) => (
                       <Tr key={entry.id}>
-                        <NameCell name={entry.displayName ?? '友だちは未取得'} sub={`${entry.partySize}人`} />
+                        <NameCell name={entry.displayName ?? '友だちは未取得'} />
                         <Td><StatusBadge tone={statusTone[entry.status] ?? 'neutral'} size="compact">{STATUS_LABELS.get(entry.status) ?? entry.status}</StatusBadge></Td>
                         <Td className="text-xs">{formatJp(entry.markedAt, '記録日時は未取得')}</Td>
                       </Tr>
@@ -338,7 +339,7 @@ function OccurrenceApplicantsPanel({
               <tbody>
                 {waitlistHistory.map((entry) => (
                   <Tr key={entry.id}>
-                    <NameCell name={entry.displayName ?? '友だちは未取得'} sub={`${entry.partySize}人`} />
+                    <NameCell name={entry.displayName ?? '友だちは未取得'} />
                     <Td><StatusBadge tone={statusTone[entry.status] ?? 'neutral'} size="compact">{WAITLIST_HISTORY_LABELS[entry.status] ?? STATUS_LABELS.get(entry.status) ?? entry.status}</StatusBadge></Td>
                     <Td className="text-xs">{formatJp(entry.createdAt, '—')}</Td>
                     <Td className="text-xs">
@@ -1143,11 +1144,11 @@ function BookingsInner() {
           {occurrenceSlots.length > 0 && (
             <label className="text-ink-secondary grid gap-1 text-xs font-medium">
               開催回
-              <Select
+              <EntitySelect
                 aria-label="開催回を選ぶ"
                 value={selectedOccurrenceId}
                 onChange={(value) => setSelectedOccurrenceId(value)}
-                options={occurrenceSlots.map((slot) => ({ value: slot.id, label: formatJp(slot.starts_at, '日時未取得') }))}
+                options={occurrenceSlots.map((slot) => ({ ...entityOptionMetadata(slot), value: slot.id, label: formatJp(slot.starts_at, '日時未取得') }))}
               />
             </label>
           )}
@@ -1159,7 +1160,7 @@ function BookingsInner() {
           <ListState
             kind="error"
             description="申込者は消えていません。開催回を読み直してから、もう一度お試しください。"
-            action={<Button onClick={() => void refreshOccurrenceSlots()}>開催回を再読み込み</Button>}
+            onRetry={() => void refreshOccurrenceSlots()}
           />
         ) : occurrenceSlots.length === 0 ? (
           <p className="text-ink-faint text-sm">有効な開催回がありません。</p>
@@ -1224,7 +1225,6 @@ function BookingsInner() {
         ) : null}
       </section>
 
-
         {/*
           操作の失敗は**一覧を消さずに**上に出す。行が消えると、
           どの予約に対して失敗したのかが分からなくなる。
@@ -1259,7 +1259,7 @@ function BookingsInner() {
             <ListState
               kind="error"
               description="受け付けた予約は消えていません。再読み込みしても直らない場合はエラー報告へ。"
-              action={<Button onClick={() => void Promise.all([refresh(), refreshSummary()])}>予約を再読み込み</Button>}
+              onRetry={() => void Promise.all([refresh(), refreshSummary()])}
             />
           ) : items.length === 0 ? (
             <div className="text-ink-faint p-12 text-center text-sm">

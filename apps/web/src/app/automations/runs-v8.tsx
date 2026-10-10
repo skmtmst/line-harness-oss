@@ -1,16 +1,5 @@
 'use client'
-
 import { Th } from '@/components/shared/table'
-
-/*
- * ★V8-B 動いた記録（板 `g98F9`・状態 `S3pdQ`・1152 `En14p`）。
- *
- * v7（runs/page.tsx の器）とは別の器。データの口・動きは v7 と同じ
- * （一覧・検索・結果の絞り込み・テスト実行の出し分け・CSV・中身・
- * もう一度やる・取りやめ・直リンク）。
- * 変える操作は器の外（共通の部品・API）へ触らない。
- * v7 を直す必要が出たら runs/page.tsx 側も同じ判断を入れる。
- */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
@@ -27,6 +16,20 @@ import { useAutomationRunPermissions } from '@/components/automations/use-can-ma
 import { formatDateTime, formatNumber } from '@/lib/format'
 import type { AutoV8Counts, AutoV8Model } from './automations-v8'
 import styles from './automations-v8.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8-B 動いた記録（板 `g98F9`・状態 `S3pdQ`・1152 `En14p`）。
+ *
+ * v7（runs/page.tsx の器）とは別の器。データの口・動きは v7 と同じ
+ * （一覧・検索・結果の絞り込み・テスト実行の出し分け・CSV・中身・
+ * もう一度やる・取りやめ・直リンク）。
+ * 変える操作は器の外（共通の部品・API）へ触らない。
+ * v7 を直す必要が出たら runs/page.tsx 側も同じ判断を入れる。
+ */
 
 type RunStatus = 'queued' | 'claimed' | 'succeeded' | 'skipped' | 'waiting' | 'retry_wait' | 'partial' | 'permanent_failed' | 'cancelled'
 
@@ -334,7 +337,7 @@ export function V8RunsTab({
       search: query.trim() || undefined,
       status: resultFilter !== 'all' ? resultFilter : undefined,
       includeTest,
-    }), 'automation-runs.csv')
+    }), csvFileName("オートメーションの実行履歴"))
       .then((result) => {
         if (result.truncated && result.totalCount !== null) {
           const rest = result.totalCount - (result.returnedCount ?? 0)
@@ -416,7 +419,7 @@ export function V8RunsTab({
         kind="error"
         title="動いた記録を読み込めませんでした"
         description="記録は消えていません。再読み込みしてください。"
-        action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+        onRetry={() => void load()}
       />
     )
   }
@@ -436,7 +439,7 @@ export function V8RunsTab({
         </div>
         <div className={styles.kpi}>
           <p className={styles.kpiLabel}>いちばん動いた</p>
-          <p className={styles.kpiValue}>{data?.summary.mostRunName ?? '—'}</p>
+          <p className={styles.kpiValue}>{data?.summary.mostRunName ?? emptyValue('unknown')}</p>
           <p className={styles.kpiSub}>
             {data?.summary.mostRunCount !== null && data?.summary.mostRunCount !== undefined
               ? `${formatNumber(data.summary.mostRunCount)}回`
@@ -453,36 +456,33 @@ export function V8RunsTab({
       <p className={styles.footnote}>オートメーションが動いた記録です。条件に外れて動かなかったものも並びます。</p>
       {retryNotice ? <p role="status" className={styles.footnote}>{retryNotice}</p> : null}
 
-      <div className={styles.toolbar}>
-        <TextField
-          aria-label="友だちの名前・オートメーションの名前で検索"
-          placeholder="友だちの名前・オートメーションの名前で検索"
-          value={query}
-          onChange={(event) => changeQuery(event.target.value)}
-          className={styles.toolsSearch}
-        />
-        <label className={styles.checkLabel}>
+      <div className={styles.toolbar}><SaveErrorField names={["query","search"]}><Field note={<>この30日・20件表示</>} label={<>
           <Checkbox
             checked={includeTest}
             onCheckedChange={(checked) => changeIncludeTest(checked)}
           />
           テスト実行も見る
-        </label>
-        <p className={styles.footnote}>この30日・20件表示</p>
-      </div>
+        </>}><TextField
+          aria-label="友だちの名前・オートメーションの名前で探す"
+          placeholder="友だちの名前・オートメーションの名前で探す"
+          value={query}
+          onChange={(event) => changeQuery(event.target.value)}
+          className={styles.toolsSearch}
+        />
+</Field></SaveErrorField></div>
 
       <div className={styles.toolbar}>
-        <SegmentedControl
+        <SaveErrorField names={["resultFilter"]}><SegmentedControl
           aria-label="結果で絞り込む"
           value={resultFilter}
           onChange={(value) => changeResultFilter(value)}
           options={[
-            { value: 'all', label: `すべて ${data ? formatNumber(data.summary.total) : '—'}` },
-            { value: 'executed', label: `動いた ${data ? formatNumber(data.summary.executed) : '—'}` },
-            { value: 'skipped', label: `条件に外れた ${data ? formatNumber(data.summary.skipped) : '—'}` },
-            { value: 'problems', label: `失敗 ${data ? formatNumber(data.summary.failed) : '—'}` },
+            { value: 'all', label: `すべて ${data ? formatNumber(data.summary.total) : emptyValue('unknown')}` },
+            { value: 'executed', label: `動いた ${data ? formatNumber(data.summary.executed) : emptyValue('unknown')}` },
+            { value: 'skipped', label: `条件に外れた ${data ? formatNumber(data.summary.skipped) : emptyValue('unknown')}` },
+            { value: 'problems', label: `失敗 ${data ? formatNumber(data.summary.failed) : emptyValue('unknown')}` },
           ]}
-        />
+        /></SaveErrorField>
       </div>
 
       {!data || data.items.length === 0 ? (

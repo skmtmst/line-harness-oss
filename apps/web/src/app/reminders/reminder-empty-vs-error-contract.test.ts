@@ -24,7 +24,7 @@ const LIST_STATE = readFileSync(
  */
 describe('リマインダ一覧の空と失敗', () => {
   it('一覧のフォルダ欄を共通パネルの統一幅で表示する', () => {
-    expect(LIST).toContain('<ListPageBody folders=')
+    expect(LIST).toMatch(/<ListPageBody\b[^>]*\bfolders=/s)
     expect(LIST).toContain('FolderPanel')
     // 追加の窓は共通のフォルダの列（ManagedFolderPanel）が変えてよい人にだけ出す（B-136）。
     expect(LIST).toMatch(/<ManagedFolderPanel[\s\S]*?canManage=\{canEdit\}/)

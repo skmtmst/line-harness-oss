@@ -46,7 +46,7 @@ function NewPoolPageV7() {
   return (
     <CreatePage
       title="プールを作る"
-      description="複数のLINE公式アカウントをひとまとめにして、友だちの追加先を自動で振り分けます。"
+      help="複数のLINE公式アカウントをひとまとめにして、友だちの追加先を自動で振り分けます。"
       designNode="D0AOyx"
       showHeader={false}
       parent={['プール', '/pools']}

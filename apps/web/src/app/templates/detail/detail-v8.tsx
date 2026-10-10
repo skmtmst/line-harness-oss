@@ -1,4 +1,33 @@
 'use client'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { ChevronLeft, CircleAlert, ExternalLink, Send, UploadCloud } from 'lucide-react'
+import { api, ApiError } from '@/lib/api'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import LinePreview from '@/components/shared/line-preview'
+import { MoreAction } from '@/components/shared/row-actions'
+import TargetMissing from '@/components/shared/target-missing'
+import VersionCompare from '@/components/shared/version-compare'
+import { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
+import { validateFlexContent } from '@line-crm/shared'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAccount } from '@/contexts/account-context'
+import { formatDateTime } from '@/lib/format'
+import { templateDeleteDescription } from '../template-delete-message'
+import { messageTypeText } from '../template-message-type'
+import { isTemplateDetailData, type TemplateDetailData } from '../template-detail-data'
+import styles from './detail-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
+import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
 
 /*
  * ★V8 テンプレートの詳細。
@@ -13,30 +42,6 @@
  * 無い（直しかけを写さない決まりのため、画面側の写しでは作れない）ので
  * API待ち。DEVIN-QUESTIONS.md に記録済み。
  */
-
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronLeft, CircleAlert, ExternalLink, Send, UploadCloud } from 'lucide-react'
-import { api, ApiError } from '@/lib/api'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
-import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import LinePreview from '@/components/shared/line-preview'
-import { MoreAction } from '@/components/shared/row-actions'
-import TargetMissing from '@/components/shared/target-missing'
-import VersionCompare from '@/components/shared/version-compare'
-import FlexPreviewComponent from '@/components/flex-preview'
-import { validateFlexContent } from '@line-crm/shared'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
-import { formatDateTime } from '@/lib/format'
-import { templateDeleteDescription } from '../template-delete-message'
-import { messageTypeText } from '../template-message-type'
-import { isTemplateDetailData, type TemplateDetailData } from '../template-detail-data'
-import styles from './detail-v8.module.css'
 
 type Usage = NonNullable<TemplateDetailData['usedBy']>
 
@@ -53,7 +58,7 @@ function versionText(version: number | null): string {
   return version === null || version === undefined ? 'いまの版' : `版${version}で固定`
 }
 
-/** 一斉配信の状態の札。予約済みは待っている途中、送信済みは終わり。 */
+/** 一斉配信の状態の札。予約中は待っている途中、送信済みは終わり。 */
 function broadcastStatusText(status: string): string {
   if (status === 'scheduled') return '予約中'
   if (status === 'sending') return '送信中'
@@ -181,6 +186,8 @@ function buildUsageRows(usage: Usage | null): UsageRow[] {
 const USAGE_VISIBLE = 4
 
 export default function TemplateDetailV8() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -216,8 +223,7 @@ export default function TemplateDetailV8() {
    * N-144: 編集・公開・削除APIは owner/admin だけ。staff へは閲覧だけ残し、
    * 押すと 403 になる口は出さない。
    */
-  const [canMutateTemplates] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canMutateTemplates = useFeatureAccess('templates')
   usePageTitle(template?.name ?? null)
 
   const loadVersions = useCallback(async () => {
@@ -230,10 +236,15 @@ export default function TemplateDetailV8() {
       } else {
         setVersionsError('版の履歴を読み込めませんでした。もう一度お試しください。')
       }
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
       setVersionsError('版の履歴を読み込めませんでした。もう一度お試しください。')
     }
-  }, [id])
+  }
+  }, [id, saveErrors]);
+
 
   const reload = useCallback(async () => {
     setMissing(false)
@@ -258,16 +269,20 @@ export default function TemplateDetailV8() {
         setMissing(true)
       }
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 404) {
         setMissing(true)
       } else {
-        setError('テンプレートを読み込めませんでした。もう一度お試しください。')
+        { if (!fieldFailure)
+
+        setError('テンプレートを読み込めませんでした。もう一度お試しください。') }
       }
     } finally {
       setLoading(false)
     }
     void loadVersions()
-  }, [id, loadVersions])
+  }, [id, loadVersions, saveErrors])
 
   useEffect(() => {
     if (!id) {
@@ -325,17 +340,20 @@ export default function TemplateDetailV8() {
       setPublishOpen(false)
       await reload()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
       if (caught instanceof ApiError && caught.status === 409) {
-        setPublishError('ほかの人が先に公開・編集しました。最新の状態を読み直したので、内容を確かめてからもう一度お試しください。')
+        { if (!fieldFailure)
+        setPublishError('ほかの人が先に公開・編集しました。最新の状態を読み直したので、内容を確かめてからもう一度お試しください。') }
         void reload()
       } else {
-        setPublishError('公開できませんでした。状態を読み直してから、もう一度お試しください。')
+        { if (!fieldFailure)
+        setPublishError('公開できませんでした。状態を読み直してから、もう一度お試しください。') }
       }
     } finally {
       setPublishing(false)
     }
-  }, [id, publishing, template, reload])
+  }, [id, publishing, template, reload, saveErrors])
 
   const doRevert = useCallback(async () => {
     if (reverting || revertTarget === null || !template) return
@@ -351,15 +369,19 @@ export default function TemplateDetailV8() {
       setCompareTarget(null)
       await reload()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
       setRevertError(
         caught instanceof ApiError && caught.status === 409
           ? 'ほかの人が先に公開しました。開き直して確認してください。'
           : 'この版に戻せませんでした。状態を読み直してから、もう一度お試しください。',
       )
+    }
     } finally {
       setReverting(false)
     }
-  }, [id, reverting, revertTarget, template, reload])
+  }, [id, reverting, revertTarget, template, reload, saveErrors])
 
   const remove = useCallback(async () => {
     if (deleting || usageCount > 0 || !template) return
@@ -370,12 +392,15 @@ export default function TemplateDetailV8() {
       if (!res.success) throw new Error(res.error)
       setDeleteOpen(false)
       router.push('/templates')
-    } catch {
-      setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
-  }, [deleting, usageCount, template, id, router])
+  }, [deleting, usageCount, template, id, router, saveErrors])
 
   const openDelete = useCallback(() => {
     setDeleteError('')
@@ -388,36 +413,36 @@ export default function TemplateDetailV8() {
 
   if (!id) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="unspecified"
         title="見るテンプレートが指定されていません"
         description="一覧から、見たいテンプレートを選び直してください。"
         backHref="/templates"
         backLabel="テンプレートの一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
 
   if (missing || (!error && !loading && !template)) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="not-found"
         title="このテンプレートは見つかりません"
         description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。"
         backHref="/templates"
         backLabel="テンプレートの一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
 
   if (error || (!loading && !template)) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="error"
         title="テンプレートを読み込めませんでした"
         description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
         onRetry={() => void reload()}
-      />
+      /></SaveErrorScope>
     )
   }
 
@@ -441,7 +466,7 @@ export default function TemplateDetailV8() {
     : (versions ?? []).find((v) => v.versionNumber === compareTarget)?.messageContent ?? null
 
   return (
-    <div className={styles.board} data-design-node="UTbi1">
+    <SaveErrorScope errors={saveErrors}><div className={styles.board} data-design-node="UTbi1">
       <nav data-design="Crumb">
         <Link href="/templates" className={styles.crumb}>
           <ChevronLeft size={14} aria-hidden="true" />
@@ -451,14 +476,12 @@ export default function TemplateDetailV8() {
 
       {loading || !template ? (
         <div className={styles.card} role="status">
-          <p className="text-ink-faint" style={{ margin: 0, fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
-            読み込み中...
-          </p>
+          <DetailLoading />
         </div>
       ) : (
         <>
           <header data-design="Head" className={styles.head}>
-            <h1 className={styles.headTitle}>{template.name}</h1>
+            <PageHeading title={template.name} />
             <p className={styles.headMeta}>
               {[messageTypeText(template.messageType), folderName ?? template.category ?? '未分類']
                 .filter(Boolean)
@@ -554,17 +577,17 @@ export default function TemplateDetailV8() {
                           <tr key={row.key}>
                             <td className={styles.usageKind}>{row.kind}</td>
                             <td className={styles.usageName}>
-                              <span className={styles.usageCellText} title={row.name}>{row.name}</span>
+                              <span className={styles.usageCellText} ><TruncatedText value={String(row.name ?? '')} /></span>
                             </td>
                             <td className={`${styles.usageVersion} ${row.fixed ? styles.usageVersionFixed : ''}`}>
                               {row.version}
                             </td>
-                            <td className={styles.usageCellText}>{row.status ?? '—'}</td>
+                            <td className={styles.usageCellText}>{row.status ?? emptyValue('unknown')}</td>
                             <td className={styles.usageOpen}>
                               {row.href ? (
                                 <Link href={row.href} className={styles.usageNameLink}>開く</Link>
                               ) : (
-                                <span className="text-ink-faint" style={{ fontSize: 12 }}>—</span>
+                                <span className="text-ink-faint" style={{ fontSize: 12 }}>{emptyValue('unknown')}</span>
                               )}
                             </td>
                           </tr>
@@ -590,11 +613,11 @@ export default function TemplateDetailV8() {
                   戻すと、その版を下書きとして作り直します。公開するまで使っている所は変わりません。
                 </p>
                 {versions === null && !versionsError ? (
-                  <p className="text-ink-faint" style={{ fontSize: 13, margin: '8px 0 0' }}>読み込み中...</p>
+                  <DetailLoading />
                 ) : versionsError ? (
                   <div>
                     <p className="text-ink-secondary" style={{ fontSize: 13, margin: '8px 0' }}>{versionsError}</p>
-                    <Button variant="secondary" onClick={() => void loadVersions()}>もう一度読み込む</Button>
+                    <Button variant="secondary" onClick={() => loadVersions()} busyLabel="処理中…">もう一度読み込む</Button>
                   </div>
                 ) : (
                   <>
@@ -707,12 +730,12 @@ export default function TemplateDetailV8() {
                   <div className={styles.aboutRow}>
                     <dt className={styles.aboutLabel}>今月送った数</dt>
                     <dd className={styles.aboutValue}>
-                      {monthlySends === undefined ? '読み込み中…' : monthlySends === null ? '—' : `${monthlySends.toLocaleString('ja-JP')}通`}
+                      {monthlySends === undefined ? '読み込み中…' : monthlySends === null ? emptyValue('unknown') : `${monthlySends.toLocaleString('ja-JP')}通`}
                     </dd>
                   </div>
                   <div className={styles.aboutRow}>
                     <dt className={styles.aboutLabel}>差し込み</dt>
-                    <dd className={styles.aboutValue}>{insertions.length > 0 ? insertions.join('・') : 'なし'}</dd>
+                    <dd className={styles.aboutValue}>{insertions.length > 0 ? insertions.join('・') : emptyValue('none')}</dd>
                   </div>
                   <div className={styles.aboutRow}>
                     <dt className={styles.aboutLabel}>使われている数</dt>
@@ -789,7 +812,7 @@ export default function TemplateDetailV8() {
               {publishUsageRows.map((row) => (
                 <div key={row.key} className={styles.publishRow}>
                   <span className={styles.publishRowKind}>{row.kind}</span>
-                  <span className={styles.publishRowName} title={row.name}>{row.name}</span>
+                  <span className={styles.publishRowName} ><TruncatedText value={String(row.name ?? '')} /></span>
                   <span className={`${styles.publishRowState} ${row.fixed ? styles.publishRowStateFixed : ''}`}>
                     {row.fixed
                       ? `${row.status ?? ''}${row.status ? '・' : ''}${row.version.replace('で固定', 'のまま')}`
@@ -861,7 +884,7 @@ export default function TemplateDetailV8() {
       <ConfirmDialog
         open={revertTarget !== null}
         title={`版${revertTarget}の内容で下書きを作り直しますか？`}
-        description="過去の版は変わりません。その中身で新しい下書きを作ります。予約済み・送信中の配信は、いま使っている版のままです。"
+        description="過去の版は変わりません。その中身で新しい下書きを作ります。予約中・送信中の配信は、いま使っている版のままです。"
         confirmLabel="この版に戻す"
         busy={reverting}
         error={revertError}
@@ -872,6 +895,6 @@ export default function TemplateDetailV8() {
           setRevertError('')
         }}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }

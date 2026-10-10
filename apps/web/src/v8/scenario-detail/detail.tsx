@@ -1,11 +1,72 @@
 'use client'
-
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
+import { DetailLoading } from '@/components/templates/detail-page'
+import { formatDate as polishFormatDate, formatNumber } from '@/lib/format'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { ArrowDown, ArrowUp, BarChart3, Check, CircleCheck, Copy, Eye, FilePlus2, GitBranch, GitCompareArrows, Pause, Pencil, Play, Plus, Send, ShieldCheck, SlidersHorizontal } from 'lucide-react'
+import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared'
+import { api, ApiError, type ScenarioRuns, type ScenarioTriggerItem } from '@/lib/api'
+import StickyBar from '@/components/shared/sticky-bar'
+import LinePreview, { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
+import Dialog from '@/components/shared/dialog'
+import VersionCompare from '@/components/shared/version-compare'
+import { TextField, TextArea } from '@/components/shared/text-field'
+import { startChecklist } from './start-checklist'
+import styles from './detail.module.css'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import TargetMissing from '@/components/shared/target-missing'
+import ActionEditor from '@/components/scenarios/action-editor'
+import TriggerEditor from '@/components/scenarios/trigger-editor'
+import CarouselPicker from '@/components/scenarios/carousel-picker'
+import InsertToolbar from '@/components/scenarios/insert-toolbar'
+import StepPreview, { previewOffsets, isDeliveryTimeSet } from '@/components/scenarios/step-preview'
+import type { StepMessageKind } from '@/components/scenarios/message-type-tabs'
+import MessageKindFields, { emptyMessageKindState, messageKindProblem, parseMessageKind, serializeMessageKind, type MessageKind, type MessageKindState } from '@/components/scenarios/message-kind-fields'
+import QuestionEditor, { deadAnswerSettings, emptyQuestion, isUriOnlyBehavior, planChoiceActionRemap, validateChoiceUris, withChoiceKeys, type ScenarioQuestion } from '@/components/scenarios/question-editor'
+import { ConditionDialog, MoveReferrersNotice, OnCompleteDialog, TestSendDialog, ON_COMPLETE_LABEL, describeCondition, type OnCompleteMode } from '@/components/scenarios/scenario-dialogs'
+import { findInvalidRangeIssue, type SegmentCondition } from '@/components/shared/condition-builder'
+import ScheduleInput, { emptySchedule, buildSchedulePayload, uiFromOffsetMinutes, type ScheduleValue } from '@/components/scenarios/schedule-input'
+import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
+import { RowMenu } from '@/components/shared/row-actions'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { notifyToast } from '@/components/shared/toast'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import StatusChip from '@/components/shared/status-chip'
+import Notice from '@/components/shared/notice'
+import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
+import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
+import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft'
+import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
+import { scenarioReachBarWidth, scenarioReachCountLabel, scenarioReachPercent, scenarioReachPercentLabel } from './scenario-reach-display'
+import { describeAfterSend, describeStepAudience, stepListTitle } from './scenario-step-audience'
+import { scenarioSimulationKey, simulationForKey, type ScenarioSimulationResult } from './scenario-simulation-refresh'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAccount } from '@/contexts/account-context'
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import { useFormErrors } from '@/lib/use-form-errors'
+import { FieldError, Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 シナリオ配信の編集（src/v8 に一から組み直した版）。
- * 板：稼働中 `PMLkX`・始めた直後 `nMSiE`・停止中 `ARuZ4`・競合 `kz2B6`、
+ * 板：有効 `PMLkX`・始めた直後 `nMSiE`・停止中 `ARuZ4`・競合 `kz2B6`、
  * 窓：止める確認 `OPGU2`・複製 `Al4Ek`・開始の確認 `F1LK4e`。
  *
  * 動き（読み込み・保存・複製・削除・開始/停止・通の編集）は今までの
@@ -16,61 +77,6 @@ import KpiCard from '@/components/shared/kpi-card'
  * 閲覧のみの人には、変える操作のボタンを置かない（オーナー決定 2026-10-06）。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
-import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import {
-  ArrowDown,
-  ArrowUp,
-  BarChart3,
-  Check,
-  CircleAlert,
-  CircleCheck,
-  Copy,
-  Eye,
-  FilePlus2,
-  GitBranch,
-  GitCompareArrows,
-  Pause,
-  Pencil,
-  Play,
-  Plus,
-  RefreshCw,
-  Send,
-  ShieldCheck,
-  SlidersHorizontal,
-} from 'lucide-react'
-import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared'
-import { api, ApiError, type ScenarioRuns, type ScenarioTriggerItem } from '@/lib/api'
-import StickyBar from '@/components/shared/sticky-bar'
-import LinePreview from '@/components/shared/line-preview'
-import Dialog from '@/components/shared/dialog'
-import VersionCompare from '@/components/shared/version-compare'
-import { TextField, TextArea } from '@/components/shared/text-field'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { startChecklist } from './start-checklist'
-import styles from './detail.module.css'
-import { PageFrame } from '@/components/templates/page-frame'
-import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import TargetMissing from '@/components/shared/target-missing'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import FlexPreviewComponent from '@/components/flex-preview'
-import ActionEditor from '@/components/scenarios/action-editor'
-import TriggerEditor from '@/components/scenarios/trigger-editor'
-import CarouselPicker from '@/components/scenarios/carousel-picker'
-import InsertToolbar from '@/components/scenarios/insert-toolbar'
-import StepPreview, { previewOffsets, isDeliveryTimeSet } from '@/components/scenarios/step-preview'
-import type { StepMessageKind } from '@/components/scenarios/message-type-tabs'
-import MessageKindFields, {
-  emptyMessageKindState,
-  messageKindProblem,
-  parseMessageKind,
-  serializeMessageKind,
-  type MessageKind,
-  type MessageKindState,
-} from '@/components/scenarios/message-kind-fields'
 
 /** 専用の入力欄で書く種別か。 */
 function isStructuredKind(type: MessageType): boolean {
@@ -87,64 +93,6 @@ function describeStartTrigger(trigger: ScenarioTriggerItem, tagName: string | nu
   if (trigger.kind === 'booking_confirmed') return '予約が確定したとき'
   return '呼ばれたとき'
 }
-import QuestionEditor, {
-  deadAnswerSettings,
-  emptyQuestion,
-  isUriOnlyBehavior,
-  planChoiceActionRemap,
-  validateChoiceUris,
-  withChoiceKeys,
-  type ScenarioQuestion,
-} from '@/components/scenarios/question-editor'
-import {
-  ConditionDialog,
-  MoveReferrersNotice,
-  OnCompleteDialog,
-  TestSendDialog,
-  ON_COMPLETE_LABEL,
-  describeCondition,
-  type OnCompleteMode,
-} from '@/components/scenarios/scenario-dialogs'
-import { findInvalidRangeIssue, type SegmentCondition } from '@/components/shared/condition-builder'
-import ScheduleInput, {
-  emptySchedule,
-  buildSchedulePayload,
-  uiFromOffsetMinutes,
-  type ScheduleValue,
-} from '@/components/scenarios/schedule-input'
-import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
-import { RowMenu } from '@/components/shared/row-actions'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { notifyToast } from '@/components/shared/toast'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import StatusChip from '@/components/shared/status-chip'
-import Notice from '@/components/shared/notice'
-import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
-import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
-import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft'
-import Select from '@/components/shared/select'
-import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
-import {
-  scenarioReachBarWidth,
-  scenarioReachCountLabel,
-  scenarioReachPercent,
-  scenarioReachPercentLabel,
-} from './scenario-reach-display'
-import { describeAfterSend, describeStepAudience, stepListTitle } from './scenario-step-audience'
-import {
-  scenarioSimulationKey,
-  simulationForKey,
-  type ScenarioSimulationResult,
-} from './scenario-simulation-refresh'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { useAccount } from '@/contexts/account-context'
-import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
-import { formatNumber } from '@/lib/format'
-import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
-import { useFormErrors } from '@/lib/use-form-errors'
-import { FieldError } from '@/components/shared/form-controls'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -179,35 +127,14 @@ const ON_COMPLETE_SENTENCE: Record<OnCompleteMode, string> = {
   move: '次のシナリオへ移す',
 }
 
-const jstParts = (iso: string | null | undefined) => {
-  if (!iso) return null
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return null
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('ja-JP', {
-      timeZone: 'Asia/Tokyo',
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    })
-      .formatToParts(d)
-      .map((p) => [p.type, p.value]),
-  )
-  return parts as Record<string, string>
-}
-
 /** ①の箱「保存済み 10月1日 14:02」。 */
 function formatSavedAt(iso: string | null | undefined): string {
-  const p = jstParts(iso)
-  return p ? `${p.month}月${p.day}日 ${p.hour}:${p.minute}` : ''
+  return polishFormatDate(iso, { style: 'detail', fallback: '' })
 }
 
 /** 競合の帯「〇〇 が 14:02 に保存しました」。 */
 function formatClock(iso: string | null | undefined): string {
-  const p = jstParts(iso)
-  return p ? `${p.hour}:${p.minute}` : '少し前'
+  return polishFormatDate(iso, { style: 'time', fallback: '少し前' })
 }
 
 /** 行の札。絵は「テキスト・カルーセル・質問・テンプレート」の短い名前。 */
@@ -410,7 +337,7 @@ function FormSection({
   return (
     <section
       data-design-node={node}
-      className="bg-canvas border-hairline rounded-card border p-4"
+      className="bg-canvas content-card rounded-card border p-4"
     >
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <div className="min-w-0">
@@ -433,6 +360,7 @@ export default function ScenarioDetailV8({
   scenarioId: string
   showStarted?: boolean
 }) {
+  const saveErrors = useSaveFormErrors()
   const id = scenarioId
 
   const [scenario, setScenario] = useState<ScenarioWithSteps | null>(null)
@@ -473,7 +401,9 @@ export default function ScenarioDetailV8({
    * 今までどおり押せる見た目（最後の守りはサーバの 403）。
    */
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const featureAccess = useFeatureAccess('scenarios')
+  const canEdit = featureAccess
+  const canTestSend = useFeatureAccess('scenarios', 'test')
   const readonlyReason = '閲覧のみのため、この操作はできません'
 
   /* --- ★V8 だけの状態 --- */
@@ -573,7 +503,7 @@ export default function ScenarioDetailV8({
   const [insertAfter, setInsertAfter] = useState<number | null>(null)
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
   const [stepForm, setStepForm] = useState<StepFormState>(() => emptyStepForm(1))
-  usePageTitle(editingStepId ? `${stepForm.stepOrder}通目を編集` : 'シナリオ配信')
+  usePageTitle(editingStepId ? `${stepForm.stepOrder} 通目を編集` : 'シナリオ配信')
   const [stepSaving, setStepSaving] = useState(false)
   const [stepError, setStepError] = useState('')
   /* 通の保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。検査は保存の直前に1つずつ見る形なので fail で結び付ける。 */
@@ -658,15 +588,20 @@ export default function ScenarioDetailV8({
         setError(res.error)
       }
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 404) {
         setScenarioMissing(true)
       } else {
-        setError('シナリオの読み込みに失敗しました。もう一度読み込んでください。')
+        { if (!fieldFailure)
+
+
+        setError('シナリオの読み込みに失敗しました。もう一度読み込んでください。') }
       }
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, saveErrors])
 
   useEffect(() => {
     loadScenario()
@@ -690,7 +625,8 @@ export default function ScenarioDetailV8({
             setConflict(true)
             setConflictLatest(detail.data)
           }
-        } catch {
+        } catch (saveFailure) {
+          saveErrors.capture(saveFailure)
           // 取れなくても今の画面は残す。次の機会に確かめる。
         }
       })()
@@ -702,7 +638,7 @@ export default function ScenarioDetailV8({
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('focus', recheck)
     }
-  }, [id, loading, scenario])
+  }, [id, loading, scenario, saveErrors])
 
   // 並列で stats / templates / tags を取得（リグレッションを起こさないよう失敗は無視）
   useEffect(() => {
@@ -896,6 +832,7 @@ export default function ScenarioDetailV8({
         })
         if (!updated.success) throw new Error(updated.error)
       } catch (cause) {
+        saveErrors.capture(cause)
         throw new DuplicateAborted(copy, 'シナリオ全体の設定（配信対象・終了後の処理）', cause)
       }
 
@@ -936,7 +873,7 @@ export default function ScenarioDetailV8({
           isDraft: step.isDraft === true,
         }).catch((cause) => ({ success: false as const, error: cause instanceof Error && cause.message ? cause.message : '通をコピーできませんでした' }))
         // 途中で止める。続けると通が欠けた別物の流れが残る。
-        if (!copied.success) throw new DuplicateAborted(copy, `${step.stepOrder}通目のコピー`, new Error(copied.error))
+        if (!copied.success) throw new DuplicateAborted(copy, `${step.stepOrder} 通目のコピー`, new Error(copied.error))
         stepIdMap.set(step.id, copied.data.id)
       }
 
@@ -958,6 +895,7 @@ export default function ScenarioDetailV8({
           if (!added.success) throw new Error(added.error)
         }
       } catch (cause) {
+        saveErrors.capture(cause)
         throw new DuplicateAborted(copy, '開始のきっかけ', cause)
       }
 
@@ -1004,6 +942,7 @@ export default function ScenarioDetailV8({
           have.add(key)
         }
       } catch (cause) {
+        saveErrors.capture(cause)
         throw new DuplicateAborted(copy, 'アクション', cause)
       }
 
@@ -1011,6 +950,8 @@ export default function ScenarioDetailV8({
       setDuplicateOpen(false)
       router.push(`/scenarios/detail?id=${copy}`)
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e);
+
       if (e instanceof DuplicateAborted) {
         // SCENARIO-09: 不完全なコピーが残っていることを隠さない。
         // 所在・止まった段階・やり直し/削除の窓を出す。
@@ -1020,9 +961,12 @@ export default function ScenarioDetailV8({
           stage: e.stage,
           detail: e.message,
         })
+        { if (!fieldFailure)
         setError(`複製が「${e.stage}」で止まりました。途中まで作成されたコピーが残っています。`)
+      }
       } else {
-        setError(e instanceof Error && e.message ? e.message : '複製に失敗しました。通信を確かめて、もう一度お試しください。')
+        { if (!fieldFailure)
+        setError(e instanceof Error && e.message ? e.message : '複製に失敗しました。通信を確かめて、もう一度お試しください。') }
       }
     } finally {
       setDuplicating(false)
@@ -1042,8 +986,11 @@ export default function ScenarioDetailV8({
       if (!res.success) throw new Error(res.error)
       setDiscardDuplicateOpen(false)
       setDuplicateRemainder(null)
-    } catch {
-      setDiscardDuplicateError('作りかけのコピーを削除できませんでした。コピーを開いて状態を確認し、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDiscardDuplicateError('作りかけのコピーを削除できませんでした。コピーを開いて状態を確認し、もう一度お試しください。') }
     } finally {
       setDiscardingDuplicate(false)
     }
@@ -1058,8 +1005,11 @@ export default function ScenarioDetailV8({
       if (!res.success) throw new Error(res.error)
       setDeleteScenarioOpen(false)
       router.push('/scenarios')
-    } catch {
-      setDeleteScenarioError('このシナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDeleteScenarioError('このシナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeletingScenario(false)
     }
@@ -1086,6 +1036,7 @@ export default function ScenarioDetailV8({
         setError(res.error)
       }
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       /*
        * ★V8 kz2B6：ほかの人が先に保存していた（409）。入力は残し、帯で知らせて
        * 「違いを比べる」「最新を読み込んで続ける」を選んでもらう。
@@ -1095,11 +1046,15 @@ export default function ScenarioDetailV8({
         try {
           const latest = await api.scenarios.get(id)
           if (latest.success) setConflictLatest(latest.data as ScenarioWithSteps)
-        } catch {
+        } catch (saveFailure) {
+          saveErrors.capture(saveFailure)
           // 最新が取れなくても帯は出す。「最新を読み込んで続ける」で取り直せる。
         }
       } else {
-        setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
+        { if (!fieldFailure)
+
+
+        setError('保存に失敗しました。通信を確かめて、もう一度お試しください。') }
       }
     } finally {
       setSaving(false)
@@ -1119,8 +1074,8 @@ export default function ScenarioDetailV8({
 
   const describeScenarioSummary = (input: { name: string; isActive: boolean; stepCount: number }): string =>
     [
-      `名前：${input.name || '（未入力）'}`,
-      `状態：${input.isActive ? '稼働中' : '停止中'}`,
+      `名前：${input.name || emptyValue('unconfigured')}`,
+      `状態：${input.isActive ? '有効' : '停止中'}`,
       `通の数：${input.stepCount}`,
     ].join('\n')
 
@@ -1151,8 +1106,11 @@ export default function ScenarioDetailV8({
       notifyToast('配信を始めました')
       loadScenario(true)
       reloadStats()
-    } catch {
-      setStartError('配信を始められませんでした。通信を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setStartError('配信を始められませんでした。通信を確かめて、もう一度お試しください。') }
     } finally {
       setStartBusy(false)
     }
@@ -1178,8 +1136,11 @@ export default function ScenarioDetailV8({
       notifyToast('配信を一時停止しました')
       loadScenario(true)
       reloadStats()
-    } catch {
-      setStopError('配信を止められませんでした。通信を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setStopError('配信を止められませんでした。通信を確かめて、もう一度お試しください。') }
     } finally {
       setStopBusy(false)
     }
@@ -1450,12 +1411,14 @@ export default function ScenarioDetailV8({
       if (stepForm.messageType === 'flex' || stepForm.messageType === 'image') {
         try {
           JSON.parse(stepForm.messageContent)
-        } catch {
+        } catch (saveFailure) {
+          saveErrors.capture(saveFailure)
           failStep('content',
             stepForm.messageType === 'flex'
               ? 'Flex メッセージの JSON が不正です'
               : '画像メッセージの JSON が不正です',
-          )
+          );
+
           return
         }
       }
@@ -1568,14 +1531,16 @@ export default function ScenarioDetailV8({
       loadScenario(true)
       reloadStats()
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error)
       /*
        * R235: 入力の不備（400番台）と通信・サーバーの失敗を分ける。
        * 時刻の空などの入力エラーまで「通信を確かめて」と出すと、
        * 直せるものを直せず再試行を繰り返すことになる。
        */
+      { if (!fieldFailure)
       setStepError(error instanceof ApiError && error.status >= 400 && error.status < 500
         ? '入力内容に不備があります。時刻・本文を確かめて、もう一度お試しください。'
-        : 'ステップの保存に失敗しました。通信を確かめて、もう一度お試しください。')
+        : 'ステップの保存に失敗しました。通信を確かめて、もう一度お試しください。') }
     } finally {
       setStepSaving(false)
     }
@@ -1630,8 +1595,11 @@ export default function ScenarioDetailV8({
       }
       loadScenario(true)
       reloadStats()
-    } catch {
-      setStepError('この通を複製できませんでした')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setStepError('この通を複製できませんでした') }
     } finally {
       setDuplicatingStepId(null)
     }
@@ -1649,8 +1617,11 @@ export default function ScenarioDetailV8({
       setDeleteStepTarget(null)
       void loadScenario(true)
       void reloadStats()
-    } catch {
-      setDeleteStepError('この通を削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDeleteStepError('この通を削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeletingStepId(null)
     }
@@ -1672,8 +1643,13 @@ export default function ScenarioDetailV8({
       loadScenario(true)
       // 到達率バッジは stepOrder ベースでマッチングするので、並び替え後は stats も再取得
       reloadStats()
-    } catch {
-      setError('並び替えに失敗しました。通信を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+
+
+      setError('並び替えに失敗しました。通信を確かめて、もう一度お試しください。') }
     }
   }
 
@@ -1747,16 +1723,13 @@ export default function ScenarioDetailV8({
           description="いつ送るか。送ったあと次の通へ進むかどうかも、設計どおりここでそろえて決めます。"
         >
           <div className="space-y-3">
-        <div>
-          <label className="block text-xs font-medium text-ink-secondary mb-1">ステップ順序</label>
-          <input
+        <div><Field label="ステップ順序"><SaveErrorField names={["stepOrder","stepForm.stepOrder","step_order","step_form.step_order","step_form"]}><NumberInput
             type="number"
             min={1}
             className="w-32 border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             value={stepForm.stepOrder}
             onChange={(e) => setStepForm({ ...stepForm, stepOrder: Number(e.target.value) })}
-          />
-        </div>
+          /></SaveErrorField></Field></div>
         <div {...stepFields.bind('time')} aria-invalid={stepFields.invalid('time') || undefined}>
           <ScheduleInput
             mode={deliveryMode}
@@ -1773,9 +1746,9 @@ export default function ScenarioDetailV8({
           以前は画面のいちばん下、到達タグと同じ束に置いていたので、
           「いつ送るか」を決めているときに目に入らなかった。
         */}
-        <div>
-          <label className="block text-xs font-medium text-ink-secondary mb-1">送信後</label>
-          <Select
+        <div><Field note={<>
+            一時停止にすると、この通を送ったところで止まります。再開するまで次は届きません。
+          </>} label="送信後"><SaveErrorField names={["afterSend","stepForm.afterSend","after_send","step_form.after_send","step_form"]}><Select
             aria-label="送信後"
             value={stepForm.afterSend}
             onChange={(value) =>
@@ -1786,11 +1759,8 @@ export default function ScenarioDetailV8({
               { value: 'pause', label: '送信後：ここで止める' },
             ]}
             size="full"
-          />
-          <p className="text-xs text-ink-faint mt-0.5">
-            一時停止にすると、この通を送ったところで止まります。再開するまで次は届きません。
-          </p>
-        </div>
+          /></SaveErrorField>
+</Field></div>
           </div>
         </FormSection>
 
@@ -1798,7 +1768,7 @@ export default function ScenarioDetailV8({
           <div className="space-y-3">
         {/* 入力モード切替: 直接入力 / テンプレート参照 */}
         <div className="space-y-2">
-          <RadioCardGroup legend="メッセージの指定方法" className="grid gap-2 sm:grid-cols-2">
+          <SaveErrorField names={["step-input-mode","inputMode","stepForm.inputMode","stepForm"]}><RadioCardGroup legend="メッセージの指定方法" className="grid gap-2 sm:grid-cols-2">
             <RadioCard
               name="step-input-mode"
               value="direct"
@@ -1813,7 +1783,7 @@ export default function ScenarioDetailV8({
               onChange={() => setStepForm({ ...stepForm, inputMode: 'template' })}
               title="テンプレートを使う"
             />
-          </RadioCardGroup>
+          </RadioCardGroup></SaveErrorField>
         </div>
 
         {/*
@@ -1863,7 +1833,7 @@ export default function ScenarioDetailV8({
           <div>
             <span className="block text-xs font-medium text-ink-secondary mb-1">テンプレート <span className="text-danger">*</span></span>
             <div {...stepFields.bind('template')}>
-            <EntityKindField
+            <SaveErrorField names={["templateId","stepForm.templateId","stepForm"]}><EntityKindField
               kind="template"
               label="テンプレート"
               options={templates}
@@ -1885,7 +1855,7 @@ export default function ScenarioDetailV8({
                   messageContent: template?.messageContent ?? stepForm.messageContent,
                 })
               }}
-            />
+            /></SaveErrorField>
             </div>
             <FieldError id="step-template-error">{stepFields.error('template')}</FieldError>
             <p className="text-xs text-warning mt-1">
@@ -1896,16 +1866,13 @@ export default function ScenarioDetailV8({
 
         {!stepForm.question && stepForm.inputMode === 'direct' && (
           <>
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">メッセージタイプ</label>
-              <Select
+            <div><Field label="メッセージタイプ"><SaveErrorField names={["messageType","stepForm.messageType","message_type","step_form.message_type","step_form"]}><Select
                 aria-label="メッセージタイプ"
                 value={stepForm.messageType}
                 onChange={(value) => setStepForm({ ...stepForm, messageType: value as MessageType })}
                 options={messageTypeOptions}
                 size="full"
-              />
-            </div>
+              /></SaveErrorField></Field></div>
             {/*
               位置情報・動画・音声・スタンプは、本文ではなく専用の欄で書く。
               中身は JSON なので、生のまま書かせると必ず壊れる。
@@ -1938,11 +1905,7 @@ export default function ScenarioDetailV8({
                 }}
               />
             ) : (
-              <div>
-                <label className="block text-xs font-medium text-ink-secondary mb-1">メッセージ内容 <span className="text-danger">*</span></label>
-                {/* 差し込みは本文のときだけ。Flex は JSON なので、入れる位置を
-                    間違えると本文が壊れる。 */}
-                {stepForm.messageType === 'text' && (
+              <div><Field label="メッセージ内容" required>{stepForm.messageType === 'text' && (
                   <div className="mb-2">
                     <InsertToolbar
                       targetRef={stepBodyRef}
@@ -1951,7 +1914,7 @@ export default function ScenarioDetailV8({
                     />
                   </div>
                 )}
-                <InsertTextField
+<SaveErrorField names={["messageContent","stepForm.messageContent","message_content","step_form.message_content","step_form"]}><InsertTextField
                   ref={stepBodyRef}
                   className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   rows={4}
@@ -1960,8 +1923,7 @@ export default function ScenarioDetailV8({
                   onValueChange={(next) => setStepForm({ ...stepForm, messageContent: next })}
                   aria-invalid={stepFields.invalid('content') || undefined}
                   aria-describedby={stepFields.invalid('content') ? 'step-content-error' : undefined}
-                />
-              </div>
+                /></SaveErrorField></Field></div>
             )}
             <FieldError id="step-content-error">{stepFields.error('content')}</FieldError>
             </div>
@@ -2015,7 +1977,7 @@ export default function ScenarioDetailV8({
                     hook: 'step_sent',
                     stepId: editingStepId,
                     choiceIndex: null,
-                    title: `${stepForm.stepOrder}通目を送ったあと`,
+                    title: `${stepForm.stepOrder} 通目を送ったあと`,
                   })
                 }
                 className="text-action shrink-0 text-xs hover:underline"
@@ -2026,22 +1988,19 @@ export default function ScenarioDetailV8({
           }
         >
           <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">到達したらタグ付与</label>
-              <Select
+            <div><Field note={<>
+                このステップが配信完了したら、選んだタグを友だちに付与します
+              </>} label="到達したらタグ付与"><SaveErrorField names={["onReachTagId","stepForm.onReachTagId","on_reach_tag_id","step_form.on_reach_tag_id","step_form"]}><EntitySelect kind="tag"
                 aria-label="到達したらタグ付与"
                 value={stepForm.onReachTagId ?? ''}
                 onChange={(value) => setStepForm({ ...stepForm, onReachTagId: value || null })}
                 options={[
                   { value: '', label: '-- なし --' },
-                  ...tags.map((t) => ({ value: t.id, label: t.name })),
+                  ...tags.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name })),
                 ]}
                 size="full"
-              />
-              <p className="text-xs text-ink-faint mt-0.5">
-                このステップが配信完了したら、選んだタグを友だちに付与します
-              </p>
-            </div>
+              /></SaveErrorField>
+</Field></div>
             {!editingStepId && (
               <p className="text-ink-faint text-xs">
                 そのほかのアクションは、この通を保存してから設定できます。
@@ -2051,12 +2010,12 @@ export default function ScenarioDetailV8({
         </FormSection>
 
         {/* 下書き。書きかけを保存しておくため。配信からは外れる。 */}
-        <Checkbox
+        <SaveErrorField names={["isDraft","stepForm.isDraft","is_draft","step_form.is_draft","step_form"]}><Checkbox
           checked={stepForm.isDraft}
           onCheckedChange={(checked) => setStepForm({ ...stepForm, isDraft: checked })}
         >
           下書きにする（配信されません。テスト送信では送れます）
-        </Checkbox>
+        </Checkbox></SaveErrorField>
 
         {stepError && <p className="text-danger text-xs">{stepError}</p>}
 
@@ -2108,7 +2067,7 @@ export default function ScenarioDetailV8({
           afterSend={stepForm.afterSend}
         />
 
-        <div className="bg-canvas border-hairline rounded-card border p-4">
+        <div className="bg-canvas content-card rounded-card border p-4">
           <h4 className="text-ink text-sm font-bold">設定内容</h4>
           <dl className="mt-3 space-y-2 text-xs">
             <div className="flex items-baseline justify-between gap-3">
@@ -2137,7 +2096,7 @@ export default function ScenarioDetailV8({
                 数を作らずに、繋がっていないことをそのまま書く。 */}
             <div className="flex items-baseline justify-between gap-3">
               <dt className="text-ink-faint shrink-0">配信前チェック</dt>
-              <dd className="text-ink-faint min-w-0 text-right">—</dd>
+              <dd className="text-ink-faint min-w-0 text-right">{emptyValue('unknown')}</dd>
             </div>
           </dl>
           <p className="text-ink-faint mt-2 text-xs leading-relaxed">
@@ -2149,47 +2108,36 @@ export default function ScenarioDetailV8({
     </div>
   )
 
-  /* ===== ここから下は ★V8 の描画（PMLkX 稼働中 / nMSiE 始めた直後 / ARuZ4 停止中） ===== */
+  /* ===== ここから下は ★V8 の描画（PMLkX 有効 / nMSiE 始めた直後 / ARuZ4 停止中） ===== */
 
   if (loading) {
     return (
-      <div className={styles.board}>
-        <DelayedSkeleton
-          loading
-          skeleton={
-            <div className="flex flex-col gap-4">
-              <Skeleton className="block h-4 w-24" />
-              <Skeleton className="block h-8 w-1/3" />
-              <Skeleton className="block h-24 w-full" />
-              <Skeleton className="block h-14 w-full" />
-              <Skeleton className="block h-14 w-full" />
-            </div>
-          }
-        />
-      </div>
+      <SaveErrorScope errors={saveErrors}><div className={styles.board}>
+        <DetailLoading />
+      </div></SaveErrorScope>
     )
   }
 
   if (!scenario && (scenarioMissing || !error)) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="not-found"
         title="このシナリオは見つかりません"
         description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。"
         backHref="/scenarios"
         backLabel="シナリオ一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
 
   if (!scenario) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="error"
         title="シナリオを読み込めませんでした"
         description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
         onRetry={() => void loadScenario(true)}
-      />
+      /></SaveErrorScope>
     )
   }
 
@@ -2279,7 +2227,7 @@ export default function ScenarioDetailV8({
         ...item,
         state: complete ? ('ok' as const) : ('warn' as const),
         detail: complete
-          ? `${simulation.steps.length}通すべての配信日時を試算しました`
+          ? `${simulation.steps.length} 通すべての配信日時を試算しました`
           : '配信日時を試算できない通があります',
       }
     }
@@ -2289,7 +2237,7 @@ export default function ScenarioDetailV8({
         state: runs.testSends.length > 0 ? ('ok' as const) : ('warn' as const),
         detail:
           runs.testSends.length > 0
-            ? `最新のテスト送信は${runs.testSends[0].messageCount}通です`
+            ? `最新のテスト送信は${runs.testSends[0].messageCount} 通です`
             : 'テスト送信の記録がありません',
       }
     }
@@ -2306,7 +2254,7 @@ export default function ScenarioDetailV8({
             ? '送信数の上限はありません'
             : runs.quota.remaining === null
               ? (runs.quota.reason ?? '送信枠を読み込めませんでした')
-              : `残り${formatNumber(runs.quota.remaining)}通です`,
+              : `残り${formatNumber(runs.quota.remaining)} 通です`,
       }
     }
     return item
@@ -2318,14 +2266,14 @@ export default function ScenarioDetailV8({
   const startCompleteSummary = ON_COMPLETE_LABEL[(scenario.onCompleteMode ?? 'pause') as OnCompleteMode]
 
   return (
-    <PageFrame kind="detail" boardId={conflict ? 'kz2B6' : scenario.isActive ? 'PMLkX' : 'ARuZ4'} hasFooter>
+    <SaveErrorScope errors={saveErrors}><PageFrame kind="detail" boardId={conflict ? 'kz2B6' : scenario.isActive ? 'PMLkX' : 'ARuZ4'} hasFooter>
       {/* 板の頭：題＋状態の札＋鉛筆・説明の1行。右に操作（配信結果・下見・まとめてテスト・その他）。 */}
-      <header className={styles.head} data-design="Head">
-        <div className={styles.headText}>
-          <div className={styles.titleRow}>
-            <h1 className={styles.title} title={scenario.name}>{scenario.name}</h1>
-            <StatusChip status={scenario.isActive ? 'running' : 'paused'} />
-            {canEdit ? (
+      <PageHeading title={scenario.name}
+        crumbs={<><p className={styles.meta}>
+            {`フォルダ：${scenarioFolderName}・配信方式：${modeLabel}（作ったあとは変えられません）・${(scenario.allowConcurrent ?? true) ? '同時購読を許可中' : '同時に1つだけ'}`}
+          </p></>}
+        titleAccessory={<><StatusChip status={scenario.isActive ? 'running' : 'paused'} /></>}
+        actions={<>{canEdit ? (
               <button
                 type="button"
                 className={styles.iconButton}
@@ -2335,18 +2283,10 @@ export default function ScenarioDetailV8({
               >
                 <Pencil aria-hidden />
               </button>
-            ) : null}
-          </div>
-          <p className={styles.meta}>
-            {`フォルダ：${scenarioFolderName}・配信方式：${modeLabel}（作ったあとは変えられません）・${(scenario.allowConcurrent ?? true) ? '同時購読を許可中' : '同時に1つだけ'}`}
-          </p>
-        </div>
-        <div className={styles.headActions}>
-          <Button variant="secondary" href={`/scenarios/results?id=${id}`}>
+            ) : null}<Button variant="secondary" href={`/scenarios/results?id=${id}`}>
             <BarChart3 aria-hidden />
             配信結果を見る
-          </Button>
-          <Button
+          </Button><Button
             variant="secondary"
             onClick={() => setPreviewOpen(true)}
             disabled={sortedSteps.length === 0}
@@ -2355,7 +2295,7 @@ export default function ScenarioDetailV8({
             <Eye aria-hidden />
             まとめて下見
           </Button>
-          {canEdit ? (
+          {canTestSend ? (
             <Button
               variant="secondary"
               onClick={() => setTestSend({ stepId: null, label: 'すべての通' })}
@@ -2365,8 +2305,7 @@ export default function ScenarioDetailV8({
               <Send aria-hidden />
               まとめてテストを送る
             </Button>
-          ) : null}
-          {canEdit ? (
+          ) : null}{canEdit ? (
             <span className={styles.menuBox}>
               <RowMenu
                 appearance="plain"
@@ -2378,7 +2317,7 @@ export default function ScenarioDetailV8({
                   {
                     id: 'duplicate',
                     /* 下の帯の「複製する」と同じ窓を開く。文言を変えるのは、撮影・試験が下の帯のボタンと取り違えないため。 */
-                    label: duplicating ? '複製中…' : 'このシナリオを複製',
+                    label: 'このシナリオを複製',
                     disabled: duplicating,
                     onSelect: openDuplicateDialog,
                   },
@@ -2395,44 +2334,21 @@ export default function ScenarioDetailV8({
                 ]}
               />
             </span>
-          ) : null}
-        </div>
-      </header>
+          ) : null}</>} />
 
       {/* 競合（kz2B6）：ほかの人の保存と食い違った。板の頭のすぐ下に、幅いっぱいで出す。 */}
       {conflict && (
         <div className={styles.conflictWrap}>
-          <div className={styles.conflictBar} data-design-node="kz2B6" role="alert">
-            <CircleAlert className={styles.conflictIcon} aria-hidden />
-            <div className={styles.conflictText}>
-              <p className={styles.conflictTitle}>
-                {conflictLatest
+          <SaveConflictBand designNode="kz2B6" title={conflictLatest
                   ? `ほかの人が ${formatClock(conflictLatest.updatedAt)} にシナリオ「${conflictLatest.name}」を保存しました`
-                  : 'ほかの人がこのシナリオを保存しました'}
-              </p>
-              <p className={styles.conflictBody}>
-                あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。
-              </p>
-            </div>
-            <Button type="button" variant="secondary" onClick={() => setCompareOpen(true)} disabled={!conflictLatest}>
-              <GitCompareArrows aria-hidden />
-              違いを比べる
-            </Button>
-            <Button type="button" variant="primary" onClick={() => void acceptLatestAndContinue()}>
-              <RefreshCw aria-hidden />
-              最新を読み込んで続ける
-            </Button>
-          </div>
+                  : 'ほかの人がこのシナリオを保存しました'} description="あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。" onCompare={() => setCompareOpen(true)} compareDisabled={!conflictLatest} onReload={() => void acceptLatestAndContinue()} />
         </div>
       )}
 
-      <div className={styles.body} data-design="Body">
+      <div className={styles.body} data-design="Body" data-template-region="body">
         <div className={styles.left}>
           {!canEdit ? (
-            <div className={styles.viewerBand} role="status">
-              <Eye aria-hidden />
-              <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
-            </div>
+            <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
           ) : null}
 
           {/* 始めた直後の知らせ（nMSiE）。始めた記録への行き先を添える。 */}
@@ -2459,9 +2375,9 @@ export default function ScenarioDetailV8({
                 続きからやり直すか、作りかけのコピーを削除してください。
               </p>
               <div className={styles.remainderActions}>
-                <button type="button" disabled={duplicating} onClick={() => void handleDuplicate()}>
-                  {duplicating ? '複製中…' : '続きからやり直す'}
-                </button>
+                <Button type="button" disabled={duplicating} onClick={() => void handleDuplicate()} variant="text" size="inline" busy={duplicating} busyLabel="複製中…">
+                  続きからやり直す
+                </Button>
                 <Link href={`/scenarios/detail?id=${duplicateRemainder.copyId}`}>コピーを確認する</Link>
                 <button
                   type="button"
@@ -2577,7 +2493,7 @@ export default function ScenarioDetailV8({
           </div>
 
           {/* メッセージの行。選んだ通が右の欄に出る。 */}
-          <h2 className={styles.sectionTitle}>{`メッセージ（${sortedSteps.length}通）`}</h2>
+          <h2 className={styles.sectionTitle}>{`メッセージ（${sortedSteps.length} 通）`}</h2>
           {sortedSteps.length === 0 ? (
             <p className={styles.emptyNote}>
               まだ配るものがありません。下の「メッセージを追加する」から1通目を作ってください。
@@ -2599,7 +2515,7 @@ export default function ScenarioDetailV8({
                           <button
                             type="button"
                             onClick={() => openInsertStep(sortedSteps[index - 1].stepOrder)}
-                            title={`${sortedSteps[index - 1].stepOrder}通目と${step.stepOrder}通目のあいだに足します`}
+                            title={`${sortedSteps[index - 1].stepOrder} 通目と${step.stepOrder} 通目のあいだに足します`}
                           >
                             ＋ ここに挿入
                           </button>
@@ -2612,7 +2528,7 @@ export default function ScenarioDetailV8({
                       className={isShown ? styles.stepRowSelected : styles.stepRow}
                       onClick={() => setSelectedStepId(step.id)}
                     >
-                      <span className={styles.stepNo}>{`${step.stepOrder}通目`}</span>
+                      <span className={styles.stepNo}>{`${step.stepOrder} 通目`}</span>
                       <span className={styles.stepWhen}>
                         <span className={styles.stepWhenMain}>{stepWhenLabel(deliveryMode, step, index)}</span>
                         {previewLabels[step.stepOrder] ? (
@@ -2645,7 +2561,7 @@ export default function ScenarioDetailV8({
                           <button
                             type="button"
                             className={styles.iconButton}
-                            aria-label={`${step.stepOrder}通目を上へ`}
+                            aria-label={`${step.stepOrder} 通目を上へ`}
                             disabled={index === 0}
                             onClick={(e) => {
                               e.stopPropagation()
@@ -2657,7 +2573,7 @@ export default function ScenarioDetailV8({
                           <button
                             type="button"
                             className={styles.iconButton}
-                            aria-label={`${step.stepOrder}通目を下へ`}
+                            aria-label={`${step.stepOrder} 通目を下へ`}
                             disabled={index === sortedSteps.length - 1}
                             onClick={(e) => {
                               e.stopPropagation()
@@ -2669,18 +2585,18 @@ export default function ScenarioDetailV8({
                           <span className={styles.menuBox} onClick={(e) => e.stopPropagation()}>
                             <RowMenu
                               appearance="plain"
-                              label={`${step.stepOrder}通目のその他操作`}
-                              menuLabel={`${step.stepOrder}通目の操作`}
+                              label={`${step.stepOrder} 通目のその他操作`}
+                              menuLabel={`${step.stepOrder} 通目の操作`}
                               open={stepMenuId === step.id}
                               onOpenChange={(next) => setStepMenuId(next ? step.id : null)}
                               items={[
                                 { id: 'edit', label: '編集', onSelect: () => openEditStep(step) },
                                 { id: 'preview', label: 'プレビュー', onSelect: () => setSelectedStepId(step.id) },
-                                {
+                                ...(canTestSend ? [{
                                   id: 'test',
                                   label: 'テスト',
-                                  onSelect: () => setTestSend({ stepId: step.id, label: `${step.stepOrder}通目` }),
-                                },
+                                  onSelect: () => setTestSend({ stepId: step.id, label: `${step.stepOrder} 通目` }),
+                                }] : []),
                                 /* この通を送ったあとに動かすアクション。件数を出すのは、設定済みを忘れて二重に足すのを防ぐため。 */
                                 {
                                   id: 'action',
@@ -2690,12 +2606,12 @@ export default function ScenarioDetailV8({
                                       hook: 'step_sent',
                                       stepId: step.id,
                                       choiceIndex: null,
-                                      title: `${step.stepOrder}通目を送ったあと`,
+                                      title: `${step.stepOrder} 通目を送ったあと`,
                                     }),
                                 },
                                 {
                                   id: 'duplicate',
-                                  label: duplicatingStepId === step.id ? '複製中…' : 'この通を複製',
+                                  label: 'この通を複製',
                                   disabled: duplicatingStepId === step.id,
                                   disabledReason: 'この通を複製しています',
                                   onSelect: () => {
@@ -2743,7 +2659,7 @@ export default function ScenarioDetailV8({
                   const audience = describeStepAudience(step.targetCondition, tags)
                   return (
                     <li key={step.id} className={styles.statRow}>
-                      <span className={styles.statNo}>{`${step.stepOrder}通目`}</span>
+                      <span className={styles.statNo}>{`${step.stepOrder} 通目`}</span>
                       <span className={styles.statAudience} title={audience}>
                         {audience}
                       </span>
@@ -2759,7 +2675,7 @@ export default function ScenarioDetailV8({
                       </span>
                       <span className={styles.statReachText}>
                         {step.isDraft === true || !stat
-                          ? '—'
+                          ? emptyValue('unknown')
                           : `到達 ${scenarioReachCountLabel(stat.reachedCount)}${pct !== null ? `・${scenarioReachPercentLabel(pct)}` : ''}`}
                       </span>
                       <span className={after.paused && !reachTag ? styles.statAfterPause : styles.statAfter}>
@@ -2796,9 +2712,9 @@ export default function ScenarioDetailV8({
         </div>
 
         {/* 右の欄：選んだ通のスマホ。 */}
-        <aside className={styles.right}>
+        <aside className={styles.right} data-template-region="preview" data-preview-narrow="hidden">
           <h2 className={styles.rightTitle}>
-            {`選んだ通（${shownStep ? `${shownStep.stepOrder}通目` : '—'}）の見え方`}
+            {`選んだ通（${shownStep ? `${shownStep.stepOrder}通目` : emptyValue('unknown')}）の見え方`}
           </h2>
           <div className={styles.phoneSlot}>
             <LinePreview
@@ -2824,7 +2740,9 @@ export default function ScenarioDetailV8({
                         ) : (
                           <p className={styles.talkBubble}>画像（プレビューなし）</p>
                         )
-                      } catch {
+                      } catch (saveFailure) {
+                        saveErrors.capture(saveFailure);
+
                         return <p className={styles.talkBubble}>画像</p>
                       }
                     }
@@ -2888,7 +2806,7 @@ export default function ScenarioDetailV8({
                   }}
                   disabled={saving || !editForm.name.trim()}
                   busy={saving}
-                  done={saveDone}
+
                 >
                   {conflict ? <GitCompareArrows aria-hidden /> : <Check aria-hidden />}
                   {conflict ? '比べてから保存' : '保存する'}
@@ -2945,29 +2863,23 @@ export default function ScenarioDetailV8({
         }
       >
         <div className="flex flex-col gap-4">
-          <label className="block">
-            <span className="text-ink-secondary mb-1 block text-xs font-medium">シナリオ名</span>
-            <TextField
+          <Field label="シナリオ名" required><SaveErrorField names={["name","editForm.name","edit_form.name","edit_form"]}><TextField
               value={editForm.name}
               onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
               maxLength={80}
               required
               aria-label="シナリオ名"
-            />
-          </label>
-          <label className="block">
-            <span className="text-ink-secondary mb-1 block text-xs font-medium">説明（任意）</span>
-            <TextArea
+            /></SaveErrorField></Field>
+          <Field label="説明"><SaveErrorField names={["description","editForm.description","edit_form.description","edit_form"]}><TextArea
               value={editForm.description}
               onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
               rows={3}
               maxLength={500}
               aria-label="説明"
-            />
-          </label>
+            /></SaveErrorField></Field>
           <div className="flex flex-col gap-1">
             <span className="text-ink-secondary text-xs font-semibold">置き場（フォルダ）</span>
-            <FolderSelect
+            <SaveErrorField names={["folderId","editForm.folderId","folder_id","edit_form.folder_id","edit_form"]}><FolderSelect
               value={editForm.folderId}
               onChange={(value) => setEditForm({ ...editForm, folderId: value })}
               aria-label="置き場（フォルダ）"
@@ -2976,7 +2888,7 @@ export default function ScenarioDetailV8({
               onCreate={canEdit
                 ? folderCreator((name, color) => api.folders.create({ kind: 'scenario', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
                 : undefined}
-            />
+            /></SaveErrorField>
             {folderState === 'error' && (
               <p className="text-status-danger text-xs">フォルダ一覧を読み込めませんでした。</p>
             )}
@@ -2986,12 +2898,12 @@ export default function ScenarioDetailV8({
               </p>
             )}
           </div>
-          <Checkbox
+          <SaveErrorField names={["allowConcurrent","editForm.allowConcurrent","allow_concurrent","edit_form.allow_concurrent","edit_form"]}><Checkbox
             checked={editForm.allowConcurrent}
             onCheckedChange={(checked) => setEditForm({ ...editForm, allowConcurrent: checked })}
           >
             同時購読を許可する（ほかのシナリオが動いている人にも並行して流す）
-          </Checkbox>
+          </Checkbox></SaveErrorField>
         </div>
       </Dialog>
 
@@ -3003,7 +2915,7 @@ export default function ScenarioDetailV8({
         cancelLabel="閉じる"
         onCancel={() => setCompareOpen(false)}
         footer={
-          <Button type="button" variant="primary" onClick={() => void acceptLatestAndContinue()}>
+          <Button type="button" variant="primary" onClick={() => acceptLatestAndContinue()} busyLabel="処理中…">
             最新を読み込んで続ける
           </Button>
         }
@@ -3022,7 +2934,7 @@ export default function ScenarioDetailV8({
         confirmLabel="この内容ではじめる"
         busy={startBusy}
         error={startError}
-        onConfirm={preflightLoading || preflightFailed ? undefined : () => void handleStart()}
+        onConfirm={preflightLoading || preflightFailed ? undefined : () => handleStart()}
         // WEB228：「内容と対象を確かめました」のチェックが入るまで「この内容ではじめる」を押せない。
         confirmDisabled={!startConfirmed}
         onCancel={() => {
@@ -3045,7 +2957,7 @@ export default function ScenarioDetailV8({
             <p className="text-ink text-sm font-semibold">
               きっかけ：{triggerHeadline}
               {simulation
-                ? ` → 対象：${formatNumber(simulation.audience.newStartPlanned)}人`
+                ? ` → 対象：${formatNumber(simulation.audience.newStartPlanned)} 人`
                 : preflightLoading
                   ? ' → 対象：試算中…'
                   : ' → 対象：まだ分かりません'}
@@ -3054,7 +2966,7 @@ export default function ScenarioDetailV8({
           <div>
             <p className="text-ink-faint text-xs">通数・終了後</p>
             <p className="text-ink text-sm font-semibold">
-              {sortedSteps.length}通・最後の1通のあと「{startCompleteSummary}」
+              {sortedSteps.length} 通・最後の1通のあと「{startCompleteSummary}」
             </p>
           </div>
         </div>
@@ -3087,7 +2999,7 @@ export default function ScenarioDetailV8({
                       : styles.checkUnknown
                 }`}
               >
-                {item.state === 'ok' ? '✓' : item.state === 'warn' ? '!' : '—'}
+                {item.state === 'ok' ? '✓' : item.state === 'warn' ? '!' : emptyValue('unknown')}
               </span>
               <span>
                 <span className="text-ink block font-medium">{item.label}</span>
@@ -3101,13 +3013,13 @@ export default function ScenarioDetailV8({
           始めると取り消せません。止めた人には、再開すると続きから届きます。
         </Notice>
         <div className="mt-3">
-          <Checkbox
+          <SaveErrorField names={["startConfirmed","start_confirmed"]}><Checkbox
             checked={startConfirmed}
             disabled={preflightLoading || preflightFailed}
             onCheckedChange={setStartConfirmed}
           >
             内容と対象を確かめました
-          </Checkbox>
+          </Checkbox></SaveErrorField>
         </div>
         {!startConfirmed && !preflightLoading && !preflightFailed && (
           <p className="text-ink-faint mt-2 text-xs">
@@ -3144,7 +3056,7 @@ export default function ScenarioDetailV8({
             <dd>
               {stats?.activeNow === undefined
                 ? '確認できません'
-                : `${formatNumber(stats.activeNow)}人（止まっているあいだ、新しい人は入りません）`}
+                : `${formatNumber(stats.activeNow)} 人（止まっているあいだ、新しい人は入りません）`}
             </dd>
           </dl>
           <div className={styles.stopFooter}>
@@ -3169,20 +3081,17 @@ export default function ScenarioDetailV8({
         }}
       >
         <div className={styles.dupBody}>
-          <label className={styles.dupField}>
-            <span className={styles.dupLabel}>新しい名前</span>
-            <TextField
+          <Field label="新しい名前" required><SaveErrorField names={["duplicateName","duplicate_name"]}><TextField
               value={duplicateName}
               onChange={(e) => setDuplicateName(e.target.value)}
               maxLength={80}
               required
               aria-label="新しい名前"
-            />
-          </label>
+            /></SaveErrorField></Field>
           <div className={styles.dupBox}>
             <p className={styles.dupBoxTitle}>引き継ぐもの</p>
             <p className={styles.dupBoxBody}>
-              {`・メッセージ ${sortedSteps.length}通${sortedSteps.some((s) => s.question) ? '（質問を含む）' : ''}・開始のきっかけ・アクション・配信対象の条件・最後の1通の後・配信方式（${modeLabel}）・フォルダ`}
+              {`・メッセージ ${sortedSteps.length} 通${sortedSteps.some((s) => s.question) ? '（質問を含む）' : ''}・開始のきっかけ・アクション・配信対象の条件・最後の1通の後・配信方式（${modeLabel}）・フォルダ`}
             </p>
           </div>
           <div className={styles.dupBox}>
@@ -3220,15 +3129,15 @@ export default function ScenarioDetailV8({
 
       <ConfirmDialog
         open={deleteStepTarget !== null}
-        title={deleteStepTarget ? `${deleteStepTarget.stepOrder}通目を削除しますか？` : 'この通を削除しますか？'}
+        title={deleteStepTarget ? `${deleteStepTarget.stepOrder} 通目を削除しますか？` : 'この通を削除しますか？'}
         description={deleteStepTarget
-          ? `${deleteStepTarget.stepOrder}通目と、その配信対象・送信後アクションが削除されます。到達済みの履歴は監査記録として残ります。この操作は取り消せません。`
+          ? `${deleteStepTarget.stepOrder} 通目と、その配信対象・送信後アクションが削除されます。到達済みの履歴は監査記録として残ります。この操作は取り消せません。`
           : ''}
         confirmLabel="この通を削除する"
         destructive
         busy={deletingStepId !== null}
         error={deleteStepError}
-        onConfirm={() => void handleDeleteStep()}
+        onConfirm={() => handleDeleteStep()}
         onCancel={() => {
           if (deletingStepId) return
           setDeleteStepTarget(null)
@@ -3244,7 +3153,7 @@ export default function ScenarioDetailV8({
             ? '購読中の人数は確認できません。'
             : stats.activeNow === 0
               ? '現在購読中の友だちは0人です。'
-              : `現在${formatNumber(stats.activeNow)}人が購読中です。途中の人は続きを受け取れません。`,
+              : `現在${formatNumber(stats.activeNow)} 人が購読中です。途中の人は続きを受け取れません。`,
           'シナリオの設定と今後の配信が削除されます。',
           'これまでの配信履歴は監査記録として残ります。',
           'この操作は取り消せません。',
@@ -3253,7 +3162,7 @@ export default function ScenarioDetailV8({
         destructive
         busy={deletingScenario}
         error={deleteScenarioError}
-        onConfirm={() => void handleDeleteScenario()}
+        onConfirm={() => handleDeleteScenario()}
         onCancel={() => {
           if (deletingScenario) return
           setDeleteScenarioOpen(false)
@@ -3275,7 +3184,7 @@ export default function ScenarioDetailV8({
         destructive
         busy={discardingDuplicate}
         error={discardDuplicateError}
-        onConfirm={() => void handleDiscardDuplicate()}
+        onConfirm={() => handleDiscardDuplicate()}
         onCancel={() => {
           if (discardingDuplicate) return
           setDiscardDuplicateOpen(false)
@@ -3340,7 +3249,7 @@ export default function ScenarioDetailV8({
       )}
 
       {/* テスト送信 */}
-      {testSend && (
+      {canTestSend && testSend && (
         <TestSendDialog
           scenarioId={id}
           lineAccountId={scenario?.lineAccountId ?? null}
@@ -3387,6 +3296,6 @@ export default function ScenarioDetailV8({
           onChanged={reloadActionCounts}
         />
       )}
-    </PageFrame>
+    </PageFrame></SaveErrorScope>
   )
 }

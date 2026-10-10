@@ -19,7 +19,7 @@ export const STATUS_LABELS: Record<MemberStatus, string> = {
   active: '有効',
   invited: '招待中',
   expired: '期限切れ',
-  inactive: '無効',
+  inactive: '停止中',
 }
 
 /** 表の「状態」。有効／招待中／期限切れ／無効の4つ。 */

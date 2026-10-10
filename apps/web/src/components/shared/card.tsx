@@ -93,7 +93,7 @@ export function CardHeader({
   title: ReactNode
   meta?: ReactNode
   action?: ReactNode
-  size?: 'standard' | 'roomy' | 'stacked' | 'panel'
+  size?: 'standard' | 'roomy' | 'stacked' | 'panel' | 'restaurant'
   actionTone?: 'accent' | 'info'
   headingLevel?: 2 | 3
   titleId?: string
@@ -101,7 +101,7 @@ export function CardHeader({
   const Heading = headingLevel === 3 ? 'h3' : 'h2'
   return (
     <div
-      className={[styles.header, size === 'roomy' && styles.headerRoomy, size === 'stacked' && styles.headerStacked, size === 'panel' && styles.headerPanel].filter(Boolean).join(' ')}
+      className={[styles.header, size === 'roomy' && styles.headerRoomy, size === 'stacked' && styles.headerStacked, size === 'panel' && styles.headerPanel, size === 'restaurant' && styles.headerRestaurant].filter(Boolean).join(' ')}
       data-design-node="t0jk8p"
     >
       <div className={styles.titleGroup}>

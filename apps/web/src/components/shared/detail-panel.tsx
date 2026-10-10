@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import React, { useCallback, useEffect, useId, useRef, type ReactNode } from 'react'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import styles from './detail-panel.module.css'
+import { DETAIL_PANEL_WIDTH } from './panel-sizes'
 import { isImeComposing } from './ime'
 
 export type DetailPanelProps = {
@@ -111,7 +112,7 @@ export default function DetailPanel({
   const panel = (
     <aside
       ref={panelRef}
-      className={styles.panel}
+      className={styles.panel} style={{ width: DETAIL_PANEL_WIDTH }}
       role="dialog"
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
@@ -166,7 +167,7 @@ export function useDetailPanelUrl(key: string): [string | null, (id: string | nu
       const url = new URL(window.location.href)
       if (id === null) url.searchParams.delete(key)
       else url.searchParams.set(key, id)
-      window.history.replaceState(null, '', url)
+      window.history.replaceState(window.history.state, '', url)
       setCurrent(id)
     },
     [key],

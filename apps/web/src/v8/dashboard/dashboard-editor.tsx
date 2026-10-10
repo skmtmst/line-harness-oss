@@ -1,21 +1,5 @@
 'use client'
-
-/*
- * ★V8 ダッシュボード編集（Pencil `mcOqK`）。V8 の入口（v8/dashboard/dashboard.tsx）からだけ開く。
- *
- * 動き（並べ替え・表示の ON/OFF・「今日やること」は4枠まで・初期状態に戻す・
- * 保存の失敗と 409・読み上げ）は v7 と共有の `components/dashboard/dashboard-editor.tsx`
- * と同じ計算（reorder / move / toggle）をそのまま使い、見た目だけを絵どおりに組む。
- * v7 の部品は変えない。
- *
- * - 引き出し 540（共通の Drawer width="editor"）。頭に「カードと配置／プレビュー」の切り替えと説明1行。
- * - 行：持ち手・名前と置き場所・上下（24 の枠つき）・スイッチ。OFF の行は薄い地。
- * - 4枠の注意は、5つ目を ON にした瞬間だけそのグループの上に出す（OFF にしたカードの名前を書く）。
- * - 下：左に「初期状態に戻す」（確認の窓 400 を挟む）、右に「閉じる」「ダッシュボードに反映」。
- * - 失敗は下の帯：保存できない（もう一度保存する）／ほかの人が変えた 409（最新の配置を読み込む）。
- * - キーボードで持ち上げている間だけ、操作の案内を下の帯に出す。
- */
-
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useEffect, useRef, useState } from 'react'
 import {
   closestCenter,
@@ -55,12 +39,31 @@ import {
 import Drawer from '@/components/shared/drawer'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import styles from './dashboard-editor.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 ダッシュボード編集（Pencil `mcOqK`）。V8 の入口（v8/dashboard/dashboard.tsx）からだけ開く。
+ *
+ * 動き（並べ替え・表示の ON/OFF・「今日やること」は4枠まで・初期状態に戻す・
+ * 保存の失敗と 409・読み上げ）は v7 と共有の `components/dashboard/dashboard-editor.tsx`
+ * と同じ計算（reorder / move / toggle）をそのまま使い、見た目だけを絵どおりに組む。
+ * v7 の部品は変えない。
+ *
+ * - 引き出し 540（共通の Drawer width="editor"）。頭に「カードと配置／プレビュー」の切り替えと説明1行。
+ * - 行：持ち手・名前と置き場所・上下（24 の枠つき）・スイッチ。OFF の行は薄い地。
+ * - 4枠の注意は、5つ目を ON にした瞬間だけそのグループの上に出す（OFF にしたカードの名前を書く）。
+ * - 下：左に「初期状態に戻す」（確認の窓 400 を挟む）、右に「閉じる」「ダッシュボードに反映」。
+ * - 失敗は下の帯：保存できない（もう一度保存する）／ほかの人が変えた 409（最新の配置を読み込む）。
+ * - キーボードで持ち上げている間だけ、操作の案内を下の帯に出す。
+ */
 
 const CARD_DEFINITION_MAP = new Map(DASHBOARD_CARD_DEFINITIONS.map((card) => [card.id, card]))
 const GROUPS: DashboardGroup[] = ['today', 'main', 'right']
@@ -104,7 +107,7 @@ function CardRow({ item, definition, canMoveUp, canMoveDown, disabled, onMove, o
         <GripVertical aria-hidden="true" />
       </ReorderHandle> : <span className={styles.grip} aria-hidden="true" />}
       <div className={styles.names}>
-        <span className={styles.name} title={definition.label}>{definition.label}</span>
+        <span className={styles.name} ><TruncatedText value={String(definition.label ?? '')} /></span>
         <span className={styles.where} title={definition.description}>{definition.description}</span>
       </div>
       <div role="group" aria-label={`${definition.label}の順番`} className={styles.moves}>
@@ -115,7 +118,7 @@ function CardRow({ item, definition, canMoveUp, canMoveDown, disabled, onMove, o
           <ChevronDown aria-hidden="true" />
         </IconButton>
       </div>
-      <Toggle disabled={disabled} checked={item.visible} onChange={() => onToggle()} label={`${definition.label}を表示`} />
+      <SaveErrorField names={["visible","item.visible"]}><SettingCheckbox disabled={disabled} checked={item.visible} onChange={() => onToggle()} label={`${definition.label}を表示`} /></SaveErrorField>
     </div>
   )
 }
@@ -135,13 +138,13 @@ function Preview({ draft }: { draft: DashboardPreferences }) {
     <div className={styles.preview}>
       <div className={styles.previewHead}>
         <p className={styles.hint}>実際のダッシュボードと同じ順番で表示します。</p>
-        <SegmentedControl<'pc' | 'mobile'>
+        <SaveErrorField names={["device"]}><SegmentedControl<'pc' | 'mobile'>
           size="small"
           aria-label="プレビューの画面幅"
           value={device}
           onChange={setDevice}
           options={[{ value: 'pc', label: 'PC' }, { value: 'mobile', label: 'スマホ' }]}
-        />
+        /></SaveErrorField>
       </div>
       <div className={styles.previewBoard}>
         {total === 0 ? <p className={styles.previewEmpty}>表示するカードがありません</p> : null}
@@ -167,7 +170,7 @@ function Preview({ draft }: { draft: DashboardPreferences }) {
         ) : (
           <div className={styles.previewStack}>
             {mobileToday.map((item) => <span key={item.id} className={styles.previewCard} data-small="">{labelOf(item.id)}</span>)}
-            {folded > 0 ? <span className={styles.previewCard} data-muted="">ほか {folded}件（「集計を見る」で開きます）</span> : null}
+            {folded > 0 ? <span className={styles.previewCard} data-muted="">ほか {folded} 件（「集計を見る」で開きます）</span> : null}
             {visible('main').map((item) => <span key={item.id} className={styles.previewCard}>{labelOf(item.id)}</span>)}
             {visible('right').map((item) => <span key={item.id} className={styles.previewCard} data-aside="">{labelOf(item.id)}</span>)}
           </div>
@@ -177,13 +180,14 @@ function Preview({ draft }: { draft: DashboardPreferences }) {
   )
 }
 
-export default function DashboardEditorV8({ open, preferences, saving = false, saveError, saveConflict, onReloadPreferences, onCancel, onApply, onReset }: {
+export default function DashboardEditorV8({ open, preferences, saving = false, saveError, saveConflict, onComparePreferences, onReloadPreferences, onCancel, onApply, onReset }: {
   open: boolean
   preferences: DashboardPreferences
   saving?: boolean
   /** 保存・初期化の失敗。引き出しの下の帯に出す（DASH-05）。 */
   saveError?: string | null
   /** 409 のとき true。「最新の配置を読み込む」を出す。 */
+  onComparePreferences?: () => Promise<DashboardPreferences | null>
   saveConflict?: boolean
   /** 最新の配置を読み直し、成功したらその配置を返す（編集中の新しい起点）。 */
   onReloadPreferences?: () => Promise<DashboardPreferences | null>
@@ -308,6 +312,7 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
     }
   }
 
+  const saveCollision = useSaveConflict<DashboardPreferences>({ fetchLatest: onComparePreferences ?? (async () => null), reload: reloadLatest })
   const conflict = Boolean(saveError && saveConflict && onReloadPreferences)
   const band = saveError || keyboardDrag ? (
     <>
@@ -323,15 +328,7 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
         />
       ) : null}
       {conflict ? (
-        <Notice
-          tone="warn"
-          message={saveError ?? ''}
-          action={(
-            <Button size="compact" onClick={() => void reloadLatest()} disabled={saving || reloading} busy={reloading} busyLabel="読み込み中…">
-              最新の配置を読み込む
-            </Button>
-          )}
-        />
+        <SaveConflictBand title="ほかの人が先にダッシュボードの配置を保存しました" compareBusy={saveCollision.compareBusy} onCompare={() => void saveCollision.compare()} onReload={() => void saveCollision.reloadLatest()} />
       ) : null}
       {keyboardDrag ? <Notice tone="info" icon={<Keyboard size={16} />} message={KEYBOARD_HINT} /> : null}
     </>
@@ -339,21 +336,23 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
 
   return (
     <>
+      <SaveConflictCompareDialog open={saveCollision.compareOpen} error={saveCollision.compareError} busy={saveCollision.compareBusy} lines={saveCollision.latest ? [{ text: JSON.stringify(draft) === JSON.stringify(saveCollision.latest) ? '配置に違いはありません' : '表示する項目や順番が異なります。最新を読み込むと、相手が保存した配置に切り替わります。' }] : null} onReload={() => void saveCollision.reloadLatest()} onCancel={saveCollision.closeCompare} />
       <Drawer
         open={open}
         width="editor"
         title="ダッシュボード編集"
         description="表示するカードと位置を変更します"
+        dirty={JSON.stringify(draft) !== JSON.stringify(preferences)}
         busy={saving}
         onClose={close}
         toolbar={(
           <div className={styles.toolbar}>
-            <SegmentedControl<'cards' | 'preview'>
+            <SaveErrorField names={["mode"]}><SegmentedControl<'cards' | 'preview'>
               aria-label="ダッシュボード編集の表示"
               value={mode}
               onChange={setMode}
               options={[{ value: 'cards', label: 'カードと配置' }, { value: 'preview', label: 'プレビュー' }]}
-            />
+            /></SaveErrorField>
             {mode === 'cards' ? (
               <p className={styles.hint}>持ち手をドラッグして移動。上下ボタン・キーボードでも順番を変更。スイッチで表示を切り替えます。</p>
             ) : null}
@@ -366,7 +365,7 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
               初期状態に戻す
             </button>
             <span className={styles.spacer} />
-            <Button onClick={onCancel} disabled={saving}>閉じる</Button>
+            <Button onClick={close} disabled={saving}>閉じる</Button>
             <Button variant="primary" onClick={apply} busy={saving}>ダッシュボードに反映</Button>
           </div>
         )}

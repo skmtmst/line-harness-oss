@@ -123,7 +123,7 @@ const buttons = () => [...host.querySelectorAll('button, a')] as HTMLElement[]
 const named = (text: string) => buttons().filter((element) => (element.textContent ?? '').trim() === text)
 
 describe('V8 オートメーションのルール一覧（LWQXd）', () => {
-  it('V8 のテーマで、タブ・数の帯・行・行の右端の「編集する」と「…」を出す', async () => {
+  it('V8 のテーマで、タブ・数の帯・行・編集は「…」の中へ入れる', async () => {
     await render(<AutomationListV8 />)
     await waitFor(() => host.textContent?.includes('問い合わせを担当へ知らせる') ?? false, 'ルールの行')
     expect(document.documentElement.dataset.theme).toBe('v8')
@@ -133,7 +133,9 @@ describe('V8 オートメーションのルール一覧（LWQXd）', () => {
     // きっかけは言葉まで（「〇〇」と送られた）。止めているルールは最後に変えた日。
     expect(host.textContent).toContain('「キャンペーン」と送られた')
     expect(host.textContent).toContain('止めています')
-    expect(named('編集する')).toHaveLength(2)
+    expect(named('編集する')).toHaveLength(0)
+    await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="ルール「問い合わせを担当へ知らせる」の操作"]')!.click() })
+    expect(document.querySelector('[role="menu"]')?.textContent).toContain('編集する')
     expect(host.querySelector('[aria-label="ルール「問い合わせを担当へ知らせる」の操作"]')).not.toBeNull()
     expect(named('ルールを作る').length).toBeGreaterThan(0)
   })
@@ -143,7 +145,7 @@ describe('V8 オートメーションのルール一覧（LWQXd）', () => {
     await render(<AutomationListV8 />)
     await waitFor(() => host.textContent?.includes('問い合わせを担当へ知らせる') ?? false, 'ルールの行')
     expect(host.querySelector('[data-design-node="nH9L8"]')).not.toBeNull()
-    expect(host.textContent).toContain('閲覧のみで見ています。変える操作は管理者に頼んでください。')
+    expect(host.textContent).toContain('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
     expect(named('編集する')).toHaveLength(0)
     expect(named('ルールを作る')).toHaveLength(0)
     expect(named('フォルダを追加')).toHaveLength(0)
@@ -167,7 +169,7 @@ describe('V8 オートメーションの動いた記録（g98F9）', () => {
     expect(host.textContent).toContain('1 つ')
     expect(host.textContent).toContain('0.3 秒')
     expect(host.textContent).toContain('動いた 2,988')
-    expect(host.textContent).toContain('1件中 1〜1件')
+    expect(host.textContent).toContain('1 件中 1〜1 件')
   })
 })
 

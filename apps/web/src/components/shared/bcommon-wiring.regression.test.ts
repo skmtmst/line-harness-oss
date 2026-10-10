@@ -2,14 +2,16 @@ import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mj
 import { expect, it } from 'vitest'
 const read = (path: string) => readFileSync(`src/${path}`, 'utf8')
 it('WEB-006: 枠なしの選ぶ欄も焦点を消さない', () => {
-  expect(read('components/shared/select.module.css')).toMatch(/\.textTrigger:focus-visible\s*\{[^}]*outline:[^}]*var\(--color-action\)/)
+  expect(read('components/shared/select.module.css')).toMatch(/\.textTrigger:focus-visible\s*\{[^}]*outline:[^}]*var\(--color-focus-ring\)/)
 })
 it('WEB-019: 自動応答の未接続のつまみを描かない', () => {
   expect(read('components/auto-replies/inline-action-rows-v8.tsx')).not.toContain('<GripVertical')
 })
 it('共通点検1: 未分類は開いたフォルダ', () => {
   // 選ぶ窓のフォルダの列は共通の FolderPanel（pickfold）。未分類の印は部品が開いたフォルダで描く。
-  expect(read('v8/inbox-chat/template-picker-view.tsx')).toContain('<FolderPanel readOnly')
+  expect(read('v8/inbox-chat/template-picker-view.tsx')).toContain('<EntityPickerDialog')
+  expect(read('components/shared/entity-picker.tsx')).toContain('<FolderPanel')
+  expect(read('components/shared/folder-picker-shell.tsx')).toContain('<FolderPanel readOnly')
   expect(read('components/shared/folder-panel.tsx')).toMatch(/kind === 'unfiled' \? <FolderOpen/)
 })
 it('共通点検2: タグ編集の切替は共通Toggle', () => {

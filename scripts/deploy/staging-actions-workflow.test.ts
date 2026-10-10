@@ -1,4 +1,7 @@
 import { readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -8,6 +11,38 @@ const workflow = readFileSync(
 );
 
 describe('Deploy Cloudflare Staging workflow', () => {
+  it.each([false, true])('passes source metadata to the actual Worker deploy command (replay=%s)', (replay) => {
+    const sandbox = mkdtempSync(resolve(tmpdir(), 'staging-metadata-'));
+    try {
+      const sha = (replay ? 'b' : 'a').repeat(40);
+      const values: Record<string, string> = {
+        'steps.worker_source.outputs.root': sandbox,
+        'steps.build_metadata.outputs.worker_sha': sha,
+        'steps.build_metadata.outputs.worker_version': '0.24.0',
+        'steps.build_metadata.outputs.released_at': '2026-10-09T00:00:00Z',
+      };
+      const step = workflow.split('- name: Deploy Worker to staging')[1].split('- name: Verify the deployed Worker')[0];
+      const script = step.split('run: |\n')[1].replace(/\$\{\{\s*([^}]+?)\s*\}\}/g, (_all, key: string) => {
+        if (!values[key]) throw new Error(`Unexpected expression: ${key}`);
+        return values[key];
+      });
+      writeFileSync(resolve(sandbox, 'npx'), '#!/bin/sh\nprintf "%s\\n" "$@" > "$RUNNER_TEMP/args.txt"\necho "Current Version ID: 11111111-1111-1111-1111-111111111111"\n', { mode: 0o755 });
+      const result = spawnSync('bash', ['-e', '-c', script], {
+        encoding: 'utf8', env: { ...process.env, PATH: `${sandbox}:${process.env.PATH}`, RUNNER_TEMP: sandbox,
+          GITHUB_OUTPUT: resolve(sandbox, 'outputs'), WORKER_CONFIG_REPLAY: String(replay), WORKER_SOURCE_SHA: sha },
+      });
+      expect(result.status, result.stderr).toBe(0);
+      const args = readFileSync(resolve(sandbox, 'args.txt'), 'utf8');
+      expect(args).toContain(`BUILD_GIT_COMMIT:${sha}`);
+      expect(args).toContain('BUILD_VERSION:0.24.0');
+      expect(args).toContain('BUILD_RELEASED_AT:2026-10-09T00:00:00Z');
+      expect(workflow).toContain('APP_COMMIT_SHA: ${{ steps.build_metadata.outputs.admin_sha }}');
+      expect(workflow).toContain('node scripts/deploy/verify-public-build.mjs');
+      expect(workflow.indexOf('Verify public source revisions')).toBeLessThan(workflow.indexOf('Release the staging lock'));
+    } finally {
+      rmSync(sandbox, { recursive: true, force: true });
+    }
+  });
   it('supports a gated development push and still defaults manual runs to dry-run', () => {
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toMatch(/^\s+push:/m);
@@ -134,4 +169,12 @@ describe('Deploy Cloudflare Staging workflow', () => {
       'test "$actual" = "$EXPECTED_GOOGLE_BUSINESS_WRITE_ENABLED"',
     );
   });
+  it('stamps the source HEAD before build and checks public metadata after deploy', () => {
+    expect(workflow).toContain('stamp-staging-version.ts "$worker_root"');
+    expect(workflow.indexOf('stamp-staging-version.ts')).toBeLessThan(workflow.indexOf('pnpm --filter worker build'));
+    expect(workflow).toContain('$STAGING_API_URL/admin/version');
+    expect(workflow).toContain('.git_commit == $commit and .version == $version');
+    expect(workflow).toContain('test "$matched" = true');
+  });
+
 });

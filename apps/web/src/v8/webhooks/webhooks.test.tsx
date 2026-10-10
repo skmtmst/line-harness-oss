@@ -275,7 +275,7 @@ describe('外部連携 V8', () => {
   it('言葉：URLは道を伏せる・いつ送るかは2つまで並べて残りは件数', () => {
     expect(maskedUrl('https://crm.example.com/line/hook?token=x')).toBe('https://crm.example.com/••••')
     expect(eventLabel(['friend_add', 'tag_change'])).toBe('友だちになった・タグが付いた')
-    expect(eventLabel(['friend_add', 'tag_change', 'booking_created'])).toBe('友だちになった・タグが付いた ほか1件')
+    expect(eventLabel(['friend_add', 'tag_change', 'booking_created'])).toBe('友だちになった・タグが付いた ほか1 件')
   })
 
   // 監査 WEB-024：切り替えの返事が来る前にアカウントを移っても、仮の表示（止めた）を残さない。

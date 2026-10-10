@@ -7,25 +7,24 @@
  */
 import { ClipboardList } from 'lucide-react'
 import Button from '@/components/shared/button'
+import FormFileAttachments from '@/components/shared/form-file-attachments'
 import ListRange from '@/components/ui/list-range'
 import { formatDateTime } from '@/lib/format'
 import type { FriendDetailState } from './use-friend-detail'
 import styles from './detail.module.css'
-
-const renderValue = (v: unknown) => (Array.isArray(v) ? v.join(', ') : String(v ?? ''))
+import { DetailLoading } from '@/components/templates/detail-page'
+import Notice from '@/components/shared/notice'
+import ListState from '@/components/shared/list-state'
 
 export default function FormsTab({ data }: { data: FriendDetailState }) {
   const { submissions, submissionsStatus, submissionsTotal, submissionsNextCursor, submissionsLoadingMore, submissionsMoreError } = data
 
   if (submissionsStatus === 'loading' || submissionsStatus === 'idle') {
-    return <div className={styles.pane}><p className={styles.paneNote}>回答を読み込んでいます…</p></div>
+    return <div className={styles.pane}><DetailLoading /></div>
   }
   if (submissionsStatus === 'error') {
     return (
-      <div className={`${styles.pane} ${styles.centered}`} role="alert">
-        <p className={styles.paneNote}>回答を読み込めませんでした。</p>
-        <Button onClick={() => void data.loadSubmissions()}>もう一度読み込む</Button>
-      </div>
+      <ListState kind="error" title="回答を読み込めませんでした。" description="" action={<><Button onClick={() => data.loadSubmissions()} busyLabel="処理中…">もう一度読み込む</Button></>} />
     )
   }
   if (submissions.length === 0) {
@@ -51,12 +50,12 @@ export default function FormsTab({ data }: { data: FriendDetailState }) {
             </div>
             <dl className={styles.answers}>
               {keys.map((k) => (
-                <div key={k} className={styles.answer}><dt>{labelByName.get(k)}</dt><dd>{renderValue(s.data[k])}</dd></div>
+                <div key={k} className={styles.answer}><dt>{labelByName.get(k)}</dt><dd><FormFileAttachments value={s.data[k]} /></dd></div>
               ))}
               {orphans.map((k) => (
                 <div key={k} className={styles.answer}>
                   <dt title={`項目キー: ${k}`}>{k}<span className={styles.orphan}>（現在は使われていない項目）</span></dt>
-                  <dd>{renderValue(s.data[k])}</dd>
+                  <dd><FormFileAttachments value={s.data[k]} /></dd>
                 </div>
               ))}
             </dl>
@@ -66,7 +65,7 @@ export default function FormsTab({ data }: { data: FriendDetailState }) {
       {submissionsNextCursor ? (
         <div className={styles.centered}>
           {/* 続きを読めなかったら、その場に黄色の文＋さらに読み込むを残す（絵の注記）。 */}
-          {submissionsMoreError ? <p className={styles.warnText} role="alert">続きを読み込めませんでした。</p> : null}
+          {submissionsMoreError ? <Notice tone="danger" className={styles.warnTextNoticePlacement} >続きを読み込めませんでした。</Notice> : null}
           <Button onClick={() => void data.loadSubmissions(submissionsNextCursor)} disabled={submissionsLoadingMore} busy={submissionsLoadingMore} busyLabel="読み込んでいます…">さらに読み込む</Button>
         </div>
       ) : null}

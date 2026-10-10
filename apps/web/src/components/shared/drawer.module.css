@@ -26,8 +26,8 @@
   width: 844px;
   max-width: 100%;
   height: 190px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-panel);
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-card);
   box-shadow: var(--card-shadow);
 }
 
@@ -67,7 +67,7 @@
 }
 
 .inlineTitle {
-  font-size: var(--text-body);
+  font-size: var(--text-callout);
 }
 
 .description {
@@ -265,7 +265,7 @@
 }
 
 [data-theme='v8'] .panel[data-width='editor'] .close:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -315,7 +315,7 @@
 [data-theme='v8'] .panel[data-layout='inset'] { padding: var(--tpl-af-dr-pad); gap: var(--tpl-af-dr-gap); box-shadow: var(--tpl-af-dr-shadow); }
 [data-theme='v8'] .panel[data-layout='inset'] .header { padding: 0; gap: var(--tpl-af-dr-gap); }
 [data-theme='v8'] .panel[data-layout='inset'] .title { font-size: var(--text-heading); font-weight: 700; line-height: normal; }
-[data-theme='v8'] .panel[data-layout='inset'] .description { margin-top: var(--tpl-af-dr-head-gap); font-size: var(--text-caption); line-height: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-theme='v8'] .panel[data-layout='inset'] .description { margin-top: var(--tpl-af-dr-head-gap); font-size: var(--text-caption); line-height: normal; white-space: normal; overflow-wrap: anywhere; }
 [data-theme='v8'] .panel[data-layout='inset'] .body { padding: 0; }
 [data-theme='v8'] .panel[data-layout='inset'] .footer { padding: 0; border: 0; gap: var(--tpl-toolbar-gap); }
 [data-theme='v8'] .panel[data-layout='inset'] .close { width: var(--tpl-af-dr-close); height: var(--tpl-af-dr-close); flex-basis: var(--tpl-af-dr-close); border: 1px solid var(--color-hairline); border-radius: var(--radius-control); color: var(--color-ink-secondary); }
@@ -335,3 +335,18 @@
 [data-theme='v8'] .panel[data-width='composer'] .footer { padding: var(--tpl-msg-composer-drawer-footer-pad); }
 
 .titleRow { display: flex; align-items: center; gap: var(--tpl-msg-composer-content-gap); flex-wrap: wrap; }
+
+/* B-158：幅の段は共通部品の指定を最後に適用する。 */
+[data-theme='v8'] .panel[data-design-width] { width: min(var(--drawer-design-width), 100%); }
+/* B-187：短い本文は中身の高さで止め、長い本文だけ縦に送る。下の操作は常に板の下端。 */
+[data-theme='v8'] .panel:not(.inline) { height: auto; max-height: 100dvh; align-self: flex-start; }
+[data-theme='v8'] .panel:not(.inline) .body { flex: 0 1 auto; }
+
+/* B-161：浮く面の影と薄い縁を共通化。 */
+[data-theme='v8'] .panel { border: 0; outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--shadow-controls-pop); }
+
+/* B-180：幅の指定がある引き出しでも窓の題の段をそろえる。 */
+[data-theme='v8'] .panel.panel .title {
+  font-size: var(--tpl-dialog-title-size);
+  font-weight: var(--tpl-dialog-title-weight);
+}

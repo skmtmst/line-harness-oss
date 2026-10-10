@@ -214,7 +214,7 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
             emptyTitle="まだ然の商品が登録されていません" emptyDescription="然の商品名と、100g あたりのカロリーを登録すると「然の鹿肉の目安」が出ます。"
             drafts={drafts} onUpdate={update} onDefault={setDefault} onRemove={remove} onAdd={() => add('nen')} disabledAdd={drafts.length >= MAX_PRODUCTS}
           />
-          <section data-design="TreatLimit" data-design-node="feeding-treat-limit" className="flex flex-wrap items-center gap-4 rounded-card border border-hairline bg-canvas px-4 py-3">
+          <section data-design="TreatLimit" data-design-node="feeding-treat-limit" className="flex flex-wrap items-center gap-4 rounded-card border content-card bg-canvas px-4 py-3">
             <div className="min-w-0 flex-1">
               <h2 className="text-label font-semibold text-ink">おやつの上限（1日の必要カロリーに対して）</h2>
               <p className="mt-1 text-caption text-ink-secondary">獣医師の一般的な目安は 10% 以内。上限を変えると、全員の「然の鹿肉の目安」が計算し直されます。</p>

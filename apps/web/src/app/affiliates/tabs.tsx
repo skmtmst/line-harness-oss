@@ -1,5 +1,7 @@
 'use client'
 
+import { RowActions } from '@/components/shared/row-actions'
+
 import { Fragment, useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
 import {
@@ -177,7 +179,6 @@ export function asReportV2(raw: unknown): ReportV2 | null {
   if (!Array.isArray(value.byOffer) || !Array.isArray(value.conversionsByPoint)) return null
   return value as ReportV2
 }
-
 
 export interface JourneySummary {
   friendId: string
@@ -724,7 +725,7 @@ export function AffiliatorsTab({
         紹介リンクを渡した人ごとに、クリックから成果までの流れと確定した報酬を確認できます。
       </NoteBar>
 
-      <section className="bg-canvas rounded-card border-hairline border p-4" aria-label="今月の成果の流れ">
+      <section className="bg-canvas rounded-card content-card border p-4" aria-label="今月の成果の流れ">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="text-ink flex items-center gap-1 text-sm font-semibold">
             今月の成果の流れ
@@ -972,7 +973,7 @@ export function AffiliatorsTab({
                                 }}
                               />
 
-                              <section className="rounded-card border-hairline order-first bg-canvas border p-4" aria-label="次の支払い">
+                              <section className="rounded-card content-card order-first bg-canvas border p-4" aria-label="次の支払い">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div>
                                     <p className="text-ink text-sm font-bold">次の支払い</p>
@@ -1419,6 +1420,7 @@ export function CreateAffiliateModal({
     <Dialog
       open
       title="アフィリエイター新規作成"
+      dirty={issuedUrl ? false : undefined}
       busy={submitting}
       onCancel={onClose}
       footer={issuedUrl ? (
@@ -2530,7 +2532,7 @@ export function ApprovalQueue({
       )}
 
       {detailItem && (
-        <div className="bg-canvas rounded-card border-hairline mt-3 border p-4" role="dialog" aria-label="成果の詳細">
+        <div className="bg-canvas rounded-card content-card mt-3 border p-4" role="dialog" aria-label="成果の詳細">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h3 className="text-ink text-sm font-semibold">成果の詳細</h3>
@@ -2631,7 +2633,7 @@ export function ApprovalQueue({
       )}
 
       {bulkResult && (
-        <div className="bg-canvas rounded-card border-hairline mt-3 border p-4" role="status" aria-label="まとめて処理の結果">
+        <div className="bg-canvas rounded-card content-card mt-3 border p-4" role="status" aria-label="まとめて処理の結果">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h3 className="text-ink text-sm font-semibold">まとめて処理の結果</h3>
@@ -2783,12 +2785,7 @@ function OffersList({
                 <span className="text-ink-faint block text-xs">確定 {formatYen(offerStats.get(offer.id)?.reward ?? 0)}</span>
               </td>
               <td className="px-4 py-3 text-right whitespace-nowrap">
-                <button
-                  onClick={() => onEdit(offer)}
-                  className="text-action text-xs font-medium hover:underline"
-                >
-                  編集
-                </button>
+                <RowActions edit={{ onClick: () => onEdit(offer) }} />
                 <button
                   onClick={() => onTerms(offer)}
                   className="text-action ml-2 text-xs font-medium hover:underline"
@@ -3068,7 +3065,7 @@ export function OffersTab() {
         )}
       </div>
 
-      <section className="bg-canvas rounded-card border-hairline border p-4">
+      <section className="bg-canvas rounded-card content-card border p-4">
         <h3 className="text-ink text-sm font-semibold">アフィリエイターと案件のちがい</h3>
         <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
           <li>・アフィリエイター＝紹介してくれる人。紹介コードを持ちます</li>
@@ -3094,7 +3091,6 @@ export function OffersTab() {
     </div>
   )
 }
-
 
 /**
  * 支払いの取り決めの編集。
@@ -3168,7 +3164,7 @@ export function SettlementEditor({
               setSaved(false)
             }}
             placeholder="partner@example.com"
-            className="w-full rounded-mini border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-action"
+            className="w-full rounded-mini border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-focus-ring"
           />
         </div>
         <div>
@@ -3190,7 +3186,7 @@ export function SettlementEditor({
                 setSaved(false)
               }}
               placeholder="なし"
-              className="w-full rounded-mini border border-hairline px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-action"
+              className="w-full rounded-mini border border-hairline px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-focus-ring"
             />
             <span className="whitespace-nowrap text-xs text-ink-faint">日</span>
           </div>
@@ -3212,7 +3208,7 @@ export function SettlementEditor({
             }}
             placeholder="例: 月末締め翌月末払い"
             maxLength={100}
-            className="w-full rounded-mini border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-action"
+            className="w-full rounded-mini border border-hairline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-focus-ring"
           />
         </div>
       </div>

@@ -1297,7 +1297,7 @@ export default function EditDialog({
                   <div className="bg-canvas-sunken mt-3 rounded-control p-3 text-xs">
                     <p className="text-ink font-semibold">この条件に当たった受信</p>
                     <p className="text-ink-faint mt-1">過去28日の受信に、この条件をあてはめた結果です。これから来る受信の件数ではありません。</p>
-                    <p className="text-ink-faint mt-2">標準互換15軸：名前・個別メモ・ステータスメッセージ・友だち登録日・タグ・友だち情報・シナリオ・イベント予約・カレンダー予約・共通情報・リマインダ・回答フォーム・最終反応日・その他・対応マーク</p>
+                    <p className="text-ink-faint mt-2">標準互換15軸：名前・メモ・ステータスメッセージ・友だち登録日・タグ・友だち情報・シナリオ・イベント予約・カレンダー予約・共通情報・リマインダ・回答フォーム・最終反応日・その他・対応マーク</p>
                     <p className="text-ink-faint mt-1">この画面だけの6軸：担当者・流入経路・配信状況・予約状況・購入履歴・ブロック状態</p>
                   </div>
                 </>
@@ -1472,11 +1472,7 @@ export default function EditDialog({
             <InlineActionList
               actions={actions}
               onChange={setActions}
-              tags={actionOptions.tags}
-              fields={actionOptions.fields}
-              marks={actionOptions.marks}
-              scenarios={actionOptions.scenarios}
-              vars={actionOptions.vars}
+              {...actionOptions}
             />
           </div>
 

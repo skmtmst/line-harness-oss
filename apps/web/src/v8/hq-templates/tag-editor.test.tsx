@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import React from 'react'
+
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TagDefinition } from '@/lib/hq-templates-api'
@@ -29,14 +29,16 @@ describe('統括の V8 タグ編集と保存先', () => {
     expect(store.retroactivePreview).not.toHaveBeenCalled()
   })
 
-  it('続けて作る場合も同じ保存口へ渡し、連動の窓を取り消しても OFF を変えない', async () => {
+  it('続けて作る場合も同じ保存口へ渡し、行うことのメニューを閉じても OFF を変えない', async () => {
     const save = vi.fn<(definition: TagDefinition, another?: boolean) => Promise<void>>().mockResolvedValue(undefined)
     render(<HqTagEditorV8 definition={{ ...definition, tag: { name: '手動用', linkedEnabled: false } }} editing={false} saving={false} onCancel={() => {}} onSave={save} />)
     fireEvent.click(screen.getAllByRole('button', { name: '開く' })[0])
-    fireEvent.click(screen.getByRole('button', { name: 'アクションを追加する' }))
-    const dialog = await screen.findByRole('dialog')
-    expect(dialog.textContent).toContain('統括のひな形で使えるのは')
-    fireEvent.click(Array.from(dialog.querySelectorAll('button')).find((button) => button.textContent === 'キャンセル')!)
+    fireEvent.click(screen.getByRole('button', { name: '行うことを足す' }))
+    const menu = await screen.findByRole('menu')
+    expect(menu.textContent).toContain('テキスト送信')
+    expect(menu.textContent).toContain('マイル付与')
+    expect(menu.textContent).not.toContain('タグ追加')
+    fireEvent.keyDown(menu, { key: 'Escape' })
     fireEvent.click(screen.getByRole('button', { name: '保存して続けて作る' }))
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
     expect(save.mock.calls[0][0].tag.linkedEnabled).toBe(false)
@@ -48,7 +50,7 @@ describe('統括の V8 タグ編集と保存先', () => {
     const view = render(<HqTagEditorV8 {...props} readOnly />)
     expect(screen.queryByRole('button', { name: 'タグを作る' })).toBeNull()
     expect(screen.queryByRole('switch', { name: 'タグ連動' })).toBeNull()
-    expect(screen.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。').getAttribute('role')).toBe('note')
+    expect(screen.getByText('閲覧のみで見ています。変える操作は統括の管理者に頼んでください。').closest('[data-read-only-notice]')?.getAttribute('role')).toBe('note')
     view.rerender(<HqTagEditorV8 {...props} key="new" definition={{ ...definition, tag: { name: '' } }} />)
     expect(screen.getByRole('button', { name: 'タグを作る' }).hasAttribute('disabled')).toBe(true)
   })

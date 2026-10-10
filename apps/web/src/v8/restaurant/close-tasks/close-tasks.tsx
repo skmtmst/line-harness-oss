@@ -1,12 +1,7 @@
 'use client'
 
-/*
- * ★V8 他のサイトの枠を閉じる知らせ（提案 E-5 `YMVFD`。ダッシュボードの「すべて見る」から）。
- *
- * 未対応／閉じた で切り替え。1行＝1つの枠（時刻）。閉じる媒体は札で並べ、閉じた媒体には ✓。
- * ［閉じた］は媒体ごと（まだ閉じていない先頭の媒体。ほかの媒体は「…」から）。
- * 席が空いた枠は「もう開けてよい」。読む口・書く口は channel-close-tasks（今ある口）だけ。動きは BEHAVIOR.md。
- */
+import { useUrlTab } from '@/lib/use-url-tab'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check } from 'lucide-react'
@@ -29,6 +24,16 @@ import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { type CloseGroup, canWriteRole, groupCloseTasks, openItems, reasonText, slotTitle } from '../dashboard/summarize'
 import { type StoreMedium, loadStoreMedia } from '../dashboard/use-store-today'
 import styles from './close-tasks.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 他のサイトの枠を閉じる知らせ（提案 E-5 `YMVFD`。ダッシュボードの「すべて見る」から）。
+ *
+ * 未対応／閉じた で切り替え。1行＝1つの枠（時刻）。閉じる媒体は札で並べ、閉じた媒体には ✓。
+ * ［閉じた］は媒体ごと（まだ閉じていない先頭の媒体。ほかの媒体は「…」から）。
+ * 席が空いた枠は「もう開けてよい」。読む口・書く口は channel-close-tasks（今ある口）だけ。動きは BEHAVIOR.md。
+ */
 
 type Tab = 'open' | 'done'
 
@@ -43,6 +48,7 @@ const STATE_BADGE: Record<CloseGroup['state'], { label: string; tone: 'danger' |
 }
 
 export default function CloseTasksPage() {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   usePageTitle('枠を閉じる知らせ')
   usePageCrumbs([{ label: '店舗ダッシュボード', href: '/restaurant-test/dashboard' }])
@@ -53,8 +59,8 @@ export default function CloseTasksPage() {
   const [tasks, setTasks] = useState<RestaurantChannelCloseTask[] | null>(null)
   const [media, setMedia] = useState<StoreMedium[]>([])
   const [error, setError] = useState<unknown>(null)
-  const [tab, setTab] = useState<Tab>('open')
-  const [query, setQuery] = useState('')
+  const [tab, setTab] = useUrlTab(['open', 'done'] as const, 'open')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [medium, setMedium] = useState('all')
   const [busyId, setBusyId] = useState('')
 
@@ -83,10 +89,15 @@ export default function CloseTasksPage() {
       ])
       setTasks(list.data); setMedia(channels); setError(null)
     } catch (caught) {
-      setError(caught)
+      const fieldFailure = saveErrors.capture(caught);
+
+
+      if (!fieldFailure) {
+      setError(caught) }
     }
-  }, [selectedAccountId, storeId])
-  useEffect(() => { void load() }, [load])
+  }, [selectedAccountId, storeId, saveErrors])
+  useEffect(() => { void load() }, [load]);
+
 
   const groups = useMemo(() => groupCloseTasks(tasks ?? [], media), [tasks, media])
   const openCount = groups.filter((g) => g.state !== 'done').length
@@ -105,7 +116,11 @@ export default function CloseTasksPage() {
       await restaurantTestApi.completeChannelCloseTask(selectedAccountId, taskId)
       notifyToast(`${name}の枠を閉じた印を付けました。`)
     } catch (caught) {
-      notifyToast(caught instanceof Error && caught.message ? caught.message : '印を付けられませんでした。', { tone: 'error' })
+      const fieldFailure = saveErrors.capture(caught);
+
+
+      if (!fieldFailure) {
+      notifyToast(caught instanceof Error && caught.message ? caught.message : '印を付けられませんでした。', { tone: 'error' }) }
     } finally {
       await load()
       setBusyId('')
@@ -143,7 +158,7 @@ export default function CloseTasksPage() {
                   <span className={styles.reason}>{reasonText(group)}</span>
                 </Td>
                 {/* 予約と知らせの結び付け（どの経路で入った予約か）は口がまだ無い（Codex 担当）。来たらここに経路の札。 */}
-                <Td className={styles.colRoute} collapseAt="narrow"><span className={styles.none} title="どの経路の予約で出た知らせかは、まだ出せません">—</span></Td>
+                <Td className={styles.colRoute} collapseAt="narrow"><span className={styles.none} title="どの経路の予約で出た知らせかは、まだ出せません">{emptyValue('unknown')}</span></Td>
                 <Td className={styles.colMedia}>
                   <span className={styles.chips} title={group.items.map((item) => `${item.name}${item.status === 'done' ? '（閉じた）' : ''}`).join('・')}>
                     {group.items.map((item) => (
@@ -159,10 +174,10 @@ export default function CloseTasksPage() {
                 <Td className={styles.colActions}>
                   <span className={styles.actions}>
                     {targetMedium?.adminUrl ? (
-                      <Button size="compact" href={targetMedium.adminUrl} target="_blank" rel="noopener noreferrer">管理画面を開く ↗</Button>
+                      <Button external size="compact" href={targetMedium.adminUrl}  >管理画面を開く</Button>
                     ) : null}
                     {canWrite && target ? (
-                      <Button size="compact" onClick={() => void close(target.id, target.name)} disabled={busyId === target.id} aria-label={`${target.name}の枠を閉じた`} title={`${target.name}の枠を閉じた`}>
+                      <Button size="compact" onClick={() => void close(target.id, target.name)} disabled={busyId === target.id} aria-label={`${target.name}の枠を閉じた`} title={`${target.name}の枠を閉じた`} busy={Boolean(busyId === target.id)} busyLabel="処理中…">
                         <Check size={15} aria-hidden="true" />閉じた
                       </Button>
                     ) : null}
@@ -171,7 +186,7 @@ export default function CloseTasksPage() {
                       label={`${slotTitle(group.startsAt)}の操作`}
                       items={[
                         ...(canWrite ? remaining.slice(1).map((item) => ({ id: item.id, label: `${item.name}を閉じた`, onSelect: () => void close(item.id, item.name) })) : []),
-                        { id: 'ledger', label: '予約台帳でこの日を見る', external: true, onSelect: () => { router.push(`/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}`) } },
+                        { id: 'ledger', label: '予約台帳でこの日を見る', external: false, href: `/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}`, onSelect: () => { router.push(`/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}`) } },
                       ]}
                     />
                   </span>
@@ -186,7 +201,7 @@ export default function CloseTasksPage() {
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId="YMVFD"
       headingSize="compact"
       title="他のサイトの枠を閉じる知らせ"
@@ -205,16 +220,16 @@ export default function CloseTasksPage() {
           <span className={styles.search}>
             <SearchField aria-label="日時・媒体で探す" placeholder="日時・媒体で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
           </span>
-          <Select
+          <SaveErrorField names={["medium"]}><Select
             aria-label="媒体で絞る"
             value={medium}
             onChange={setMedium}
             options={[{ value: 'all', label: '媒体：すべて' }, ...mediaOptions.map(([code, name]) => ({ value: code, label: `媒体：${name}` }))]}
-          />
+          /></SaveErrorField>
         </>
       )}
     >
       {content}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

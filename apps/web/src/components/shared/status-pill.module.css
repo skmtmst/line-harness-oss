@@ -47,5 +47,24 @@
   font-size: var(--text-label);
   font-weight: 600;
 }
-[data-theme='v8'] .pill.control:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+[data-theme='v8'] .pill.control:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 }
+
+/* B-152・仕上げ4 */
+[data-theme='v8'] .pill {
+  --status-dot: var(--polish-status-neutral-dot);
+  --status-bg: var(--polish-status-neutral-bg);
+  --status-ink: var(--polish-status-neutral-ink);
+  gap: var(--polish-status-gap); padding: var(--polish-status-pad);
+  border: 0; border-radius: var(--radius-pill);
+  background: var(--status-bg); color: var(--status-ink);
+  font-size: var(--polish-text-support); font-weight: var(--polish-status-weight); line-height: 1.5;
+  max-width: 100%; min-width: 0;
+}
+[data-theme='v8'] .pill[data-tone='success'] { --status-dot: var(--polish-status-success-dot); --status-bg: var(--polish-status-success-bg); --status-ink: var(--polish-status-success-ink); }
+[data-theme='v8'] .pill[data-tone='warning'] { --status-dot: var(--polish-status-warning-dot); --status-bg: var(--polish-status-warning-bg); --status-ink: var(--polish-status-warning-ink); }
+[data-theme='v8'] .pill[data-tone='danger'] { --status-dot: var(--polish-status-danger-dot); --status-bg: var(--polish-status-danger-bg); --status-ink: var(--polish-status-danger-ink); }
+[data-theme='v8'] .pill[data-tone='info'] { --status-dot: var(--polish-status-info-dot); --status-bg: var(--polish-status-info-bg); --status-ink: var(--polish-status-info-ink); }
+[data-theme='v8'] .pill[data-tone='neutral'] { --status-dot: var(--polish-status-neutral-dot); --status-bg: var(--polish-status-neutral-bg); --status-ink: var(--polish-status-neutral-ink); }
+[data-theme='v8'] .pill .dot { width: var(--polish-status-dot-size); height: var(--polish-status-dot-size); flex-basis: var(--polish-status-dot-size); background: var(--status-dot); }
+[data-theme='v8'] .pill.control[data-tone] { background: var(--status-bg); color: var(--status-ink); }

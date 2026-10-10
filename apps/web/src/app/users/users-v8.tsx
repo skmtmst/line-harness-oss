@@ -1,15 +1,5 @@
 'use client'
 
-/*
- * ★V8 統合ユーザー（Pencil `ADjK8`、採用版の流れは `sdbsQ` 板3、状態 `SXCb3`）。
- *
- * データの口は v7 と同じ `useMergedUsers`。違いは見せ方——タブの段は
- * 「← 友だち一覧 › データ管理 › 統合ユーザー」＋「データ管理 ▾」に替える。
- * 詳細は v7 と同じく一覧の面を差し替える（merged-person-detail-v8.tsx）。
- *
- * 板にある「配信に使うアカウント」の列は /api/users-grouped の行に無いので
- * 出さない（DEVIN-QUESTIONS に未接続として記録）。
- */
 import { useCallback, useEffect, useState } from 'react'
 import { CircleAlert, RotateCw, SearchX, UserPlus } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -28,6 +18,21 @@ import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import { useMergedUsers, USERS_PAGE_SIZE } from './use-merged-users'
 import styles from '@/app/friends/friends-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
+
+/*
+ * ★V8 統合ユーザー（Pencil `ADjK8`、採用版の流れは `sdbsQ` 板3、状態 `SXCb3`）。
+ *
+ * データの口は v7 と同じ `useMergedUsers`。違いは見せ方——タブの段は
+ * 「← 友だち一覧 › データ管理 › 統合ユーザー」＋「データ管理 ▾」に替える。
+ * 詳細は v7 と同じく一覧の面を差し替える（merged-person-detail-v8.tsx）。
+ *
+ * 板にある「配信に使うアカウント」の列は /api/users-grouped の行に無いので
+ * 出さない（DEVIN-QUESTIONS に未接続として記録）。
+ */
 
 const UID_STATUS = {
   url_token: '要確認',
@@ -39,7 +44,7 @@ export default function UsersV8() {
   usePageTitle('統合ユーザー')
   const u = useMergedUsers()
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || canManageRole(staffRole)
+  const canManage = canManageRole(staffRole)
   const [openedPersonId, setOpenedPersonId] = useState<string | null>(null)
   /*
    * 人の詳細は同じ URL のまま開くので、上の帯のパンくずの「統合ユーザー」で一覧へ戻す
@@ -111,7 +116,7 @@ export default function UsersV8() {
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>統合ユーザー</span>
           <p className={styles.kpiValue}>
-            {uniquePeople !== null ? formatNumber(uniquePeople) : '—'}
+            {uniquePeople !== null ? formatNumber(uniquePeople) : emptyValue('unknown')}
             <span className={styles.kpiUnit}>人</span>
           </p>
           <p className={styles.kpiDetail}>重複を1人にまとめた数</p>
@@ -122,7 +127,7 @@ export default function UsersV8() {
             <HelpTip label="UID連携済みの説明">このページに出ている人のうち、LINE UIDを根拠にまとめている数です。</HelpTip>
           </span>
           <p className={styles.kpiValue}>
-            {u.loading || u.error ? '—' : formatNumber(linkedUidCount)}
+            {u.loading || u.error ? emptyValue('unknown') : formatNumber(linkedUidCount)}
             <span className={styles.kpiUnit}>人</span>
           </p>
           <p className={styles.kpiDetail}>このページでUID確認済み</p>
@@ -133,7 +138,7 @@ export default function UsersV8() {
             <HelpTip label="複数アカウントの説明">このページに出ている人のうち、2つ以上のLINEアカウントに登録がある数です。</HelpTip>
           </span>
           <p className={styles.kpiValue}>
-            {u.loading || u.error ? '—' : formatNumber(multiAccountCount)}
+            {u.loading || u.error ? emptyValue('unknown') : formatNumber(multiAccountCount)}
             <span className={styles.kpiUnit}>人</span>
           </p>
           <p className={styles.kpiDetail}>送信前に配信先の確認が必要です</p>
@@ -153,7 +158,7 @@ export default function UsersV8() {
           />
         </div>
         <div className={styles.selectWrap}>
-          <Select
+          <SaveErrorField names={["uid","u.uid"]}><Select
             aria-label="UID連携で絞り込む"
             label="UID連携"
             size="full"
@@ -164,10 +169,10 @@ export default function UsersV8() {
               { value: 'linked', label: 'UID：連携済み' },
               { value: 'unlinked', label: 'UID：未連携・要確認' },
             ]}
-          />
+          /></SaveErrorField>
         </div>
         <div className={styles.selectWrap}>
-          <Select
+          <SaveErrorField names={["account","u.account"]}><EntitySelect
             aria-label="所属アカウントで絞り込む"
             label="所属アカウント"
             size="full"
@@ -175,17 +180,17 @@ export default function UsersV8() {
             onChange={u.setAccount}
             options={[
               { value: '', label: '所属：すべて' },
-              ...u.accountOptions.map((a) => ({ value: a.id, label: a.name })),
+              ...u.accountOptions.map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: a.name })),
             ]}
-          />
+          /></SaveErrorField>
         </div>
-        <Checkbox
+        <SaveErrorField names={["onlyDups","u.onlyDups","only_dups","u.only_dups"]}><Checkbox
           checked={u.onlyDups}
           onCheckedChange={u.setOnlyDups}
           className="whitespace-nowrap"
         >
           複数アカウントのみ
-        </Checkbox>
+        </Checkbox></SaveErrorField>
         <span className={styles.toolbarSpacer} />
         <span className={styles.toolbarCount}>
           {/* WEB322：読めなかったときは 0人と言わない。 */}
@@ -206,7 +211,7 @@ export default function UsersV8() {
       </div>
 
       {u.exportError ? (
-        <p className={styles.errorBand} role="alert">{u.exportError}</p>
+        <Notice tone="danger" className={styles.errorBandNoticePlacement} >{u.exportError}</Notice>
       ) : null}
 
       {/* 一覧。状態は SXCb3：骨格・0件・失敗をこの場所で出す。 */}
@@ -230,7 +235,7 @@ export default function UsersV8() {
                       <CircleAlert size={20} aria-hidden="true" />
                     </span>
                     <p className={styles.stateTitle}>統合ユーザーを読み込めませんでした</p>
-                    <Button type="button" variant="primary" onClick={() => void u.load()}>
+                    <Button type="button" variant="primary" onClick={() => u.load()} busyLabel="処理中…">
                       もう一度試す
                     </Button>
                   </div>
@@ -264,11 +269,11 @@ export default function UsersV8() {
                           </button>
                         ) : (
                           <span className={styles.personName} style={{ cursor: 'default' }}>
-                            {row.displayName || '—'}
+                            {row.displayName || emptyValue('unknown')}
                           </span>
                         )}
                         <span className={styles.personSub}>
-                          {row.emails[0] ?? row.phones[0] ?? '—'}
+                          {row.emails[0] ?? row.phones[0] ?? emptyValue('unknown')}
                         </span>
                       </div>
                     </div>

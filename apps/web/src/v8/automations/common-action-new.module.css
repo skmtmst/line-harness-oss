@@ -59,17 +59,7 @@
   line-height: var(--tpl-cn-main-lh);
 }
 
-.errorBand {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--tpl-cn-field-row-gap);
-  padding: var(--tpl-tg2-info-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-danger-soft);
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-}
+
 
 .errorBand > p {
   flex: 1 1 0;

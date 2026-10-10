@@ -1,3 +1,4 @@
+import Button from './ui/Button.js';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 /*
@@ -73,21 +74,20 @@ export default function HelpTip({
         if (!wrapRef.current?.contains(event.relatedTarget as Node)) setOpen(false);
       }}
     >
-      <button
+      <Button variant="icon"
         ref={buttonRef}
         type="button"
         aria-label={label}
         aria-describedby={open ? tipId : undefined}
         aria-expanded={open}
         onClick={toggle}
-        className="liff-hit inline-flex h-6 w-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="10" />
           <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
           <path d="M12 17h.01" />
         </svg>
-      </button>
+      </Button>
       {open ? (
         <span
           role="note"

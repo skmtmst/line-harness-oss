@@ -1,13 +1,5 @@
 'use client'
 
-/*
- * ★V8 友だち詳細（Pencil「★P1-4 友だち詳細」Q5F2QE・概要は JCDRm）。
- *
- * 入口は app/friends/detail/page.tsx（V8 のときだけこの画面）。
- * データの口・権限・失敗の扱いは今の画面と同じ（BEHAVIOR.md）。見せ方だけ絵どおり：
- * 板の頭（顔・名前・札・補足／…・個別操作・受信箱で開く）→ タブ10個 → タブの中身。
- * タブの中身はタブごとのファイルに分けた。
- */
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, CircleCheck, Copy, List, MessageCircle, MessageSquare, Star, Workflow, Zap } from 'lucide-react'
@@ -41,6 +33,21 @@ import ActionsTab from './actions-tab'
 import MilesTab from './miles-tab'
 import RichMenuTab from './rich-menu-tab'
 import styles from './detail.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+
+/*
+ * ★V8 友だち詳細（Pencil「★P1-4 友だち詳細」Q5F2QE・概要は JCDRm）。
+ *
+ * 入口は app/friends/detail/page.tsx（V8 のときだけこの画面）。
+ * データの口・権限・失敗の扱いは今の画面と同じ（BEHAVIOR.md）。見せ方だけ絵どおり：
+ * 板の頭（顔・名前・札・補足／…・個別操作・受信箱で開く）→ タブ10個 → タブの中身。
+ * タブの中身はタブごとのファイルに分けた。
+ */
 
 /** タブ10個（並びと URL の値は今の画面と同じ）。 */
 export const FRIEND_DETAIL_TABS = [
@@ -110,11 +117,11 @@ function FriendDetailV8Inner() {
   ]
   // 「…」＝関連する画面を開く。別の画面へ移るものは ↗（external）。
   const secondaryActions: ActionMenuItem[] = [
-    { id: 'templates', label: 'テンプレート一覧を見る', icon: <List size={16} />, external: true, onSelect: () => router.push('/templates') },
-    { id: 'scenarios', label: 'シナリオ一覧を見る', icon: <List size={16} />, external: true, onSelect: () => router.push('/scenarios') },
-    { id: 'reminders', label: 'リマインダ一覧を見る', icon: <List size={16} />, external: true, onSelect: () => router.push('/reminders') },
-    { id: 'mileage', label: 'マイルを確認', icon: <Star size={16} />, external: true, onSelect: () => router.push('/mileage') },
-    { id: 'duplicates', label: '重複候補を確認', icon: <Copy size={16} />, external: true, onSelect: () => router.push('/duplicates') },
+    { id: 'templates', label: 'テンプレート一覧を見る', icon: <List size={16} />, external: false, href: '/templates', onSelect: () => router.push('/templates') },
+    { id: 'scenarios', label: 'シナリオ一覧を見る', icon: <List size={16} />, external: false, href: '/scenarios', onSelect: () => router.push('/scenarios') },
+    { id: 'reminders', label: 'リマインダ一覧を見る', icon: <List size={16} />, external: false, href: '/reminders', onSelect: () => router.push('/reminders') },
+    { id: 'mileage', label: 'マイルを確認', icon: <Star size={16} />, external: false, href: '/mileage', onSelect: () => router.push('/mileage') },
+    { id: 'duplicates', label: '重複候補を確認', icon: <Copy size={16} />, external: false, href: '/duplicates', onSelect: () => router.push('/duplicates') },
     { id: 'back-to-list', label: '友だち一覧へ戻る', icon: <ArrowLeft size={16} />, dividerBefore: true, onSelect: () => router.push('/friends') },
   ]
 
@@ -124,7 +131,7 @@ function FriendDetailV8Inner() {
   }
   if (!data.loading && data.loadForbidden) {
     // 403 は見つからない案内より先に分ける（監査 228-003）。押しても直らないので再試行は出さない。
-    return <TargetMissing kind="error" title="この友だちを見る権限がありません" description="見るには権限が要ります。オーナーか管理者の方に確認してください。" backHref="/friends" backLabel="友だち一覧へ戻る" />
+    return <TargetMissing kind="error" title="この友だちを見る権限がありません" description={permissionDeniedMessage('store')} backHref="/friends" backLabel="友だち一覧へ戻る" />
   }
   if (!data.loading && (data.friendMissing || (!data.error && !friend))) {
     return <TargetMissing kind="not-found" title="この友だちは見つかりません" description="削除されたか、別の LINE アカウントの人です。一覧から選び直してください。" accountName={selectedAccount?.name} backHref="/friends" backLabel="友だち一覧へ戻る" />
@@ -135,22 +142,15 @@ function FriendDetailV8Inner() {
 
   const status = friend?.support?.status
   const subtitle = friend
-    ? `LINE 表示名：${friend.displayName || '—'}・${friend.createdAt ? `${formatDay(friend.createdAt).replace(/（.）$/, '')}に友だち追加` : '—'}・担当 ${friend.support?.operatorName ?? '未割り当て'}`
+    ? `LINE 表示名：${friend.displayName || emptyValue('unknown')}・${friend.createdAt ? `${formatDay(friend.createdAt).replace(/（.）$/, '')}に友だち追加` : emptyValue('unknown')}・担当 ${friend.support?.operatorName ?? '未割り当て'}`
     : '読み込んでいます…'
-  const realName = data.fields.find((f) => f.name === '本名')?.value ?? ''
+  const realName = data.fields.find((f) => f.fixedKey === 'name')?.value ?? data.friend?.realName ?? ''
 
   return (
     <PageFrame kind="detail" boardId="Q5F2QE">
-      <header className={styles.head}>
-        <Avatar name={friend?.displayName} src={friend?.pictureUrl} size={52} />
-        <div className={styles.nameBlock}>
-          <div className={styles.nameRow}>
-            <h2 className={styles.name} title={friend?.displayName}>{friend?.displayName ?? '友だち詳細'}</h2>
-            {status ? <StatusPill tone={SUPPORT_TONES[status]}>{SUPPORT_LABELS[status]}</StatusPill> : friend ? <span className={styles.faint}>やり取りなし</span> : null}
-          </div>
-          <p className={styles.sub} title={subtitle}>{subtitle}</p>
-        </div>
-        <span className={styles.menuAnchor}>
+      <PageHeading title={friend?.displayName ?? '友だち詳細'}
+        help={<>{subtitle}</>}
+        actions={<><Avatar name={friend?.displayName} src={friend?.pictureUrl} size={52} />{status ? <StatusPill tone={SUPPORT_TONES[status]}>{SUPPORT_LABELS[status]}</StatusPill> : friend ? <span className={styles.faint}>やり取りなし</span> : null}<span className={styles.menuAnchor}>
           <RowMenu
             className={styles.square}
             label="その他の操作"
@@ -159,8 +159,7 @@ function FriendDetailV8Inner() {
             open={moreMenuOpen}
             onOpenChange={(next) => { setMoreMenuOpen(next); setActionMenuOpen(false) }}
           />
-        </span>
-        <span className={styles.menuAnchor}>
+        </span><span className={styles.menuAnchor}>
           <Button
             aria-haspopup="menu"
             aria-expanded={actionMenuOpen}
@@ -169,13 +168,11 @@ function FriendDetailV8Inner() {
             <Zap aria-hidden />個別操作
           </Button>
           <ActionMenu open={actionMenuOpen} items={primaryActions} ariaLabel="この友だちへの個別操作" onClose={() => setActionMenuOpen(false)} />
-        </span>
-        <Button href={inbox} variant="primary"><MessageCircle aria-hidden />受信箱で開く</Button>
-      </header>
+        </span><Button href={inbox} variant="primary"><MessageCircle aria-hidden />受信箱で開く</Button></>} />
 
       {perms.viewOnly ? (
         <div className={styles.band}>
-          <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+          <ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice>
         </div>
       ) : null}
 
@@ -200,7 +197,7 @@ function FriendDetailV8Inner() {
       ) : null}
 
       {data.loading || !friend ? (
-        <div className={styles.pane}><p className={styles.paneNote}>読み込んでいます…</p></div>
+        <div className={styles.pane}><DetailLoading /></div>
       ) : tab === 'timeline' ? (
         <OverviewTab
           friend={friend}
@@ -243,7 +240,7 @@ function FriendDetailV8Inner() {
 
 export default function FriendDetailV8() {
   return (
-    <Suspense fallback={<div className={styles.pane}><p className={styles.paneNote}>読み込んでいます…</p></div>}>
+    <Suspense fallback={<div className={styles.pane}><DetailLoading /></div>}>
       <FriendDetailV8Inner />
     </Suspense>
   )

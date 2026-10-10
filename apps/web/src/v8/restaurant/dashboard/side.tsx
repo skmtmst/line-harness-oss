@@ -7,7 +7,8 @@
  * 保存してある行だけにリンクが出る。見出しの右の「設定」から、その設定の画面へ。
  * Instagram は投稿の同時公開まで対応（設定 › SNS 連携）。DM・コメントを受け取る口はまだ無いので案内だけ。
  */
-import { CornerUpLeft } from 'lucide-react'
+import {RowActions} from '@/components/shared/row-actions'
+import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import SectionHeader from '@/components/shared/section-header'
 import StatusBadge from '@/components/shared/status-badge'
@@ -38,10 +39,10 @@ export function SidePanel({ media, google, latestReview, canWrite, now }: {
   const connected = google?.connection.status === 'connected'
   return (
     <div className={styles.side}>
-      <SectionHeader
-        title="予約サイト・グルメ媒体"
-        help="この店が予約を受け取っている媒体です。店舗ページ・管理画面のリンクは、媒体の設定で保存すると出ます。"
-        helpLabel="予約サイト・グルメ媒体の説明"
+      <Card padding="roomy" layout="vertical" gap="12px"><SectionHeader linkTone="action" title="今日の回転"/><div className={styles.rotation}>{['稼働率','回転','滞在','無断取消'].map(label=><div key={label}><span>{label}</span><strong title="この指標はまだ計測されていません">—</strong></div>)}</div></Card>
+      <Card padding="roomy" layout="vertical" gap="12px">
+      <SectionHeader linkTone="action"
+        title="予約サイト・グルメ媒体" note={media?.some(m=>m.storePageUrl||m.adminUrl)?<RowActions subjectName="媒体のリンク" menuItems={media.flatMap(m=>[...(m.storePageUrl?[{id:m.code+'-page',label:`${m.name}の店舗ページ`,href:m.storePageUrl,external:true,onSelect:()=>{}}]:[]),...(m.adminUrl?[{id:m.code+'-admin',label:`${m.name}の管理画面`,href:m.adminUrl,external:true,onSelect:()=>{}}]:[])])}/>:undefined}
         href="/settings/booking-media"
         linkLabel="設定へ"
       />
@@ -50,34 +51,23 @@ export function SidePanel({ media, google, latestReview, canWrite, now }: {
       ) : media.length === 0 ? (
         <p className={styles.sideText}>予約を受け取っている媒体はまだありません。</p>
       ) : (
-        <ul className={styles.media}>
-          {media.map((m) => (
-            <li key={m.code} className={styles.medium}>
-              <span className={styles.mediumMark} aria-hidden="true">{m.name.slice(0, 1)}</span>
-              <span className={styles.mediumName} title={m.name}>{m.name}</span>
-              {m.storePageUrl ? <a className={styles.mediumLink} href={m.storePageUrl} target="_blank" rel="noopener noreferrer">店舗ページ ↗</a> : null}
-              {m.adminUrl ? <a className={styles.mediumLink} href={m.adminUrl} target="_blank" rel="noopener noreferrer">管理画面 ↗</a> : null}
-            </li>
-          ))}
-        </ul>
+        <p className={styles.sideText}>{media.map(m=>m.name).join('・')}</p>
       )}
 
-      <SectionHeader
+      </Card><Card padding="roomy" layout="vertical" gap="12px"><SectionHeader linkTone="action"
         title="Google の口コミ"
-        help="Google ビジネスに届いた口コミのうち、まだ返信していない新しいものです。"
-        helpLabel="Google の口コミの説明"
         href={connected ? '/restaurant-test/google' : undefined}
         linkLabel={connected ? 'すべて見る' : undefined}
       />
       {!google ? (
         <p className={styles.sideText}>Google の口コミを読み込めませんでした。</p>
       ) : !connected ? (
-        <div className={styles.sideCard}>
+        <div className={styles.reviewBody}>
           <p className={styles.sideText}>Google ビジネスとつないでいません。つなぐと口コミがここに出ます。</p>
-          <TextLink href="/settings/sns">SNS 連携でつなぐ</TextLink>
+          <TextLink tone="action" href="/settings/sns">SNS 連携でつなぐ</TextLink>
         </div>
       ) : latestReview ? (
-        <div className={styles.sideCard}>
+        <div className={styles.reviewBody}>
           <div className={styles.reviewHead}>
             <span className={styles.reviewStars}>{stars(latestReview.starRating)}</span>
             <span className={styles.reviewWho}>{`${latestReview.reviewerDisplayName ?? 'お客さま'} 様 ・ ${ago(latestReview.createTime, now)}`}</span>
@@ -86,8 +76,8 @@ export function SidePanel({ media, google, latestReview, canWrite, now }: {
           </div>
           {latestReview.comment ? <p className={styles.reviewText}>{latestReview.comment}</p> : null}
           {canWrite ? (
-            <Button variant="text" href={`/restaurant-test/google?tab=reviews&view=draft&id=${encodeURIComponent(latestReview.id)}`}>
-              <CornerUpLeft size={15} aria-hidden="true" />返信する
+            <Button variant="secondary" presentation="restaurant" href={`/restaurant-test/google?tab=reviews&view=draft&id=${encodeURIComponent(latestReview.id)}`}>
+              返信する
             </Button>
           ) : null}
         </div>
@@ -95,15 +85,16 @@ export function SidePanel({ media, google, latestReview, canWrite, now }: {
         <p className={styles.sideText}>未返信の口コミはありません。</p>
       )}
 
-      <SectionHeader
+      </Card><Card padding="roomy" layout="vertical" gap="12px"><SectionHeader linkTone="action"
         title="Instagram の新着"
         help="いまの Instagram 連携は、Googleビジネスの投稿を Instagram にも同時に出すところまでです。DM とコメントの新着は、受け取る口ができてからここに出します。"
         helpLabel="Instagram の新着の説明"
       />
-      <div className={styles.sideCard}>
+      <div className={styles.reviewBody}>
         <p className={styles.sideText}>DM・コメントの新着はまだここに出せません。Instagram のつなぎ方は SNS 連携の画面で見られます。</p>
-        <TextLink href="/settings/sns">SNS 連携を見る</TextLink>
+        <TextLink tone="action" href="/settings/sns">SNS 連携を見る</TextLink>
       </div>
+      </Card>
     </div>
   )
 }

@@ -22,6 +22,7 @@ import { restaurantTestApi, type RestaurantTable } from '@/lib/restaurant-test-a
 import RestaurantShell, { Panel, Stat, Status, type RestaurantV8Context } from './shell'
 import shellStyles from './shell.module.css'
 import styles from './tables.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const SEAT_TYPE_LABEL: Record<string, string> = {
   table: 'テーブル',
@@ -103,7 +104,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
     const reordered = [...placed]
     reordered.splice(to,0,reordered.splice(from,1)[0])
     void mutate(()=>restaurantTestApi.saveTableLayout(selectedAccountId,{
-      storeId: store.id,
+      storeId: store.id, expectedVersion:reordered[0]?.floor_version??1,
       tables: reordered.map((t,index)=>({id:t.id,floorX:index%3,floorY:Math.floor(index/3),joinGroup:t.join_group})),
     }),'卓の配置を保存しました。')
   }
@@ -139,18 +140,18 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
         <div data-design-node="gBrCz">
         <Panel title="新しい卓">
           <form onSubmit={submit} className={styles.formGrid}>
-            <label className={styles.field}>卓番<TextField name="code" required aria-label="卓番" /></label>
-            <label className={styles.field}>表示名<TextField name="label" required aria-label="表示名" /></label>
+            <label className={styles.field}>卓番<SaveErrorField names={["code"]}><TextField name="code" required aria-label="卓番" /></SaveErrorField></label>
+            <label className={styles.field}>表示名<SaveErrorField names={["label"]}><TextField name="label" required aria-label="表示名" /></SaveErrorField></label>
             <label className={styles.field}>席種
-              <select name="seatType" aria-label="席種" defaultValue="table" className={styles.select}>
+              <SaveErrorField names={["seatType","seat_type"]}><select name="seatType" aria-label="席種" defaultValue="table" className={styles.select}>
                 {SEAT_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
+              </select></SaveErrorField>
             </label>
-            <label className={styles.field}>最小人数<input name="minCapacity" type="number" defaultValue="1" required aria-label="最小人数" className={styles.numberInput} /></label>
-            <label className={styles.field}>最大人数<input name="maxCapacity" type="number" defaultValue="4" required aria-label="最大人数" className={styles.numberInput} /></label>
-            <label className={styles.field}>配置の列（0から）<input name="floorX" type="number" min="0" max="10000" defaultValue={rows.length%3} required aria-label="配置の列" className={styles.numberInput} /></label>
-            <label className={styles.field}>配置の行（0から）<input name="floorY" type="number" min="0" max="10000" defaultValue={Math.floor(rows.length/3)} required aria-label="配置の行" className={styles.numberInput} /></label>
-            <label className={styles.field}>結合グループ<TextField name="joinGroup" maxLength={100} defaultValue="" aria-label="結合グループ" /></label>
+            <label className={styles.field}>最小人数<SaveErrorField names={["minCapacity","min_capacity"]}><input name="minCapacity" type="number" defaultValue="1" required aria-label="最小人数" className={styles.numberInput} /></SaveErrorField></label>
+            <label className={styles.field}>最大人数<SaveErrorField names={["maxCapacity","max_capacity"]}><input name="maxCapacity" type="number" defaultValue="4" required aria-label="最大人数" className={styles.numberInput} /></SaveErrorField></label>
+            <label className={styles.field}>配置の列（0から）<SaveErrorField names={["floorX","floor_x"]}><input name="floorX" type="number" min="0" max="10000" defaultValue={rows.length%3} required aria-label="配置の列" className={styles.numberInput} /></SaveErrorField></label>
+            <label className={styles.field}>配置の行（0から）<SaveErrorField names={["floorY","floor_y"]}><input name="floorY" type="number" min="0" max="10000" defaultValue={Math.floor(rows.length/3)} required aria-label="配置の行" className={styles.numberInput} /></SaveErrorField></label>
+            <label className={styles.field}>結合グループ<SaveErrorField names={["joinGroup","join_group"]}><TextField name="joinGroup" maxLength={100} defaultValue="" aria-label="結合グループ" /></SaveErrorField></label>
             <div className={styles.formActions}>
               <Button type="submit" variant="primary" disabled={busy}>追加する</Button>
             </div>
@@ -162,18 +163,18 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
         <div data-design-node="gBrCz">
         <Panel title={`${editing.code}・${editing.label}を変更`}>
           <form key={editing.id} onSubmit={(event) => void submitEdit(event)} className={styles.formGrid}>
-            <label className={styles.field}>卓番<TextField name="code" defaultValue={editing.code} required aria-label="卓番" /></label>
-            <label className={styles.field}>表示名<TextField name="label" defaultValue={editing.label} required aria-label="表示名" /></label>
+            <label className={styles.field}>卓番<SaveErrorField names={["code"]}><TextField name="code" defaultValue={editing.code} required aria-label="卓番" /></SaveErrorField></label>
+            <label className={styles.field}>表示名<SaveErrorField names={["label"]}><TextField name="label" defaultValue={editing.label} required aria-label="表示名" /></SaveErrorField></label>
             <label className={styles.field}>席種
-              <select name="seatType" aria-label="席種" defaultValue={editing.seat_type} className={styles.select}>
+              <SaveErrorField names={["seatType","seat_type"]}><select name="seatType" aria-label="席種" defaultValue={editing.seat_type} className={styles.select}>
                 {SEAT_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
+              </select></SaveErrorField>
             </label>
-            <label className={styles.field}>最小人数<input name="minCapacity" type="number" defaultValue={String(editing.min_capacity)} required aria-label="最小人数" className={styles.numberInput} /></label>
-            <label className={styles.field}>最大人数<input name="maxCapacity" type="number" defaultValue={String(editing.max_capacity)} required aria-label="最大人数" className={styles.numberInput} /></label>
-            <label className={styles.field}>配置の列（0から）<input name="floorX" type="number" min="0" max="10000" defaultValue={editing.floor_x} required aria-label="配置の列" className={styles.numberInput} /></label>
-            <label className={styles.field}>配置の行（0から）<input name="floorY" type="number" min="0" max="10000" defaultValue={editing.floor_y} required aria-label="配置の行" className={styles.numberInput} /></label>
-            <label className={styles.field}>結合グループ<TextField name="joinGroup" maxLength={100} defaultValue={editing.join_group || ''} aria-label="結合グループ" /></label>
+            <label className={styles.field}>最小人数<SaveErrorField names={["minCapacity","min_capacity"]}><input name="minCapacity" type="number" defaultValue={String(editing.min_capacity)} required aria-label="最小人数" className={styles.numberInput} /></SaveErrorField></label>
+            <label className={styles.field}>最大人数<SaveErrorField names={["maxCapacity","max_capacity"]}><input name="maxCapacity" type="number" defaultValue={String(editing.max_capacity)} required aria-label="最大人数" className={styles.numberInput} /></SaveErrorField></label>
+            <label className={styles.field}>配置の列（0から）<SaveErrorField names={["floorX","floor_x"]}><input name="floorX" type="number" min="0" max="10000" defaultValue={editing.floor_x} required aria-label="配置の列" className={styles.numberInput} /></SaveErrorField></label>
+            <label className={styles.field}>配置の行（0から）<SaveErrorField names={["floorY","floor_y"]}><input name="floorY" type="number" min="0" max="10000" defaultValue={editing.floor_y} required aria-label="配置の行" className={styles.numberInput} /></SaveErrorField></label>
+            <label className={styles.field}>結合グループ<SaveErrorField names={["joinGroup","join_group"]}><TextField name="joinGroup" maxLength={100} defaultValue={editing.join_group || ''} aria-label="結合グループ" /></SaveErrorField></label>
             <div className={styles.formActions}>
               <Button type="button" onClick={() => setEditingId('')}>キャンセル</Button>
               <Button type="submit" variant="primary" disabled={busy}>保存する</Button>

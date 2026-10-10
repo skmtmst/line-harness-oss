@@ -19,6 +19,7 @@ import { audienceText } from '@/app/webinars/overview-view'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import { formatNumber } from '@/lib/format'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /**
  * ウェビナーの通知・リマインド（設計 `Ho8z4` 10-1-D）。
@@ -93,6 +94,8 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
   /** 親の固定バーから保存を呼べるようにする。true のときだけ保存が完了。 */
   registerSave?: (save: (() => Promise<boolean>) | null) => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [settings, setSettings] = useState<WebinarNotificationSettings | null>(null)
   /* 最後に読めた・保存できた設定。ここと違う入力が「未保存」。 */
   const [baseline, setBaseline] = useState<WebinarNotificationSettings | null>(null)
@@ -120,12 +123,14 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       setOverview(res.data.overview ?? null)
       setState('ready')
       onLoaded?.({ settings: res.data.settings, overview: res.data.overview ?? null })
-    } catch {
+    } catch (saveFailure) {
       if (request !== requestGeneration.current) return
-      setState('error')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure)
+      setState('error') }
       onLoaded?.(null)
     }
-  }, [webinarId, onLoaded])
+  }, [webinarId, onLoaded, saveErrors])
 
   useEffect(() => { void load(); return () => { requestGeneration.current += 1 } }, [load])
 
@@ -170,8 +175,11 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       notifyToast(`保存しました。${res.data.queued}件を予定に入れ、${res.data.cancelled}件を取り消しました。`)
       await load()
       return true
-    } catch {
-      setError('通知の設定を保存できませんでした。入力を残しました。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setError('通知の設定を保存できませんでした。入力を残しました。もう一度お試しください。') }
       return false
     } finally {
       saveLock.current = false
@@ -190,15 +198,16 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
     return () => registerSave(null)
   }, [registerSave])
 
-  if (state === 'loading') return <ListState kind="loading" />
+  if (state === 'loading') return <SaveErrorScope errors={saveErrors}><ListState kind="loading" /></SaveErrorScope>
   if (state === 'error') {
     return (
+      <SaveErrorScope errors={saveErrors}>
       <ListState
         kind="error"
         title="通知の設定を読み込めませんでした"
         description="通信を確認して、もう一度読み込んでください。"
-        action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
-      />
+        onRetry={() => void load()}
+      /></SaveErrorScope>
     )
   }
   /*
@@ -209,6 +218,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
    */
   if (!settings) {
     return (
+      <SaveErrorScope errors={saveErrors}>
       <ListState
         kind="empty"
         title="通知の設定がまだありません"
@@ -225,7 +235,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
             通知の設定を入力する
           </Button>
         )}
-      />
+      /></SaveErrorScope>
     )
   }
 
@@ -246,11 +256,11 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       extra: (
         <span className="text-ink-secondary flex items-center gap-2 text-xs">
           送る時刻
-          <TimeField
+          <SaveErrorField names={["dayBeforeTime","settings.dayBeforeTime","day_before_time","settings.day_before_time"]}><TimeField
             value={settings.dayBeforeTime}
             onChange={(v) => patch({ dayBeforeTime: v })}
             aria-label="前日のご案内を送る時刻"
-          />
+          /></SaveErrorField>
         </span>
       ),
     },
@@ -261,12 +271,12 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       on: settings.hourBeforeEnabled,
       toggle: () => patch({ hourBeforeEnabled: !settings.hourBeforeEnabled }),
       extra: (
-        <Select
+        <SaveErrorField names={["hourBeforeMinutes","settings.hourBeforeMinutes","hour_before_minutes","settings.hour_before_minutes"]}><Select
           aria-label="開始前のお知らせを送るタイミング"
           value={String(settings.hourBeforeMinutes)}
           onChange={(value) => patch({ hourBeforeMinutes: Number(value) })}
           options={HOUR_OPTIONS}
-        />
+        /></SaveErrorField>
       ),
     },
     {
@@ -285,18 +295,19 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       extra: (
         <span className="text-ink-secondary flex flex-wrap items-center gap-2 text-xs">
           送る時刻
-          <TimeField
+          <SaveErrorField names={["missedTime","settings.missedTime","missed_time","settings.missed_time"]}><TimeField
             value={settings.missedTime}
             onChange={(v) => patch({ missedTime: v })}
             aria-label="見逃した人への案内を送る時刻"
-          />
+          /></SaveErrorField>
           期限
+          <SaveErrorField names={["missedWindowDays","settings.missedWindowDays","missed_window_days","settings.missed_window_days"]}>
           <Select
             aria-label="見逃した人への案内の期限（開催からの日数）"
             value={String(settings.missedWindowDays ?? 7)}
             onChange={(value) => patch({ missedWindowDays: Number(value) })}
             options={MISSED_WINDOW_OPTIONS}
-          />
+          /></SaveErrorField>
         </span>
       ),
     },
@@ -313,6 +324,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
   const audience = audienceText(overview?.audience)
 
   return (
+    <SaveErrorScope errors={saveErrors}>
     <section className="space-y-4" data-webinar-notifications="true">
       <div>
         <h2 className="text-ink font-bold">通知とリマインド <HelpTip label="通知とリマインドの説明">LINEで送るお知らせです。通知ごとに送るかどうかと時刻を決めます。</HelpTip></h2>
@@ -345,7 +357,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
         0 件のときは出さない——常に空の枠があると、誰も見なくなる。
       */}
       {available && (overview?.skippedReasons?.length ?? 0) > 0 && (
-        <div className="border-hairline rounded-card border p-4" data-testid="webinar-skip-reasons">
+        <div className="content-card rounded-card border p-4" data-testid="webinar-skip-reasons">
           <p className="text-ink text-xs font-medium">見送りの内訳</p>
           <ul className="mt-2 space-y-1">
             {overview!.skippedReasons.map((reason) => (
@@ -364,11 +376,11 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       <Disclosure title="その他の送信実績と通知の対象" size="compact"><p className="text-ink-secondary text-xs">予定 {countText(overview?.pending, available)}件・取消 {countText(overview?.cancelled, available)}件・合計 {countText(overview?.total, available)}件</p><p className="text-ink-secondary text-xs">通知の対象：{audience.people}<HelpTip label="通知の対象の説明">{audience.note}</HelpTip></p></Disclosure>
       <fieldset disabled={saving} className="min-w-0">
         <ul className="divide-hairline divide-y">
-          {rows.map((row) => (
+          {rows.map((row, saveFieldIndex) => (
             <li key={row.key} data-notification-row="true">
               <span className="text-ink flex items-center gap-1 text-sm font-semibold">{row.label}<HelpTip label={`${row.label}の説明`}>{row.note}</HelpTip></span>
               <div className="text-ink-secondary min-w-0 text-xs">{row.extra ?? (row.key === 'registration' ? '申し込んだらすぐ' : row.key === 'start' ? '開始したとき' : '見終わったら')}</div>
-              <Toggle checked={row.on} onChange={row.toggle} label={row.label} />
+              <SaveErrorField names={[`rows.${saveFieldIndex}.on`,"on","row.on"]}><Toggle checked={row.on} onChange={row.toggle} label={row.label} /></SaveErrorField>
             </li>
           ))}
         </ul>
@@ -377,6 +389,6 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       {error && <Notice tone="danger">{error}</Notice>}
 
       {!registerSave ? <div className="flex justify-end"><Button onClick={() => void save()} disabled={saving} busy={saving}>通知の設定を保存する</Button></div> : null}
-    </section>
+    </section></SaveErrorScope>
   )
 }

@@ -32,7 +32,7 @@ export const HQ_KIND_TABS: ReadonlyArray<readonly [HqKind, string]> = [
 
 export const HQ_KIND_LABEL: Record<HqKind, string> = {
   text: 'テキスト', image: '画像', video: '動画', audio: '音声', sticker: 'スタンプ', carousel: 'カルーセル',
-  rich: 'リッチメッセージ', location: '位置情報', question: '質問', intro: '紹介', coupon: 'クーポン', flex: 'カード',
+  rich: 'リッチメッセージ', location: '位置情報', question: '質問', intro: '紹介', coupon: 'クーポン', research: 'リサーチ', flex: 'カード',
 }
 
 /** 統括の口がまだ受けない種類。 */
@@ -58,6 +58,7 @@ export function toApiBubble(item: HqBubble, id: string): BroadcastBubble | null 
     case 'image': case 'video': case 'audio': case 'sticker': case 'location': return { id, type: item.kind, content: item.content }
     case 'carousel': return { id, type: item.cardAsset ? 'card_message' : 'carousel', content: item.content }
     case 'rich': return { id, type: 'rich_message', content: item.content }
+    case 'research': return { id, type: 'research', content: item.content }
     case 'coupon': return { id, type: 'coupon', content: item.content }
     case 'flex': return { id, type: 'flex', content: item.content }
     default: return null
@@ -74,6 +75,7 @@ export function fromApiBubble(raw: { type?: string; content?: Record<string, unk
     case 'carousel': return { ...base, kind: 'carousel', content }
     case 'card_message': return { ...base, kind: 'carousel', content, cardAsset: true }
     case 'rich_message': return { ...base, kind: 'rich', content }
+    case 'research': return { ...base, kind: 'research', content }
     case 'coupon': return { ...base, kind: 'coupon', content }
     case 'flex': return { ...base, kind: 'flex', content }
     default: return null
@@ -114,6 +116,7 @@ export function flexPostbackProblem(item: Pick<HqBubble, 'content'>): string | n
 
 /** 吹き出しの入れ忘れ・送れない形。店の一斉配信と同じ確かめ。問題なければ null。 */
 export function hqBubbleProblem(item: HqBubble): string | null {
+  if (item.kind === 'research' && item.content.hqTemplateId && !item.content.hqTemplateVersionId) return '公開した版のリサーチを選び直してください'
   if (HQ_NOT_YET.has(item.kind)) return notYetText(item.kind)
   if (item.kind === 'text') return item.body.trim() ? null : '本文を入れてください'
   if (item.kind === 'image' || item.kind === 'video') {
@@ -130,9 +133,9 @@ export function hqBubbleProblem(item: HqBubble): string | null {
     return carouselColumnsProblem(item.content.columnsJson) ?? carouselPostbackProblem(item)
   }
   if (item.kind === 'flex') return flexContentProblem(item.content.flexJson) ?? flexPostbackProblem(item)
-  if (item.kind === 'rich' || item.kind === 'coupon') {
+  if (item.kind === 'rich' || item.kind === 'coupon' || item.kind === 'research') {
     if (!item.content.assetId) return `${HQ_KIND_LABEL[item.kind]}を選んでください`
-    return assetBubbleError({ id: 'check', type: item.kind === 'rich' ? 'rich_message' : 'coupon', content: item.content }) || null
+    return assetBubbleError({ id: 'check', type: item.kind === 'rich' ? 'rich_message' : item.kind === 'research' ? 'research' : 'coupon', content: item.content }) || null
   }
   return null
 }
@@ -144,18 +147,18 @@ export function hqBubbleSummary(item: HqBubble): string {
   if (HQ_NOT_YET.has(item.kind)) return `${label} ・ 統括からは送れません`
   if (item.kind === 'carousel') {
     const name = String(item.content.templateName ?? item.content.assetName ?? '')
-    return name ? `${label} ・ ${name}（カード${carouselColumns(item).length}枚）` : `${label} ・ まだ選んでいません`
+    return name ? `${label} ・ ${name}（カード${carouselColumns(item).length} 枚）` : `${label} ・ まだ選んでいません`
   }
-  if (item.kind === 'rich' || item.kind === 'coupon' || item.kind === 'flex') return `${label} ・ ${String(item.content.assetName ?? item.content.templateName ?? '') || 'まだ選んでいません'}`
+  if (item.kind === 'rich' || item.kind === 'coupon' || item.kind === 'research' || item.kind === 'flex') return `${label} ・ ${String(item.content.assetName ?? item.content.templateName ?? '') || 'まだ選んでいません'}`
   return hqBubbleProblem(item) ? `${label} ・ まだ入れていません` : `${label} ・ 入力済み`
 }
 
 /** LINE の見え方の例に出す1行（テキストは呼ぶ側が差し込みを置き換える）。 */
 export function hqBubblePreview(item: HqBubble): string {
-  if (item.kind === 'carousel' || item.kind === 'rich' || item.kind === 'coupon') {
+  if (item.kind === 'carousel' || item.kind === 'rich' || item.kind === 'coupon' || item.kind === 'research') {
     const name = String(item.content.templateName ?? item.content.assetName ?? '')
     if (!name) return ''
-    return item.kind === 'carousel' ? `［カルーセル］${name}（カード${carouselColumns(item).length}枚）` : `［${HQ_KIND_LABEL[item.kind]}］${name}`
+    return item.kind === 'carousel' ? `［カルーセル］${name}（カード${carouselColumns(item).length} 枚）` : `［${HQ_KIND_LABEL[item.kind]}］${name}`
   }
   if (item.kind === 'location') {
     const state = item.content.state as MessageKindState | undefined
@@ -166,11 +169,12 @@ export function hqBubblePreview(item: HqBubble): string {
 }
 
 /** 統括のひな形を吹き出しへ読む。読めない種類は理由。 */
-export function bubbleFromTemplate(templateId: string, definition: MessageTemplateDefinition): { bubble: HqBubble } | { error: string } {
+export function bubbleFromTemplate(templateId: string, definition: MessageTemplateDefinition, versionId?: string | null): { bubble: HqBubble } | { error: string } {
   const base = newHqBubble('text')
   const name = definition.template.name
   if (definition.asset) {
     const content = { assetId: templateId, assetName: name, ...(definition.asset.payload as Record<string, unknown>) }
+    if (definition.asset.kind === 'research') return { bubble: { ...base, kind: 'research', content: { ...content, hqTemplateId: templateId, hqTemplateVersionId: versionId } } }
     if (definition.asset.kind === 'coupon') return { bubble: { ...base, kind: 'coupon', content } }
     if (definition.asset.kind === 'rich_message') return { bubble: { ...base, kind: 'rich', content } }
     if (definition.asset.kind === 'card_message') return { bubble: { ...base, kind: 'carousel', content, cardAsset: true } }
@@ -262,6 +266,6 @@ export function previewBubbleOf(item: HqBubble, text: string): BroadcastBubble |
     return cards.length ? { id: item.id, type: 'card_message', content: { cards } } : null
   }
   if (item.kind === 'flex' && item.previewCard) return { id: item.id, type: 'card_message', content: { cards: [item.previewCard] } }
-  if ((item.kind === 'rich' || item.kind === 'coupon' || item.kind === 'carousel') && !item.content.assetName) return null
+  if ((item.kind === 'rich' || item.kind === 'coupon' || item.kind === 'research' || item.kind === 'carousel') && !item.content.assetName) return null
   return toApiBubble(item, item.id)
 }

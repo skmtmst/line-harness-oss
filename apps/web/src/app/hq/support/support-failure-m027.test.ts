@@ -17,7 +17,7 @@ describe('M027 お問い合わせの失敗表示', () => {
 
   it('送信の失敗は原文のまま出さない', () => {
     expect(PAGE).toContain("describeApiFailure(caught, '送信'")
-    expect(PAGE).toContain('お問い合わせの送信はオーナー・管理者・担当者だけができます')
+    expect(PAGE).toContain("scope: 'hq'")
     expect(PAGE).not.toContain("caught.message : '送信できませんでした。もう一度お試しください。'")
   })
 

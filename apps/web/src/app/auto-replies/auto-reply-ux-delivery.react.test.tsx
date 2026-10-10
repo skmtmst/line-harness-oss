@@ -23,6 +23,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       autoReplies: { ...actual.api.autoReplies, list: listReplies, update: updateReply, stop: stopReply, summary },
       templates: { ...actual.api.templates, list: listTemplates },
       folders: { ...actual.api.folders, list: listFolders },
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: 'owner' } }) },
     },
   }
 })
@@ -107,7 +108,7 @@ function renderPage() {
   })
 }
 
-test('まとめて再開は窓を閉じた瞬間に有効の札になり、すぐ送る。元に戻すは止め直しを送る', async () => {
+test('まとめて再開は確認なしですぐ反映し、元に戻すを出さない', async () => {
   // 裁定 C：5秒待たない。通った変更は口にも残る想定で、読み直しも新しい札を返す。
   const active = new Map([['ar-1', false], ['ar-2', true]])
   listReplies.mockImplementation(async () => ({
@@ -135,13 +136,7 @@ test('まとめて再開は窓を閉じた瞬間に有効の札になり、す�
   const bulkResume = [...host.querySelectorAll('button')].find((b) => b.textContent === 'まとめて再開') as HTMLElement
   expect(bulkResume).toBeTruthy()
   await act(async () => { bulkResume.click() })
-  // 確認窓が出る（窓は document.body 直下の portal に出る）。
-  await eventually(() => {
-    if (!document.body.textContent?.includes('再開しますか？')) throw new Error('no dialog yet')
-  })
-  const confirm = [...document.querySelectorAll('button')].find((b) => b.textContent === '再開する') as HTMLElement
-  expect(confirm).toBeTruthy()
-  await act(async () => { confirm.click() })
+  expect(document.querySelector('[role="dialog"]')).toBeNull()
   // 窓を閉じた瞬間に有効の札へ（裏の保存を待たない）。
   await eventually(() => {
     const pills = [...host.querySelectorAll('span')].filter((s) => s.textContent === '有効')
@@ -152,18 +147,8 @@ test('まとめて再開は窓を閉じた瞬間に有効の札になり、す�
     if (updateReply.mock.calls.length < 1) throw new Error('not yet sent')
   })
   expect(updateReply.mock.calls[0][0]).toBe('ar-1')
-  // 知らせの「元に戻す」は逆の操作（止め直し）を送る。
-  const undo = [...host.querySelectorAll('button')].find((b) => b.textContent === '元に戻す') as HTMLElement
-  expect(undo).toBeTruthy()
-  await act(async () => { undo.click() })
-  await eventually(() => {
-    if (stopReply.mock.calls.length < 1) throw new Error('reverse not yet sent')
-  })
-  expect(stopReply.mock.calls[0][0]).toBe('ar-1')
-  await eventually(() => {
-    const stopped = [...host.querySelectorAll('span')].filter((s) => s.textContent === '停止中')
-    if (stopped.length < 1) throw new Error('not yet reverted')
-  })
+  expect([...host.querySelectorAll('button')].some((b) => b.textContent === '元に戻す')).toBe(false)
+  expect(stopReply).not.toHaveBeenCalled()
 })
 
 test('読み込み中は出来上がりと同じ形の骨組みを出す', async () => {

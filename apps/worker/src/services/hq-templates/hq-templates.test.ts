@@ -88,9 +88,9 @@ describe('統括ひな形の共通contract', () => {
     expect(context.resolutions.map((item) => item.mode)).toEqual(['overwrite', 'alias']);
   });
 
-  test('7種類は別adapterとして登録され、明示的にUNSUPPORTEDを返す', async () => {
+  test('10種類は別adapterとして登録され、明示的にUNSUPPORTEDを返す', async () => {
     expect(Object.keys(hqTemplateAdapterRegistry).sort()).toEqual([
-      'form', 'friend_field', 'mark', 'rich_menu', 'scenario', 'tag', 'template',
+      'auto_reply', 'form', 'friend_add_rule', 'friend_field', 'mark', 'reminder', 'rich_menu', 'scenario', 'tag', 'template',
     ]);
     for (const type of ['tag', 'template', 'rich_menu', 'form'] as const) {
       const adapter = getHqTemplateAdapter(type);

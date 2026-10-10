@@ -15,14 +15,14 @@
 .supportMetric > div > div p, .supportMetric > div > p:last-child { font-size: var(--text-nano); }
 .supportMetric > div > p:not(:last-child) { font-size: var(--text-heading); }
 .supportColumns { display: grid; grid-template-columns: minmax(0, 480px) minmax(0, 1fr); gap: 16px; }
-.supportList, .supportDetail { min-width: 0; border: 1px solid var(--card-edge); border-radius: var(--radius-card); background: var(--color-canvas); min-height: calc(100svh - 310px); box-shadow: var(--card-shadow); }
+.supportList, .supportDetail { min-width: 0; border: 1px solid var(--card-edge); border-radius: var(--radius-card); background: var(--color-canvas); min-height: calc(100svh - 310px); box-shadow: var(--card-shadow); padding: 18px 22px; }
 .supportList > header { background: var(--color-shell); padding: 12px 14px; border-radius: var(--radius-card) var(--radius-card) 0 0; }
 .supportList h2, .supportList li button > span:nth-child(2) { font-size: var(--text-micro); }
 .supportList li button > span:first-child { font-size: var(--text-nano); }
-.supportList li button > span:first-child > span:first-child { color: var(--color-status-info); }
+.supportList li button > span:first-child > span:first-child { color: var(--color-action); }
 .supportDetail { padding: 18px 22px; }
 .supportSubject { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 34px; }
-.supportSubject > span:first-child { font-size: var(--text-micro); color: var(--color-status-info); }
+.supportSubject > span:first-child { font-size: var(--text-micro); color: var(--color-action); }
 .supportSubject h2 { font-size: var(--text-lead); overflow-wrap: anywhere; }
 .supportSubject button { height: 34px; font-size: var(--text-micro); }
 .supportSubject select { height: 34px; width: 70px; font-size: var(--text-micro); }
@@ -115,7 +115,7 @@
 .field textarea { padding: 10px 12px; font-size: var(--text-label); line-height: 1.6; resize: vertical; }
 .field .question { min-height: 64px; height: 64px; }
 .field .answer { min-height: 112px; height: 112px; }
-.emptyAnswerNote { margin-top: -6px; color: var(--color-status-info); font-size: var(--text-caption); }
+.emptyAnswerNote { margin-top: -6px; color: var(--color-action); font-size: var(--text-caption); }
 .kind { width: 360px; max-width: 100%; }
 .confirm { display: flex; gap: 8px; align-items: center; font-size: var(--text-caption); font-weight: 600; }
 .confirm input { width: 14px; height: 14px; accent-color: var(--color-accent-deep); }

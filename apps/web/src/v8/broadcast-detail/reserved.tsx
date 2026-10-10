@@ -19,6 +19,8 @@ import BroadcastPhone from './phone'
 import { CancelReservationDialog } from './detail'
 import { formatBroadcastDateTime, formatShortDateTime } from './display'
 import styles from './reserved.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type AudienceEstimate = {
   audienceCount: number
@@ -90,18 +92,12 @@ export default function Reserved({
 
   return (
     <PageFrame kind="detail" boardId="cdZBf CRtK8">
-      <header className={styles.head}>
-        <div className={styles.titleRow}>
-          <h2 className={styles.title} title={broadcast.title}>{broadcast.title}</h2>
-          <span className={styles.badge}>
+      <PageHeading title={broadcast.title}
+        help={<>{`${scheduledLabel} に、${audienceCount === null ? '対象の友だち' : `${formatNumber(audienceCount)}人`}へ送ります。開始の前までは確かめる・取り消すができます。`}</>}
+        titleAccessory={<><span className={styles.badge}>
             <span className={styles.dot} aria-hidden="true" />
             予約中
-          </span>
-        </div>
-        <p className={styles.desc}>
-          {`${scheduledLabel} に、${audienceCount === null ? '対象の友だち' : `${formatNumber(audienceCount)}人`}へ送ります。開始の前までは確かめる・取り消すができます。`}
-        </p>
-      </header>
+          </span></>} />
 
       <div className={styles.split}>
         <div className={styles.main}>
@@ -117,10 +113,10 @@ export default function Reserved({
               <Row label="管理名" value={broadcast.title} />
               <Row
                 label="配信対象"
-                value={`${audienceLabel}${audienceCount === null ? '' : ` ${formatNumber(audienceCount)}人`}${estimate && estimate.hiddenExcluded > 0 ? `（除く見込み ${formatNumber(estimate.hiddenExcluded)}人）` : ''}`}
+                value={`${audienceLabel}${audienceCount === null ? '' : ` ${formatNumber(audienceCount)} 人`}${estimate && estimate.hiddenExcluded > 0 ? `（除く見込み ${formatNumber(estimate.hiddenExcluded)} 人）` : ''}`}
               />
               <Row label="送る日時" value={scheduledLabel} />
-              <Row label="メッセージ" value={`${messageTypeLabel(broadcast.messageType)} ${bubbleCount}通`} />
+              <Row label="メッセージ" value={`${messageTypeLabel(broadcast.messageType)} ${bubbleCount} 通`} />
               <Row label="状態" value={`予約中${approverLabel}`} />
             </dl>
             <p className={styles.slack}>
@@ -128,7 +124,7 @@ export default function Reserved({
               <span>{notificationText || '配信の開始・完了・エラーは、Slack の同じスレッドへ知らせます。'}</span>
             </p>
             <div className={styles.doneButtons}>
-              <Button href="/broadcasts">一覧へ戻る</Button>
+              <></>
               <Button variant="primary" href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`}>
                 <Eye aria-hidden="true" />
                 予約の内容を見る
@@ -181,7 +177,7 @@ export default function Reserved({
             broadcast={broadcast}
             accountName={accountName}
             chip={shortTime ? `${shortTime} に届きます` : undefined}
-            time={shortTime ? shortTime.slice(shortTime.indexOf('）') + 1) : '—'}
+            time={shortTime ? shortTime.slice(shortTime.indexOf('）') + 1) : emptyValue('unknown')}
           />
         </aside>
       </div>
@@ -190,7 +186,7 @@ export default function Reserved({
         open={cancelOpen}
         title={broadcast.title}
         description={broadcast.scheduledAt
-          ? `${scheduledLabel} に送る予定の ${audienceCount === null ? '対象の友だち' : `${formatNumber(audienceCount)}人`} に送らなくなります。取り消すと下書きに戻り、もう一度予約できます。${broadcast.approvalStatus && broadcast.approvalStatus !== 'none' ? '承認はやり直しになります。' : ''}`
+          ? `${scheduledLabel} に送る予定の ${audienceCount === null ? '対象の友だち' : `${formatNumber(audienceCount)} 人`} に送らなくなります。取り消すと下書きに戻り、もう一度予約できます。${broadcast.approvalStatus && broadcast.approvalStatus !== 'none' ? '承認はやり直しになります。' : ''}`
           : '予約が取り消され、この配信は送られなくなります。書いた内容は下書きとして残るので、作り直しにはなりません。'}
         busy={cancelling}
         error={cancelError}

@@ -1,13 +1,8 @@
 'use client'
 
-/*
- * ★V8 成果とアフィリエイト「レポート」（板 `Eo56k`）。
- *
- * app/affiliates/v8-report-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で組み直した。
- * 数えるのは「認めた成果」だけ（承認の全件読み）。期間は今月・先月・すべて。
- * アフィリエイターごと・案件ごとの2つの見方。行（名前）を押すとその人の詳細の引き出し（tnTn9）。
- * 取得の上限を超えたら、合計を出さずに知らせる（今と同じ）。
- */
+import { FolderDotName } from '@/components/shared/folder-dot'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Banknote, CalendarDays, Download, ListOrdered, ReceiptText, ShoppingBag, Trophy, Users } from 'lucide-react'
@@ -36,6 +31,20 @@ import { AffiliateArchiveDialog } from './dialogs'
 import { AffiliateFrame, useAffiliateShell } from './frame'
 import { AffiliateToolbar, RetryButton, RowMenu, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './affiliates.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import PeriodPicker, { useReportPeriod } from '@/components/shared/period-picker'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 成果とアフィリエイト「レポート」（板 `Eo56k`）。
+ *
+ * app/affiliates/v8-report-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で組み直した。
+ * 数えるのは「認めた成果」だけ（承認の全件読み）。期間は今月・前の期間・すべて。
+ * アフィリエイターごと・案件ごとの2つの見方。行（名前）を押すとその人の詳細の引き出し（tnTn9）。
+ * 取得の上限を超えたら、合計を出さずに知らせる（今と同じ）。
+ */
 
 type ViewKey = 'affiliate' | 'offer'
 
@@ -54,8 +63,8 @@ const SAVED_VIEWS = [
   { value: '', label: 'よく使う絞り込み' },
   { value: 'affiliate-this', label: 'アフィリエイターごと・今月' },
   { value: 'offer-this', label: '案件ごと・今月' },
-  { value: 'affiliate-last', label: 'アフィリエイターごと・先月' },
-  { value: 'offer-last', label: '案件ごと・先月' },
+  { value: 'affiliate-last', label: 'アフィリエイターごと・前の期間' },
+  { value: 'offer-last', label: '案件ごと・前の期間' },
 ]
 
 export default function ReportTab() {
@@ -65,9 +74,18 @@ export default function ReportTab() {
   const [affiliates, setAffiliates] = useState<AffiliateItem[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loadError, setLoadError] = useState('')
-  const [query, setQuery] = useState('')
-  const [view, setView] = useState<ViewKey>('affiliate')
-  const [period, setPeriod] = useState<ReportPeriod>('this_month')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [view, setView] = useListUrlValue<ViewKey>('view', 'affiliate')
+  const { days, setDays, range, customRange, setRange } = useReportPeriod()
+  const periodLabel = customRange ? `${range.from}〜${range.to}` : `過去${days}日`
+  const setPeriod = (period: ReportPeriod) => {
+    if (period === 'all') { setDays(90); return }
+    const month = reportMonthKey(period === 'last_month' ? -1 : 0)
+    const from = `${month}-01`
+    const date = new Date(`${from}T00:00:00Z`)
+    const to = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
+    setRange({ from, to })
+  }
   const [saved, setSaved] = useState('')
   /* 見方の札を押したか（はじめはアフィリエイターごとで、どちらの札も押していない形）。 */
   const [viewPicked, setViewPicked] = useState(false)
@@ -99,10 +117,10 @@ export default function ReportTab() {
     return () => { requestSeq.current += 1 }
   }, [load, accountId])
 
-  const monthKey = period === 'this_month' ? reportMonthKey(0) : period === 'last_month' ? reportMonthKey(-1) : null
-  const prevMonthKey = monthKey ? reportMonthKey(period === 'this_month' ? -1 : -2) : null
-  const inPeriod = useMemo(() => items.filter((item) => monthKey == null || jstMonthKey(item.createdAt) === monthKey), [items, monthKey])
-  const inPrev = useMemo(() => items.filter((item) => prevMonthKey != null && jstMonthKey(item.createdAt) === prevMonthKey), [items, prevMonthKey])
+  const fromTime = Date.parse(`${range.from}T00:00:00+09:00`)
+  const toTime = Date.parse(`${range.to}T00:00:00+09:00`) + 86400_000
+  const inPeriod = useMemo(() => items.filter((item) => { const time = Date.parse(item.createdAt); return time >= fromTime && time < toTime }), [items, fromTime, toTime])
+  const inPrev = useMemo(() => items.filter((item) => { const time = Date.parse(item.createdAt); return time >= fromTime - (toTime - fromTime) && time < fromTime }), [items, fromTime, toTime])
   const rewardOf = (item: ConversionApprovalItem) => item.rewardAmount ?? 0
 
   const hasMissingReward = inPeriod.some((item) => item.rewardAmount == null)
@@ -129,11 +147,11 @@ export default function ReportTab() {
   }, [inPeriod])
 
   const prevOf = useCallback((keyOf: (item: ConversionApprovalItem) => string, id: string): number | null => {
-    if (prevMonthKey == null) return null
+    if (range.from == null) return null
     const rows = inPrev.filter((item) => keyOf(item) === id)
     if (rows.some((item) => item.rewardAmount == null)) return null
     return rows.reduce((sum, item) => sum + rewardOf(item), 0)
-  }, [inPrev, prevMonthKey])
+  }, [inPrev, range.from])
 
   const affiliateRows = useMemo<Agg[]>(() => {
     const keyOf = (item: ConversionApprovalItem) => item.affiliateId
@@ -154,7 +172,7 @@ export default function ReportTab() {
     const map = aggregate(keyOf, (item) => item.offerName ?? '案件は未設定')
     return [...map.values()].map((row) => {
       const people = new Set(inPeriod.filter((item) => keyOf(item) === row.id).map((item) => item.affiliateId)).size
-      return { ...row, sub: `${formatNumber(people)}人が紹介`, prevReward: prevOf(keyOf, row.id) }
+      return { ...row, sub: `${formatNumber(people)} 人が紹介`, prevReward: prevOf(keyOf, row.id) }
     }).sort((a, b) => b.conversions - a.conversions || b.reward - a.reward)
   }, [aggregate, inPeriod, prevOf])
 
@@ -167,7 +185,7 @@ export default function ReportTab() {
   const ready = state === 'ready'
 
   const exportCsv = () => {
-    downloadCsv(`affiliate-report-${new Date().toISOString().slice(0, 10)}.csv`, view === 'affiliate'
+    downloadCsv(csvFileName("アフィリエイト成果レポート"), view === 'affiliate'
       ? [['アフィリエイター', 'いちばん多い案件', '成果', '売上', '報酬', '前の期間の報酬'], ...shown.map((row) => [row.name, row.sub ?? '', row.conversions, row.revenue, row.missingReward ? '' : row.reward, row.prevReward ?? ''])]
       : [['案件', '成果', '売上', '報酬', '前の期間の報酬'], ...shown.map((row) => [row.name, row.conversions, row.revenue, row.missingReward ? '' : row.reward, row.prevReward ?? ''])])
   }
@@ -176,7 +194,7 @@ export default function ReportTab() {
     if (row.conversions === 0 || row.missingReward) return '—'
     if (row.reward === 0) return '計測のみ'
     const base = formatYen(row.reward)
-    if (period === 'all' || row.prevReward == null) return base
+    if (false || row.prevReward == null) return base
     if (row.prevReward === 0) return `${base}（初めて）`
     const diff = row.reward - row.prevReward
     if (diff === 0) return `${base}（±¥0）`
@@ -201,14 +219,14 @@ export default function ReportTab() {
         icon={<Trophy size={14} aria-hidden="true" />}
         value={ready ? inPeriod.length : null}
         unit="件"
-        detail={ready ? (period === 'all' ? '期間内に認めた成果' : conversionsDelta === 0 ? '先月と同じ' : `先月より ${conversionsDelta > 0 ? '+' : '−'}${formatNumber(Math.abs(conversionsDelta))}`) : state === 'loading' ? loadingWord : errorWord}
+        detail={ready ? (false ? '期間内に認めた成果' : conversionsDelta === 0 ? '前の期間と同じ' : `前の期間より ${conversionsDelta > 0 ? '+' : '−'}${formatNumber(Math.abs(conversionsDelta))}`) : state === 'loading' ? loadingWord : errorWord}
       />
       <KpiCard
         presentation="band"
         title="売上"
         icon={<ShoppingBag size={14} aria-hidden="true" />}
         value={null}
-        valueText={ready ? formatYen(totalRevenue) : '—'}
+        valueText={ready ? formatYen(totalRevenue) : emptyValue('unknown')}
         unit=""
         detail={ready ? '成果になった注文の合計' : state === 'loading' ? loadingWord : errorWord}
       />
@@ -217,7 +235,7 @@ export default function ReportTab() {
         title="報酬"
         icon={<Banknote size={14} aria-hidden="true" />}
         value={null}
-        valueText={ready && !hasMissingReward ? formatYen(totalReward) : '—'}
+        valueText={ready && !hasMissingReward ? formatYen(totalReward) : emptyValue('unknown')}
         unit=""
         detail={ready ? (hasMissingReward ? '未確定の報酬があります' : totalRevenue > 0 ? `売上の ${(totalReward / totalRevenue * 100).toFixed(1)}%` : '売上なし') : state === 'loading' ? loadingWord : errorWord}
       />
@@ -226,9 +244,9 @@ export default function ReportTab() {
         title="1件あたりの報酬"
         icon={<ReceiptText size={14} aria-hidden="true" />}
         value={null}
-        valueText={ready && !hasMissingReward ? formatYen(perItem) : '—'}
+        valueText={ready && !hasMissingReward ? formatYen(perItem) : emptyValue('unknown')}
         unit=""
-        detail={ready ? (hasMissingReward ? '未確定の報酬があります' : period === 'all' ? '成果1件あたりの平均' : hasMissingPrevReward ? '先月の報酬は未確定です' : `先月 ${formatYen(prevPerItem)}`) : state === 'loading' ? loadingWord : errorWord}
+        detail={ready ? (hasMissingReward ? '未確定の報酬があります' : false ? '成果1件あたりの平均' : hasMissingPrevReward ? '前の期間の報酬は未確定です' : `前の期間 ${formatYen(prevPerItem)}`) : state === 'loading' ? loadingWord : errorWord}
       />
     </KpiBand>
   )
@@ -253,19 +271,7 @@ export default function ReportTab() {
           setPeriod(when === 'last' ? 'last_month' : 'this_month')
         }}
       />
-      <div className={styles.periodBox}>
-        <CalendarDays size={15} aria-hidden="true" className={styles.periodIcon} />
-        <Select
-          aria-label="期間"
-          value={period}
-          options={[
-            { value: 'this_month', label: reportPeriodLabel('this_month') },
-            { value: 'last_month', label: reportPeriodLabel('last_month') },
-            { value: 'all', label: 'すべての期間' },
-          ]}
-          onChange={(value) => setPeriod(value as ReportPeriod)}
-        />
-      </div>
+      <PeriodPicker days={days} onChange={setDays} customRange={customRange} onRangeChange={setRange} />
     </>
   )
 
@@ -273,7 +279,7 @@ export default function ReportTab() {
     <AffiliateToolbar
       narrow={narrow}
       notices={<ToolbarNotices
-        info={`期間は${reportPeriodLabel(period)}。数は「認めた成果」だけ。${hasMissingReward ? '未確定の報酬は金額を出さず、CSVも空欄にしています。' : ''}成果地点ごとのレポートは「分析 › レポート」で見られます。`}
+        info={`期間は${periodLabel}。数は「認めた成果」だけ。${hasMissingReward ? '未確定の報酬は金額を出さず、CSVも空欄にしています。' : ''}成果地点ごとのレポートは「分析 › レポート」で見られます。`}
         error={state === 'error' ? loadError : undefined}
       />}
       search={{ placeholder: view === 'affiliate' ? '名前で探す' : '案件名で探す', value: query, onChange: setQuery }}
@@ -289,27 +295,27 @@ export default function ReportTab() {
           <TableHeadRow className={styles.headRow} data-table-layout="columns">
             <Th className={styles.colName}>{view === 'affiliate' ? 'アフィリエイター（いちばん多い案件）' : '案件（紹介した人の数）'}</Th>
             <Th className={styles.colRepConv}>成果・売上</Th>
-            <Th className={styles.colRepReward}>{period === 'all' ? '報酬' : '報酬（先月より）'}</Th>
+            <Th className={styles.colRepReward}>{false ? '報酬' : '報酬（前の期間より）'}</Th>
             <Th className={styles.colRepOps}><span className={styles.srOnly}>操作</span></Th>
           </TableHeadRow>
         </thead>
         <tbody>
           {shown.map((row) => (
-            <Tr key={row.id} className={styles.row} data-table-layout="columns">
-              <Td className={styles.colName}>
+            <Tr data-row-id={row.id} key={row.id} className={styles.row} data-table-layout="columns" onOpen={() => openDrawer(row.id)}>
+              <Td className={styles.colName}><FolderDotName>
                 <span className={styles.stack}>
                   {view === 'affiliate' ? (
-                    <button type="button" className={styles.rowLink} title={row.name} onClick={() => openDrawer(row.id)}>{row.name}</button>
+                    <button type="button" className={styles.rowLink} title={row.name}  onClick={() => openDrawer(row.id)}>{row.name}</button>
                   ) : (
-                    <span className={styles.rowLinkText} title={row.name}>{row.name}</span>
+                    <span className={styles.rowLinkText} ><TruncatedText value={String(row.name ?? '')} /></span>
                   )}
-                  <span className={styles.rowPlan}>{row.sub ?? '—'}</span>
+
                 </span>
-              </Td>
+              </FolderDotName></Td>
               <Td className={styles.colRepConv}>
                 <span className={styles.stack}>
                   <span className={styles.cellMain}>{`${formatNumber(row.conversions)}件`}</span>
-                  <span className={styles.rowPlan}>{row.conversions > 0 && row.revenue > 0 ? formatYen(row.revenue) : '—'}</span>
+                  <span className={styles.rowPlan}>{row.conversions > 0 && row.revenue > 0 ? formatYen(row.revenue) : emptyValue('unknown')}</span>
                 </span>
               </Td>
               <Td className={styles.colRepReward}><span className={styles.cellStrong}>{rewardText(row)}</span></Td>
@@ -319,7 +325,7 @@ export default function ReportTab() {
                     label={`${row.name}の操作`}
                     items={[
                       { id: 'view', label: '成果を見る', onSelect: () => openDrawer(row.id) },
-                      { id: 'approvals', label: 'この人の成果承認を開く', external: true, onSelect: () => router.push(`/affiliates?tab=approvals&affiliate=${encodeURIComponent(row.id)}`) },
+                      { id: 'approvals', label: 'この人の成果承認を開く', external: false, href: `/affiliates?tab=approvals&affiliate=${encodeURIComponent(row.id)}`, onSelect: () => router.push(`/affiliates?tab=approvals&affiliate=${encodeURIComponent(row.id)}`) },
                     ]}
                   />
                 ) : null}
@@ -336,7 +342,7 @@ export default function ReportTab() {
   ) : state === 'error' ? (
     <StateCard tone="error" title="レポートを読み込めませんでした" description={loadError || '数の帯は「—」にしています。道具はそのまま使えます。'} action={<RetryButton onRetry={() => { void load() }} />} />
   ) : rows.length === 0 ? (
-    <StateCard icon={<Trophy size={16} aria-hidden="true" />} title="この期間の成果はありません" description="期間を変えると、ほかの月の成果が出ます" action={<Button type="button" onClick={() => setPeriod('all')}>すべての期間にする</Button>} />
+    <StateCard icon={<Trophy size={16} aria-hidden="true" />} title="この期間の成果はありません" description="期間を変えると、ほかの月の成果が出ます" action={<Button type="button" onClick={() => setPeriod('all')}>過去90日にする</Button>} />
   ) : shown.length === 0 ? (
     <StateCard title="条件に合うものはありません" description="検索や絞り込みを外すと、すべて出ます" action={<Button type="button" onClick={() => setQuery('')}>条件を外す</Button>} />
   ) : (
@@ -350,7 +356,7 @@ export default function ReportTab() {
       help={view === 'affiliate'
           ? '行を押すと、その人の成果の明細（いつ・どの案件・いくら）を開きます。CSV は今の期間・今の並びで書き出します。'
           : '案件ごとの成果・売上・報酬です。CSV は今の期間・今の並びで書き出します。'}
-      actions={<Button onClick={exportCsv} disabled={!ready || shown.length === 0}><Download size={15} aria-hidden="true" /> CSV で書き出す</Button>}
+      actions={<Button onClick={exportCsv} disabled={!ready || shown.length === 0}><Download size={15} aria-hidden="true" /> CSVで書き出す</Button>}
       stats={stats}
       toolbar={toolbar}
       overlays={<>

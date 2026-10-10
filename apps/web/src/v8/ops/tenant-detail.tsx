@@ -1,5 +1,5 @@
 'use client'
-
+import { useUrlTab } from '@/lib/use-url-tab'
 import { ChevronLeft, LogIn } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
@@ -15,11 +15,17 @@ import TargetMissing from '@/components/shared/target-missing'
 import { Tabs } from '@/components/shared/tabs'
 import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
-import { formatNumber } from '@/lib/format'
+import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
 import { OpsHead } from './shell'
 import { useOpsReadOnly } from './use-ops-read-only'
 import parts from './parts.module.css'
 import styles from './tenant-detail.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営の契約先の詳細 V8（絵 `Oub6x`・停止の窓 `okXoi`）。
@@ -46,15 +52,12 @@ const AUDIT_WORD: Record<string, string> = {
 }
 
 function shortDateTime(value: string | null | undefined): string {
-  if (!value) return '—'
-  const full = formatDateTime(value)
-  const m = full.match(/^(\d+)-(\d+)-(\d+) (\d+:\d+)$/)
-  return m ? `${Number(m[2])}/${Number(m[3])} ${m[4]}` : full
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 export default function OpsTenantDetailV8() {
   return (
-    <Suspense fallback={<ListState kind="loading" title="契約先を読み込んでいます" />}>
+    <Suspense fallback={<DetailLoading label="契約先を読み込んでいます" />}>
       <DetailContent />
     </Suspense>
   )
@@ -64,7 +67,7 @@ function DetailContent() {
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
   const [detail, setDetail] = useState<OpsTenantDetail | null>(null)
-  const [tab, setTab] = useState<TabKey>('overview')
+  const [tab, setTab] = useUrlTab(TABS.map(t => t.key), 'overview')
   const [error, setError] = useState('')
   const [statusDialog, setStatusDialog] = useState<StatusTarget | null>(null)
   const [busy, setBusy] = useState(false)
@@ -118,8 +121,8 @@ function DetailContent() {
         <OpsHead title="契約先アカウント" environment={environment} actions={<BackToList />} />
         <div className={parts.panel}>
           {error
-            ? <ListState kind="error" title="契約先を表示できませんでした" description={error} onRetry={() => void load()} />
-            : <ListState kind="loading" title="契約先を読み込んでいます" />}
+            ? <ListState permissionScope="hq" kind="error" title="契約先を表示できませんでした" description={error} onRetry={() => void load()} />
+            : <DetailLoading label="契約先を読み込んでいます" />}
         </div>
       </div>
     )
@@ -150,7 +153,7 @@ function DetailContent() {
         )}
       />
       <div className={parts.stack}>
-        {error ? <p role="alert" className={parts.alert}>{error}</p> : null}
+        {error ? <Notice tone="danger" className={parts.alertNoticePlacement} >{error}</Notice> : null}
         <div className={parts.tabs}>
           <Tabs
             label="契約先の中身"
@@ -168,7 +171,7 @@ function DetailContent() {
               <h3 className={parts.panelTitle}>契約先の情報</h3>
               <dl className={styles.kvs}>
                 <Kv k="統括名" v={tenant.name} />
-                <Kv k="メール" v={owner ? `${owner.email}（${ROLE_LABEL[owner.role] ?? owner.role}）` : '—'} />
+                <Kv k="メール" v={owner ? `${owner.email}（${ROLE_LABEL[owner.role] ?? owner.role}）` : emptyValue('unknown')} />
                 <Kv k="登録日" v={formatDate(tenant.created_at)} />
                 <Kv k="最終ログイン" v={formatDateTime(tenant.last_login_at)} />
               </dl>
@@ -184,7 +187,7 @@ function DetailContent() {
                   v={readOnly ? (restaurant ? '使う' : '使わない') : (
                     <span className={styles.toggleRow}>
                       <span>{restaurant ? '使う' : '使わない'}</span>
-                      <Toggle checked={restaurant} label={`飲食店機能を${restaurant ? 'オフ' : 'オン'}にする`} onChange={(next) => void toggleRestaurantFeature(next)} />
+                      <SaveErrorField names={["restaurant"]}><Toggle checked={restaurant} label={`飲食店機能を${restaurant ? 'オフ' : 'オン'}にする`} onChange={(next) => void toggleRestaurantFeature(next)} /></SaveErrorField>
                     </span>
                   )}
                 />
@@ -197,7 +200,7 @@ function DetailContent() {
           <section className={parts.panel} aria-label="店舗（LINE公式アカウント）">
             <h3 className={parts.panelTitle}>店舗（LINE公式アカウント）</h3>
             {accounts.length === 0 ? (
-              <ListState kind="empty" title="店舗がありません" description="この契約先にはまだ LINE 公式アカウントがつながっていません。" />
+              <ListState permissionScope="hq" kind="empty" title="店舗がありません" description="この契約先にはまだ LINE 公式アカウントがつながっていません。" />
             ) : (
               <div className={parts.mini} role="table" aria-label="店舗">
                 <div className={parts.miniHead} role="row">
@@ -208,7 +211,7 @@ function DetailContent() {
                 </div>
                 {accounts.map((a) => (
                   <div key={a.id} className={`${parts.miniRow} ${styles.accountRow}`} role="row">
-                    <span className={parts.grow} role="cell" title={a.name}>{a.name}</span>
+                    <span className={parts.grow} role="cell" ><TruncatedText value={String(a.name ?? '')} /></span>
                     <span className={`${parts.fixed} ${styles.col90}`} role="cell">{a.archived_at || !a.is_active ? <StatusBadge tone="neutral">止めている</StatusBadge> : <StatusBadge tone="success">接続中</StatusBadge>}</span>
                     <span className={`${parts.num} ${styles.col80}`} role="cell">{a.archived_at ? '—' : formatNumber(a.friend_count)}</span>
                     <span className={`${parts.fixed} ${styles.col80}`} role="cell">{a.archived_at ? <StatusBadge tone="neutral">アーカイブ</StatusBadge> : a.is_active ? <StatusBadge tone="success">有効</StatusBadge> : <StatusBadge tone="neutral">停止</StatusBadge>}</span>
@@ -223,7 +226,7 @@ function DetailContent() {
           <section className={parts.panel} aria-label="権限者">
             <h3 className={parts.panelTitle}>権限者</h3>
             {members.length === 0 ? (
-              <ListState kind="empty" title="権限者がいません" description="この契約先にはまだ権限者が登録されていません。" />
+              <ListState permissionScope="hq" kind="empty" title="権限者がいません" description="この契約先にはまだ権限者が登録されていません。" />
             ) : (
               <div className={parts.mini} role="table" aria-label="権限者">
                 <div className={parts.miniHead} role="row">
@@ -235,7 +238,7 @@ function DetailContent() {
                 </div>
                 {members.map((m) => (
                   <div key={m.id} className={parts.miniRow} role="row">
-                    <span className={parts.grow} role="cell" title={m.name}>{m.name}</span>
+                    <span className={parts.grow} role="cell" ><TruncatedText value={String(m.name ?? '')} /></span>
                     <span className={`${parts.fixed} ${styles.colMail}`} role="cell" title={m.email ?? ''}>{m.email ?? '—'}</span>
                     <span className={`${parts.fixed} ${styles.col90}`} role="cell">{ROLE_LABEL[m.role] ?? m.role}{m.access_level === 'read_only' ? '（閲覧）' : ''}</span>
                     <span className={`${parts.fixed} ${styles.col80}`} role="cell">{m.is_active ? <StatusBadge tone="success">有効</StatusBadge> : <StatusBadge tone="neutral">停止</StatusBadge>}</span>
@@ -251,7 +254,7 @@ function DetailContent() {
           <section className={parts.panel} aria-label="運営の操作（監査）">
             <h3 className={parts.panelTitle}>運営の操作（監査）</h3>
             {audit.length === 0 ? (
-              <ListState kind="empty" title="運営の操作はまだありません" description="運営がこの契約先に対して行った操作が、ここに残ります。" />
+              <ListState permissionScope="hq" kind="empty" title="運営の操作はまだありません" description="運営がこの契約先に対して行った操作が、ここに残ります。" />
             ) : (
               <div className={parts.mini} role="table" aria-label="運営の操作">
                 <div className={parts.miniHead} role="row">
@@ -263,9 +266,9 @@ function DetailContent() {
                 {audit.map((row) => (
                   <div key={row.id} className={parts.miniRow} role="row">
                     <span className={`${parts.fixed} ${styles.colAt}`} role="cell" title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</span>
-                    <span className={`${parts.fixed} ${styles.col80}`} role="cell" title={row.staff_name}>{row.staff_name}</span>
+                    <span className={`${parts.fixed} ${styles.col80}`} role="cell" ><TruncatedText value={String(row.staff_name ?? '')} /></span>
                     <span className={`${parts.fixed} ${styles.colWhat}`} role="cell">{AUDIT_WORD[row.action] ?? AUDIT_ACTION_LABEL[row.action]?.label ?? row.action}</span>
-                    <span className={parts.grow} role="cell" title={row.reason ?? ''}>{row.reason ?? '—'}</span>
+                    <span className={parts.grow} role="cell" title={row.reason ?? ''}>{row.reason ?? emptyValue('unknown')}</span>
                   </div>
                 ))}
               </div>
@@ -291,7 +294,7 @@ function DetailContent() {
           confirmLabel="代理ログインを始める"
           busy={busy}
           error={error || undefined}
-          onConfirm={() => void impersonate()}
+          onConfirm={() => impersonate()}
           onCancel={() => { if (!busy) setImpersonateConfirm(false) }}
         />
       ) : null}
@@ -352,7 +355,7 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
       busy={busy}
       error={error || undefined}
       designNode={target === 'suspended' ? 'okXoi' : undefined}
-      onConfirm={() => void submit()}
+      onConfirm={() => submit()}
       onCancel={onClose}
     >
       <div className={parts.dialogBody}>
@@ -364,15 +367,9 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
               : '再開すると、権限者がまたログインできるようになります。'}
         </p>
         {needsName ? (
-          <label className={styles.field}>
-            <span className={styles.label}>確認のため、契約先の名前をそのまま入力</span>
-            <TextField value={confirmName} onChange={(event) => setConfirmName(event.target.value)} placeholder={tenantName} />
-          </label>
+          <Field label="確認のため、契約先の名前をそのまま入力"><SaveErrorField names={["confirmName","confirm_name"]}><TextField value={confirmName} onChange={(event) => setConfirmName(event.target.value)} placeholder={tenantName} /></SaveErrorField></Field>
         ) : null}
-        <label className={styles.field}>
-          <span className={styles.label}>理由（4文字以上）</span>
-          <TextField value={reason} onChange={(event) => setReason(event.target.value)} placeholder="支払いの遅れが3か月続いたため" aria-label="理由（4文字以上）" required />
-        </label>
+        <Field label="理由（4文字以上）" required><SaveErrorField names={["reason"]}><TextField value={reason} onChange={(event) => setReason(event.target.value)} placeholder="支払いの遅れが3か月続いたため" aria-label="理由（4文字以上）" required /></SaveErrorField></Field>
       </div>
     </Dialog>
   )

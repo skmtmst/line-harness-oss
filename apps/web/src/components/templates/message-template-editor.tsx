@@ -1,9 +1,10 @@
 'use client'
 
+import EntitySelect from '@/components/shared/entity-select'
 import Link from 'next/link'
 import { useRef, type ReactNode } from 'react'
 import { listInterpolations, validateFlexContent, type CommonVar, type FriendField } from '@line-crm/shared'
-import FlexPreviewComponent from '@/components/flex-preview'
+import { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import Button from '@/components/shared/button'
 import LinePreview from '@/components/shared/line-preview'
@@ -194,10 +195,10 @@ export function TemplateInsertControls({
       <div className="flex flex-wrap gap-2">
         <Button size="field" disabled={disabled} onClick={() => onInsert('{{name}}')}>名前</Button>
         {fieldsEnabled && (
-          <Select aria-label="友だち情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || friendFields.length === 0} onChange={(value) => choose(value)} options={[{ value: '', label: state === 'loading' ? '友だち情報を読込中' : '友だち情報を選ぶ' }, ...friendFields.map((field) => ({ value: `{{field.${field.fieldKey}}}`, label: field.name }))]} />
+          <EntitySelect aria-label="友だち情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || friendFields.length === 0} onChange={(value) => choose(value)} options={[{ value: '', label: state === 'loading' ? '友だち情報を読込中' : '友だち情報を選ぶ' }, ...friendFields.map((field) => ({ value: `{{field.${field.fieldKey}}}`, label: field.name }))]} />
         )}
         {varsEnabled && (
-          <Select aria-label="共通情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || commonVars.length === 0} onChange={(value) => choose(value)} options={[{ value: '', label: state === 'loading' ? '共通情報を読込中' : '共通情報を選ぶ' }, ...commonVars.map((item) => ({ value: `{{var.${item.varKey}}}`, label: item.name }))]} />
+          <EntitySelect aria-label="共通情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || commonVars.length === 0} onChange={(value) => choose(value)} options={[{ value: '', label: state === 'loading' ? '共通情報を読込中' : '共通情報を選ぶ' }, ...commonVars.map((item) => ({ value: `{{var.${item.varKey}}}`, label: item.name }))]} />
         )}
         <Select aria-label="配信日を差し込む" value="" disabled={disabled} onChange={(value) => choose(value)} options={[{ value: '', label: '配信日を選ぶ' }, ...DATE_OPTIONS]} />
         <Select aria-label="その他の差し込みを選ぶ" value="" disabled={disabled} onChange={(value) => choose(value)} options={[{ value: '', label: 'その他を選ぶ' }, ...OTHER_OPTIONS]} />
@@ -310,7 +311,7 @@ export function MessageTemplateEditor({
 
   return (
     <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
-      <div data-design="Left" className="bg-canvas rounded-card border-hairline min-w-0 flex-1 space-y-5 border p-6">
+      <div data-design="Left" className="bg-canvas rounded-card content-card min-w-0 flex-1 space-y-5 border p-6">
         {beforeType}
         {editorContent ?? <>
         {showTypeSelector ? <Field label="種類" htmlFor="tp-type" note={typeNote}>

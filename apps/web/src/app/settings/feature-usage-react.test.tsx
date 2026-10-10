@@ -119,6 +119,7 @@ beforeEach(() => {
   })
   vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
     const path = String(input)
+    if (path.includes('/api/staff/me')) return Promise.resolve(response({ success: true, data: { role: 'owner' } }))
     if (path.includes('/api/settings/features')) return response(featureResponse())
     if (path.includes('/api/analytics/usage')) {
       network.usageRequests.push(path)
@@ -165,7 +166,7 @@ async function settle() {
 /** 切り替えられる機能の行（必須行・スイッチを持たない行は除く）。 */
 function toggleableRows(): HTMLLIElement[] {
   return [...host.querySelectorAll<HTMLLIElement>('li')].filter((row) => {
-    const toggle = row.querySelector<HTMLButtonElement>('[role="switch"]')
+    const toggle = row.querySelector<HTMLButtonElement>('[type="checkbox"]')
     return Boolean(toggle) && !toggle.disabled
   })
 }
@@ -191,7 +192,7 @@ describe('N-448 全任意機能の利用状況バッジ', () => {
     expect(broadcasts && rowText(broadcasts)).toContain('90日で 7配信')
     // 90日の利用は無いが過去の最終利用はある。
     const inflow = rows.find((row) => rowText(row).includes('流入と計測'))
-    expect(inflow && rowText(inflow)).toContain('最終利用 3月5日（木）')
+    expect(inflow && rowText(inflow)).toContain('最終利用 03/05')
     // 計測できない機能は 0 にせず未計測＋理由。
     const analytics = rows.find((row) => rowText(row).includes('分析'))
     expect(analytics && rowText(analytics)).toContain('未計測')
@@ -200,7 +201,7 @@ describe('N-448 全任意機能の利用状況バッジ', () => {
     // 集計に失敗した機能は取得失敗＋読み直し。
     const forms = rows.find((row) => rowText(row).includes('フォーム'))
     expect(forms && rowText(forms)).toContain('取得失敗')
-    expect(forms && rowText(forms)).toContain('読み直す')
+    expect(forms && rowText(forms)).toContain('もう一度読み込む')
   })
 
   it('利用状況の応答が遅れても、設定の切替は先に触れる', async () => {
@@ -210,10 +211,10 @@ describe('N-448 全任意機能の利用状況バッジ', () => {
     // 利用状況はまだ届いていないが、設定は出て切替が触れる。
     const rows = toggleableRows()
     expect(rows.length).toBeGreaterThan(0)
-    const toggle = rows[0].querySelector<HTMLButtonElement>('[role="switch"]')!
-    const before = toggle.getAttribute('aria-checked')
+    const toggle = rows[0].querySelector<HTMLButtonElement>('[type="checkbox"]')!
+    const before = String((toggle as HTMLInputElement).checked)
     await act(async () => { toggle.click(); await Promise.resolve() })
-    expect(toggle.getAttribute('aria-checked')).not.toBe(before)
+    expect(String((toggle as HTMLInputElement).checked)).not.toBe(before)
 
     // 後から届いたらバッジが足される。
     await act(async () => {

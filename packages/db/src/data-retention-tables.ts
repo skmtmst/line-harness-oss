@@ -57,6 +57,8 @@ export function purgeTablesChildFirst(): string[] {
   const depth = new Map<string, number>();
   /** その表の行を選ぶために、まだ残っていないといけない表。 */
   const dependsOn = (name: string): string | undefined => {
+    // Files also reference answers and friends; remove them before either parent.
+    if (name === 'form_submission_files') return 'form_submissions';
     const scope = RETENTION_TABLES[name]?.scope;
     if (!scope) return undefined;
     if (scope.by === 'parent') return scope.parent;
@@ -121,6 +123,7 @@ export const RETENTION_R2_KEY_COLUMNS: ReadonlyArray<{ table: string; column: st
   { table: 'visit_stamp_paper_photos', column: 'object_key' },
   { table: 'hq_template_owned_r2_keys', column: 'object_key' },
   { table: 'media', column: 'r2_key' },
+  { table: 'form_submission_files', column: 'r2_key' },
   { table: 'imagemap_images', column: 'r2_key' },
   { table: 'broadcast_media_upload_sessions', column: 'r2_key' },
   { table: 'broadcast_media_upload_sessions', column: 'public_key' },

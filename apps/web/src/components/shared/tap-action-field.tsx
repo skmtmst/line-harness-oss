@@ -20,13 +20,13 @@
  */
 import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { CalendarCheck, ClipboardList, ExternalLink, History, Info, MessageSquare, Stamp, type LucideIcon } from 'lucide-react'
+import { CalendarCheck, ChevronRight, ClipboardList, ExternalLink, History, Info, MessageSquare, Stamp, type LucideIcon } from 'lucide-react'
 import {
   TAP_ACTION_DEFS, TAP_ACTION_KINDS, tapActionDef,
   type TapActionKind, type TapActionValue,
 } from '@/lib/tap-actions'
-import Button from './button'
-import { EntityPickerDialog, type EntityPickerItem } from './entity-picker'
+import TapExtrasField from './tap-extras-field'
+import { EntityPickerSummary, EntityPickerDialog, type EntityPickerItem } from './entity-picker'
 import { ENTITY_KINDS, EntityKindDialog, type EntityKind } from './entity-picker-sources'
 import Select from './select'
 import { TextField } from './text-field'
@@ -62,6 +62,9 @@ export interface TapActionSourceItem {
 export type TapActionSources = Partial<Record<'form' | 'booking' | 'visit_stamp', TapActionSourceItem[]>>
 
 export interface TapActionFieldProps {
+  id?: string
+  invalid?: boolean
+  'aria-describedby'?: string
   /** 読み上げ名の頭（「カード1のボタン1」「面 A」）。 */
   name: string
   value: TapActionValue
@@ -93,6 +96,10 @@ export interface TapActionFieldProps {
   uriPlaceholder?: string
   /** 押したらのプルダウンの読み上げ名（既定「〇〇を押したら」）。幅は持たない（呼び出し側の箱で決める）。 */
   kindLabel?: string
+  allowExtras?: boolean
+  accountId?: string | null
+  extrasUnavailable?: string
+  extrasError?: string | null
 }
 
 function kindOptionsOf(kinds: readonly TapActionKind[], extras: readonly TapActionExtraKind[], current: string) {
@@ -106,15 +113,17 @@ function kindOptionsOf(kinds: readonly TapActionKind[], extras: readonly TapActi
 }
 
 export default function TapActionField({
+  id, invalid, 'aria-describedby': saveDescription,
   name, value, onChange, kinds = TAP_ACTION_KINDS, extraKinds = [], renderBody,
   scope = 'shop', hasLiff, liffSettingsHref = '/accounts', readOnly = false, sources,
-  layout = 'row', textMax, kindLabel, uriPlaceholder = 'https://example.com',
+  layout = 'row', textMax, kindLabel, allowExtras = false, accountId, extrasUnavailable, extrasError, uriPlaceholder = 'https://example.com',
 }: TapActionFieldProps) {
   const options = useMemo(() => kindOptionsOf(kinds, extraKinds, value.kind), [kinds, extraKinds, value.kind])
   const current = options.find((option) => option.value === value.kind)
   const CurrentIcon = current?.icon
   const def = tapActionDef(value.kind)
   const [picking, setPicking] = useState(false)
+  const PickRow = readOnly ? 'div' : 'button'
 
   const kindControl = readOnly ? (
     <span className={styles.readKind} aria-label={`${kindLabel ?? `${name}を押したら`}：${current?.label ?? ''}`}>
@@ -172,21 +181,12 @@ export default function TapActionField({
       ? `（${target.noun}を選んでください）`
       : def.kind === 'booking' ? 'メニューを決めずに開く（予約ページの最初）' : 'ふつうのスタンプカードを開く'
     body = (
-      <div className={styles.pickRow} data-empty={!value.refId || undefined}>
-        <Icon className={styles.icon} aria-hidden="true" />
-        <span className={styles.pickText} title={picked?.name}>
-          {value.refId ? (
-            <>
-              <strong className={styles.pickName}>{picked?.name ?? `保存してある${target.noun}`}</strong>
-              {picked?.note ? <span className={styles.pickNote}>{picked.note}</span> : def.kind === 'booking' ? <span className={styles.pickNote}>メニューを決めて開く（空のときは予約ページの最初）</span> : null}
-            </>
-          ) : <span className={styles.pickEmpty}>{emptyText}</span>}
-        </span>
-        {readOnly ? null : (
-          <Button type="button" size="compact" aria-label={`${name}の${target.noun}を${value.refId ? '変える' : '選ぶ'}`} onClick={() => setPicking(true)}>
-            {value.refId ? '変える' : '選ぶ'}
-          </Button>
-        )}
+      <>
+        {readOnly ? <span className={styles.readBody}>{picked?.name ?? emptyText}{picked?.note ? <small>{picked.note}</small> : null}</span> : <EntityPickerSummary
+          label={`${name}の${target.noun}`} noun={target.noun} icon={Icon}
+          name={value.refId ? picked?.name ?? `保存してある${target.noun}` : undefined}
+          meta={picked?.note} placeholder={emptyText}
+          id={id} invalid={invalid} describedBy={saveDescription} ariaLabel={`${name}の${target.noun}を${value.refId ? '変える' : '選ぶ'}`} onOpen={() => setPicking(true)} />}
         {picking ? (
           <TapTargetPicker
             tapKind={def.kind}
@@ -199,14 +199,16 @@ export default function TapActionField({
             onCancel={() => setPicking(false)}
           />
         ) : null}
-      </div>
+      </>
     )
   }
 
   return (
-    <div className={layout === 'stack' ? `${styles.root} ${styles.stack}` : `${styles.root} ${styles.row}`} data-tap-kind={value.kind}>
+    <div id={id} aria-invalid={invalid || undefined} aria-describedby={saveDescription} style={invalid ? { outline: '1px solid var(--color-danger)' } : undefined} className={styles.withExtras}><div className={layout === 'stack' ? `${styles.root} ${styles.stack}` : `${styles.root} ${styles.row}`} data-tap-kind={value.kind}>
       <div className={styles.kind}>{kindControl}</div>
       <div className={styles.body}>{body}</div>
+    </div>
+    {allowExtras ? <TapExtrasField name={name} value={value.tapExtras} onChange={tapExtras => onChange({ tapExtras })} accountId={accountId} readOnly={readOnly} unavailable={extrasUnavailable} error={extrasError} /> : null}
     </div>
   )
 }

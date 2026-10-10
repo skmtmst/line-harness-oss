@@ -5,6 +5,7 @@
  * - RowMore：行の右端の「…」（右クリックだけで開く操作にしない）。
  * - RsDialog：絵の窓（幅・上からの位置・題の下 14 の間・下の線と右寄せのボタン）。
  */
+import { Field as SharedField } from '@/components/shared/form-controls'
 import { type FormEvent, type ReactNode } from 'react'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Dialog from '@/components/shared/dialog'
@@ -84,18 +85,8 @@ export function RsDialog({ open, title, width, top, tone, busy, designNode, titl
 }
 
 /** 窓の中の欄（題＋中身）。題は選ぶ欄なら 12/600、入力欄なら 13/500（絵のとおり）。 */
-export function DialogField({ label, kind = 'input', htmlFor, children }: {
-  label: ReactNode
-  kind?: 'input' | 'select'
-  htmlFor?: string
-  children: ReactNode
-}) {
-  return (
-    <div className={styles.field}>
-      <label htmlFor={htmlFor} className={kind === 'select' ? styles.fieldLabelSelect : styles.fieldLabel}>{label}</label>
-      {children}
-    </div>
-  )
+export function DialogField({ label, htmlFor, children }: { label: ReactNode; kind?: 'input' | 'select'; htmlFor?: string; children: ReactNode }) {
+  return <SharedField label={label} htmlFor={htmlFor}>{children}</SharedField>
 }
 
 export function DialogNote({ children }: { children: ReactNode }) {

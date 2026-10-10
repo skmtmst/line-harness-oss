@@ -1,16 +1,7 @@
 'use client'
 
-/*
- * ★V8 外部連携「こちらから送る」の一覧（Pencil `ZSbFY`・1152 `AsfFB`・
- * 閲覧のみ `l5SRfT`・状態 `wWrpY`）。
- *
- * 型（ListPage）に、タブ・数の帯・左のフォルダの列（上に「送り先を作る」）・
- * 案内の帯・道具の段・表をはめる。データの口は v7 と同じ（一覧・集計・
- * 動かす/止める・試し送信・合言葉の作り直し・削除）。
- *
- * 絵と今の作りが合わない所は BEHAVIOR.md に書いた（フォルダへ入れる口が無い・
- * 「先月より」の集計が無い・複製の口が無い など）。
- */
+import { useFolderMove } from '@/components/shared/use-folder-move'
+import { moveOutgoingWebhookToFolder } from '@/lib/move-to-folder'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
@@ -33,9 +24,10 @@ import { RowMenu } from '@/components/shared/row-actions'
 import EmptyList from '@/components/shared/empty-list'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
 import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import Pagination from '@/components/shared/pagination'
 import ManagedFolderPanel, { folderDotFor, managedFolderOptions } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
@@ -60,6 +52,21 @@ import {
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import { eventLabel, isHttpsUrl, maskedUrl, payloadLabel, shortDateTime, urlHost } from './words'
 import styles from './outgoing.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 外部連携「こちらから送る」の一覧（Pencil `ZSbFY`・1152 `AsfFB`・
+ * 閲覧のみ `l5SRfT`・状態 `wWrpY`）。
+ *
+ * 型（ListPage）に、タブ・数の帯・左のフォルダの列（上に「送り先を作る」）・
+ * 案内の帯・道具の段・表をはめる。データの口は v7 と同じ（一覧・集計・
+ * 動かす/止める・試し送信・合言葉の作り直し・削除）。
+ *
+ * 絵と今の作りが合わない所は BEHAVIOR.md に書いた
+ * （「先月より」の集計が無い・複製の口が無い など）。
+ */
 
 type SavedFilter = '' | 'active' | 'paused' | 'failed'
 type SortKey = 'volume' | 'name'
@@ -80,6 +87,7 @@ function isFailing(item: OutgoingWebhookOverview): boolean {
 }
 
 export default function WebhooksOutgoingV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('外部連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -95,7 +103,7 @@ export default function WebhooksOutgoingV8() {
    * 送り先の変更（作る・動かす/止める・直す・合言葉・削除）は統括だけ（R32）。
    * 試し送信は管理者も使える。見るだけの担当者は中身の確認と検索だけ（l5SRfT）。
    */
-  const canManage = staffRole === null || staffRole === 'owner'
+  const canManage = staffRole === 'owner'
   const canTest = canManage || staffRole === 'admin'
 
   const overview = useWebhookOverview()
@@ -149,7 +157,8 @@ export default function WebhooksOutgoingV8() {
     try {
       const res = await api.folders.list('webhook', selectedAccountId ?? undefined)
       if (res.success) setFolders(res.data)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       // 箱が取れなくても一覧は出す。
     }
   }
@@ -237,11 +246,16 @@ export default function WebhooksOutgoingV8() {
       })
     } catch (caught) {
       if (!isCurrent()) return
+      saveErrors.capture(caught);
+
       const forbidden = caught instanceof ApiError && caught.status === 403
-      if (!forbidden) await reload().catch(() => {})
-      if (!isCurrent()) return
+      if (!forbidden) await reload().catch(() => {});
+
+      if (!isCurrent())
+
+ return
       fail(forbidden
-        ? `「${item.name}」は統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。`
+        ? permissionDeniedMessage('store')
         : `「${item.name}」は切り替えの応答を受け取れませんでした。一覧の表示を確かめてください。変わっている可能性があります。`)
     } finally {
       if (isCurrent()) {
@@ -268,9 +282,11 @@ export default function WebhooksOutgoingV8() {
         const status = response.success ? response.data.responseStatus : null
         setTestNotice(`「${item.name}」への試し送信は届きませんでした${status === null ? '' : `(相手の応答 ${status})`}。「やり取りの記録」タブで詳しく確認できます。`)
       }
-    } catch {
+    } catch (saveFailure) {
       if (accountRef.current !== accountId) return
-      setTestNotice(`「${item.name}」への試し送信に失敗しました。「やり取りの記録」タブで詳しく確認できます。`)
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure)
+      setTestNotice(`「${item.name}」への試し送信に失敗しました。「やり取りの記録」タブで詳しく確認できます。`) }
     } finally {
       setTestingId(null)
     }
@@ -303,10 +319,13 @@ export default function WebhooksOutgoingV8() {
       await reload()
     } catch (caught) {
       if (accountRef.current !== accountId) return
+      const fieldFailure = saveErrors.capture(caught);
+
       const forbidden = caught instanceof ApiError && caught.status === 403
+      { if (!fieldFailure)
       setDeleteError(forbidden
-        ? 'この送り先の削除は統括だけができます。必要なときは統括に頼んでください。'
-        : 'この送り先を削除できませんでした。状態を読み直してから、もう一度お試しください。')
+        ? permissionDeniedMessage('store')
+        : 'この送り先を削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
@@ -344,24 +363,35 @@ export default function WebhooksOutgoingV8() {
       setRotateSecret('')
       void reload()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (!stepUpToken && isStepUpRequired(caught)) {
-        setStepUp({ purpose: 'webhook.secret', action: 'シークレットを更新する', retry: (token) => runRotate(token) })
+        setStepUp({ purpose: 'webhook.secret', action: 'シークレットを更新する', retry: (token) => runRotate(token) });
+
         return
       }
       if (accountRef.current !== accountId) return
+      { if (!fieldFailure)
       setRotateError(describeApiFailure(caught, 'シークレットの更新', {
-        forbidden: '合言葉の更新は統括だけができます。必要なときは統括に頼んでください。',
-      }))
+        scope: 'store',
+      })) }
     } finally {
       setRotating(false)
     }
   }
+
+  const folderMove = useFolderMove({
+    accountId: selectedAccountId, canEdit: canManage, items: visible, folders,
+    move: (item, folderId) => moveOutgoingWebhookToFolder(item.id, selectedAccountId!, folderId),
+    onChanged: async () => { await reload(); await loadFolders() },
+  })
 
   /* ===== 行の「設定」（操作の一覧） ===== */
   const menuItemsFor = (item: OutgoingWebhookOverview): ActionMenuItem[] => {
     const canActivate = item.hasSecret && isHttpsUrl(item.url)
     const items: ActionMenuItem[] = []
     if (canManage) {
+      items.push({ id: 'move', label: 'フォルダへ移す', onSelect: () => folderMove.open(item) })
       items.push({ id: 'edit', label: '直す', onSelect: () => { setMenuId(null); router.push(`/webhooks/edit?id=${item.id}`) } })
       items.push({
         id: 'toggle',
@@ -399,12 +429,12 @@ export default function WebhooksOutgoingV8() {
   /* 件数は読み込んだ送り先（全件）から数える。 */
   const folderCountOf = (folder: Folder) => (ready ? displayed.filter((item) => item.folderId === folder.id).length : null)
   const folderSelect = (
-    <Select
+    <SaveErrorField names={["folderFilter","folder_filter"]}><Select
       aria-label="フォルダ"
       value={folderFilter}
       onChange={(value) => setFolderFilter(value)}
       options={managedFolderOptions('webhook', folders, { allId: '', unfiledId: UNFILED })}
-    />
+    /></SaveErrorField>
   )
   /* 閲覧のみには押せない作るボタンを置かない（場所だけ空ける）。 */
   const createButton = canManage
@@ -415,10 +445,10 @@ export default function WebhooksOutgoingV8() {
   const chips = (
     <div role="group" aria-label="状態で絞り込む" className={styles.chips}>
       <FilterChip selected={chip === 'active'} onChange={(next) => setChip(next ? 'active' : '')} icon={<Pause size={13} aria-hidden="true" />}>
-        {ready ? `動いている ${activeCount}` : '動いている'}
+        {ready ? `動いている ${activeCount}` : '有効'}
       </FilterChip>
       <FilterChip selected={chip === 'paused'} onChange={(next) => setChip(next ? 'paused' : '')} icon={<Play size={13} aria-hidden="true" />}>
-        {ready ? `止めている ${pausedCount}` : '止めている'}
+        {ready ? `止めている ${pausedCount}` : '停止中'}
       </FilterChip>
     </div>
   )
@@ -426,7 +456,7 @@ export default function WebhooksOutgoingV8() {
   const savedBox = (
     <div className={styles.savedBox}>
       <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-      <Select
+      <SaveErrorField names={["chip","sortKey","sort_key"]}><Select
         aria-label="よく使う絞り込み"
         value={chip}
         onChange={(value) => {
@@ -441,7 +471,7 @@ export default function WebhooksOutgoingV8() {
           { value: 'failed', label: '失敗あり' },
           { value: sortKey === 'volume' ? 'sort-name' : 'sort-volume', label: sortKey === 'volume' ? '名前順に並べる' : '送った回数が多い順に並べる' },
         ]}
-      />
+      /></SaveErrorField>
     </div>
   )
   const perPage = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
@@ -511,14 +541,14 @@ export default function WebhooksOutgoingV8() {
       </div>
     )
   } else if (!selectedAccountId) {
-    listBody = <ListState kind="empty" title={accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'} />
+    listBody = <AccountRequiredState hasAccounts={accounts.length > 0} />
   } else if (outgoingStatus === 'error') {
     listBody = (
       <ListState
         kind="error"
         title="送り先を読み込めませんでした"
         description="登録内容は消えていません。通信の状態を確認して、もう一度お試しください。"
-        action={<Button onClick={() => void reload()}>もう一度読み込む</Button>}
+        onRetry={() => void reload()}
       />
     )
   } else if (visible.length === 0) {
@@ -547,7 +577,7 @@ export default function WebhooksOutgoingV8() {
               label: menuItem.label,
               danger: menuItem.tone === 'danger',
               disabled: menuItem.disabled,
-              onSelect: () => menuItem.onSelect(),
+              onSelect: () => menuItem.onSelect?.(),
             })) : []
           })()}
           shouldOpen={(event) => {
@@ -563,14 +593,14 @@ export default function WebhooksOutgoingV8() {
               {narrow ? (
                 /* 1152 の絵 AsfFB：送り先・今月送った・状態・操作の4列。 */
                 <TableHeadRow data-table-layout="columns">
-                  <Th grow inset="var(--tpl-folder-dot-indent)" className={styles.colName}>送り先（送るタイミング → URL）</Th>
+                  <Th grow inset="var(--tpl-folder-dot-indent)" className={styles.colName}>{folderMove.pageCheckbox}送り先（送るタイミング → URL）</Th>
                   <Th className={styles.colMonth}>今月送った</Th>
                   <Th className={styles.colStateNarrow}>状態</Th>
                   <Th className={styles.colOpsNarrow}>操作</Th>
                 </TableHeadRow>
               ) : (
               <TableHeadRow data-table-layout="columns">
-                <Th grow className={styles.colName}>つなぎ先</Th>
+                <Th grow className={styles.colName}>{folderMove.pageCheckbox}つなぎ先</Th>
                 <Th className={styles.colWhen}>いつ送るか</Th>
                 <Th className={styles.colPayload}>送るもの</Th>
                 <Th align="right" className={styles.colCount}>この30日</Th>
@@ -589,13 +619,13 @@ export default function WebhooksOutgoingV8() {
                 const menuItems = menuItemsFor(item)
                 const showMenu = canManage || canTest
                 const tone = toggling ? 'neutral' : failing ? 'danger' : item.isActive ? 'active' : 'neutral'
-                const stateWord = toggling ? '切り替え中' : failing ? '失敗あり' : item.isActive ? '動いている' : '止めている'
+                const stateWord = toggling ? '切り替え中' : failing ? '失敗あり' : item.isActive ? '有効' : '停止中'
                 const nameNode = (
-                  <FolderDotName folder={folderDotFor(folders, item.folderId)}>
+                  <FolderDotName folder={folderDotFor(folders, item.folderId)}>{folderMove.checkbox(item)}
                     {canManage ? (
-                      <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} title={item.name}>{item.name}</Link>
+                      <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></Link>
                     ) : (
-                      <span className={styles.name} title={item.name}>{item.name}</span>
+                      <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
                     )}
                   </FolderDotName>
                 )
@@ -606,10 +636,7 @@ export default function WebhooksOutgoingV8() {
                     : completedAt ? `最後 ${shortDateTime(completedAt)}` : null
                   return (
                     <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
-                      <Td grow className={styles.colName}>
-                        {nameNode}
-                        <span className={`${styles.sub} ${styles.nameSub}`} title={`${when} → ${item.url}`}>{target}</span>
-                      </Td>
+                      <Td grow className={styles.colName}>{nameNode}</Td>
                       <Td className={styles.colMonth}>
                         <span className={styles.num}>{`${formatNumber(item.deliverySummary.total)} 回`}</span>
                         {countSub ? <span className={styles.numSub}>{countSub}</span> : null}
@@ -640,26 +667,26 @@ export default function WebhooksOutgoingV8() {
                   )
                 }
                 return (
-                  <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
+                  <Tr key={item.id} data-table-layout="columns" data-row-id={item.id} href={`/webhooks/edit?id=${item.id}`}>
                     <Td grow className={styles.colName}>
                       {/* 名前の前に左の列と同じフォルダの色の丸（未分類は色の無い輪）。 */}
-                      <FolderDotName folder={folderDotFor(folders, item.folderId)}>
+                      <FolderDotName folder={folderDotFor(folders, item.folderId)}>{folderMove.checkbox(item)}
                         {canManage ? (
-                          <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} title={item.name}>{item.name}</Link>
+                          <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></Link>
                         ) : (
-                          <span className={styles.name} title={item.name}>{item.name}</span>
+                          <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
                         )}
                       </FolderDotName>
-                      <span className={`${styles.sub} ${styles.nameSub}`} title={item.url}>{maskedUrl(item.url)}</span>
+
                     </Td>
                     <Td className={styles.colWhen}><span className={styles.cellText} title={when}>{when}</span></Td>
                     <Td className={styles.colPayload}><span className={styles.cellText} title={payload}>{payload}</span></Td>
                     <Td align="right" className={styles.colCount}>
-                      <span className={styles.num}>{formatNumber(item.deliverySummary.total)}回</span>
+                      <span className={styles.num}>{formatNumber(item.deliverySummary.total)} 回</span>
                       <span className={styles.numSub}>
                         {item.deliverySummary.failed > 0
-                          ? `失敗 ${formatNumber(item.deliverySummary.failed)}回`
-                          : `送信中 ${formatNumber(item.deliverySummary.pending)}回`}
+                          ? `失敗 ${formatNumber(item.deliverySummary.failed)} 回`
+                          : `送信中 ${formatNumber(item.deliverySummary.pending)} 回`}
                       </span>
                     </Td>
                     <Td className={styles.colState}>
@@ -708,21 +735,22 @@ export default function WebhooksOutgoingV8() {
   const pager = ready && pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visible.length} / {formatNumber(filtered.length)}件
+        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visible.length} / {formatNumber(filtered.length)} 件
       </span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="送り先一覧のページ送り" />
     </ListPagePagination>
   ) : null
 
   return (
-    <ListPage
-      help={narrow
+    <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
+      help={<>{WEBHOOKS_DESCRIPTION}{narrow
           ? '行の「…」から 中身を見る・試しに送る・失敗をやり直す・鍵を作り直す・止める・削除。'
-          : '行の「設定」から 直す・止める・鍵を作り直す・試しに送る・削除。「中身を見る」で送った中身と返事を見られます。'}
+          : '行の「設定」から 直す・止める・鍵を作り直す・試しに送る・削除。「中身を見る」で送った中身と返事を見られます。'}</>}
       boardId={narrow ? 'AsfFB' : 'ZSbFY'}
       headingSize="regular"
       title="外部連携"
-      description={WEBHOOKS_DESCRIPTION}
+
       actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button> : undefined}
       tabs={<WebhookTabs active="outgoing" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
@@ -751,13 +779,14 @@ export default function WebhooksOutgoingV8() {
           allCount={ready ? displayed.length : null}
           unfiledCount={ready ? displayed.filter((item) => !item.folderId).length : null}
           countOf={folderCountOf}
-          placeholder="例: 顧客・会員"
+          placeholder="例：顧客・会員"
         />
       </>}
       collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={pager}
       overlays={<>
+        {folderMove.overlays}
         <ConfirmDialog
           open={testTarget !== null}
           title="試し送信をします"
@@ -783,7 +812,7 @@ export default function WebhooksOutgoingV8() {
           destructive
           busy={deleting}
           error={deleteError || undefined}
-          onConfirm={() => void runDelete()}
+          onConfirm={() => runDelete()}
           onCancel={() => {
             if (deleting) return
             setDeleteTarget(null)
@@ -797,18 +826,18 @@ export default function WebhooksOutgoingV8() {
           description="新しい鍵（合言葉）を設定します。保存したあとは二度と全部は表示されません。前の鍵は24時間だけ使えるので、相手側の切り替え中も送信は止まりません。"
           error={rotateError || undefined}
           onCancel={() => { setRotateTarget(null); setRotateSecret('') }}
-          onConfirm={() => void runRotate()}
+          onConfirm={() => runRotate()}
           confirmLabel="保存する"
         >
           <div className={styles.secretRow}>
-            <TextField
+            <SaveErrorField names={["rotateSecret","secret","rotate_secret"]}><TextField
               value={rotateSecret}
               onChange={(event) => setRotateSecret(event.target.value)}
               placeholder="ランダムな英数字32文字以上"
               aria-label="新しい鍵"
               minLength={MIN_SECRET_LENGTH}
               autoFocus
-            />
+            /></SaveErrorField>
             <Button type="button" onClick={() => setRotateSecret(generateSecret())}>自動生成</Button>
           </div>
         </Dialog>
@@ -818,6 +847,6 @@ export default function WebhooksOutgoingV8() {
       {error ? <div className={styles.errorRow}><Notice tone="danger" message={error} onClose={() => setError('')} /></div> : null}
       {testNotice ? <div className={styles.errorRow}><Notice tone="danger" message={testNotice} onClose={() => setTestNotice(null)} /></div> : null}
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

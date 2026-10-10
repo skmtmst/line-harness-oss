@@ -1,26 +1,11 @@
 'use client'
 
-/*
- * ★V8 自動応答の実行結果（Pencil `nWmLg`）。
- *
- * 型は詳細（DetailPage）：頭（戻る・題・説明・右に3つの操作）→ 数の帯（4つ）→
- * 失敗の帯 → 実行の記録（道具の段・表・ページ送り）→ 言葉ごとの数と引き継ぎ。
- * 取得・操作の動き（読み直し・一時停止・再実行・CSV）は `app/auto-replies/runs/runs-v8.tsx`
- * から写した（import はしない）。動きの一覧は BEHAVIOR.md の「実行結果」。
- */
-
+import SegmentedControl from '@/components/shared/segmented'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  ArrowLeft,
-  Download,
-  MessageCircle,
-  Pause,
-  Pencil,
-  RotateCcw,
-  TriangleAlert,
-} from 'lucide-react'
+import { ArrowLeft, Download, MessageCircle, Pause, Pencil, RotateCcw } from 'lucide-react'
 import type { AutoReplyRun, AutoReplyRunsResponse, ExecutionRunStatus } from '@line-crm/shared'
 import { DetailPage } from '@/components/templates'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -39,12 +24,29 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { api, ApiError } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
+import { formatDateTime, formatNumber, formatTime, formatListDateTime as polishFormatListDateTime } from '@/lib/format'
 import styles from './runs.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
+import Notice from '@/components/shared/notice'
+
+/*
+ * ★V8 自動応答の実行結果（Pencil `nWmLg`）。
+ *
+ * 型は詳細（DetailPage）：頭（戻る・題・説明・右に3つの操作）→ 数の帯（4つ）→
+ * 失敗の帯 → 実行の記録（道具の段・表・ページ送り）→ 言葉ごとの数と引き継ぎ。
+ * 取得・操作の動き（読み直し・一時停止・再実行・CSV）は `app/auto-replies/runs/runs-v8.tsx`
+ * から写した（import はしない）。動きの一覧は BEHAVIOR.md の「実行結果」。
+ */
 
 /* 再実行・一時停止は owner/admin だけ（R530・再実行POST・停止口の requireRole と同じ境目）。 */
 const NO_MANAGE_NOTE = '閲覧のみで見ています。再実行・一時停止はオーナーと管理者だけができます。実行結果の確認と書き出しはこのまま使えます。'
-const NO_RETRY_PERMISSION = '再実行する権限がありません。オーナーか管理者に頼んでください。'
+const NO_RETRY_PERMISSION = permissionDeniedMessage('store')
 
 /* 絵の札の言葉（成功・確認待ち・失敗・見送り）。表に無い状態は「確認中」で出す（白い画面にしない）。 */
 const STATUS: Record<ExecutionRunStatus, { label: string; tone: StatusBadgeTone }> = {
@@ -69,7 +71,7 @@ export function actionLabel(run: AutoReplyRun): string {
   if (run.replyStatus === 'accepted') parts.push('返信')
   if ((summary.executed ?? 0) > 0) parts.push(`後続処理${summary.executed}件`)
   if ((summary.failed ?? 0) > 0) parts.push(`失敗${summary.failed}件`)
-  return parts.length > 0 ? parts.join('＋') : run.detail ?? '—'
+  return parts.length > 0 ? parts.join('＋') : run.detail ?? emptyValue('unknown')
 }
 
 function csvCell(value: unknown): string {
@@ -82,12 +84,12 @@ function csvFor(items: AutoReplyRun[]): string {
     ...items.map((item) => [
       formatDateTime(item.occurredAt),
       item.friendName ?? '削除済みの友だち',
-      item.accountLabel ?? '—',
-      item.inputPreview ?? '—',
+      item.accountLabel ?? emptyValue('unknown'),
+      item.inputPreview ?? emptyValue('unknown'),
       item.triggerLabel,
       statusView(item.status).label,
       actionLabel(item),
-      item.durationMs === null ? '—' : `${item.durationMs}ms`,
+      item.durationMs === null ? emptyValue('unknown') : `${item.durationMs}ms`,
     ]),
   ]
   return `﻿${rows.map((row) => row.map(csvCell).join(',')).join('\n')}`
@@ -133,11 +135,11 @@ export function periodFrom(period: PeriodKey, now: Date): string | null {
   return null
 }
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n}件表示` }))
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 /** 届いた言葉は「」で囲んで1行。 */
 function quoted(text: string | null): string {
-  return text ? `「${text}」` : '—'
+  return text ? `「${text}」` : emptyValue('unknown')
 }
 
 function initialOf(name: string | null): string {
@@ -150,17 +152,17 @@ export default function AutoReplyRunsV8() {
   const searchParams = useSearchParams()
   const requestedRuleId = searchParams.get('id') ?? ''
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || canManageRole(staffRole)
-  const [period, setPeriod] = useState<PeriodKey>('month')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
-  const [pageSize, setPageSize] = useState(20)
+  const canManage = canManageRole(staffRole)
+  const [period, setPeriod] = useListUrlValue<PeriodKey>('period', 'month')
+  const [dateFrom, setDateFrom] = useListUrlValue('dateFrom', '')
+  const [dateTo, setDateTo] = useListUrlValue('dateTo', '')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [data, setData] = useState<AutoReplyRunsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [page, setPage] = useState(1)
-  const [filter, setFilter] = useState<RunFilter>('all')
-  const [search, setSearch] = useState('')
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [filter, setFilter] = useListUrlValue<RunFilter>('filter', 'all')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [actionMessage, setActionMessage] = useState('')
   const [stopOpen, setStopOpen] = useState(false)
   const [stopReason, setStopReason] = useState('')
@@ -294,7 +296,7 @@ export default function AutoReplyRunsV8() {
     }
     setActionMessage(
       retried > 0
-        ? `失敗した処理を${retried}件もう一度実行しました。`
+        ? `失敗した処理を${retried} 件もう一度実行しました。`
         : 'もう一度実行できる処理はありませんでした。',
     )
     await load()
@@ -318,7 +320,7 @@ export default function AutoReplyRunsV8() {
         rows.push(...response.data.items.slice(0, room))
         offset += response.data.items.length
         if (rows.length % 1000 === 0 && rows.length > 0) {
-          setActionMessage(`${formatNumber(rows.length)}件読み込み中…`)
+          setActionMessage(`${formatNumber(rows.length)} 件読み込み中…`)
         }
         if (rows.length >= MAX_CSV_ROWS) {
           capped = offset < response.data.pagination.total || response.data.items.length > room
@@ -329,13 +331,13 @@ export default function AutoReplyRunsV8() {
       const url = URL.createObjectURL(new Blob([csvFor(rows)], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `auto-reply-runs${requestedRuleId ? `-${requestedRuleId}` : ''}.csv`
+      anchor.download = csvFileName("自動応答の実行履歴")
       anchor.click()
       URL.revokeObjectURL(url)
       setActionMessage(
         capped
-          ? `直近${formatNumber(MAX_CSV_ROWS)}件まで書き出しました。全部要るときは期間を絞って分けてください。`
-          : `${formatNumber(rows.length)}件を書き出しました。`,
+          ? `直近${formatNumber(MAX_CSV_ROWS)} 件まで書き出しました。全部要るときは期間を絞って分けてください。`
+          : `${formatNumber(rows.length)} 件を書き出しました。`,
       )
     } catch (e) {
       if (e instanceof Error && e.message === 'csv_cancelled') {
@@ -380,8 +382,8 @@ export default function AutoReplyRunsV8() {
         id: 'chat',
         label: 'トークを開く',
         icon: <MessageCircle size={14} aria-hidden="true" />,
-        external: true,
-        onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(item.friendId)}`) },
+        external: false,
+        href: `/chats?friend=${encodeURIComponent(item.friendId)}`, onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(item.friendId)}`) },
       })
     }
     if (canManage && item.canRetry) {
@@ -400,8 +402,8 @@ export default function AutoReplyRunsV8() {
     <DetailPage
       boardId="nWmLg"
       title={`実行結果：${data?.rule.name ?? '自動応答'}`}
-      description="いつ・誰に・何を返したか、失敗した処理を見ます。"
-      identity={<Link href="/auto-replies" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />自動応答へ</Link>}
+      help="いつ・誰に・何を返したか、失敗した処理を見ます。"
+      identity={<></>}
       actions={<div className={styles.headActions}>
         {canManage ? (
           <Button onClick={() => setStopOpen(true)} disabled={!isActiveRule || stopping}>
@@ -422,32 +424,25 @@ export default function AutoReplyRunsV8() {
       </div>}
     >
       {!canManage ? (
-        <p className={styles.viewerBand} role="status">{NO_MANAGE_NOTE}</p>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">{NO_MANAGE_NOTE}</ReadOnlyNotice></div>
       ) : null}
 
       <div className={styles.kpis}>
       <KpiBand data-design="KPIs">
         <KpiCard presentation="band" icon={null} title="今月当たった" value={data ? data.summary.monthHits : null} unit="回"
-          detail={`累計 ${data ? formatNumber(data.summary.totalHits) : '—'}回`} />
+          detail={`累計 ${data ? formatNumber(data.summary.totalHits) : emptyValue('unknown')}回`} />
         <KpiCard presentation="band" icon={null} title="担当者へ引き継ぎ" value={data ? data.summary.handovers : null} unit="件"
-          detail={`確認待ち ${data ? formatNumber(data.handovers.waiting) : '—'}件`} />
+          detail={`確認待ち ${data ? formatNumber(data.handovers.waiting) : emptyValue('unknown')}件`} />
         <KpiCard presentation="band" icon={null} title="失敗した処理" value={data ? failedCount : null} unit="件"
           detail={failedCount > 0 ? '理由を見て、もう一度実行できます' : '記録を開始してからの合計です'} />
         <KpiCard presentation="band" icon={null} title="平均で返すまで"
           value={data?.summary.averageResponseMs == null ? null : Number((data.summary.averageResponseMs / 1000).toFixed(1))} unit="秒"
-          detail={`最後に動いた ${data ? formatTime(data.summary.lastRunAt) : '—'}`} />
+          detail={`最後に動いた ${data ? formatTime(data.summary.lastRunAt) : emptyValue('unknown')}`} />
       </KpiBand>
       </div>
 
       {failedCount > 0 ? (
-        <div className={styles.failBand} role="alert">
-          <TriangleAlert size={18} className={styles.failIcon} aria-hidden="true" />
-          <div className={styles.failText}>
-            <p className={styles.failTitle}>{`失敗した処理が ${formatNumber(failedCount)}件あります`}</p>
-            <p className={styles.failNote}>止まった行の理由を見て、もう一度実行できます。返信が届いているかは「行ったこと」に出ます。</p>
-          </div>
-          <Button onClick={() => { setFilter('failed'); setPage(1) }}>失敗だけ見る</Button>
-          {canManage ? (
+        <Notice tone="danger" heading={<> {`失敗した処理が ${formatNumber(failedCount)} 件あります`} </>} action={<> <Button onClick={() => { setFilter('failed'); setPage(1) }}>失敗だけ見る</Button>{canManage ? (
             <Button
               variant="primary"
               onClick={() => void retryAllFailed()}
@@ -457,8 +452,7 @@ export default function AutoReplyRunsV8() {
             >
               <RotateCcw size={14} aria-hidden="true" />失敗した処理をもう一度
             </Button>
-          ) : null}
-        </div>
+          ) : null} </>} >止まった行の理由を見て、もう一度実行できます。返信が届いているかは「行ったこと」に出ます。</Notice>
       ) : null}
 
       <section className={styles.card} aria-label="実行の記録">
@@ -472,52 +466,37 @@ export default function AutoReplyRunsV8() {
               onClear={() => setSearch('')}
             />
           </div>
-          <div className={styles.chips} role="group" aria-label="結果で絞り込む">
-            {chips.map((chip) => {
-              const count = chipCounts[chip.key]
-              return (
-                <button
-                  key={chip.key}
-                  type="button"
-                  className={styles.chip}
-                  aria-pressed={filter === chip.key}
-                  onClick={() => setFilter(chip.key)}
-                >
-                  {count == null ? chip.label : `${chip.label} ${formatNumber(count)}`}
-                </button>
-              )
-            })}
-          </div>
+          <SegmentedControl aria-label="結果で絞り込む" value={filter} onChange={setFilter} options={chips.map(chip=>({value:chip.key,label:chipCounts[chip.key]==null?chip.label:`${chip.label} ${formatNumber(chipCounts[chip.key]!)}`}))} />
           <span className={styles.toolsSpacer} aria-hidden="true" />
           {period === 'custom' ? (
             <>
-              <DateField value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} max={dateTo || undefined} aria-label="実行日（開始）" />
-              <DateField value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} min={dateFrom || undefined} aria-label="実行日（終了）" />
+              <SaveErrorField names={["dateFrom","from","date_from"]}><DateField value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} max={dateTo || undefined} aria-label="実行日（開始）" /></SaveErrorField>
+              <SaveErrorField names={["dateTo","to","date_to"]}><DateField value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} min={dateFrom || undefined} aria-label="実行日（終了）" /></SaveErrorField>
             </>
           ) : null}
           <div className={styles.periodBox}>
-            <Select
+            <SaveErrorField names={["period"]}><Select
               aria-label="期間"
               value={period}
               onChange={(value) => { setPeriod(value as PeriodKey); setPage(1) }}
               options={PERIOD_OPTIONS}
-            />
+            /></SaveErrorField>
           </div>
           <div className={styles.sizeBox}>
-            <Select
+            <SaveErrorField names={["pageSize","limit","page_size"]}><Select
               aria-label="1ページに出す件数"
               size="page-size"
               value={String(pageSize)}
               onChange={(value) => { setPageSize(Number(value)); setPage(1) }}
               options={PAGE_SIZE_OPTIONS}
-            />
+            /></SaveErrorField>
           </div>
         </div>
 
         {loading ? (
           <ListState kind="loading" />
         ) : error ? (
-          <ListState kind="error" description={error} action={<Button onClick={() => void load()}>再読み込み</Button>} />
+          <ListState kind="error" description={error} onRetry={() => void load()} />
         ) : items.length === 0 ? (
           <ListState kind="empty" title="実行結果はまだありません" description="自動応答が動くと、ここに結果が残ります。" />
         ) : visibleItems.length === 0 ? (
@@ -543,16 +522,16 @@ export default function AutoReplyRunsV8() {
                 const name = item.friendName ?? '削除済みの友だち'
                 const menuItems = rowMenuItems(item)
                 return (
-                  <Tr key={item.id} className={styles.row} data-table-layout="columns">
+                  <Tr key={item.id} className={styles.row} data-table-layout="columns" href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>
                     <Td className={styles.colWhen}>
-                      <time dateTime={item.occurredAt} title={formatDateTime(item.occurredAt)} className={styles.when}>{formatTime(item.occurredAt)}</time>
+                      <time dateTime={item.occurredAt} title={polishFormatListDateTime(item.occurredAt)} className={styles.when}>{formatTime(item.occurredAt)}</time>
                     </Td>
                     <Td className={styles.colFriend}>
                       <span className={styles.face} aria-hidden="true">{initialOf(item.friendName)}</span>
                       {item.friendId ? (
-                        <Link className={styles.friendName} href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} title={name}>{name}</Link>
+                        <Link className={styles.friendName} href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} ><TruncatedText value={String(name ?? '')} /></Link>
                       ) : (
-                        <span className={styles.friendName} title={name}>{name}</span>
+                        <span className={styles.friendName} ><TruncatedText value={String(name ?? '')} /></span>
                       )}
                     </Td>
                     <Td className={styles.colInput}>
@@ -561,7 +540,7 @@ export default function AutoReplyRunsV8() {
                     <Td className={styles.colResult}><StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge></Td>
                     <Td className={styles.colDone}><span className={styles.done} title={done}>{done}</span></Td>
                     <Td className={styles.colTime}>
-                      <span className={styles.time}>{item.durationMs === null ? '—' : `${(item.durationMs / 1000).toFixed(1)}秒`}</span>
+                      <span className={styles.time}>{item.durationMs === null ? emptyValue('unknown') : `${(item.durationMs / 1000).toFixed(1)}秒`}</span>
                     </Td>
                     <Td className={styles.colMenu}>
                       {menuItems.length > 0 ? (
@@ -588,7 +567,7 @@ export default function AutoReplyRunsV8() {
               pageCount={pageCount}
               onPageChange={setPage}
               disabled={loading}
-              summary={total > 0 ? `${formatNumber(total)}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total)}件` : undefined}
+              summary={total > 0 ? `${formatNumber(total)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total)} 件` : undefined}
             />
           </div>
         ) : null}
@@ -606,7 +585,7 @@ export default function AutoReplyRunsV8() {
               {data.triggerBreakdown.map((item) => (
                 <div className={styles.kvRow} key={item.trigger}>
                   <dt>{item.trigger}</dt>
-                  <dd>{`${formatNumber(item.count)}回${item.share === null ? '' : `（${(item.share * 100).toFixed(1)}%）`}`}</dd>
+                  <dd>{`${formatNumber(item.count)} 回${item.share === null ? '' : `（${(item.share * 100).toFixed(1)}%）`}`}</dd>
                 </div>
               ))}
             </dl>
@@ -618,15 +597,15 @@ export default function AutoReplyRunsV8() {
           <dl className={styles.kv}>
             <div className={styles.kvRow}>
               <dt>確認待ち</dt>
-              <dd className={data && data.handovers.waiting > 0 ? styles.kvWarn : undefined}>{data ? `${formatNumber(data.handovers.waiting)}件` : '—'}</dd>
+              <dd className={data && data.handovers.waiting > 0 ? styles.kvWarn : undefined}>{data ? `${formatNumber(data.handovers.waiting)}件` : emptyValue('unknown')}</dd>
             </div>
             <div className={styles.kvRow}>
               <dt>対応中</dt>
-              <dd>{data ? `${formatNumber(data.handovers.inProgress)}件` : '—'}</dd>
+              <dd>{data ? `${formatNumber(data.handovers.inProgress)}件` : emptyValue('unknown')}</dd>
             </div>
             <div className={styles.kvRow}>
               <dt>完了</dt>
-              <dd>{data ? `${formatNumber(data.handovers.completed)}件` : '—'}</dd>
+              <dd>{data ? `${formatNumber(data.handovers.completed)}件` : emptyValue('unknown')}</dd>
             </div>
           </dl>
           <div className={styles.boxFoot}>
@@ -645,17 +624,17 @@ export default function AutoReplyRunsV8() {
         destructive
         busy={stopping}
         designNode="i8F12"
-        onConfirm={() => void stopRule()}
+        onConfirm={() => stopRule()}
         onCancel={() => { if (!stopping) { setStopOpen(false); setStopReason('') } }}
       >
-        <input
+        <SaveErrorField names={["stopReason","reason","stop_reason"]}><input
           type="text"
           className={styles.stopReason}
           placeholder="止める理由（任意・記録に残ります）"
           aria-label="止める理由（任意）"
           value={stopReason}
           onChange={(e) => setStopReason(e.target.value)}
-        />
+        /></SaveErrorField>
       </ConfirmDialog>
     </DetailPage>
   )

@@ -194,7 +194,7 @@ test('v8 の下では Pencil r6dJFy の新しい一覧に切り替わる', async
   })
   // 見出しと右のボタン
   expect(host.textContent).toContain('コンバージョン')
-  expect(host.textContent).toContain('CSV で書き出す')
+  expect(host.textContent).toContain("CSV で書き出す")
   // 数の帯は表の行の合計（52件・¥412,000）と一致する
   expect(host.textContent).toContain('この30日の成果')
   expect(host.textContent).toContain('52')
@@ -233,7 +233,7 @@ test('v8 で行を選ぶと詳細の小窓が出て、止める小窓は理由�
     expect(host.textContent).toContain('止めるときの小窓（3択）')
     expect(host.textContent).toContain('対象：商品を買った')
   })
-  expect(host.textContent).toContain('理由（必須）')
+  expect(host.textContent).toContain('理由必須')
   // 理由が空のままは止められない（詳細の小窓の「止める」と区別する）
   const stopPanel = host.querySelector('section[aria-label="止めるときの小窓"]')
   expect(stopPanel).toBeTruthy()

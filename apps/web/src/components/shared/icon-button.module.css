@@ -3,13 +3,13 @@
 .button {
   display: inline-flex;
   width: 32px;
-  height: 32px;
+  height: 36px;
   flex: 0 0 32px;
   align-items: center;
   justify-content: center;
-  border: 0;
-  border-radius: var(--radius-icon);
-  background: transparent;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
   color: var(--color-ink-faint);
   cursor: pointer;
   transition:
@@ -103,12 +103,12 @@
 }
 
 [data-theme='v8'] .button:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
-[data-theme='v8'] .button { border: 0; padding: 0; gap: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; }
+[data-theme='v8'] .button { border: 0; padding: 0; gap: 0; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow); }
 [data-theme='v8'] .button > :is(svg, img) { width: 16px; height: 16px; }
 
 /* 行の中の小さい形（size="small"・mcOqK の上下 24×24・印 12）。既定の 36 は変えない。 */
@@ -138,3 +138,7 @@
 }
 [data-theme='v8'] .button[data-variant='plain']:not(:focus-visible) { outline-color: transparent; background: transparent; }
 }
+
+/* B-152・仕上げ7 */
+[data-theme='v8'] .button:disabled { opacity: var(--polish-disabled-opacity); }
+[data-theme='v8'] .button:is(:hover, :active):not(:disabled) { filter: none; }

@@ -1,5 +1,7 @@
 'use client'
 
+import { ValueBarChart } from '@/components/shared/charts'
+
 /*
  * ★V8 分析「配信の反応」（Pencil `yvOtn`）。
  * 数の帯（配信・届いた人・押された割合・取得できない配信）→ 道具の段（期間・データの範囲・CSV）
@@ -17,16 +19,19 @@ import { formatNumber } from '@/lib/format'
 import { RangePickerV8, dataRangeCaption, shortDateTime } from './common'
 import { METRIC_STATE_TEXT, downloadCsv, metricText, rangeFor, shownValue, useOverview, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { useReportPeriod } from '@/components/shared/period-picker'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 表の数。集計待ち・取得できない数は 0 にせず「—」と理由（title）。 */
 export function MetricText({ metric, percent, currency }: { metric: AnalyticsMetric<number | string>; percent?: boolean; currency?: boolean }) {
   const shown = metric.state === 'available' || metric.state === 'partial'
-  return <span className={shown && metric.value !== null ? undefined : styles.faint} title={metric.reason ?? undefined}>{shown ? metricText(metric, { percent, currency }) : '—'}</span>
+  return <span className={shown && metric.value !== null ? undefined : styles.faint} title={metric.reason ?? undefined}>{shown ? metricText(metric, { percent, currency }) : emptyValue('unknown')}</span>
 }
 
 export default function ReactionsV8({ accountId }: { accountId: string }) {
-  const [days, setDays] = useState(30)
-  const range = useMemo(() => rangeFor(days - 1), [days])
+  const { days, setDays, range, customRange, setRange } = useReportPeriod()
   const state = useOverview<AnalyticsReactionsOverview>(
     () => api.analytics.reactionsOverview(accountId, range),
     `${accountId}:${range.from}:${range.to}:reactions`,
@@ -36,12 +41,12 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
   const scenarioShown = overview ? overview.campaigns.length - broadcastShown : 0
   // 打切りに達した系統だけ、一覧に実際に出ている件数で「先頭○件まで」を告げる。
   const truncationNote = overview ? [
-    overview.campaignsTruncation?.broadcast ? `一斉配信は新しい方から先頭${broadcastShown}件` : null,
-    overview.campaignsTruncation?.scenario ? `シナリオは新しい方から先頭${scenarioShown}件` : null,
+    overview.campaignsTruncation?.broadcast ? `一斉配信は新しい方から先頭${broadcastShown} 件` : null,
+    overview.campaignsTruncation?.scenario ? `シナリオは新しい方から先頭${scenarioShown} 件` : null,
   ].filter(Boolean).join('・') : ''
   const exportCampaigns = () => {
     if (!overview) return
-    downloadCsv('analytics-reactions.csv', [
+    downloadCsv(csvFileName("反応"), [
       ['配信', '種類', '送った日時', '対象', '到達', '送信通数', '開封', 'LINEクリック', '成果'],
       ...overview.campaigns.map((item) => [
         item.name, item.kind === 'broadcast' ? '一斉配信' : 'シナリオ', item.sentAt,
@@ -57,7 +62,7 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
 
   if (!state.data || !overview) {
     return <div className={styles.body}>
-      <div className={styles.toolbar}><RangePickerV8 days={days} onChange={setDays} /></div>
+      <div className={styles.toolbar}><RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} /></div>
       {state.loading ? <ListState kind="loading" title="分析を読み込んでいます" /> : <ListState kind="error" description={state.error} onRetry={state.retry} />}
     </div>
   }
@@ -78,10 +83,10 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
     </KpiBand>
     <div className={styles.body} data-gap="tab">
       <div className={styles.toolbar}>
-        <RangePickerV8 days={days} onChange={setDays} />
+        <RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} />
         <span className={styles.caption} title={`データ締切 ${state.data.dataCutoffAt}`}>{dataRangeCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)}</span>
         <span className={styles.spacer} />
-        <Button variant="secondary" onClick={exportCampaigns} disabled={exportDisabled}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+        <Button variant="secondary" onClick={exportCampaigns} disabled={exportDisabled}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
       </div>
       <p className={styles.caption}>配信ごとの開かれ方・押され方です。20人未満など取得できない数は、0ではなく「—」と理由で示します。{truncationNote ? ` ${truncationNote}までを表示しています。それより古い配信は一覧にも CSV にも入りません。` : ''}</p>
       <div className={styles.table} role="table" aria-label="配信ごとの反応">
@@ -97,9 +102,9 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
         {overview.campaigns.length === 0
           ? <div className={styles.emptyRow} role="row"><span role="cell">この期間の配信はありません</span></div>
           : overview.campaigns.map((item) => <div key={`${item.kind}:${item.id}`} className={styles.trow} role="row" data-h="two">
-            <span role="cell" className={styles.colMain}><span className={styles.cellText} title={item.name}>{item.name}</span></span>
+            <span role="cell" className={styles.colMain}><span className={styles.cellText} ><TruncatedText value={String(item.name ?? '')} /></span></span>
             <span role="cell" className={styles.colType}><strong className={styles.cellStrong}>{item.kind === 'broadcast' ? '一斉配信' : 'シナリオ'}</strong><span className={styles.cellSub}>{shortDateTime(item.sentAt)}</span></span>
-            <span role="cell" className={styles.num} data-w="80"><MetricText metric={item.targetPeople} />{item.kind === 'scenario' ? <span className={styles.cellSub}>送信 {metricText(item.sentMessages)}通</span> : null}</span>
+            <span role="cell" className={styles.num} data-w="80"><MetricText metric={item.targetPeople} />{item.kind === 'scenario' ? <span className={styles.cellSub}>送信 {metricText(item.sentMessages)} 通</span> : null}</span>
             <span role="cell" className={styles.num} data-w="80"><MetricText metric={item.delivered} /></span>
             <span role="cell" className={styles.num} data-w="80"><MetricText metric={item.opened} /></span>
             <span role="cell" className={styles.num} data-w="100"><MetricText metric={item.lineClicked} /></span>
@@ -110,13 +115,7 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
         {/* 集計はクリックされた時刻の時間帯。送った時刻ではない。 */}
         <h2 id="reactions-hours-title" className={styles.hoursTitle}>押された時間帯ごとの回数</h2>
         <p className={styles.caption}>こちらで作った中継URLを、相手が押した時刻で時間帯ごとに並べています。送った時刻ではありません。</p>
-        <div className={styles.hourBars}>
-          {Array.from({ length: 24 }, (_, hour) => {
-            const clicks = overview.trackedClickHours.find((item) => item.hour === hour)?.clicks ?? 0
-            return <span key={hour} role="img" aria-label={`${hour}時台 ${clicks}回`} title={`${hour}時台 ${clicks}回`} className={styles.hourBar} data-top={topHours.includes(hour) || undefined} style={{ height: `${Math.max(2, clicks / maxHourly * 100)}%` }} />
-          })}
-        </div>
-        <div className={styles.hourTicks} aria-hidden="true">{Array.from({ length: 24 }, (_, hour) => <span key={hour}>{hour % 3 === 0 ? hour : ''}</span>)}</div>
+        <ValueBarChart label="押された時間帯ごとの回数" unit="回" items={Array.from({length:24},(_,hour)=>({key:String(hour),label:`${hour}時台`,value:overview.trackedClickHours.find(item=>item.hour===hour)?.clicks??0,note:topHours.includes(hour)?'よく押された時間帯':undefined}))} />
       </section>
     </div>
   </>

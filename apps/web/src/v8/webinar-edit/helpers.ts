@@ -1,4 +1,6 @@
 import type { Webinar, WebinarParticipantPage } from '@/lib/api'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 /*
  * ウェビナーの編集（V8）の小物。app/webinars/edit の participants-shared・
@@ -44,18 +46,7 @@ export function percent(value: number, total: number): string {
 
 /** 9/30 10:12。サーバーの記録時刻を日本時間で短く出す。 */
 export function shortDateTime(value: string | null): string {
-  if (!value) return '—'
-  const time = new Date(value).getTime()
-  if (Number.isNaN(time)) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).formatToParts(new Date(time))
-  const pick = (type: string): string => parts.find((p) => p.type === type)?.value ?? ''
-  return `${pick('month')}/${pick('day')} ${pick('hour')}:${pick('minute')}`
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 export function webinarStatusLabel(status: Webinar['status']): string {
@@ -70,7 +61,7 @@ export type ParticipantRow = WebinarParticipantPage['items'][number]
 export function joinNote(participant: ParticipantRow): string {
   const sessions = participant.sessions ?? 0
   if (sessions <= 0) return '申込のみ'
-  return `${sessions}回参加・${participant.registered ? '予約から参加' : '直接参加'}`
+  return `${sessions} 回参加・${participant.registered ? '予約から参加' : '直接参加'}`
 }
 
 /** 入場がライブ時間内か終了後（録画）かを回数つきで短く示す。 */

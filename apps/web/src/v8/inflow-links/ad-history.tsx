@@ -1,13 +1,6 @@
 'use client'
 
-/*
- * ★V8 広告への送信履歴（Pencil `p0kA3`・`/inflow-links?tab=connections&view=history`）。
- *
- * 2026-10-07 src/v8 に一から書いた（今の V8 は 18%）。頭は広告連携（qSTVR）と同じ形。
- * 本文（間14）：道具の段（探す・状態・媒体・件数）→ 表（いつ・何の成果／媒体／流入元／状態／次の予定／操作）→ 注。
- * 呼ぶ口：媒体の一覧・送信記録のページ（今と同じ）、断られた1件のやり直し `POST /api/ad-platforms/logs/:id/retry`（F-22・owner）。
- * BEHAVIOR.md の「広告への送信履歴」。
- */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useMemo, useState } from 'react'
 import { Download, RotateCw } from 'lucide-react'
 import { api, type AdConversionLog } from '@/lib/api'
@@ -24,6 +17,21 @@ import { notifyToast } from '@/components/shared/toast'
 import { AD_LOG_PAGE_SIZE, adDateTime, adLogStatus, adPlatformLabel, useAdLogs } from './ad-shared'
 import adsStyles from './ads.module.css'
 import styles from './ad-pages.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
+
+/*
+ * ★V8 広告への送信履歴（Pencil `p0kA3`・`/inflow-links?tab=connections&view=history`）。
+ *
+ * 2026-10-07 src/v8 に一から書いた（今の V8 は 18%）。頭は広告連携（qSTVR）と同じ形。
+ * 本文（間14）：道具の段（探す・状態・媒体・件数）→ 表（いつ・何の成果／媒体／流入元／状態／次の予定／操作）→ 注。
+ * 呼ぶ口：媒体の一覧・送信記録のページ（今と同じ）、断られた1件のやり直し `POST /api/ad-platforms/logs/:id/retry`（F-22・owner）。
+ * BEHAVIOR.md の「広告への送信履歴」。
+ */
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'すべての状態' },
@@ -54,9 +62,9 @@ export default function AdHistoryV8() {
   const role = useStaffRole()
   /* やり直し（POST …/retry）は owner だけ。ほかの人には押せない「やり直す」を置かない。 */
   const canRetry = role === 'owner'
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [status, setStatus] = useState('all')
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [media, setMedia] = useState('all')
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [retryError, setRetryError] = useState('')
@@ -76,7 +84,7 @@ export default function AdHistoryV8() {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `広告への送信履歴_${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("広告への送信履歴")
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -114,7 +122,7 @@ export default function AdHistoryV8() {
         kind="error"
         title="広告への送信履歴を表示できませんでした"
         description="送信の記録は消えていません。読み直して、もう一度お試しください。"
-        action={<Button onClick={() => void model.reload()}>送信履歴を読み直す</Button>}
+        onRetry={() => void model.reload()}
       />
     )
   } else if (visible.length === 0) {
@@ -141,19 +149,19 @@ export default function AdHistoryV8() {
               </span>
               <span className={styles.colMedia} role="cell"><span className={styles.cellText}>{adPlatformLabel(platform)}</span></span>
               {/* 流入元は送信記録の口が返さないので「—」。 */}
-              <span className={styles.colSource} role="cell"><span className={styles.cellFaint}>—</span></span>
+              <span className={styles.colSource} role="cell"><span className={styles.cellFaint}>{emptyValue('unknown')}</span></span>
               <span className={styles.colStatus} role="cell">
                 <StatusBadge tone={state.tone} size="compact" title={log.status === 'failed' && log.errorMessage ? `断られた理由：${log.errorMessage}` : undefined}>{state.label}</StatusBadge>
               </span>
               <span className={styles.colNext} role="cell">
-                <span className={styles.cellFaint}>{log.status === 'pending' ? '送信待ち' : '—'}</span>
+                <span className={styles.cellFaint}>{log.status === 'pending' ? '送信待ち' : emptyValue('unknown')}</span>
               </span>
               <span className={styles.colOps} role="cell">
                 {log.status === 'failed' && canRetry ? (
                   <Button onClick={() => void retry(log)} busy={retryingId === log.id} busyLabel="やり直しています…" disabled={retryingId !== null}>
                     <RotateCw size={15} aria-hidden="true" />やり直す
                   </Button>
-                ) : <span className={styles.cellFaint}>—</span>}
+                ) : <span className={styles.cellFaint}>{emptyValue('unknown')}</span>}
               </span>
             </div>
           )
@@ -164,13 +172,9 @@ export default function AdHistoryV8() {
 
   return (
     <div className={adsStyles.board} data-design-node="p0kA3">
-      <header className={adsStyles.head}>
-        <div className={adsStyles.headText}>
-          <h1 className={adsStyles.title}>広告への送信履歴</h1>
-          <p className={adsStyles.description}>成果と広告のクリックが結びつき、送信処理が始まるとここに並びます。</p>
-        </div>
-        <Button onClick={exportLogs} disabled={visible.length === 0}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
-      </header>
+      <PageHeading title={<>広告への送信履歴</>}
+        help={<>成果と広告のクリックが結びつき、送信処理が始まるとここに並びます。</>}
+        actions={<><Button onClick={exportLogs} disabled={visible.length === 0}><Download size={15} aria-hidden="true" />CSVで書き出す</Button></>} />
       <div className={adsStyles.body}>
         <div className={styles.tools}>
           <span className={styles.searchBox}>
@@ -183,15 +187,15 @@ export default function AdHistoryV8() {
             />
           </span>
           <span className={styles.selectBox}>
-            <Select aria-label="送信状態" value={status} onChange={(value) => { setStatus(value); setPage(1) }} options={STATUS_OPTIONS} width={160} />
+            <SaveErrorField names={["status"]}><Select aria-label="送信状態" value={status} onChange={(value) => { setStatus(value); setPage(1) }} options={STATUS_OPTIONS} width={160} /></SaveErrorField>
           </span>
           <span className={styles.selectBox}>
-            <Select aria-label="媒体" value={media} onChange={setMedia} options={mediaOptions} width={160} />
+            <SaveErrorField names={["media"]}><EntitySelect aria-label="媒体" value={media} onChange={setMedia} options={mediaOptions} width={160} /></SaveErrorField>
           </span>
           <span className={styles.toolsSpacer} aria-hidden="true" />
           <span className={styles.toolsCount}>{`${formatNumber(model.total)} 件中 ${formatNumber(visible.length)} 件`}</span>
         </div>
-        {retryError ? <p className={adsStyles.error} role="alert">{retryError}</p> : null}
+        {retryError ? <Notice tone="danger" className={adsStyles.errorNoticePlacement} >{retryError}</Notice> : null}
         {body}
         {pageCount > 1 ? (
           <div className={styles.pager}>

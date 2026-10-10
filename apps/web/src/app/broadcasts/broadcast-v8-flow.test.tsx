@@ -8,7 +8,7 @@ import React from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -29,7 +29,7 @@ function scheduledRow(id: string, title: string) {
   return {
     ...draftRow(id, title),
     status: 'scheduled', scheduledAt: '2026-10-10T10:00:00+09:00',
-    displayStatus: 'scheduled', displayStatusLabel: '予約済み',
+    displayStatus: 'scheduled', displayStatusLabel: '予約中',
   }
 }
 
@@ -80,7 +80,6 @@ vi.mock('next/link', () => ({
 }))
 
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin', canManageRole: (role: string | null | undefined) => role === 'owner' || role === 'admin' }))
-vi.mock('@/lib/staff-capability', () => ({ canEditFeature: () => true }))
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: mocks.accountId, selectedAccount: null, loading: false }),
@@ -180,7 +179,7 @@ describe('V8 一斉配信の通し', () => {
     })
     // テンプレートの選択は使わず、メッセージの編集へ戻って自分で書く。
     await act(async () => {
-      fireEvent.click(await screen.findByRole('button', { name: 'メッセージ編集へ戻る' }))
+      fireEvent.click(within(await screen.findByRole('dialog', { name: 'テンプレートを選ぶ' })).getByRole('button', { name: 'キャンセル' }))
     })
     await screen.findByPlaceholderText('例：8月キャンペーンのお知らせ')
 
@@ -244,6 +243,6 @@ describe('V8 一斉配信の通し', () => {
     await waitFor(() => expect(mocks.cancelReservation).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.queryByText('「予約ずみ配信」の予約を取り消しますか？')).toBeNull())
     await screen.findByText('下書き')
-    expect(screen.queryByText('予約済み')).toBeNull()
+    expect(screen.queryByText('予約中')).toBeNull()
   })
 })

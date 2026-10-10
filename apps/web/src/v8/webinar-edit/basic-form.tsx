@@ -1,9 +1,4 @@
 'use client'
-
-/*
- * ★V8 ウェビナーの①基本設定の中身（Pencil j7PP04）。作る（/webinars/new）と編集の①の両方で使う。
- * カード3枚：基本設定（名前・公開ページの URL・フォルダ・案内文）／開催形式／だれに案内するか。
- */
 import type { ReactNode } from 'react'
 import { CalendarDays, Play } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -17,6 +12,14 @@ import { TextField } from '@/components/shared/text-field'
 import type { WebinarFolder } from '@/lib/api'
 import { ReadValue } from './parts'
 import styles from './form.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 ウェビナーの①基本設定の中身（Pencil j7PP04）。作る（/webinars/new）と編集の①の両方で使う。
+ * カード3枚：基本設定（名前・公開ページの URL・フォルダ・案内文）／開催形式／だれに案内するか。
+ */
 
 export type BasicValues = {
   title: string
@@ -70,9 +73,7 @@ export function BasicForm({
         <div className={styles.cardHead}>
           <h2 id={`${idPrefix}-basic`} className={styles.cardTitle}>基本設定</h2>
         </div>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor={`${idPrefix}-title`}>名前<RequiredBadge /></label>
-          <TextField
+        <div className={styles.field}><Field label="名前" htmlFor={`${idPrefix}-title`} required><SaveErrorField names={["title","values.title"]}><TextField
             id={`${idPrefix}-title`}
             value={values.title}
             disabled={disabled}
@@ -81,16 +82,15 @@ export function BasicForm({
             invalid={Boolean(fieldErrors.title)}
             onChange={(event) => onChange({ title: event.target.value })}
             onBlur={onBlurTitle}
-          />
-          {fieldErrors.title ? <p className={styles.fieldError} role="alert">{fieldErrors.title}</p> : null}
-        </div>
+          /></SaveErrorField>
+{fieldErrors.title ? <p className={styles.fieldError} role="alert">{fieldErrors.title}</p> : null}</Field></div>
         <div className={styles.pair}>
           <div className={styles.field}>
             <span className={styles.label}>
-              <label htmlFor={`${idPrefix}-slug`}>公開ページの URL</label>
+
               <HelpTip label="公開ページの URL の説明">アドレスの最後の部分です。半角の英小文字・数字・ハイフンで入れます。作るときに空のままなら自動で付けます。</HelpTip>
             </span>
-            <TextField
+            <Field label="公開ページの URL" htmlFor={`${idPrefix}-slug`}><SaveErrorField names={["slug","values.slug"]}><TextField
               id={`${idPrefix}-slug`}
               value={values.slug}
               disabled={disabled}
@@ -100,30 +100,24 @@ export function BasicForm({
               invalid={Boolean(fieldErrors.slug)}
               onChange={(event) => onChange({ slug: event.target.value })}
               onBlur={onBlurSlug}
-            />
+            /></SaveErrorField></Field>
             {fieldErrors.slug ? <p className={styles.fieldError} role="alert">{fieldErrors.slug}</p> : null}
           </div>
-          <div className={styles.field}>
-            <label className={styles.labelSmall} htmlFor={`${idPrefix}-folder`}>フォルダ</label>
-            {readOnly
+          <div className={styles.field}><Field label="フォルダ" htmlFor={`${idPrefix}-folder`}>{readOnly
               ? <ReadValue label="フォルダ">{folderOptions.find((option) => option.value === values.folderId)?.label ?? '未分類'}</ReadValue>
-              : <FolderSelect id={`${idPrefix}-folder`} aria-label="フォルダ" size="full" value={values.folderId} disabled={disabled || folderState !== 'ready'} onChange={(value) => onChange({ folderId: value })} folders={folderOptions.slice(1).map((option) => ({ ...option, color: folders.find((folder) => folder.id === option.value)?.color ?? null }))} onCreate={onCreateFolder} />}
-            {folderState === 'error' ? (
+              : <SaveErrorField names={["folderId","values.folderId","folder_id","values.folder_id"]}><FolderSelect id={`${idPrefix}-folder`} aria-label="フォルダ" size="full" value={values.folderId} disabled={disabled || folderState !== 'ready'} onChange={(value) => onChange({ folderId: value })} folders={folderOptions.slice(1).map((option) => ({ ...option, color: folders.find((folder) => folder.id === option.value)?.color ?? null }))} onCreate={onCreateFolder} /></SaveErrorField>}
+{folderState === 'error' ? (
               <p className={styles.help}>フォルダを読み込めませんでした。<Button size="compact" onClick={onReloadFolders}>もう一度読み込む</Button></p>
-            ) : null}
-          </div>
+            ) : null}</Field></div>
         </div>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor={`${idPrefix}-description`}>案内文</label>
-          <TextField
+        <div className={styles.field}><Field label="案内文" htmlFor={`${idPrefix}-description`}><SaveErrorField names={["description","values.description"]}><TextField
             id={`${idPrefix}-description`}
             value={values.description}
             disabled={disabled}
             readOnly={readOnly}
             placeholder="15分で NEN の使い方がわかる無料セミナーです"
             onChange={(event) => onChange({ description: event.target.value })}
-          />
-        </div>
+          /></SaveErrorField></Field></div>
       </section>
 
       <section className={styles.card} aria-labelledby={`${idPrefix}-kind`}>
@@ -135,10 +129,10 @@ export function BasicForm({
         {readOnly ? (
           <ReadValue label="開催形式">{values.deliveryKind === 'scheduled' ? '日時指定配信' : values.deliveryKind === 'on_demand' ? 'オンデマンド配信' : '外部の動画'}</ReadValue>
         ) : (
-          <RadioCardGroup legend="開催形式" className={styles.radioPair}>
+          <SaveErrorField names={["deliveryKind","values.deliveryKind"]}><RadioCardGroup legend="開催形式" className={styles.radioPair}>
             <RadioCard name={`${idPrefix}-delivery`} value="on_demand" checked={values.deliveryKind === 'on_demand'} disabled={disabled} onChange={() => onChange({ deliveryKind: 'on_demand' })} title="オンデマンド配信" note="録画動画をいつでも視聴" icon={<Play size={16} />} />
             <RadioCard name={`${idPrefix}-delivery`} value="scheduled" checked={values.deliveryKind === 'scheduled'} disabled={disabled} onChange={() => onChange({ deliveryKind: 'scheduled' })} title="日時指定配信" note="指定日時に公開開始" icon={<CalendarDays size={16} />} />
-          </RadioCardGroup>
+          </RadioCardGroup></SaveErrorField>
         )}
         {values.deliveryKind === 'external' ? <p className={styles.help}>今は外部の動画を使っています。別の形式を選ぶまでそのままです。</p> : null}
       </section>
@@ -147,13 +141,10 @@ export function BasicForm({
         <div className={styles.cardHead}>
           <h2 id={`${idPrefix}-audience`} className={styles.cardTitle}>だれに案内するか</h2>
         </div>
-        <div className={styles.field}>
-          <label className={styles.labelSmall} htmlFor={`${idPrefix}-audience-select`}>案内する相手</label>
-          {readOnly
+        <div className={styles.field}><Field note={<>タグ「配信済み」は確認の段で足せます</>} label="案内する相手" htmlFor={`${idPrefix}-audience-select`}>{readOnly
             ? <ReadValue label="案内する相手">{audienceLabel}</ReadValue>
             : <Select id={`${idPrefix}-audience-select`} aria-label="案内する相手" size="full" value="registered" disabled={disabled} onChange={() => {}} options={[{ value: 'registered', label: audienceLabel }]} />}
-          <p className={styles.help}>タグ「配信済み」は確認の段で足せます</p>
-        </div>
+</Field></div>
       </section>
     </>
   )

@@ -1,22 +1,4 @@
 'use client'
-
-/*
- * ★V8-B 外部連携の API 接続（板 `ralAc`）。
- *
- * v7 の鍵タブ（`api-tokens-panel.tsx` の ApiTokensPanel）とは別の部品として
- * 持つ。データの口（一覧・発行・入れ替え・停止・本人確認）は同じ。違いは
- * 置き場と見せ方——表は「名前・できること・作った日・最後に使った・状態・
- * 操作（入れ替える＋…）」。
- * v7 を直す必要が出たら向こうも同じ判断を入れる（V8 完成までの二重管理）。
- *
- * 見本と今の作りが合わない所（API が無い所は作らず。今の形のまま）：
- * - 状態の「止めている」：止めた鍵は一覧に出ないので、一覧の行は
- *   「使っている」だけ出す。
- * - 行の「…」の中身：止めるだけ出す。名前を変える・できることを変えるは
- *   変える口が無いので足さない。
- * - 失効・ローテーションの確認：入れ替え確認の文と発行直後の1回表示で
- *   見せる（`ralAc` の指摘どおり維持する）。
- */
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError, type IntegrationApiTokenInfo } from '@/lib/api'
 import { describeApiFailure } from '@/components/shared/api-error-message'
@@ -36,6 +18,28 @@ import {
   WebhooksV8Band, WebhooksV8Head, outgoingKpiCells, useV8BandData,
 } from './outgoing-v8'
 import styles from './apitokens-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B 外部連携の API 接続（板 `ralAc`）。
+ *
+ * v7 の鍵タブ（`api-tokens-panel.tsx` の ApiTokensPanel）とは別の部品として
+ * 持つ。データの口（一覧・発行・入れ替え・停止・本人確認）は同じ。違いは
+ * 置き場と見せ方——表は「名前・できること・作った日・最後に使った・状態・
+ * 操作（入れ替える＋…）」。
+ * v7 を直す必要が出たら向こうも同じ判断を入れる（V8 完成までの二重管理）。
+ *
+ * 見本と今の作りが合わない所（API が無い所は作らず。今の形のまま）：
+ * - 状態の「止めている」：止めた鍵は一覧に出ないので、一覧の行は
+ *   「使っている」だけ出す。
+ * - 行の「…」の中身：止めるだけ出す。名前を変える・できることを変えるは
+ *   変える口が無いので足さない。
+ * - 失効・ローテーションの確認：入れ替え確認の文と発行直後の1回表示で
+ *   見せる（`ralAc` の指摘どおり維持する）。
+ */
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'disabled'
 
@@ -57,6 +61,7 @@ export default function ApiTokensV8Page() {
 }
 
 function ApiTokensV8Inner() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('外部連携')
   const { selectedAccountId } = useAccount()
   const selectedAccountIdRef = useRef(selectedAccountId)
@@ -120,9 +125,13 @@ function ApiTokensV8Inner() {
       setStatus('ready')
     } catch (caught) {
       if (loadGenerationRef.current !== requestGeneration || selectedAccountIdRef.current !== requestAccountId) return
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.code === 'FEATURE_DISABLED') {
-        setTokens([])
-        setStatus('disabled')
+        setTokens([]);
+
+        setStatus('disabled');
+
         return
       }
       if (caught instanceof ApiError && (caught.status === 403 || caught.status === 404)) {
@@ -131,9 +140,11 @@ function ApiTokensV8Inner() {
         return
       }
       setStatus('error')
+      { if (!fieldFailure)
       setLoadError(describeApiFailure(caught, '読み込み'))
     }
-  }, [selectedAccountId])
+  }
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     void load()
@@ -176,14 +187,18 @@ function ApiTokensV8Inner() {
       setShowCreate(false)
       await load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (!stepUpToken && isStepUpRequired(caught)) {
-        setStepUp({ purpose: 'webhook.api_token', action: 'API接続の鍵を発行する', retry: (token) => handleCreate(token) })
+        setStepUp({ purpose: 'webhook.api_token', action: 'API接続の鍵を発行する', retry: (token) => handleCreate(token) });
+
         return
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
+      { if (!fieldFailure)
       setActionError(describeApiFailure(caught, '発行', {
-        forbidden: '鍵の発行は統括だけができます。必要なときは統括に頼んでください。',
-      }))
+        scope: 'store',
+      })) }
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setCreating(false)
     }
@@ -206,6 +221,8 @@ function ApiTokensV8Inner() {
       setRotateTarget(null)
       await load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (!stepUpToken && isStepUpRequired(caught)) {
         const target = rotateTarget
         setStepUp({
@@ -218,13 +235,15 @@ function ApiTokensV8Inner() {
       if (selectedAccountIdRef.current !== requestAccountId) return
       if (caught instanceof ApiError && caught.code === 'TOKEN_ROTATE_CONFLICT') {
         setRotateTarget(null)
-        setActionError('ほかの操作が先にこの鍵を更新しました。一覧を読み直しました。最新の状態からもう一度お試しください')
+        { if (!fieldFailure)
+        setActionError('ほかの操作が先にこの鍵を更新しました。一覧を読み直しました。最新の状態からもう一度お試しください') }
         await load()
         return
       }
+      { if (!fieldFailure)
       setDialogError(describeApiFailure(caught, '入れ替え', {
-        forbidden: '鍵の入れ替えは統括だけができます。必要なときは統括に頼んでください。',
-      }))
+        scope: 'store',
+      })) }
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
     }
@@ -245,6 +264,8 @@ function ApiTokensV8Inner() {
       setRevokeTarget(null)
       await load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (!stepUpToken && isStepUpRequired(caught)) {
         const target = revokeTarget
         setStepUp({
@@ -255,9 +276,10 @@ function ApiTokensV8Inner() {
         return
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
+      { if (!fieldFailure)
       setDialogError(describeApiFailure(caught, '停止', {
-        forbidden: '鍵の停止は統括だけができます。必要なときは統括に頼んでください。',
-      }))
+        scope: 'store',
+      })) }
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
     }
@@ -268,13 +290,14 @@ function ApiTokensV8Inner() {
     try {
       await navigator.clipboard.writeText(issued.token)
       setCopied(true)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       // 手で選んで写せるので、失敗しても文は出さない。
     }
   }
 
   return (
-    <div className={styles.board} data-design-node="ralAc">
+    <SaveErrorScope errors={saveErrors}><div className={styles.board} data-design-node="ralAc">
       <WebhooksV8Head
         activeTab="api-tokens"
         outgoingCount={band.outgoingItems === null ? null : band.outgoingItems.length}
@@ -282,7 +305,7 @@ function ApiTokensV8Inner() {
       />
       <WebhooksV8Band cells={outgoingKpiCells({ items: band.outgoingItems, incomingCount: band.incomingCount, summary: band.summary })} />
 
-      {actionError ? <Notice tone="error">{actionError}</Notice> : null}
+      {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
 
       {issued ? (
         <section className={styles.issuedBox} aria-label="発行した鍵">
@@ -313,25 +336,22 @@ function ApiTokensV8Inner() {
         {showCreate ? (
           <section className={styles.createBox} aria-label="鍵の発行">
             <h2 className={styles.createTitle}>新しい鍵</h2>
-            <div>
-              <label className={styles.label} htmlFor="webhook-v8-token-name">名前</label>
-              <input
+            <div><Field label={<>名前</>} htmlFor="webhook-v8-token-name"><SaveErrorField names={["name"]}><input
                 id="webhook-v8-token-name"
                 value={name}
                 maxLength={120}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="例：予約システム連携"
                 className={styles.input}
-              />
-              {nameError ? <p className={styles.fieldError} role="alert">{nameError}</p> : null}
-            </div>
+              /></SaveErrorField>
+{nameError ? <p className={styles.fieldError} role="alert">{nameError}</p> : null}</Field></div>
             <fieldset>
               <legend className={styles.label}>できること</legend>
               <div className={styles.checkRow}>
                 {['tags:read', 'tags:write'].map((scope) => (
-                  <Checkbox key={scope} checked={scopes.includes(scope)} onCheckedChange={() => toggleScope(scope)}>
+                  <SaveErrorField names={["scope"]} key={scope}><Checkbox key={scope} checked={scopes.includes(scope)} onCheckedChange={() => toggleScope(scope)}>
                     {scopeLabel(scope)}
-                  </Checkbox>
+                  </Checkbox></SaveErrorField>
                 ))}
               </div>
             </fieldset>
@@ -387,7 +407,7 @@ function ApiTokensV8Inner() {
             kind="error"
             title="鍵を読み込めませんでした"
             description={loadError}
-            action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+            onRetry={() => void load()}
           />
         ) : null}
         {status === 'forbidden' ? (
@@ -439,7 +459,7 @@ function ApiTokensV8Inner() {
                     {tokens.map((token) => (
                       <tr key={token.id} data-ctx-row={token.id}>
                         <td className={styles.nameCell} title={token.name}>{token.name}</td>
-                        <td><span className={styles.nameCell} title={token.scopes.map(scopeLabel).join('・')}>{token.scopes.map(scopeLabel).join('・')}</span></td>
+                        <td><span className={styles.nameCell} ><TruncatedText value={String(token.scopes.map(scopeLabel).join('・') ?? '')} /></span></td>
                         <td className={styles.dimCell}>{formatDateTime(token.createdAt)}</td>
                         <td className={styles.dimCell}>{formatDateTime(token.lastUsedAt)}</td>
                         <td><span className={`${styles.pill} ${styles.pillActive}`}>● 使っている</span></td>
@@ -519,6 +539,6 @@ function ApiTokensV8Inner() {
         }}
       />
       {stepUp ? <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} /> : null}
-    </div>
+    </div></SaveErrorScope>
   )
 }

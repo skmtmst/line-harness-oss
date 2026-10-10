@@ -11,6 +11,7 @@ import {
   useListUrlFlag,
   useListUrlParam,
   useListUrlState,
+  useListUrlSetValue,
   useOnAccountSwitch,
 } from './list-url-state'
 
@@ -216,4 +217,69 @@ it('B-12: スクロール直後に詳細へ移っても最後の位置を覚え�
   view.unmount()
   expect(window.sessionStorage.getItem('lh:list-scroll:/scenarios')).toBe('615')
   vi.useRealTimers()
+})
+
+it('複数の絞り込み条件をURLへ残し、読み直しても同じ条件で開く', async () => {
+  const { useListUrlJsonValue } = await import('./list-url-state')
+  function Filters() {
+    const [filters, setFilters] = useListUrlJsonValue<string[]>('filters', [])
+    return <><output>{filters.join(',') || 'すべて'}</output><button onClick={() => setFilters(['未承認', '公開中'])}>絞る</button></>
+  }
+  const first = render(<Filters />)
+  await act(async () => { screen.getByRole('button', { name: '絞る' }).click() })
+  flushListUrlState()
+  expect(JSON.parse(new URLSearchParams(window.location.search).get('filters')!)).toEqual(['未承認', '公開中'])
+  first.unmount()
+  render(<Filters />)
+  expect(screen.getByText('未承認,公開中')).toBeTruthy()
+})
+
+it('内部のページ番号が0からでもURLは1から数え、絞り込み変更で先頭へ戻る', async () => {
+  const { useListUrlValue } = await import('./list-url-state')
+  function Page() {
+    const [page, setPage] = useListUrlValue('page', 0)
+    const [, setQuery] = useListUrlValue('q', '')
+    return <><output>{`内部${page}`}</output><button onClick={() => setPage(2)}>3ページ目</button><button onClick={() => setQuery('名前')}>絞る</button></>
+  }
+  render(<Page />)
+  await act(async () => { screen.getByRole('button', { name: '3ページ目' }).click() })
+  flushListUrlState()
+  expect(new URLSearchParams(window.location.search).get('page')).toBe('3')
+  await act(async () => { screen.getByRole('button', { name: '絞る' }).click() })
+  expect(screen.getByText('内部0')).toBeTruthy()
+})
+
+it('複数の種類はURLから戻り、関数による連続変更で条件を失わずページだけを先頭に戻す', () => {
+  window.history.replaceState(null, '', '/contents?kinds=%5B%22image%22%5D&page=4&id=detail')
+  function Kinds() {
+    const [kinds, setKinds] = useListUrlSetValue('kinds', ['image', 'video'])
+    return <><output>{Array.from(kinds).join(',')}</output><button onClick={() => {
+      setKinds(previous => new Set([...previous, 'audio']))
+      setKinds(previous => new Set([...previous, 'file']))
+    }}>種類を追加</button></>
+  }
+  render(<Kinds />)
+  expect(screen.getByText('image')).toBeTruthy()
+  act(() => screen.getByText('種類を追加').click())
+  flushListUrlState()
+  expect(screen.getByText('image,audio,file')).toBeTruthy()
+  const params = new URLSearchParams(window.location.search)
+  expect(JSON.parse(params.get('kinds')!)).toEqual(['image', 'audio', 'file'])
+  expect(params.has('page')).toBe(false)
+  expect(params.get('id')).toBe('detail')
+})
+
+it('詳細内の一覧も絞り込みで先頭に戻り、明示したページ送りはそのまま残す', () => {
+  expect(nextListUrl({ pathname: '/inflow-links/detail', search: '?id=r1&friendPage=4&friendSearch=old', hash: '' }, { friendSearch: '' }, { friendSearch: 'new' })).toBe('/inflow-links/detail?id=r1&friendSearch=new')
+  expect(nextListUrl({ pathname: '/inflow-links/detail', search: '?id=r1&friendSearch=new', hash: '' }, { friendPage: '1' }, { friendPage: '3' })).toBe('/inflow-links/detail?id=r1&friendSearch=new&friendPage=3')
+})
+
+it('タブで記録と設定を行き来しても、記録の一覧ページは覚えておく', () => {
+  expect(nextListUrl({ pathname: '/visit-stamps', search: '?logPage=2&tab=history', hash: '' }, { tab: '' }, { tab: 'settings' })).toBe('/visit-stamps?logPage=2&tab=settings')
+})
+
+it('カーソル履歴はページ送りとして残し、検索を変えたら消す', () => {
+  const location = { pathname: '/hq/banners', search: '?libraryCursors=%5Bnull%2C%22next%22%5D', hash: '' }
+  expect(nextListUrl(location, { libraryCursors: '[null]' }, { libraryCursors: '[null,"next","last"]' })).toContain('libraryCursors=')
+  expect(nextListUrl(location, { q: '' }, { q: '新しい名前' })).not.toContain('libraryCursors=')
 })

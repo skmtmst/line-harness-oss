@@ -1,18 +1,16 @@
 import { Hono } from 'hono';
 import {
-  BUNDLE_VERSION,
   WORKER_HASH,
   ADMIN_HASH,
   LIFF_HASH,
-  RELEASED_AT,
-  GIT_COMMIT,
 } from '../_version.js';
+import { buildMetadata, type BuildBindings } from '../lib/build-metadata.js';
 
 const DEFAULT_MANIFEST_URL =
   'https://github.com/Shudesu/line-harness-oss/releases/latest/download/release-manifest.json';
 
 type Env = {
-  Bindings: {
+  Bindings: BuildBindings & {
     MANIFEST_URL?: string;
     DEPLOY_ENV?: string;
   };
@@ -30,17 +28,16 @@ const app = new Hono<Env>();
  * 環境を返す。DEPLOY_ENV は wrangler の staging/production の設定が持つ
  * （`wrangler.staging.toml` / `wrangler.toml` の [vars]）。未設定なら null。
  */
-app.get('/version', (c) =>
-  c.json({
-    version: BUNDLE_VERSION,
+app.get('/version', (c) => {
+  c.header('Cache-Control', 'no-store');
+  return c.json({
+    ...buildMetadata(c.env),
     worker_hash: WORKER_HASH,
     admin_hash: ADMIN_HASH,
     liff_hash: LIFF_HASH,
-    released_at: RELEASED_AT,
-    git_commit: GIT_COMMIT,
     deploy_env: c.env?.DEPLOY_ENV ?? null,
-  }),
-);
+  });
+});
 
 app.get('/manifest', async (c) => {
   const manifestUrl = c.env?.MANIFEST_URL ?? DEFAULT_MANIFEST_URL;

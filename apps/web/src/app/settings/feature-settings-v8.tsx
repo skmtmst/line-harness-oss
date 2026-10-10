@@ -1,5 +1,4 @@
 'use client'
-
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
@@ -7,7 +6,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import {
   groupEnabledCount,
@@ -29,6 +28,8 @@ import {
   type UsageCategory,
 } from './use-feature-settings'
 import styles from './settings-v8.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
  * 機能設定の V8 画面（★V8-B `ywFJT`）。
@@ -163,11 +164,11 @@ function FeatureRowV8({ item, features, usage, featureUsage, usageRetry, sharedS
             必須
           </span>
         ) : (
-          <Toggle
+          <SaveErrorField names={["enabled"]}><SettingCheckbox
             checked={enabled}
             label={`${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
             onChange={(next) => onToggle(item, next)}
-          />
+          /></SaveErrorField>
         )}
       </div>
     </li>
@@ -318,8 +319,6 @@ export function ReorderDialog({ groups, initialOrder, onCancel, onApply, moveIte
   )
 }
 
-
-
 export function FeatureSettingsV8() {
   const settings = useFeatureSettings()
   const {
@@ -427,7 +426,7 @@ export function FeatureSettingsV8() {
         <p>あなたが直した所はまだ保存されていません。違いを確認してから続けてください。</p>
         <div className={styles.toolbar}>
           <Button variant="secondary" onClick={() => setCompareOpen(true)}>違いを比べる</Button>
-          <Button variant="secondary" onClick={() => void load()}>最新を読み込んで続ける</Button>
+          <Button variant="secondary" onClick={() => load()} busyLabel="処理中…">最新を読み込んで続ける</Button>
         </div>
       </div>}
       <p className={`${styles.band} ${styles.bandInfo}`}>
@@ -465,7 +464,7 @@ export function FeatureSettingsV8() {
           kind="error"
           title={error || '設定を読み込めませんでした'}
           action={(
-            <Button type="button" variant="secondary" onClick={() => void load()}>
+            <Button type="button" variant="secondary" onClick={() => load()} busyLabel="処理中…">
               もう一度試す
             </Button>
           )}
@@ -515,20 +514,18 @@ export function FeatureSettingsV8() {
             </div>
           )}
 
-          {dirty && <div className={styles.reasonBand}>
-            <label htmlFor="feature-settings-reason">
-              変更理由（必須）
-            </label>
-            <input
+          {dirty && <div className={styles.reasonBand}><Field note={<>保存の記録に残ります。空のままでは保存できません。</>} label={<>
+
+              変更理由
+            </>} htmlFor="feature-settings-reason" required><SaveErrorField names={["reason"]}><input
               id="feature-settings-reason"
               value={reason}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="例: マイルを使わないのでオフにする"
+              placeholder="例：マイルを使わないのでオフにする"
               maxLength={300}
               disabled={saving}
-            />
-            <p className={styles.reasonHint}>保存の記録に残ります。空のままでは保存できません。</p>
-          </div>}
+            /></SaveErrorField>
+</Field></div>}
 
         </>
       )}

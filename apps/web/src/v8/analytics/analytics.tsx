@@ -13,9 +13,9 @@
  * 受け付ける URL・呼ぶ口・権限は今の画面と同じ（BEHAVIOR.md）。
  */
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
-import Link from 'next/link'
+import { Tabs } from '@/components/shared/tabs'
 import { useSearchParams } from 'next/navigation'
-import { Download, Eye, Plus } from 'lucide-react'
+import { Download, Plus } from 'lucide-react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -33,6 +33,8 @@ import SavedV8 from './saved'
 import FunnelV8, { type FunnelFormSlot, type FunnelSaveSlot } from './funnel'
 import CrossV8 from './cross'
 import styles from './analytics.module.css'
+
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export const ANALYTICS_TABS = ['friends', 'reactions', 'routes', 'usage', 'cross', 'funnel', 'url-clicks', 'saved'] as const
 export type AnalyticsTabV8 = (typeof ANALYTICS_TABS)[number] | 'conversion-report'
@@ -61,7 +63,7 @@ export type AnalyticsSlotsV8 = {
 
 
 function readTab(params: URLSearchParams): AnalyticsTabV8 {
-  if (params.get('view') === 'conversion-report') return 'conversion-report'
+  if (params.get('tab') === 'conversion-report' || params.get('view') === 'conversion-report') return 'conversion-report'
   const raw = params.get('tab')
   // 旧キー clicks（Search Console 側の以前の表記）は URL クリックへ寄せる。知らない値は先頭へ。
   const key = raw === 'clicks' ? 'url-clicks' : raw
@@ -72,14 +74,8 @@ function Navigation({ active, savedCount }: { active: AnalyticsTabV8; savedCount
   const owner = tabOwner(active)
   const group = GROUPS.find((item) => item.tabs.some((tab) => tab.key === owner)) ?? GROUPS[0]
   return <div className={styles.navigation}>
-    <nav aria-label="分析の組" className={styles.groups}>
-      {GROUPS.map((item) => <Link key={item.label} href={hrefOf(item.tabs[0].key)} className={styles.group} aria-current={item === group ? 'true' : undefined}>{item.label}</Link>)}
-    </nav>
-    <nav aria-label="分析の見かた" className={styles.tabs}>
-      {group.tabs.map((item) => <Link key={item.key} href={hrefOf(item.key)} className={styles.tab} aria-current={item.key === owner ? 'page' : undefined}>
-        {item.key === 'saved' && savedCount != null ? `${item.label} ${savedCount}` : item.label}
-      </Link>)}
-    </nav>
+    <Tabs label="分析の組" items={GROUPS.map(item => ({label:item.label,href:hrefOf(item.tabs[0].key),current:item===group}))} />
+    <Tabs label="分析の見かた" items={group.tabs.map(item => ({label:item.label,href:hrefOf(item.key),current:item.key===owner,count:item.key==='saved' ? savedCount ?? undefined : undefined}))} />
   </div>
 }
 
@@ -106,13 +102,13 @@ function AnalyticsInnerV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
   const board = tab === 'friends' ? (readOnly ? 'L4Uov' : narrow ? 'eEhYU' : 'ws9wt') : BOARD[tab]
   const exportReady = exportAction !== null && exportAction.scope === scope && !exportAction.disabled
   const actions = <>
-    <Button variant="secondary" className={styles.csvButton} disabled={!exportReady} onClick={() => exportAction?.scope === scope && exportAction.onClick()}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+    <Button variant="secondary" className={styles.csvButton} disabled={!exportReady} onClick={() => exportAction?.scope === scope && exportAction.onClick()}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
     {/* 閲覧のみの人には作るボタンを置かない（オーナー決定 2026-10-06）。場所だけ空けて CSV の位置を保つ。 */}
     {readOnly ? <span className={styles.createSpace} aria-hidden="true" /> : <Button variant="primary" href="/analytics/reports/new"><Plus size={15} aria-hidden="true" />レポートを作る</Button>}
   </>
   const tabs = <>
     <Navigation active={tab} savedCount={savedCount} />
-    {readOnly ? <div className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" /><span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span></div> : null}
+    {readOnly ? <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div> : null}
   </>
   const content = tab === 'friends' ? <FriendsV8 key={selectedAccountId} accountId={selectedAccountId} />
     : tab === 'reactions' ? <ReactionsV8 key={selectedAccountId} accountId={selectedAccountId} />
@@ -133,7 +129,7 @@ function AnalyticsInnerV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
     <ListPage
       boardId={board}
       title="分析"
-      description={<span className={styles.description}>友だちの増減・配信の反応・経路と成果を、期間を決めて見ます。気になる見かたは保存して、レポートで毎週届けられます。</span>}
+      help={<span className={styles.description}>友だちの増減・配信の反応・経路と成果を、期間を決めて見ます。気になる見かたは保存して、レポートで毎週届けられます。</span>}
       actions={actions}
       tabs={tabs}
     >

@@ -1,4 +1,5 @@
 import { ApiError, fetchApi } from './api'
+import { readSaveFieldErrors } from './api-field-errors'
 import type { FormLayout, HqTemplateListDisplay } from '@line-crm/shared'
 
 export const TEMPLATE_TYPES = ['tag', 'template', 'rich_menu', 'form', 'scenario'] as const
@@ -6,6 +7,7 @@ export type TemplateType = typeof TEMPLATE_TYPES[number]
 export type DistributionMode = 'create' | 'overwrite' | 'alias'
 export interface HqTemplate extends Partial<HqTemplateListDisplay> {
   id: string; name: string; description: string | null; template_type: TemplateType
+  current_version_id?: string | null;
   folder_id?: string | null; revision: number; updated_at: string; reference_summary?: string; distributed_account_count?: number
 }
 export type HqTemplateListItem = HqTemplate & HqTemplateListDisplay
@@ -79,7 +81,7 @@ export interface DistributionResult {
   } & import('@line-crm/shared').HqTemplateResultDisplay)[]
 }
 export class HqTemplatesApiError extends Error {
-  constructor(message: string, public readonly status?: number, public readonly responseReceived = false, public readonly requestNotApplied = false, public readonly code?: string) {
+  constructor(message: string, public readonly status?: number, public readonly responseReceived = false, public readonly requestNotApplied = false, public readonly code?: string, public readonly fields?: Record<string, string>) {
     super(message)
     this.name = 'HqTemplatesApiError'
   }
@@ -87,7 +89,7 @@ export class HqTemplatesApiError extends Error {
 
 async function request<T>(path: string, method = 'GET', body?: unknown, headers?: HeadersInit): Promise<T> {
   try {
-  const result = await fetchApi<{ success: true; data: T } | { success: false; error: string; code?: string }>(
+  const result = await fetchApi<{ success: true; data: T } | { success: false; error: string; code?: string; fields?: Record<string, string> }>(
     `/api/hq/templates${path}`, {
       method,
       ...(headers ? { headers } : {}),
@@ -98,7 +100,7 @@ async function request<T>(path: string, method = 'GET', body?: unknown, headers?
     const message = result.code === 'UNSUPPORTED'
       ? 'この種類のひな形は未対応です（UNSUPPORTED）。'
       : '入力内容を確認してください。'
-    throw new HqTemplatesApiError(message, 422, true, false, result.code)
+    throw new HqTemplatesApiError(message, 422, true, false, result.code, readSaveFieldErrors({status: 422, fields: result.fields}))
   }
   return result.data
   } catch (error) {
@@ -120,7 +122,7 @@ async function request<T>(path: string, method = 'GET', body?: unknown, headers?
     // this request did not apply; a previous ambiguous attempt remains ambiguous.
     const requestNotApplied = error instanceof ApiError && [400, 401, 403, 404, 405, 409, 422, 428].includes(error.status)
     // 理由の符号（VERSION_CONFLICT など）は画面が言い分けに使う（フォルダの窓・2026-10-09）。
-    throw new HqTemplatesApiError(message, detail.status, error instanceof ApiError, requestNotApplied, detail.code)
+    throw new HqTemplatesApiError(message, detail.status, error instanceof ApiError, requestNotApplied, detail.code, readSaveFieldErrors(error))
   }
 }
 const idPath = (id: string) => `/${encodeURIComponent(id)}`

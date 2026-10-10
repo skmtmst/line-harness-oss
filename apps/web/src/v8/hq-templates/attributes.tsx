@@ -1,11 +1,12 @@
 'use client'
 
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FriendField, Folder, HqFriendAttributeDetail, HqFriendAttributeInput, HqFriendAttributeTemplate, HqFriendAttributeType, HqFriendAttributeListStats, HqTemplateFolder, HqMarkDefinition } from '@line-crm/shared'
 import { ClipboardList, FileText, Flag, History, Loader, Users, CircleDot, PenLine, Plus } from 'lucide-react'
 import { hqFriendAttributesApi as api } from '@/lib/hq-friend-attributes-api'
 import { hqTemplatesApi } from '@/lib/hq-templates-api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -30,16 +31,19 @@ import { fieldOf, fieldDefinition, markOf } from './attribute-model'
 import listStyles from '@/v8/tags/list.module.css'
 import createStyles from '@/v8/tags/create.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 type Attempt = { input: HqFriendAttributeInput; requestId: string; distribute: boolean }
 type Entry = { row: HqFriendAttributeTemplate; detail: HqFriendAttributeDetail }
 const title = 'タグ'
 const description = 'タグ・友だち情報欄・対応マークのひな形を作り、各 LINE アカウントへ配ります。'
-const errorText = (cause: unknown) => (cause instanceof Error && cause.message && !/^API error: /.test(cause.message) ? cause.message : '処理できませんでした。もう一度確認してください。')
+const errorText = (cause: unknown) => (cause && typeof cause === 'object' && 'status' in cause && cause.status === 403 ? permissionDeniedMessage('hq') : cause instanceof Error && cause.message && !/^API error: /.test(cause.message) ? cause.message : '処理できませんでした。もう一度確認してください。')
 
 export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttributeType; tab: 'fields' | 'marks'; onTab: (tab: AttributeTabKey) => void }) {
+  const saveErrors = useSaveFormErrors()
   const role = useStaffRole()
-  const canEdit = role !== null && canManageRole(role)
+  const canEdit = useTenantWideAccess()
   const [entries, setEntries] = useState<Entry[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
   const [folders, setFolders] = useState<HqTemplateFolder[]>([])
@@ -78,12 +82,17 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
         return order(a.detail) - order(b.detail)
       })
       setEntries(loaded); setStatus('ready')
-    } catch (cause) { if (alive.current && request === sequence.current) { setStatus(cause && typeof cause === 'object' && 'status' in cause && cause.status === 403 ? 'forbidden' : 'error'); setError(errorText(cause)) } }
-  }, [type])
+    } catch (cause) {
+      const fieldFailure = saveErrors.capture(cause);
+ if (alive.current && request === sequence.current) { setStatus(cause && typeof cause === 'object' && 'status' in cause && cause.status === 403 ? 'forbidden' : 'error'); { if (!fieldFailure) setError(errorText(cause)) } }
+  }
+  }, [type, saveErrors])
   const loadFolders = useCallback(async () => {
     try { const rows = await api.folders.list(); if (alive.current) { setFolders(rows); setFoldersFailed(false) } }
-    catch { if (alive.current) setFoldersFailed(true) }
-  }, [])
+    catch (saveFailure) {
+      saveErrors.capture(saveFailure);
+ if (alive.current) setFoldersFailed(true) }
+  }, [saveErrors])
   useEffect(() => {
     alive.current = true
     void load(); void loadFolders()
@@ -104,7 +113,9 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
   const perform = async (action: () => Promise<void>) => {
     if (lock.current || !canEdit) return
     lock.current = true; setBusy(true); setError('')
-    try { await action() } catch (cause) { if (alive.current) setError(errorText(cause)) }
+    try { await action() } catch (cause) {
+      const fieldFailure = saveErrors.capture(cause);
+ if (alive.current) { if (!fieldFailure) setError(errorText(cause)) } }
     finally { lock.current = false; if (alive.current) setBusy(false) }
   }
   const open = (id: string, distribute = false) => void perform(async () => {
@@ -124,6 +135,8 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
       window.sessionStorage.setItem(scopeKey.current, JSON.stringify(record)); attempt.current = record
       try { detail = await api.create(record.input, record.requestId) }
       catch (cause) {
+        saveErrors.capture(cause);
+
         if (!uncertain && cause && typeof cause === 'object' && 'requestNotApplied' in cause && cause.requestNotApplied === true) { window.sessionStorage.removeItem(scopeKey.current); attempt.current = null }
         else { setUncertain(true); setRestored(record) }
         throw cause
@@ -157,7 +170,9 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
       if (folderDialog === 'new') await api.folders.create(folderName.trim(), folderColor)
       else await api.folders.update(folderDialog.id, folderName.trim(), folderDialog.revision, folderColor)
       setFolderDialog(null); await loadFolders()
-    } catch (cause) { setFolderError(errorText(cause)) }
+    } catch (cause) {
+      const fieldFailure = saveErrors.capture(cause)
+ { if (!fieldFailure) setFolderError(errorText(cause)) } }
     finally { lock.current = false; setBusy(false) }
   }
 
@@ -183,8 +198,8 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
     onEditFolder: (id) => { const folder = folders.find((row) => row.id === id); if (folder) { setFolderName(folder.name); setFolderColor(folderDisplayColor(folder)); setFolderError(''); setFolderDialog(folder) } },
     onRemoveFolder: (id) => setDeletingFolder(folders.find((row) => row.id === id) ?? null),
   }
-  const notices = <>{role !== null && !canEdit ? <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /> : null}{error ? <Notice tone="danger" message={error} action={editor && editor !== 'new' ? <Button disabled={busy} onClick={() => open(editor.template.id)}>最新の内容を読み込む</Button> : undefined} /> : null}</>
-  if (distribution && !distribution.saved) return <AttributeDistribution key={distribution.detail.template.id} detail={distribution.detail} canEdit={canEdit} onClose={() => { setDistribution(null); void load() }} />
+  const notices = <>{role !== null && !canEdit ? <ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice> : null}{error ? <Notice tone="danger" message={error} action={editor && editor !== 'new' ? <Button disabled={busy} onClick={() => open(editor.template.id)} busy={Boolean(busy)} busyLabel="処理中…">最新の内容を読み込む</Button> : undefined} /> : null}</>
+  if (distribution && !distribution.saved) return <SaveErrorScope errors={saveErrors}><AttributeDistribution key={distribution.detail.template.id} detail={distribution.detail} canEdit={canEdit} onClose={() => { setDistribution(null); void load() }} /></SaveErrorScope>
   if (editor && canEdit) {
     const current = editor === 'new' ? null : editor
     const input = restored?.input
@@ -193,29 +208,29 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
     if (type === 'friend_field') {
       const definition = current && 'field' in current.definition ? current.definition : input && input.type === 'friend_field' ? input.definition : null
       const initial = definition ? fieldOf({ template: current?.template ?? { id: 'new', name: definition.field.name, description: null, template_type: 'friend_field', revision: 0, updated_at: '', folder_id: input?.folderId }, definition } as Extract<HqFriendAttributeDetail, { template: { template_type: 'friend_field' } }>) : null
-      return <FieldEditor key={`${current?.template.id ?? 'new'}:${current?.template.revision ?? 'new'}`} host={{ title: editing ? '友だち情報欄のひな形を編集' : '友だち情報欄のひな形を作る', notice: notices, footer }} mode={editing ? 'edit' : 'create'} field={initial} locked={uncertain} folders={folderRows} foldersState={foldersFailed ? 'error' : 'ready'} onRetryFolders={() => void loadFolders()} onCreateFolder={async (name, color) => { const folder = await api.folders.create(name, color); await loadFolders(); return { value: folder.id, label: folder.name, color: folder.color } }} siblings={fieldRows} siblingsReady={status === 'ready'} saving={busy} backHref="/hq/friend-attributes?tab=fields" onCancel={() => setEditor(null)} onSubmit={(values: FieldEditorValues) => {
+      return <SaveErrorScope errors={saveErrors}><FieldEditor key={`${current?.template.id ?? 'new'}:${current?.template.revision ?? 'new'}`} host={{ title: editing ? '友だち情報欄のひな形を編集' : '友だち情報欄のひな形を作る', notice: notices, footer }} mode={editing ? 'edit' : 'create'} field={initial} locked={uncertain} folders={folderRows} foldersState={foldersFailed ? 'error' : 'ready'} onRetryFolders={() => void loadFolders()} onCreateFolder={async (name, color) => { const folder = await api.folders.create(name, color); await loadFolders(); return { value: folder.id, label: folder.name, color: folder.color } }} siblings={fieldRows} siblingsReady={status === 'ready'} saving={busy} backHref="/hq/friend-attributes?tab=fields" onCancel={() => setEditor(null)} onSubmit={(values: FieldEditorValues) => {
         const definition = fieldDefinition(values, current && 'field' in current.definition ? current.definition : null, folders, Boolean(current && (current.template.folder_id ?? '') === values.folderId))
         if (!current) definition.field.displayOrder = entries.length
         void save({ type: 'friend_field', name: values.name, description: current?.template.description ?? '', folderId: values.folderId || null, definition }, saveIntent.current)
-      }} />
+      }} /></SaveErrorScope>
     }
     const definition = current && 'mark' in current.definition ? current.definition : input?.type === 'mark' ? input.definition : { schemaVersion: 1 as const, mark: { name: '', color: '#EF4B55', displayOrder: entries.length } }
-    return <HqMarkEditor key={`${current?.template.id ?? 'new'}:${current?.template.revision ?? 'new'}`} definition={definition} busy={busy} locked={uncertain} notices={notices} footer={footer} onCancel={() => setEditor(null)} onSave={(definition) => void save({ type: 'mark', name: definition.mark.name, description: current?.template.description ?? '', folderId: current?.template.folder_id ?? null, definition }, saveIntent.current)} />
+    return <SaveErrorScope errors={saveErrors}> <HqMarkEditor key={`${current?.template.id ?? 'new'}:${current?.template.revision ?? 'new'}`} definition={definition} busy={busy} locked={uncertain} notices={notices} footer={footer} onCancel={() => setEditor(null)} onSave={(definition) => void save({ type: 'mark', name: definition.mark.name, description: current?.template.description ?? '', folderId: current?.template.folder_id ?? null, definition }, saveIntent.current)} /></SaveErrorScope>
   }
-  return <ListPage boardId={tab === 'fields' ? 'y0sapC' : 'Qgjmc'} headingSize="regular" title={title} description={description}
+  return <SaveErrorScope errors={saveErrors}> <ListPage boardId={tab === 'fields' ? 'y0sapC' : 'Qgjmc'} headingSize="regular" title={title} help={description}
     actions={type === 'mark' && canEdit ? <Button variant="primary" disabled={busy || status !== 'ready'} onClick={hostBase.onCreate}><Plus size={15} aria-hidden="true" />マークを作る</Button> : undefined}
     tabs={<AttributeTabs tab={tab} onSelect={onTab} />} overlays={<>
       {distribution?.saved ? <AttributeDistribution key={distribution.detail.template.id} detail={distribution.detail} canEdit={canEdit} saved onClose={() => { setDistribution(null); void load() }} /> : null}
-      <ConfirmDialog open={!!deleting} title="ひな形を削除" description={`「${deleting?.row.name ?? ''}」を削除します。配布済みのアカウントの情報と履歴は残ります。`} destructive confirmLabel="削除する" busy={busy} error={error || undefined} onCancel={() => { if (!busy) setDeleting(null) }} onConfirm={() => void perform(async () => { if (!deleting) return; await api.remove(deleting.row.id, deleting.row.revision); setDeleting(null); await load() })} />
+      <ConfirmDialog open={!!deleting} title="ひな形を削除" deleteName={deleting?.row.name ?? ''} description={`「${deleting?.row.name ?? ''}」を削除します。配布済みのアカウントの情報と履歴は残ります。`} destructive confirmLabel="削除する" busy={busy} error={error || undefined} onCancel={() => { if (!busy) setDeleting(null) }} onConfirm={() => perform(async () => { if (!deleting) return; await api.remove(deleting.row.id, deleting.row.revision); setDeleting(null); await load() })} />
       <FolderEditorDialog open={folderDialog !== null} title={folderDialog === 'new' ? 'フォルダを追加' : 'フォルダを直す'}
         name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor}
         busy={busy} error={folderError || undefined} confirmLabel={folderDialog === 'new' ? '追加する' : '保存する'}
-        onCancel={() => { if (!busy) setFolderDialog(null) }} onConfirm={() => void saveFolder()} />
-      <ConfirmDialog open={!!deletingFolder} title="フォルダを削除" description="中のひな形は未分類に残ります。" destructive confirmLabel="削除する" busy={busy} error={error || undefined} onCancel={() => { if (!busy) setDeletingFolder(null) }} onConfirm={() => void perform(async () => { if (!deletingFolder) return; await api.folders.remove(deletingFolder.id, deletingFolder.revision); setDeletingFolder(null); await loadFolders(); await load() })} />
+        onCancel={() => { if (!busy) setFolderDialog(null) }} onConfirm={() => saveFolder()} />
+      <ConfirmDialog open={!!deletingFolder} title="フォルダを削除" deleteName={deletingFolder?.name ?? ''} description="中のひな形は未分類に残ります。" destructive confirmLabel="削除する" busy={busy} error={error || undefined} onCancel={() => { if (!busy) setDeletingFolder(null) }} onConfirm={() => perform(async () => { if (!deletingFolder) return; await api.folders.remove(deletingFolder.id, deletingFolder.revision); setDeletingFolder(null); await loadFolders(); await load() })} />
     </>}>
     {notices}
     {type === 'friend_field' ? <FieldsTab accountId={null} canEdit={canEdit && !busy} host={{ ...hostBase, items: fieldRows }} /> : <MarksTab accountId={null} canEdit={canEdit && !busy} host={{ ...hostBase, items: markRows }} />}
-  </ListPage>
+  </ListPage></SaveErrorScope>
 }
 
 function HqMarkEditor({ definition, busy, locked, notices, footer, onCancel, onSave }: { definition: HqMarkDefinition; busy: boolean; locked: boolean; notices: React.ReactNode; footer: (submit: () => void, cancel: () => void) => React.ReactNode; onCancel: () => void; onSave: (definition: HqMarkDefinition) => void }) {
@@ -230,8 +245,8 @@ function HqMarkEditor({ definition, busy, locked, notices, footer, onCancel, onS
     if (!name.trim()) { setError('マーク名を入力してください'); requestAnimationFrame(() => { const input = document.querySelector<HTMLElement>('[aria-labelledby="mark-basic"] input'); input?.focus(); input?.scrollIntoView({ block: 'center' }) }); return }
     onSave({ ...definition, mark: { ...definition.mark, name: name.trim(), color, isDefault, autoOnInbound } })
   }
-  return <><CreatePage title="対応マークのひな形" notice={notices} footerActions={footer(submit, () => guarded(onCancel))}>
+  return <><CreatePage title="対応マークのひな形" notice={notices} footerActions={footer(submit, () => guarded(onCancel))} dirty={false}>
     <MarkBasicFields name={name} color={color} onName={setName} onColor={setColor} disabled={busy || locked} error={error || undefined} />
-    <section className={createStyles.card}><h2 className={createStyles.cardTitle}>自動で変えるきまり</h2><Checkbox checked={autoOnInbound} onCheckedChange={setAutoOnInbound} disabled={busy || locked}>新しいメッセージが来たらこのマークに変える</Checkbox><Checkbox checked={isDefault} onCheckedChange={setIsDefault} disabled={busy || locked}>新しい友だちに最初から付ける</Checkbox></section>
+    <section className={createStyles.card}><h2 className={createStyles.cardTitle}>自動で変えるきまり</h2><SaveErrorField names={["autoOnInbound","auto_on_inbound"]}><Checkbox checked={autoOnInbound} onCheckedChange={setAutoOnInbound} disabled={busy || locked}>新しいメッセージが来たらこのマークに変える</Checkbox></SaveErrorField><SaveErrorField names={["isDefault","is_default"]}><Checkbox checked={isDefault} onCheckedChange={setIsDefault} disabled={busy || locked}>新しい友だちに最初から付ける</Checkbox></SaveErrorField></section>
   </CreatePage><UnsavedLeaveDialog open={leaveTarget !== null} subject="マークへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} /></>
 }

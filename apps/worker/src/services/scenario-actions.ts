@@ -22,6 +22,9 @@ import {
   validateFriendFieldValue,
   type PinnedScenarioAction,
 } from '@line-crm/db'
+import { executeConfiguredAction } from './action-execution-context.js'
+import type { AutomationActionExecutorDependencies } from './automation-action-executors.js'
+import { runEventBookingAction, validEventBookingAction } from './event-booking-action.js'
 import { matchesCondition, parseCondition } from './segment-query.js'
 
 export type ScenarioActionHook = 'step_sent' | 'scenario_completed' | 'choice_selected'
@@ -64,11 +67,14 @@ export interface RunActionRowsOptions {
    * - `pinned` … scenario_pinned_action_fires（版固定の実行用。live 行が消えても書ける）
    */
   fires?: 'live' | 'pinned'
+  /** 呼び出し元の工程キー。同じイベントの再送では予約を増やさない。 */
+  sourceEventId?: string
   /**
    * シナリオの LINE 公式アカウント。タグ・テンプレート・遷移先が別の
    * アカウントのものなら実行しない。null は共通シナリオ（確かめない）。
    */
   accountId?: string | null
+  executorDependencies?: AutomationActionExecutorDependencies
 }
 
 /** config_json の形。action_type ごとに違う。 */
@@ -149,13 +155,13 @@ export function isScenarioActionComplete(actionType: string, config: unknown): b
     case 'reminder':
       return typeof c.reminderId === 'string' && c.reminderId !== ''
     case 'event_booking':
-      return typeof c.eventId === 'string' && c.eventId !== ''
+      return validEventBookingAction(c)
     default:
       return false
   }
 }
 
-export interface RunActionsInput {
+export interface RunActionsInput extends RunActionRowsOptions {
   scenarioId: string
   hook: ScenarioActionHook
   friendId: string
@@ -172,6 +178,8 @@ export interface RunActionsResult {
   skippedByOnce: number
   /** 失敗した数。失敗しても配信は続ける。 */
   failed: number
+  /** B-179: 空き・申込なしは理由を記録し、この処理だけを止める。 */
+  eventBookingFailure?: { code: string; reason: string }
   /** 中身が埋まっていないため飛ばした数。 */
   skippedIncomplete: number
   /**
@@ -222,7 +230,7 @@ export async function runScenarioActions(
     console.error('[scenario-actions] failed to load actions', err)
     return emptyActionsResult()
   }
-  return runActionRows(db, actions, input.friendId)
+  return runActionRows(db, actions, input.friendId, input)
 }
 
 /**
@@ -247,7 +255,7 @@ export function pinnedActionsToRows(actions: PinnedScenarioAction[]): ScenarioAc
   }))
 }
 
-export interface RunPinnedActionsInput {
+export interface RunPinnedActionsInput extends RunActionRowsOptions {
   /** 版に固定されたアクション一式（版の写しをそのまま渡す）。 */
   actions: PinnedScenarioAction[]
   hook: ScenarioActionHook
@@ -281,6 +289,7 @@ export async function runPinnedScenarioActions(
     )
     .sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id))
   return runActionRows(db, rows, input.friendId, {
+    ...input,
     fires: 'pinned',
     accountId: input.accountId ?? null,
   })
@@ -408,6 +417,10 @@ export async function runActionRows(
       // 1つ失敗しても残りは続ける。配信も止めない。
       console.error(`[scenario-actions] action=${action.id} type=${action.action_type} failed`, err)
       result.failed++
+      if (action.action_type === 'event_booking' && err instanceof Error && 'code' in err &&
+        (err.code === 'event_booking_unavailable' || err.code === 'event_booking_missing')) {
+        result.eventBookingFailure = { code: err.code, reason: err.message }
+      }
     }
   }
 
@@ -471,27 +484,19 @@ async function executeAction(
       return false
     }
 
-    // 送信・予約系は配信本体の専用キューへ委譲する契約。ここでは
-    // scenario_actions の保存と実行順を保証し、専用キューが未接続の場合は
-    // 配信全体を止めず監査ログへ残す。
-    case 'send_template': {
-      const templateId = (config as { templateId?: string }).templateId ?? null
-      if (!(await isResourceInScenarioAccount(db, 'template', templateId, accountId))) {
-        console.warn(
-          `[scenario-actions] cross-account template action=${action.id} template=${templateId} — skipped`,
-        )
-        return false
-      }
-      console.info(`[scenario-actions] deferred action=${action.id} type=${action.action_type} friend=${friendId}`)
+    case 'send_template':
+    case 'send_message':
+    case 'event_booking':
+    case 'reminder': {
+      const c = config as Record<string, unknown>
+      const type = action.action_type === 'reminder'
+        ? (c.op === 'stop' || c.op === 'cancel' ? 'stop_reminder' : 'start_reminder')
+        : action.action_type === 'event_booking' ? 'event_booking' : 'send_message'
+      await executeConfiguredAction(db, { friendId, accountId, source: 'scenario-action',
+        sourceEventId: options.sourceEventId ?? (action.repeat_on_refire === 0 ? `once:${action.fires_key ?? action.id}` : crypto.randomUUID()),
+        actionId: action.id, type, params: c, dependencies: options.executorDependencies })
       return false
     }
-
-    case 'send_message':
-    case 'reminder':
-    case 'event_booking':
-      console.info(`[scenario-actions] deferred action=${action.id} type=${action.action_type} friend=${friendId}`)
-      return false
-
     default: {
       const exhaustive: never = action.action_type
       throw new Error(`Unknown action type: ${String(exhaustive)}`)

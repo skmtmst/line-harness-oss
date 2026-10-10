@@ -1,15 +1,8 @@
 'use client'
-
-/*
- * ★V8 ファイルの検査（Pencil `PfA4o`、状態は `bR6a1`）。
- *
- * 動き（権限・一覧・札の絞り込み・探す・ページ送り・使えるように戻す・消す・外の検査の設定）は
- * 今までの V8（app/settings/file-scan/file-scan-v8.tsx）と同じ。処理は同じ場所の use-file-scan.ts（写し）。
- * 行の右端は「使えるように戻す」＋「…」（中の「削除する」）。
- */
 import { useEffect, useRef, useState } from 'react'
 import { Pencil, RotateCcw, Trash2 } from 'lucide-react'
 import Button from '@/components/shared/button'
+import FormDocumentRetention from '@/components/shared/form-document-retention'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -27,6 +20,17 @@ import type { FileScanItem } from '@/lib/api'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { FILE_SCAN_PAGE_SIZE, useFileScan } from './use-file-scan'
 import styles from './screen.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 ファイルの検査（Pencil `PfA4o`、状態は `bR6a1`）。
+ *
+ * 動き（権限・一覧・札の絞り込み・探す・ページ送り・使えるように戻す・消す・外の検査の設定）は
+ * 今までの V8（app/settings/file-scan/file-scan-v8.tsx）と同じ。処理は同じ場所の use-file-scan.ts（写し）。
+ * 行の右端は「使えるように戻す」＋「…」（中の「削除する」）。
+ */
 
 const TITLE = 'ファイルの検査'
 const DESCRIPTION = '上げたファイルに危ないものがないかを確かめます'
@@ -154,18 +158,18 @@ export default function FileScanScreen() {
               releaseReasonRef.current?.scrollIntoView({ block: 'center' })
               return
             }
-            void release()
+            return release()
           }}
         >
           <Field label="理由（必須）" htmlFor="file-scan-release-reason" error={releaseReasonError || undefined}>
-            <TextArea
+            <SaveErrorField names={["releaseReason","release_reason"]}><TextArea
               ref={releaseReasonRef}
               id="file-scan-release-reason"
               aria-required="true"
               value={releaseReason}
               onChange={(event) => { setReleaseReason(event.target.value); setReleaseError('') }}
               placeholder="例：社内の画像と確認できたため"
-            />
+            /></SaveErrorField>
           </Field>
         </ConfirmDialog>
       ) : null}
@@ -188,7 +192,7 @@ export default function FileScanScreen() {
           busy={configBusy}
           error={stopError || undefined}
           onCancel={() => { setStopExternal(false); setStopError('') }}
-          onConfirm={() => void stopExternalConfig()}
+          onConfirm={() => stopExternalConfig()}
         />
       ) : null}
 
@@ -196,6 +200,7 @@ export default function FileScanScreen() {
         <ConfirmDialog
           open
           title="ファイルを削除する"
+          deleteName={deleteTarget.filename}
           description={`${deleteTarget.filename} を消します。中身は画面に出ません。監査の記録は残ります。`}
           confirmLabel="削除する"
           cancelLabel="キャンセル"
@@ -203,7 +208,7 @@ export default function FileScanScreen() {
           busy={deleteBusy}
           error={deleteError || undefined}
           onCancel={() => { setDeleteTarget(null); setDeleteError('') }}
-          onConfirm={() => void remove()}
+          onConfirm={() => remove()}
         />
       ) : null}
     </>
@@ -211,7 +216,7 @@ export default function FileScanScreen() {
 
   if (phase === 'loading' || phase === 'error' || phase === 'forbidden' || !selectedAccountId) {
     return (
-      <SbSettingsScreen boardId="PfA4o" title={TITLE} description={DESCRIPTION}>
+      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}>
         {phase === 'loading' ? (
           <ListState kind="loading" />
         ) : phase === 'error' ? (
@@ -241,7 +246,7 @@ export default function FileScanScreen() {
   const externalOn = Boolean(config?.externalProvider && config?.externalEndpointUrl)
 
   return (
-    <SbSettingsScreen boardId="PfA4o" title={TITLE} description={DESCRIPTION}>
+    <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}>
       <Notice tone="info">確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</Notice>
 
       {actionError && !configServerError ? <Notice tone="danger" message={actionError} /> : null}
@@ -296,7 +301,7 @@ export default function FileScanScreen() {
                   {item.filename}
                   {item.releasedAt ? <span className={styles.released}>戻した</span> : null}
                 </GridCell>
-                <GridCell role="cell" className={styles.cell} title={item.uploaderLabel ?? '—'}>{item.uploaderLabel ?? '—'}</GridCell>
+                <GridCell role="cell" className={styles.cell} title={item.uploaderLabel ?? emptyValue('unknown')}>{item.uploaderLabel ?? emptyValue('unknown')}</GridCell>
                 <GridCell role="cell" className={styles.cell} data-tone={reasonTone(item)} title={item.reasonLabel ?? '確認が必要です'}>
                   {item.reasonLabel ?? '確認が必要です'}
                 </GridCell>
@@ -318,7 +323,7 @@ export default function FileScanScreen() {
                       />
                     </span>
                   ) : (
-                    <span className={styles.muted}>—</span>
+                    <span className={styles.muted}>{emptyValue('unknown')}</span>
                   )}
                 </GridCell>
               </GridRow>
@@ -361,13 +366,13 @@ export default function FileScanScreen() {
         {configOpen ? (
           <div className={styles.form}>
             <Field label="提供元" htmlFor="file-scan-provider" error={configErrors.provider}>
-              <TextField ref={providerRef} id="file-scan-provider" value={provider} onChange={(event) => { setProvider(event.target.value); setConfigErrors((current) => ({ ...current, provider: undefined })); if (configServerError) setActionError('') }} placeholder="例：example-scan" />
+              <SaveErrorField names={["provider"]}><TextField ref={providerRef} id="file-scan-provider" value={provider} onChange={(event) => { setProvider(event.target.value); setConfigErrors((current) => ({ ...current, provider: undefined })); if (configServerError) setActionError('') }} placeholder="例：example-scan" /></SaveErrorField>
             </Field>
             <Field label="送り先（https）" htmlFor="file-scan-endpoint" error={configErrors.endpoint || configServerError || undefined}>
-              <TextField ref={endpointRef} id="file-scan-endpoint" value={endpoint} onChange={(event) => { setEndpoint(event.target.value); setConfigErrors((current) => ({ ...current, endpoint: undefined })); if (configServerError) setActionError('') }} placeholder="https://example.com/scan" />
+              <SaveErrorField names={["endpoint"]}><TextField ref={endpointRef} id="file-scan-endpoint" value={endpoint} onChange={(event) => { setEndpoint(event.target.value); setConfigErrors((current) => ({ ...current, endpoint: undefined })); if (configServerError) setActionError('') }} placeholder="https://example.com/scan" /></SaveErrorField>
             </Field>
             <Field label="鍵の名前" htmlFor="file-scan-secret-ref">
-              <TextField id="file-scan-secret-ref" value={secretRef} onChange={(event) => setSecretRef(event.target.value)} placeholder="例：FILE_SCAN_API_KEY" />
+              <SaveErrorField names={["secretRef","secret_ref"]}><TextField id="file-scan-secret-ref" value={secretRef} onChange={(event) => setSecretRef(event.target.value)} placeholder="例：FILE_SCAN_API_KEY" /></SaveErrorField>
             </Field>
             <div>
               <Button type="button" variant="primary" disabled={configBusy} onClick={saveExternalConfig} busy={configBusy} busyLabel="保存しています…">
@@ -378,6 +383,7 @@ export default function FileScanScreen() {
         ) : null}
       </section>
 
+      {selectedAccountId ? <FormDocumentRetention key={selectedAccountId} accountId={selectedAccountId} /> : null}
       {dialogs}
     </SbSettingsScreen>
   )

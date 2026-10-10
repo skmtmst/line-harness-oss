@@ -63,22 +63,7 @@
 }
 
 /* 閲覧のみの帯（タブの下・数の帯の上）。薄い青の地・目の印・枠なし。 */
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  margin: var(--tpl-an-ro-margin);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
-.viewerBand > svg {
-  flex-shrink: 0;
-  color: var(--color-action);
-}
+.viewerBand { margin: var(--tpl-an-ro-margin); }
 
 /* 説明は絵どおり字の途中で折る（全体の言葉のまとまりの折り返しを外す）。 */
 .description {
@@ -141,7 +126,8 @@
   padding: var(--tpl-an-card-pad);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
-  box-shadow: var(--tpl-an-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 .side > .card {
   flex: none;
@@ -423,7 +409,6 @@
   min-width: 0;
 }
 .caption {
-  margin: 0;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   line-height: var(--tpl-an-sub-lh);
@@ -543,7 +528,9 @@
   gap: var(--tpl-an-hours-gap);
   padding: var(--tpl-an-hours-pad);
   border-radius: var(--radius-card);
-  box-shadow: var(--tpl-an-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 .hoursTitle {
   margin: 0;
@@ -602,7 +589,9 @@
   flex-shrink: 0;
   padding: var(--tpl-an-flow-pad);
   border-radius: var(--radius-card);
-  box-shadow: var(--tpl-an-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 .flowLabel {
   min-width: 0;
@@ -725,7 +714,8 @@
   padding: var(--tpl-an-card-pad);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
-  box-shadow: var(--tpl-an-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 .reportHead {
   display: flex;
@@ -897,7 +887,9 @@
   flex-shrink: 0;
   padding: var(--tpl-an-flow-pad);
   border-radius: var(--radius-card);
-  box-shadow: var(--tpl-an-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 .sectionHead {
   display: flex;
@@ -905,14 +897,7 @@
   gap: var(--tpl-an-wide-gap);
   min-width: 0;
 }
-.inlineError {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--tpl-an-wide-gap);
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-}
+
 .resultList {
   display: flex;
   flex-direction: column;
@@ -974,7 +959,9 @@
   min-width: 0;
   padding: var(--tpl-an-flow-pad);
   border-radius: var(--radius-card);
-  box-shadow: var(--tpl-an-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 .funnelStep {
   display: flex;
@@ -1076,7 +1063,9 @@
   flex-shrink: 0;
   padding: var(--tpl-an-flow-pad);
   border-radius: var(--radius-card);
-  box-shadow: var(--tpl-an-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 .funnelSide > p {
   align-self: stretch;
@@ -1226,3 +1215,5 @@
 .table[data-kind='page'] .thead[data-size='compact'],
 .table[data-kind='page'] .trow[data-size='compact'] { gap: var(--tpl-an-report-col-gap); }
 .table[data-kind='page'] .num[data-w^='sc'] { padding-right: var(--tpl-an-num-pad-end); }
+
+.caption, .captionNoticePlacement { margin: 0; }

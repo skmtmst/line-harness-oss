@@ -8,6 +8,7 @@
  * ロジックの正本）。v7 の画面と ★V8 の画面（`duplicates-v8.tsx`）が
  * 同じ口を使う。判定はここでだけ変える——2か所で計算がずれないため。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import type { IdentityCandidateListItem, IdentityCandidateStatus } from '@line-crm/shared'
@@ -70,11 +71,11 @@ export function useDuplicatesData() {
   // 省かれたときは null のまま残し、空の集計で0組と誤案内しない。
   const [statusCounts, setStatusCounts] = useState<Partial<Record<IdentityCandidateStatus, number>> | null>(null)
   const [lowConfidenceCount, setLowConfidenceCount] = useState<number | null>(null)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   // FRIEND-11: 検索はサーバーへ渡して全件へかける。入力中の逐次送信を避けるため debounce。
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [status, setStatus] = useState('')
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [candidatesLoading, setCandidatesLoading] = useState(false)
   const [candidateError, setCandidateError] = useState('')
   // 表の中の失敗表示（403の言い分けつき）に渡すため、捕まえた失敗を残す。

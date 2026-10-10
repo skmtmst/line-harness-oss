@@ -92,11 +92,7 @@
   line-height: var(--tpl-op-auth-label-lh);
 }
 
-.error {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-}
+
 
 .wide {
   width: 100%;
@@ -212,4 +208,10 @@
 
 .digit:focus {
   outline: var(--tpl-op-auth-digit-focus) solid var(--color-accent-deep);
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
 }

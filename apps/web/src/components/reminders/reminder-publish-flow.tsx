@@ -209,7 +209,7 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
   if (!subjectDraft || !subjectSettings) {
     // 読み込みが終わっても本文が無いときは失敗として出す。ここで
     // 読み込み中に戻すと、失敗・返事なしのときに永遠に止まる。
-    return <ListState kind="error" title="下書きを表示できませんでした" description={error || '下書きを読み込めませんでした。'} action={<Button onClick={() => void loadDraft()}>再読み込み</Button>} />
+    return <ListState kind="error" title="下書きを表示できませんでした" description={error || '下書きを読み込めませんでした。'} onRetry={() => void loadDraft()} />
   }
 
   // 送信の失敗・結果不明は一つの状態で持つ。窓が開いている間は窓の中に出し、

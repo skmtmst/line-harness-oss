@@ -38,7 +38,7 @@
 }
 
 .tile:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -101,7 +101,7 @@
 }
 
 .confirm button:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: -2px;
 }
 
@@ -129,8 +129,8 @@
 }
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
-[data-theme='v8'] .root { gap: 0; border-radius: 16px; background: var(--color-shell); }
-[data-theme='v8'] .tile { flex: none; border-radius: 16px; box-shadow: var(--shadow-board); }
+[data-theme='v8'] .root { gap: 0; border-radius: var(--polish-radius-control); background: var(--color-shell); }
+[data-theme='v8'] .tile { flex: none; border-radius: var(--polish-radius-control); box-shadow: var(--shadow-board); }
 [data-theme='v8'] .tile > svg { width: 20px; height: 20px; }
 [data-theme='v8'] .root[data-open] .tile { opacity: 1; transform: none; box-shadow: none; border-radius: 16px 0 0 16px; }
 [data-theme='v8'] .root[data-open] .confirm { position: relative; width: 84px; padding: 0; justify-content: center; border: 0; border-radius: 0 16px 16px 0; background: var(--color-shell-gray); }
@@ -141,5 +141,5 @@
 [data-theme='v8'] .root[data-open] { overflow: hidden; }
 [data-theme='v8'] .root[data-open] .tile { background: transparent; border-radius: 0; }
 [data-theme='v8'] .root[data-open] .confirm { border-radius: 0; }
-[data-theme='v8'] .confirm button { min-height: 0; gap: 0; border-radius: 999px; }
+[data-theme='v8'] .confirm button { min-height: 0; gap: 0; border-radius: var(--polish-radius-control); }
 }

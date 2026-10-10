@@ -3,6 +3,8 @@
  * 設定の形は @line-crm/shared の VisitStampSettings（サーバと同じ）。ここで形を変えない。
  */
 import type { VisitStampEntry, VisitStampMultiplier, VisitStampReward, VisitStampSettings } from '@line-crm/shared'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 export const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const
 const TZ = 'Asia/Tokyo'
@@ -55,7 +57,7 @@ export function sortedRewards(rewards: VisitStampReward[]): VisitStampReward[] {
 export function rewardNote(reward: VisitStampReward, settings: VisitStampSettings): string {
   return reward.stamps >= Math.max(...settings.rewards.map(r => r.stamps))
     ? settings.completion === 'next_card' ? '使ったら次のカードへ' : '使ったら新しいカードへ'
-    : `使うとスタンプが ${reward.stamps}個へる`
+    : `使うとスタンプが ${reward.stamps} 個へる`
 }
 
 export function expiryLabel(months: number | null, basis: VisitStampSettings['expiryBasis'] = 'last_visit'): string {
@@ -66,7 +68,7 @@ export function previewExpiry(months: number | null, basis: VisitStampSettings['
   const date = new Date(at.getTime() + 9 * 3_600_000), day = date.getUTCDate()
   date.setUTCDate(1); date.setUTCMonth(date.getUTCMonth() + months)
   date.setUTCDate(Math.min(day, new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate()))
-  const label = new Intl.DateTimeFormat('ja-JP', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(date.getTime() - 9 * 3_600_000))
+  const label = polishFormatDate(new Date(date.getTime() - 9 * 3_600_000), { style: 'list-day' })
   return `有効期限 ${label}（${expiryLabel(months, basis)}）`
 }
 
@@ -85,9 +87,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
 export const minuteLabel = (m: number) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`
 
 function monthDay(iso: string, minusDay = false): string {
-  const d = new Date(Date.parse(iso) - (minusDay ? 86_400_000 : 0))
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: TZ, month: 'numeric', day: 'numeric' }).formatToParts(d)
-  return `${parts.find((p) => p.type === 'month')?.value}/${parts.find((p) => p.type === 'day')?.value}`
+  return polishFormatDate(new Date(Date.parse(iso) - (minusDay ? 86_400_000 : 0)), { style: 'list-day' })
 }
 
 /** 倍率の名前。付けた名前があればそれ。無ければ「2倍デー」（曜日か時間）・「2倍の期間」（期間だけ）・「いつも 2倍」。 */
@@ -121,10 +121,7 @@ export function trimNumber(n: number): string {
 
 /** 日付と時刻「1/13 18:40」（店の暦＝日本時間）。 */
 export function shortDateTime(iso: string): string {
-  const d = new Date(iso.includes('T') || iso.endsWith('Z') ? iso : `${iso.replace(' ', 'T')}Z`)
-  const f = new Intl.DateTimeFormat('ja-JP', { timeZone: TZ, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(d)
-  const v = (t: string) => f.find((p) => p.type === t)?.value ?? ''
-  return `${v('month')}/${v('day')} ${v('hour')}:${v('minute')}`
+  return polishFormatDate(iso, { style: 'list', fallback: '—' })
 }
 
 export type HistoryRow = { id: string; friendId: string; at: string; count: string; why: string; actor: string; reversible: boolean; reversed: boolean }

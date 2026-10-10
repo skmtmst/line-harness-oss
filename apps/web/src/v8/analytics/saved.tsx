@@ -1,11 +1,5 @@
 'use client'
-
-/*
- * ★V8 分析「保存した分析」（Pencil `bglah`）。
- * 数の帯 → 道具の段（探す・説明）→ 左に保存した分析の表、右に選んだ分析の履歴（結果を見る・CSV・内容を変える）
- * → 定期レポート（作る・止める・また送る・しまう）→ 1回だけ送った結果。
- * 呼ぶ口・世代の守り・失敗の言い分け・CSV は今の画面（SavedAnalyticsTab）と同じ。
- */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Bookmark, Download, FilePen, History, Mail, Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -22,9 +16,21 @@ import { formatNumber } from '@/lib/format'
 import { StatePill, shortDateTime, shortDay } from './common'
 import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
+
+/*
+ * ★V8 分析「保存した分析」（Pencil `bglah`）。
+ * 数の帯 → 道具の段（探す・説明）→ 左に保存した分析の表、右に選んだ分析の履歴（結果を見る・CSV・内容を変える）
+ * → 定期レポート（作る・止める・また送る・しまう）→ 1回だけ送った結果。
+ * 呼ぶ口・世代の守り・失敗の言い分け・CSV は今の画面（SavedAnalyticsTab）と同じ。
+ */
 
 const SAVED_STATE_LABELS: Record<SavedAnalyticsSnapshot['state'], string> = { available: '利用可能', partial: '一部集計', unavailable: '未取得', failed: '失敗' }
-const REPORT_STATUS_LABELS: Record<AnalyticsReportSchedule['status'], string> = { active: '動いている', paused: '止めている', archived: 'しまった' }
+const REPORT_STATUS_LABELS: Record<AnalyticsReportSchedule['status'], string> = { active: '有効', paused: '停止中', archived: 'アーカイブ' }
 const RUN_STATE_LABELS: Record<AnalyticsReportRun['state'], string> = { running: '送信中', available: '送信済み', partial: '一部だけ送信', unavailable: '未取得', failed: '失敗' }
 
 function runErrorLabel(errorCode: string | null, state: AnalyticsReportRun['state']): string | null {
@@ -49,7 +55,7 @@ function summarizeSnapshotResult(result: unknown, limit = 12): Array<{ path: str
     if (Array.isArray(node)) {
       if (node.length === 0) rows.push({ path, text: '0件' })
       node.slice(0, 4).forEach((item, index) => visit(item, `${path}[${index + 1}]`, depth + 1))
-      if (node.length > 4) rows.push({ path, text: `ほか${node.length - 4}件` })
+      if (node.length > 4) rows.push({ path, text: `ほか${node.length - 4} 件` })
       return
     }
     if (typeof node === 'object') {
@@ -64,7 +70,7 @@ function summarizeSnapshotResult(result: unknown, limit = 12): Array<{ path: str
 
 function latestPill(item: SavedAnalyticsSummary) {
   const latest = item.latestSnapshot
-  if (!latest) return <span className={styles.faint}>—</span>
+  if (!latest) return <span className={styles.faint}>{emptyValue('unknown')}</span>
   // 版ずれ（定義が古い）は集計状態とは別の軸。版ずれを先に出す。
   if (latest.definitionStale) return <StatePill tone="info">更新後未集計</StatePill>
   if (latest.state === 'available') return <StatePill tone="ok">最新の期間</StatePill>
@@ -80,8 +86,9 @@ function ScheduleMenu({ schedule }: { schedule: AnalyticsReportSchedule }) {
 }
 
 export default function SavedV8({ accountId, onCountChange, canManage }: { accountId: string; onCountChange?: (count: number | null) => void; canManage: boolean }) {
+  const saveErrors = useSaveFormErrors()
   const [items, setItems] = useState<SavedAnalyticsSummary[]>([])
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [selectedId, setSelectedId] = useState('')
   const [snapshots, setSnapshots] = useState<SavedAnalyticsSnapshot[]>([])
   const [loading, setLoading] = useState(true)
@@ -169,7 +176,11 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
       setSchedules((current) => status === 'archived' ? current.filter((item) => item.id !== schedule.id) : current.map((item) => (item.id === schedule.id ? response.data : item)))
       setArchiveTarget(null)
     } catch (caught) {
-      setSchedulesError(caught instanceof Error ? caught.message : '定期レポートを更新できませんでした')
+      const fieldFailure = saveErrors.capture(caught);
+
+
+      if (!fieldFailure) {
+      setSchedulesError(caught instanceof Error ? caught.message : '定期レポートを更新できませんでした') }
     } finally {
       setScheduleBusyId('')
     }
@@ -197,7 +208,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
   }, [visibleItems, selectedId])
   // 「定義が古い」は版ずれだけを数える（未取得・失敗とは別の軸）。
   const staleCount = items.filter((item) => item.latestSnapshot?.definitionStale).length
-  const exportSaved = () => downloadCsv('analytics-saved.csv', [
+  const exportSaved = () => downloadCsv(csvFileName("保存したレポート"), [
     ['分析名', '種類', '作った人', '定義版', '更新日時', '集計状態', '保存結果数'],
     ...visibleItems.map((item) => [
       item.name, kindLabel(item.kind), item.createdByName, item.currentVersionNumber, item.updatedAt,
@@ -207,7 +218,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
   ])
   const exportSnapshots = () => {
     if (!selected) return
-    downloadCsv(`analytics-saved-${selected.id}.csv`, [
+    downloadCsv(csvFileName("保存したレポート"), [
       ['対象期間', 'データ締切', '集計状態', '結果の要約'],
       ...snapshots.map((snapshot) => [
         `${snapshot.periodFrom}〜${snapshot.periodTo}`, snapshot.dataCutoffAt, SAVED_STATE_LABELS[snapshot.state],
@@ -220,7 +231,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
   const failed = error ? '読み込めませんでした' : null
   const crossCount = items.filter((item) => item.kind === 'cross').length
 
-  return <>
+  return <SaveErrorScope errors={saveErrors}><>
     <KpiBand className={styles.band}>
       <KpiCard presentation="band" title="保存した分析" icon={<Bookmark size={13} aria-hidden="true" />} value={error ? null : items.length} unit="件" detail={failed ?? `クロス分析 ${crossCount}・ファネル ${items.length - crossCount}`} loading={loading} />
       <KpiCard presentation="band" title="保存結果数" icon={<History size={13} aria-hidden="true" />} value={error ? null : items.reduce((sum, item) => sum + item.snapshotCount, 0)} unit="件" detail={failed ?? '時点ごとに固定した結果'} loading={loading} />
@@ -251,7 +262,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
                 : visibleItems.map((item) => {
                   const active = selectedId === item.id
                   return <div key={item.id} className={styles.trow} role="row" data-h="pill" data-selected={active || undefined}>
-                    <span role="cell" className={styles.colMain}><button type="button" className={styles.rowButton} onClick={() => setSelectedId(item.id)} title={`${item.name}（第${item.currentVersionNumber}版・保存結果 ${item.snapshotCount}件）`} aria-pressed={active}>{item.name}</button></span>
+                    <span role="cell" className={styles.colMain}><button type="button" className={styles.rowButton} onClick={() => setSelectedId(item.id)} title={`${item.name}（第${item.currentVersionNumber}版・保存結果 ${item.snapshotCount}件）`}  aria-pressed={active}>{item.name}</button></span>
                     <span role="cell" className={styles.colType} data-w="90"><span>{kindLabel(item.kind)}</span></span>
                     <span role="cell" className={styles.colType} data-w="80"><span className={styles.cellText} title={item.createdByName}>{item.createdByName}</span></span>
                     <span role="cell" className={styles.colType} data-w="100"><span>{shortDateTime(item.updatedAt)}</span></span>
@@ -261,9 +272,9 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
             </div>
           </div>
           <section className={styles.historyCard} aria-labelledby="saved-history-title">
-            <h2 id="saved-history-title" className={styles.hoursTitle} title={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? '—' : `${schedules.filter((schedule) => schedule.savedAnalysisIds.includes(selected.id)).length}件`}` : undefined}>{selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'}</h2>
+            <h2 id="saved-history-title" className={styles.hoursTitle} title={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? emptyValue('unknown') : `${schedules.filter((schedule) => schedule.savedAnalysisIds.includes(selected.id)).length}件`}` : undefined}>{selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'}</h2>
             {/* 履歴だけ取れないときは、その場所に小さく1行。一覧の失敗とは分ける。 */}
-            {snapshotError ? <p className={styles.caption} role="alert">結果の履歴を読み込めませんでした。<button type="button" className={styles.linkButton} onClick={() => setSnapshotReload((n) => n + 1)}>もう一度</button></p> : null}
+            {snapshotError ? <Notice tone="danger" className={styles.captionNoticePlacement} >結果の履歴を読み込めませんでした。<button type="button" className={styles.linkButton} onClick={() => setSnapshotReload((n) => n + 1)}>もう一度</button></Notice> : null}
             {snapshotLoading ? <p className={styles.caption}>結果を読み込んでいます</p>
               : !selected ? <p className={styles.caption}>一覧から分析を選んでください</p>
               : snapshots.length === 0 ? <p className={styles.caption}>保存された結果はありません</p>
@@ -282,7 +293,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
                 </div>)}
               </div>}
             {selected ? <div className={styles.rowActions} data-gap="wide">
-              <Button variant="secondary" disabled={snapshots.length === 0} onClick={exportSnapshots}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+              <Button variant="secondary" disabled={snapshots.length === 0} onClick={exportSnapshots}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
               {canManage ? <Button variant="secondary" href={`/analytics?tab=${selected.kind}`} title="条件を変えるときは、元の分析で集計し直してから保存します"><FilePen size={15} aria-hidden="true" />内容を変える</Button> : null}
             </div> : null}
             <p className={styles.caption}>保存時点の固定結果です。いま集計し直しても変わりません。</p>
@@ -296,9 +307,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
         {schedulesLoading ? <span className={styles.caption}>確認中</span> : null}
         {canManage ? <Button href="/analytics/reports/new" variant="secondary"><Plus size={15} aria-hidden="true" />定期レポートを作る</Button> : null}
       </div>
-      {schedulesError ? <div className={styles.inlineError} role="alert"><span>{schedulesError}</span>
-        {/* 版ずれの通知は reloadSchedules で消さない。消すのは手でやり直したこの入口だけ。 */}
-        <Button variant="secondary" disabled={schedulesLoading} onClick={() => { setSchedulesError(''); reloadSchedules() }}>もう一度確認</Button></div> : null}
+      {schedulesError ? <Notice tone="danger" ><span>{schedulesError}</span>{/* 版ずれの通知は reloadSchedules で消さない。消すのは手でやり直したこの入口だけ。 */}<Button variant="secondary" disabled={schedulesLoading} onClick={() => { setSchedulesError(''); reloadSchedules() }}>もう一度確認</Button></Notice> : null}
       {schedulesLoading ? null : schedules.length === 0 ? (schedulesError ? null : <ListState kind="empty" title="定期レポートはまだありません" description="決まった曜日や日に、集計結果をメールやLINEへ届けられます。" />)
         : <div className={styles.table} role="table" aria-label="定期レポート">
           <div className={styles.thead} role="row">
@@ -309,13 +318,13 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
             <span role="columnheader" className={styles.colOps}>操作</span>
           </div>
           {schedules.map((schedule) => <div key={schedule.id} className={styles.trow} role="row" data-h="button">
-            <span role="cell" className={styles.colMain}><span className={styles.cellText} title={schedule.name}>{schedule.name}</span></span>
+            <span role="cell" className={styles.colMain}><span className={styles.cellText} ><TruncatedText value={String(schedule.name ?? '')} /></span></span>
             <span role="cell" className={styles.colType} data-w="90"><span>{schedule.isOneTime ? '1回だけ' : cadenceLabel(schedule)}</span></span>
-            <span role="cell" className={styles.colType} data-w="130"><span>{schedule.status === 'paused' ? '—' : shortDateTime(schedule.nextRunAt).replace(/ 0(\d):/, ' $1:')}</span></span>
+            <span role="cell" className={styles.colType} data-w="130"><span>{schedule.status === 'paused' ? emptyValue('unknown') : shortDateTime(schedule.nextRunAt).replace(/ 0(\d):/, ' $1:')}</span></span>
             <span role="cell" className={styles.colType} data-w="90"><span><StatePill tone={schedule.status === 'active' ? 'ok' : 'neutral'}>{REPORT_STATUS_LABELS[schedule.status]}</StatePill></span></span>
             <span role="cell" className={styles.colOps}>{canManage ? <span className={styles.rowActions}>
-              {schedule.status === 'active' && !schedule.isOneTime ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'paused')}>止める</Button> : null}
-              {schedule.status === 'paused' ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'active')}>また送る</Button> : null}
+              {schedule.status === 'active' && !schedule.isOneTime ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'paused')} busy={Boolean(scheduleBusyId === schedule.id)} busyLabel="処理中…">止める</Button> : null}
+              {schedule.status === 'paused' ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'active')} busy={Boolean(scheduleBusyId === schedule.id)} busyLabel="処理中…">また送る</Button> : null}
               {!schedule.isOneTime ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => setArchiveTarget(schedule)}>しまう</Button> : null}
               {!schedule.isOneTime ? <ScheduleMenu schedule={schedule} /> : null}
             </span> : null}</span>
@@ -324,9 +333,9 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
 
       {/* 1回だけ送った直近の結果。一覧からは消えるため、ここから失敗理由・宛先別結果へ進める。 */}
       {recentOneTime.length > 0 ? <section className={styles.table} aria-label="1回だけ送った結果">
-        <div className={styles.thead}><span className={styles.colMain}>{`1回だけ送った結果（${recentOneTime.length}件）`}</span></div>
+        <div className={styles.thead}><span className={styles.colMain}>{`1回だけ送った結果（${recentOneTime.length} 件）`}</span></div>
         {recentOneTime.map((item) => <div key={item.schedule.id} className={styles.trow} data-h="button">
-          <span className={styles.colMain}><strong className={styles.cellStrong} title={item.schedule.name}>{item.schedule.name}</strong><span className={styles.cellSub}>{item.lastRun ? `${RUN_STATE_LABELS[item.lastRun.state] ?? item.lastRun.state}${runErrorLabel(item.lastRun.errorCode, item.lastRun.state) ? `：${runErrorLabel(item.lastRun.errorCode, item.lastRun.state)}` : ''}` : 'まだ送信されていません'}</span></span>
+          <span className={styles.colMain}><strong className={styles.cellStrong} ><TruncatedText value={String(item.schedule.name ?? '')} /></strong><span className={styles.cellSub}>{item.lastRun ? `${RUN_STATE_LABELS[item.lastRun.state] ?? item.lastRun.state}${runErrorLabel(item.lastRun.errorCode, item.lastRun.state) ? `：${runErrorLabel(item.lastRun.errorCode, item.lastRun.state)}` : ''}` : 'まだ送信されていません'}</span></span>
           <span className={styles.colOps}><Button href={`/analytics/reports/new?id=${item.schedule.id}`} variant="secondary">結果を見る</Button></span>
         </div>)}
       </section> : null}
@@ -350,5 +359,5 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
         </dl>
       })() : null}
     </Dialog>
-  </>
+  </></SaveErrorScope>
 }

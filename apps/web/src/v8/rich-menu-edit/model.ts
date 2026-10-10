@@ -2,6 +2,8 @@
  * ★V8 リッチメニューの詳細（hKr8f）で使う小さな計算。画面から切り出して試験で確かめる。
  */
 import type { RichMenuPublishRun } from '@/lib/api'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 export type ProgressStep = { key: string; label: string; status: 'done' | 'failed' | 'running' | 'pending' | 'skipped' }
 export type ReconcileDiff = { kind: string; detail: string; pageId?: string; richMenuId?: string; fix?: { label: string; action: string } }
@@ -32,11 +34,5 @@ export function runAudienceText(run: RichMenuPublishRun): string {
 
 /** 「10/1 10:45」（日本時間）。timeOnly は「10:46」。 */
 export function runStamp(value: string, timeOnly = false): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', hourCycle: 'h23' })
-      .formatToParts(date).map((p) => [p.type, p.value]),
-  )
-  return timeOnly ? `${parts.hour}:${parts.minute}` : `${parts.month}/${parts.day} ${parts.hour}:${parts.minute}`
+  return polishFormatDate(value, { style: timeOnly ? 'time' : 'list' })
 }

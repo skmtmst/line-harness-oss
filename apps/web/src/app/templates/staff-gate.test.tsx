@@ -11,6 +11,7 @@ import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 
+const identity = vi.hoisted(() => ({ role: 'owner' as string | null }))
 const templateGet = vi.hoisted(() => vi.fn())
 const assetList = vi.hoisted(() => vi.fn())
 const searchParams = vi.hoisted(() => ({ value: new URLSearchParams() }))
@@ -39,6 +40,7 @@ vi.mock('@/contexts/account-context', () => ({
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
   api: {
+    staff: { me: async () => ({ success: true, data: { role: identity.role } }) },
     templates: {
       list: () => Promise.resolve({ success: true, data: TEMPLATES }),
       get: templateGet,
@@ -85,6 +87,7 @@ import CarouselEditorPage from './carousel/page'
 import QuestionTemplatePage from './questions/new/page'
 
 function stubRole(role: string | null) {
+  identity.role = role
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => (key === 'lh_staff_role' ? role : null),
     setItem: () => {},

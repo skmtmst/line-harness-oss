@@ -49,7 +49,8 @@ async function fillBasics() {
     fireEvent.change(screen.getByLabelText(/名前/), { target: { value: '承認担当' } })
     fireEvent.change(screen.getByLabelText(/メールアドレス/), { target: { value: 'approve@example.test' } })
     fireEvent.click(screen.getByLabelText('最初に表示するアカウント'))
-    fireEvent.click(await screen.findByRole('button', { name: '本店' }))
+    fireEvent.click(await screen.findByRole('radio', { name: '本店' }))
+    fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))
   })
 }
 

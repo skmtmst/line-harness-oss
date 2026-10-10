@@ -1,45 +1,21 @@
 'use client'
-
-/*
- * ★V8 リマインダの詳細（src/v8 に一から書いた版）。
- * 板：rbAig（概要）/ loVfW（登録者）/ RwVo5（一時停止の窓）。
- * 枠は型（PageFrame）。頭の中にタブを持つ形（絵の「板の頭」）は型の頭に無いので、ここで組む。
- * 読む口・操作は今の画面（app/reminders/detail/detail-v8.tsx）と同じ。BEHAVIOR.md に一覧がある。
- */
+import { scheduledJstIso } from '@/lib/jst-datetime'
+import SharedStatusPill from '@/components/shared/status-pill'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  ArrowRight,
-  Check,
-  ChevronLeft,
-  CircleAlert,
-  Copy,
-  Download,
-  Info,
-  Pause,
-  Pencil,
-  Play,
-  RotateCcw,
-  Trash2,
-  X,
-} from 'lucide-react'
+import { ArrowRight, Check, Copy, Download, Info, Pause, Pencil, Play, RotateCcw, Trash2, X } from 'lucide-react'
 import { describeReminderTiming, type Reminder, type ReminderStep } from '@line-crm/shared'
-import {
-  api,
-  ApiError,
-  type ReminderDeliveryRun,
-  type ReminderDeliveryRunsResponse,
-  type ReminderDeliveryRunStatus,
-  type ReminderRegistrant,
-} from '@/lib/api'
+import { api, ApiError, type ReminderDeliveryRun, type ReminderDeliveryRunsResponse, type ReminderDeliveryRunStatus, type ReminderRegistrant } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { formatDateTime, formatNumber, formatDate as polishFormatDate } from '@/lib/format'
 import { csvCell } from '@/lib/presentation'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { PageFrame } from '@/components/templates/page-frame'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -55,10 +31,21 @@ import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { Tabs } from '@/components/shared/tabs'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import { reminderTriggerLabel, reminderStopSummary, renderReminderBodySample } from '@/components/reminders/reminder-labels'
 import SheetDialog from './sheet-dialog'
 import styles from './detail.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 リマインダの詳細（src/v8 に一から書いた版）。
+ * 板：rbAig（概要）/ loVfW（登録者）/ RwVo5（一時停止の窓）。
+ * 枠は型（PageFrame）。頭の中にタブを持つ形（絵の「板の頭」）は型の頭に無いので、ここで組む。
+ * 読む口・操作は今の画面（app/reminders/detail/detail-v8.tsx）と同じ。BEHAVIOR.md に一覧がある。
+ */
 
 const PAGE_SIZE = 20
 /** 書き出しの上限。実行結果が多いとき、手元に全部ため込むと固まる。 */
@@ -103,13 +90,13 @@ function jstParts(value: string | null) {
 /** 「10/1（水）18:00」（日本時間）。 */
 function formatMd(value: string | null): string {
   const p = jstParts(value)
-  return p ? `${p.month}/${p.day}（${p.weekday}）${p.time}` : '—'
+  return p ? `${p.month}/${p.day}（${p.weekday}）${p.time}` : emptyValue('unknown')
 }
 
 /** 「9/30 18:00」（日本時間）。 */
 function formatShort(value: string | null): string {
   const p = jstParts(value)
-  return p ? `${p.month}/${p.day} ${p.time}` : '—'
+  return p ? `${p.month}/${p.day} ${p.time}` : emptyValue('unknown')
 }
 
 /** 「9月28日」（日本時間）。 */
@@ -119,10 +106,7 @@ function formatMonthDay(value: string | null): string {
 }
 
 function formatJst(value: string | null): string {
-  if (!value) return '—'
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return '—'
-  return formatDateTime(parsed)
+  return polishFormatDate(value, { style: 'detail', fallback: '—' })
 }
 
 /** API の UTC ISO を、どの端末でも同じ JST の datetime-local 値へ変える。 */
@@ -139,18 +123,8 @@ export function dateTimeLocalJst(value: string): string {
 
 /** datetime-local の JST の壁時計時刻を、曖昧さなく UTC ISO へ変える。 */
 export function dateTimeLocalJstToUtcIso(value: string): string | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value)
-  if (!match) return null
-  const [, yearRaw, monthRaw, dayRaw, hourRaw, minuteRaw] = match
-  const year = Number(yearRaw)
-  const month = Number(monthRaw)
-  const day = Number(dayRaw)
-  const hour = Number(hourRaw)
-  const minute = Number(minuteRaw)
-  if (month < 1 || month > 12 || day < 1 || hour > 23 || minute > 59) return null
-  const utc = new Date(Date.UTC(year, month - 1, day, hour - 9, minute))
-  // 2月30日などを Date が翌月へ丸めても保存しない。
-  return dateTimeLocalJst(utc.toISOString()) === value ? utc.toISOString() : null
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/.exec(value)
+  return match ? scheduledJstIso(match[1], match[2]) : null
 }
 
 /** 通知の短い呼び名。日で書いた通は「1日前 18:00」、分で書いた通は「1時間前」。 */
@@ -165,7 +139,7 @@ function stepTiming(step: ReminderDeliveryRunsResponse['steps'][number], detail:
 /** 通知の本文を、番号だけでなく人が見分けられる短い名前にする。 */
 function stepLabel(step: ReminderDeliveryRunsResponse['steps'][number]): string {
   const firstLine = step.messageContent.trim().split(/\r?\n/, 1)[0]?.trim()
-  return firstLine ? firstLine.slice(0, 40) : `${step.stepNumber}通目`
+  return firstLine ? firstLine.slice(0, 40) : `${step.stepNumber} 通目`
 }
 
 function csvFor(items: ReminderDeliveryRun[]): string {
@@ -173,13 +147,13 @@ function csvFor(items: ReminderDeliveryRun[]): string {
     ['友だち', '通知', '結果', '配信予定', '実行時刻', '試行回数', '次の再試行', 'LINE要求ID', '理由'],
     ...items.map((item) => [
       item.friendName ?? '削除済みの友だち',
-      `${item.stepNumber}通目`,
+      `${item.stepNumber} 通目`,
       STATUS_VIEW[item.domainStatus].label,
       formatJst(item.scheduledAt),
       formatJst(item.completedAt ?? item.startedAt),
       item.attemptCount,
       formatJst(item.nextRetryAt),
-      item.lineRequestId ?? '—',
+      item.lineRequestId ?? emptyValue('unknown'),
       item.lastErrorMessage ?? '',
     ]),
   ]
@@ -188,23 +162,22 @@ function csvFor(items: ReminderDeliveryRun[]): string {
 
 function StatusPill({ tone, children }: { tone: 'ok' | 'warn' | 'muted'; children: ReactNode }) {
   return (
-    <span className={styles.pill} data-tone={tone}>
-      <span className={styles.pillDot} aria-hidden="true" />
-      {children}
-    </span>
+    <SharedStatusPill tone={tone === 'ok' ? 'success' : tone === 'warn' ? 'warning' : 'neutral'}>{children}</SharedStatusPill>
   )
 }
 
 export default function ReminderDetailV8Page() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
-    <Suspense fallback={<ListState kind="loading" />}>
+    <Suspense fallback={<DetailLoading />}>
       <ReminderDetailV8 />
     </Suspense>
   )
 }
 
 function ReminderDetailV8() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
@@ -213,7 +186,8 @@ function ReminderDetailV8() {
   const runsStatusParam = searchParams.get('runStatus')
   const { selectedAccount, selectedAccountId } = useAccount()
   const staffRole = useStaffRole()
-  const canManage = canManageRole(staffRole)
+  const featureAccess = useFeatureAccess('reminders')
+  const canManage = featureAccess
 
   const [data, setData] = useState<ReminderDeliveryRunsResponse | null>(null)
   const [reminder, setReminder] = useState<(Reminder & { steps?: ReminderStep[] }) | null>(null)
@@ -257,15 +231,19 @@ function ReminderDetailV8() {
       setData(runsRes.data)
       if (reminderRes.success) setReminder(reminderRes.data)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 404) {
         setMissing(true)
       } else {
-        setError('リマインダの詳細を読み込めませんでした。時間を置いてもう一度お試しください。')
+        { if (!fieldFailure)
+
+        setError('リマインダの詳細を読み込めませんでした。時間を置いてもう一度お試しください。') }
       }
     } finally {
       setLoading(false)
     }
-  }, [reminderId])
+  }, [reminderId, saveErrors])
 
   useEffect(() => {
     void load()
@@ -309,12 +287,14 @@ function ReminderDetailV8() {
       setActionMessage(isActive ? 'リマインダを再開しました。' : 'リマインダを一時停止しました。')
       return true
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       // API も未公開の再開を 409 で止める。その文面をそのまま出す。
+      { if (!fieldFailure)
       setActionMessage(caught instanceof ApiError && caught.status === 409
         ? caught.message
         : isActive
           ? '再開できませんでした。状態を読み直してからお試しください。'
-          : '一時停止できませんでした。状態を読み直してからお試しください。')
+          : '一時停止できませんでした。状態を読み直してからお試しください。') }
       return false
     }
   }
@@ -347,16 +327,19 @@ function ReminderDetailV8() {
         if (all.length >= EXPORT_LIMIT || offset >= total || response.data.items.length === 0) break
       }
       if (total > EXPORT_LIMIT) {
-        setActionMessage(`件数が多いため、全${formatNumber(total)}件のうち${formatNumber(EXPORT_LIMIT)}件まで書き出しました。`)
+        setActionMessage(`件数が多いため、全${formatNumber(total)} 件のうち${formatNumber(EXPORT_LIMIT)} 件まで書き出しました。`)
       }
       const url = URL.createObjectURL(new Blob([csvFor(all)], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `reminder-runs-${reminderId}.csv`
+      anchor.download = csvFileName("リマインダの実行履歴")
       anchor.click()
       URL.revokeObjectURL(url)
-    } catch {
-      setActionMessage('CSVを書き出せませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionMessage('CSVを書き出せませんでした。もう一度お試しください。') }
     } finally {
       setExporting(false)
     }
@@ -377,8 +360,11 @@ function ReminderDetailV8() {
       })
       if (!res.success) throw new Error(res.error)
       router.push(`/reminders/edit?id=${encodeURIComponent(String(res.data.reminderId))}&stage=target`)
-    } catch {
-      setActionMessage('複製できませんでした。通信を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionMessage('複製できませんでした。通信を確かめて、もう一度お試しください。') }
     } finally {
       setDuplicating(false)
     }
@@ -394,8 +380,11 @@ function ReminderDetailV8() {
       const res = await api.reminders.delete(reminderId)
       if (!res.success) throw new Error(res.error)
       router.push('/reminders')
-    } catch {
-      setDeleteError('削除できませんでした。時間を置いてもう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDeleteError('削除できませんでした。時間を置いてもう一度お試しください。') }
       setDeleting(false)
     }
   }
@@ -459,36 +448,35 @@ function ReminderDetailV8() {
 
   if (!reminderId) {
     return (
-      <ListState kind="empty" title="リマインダが指定されていません" description="一覧から選び直してください。" action={<Button href="/reminders">リマインダ一覧へ戻る</Button>} />
+      <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="リマインダが指定されていません" description="一覧から選び直してください。" action={<Button href="/reminders">リマインダ一覧へ戻る</Button>} /></SaveErrorScope>
     )
   }
-  if (loading) return <ListState kind="loading" title="リマインダの詳細を読み込んでいます" />
+  if (loading) return <SaveErrorScope errors={saveErrors}><DetailLoading label="リマインダの詳細を読み込んでいます" /></SaveErrorScope>
   if (missing) {
     return (
-      <ListState kind="empty" title="このリマインダは見つかりません" description="削除されたか、別の記録です。一覧から選び直してください。" action={<Button href="/reminders">リマインダ一覧へ戻る</Button>} />
+      <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="このリマインダは見つかりません" description="削除されたか、別の記録です。一覧から選び直してください。" action={<Button href="/reminders">リマインダ一覧へ戻る</Button>} /></SaveErrorScope>
     )
   }
   if (error || !data) {
-    return <ListState kind="error" title="詳細を表示できませんでした" description={error || '詳細を読み込めませんでした。'} onRetry={() => void load()} />
+    return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="詳細を表示できませんでした" description={error || '詳細を読み込めませんでした。'} onRetry={() => void load()} /></SaveErrorScope>
   }
 
   const hasErrors = data.summary.errors > 0
   const firstStep = data.steps[0] ?? null
-  const statusLabel = !data.reminder.hasPublishedVersion ? '下書き' : data.reminder.isActive ? '稼働中' : '停止中'
+  const statusLabel = !data.reminder.hasPublishedVersion ? '下書き' : data.reminder.isActive ? '有効' : '停止中'
   const nextTime = jstParts(data.summary.nextScheduledAt)?.time ?? ''
   const accountName = selectedAccount?.name ?? 'LINE公式アカウント'
   const meta = [
     reminder?.triggerType ? `基準日：${reminderTriggerLabel(reminder.triggerType)}` : null,
-    `通知 ${data.steps.length}通`,
+    `通知 ${data.steps.length} 通`,
     reminder?.updatedAt ? `更新 ${formatMonthDay(reminder.updatedAt)}` : null,
   ].filter(Boolean).join('・')
 
   return (
-    <PageFrame kind="detail" boardId={tab === 'registrants' ? 'loVfW' : 'rbAig'}>
-      <header className={styles.head} data-template-region="heading">
-        <h1 className={styles.title} title={data.reminder.name}>{data.reminder.name}</h1>
-        <p className={styles.meta}>{meta}</p>
-        <Tabs
+    <SaveErrorScope errors={saveErrors}><PageFrame kind="detail" boardId={tab === 'registrants' ? 'loVfW' : 'rbAig'}>
+      <PageHeading title={data.reminder.name}
+        crumbs={<><p className={styles.meta}>{meta}</p></>}
+        tabs={<><Tabs
           label="リマインダの詳細"
           items={[
             { label: '概要', current: tab === 'overview', onClick: () => selectTab('overview') },
@@ -496,8 +484,7 @@ function ReminderDetailV8() {
             { label: '実行結果', current: tab === 'runs', onClick: () => selectTab('runs') },
             { label: '登録者', current: tab === 'registrants', onClick: () => selectTab('registrants') },
           ]}
-        />
-      </header>
+        /></>} />
 
       <div className={styles.split}>
         <div className={styles.main}>
@@ -539,7 +526,7 @@ function ReminderDetailV8() {
                   <Pause size={15} aria-hidden="true" />一時停止する
                 </Button>
               ) : (
-                <Button className={styles.sideAction} onClick={() => void setReminderActive(true)}>
+                <Button className={styles.sideAction} onClick={() => setReminderActive(true)} busyLabel="処理中…">
                   <Play size={15} aria-hidden="true" />再開する
                 </Button>
               )
@@ -563,7 +550,7 @@ function ReminderDetailV8() {
           <CreateSummaryCard
             title="いまの状態"
             rows={[
-              { key: 'state', label: '状態', value: <span className={styles.valueState} title={reminderStopSummary(data.reminder.stopConditions)} data-tone={statusLabel === '稼働中' ? 'ok' : undefined}>{statusLabel}</span> },
+              { key: 'state', label: '状態', value: <span className={styles.valueState} title={reminderStopSummary(data.reminder.stopConditions)} data-tone={statusLabel === '有効' ? 'ok' : undefined}>{statusLabel}</span> },
               { key: 'registrants', label: '登録者', value: `${formatNumber(data.summary.targetCount)}人` },
               { key: 'next7', label: 'これから送る（今後7日）', value: `${formatNumber(data.summary.scheduledNext7Days ?? 0)}通` },
               { key: 'month', label: '今月送った', value: `${formatNumber(data.summary.sentThisMonth ?? 0)}通` },
@@ -596,8 +583,8 @@ function ReminderDetailV8() {
         title={`「${data.reminder.name}」を一時停止する`}
         description="止めているあいだ、通知は送りません。止めているあいだに送る予定だった通知は、再開しても送りません（過去の日時になるため）。登録者と送った履歴は残ります。"
         band={pauseImpact.truncated
-          ? `送る予定の ${formatNumber(plannedTotal)}通が送られなくなります（今後24時間の分は数え切れませんでした）。`
-          : `今後24時間で送る予定の ${formatNumber(pauseImpact.count)}通 が送られなくなります。`}
+          ? `送る予定の ${formatNumber(plannedTotal)} 通が送られなくなります（今後24時間の分は数え切れませんでした）。`
+          : `今後24時間で送る予定の ${formatNumber(pauseImpact.count)} 通 が送られなくなります。`}
         busy={pausing}
         onClose={() => { if (!pausing) setConfirmPause(false) }}
         actions={(
@@ -618,10 +605,10 @@ function ReminderDetailV8() {
         destructive
         busy={deleting}
         error={deleteError}
-        onConfirm={() => void runDelete()}
+        onConfirm={() => runDelete()}
         onCancel={() => setConfirmDelete(false)}
       />
-    </PageFrame>
+    </PageFrame></SaveErrorScope>
   )
 }
 
@@ -649,16 +636,9 @@ function OverviewTab({
   return (
     <>
       {hasErrors ? (
-        <div className={styles.failBand} role="alert">
-          <CircleAlert size={18} className={styles.failIcon} aria-hidden="true" />
-          <div className={styles.failText}>
-            <p className={styles.failTitle}>送れなかった通知が {formatNumber(data.summary.errors)}通あります</p>
-            <p className={styles.failNote}>友だちがブロックしていたか、LINE が受け付けませんでした。理由を見て、送り直せます。</p>
-          </div>
-          <Button onClick={onShowErrors}>
+        <Notice tone="danger" heading={<> 送れなかった通知が {formatNumber(data.summary.errors)}通あります </>} action={<> <Button onClick={onShowErrors}>
             <ArrowRight size={15} aria-hidden="true" />実行結果を見る
-          </Button>
-        </div>
+          </Button> </>} >友だちがブロックしていたか、LINE が受け付けませんでした。理由を見て、送り直せます。</Notice>
       ) : null}
 
       <section className={styles.card} aria-labelledby="rm-detail-steps">
@@ -680,7 +660,7 @@ function OverviewTab({
               <span role="cell" className={styles.colFlex} title={stepLabel(step)}>{stepTiming(step, detailSteps[index], reminder?.deliveryMode)}</span>
               <span role="cell" className={styles.colSent}>{formatNumber(step.sent)}通</span>
               <span role="cell" className={styles.colFail} data-danger={step.errors > 0 || undefined}>{formatNumber(step.errors)}通</span>
-              <span role="cell" className={styles.colNext}>{nextByStep ? formatMd(nextByStep[step.stepNumber] ?? null) : '—'}</span>
+              <span role="cell" className={styles.colNext}>{nextByStep ? formatMd(nextByStep[step.stepNumber] ?? null) : emptyValue('unknown')}</span>
             </div>
           ))}
         </div>
@@ -740,7 +720,7 @@ function ScheduleTab({ reminderId, steps }: { reminderId: string; steps: Reminde
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [items, setItems] = useState<ReminderDeliveryRun[]>([])
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
 
   const stepNameByNumber = useMemo(() => Object.fromEntries(steps.map((step) => [step.stepNumber, stepLabel(step)])), [steps])
 
@@ -769,7 +749,7 @@ function ScheduleTab({ reminderId, steps }: { reminderId: string; steps: Reminde
         <p className={styles.cardNote}>これから送る通知を予定の近い順に並べています。</p>
       </div>
       {state === 'loading' ? (
-        <ListState kind="loading" title="配信予定を読み込んでいます" />
+        <DetailLoading label="配信予定を読み込んでいます" />
       ) : state === 'error' ? (
         <ListState kind="error" title="配信予定を読み込めませんでした" onRetry={() => void load()} />
       ) : items.length === 0 ? (
@@ -792,7 +772,7 @@ function ScheduleTab({ reminderId, steps }: { reminderId: string; steps: Reminde
                 <span role="cell" className={styles.colFlex}>
                   <Link href={`/friends/${encodeURIComponent(item.friendId)}`} className={styles.friendName}>{item.friendName ?? '削除済みの友だち'}</Link>
                 </span>
-                <span role="cell" className={styles.colWide} title={stepNameByNumber[item.stepNumber] ?? ''}>{item.stepNumber}通目</span>
+                <span role="cell" className={styles.colWide} title={stepNameByNumber[item.stepNumber] ?? ''}>{item.stepNumber} 通目</span>
                 <span role="cell" className={styles.colResult}>
                   <StatusPill tone={STATUS_VIEW[item.domainStatus].tone}>{STATUS_VIEW[item.domainStatus].label}</StatusPill>
                 </span>
@@ -800,7 +780,7 @@ function ScheduleTab({ reminderId, steps }: { reminderId: string; steps: Reminde
             ))}
           </div>
           <div className={styles.pager}>
-            <span className={styles.pagerCount}>{formatNumber(total)}件中 {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件</span>
+            <span className={styles.pagerCount}>{formatNumber(total)} 件中 {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)} 件</span>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="配信予定のページ送り" />
           </div>
         </>
@@ -823,9 +803,9 @@ const RUN_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
 
 function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string; canManage: boolean; initialStatus: '' | ReminderDeliveryRunStatus }) {
   const [status, setStatus] = useState<'' | ReminderDeliveryRunStatus>(initialStatus)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [appliedSearch, setAppliedSearch] = useState('')
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [items, setItems] = useState<ReminderDeliveryRun[]>([])
   const [total, setTotal] = useState(0)
@@ -893,11 +873,11 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
             }
           }}
         />
-        <Select aria-label="結果で絞り込む" value={status} onChange={(value) => { setStatus(value as '' | ReminderDeliveryRunStatus); setPage(1) }} options={RUN_STATUS_OPTIONS} />
+        <SaveErrorField names={["status"]}><Select aria-label="結果で絞り込む" value={status} onChange={(value) => { setStatus(value as '' | ReminderDeliveryRunStatus); setPage(1) }} options={RUN_STATUS_OPTIONS} /></SaveErrorField>
         <Button onClick={() => { setAppliedSearch(search.trim()); setPage(1) }}>探す</Button>
       </div>
       {state === 'loading' ? (
-        <ListState kind="loading" title="実行結果を読み込んでいます" />
+        <DetailLoading label="実行結果を読み込んでいます" />
       ) : state === 'error' ? (
         <ListState kind="error" title="実行結果を読み込めませんでした" onRetry={() => void load()} />
       ) : items.length === 0 ? (
@@ -927,11 +907,11 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
                 <span role="cell" className={styles.colFlex}>
                   <Link href={`/friends/${encodeURIComponent(item.friendId)}`} className={styles.friendName}>{item.friendName ?? '削除済みの友だち'}</Link>
                 </span>
-                <span role="cell" className={styles.colStep}>{item.stepNumber}通目</span>
+                <span role="cell" className={styles.colStep}>{item.stepNumber} 通目</span>
                 <span role="cell" className={styles.colResult}>
                   <StatusPill tone={STATUS_VIEW[item.domainStatus].tone}>{STATUS_VIEW[item.domainStatus].label}</StatusPill>
                 </span>
-                <span role="cell" className={styles.colReason} title={item.lastErrorMessage ?? undefined}>{item.lastErrorMessage ?? `${item.attemptCount}回試行`}</span>
+                <span role="cell" className={styles.colReason} title={item.lastErrorMessage ?? undefined}>{item.lastErrorMessage ?? `${item.attemptCount} 回試行`}</span>
                 <span role="cell" className={styles.colOps}>
                   {item.canRetry && canManage ? (
                     <Button variant="text" disabled={retryingId === item.id} busy={retryingId === item.id} busyLabel="受け付けています" onClick={() => void retry(item.id)}>
@@ -943,7 +923,7 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
             ))}
           </div>
           <div className={styles.pager}>
-            <span className={styles.pagerCount}>{formatNumber(total)}件中 {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件</span>
+            <span className={styles.pagerCount}>{formatNumber(total)} 件中 {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)} 件</span>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="実行結果のページ送り" />
           </div>
         </>
@@ -957,6 +937,8 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
 type RegistrantFilter = 'all' | 'active' | 'cancelled'
 
 function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canManage: boolean }) {
+  const saveErrors = useSaveFormErrors()
+
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<ReminderRegistrant[]>([])
   const [draftDates, setDraftDates] = useState<Record<string, string>>({})
@@ -964,10 +946,10 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
   const [error, setError] = useState('')
   const [actioningId, setActioningId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<RegistrantFilter>('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<RegistrantFilter>('filter', 'all')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -977,13 +959,16 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
       if (!registrants.success) throw new Error('load failed')
       setItems(registrants.data)
       setDraftDates(Object.fromEntries(registrants.data.map((item) => [item.id, dateTimeLocalJst(item.targetDate)])))
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
       setItems([])
-      setError('登録者を読み込めませんでした。時間を置いてもう一度お試しください。')
+      { if (!fieldFailure)
+
+      setError('登録者を読み込めませんでした。時間を置いてもう一度お試しください。') }
     } finally {
       setLoading(false)
     }
-  }, [reminderId])
+  }, [reminderId, saveErrors])
 
   useEffect(() => {
     // アカウント切替直後に前の店舗の一覧を見せたままにしない。
@@ -1029,8 +1014,11 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
       if (!response.success) throw new Error(response.error)
       apply(item.id, response.data)
       setNotice(response.data.replayed ? '同じ変更を確認しました。基準日は変更済みです。' : '基準日を変更しました。未送信分だけ新しい日程で組み直します。')
-    } catch {
-      setNotice('基準日を変更できませんでした。ほかの担当者による変更がないか、一覧を読み直してください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setNotice('基準日を変更できませんでした。ほかの担当者による変更がないか、一覧を読み直してください。') }
     } finally { setActioningId(null) }
   }
 
@@ -1047,13 +1035,16 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
       setNotice(action === 'cancel'
         ? '登録を取り消しました。送信済みの履歴は残り、未送信分だけを止めています。'
         : '登録を再開しました。未送信分だけを次の配信処理で組み直します。')
-    } catch {
-      setNotice('操作を完了できませんでした。一覧を読み直してからもう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setNotice('操作を完了できませんでした。一覧を読み直してからもう一度お試しください。') }
     } finally { setActioningId(null) }
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <p className={styles.infoBand}>
         <Info size={16} aria-hidden="true" className={styles.infoIcon} />
         基準日を変えると、まだ送っていない通知だけ新しい日程で組み直します。送った履歴は消えません。
@@ -1062,7 +1053,7 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
       <section className={styles.card} aria-labelledby="rm-detail-registrants">
         <div className={styles.cardHead}>
           <h2 id="rm-detail-registrants" className={styles.cardTitle}>登録者</h2>
-          <p className={styles.cardNote}>{formatNumber(items.length)}人</p>
+          <p className={styles.cardNote}>{formatNumber(items.length)} 人</p>
         </div>
         {notice ? <Notice tone="info">{notice}</Notice> : null}
         <div className={styles.toolbar}>
@@ -1085,7 +1076,7 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
         </div>
 
         {loading ? (
-          <ListState kind="loading" title="登録者を読み込んでいます" />
+          <DetailLoading label="登録者を読み込んでいます" />
         ) : error ? (
           <ListState kind="error" title="登録者を表示できませんでした" description={error} onRetry={() => void load()} />
         ) : items.length === 0 ? (
@@ -1110,13 +1101,13 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
                       <Link href={`/friends/${encodeURIComponent(item.friendId)}`} className={styles.friendLink}>{item.friendName || '名前未設定'}</Link>
                     </span>
                     <span role="cell" className={styles.colDate}>
-                      <DateTimeField
+                      <SaveErrorField names={["draftDates","draft_dates"]}><DateTimeField
                         className={styles.dateField}
                         aria-label={`${item.friendName || '登録者'}の基準日`}
                         value={draftDates[item.id] ?? ''}
                         disabled={item.status !== 'active' || busy || !canManage}
                         onChange={(v) => setDraftDates((current) => ({ ...current, [item.id]: v }))}
-                      />
+                      /></SaveErrorField>
                     </span>
                     <span role="cell" className={styles.colState}>
                       <StatusPill tone={item.status === 'active' ? 'ok' : 'muted'}>
@@ -1146,12 +1137,12 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
               })}
             </div>
             <div className={styles.pager}>
-              <span className={styles.pagerCount}>{formatNumber(visible.length)}人中 {visible.length === 0 ? 0 : (page - 1) * pageSize + 1}〜{Math.min(page * pageSize, visible.length)}人</span>
+              <span className={styles.pagerCount}>{formatNumber(visible.length)} 人中 {visible.length === 0 ? 0 : (page - 1) * pageSize + 1}〜{Math.min(page * pageSize, visible.length)} 人</span>
               <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="登録者のページ送り" />
             </div>
           </>
         )}
       </section>
-    </>
+    </></SaveErrorScope>
   )
 }

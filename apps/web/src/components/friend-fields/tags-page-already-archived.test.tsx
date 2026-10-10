@@ -196,10 +196,10 @@ describe('R190 保管済みの行に同じ確認を繰り返さない', () => {
     }))
     render(<><TagsPageV4 accountId="account-a" /><ToastHost /></>)
     expect((await screen.findAllByText('旧キャンペーン')).length).toBeGreaterThan(0)
-    // 入れる操作が無いので「…」自体が出ない。開いても何も無い飾りにしない。
-    expect(screen.queryByRole('button', { name: '旧キャンペーンのその他操作' })).toBeNull()
+    // 保管済みでも編集は「…」に残し、保管を繰り返す口は出さない。
+    fireEvent.click(screen.getAllByRole('button', { name: '旧キャンペーンのその他操作' })[0])
     expect(screen.queryByRole('menuitem', { name: '保管する' })).toBeNull()
     // 編集への道は残す。保管済みでも名前・説明の訂正はできる（#710）。
-    expect(screen.getAllByRole('link', { name: '編集' }).length).toBeGreaterThan(0)
+    expect(screen.getByRole('menuitem', { name: '編集する' })).toBeTruthy()
   })
 })

@@ -105,7 +105,7 @@ describe('R520 アカウント一覧の取得失敗中の集計（本物のReact
     await flush()
 
     // 一覧部分は error と再読み込みを示す。
-    expect(container.textContent ?? '').toContain('再読み込み')
+    expect(container.textContent ?? '').toContain('もう一度読み込む')
 
     // 3 つの集計は未取得と真の 0 件を見分けられる形にする。
     const text = kpis()?.textContent ?? ''
@@ -120,10 +120,10 @@ describe('R520 アカウント一覧の取得失敗中の集計（本物のReact
   it('再読み込みの成功後は実際の件数を表示する', async () => {
     await act(async () => { root.render(<AccountsPage />) })
     await flush()
-    expect(container.textContent ?? '').toContain('再読み込み')
+    expect(container.textContent ?? '').toContain('もう一度読み込む')
 
     net.down = false
-    const retry = [...container.querySelectorAll('button')].find((button) => button.textContent === '再読み込み')
+    const retry = [...container.querySelectorAll('button')].find((button) => button.textContent === 'もう一度読み込む')
     expect(retry).toBeTruthy()
     await act(async () => { retry?.click() })
     await flush()

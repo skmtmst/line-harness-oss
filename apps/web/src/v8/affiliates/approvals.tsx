@@ -1,14 +1,7 @@
 'use client'
-
-/*
- * ★V8 成果とアフィリエイト「成果承認」（板 `OylSV`、まとめて操作は `hadfk`）。
- *
- * app/affiliates/v8-approvals-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で
- * 組み直した。データの口・操作は今と同じ（承認の全件読み・続きの読み込み・認める・
- * 却下・まとめて判断・付帯動作のやり直し・成果の詳細と成果の付け方・CSV）。
- * 行の右端は「認める」と「…」（認める・認めない・付帯動作をやり直す・詳細を見る）。
- * 左のチェックで選ぶと下から一括バー →「操作を選ぶ」（hadfk）→ 確かめる → 結果。
- */
+import { FolderDotName } from '@/components/shared/folder-dot'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Ban, Check, CircleCheck, CircleHelp, Download, Hourglass, ListChecks, ShieldAlert, X } from 'lucide-react'
 import { api, type ConversionApprovalItem } from '@/lib/api'
@@ -53,6 +46,19 @@ import {
   ToolbarNotices,
 } from './parts'
 import styles from './affiliates.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 成果とアフィリエイト「成果承認」（板 `OylSV`、まとめて操作は `hadfk`）。
+ *
+ * app/affiliates/v8-approvals-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で
+ * 組み直した。データの口・操作は今と同じ（承認の全件読み・続きの読み込み・認める・
+ * 却下・まとめて判断・付帯動作のやり直し・成果の詳細と成果の付け方・CSV）。
+ * 行の右端は「認める」と「…」（認める・認めない・付帯動作をやり直す・詳細を見る）。
+ * 左のチェックで選ぶと下から一括バー →「操作を選ぶ」（hadfk）→ 確かめる → 結果。
+ */
 
 type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 type BulkOutcome = 'approved' | 'rejected'
@@ -82,17 +88,17 @@ export default function ApprovalsTab() {
   const { readonly, narrow, setCount, focusAffiliateId, accountId } = useAffiliateShell()
 
   const [status, setStatus] = useState<ApprovalStatus>('pending')
-  const [affiliateFilter, setAffiliateFilter] = useState<string | null>(focusAffiliateId)
+  const [affiliateFilter, setAffiliateFilter] = useListUrlValue<string | null>('affiliateFilter', focusAffiliateId)
   const [items, setItems] = useState<ConversionApprovalItem[]>([])
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [holdDays, setHoldDays] = useState<number | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [actioning, setActioning] = useState<string | null>(null)
-  const [query, setQuery] = useState('')
-  const [flaggedOnly, setFlaggedOnly] = useState(false)
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [flaggedOnly, setFlaggedOnly] = useListUrlValue('flaggedOnly', false)
   const [saved, setSaved] = useState('')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [detailItem, setDetailItem] = useState<ConversionApprovalItem | null>(null)
   const [truncatedStatuses, setTruncatedStatuses] = useState<ApprovalStatus[]>([])
@@ -290,15 +296,15 @@ export default function ApprovalsTab() {
   }
 
   const exportCsv = () => {
-    downloadCsv(`conversion-approvals-${new Date().toISOString().slice(0, 10)}.csv`, [
+    downloadCsv(csvFileName("成果の承認"), [
       ['日時', '友だち', 'アフィリエイター', 'アカウント', '案件', '成果地点', '注文番号', '金額', '確認状態'],
       ...shownItems.map((item) => [
         formatMonthDayTime(item.createdAt),
         personName(item.friendName),
         item.affiliateName ?? '名前を読み込めませんでした',
         item.lineAccountName ?? 'アカウント未設定',
-        item.offerName ?? '未設定',
-        item.conversionPointName ?? '未設定',
+        item.offerName ?? emptyValue('unconfigured'),
+        item.conversionPointName ?? emptyValue('unconfigured'),
         item.orderNumber ?? '',
         item.value ?? '',
         approvalReviewReasons(item).join('・') || '問題なし',
@@ -408,7 +414,7 @@ export default function ApprovalsTab() {
           <TableHeadRow className={styles.headRow} data-table-layout="columns">
             <Th className={styles.colCheck}>
               {canSelect ? (
-                <Checkbox
+                <SaveErrorField names={["allSafeSelected","selected","all_safe_selected"]}><Checkbox
                   aria-label="このページの確認不要な成果をすべて選ぶ"
                   checked={allSafeSelected}
                   onCheckedChange={(checked) => setSelected((current) => {
@@ -419,7 +425,7 @@ export default function ApprovalsTab() {
                     }
                     return next
                   })}
-                />
+                /></SaveErrorField>
               ) : null}
             </Th>
             <Th className={styles.colName}>友だちと、成果が出た時刻</Th>
@@ -432,15 +438,15 @@ export default function ApprovalsTab() {
           </TableHeadRow>
         </thead>
         <tbody>
-          {pagedItems.map((item) => {
+          {pagedItems.map((item, saveFieldIndex) => {
             const reasons = approvalReviewReasons(item)
             const needsReview = reasons.length > 0
             const pending = item.approvalStatus === 'pending'
             return (
-              <Tr key={item.eventId} className={styles.row} data-table-layout="columns">
+              <Tr key={item.eventId} className={styles.row} data-table-layout="columns" onOpen={() => setDetailItem(item)}>
                 <Td className={styles.colCheck}>
                   {canSelect ? (
-                    <Checkbox
+                    <SaveErrorField names={[`pagedItems.${saveFieldIndex}.eventId`,`pagedItems.${saveFieldIndex}.event_id`,"eventId","item.eventId","selected","event_id","id","item.event_id"]}><Checkbox
                       aria-label={`${personName(item.friendName)}の成果を選ぶ`}
                       checked={selected.has(item.eventId)}
                       disabled={needsReview}
@@ -451,15 +457,15 @@ export default function ApprovalsTab() {
                         else next.delete(item.eventId)
                         return next
                       })}
-                    />
+                    /></SaveErrorField>
                   ) : null}
                 </Td>
-                <Td className={styles.colName}>
+                <Td className={styles.colName}><FolderDotName>
                   <span className={styles.stack}>
                     <button type="button" className={styles.rowName} title={personName(item.friendName)} onClick={() => setDetailItem(item)}>{personName(item.friendName)}</button>
-                    <span className={styles.rowPlan}>{`${formatMonthDayTime(item.createdAt)} に成果`}</span>
+
                   </span>
-                </Td>
+                </FolderDotName></Td>
                 <Td className={styles.colApAffiliate}><span className={styles.cellNum} title={item.affiliateName ?? undefined}>{item.affiliateName ?? '名前を読み込めませんでした'}</span></Td>
                 <Td className={styles.colApAccount}><span className={styles.cellNum} title={item.lineAccountName ?? undefined}>{item.lineAccountName ?? 'アカウント未設定'}</span></Td>
                 <Td className={styles.colApOffer}>
@@ -537,7 +543,7 @@ export default function ApprovalsTab() {
       {bulkResult ? (
         <div className={styles.subSection} role="status" aria-label="まとめて処理の結果">
           <Notice tone={bulkResult.conflicted.length + bulkResult.denied.length + bulkResult.failed.length > 0 ? 'warn' : 'success'}>
-            {`まとめて処理の結果：成功 ${formatNumber(bulkResult.succeeded.length)}件／ほかの人が先に判断 ${formatNumber(bulkResult.conflicted.length)}件／権限なし ${formatNumber(bulkResult.denied.length)}件／失敗 ${formatNumber(bulkResult.failed.length)}件`}
+            {`まとめて処理の結果：成功 ${formatNumber(bulkResult.succeeded.length)} 件／ほかの人が先に判断 ${formatNumber(bulkResult.conflicted.length)} 件／権限なし ${formatNumber(bulkResult.denied.length)} 件／失敗 ${formatNumber(bulkResult.failed.length)} 件`}
           </Notice>
           <ul className={styles.resultList}>
             {bulkResult.conflicted.map((entry) => (
@@ -554,7 +560,7 @@ export default function ApprovalsTab() {
           </div>
         </div>
       ) : null}
-      <BulkBar count={canSelect ? selected.size : 0} hint="対象を確認してから操作を選んでください">
+      <BulkBar count={canSelect ? selected.size : 0} total={shownItems.filter(item => item.approvalStatus === 'pending' && approvalReviewReasons(item).length === 0).length} onSelectAll={() => setSelected(new Set(shownItems.filter(item => item.approvalStatus === 'pending' && approvalReviewReasons(item).length === 0).map(item => item.eventId)))} hint="対象を確認してから操作を選んでください">
         <Button type="button" onClick={openBulkWizard}><ListChecks size={15} aria-hidden="true" /> 操作を選ぶ</Button>
       </BulkBar>
     </>
@@ -562,7 +568,7 @@ export default function ApprovalsTab() {
 
   const pager = ready && shownItems.length > 0 && pageCount > 1 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{`${formatNumber(shownItems.length)}件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shownItems.length)}件`}</span>
+      <span className={styles.pagerCount}>{`${formatNumber(shownItems.length)} 件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shownItems.length)} 件`}</span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={(value) => { setPage(value); clearSelections() }} />
     </ListPagePagination>
   ) : undefined
@@ -572,7 +578,7 @@ export default function ApprovalsTab() {
       help={readonly
           ? '行の「…」から 詳細と成果の付け方を見る。'
           : '行の「…」から 認める・認めない・詳細を見る。左のチェックで選ぶと、画面の下から一括バーが出ます。「操作を選ぶ」→ 認める／認めない → 確かめる → 結果 の順。却下の理由はまだ記録できません。'}
-      actions={<Button onClick={exportCsv} disabled={shownItems.length === 0}><Download size={15} aria-hidden="true" /> CSV で書き出す</Button>}
+      actions={<Button onClick={exportCsv} disabled={shownItems.length === 0}><Download size={15} aria-hidden="true" /> CSVで書き出す</Button>}
       stats={stats}
       toolbar={toolbar}
       pagination={pager}
@@ -609,13 +615,13 @@ export default function ApprovalsTab() {
           <ConfirmDialog
             open
             title={bulkConfirm.action === 'approved'
-              ? `選んだ${formatNumber(bulkConfirm.items.length)}件を認めますか`
-              : `選んだ${formatNumber(bulkConfirm.items.length)}件を認めない（却下）にしますか`}
+              ? `選んだ${formatNumber(bulkConfirm.items.length)} 件を認めますか`
+              : `選んだ${formatNumber(bulkConfirm.items.length)} 件を認めない（却下）にしますか`}
             description="1件ずつ同じ判断の決まりで処理します。ほかの人が先に判断した成果は上書きせず残します。"
             confirmLabel={bulkConfirm.action === 'approved' ? '認める' : '認めない（却下）'}
             destructive={bulkConfirm.action === 'rejected'}
             busy={actioning !== null}
-            onConfirm={() => { void runBulkDecide(bulkConfirm.action, bulkConfirm.items) }}
+            onConfirm={() => { return runBulkDecide(bulkConfirm.action, bulkConfirm.items) }}
             onCancel={() => setBulkConfirm(null)}
           >
             <ul className={styles.resultList}>

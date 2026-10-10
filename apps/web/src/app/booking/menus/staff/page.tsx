@@ -1,5 +1,6 @@
 'use client'
 
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -14,7 +15,6 @@ import Notice from '@/components/shared/notice'
 import { isForbiddenOrRateLimited, loadFailureCopy, loadFailureNotice } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
 import { describeSaveFailure } from '@/lib/api'
-import { canEditFeature } from '@/lib/staff-capability'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import AssignMatrixV8 from '@/v8/booking-menus/assign'
 import StatusBadge from '@/components/shared/status-badge'
@@ -59,14 +59,12 @@ function MenuStaffMatrixContent() {
    * R538: 担当割当の変更は '/booking/menus' の実効permission。閲覧のみの
    * 担当者は読めるが変えられない。Worker の一括PUTも同じ鍵で守られている。
    */
-  const [canEditMenus] = useState(() =>
-    typeof window === 'undefined' ? true : canEditFeature('/booking/menus'))
+  const canEditMenus = usePermissionAccess('/booking/menus')
   /*
    * R538: スタッフ追加の行き先は予約設定の権限。鍵の無い人には入口を
    * 出さず、行き先の画面で権限不足にぶつかる手間を省く。
    */
-  const [canAddStaff] = useState(() =>
-    typeof window === 'undefined' ? true : canEditFeature('booking.settings'))
+  const canAddStaff = usePermissionAccess('booking.settings')
 
 
   const load = useCallback(async () => {

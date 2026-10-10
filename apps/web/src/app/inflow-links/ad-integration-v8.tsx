@@ -1,15 +1,4 @@
 'use client'
-
-/*
- * ★V8-B 広告連携（板 `qSTVR`）・広告とのつなぎ（板 `FDBsG`）・
- * 広告への送信履歴（板 `p0kA3`）。
- *
- * v7 の広告タブ（`ad-integration.tsx`）とは別の見せ方。取ってくる口・
- * 取り込み・手入力・取消し・書き出しの動きは v7 と同じ。口に無い所
- * （つなぐ操作・対応表の件数・媒体の絞り込み・流入元の紐づけ）は作らず、
- * 今の形のままか「—」にする。v7 を直す必要が出たら
- * `ad-integration.tsx` 側も同じ判断を入れる（V8 完成までの二重管理）。
- */
 import Link from 'next/link'
 import type React from 'react'
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
@@ -32,6 +21,24 @@ import { TextField } from '@/components/shared/text-field'
 import { RowActions } from '@/components/shared/row-actions'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import styles from './ad-integration-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
+import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorScope, useSaveFormErrors, SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B 広告連携（板 `qSTVR`）・広告とのつなぎ（板 `FDBsG`）・
+ * 広告への送信履歴（板 `p0kA3`）。
+ *
+ * v7 の広告タブ（`ad-integration.tsx`）とは別の見せ方。取ってくる口・
+ * 取り込み・手入力・取消し・書き出しの動きは v7 と同じ。口に無い所
+ * （つなぐ操作・対応表の件数・媒体の絞り込み・流入元の紐づけ）は作らず、
+ * 今の形のままか「—」にする。v7 を直す必要が出たら
+ * `ad-integration.tsx` 側も同じ判断を入れる（V8 完成までの二重管理）。
+ */
 
 const LOG_PAGE_SIZE = 20
 
@@ -159,6 +166,8 @@ const READONLY_REASON = 'この操作にはオーナーか管理者の権限が�
  * 同じ順番・同じ口。取り直しは `reload` にまとめる。
  */
 function useAdV8Model() {
+  const saveErrors = useSaveFormErrors()
+
   const { selectedAccountId } = useAccount()
   const loadGenerationRef = useRef(0)
   const latestAccountRef = useRef(selectedAccountId)
@@ -249,13 +258,14 @@ function useAdV8Model() {
         setManualEntries([])
         setCostFailed(true)
       }
-    } catch {
+    } catch (saveFailure) {
       if (!isCurrent()) return
+      saveErrors.capture(saveFailure)
       setFailed(true)
     } finally {
       if (isCurrent()) setLoading(false)
     }
-  }, [logPage, query, selectedAccountId, status])
+  }, [logPage, query, selectedAccountId, status, saveErrors])
 
   useEffect(() => {
     setPlatforms([])
@@ -333,12 +343,16 @@ function useAdV8Model() {
       setManualDay('')
       setManualAmount('')
       void load()
-    } catch {
-      setManualError('記録できませんでした。通信状態を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
+
+      if (!fieldFailure) {
+      setManualError('記録できませんでした。通信状態を確かめて、もう一度お試しください。') }
     } finally {
       setManualBusy(false)
     }
-  }, [selectedAccountId, manualBusy, manualLabel, manualDay, manualAmount, manualRouteId, load])
+  }, [selectedAccountId, manualBusy, manualLabel, manualDay, manualAmount, manualRouteId, load, saveErrors])
 
   const submitCancel = useCallback(async () => {
     if (!cancelTarget || cancelBusy) return
@@ -357,12 +371,16 @@ function useAdV8Model() {
       }
       setCancelTarget(null)
       void load()
-    } catch {
-      setCancelError('取り消せませんでした。通信状態を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
+
+      if (!fieldFailure) {
+      setCancelError('取り消せませんでした。通信状態を確かめて、もう一度お試しください。') }
     } finally {
       setCancelBusy(false)
     }
-  }, [cancelTarget, cancelBusy, cancelReason, load])
+  }, [cancelTarget, cancelBusy, cancelReason, load, saveErrors])
 
   const runImportNow = useCallback(
     async (platformId: string) => {
@@ -373,13 +391,17 @@ function useAdV8Model() {
         const res = await api.adPlatforms.importCost(platformId)
         if (!res.success) setImportError(res.error ?? '取り込めませんでした')
         void load()
-      } catch {
-        setImportError('取り込めませんでした。接続設定を確かめて、もう一度お試しください。')
+      } catch (saveFailure) {
+        const fieldFailure = saveErrors.capture(saveFailure);
+
+
+        if (!fieldFailure) {
+        setImportError('取り込めませんでした。接続設定を確かめて、もう一度お試しください。') }
       } finally {
         setImportingId(null)
       }
     },
-    [importingId, load],
+    [importingId, load, saveErrors],
   )
 
   const exportLogs = useCallback(() => {
@@ -387,7 +409,7 @@ function useAdV8Model() {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `広告への送信履歴_${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("広告への送信履歴")
     anchor.click()
     URL.revokeObjectURL(url)
   }, [logs])
@@ -433,7 +455,7 @@ function useAdV8Model() {
   const avgCostPerFriend = linkedFriendAdds > 0 ? Math.round(linkedJpyCost / linkedFriendAdds) : null
   const routeRefById = new Map(entryRoutes.map((route) => [route.id, route.refCode]))
 
-  return {
+  return { saveErrors,
     selectedAccountId,
     platforms,
     connected,
@@ -536,7 +558,7 @@ function AdV8Gate({
         kind="error"
         title="広告との接続状況を表示できませんでした"
         description="接続設定は消えていません。状態を読み直して、もう一度お試しください。"
-        action={<Button onClick={() => void model.reload()}>広告の状態を再読み込み</Button>}
+        onRetry={() => void model.reload()}
       />
     )
   }
@@ -577,19 +599,14 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
         }}
       >
         <div className="space-y-4">
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-label-v8">流入元の名前</label>
-            <TextField
+          <div><Field label="流入元の名前" htmlFor="ad-cost-label-v8"><SaveErrorField names={["manualLabel","model.manualLabel","sourceLabel","manual_label","model.manual_label"]}><TextField
               id="ad-cost-label-v8"
               value={model.manualLabel}
               onChange={(event: React.ChangeEvent<HTMLInputElement>) => model.setManualLabel(event.target.value)}
-              placeholder="例: チラシ"
+              placeholder="例：チラシ"
               maxLength={100}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-route-v8">計測リンク（分かれば）</label>
-            <Select
+            /></SaveErrorField></Field></div>
+          <div><Field note={<>結びつけると友だち追加の人数で「1人あたり」が出ます。</>} label="計測リンク（分かれば）" htmlFor="ad-cost-route-v8"><SaveErrorField names={["manualRouteId","model.manualRouteId","entryRouteId","manual_route_id","model.manual_route_id"]}><Select
               id="ad-cost-route-v8"
               aria-label="計測リンク"
               value={model.manualRouteId}
@@ -598,23 +615,16 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
                 { value: '', label: '結びつけない' },
                 ...model.entryRoutes.map((route) => ({ value: route.id, label: route.name })),
               ]}
-            />
-            <p className="mt-1 text-xs text-ink-faint">結びつけると友だち追加の人数で「1人あたり」が出ます。</p>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-day-v8">費用の日付</label>
-            <DateField id="ad-cost-day-v8" value={model.manualDay} onChange={model.setManualDay} />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-amount-v8">費用（円）</label>
-            <TextField
+            /></SaveErrorField>
+</Field></div>
+          <div><Field label="費用の日付" htmlFor="ad-cost-day-v8"><SaveErrorField names={["manualDay","model.manualDay","day","manual_day","model.manual_day"]}><DateField id="ad-cost-day-v8" value={model.manualDay} onChange={model.setManualDay} /></SaveErrorField></Field></div>
+          <div><Field label="費用（円）" htmlFor="ad-cost-amount-v8"><SaveErrorField names={["manualAmount","model.manualAmount","amountMinor","manual_amount","model.manual_amount"]}><NumberInput numericText
               id="ad-cost-amount-v8"
               inputMode="numeric"
               value={model.manualAmount}
               onChange={(event: React.ChangeEvent<HTMLInputElement>) => model.setManualAmount(event.target.value)}
-              placeholder="例: 20000"
-            />
-          </div>
+              placeholder="例：20000"
+            /></SaveErrorField></Field></div>
         </div>
       </Dialog>
 
@@ -639,16 +649,13 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
                 {formatMinor(model.cancelTarget.amountMinor, model.cancelTarget.currency)}
               </strong>
             </p>
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-cancel-reason-v8">取り消す理由（必須）</label>
-              <TextField
+            <div><Field label="取り消す理由" htmlFor="ad-cost-cancel-reason-v8" required><SaveErrorField names={["reason","cancelReason","model.cancelReason","cancel_reason","model.cancel_reason"]}><TextField
                 id="ad-cost-cancel-reason-v8"
                 value={model.cancelReason}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) => model.setCancelReason(event.target.value)}
-                placeholder="例: 金額を間違えた"
+                placeholder="例：金額を間違えた"
                 maxLength={200}
-              />
-            </div>
+              /></SaveErrorField></Field></div>
           </div>
         ) : null}
       </Dialog>
@@ -675,19 +682,19 @@ export function AdMetricsV8() {
   const otherTotals = [...model.totalCostByCurrency].filter(([currency]) => currency !== 'JPY')
 
   return (
-    <AdV8Gate model={model} loadingTitle="広告連携を読み込んでいます">
+    <SaveErrorScope errors={model.saveErrors}><AdV8Gate model={model} loadingTitle="広告連携を読み込んでいます">
       <div className={styles.board} data-design-node="qSTVR">
         <div className={styles.head}>
           <div className={styles.headText}>
-            <p className={styles.headBack}>
+
+            <PageHeading title="広告連携" help={<>
               <Link href="/inflow-links" className={styles.headBackLink}>
                 ← 流入と計測へ
               </Link>
-            </p>
-            <h1 className={styles.headTitle}>広告連携</h1>
-            <p className={styles.headDescription}>
+
               広告をつなぐと毎日自動で費用を取り込みます。取り込めない分（チラシや看板など）は「費用を手で入れる」から足せます。
-            </p>
+            </>} />
+
           </div>
           <div className={styles.headActions}>
             {canEdit ? (
@@ -757,7 +764,7 @@ export function AdMetricsV8() {
               <BadgeDollarSign size={13} aria-hidden="true" />
               成果1件あたり
             </span>
-            <p className={styles.kpiValue}>—</p>
+            <p className={styles.kpiValue}>{emptyValue('unknown')}</p>
             <p className={styles.kpiDetail}>認めた成果の件数は未接続のため表示できません</p>
           </li>
         </ul>
@@ -786,7 +793,7 @@ export function AdMetricsV8() {
                   </div>
                   <p className={styles.providerSub}>
                     {active
-                      ? `最後の取り込み ${synced ?? '—'}・毎日自動`
+                      ? `最後の取り込み ${synced ?? emptyValue('unknown')}・毎日自動`
                       : 'つなぐと費用とクリックを毎日取り込みます'}
                   </p>
                   {active && platform ? (
@@ -827,7 +834,7 @@ export function AdMetricsV8() {
               kind="error"
               title="広告費を読み込めませんでした"
               description="記録は消えていません。もう一度読み込んでください。"
-              action={<Button onClick={() => void model.reload()}>もう一度読み込む</Button>}
+              onRetry={() => void model.reload()}
             />
           ) : model.costRows.length === 0 ? (
             <ListState
@@ -873,12 +880,12 @@ export function AdMetricsV8() {
                         </td>
                         <td>
                           <span className={styles.cellEllipsis}>
-                            {platform ? platformLabel(platform) : row.source === 'manual' ? '手入力' : '—'}
+                            {platform ? platformLabel(platform) : row.source === 'manual' ? '手入力' : emptyValue('unknown')}
                           </span>
                         </td>
                         <td>
                           <span className={styles.cellEllipsis} title={refCode ?? undefined}>
-                            {refCode ?? '—'}
+                            {refCode ?? emptyValue('unknown')}
                           </span>
                         </td>
                         <td className={styles.numeric}>
@@ -886,13 +893,13 @@ export function AdMetricsV8() {
                         </td>
                         <td className={styles.numeric}>
                           <span className={styles.cellValue}>
-                            {row.friendAdds == null ? '—' : `${formatNumber(row.friendAdds)}人`}
+                            {row.friendAdds == null ? emptyValue('unknown') : `${formatNumber(row.friendAdds)}人`}
                           </span>
                         </td>
                         <td className={styles.numeric}>
                           <span className={styles.cellValue}>
                             {row.costPerFriendMinor == null
-                              ? '—'
+                              ? emptyValue('unknown')
                               : formatMinor(row.costPerFriendMinor, row.totals[0]?.currency ?? 'JPY')}
                           </span>
                         </td>
@@ -1012,7 +1019,7 @@ export function AdMetricsV8() {
 
         <ManualEntryDialogs model={model} />
       </div>
-    </AdV8Gate>
+    </AdV8Gate></SaveErrorScope>
   )
 }
 
@@ -1030,19 +1037,19 @@ export function AdConnectionsV8() {
   const model = useAdV8Model()
 
   return (
-    <AdV8Gate model={model} loadingTitle="広告とのつなぎを読み込んでいます">
+    <SaveErrorScope errors={model.saveErrors}><AdV8Gate model={model} loadingTitle="広告とのつなぎを読み込んでいます">
       <div className={styles.board} data-design-node="FDBsG">
         <div className={styles.head}>
           <div className={styles.headText}>
-            <p className={styles.headBack}>
+
+            <PageHeading title="広告とのつなぎ" help={<>
               <Link href="/inflow-links" className={styles.headBackLink}>
                 ← 流入と計測へ
               </Link>
-            </p>
-            <h1 className={styles.headTitle}>広告とのつなぎ</h1>
-            <p className={styles.headDescription}>
+
               LINE で出た成果を広告へ返し、広告の配信を賢くします。お客様の名前やメールアドレスは広告へ送りません。
-            </p>
+            </>} />
+
           </div>
           <div className={styles.headActions}>
             <Button variant="secondary" href="/inflow-links?tab=connections&view=history">
@@ -1117,7 +1124,7 @@ export function AdConnectionsV8() {
           </li>
           <li className={styles.kpi}>
             <span className={styles.kpiLabel}>やり直して成功</span>
-            <p className={styles.kpiValue}>—</p>
+            <p className={styles.kpiValue}>{emptyValue('unknown')}</p>
             <p className={styles.kpiDetail}>二重にはなっていません</p>
           </li>
         </ul>
@@ -1139,7 +1146,7 @@ export function AdConnectionsV8() {
           </p>
         </section>
       </div>
-    </AdV8Gate>
+    </AdV8Gate></SaveErrorScope>
   )
 }
 
@@ -1157,19 +1164,19 @@ export function AdHistoryV8() {
   const model = useAdV8Model()
 
   return (
-    <AdV8Gate model={model} loadingTitle="広告への送信履歴を読み込んでいます">
+    <SaveErrorScope errors={model.saveErrors}><AdV8Gate model={model} loadingTitle="広告への送信履歴を読み込んでいます">
       <div className={styles.board} data-design-node="p0kA3">
         <div className={styles.head}>
           <div className={styles.headText}>
-            <p className={styles.headBack}>
+
+            <PageHeading title="広告への送信履歴" help={<>
               <Link href="/inflow-links?tab=connections" className={styles.headBackLink}>
                 ← 広告とのつなぎへ戻る
               </Link>
-            </p>
-            <h1 className={styles.headTitle}>広告への送信履歴</h1>
-            <p className={styles.headDescription}>
+
               成果と広告のクリックが結びつき、送信処理が始まるとここに並びます。
-            </p>
+            </>} />
+
           </div>
           <div className={styles.headActions}>
             <Button
@@ -1191,12 +1198,12 @@ export function AdHistoryV8() {
               aria-label="成果・クリックの種類で探す"
             />
           </span>
-          <Select
+          <SaveErrorField names={["status","model.status","statusAndPage","status_and_page"]}><Select
             value={model.status}
             onChange={model.setStatusAndPage}
             options={STATUS_OPTIONS}
             aria-label="送信状態"
-          />
+          /></SaveErrorField>
           <span className={styles.toolbarSpacer} />
           <span className={styles.toolbarCount}>全 {formatNumber(model.logTotal)} 件</span>
         </div>
@@ -1242,7 +1249,7 @@ export function AdHistoryV8() {
                           </td>
                           <td>
                             <span className={styles.cellEllipsis}>
-                              {platform ? platformLabel(platform) : '—'}
+                              {platform ? platformLabel(platform) : emptyValue('unknown')}
                             </span>
                           </td>
                           <td>
@@ -1262,7 +1269,7 @@ export function AdHistoryV8() {
                                 {expanded ? '理由を閉じる' : 'やり直す'}
                               </Button>
                             ) : (
-                              <span className={styles.cellMuted}>—</span>
+                              <span className={styles.cellMuted}>{emptyValue('unknown')}</span>
                             )}
                           </td>
                         </tr>
@@ -1294,6 +1301,6 @@ export function AdHistoryV8() {
           断られた理由：クリックの目印の期限（90日）が切れていました。やり直しても同じ目印を使うため、2重には数えられません。
         </p>
       </div>
-    </AdV8Gate>
+    </AdV8Gate></SaveErrorScope>
   )
 }

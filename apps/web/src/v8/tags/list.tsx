@@ -13,7 +13,7 @@
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Eye, Plus, Upload } from 'lucide-react'
+import { Plus, Upload } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -29,6 +29,8 @@ import MarksTab from './marks-tab'
 import SearchesTab from './searches-tab'
 import FieldsTab from './fields-tab'
 import styles from './list.module.css'
+
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 const TABS = [
   ['tags', 'タグ'],
@@ -70,7 +72,7 @@ export default function TagsList({
    * （最後の守りはサーバの 403）。
    */
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const canEdit = canManageRole(staffRole)
   const readOnly = staffRole !== null && !canEdit
   const narrow = useNarrowViewport()
 
@@ -103,20 +105,17 @@ export default function TagsList({
   ) : null
 
   return (
-    <PageFrame kind="list" boardId={boardId}>
+    <PageFrame skeleton kind="list" boardId={boardId}>
       <PageHeading
         headingSize="regular"
         title="タグ"
-        description="友だちに付ける印（タグ）・入力してもらう項目・対応の印・保存した条件をまとめて管理します。"
+        help="友だちに付ける印（タグ）・入力してもらう項目・対応の印・保存した条件をまとめて管理します。"
         actions={actions}
       />
 
       {readOnly ? (
         <div className={styles.readonlyRow}>
-          <p className={styles.readonlyBand}>
-            <Eye className={styles.readonlyIcon} aria-hidden="true" />
-            閲覧のみで見ています。変える操作は管理者に頼んでください。
-          </p>
+          <div className={styles.readonlyBand}><ReadOnlyNotice ></ReadOnlyNotice></div>
         </div>
       ) : null}
 

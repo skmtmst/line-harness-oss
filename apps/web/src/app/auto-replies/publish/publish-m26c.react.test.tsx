@@ -81,7 +81,7 @@ vi.mock('@/lib/api', async (importOriginal) => ({
 }))
 
 let currentQuery = 'id=r1&step=priority'
-vi.mock('@/components/shared/toast', () => ({ notifyToast: mocks.toast }))
+vi.mock('@/components/shared/toast', () => ({ notifyToast: mocks.toast, notifySaved: mocks.toast }))
 vi.mock('next/navigation', () => ({
   usePathname: () => '/auto-replies/publish',
   useRouter: () => ({ replace: (url: string) => { currentQuery = url.split('?')[1] || ''; root.render(<AutoReplyPublishPage />) }, push: vi.fn() }),
@@ -328,13 +328,12 @@ describe('m26c R556-UI: 複製の再送は同じ確認キー', () => {
     mocks.create.mockRejectedValueOnce(new MockApiError(500, '応答消失'))
     mocks.create.mockResolvedValueOnce({
       success: true,
-      data: { autoReplyId: 'r-copy', versionId: 'v-copy' },
+      data: { id: 'r-copy' },
     })
     await goToDone()
     await openListAction('複製する')
-    await click('複製する', document)
-    expect(document.body.textContent).toMatch(/読み直して/)
-    await click('複製する', document)
+    expect(mocks.toast).toHaveBeenCalledWith(expect.stringMatching(/読み直して/), expect.objectContaining({ tone: 'error' }))
+    await openListAction('複製する')
     expect(mocks.create).toHaveBeenCalledTimes(2)
     const firstKey = mocks.create.mock.calls[0][1]
     const secondKey = mocks.create.mock.calls[1][1]

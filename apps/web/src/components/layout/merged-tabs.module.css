@@ -11,13 +11,13 @@
 
 .tab {
   display: inline-flex;
-  height: 44px;
+  height: 32px;
   align-items: center;
   justify-content: center;
   border-bottom: 2px solid transparent;
   padding: 0 4px;
   color: var(--color-ink-secondary);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
   transition: color var(--motion-fast) var(--motion-ease-out), border-color var(--motion-fast) var(--motion-ease-out), background-color var(--motion-fast) var(--motion-ease-out);
@@ -36,27 +36,27 @@
 /* #976 U084: 選択中の文字・下線は白地で読める `$accent-deep`。
  * `$accent`(#06c755) の文字は白地で 2.26:1 しか取れない。 */
 .selected {
-  border-bottom-color: var(--color-accent-deep);
-  color: var(--color-accent-deep);
-  font-weight: 500;
+  border-bottom-color: var(--color-ink);
+  color: var(--color-ink);
+  font-weight: 600;
 }
 
 .segmented {
   display: flex;
-  height: 50px;
-  gap: 5px;
+  height: 40px;
+  gap: 2px;
   margin-bottom: 20px;
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-control);
   background: var(--color-shell);
-  padding: 4px;
+  padding: 2px;
 }
 
 .segmentedTab {
-  height: 42px;
+  height: 36px;
   min-width: 0;
   flex: 1;
   border: 0;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-segment);
   padding: 0 12px;
   color: var(--color-ink-faint);
   font-weight: 600;

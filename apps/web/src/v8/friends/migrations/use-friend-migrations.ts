@@ -9,6 +9,7 @@
  * 同じ口を使う——確認だけ→反映の順序、二重取り込みの指紋、
  * 権限の言い分けはここでだけ変える。
  */
+import { useStaffRole } from '@/lib/staff-role'
 import { useCallback, useEffect, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api, ApiError, type FriendMigrationJob } from '@/lib/api'
@@ -43,7 +44,7 @@ export function useFriendMigrations() {
   const [jobs, setJobs] = useState<FriendMigrationJob[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
   // M016：書き出し・取り込みは owner/admin 専用。押せる人かで案内を変える目安。
-  const [role, setRole] = useState('')
+  const role = useStaffRole()
   // R114: タグ・友だち情報と対応情報の書き出しは未接続のため、初期選択は
   // 実際に出る基本だけにする。選べるのに出ない状態を作らない。
   const [columns, setColumns] = useState<Array<'basic' | 'tags_fields' | 'support'>>(['basic'])
@@ -75,7 +76,6 @@ export function useFriendMigrations() {
   useEffect(() => {
     void load()
     try {
-      setRole(window.localStorage.getItem('lh_staff_role') ?? '')
     } catch {
       // ストレージが使えなくても画面は出せる
     }
@@ -147,7 +147,7 @@ export function useFriendMigrations() {
     setBusy(true)
     try {
       const response = await api.friendMigrations.executeImport(importId)
-      setMessage(response.success ? `${response.data.applied ?? 0}件を反映しました。` : response.error)
+      setMessage(response.success ? `${response.data.applied ?? 0} 件を反映しました。` : response.error)
     } catch (error) {
       setMessage(operationFailureMessage(error, '反映'))
     } finally {

@@ -8,7 +8,7 @@ const LABEL: Record<StatusChipStatus, string> = {
   draft: '下書き',
   ready: '準備完了',
   reserved: '予約中',
-  running: '稼働中',
+  running: '有効',
   paused: '停止中',
   ended: '終了',
 }
@@ -18,7 +18,7 @@ const TONE: Record<StatusChipStatus, StatusBadgeTone> = {
   ready: 'info',
   reserved: 'info',
   running: 'success',
-  paused: 'warning',
+  paused: 'neutral',
   ended: 'neutral',
 }
 

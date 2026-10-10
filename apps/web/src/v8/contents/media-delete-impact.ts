@@ -108,10 +108,10 @@ export function summarizeBulkDeleteResult(deletedCount: number, failedNames: str
   tone: 'success' | 'error'
   message: string
 } {
-  if (failedNames.length === 0) return { tone: 'success', message: `削除しました（${deletedCount}件）` }
+  if (failedNames.length === 0) return { tone: 'success', message: `削除しました（${deletedCount} 件）` }
   if (deletedCount === 0) return { tone: 'error', message: `削除できませんでした（${failedNames.join('、')}）` }
   return {
     tone: 'error',
-    message: `削除しました${deletedCount}件、失敗${failedNames.length}件（${failedNames.join('、')}）`,
+    message: `削除しました${deletedCount} 件、失敗${failedNames.length} 件（${failedNames.join('、')}）`,
   }
 }

@@ -145,7 +145,7 @@ function stubFetch() {
 let host: HTMLDivElement
 let root: Root
 
-async function settle(milliseconds = 150) {
+async function settle(milliseconds = 320) {
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, milliseconds))
   })

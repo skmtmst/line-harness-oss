@@ -5,12 +5,14 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+const duplicate = vi.hoisted(() => vi.fn())
 const fetchApi = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
@@ -18,7 +20,7 @@ const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   const api = (actual as unknown as { api: Record<string, object> }).api
-  return { ...actual, fetchApi, api: { ...api, folders: { ...api.folders, list: listFolders } } }
+  return { ...actual, fetchApi, eventsApi: { ...actual.eventsApi, duplicate }, api: { ...api, folders: { ...api.folders, list: listFolders } } }
 })
 vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
@@ -64,6 +66,7 @@ async function render() {
 }
 
 beforeEach(() => {
+  duplicate.mockReset()
   fetchApi.mockReset()
   fetchApi.mockImplementation(async () => ({ items: [event], total: 1, summary: null }))
   listFolders.mockReset()
@@ -102,4 +105,29 @@ describe('V8 イベント予約の一覧', () => {
     expect(dot?.getAttribute('aria-label')).toBe('フォルダ：教室')
     expect(host.textContent).toContain('秋のしつけ教室')
   })
+})
+
+
+it('一覧の複製は確認窓なしで保存済み版を送り、下書きの行を追加して光らせる', async () => {
+  duplicate.mockImplementation(async () => {
+    fetchApi.mockImplementation(async (path: string) => new URL(path, 'http://worker.test').searchParams.get('highlight') === 'copy'
+      ? { items: [{ ...event, id: 'copy', name: '複製した教室', lifecycle_status: 'draft', is_published: 0 }, event], total: 2, summary: null }
+      : { items: [event], total: 2, summary: null })
+    return { id: 'copy', lifecycle_status: 'draft' }
+  })
+  await render()
+  fireEvent.click(screen.getByRole('button', { name: /秋のしつけ教室.*操作/ }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '複製する' }))
+  await waitFor(() => expect(duplicate).toHaveBeenCalledWith('account-a', 'ev-1', 1))
+  await waitFor(() => expect(host.querySelector('[data-row-id="copy"]')?.getAttribute('aria-selected')).toBe('true'))
+  await waitFor(() => expect(fetchApi.mock.calls.some(([path]) => new URL(String(path), 'http://worker.test').searchParams.get('highlight') === 'copy')).toBe(true))
+  expect(screen.queryByRole('dialog')).toBeNull()
+})
+
+it('閲覧のみの行の操作には複製とフォルダ移動を出さない', async () => {
+  role.value = 'staff'
+  await render()
+  fireEvent.click(screen.getByRole('button', { name: /秋のしつけ教室.*操作/ }))
+  expect(screen.queryByRole('menuitem', { name: '複製する' })).toBeNull()
+  expect(screen.queryByRole('menuitem', { name: 'フォルダへ移す' })).toBeNull()
 })

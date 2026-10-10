@@ -44,8 +44,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 
 vi.mock('next/link', () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) =>
-    React.createElement('a', { href }, children),
+  default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
 
 const routerPush = vi.hoisted(() => vi.fn())
@@ -68,6 +67,8 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
   return { ...actual, useStaffRole: () => role.current }
 })
 
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import BroadcastListV8 from './list'
 import { flushListUrlState } from '@/components/shared/list-url-state'
 
@@ -97,7 +98,7 @@ const base = {
   targetTagId: null,
   status: 'scheduled',
   displayStatus: 'scheduled',
-  displayStatusLabel: '予約済み',
+  displayStatusLabel: '予約中',
   scheduledAt: '2026-08-24T01:00:00.000Z',
   sentAt: null,
   successCount: 0,
@@ -106,6 +107,7 @@ const base = {
 const rowB = { ...base, id: 'bc-2', title: '未購入者フォロー', messageContent: 'まだお買い物していない方へ', status: 'draft', displayStatus: 'draft', displayStatusLabel: '下書き', scheduledAt: null }
 
 beforeEach(() => {
+  forgetStaffIdentity()
   document.documentElement.dataset.theme = 'v8'
   role.current = 'owner'
   store.clear()
@@ -160,6 +162,7 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     const search = host.querySelector('input[placeholder="タイトル・内容で探す"]') as HTMLInputElement
     expect(search, '探す欄がありません').toBeTruthy()
     fireEvent.change(search, { target: { value: '未購入' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
     await flush()
     expect(host.textContent).not.toContain('8月キャンペーンのお知らせ')
     expect(host.textContent).toContain('未購入者フォロー')
@@ -171,10 +174,11 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     act(() => { buttonByText('下書き 3')?.click() })
     await flush()
     expect(listBroadcasts).toHaveBeenLastCalledWith(expect.objectContaining({ displayStatus: 'draft', cursor: 0 }))
-    act(() => { buttonByText('新しい順')?.click() })
+    act(() => { fireEvent.click(host.querySelector('[aria-label="並び"]')!) })
+    act(() => { fireEvent.click([...document.querySelectorAll('[role="option"]')].find(el => el.textContent?.includes('古い順'))!.querySelector('button')!) })
     await flush()
     expect(listBroadcasts).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'oldest' }))
-    expect(buttonByText('古い順'), '並びの字が入れ替わっていません').toBeTruthy()
+    expect(host.querySelector('[aria-label="並び"]'), '並びの字が入れ替わっていません').toBeTruthy()
   })
 
   it('編集キーの無い運用担当は閲覧のみの帯が出て、作る・保存・フォルダ追加のボタンを置かない', async () => {
@@ -191,7 +195,7 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
 
   it('編集キーを持つ運用担当は作れる', async () => {
     role.current = 'staff'
-    window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['broadcast.definition.edit']))
+    rememberStaffIdentity({ role: 'staff', permissionKeys: ['/broadcasts', 'broadcast.definition.edit'] } as StaffMember)
     act(() => { root.render(<BroadcastListV8 />) })
     await flush()
     expect(host.textContent).not.toContain('閲覧のみで見ています')
@@ -216,7 +220,7 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     expect(routerPush).toHaveBeenCalledWith('/broadcasts/new')
   })
 
-  it('下書きの削除は窓を出さずに行を外し、5秒は送らない。予約済みは今までどおり確かめの窓', async () => {
+  it('決まり2：下書きも予約済みも確認してから削除する', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     try {
       deleteBroadcast.mockClear()
@@ -237,10 +241,12 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
       openMenuOf('未購入者フォロー')
       clickMenuItem('削除する')
       await flush()
-      expect(document.querySelector('[role="dialog"],[role="alertdialog"]'), '下書きなのに確かめの窓が出ました').toBeNull()
-      expect([...host.querySelectorAll('tr')].some((tr) => tr.textContent?.includes('未購入者フォロー')), '行が外れていません').toBe(false)
-      expect(deleteBroadcast).not.toHaveBeenCalled()
+      expect(document.body.textContent).toContain('「未購入者フォロー」を削除しますか？')
+      expect([...host.querySelectorAll('tr')].some((tr) => tr.textContent?.includes('未購入者フォロー'))).toBe(true)
       await act(async () => { vi.advanceTimersByTime(5100) })
+      expect(deleteBroadcast).not.toHaveBeenCalled()
+      const confirm = [...document.querySelectorAll('[role="alertdialog"] button')].find((el) => el.textContent?.trim() === '削除する') as HTMLButtonElement
+      act(() => confirm.click())
       await flush()
       expect(deleteBroadcast).toHaveBeenCalledWith('bc-2')
 
@@ -294,29 +300,35 @@ it('2ページ目を含む全配信を検索し、検索結果を20件ずつ表�
   act(() => { root.render(<BroadcastListV8 />) })
   await flush()
   fireEvent.change(host.querySelector('input[placeholder="タイトル・内容で探す"]')!, { target: { value: '検索対象' } })
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
   await flush()
   expect(host.textContent).toContain('検索対象100')
   expect(host.textContent).not.toContain('検索対象124')
-  expect(host.textContent).toContain('25件中 1〜20件')
+  expect(host.textContent).toContain('25 件中 1〜20 件')
   const next = host.querySelector('button[aria-label="次のページ"]') as HTMLButtonElement
   expect(next).toBeTruthy()
   act(() => next.click())
   await flush()
   expect(host.textContent).toContain('検索対象124')
-  expect(host.textContent).toContain('25件中 21〜25件')
+  expect(host.textContent).toContain('25 件中 21〜25 件')
   fireEvent.change(host.querySelector('input[placeholder="タイトル・内容で探す"]')!, { target: { value: '見つからない' } })
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
   await flush()
-  expect(host.textContent).toContain('0件')
+  expect(host.textContent).toContain('0 件')
   fireEvent.change(host.querySelector('input[placeholder="タイトル・内容で探す"]')!, { target: { value: '' } })
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
   await flush()
   expect(host.textContent).toContain('通常0')
-})
+// 複数ページの取得・検索・ページ移動を全部確認し、混雑時も操作全体を待つ。
+}, 20_000)
+
 it('全件検索が上限を超えたら部分的な検索結果を表示しない', async () => {
   resetUrl()
   listBroadcasts.mockResolvedValue({ success: true, data: [rowB], pagination: { total: 10001, nextCursor: '100' } })
   act(() => { root.render(<BroadcastListV8 />) })
   await flush()
   fireEvent.change(host.querySelector('input[placeholder="タイトル・内容で探す"]')!, { target: { value: '未購入' } })
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
   await flush()
   expect(host.textContent).toContain('10,000件')
   expect(host.querySelector('tbody')?.textContent ?? '').not.toContain('未購入者フォロー')
@@ -337,7 +349,9 @@ it('検索保存は現在の並び順と表示件数を保存する', async () =
   createView.mockClear()
   act(() => { root.render(<BroadcastListV8 />) })
   await flush()
-  act(() => { buttonByText('新しい順')!.click(); buttonByText('この条件を保存する')!.click() })
+  act(() => { fireEvent.click(host.querySelector('[aria-label="並び"]')!) })
+  act(() => { fireEvent.click([...document.querySelectorAll('[role="option"]')].find(el => el.textContent?.includes('古い順'))!.querySelector('button')!) })
+  act(() => { buttonByText('この条件を保存する')!.click() })
   await flush()
   fireEvent.change(host.querySelector('input[aria-label="保存する検索の名前"]')!, { target: { value: '古い配信' } })
   act(() => { buttonByText('保存する')!.click() })
@@ -351,15 +365,15 @@ it('検索の通信失敗は内部の英語を出さず、読み直す案内を�
   await flush()
   expect(host.textContent).not.toContain('API error: 500')
   expect(host.textContent).toContain('再読み込みしても直らない場合はエラー報告へ')
-  expect(buttonByText('もう一度試す')).toBeTruthy()
+  expect(buttonByText('もう一度読み込む')).toBeTruthy()
   expect(host.textContent).not.toContain('まだ一斉配信がありません')
   const calls = listBroadcasts.mock.calls.length
   listBroadcasts.mockResolvedValue({ success: true, data: [base], pagination: { total: 1, limit: 20, offset: 0 } })
-  act(() => { buttonByText('もう一度試す')!.click() })
+  act(() => { buttonByText('もう一度読み込む')!.click() })
   await flush()
   expect(listBroadcasts.mock.calls.length).toBe(calls + 1)
   expect(host.textContent).toContain(base.title)
-  expect(buttonByText('もう一度試す')).toBeUndefined()
+  expect(buttonByText('もう一度読み込む')).toBeUndefined()
 })
 
 it('取得に成功して0件だったときだけ、空の一覧を出す', async () => {
@@ -367,7 +381,7 @@ it('取得に成功して0件だったときだけ、空の一覧を出す', asy
   act(() => { root.render(<BroadcastListV8 />) })
   await flush()
   expect(host.textContent).toContain('まだ一斉配信がありません')
-  expect(buttonByText('もう一度試す')).toBeUndefined()
+  expect(buttonByText('もう一度読み込む')).toBeUndefined()
 })
 
 it('WEB-014：一斉配信には手動順・つまみ・上下移動を置かない', async () => {

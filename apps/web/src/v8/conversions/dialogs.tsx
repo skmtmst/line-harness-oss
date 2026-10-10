@@ -1,17 +1,9 @@
 'use client'
-
-/*
- * ★V8 成果地点の詳細・取消・編集の窓。
- *
- * 今の画面（app/conversions/_components/conversion-dialogs.tsx）から写したもの
- * （src/v8 から古い画面ファイルは import できないため）。文言・動き・送る形は
- * 今と同じ。止める操作は V8 では表の下の小窓（list.tsx）で行うので、
- * 止める窓は写していない。
- */
 import type { Dispatch, SetStateAction } from 'react'
 import Button from '@/components/shared/button'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import Dialog from '@/components/shared/dialog'
+import EditorSurface from '@/components/shared/editor-surface'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -28,6 +20,18 @@ import type {
 import { deduplicationLabel } from './dedup'
 import { originInfoOf } from './origin-labels'
 import { readExclusionView, type ExclusionCondition } from './exclusion'
+import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 成果地点の詳細・取消・編集の窓。
+ *
+ * 今の画面（app/conversions/_components/conversion-dialogs.tsx）から写したもの
+ * （src/v8 から古い画面ファイルは import できないため）。文言・動き・送る形は
+ * 今と同じ。止める操作は V8 では表の下の小窓（list.tsx）で行うので、
+ * 止める窓は写していない。
+ */
 
 /**
  * 編集の入力（N-252）。
@@ -93,9 +97,9 @@ const REVERSAL_OPTIONS = [
  * 全部「動いている」に潰れてしまうので、口が導出した `state` を見る。
  */
 export const STATE_LABELS: Record<ConversionDefinitionState, string> = {
-  active: '動いている',
+  active: '有効',
   draft: '下書き',
-  stopped: '止めている',
+  stopped: '停止中',
   invalid: '入力不良',
   sourceStopped: '起点停止',
 }
@@ -269,14 +273,14 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
             {/* R40: 数えない条件とメモを詳細でも確認できる。 */}
             <div className="col-span-2"><dt className="text-ink-faint">数えない条件</dt><dd className="text-ink mt-1 font-semibold">{exclusionLine(detailTarget.sourceConfig)}</dd></div>
             <div><dt className="text-ink-faint">数え方</dt><dd className="text-ink mt-1 font-semibold">{deduplicationLabel(detailTarget.deduplicationMode, detailTarget.deduplicationWindowDays)}</dd></div>
-            <div><dt className="text-ink-faint">この30日</dt><dd className="text-ink mt-1 font-semibold">{formatNumber(detailTarget.metrics.netCount)}件</dd></div>
+            <div><dt className="text-ink-faint">この30日</dt><dd className="text-ink mt-1 font-semibold">{formatNumber(detailTarget.metrics.netCount)} 件</dd></div>
             <div><dt className="text-ink-faint">利用先</dt><dd className="text-ink mt-1 font-semibold">{usageLabel(detailTarget)}</dd></div>
-            <div><dt className="text-ink-faint">取消内訳</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.reversedCount == null ? '取消台帳は未接続' : `${detailTarget.metrics.reversedCount}件・¥${formatNumber((detailTarget.metrics.reversedValue ?? 0))}`}</dd></div>
+            <div><dt className="text-ink-faint">取消内訳</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.reversedCount == null ? '取消台帳は未接続' : `${detailTarget.metrics.reversedCount} 件・¥${formatNumber((detailTarget.metrics.reversedValue ?? 0))}`}</dd></div>
           </dl>
           {detailTarget.stateReason ? (
             <Notice tone="warn" message={detailTarget.stateReason} />
           ) : null}
-          {ingestError ? <p className="text-danger text-sm" role="alert">{ingestError}</p> : null}
+          {ingestError ? <Notice tone="danger" >{ingestError}</Notice> : null}
           {/*
            * IDEA-19: 「購入」「相談完了」など成果1件ずつの記録。
            * 検知は受信履歴、ここは数えた成果の状態(確定・確認待ち・却下・取消)
@@ -449,19 +453,16 @@ export function ConversionReversalDialog(props: ConversionReversalDialogProps) {
       busy={reversalBusy}
       error={reversalError || undefined}
       confirmLabel={reversalKind === 'restore' ? '取消を戻す' : '取り消す'}
-      onConfirm={() => void submitReversal()}
+      onConfirm={() => submitReversal()}
       onCancel={() => setReversalTarget(null)}
     >
-      <label className="block">
-        <span className="text-ink text-xs font-semibold">理由</span>
-        <TextField
+      <Field label="理由"><SaveErrorField names={["reversalReason","reversal_reason"]}><TextField
           className="mt-1"
           value={reversalReason}
           maxLength={500}
-          placeholder="例: 重複して届いた成果だったため"
+          placeholder="例：重複して届いた成果だったため"
           onChange={(e) => setReversalReason(e.target.value)}
-        />
-      </label>
+        /></SaveErrorField></Field>
     </Dialog>
     </>
   )
@@ -481,7 +482,7 @@ export interface ConversionEditDialogProps {
 }
 
 /** 「○○を編集」の窓。中身は `page.tsx` にあったまま。 */
-export function ConversionEditDialog(props: ConversionEditDialogProps) {
+export function ConversionEditDialog(props: ConversionEditDialogProps & { surface?: 'page' | 'dialog' }) {
   const {
     editTarget,
     setEditTarget,
@@ -495,7 +496,7 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
     submitEdit,
   } = props
   return (
-    <Dialog
+    <EditorSurface surface={props.surface}
       open={editTarget !== null && editForm !== null}
       busy={editSaving}
       title={editTarget ? `「${editTarget.name}」を編集` : ''}
@@ -516,30 +517,28 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
             起点：{originInfoOf(editForm.sourceType).trigger}／{originInfoOf(editForm.sourceType).target}
           </p>
           <Field label="名前" htmlFor="cv-edit-name" error={editFieldIssue?.field === 'cv-edit-name' ? editFieldIssue.message : undefined}>
-            <TextField
+            <SaveErrorField names={["name","editForm.name","edit_form.name","edit_form"]}><TextField
               aria-label="成果地点の名前"
               value={editForm.name}
               maxLength={120}
               onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
-            />
+            /></SaveErrorField>
           </Field>
           {/* R281: ページ到達の対象URLも編集できる。URL以外は起点が固定で入力欄は出さない。 */}
           {editForm.sourceType === 'url_reach' ? (
             <Field label="数えてよいページ" htmlFor="cv-edit-url" error={editFieldIssue?.field === 'cv-edit-url' ? editFieldIssue.message : undefined}>
-              <TextField
+              <SaveErrorField names={["targetUrl","editForm.targetUrl","target_url","edit_form.target_url","edit_form"]}><TextField
                 aria-label="数えてよいページ"
                 inputMode="url"
                 value={editForm.targetUrl}
                 maxLength={2000}
                 placeholder="https://example.com/thanks"
                 onChange={(event) => setEditForm({ ...editForm, targetUrl: event.target.value })}
-              />
+              /></SaveErrorField>
             </Field>
           ) : null}
           {/* 起点に金額が無いものは注文の金額を出さない。選択肢は対応表が持つ(作成と同じ)。 */}
-          <label className="block">
-            <span className="text-ink-faint text-xs">金額の決め方</span>
-            <Select
+          <Field label="金額の決め方"><SaveErrorField names={["valueMode","editForm.valueMode","value_mode","edit_form.value_mode","edit_form"]}><Select
               id="cv-edit-value-mode"
               error={editFieldIssue?.field === 'cv-edit-value-mode' ? editFieldIssue.message : undefined}
               aria-label="金額の決め方"
@@ -552,51 +551,44 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
                 setEditForm({ ...editForm, valueMode: value as EditForm['valueMode'] })
                 setEditValueModeNotice(null)
               }}
-            />
-            {editValueModeNotice ? (
+            /></SaveErrorField>
+{editValueModeNotice ? (
               <span className="text-warning mt-1 block text-xs" role="status">
                 {editValueModeNotice}
               </span>
-            ) : null}
-          </label>
+            ) : null}</Field>
           {editForm.valueMode === 'fixed' ? (
             <Field label="1件あたりの金額" htmlFor="cv-edit-value" error={editFieldIssue?.field === 'cv-edit-value' ? editFieldIssue.message : undefined}>
-              <TextField
+              <SaveErrorField names={["fixedValue","editForm.fixedValue","fixed_value","edit_form.fixed_value","edit_form"]}><NumberInput numericText
                 aria-label="1件あたりの金額"
                 inputMode="numeric"
                 value={editForm.fixedValue}
                 onChange={(event) => setEditForm({ ...editForm, fixedValue: event.target.value })}
-              />
+              /></SaveErrorField>
             </Field>
           ) : null}
-          <label className="block">
-            <span className="text-ink-faint text-xs">同じ人を何回数えるか</span>
-            <Select
+          <Field label="同じ人を何回数えるか"><SaveErrorField names={["deduplicationMode","editForm.deduplicationMode","deduplication_mode","edit_form.deduplication_mode","edit_form"]}><Select
               aria-label="同じ人を何回数えるか"
               value={editForm.deduplicationMode}
               options={DEDUP_OPTIONS}
               onChange={(value) => setEditForm({ ...editForm, deduplicationMode: value as EditForm['deduplicationMode'] })}
-            />
-          </label>
+            /></SaveErrorField></Field>
           {editForm.deduplicationMode === 'window' ? (
             <Field label="数えない日数（1〜365）" htmlFor="cv-edit-window" error={editFieldIssue?.field === 'cv-edit-window' ? editFieldIssue.message : undefined}>
-              <TextField
+              <SaveErrorField names={["deduplicationWindowDays","editForm.deduplicationWindowDays","deduplication_window_days","edit_form.deduplication_window_days","edit_form"]}><NumberInput numericText
                 aria-label="数えない日数"
                 inputMode="numeric"
                 value={editForm.deduplicationWindowDays}
                 onChange={(event) => setEditForm({ ...editForm, deduplicationWindowDays: event.target.value })}
-              />
+              /></SaveErrorField>
             </Field>
           ) : null}
-          <label className="block">
-            <span className="text-ink-faint text-xs">取り消しの扱い</span>
-            <Select
+          <Field label="取り消しの扱い"><SaveErrorField names={["reversalPolicy","editForm.reversalPolicy","reversal_policy","edit_form.reversal_policy","edit_form"]}><Select
               aria-label="取り消しの扱い"
               value={editForm.reversalPolicy}
               options={REVERSAL_OPTIONS}
               onChange={(value) => setEditForm({ ...editForm, reversalPolicy: value as EditForm['reversalPolicy'] })}
-            />
-          </label>
+            /></SaveErrorField></Field>
           {/* R281: 友だち追加からの計測期間も編集できる。空欄は既定の90日。 */}
           <Field
             label="友だち追加からの計測期間（日）"
@@ -606,13 +598,13 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
             help="友だち追加からこの日数までの成果を数えます。同じ人を数えない「数えない日数」とは別の設定です。"
             helpLabel="計測期間"
           >
-            <TextField
+            <SaveErrorField names={["attributionDays","editForm.attributionDays","attribution_days","edit_form.attribution_days","edit_form"]}><NumberInput numericText unit="日"
               aria-label="友だち追加からの計測期間"
               inputMode="numeric"
               value={editForm.attributionDays}
               placeholder="90"
               onChange={(event) => setEditForm({ ...editForm, attributionDays: event.target.value })}
-            />
+            /></SaveErrorField>
           </Field>
           {/* R40: 数えない条件とメモも編集できる。条件は作成と同じ共通部品。 */}
           <div id="cv-edit-exclusion" aria-invalid={editFieldIssue?.field === 'cv-edit-exclusion' || undefined}>
@@ -625,21 +617,21 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
               />
             </Field>
           </div>
-          <Field label="数えない条件のメモ（任意）" htmlFor="cv-edit-memo" error={editFieldIssue?.field === 'cv-edit-memo' ? editFieldIssue.message : undefined}>
-            <TextField
+          <Field note={<>
+            いま使っている場所（{usageLabel(editTarget!)}）は、この成果地点のまま次の版へ引き継がれます。
+            過去の成果は数えたときの金額のままなので、集計額は変わりません。
+          </>} label="数えない条件のメモ（任意）" htmlFor="cv-edit-memo" error={editFieldIssue?.field === 'cv-edit-memo' ? editFieldIssue.message : undefined}>
+            <SaveErrorField names={["exclusionMemo","editForm.exclusionMemo","exclusion_memo","edit_form.exclusion_memo","edit_form"]}><TextField
               aria-label="数えない条件のメモ"
               value={editForm.exclusionMemo}
               maxLength={500}
               onChange={(event) => setEditForm({ ...editForm, exclusionMemo: event.target.value })}
-            />
+            /></SaveErrorField>
           </Field>
-          <p className="text-ink-faint text-xs leading-5">
-            いま使っている場所（{usageLabel(editTarget!)}）は、この成果地点のまま次の版へ引き継がれます。
-            過去の成果は数えたときの金額のままなので、集計額は変わりません。
-          </p>
+
           {editError ? <Notice tone="danger">{editError}</Notice> : null}
         </div>
       ) : null}
-    </Dialog>
+    </EditorSurface>
   )
 }

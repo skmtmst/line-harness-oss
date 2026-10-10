@@ -52,6 +52,20 @@ describe('Visual QA モックの HTTP method 受け渡し', () => {
     child?.kill('SIGTERM')
   })
 
+  it('計測鍵を待たせず返し、同じアカウントは同じ鍵・別アカウントは別の鍵', async () => {
+    const key = async (account: string) => {
+      const response = await fetch(`${baseUrl}/api/site/tracking-key?account_id=${account}`, { signal: AbortSignal.timeout(2000) })
+      expect(response.status).toBe(200)
+      const body = await response.json()
+      expect(body).toMatchObject({ success: true, data: { accountId: account } })
+      expect(body.data.trackingKey).toMatch(/^hk_[a-f0-9]{32}$/)
+      return body.data.trackingKey as string
+    }
+    const first = await key('visual-account-one')
+    expect(await key('visual-account-one')).toBe(first)
+    expect(await key('visual-account-two')).not.toBe(first)
+  })
+
   it.each([
     ['GET', '/api/forms', 200],
     ['POST', '/api/forms/drafts', 200],

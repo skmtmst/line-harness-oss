@@ -28,6 +28,7 @@ import { formatDateTime } from '@/lib/format'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import RestaurantShell, { Panel, Stat, Status, type RestaurantV8Context } from './shell'
 import styles from './shell.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const roleLabel: Record<RestaurantMembership['role'], string> = {
   super_admin: 'SuperAdmin',
@@ -92,14 +93,14 @@ function DefaultSelect({ name, ariaLabel, defaultValue, options }: {
 }) {
   const [value, setValue] = useState(defaultValue)
   return (
-    <Select
+    <SaveErrorField names={["value"]}><Select
       name={name}
       aria-label={ariaLabel}
       value={value}
       onChange={setValue}
       size="full"
       options={options}
-    />
+    /></SaveErrorField>
   )
 }
 
@@ -241,19 +242,19 @@ function IntakeAddressPanel({ accountId, store }: { accountId: string; store: Re
         <div className={styles.intakeEmpty}><p>未発行</p></div>
       ) : (
         <div className={styles.intakeList}>
-          {addresses.map((item) => (
+          {addresses.map((item, saveFieldIndex) => (
             <div key={item.id} className={styles.intakeCard}>
               <div className={styles.intakeCardHead}>
                 <p className={styles.cellSub}>{item.revokedAt ? `${intakeDate(item.revokedAt)}まで有効` : '現在使用中'}</p>
                 <Status value={item.status} />
               </div>
               <div className={styles.intakeRow}>
-                <input
+                <SaveErrorField names={[`addresses.${saveFieldIndex}.address`,"address","item.address"]}><input
                   aria-label={`${store.name}の取り込みアドレス`}
                   readOnly
                   value={item.address}
                   className={`${styles.input} ${styles.intakeAddress}`}
-                />
+                /></SaveErrorField>
                 <Button size="compact" onClick={() => void copy(item)}>{copiedId === item.id ? 'コピー済み' : 'コピー'}</Button>
               </div>
               <p className={styles.cellSub}>発行日時: {intakeDate(item.createdAt)}</p>
@@ -324,12 +325,14 @@ function LoginConnection({ member, logins, busy, save }: { member: RestaurantMem
   return <div>
     <p>{member.staff_id ? `${member.loginName || 'ログインメンバー'}・${member.loginRole === 'owner' ? 'オーナー' : member.loginRole === 'admin' ? '管理者' : 'スタッフ'}${member.loginAccessLevel === 'read_only' ? '（閲覧のみ）' : ''}` : 'ログイン未連携'}</p>
     {member.staff_id ? <p>{member.loginAccountScope === 'all' ? '全アカウント' : '担当アカウントのみ'}・版 {member.loginPolicyVersion}</p> : null}
-    {logins.length ? <><Select aria-label={`${member.staff_name}のログインメンバー`} value={selected} onChange={setSelected} size="full" options={[{value:'',label:'連携しない'},...logins.map(l=>({value:l.id,label:l.name}))]} />
+    {logins.length ? <><SaveErrorField names={["selected"]}><Select aria-label={`${member.staff_name}のログインメンバー`} value={selected} onChange={setSelected} size="full" options={[{value:'',label:'連携しない'},...logins.map(l=>({value:l.id,label:l.name}))]} /></SaveErrorField>
       <Button size="compact" disabled={busy || selected===(member.staff_id || '')} onClick={()=>save(selected || null)}>ログインと連携</Button></> : null}
   </div>
 }
 
 function OrganizationBoard({ ctx }: { ctx: RestaurantV8Context }) {
+  const saveErrors = useSaveFormErrors()
+
   const { data, store, selectedStoreId, busy, mutate } = ctx
   const { accounts, selectedAccountId } = useAccount()
   const members = selectedStoreId ? data.memberships.filter((m) => !m.store_id || m.store_id === selectedStoreId) : data.memberships
@@ -357,6 +360,8 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantV8Context }) {
     const request={...body,expectedPolicyVersion:member?.loginPolicyVersion,idempotencyKey:crypto.randomUUID()}
     try { return await restaurantTestApi.updateMembership(accountId,id,request) }
     catch(error) {
+      saveErrors.capture(error)
+
       if(!isStepUpRequired(error)) throw error
       const token=await gate('staff.permissions.change','店の役割とログイン権限を変更する')
       if(!token) throw new Error('本人確認を中止しました。変更は保存されていません。')
@@ -404,7 +409,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantV8Context }) {
   }
 
   return (
-    <div className={styles.orgGrid}>
+    <SaveErrorScope errors={saveErrors}><div className={styles.orgGrid}>
       {prompt}
       <Panel title="組織階層">
         <p className={styles.cellSub}>統括: {data.organization?.tenant_name || '未設定'}</p>
@@ -552,7 +557,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantV8Context }) {
           </DataTable>
         </Panel>
       </div>
-    </div>
+    </div></SaveErrorScope>
   )
 }
 

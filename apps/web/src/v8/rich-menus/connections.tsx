@@ -1,17 +1,6 @@
 'use client'
 
-/*
- * ★V8 リッチメニュー「切替のつながり」（Pencil `wxIQ7`）。
- *
- * 読み込み（古い応答を捨てる）・404 と失敗の分け方・アカウント違いの扱い・つながりの調べ方
- * （保存済みのページと切替ボタンだけから、戻れない・届かない・切替先なしを見る）は今の画面
- * （app/rich-menus/connections/page.tsx）と同じ。見せ方を絵に合わせた：
- * 左に段「つながりの図」（メニューのカードとタブの行き来）と「よくある事故の見張り」、
- * 右の列に操作（編集する・切替のつながり・…）と「いまの状態」。
- * 受け付ける URL：`/rich-menus/connections?id=<メニュー>`。
- */
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeftRight, ArrowRight, GitFork, Pencil, Plus, TriangleAlert } from 'lucide-react'
 import { api, ApiError, type RichMenuAreaResponse } from '@/lib/api'
@@ -26,6 +15,19 @@ import TargetMissing from '@/components/shared/target-missing'
 import { formatNumber } from '@/lib/format'
 import { analyzeConnections, type ConnectionAnalysis, type ConnectionPage } from './connection-analysis'
 import styles from './connections.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+
+/*
+ * ★V8 リッチメニュー「切替のつながり」（Pencil `wxIQ7`）。
+ *
+ * 読み込み（古い応答を捨てる）・404 と失敗の分け方・アカウント違いの扱い・つながりの調べ方
+ * （保存済みのページと切替ボタンだけから、戻れない・届かない・切替先なしを見る）は今の画面
+ * （app/rich-menus/connections/page.tsx）と同じ。見せ方を絵に合わせた：
+ * 左に段「つながりの図」（メニューのカードとタブの行き来）と「よくある事故の見張り」、
+ * 右の列に操作（編集する・切替のつながり・…）と「いまの状態」。
+ * 受け付ける URL：`/rich-menus/connections?id=<メニュー>`。
+ */
 
 const MAX_PAGES = 10
 
@@ -164,7 +166,7 @@ function Connections() {
   const taps = group.monthlyStats?.taps ?? null
 
   const menuItems: ActionMenuItem[] = [
-    { id: 'open', label: 'メニューを開く', external: true, onSelect: () => router.push(editHref) },
+    { id: 'open', label: 'メニューを開く', external: false, href: editHref, onSelect: () => router.push(editHref) },
     { id: 'list', label: 'メニュー一覧へ', onSelect: () => router.push('/rich-menus') },
   ]
 
@@ -181,8 +183,8 @@ function Connections() {
         <h2 className={styles.boxTitle} id="rm-state">いまの状態</h2>
         <div className={styles.row}><span>状態</span><strong>{group.status === 'published' ? '公開中' : '下書き'}</strong></div>
         <div className={styles.row}><span>出す相手</span><strong>{audienceText}</strong></div>
-        <div className={styles.row}><span>出る人</span><strong>{reach === null ? '—' : `${formatNumber(reach)}人`}</strong></div>
-        <div className={styles.row}><span>今月押された</span><strong>{taps === null ? '—' : `${formatNumber(taps)}回`}</strong></div>
+        <div className={styles.row}><span>出る人</span><strong>{reach === null ? emptyValue('unknown') : `${formatNumber(reach)}人`}</strong></div>
+        <div className={styles.row}><span>今月押された</span><strong>{taps === null ? emptyValue('unknown') : `${formatNumber(taps)}回`}</strong></div>
       </section>
     </div>
   )
@@ -191,8 +193,8 @@ function Connections() {
     <CreatePage
       boardId="wxIQ7"
       title={`切替のつながり：${group.name}`}
-      description="タブで行き来できるメニューの関係"
-      identity={<Link href="/rich-menus" className={styles.backLink}>← リッチメニューへ</Link>}
+      help="タブで行き来できるメニューの関係"
+
       preview={aside}
       footerActions={<>
         <Button href="/rich-menus">メニュー一覧へ</Button>
@@ -208,7 +210,7 @@ function Connections() {
           {entry ? (
             <article className={styles.menu} data-entry="">
               <span className={styles.menuImage} aria-hidden="true" />
-              <strong className={styles.menuName} title={entry.name}>{entry.name}</strong>
+              <strong className={styles.menuName} ><TruncatedText value={String(entry.name ?? '')} /></strong>
               <span className={styles.menuSub}>このメニュー・タブA</span>
             </article>
           ) : null}
@@ -223,7 +225,7 @@ function Connections() {
                 </span>
                 <article className={styles.menu} data-broken={returns ? undefined : ''}>
                   <span className={styles.menuImage} aria-hidden="true" />
-                  <strong className={styles.menuName} title={page.name}>{page.name}</strong>
+                  <strong className={styles.menuName} ><TruncatedText value={String(page.name ?? '')} /></strong>
                   <span className={styles.menuSub}>{`タブ${tabLetter(index + 1)}・${returns ? '戻るタブあり' : '戻るタブなし'}`}</span>
                 </article>
               </div>
@@ -232,9 +234,9 @@ function Connections() {
         </div>
         <div className={styles.addRow}>
           {pages.length < MAX_PAGES ? (
-            <Button variant="text" href={buttonsHref}><Plus size={15} aria-hidden="true" />{`切替先のメニューを足す（最大${MAX_PAGES}枚）`}</Button>
-          ) : <span className={styles.cardNote}>{`切替先は最大${MAX_PAGES}枚です`}</span>}
-          <span className={styles.count}>{`${pages.length}枚`}</span>
+            <Button variant="text" href={buttonsHref}><Plus size={15} aria-hidden="true" />{`切替先のメニューを足す（最大${MAX_PAGES} 枚）`}</Button>
+          ) : <span className={styles.cardNote}>{`切替先は最大${MAX_PAGES} 枚です`}</span>}
+          <span className={styles.count}>{`${pages.length} 枚`}</span>
         </div>
       </section>
 
@@ -248,12 +250,12 @@ function Connections() {
           </div>
         ))}
         {analysis.missingTargetEdges.length > 0 ? (
-          <div className={styles.check}><span>切替先が見つからないタブ</span><strong className={styles.bad}>{`${analysis.missingTargetEdges.length}件`}</strong></div>
+          <div className={styles.check}><span>切替先が見つからないタブ</span><strong className={styles.bad}>{`${analysis.missingTargetEdges.length} 件`}</strong></div>
         ) : null}
         {analysis.unreachablePageIds.size > 0 ? (
-          <div className={styles.check}><span>どこからも来られないメニュー</span><strong className={styles.bad}>{`${analysis.unreachablePageIds.size}件`}</strong></div>
+          <div className={styles.check}><span>どこからも来られないメニュー</span><strong className={styles.bad}>{`${analysis.unreachablePageIds.size} 件`}</strong></div>
         ) : null}
-        <div className={styles.check}><span>切替先が下書きのまま</span><strong className={draftTargets.length ? styles.bad : undefined}>{draftTargets.length ? `${draftTargets.length}件` : 'なし'}</strong></div>
+        <div className={styles.check}><span>切替先が下書きのまま</span><strong className={draftTargets.length ? styles.bad : undefined}>{draftTargets.length ? `${draftTargets.length}件` : emptyValue('none')}</strong></div>
         {/* 「誰に出すか」はメニューの束ごとに決めるので、切替先だけ違うことは起きない。 */}
         <div className={styles.check}><span>切替先だけ「誰に出すか」が違う</span><strong>なし</strong></div>
       </section>

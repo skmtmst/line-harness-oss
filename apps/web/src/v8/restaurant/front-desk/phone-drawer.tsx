@@ -1,12 +1,7 @@
 'use client'
+import Toggle from '@/components/shared/toggle';
 
-/*
- * ★V8 電話予約の引き出し（提案 E-2 `wEzuG`）。
- *
- * 電話番号 → LINE の友だちを探して候補（押すと名前が入る）→ 名前 → 人数（−/＋）→ 日付（今日／明日／選ぶ）
- * → 空いている時刻の札 → 卓は自動（変えられる）→ メモ → 「LINE で確認を送る」（友だちのときだけ）→［予約を入れる］。
- * 電話番号・時刻・［予約を入れる］の3〜4手で入る。保存は今の手動予約の口（source=phone）。動きは BEHAVIOR.md。
- */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useMemo, useState } from 'react'
 import { Check, CircleCheck, Minus, Plus } from 'lucide-react'
 import type { RestaurantOpeningDay } from '@line-crm/shared'
@@ -18,12 +13,23 @@ import IconButton from '@/components/shared/icon-button'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { restaurantTestApi, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
 import { STAY_MINUTES, freeTables, openTimes, startOf, tableNote, toYmd } from './slots'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
 import styles from './front-desk.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+/*
+ * ★V8 電話予約の引き出し（提案 E-2 `wEzuG`）。
+ *
+ * 電話番号 → LINE の友だちを探して候補（押すと名前が入る）→ 名前 → 人数（−/＋）→ 日付（今日／明日／選ぶ）
+ * → 空いている時刻の札 → 卓は自動（変えられる）→ メモ → 「LINE で確認を送る」（友だちのときだけ）→［予約を入れる］。
+ * 電話番号・時刻・［予約を入れる］の3〜4手で入る。保存は今の手動予約の口（source=phone）。動きは BEHAVIOR.md。
+ */
 
 type Friend = { name: string; phone: string; lineUid: string }
 type DayChoice = 'today' | 'tomorrow' | 'pick'
@@ -37,7 +43,7 @@ function addDays(day: Date, days: number): Date {
 }
 
 function md(day: Date): string {
-  return `${day.getMonth() + 1}/${day.getDate()}`
+  return polishFormatDate(day, { style: 'list-day' })
 }
 
 export default function PhoneReservationDrawer({ open, accountId, storeId, tables, onClose, onSaved }: {
@@ -49,6 +55,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
   /** 保存できたら呼ぶ（LINE の確認が送れなかったときは lineFailed）。 */
   onSaved: (result: { lineFailed: boolean }) => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const now = useMemo(() => new Date(), [open]) // eslint-disable-line react-hooks/exhaustive-deps
   const [phone, setPhone] = useState('')
   const [friends, setFriends] = useState<Friend[]>([])
@@ -160,7 +167,12 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
       })
       onSaved({ lineFailed: Boolean(friend) && notify && !res.data.lineNotice.sent })
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : '予約を入れられませんでした。もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
+
+      setError(caught instanceof Error && caught.message ? caught.message : '予約を入れられませんでした。もう一度お試しください。') }
     } finally {
       setBusy(false)
     }
@@ -169,19 +181,16 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
   const footer = (
     <div className={styles.drawerFoot}>
       <Button onClick={onClose} disabled={busy}>キャンセル</Button>
-      <Button variant="primary" onClick={() => void save()} disabled={busy}>
+      <Button variant="primary" onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
         <Check size={15} aria-hidden="true" />予約を入れる
       </Button>
     </div>
   )
 
   return (
-    <Drawer open={open} width="narrow" title="電話予約を入れる" dirty={dirty} busy={busy} error={error || undefined} onClose={onClose} footer={footer}>
+    <SaveErrorScope errors={saveErrors}><Drawer open={open} width="narrow" title="電話予約を入れる" dirty={dirty} busy={busy} error={error || undefined} onClose={onClose} footer={footer}>
       <div className={styles.form} data-design-node="wEzuG">
-        <label className={styles.field}>
-          <span className={styles.label}>電話番号</span>
-          <TextField type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={(event) => { setPhone(event.target.value); if (friend) choose(null) }} placeholder="090-1234-5678" />
-        </label>
+        <Field label="電話番号"><SaveErrorField names={["phone","customerPhone"]}><TextField type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={(event) => { setPhone(event.target.value); if (friend) choose(null) }} placeholder="090-1234-5678" /></SaveErrorField></Field>
         {friends.length > 0 ? (
           <div className={styles.friendBox} role="group" aria-label="LINE の友だちの候補">
             <p className={styles.friendTitle}>LINE の友だちが見つかりました</p>
@@ -200,11 +209,8 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
             })}
           </div>
         ) : null}
-        <div className={styles.field}>
-          <label htmlFor="e2-name" className={styles.label}>お名前</label>
-          <TextField {...fields.bind('name')} id="e2-name" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'e2-name-error' : undefined} value={name} onChange={(event) => setName(event.target.value)} autoComplete="off" />
-          <FieldError id="e2-name-error">{fields.error('name')}</FieldError>
-        </div>
+        <div className={styles.field}><Field label="お名前" htmlFor="e2-name"><SaveErrorField names={["name","customerName"]}><TextField {...fields.bind('name')} id="e2-name" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'e2-name-error' : undefined} value={name} onChange={(event) => setName(event.target.value)} autoComplete="off" /></SaveErrorField>
+<FieldError id="e2-name-error">{fields.error('name')}</FieldError></Field></div>
         <div className={styles.field}>
           <span className={styles.label} id="e2-guests">人数</span>
           <div className={styles.stepper} role="group" aria-labelledby="e2-guests">
@@ -216,7 +222,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
         <div className={styles.field}>
           <span className={styles.label}>日付</span>
           <span className={styles.segment}>
-          <SegmentedControl<DayChoice>
+          <SaveErrorField names={["dayChoice"]}><SegmentedControl<DayChoice>
             aria-label="日付"
             value={dayChoice}
             onChange={(value) => { setDayChoice(value); setTime('') }}
@@ -225,11 +231,11 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
               { value: 'tomorrow', label: `明日 ${md(addDays(now, 1))}` },
               { value: 'pick', label: '日付を選ぶ' },
             ]}
-          />
+          /></SaveErrorField>
           </span>
           {dayChoice === 'pick' ? (
             <span {...fields.bind('date')}>
-              <DateField value={picked} onChange={(value) => { setPicked(value); setTime('') }} min={toYmd(now)} aria-label="予約の日付" invalid={fields.invalid('date')} aria-describedby={describedBy('date')} />
+              <SaveErrorField names={["picked"]}><DateField value={picked} onChange={(value) => { setPicked(value); setTime('') }} min={toYmd(now)} aria-label="予約の日付" invalid={fields.invalid('date')} aria-describedby={describedBy('date')} /></SaveErrorField>
             </span>
           ) : null}
           <FieldError id="e2-date-error">{fields.error('date')}</FieldError>
@@ -264,21 +270,18 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
           {candidates.length > 1 && !changingTable ? <Button variant="text" onClick={() => setChangingTable(true)}>変える</Button> : null}
         </div>
         {changingTable && candidates.length > 1 ? (
-          <Select
+          <SaveErrorField names={["id","chosenTable?.id","tableId","chosen_table?.id","table_id"]}><EntitySelect
             aria-label="卓を選ぶ"
             size="full"
             value={chosenTable?.id ?? ''}
             onChange={setTableId}
-            options={candidates.map((t) => ({ value: t.id, label: `${t.code}（${tableNote(t)}）` }))}
-          />
+            options={candidates.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: `${t.code}（${tableNote(t)}）` }))}
+          /></SaveErrorField>
         ) : null}
-        <label className={styles.field}>
-          <span className={styles.label}>メモ <span className={styles.optional}>任意</span></span>
-          <TextField value={memo} onChange={(event) => setMemo(event.target.value)} placeholder="アレルギー・記念日など" />
-        </label>
+        <Field label="メモ"><SaveErrorField names={["memo","note"]}><TextField value={memo} onChange={(event) => setMemo(event.target.value)} placeholder="アレルギー・記念日など" /></SaveErrorField></Field>
         {friend ? (
           <div className={styles.notifyRow}>
-            <Toggle checked={notify} onChange={setNotify} label="LINE で確認を送る" />
+            <SaveErrorField names={["notify"]}><SettingCheckbox checked={notify} onChange={setNotify} label="LINE で確認を送る" /></SaveErrorField>
             <span className={styles.notifyText}>
               <span className={styles.notifyTitle}>LINE で確認を送る</span>
               <span className={styles.notifySub}>友だちのときだけ出ます</span>
@@ -286,6 +289,6 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
           </div>
         ) : null}
       </div>
-    </Drawer>
+    </Drawer></SaveErrorScope>
   )
 }

@@ -180,3 +180,4 @@ export * from './booking-menu-order.js';
 export * from './tenant-company-contact.js';
 export * from './workflow-steps.js';
 export * from './hq-folders.js';
+export * from './archive-restore.js';

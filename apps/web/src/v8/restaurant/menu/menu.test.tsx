@@ -3,6 +3,12 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// 日付の見本を作る前に日本時間で固定し、待ち合わせのタイマーは動かす。
+vi.hoisted(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
+})
+
 const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), createMenu: vi.fn(), updateMenu: vi.fn() }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const fetchApi = vi.hoisted(() => vi.fn())
@@ -16,19 +22,21 @@ import MenuPage from './menu'
 import { snapshotOf } from '../booking-kit/test-data'
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
   role.value = 'owner'
   fixture.snapshot.mockResolvedValue({ data: snapshotOf() })
   fixture.createMenu.mockResolvedValue({ success: true })
   fixture.updateMenu.mockResolvedValue({ success: true })
   fetchApi.mockResolvedValue({ success: true })
 })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 
 const openMenu = (name: string) => fireEvent.click(screen.getByRole('button', { name: `メニュー「${name}」の操作` }))
 
 /* ★V8 メニュー管理（板 MJoJR・停止 MV5Os・追加と変更 NkmwU）の動き。 */
 describe('MJoJR メニュー管理', () => {
-  it('数5・「…」の決まりの帯・一覧が出て、保管済みだけ再開が出る', async () => {
+  it('数5・「…」の決まりの帯・一覧が出て、アーカイブだけ再開が出る', async () => {
     render(<MenuPage />)
     await screen.findByText('メニュー一覧')
     const board = document.querySelector('[data-design-node="MJoJR"]')!

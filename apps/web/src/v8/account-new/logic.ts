@@ -1,3 +1,5 @@
+
+import { jstDateOffset } from '@/lib/jst-datetime'
 /*
  * ★V8 LINEアカウントを登録の、画面に依らない小さな計算。
  * src/v8 からは @/app を読めないので、今の登録（app/accounts/connection-check-view.ts・
@@ -108,8 +110,7 @@ export function allV8RowsPassed(rows: V8CheckRow[]): boolean {
 
 /** 友だち数の統計は前日分。日本時間の昨日を yyyyMMdd で返す。 */
 export function insightDateJst(now: Date = new Date()): string {
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000 - 24 * 60 * 60 * 1000)
-  return `${jst.getUTCFullYear()}${String(jst.getUTCMonth() + 1).padStart(2, '0')}${String(jst.getUTCDate()).padStart(2, '0')}`
+  return jstDateOffset(-1, now).replaceAll('-', '')
 }
 
 export const DRAFT_KEY = 'musubo-register-draft-v8'

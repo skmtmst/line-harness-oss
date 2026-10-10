@@ -1,12 +1,5 @@
 'use client'
-
-/*
- * ★V8-B ごはんの目安（h7A2F）。
- * 左に「主食」「然の商品（おやつ・トッピング）＋おやつの上限」の2枚、右に「今日の目安の計算」。
- * 保存・キャンセルは画面の下に張り付く帯（中央）。保存していない変更は離れる前に確かめる。
- * 口は今の画面と同じ（GET/PUT /api/nen/feeding-products）。
- * 行は文字で見せ、商品名を押すとその行だけ入力欄になる（足した行は最初から入力欄）。
- */
+import { notifySaved } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Trash2 } from 'lucide-react'
 import Card from '@/components/shared/card'
@@ -26,6 +19,19 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { nenRanksApi, type NenFeedingData, type NenFeedingKind } from '@/lib/nen-ranks-api'
 import { Pill } from './parts'
 import styles from './pets.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B ごはんの目安（h7A2F）。
+ * 左に「主食」「然の商品（おやつ・トッピング）＋おやつの上限」の2枚、右に「今日の目安の計算」。
+ * 保存・キャンセルは画面の下に張り付く帯（中央）。保存していない変更は離れる前に確かめる。
+ * 口は今の画面と同じ（GET/PUT /api/nen/feeding-products）。
+ * 行は文字で見せ、商品名を押すとその行だけ入力欄になる（足した行は最初から入力欄）。
+ */
 
 /** 係数の説明（Worker `services/nen-feeding.ts` の ENERGY_FACTORS と同じ値）。 */
 const FACTOR_ROWS: Array<{ label: string; dog: string; cat: string }> = [
@@ -54,6 +60,7 @@ const fromData = (next: NenFeedingData): FeedingDraft[] =>
   next.products.map((p) => ({ key: p.id, id: p.id, name: p.name, kcal: String(p.kcalPer100g), isDefault: p.isDefault, kind: p.kind === 'nen' ? 'nen' : 'staple', editing: false }))
 
 export default function FeedingV8({ accountId, canEdit }: { accountId: string; canEdit: boolean }) {
+  const saveErrors = useSaveFormErrors()
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
   const [data, setData] = useState<NenFeedingData | null>(null)
   const [drafts, setDrafts] = useState<FeedingDraft[]>([])
@@ -84,9 +91,11 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
       setStatus('ready')
     } catch (caught) {
       if (generationRef.current !== generation) return
+      saveErrors.capture(caught);
+
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
-  }, [accountId])
+  }, [accountId, saveErrors])
 
   useEffect(() => {
     void load()
@@ -150,26 +159,30 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
       setDrafts(fromData(res.data))
       setTreatLimit(String(res.data.treatLimitPercent ?? 10))
       setDirty(false)
-      setNotice(res.data.refreshedPets
+      notifySaved(res.data.refreshedPets
         ? `主食を保存し、登録済みのペット ${formatNumber(res.data.refreshedPets)}頭の目安を計算し直しました。`
         : '主食を保存しました。')
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
       setError(describeApiFailure(caught, '主食の保存', {
-        forbidden: '主食を保存する権限がありません。権限を確認してください。',
-      }))
+        scope: 'store',
+      })) }
     } finally {
       setBusy(false)
     }
   }
 
-  if (status === 'forbidden') return <ListState kind="forbidden" />
-  if (status === 'error') return <ListState kind="error" title="主食のカロリー表を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
-  if (!data) return <ListState kind="loading" title="主食のカロリー表を読み込んでいます" />
+  if (status === 'forbidden') return <SaveErrorScope errors={saveErrors}><ListState kind="forbidden" /></SaveErrorScope>
+  if (status === 'error') return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="主食のカロリー表を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} /></SaveErrorScope>
+  if (!data) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="主食のカロリー表を読み込んでいます" /></SaveErrorScope>
 
   const tableProps = { fields, drafts, canEdit, busy, onUpdate: update, onDefault: setDefault, onRemove: remove, addDisabled: drafts.length >= MAX_PRODUCTS }
 
   return (
-    <div className={styles.feeding}>
+    <SaveErrorScope errors={saveErrors}><div className={styles.feeding}>
       {notice ? <Notice tone="success" message={notice} /> : null}
       {error ? <Notice tone="danger" message={error} /> : null}
       <div className={styles.feedingGrid}>
@@ -187,19 +200,16 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
               <p className={styles.cardDesc}>然の商品名と 100g あたりのカロリーを登録すると、マイページに「然の鹿肉の目安」が出ます</p>
             </div>
             <ProductTable {...tableProps} kind="nen" defaultHead="目安に使う商品" defaultChip="目安に使う中" makeDefault="これを使う" addLabel="然の商品を追加する" onAdd={() => add('nen')} />
-            <div className={styles.treat}>
-              <label className={styles.treatLabel} htmlFor="nen-treat-limit">おやつの上限（%）</label>
-              <span className={styles.treatRow}>
+            <div className={styles.treat}><Field label="おやつの上限（%）" htmlFor="nen-treat-limit"><span className={styles.treatRow}>
                 <span className={styles.treatInput}>
                   {canEdit ? (
-                    <TextField disabled={busy} id="nen-treat-limit" inputMode="numeric" value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); touch() }} />
+                    <SaveErrorField names={["treatLimit","treat_limit"]}><NumberInput numericText unit="%" disabled={busy} id="nen-treat-limit" inputMode="numeric" value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); touch() }} /></SaveErrorField>
                   ) : (
-                    <TextField id="nen-treat-limit" value={treatLimit} readOnly />
+                    <SaveErrorField names={["treatLimit","treat_limit"]}><TextField id="nen-treat-limit" value={treatLimit} readOnly /></SaveErrorField>
                   )}
                 </span>
                 <span className={styles.treatNote}>1日の必要カロリーのうち、おやつに回す割合</span>
-              </span>
-            </div>
+              </span></Field></div>
           </Card>
         </div>
 
@@ -247,7 +257,7 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
         />
       ) : null}
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="ごはんの目安への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div>
+    </div></SaveErrorScope>
   )
 }
 
@@ -279,21 +289,21 @@ function ProductTable({
           <span className={styles.productDefault} role="columnheader">{defaultHead}</span>
           <span className={styles.productTrash} role="columnheader"><span className="sr-only">削除</span></span>
         </div>
-        {rows.map((row) => (
+        {rows.map((row, saveFieldIndex) => (
           <div key={row.key} className={styles.productRow} role="row">
             <span className={styles.productName} role="cell">
               {row.editing && canEdit ? (
-                <><TextField {...fields.bind(`feeding-name-${row.key}`)} disabled={busy} aria-label="商品名" value={row.name} maxLength={40} placeholder={kind === 'nen' ? '例：然 鹿肉ジャーキー' : '例：ドライフード'} onChange={(event) => onUpdate(row.key, { name: event.target.value })} /><FieldError id={`feeding-name-${row.key}-error`}>{fields.error(`feeding-name-${row.key}`)}</FieldError></>
+                <><SaveErrorField names={[`rows.${saveFieldIndex}.name`,"row.name"]}><TextField {...fields.bind(`feeding-name-${row.key}`)} disabled={busy} aria-label="商品名" value={row.name} maxLength={40} placeholder={kind === 'nen' ? '例：然 鹿肉ジャーキー' : '例：ドライフード'} onChange={(event) => onUpdate(row.key, { name: event.target.value })} /></SaveErrorField><FieldError id={`feeding-name-${row.key}-error`}>{fields.error(`feeding-name-${row.key}`)}</FieldError></>
               ) : canEdit ? (
-                <button type="button" disabled={busy} className={styles.productNameButton} title={`${row.name}を直す`} onClick={() => onUpdate(row.key, { editing: true })}>{row.name}</button>
+                <button type="button" disabled={busy} className={styles.productNameButton} title={`${row.name}を直す`}  onClick={() => onUpdate(row.key, { editing: true })}>{row.name}</button>
               ) : (
-                <span className={styles.cell} title={row.name}>{row.name}</span>
+                <span className={styles.cell} ><TruncatedText value={String(row.name ?? '')} /></span>
               )}
             </span>
             <span className={styles.productKcal} role="cell">
               {row.editing && canEdit ? (
                 <span className={styles.kcalInput}>
-                  <TextField {...fields.bind(`feeding-kcal-${row.key}`)} disabled={busy} aria-label={`${row.name || '商品'}の100gあたりのカロリー`} inputMode="decimal" value={row.kcal} placeholder="360" onChange={(event) => onUpdate(row.key, { kcal: event.target.value })} /><FieldError id={`feeding-kcal-${row.key}-error`}>{fields.error(`feeding-kcal-${row.key}`)}</FieldError>
+                  <SaveErrorField names={[`rows.${saveFieldIndex}.kcal`,"kcal","row.kcal"]}><TextField {...fields.bind(`feeding-kcal-${row.key}`)} disabled={busy} aria-label={`${row.name || '商品'}の100gあたりのカロリー`} inputMode="decimal" value={row.kcal} placeholder="360" onChange={(event) => onUpdate(row.key, { kcal: event.target.value })} /></SaveErrorField><FieldError id={`feeding-kcal-${row.key}-error`}>{fields.error(`feeding-kcal-${row.key}`)}</FieldError>
                   <span className={styles.sub}>kcal</span>
                 </span>
               ) : (

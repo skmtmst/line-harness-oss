@@ -1,5 +1,6 @@
 'use client'
 
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchApi } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -9,19 +10,19 @@ import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Toggle from '@/components/shared/toggle'
 import { notifyToast } from '@/components/shared/toast'
 import { describeApiFailure } from '@/components/shared/api-error-message'
-import {
-  bookingChannelsApi,
-  type BookingChannel,
-  type BookingChannelStaff,
-  type BookingChannelsData,
-  type BookingConflict,
-} from './lib/booking-channels'
+import { bookingChannelsApi, type BookingChannel, type BookingChannelStaff, type BookingChannelsData, type BookingConflict } from './lib/booking-channels'
 import type { BookingStaff } from '@/lib/api'
 import styles from './settings.module.css'
 import ch from './channels.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -34,24 +35,16 @@ const CHANNEL_LABEL: Record<string, { name: string; sub: string; how: string }> 
 }
 
 function formatReadAt(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getMonth() + 1}/${date.getDate()} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return polishFormatDate(value, { style: 'list' })
 }
 
 function formatConflictRange(conflict: BookingConflict): string {
-  const starts = new Date(conflict.startsAt)
-  if (Number.isNaN(starts.getTime())) return ''
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short' }).formatToParts(starts)
-  const part = (kind: Intl.DateTimeFormatPartTypes) => parts.find((value) => value.type === kind)?.value ?? ''
-  return `${conflict.staffName}さんの ${part('month')}/${part('day')}（${part('weekday')}） ${formatConflictTime(conflict.startsAt)}`
+  const day = polishFormatDate(conflict.startsAt, { style: 'day', fallback: '' })
+  return day ? `${conflict.staffName}さんの ${day} ${formatConflictTime(conflict.startsAt)}` : ''
 }
 
 function formatConflictTime(value: string): string {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date)
+  return polishFormatDate(value, { style: 'time' })
 }
 
 function StaffStatusChip({ status }: { status: BookingChannelStaff['status'] }) {
@@ -69,7 +62,7 @@ function ChannelStatusChip({ channel }: { channel: BookingChannel }) {
 
 /** 1行で収め、はみ出す分は「…」にして title で全文を見せる。 */
 function OneLine({ text, tone }: { text: string; tone?: 'name' | 'sub' }) {
-  return <span className={tone === 'name' ? `${ch.oneLine} ${ch.name}` : tone === 'sub' ? `${ch.oneLine} ${ch.sub}` : ch.oneLine} title={text}>{text}</span>
+  return <span className={tone === 'name' ? `${ch.oneLine} ${ch.name}` : tone === 'sub' ? `${ch.oneLine} ${ch.sub}` : ch.oneLine} ><TruncatedText value={String(text ?? '')} /></span>
 }
 
 /** つながっているカレンダーの中身（「予定を見る」）。つなぎ直す口もここに置く。 */
@@ -96,9 +89,9 @@ function CalendarDetailDialog({
       onCancel={onClose}
     >
       <dl className={ch.detail}>
-        <div className={ch.detailRow}><dt className={ch.detailKey}>カレンダー</dt><dd className={ch.detailValue}>{calendarId || '—'}</dd></div>
+        <div className={ch.detailRow}><dt className={ch.detailKey}>カレンダー</dt><dd className={ch.detailValue}>{calendarId || emptyValue('unknown')}</dd></div>
         <div className={ch.detailRow}><dt className={ch.detailKey}>状態</dt><dd className={ch.detailValue}><StaffStatusChip status={staff.status} /></dd></div>
-        <div className={ch.detailRow}><dt className={ch.detailKey}>外の予定（今週）</dt><dd className={ch.detailValue}>{staff.externalEventsThisWeek == null ? '—' : `${staff.externalEventsThisWeek}件`}</dd></div>
+        <div className={ch.detailRow}><dt className={ch.detailKey}>外の予定（今週）</dt><dd className={ch.detailValue}>{staff.externalEventsThisWeek == null ? emptyValue('unknown') : `${staff.externalEventsThisWeek}件`}</dd></div>
         <div className={ch.detailRow}><dt className={ch.detailKey}>最後に読んだ</dt><dd className={ch.detailValue}>{formatReadAt(staff.lastReadAt)}</dd></div>
         {staff.readError ? <div className={ch.detailRow}><dt className={ch.detailKey}>読めなかった理由</dt><dd className={ch.detailValue}>{staff.readError}</dd></div> : null}
       </dl>
@@ -118,6 +111,8 @@ function ConnectDialog({
   onClose: () => void
   onDone: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [calendarId, setCalendarId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -134,13 +129,18 @@ function ConnectDialog({
       notifyToast(`${staff.displayName}の Google カレンダーをつなぎました。`)
       onDone()
     } catch (e) {
-      setError(describeApiFailure(e, 'つなげませんでした。ID を確かめてやり直してください。'))
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure)
+
+
+      setError(describeApiFailure(e, 'つなげませんでした。ID を確かめてやり直してください。')) }
     } finally {
       setBusy(false)
     }
   }
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open
       title={`${staff.displayName}の Google カレンダーをつなぐ`}
       description="Google カレンダーの ID（メールアドレスの形）を入れると、その予定を「埋まっている時間」として扱います。"
@@ -148,11 +148,11 @@ function ConnectDialog({
       cancelLabel="やめる"
       busy={busy}
       error={error || undefined}
-      onConfirm={() => void save()}
+      onConfirm={() => save()}
       onCancel={onClose}
     >
-      <TextField aria-label="カレンダーの ID" value={calendarId} onChange={(e) => setCalendarId(e.target.value)} placeholder="例：shop@example.com" />
-    </Dialog>
+      <SaveErrorField names={["calendarId","calendar_id"]}><TextField aria-label="カレンダーの ID" value={calendarId} onChange={(e) => setCalendarId(e.target.value)} placeholder="例：shop@example.com" /></SaveErrorField>
+    </Dialog></SaveErrorScope>
   )
 }
 
@@ -208,7 +208,7 @@ export function ConflictDialog({
         cancelLabel="あとで"
         busy={busy}
         error={error || undefined}
-        onConfirm={canEdit ? () => void move() : undefined}
+        onConfirm={canEdit ? () => move() : undefined}
         onCancel={onClose}
       >
         {conflict.bookings?.length ? (
@@ -223,7 +223,7 @@ export function ConflictDialog({
         {conflict.reason ? <p className={ch.conflictReason}>{conflict.reason}</p> : null}
         {canEdit ? <>
         <p className={ch.conflictLabel}>①の予約を移す先のスタッフ</p>
-        <Select
+        <SaveErrorField names={["targetId","staffId","target_id"]}><EntitySelect
           aria-label="移す先のスタッフ"
           size="full"
           disabled={busy}
@@ -231,11 +231,11 @@ export function ConflictDialog({
           onChange={setTargetId}
           options={[
             { value: '', label: '移す先を選ぶ' },
-            ...targets.map((t) => ({ value: t.staffId, label: `${t.displayName}へ移す` })),
+            ...targets.map((t) => ({ ...entityOptionMetadata(t), value: t.staffId, label: `${t.displayName}へ移す` })),
           ]}
-        />
+        /></SaveErrorField>
         <div className={ch.detailRow}>
-          <Toggle label="移したことを、お客さまに知らせる" checked={notify} disabled={busy} onChange={setNotify} />
+          <SaveErrorField names={["notify","notifyCustomer"]}><SettingCheckbox label="移したことを、お客さまに知らせる" checked={notify} disabled={busy} onChange={setNotify} /></SaveErrorField>
           <span className={ch.conflictReason}>移したことを、お客さまに知らせる（LINE の友だちなら LINE、そうでなければ電話の案内を出す）</span>
         </div>
         </> : null}
@@ -247,6 +247,8 @@ export function ConflictDialog({
 
 /** 予約経路の連携タブ（ZyDd6）。スタッフの Google カレンダーと予約経路の一覧。 */
 export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { accountId: string; canEdit: boolean; staff?: BookingStaff[] }) {
+  const saveErrors = useSaveFormErrors()
+
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState('')
   const [data, setData] = useState<BookingChannelsData | null>(null)
@@ -277,8 +279,11 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
       setData((current) => current ? { ...current, autoAssign: next } : current)
       notifyToast(next ? '自動割り当てを入れました。' : '自動割り当てを止めました。')
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e);
+
       if (latestAccountId.current === accountId) {
-        setAssignError(describeApiFailure(e, '自動割り当てを保存できませんでした。'))
+        { if (!fieldFailure)
+        setAssignError(describeApiFailure(e, '自動割り当てを保存できませんでした。')) }
       }
     } finally {
       assignBusy.current = false
@@ -318,18 +323,27 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
         try {
           const d = await bookingChannelsApi.calendarDetail(accountId, s.staffId)
           return [s.staffId, d.connection?.calendar_id ?? ''] as const
-        } catch {
+        } catch (saveFailure) {
+          saveErrors.capture(saveFailure);
+
           return [s.staffId, ''] as const
         }
-      }))
-      if (!alive()) return
+      }));
+
+      if (!alive())
+
+ return
       setCalendars(Object.fromEntries(details.filter(([, id]) => id)))
     } catch (e) {
       if (!alive()) return
-      setError(describeApiFailure(e, '予約経路を読み込めませんでした。'))
+      const fieldFailure = saveErrors.capture(e)
+      { if (!fieldFailure)
+
+
+      setError(describeApiFailure(e, '予約経路を読み込めませんでした。')) }
       setStatus('error')
     }
-  }, [accountId])
+  }, [accountId, saveErrors])
 
   useEffect(() => {
     void load()
@@ -337,13 +351,13 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
 
   const firstConflict = conflicts[0] ?? null
 
-  if (status === 'loading') return <ListState kind="loading" />
+  if (status === 'loading') return <SaveErrorScope errors={saveErrors}><ListState kind="loading" /></SaveErrorScope>
   if (status === 'error' || !data) {
-    return <ListState kind="error" title="予約経路を読み込めませんでした" description={error} action={<Button onClick={() => void load()}>もう一度読む</Button>} />
+    return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="予約経路を読み込めませんでした" description={error} onRetry={() => void load()} /></SaveErrorScope>
   }
 
   return (
-    <div className={styles.tabStack}>
+    <SaveErrorScope errors={saveErrors}><div className={styles.tabStack}>
       {/* 絵 ZyDd6：緑の帯に1行で全文。 */}
       <p className={ch.band}>
         いちばん確かなのは「スタッフの Google カレンダー」です。ほかの予約サービスがスタッフの Google カレンダーへ予約を書き出せれば、その時間は自動で LINE の予約受付から外れます（いまの作りでできます）。
@@ -377,9 +391,9 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
                   <OneLine text={person.displayName} tone="name" />
                   {role ? <OneLine text={role} tone="sub" /> : null}
                 </span>
-                <span className={ch.cell} role="cell"><OneLine text={calendarId || '—'} /></span>
+                <span className={ch.cell} role="cell"><OneLine text={calendarId || emptyValue('unknown')} /></span>
                 <span className={ch.cell} role="cell"><StaffStatusChip status={person.status} /></span>
-                <span className={`${ch.cell} ${ch.right}`} role="cell">{person.externalEventsThisWeek == null ? '—' : `${person.externalEventsThisWeek}件`}</span>
+                <span className={`${ch.cell} ${ch.right}`} role="cell">{person.externalEventsThisWeek == null ? emptyValue('unknown') : `${person.externalEventsThisWeek}件`}</span>
                 <span className={ch.cell} role="cell">{formatReadAt(person.lastReadAt)}</span>
                 <span className={ch.cell} role="cell">
                   {person.status === 'connected' ? (
@@ -416,10 +430,10 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
                   <OneLine text={label.name} tone="name" />
                   {label.sub ? <OneLine text={label.sub} tone="sub" /> : null}
                 </span>
-                <span className={`${ch.cell} ${ch.wrap}`} role="cell">{label.how || '—'}</span>
+                <span className={`${ch.cell} ${ch.wrap}`} role="cell">{label.how || emptyValue('unknown')}</span>
                 <span className={ch.cell} role="cell"><ChannelStatusChip channel={channel} /></span>
-                <span className={`${ch.cell} ${ch.right}`} role="cell">{channel.todayCount == null ? '—' : `${channel.todayCount}件`}</span>
-                <span className={ch.cell} role="cell">—</span>
+                <span className={`${ch.cell} ${ch.right}`} role="cell">{channel.todayCount == null ? emptyValue('unknown') : `${channel.todayCount}件`}</span>
+                <span className={ch.cell} role="cell">{emptyValue('unknown')}</span>
                 <span className={ch.cell} role="cell">
                   {channel.status === 'active' && (channel.key === 'line' || channel.key === 'manual') ? (
                     <Button href="/booking/bookings">予約管理へ</Button>
@@ -437,11 +451,11 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
         {canEdit ? (
           <fieldset disabled={savingAssign} className={styles.ruleLine}>
             <span className={styles.ruleLineLabel}>指名なしの予約は、その時間に空いているスタッフへ自動で割り当て</span>
-            <Toggle
+            <SaveErrorField names={["autoAssign","data.autoAssign","auto_assign","data.auto_assign"]}><Toggle
               label="指名なしの予約は、その時間に空いているスタッフへ自動で割り当て"
               checked={data.autoAssign}
               onChange={(next) => void saveAutoAssign(next)}
-            />
+            /></SaveErrorField>
           </fieldset>
         ) : (
           // 閲覧のみ：つまみは置かず、いまの設定を文字で見せる（2026-10-06 オーナー決定）。
@@ -450,7 +464,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
             <span className={ch.cardDesc}>{data.autoAssign ? 'オン' : 'オフ'}</span>
           </p>
         )}
-        {assignError ? <p role="alert" className={ch.cardDesc}>{assignError}</p> : null}
+        {assignError ? <Notice tone="danger" className={ch.cardDescNoticePlacement} >{assignError}</Notice> : null}
       </section>
 
       {detailTarget ? (
@@ -468,6 +482,6 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
       {conflictOpen && firstConflict ? (
         <ConflictDialog canEdit={canEdit} accountId={accountId} conflict={firstConflict} staff={data.staff} onClose={() => setConflictOpen(false)} onDone={() => { setConflictOpen(false); void load() }} />
       ) : null}
-    </div>
+    </div></SaveErrorScope>
   )
 }

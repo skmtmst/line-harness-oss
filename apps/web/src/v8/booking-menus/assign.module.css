@@ -172,7 +172,7 @@
 
 .unitField:focus-within {
   border-color: var(--color-accent);
-  outline: var(--tpl-bm-2) solid var(--color-action);
+  outline: var(--tpl-bm-2) solid var(--color-focus-ring);
   outline-offset: 1px;
 }
 

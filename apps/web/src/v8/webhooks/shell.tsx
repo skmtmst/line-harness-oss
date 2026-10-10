@@ -10,16 +10,18 @@
  * v7 の画面（app/webhooks/page.tsx ほか）は触らない。データの口は同じ。
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Eye, Inbox, ListChecks, Send, TriangleAlert } from 'lucide-react'
+import { Inbox, ListChecks, Send, TriangleAlert } from 'lucide-react'
 import type { IncomingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
 import { api, type OutgoingWebhookOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import Notice from '@/components/shared/notice'
+
 import { Tabs } from '@/components/shared/tabs'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { formatNumber } from '@/lib/format'
 import styles from './shell.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export type WebhookTabKey = 'outgoing' | 'incoming' | 'api-tokens' | 'sheets' | 'interactions' | 'notify'
 export type LoadStatus = 'loading' | 'ready' | 'error'
@@ -31,7 +33,7 @@ export const SAMPLE_COUNT = 9
 export const WEBHOOKS_DESCRIPTION = 'ほかのシステムと、友だちの動きをやり取りします。送る・受け取る・API・Google Sheets をここで決めます。'
 
 /** 変更は統括だけ（v7 と同じ R32）。見るだけの人への一言。 */
-export const MANAGE_REASON = '統括だけが変更できます。必要なときは統括に頼んでください。'
+export const MANAGE_REASON = permissionDeniedMessage('store')
 
 /*
  * タブ（絵の並び）。行き先は今と同じ ?tab=。送るタブだけ素の /webhooks（今と同じ）。
@@ -172,7 +174,7 @@ export function overviewBandCells(args: {
       icon: <Send size={13} aria-hidden="true" />,
       value: summary ? summary.outgoing : null,
       unit: '回',
-      detail: summary ? `成功 ${formatNumber(Math.max(0, summary.outgoing - summary.outgoingFailed))}回` : '集計を読み込めませんでした',
+      detail: summary ? `成功 ${formatNumber(Math.max(0, summary.outgoing - summary.outgoingFailed))} 回` : '集計を読み込めませんでした',
     },
     {
       key: 'failed',
@@ -215,7 +217,7 @@ export function WebhookBand({ cells }: { cells: BandCell[] }) {
 export function ViewerBand() {
   return (
     <div className={styles.viewerRow}>
-      <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />}>閲覧のみで見ています。変える操作は統括に頼んでください。</Notice>
+      <ReadOnlyNotice role="status"></ReadOnlyNotice>
     </div>
   )
 }

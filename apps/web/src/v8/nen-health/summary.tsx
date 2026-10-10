@@ -1,11 +1,14 @@
 'use client'
 
+import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+
 /*
  * ★V8-B 健康日記 30日のまとめ（BVuYh）。一覧の上に右から出る引き出し（幅 600）。
  * 注意書き → 数（記録・体重・呼吸数・心拍数）→ 体重の30日の棒 → 記録の表 → 印刷・PDF に保存する。
  * 引き出しの枠は共通の Drawer。診察時に獣医師へ見せる前提なので、記録の事実だけを並べ、判断は書かない。
  * 印刷面（SummarySheet）は画面に出ず、印刷のときだけ紙になる（今の画面と同じ data-print-sheet）。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '@/components/shared/button'
@@ -18,6 +21,7 @@ import { formatDay } from '@/lib/format'
 import { petAnimalTypeLabel, type NenHealthSummaryData } from '@/lib/nen-pets-api'
 import { SKIN_LABELS, TEAR_LABELS, countText, md } from './parts'
 import styles from './health.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Logs = NenHealthSummaryData['summary']['logs']
 
@@ -30,7 +34,7 @@ function petLine(summary: NenHealthSummaryData): string {
   const parts = [kind, summary.pet.breed, summary.pet.ageLabel === '—' ? '' : summary.pet.ageLabel].filter(Boolean).join('・')
   const end = new Date(summary.generatedAt)
   const start = new Date(end.getTime() - (summary.summary.days - 1) * 86_400_000)
-  const range = Number.isNaN(end.getTime()) ? '' : `・${start.getMonth() + 1}/${start.getDate()}〜${end.getMonth() + 1}/${end.getDate()}`
+  const range = Number.isNaN(end.getTime()) ? '' : `・${polishFormatDate(start, { style: 'list-day' })}〜${polishFormatDate(end, { style: 'list-day' })}`
   return `${summary.pet.name || summary.pet.callName}（${parts}）・${summary.owner.name}さん${range}`
 }
 
@@ -109,12 +113,12 @@ export default function SummaryDrawerV8({
                 {s.logs.map((log) => (
                   <div key={log.loggedOn} className={styles.logRow} role="row">
                     <span className={styles.logDate} role="cell">{md(log.loggedOn)}</span>
-                    <span className={styles.logWeight} role="cell">{log.weightKg == null ? '—' : `${log.weightKg}kg`}</span>
+                    <span className={styles.logWeight} role="cell">{log.weightKg == null ? emptyValue('unknown') : `${log.weightKg}kg`}</span>
                     <span className={styles.logStool} role="cell">{summary.labels.stool[log.stool] ?? log.stool}</span>
                     <span className={styles.logStool} role="cell">{summary.labels.appetite[log.appetite] ?? log.appetite}</span>
-                    <span className={styles.logSkin} role="cell">{log.skin ? SKIN_LABELS[log.skin] ?? log.skin : '—'}</span>
-                    <span className={styles.logTear} role="cell">{log.tearStain ? TEAR_SHORT[log.tearStain] ?? log.tearStain : '—'}</span>
-                    <span className={styles.logMemo} role="cell">{notes.get(log.loggedOn) ?? '—'}</span>
+                    <span className={styles.logSkin} role="cell">{log.skin ? SKIN_LABELS[log.skin] ?? log.skin : emptyValue('unknown')}</span>
+                    <span className={styles.logTear} role="cell">{log.tearStain ? TEAR_SHORT[log.tearStain] ?? log.tearStain : emptyValue('unknown')}</span>
+                    <span className={styles.logMemo} role="cell">{notes.get(log.loggedOn) ?? emptyValue('unknown')}</span>
                   </div>
                 ))}
               </div>
@@ -154,15 +158,7 @@ function WeightChart30d({ logs, generatedAt }: { logs: Logs; generatedAt: string
   const min = known.length ? Math.min(...known) : 0
   const max = known.length ? Math.max(...known) : 0
   const label = known.length >= 2 ? `${known[0]}kg → ${known[known.length - 1]}kg` : known.length === 1 ? `${known[0]}kg` : '記録なし'
-  return (
-    <div className={styles.chartBars} role="img" aria-label={`体重の推移（30日）：${label}`} title={label}>
-      {days.map((day) => day.value == null ? (
-        <span key={day.key} className={styles.chartBarEmpty} />
-      ) : (
-        <span key={day.key} className={styles.chartBar} data-level={max === min ? 3 : 1 + Math.round(((day.value - min) / (max - min)) * 3)} title={`${md(day.key)} ${day.value}kg`} />
-      ))}
-    </div>
-  )
+  return <ValueBarChart label={`体重の推移（30日）：${label}`} unit="kg" items={days.map(day=>({key:day.key,label:day.key,value:day.value}))} />
 }
 
 /**
@@ -181,9 +177,9 @@ export function SummarySheet({ summary }: { summary: NenHealthSummaryData }) {
       <p><strong>健康日記 30日のまとめ</strong></p>
       <p>{summary.pet.callName || summary.pet.name}（{kind}{summary.pet.breed ? `・${summary.pet.breed}` : ''}・{summary.pet.ageLabel}）／飼い主 {summary.owner.name}／作成 {formatDay(summary.generatedAt)}</p>
       <p>
-        記録 {s.records}件／{s.days}日。
+        記録 {s.records} 件／{s.days}日。
         体重 {s.weight ? `${s.weight.first}kg → ${s.weight.last}kg（最小 ${s.weight.min}・最大 ${s.weight.max}）` : '記録なし'}。
-        心拍数 平均 {s.heartRateAvg == null ? '—' : `${s.heartRateAvg}回／分`}。呼吸数 平均 {s.respiratoryRateAvg == null ? '—' : `${s.respiratoryRateAvg}回／分`}。
+        心拍数 平均 {s.heartRateAvg == null ? emptyValue('unknown') : `${s.heartRateAvg}回／分`}。呼吸数 平均 {s.respiratoryRateAvg == null ? emptyValue('unknown') : `${s.respiratoryRateAvg}回／分`}。
       </p>
       <p>便：{countText(s.stool, summary.labels.stool)}／食いつき：{countText(s.appetite, summary.labels.appetite)}／皮膚：{countText(s.skin, SKIN_LABELS)}／涙やけ：{countText(s.tearStain, TEAR_LABELS)}</p>
       <table>
