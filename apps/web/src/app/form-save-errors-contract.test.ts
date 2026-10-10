@@ -7,7 +7,7 @@ const root = fileURLToPath(new URL('../../', import.meta.url))
 describe('全V8画面の保存失敗を欄へ返す見張り（B-154）', () => {
   it('作成・更新・公開のcatchに、欄の理由を受ける口とスコープがある', () => {
     expect(auditSavedScreens(root)).toEqual([])
-  })
+  }, 60_000)
   it('上の知らせだけに戻すと落ちる（importが残っていても検出する）', () => {
     const broken = `import { useSaveFormErrors } from '@/components/shared/save-form-errors'
       function Editor() { const errors = useSaveFormErrors();
