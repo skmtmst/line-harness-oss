@@ -245,7 +245,18 @@ it('ビジネスアカウントのつながったページが無ければ保存�
       new URLSearchParams({ state, code: 'mock_code' }),
   );
   expect(callback.status).toBe(302);
-  expect(callback.headers.get('location')).toContain('instagram=failed');
+  const back = new URL(callback.headers.get('location')!);
+  // 画面が見る値は従来どおり failed だけ（帯の文言は変わらない）。
+  expect(back.pathname).toBe('/settings/sns');
+  expect(back.searchParams.get('instagram')).toBe('failed');
+  // サーバー記録が読めない場合でも原因が分かるよう、戻り先URLに手がかりを添える。
+  expect(back.searchParams.get('instagram_code')).toBe(
+    'instagram_business_account_required',
+  );
+  expect(back.searchParams.get('instagram_pages')).toBe('1/0/1');
+  expect(back.searchParams.get('instagram_scopes')).toContain(
+    'instagram_content_publish',
+  );
   expect(
     db.raw.prepare('SELECT COUNT(*) n FROM instagram_connections').get(),
   ).toEqual({ n: 0 });
@@ -423,6 +434,7 @@ it('Metaのエラー説明文は、秘密値がどんな形で混ざっていて
     .mockImplementation((...args: unknown[]) => {
       logged.push(args.map(String).join(' '));
     });
+  let location = '';
   try {
     const start = await read(await req('/api/instagram/oauth/start', {})),
       state = new URL(start.data.url).searchParams.get('state')!;
@@ -431,7 +443,8 @@ it('Metaのエラー説明文は、秘密値がどんな形で混ざっていて
         new URLSearchParams({ state, code: 'mock_code' }),
     );
     expect(callback.status).toBe(302);
-    expect(callback.headers.get('location')).toContain('instagram=failed');
+    location = callback.headers.get('location') ?? '';
+    expect(location).toContain('instagram=failed');
   } finally {
     spy.mockRestore();
   }
@@ -454,6 +467,19 @@ it('Metaのエラー説明文は、秘密値がどんな形で混ざっていて
     config.META_TOKEN_ENCRYPTION_KEY,
   ])
     expect(logged.join('\n')).not.toContain(secret);
+  // 戻り先URLにも同じ手がかりを添えるので、そこにも秘密値が移らないことを確かめる。
+  // URLは値をエンコードして持つため、元に戻した形でも照合する。
+  const returned = `${location}\n${decodeURIComponent(location)}`;
+  expect(location).toContain('instagram_detail=');
+  for (const secret of [
+    config.META_APP_SECRET,
+    'mock_code',
+    longToken,
+    encodeURIComponent(longToken),
+    doubleEncoded,
+    config.META_TOKEN_ENCRYPTION_KEY,
+  ])
+    expect(returned).not.toContain(secret);
 });
 
 it('写真DMと受信時刻の順、別アカウントのカーソルを守る', async () => {

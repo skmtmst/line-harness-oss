@@ -176,13 +176,44 @@ instagram.post(
 /**
  * 認可が終わったあとに戻る画面。利用者が見るのは「設定 › SNS連携」だけなので、
  * 成否をクエリで伝えてそこへ戻す（restaurant-google.ts の折り返しと同じ形）。
+ *
+ * 失敗したときは、画面に出す文言を変えないまま、手がかりだけをクエリへ添える。
+ * サーバー記録は閲覧の権限が無くて読めない場合があり、そのときは原因が全く分からなく
+ * なってしまうため、戻り先のURLそのものに失敗の種別が残るようにしておく。
+ * 添えるのは次の4つで、いずれも Meta へ送った値（合鍵・アプリシークレット・認可コード）を
+ * 運ばない項目だけに限る。画面側は `instagram` の値だけを見るので、見た目は変わらない。
+ *
+ * - `instagram_code` … こちらで決めた失敗の種類名
+ * - `instagram_detail` … Meta の応答の種別名と番号だけ
+ * - `instagram_scopes` … 利用者が許可した権限の名前
+ * - `instagram_pages` … 見つかった Facebook ページの件数（`総数/Instagram有り/合鍵有り`）
  */
-function snsReturnUrl(c: Context<Env>, result: 'connected' | 'failed'): string {
+function snsReturnUrl(
+  c: Context<Env>,
+  result: 'connected' | 'failed',
+  diagnostic?: {
+    code: string;
+    detail: string | null;
+    grantedScopes: string | null;
+    pages: InstagramPageScan;
+  },
+): string {
   const base = (c.env.ADMIN_PUBLIC_URL ?? '').replace(/\/+$/, '');
   const url = new URL(
     `${base || new URL(c.req.url).origin}${INSTAGRAM_RETURN_PATH}`,
   );
   url.searchParams.set('instagram', result);
+  if (result === 'failed' && diagnostic) {
+    url.searchParams.set('instagram_code', diagnostic.code);
+    if (diagnostic.detail)
+      url.searchParams.set('instagram_detail', diagnostic.detail);
+    if (diagnostic.grantedScopes)
+      url.searchParams.set('instagram_scopes', diagnostic.grantedScopes);
+    url.searchParams.set(
+      'instagram_pages',
+      `${diagnostic.pages.total}/${diagnostic.pages.withInstagram}/${diagnostic.pages.withToken}`,
+    );
+  }
   return url.toString();
 }
 const INSTAGRAM_RETURN_PATH = '/settings/sns';
@@ -311,13 +342,16 @@ instagram.get(
     } catch (e) {
       // 失敗の中身は画面に出さない（文言は「つなげませんでした」のまま）。
       // ただし理由が分からないと直せないので、秘密値を含まない手がかりだけ記録に残す。
+      const failure = {
+        code: e instanceof InstagramError ? e.code : 'instagram_failed',
+        detail: e instanceof InstagramError ? (e.detail ?? null) : null,
+        grantedScopes,
+        pages: scan,
+      };
       console.error(
         JSON.stringify({
           event: 'instagram_oauth_callback_failed',
-          code: e instanceof InstagramError ? e.code : 'instagram_failed',
-          detail: e instanceof InstagramError ? (e.detail ?? null) : null,
-          grantedScopes,
-          pages: scan,
+          ...failure,
         }),
       );
       // 使い切りの state は必ず捨てて、やり直せる状態に戻す。
@@ -327,7 +361,7 @@ instagram.get(
         )
           .bind(hash)
           .run();
-      return c.redirect(snsReturnUrl(c, 'failed'));
+      return c.redirect(snsReturnUrl(c, 'failed', failure));
     }
   },
 );
