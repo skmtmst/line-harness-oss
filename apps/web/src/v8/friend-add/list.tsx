@@ -641,7 +641,7 @@ function FriendAddList() {
   const errorBand = actionError ? (
     <p className={styles.errorBand} role="alert">
       {actionError}
-      <Button onClick={() => void load()}>もう一度読み込む</Button>
+      <Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
     </p>
   ) : null
   /* 1152 の板（P20kYU）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「状態の札」。 */
@@ -733,7 +733,7 @@ function FriendAddList() {
         <p className={styles.stateDesc}>
           {errorStatus === 403 ? error : '数の帯は「—」、道具はそのまま使えます。条件を変えてから試し直せます。'}
         </p>
-        <Button onClick={() => void load()}>もう一度読み込む</Button>
+        <Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
       </div>
     )
   } else if (items.length === 0) {

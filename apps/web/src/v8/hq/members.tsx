@@ -259,14 +259,14 @@ function MembersInner() {
                     <span role="cell" className={styles.cell}>{lastLoginShort(lastLogins[member.id])}</span>
                     <span role="cell" className={styles.actions}>
                       {canManage && canResendInvite(member) ? (
-                        <button
+                        <Button
                           type="button"
-                          className={styles.textButton}
+                          variant="text" size="inline"
                           disabled={resendingId === member.id}
                           onClick={() => void resend(member)}
-                        >
-                          {resendingId === member.id ? '送信中…' : '再送'}
-                        </button>
+                         busy={resendingId === member.id} busyLabel="送信中…">
+                          再送
+                        </Button>
                       ) : null}
                       {canManage ? (
                         <Button onClick={() => openChange(member)} aria-label={`${member.name}さんの権限を変更`}>変更</Button>

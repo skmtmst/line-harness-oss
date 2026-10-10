@@ -212,8 +212,8 @@ function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: string;
       )}
       {store && !error && !readOnly ? (
         <div className={styles.intakeFoot}>
-          <Button disabled={issuing || loading} onClick={() => { if (addresses.length > 0) setReissueOpen(true); else void issue() }}>
-            <MailPlus aria-hidden className={styles.buttonIcon} />{issuing ? '発行中…' : 'アドレスを発行'}
+          <Button disabled={issuing || loading} onClick={() => { if (addresses.length > 0) setReissueOpen(true); else void issue() }} busy={issuing} busyLabel="発行中…">
+            <MailPlus aria-hidden className={styles.buttonIcon} />アドレスを発行
           </Button>
         </div>
       ) : null}

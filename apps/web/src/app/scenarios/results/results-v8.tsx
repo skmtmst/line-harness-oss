@@ -710,7 +710,7 @@ export default function ScenarioResultsV8() {
                                       if (sub.status === 'active') {
                                         items.push({
                                           id: 'pause',
-                                          label: opBusy === `${sub.id}:pause` ? '停止中…' : '止める',
+                                          label: '止める',
                                           disabled: opBusy !== null,
                                           onSelect: () => void runSubscriptionOp(sub, 'pause'),
                                         })
@@ -718,14 +718,14 @@ export default function ScenarioResultsV8() {
                                       if (sub.status === 'paused') {
                                         items.push({
                                           id: 'resume',
-                                          label: opBusy === `${sub.id}:resume` ? '再開中…' : '再開',
+                                          label: '再開',
                                           disabled: opBusy !== null,
                                           onSelect: () => void runSubscriptionOp(sub, 'resume'),
                                         })
                                         if (pausedByFailure) {
                                           items.push({
                                             id: 'retry',
-                                            label: opBusy === `${sub.id}:retry` ? '再送中…' : '失敗を再送',
+                                            label: '失敗を再送',
                                             disabled: opBusy !== null,
                                             onSelect: () => void runSubscriptionOp(sub, 'retry'),
                                           })

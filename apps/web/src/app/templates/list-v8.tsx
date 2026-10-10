@@ -1099,7 +1099,7 @@ export default function TemplatesListV8() {
           : '登録したテンプレートは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'}
       </p>
       {view === 'error' && (
-        <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+        <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度試す</Button>
       )}
     </div>
   ) : filteredTemplates.length === 0 ? (
@@ -1532,7 +1532,7 @@ export default function TemplatesListV8() {
                       type="button"
                       variant="primary"
                       onClick={() => withViewTransition(() => router.push(detailHref(activeTemplate)))}
-                    >
+                     busyLabel="移動中…">
                       詳細を見る
                     </Button>
                     <Button
@@ -1540,7 +1540,7 @@ export default function TemplatesListV8() {
                       variant="secondary"
                       disabled={!canMutateTemplates}
                       onClick={() => withViewTransition(() => router.push(editHref(activeTemplate)))}
-                    >
+                     busyLabel="移動中…">
                       編集する
                     </Button>
                     <Button
@@ -1622,8 +1622,8 @@ export default function TemplatesListV8() {
                           disabled={moving}
                           busy={moving}
                           onClick={() => void runMove()}
-                        >
-                          {moving ? '移動中…' : '移動する'}
+                         busyLabel="移動中…">
+                          移動する
                         </Button>
                       </div>
                       {moveError ? <p className={styles.panelError} role="alert">{moveError}</p> : null}
@@ -1797,7 +1797,7 @@ export default function TemplatesListV8() {
             : `${moveIds?.length ?? 0}件のテンプレートをフォルダへ移す`
         }
         description="移動先のフォルダを選んでください。「未分類」を選ぶとフォルダから外れます。"
-        confirmLabel={moving ? '移動中…' : '移動する'}
+        confirmLabel="移動する" busyLabel="移動中…"
         busy={moving}
         error={moveError}
         onConfirm={() => void runMove()}
@@ -1828,7 +1828,7 @@ export default function TemplatesListV8() {
         open={duplicateTarget !== null}
         title={duplicateTarget ? `「${duplicateTarget.name}」を複製しますか？` : ''}
         description="同じ本文のテンプレートをもう1つ作ります。コピーは「下書き」で作られるので、確認してから公開してください。名前に「（コピー）」を付けます。"
-        confirmLabel={duplicating ? '複製中…' : '複製する'}
+        confirmLabel="複製する" busyLabel="複製中…"
         busy={duplicating}
         error={duplicateError}
         onConfirm={() => void runDuplicate()}

@@ -465,7 +465,7 @@ export default function TemplateDetailV8() {
           {versions === null && !versionsError ? <DetailLoading /> : versionsError ? (
             <div className={styles.versionError}>
               <p className={styles.errorText}>{versionsError}</p>
-              <Button variant="secondary" onClick={() => void loadVersions()}>もう一度読み込む</Button>
+              <Button variant="secondary" onClick={() => loadVersions()} busyLabel="処理中…">もう一度読み込む</Button>
             </div>
           ) : (
             <>

@@ -458,7 +458,7 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
                 onKeyDown={(event) => { if (event.key === 'Enter') void searchFriends() }}
               /></Field>
             <span className={styles.selectFoot}>
-              <Button type="button" variant="secondary" onClick={() => void searchFriends()}>探す</Button>
+              <Button type="button" variant="secondary" onClick={() => searchFriends()} busyLabel="処理中…">探す</Button>
               {testCandidates.slice(0, 3).map((candidate) => (
                 <Button key={candidate.id} type="button" variant="secondary" disabled={testing} onClick={() => void sendTest(candidate.id)}>
                   {candidate.displayName ?? '名前なし'}へ送る

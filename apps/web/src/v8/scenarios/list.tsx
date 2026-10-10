@@ -1243,7 +1243,7 @@ export default function ScenariosListV8() {
                       router.push(`/scenarios/results?id=${encodeURIComponent(panelRow.id)}`)
                     })
                   }
-                >
+                 busyLabel="移動中…">
                   配信結果を見る
                 </Button>
                 {canEdit && <Button variant="secondary" onClick={() => openDuplicate(panelRow)}>
@@ -1350,7 +1350,7 @@ export default function ScenariosListV8() {
           title="このシナリオを複製する"
           confirmation
           designNode="Al4Ek"
-          confirmLabel={duplicating ? '複製中…' : '複製する'}
+          confirmLabel={'複製する'} busyLabel={'複製中…'}
           confirmIcon={<Copy size={14} aria-hidden="true" />}
           busy={duplicating}
           error={duplicateError}

@@ -284,7 +284,7 @@ export function V8CommonActionsTab({
           onChange={(event) => { setQuery(event.target.value); setPage(1) }}
           className={styles.toolsSearch}
         />
-        <Button onClick={() => void load()} variant="secondary" size="compact">
+        <Button onClick={() => load()} variant="secondary" size="compact" busyLabel="処理中…">
           <RefreshCw size={16} aria-hidden />
           一覧を更新する
         </Button>

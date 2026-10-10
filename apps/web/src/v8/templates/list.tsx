@@ -1069,7 +1069,7 @@ export default function TemplatesListV8() {
           : '登録したテンプレートは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'}
       </p>
       {view === 'error' && (
-        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
+        <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
       )}
     </div>
   ) : filteredTemplates.length === 0 ? (
@@ -1443,8 +1443,8 @@ export default function TemplatesListV8() {
                   const target = blockedDelete.item
                   setBlockedDelete(null)
                   setBlockedUsage(null)
-                  withViewTransition(() => router.push(detailHref(target)))
-                }}
+                  return withViewTransition(() => router.push(detailHref(target)))
+                }} busyLabel="処理中…"
               >
                 <List size={15} aria-hidden="true" />
                 使っている所をすべて見る
@@ -1492,7 +1492,7 @@ export default function TemplatesListV8() {
             : `${moveIds?.length ?? 0} 件のテンプレートをフォルダへ移す`
         }
         description="移動先のフォルダを選んでください。「未分類」を選ぶとフォルダから外れます。"
-        confirmLabel={moving ? '移動中…' : '移動する'}
+        confirmLabel="移動する" busyLabel="移動中…"
         busy={moving}
         error={moveError}
         onConfirm={() => runMove()}
@@ -1523,7 +1523,7 @@ export default function TemplatesListV8() {
         open={duplicateTarget !== null}
         title={duplicateTarget ? `「${duplicateTarget.name}」を複製しますか？` : ''}
         description="同じ本文のテンプレートをもう1つ作ります。コピーは「下書き」で作られるので、確認してから公開してください。名前に「（コピー）」を付けます。"
-        confirmLabel={duplicating ? '複製中…' : '複製する'}
+        confirmLabel="複製する" busyLabel="複製中…"
         busy={duplicating}
         error={duplicateError}
         onConfirm={() => runDuplicate()}
@@ -1588,12 +1588,12 @@ export default function TemplatesListV8() {
           onNext={() => setActiveId(navItems[activeIndex + 1]?.id ?? null)}
           footer={
             <div className={styles.panelActions}>
-              <Button type="button" variant="primary" onClick={() => withViewTransition(() => router.push(detailHref(activeTemplate)))}>
+              <Button type="button" variant="primary" onClick={() => withViewTransition(() => router.push(detailHref(activeTemplate)))} busyLabel="移動中…">
                 詳細を見る
               </Button>
               {/* 閲覧のみ：変えるボタンは置かない（2026-10-06 オーナー決定） */}
               {canMutateTemplates ? <>
-                <Button type="button" variant="secondary" onClick={() => withViewTransition(() => router.push(editHref(activeTemplate)))}>
+                <Button type="button" variant="secondary" onClick={() => withViewTransition(() => router.push(editHref(activeTemplate)))} busyLabel="移動中…">
                   編集する
                 </Button>
                 <Button
@@ -1664,8 +1664,8 @@ export default function TemplatesListV8() {
                       ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
                     ]}
                   />
-                  <Button type="button" variant="primary" disabled={moving} busy={moving} onClick={() => void runMove()}>
-                    {moving ? '移動中…' : '移動する'}
+                  <Button type="button" variant="primary" disabled={moving} busy={moving} onClick={() => void runMove()} busyLabel="移動中…">
+                    移動する
                   </Button>
                 </div>
                 {moveError ? <p className={styles.alertText} role="alert">{moveError}</p> : null}

@@ -584,7 +584,7 @@ export default function AccountHandoverV8() {
         open={confirmOpen}
         title="本実行しますか？"
         description={`要確認はすべて決めました。本実行すると、決めた内容で友だちが「${destinationName}」へ移ります。元のアカウントの友だち・履歴・配信は消しません。`}
-        confirmLabel={executing ? '実行中…' : '本実行する'}
+        confirmLabel="本実行する" busyLabel="実行中…"
         busy={executing}
         error={executeError}
         onConfirm={() => executeHandover()}
@@ -594,7 +594,7 @@ export default function AccountHandoverV8() {
         open={cancelOpen}
         title="この引き継ぎを取り消しますか？"
         description="進行中の引き継ぎをやめます。コードは使えなくなり、決めた内容は破棄されます。元のアカウントの友だちは変わりません。"
-        confirmLabel={cancelling ? '取り消し中…' : '引き継ぎを取り消す'}
+        confirmLabel="引き継ぎを取り消す" busyLabel="取り消し中…"
         destructive
         busy={cancelling}
         onConfirm={() => runCancel()}
@@ -604,7 +604,7 @@ export default function AccountHandoverV8() {
         open={rollbackOpen}
         title="移した友だちを元へ戻しますか？"
         description={`本実行で「${destinationName}」へ移した友だちを、元の「${account.name}」へ戻します。移したあとで人が動かした人は戻しません。`}
-        confirmLabel={rollingBack ? '戻し中…' : '切り戻す'}
+        confirmLabel="切り戻す" busyLabel="戻し中…"
         destructive
         busy={rollingBack}
         error={rollbackError}

@@ -372,7 +372,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
       <AlertCircle className={styles.stateIconError} aria-hidden="true" />
       <p className={styles.stateTitle}>対応マークを読み込めませんでした</p>
       <p className={styles.stateDesc}>{error || '再読み込みしても直らない場合はエラー報告へ。'}</p>
-      <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
+      <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
     </div>
   ) : listReady && items.length === 0 ? (
     <div className={styles.stateCard}>

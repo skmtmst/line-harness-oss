@@ -880,7 +880,7 @@ function WebinarList() {
   } else if (!selectedAccountId) {
     listBody = <ListState kind="empty" title={accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'} />
   } else if (loadFailure && visibleItems.length === 0) {
-    listBody = <ListState kind={loadFailure.kind} title={loadFailure.title} description={loadFailure.description} action={loadFailure.retryable ? <Button onClick={() => void refresh()}>もう一度読み込む</Button> : undefined} />
+    listBody = <ListState kind={loadFailure.kind} title={loadFailure.title} description={loadFailure.description} action={loadFailure.retryable ? <Button onClick={() => refresh()} busyLabel="処理中…">もう一度読み込む</Button> : undefined} />
   } else if (visibleItems.length === 0) {
     /* 修正案 D-2：空の一覧。 */
     listBody = (
@@ -900,7 +900,7 @@ function WebinarList() {
         {loadFailure ? (
           <div role="alert" className={styles.errorBand}>
             <span>{loadFailure.title}</span>
-            {loadFailure.retryable ? <Button onClick={() => void refresh()}>もう一度読み込む</Button> : null}
+            {loadFailure.retryable ? <Button onClick={() => refresh()} busyLabel="処理中…">もう一度読み込む</Button> : null}
           </div>
         ) : null}
         {refreshing ? <p role="status" className="sr-only">検索中…</p> : null}
@@ -1017,7 +1017,7 @@ function WebinarList() {
         {csvError ? <div className={styles.statsNotice}><Notice tone="info">{csvError}</Notice></div> : null}
         {overviewFailure && !loadFailure ? (
           <div className={styles.statsNotice}>
-            <Notice tone="info" action={overviewFailure.retryable ? <Button onClick={() => void refreshOverview()}>集計を読み直す</Button> : undefined}>集計を表示できませんでした。</Notice>
+            <Notice tone="info" action={overviewFailure.retryable ? <Button onClick={() => refreshOverview()} busyLabel="処理中…">集計を読み直す</Button> : undefined}>集計を表示できませんでした。</Notice>
           </div>
         ) : null}
         <KpiBand>

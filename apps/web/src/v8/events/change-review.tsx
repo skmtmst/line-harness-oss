@@ -99,7 +99,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
           <ListState
             kind="error"
             description="イベントは消えていません。開き直しても直らない場合はエラー報告へ。"
-            action={<Button onClick={() => void refresh()}>開き直す</Button>}
+            action={<Button onClick={() => refresh()} busyLabel="処理中…">開き直す</Button>}
           />
         ) : (
           <TargetMissing

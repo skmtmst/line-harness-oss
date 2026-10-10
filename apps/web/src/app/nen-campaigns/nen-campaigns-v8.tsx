@@ -702,7 +702,7 @@ function SelectedColumnV8(props: NenOverviewProps) {
       <div className={styles.selectFoot}>
         <span className={styles.selectDesc}>{introDraft.length}／1500文字</span>
         <Button type="button" variant="secondary" disabled={introDraft === selected.introText || props.savingColumnId === selected.id || !introDraft.trim()} onClick={() => props.onSaveIntro(selected)} busy={props.savingColumnId === selected.id} busyLabel="保存中…">紹介文を保存する</Button>
-        <Button type="button" variant="secondary" disabled={props.duplicatingColumnId === selected.id} onClick={() => props.onDuplicateColumn(selected)}>{props.duplicatingColumnId === selected.id ? '複製しています' : '同じ形で書く'}</Button>
+        <Button type="button" variant="secondary" disabled={props.duplicatingColumnId === selected.id} onClick={() => props.onDuplicateColumn(selected)} busy={props.duplicatingColumnId === selected.id} busyLabel="複製しています">同じ形で書く</Button>
         <TestRecipientPicker friends={friends} value={testFriendId} onChange={props.onTestFriendChange} accountId={props.accountId} />
         <Button type="button" variant="secondary" disabled={!testFriendId || testing !== null} onClick={() => props.onTestColumn(selected)} busy={testing === selected.id} busyLabel="送信中…">自分にテストを送る</Button>
         <Button type="button" variant="primary" disabled={!columnEnabled || scheduleInvalid} onClick={() => setConfirmDeliver({ column: selected, scheduledAt: scheduledIso ?? undefined })}>

@@ -428,7 +428,7 @@ export function FeatureSettingsV8() {
         <p>あなたが直した所はまだ保存されていません。違いを確認してから続けてください。</p>
         <div className={styles.toolbar}>
           <Button variant="secondary" onClick={() => setCompareOpen(true)}>違いを比べる</Button>
-          <Button variant="secondary" onClick={() => void load()}>最新を読み込んで続ける</Button>
+          <Button variant="secondary" onClick={() => load()} busyLabel="処理中…">最新を読み込んで続ける</Button>
         </div>
       </div>}
       <p className={`${styles.band} ${styles.bandInfo}`}>
@@ -466,7 +466,7 @@ export function FeatureSettingsV8() {
           kind="error"
           title={error || '設定を読み込めませんでした'}
           action={(
-            <Button type="button" variant="secondary" onClick={() => void load()}>
+            <Button type="button" variant="secondary" onClick={() => load()} busyLabel="処理中…">
               もう一度試す
             </Button>
           )}

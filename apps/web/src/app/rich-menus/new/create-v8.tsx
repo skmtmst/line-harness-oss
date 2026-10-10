@@ -1819,7 +1819,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           className="mb-1"
           action={
             loadFailedKinds.length > 0 && !isForbidden(loadError) ? (
-              <Button type="button" onClick={() => { setError(null); void load() }}>
+              <Button type="button" onClick={() => { setError(null); return load() }} busyLabel="処理中…">
                 もう一度読み込む
               </Button>
             ) : undefined
@@ -2534,9 +2534,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                   </p>
                 </div>
                 <span className={styles.checkAction}>
-                  <button type="button" className={styles.checkRetry} onClick={() => void loadChecks()} disabled={checksLoading}>
-                    {checksLoading ? '確認中…' : '見直す'}
-                  </button>
+                  <Button type="button" variant="text" size="inline" onClick={() => void loadChecks()} disabled={checksLoading} busy={checksLoading} busyLabel="確認中…">
+                    見直す
+                  </Button>
                 </span>
               </li>
               <li className={styles.checkRow}>
@@ -2548,9 +2548,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                   </p>
                 </div>
                 <span className={styles.checkAction}>
-                  <button type="button" className={styles.checkRetry} onClick={() => void validateWithLine()} disabled={validating}>
-                    {validating ? '確認中…' : '見直す'}
-                  </button>
+                  <Button type="button" variant="text" size="inline" onClick={() => void validateWithLine()} disabled={validating} busy={validating} busyLabel="確認中…">
+                    見直す
+                  </Button>
                 </span>
               </li>
               <li className={styles.checkRow}>

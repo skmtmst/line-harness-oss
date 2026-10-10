@@ -1244,7 +1244,7 @@ export default function RemindersListV8() {
         open={duplicateTarget !== null}
         title={duplicateTarget ? `「${duplicateTarget.name}」を複製しますか？` : ''}
         description="設定と通知の中身を写して、新しいリマインダを「下書き」で作ります。登録者と送信履歴は写りません。作ったあとは確認してから有効にしてください。"
-        confirmLabel={duplicating ? '複製中…' : '複製する'}
+        confirmLabel="複製する" busyLabel="複製中…"
         busy={duplicating}
         error={duplicateError}
         onConfirm={() => runDuplicate()}

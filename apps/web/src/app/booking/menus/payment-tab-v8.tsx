@@ -170,8 +170,8 @@ export default function PaymentTabV8({ accountId, menus, canEdit }: {
           {config.testMode && <span>テストモード</span>}
         </div>
         {error && <p role="alert">{error}</p>}
-        <Button variant="primary" onClick={() => void submit()} disabled={!canEdit || saving}>
-          {saving ? '保存中…' : '保存する'}
+        <Button variant="primary" onClick={() => void submit()} disabled={!canEdit || saving} busy={saving} busyLabel="保存中…">
+          保存する
         </Button>
         <UnsavedLeaveDialog
           open={leaveTarget !== null}

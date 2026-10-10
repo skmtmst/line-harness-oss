@@ -981,7 +981,7 @@ function SearchEditorV8Inner() {
               <p className={`${styles.noteText} mt-2`}>{preview ? `LINE ${preview.byChannel.line ?? emptyValue('unknown')}人・MAIL ${preview.byChannel.mail ?? emptyValue('unknown')}人` : '保存済み条件で集計'}</p>
             )}
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button type="button" onClick={() => void recount()}>数え直す</Button>
+              <Button type="button" onClick={() => recount()} busyLabel="処理中…">数え直す</Button>
               <Button href={`/friends?savedSearch=${encodeURIComponent(id)}`} variant="primary">当てはまる人を見る</Button>
             </div>
           </section>

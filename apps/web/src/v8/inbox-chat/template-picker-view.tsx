@@ -148,8 +148,8 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
                 </ul>
               )}
               {props.remaining > 0 ? (
-                <Button variant="secondary" size="compact" onClick={props.onLoadMore} disabled={props.loadingMore}>
-                  {props.loadingMore ? '読み込み中...' : `さらに表示（残り${props.remaining} 件）`}
+                <Button variant="secondary" size="compact" onClick={props.onLoadMore} disabled={props.loadingMore} busy={props.loadingMore} busyLabel="読み込み中...">
+                  {`さらに表示（残り${props.remaining} 件）`}
                 </Button>
               ) : null}
     </FolderPickerShell>

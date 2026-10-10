@@ -2208,7 +2208,7 @@ export function NewAutomationV8({
           <p className={styles.footnote}>このまま保存すると、相手の変更が消えます。先に内容を比べてください。</p>
           <div className={styles.toolbar}>
             <Button variant="secondary" size="compact" onClick={() => setCompareOpen(true)}>違いを比べる</Button>
-            <Button variant="secondary" size="compact" onClick={() => void reloadServerDraft()}>最新を読み込んで続ける</Button>
+            <Button variant="secondary" size="compact" onClick={() => reloadServerDraft()} busyLabel="処理中…">最新を読み込んで続ける</Button>
           </div>
         </div>
       ) : null}
@@ -2652,7 +2652,7 @@ export function NewAutomationV8({
                   setActivateConfirmOpen(true)
                 }}
               >
-                {saving ? '作成中...' : 'つくって動かす'}
+                つくって動かす
               </Button>
             )}
           </>

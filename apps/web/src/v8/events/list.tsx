@@ -500,13 +500,13 @@ export default function EventsListV8() {
       </div>
     )
   } else if (loadStatus === 'forbidden') {
-    listBody = stateCard(<TriangleAlert size={18} aria-hidden="true" />, 'イベントを見る権限がありません', '選んでいるアカウントでは見られません。管理者に権限を確かめてください。', <Button onClick={() => refresh()}>もう一度読み込む</Button>, true)
+    listBody = stateCard(<TriangleAlert size={18} aria-hidden="true" />, 'イベントを見る権限がありません', '選んでいるアカウントでは見られません。管理者に権限を確かめてください。', <Button onClick={() => refresh()} busyLabel="読み込み中…">もう一度読み込む</Button>, true)
   } else if (loadStatus === 'error') {
     listBody = stateCard(
       <TriangleAlert size={18} aria-hidden="true" />,
       'イベントを読み込めませんでした',
       '登録したイベントは消えていません。もう一度読み込んでも直らない場合はエラー報告へ。',
-      <Button onClick={() => void refresh()}>もう一度読み込む</Button>,
+      <Button onClick={() => refresh()} busyLabel="処理中…">もう一度読み込む</Button>,
       true,
     )
   } else if (items.length === 0) {
@@ -625,7 +625,7 @@ export default function EventsListV8() {
         footer={active ? (
           <div className={styles.panelActions}>
             <Button href={`/events/edit?id=${active.id}`}>中身を見る</Button>
-            {canEdit ? <Button variant="danger" onClick={() => { closeDetail(); requestDelete(active) }}>削除する</Button> : null}
+            {canEdit ? <Button variant="danger" onClick={() => { const transition = closeDetail(); requestDelete(active); return transition }} busyLabel="処理中…">削除する</Button> : null}
           </div>
         ) : undefined}
       >

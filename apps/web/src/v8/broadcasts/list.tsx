@@ -1002,10 +1002,10 @@ export default function BroadcastListV8() {
       <DelayedSkeleton loading skeleton={loadingSkeleton} />
     </div>
   ) : forbidden ? (
-    stateCard(<AlertCircle size={20} aria-hidden="true" />, '配信を見る権限がありません', permissionDeniedMessage('store'), <Button onClick={() => void loadList((page - 1) * pageSize)}>もう一度読み込む</Button>, true)
+    stateCard(<AlertCircle size={20} aria-hidden="true" />, '配信を見る権限がありません', permissionDeniedMessage('store'), <Button onClick={() => loadList((page - 1) * pageSize)} busyLabel="処理中…">もう一度読み込む</Button>, true)
   ) : error ? (
     stateCard(<AlertCircle size={20} aria-hidden="true" />, '一斉配信を読み込めませんでした', error,
-      <Button type="button" onClick={() => void loadList((page - 1) * pageSize)}>もう一度読み込む</Button>, true)
+      <Button type="button" onClick={() => loadList((page - 1) * pageSize)} busyLabel="処理中…">もう一度読み込む</Button>, true)
   ) : visibleBroadcasts.length === 0 ? (
     /* 修正案 D-2：空の一覧。閲覧のみには作るボタンを出さない（2026-10-06 オーナー決定）。 */
     <EmptyList
@@ -1250,7 +1250,7 @@ export default function BroadcastListV8() {
                   <Button
                     variant="secondary"
                     onClick={() => withViewTransition(() => { router.push(`/broadcasts/new?draft=${encodeURIComponent(panelRow.id)}`) })}
-                  >
+                   busyLabel="移動中…">
                     編集を続ける
                   </Button>
                 ) : null}
@@ -1259,7 +1259,7 @@ export default function BroadcastListV8() {
                   <Button
                     variant="secondary"
                     onClick={() => withViewTransition(() => { router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(panelRow.id)}`) })}
-                  >
+                   busyLabel="移動中…">
                     複製する
                   </Button>
                   {fromHq ? null : (

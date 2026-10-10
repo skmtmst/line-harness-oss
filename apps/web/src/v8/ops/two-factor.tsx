@@ -138,7 +138,7 @@ export default function OpsTwoFactorV8() {
         ) : (
           <form onSubmit={(event) => void submit(event)} noValidate className={styles.form}>
             {error ? <Notice tone="danger" message={error} /> : null}
-            {error && !uri ? <Button onClick={() => void load()} className={styles.wide}>もう一度読み込む</Button> : null}
+            {error && !uri ? <Button onClick={() => load()} className={styles.wide} busyLabel="処理中…">もう一度読み込む</Button> : null}
             <div className={styles.qrRow}>
               <div className={styles.qr}>
                 {qr ? (

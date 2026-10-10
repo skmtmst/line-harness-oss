@@ -345,7 +345,7 @@ function FriendDetailInner() {
       const retrying = notificationRetryId === item.id
       items.push({
         id: 'retry',
-        label: retrying ? '通知を送り直しています…' : '通知を再送',
+        label: '通知を再送',
         disabled: retrying,
         disabledReason: '通知を送り直しています',
         onSelect: () => void retryNotification(item.id, item.lineAccountId ?? selectedAccountId ?? ''),

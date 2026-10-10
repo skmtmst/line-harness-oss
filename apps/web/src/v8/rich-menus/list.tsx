@@ -1002,7 +1002,7 @@ export default function RichMenusListV8() {
       loadFailure?.description
         ?? '登録したメニューは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。',
       loadFailure === null || loadFailure.retryable
-        ? <Button type="button" onClick={() => void reload()}>もう一度読み込む</Button>
+        ? <Button type="button" onClick={() => reload()} busyLabel="処理中…">もう一度読み込む</Button>
         : null,
       'error',
     )

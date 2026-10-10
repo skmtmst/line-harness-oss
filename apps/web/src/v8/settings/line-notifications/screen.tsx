@@ -1312,7 +1312,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
     <Notice tone="info">これは「お知らせ」であって「売り込みの配信」ではありません。お客さまが配信を止めていても、取引に必要な連絡は届きます。</Notice>
     {sendCountsFailed && loadState === 'ready' ? <div className={styles.inlineRow}>
       <p className={styles.minor}>送信件数を読み込めませんでした。時間をおいて、もう一度お試しください。</p>
-      <Button variant="secondary" size="compact" onClick={() => void load()}>もう一度読み込む</Button>
+      <Button variant="secondary" size="compact" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
     </div> : null}
 
     {/* 板 g3iDs：絞り込みは共通の札。並びは送った数が多い順のまま。 */}

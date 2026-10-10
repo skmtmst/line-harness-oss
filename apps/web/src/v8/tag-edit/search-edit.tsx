@@ -846,7 +846,7 @@ export default function SavedSearchEditV8() {
         </div>
       ) : <p className={styles.countNote}>{countNote}</p>}
       <div className={styles.sideButtons}>
-        <Button type="button" onClick={() => void recount()}><RefreshCw size={14} aria-hidden="true" />数え直す</Button>
+        <Button type="button" onClick={() => recount()} busyLabel="処理中…"><RefreshCw size={14} aria-hidden="true" />数え直す</Button>
         <Button href={`/friends?savedSearch=${encodeURIComponent(id)}`}><Users size={14} aria-hidden="true" />当てはまる人を見る</Button>
       </div>
       <div className={styles.sideHead}>

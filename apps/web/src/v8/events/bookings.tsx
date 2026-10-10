@@ -434,7 +434,7 @@ function Bookings({ eventId }: { eventId: string }) {
         <ListState
           kind="error"
           description="イベントは消えていません。開き直しても直らない場合はエラー報告へ。"
-          action={<Button onClick={() => void refreshEvent()}>開き直す</Button>}
+          action={<Button onClick={() => refreshEvent()} busyLabel="処理中…">開き直す</Button>}
         />
       ) : null}
       {actionError ? <p className={styles.error} role="alert">{actionError}</p> : null}
@@ -464,7 +464,7 @@ function Bookings({ eventId }: { eventId: string }) {
           <ListState
             kind="error"
             description="申込者は消えていません。開き直しても直らない場合はエラー報告へ。"
-            action={<Button onClick={() => void refreshApplicants()}>開き直す</Button>}
+            action={<Button onClick={() => refreshApplicants()} busyLabel="処理中…">開き直す</Button>}
           />
         ) : rows.length === 0 ? (
           <p className={styles.empty}>この開催回には申込者もキャンセル待ちもいません。</p>

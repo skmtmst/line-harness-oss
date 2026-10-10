@@ -171,7 +171,7 @@ export default function AutomationTemplatesV8() {
               </FilterChip>
             ))}
             <div className={styles.toolbarSpice}>
-              <Button variant="secondary" onClick={() => void load()}>見本を再読み込み</Button>
+              <Button variant="secondary" onClick={() => load()} busyLabel="処理中…">見本を再読み込み</Button>
             </div>
           </div>
 

@@ -315,7 +315,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
               : `準備が済むまで公開できません（いま「${STAGES.find((stage) => stage.key === asset.stage)?.label ?? asset.stageLabel}」を作っています）`}
           </p>
         </> : null}
-        {assetError ? <p className={styles.stageNote} role="alert">{assetError}<Button size="compact" onClick={() => void loadAsset()}>もう一度読み込む</Button></p> : null}
+        {assetError ? <p className={styles.stageNote} role="alert">{assetError}<Button size="compact" onClick={() => loadAsset()} busyLabel="処理中…">もう一度読み込む</Button></p> : null}
       </section>
 
       {scheduled ? null : (

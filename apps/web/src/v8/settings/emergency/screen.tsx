@@ -78,8 +78,8 @@ export default function EmergencyScreen({
   const controlRef = useRef<EmergencyControlHandle | null>(null)
 
   const actions = tab === 'health'
-    ? <Button variant="secondary" type="button" onClick={requestManualRun} disabled={!selectedAccountId || manualBusy}>
-        <RefreshCw className={styles.btnIcon} aria-hidden="true" />{manualBusy ? '確認中…' : 'いますぐ確かめる'}
+    ? <Button variant="secondary" type="button" onClick={requestManualRun} disabled={!selectedAccountId || manualBusy} busy={manualBusy} busyLabel="確認中…">
+        <RefreshCw className={styles.btnIcon} aria-hidden="true" />いますぐ確かめる
       </Button>
     : tab === 'control' && canManage
       ? <Button variant="danger" type="button" onClick={() => controlRef.current?.openStop()}>緊急停止する</Button>

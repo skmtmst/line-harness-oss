@@ -491,7 +491,7 @@ export default function HqHomeV8() {
         <Notice
           tone="warn"
           message="保存はできましたが、一覧を読み直せませんでした。"
-          action={<Button type="button" onClick={() => void reloadAfterSave()}>もう一度読み込む</Button>}
+          action={<Button type="button" onClick={() => reloadAfterSave()} busyLabel="処理中…">もう一度読み込む</Button>}
         />
       ) : null}
 

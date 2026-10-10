@@ -379,7 +379,7 @@ export default function BalancesTab() {
       <p className={styles.approvalTitle}>承認待ちのマイル変更</p>
       <p className={styles.approvalNote}>承認待ちを読み込めませんでした。依頼があるか分からない状態です。</p>
       <div>
-        <Button onClick={() => void loadApprovals()}>もう一度読み込む</Button>
+        <Button onClick={() => loadApprovals()} busyLabel="処理中…">もう一度読み込む</Button>
       </div>
     </section>
   ) : null

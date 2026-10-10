@@ -162,7 +162,7 @@ export default function MessageForm({
           {card.format === 'flex' && (
             <div className={styles.buttonsBox}>
               <span className={styles.smallLabel}>ボタン <small className={styles.optional}>最大 3 つ</small></span>
-              {referenceError && <Notice tone="warn" message={referenceError} action={<Button disabled={disabled} onClick={() => void loadReferences()}>参照先を再読み込み</Button>} />}
+              {referenceError && <Notice tone="warn" message={referenceError} action={<Button disabled={disabled} onClick={() => loadReferences()} busyLabel="処理中…">参照先を再読み込み</Button>} />}
               {card.buttons.map((button, index) => (
                 <div key={button.id} className={styles.buttonEdit} {...(fields ? fields.bind(`button-${button.id}`) : {})} aria-describedby={fields?.invalid(`button-${button.id}`) ? `hq-msg-button-${button.id}-error` : undefined}>
                   <Field label="ボタンの文字"><input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} /></Field>

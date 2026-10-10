@@ -189,7 +189,7 @@ export default function AutomationTemplatesV8() {
             ))}
           </div>
           <span className={styles.spacer} aria-hidden="true" />
-          <Button variant="secondary" onClick={() => void load()}>
+          <Button variant="secondary" onClick={() => load()} busyLabel="処理中…">
             <RefreshCw size={15} aria-hidden="true" />見本を再読み込み
           </Button>
         </div>

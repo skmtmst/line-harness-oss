@@ -460,7 +460,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
               </span>
               <p className={styles.stateTitle}>友だち情報欄を読み込めませんでした</p>
               <p className={styles.stateDesc}>{error || '再読み込みしても直らない場合はエラー報告へ。'}</p>
-              <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+              <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度試す</Button>
             </div>
           ) : items.length === 0 ? (
             <div className={styles.stateCard}>

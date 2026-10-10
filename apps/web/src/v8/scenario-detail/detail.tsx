@@ -2333,7 +2333,7 @@ export default function ScenarioDetailV8({
                   {
                     id: 'duplicate',
                     /* 下の帯の「複製する」と同じ窓を開く。文言を変えるのは、撮影・試験が下の帯のボタンと取り違えないため。 */
-                    label: duplicating ? '複製中…' : 'このシナリオを複製',
+                    label: 'このシナリオを複製',
                     disabled: duplicating,
                     onSelect: openDuplicateDialog,
                   },
@@ -2394,9 +2394,9 @@ export default function ScenarioDetailV8({
                 続きからやり直すか、作りかけのコピーを削除してください。
               </p>
               <div className={styles.remainderActions}>
-                <button type="button" disabled={duplicating} onClick={() => void handleDuplicate()}>
-                  {duplicating ? '複製中…' : '続きからやり直す'}
-                </button>
+                <Button type="button" disabled={duplicating} onClick={() => void handleDuplicate()} variant="text" size="inline" busy={duplicating} busyLabel="複製中…">
+                  続きからやり直す
+                </Button>
                 <Link href={`/scenarios/detail?id=${duplicateRemainder.copyId}`}>コピーを確認する</Link>
                 <button
                   type="button"
@@ -2630,7 +2630,7 @@ export default function ScenarioDetailV8({
                                 },
                                 {
                                   id: 'duplicate',
-                                  label: duplicatingStepId === step.id ? '複製中…' : 'この通を複製',
+                                  label: 'この通を複製',
                                   disabled: duplicatingStepId === step.id,
                                   disabledReason: 'この通を複製しています',
                                   onSelect: () => {
@@ -2932,7 +2932,7 @@ export default function ScenarioDetailV8({
         cancelLabel="閉じる"
         onCancel={() => setCompareOpen(false)}
         footer={
-          <Button type="button" variant="primary" onClick={() => void acceptLatestAndContinue()}>
+          <Button type="button" variant="primary" onClick={() => acceptLatestAndContinue()} busyLabel="処理中…">
             最新を読み込んで続ける
           </Button>
         }

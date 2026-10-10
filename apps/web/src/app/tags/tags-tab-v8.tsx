@@ -132,8 +132,8 @@ function TagFolderDialog({
           <button type="button" onClick={onClose} disabled={saving} className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-4 py-2 text-sm disabled:opacity-40">
             キャンセル
           </button>
-          <Button variant="primary" type="button" onClick={() => void save()} disabled={saving || !name.trim()}>
-            {saving ? (group ? '保存中…' : '追加中…') : (group ? '保存する' : 'フォルダを作る')}
+          <Button variant="primary" type="button" onClick={() => void save()} disabled={saving || !name.trim()} busy={saving} busyLabel={(group ? '保存中…' : '追加中…')}>
+            {(group ? '保存する' : 'フォルダを作る')}
           </Button>
         </>
       }
@@ -698,7 +698,7 @@ export default function TagsTabV8({
               </span>
               <p className={styles.stateTitle}>タグを読み込めませんでした</p>
               <p className={styles.stateDesc}>再読み込みしても直らない場合はエラー報告へ。</p>
-              <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+              <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度試す</Button>
             </div>
           ) : status === 'ready' && !staleAccount && items.length === 0 ? (
             /*

@@ -437,7 +437,7 @@ export default function SiteScriptV8() {
                       <p className={styles.faint}>コードを貼ったあと、サイトを開くと数分で表示されます。</p>
                     </>
                   )}
-                  <span><Button onClick={() => void load()}><RefreshCw size={15} aria-hidden="true" />いま届いているか確かめる</Button></span>
+                  <span><Button onClick={() => load()} busyLabel="処理中…"><RefreshCw size={15} aria-hidden="true" />いま届いているか確かめる</Button></span>
                 </div>
                 <div className={styles.pageTable} role="table" aria-label="ページごとの表示">
                   <div className={styles.pageHead} role="row">

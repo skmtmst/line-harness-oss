@@ -326,7 +326,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       <AlertCircle className={styles.stateIconError} aria-hidden="true" />
       <p className={styles.stateTitle}>保存した検索を読み込めませんでした</p>
       <p className={styles.stateDesc}>{loadError}</p>
-      <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
+      <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
     </div>
   ) : ready && items.length === 0 ? (
     <div className={styles.stateCard}>

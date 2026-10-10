@@ -160,7 +160,7 @@ export default function BasicV8({ webinar, editor, onWebinarSaved, onEditorChang
                   ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
                   ...(folderId && !folders.some((folder) => folder.id === folderId) ? [{ value: folderId, label: '現在のフォルダ' }] : []),
                 ]} />
-{folderState === 'error' ? <p className="wb-basic-fieldHelp">フォルダを読み込めませんでした。<Button size="compact" onClick={() => void loadFolders()}>もう一度読み込む</Button></p> : null}</Field></div>
+{folderState === 'error' ? <p className="wb-basic-fieldHelp">フォルダを読み込めませんでした。<Button size="compact" onClick={() => loadFolders()} busyLabel="処理中…">もう一度読み込む</Button></p> : null}</Field></div>
               <div className="wb-basic-fieldFull"><Field label={<>案内文</>} htmlFor="webinar-basic-description"><input id="webinar-basic-description" value={description} onChange={(event) => setDescription(event.target.value)} className="wb-basic-input" /></Field></div>
             </div>
           </section>

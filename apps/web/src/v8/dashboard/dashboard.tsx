@@ -360,7 +360,7 @@ export default function DashboardV8() {
       {d.error ? (
         <div className={styles.errorBand} role="alert">
           <span>{d.error}</span>
-          <Button type="button" onClick={() => void d.load()}><RetryLabel /></Button>
+          <Button type="button" onClick={() => d.load()} busyLabel="処理中…"><RetryLabel /></Button>
         </div>
       ) : null}
       {looseFailures.length ? (
@@ -368,7 +368,7 @@ export default function DashboardV8() {
           tone="warn"
           role="status"
           message={`${partialFailureLabels(looseFailures)}を${STATE_TEXT.error}。0件としては表示していません。`}
-          action={<Button type="button" onClick={() => void d.load()}><RetryLabel /></Button>}
+          action={<Button type="button" onClick={() => d.load()} busyLabel="処理中…"><RetryLabel /></Button>}
         />
       ) : null}
     </div>

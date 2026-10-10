@@ -401,8 +401,8 @@ export default function BookingsV8({ eventId }: { eventId: string }) {
           </p>
         </div>
         <div className={styles.headActions}>
-          <Button variant="secondary" onClick={() => void exportCsv()} disabled={csvBusy || !applicants}>
-            {csvBusy ? '書き出しています…' : 'CSVで書き出す'}
+          <Button variant="secondary" onClick={() => void exportCsv()} disabled={csvBusy || !applicants} busy={csvBusy} busyLabel="書き出しています…">
+            CSVで書き出す
           </Button>
           <Select
             value={selectedOccurrenceId}
@@ -417,7 +417,7 @@ export default function BookingsV8({ eventId }: { eventId: string }) {
         <ListState
           kind="error"
           description="イベントは消えていません。開き直しても直らない場合はエラー報告へ。"
-          action={<Button onClick={() => void refreshEvent()}>開き直す</Button>}
+          action={<Button onClick={() => refreshEvent()} busyLabel="処理中…">開き直す</Button>}
         />
       ) : null}
       {actionError ? <p className="text-danger text-sm" role="alert">{actionError}</p> : null}
@@ -465,7 +465,7 @@ export default function BookingsV8({ eventId }: { eventId: string }) {
           <ListState
             kind="error"
             description="申込者は消えていません。開き直しても直らない場合はエラー報告へ。"
-            action={<Button onClick={() => void refreshApplicants()}>開き直す</Button>}
+            action={<Button onClick={() => refreshApplicants()} busyLabel="処理中…">開き直す</Button>}
           />
         ) : rows.length === 0 ? (
           <p className="text-ink-faint py-4 text-sm">この開催回には申込者もキャンセル待ちもいません。</p>

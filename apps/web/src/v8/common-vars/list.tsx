@@ -1131,7 +1131,7 @@ function CommonVarsListInner() {
         <span className={styles.stateIcon}><Lock size={18} aria-hidden="true" /></span>
         <p className={styles.stateTitle}>共通情報を見る権限がありません</p>
         <p className={styles.stateDesc}>オーナーか管理者に、共通情報を見られるよう頼んでください。</p>
-        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
+        <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
         <Button href="/staff" variant="secondary">できることを確かめる</Button>
       </div>
     ) : (
@@ -1139,7 +1139,7 @@ function CommonVarsListInner() {
         <span className={`${styles.stateIcon} ${styles.stateIconError}`}><TriangleAlert size={18} aria-hidden="true" /></span>
         <p className={styles.stateTitle}>共通情報を読み込めませんでした</p>
         <p className={styles.stateDesc}>{error || '読み込みに失敗しました。接続を確かめて、もう一度お試しください。'}</p>
-        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
+        <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
       </div>
     )
   ) : filtered.length === 0 ? (
@@ -1294,7 +1294,7 @@ function CommonVarsListInner() {
       {/* まとめての帯（選ぶと表の下に出る）。 */}
       {canWrite ? <BulkBar count={selected.size} total={filtered.length} onSelectAll={() => setSelected(new Set(filtered.map(item => item.id)))} hint="対象を確認してから操作を選んでください" onClear={() => setSelected(new Set())}>
         <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>選択を外す</Button>
-        <Button type="button" variant="danger" onClick={() => void prepareRemoveSelected()}>選択した共通情報を削除</Button>
+        <Button type="button" variant="danger" onClick={() => prepareRemoveSelected()} busyLabel="処理中…">選択した共通情報を削除</Button>
       </BulkBar> : null}
     </>
   )
@@ -1713,7 +1713,7 @@ function CommonVarsListInner() {
                 type="button"
                 variant="primary"
                 onClick={() => withViewTransition(() => router.push(`/contents/vars/edit?id=${activeItem.id}`))}
-              >
+               busyLabel="移動中…">
                 編集する
               </Button>
               {canWrite ? (
@@ -1729,8 +1729,8 @@ function CommonVarsListInner() {
                 <Button
                   type="button"
                   variant="danger"
-                  onClick={() => void openDelete(activeItem)}
-                >
+                  onClick={() => openDelete(activeItem)}
+                 busyLabel="処理中…">
                   削除する
                 </Button>
               ) : null}
@@ -1792,10 +1792,8 @@ function CommonVarsListInner() {
                     disabled={statusBusy}
                     busy={statusBusy}
                     onClick={() => void applyStatus()}
-                  >
-                    {statusBusy
-                      ? (statusAction === 'stop' ? '止めています…' : '再開しています…')
-                      : (statusAction === 'stop' ? '止める' : '再開する')}
+                   busyLabel={(statusAction === 'stop' ? '止めています…' : '再開しています…')}>
+                    {(statusAction === 'stop' ? '止める' : '再開する')}
                   </Button>
                 </div>
                 {statusError ? <p className={styles.dialogError} role="alert">{statusError}</p> : null}

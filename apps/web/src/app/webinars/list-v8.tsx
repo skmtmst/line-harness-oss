@@ -877,7 +877,7 @@ function WebinarListV8Inner() {
       </div>
 
       {csvError ? <Notice tone="info">{csvError}</Notice> : null}
-      {overviewFailure && !loadFailure ? <Notice tone="info" action={overviewFailure.retryable ? <Button onClick={() => void refreshOverview()}>集計を読み直す</Button> : undefined}>集計を表示できませんでした。</Notice> : null}
+      {overviewFailure && !loadFailure ? <Notice tone="info" action={overviewFailure.retryable ? <Button onClick={() => refreshOverview()} busyLabel="処理中…">集計を読み直す</Button> : undefined}>集計を表示できませんでした。</Notice> : null}
       <section className={styles.kpiBand} aria-label="ウェビナーの数の帯">
         {webinarKpiCells(visibleOverview).map((cell) => (
           <div className={styles.kpiCell} key={cell.key}>

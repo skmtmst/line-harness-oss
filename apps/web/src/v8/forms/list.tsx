@@ -1122,7 +1122,7 @@ export default function FormsListV8() {
       failure.title,
       failure.description,
       failure.retryable ? (
-        <Button type="button" variant="secondary" onClick={() => void loadForms()}>もう一度読み込む</Button>
+        <Button type="button" variant="secondary" onClick={() => loadForms()} busyLabel="処理中…">もう一度読み込む</Button>
       ) : null,
       true,
     )
@@ -1469,10 +1469,10 @@ export default function FormsListV8() {
               {canEditForms ? <>
               <Button type="button" variant="secondary" onClick={() => { closeDetail(); openDuplicate(active) }}>複製</Button>
               {active.isActive ? (
-                <Button type="button" variant="secondary" onClick={() => { closeDetail(); void openStop(active) }}>受付を止める</Button>
+                <Button type="button" variant="secondary" onClick={() => { closeDetail(); return openStop(active) }} busyLabel="処理中…">受付を止める</Button>
               ) : null}
               <Button type="button" variant="secondary" onClick={() => { closeDetail(); openMove(active) }}>フォルダへ移す</Button>
-              <Button type="button" variant="secondary" onClick={() => { closeDetail(); void openDelete(active) }}>アーカイブ・削除</Button>
+              <Button type="button" variant="secondary" onClick={() => { closeDetail(); return openDelete(active) }} busyLabel="処理中…">アーカイブ・削除</Button>
               </> : null}
               <CopyTextButton value={formAnswerUrl(selectedAccount?.liffId, active.id) ?? ''} aria-label="回答フォームのURLをコピー" disabled={!formAnswerUrl(selectedAccount?.liffId, active.id)} />
             </div>

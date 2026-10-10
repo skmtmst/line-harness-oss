@@ -886,7 +886,7 @@ export default function HqBroadcastCreate() {
                 {tagStatus === 'error' ? (
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-xs text-warning">タグを読み込めませんでした。通信を確かめて、もう一度お試しください。</p>
-                    <Button variant="secondary" size="compact" onClick={() => void loadTags()}>もう一度読み込む</Button>
+                    <Button variant="secondary" size="compact" onClick={() => loadTags()} busyLabel="処理中…">もう一度読み込む</Button>
                   </div>
                 ) : null}
                 {audience === 'scenario' ? (

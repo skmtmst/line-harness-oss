@@ -292,7 +292,7 @@ export default function CtaV8({
             CTAカード {ctas === null ? '' : `${ctas.length}枚`}
           </h2>
           <p className="text-ink-faint mt-1 text-xs">動画の途中で出す申し込みボタンです。出す時刻は分:秒で入れます。</p>
-          {message ? <Notice tone="danger" title="CTAカード" action={ctas === null ? <Button onClick={() => void loadCtas()}>もう一度読み込む</Button> : undefined}>{message}</Notice> : null}
+          {message ? <Notice tone="danger" title="CTAカード" action={ctas === null ? <Button onClick={() => loadCtas()} busyLabel="処理中…">もう一度読み込む</Button> : undefined}>{message}</Notice> : null}
           {ctas === null ? (
             <>{message ? null : <ListState kind="loading" />}<Button disabled>CTAカードを保存する</Button></>
           ) : (

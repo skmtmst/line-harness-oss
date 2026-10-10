@@ -231,7 +231,7 @@ export default function UsersV8() {
                       <CircleAlert size={20} aria-hidden="true" />
                     </span>
                     <p className={styles.stateTitle}>統合ユーザーを読み込めませんでした</p>
-                    <Button type="button" variant="primary" onClick={() => void u.load()}>
+                    <Button type="button" variant="primary" onClick={() => u.load()} busyLabel="処理中…">
                       もう一度試す
                     </Button>
                   </div>
