@@ -96,7 +96,6 @@ describe('共通部品の影響範囲', () => {
       // サーバが数えた総数でページ送りを出すため共通へ寄せた。
       // ★V8 重複しているかも（hn6Y8）。v7 と同じくサーバ総数でページ送り。
       'app/duplicates/duplicates-v8.tsx',
-      'app/duplicates/page.tsx',
       // #572: EC連携の取り込み記録が先頭20件しか出ず、21件目以降の失敗に
       // 届かなかった。状態絞りをサーバへ移し、共通へ寄せた。
       'app/ec-commerce/page.tsx',

@@ -21,7 +21,7 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
@@ -140,7 +140,7 @@ describe('権限不足でも候補を残し再試行を出さない（R598残件
     expect(host.textContent).toContain('権限')
     expect(hasRetryButton()).toBe(true)
     // 空の一覧と誤認させない。
-    expect(host.textContent).not.toContain('条件に合う重複候補はありません')
+    expect(host.textContent).not.toContain('重複の候補はありません')
   })
 
   it('取得済み集計→再検出で集計403：候補は残し権限の案内、「もう一度」は出さない', async () => {
@@ -179,3 +179,5 @@ describe('権限不足でも候補を残し再試行を出さない（R598残件
     retryButton('もう一度')
   })
 })
+
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
