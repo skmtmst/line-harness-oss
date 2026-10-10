@@ -177,3 +177,9 @@
 [data-theme='v8'] .paddingCompact { padding: var(--tpl-nc-side-pad); }
 [data-theme='v8'] .spacingTight { gap: var(--tpl-nc-field-gap); }
 [data-theme='v8'] .spacingControls { gap: var(--tpl-toolbar-gap); }
+
+/* B-159：入れ子の面には影を重ねない。外のカードの内側だけをそろえる。 */
+[data-theme='v8'] .paddingCompact,
+[data-theme='v8'] .paddingDefault,
+[data-theme='v8'] .paddingRoomy,
+[data-theme='v8'] .paddingSpacious { padding: var(--tpl-card-pad); }

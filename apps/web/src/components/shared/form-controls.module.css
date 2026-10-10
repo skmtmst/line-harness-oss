@@ -142,3 +142,12 @@
 [data-theme='v8'] .field[data-spacing='section'] { gap: var(--tpl-section-gap); }
 [data-theme='v8'] .field[data-field-size='compact'] .label { font-size: var(--tpl-rest3-ec-small); line-height: var(--tpl-rest3-ec-label-lh); }
 [data-theme='v8'] .field[data-field-size='compact'] :is(.note, .error) { margin-top: 0; font-size: var(--tpl-rest3-ec-xs); line-height: var(--tpl-rest3-ec-note-lh); }
+
+/* B-180：欄の上の小見出しは形・密度にかかわらず12/500。 */
+[data-theme='v8'] .label,
+[data-theme='v8'] .field[data-field-size] .label,
+[data-theme='v8'] .field[data-label-size] .label,
+[data-theme='v8'] .field[data-density] .label {
+  font-size: var(--tpl-field-label-size);
+  font-weight: var(--tpl-field-label-weight);
+}

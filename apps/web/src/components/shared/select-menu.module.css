@@ -200,3 +200,6 @@
   height: var(--select-menu-item-line);
 }
 }
+
+/* B-161：開いた選ぶ欄も浮く面の薄い縁を使う。 */
+[data-theme='v8'] .surface { border-color: var(--card-edge); }

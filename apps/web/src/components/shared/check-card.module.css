@@ -138,7 +138,7 @@
 [data-theme='v8'] .box:checked { outline-color: var(--color-accent-deep); }
 [data-theme='v8'] .box:focus-visible { outline: 2px solid var(--color-action); outline-offset: 3px; }
 [data-theme='v8'] .body { display: flex; flex: 1; flex-direction: column; gap: 2px; }
-[data-theme='v8'] .title { line-height: 21px; }
+[data-theme='v8'] .title { line-height: 20px; }
 [data-theme='v8'] .note { line-height: 18px; font-weight: 400; }
 [data-theme='v8'] .disabled, [data-theme='v8'] .disabled .box { outline-color: var(--color-ink-disabled); }
 
@@ -162,3 +162,5 @@
 /* 単独の確認行（Yyw6i）。既定のカード寸法は変えない。 */
 [data-theme='v8'] .row { align-items: center; min-height: 36px; padding: 8px 10px; gap: 8px; border-radius: var(--radius-control); }
 [data-theme='v8'] .row .title { font-size: 13px; font-weight: 500; line-height: 20px; }
+
+[data-theme='v8'] .card { padding: var(--tpl-card-pad); }

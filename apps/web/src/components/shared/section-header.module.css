@@ -12,7 +12,7 @@
 .root {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .title {
@@ -21,8 +21,8 @@
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--tpl-section-title-size);
+  font-weight: var(--tpl-section-title-weight);
   color: var(--color-ink);
   line-height: var(--text-lh, 1.4);
   white-space: nowrap;
@@ -51,4 +51,4 @@
 
 }
 
-[data-theme='v8'] .root[data-size="small"] .title { font-size: var(--text-body); font-weight: 700; line-height: var(--tpl-rt-label-lh); }
+[data-theme='v8'] .root[data-size="small"] .title { font-size: var(--tpl-section-title-size); font-weight: var(--tpl-section-title-weight); line-height: var(--tpl-rt-label-lh); }

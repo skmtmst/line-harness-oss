@@ -62,7 +62,7 @@ describe('押せる部品のフォーカスが見える', () => {
     // 緑は「正常」の意味なので、輪郭の色は action にそろえる。
     for (const name of files.filter((n) => n.endsWith('.css'))) {
       const css = withoutComments(read(name))
-      if (/:(?:focus-within|has\(:focus-visible\))\s*\{[^}]*outline:\s*2px solid var\(--color-action\)/.test(css)) continue
+      if (/:(?:focus-within|has\(:focus-visible\))\s*\{[^}]*outline:\s*2px solid var\(--color-(?:action|focus-ring)\)/.test(css)) continue
       // 通常時だけ輪郭を消す指定は、キーボードの輪郭を消さない。
       const focusCss = css.replace(/([^{}]+)\{([^{}]*)\}/g, (rule, selectors) =>
         selectors.split(',').every((selector: string) => selector.includes(':not(:focus-visible)')) ? '' : rule,
@@ -71,7 +71,7 @@ describe('押せる部品のフォーカスが見える', () => {
     }
   })
 
-  it('入力欄の輪郭は action 色で2px・外側に余白', () => {
+  it('入力欄の輪郭は青い色で2px・外側に余白', () => {
     // TextField・Select・DateField ほか、入力欄のフォーカスは
     // `2px・action 色・outline-offset: 2px` にそろえる。
     // 緑（accent 系）は「正常」の意味なので輪郭に使わない。
@@ -83,7 +83,7 @@ describe('押せる部品のフォーカスが見える', () => {
     ]
     for (const name of targets) {
       const css = withoutComments(read(name))
-      expect(css, `${name} の輪郭が action 色ではない`).toMatch(/:focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--color-action\)/)
+      expect(css, `${name} の輪郭が action 色ではない`).toMatch(/:focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--color-(?:action|focus-ring)\)/)
       expect(css, `${name} に緑の輪郭が残っている`).not.toMatch(/:focus-visible[^{]*\{[^}]*var\(--color-accent/)
     }
   })

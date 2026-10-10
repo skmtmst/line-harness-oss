@@ -107,3 +107,18 @@
 /* タグ名の横の注記。板の小さい札の寸法を保つ。 */
 [data-theme='v8'] .annotation { padding: 0 var(--tpl-tag-name-gap); background: var(--color-canvas-sunken); color: var(--color-ink-faint); font-size: var(--tpl-tag-note-size); font-weight: 500; line-height: var(--tpl-row-sub-lh); }
 [data-theme='v8'] .annotation.warning { color: var(--color-warning); }
+
+/* B-159 / B-180：小さい注記も状態なら同じ22px・12/600。 */
+[data-theme='v8'] .badge {
+  box-sizing: border-box;
+  height: var(--tpl-badge-h);
+  font-size: var(--text-caption); font-weight: 600; line-height: 18px;
+}
+[data-theme='v8'] .badge.micro {
+  font-size: var(--text-caption); font-weight: 600; line-height: 18px;
+}
+[data-theme='v8'] .neutral { background: var(--color-badge-neutral-bg); color: var(--color-badge-neutral); }
+[data-theme='v8'] .success { background: var(--color-badge-success-bg); color: var(--color-badge-success); }
+[data-theme='v8'] .warning { background: var(--color-badge-warning-bg); color: var(--color-badge-warning); }
+[data-theme='v8'] .danger { background: var(--color-badge-danger-bg); color: var(--color-badge-danger); }
+[data-theme='v8'] .info { background: var(--color-badge-info-bg); color: var(--color-badge-info); }

@@ -220,7 +220,7 @@ export default function Dialog({
       data-design-content-padding={designContentPadding ? '' : undefined}
       style={designWidth || designHeaderPadding || designHeaderHeight || designContentPadding || designFooterPadding || designFooterGap !== undefined ? ({
         ...(designFooterGap !== undefined ? { '--dialog-footer-gap': `${designFooterGap}px` } : {}),
-        ...(designWidth ? { '--dialog-design-width': `${designWidth}px` } : {}),
+        ...(designWidth ? { '--dialog-design-width': `${designWidth === 600 ? 560 : designWidth === 844 ? 720 : designWidth}px` } : {}),
         ...(designHeaderPadding ? { '--dialog-design-header-padding': designHeaderPadding } : {}),
         ...(designHeaderHeight ? { '--dialog-design-header-height': `${designHeaderHeight}px` } : {}),
         ...(designContentPadding ? { '--dialog-design-content-padding': designContentPadding } : {}),

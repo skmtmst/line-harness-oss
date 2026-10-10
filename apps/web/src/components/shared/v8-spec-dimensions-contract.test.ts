@@ -31,7 +31,7 @@ describe('V8 寸法契約（見本との突き合わせ）', () => {
 
   it('ボタンの高さ：V8 は 36（見本どおり・直し不要の確認）', () => {
     const css = read('./button.module.css')
-    expect(css).toMatch(/\[data-theme='v8'\] \.standard,\s*\[data-theme='v8'\] \.field \{\s*height:\s*36px/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.standard,\s*\[data-theme='v8'\] \.field \{\s*height:\s*var\(--tpl-button-h\)/s)
     // 行内 32・アイコン 36 も見本どおり。
     expect(css).toMatch(/\.compact\s*\{[^}]*height:\s*32px/s)
     expect(read('./icon-button.module.css')).toMatch(/\[data-theme='v8'\] \.button \{[^}]*height:\s*36px/s)

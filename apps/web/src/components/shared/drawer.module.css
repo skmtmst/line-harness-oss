@@ -335,3 +335,6 @@
 [data-theme='v8'] .panel[data-width='composer'] .footer { padding: var(--tpl-msg-composer-drawer-footer-pad); }
 
 .titleRow { display: flex; align-items: center; gap: var(--tpl-msg-composer-content-gap); flex-wrap: wrap; }
+
+/* B-161：浮く面の影と薄い縁を共通化。 */
+[data-theme='v8'] .panel { border: 0; outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--shadow-controls-pop); }
