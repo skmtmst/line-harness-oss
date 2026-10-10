@@ -56,6 +56,7 @@ import MenuPortal from '@/components/shared/menu-portal'
 import BulkBar from '@/components/shared/bulk-bar'
 import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
+import { TableBody } from '@/components/shared/table-body'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
@@ -718,10 +719,10 @@ export default function FriendsListV8() {
           <col className={styles.colStar} />
           <col />
           {visible.has('support') ? <col className={styles.colSupport} /> : null}
-          {visible.has('scenario') ? <col className={styles.colScenario} /> : null}
+          {visible.has('scenario') ? <col className={styles.colScenario} data-cell-collapse="narrow" /> : null}
           {visible.has('latest') ? <col className={styles.colLatest} /> : null}
           {visible.has('tags') ? <col className={styles.colTags} /> : null}
-          {visible.has('source') ? <col className={styles.colSource} /> : null}
+          {visible.has('source') ? <col className={styles.colSource} data-cell-collapse="narrow" /> : null}
           {visible.has('last') ? <col className={styles.colLast} /> : null}
           <col className={styles.colMenu} />
         </colgroup>
@@ -739,46 +740,16 @@ export default function FriendsListV8() {
               <span className={styles.thFriendInner}><Star size={14} aria-label="注目" className={styles.thStar} />友だち</span>
             </Th>
             {COLUMNS.filter((column) => visible.has(column.key)).map((column) => (
-              <Th key={column.key} className={styles.th}>{column.label}</Th>
+              <Th key={column.key} className={styles.th} collapseAt={column.key === 'scenario' || column.key === 'source' ? 'narrow' : undefined}>{column.label}</Th>
             ))}
             <Th className={styles.thMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
-        <tbody>
-          {loadStatus === 'loading' ? (
-            <tr>
-              <td colSpan={colCount}>
-                <DelayedSkeleton
-                  loading
-                  skeleton={(
-                    <div aria-hidden="true">
-                      {[0, 1, 2, 3, 4, 5].map((row) => (
-                        <div key={row} className={styles.skeletonRow}>
-                          <Skeleton className={styles.skelBox} />
-                          <Skeleton circle className={styles.skelAvatar} />
-                          <Skeleton className={styles.skelName} />
-                          <Skeleton className={styles.skelCell} />
-                          <Skeleton className={styles.skelCell} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                />
-              </td>
-            </tr>
-          ) : loadStatus === 'error' ? (
-            <tr>
-              <td colSpan={colCount} className={styles.stateCell}>
-                <ListState kind="error" title="友だちを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度試してください。" onRetry={() => void loadFriends()} />
-              </td>
-            </tr>
-          ) : friends.length === 0 ? (
-            <tr>
-              <td colSpan={colCount} className={styles.stateCell}>
-                <ListState kind="empty" title={emptyMessage.title} description={emptyMessage.description} />
-              </td>
-            </tr>
-          ) : friends.map((friend) => {
+        <TableBody
+          items={loadStatus === 'ready' ? friends : []}
+          itemKey={(friend) => friend.id}
+          colSpan={colCount}
+          renderRow={(friend) => {
             const status = statusOf(friend.chatStatus)
             const latest = friend.latestIncomingMessage
             const lastContact = lastContactOf(friend)
@@ -828,7 +799,7 @@ export default function FriendsListV8() {
                   </Td>
                 ) : null}
                 {visible.has('scenario') ? (
-                  <Td className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={friend.activeScenario?.name}>{friend.activeScenario?.name ?? 'なし'}</span></Td>
+                  <Td className={`${styles.td} ${styles.fixedContent}`} collapseAt="narrow"><span className={styles.cellText} title={friend.activeScenario?.name}>{friend.activeScenario?.name ?? 'なし'}</span></Td>
                 ) : null}
                 {visible.has('latest') ? (
                   <Td className={styles.td}>
@@ -850,7 +821,7 @@ export default function FriendsListV8() {
                   </Td>
                 ) : null}
                 {visible.has('source') ? (
-                  <Td className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={friend.firstTrackedLinkName || '不明'}>{friend.firstTrackedLinkName || '不明'}</span></Td>
+                  <Td className={`${styles.td} ${styles.fixedContent}`} collapseAt="narrow"><span className={styles.cellText} title={friend.firstTrackedLinkName || '不明'}>{friend.firstTrackedLinkName || '不明'}</span></Td>
                 ) : null}
                 {visible.has('last') ? (
                   <Td className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={monthDayTime(lastContact)}>{monthDay(lastContact)}</span></Td>
@@ -870,8 +841,43 @@ export default function FriendsListV8() {
                 </Td>
               </Tr>
             )
-          })}
-        </tbody>
+          }}
+        >
+          {loadStatus === 'loading' ? (
+            <tr>
+              <td colSpan={colCount}>
+                <DelayedSkeleton
+                  loading
+                  skeleton={(
+                    <div aria-hidden="true">
+                      {[0, 1, 2, 3, 4, 5].map((row) => (
+                        <div key={row} className={styles.skeletonRow}>
+                          <Skeleton className={styles.skelBox} />
+                          <Skeleton circle className={styles.skelAvatar} />
+                          <Skeleton className={styles.skelName} />
+                          <Skeleton className={styles.skelCell} />
+                          <Skeleton className={styles.skelCell} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                />
+              </td>
+            </tr>
+          ) : loadStatus === 'error' ? (
+            <tr>
+              <td colSpan={colCount} className={styles.stateCell}>
+                <ListState kind="error" title="友だちを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度試してください。" onRetry={() => void loadFriends()} />
+              </td>
+            </tr>
+          ) : friends.length === 0 ? (
+            <tr>
+              <td colSpan={colCount} className={styles.stateCell}>
+                <ListState kind="empty" title={emptyMessage.title} description={emptyMessage.description} />
+              </td>
+            </tr>
+          ) : null}
+        </TableBody>
       </DataTable>
     </div>
   )

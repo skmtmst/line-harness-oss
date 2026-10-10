@@ -205,9 +205,9 @@
  */
 :global([data-theme='v8']) .table td:is(.tdCheck, .tdStar, .tdMenu, .fixedContent) {
   content-visibility: auto;
-  contain-intrinsic-block-size: auto 32px;
+  contain-intrinsic-block-size: auto var(--tpl-fr-avatar);
   /* 枠の外の影・フォーカス輪郭まで描き、セルの端で切らない。 */
-  overflow-clip-margin: 8px;
+  overflow-clip-margin: var(--tpl-fr-cell-inset);
 }
 
 .row { cursor: default; }
