@@ -80,11 +80,11 @@ vi.mock('@/components/layout/merged-tabs', () => ({
   useMergedTab: () => fixture.activeTab,
 }))
 
-vi.mock('@/components/line-notifications/notification-run-list', () => ({
+vi.mock('@/v8/settings/line-notifications/runs-tab', () => ({
   default: () => <section>送信記録</section>,
 }))
 
-vi.mock('./operator-notification-rules', () => ({
+vi.mock('@/v8/settings/line-notifications/operator-tab', () => ({
   default: () => <section>運用者へのお知らせ設定</section>,
 }))
 

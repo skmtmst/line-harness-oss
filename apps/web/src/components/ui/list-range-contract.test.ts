@@ -30,7 +30,7 @@ const LIST_RANGE_USERS: Array<[string, string]> = [
    */
   ['回答フォーム 回答一覧', '../../app/form-submissions/responses/page.tsx'],
   ['コンテンツ管理', '../../app/contents/page.tsx'],
-  ['運営へのお知らせ', '../../app/line-notifications/operator-notification-rules.tsx'],
+  ['運営へのお知らせ', '../../v8/settings/line-notifications/operator-tab.tsx'],
   ['NENキャンペーン 送った履歴', '../../app/nen-campaigns/nen-overview.tsx'],
   ['コンバージョン', '../../v8/conversions/list.tsx'],
   ['EC連携 取り込みの記録', '../../app/ec-commerce/page.tsx'],

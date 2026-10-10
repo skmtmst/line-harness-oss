@@ -12,7 +12,7 @@
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { customerNotificationKpis } from './customer-kpis'
+import { customerNotificationKpis } from '@/v8/settings/line-notifications/customer-kpis'
 
 const fixture = vi.hoisted(() => ({
   operatorList: vi.fn(),
@@ -43,8 +43,8 @@ vi.mock('@/components/layout/merged-tabs', () => ({
   useMergedTab: () => 'customer',
 }))
 
-vi.mock('@/components/line-notifications/notification-run-list', () => ({ default: () => null }))
-vi.mock('./operator-notification-rules', () => ({ default: () => null }))
+vi.mock('@/v8/settings/line-notifications/runs-tab', () => ({ default: () => null }))
+vi.mock('@/v8/settings/line-notifications/operator-tab', () => ({ default: () => null }))
 
 vi.mock('@/lib/api', () => {
   class ApiError extends Error {
@@ -166,14 +166,14 @@ describe('R611 customer-kpis の失敗注記（器の試験）', () => {
     const kpis = customerNotificationKpis({ ...base, loadFailed: true })
     expect(kpis.every((kpi) => kpi.value === null)).toBe(true)
     // 板 g3iDs の4枚。
-    expect(kpis.find((kpi) => kpi.label === '今日送った')?.note).toBe('取得失敗')
+    expect(kpis.find((kpi) => kpi.label === '今日 送った')?.note).toBe('取得失敗')
     expect(kpis.find((kpi) => kpi.label === 'この30日')?.note).toBe('取得失敗')
     expect(kpis.find((kpi) => kpi.label === '今月の送信枠')?.note).toBe('取得失敗')
   })
 
   it('loadFailed がなければ今までどおり「取得中」', () => {
     const kpis = customerNotificationKpis({ ...base })
-    expect(kpis.find((kpi) => kpi.label === '今日送った')?.note).toBe('種類別の件数は未取得')
+    expect(kpis.find((kpi) => kpi.label === '今日 送った')?.note).toBe('種類別の件数は未取得')
     expect(kpis.find((kpi) => kpi.label === '今月の送信枠')?.note).toBe('送信枠を取得中')
   })
 })

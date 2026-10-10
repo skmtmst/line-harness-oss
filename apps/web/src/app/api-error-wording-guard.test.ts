@@ -72,8 +72,6 @@ const BASELINE: Record<string, number> = {
   'app/hq/banners/project/page.tsx': 6,
   'app/hq/templates/template-console.tsx': 1,
   'app/hq/templates/template-definition-editor.tsx': 3,
-  'app/line-notifications/operator-notification-rules.tsx': 4,
-  'app/line-notifications/operator/new/operator-new-v8.tsx': 1,
   'app/login/two-factor/setup/page.tsx': 1,
   'app/login/two-factor/two-factor-error.ts': 1,
   'app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx': 1,

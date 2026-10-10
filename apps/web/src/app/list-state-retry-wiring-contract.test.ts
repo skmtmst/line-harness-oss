@@ -11,7 +11,7 @@ const TARGETS = [
   '../v8/friend-add-publish/publish.tsx',
   '../components/friends/friend-list-table.tsx',
   'line-notifications/page.tsx',
-  'line-notifications/operator-notification-rules.tsx',
+  '../v8/settings/line-notifications/operator-tab.tsx',
   '../v8/mileage/score.tsx',
   '../v8/mileage/balances.tsx',
   '../v8/mileage/earning-rules.tsx',

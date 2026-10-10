@@ -174,11 +174,6 @@
     "height": 4,
     "font": 21
   },
-  "app/line-notifications/operator/new/operator-new-v8.module.css": {
-    "spacing": 29,
-    "height": 10,
-    "font": 19
-  },
   "app/mileage/earning-rules/new/v8-create-form.module.css": {
     "spacing": 32,
     "height": 6,

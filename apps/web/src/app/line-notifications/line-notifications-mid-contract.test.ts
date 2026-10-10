@@ -4,7 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const OPERATOR_RULES = fs.readFileSync(
-  path.join(__dirname, 'operator-notification-rules.tsx'),
+  path.join(__dirname, '../../v8/settings/line-notifications/operator-tab.tsx'),
   'utf8',
 )
 const OPERATOR_NEW = fs.readFileSync(

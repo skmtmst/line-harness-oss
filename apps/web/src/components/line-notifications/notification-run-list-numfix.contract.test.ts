@@ -14,14 +14,14 @@ import { describe, expect, it } from "vitest";
 const here = dirname(fileURLToPath(import.meta.url));
 const list = readFileSync(join(here, "notification-run-list.tsx"), "utf8");
 const operator = readFileSync(
-  join(here, "..", "..", "app", "line-notifications", "operator-notification-rules.tsx"),
+  join(here, "..", "..", "v8", "settings", "line-notifications", "operator-tab.tsx"),
   "utf8",
 );
 
 describe("notification-run-list-numfix (DrwMm/PZBVb/u8xibp)", () => {
   it("検索欄の字は13", () => {
     expect(list).toContain("px-3 text-label outline-none focus:border-accent");
-    expect(operator).toContain("flex-1 bg-transparent text-label outline-none");
+    expect(operator).toContain("<SearchField aria-label=\"お知らせを検索\"");
   });
 
   it("行の日時は12/600・試行と理由は12", () => {
