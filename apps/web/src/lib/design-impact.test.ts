@@ -84,7 +84,6 @@ describe('共通部品の影響範囲', () => {
       'app/booking/bookings/page.tsx',
       // 予約設定の入口は現役v8/booking-menus/settingsを読む。ページ送りの利用先は下の本体で数える。
       // #1145(★V8) の一斉配信の一覧（app/broadcasts/list-v8.tsx）は描かれなくなった。入口は src/v8/broadcasts/list.tsx（下）。
-      'app/common-actions/page.tsx',
       'app/contents/media-replacement-dialog.tsx',
       'app/contents/page.tsx',
       // #973: 共通情報の変更影響を1件ずつ確認する一覧にページ送りを追加した。

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -16,7 +16,7 @@ describe('公開競合の理由の残存（監査 R479）', () => {
     // R477 の読み直し自体は残す。
     expect(VERSIONS).toContain('await load()')
     // 読み直しで消えた文言を戻す。読み直し自体の失敗は上書きしない。
-    expect(VERSIONS).toContain('setError((current) => current || message)')
+    expect(VERSIONS).toContain('setError((current) => current || result)')
   })
 
   it('成功時は知らせを残さない（失敗のときだけ読み直しのあとに戻す）', () => {
