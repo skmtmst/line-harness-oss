@@ -1,4 +1,5 @@
 'use client'
+
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
@@ -49,7 +50,6 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 タグ「タグ」タブの一覧（Pencil `I1E7Bt`、フォルダ窓 `IjVpM`、
@@ -121,6 +121,7 @@ function TagFolderDialog({
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
+
 
       setError(group ? 'フォルダを直せませんでした' : 'フォルダを追加できませんでした') }
     } finally {

@@ -1,4 +1,5 @@
 'use client'
+
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
@@ -271,6 +272,7 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
 
   return (
     <ListPage
+      skeleton
       boardId={BOARD[tab]}
       headingSize="regular"
       title="NEN配信"
@@ -318,7 +320,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
   const [filter, setFilter] = useListUrlValue<AutoFilter>('filter', '')
   const [saved, setSaved] = useState('')
   const [page, setPage] = useListUrlValue('page', 1)
-  const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [savedOpen, setSavedOpen] = useState(false)
   const savedRef = useRef<HTMLSpanElement | null>(null)
 
@@ -622,7 +624,7 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
   const [filter, setFilter] = useListUrlValue<ColumnFilter>('filter', '')
   const [category, setCategory] = useState('')
   const [page, setPage] = useListUrlValue('page', 1)
-  const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [savedOpen, setSavedOpen] = useState(false)
   const savedRef = useRef<HTMLSpanElement | null>(null)
 

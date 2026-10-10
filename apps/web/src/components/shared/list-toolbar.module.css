@@ -195,3 +195,26 @@
 /* 畳む道具がない一覧では、実際の空き幅に合わせて折り返す。
  * フォルダ列がある1440幅でも、検索・並び順・件数を切らない。 */
 [data-theme='v8'] .toolbar:not(:has(.optional)) { flex-wrap: wrap; }
+
+
+/* B-178：通常は1段。狭い板は検索を縮め、その次に右の道具を折り返す。 */
+[data-theme='v8'] :global([data-list-skeleton]) .toolbar {
+  flex-wrap: wrap; min-width: 0;
+}
+[data-theme='v8'] :global([data-list-skeleton]) .row1 > .search {
+  width: var(--tpl-list-search-w);
+  flex: 0 1 var(--tpl-list-search-w);
+  min-width: min(var(--tpl-list-search-min), 100%);
+}
+[data-theme='v8'] :global([data-list-skeleton]) .search > * { width: 100%; min-width: 0; }
+.secondary {
+  display: flex; flex: 1 0 100%; order: 5; min-width: 0;
+  flex-wrap: wrap; align-items: center; gap: var(--tpl-list-gap);
+}
+
+/* B-178：独自の段組みを持っていた一覧の移行用。中身とイベントだけ渡す。 */
+.slots { display: flex; flex: 1 0 100%; width: 100%; flex-direction: column; min-width: 0; gap: var(--tpl-list-gap); }
+.slotsRow { display: flex; flex-wrap: wrap; align-items: center; min-width: 0; gap: var(--tpl-list-gap); }
+.searchSlot { flex: 0 1 var(--tpl-list-search-w); min-width: min(var(--tpl-list-search-min), 100%); max-width: 100%; }
+.searchSlot > * { width: 100%; min-width: 0; }
+.slotsEnd { display: flex; flex-wrap: wrap; align-items: center; margin-left: auto; min-width: 0; gap: var(--tpl-list-gap); }

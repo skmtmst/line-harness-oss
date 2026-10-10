@@ -1,4 +1,5 @@
 'use client'
+
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -25,7 +26,9 @@ import { RankChip, yen } from './parts'
 import styles from './members.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import { GridTable, GridHeadRow, GridRow, GridNameCell } from '@/components/shared/grid-table'
+import { ListPager } from '@/components/templates/list-page'
+import { ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 
 /*
  * ★V8-B 会員一覧（AOWoJ）。今の V8 の会員一覧（app/nen/members/members-v8.tsx の MembersTabV8）を
@@ -52,7 +55,7 @@ export default function MembersListV8({
   const [rank, setRank] = useListUrlValue('rank', '')
   const [sort, setSort] = useListUrlValue<NenMemberSort>('sort', 'annual_desc')
   const [page, setPage] = useListUrlValue('page', 1)
-  const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const requestRef = useRef(0)
 
   /*
@@ -115,8 +118,8 @@ export default function MembersListV8({
         会員はネットショップで登録した人です。LINE と結びつくと、ランクやペットに合わせた配信ができます。
       </NoteBar>
 
-      <div className={styles.toolbar}>
-        <div className={styles.searchWrap}>
+      <ListToolbarRow>
+        <ListToolbarSearchSlot>
           <SearchField
             aria-label="会員を検索"
             placeholder="会員を探す"
@@ -124,7 +127,7 @@ export default function MembersListV8({
             onChange={(value) => { setQuery(value); setPage(1) }}
             onClear={() => { setQuery(''); setPage(1) }}
           />
-        </div>
+        </ListToolbarSearchSlot>
         <FilterChip
           selected={chipTopRanks}
           count={topTwoCount}
@@ -139,7 +142,7 @@ export default function MembersListV8({
         <FilterChip selected={chipUnlinked} count={unlinkedCount} onChange={(next) => { setChipUnlinked(next); setPage(1) }}>
           EC未連携
         </FilterChip>
-        <span className={styles.toolbarRight}>
+        <ListToolbarEnd>
           <SaveErrorField names={["rank"]}><Select
             aria-label="よく使う絞り込み"
             value={rank}
@@ -161,8 +164,8 @@ export default function MembersListV8({
             ]}
           /></SaveErrorField>
           <PageSizeSelect value={pageSize} options={[10, 20, 50]} onChange={(value) => { setPageSize(value); setPage(1) }} />
-        </span>
-      </div>
+        </ListToolbarEnd>
+      </ListToolbarRow>
 
       <section>
         {status === 'loading' && !data ? (
@@ -185,9 +188,9 @@ export default function MembersListV8({
         ) : data ? (
           <>
             {/* 絵 AOWoJ：表は白い板の幅いっぱい（行の内側 24）。列は 会員・ランク・通年・ライフタイム・マイル残高・ペット・最終購入・マイル還元・「…」。 */}
-            <div className={styles.mTable} role="table" aria-label="会員の一覧">
+            <GridTable className={styles.mTable}label="会員の一覧" framed={false} design={{ columns: 'var(--tpl-rest3-mb-cols)', gap: 'var(--tpl-rest3-mb-gap)', rowPadding: 'var(--tpl-rest3-mb-row-pad)', fontSize: 'var(--polish-text-body)' }}>
               <div role="rowgroup">
-                <div role="row" className={`${styles.mRow} ${styles.mHead}`}>
+                <GridHeadRow className={`${styles.mRow} ${styles.mHead}`}>
                   <span role="columnheader">会員</span>
                   <span role="columnheader">ランク</span>
                   <span role="columnheader">通年</span>
@@ -197,15 +200,15 @@ export default function MembersListV8({
                   <span role="columnheader" className={styles.mWide}>最終購入</span>
                   <span role="columnheader" className={styles.mWide}>マイル還元</span>
                   <span role="columnheader"><span className={styles.srOnly}>操作</span></span>
-                </div>
+                </GridHeadRow>
               </div>
               <div role="rowgroup">
                 {data.items.map((member) => (
                   <MemberRow key={member.friendId} member={member} rankOrder={rankOrder} onOpen={(href) => router.push(href)} />
                 ))}
               </div>
-            </div>
-            <div className={styles.listFoot}>
+            </GridTable>
+            <ListPager>
               <ListRange
                 total={data.total}
                 first={data.total === 0 ? 0 : (data.page - 1) * data.pageSize + 1}
@@ -214,7 +217,7 @@ export default function MembersListV8({
               {data.total > data.pageSize ? (
                 <Pagination page={data.page} pageCount={Math.max(1, Math.ceil(data.total / data.pageSize))} onPageChange={setPage} />
               ) : null}
-            </div>
+            </ListPager>
             <p className={styles.listHint}>行の「…」から 会員の詳細・友だちを開く・ECで開く。</p>
           </>
         ) : null}
@@ -234,11 +237,9 @@ function MemberRow({
 }) {
   const friendDetail = `/friends/detail?id=${encodeURIComponent(member.friendId)}`
   return (
-    <div role="row" className={styles.mRow}>
-      <span role="cell" className={styles.memberText}>
-        <span className={styles.memberName} title={member.name}>{member.name || '（名前なし）'}</span>
-        <span className={styles.memberSub}>{member.customerId ? `EC会員 ${member.customerId}` : 'EC未連携'}</span>
-      </span>
+    <GridRow className={styles.mRow} data-row-id={member.friendId}>
+      <GridNameCell name={
+        <span className={styles.memberName} title={`${member.name || '（名前なし）'} ／ ${member.customerId ? `EC会員 ${member.customerId}` : 'EC未連携'}`}>{member.name || '（名前なし）'}</span>}/>
       <span role="cell"><RankChip rankKey={member.rankKey} name={member.rankName} rankOrder={rankOrder} /></span>
       <span role="cell"><span className={styles.numStrong}>{yen(member.annualMilesYen)}</span></span>
       <span role="cell"><span className={styles.numSoft}>{yen(member.lifetimeMilesYen)}</span></span>
@@ -270,6 +271,6 @@ function MemberRow({
           ]}
         />
       </span>
-    </div>
+    </GridRow>
   )
 }

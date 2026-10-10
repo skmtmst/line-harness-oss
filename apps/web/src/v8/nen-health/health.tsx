@@ -1,4 +1,5 @@
 'use client'
+
 import { useListUrlJsonValue } from '@/components/shared/list-url-state'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
@@ -34,7 +35,7 @@ import { EMPTY_FILTERS, Pill, RowMenu, WeightBars, changeBadges, md, rangeText, 
 import styles from './health.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import { ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from '@/components/shared/list-toolbar'
 
 /*
  * ★V8-B 健康日記（Pencil「★V8-B 画面の地図」専用機能の組：
@@ -178,6 +179,7 @@ export default function HealthV8({
 
   return (
     <ListPage
+      skeleton
       boardId={BOARD[tab]}
       headingSize="regular"
       title="健康日記"
@@ -240,7 +242,7 @@ function HealthListV8({
   const [data, setData] = useState<NenHealthListData | null>(null)
   const [draft, setDraft] = useState(filters.q)
   const [page, setPage] = useListUrlValue('page', 1)
-  const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [savedOpen, setSavedOpen] = useState(false)
   const savedRef = useRef<HTMLSpanElement | null>(null)
   const requestRef = useRef(0)
@@ -303,10 +305,10 @@ function HealthListV8({
         <Notice tone="info" message="「気になる変化」は、体重が8週で±10%以上変わった・便の異常が3回続いた・食いつき不良が3回続いた、のどれかに当てはまるペットです。行の「…」から 30日のまとめ を開けます。" />
       </div>
 
-      <div className={styles.toolsRow} data-design="ListControls">
-        <span className={styles.searchBox}>
+      <ListToolbarRow data-design="ListControls">
+        <ListToolbarSearchSlot>
           <SearchField aria-label="ペットを探す" placeholder="ペットを探す" value={draft} onChange={(value: string) => { setDraft(value); onFiltersChange({ ...filters, q: value.trim() }); setPage(1) }} onClear={() => { setDraft(''); onFiltersChange({ ...filters, q: '' }); setPage(1) }} />
-        </span>
+        </ListToolbarSearchSlot>
         {concernOnly ? null : (
           <span className={styles.chips} role="group" aria-label="よく使う札">
             <FilterChip selected={filters.change === 'concern'} onChange={(next) => set({ change: next ? 'concern' : '' })} icon={<Columns2 size={13} aria-hidden="true" />} title="体重の±10%の変化・便の異常・食いつき不良が3回続いたペットだけ出します">
@@ -320,7 +322,7 @@ function HealthListV8({
             </FilterChip>
           </span>
         )}
-        <span className={styles.toolsTail}>
+        <ListToolbarEnd>
           <span ref={savedRef} className={styles.savedBox}>
             <Button type="button" aria-haspopup="menu" aria-expanded={savedOpen} onClick={() => setSavedOpen((current) => !current)}>
               <Bookmark size={15} aria-hidden="true" />よく使う絞り込み
@@ -333,9 +335,9 @@ function HealthListV8({
               items={savedItems.map((item) => ({ ...item, onSelect: () => { setSavedOpen(false); item.onSelect() } }))}
             />
           </span>
-          <SaveErrorField names={["pageSize","page_size"]}><Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))} /></SaveErrorField>
-        </span>
-      </div>
+          <SaveErrorField names={["pageSize","page_size"]}><Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))} /></SaveErrorField>
+        </ListToolbarEnd>
+      </ListToolbarRow>
 
       {status === 'loading' && !data ? (
         <ListState kind="loading" title="健康日記を読み込んでいます" />

@@ -229,7 +229,7 @@ export default function RestaurantShell({ boardId, title, description, query, he
 
   if (bare) {
     return (
-      <div data-design-node={boardId} className={styles.page}>
+      <div data-design-node={boardId} className={styles.page} data-list-skeleton={layout === 'ledger' ? 'templates' : undefined}>
         {noticeBand}
         {content}
       </div>
@@ -237,7 +237,7 @@ export default function RestaurantShell({ boardId, title, description, query, he
   }
 
   const page = (
-    <div data-design-node={boardId} className={styles.page}>
+    <div data-design-node={boardId} className={styles.page} data-list-skeleton={layout === 'ledger' ? 'templates' : undefined}>
       {templateHeading ? <PageHeading
         inset="none"
         title={title}

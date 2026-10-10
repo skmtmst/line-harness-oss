@@ -1,4 +1,5 @@
 'use client'
+
 import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { FolderDotName } from '@/components/shared/folder-dot'
@@ -37,7 +38,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 
 /*
  * ★V8 タグ「保存した検索」タブ（Pencil `IWnYX`）。
@@ -188,6 +189,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
 
       { if (!fieldFailure)
 
+
       setError(reason instanceof ApiError ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。') }
     }
   }
@@ -211,6 +213,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
 
       { if (!fieldFailure)
 
+
       setError(reason instanceof ApiError ? `複製できませんでした（${reason.message}）` : '複製できませんでした') }
     }
   }
@@ -232,6 +235,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
 
       const message = reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした'
       { if (!fieldFailure)
+
 
       setError(message) }
       setRetryOrder(next)
@@ -477,11 +481,12 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       </div>
 
       <ListPageBody
+        skeleton
         listHelp={canEdit ? `保存は最大 ${MAX_SAVED} 件。行の「…」に：編集・複製して保存・削除。` : `保存は最大 ${MAX_SAVED} 件。`}
         toolbar={<>
-          <span className={styles.search}>
+          <ListToolbarSearchSlot>
             <SearchField aria-label="条件名で探す" placeholder="条件名で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
-          </span>
+          </ListToolbarSearchSlot>
           <SaveErrorField names={["usageFilter","usage_filter"]}><Select
             value={usageFilter}
             width={170}

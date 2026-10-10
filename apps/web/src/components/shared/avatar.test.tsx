@@ -1,13 +1,14 @@
-// @vitest-environment happy-dom
-/*
- * 友だちの顔（★V7 `KXDhj`）。画像が読み込めない時も空白にしない。
- */
+
 import React from 'react'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import Avatar, { avatarInitials, avatarToneIndex } from './avatar'
+// @vitest-environment happy-dom
+/*
+ * 友だちの顔（★V7 `KXDhj`）。画像が読み込めない時も空白にしない。
+ */
 
 afterEach(() => cleanup())
 
@@ -45,7 +46,7 @@ describe('友だちの顔（★V7）', () => {
       if (match[2]) return token(match[2])
       const hex = match[1]
       if (hex.length === 7) return hex
-      const alpha = parseInt(hex.slice(7), 16) / 255
+      const alpha = parseInt(hex.slice(7, 9), 16) / 255
       return '#' + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * alpha + 255 * (1 - alpha)).toString(16).padStart(2, '0')).join('')
     }
     const lum = (hex: string) => {

@@ -61,10 +61,10 @@ export function PageHeading({ title, titleAs: HeadingTag = 'h2', titleId, titleT
   </header>
 }
 
-export function PageFrame({ kind, children, boardId, layout, standalone = false, hasFooter = false }: {
-  kind: string; children: ReactNode; boardId?: string; layout?: string; standalone?: boolean; hasFooter?: boolean
+export function PageFrame({ kind, children, boardId, layout, standalone = false, hasFooter = false, skeleton = false }: {
+  kind: string; children: ReactNode; boardId?: string; layout?: string; standalone?: boolean; hasFooter?: boolean; skeleton?: boolean
 }) {
-  return <div className={styles.frame} data-page-template={kind} data-template-layout={layout} data-design-node={boardId} data-standalone={standalone || undefined} data-has-footer={hasFooter || undefined}>{children}</div>
+  return <div className={styles.frame} data-list-skeleton={skeleton ? 'templates' : undefined} data-page-template={kind} data-template-layout={layout} data-design-node={boardId} data-standalone={standalone || undefined} data-has-footer={hasFooter || undefined}>{children}</div>
 }
 
 /** 型が保存帯の置き場所と追従を持つ。画面は操作と状態だけを渡す。 */

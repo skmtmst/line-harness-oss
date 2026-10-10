@@ -1,4 +1,5 @@
 'use client'
+
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
@@ -38,7 +39,7 @@ import type { AttributeListHost } from './attribute-host'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 
 /*
  * ★V8 タグ「対応マーク」タブ（Pencil `vKDj5`）。
@@ -530,8 +531,9 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
         confirmLabel="保管から戻す" busy={restoring} error={restoreError}
         onConfirm={() => void confirmRestore()} onCancel={() => { if (!restoring) setRestoreTarget(null) }} />
       <ListPageBody
+        skeleton
         toolbar={<>
-          <span className={styles.search}>
+          <ListToolbarSearchSlot>
             <SearchField
               aria-label="マーク名で探す"
               placeholder="マーク名で探す"
@@ -539,7 +541,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
               onChange={setQuery}
               onClear={() => setQuery('')}
             />
-          </span>
+          </ListToolbarSearchSlot>
           <SaveErrorField names={["usage"]}><Select
             aria-label="使っているかで絞り込む"
             width={157}

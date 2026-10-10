@@ -1,4 +1,6 @@
 'use client'
+import { ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from '@/components/shared/list-toolbar';
+
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
@@ -25,7 +27,6 @@ import { NEUTERED_LABEL, Pill, RowMenu, feedingLines, monthDay, rangeText, type 
 import styles from './pets.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8-B 登録ペットの一覧（wTIej・1152 は t2SMXX）。
@@ -55,7 +56,7 @@ export default function PetsListV8({
   const [data, setData] = useState<NenPetListData | null>(null)
   const [draft, setDraft] = useState(query.q)
   const [page, setPage] = useListUrlValue('page', 1)
-  const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [editing, setEditing] = useState<NenPetRow | null>(null)
   const requestRef = useRef(0)
 
@@ -91,11 +92,10 @@ export default function PetsListV8({
         <Notice tone="info" message="体重が90日更新されていないペットは、マイページで更新をお願いできます（行の「…」→マイページで更新を促す）。" />
       </div>
 
-      <div className={styles.toolsRow} data-design="ListControls">
-        <span className={styles.searchBox}>
+      <ListToolbarRow data-design="ListControls">
+        <ListToolbarSearchSlot>
           <SearchField aria-label="ペット名・飼い主で探す" placeholder="ペット名・飼い主で探す" value={draft} onChange={(value: string) => { setDraft(value); onQueryChange({ ...query, q: value.trim() }); setPage(1) }} onClear={() => { setDraft(''); onQueryChange({ ...query, q: '' }); setPage(1) }} />
-        </span>
-        <span className={styles.toolsBreak} aria-hidden="true" />
+        </ListToolbarSearchSlot>
         <SaveErrorField names={["species","query.species"]}><Select
           aria-label="種別で絞り込む"
           width={140}
@@ -133,10 +133,10 @@ export default function PetsListV8({
             { value: 'age_desc', label: '並び：年齢が高い順' },
           ]}
         /></SaveErrorField>
-        <span className={styles.toolsTail}>
-          <SaveErrorField names={["pageSize","page_size"]}><Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))} /></SaveErrorField>
-        </span>
-      </div>
+        <ListToolbarEnd>
+          <SaveErrorField names={["pageSize","page_size"]}><Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))} /></SaveErrorField>
+        </ListToolbarEnd>
+      </ListToolbarRow>
 
       {status === 'loading' && !data ? (
         <ListState kind="loading" title="ペットを読み込んでいます" />

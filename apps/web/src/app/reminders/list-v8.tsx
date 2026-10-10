@@ -1,4 +1,7 @@
 'use client'
+import { canManageRole } from '@/lib/staff-role';
+import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { useFeatureAccess } from '@/lib/use-feature-access'
@@ -1154,7 +1157,7 @@ export default function RemindersListV8() {
   const perPageSelect = <PageSizeSelect value={perPage} onChange={setPerPage} options={PER_PAGE_OPTIONS} label={null} />
 
   return (
-    <SaveErrorScope errors={saveErrors}><PageFrame kind="list" boardId={narrow ? 'Iffil' : 'apLqS'}>
+    <SaveErrorScope errors={saveErrors}><PageFrame skeleton kind="list" boardId={narrow ? 'Iffil' : 'apLqS'}>
       <PageHeading headingSize="regular" title={<>リマインダ</>} help={<>
             予約日時・誕生日・契約終了日などの「基準日」を決めて、その前や後に自動で送ります。
           </>}  />
@@ -1299,7 +1302,7 @@ export default function RemindersListV8() {
         </div>
       </ConfirmDialog>
 
-      <ListPageBody folders={<>
+      <ListPageBody skeleton folders={<>
           {canEdit ? (
             <Button href="/reminders/new" variant="primary" className="v8-folder-create w-full">
               ＋ リマインダを作る
@@ -1367,7 +1370,7 @@ export default function RemindersListV8() {
                 <Button href="/reminders/new" variant="primary"><Plus size={15} aria-hidden="true" />リマインダを作る</Button>
               ) : null}
               <div className={styles.narrowFolder}>{folderSelect}</div>
-              <div className={styles.narrowSearch}>
+              <ListToolbarSearchSlot>
                 <SearchField
                   placeholder="名前・内容で探す"
                   aria-label="名前・内容で探す"
@@ -1375,7 +1378,7 @@ export default function RemindersListV8() {
                   onChange={(value) => setNameQuery(clampSearchQuery(value))}
                   onClear={() => setNameQuery('')}
                 />
-              </div>
+              </ListToolbarSearchSlot>
               <span className={styles.narrowSpacer} aria-hidden="true" />
               {perPageSelect}
             </div>

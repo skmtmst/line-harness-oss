@@ -1,4 +1,7 @@
 'use client'
+import { canManageRole } from '@/lib/staff-role';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useFeatureAccess } from '@/lib/use-feature-access'
@@ -78,7 +81,6 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 リッチメニューの一覧（Pencil「★V8 画面の地図」のリッチメニューの行：
@@ -354,6 +356,7 @@ export default function RichMenusListV8() {
 
       if (activeAccountRef.current === accountId) {
         { if (!fieldFailure)
+
 
         setError(richMenuError(e, 'load')) }
         { if (!fieldFailure)
@@ -919,12 +922,12 @@ export default function RichMenusListV8() {
 
   /* 1152 の板（Y9ASp）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札」。 */
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
+    <ListToolbarFrame>
       {priorityNotice}
-      <div className={styles.narrowRow}>
+      <ListToolbarRow>
         {createButton}
         <div className={styles.narrowFolder}>{folderSelect}</div>
-        <div className={styles.narrowSearch}>
+        <ListToolbarSearchSlot>
           <SearchField
             placeholder="メニュー名・ボタン名"
             aria-label="メニュー名・ボタン名で探す"
@@ -935,13 +938,13 @@ export default function RichMenusListV8() {
             }}
             onClear={() => setQuery('')}
           />
-        </div>
+        </ListToolbarSearchSlot>
         <span className={styles.spacer} aria-hidden="true" />
         {sortBox}
         {perPageBox}
-      </div>
-      <div className={styles.narrowRow}>{filterChips}</div>
-    </div>
+      </ListToolbarRow>
+      <ListToolbarRow>{filterChips}</ListToolbarRow>
+    </ListToolbarFrame>
   )
 
   const wideToolbar = (
@@ -1321,6 +1324,7 @@ export default function RichMenusListV8() {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId={!canEdit ? 'ZoKow' : narrow ? 'Y9ASp' : 'rZEGN'}
       headingSize="regular"
       title="リッチメニュー"

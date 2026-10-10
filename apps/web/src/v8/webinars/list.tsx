@@ -1,4 +1,7 @@
 'use client'
+import { canManageRole } from '@/lib/staff-role';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
@@ -82,7 +85,6 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 ウェビナーの一覧（Pencil：一覧 `UyUMw`・1152 `uBMuB`・閲覧のみ `jiNg0`・
@@ -871,21 +873,21 @@ function WebinarList() {
   )
   /* 1152 の板（uBMuB）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … 並び・よく使う絞り込み・件数」。 */
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
+    <ListToolbarFrame>
       {notice}
-      <div className={styles.narrowRow}>
+      <ListToolbarRow>
         {createButton}
         <div className={styles.narrowFolder}>{folderSelect}</div>
-        <div className={styles.narrowSearch}>{searchBox}</div>
-      </div>
-      <div className={styles.narrowRow}>
+        <ListToolbarSearchSlot>{searchBox}</ListToolbarSearchSlot>
+      </ListToolbarRow>
+      <ListToolbarRow>
         {filterChips}
         <span className={styles.spacer} aria-hidden="true" />
         {sortBox}
         {savedBox}
         {perPageBox}
-      </div>
-    </div>
+      </ListToolbarRow>
+    </ListToolbarFrame>
   )
   const wideToolbar = (
     <>
@@ -1016,6 +1018,7 @@ function WebinarList() {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       help={<>{"録画やライブのセミナーをLINEで案内し、申込から視聴・相談までをつなげます。"}{"行の「…」から 参加者・分析・コメント演出・アーカイブ。行を押すと右に詳細が出ます（↑↓で次の行へ）。"}</>}
       boardId="UyUMw"
       headingSize="regular"

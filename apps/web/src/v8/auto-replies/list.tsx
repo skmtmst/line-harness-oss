@@ -1,4 +1,7 @@
 'use client'
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { canManageRole } from '@/lib/staff-role';
+
 import SharedStatusPill from '@/components/shared/status-pill'
 import BulkBar from '@/components/shared/bulk-bar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -1521,9 +1524,9 @@ export default function AutoRepliesListV8() {
    * 部品は広い板と同じもの（動きは同じ）。並びと段だけを変える。
    */
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
+    <ListToolbarFrame>
       <Notice tone="info">上のルールから順に見て、最初に当たった1つだけが動きます。順番は行の左のつまみで入れ替えます。</Notice>
-      <div className={styles.narrowRow}>
+      <ListToolbarRow>
         {canEdit && <CreateRuleButton
           compact
           disabled={false}
@@ -1531,7 +1534,7 @@ export default function AutoRepliesListV8() {
           onOpenMenu={(anchor) => { createMenuAnchorRef.current = anchor; setCreateMenuOpen(true) }}
         />}
         <div className={styles.narrowFolder}>{folderSelect}</div>
-        <div className={styles.narrowSearch}>
+        <ListToolbarSearchSlot>
           <SearchField
             placeholder="ルール名・言葉で探す"
             aria-label="ルール名・言葉で探す"
@@ -1545,20 +1548,20 @@ export default function AutoRepliesListV8() {
               setPage(1)
             }}
           />
-        </div>
+        </ListToolbarSearchSlot>
         <span className={styles.narrowSpacer} aria-hidden="true" />
         {perPageBox}
-      </div>
-      <div className={styles.narrowRow}>
+      </ListToolbarRow>
+      <ListToolbarRow>
         {filterChips}
         {sortBox}
         <ListToolbarOptional compact label="よく使う絞り込み">{savedBox}</ListToolbarOptional>
-      </div>
-    </div>
+      </ListToolbarRow>
+    </ListToolbarFrame>
   )
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" title={<>
+    <SaveErrorScope errors={saveErrors}><ListPage skeleton boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" title={<>
         自動応答
       </>} help={<>{<>
         届いたメッセージに、決めた言葉・曜日・時間帯で自動で返します。上のルールから順に、最初に当たった1つだけが動きます。

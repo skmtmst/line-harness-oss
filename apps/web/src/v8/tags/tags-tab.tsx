@@ -65,6 +65,10 @@ import {
 } from '@/components/friend-fields/tags-page-v4'
 import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+import { ListPager } from '@/components/templates/list-page'
+
+
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
@@ -597,7 +601,7 @@ export default function TagsTab({
   )
 
   const search = (
-    <span className={narrow ? styles.searchNarrow : styles.search}>
+    <ListToolbarSearchSlot>
       <SearchField
         aria-label="タグ名・用途で探す"
         placeholder="タグ名・用途で探す"
@@ -605,7 +609,7 @@ export default function TagsTab({
         onChange={setQuery}
         onClear={() => setQuery('')}
       />
-    </span>
+    </ListToolbarSearchSlot>
   )
   const archiveChip = <FilterChip selected={onlyArchived} onChange={(next) => setView({ archived: next ? '1' : '', page: '1' })}>保管</FilterChip>
   const usageSelect = (
@@ -818,14 +822,14 @@ export default function TagsTab({
       </DataTable>
 
       {/* 件数とページ送り（絵：左に件数・右にページ送り）。表示件数は道具の段の右端。 */}
-      <div className={styles.pager}>
+      <ListPager>
         <span className={styles.pagerCount}>
           {`${filtered.length} 件中 ${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, filtered.length)} 件`}
         </span>
         {pages > 1 ? (
           <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="タグのページ送り" />
         ) : null}
-      </div>
+      </ListPager>
     </DelayedSkeleton>
   )
 
@@ -848,6 +852,7 @@ export default function TagsTab({
       </KpiBand>
 
       <ListPageBody
+        skeleton
         folders={<>
           {createButton(true) ?? (status === 'forbidden' ? null : <span className={styles.viewerCreateSpace} aria-hidden="true" />)}
           <FolderPanel
@@ -869,12 +874,12 @@ export default function TagsTab({
           {search}
           {usageSelect}
           {archiveChip}
-          <div className={styles.toolbarRow2}>
+          <ListToolbarRow>
             {sourceSelect}
             {quickButton}
             <span className={styles.toolbarSpacer} />
             {pageSizeSelect}
-          </div>
+          </ListToolbarRow>
         </> : <>
           {search}
           {usageSelect}

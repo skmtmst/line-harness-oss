@@ -1,4 +1,5 @@
 'use client'
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -36,7 +37,6 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8-B イベント予約の一覧（板 `e2ekFu`）。
@@ -154,6 +154,7 @@ function EventFolderPanelForm({
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
+
 
       setError('フォルダを追加できませんでした') }
     } finally {

@@ -1,4 +1,5 @@
 'use client'
+
 import { FolderDotName } from '@/components/shared/folder-dot'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
@@ -126,6 +127,7 @@ export default function AccountHandoverV8() {
 
   const retryAccounts = useCallback(async () => {
     if (accountsRetrying)
+
  return
     setAccountsRetrying(true)
     try { await loadAccounts() } finally { setAccountsRetrying(false) }
@@ -506,7 +508,7 @@ export default function AccountHandoverV8() {
           const editable = canManage && (decision.bucket === 'review' || decision.bucket === 'lookalike')
           const name = decision.sourceName ?? decision.from_friend_id
           return (
-            <Tr data-row-id={decision.id} key={decision.id}>
+            <Tr data-row-id={decision.id} key={decision.id} data-row-id={decision.id}>
               <Td className={styles.colName}><FolderDotName><div className={styles.nameStack}>
                 <span className={styles.name} title={name}>{name}</span>
 

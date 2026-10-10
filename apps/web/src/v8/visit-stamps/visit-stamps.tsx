@@ -1,4 +1,5 @@
 'use client'
+
 import { flushListUrlState, useListUrlValue } from '@/components/shared/list-url-state'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
@@ -50,7 +51,7 @@ import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import ImageFrame from '@/components/shared/image-frame'
 
 /*
  * ★V8 来店スタンプ（G-8a〜a3）。マイル（オンライン・特定の動き）とは別のスタンプカード。
@@ -479,8 +480,7 @@ function VisitStampsScreen() {
                   <span className={styles.label}>カードの見た目 <HelpTip label="カードの見た目の説明">画像があるときは画像を使います。色は文字の下地です。</HelpTip></span>
                   <div className={styles.appearance}>
                     <div className={styles.imageSlot}>
-                      <SaveErrorField names={["backgroundImageUrl","settings.backgroundImageUrl","background_image_url","settings.background_image_url"]}><MediaSlot
-                        size="compact"
+                      <SaveErrorField names={["backgroundImageUrl","settings.backgroundImageUrl","background_image_url","settings.background_image_url"]}><ImageFrame
                         title="背景画像を追加"
                         previewAlt="背景画像"
                         value={settings.backgroundImageUrl || null}

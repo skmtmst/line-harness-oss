@@ -117,7 +117,7 @@
 }
 
 .chip[aria-checked='true'] {
-  outline-color: var(--color-action);
+  outline-color: var(--color-focus-ring);
   background: var(--color-success-bg);
   color: var(--color-action);
   font-weight: 600;

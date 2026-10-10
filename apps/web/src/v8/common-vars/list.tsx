@@ -1,4 +1,8 @@
 'use client'
+import { isOwnerOrAdmin } from '@/lib/staff-capability';
+import { canManageRole } from '@/lib/staff-role';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+
 import SharedStatusPill from '@/components/shared/status-pill'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -88,7 +92,6 @@ import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 共通情報の一覧（Pencil「★V8 画面の地図」の共通情報の行：
@@ -299,6 +302,7 @@ function CommonVarsListInner() {
         { if (!fieldFailure)
         setListFailure(e) }
         { if (!fieldFailure)
+
 
         setError(e instanceof ApiError && e.status === 403
           ? permissionDeniedMessage('store')
@@ -567,6 +571,7 @@ function CommonVarsListInner() {
 
   const selectReplacement = async (nextId: string) => {
     if (!deleteTarget || !selectedAccountId)
+
  return
     setReplacementId(nextId)
     setReplacementImpact(null)
@@ -843,11 +848,13 @@ function CommonVarsListInner() {
       const fieldFailure = saveErrors.capture(saveFailure)
       { if (!fieldFailure)
 
+
       setError('使用先を確認できないため削除できません。もう一度お試しください。') }
       return
     }
 
     if (!isCurrentRequest())
+
  return
     const targets = items.filter((item) => selected.has(item.id))
     if (targets.length !== selected.size) {
@@ -886,11 +893,13 @@ function CommonVarsListInner() {
         failed.push(target)
       }
       if (!isCurrentRequest())
+
  return
     }
 
     try {
       if (!isCurrentRequest())
+
  return
       if (failed.length > 0) {
         setDeleteTargets(failed)
@@ -1035,8 +1044,8 @@ function CommonVarsListInner() {
    * フォルダの追加・名前変更・削除は、縦の列が無いぶん、フォルダの印のメニューから。
    */
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
-      <div className={styles.narrowRow}>
+    <ListToolbarFrame>
+      <ListToolbarRow>
         {createButton(false)}
         <div className={styles.narrowFolder}>
           <SaveErrorField names={["folderFilter","folderId","activeId","folder_filter"]}><Select
@@ -1046,7 +1055,7 @@ function CommonVarsListInner() {
             options={folderOptions}
           /></SaveErrorField>
         </div>
-        <div className={styles.narrowSearch}>
+        <ListToolbarSearchSlot>
           <SearchField
             aria-label="共通情報を検索"
             placeholder="名前・差し込み名・中身"
@@ -1054,7 +1063,7 @@ function CommonVarsListInner() {
             onChange={onSearch}
             onClear={() => onSearch('')}
           />
-        </div>
+        </ListToolbarSearchSlot>
         {canWrite ? (
           <>
             <IconButton
@@ -1093,13 +1102,13 @@ function CommonVarsListInner() {
         <span className={styles.spacer} aria-hidden="true" />
         {orderBox}
         {perPageBox}
-      </div>
-      <div className={styles.narrowRow}>{filterChips}</div>
-    </div>
+      </ListToolbarRow>
+      <ListToolbarRow>{filterChips}</ListToolbarRow>
+    </ListToolbarFrame>
   )
 
   const wideToolbar = (
-    <div className={styles.wideTools}>
+    <ListToolbarFrame>
       <ListToolbar
         search={{
           placeholder: '名前・差し込み名・中身',
@@ -1110,7 +1119,7 @@ function CommonVarsListInner() {
         filters={filterChips}
         trailing={<>{orderBox}{perPageBox}</>}
       />
-    </div>
+    </ListToolbarFrame>
   )
 
   /* 空のまま使われているときの黄色の帯（絵：表の列の上・道具の段の上）。 */
@@ -1848,6 +1857,7 @@ function CommonVarsListInner() {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId={narrow ? 'XIzkJ' : canWrite ? 'FM94M' : 'OxSw8'}
       headingSize="regular"
       title="共通情報"

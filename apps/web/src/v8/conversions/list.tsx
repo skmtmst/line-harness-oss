@@ -1,4 +1,7 @@
 'use client'
+import { canManageRole } from '@/lib/staff-role';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useFolderMove } from '@/components/shared/use-folder-move'
 import { moveConversionToFolder } from '@/lib/move-to-folder'
@@ -90,7 +93,6 @@ import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 コンバージョンの一覧（Pencil：一覧 `r6dJFy`・1152 `BygrU`・閲覧のみ `WSGvo`・
@@ -910,20 +912,20 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   )
   /* 1152 の板（BygrU）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。 */
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
+    <ListToolbarFrame>
       {notice}
-      <div className={styles.narrowRow}>
+      <ListToolbarRow>
         {createInRow}
         <div className={styles.narrowFolder}>{folderSelect}</div>
-        <div className={styles.narrowSearch}>{searchBox}</div>
-      </div>
-      <div className={styles.narrowRow}>
+        <ListToolbarSearchSlot>{searchBox}</ListToolbarSearchSlot>
+      </ListToolbarRow>
+      <ListToolbarRow>
         <div className={styles.narrowChips}>{filterChips}</div>
         <span className={styles.spacer} aria-hidden="true" />
         {savedBox}
         {perPageBox}
-      </div>
-    </div>
+      </ListToolbarRow>
+    </ListToolbarFrame>
   )
   const wideToolbar = (
     <div className={`${styles.wideTools} ${role !== null && !canEdit ? styles.viewerTools : ''}`}>
@@ -1193,6 +1195,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       help={<>{"成果として数えるできごと（成果地点）を決めます。配信・流入・アフィリエイトの成果は、ここの数え方で集計します。"}{canEdit
             ? '行の「…」から 編集・使う場所を見る・使う場所を足す・止める・複製。止めると、使っている配信や流入リンクでも数えなくなります。'
             : '行の「…」から 中身と使う場所を見られます。止めると、使っている配信や流入リンクでも数えなくなります。'}</>}

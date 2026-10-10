@@ -1,4 +1,6 @@
 'use client'
+import { canManageRole } from '@/lib/staff-role';
+
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved } from '@/components/shared/toast'
 import { useFeatureAccess } from '@/lib/use-feature-access'
@@ -44,7 +46,7 @@ import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import ImageFrame from '@/components/shared/image-frame'
 
 /*
  * ★V8「クーポンを作る」（絵 S6FEuB）・「リサーチを作る」（絵 EsYo4）。
@@ -491,8 +493,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               </div>
               <div className={styles.couponRow}>
                 <div className={styles.couponImage}>
-                  <SaveErrorField names={["imageUrl","image_url"]}><MediaSlot
-                    size="compact"
+                  <SaveErrorField names={["imageUrl","image_url"]}><ImageFrame
                     title="画像を追加"
                     previewAlt="クーポンの画像"
                     value={imageSet ? imageUrl.trim() : null}

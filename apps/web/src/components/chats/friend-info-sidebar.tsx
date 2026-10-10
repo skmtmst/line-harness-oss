@@ -1,12 +1,11 @@
 'use client'
+import { isOwnerOrAdmin } from '@/lib/staff-capability';
 
 import { formAnswerText } from '@/lib/form-answer'
 import { useStaffRole } from '@/lib/staff-role'
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import TagOverflow from '@/components/shared/tag-overflow'
-
 import { DragHandle } from '@/components/shared/row-actions'
-
 import Link from 'next/link'
 import CustomerInfoPanel from '@/components/shared/customer-info-panel'
 import StatusPill, { StatusDot, SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'

@@ -1,4 +1,7 @@
 'use client'
+import { canManageRole } from '@/lib/staff-role';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+
 import SharedStatusBadge from '@/components/shared/status-badge'
 import SharedStatusPill from '@/components/shared/status-pill'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
@@ -402,6 +405,7 @@ export default function BroadcastListV8() {
 
       if (err instanceof ApiError && err.status === 403) setForbidden(true)
       else { if (!fieldFailure)
+
  setError(searchError || loadFailureNotice(err, '一斉配信')) }
     } finally {
       if (seq === loadSeqRef.current) setLoading(false)
@@ -785,7 +789,7 @@ export default function BroadcastListV8() {
   ))
 
   const searchBox = (
-    <div className={narrow ? `${styles.searchBox} ${styles.searchNarrow}` : styles.searchBox}>
+    <ListToolbarSearchSlot>
       <SearchField
         aria-label="タイトル・内容で探す"
         placeholder="タイトル・内容で探す"
@@ -793,7 +797,7 @@ export default function BroadcastListV8() {
         onChange={setTitleQuery}
         onClear={() => setTitleQuery('')}
       />
-    </div>
+    </ListToolbarSearchSlot>
   )
 
   const dateBox = (
@@ -934,8 +938,8 @@ export default function BroadcastListV8() {
 
   /* 道具の段：1440 は「探す・配信日・保存 … 保存した検索」／「札 … 件数・並び」。1152 は作る・フォルダが前に入り、札は選ぶ欄。 */
   const toolbar = (
-    <div className={styles.tools}>
-      <div className={styles.toolRow}>
+    <ListToolbarFrame>
+      <ListToolbarRow>
         {narrow ? createButton(false) : null}
         {narrow ? folderSelect : null}
         {searchBox}
@@ -943,13 +947,13 @@ export default function BroadcastListV8() {
         {narrow ? null : saveCurrentButton}
         <span className={styles.spacer} aria-hidden="true" />
         {savedSearchBox}
-      </div>
-      <div className={styles.toolRow}>
+      </ListToolbarRow>
+      <ListToolbarRow>
         {narrow ? statusSelect : statusChips}
         <span className={styles.spacer} aria-hidden="true" />
         {pageSizeBox}
         {sortButton}
-      </div>
+      </ListToolbarRow>
       {savedViewOpen ? (
         <div className={styles.saveRow}>
           <SaveErrorField names={["savedViewName","name","saved_view_name"]}><input
@@ -969,7 +973,7 @@ export default function BroadcastListV8() {
           <button type="button" onClick={() => setSavedViewsSeq((n) => n + 1)} className={styles.inlineRetry}>もう一度</button>
         </p>
       ) : null}
-    </div>
+    </ListToolbarFrame>
   )
 
   /* ===== 表 ===== */
@@ -1161,6 +1165,7 @@ export default function BroadcastListV8() {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId={boardId}
       headingSize="compact"
       title="一斉配信"

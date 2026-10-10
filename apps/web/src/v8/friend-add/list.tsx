@@ -1,4 +1,5 @@
 'use client'
+
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue, writeListUrlParam } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
@@ -63,7 +64,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import { ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
 
 /*
  * ★V8 友だち追加時の配信の一覧（Pencil：一覧 `MRhef`・閲覧のみ `LEwkJ`・1152 `P20kYU`・
@@ -271,6 +272,7 @@ function FriendAddList() {
       // 権限・対象なし・重複を「通信を確認して」にまとめない。
       const failure = describeFriendAddFailure(caught, '友だち追加時の配信', 'load')
       { if (!fieldFailure)
+
 
       setError(failure.message) }
       setErrorStatus(failure.status)
@@ -664,18 +666,18 @@ function FriendAddList() {
   ) : null
   /* 1152 の板（P20kYU）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「状態の札」。 */
   const toolbar = narrow ? (
-    <div className={styles.narrowTools}>
+    <ListToolbarFrame>
       {notice}
       {errorBand}
-      <div className={styles.narrowRow}>
+      <ListToolbarRow>
         {createButton}
         {folderSelect}
         {searchBox}
         <span className={styles.spacer} aria-hidden="true" />
         {perPageBox}
-      </div>
-      <div className={styles.narrowRow}>{statusChips}</div>
-    </div>
+      </ListToolbarRow>
+      <ListToolbarRow>{statusChips}</ListToolbarRow>
+    </ListToolbarFrame>
   ) : (
     <>
       {notice}
@@ -866,6 +868,7 @@ function FriendAddList() {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       help={<>{"友だち追加されたときに、来た経路（流入リンク）ごとに初回の案内を送り、タグ付けやシナリオを始めます。"}{ORDER_NOTE}</>}
       boardId={canEdit ? 'MRhef' : 'LEwkJ'}
       headingSize="regular"

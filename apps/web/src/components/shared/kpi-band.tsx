@@ -39,6 +39,7 @@ export default function KpiBand({
       data-kpi-layout={layout}
       data-kpi-border={border}
       data-kpi-density={density}
+      data-shared-part="kpi-band"
       data-kpi-strip
       data-kpi-presentation={presentation}
       {...rest}

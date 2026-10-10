@@ -1,4 +1,5 @@
 'use client'
+
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useFolderMove } from '@/components/shared/use-folder-move'
@@ -67,7 +68,6 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 オートメーションのルール一覧（Pencil：一覧 `LWQXd`・1152 `En14p`・閲覧のみ `nH9L8`）。
@@ -581,6 +581,7 @@ export default function AutomationListV8() {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       help={<>{AUTOMATIONS_DESCRIPTION}{canEdit
             ? '行の「…」から 編集・複製・1人で試す・止める・動いた記録を見る・削除。'
             : '行の「…」から 動いた記録を見る。'}</>}

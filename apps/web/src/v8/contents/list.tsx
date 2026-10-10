@@ -1,4 +1,5 @@
 'use client'
+
 import { hasDeliveryAccess } from '@line-crm/shared'
 import { collectListRows } from '@/components/shared/collect-list-rows'
 import { useListUrlSetValue, useListUrlValue } from '@/components/shared/list-url-state'
@@ -58,6 +59,7 @@ import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { ListPager } from '@/components/templates/list-page'
 
 /*
  * ★V8 登録メディア一覧（Pencil `O7hUt7`）。
@@ -730,6 +732,7 @@ export default function MediaLibraryListV8() {
 
       { if (!fieldFailure)
 
+
       setError(caught instanceof Error ? caught.message : 'ダウンロードできませんでした') }
     } finally {
       setDownloadingIds((current) => {
@@ -1166,6 +1169,7 @@ export default function MediaLibraryListV8() {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId="O7hUt7"
       headingSize="regular"
       title="登録メディア一覧"
@@ -1348,10 +1352,8 @@ export default function MediaLibraryListV8() {
             「…」から プレビュー・使用箇所を見る・名前を変える・フォルダへ移す・ダウンロード・アーカイブ・削除（使っているものは消せません）。
           </p>
           {listKnown && !loadFailed ? (
-            <div className={styles.foot}>
-              <div className={styles.footLeft}>
+            <ListPager>
                 <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />
-                <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
                 {canManageMedia ? (
                   <label className={styles.selectAll}>
                     <SaveErrorField names={["allSelected","selected","all_selected"]}><Checkbox
@@ -1370,8 +1372,8 @@ export default function MediaLibraryListV8() {
                 ) : (
                   <span>{managementPermissionReason}。</span>
                 )}
-              </div>
-            </div>
+              <Pagination page={page} pageCount={pageCount} onPageChange={setPage}/>
+            </ListPager>
           ) : null}
           {canManageMedia ? (
             <BulkBar

@@ -1,4 +1,5 @@
 'use client'
+
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
@@ -166,7 +167,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
               const pending = item.pendingPrice != null
               const allergens = safeArray(item.allergens_json)
               return (
-                <Tr data-row-id={item.id} key={item.id} className={styles.row}>
+                <Tr data-row-id={item.id} key={item.id} className={styles.row} data-row-id={item.id}>
                   <Td className={`${styles.td} ${styles.colName}`}><FolderDotName>
                     {canEdit ? (
                       <button type="button" className={styles.name} title={item.name} onClick={() => openEdit(item)}>{item.name}</button>

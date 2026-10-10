@@ -1,4 +1,5 @@
 'use client'
+
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useMemo, useState, type ReactNode } from 'react'
 import {
@@ -39,7 +40,6 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 統括のひな形の一覧を「店の同じ機能の一覧と同じ形」で出す（オーナー 2026-10-08・B-27〜B-29・B-34・B-36）。
@@ -522,6 +522,7 @@ export default function HqStoreList(props: HqStoreListProps) {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId={type === 'template' ? 'i0Ao0R' : type === 'form' ? 'wZPua' : type === 'tag' ? 'DzdC3' : type === 'rich_menu' ? 'noVq4' : 'LRc93'}
       headingSize="regular"
       title={words.title}
@@ -530,7 +531,7 @@ export default function HqStoreList(props: HqStoreListProps) {
       stats={(
         <KpiBand data-design="KPIs" className={storeStyles.kpiStrip}>
           {bandKpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={<span className={storeStyles.kpiDetailWrap}>{kpi.detail}</span>} />
+            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} />
           ))}
         </KpiBand>
       )}

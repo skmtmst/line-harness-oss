@@ -1,4 +1,6 @@
 'use client'
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+
 import TagOverflow from '@/components/shared/tag-overflow'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { collectListRows } from '@/components/shared/collect-list-rows'
@@ -74,6 +76,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { ListPager } from '@/components/templates/list-page'
 
 /*
  * ★V8 友だち一覧（Pencil `x6QsVz`：閲覧のみ。いつもの形は同じ板からボタンを出したもの）。
@@ -629,15 +632,14 @@ export default function FriendsListV8() {
   )
 
   const toolbar = (
-    <div className={styles.tools} data-design="V8SearchPanel">
-      <form
-        className={styles.toolRow}
+    <ListToolbarFrame data-design="V8SearchPanel">
+      <ListToolbarRow as="form"
         onSubmit={(event) => {
           event.preventDefault()
           resetPageWith(() => setSearchSubmitted(searchInput.trim()))
         }}
       >
-        <div className={styles.search}>
+        <ListToolbarSearchSlot>
           <SearchField
             className={styles.searchField}
             aria-label="名前・LINE名・タグ・メモで探す"
@@ -652,7 +654,7 @@ export default function FriendsListV8() {
             }}
             placeholder="名前・LINE名・タグ・メモで探す"
           />
-        </div>
+        </ListToolbarSearchSlot>
         {/* 選んだ値は「タグ：すべて」の1つの文字で出す（絵どおり。部品の label は文字が2つに割れる）。 */}
         <SaveErrorField names={["selectedTagId","tagId","selected_tag_id"]}><Select aria-label="タグで絞り込む" width={119} value={selectedTagId}
           onChange={(value) => resetPageWith(() => setSelectedTagId(value))}
@@ -682,8 +684,8 @@ export default function FriendsListV8() {
             保存した検索
           </Button>
         ) : null}
-      </form>
-      <div className={styles.toolRow}>
+      </ListToolbarRow>
+      <ListToolbarRow>
         <div role="group" aria-label="すばやく絞り込む" className={styles.chips}>
           <FilterChip selected={responseFilter === 'unhandled'} icon={<CircleDot size={14} aria-hidden="true" />} onChange={() => resetPageWith(() => setResponseFilter(responseFilter === 'unhandled' ? 'all' : 'unhandled'))}>
             未対応
@@ -741,7 +743,7 @@ export default function FriendsListV8() {
           onChange={(value) => resetPageWith(() => setSortMode(value as SortMode))}
           options={[{ value: 'recent', label: '友だち追加の新しい順' }, { value: 'oldest', label: '友だち追加の古い順' }]}
         /></SaveErrorField>
-      </div>
+      </ListToolbarRow>
       {advanced?.summary.length ? (
         <div className={styles.applied}>
           <span className={styles.appliedLabel}>絞り込み中</span>
@@ -766,7 +768,7 @@ export default function FriendsListV8() {
           <button type="button" onClick={() => { void loadOptions(); void loadMarks() }} className={styles.linkButton}>もう一度読み込む</button>
         </p>
       ) : null}
-    </div>
+    </ListToolbarFrame>
   )
 
   const colCount = 4 + [...visible].length
@@ -936,16 +938,17 @@ export default function FriendsListV8() {
   )
 
   const pager = (
-    <div className={styles.pager}>
+    <ListPager>
       <span className={styles.pagerCount}>
         {loadStatus === 'ready' ? `${formatNumber(total)}人中 ${formatNumber(rangeStart)}〜${formatNumber(rangeEnd)}人` : emptyValue('unknown')}
       </span>
       <Pagination page={page} pageCount={totalPages} onPageChange={setPage} disabled={loadStatus !== 'ready'} ariaLabel="友だち一覧のページ" />
-    </div>
+    </ListPager>
   )
 
   return (
     <ListPage
+      skeleton
       boardId="x6QsVz"
       headingSize="compact"
       title="友だち"

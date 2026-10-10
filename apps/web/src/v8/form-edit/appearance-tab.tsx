@@ -1,4 +1,5 @@
 'use client'
+
 import { useState } from 'react'
 import { Sparkles, Link2 } from 'lucide-react'
 import {
@@ -27,7 +28,7 @@ import { formatNumber as polishFormatNumber } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import ImageFrame from '@/components/shared/image-frame'
 
 /*
  * 「受付と見た目」のタブ（tpRRT）。受付のきまり・色と文字・背景とリンクの見え方・
@@ -202,8 +203,7 @@ export function AppearanceTab(props: Props) {
         {props.portable ? null : <div className={styles.subBox}>
           <h3 className={styles.subTitle}>背景とリンクの見え方</h3>
           <div className={styles.tight}>
-            <SaveErrorField names={["backgroundImageUrl","theme.backgroundImageUrl","background_image_url","theme.background_image_url"]}><MediaSlot
-              size="compact"
+            <SaveErrorField names={["backgroundImageUrl","theme.backgroundImageUrl","background_image_url","theme.background_image_url"]}><ImageFrame
               title="背景の画像を追加"
               previewAlt="背景の画像"
               value={theme.backgroundImageUrl || null}
@@ -251,8 +251,7 @@ export function AppearanceTab(props: Props) {
           <div className={styles.field}><Field label="カードの説明" htmlFor="fe-og-desc"><SaveErrorField names={["ogDescription","props.ogDescription","og_description","props.og_description"]}><TextArea id="fe-og-desc" rows={3} maxLength={200} value={props.ogDescription} onChange={(e) => props.onChangeOgDescription(e.target.value)} /></SaveErrorField></Field></div>
           <div className={styles.field}>
             <span className={styles.fieldLabel}>カードの画像</span>
-            <SaveErrorField names={["ogImageUrl","props.ogImageUrl","og_image_url","props.og_image_url"]}><MediaSlot
-              size="compact"
+            <SaveErrorField names={["ogImageUrl","props.ogImageUrl","og_image_url","props.og_image_url"]}><ImageFrame
               title="カードの画像を追加"
               previewAlt="カードの画像"
               value={props.ogImageUrl || null}

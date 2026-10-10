@@ -78,9 +78,9 @@
 
   /* 操作。LINEの状態色とは分け、設定画面のリンクと主要ボタンに使う。 */
   --color-action: var(--color-accent-deep);
-  --color-focus-ring: #2563eb;
-  --color-action-hover: var(--color-action);
+  --color-action-hover: var(--color-accent);
   --color-action-soft: var(--color-accent-soft);
+  --color-focus-ring: #2563eb;
   --color-on-action: #ffffff;
 
   /*
@@ -138,6 +138,7 @@
   /* Pencilの状態バッジ。既存画面の状態色は移行時にこの語彙へ寄せる。 */
   --color-status-info: var(--color-focus-ring);
   --color-status-info-deep: #1d4ed8; /* §6.5-4 案内の文字は濃い青 */
+  --color-status-info-icon: var(--color-focus-ring);
   --color-status-info-soft: #2563eb1a;
   --color-status-warn: #f5c56b;
   --color-status-warn-soft: #f973161a;
@@ -478,7 +479,7 @@
   --color-notice-warning-bg: #fff7e6;
   --color-notice-danger-bg: #fef0f0;
   --color-menu-danger: #e5484d;
-  --color-link: #0b63ce;
+  --color-link: var(--color-accent-deep);
   --color-checkbox-line: #dadde2;
   --radius-checkbox-mark: 3px;
   --text-callout: 14px;
@@ -3026,3 +3027,17 @@ html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader']
   --tpl-notice-pad: 12px 16px;
   --tpl-thead-pad-side: 16px;
 }
+
+/* B-178：一覧の骨組み（v19Ivv）。画面の寸法ではなく部品の値。 */
+[data-theme='v8'] {
+  --tpl-list-row-h: 60px;
+  --tpl-list-head-h: 40px;
+  --tpl-list-search-w: 240px;
+  --tpl-list-search-min: 120px;
+  --tpl-list-band-h: 116px;
+  --tpl-list-band-pad: 16px 24px;
+  --tpl-list-gap: 8px;
+  --tpl-list-cell-side: 16px;
+}
+
+[data-theme='v8'] { --tpl-image-frame-w: 160px; --tpl-image-frame-h: 106px; }

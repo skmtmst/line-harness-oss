@@ -1,4 +1,5 @@
 'use client'
+
 import { useFolderMove } from '@/components/shared/use-folder-move'
 import { moveOutgoingWebhookToFolder } from '@/lib/move-to-folder'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -53,7 +54,6 @@ import styles from './outgoing.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 外部連携「こちらから送る」の一覧（Pencil `ZSbFY`・1152 `AsfFB`・
@@ -251,6 +251,7 @@ export default function WebhooksOutgoingV8() {
       if (!forbidden) await reload().catch(() => {});
 
       if (!isCurrent())
+
  return
       fail(forbidden
         ? permissionDeniedMessage('store')
@@ -741,6 +742,7 @@ export default function WebhooksOutgoingV8() {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       help={<>{WEBHOOKS_DESCRIPTION}{narrow
           ? '行の「…」から 中身を見る・試しに送る・失敗をやり直す・鍵を作り直す・止める・削除。'
           : '行の「設定」から 直す・止める・鍵を作り直す・試しに送る・削除。「中身を見る」で送った中身と返事を見られます。'}</>}

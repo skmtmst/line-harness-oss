@@ -2,12 +2,10 @@
 
 import { jstDate } from '@/lib/jst-datetime'
 import { RowActions } from '@/components/shared/row-actions'
-
 import { X } from 'lucide-react'
 import { RowMenu } from '@/components/shared/row-actions'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import StickyBar from '@/components/shared/sticky-bar'
-
 import { useEffect, useState } from 'react'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useRouter } from 'next/navigation'
@@ -34,7 +32,6 @@ import DateField from '@/components/shared/date-field'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TimeField } from '@/components/shared/date-time-field'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-// #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
 import {
   EVENT_CANCEL_DEADLINE_OPTIONS,
   EVENT_DEFAULT_DRAFT,
@@ -46,6 +43,8 @@ import {
   parseDeadlineSelect,
 } from './event-draft-shared'
 import { formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format'
+
+// #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
 
 type Tab = 'overview' | 'slots' | 'publish'
 

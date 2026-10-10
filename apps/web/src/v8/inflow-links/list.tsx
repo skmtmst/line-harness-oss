@@ -1,4 +1,6 @@
 'use client'
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
@@ -78,7 +80,6 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8-B 流入と計測の一覧（Pencil「★V8-B 画面の地図」：
@@ -373,8 +374,10 @@ export default function InflowListV8({
       void load()
       return true
     } catch (cause) {
-      const fieldFailure = saveErrors.capture(cause)
-      if (!isCurrent()) return false
+      const fieldFailure = saveErrors.capture(cause);
+
+      if (!isCurrent())
+ return false
       setActive(!nextActive)
       { if (!fieldFailure)
       notifyToast(
@@ -622,22 +625,22 @@ export default function InflowListV8({
   const onSearch = (value: string) => { setSearch(value); setPage(1) }
   // 1152 の板（y1ztx）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
+    <ListToolbarFrame>
       {notice}
-      <div className={styles.narrowRow}>
+      <ListToolbarRow>
         {createButton}
         <div className={styles.narrowFolder}>{folderSelect}</div>
-        <div className={styles.narrowSearch}>
+        <ListToolbarSearchSlot>
           <SearchField value={search} onChange={onSearch} onClear={() => onSearch('')} placeholder={searchLabel} aria-label={searchLabel} />
-        </div>
-      </div>
-      <div className={styles.narrowRow}>
+        </ListToolbarSearchSlot>
+      </ListToolbarRow>
+      <ListToolbarRow>
         {filterChips}
         <span className={styles.spacer} aria-hidden="true" />
         {presetBox}
         {perPageBox}
-      </div>
-    </div>
+      </ListToolbarRow>
+    </ListToolbarFrame>
   )
   const wideToolbar = (
     <>
@@ -850,6 +853,7 @@ export default function InflowListV8({
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       help={<>{"QRコード・URLごとに、どこから友だちになったかを数えます。友だちになったときに、タグ・メッセージ・シナリオを自動で動かせます。"}{readonly
             ? '行の「…」から QRコードを表示・URLをコピーできます。'
             : '行の「…」から QRコードを表示・URLをコピー・リンクを編集・止める。左のチェックで、まとめて操作できます。'}</>}

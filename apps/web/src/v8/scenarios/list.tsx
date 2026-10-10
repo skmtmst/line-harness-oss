@@ -1,4 +1,7 @@
 'use client'
+import { canManageRole } from '@/lib/staff-role';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+
 import StatusBadge from '@/components/shared/status-badge'
 import SharedStatusPill from '@/components/shared/status-pill'
 import { collectListRows } from '@/components/shared/collect-list-rows'
@@ -1130,12 +1133,12 @@ export default function ScenariosListV8() {
    * 部品は広い板と同じもの（動きは同じ）。並びと段だけを変える。
    */
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
+    <ListToolbarFrame>
       {noteBand}
-      <div className={styles.narrowRow}>
+      <ListToolbarRow>
         {createButton(false)}
         <div className={styles.narrowFolder}>{folderSelect}</div>
-        <div className={styles.narrowSearch}>
+        <ListToolbarSearchSlot>
           <SearchField
             placeholder="シナリオ名で探す"
             aria-label="シナリオ名で探す"
@@ -1143,16 +1146,16 @@ export default function ScenariosListV8() {
             onChange={(value) => setNameQuery(clampSearchQuery(value))}
             onClear={() => setNameQuery('')}
           />
-        </div>
+        </ListToolbarSearchSlot>
         <span className={styles.narrowSpacer} aria-hidden="true" />
         {perPageBox}
-      </div>
-      <div className={styles.narrowRow}>
+      </ListToolbarRow>
+      <ListToolbarRow>
         {filterChips}
         <div className={styles.savedIconOnly} title="よく使う絞り込み">{savedBox}</div>
-      </div>
+      </ListToolbarRow>
       {filteredCount}
-    </div>
+    </ListToolbarFrame>
   )
 
   const wideToolbar = (
@@ -1190,6 +1193,7 @@ export default function ScenariosListV8() {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId={narrow ? 'wjfLe' : canEdit ? 'axFrW' : 'X0QrW0'}
       headingSize="regular"
       title="シナリオ配信"

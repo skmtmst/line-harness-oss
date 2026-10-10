@@ -1,4 +1,5 @@
 'use client'
+
 import { Field } from '@/components/shared/form-controls'
 import { useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import Link from 'next/link'
@@ -34,7 +35,7 @@ import { useFormEditAttempted } from './field-issues'
 import styles from './edit.module.css'
 import TextLink from '@/components/shared/text-link'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import ImageFrame from '@/components/shared/image-frame'
 
 /*
  * 「中身」のタブ（m1cWEy・ITBAB・ijxur・J1pdB・Z9wXm の左の列）。
@@ -528,8 +529,7 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
       return (
         <>
           <div className={styles.decoRow}>
-            <SaveErrorField names={["mediaUrl","block.mediaUrl","media_url","block.media_url"]}><MediaSlot
-              size="compact"
+            <SaveErrorField names={["mediaUrl","block.mediaUrl","media_url","block.media_url"]}><ImageFrame
               title="画像を追加"
               previewAlt={block.alt || "フォームの画像"}
               value={block.mediaUrl || null}

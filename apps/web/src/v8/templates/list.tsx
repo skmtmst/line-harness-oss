@@ -1,4 +1,8 @@
 'use client'
+import { isOwnerOrAdmin } from '@/lib/staff-capability';
+import { canManageRole } from '@/lib/staff-role';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+
 import BulkBar from '@/components/shared/bulk-bar'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
@@ -89,7 +93,6 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 テンプレートの一覧（Pencil「★V8 画面の地図」のテンプレートの行）。
@@ -1010,8 +1013,8 @@ export default function TemplatesListV8() {
 
   /* 1152 の板（L7zA7C）：1段目「作る・フォルダ・探す … 件数」、2段目「札・よく使う絞り込み（印だけ）」。 */
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
-      <div className={styles.narrowRow}>
+    <ListToolbarFrame>
+      <ListToolbarRow>
         {createButton(false)}
         <div className={styles.narrowFolder}>
           <SaveErrorField names={["selectedCategory","selected_category"]}><Select
@@ -1024,7 +1027,7 @@ export default function TemplatesListV8() {
             options={folderSelectOptions}
           /></SaveErrorField>
         </div>
-        <div className={styles.narrowSearch}>
+        <ListToolbarSearchSlot>
           <SearchField
             aria-label="テンプレートを検索"
             placeholder="名前・本文で探す"
@@ -1032,19 +1035,19 @@ export default function TemplatesListV8() {
             onChange={onSearch}
             onClear={() => onSearch('')}
           />
-        </div>
+        </ListToolbarSearchSlot>
         <span className={styles.spacer} aria-hidden="true" />
         {perPageBox}
-      </div>
-      <div className={styles.narrowRow}>
+      </ListToolbarRow>
+      <ListToolbarRow>
         {filterChips}
         {savedBox(true)}
-      </div>
-    </div>
+      </ListToolbarRow>
+    </ListToolbarFrame>
   )
 
   const wideToolbar = (
-    <div className={styles.wideTools}>
+    <ListToolbarFrame>
       <ListToolbar
         search={{
           placeholder: '名前・本文・差し込みで探す',
@@ -1055,7 +1058,7 @@ export default function TemplatesListV8() {
         filters={filterChips}
         trailing={<><ListToolbarOptional label="よく使う絞り込み">{savedBox(false)}</ListToolbarOptional>{perPageBox}</>}
       />
-    </div>
+    </ListToolbarFrame>
   )
 
   /* ===== 一覧の中身（`susGP`：読込中・読み込めない・空・0件を分ける） ===== */
@@ -1729,6 +1732,7 @@ export default function TemplatesListV8() {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId={narrow ? 'L7zA7C' : 'v19Ivv'}
       headingSize="regular"
       {...heading}
@@ -1744,7 +1748,7 @@ export default function TemplatesListV8() {
               icon={<kpi.icon size={13} aria-hidden="true" />}
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
-              detail={<span className={styles.kpiDetailWrap}>{kpi.detail}</span>}
+              detail={kpi.detail}
             />
           ))}
         </KpiBand>

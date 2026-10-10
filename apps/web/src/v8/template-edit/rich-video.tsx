@@ -1,4 +1,6 @@
 'use client'
+import { canManageRole } from '@/lib/staff-role';
+
 import { notifySaved } from '@/components/shared/toast'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { useEffect, useRef, useState } from 'react'
@@ -32,6 +34,7 @@ import videoStyles from './rich-video.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ImageFrame from '@/components/shared/image-frame'
 
 const emptyDraft: RichVideoDraft = {name:'',folderId:'',originalContentUrl:'',previewImageUrl:'',height:1040,buttonEnabled:true,actionLabel:'詳しく見る',actionUrl:'',altText:''}
 
@@ -86,6 +89,7 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
         try { const p = JSON.parse(initial.messageContent); if (p.video) { baseUrl.current = p.baseUrl; media.current = initial.kind === 'rich_video' ? [...initial.media] : []; const next: RichVideoDraft = {name:initial.name,folderId:'',originalContentUrl:p.video.originalContentUrl,previewImageUrl:p.video.previewImageUrl,height:p.baseSize.height,buttonEnabled:Boolean(p.video.externalLink),actionLabel:p.video.externalLink?.label??'詳しく見る',actionUrl:p.video.externalLink?.linkUri??'',altText:p.altText??''};setDraft(next);setClean(snapshotOf(next));setLoading(false);return ()=>{generation.current++} } } catch (saveFailure) {
           const fieldFailure = saveErrors.capture(saveFailure)
  { if (!fieldFailure)
+
  setError('動画の中身を読み込めませんでした。') } }
       }
       setDraft(visual ? {...emptyDraft,name:'新メニュー紹介の動画',actionUrl:'https://nen-petfood.jp/new-menu',altText:'新メニューの動画が届きました'} : emptyDraft)
@@ -151,6 +155,7 @@ if(current===generation.current)setNeedsImage(true)}
     } catch(cause){
       const fieldFailure = saveErrors.capture(cause);
 if(current===generation.current){ if (!fieldFailure)
+
 setError(cause instanceof Error?cause.message:'アップロードできませんでした。選び直してください。') }}
     finally{if(current===generation.current)setBusy(false)}
   }
@@ -173,7 +178,8 @@ setError(cause instanceof Error?cause.message:'アップロードできません
       try {
         const saved = await host.onSave({kind:'rich_video',name:draft.name.trim(),messageContent:JSON.stringify(content),media:[...media.current]},distribute)
         if (current === generation.current && saved !== false) {setClean(snapshot);disarm()}
-      } catch (cause) { if (current === generation.current && !saveErrors.capture(cause)) setError(japaneseDetailOf(cause) || '保存できませんでした。もう一度お試しください。') }
+      } catch (cause) { if (current === generation.current && !saveErrors.capture(cause))
+ setError(japaneseDetailOf(cause) || '保存できませんでした。もう一度お試しください。') }
       finally {saveLock.current=false;if(current===generation.current)setBusy(false)}
       return
     }
@@ -194,6 +200,7 @@ setError(cause instanceof Error?cause.message:'アップロードできません
       } catch (saveFailure) {
         const fieldFailure = saveErrors.capture(saveFailure);
  if(current===generation.current){ if (!fieldFailure)
+
 setError('この吹き出しに入れられませんでした。もう一度お試しください。') } }
       finally {saveLock.current=false;if(current===generation.current)setBusy(false)}
       return
@@ -218,6 +225,7 @@ setError('この吹き出しに入れられませんでした。もう一度お�
     }catch(cause){
       const fieldFailure = saveErrors.capture(cause);
 if(current===generation.current){ if (!fieldFailure)
+
 setError(cause instanceof Error?cause.message:'保存できませんでした。もう一度お試しください。') }}
     finally{saveLock.current=false;if(current===generation.current)setBusy(false)}
   }
@@ -242,7 +250,7 @@ setError(cause instanceof Error?cause.message:'保存できませんでした。
       <Card padding="none" layout="vertical" className={styles.card}><div className={styles.cardHead}><h2 className={styles.cardTitle}>動画</h2><p className={styles.cardNote}>縦長・横長・正方形のどれでも。トーク画面では自動で流れます</p></div>
         <div id="rv-video" tabIndex={-1}>{canMutate && !loadFailed ? <SaveErrorField names={["originalContentUrl","draft.originalContentUrl","original_content_url","draft.original_content_url"]}><MediaSlot kind="video" title="動画を追加" value={draft.originalContentUrl||null} valueName={fileName||undefined} accept="video/mp4" maxBytes={200 * 1024 * 1024} limitText="1ファイル200メガバイト以内・MP4・縦長 / 横長 / 正方形" busy={busy} error={issue?.field==='video'?issue.message:undefined} disabled={loading||mismatch} onFile={file=>void upload(file)} onRemove={()=>{patch({originalContentUrl:'',previewImageUrl:''});setFileName('');setNeedsImage(false);media.current=[];baseUrl.current=''}}/></SaveErrorField>:null}</div>
         {fileName?<AttachmentRow name={fileName} meta={draft.previewImageUrl?'プレビュー画像も作りました':'プレビュー画像を追加してください'}/>:null}
-        {(needsImage || issue?.field==='preview')?<div id="rv-preview" tabIndex={-1} className={videoStyles.previewSlot}>{needsImage && canMutate?<SaveErrorField names={["previewImageUrl","draft.previewImageUrl","preview_image_url","draft.preview_image_url"]}><MediaSlot size="compact" title="プレビュー画像を追加" previewAlt="動画のプレビュー画像" value={draft.previewImageUrl||null} accept="image/png,image/jpeg" maxBytes={1 * 1024 * 1024} error={issue?.field==='preview'?issue.message:undefined} disabled={busy||mismatch} onFile={file=>void upload(file,true)}/></SaveErrorField>:fieldError('preview')}<p className={styles.cardNote}>動画から画像を作れませんでした。動画と同じ縦横比の JPEG・PNG（1MBまで）を入れてください。</p></div>:null}
+        {(needsImage || issue?.field==='preview')?<div id="rv-preview" tabIndex={-1} className={videoStyles.previewSlot}>{needsImage && canMutate?<SaveErrorField names={["previewImageUrl","draft.previewImageUrl","preview_image_url","draft.preview_image_url"]}><ImageFrame title="プレビュー画像を追加" previewAlt="動画のプレビュー画像" value={draft.previewImageUrl||null} accept="image/png,image/jpeg" maxBytes={1 * 1024 * 1024} error={issue?.field==='preview'?issue.message:undefined} disabled={busy||mismatch} onFile={file=>void upload(file,true)}/></SaveErrorField>:fieldError('preview')}<p className={styles.cardNote}>動画から画像を作れませんでした。動画と同じ縦横比の JPEG・PNG（1MBまで）を入れてください。</p></div>:null}
       </Card>
       <Card padding="none" layout="vertical" className={styles.card}><div className={styles.toggleRow}><h2 className={styles.cardTitle}>見終わったあとのボタン</h2><HelpTip label="見終わったあとのボタンの説明">動画の再生が終わったあとに、リンクを開くボタンを出します。</HelpTip><span className={styles.spacer}/><span className={styles.toggleLabelSmall}>{draft.buttonEnabled?'出す':'出さない'}</span>{canMutate?<SaveErrorField names={["buttonEnabled","draft.buttonEnabled","button_enabled","draft.button_enabled"]}><SettingCheckbox checked={draft.buttonEnabled} label="見終わったあとのボタンを出す" onChange={value=>patch({buttonEnabled:value})} disabled={busy||loading||loadFailed}/></SaveErrorField>:null}</div>
         {draft.buttonEnabled?<div className={styles.pair}><div className={`${styles.field} ${styles.folderField}`}><Field label="ボタンの文字" htmlFor="rv-label">{canMutate?<SaveErrorField names={["actionLabel","draft.actionLabel","action_label","draft.action_label"]}><Select size="full" id="rv-label" aria-label="ボタンの文字" value={draft.actionLabel} onChange={value=>patch({actionLabel:value})} options={RICH_VIDEO_BUTTON_LABELS.map(label=>({value:label,label}))} disabled={busy||loading||loadFailed}/></SaveErrorField>:<span>{draft.actionLabel}</span>}</Field></div><div className={`${styles.field} ${styles.grow}`}><Field label="リンク先URL" htmlFor="rv-actionUrl"><SaveErrorField names={["actionUrl","draft.actionUrl","action_url","draft.action_url"]}><TextField id="rv-actionUrl" type="url" invalid={issue?.field==='actionUrl'} aria-describedby={issue?.field==='actionUrl'?'rv-actionUrl-error':undefined} value={draft.actionUrl} onChange={e=>patch({actionUrl:e.target.value})} placeholder="https://…" disabled={!canMutate||busy||loading||loadFailed}/></SaveErrorField>

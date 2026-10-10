@@ -1,4 +1,7 @@
 'use client'
+import { canManageRole } from '@/lib/staff-role';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useTenantWideAccess } from '@/lib/staff-role'
@@ -38,7 +41,6 @@ import styles from '../broadcasts/list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 統括 一括配信の一覧（絵 U4Eep0・V8.pen の行「統括」。2026-10-08 オーナー：店の一斉配信とほぼ同じ画面）。
@@ -119,6 +121,7 @@ export default function HqBroadcastList() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
+
 
       setError(caught)
     }
@@ -258,13 +261,13 @@ export default function HqBroadcastList() {
   }
 
   const toolbar = (
-    <div className={styles.tools}>
-      <div className={styles.toolRow}>
-        <div className={styles.searchBox}>
+    <ListToolbarFrame>
+      <ListToolbarRow>
+        <ListToolbarSearchSlot>
           <SearchField aria-label="タイトル・内容で探す" placeholder="タイトル・内容で探す" value={query} onChange={(value) => { setQuery(value); setPage(1) }} onClear={() => { setQuery(''); setPage(1) }} />
-        </div>
-      </div>
-      <div className={styles.toolRow}>
+        </ListToolbarSearchSlot>
+      </ListToolbarRow>
+      <ListToolbarRow>
         <div className={styles.chips} role="group" aria-label="状態で絞る">
           {STATUS_CHIPS.map((chip) => (
             <FilterChip key={chip.key} selected={status === chip.key} onChange={() => { setStatus(chip.key); setPage(1) }} icon={<chip.icon size={13} aria-hidden="true" />}>
@@ -283,8 +286,8 @@ export default function HqBroadcastList() {
           /></SaveErrorField>
         </div>
 <ListToolbarSort value={sortKey} onChange={(value) => { setSortKey(value as typeof sortKey); setPage(1) }} options={[{ value: 'newest', label: '新しい順' }, { value: 'oldest', label: '古い順' }]} />
-      </div>
-    </div>
+      </ListToolbarRow>
+    </ListToolbarFrame>
   )
 
   let content
@@ -378,6 +381,7 @@ export default function HqBroadcastList() {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId="U4Eep0"
       headingSize="regular"
       title="一括配信"

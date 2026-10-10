@@ -1,4 +1,5 @@
 'use client'
+
 import { FolderDotName } from '@/components/shared/folder-dot'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'

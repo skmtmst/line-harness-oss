@@ -1,4 +1,5 @@
 'use client'
+
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useState } from 'react'
 import { Plus, RefreshCw, Send } from 'lucide-react'
@@ -39,7 +40,7 @@ import styles from './google.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import ImageFrame from '@/components/shared/image-frame'
 
 /*
  * ★V8 Googleビジネス 投稿（一覧 `Cfed0`・投稿を作る `T1j2Sw`）と公開前の確認。
@@ -532,8 +533,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
           <span id="gb-post-summary-count" className="sr-only">{`${form.summary.length} / 1,500 文字`}</span>
         </Field>
         <div className={styles.imageSlot}>
-          <SaveErrorField names={["mediaSourceUrl","form.mediaSourceUrl","media_source_url","form.media_source_url"]}><MediaSlot
-            size="compact"
+          <SaveErrorField names={["mediaSourceUrl","form.mediaSourceUrl","media_source_url","form.media_source_url"]}><ImageFrame
             title="画像を追加"
             previewAlt={form.mediaFilename ?? '投稿の画像'}
             value={form.mediaSourceUrl}
