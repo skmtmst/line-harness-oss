@@ -207,7 +207,9 @@ export default function SoldOutBoard({
                     />
                   </Td>
                   <Td className={styles.td}>
-                    <span className={styles.checkMain}>{item.name || DASH}</span>
+                    <span className={styles.menuName} title={item.name || undefined}>
+                      {item.name || DASH}
+                    </span>
                   </Td>
                   <Td className={styles.td}>{item.category || DASH}</Td>
                   <Td className={styles.td} align="right">

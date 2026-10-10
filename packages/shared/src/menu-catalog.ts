@@ -140,6 +140,7 @@ export const MENU_SECTION_CATALOG: readonly MenuSectionCatalogEntry[] = [
       { id: 'restaurant-tables', featureKey: 'restaurant_test' },
       { id: 'restaurant-inventory', featureKey: 'restaurant_test' },
       { id: 'restaurant-menu', featureKey: 'restaurant_test' },
+      { id: 'restaurant-delivery', featureKey: 'restaurant_test' },
       { id: 'restaurant-google', featureKey: 'restaurant_test' },
       { id: 'restaurant-line-followup', featureKey: 'restaurant_test' },
     ],

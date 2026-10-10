@@ -28,7 +28,15 @@ import {
   type DeliveryServiceState,
   type DeliveryUrgency,
 } from '@/lib/restaurant-delivery-api'
-import { DASH, formatClock, formatElapsed, formatYen, urgencyLabel } from './format'
+import {
+  DASH,
+  SERVICE_TONES,
+  formatClock,
+  formatElapsed,
+  formatOrderNumber,
+  formatYen,
+  urgencyLabel,
+} from './format'
 import styles from './delivery.module.css'
 
 const CONNECTION_LABELS: Record<DeliveryConnectionStatus, string> = {
@@ -195,10 +203,14 @@ function OrderRow({
           aria-label={`注文${order.orderNumber}の詳細`}
           onClick={() => onOpen(order.id)}
         >
-          {order.orderNumber}
+          {formatOrderNumber(order.orderNumber)}
         </Button>
       </Td>
-      <Td className={styles.td}>{order.serviceLabel || DELIVERY_SERVICE_LABELS[order.service]}</Td>
+      <Td className={styles.td}>
+        <StatusBadge tone={SERVICE_TONES[order.service]} size="compact">
+          {order.serviceLabel || DELIVERY_SERVICE_LABELS[order.service]}
+        </StatusBadge>
+      </Td>
       <Td className={styles.td}>
         <span className={styles.items} title={order.itemSummary}>
           {order.itemSummary || DASH}
@@ -211,13 +223,11 @@ function OrderRow({
         <span className={styles.elapsed}>{formatElapsed(order.receivedAt, nowMs)}</span>
       </Td>
       <Td className={styles.td}>
-        <span className={styles.urgencyCell}>
+        {/* 絵（kDQHr）の一覧は印だけ。理由の文は幅を押し広げるので注文の詳細（hjdqV）で出す。 */}
+        <span className={styles.urgencyCell} title={order.urgencyReason || undefined}>
           <StatusBadge tone={URGENCY_TONES[order.urgency]} size="compact">
             {urgencyLabel(order.urgency)}
           </StatusBadge>
-          {order.urgencyReason ? (
-            <span className={styles.urgencyReason}>{order.urgencyReason}</span>
-          ) : null}
         </span>
       </Td>
       <Td className={styles.td}>
@@ -376,8 +386,6 @@ export default function OrdersBoard({
 
   return (
     <>
-      <Tabs items={tabs} label="注文の状態" />
-
       <div className={styles.serviceRow}>
         {data.services.map((state) => (
           <ServiceCard
@@ -430,6 +438,9 @@ export default function OrdersBoard({
           menu={<KpiMenu title="平均準備時間" onOpenHistory={onOpenHistory} />}
         />
       </KpiBand>
+
+      {/* 絵（kDQHr）の並びは サービス3枚 → 数の帯 → タブ → 表。 */}
+      <Tabs items={tabs} label="注文の状態" />
 
       {checkedCount > 0 ? (
         <div className={styles.selectBar}>

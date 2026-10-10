@@ -1,5 +1,6 @@
+import type { StatusBadgeTone } from '@/components/shared/status-badge'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
-import type { DeliveryUrgency } from '@/lib/restaurant-delivery-api'
+import type { DeliveryService, DeliveryUrgency } from '@/lib/restaurant-delivery-api'
 
 /**
  * ★V8 デリバリー受注の見せ方（D-1 `kDQHr`／D-2 `hjdqV`／D-3 `dgeTy`／
@@ -12,6 +13,23 @@ import type { DeliveryUrgency } from '@/lib/restaurant-delivery-api'
 export const STORE_TIME_ZONE = 'Asia/Tokyo'
 
 export const DASH = '—'
+
+/**
+ * 注文番号は必ず頭に `#` を1つだけ付けて出す。
+ * 取り込み元によって `#` が付く相手と付かない相手がいるので、ここでそろえる（`##` を出さない）。
+ */
+export function formatOrderNumber(value: string | null | undefined): string {
+  const text = (value ?? '').trim()
+  if (!text) return DASH
+  return text.startsWith('#') ? text : `#${text}`
+}
+
+/* 相手ごとの色（絵のとおり Uber Eats は緑・出前館は赤・ロケットナウは青）。 */
+export const SERVICE_TONES: Record<DeliveryService, StatusBadgeTone> = {
+  ubereats: 'success',
+  demaecan: 'danger',
+  rocketnow: 'info',
+}
 
 function parts(value: string | null | undefined) {
   if (!value) return null

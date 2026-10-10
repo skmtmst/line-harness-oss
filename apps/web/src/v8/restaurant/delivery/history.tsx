@@ -27,7 +27,14 @@ import {
   type DeliveryOrderStatus,
   type DeliveryService,
 } from '@/lib/restaurant-delivery-api'
-import { CANCEL_REASON_LABELS, DASH, formatClock, formatYen } from './format'
+import {
+  CANCEL_REASON_LABELS,
+  DASH,
+  SERVICE_TONES,
+  formatClock,
+  formatOrderNumber,
+  formatYen,
+} from './format'
 import styles from './delivery.module.css'
 
 const STATUS_TONES: Record<DeliveryOrderStatus, StatusBadgeTone> = {
@@ -48,11 +55,6 @@ const SERVICE_OPTIONS = [
     label: DELIVERY_SERVICE_LABELS[service],
   })),
 ]
-
-function countText(value: number | null | undefined, unit = '件') {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return DASH
-  return `${value}${unit}`
-}
 
 /* ── 板の頭の右（日付・サービス・CSV） ───────────────────────────── */
 
@@ -126,11 +128,11 @@ function HistoryRow({
           aria-label={`注文${order.orderNumber}の詳細`}
           onClick={() => onOpenOrder(order.id)}
         >
-          <span className={styles.orderNumber}>{order.orderNumber || DASH}</span>
+          <span className={styles.orderNumber}>{formatOrderNumber(order.orderNumber)}</span>
         </Button>
       </Td>
       <Td className={styles.td}>
-        <StatusBadge tone="neutral" size="compact">
+        <StatusBadge tone={SERVICE_TONES[order.service]} size="compact">
           {order.serviceLabel || DELIVERY_SERVICE_LABELS[order.service]}
         </StatusBadge>
       </Td>
@@ -138,21 +140,21 @@ function HistoryRow({
         <span className={styles.elapsed}>{formatClock(order.receivedAt)}</span>
       </Td>
       <Td className={styles.td}>
+        {/* 絵（OzHLO）の注文内容は1行だけ。点数は注文の詳細（hjdqV）で出す。 */}
         <span className={styles.items} title={order.itemSummary || undefined}>
           {order.itemSummary || DASH}
         </span>
-        <span className={styles.itemNote}>{countText(order.itemCount, '点')}</span>
       </Td>
       <Td className={styles.td} align="right">
         <span className={styles.amount}>{formatYen(order.totalAmount)}</span>
       </Td>
       <Td className={styles.td}>
-        <div className={styles.urgencyCell}>
+        {/* 絵（OzHLO）の「状態」は札だけ。キャンセルの理由は札の下に書かず、指を当てたときだけ出す。 */}
+        <span className={styles.urgencyCell} title={reason || undefined}>
           <StatusBadge tone={STATUS_TONES[order.status]} size="compact">
             {order.statusLabel || DASH}
           </StatusBadge>
-          {reason ? <span className={styles.urgencyReason}>{reason}</span> : null}
-        </div>
+        </span>
       </Td>
     </Tr>
   )

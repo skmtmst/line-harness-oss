@@ -143,6 +143,37 @@
   white-space: nowrap;
 }
 
+/*
+ * 注文一覧（kDQHr）の列の幅。
+ * 共通の表は `table-layout: fixed` なので、何も書かないと9列を等分して
+ * 「操作」の2つのボタン（受け付ける・拒否）が枠の外へはみ出す。
+ * 両端（選ぶ四角・操作の2つのボタン）は文字数で決まるので実寸で押さえ、
+ * 中の短い列は割合にして、残りぜんぶを「注文内容」（省略できる列）へ回す。
+ * `.table` は共通部品の外枠に付く名前で、`data-design` は中の `table` に付くので
+ * 子孫で書く（同じ要素に重ねると当たらない）。
+ */
+.table table[data-design='kDQHr'] thead .th:nth-child(1) { width: 46px; }
+.table table[data-design='kDQHr'] thead .th:nth-child(2) { width: 9.5%; }
+/* 3列目（サービス）は札の文字数で決まるので実寸。割合だと狭い幅で札が列いっぱいになり、となりの文字とくっつく。 */
+.table table[data-design='kDQHr'] thead .th:nth-child(3) { width: 118px; }
+/* 4列目（注文内容）は幅を書かない。残りを受け取って、あふれる分は「…」で省く。 */
+.table table[data-design='kDQHr'] thead .th:nth-child(5) { width: 7%; }
+.table table[data-design='kDQHr'] thead .th:nth-child(6) { width: 6%; }
+.table table[data-design='kDQHr'] thead .th:nth-child(7) { width: 7.5%; }
+.table table[data-design='kDQHr'] thead .th:nth-child(8) { width: 7.5%; }
+.table table[data-design='kDQHr'] thead .th:nth-child(9) { width: 204px; }
+
+/*
+ * 品切れ一括設定（h7OeT）の列の幅。
+ * ここも等分されるため、長い商品名が「分類」の文字に重なる。
+ * 商品名の列だけ幅を書かずに残りを受け取り、あふれる分は「…」で省く。
+ */
+.table table[data-design='h7OeT'] thead .th:nth-child(1) { width: 46px; }
+.table table[data-design='h7OeT'] thead .th:nth-child(3) { width: 16%; }
+.table table[data-design='h7OeT'] thead .th:nth-child(4) { width: 12%; }
+.table table[data-design='h7OeT'] thead .th:nth-child(5) { width: 14%; }
+.table table[data-design='h7OeT'] thead .th:nth-child(6) { width: 13%; }
+
 .td {
   vertical-align: middle;
 }
@@ -158,7 +189,17 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 260px;
+  /* 幅は列に任せる（固定の 260px だと狭い幅でとなりの列を押し出す）。 */
+  max-width: 100%;
+}
+
+/* 表の中の商品名。`.checkMain` は横並びの中でだけ縮むので、ここでは使えない。 */
+.menuName {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .amount {
@@ -172,28 +213,22 @@
 }
 
 /*
- * 急ぎ度の列。札の下に理由の文を添える。
+ * 急ぎ度（kDQHr）・状態（OzHLO）の列。絵のとおり札だけを置く。
+ * 理由の文は絵に無いので下に書かず、指を当てたときの吹き出し（title）にする。
  * 判定はWorker側だけで行うので、ここには結果と理由しか来ない（仕組みの名前は出さない）。
  */
 .urgencyCell {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  display: inline-flex;
+  align-items: center;
   min-width: 0;
 }
 
-.urgencyReason {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  overflow-wrap: anywhere;
-}
-
+/* 絵（kDQHr）の「操作」は左そろえ。右そろえだと狭い幅で右端から出る。 */
 .rowActions {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .srOnly {

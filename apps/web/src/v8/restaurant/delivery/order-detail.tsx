@@ -10,7 +10,7 @@
  * キャンセルは取り消せないので、別の窓で理由を選んでから送る。自由文は扱わず符号だけを送る。
  */
 
-import { Ban } from 'lucide-react'
+import { Ban, Check, X } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice, { type NoticeTone } from '@/components/shared/notice'
@@ -27,7 +27,9 @@ import { DialogField, DialogNote, RsDialog } from '../booking-kit/parts'
 import {
   CANCEL_REASON_OPTIONS,
   DASH,
+  SERVICE_TONES,
   formatClock,
+  formatOrderNumber,
   formatShortStamp,
   formatYen,
   urgencyLabel,
@@ -140,9 +142,11 @@ export function OrderDetailDialog({
             <Ban size={15} aria-hidden="true" />キャンセル
           </Button>
           <span className={styles.spacer} />
-          <Button disabled={busy} onClick={onReject}>拒否する</Button>
+          <Button disabled={busy} onClick={onReject}>
+            <X size={15} aria-hidden="true" />拒否する
+          </Button>
           <Button variant="primary" busy={busy} busyLabel="受付中…" onClick={onAccept}>
-            受け付ける
+            <Check size={15} aria-hidden="true" />受け付ける
           </Button>
         </>
       )
@@ -191,8 +195,8 @@ export function OrderDetailDialog({
           {summaryLine ? <p className={styles.muted}>{summaryLine}</p> : null}
 
           <div className={styles.detailHead}>
-            <span className={styles.orderNumber}>#{order.orderNumber || DASH}</span>
-            <StatusBadge tone="neutral" size="compact">{serviceLabel}</StatusBadge>
+            <span className={styles.orderNumber}>{formatOrderNumber(order.orderNumber)}</span>
+            <StatusBadge tone={SERVICE_TONES[order.service]} size="compact">{serviceLabel}</StatusBadge>
             <StatusBadge tone={STATUS_TONES[order.status]} size="compact">
               {order.statusLabel || DASH}
             </StatusBadge>
@@ -239,7 +243,8 @@ export function OrderDetailDialog({
           <DialogField label="受け取り情報">
             <dl className={styles.detailFacts}>
               <Fact label="受け取り方法">{order.pickupMethod || DASH}</Fact>
-              <Fact label="希望時刻">{formatShortStamp(order.wantedAt)}</Fact>
+              {/* 絵（hjdqV）は同じ日の受け取りなので時刻だけを出す。 */}
+              <Fact label="希望時刻">{formatClock(order.wantedAt)}</Fact>
               {order.acceptedAt ? (
                 <Fact label="受付">{formatShortStamp(order.acceptedAt)}</Fact>
               ) : null}
@@ -292,9 +297,10 @@ export function CancelOrderDialog({
 }: CancelOrderDialogProps) {
   /* 絵のとおり「#番号（サービス・金額）をキャンセルします。」の一文にする。 */
   const amount = formatYen(totalAmount)
+  const number = formatOrderNumber(orderNumber)
   const subject = amount === DASH
-    ? `#${orderNumber || DASH}（${serviceLabel}）`
-    : `#${orderNumber || DASH}（${serviceLabel}・${amount}）`
+    ? `${number}（${serviceLabel}）`
+    : `${number}（${serviceLabel}・${amount}）`
 
   return (
     <RsDialog

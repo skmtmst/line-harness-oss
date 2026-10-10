@@ -281,7 +281,7 @@ describe('kDQHr デリバリー受注', () => {
   it('注文一覧の板・サービス3枚・新着の操作を出す', async () => {
     render(<DeliveryPage />)
 
-    expect(await screen.findByText('UE-1001')).toBeTruthy()
+    expect(await screen.findByText('#UE-1001')).toBeTruthy()
     expect(document.querySelector('[data-design-node="kDQHr"]')).toBeTruthy()
 
     // 相手は Uber Eats・出前館・ロケットナウの3つだけ（menu も Camel も出さない）。
@@ -298,18 +298,20 @@ describe('kDQHr デリバリー受注', () => {
     expect(screen.getByLabelText('ロケットナウの受付を再開')).toBeTruthy()
   })
 
-  it('急ぎ度は結果と理由の文だけを出し、仕組みの名前は出さない', async () => {
+  it('急ぎ度は札だけを出し、理由は添え書きに回して仕組みの名前は出さない', async () => {
     render(<DeliveryPage />)
-    await screen.findByText('UE-1001')
+    await screen.findByText('#UE-1001')
 
     expect(screen.getAllByText('急ぎ').length).toBeGreaterThan(0)
-    expect(screen.getByText('受け取り希望まで10分を切っています')).toBeTruthy()
+    // 絵（kDQHr）の一覧は札だけ。理由の文は幅を押し広げるので添え書きにする。
+    expect(screen.queryByText('受け取り希望まで10分を切っています')).toBeNull()
+    expect(document.querySelector('[title="受け取り希望まで10分を切っています"]')).toBeTruthy()
     expect(document.body.textContent).not.toMatch(/Clef/i)
   })
 
   it('まとめて受け付けるは新着だけを1件ずつ順に送る', async () => {
     render(<DeliveryPage />)
-    await screen.findByText('UE-1001')
+    await screen.findByText('#UE-1001')
 
     // 調理中は選べない（新着だけが相手）。
     const cooking = screen.getByLabelText('注文DM-2002を選ぶ') as HTMLInputElement
@@ -325,7 +327,7 @@ describe('kDQHr デリバリー受注', () => {
 
   it('注文番号を押すと ?id= が付いて注文の詳細が開く', async () => {
     render(<DeliveryPage />)
-    await screen.findByText('UE-1001')
+    await screen.findByText('#UE-1001')
 
     fireEvent.click(screen.getByLabelText('注文UE-1001の詳細'))
 
@@ -333,6 +335,11 @@ describe('kDQHr デリバリー受注', () => {
     expect(await screen.findByText('注文の詳細')).toBeTruthy()
     expect(document.querySelector('[data-design-node="hjdqV"]')).toBeTruthy()
     expect(fixture.order).toHaveBeenCalledWith('account-1', 'o1')
+
+    // 急ぎ度の理由の文は注文の詳細（hjdqV）の帯で出す。仕組みの名前は出さない。
+    expect(await screen.findByText('急ぎ対応のおすすめ')).toBeTruthy()
+    expect(screen.getByText('受け取り希望まで10分を切っています')).toBeTruthy()
+    expect(document.body.textContent).not.toMatch(/Clef/i)
   })
 })
 
@@ -360,7 +367,7 @@ describe('閲覧のみ（staff）', () => {
   it('受け付ける・拒否・準備完了・停止・再開を置かない', async () => {
     fixture.role.value = 'staff'
     render(<DeliveryPage />)
-    await screen.findByText('UE-1001')
+    await screen.findByText('#UE-1001')
 
     expect(screen.queryByLabelText('注文UE-1001を受け付ける')).toBeNull()
     expect(screen.queryByLabelText('注文UE-1001を拒否')).toBeNull()
