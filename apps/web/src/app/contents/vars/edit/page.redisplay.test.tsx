@@ -46,6 +46,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
+
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) =>
     React.createElement('a', { href }, children),
@@ -289,7 +291,7 @@ describe('共通情報: 保存した社内メモの再表示(実React)', () => {
     await setValue(byId('cv-key'), 'redisplay_check')
     await setValue(byId('cv-value'), '平日 10:00〜18:00')
     await setValue(byId('cv-memo'), '更新は毎月1日に確認する')
-    await click(byExactText('button', '登録する'))
+    await click(byExactText('button', '保存して公開'))
 
     expect(api.create).toHaveBeenCalledTimes(1)
     const created = api.create.mock.calls[0][0]
