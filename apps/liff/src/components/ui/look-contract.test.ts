@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const root = join(HERE, '..', '..');
 const src = (...parts: string[]): string => readFileSync(join(root, ...parts), 'utf8');
-const css = src('index.css');
+const css = src('index.css') + src('tokens.css');
 const html = src('..', 'index.html');
 
 /*

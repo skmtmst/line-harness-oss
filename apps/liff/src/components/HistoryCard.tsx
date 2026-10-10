@@ -1,3 +1,4 @@
+import BookingCancelDeadline from './BookingCancelDeadline.js';
 import type { BookingHistoryItem } from '../lib/api.js';
 import { utcToJstHm, utcToJstMd } from '../lib/datetime.js';
 import Card from './ui/Card.js';
@@ -39,7 +40,7 @@ export default function HistoryCard({
             <Badge tone={meta.tone}>{meta.label}</Badge>
           </div>
         </div>
-        {booking.cancel_deadline_at && <p className="text-xs text-ink-secondary">キャンセル期限：{new Date(booking.cancel_deadline_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</p>}
+        <BookingCancelDeadline deadline={booking.cancel_deadline_at} />
         {hasActions && (
           <div className="flex gap-2">
             {onChange && (

@@ -1,3 +1,4 @@
+import BookingCancelDeadline from '../../../../../liff/src/components/BookingCancelDeadline.js';
 import type { BookingHistoryItem } from '../lib/api.js';
 import { utcToJstDisplay } from '../lib/datetime.js';
 
@@ -30,6 +31,7 @@ export default function HistoryCard({ booking }: { booking: BookingHistoryItem }
         <div className="font-semibold text-gray-900 truncate">{booking.menu_name}</div>
         <div className="text-xs text-gray-500 mt-0.5">{booking.staff_name}</div>
         <div className="text-xs text-gray-600 mt-1 tabular-nums">{utcToJstDisplay(booking.starts_at)}</div>
+        <BookingCancelDeadline deadline={booking.cancel_deadline_at} />
       </div>
       <span className="sb-badge shrink-0" style={{ background: meta.bg, color: meta.fg }}>
         {meta.label}
