@@ -513,6 +513,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             </div>
           </div>
         ) : null}
+        <div className={styles.postCompose}>
         <Field density="compact" label="本文" htmlFor="gb-post-summary" error={fieldErrors.summary}>
           <TextArea density="compact" height="post" id="gb-post-summary" value={form.summary} onChange={(e) => set({ summary: e.target.value })} disabled={!editable} maxLength={1500} aria-describedby="gb-post-summary-count" />
           <span id="gb-post-summary-count" className="sr-only">{`${form.summary.length} / 1,500 文字`}</span>
@@ -535,6 +536,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             onRemove={() => set({ mediaId: null, mediaFilename: null, mediaSourceUrl: null })}
           />
           {form.mediaFilename ? <span className={styles.imageName} title={form.mediaFilename}>{`${form.mediaFilename}・4:3`}</span> : null}
+        </div>
         </div>
         {picker.open ? (
           <div className={styles.picker} role="group" aria-label="画像を選ぶ">

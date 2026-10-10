@@ -335,3 +335,7 @@
 [data-theme='v8'] .panel[data-width='composer'] .footer { padding: var(--tpl-msg-composer-drawer-footer-pad); }
 
 .titleRow { display: flex; align-items: center; gap: var(--tpl-msg-composer-content-gap); flex-wrap: wrap; }
+
+/* B-187：短い本文は中身の高さで止め、長い本文だけ縦に送る。下の操作は常に板の下端。 */
+[data-theme='v8'] .panel:not(.inline) { height: auto; max-height: 100dvh; align-self: flex-start; }
+[data-theme='v8'] .panel:not(.inline) .body { flex: 0 1 auto; }

@@ -665,8 +665,10 @@ a.railStep:hover .railLabel {
   }
 
   .split {
-    flex-direction: column;
+    flex-direction: column; flex: 0 0 auto;
   }
+
+  .main { flex: 0 0 auto; width: 100%; }
 
   .side {
     width: 100%;

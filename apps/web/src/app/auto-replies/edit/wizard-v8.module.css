@@ -568,7 +568,7 @@
 }
 
 /* 完了（V4LjH）：作る型の頭の下に、中央の完了カード（幅560・余白32・間12）。 */
-.doneBody { display: flex; justify-content: center; padding: var(--tpl-ar-done-body-pad); }
+.doneBody { display: flex; justify-content: center; padding: var(--tpl-section-pad); }
 .done {
   display: flex; flex-direction: column; align-items: center; gap: var(--tpl-rule-row-gap);
   width: min(var(--tpl-ar-done-w), 100%); padding: var(--tpl-ar-done-pad);
