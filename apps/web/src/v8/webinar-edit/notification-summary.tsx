@@ -1,5 +1,11 @@
 import type { WebinarNotificationSettings } from '@/lib/api'
 import StatusPill from '@/components/shared/status-pill'
+import { formatNumber } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
+
+export function audienceText(audience: { people: number; bookings: number; definition: string } | undefined): string {
+  return audience ? `${formatNumber(audience.people)}人（取消を除いた有効な申込。延べ予約は${formatNumber(audience.bookings)}件）` : emptyValue('unknown')
+}
 
 export type NotificationRowState = 'configured' | 'unset' | 'pending' | 'failed'
 export const NOTIFICATION_ROW_STATE = {

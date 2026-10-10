@@ -66,9 +66,10 @@ describe('送った結果の数', () => {
 
   it('通知対象は実人数と延べ予約を分けて表示する', () => {
     expect(PART).toContain('通知の対象')
-    expect(PART).toContain('formatNumber(overview.audience.people)')
+    expect(PART).toContain('audienceText(overview?.audience)')
+    expect(PART).toContain('formatNumber(audience.people)')
     expect(PART).toContain('取消を除いた有効な申込。延べ予約は')
-    expect(PART).toContain('formatNumber(overview.audience.bookings)')
+    expect(PART).toContain('formatNumber(audience.bookings)')
   })
 })
 

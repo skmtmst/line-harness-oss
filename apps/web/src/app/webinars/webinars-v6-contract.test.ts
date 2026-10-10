@@ -13,7 +13,7 @@ const PUBLISHED = fs.readFileSync(path.join(__dirname, 'published/page.tsx'), 'u
 const API = fs.readFileSync(path.join(__dirname, '../../lib/api.ts'), 'utf8')
 const FORM = fs.readFileSync(path.join(__dirname, '../../components/webinars/webinar-form.tsx'), 'utf8')
 /** 読み込めなかった理由の文言は、試験しやすいよう別ファイルへ出した。 */
-const FAILURE = fs.readFileSync(path.join(__dirname, 'webinar-load-failure.ts'), 'utf8')
+const FAILURE = fs.readFileSync(path.join(__dirname, '../../v8/webinars/helpers.ts'), 'utf8')
 
 describe('V8 ウェビナー一覧の契約', () => {
   it('既存データで判定できる並び順と表示件数だけを選べる', () => {

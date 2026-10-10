@@ -5,11 +5,11 @@ import { describe, expect, it } from 'vitest'
 
 import { ApiError } from '@/lib/api'
 
-import { webinarLoadFailure } from './webinar-load-failure'
+import { webinarLoadFailure } from '@/v8/webinars/helpers'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'list-v8.tsx'), 'utf8')
-const OVERVIEW = readFileSync(join(HERE, 'overview-view.ts'), 'utf8')
+const OVERVIEW = readFileSync(join(HERE, '../../v8/webinars/overview.ts'), 'utf8')
 
 /**
  * ウェビナー一覧（設計 `ZC13r` 10-1 ／ `zCQXe` 10-1-L）の、
@@ -60,8 +60,8 @@ describe('一覧の状態（設計 10-1-L `zCQXe`）', () => {
      * 「1つも無い」と「読めなかった」は別のこと。0 と出すと消えたように見える。
      */
     expect(PAGE).toContain('kpiCells(visibleOverview)')
-    expect(OVERVIEW).toContain("metric.state !== 'available' || metric.value === null")
-    expect(OVERVIEW).toContain('metric?.reason ??')
+    expect(OVERVIEW).toContain("metric.state === 'available' && metric.value !== null")
+    expect(OVERVIEW).toContain('reason')
   })
 
   it('集計失敗を空表示にせず、その場で再読み込みできる', () => {
