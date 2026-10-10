@@ -1,8 +1,8 @@
 'use client'
+
 import { ChevronRight } from 'lucide-react';
 import { folderDisplayColor } from './folder-dot';
 import { useFieldContext } from './field-context';
-
 import { joinDescribedBy } from './field-context'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
 import Link from 'next/link'
@@ -21,7 +21,6 @@ import shell from './source-picker-dialog.module.css'
 import styles from './entity-picker.module.css'
 import Dialog from './dialog'
 import TagPill from './tag-pill'
-
 
 /*
  * 受信箱の幅640の器を、作ってあるものを選ぶ窓へ共通化（B-155・163・164・165・175）。
@@ -176,7 +175,7 @@ function SingleEntityPickerDialog({
   if (items.some((item) => item.frequent !== undefined)) folderRows.unshift ({id: '__frequent__', label: 'よく使う', kind: 'folder', count: listState ? null : items.filter((item) => item.frequent).length })
   const previewNode = typeof preview === 'function' ? preview(picked) : preview
 
-  return <EntityPickerDialog title={title} description={description} busy={busy} error={error} designNode={designNode} onCancel={onCancel} initialFocusId={`${id}-search`}
+  return <EntityPickerDialog title={title} description={description} size="picker-narrow" busy={busy} error={error} designNode={designNode} onCancel={onCancel} initialFocusId={`${id}-search`}
     footer={<>
       <div className={styles.tpFootLead}>
         {!readOnly ?

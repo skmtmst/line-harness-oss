@@ -534,7 +534,7 @@ function ConversionCreate() {
       )}
     </>
   ) : (
-    <Button href="/conversions?tab=points">一覧へ戻る</Button>
+    <Button href="/conversions?tab=points">キャンセル</Button>
   )
 
   /* 帯は共通部品（save-conflict）に寄せた。名前の重なりと先の保存で題を言い分ける。 */

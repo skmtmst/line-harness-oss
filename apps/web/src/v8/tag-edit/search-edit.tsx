@@ -753,7 +753,6 @@ export default function SavedSearchEditV8() {
 
       { if (!fieldFailure)
 
-
       setError(saveError instanceof Error ? saveError.message : '変更を保存できませんでした') }
     } finally {
       setSaving(false)
@@ -779,7 +778,6 @@ export default function SavedSearchEditV8() {
 
       { if (!fieldFailure)
 
-
       setError(duplicateError instanceof Error ? duplicateError.message : '複製できませんでした') }
     } finally {
       setSaving(false)
@@ -795,7 +793,6 @@ export default function SavedSearchEditV8() {
       const fieldFailure = saveErrors.capture(deleteError)
 
       { if (!fieldFailure)
-
 
       setError(deleteError instanceof ApiError ? deleteError.message : '削除できませんでした') }
     }
@@ -896,7 +893,7 @@ export default function SavedSearchEditV8() {
     <SaveErrorScope errors={saveErrors}><div className={styles.page}>
       <CreatePage
         title={original.name}
-        identity={<Link href="/tags?tab=searches" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />保存した検索へ</Link>}
+        identity={<></>}
         help={[
           previewCount === null ? '人数はまだ数えていません' : `${polishFormatNumber(previewCount)} 人が当てはまる`,
           original.isShared ? '全員に共有' : '自分だけ',

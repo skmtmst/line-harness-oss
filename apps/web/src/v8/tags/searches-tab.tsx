@@ -189,7 +189,6 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
 
       { if (!fieldFailure)
 
-
       setError(reason instanceof ApiError ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。') }
     }
   }
@@ -213,7 +212,6 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
 
       { if (!fieldFailure)
 
-
       setError(reason instanceof ApiError ? `複製できませんでした（${reason.message}）` : '複製できませんでした') }
     }
   }
@@ -235,7 +233,6 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
 
       const message = reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした'
       { if (!fieldFailure)
-
 
       setError(message) }
       setRetryOrder(next)
@@ -278,9 +275,9 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
     const list: ActionMenuItem[] = []
     const index = filteredList.findIndex((item) => item.id === search.id)
     if (search.lineAccountId) {
-      list.push({ id: 'open', label: '友だち一覧へ', external: true, href: `/friends?savedSearch=${search.id}`, onSelect: () => router.push(`/friends?savedSearch=${search.id}`) })
+      list.push({ id: 'open', label: '友だち一覧へ', external: false, href: `/friends?savedSearch=${search.id}`, onSelect: () => router.push(`/friends?savedSearch=${search.id}`) })
       if (canEdit) {
-        list.push({ id: 'edit', label: '編集', external: true, href: `/tags/searches/edit?id=${encodeURIComponent(search.id)}`, onSelect: () => router.push(`/tags/searches/edit?id=${encodeURIComponent(search.id)}`) })
+        list.push({ id: 'edit', label: '編集', external: false, href: `/tags/searches/edit?id=${encodeURIComponent(search.id)}`, onSelect: () => router.push(`/tags/searches/edit?id=${encodeURIComponent(search.id)}`) })
         list.push({
           id: 'duplicate',
           label: '複製して保存',
@@ -319,7 +316,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   const sharedCount = items.filter((item) => item.isShared).length

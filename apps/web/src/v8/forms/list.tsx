@@ -1,4 +1,8 @@
 'use client'
+import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability';
+import { useDeferredDelete } from '@/lib/use-deferred-delete';
+import { useDetailPanelUrl } from '@/components/shared/detail-panel';
+
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
@@ -79,13 +83,12 @@ import {
 } from './model'
 import styles from './list.module.css'
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
-
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import { insertDuplicateAfter, useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
 
 /*
  * ★V8 回答フォームの一覧（Pencil「★V8 画面の地図」の回答フォームの行）。
@@ -105,7 +108,7 @@ function toContextMenuItems(menuItems: ActionMenuItem[]): ContextMenuItem[] {
     label: item.label,
     danger: item.tone === 'danger',
     disabled: item.disabled,
-    onSelect: () => item.onSelect(),
+    onSelect: () => item.onSelect?.(),
   }))
 }
 
@@ -163,10 +166,10 @@ export default function FormsListV8() {
   const [formSort, setFormSort] = useState<FormSort>(() => validSort(searchParams.get('sort')))
   const [pageSize, setPageSize] = useState(() => validPageSize(searchParams.get('limit')))
   const [page, setPage] = useState(() => validPage(searchParams.get('page')))
-  const [duplicateTarget, setDuplicateTarget] = useState<Form | null>(null)
-  const [duplicateName, setDuplicateName] = useState('')
+  const duplicateLock = useRef(false)
+  const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const [duplicating, setDuplicating] = useState(false)
-  const [duplicateError, setDuplicateError] = useState('')
+  const setDuplicateError =(message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
   /* アーカイブ・削除の窓（`GVizd`）。開いたら影響を読んでから2つの道を出す。 */
   const [deleteTarget, setDeleteTarget] = useState<Form | null>(null)
   const [deleteImpact, setDeleteImpact] = useState<FormDeleteImpact | null>(null)
@@ -194,7 +197,7 @@ export default function FormsListV8() {
   /** 行の「…」。開いている行のID。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 右から出る詳細パネル。管理者確認は読み取り専用なので開かない。 */
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [activeId, setActiveId] = useDetailPanelUrl('form')
   /* 右クリックされた行（「…」と同じ項目を出す）。 */
   const [contextId, setContextId] = useState<string | null>(null)
   const formRequest = useRef(0)
@@ -214,7 +217,6 @@ export default function FormsListV8() {
     setDeleteImpact(null)
     setStopTarget(null)
     setMoveTarget(null)
-    setDuplicateTarget(null)
     setRenameTarget(null)
     setOpenMenuId(null)
     setStats(null)
@@ -456,28 +458,35 @@ export default function FormsListV8() {
     withViewTransition(() => setActiveId(next.id))
   }
 
-  const openDuplicate = (form: Form) => {
-    closeDetail()
-    setDuplicateTarget(form)
-    setDuplicateName(`${displayFormName(form.name)}の複製`)
-    setDuplicateError('')
+  const openDuplicate = (form: Form) => { void duplicateForm(form)
   }
 
-  const duplicateForm = async () => {
+  const duplicateForm = async (duplicateTarget: Form) => {
+    if (duplicateLock.current) return
     if (!duplicateTarget || duplicating || !selectedAccountId) return
-    const name = duplicateName.trim()
-    if (!name) {
-      setDuplicateError('複製の名前を入力してください。')
-      return
-    }
+    duplicateLock.current = true
+    const name = `${displayFormName(duplicateTarget.name)}のコピー`
     setDuplicating(true)
     setDuplicateError('')
     try {
       const res = await api.forms.duplicate(duplicateTarget.id, selectedAccountId, name)
       if (!res.success) throw new Error(res.error)
-      setDuplicateTarget(null)
-      // 複製は停止中の下書き。用途に合わせて直せるよう、編集画面を開く。
-      router.push(`/form-submissions/edit?id=${encodeURIComponent(res.data.id)}&tab=basic`)
+
+      notifyToast('複製しました', { tone: 'success' })
+      // 保存済みのコピーをその場に表示する。取得失敗を複製の失敗として再実行させない。
+      const query = new URLSearchParams({ account_id: selectedAccountId, with_list_summary: '1', q: name, limit: '20' })
+      try {
+        const listed = await fetchApi<{ success: boolean; data: FormListResponse }>(`/api/forms?${query}`)
+        const candidates = listed.success ? (Array.isArray(listed.data) ? listed.data : listed.data.items) : []
+        const copy = candidates.find((row) => row.id === res.data.id)
+        if (copy) setForms((current) => insertDuplicateAfter(current, duplicateTarget.id, copy))
+        else await loadForms()
+      } catch {
+        void loadForms()
+        notifyToast('複製はできました。一覧を読み直して確認してください。', { tone: 'success' })
+      }
+      duplicateFeedback.mark(duplicateTarget.id, res.data.id)
+      void loadStats()
     } catch (error) {
       const fieldFailure = saveErrors.capture(error)
 
@@ -486,6 +495,7 @@ export default function FormsListV8() {
         ? '元のフォームが見つかりませんでした。一覧を開き直してください。'
         : 'フォームを複製できませんでした。もう一度お試しください。') }
     } finally {
+      duplicateLock.current = false
       setDuplicating(false)
     }
   }
@@ -750,6 +760,7 @@ export default function FormsListV8() {
 
   const removeFolder = async () => {
     if (!deletingFolder || folderBusy || !selectedAccountId)
+
  return
     const targetId = deletingFolder.id
     setFolderBusy(true)
@@ -911,10 +922,10 @@ export default function FormsListV8() {
     {
       id: 'responses',
       label: '集まった回答',
-      external: true,
+      external: false,
       href: `/form-submissions/responses?id=${encodeURIComponent(form.id)}`, onSelect: () => router.push(`/form-submissions/responses?id=${encodeURIComponent(form.id)}`),
     },
-    { id: 'duplicate', label: '複製', onSelect: () => openDuplicate(form) },
+    { id: 'duplicate', label: '複製する', onSelect: () => openDuplicate(form) },
     ...(form.isActive
       ? [{ id: 'stop', label: '受付を止める', onSelect: () => void openStop(form) }]
       : []),
@@ -1207,7 +1218,7 @@ export default function FormsListV8() {
         <DataTable>
           {tableHead}
           <tbody>
-            {visibleForms.map((form) => {
+            {duplicateFeedback.order(visibleForms).map((form) => {
               const name = displayFormName(form.name)
               const answerCount = formAnswerCount(form)
               const sub = subLineText(form)
@@ -1218,18 +1229,17 @@ export default function FormsListV8() {
               const nameNode = reviewMode ? (
                 <span className={styles.cellTitle} ><TruncatedText value={String(name ?? '')} /></span>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => openDetail(form.id)}
+                <Link
+                  href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`}
                   title={`${name}の詳細を見る`}
                   aria-label={`「${name}」の詳細を見る`}
                   className={styles.cellTitleButton}
                 >
                   {name}
-                </button>
+                </Link>
               )
               const row = (
-                <Tr key={form.id} data-row-id={form.id}>
+                <Tr highlighted={duplicateFeedback.highlightedId === form.id} key={form.id} data-row-id={form.id} onOpen={reviewMode ? undefined : () => openDetail(form.id)}>
                   <NameCell name={nameNode} folder={folderDotOf(form.folderId)}
                   />
                   {!narrow && (

@@ -1,15 +1,5 @@
 'use client'
 
-/*
- * ★V8 リッチメニュー「切替のつながり」（Pencil `wxIQ7`）。
- *
- * 読み込み（古い応答を捨てる）・404 と失敗の分け方・アカウント違いの扱い・つながりの調べ方
- * （保存済みのページと切替ボタンだけから、戻れない・届かない・切替先なしを見る）は今の画面
- * （app/rich-menus/connections/page.tsx）と同じ。見せ方を絵に合わせた：
- * 左に段「つながりの図」（メニューのカードとタブの行き来）と「よくある事故の見張り」、
- * 右の列に操作（編集する・切替のつながり・…）と「いまの状態」。
- * 受け付ける URL：`/rich-menus/connections?id=<メニュー>`。
- */
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -28,6 +18,18 @@ import { analyzeConnections, type ConnectionAnalysis, type ConnectionPage } from
 import styles from './connections.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
+
+
+/*
+ * ★V8 リッチメニュー「切替のつながり」（Pencil `wxIQ7`）。
+ *
+ * 読み込み（古い応答を捨てる）・404 と失敗の分け方・アカウント違いの扱い・つながりの調べ方
+ * （保存済みのページと切替ボタンだけから、戻れない・届かない・切替先なしを見る）は今の画面
+ * （app/rich-menus/connections/page.tsx）と同じ。見せ方を絵に合わせた：
+ * 左に段「つながりの図」（メニューのカードとタブの行き来）と「よくある事故の見張り」、
+ * 右の列に操作（編集する・切替のつながり・…）と「いまの状態」。
+ * 受け付ける URL：`/rich-menus/connections?id=<メニュー>`。
+ */
 
 const MAX_PAGES = 10
 
@@ -166,7 +168,7 @@ function Connections() {
   const taps = group.monthlyStats?.taps ?? null
 
   const menuItems: ActionMenuItem[] = [
-    { id: 'open', label: 'メニューを開く', external: true, href: editHref, onSelect: () => router.push(editHref) },
+    { id: 'open', label: 'メニューを開く', external: false, href: editHref, onSelect: () => router.push(editHref) },
     { id: 'list', label: 'メニュー一覧へ', onSelect: () => router.push('/rich-menus') },
   ]
 
@@ -194,7 +196,7 @@ function Connections() {
       boardId="wxIQ7"
       title={`切替のつながり：${group.name}`}
       help="タブで行き来できるメニューの関係"
-      identity={<Link href="/rich-menus" className={styles.backLink}>← リッチメニューへ</Link>}
+      identity={<></>}
       preview={aside}
       footerActions={<>
         <Button href="/rich-menus">メニュー一覧へ</Button>

@@ -1,4 +1,4 @@
-// @vitest-environment happy-dom
+
 import React from 'react'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -6,6 +6,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Dialog from './dialog'
 import ConfirmDialog from './confirm-dialog'
+// @vitest-environment happy-dom
 
 /*
  * 司令塔 2026-10-07：小窓だけの絵（MyJP7・F1LK4e・CVz5d など）は窓の頭が共通の値より

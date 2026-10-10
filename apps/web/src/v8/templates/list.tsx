@@ -1,8 +1,9 @@
 'use client'
+import { useDeferredDelete } from '@/lib/use-deferred-delete';
+
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import { canManageRole } from '@/lib/staff-role';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
-
 import BulkBar from '@/components/shared/bulk-bar'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
@@ -93,6 +94,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
 
 /*
  * ★V8 テンプレートの一覧（Pencil「★V8 画面の地図」のテンプレートの行）。
@@ -314,9 +316,10 @@ export default function TemplatesListV8() {
   /* 右クリックされた行（「…」と同じ項目を出す）。 */
   const [contextId, setContextId] = useState<string | null>(null)
 
-  const [duplicateTarget, setDuplicateTarget] = useState<Template | null>(null)
+  const duplicateLock = useRef(false)
+  const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const [duplicating, setDuplicating] = useState(false)
-  const [duplicateError, setDuplicateError] = useState('')
+  const setDuplicateError =(message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
 
   /** まとめて削除の確認。対象は「使っていない」ものだけ。 */
   const [pendingBulkDelete, setPendingBulkDelete] = useState<Template[] | null>(null)
@@ -340,7 +343,6 @@ export default function TemplatesListV8() {
     setBlockedUsage(null)
     setPendingBulkDelete(null)
     setMoveIds(null)
-    setDuplicateTarget(null)
     setOpenMenuId(null)
     setSelectedIds(new Set())
   }, [selectedAccountId])
@@ -573,7 +575,7 @@ export default function TemplatesListV8() {
       return next
     })
   }
-  const pageIds = shownItems.map((t) => t.id)
+  const pageIds = duplicateFeedback.order( shownItems, templates).map((t) => t.id)
   const allOnPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
   const toggleAllOnPage = () => {
     setSelectedIds((current) => {
@@ -723,8 +725,10 @@ export default function TemplatesListV8() {
   }
 
   /* 複製。複製の口は無いので、同じ内容で「下書き」として新しく作る。 */
-  const runDuplicate = async () => {
+  const runDuplicate = async (duplicateTarget: Template) => {
+    if (duplicateLock.current) return
     if (!duplicateTarget) return
+    duplicateLock.current = true
     setDuplicating(true)
     setDuplicateError('')
     const source = duplicateTarget
@@ -743,8 +747,9 @@ export default function TemplatesListV8() {
         setDuplicateError('複製できませんでした。状態を読み直してからお試しください。')
         return
       }
-      setDuplicateTarget(null)
-      notifyToast(`「${source.name}」をコピーしました（下書きで作られました）`, { tone: 'success' })
+
+      duplicateFeedback.mark(source.id, result.data.id)
+      notifyToast('複製しました', { tone: 'success' })
       await Promise.all([load(), loadFolders()])
     } catch (reason) {
       const fieldFailure = saveErrors.capture(reason)
@@ -756,6 +761,7 @@ export default function TemplatesListV8() {
           : '複製できませんでした。状態を読み直してからお試しください。',
       ) }
     } finally {
+      duplicateLock.current = false
       setDuplicating(false)
     }
   }
@@ -807,7 +813,7 @@ export default function TemplatesListV8() {
       {
         id: 'usage',
         label: '使っている所を見る',
-        external: true,
+        external: false,
         href: detailHref(t), onSelect: () => withViewTransition(() => router.push(detailHref(t))),
       },
       {
@@ -822,7 +828,7 @@ export default function TemplatesListV8() {
           icon: <Copy size={14} aria-hidden="true" />,
           onSelect: () => {
             setDuplicateError('')
-            setDuplicateTarget(t)
+            void runDuplicate(t)
           },
         },
         {
@@ -869,7 +875,7 @@ export default function TemplatesListV8() {
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
     : []
 
@@ -1155,7 +1161,7 @@ export default function TemplatesListV8() {
               </TableHeadRow>
             </thead>
             <RovingTbody>
-              {shownItems.map((t, saveFieldIndex) => {
+              {duplicateFeedback.order(shownItems, templates).map((t, saveFieldIndex) => {
                 const publish = publishStateOf(t)
                 const kindLabel = t.question ? 'question' : t.messageType
                 const excerpt = excerptOf(t)
@@ -1339,7 +1345,7 @@ export default function TemplatesListV8() {
         open={pickerOpen}
         title="どの種類を作りますか"
         designNode="I4jUUW"
-        designWidth={1060}
+        designWidth={960}
         designTop={200}
         designHeaderPadding="24px 24px 0"
         designHeaderHeight={48}
@@ -1547,20 +1553,7 @@ export default function TemplatesListV8() {
       </ConfirmDialog>
 
       {/* 複製の確認窓。コピーは下書きで作る（公開は別の操作）。 */}
-      <ConfirmDialog
-        open={duplicateTarget !== null}
-        title={duplicateTarget ? `「${duplicateTarget.name}」を複製しますか？` : ''}
-        description="同じ本文のテンプレートをもう1つ作ります。コピーは「下書き」で作られるので、確認してから公開してください。名前に「（コピー）」を付けます。"
-        confirmLabel={duplicating ? '複製中…' : '複製する'}
-        busy={duplicating}
-        error={duplicateError}
-        onConfirm={() => runDuplicate()}
-        onCancel={() => {
-          if (duplicating) return
-          setDuplicateTarget(null)
-          setDuplicateError('')
-        }}
-      />
+      <></>
 
       {folderDialogOpen && (
         <FolderAddDialog
@@ -1629,7 +1622,7 @@ export default function TemplatesListV8() {
                   variant="secondary"
                   onClick={() => {
                     setDuplicateError('')
-                    setDuplicateTarget(activeTemplate)
+                    void runDuplicate(activeTemplate)
                   }}
                 >
                   複製する

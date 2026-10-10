@@ -397,7 +397,7 @@ function FriendAddPublish() {
         </>
       ) : (
         /* 閲覧のみ：変える操作（保存・有効にする）は置かない。 */
-        <Button href="/friend-add-settings">一覧へ戻る</Button>
+        <></>
       )}
     >
       {!canEdit ? <p className={styles.viewerBand} role="status">閲覧のみで見ています。有効にする操作はオーナーか管理者に頼んでください。</p> : null}

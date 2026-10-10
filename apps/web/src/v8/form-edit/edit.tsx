@@ -925,20 +925,9 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       identity={(
         /* 絵は矢印も文字の1つ（「← 回答フォームへ」）。 */
         host ? (
-          <Link
-            href={host.backHref}
-            className={styles.backLink}
-            onClick={(event) => {
-              event.preventDefault()
-              requestUnsavedAction(host.onCancel)
-            }}
-          >
-            {'← 回答フォームへ'}
-          </Link>
+          <></>
         ) : (
-          <Link href="/form-submissions" className={styles.backLink}>
-            {'← 回答フォームへ'}
-          </Link>
+          <></>
         )
       )}
       steps={(

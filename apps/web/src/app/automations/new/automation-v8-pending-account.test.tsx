@@ -1,8 +1,12 @@
-// @vitest-environment happy-dom
+
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
+import { notifyToast } from '@/components/shared/toast'
+import { api } from '@/lib/api'
+import { NewAutomationV8 } from '@/v8/automations/create/create'
+// @vitest-environment happy-dom
 
 // 実ブラウザではV8のガードが保存・送信中の切替を止める。
 // それとは別に、Provider側の選択が変わった場合も遅い応答を他店へ混ぜない。
@@ -61,9 +65,6 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 vi.mock('@/components/shared/toast', () => ({ notifyToast: vi.fn() }))
-import { notifyToast } from '@/components/shared/toast'
-import { api } from '@/lib/api'
-import { NewAutomationV8 } from '@/v8/automations/create/create'
 
 function ok<T>(data: T) { return { success: true as const, data } }
 function draft(accountId = 'account-1') {

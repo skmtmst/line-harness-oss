@@ -1789,11 +1789,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               onReload={acceptLatestAndContinue}
             />
           </div>
-        ) : null}</>} identity={host ? (
-          <button type="button" className={styles.backLink} onClick={host.onCancel}>← リッチメニューへ</button>
-        ) : <Link href="/rich-menus" className={styles.backLink}>
-          ← リッチメニューへ
-        </Link>} steps={<Steps label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} />}  preview={renderRail()} previewCompactWhenNarrow footerActions={
+        ) : null}</>} identity={undefined} steps={<Steps label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} />}  preview={renderRail()} previewCompactWhenNarrow footerActions={
           host ? (
             <>
               <Button type="button" onClick={host.onCancel} disabled={busy}>キャンセル</Button>
@@ -2479,9 +2475,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               : '予約の時点の内容で公開します。予約の確認・取り消しは編集画面からできます。'}
           </p>
           <div className={styles.pageTools}>
-            <Button href="/rich-menus" variant="primary">
-              一覧へ戻る
-            </Button>
+            <Button href="/rich-menus" variant="primary">一覧へ戻る</Button>
             {group ? <Button href={`/rich-menus/edit?id=${group.id}`}>編集画面を開く</Button> : null}
           </div>
         </Card>

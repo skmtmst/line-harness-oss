@@ -1,6 +1,6 @@
 'use client'
 
-import { dialogWidth } from './panel-sizes'
+
 import { isDeleteConfirmation, normalizeDeleteTitle } from './delete-confirmation'
 import React, { useContext, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -12,6 +12,7 @@ import styles from './dialog.module.css'
 import { useFormInputDirty } from './form-input-dirty'
 import { useOverlayDiscard } from './overlay-discard'
 import { useStepMotion } from './use-step-motion'
+import { dialogWidth } from './destination-policy'
 
 export type DialogProps = {
   open: boolean

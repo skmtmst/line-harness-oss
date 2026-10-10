@@ -1,4 +1,5 @@
 'use client'
+
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -25,7 +26,6 @@ import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import styles from './create.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 外部連携「送り先を作る」（Pencil `hsD8e`、競合 `NGh7b`）。
@@ -241,6 +241,7 @@ function WebhooksCreateV8Inner() {
 
         { if (!fieldFailure)
 
+
         setError('送り先は作れましたが、まだ止められていません（いまは動いています）。もう一度「下書きを保存」を押すと、止めるところだけやり直します。') }
         setSaving(false)
       }
@@ -300,6 +301,7 @@ function WebhooksCreateV8Inner() {
 
       { if (!fieldFailure)
 
+
       setError(cause instanceof Error ? cause.message : '保存できませんでした。もう一度お試しください。') }
       setSaving(false)
     }
@@ -315,7 +317,7 @@ function WebhooksCreateV8Inner() {
         boardId="hsD8e"
         title="送り先を作る"
         help="友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。"
-        footerActions={<Button href="/webhooks">一覧へ戻る</Button>} dirty={false}
+        footerActions={<></>} dirty={false}
       >
         <Notice tone="info">{permissionDeniedMessage('store')}</Notice>
       </CreatePage></SaveErrorScope>

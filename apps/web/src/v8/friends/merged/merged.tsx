@@ -248,7 +248,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
                     { id: 'accounts', label: open ? '登録アカウントを閉じる' : '登録アカウントを見る', onSelect: () => setExpanded(open ? null : row.identityKey) },
                   ]
                   const main = (
-                    <Tr key={row.identityKey} className={styles.row}>
+                    <Tr key={row.identityKey} className={styles.row} onOpen={personId ? () => onOpen(personId) : undefined}>
                       <Td className={styles.td}>
                         <div className={styles.person}>
                           {personId ? (

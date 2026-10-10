@@ -1,4 +1,5 @@
 'use client'
+
 import { useListUrlJsonValue } from '@/components/shared/list-url-state'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
@@ -50,7 +51,6 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 成果とアフィリエイト「案件」（板 `h7dmB`）。

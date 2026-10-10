@@ -1,4 +1,5 @@
 'use client'
+
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Ban, CircleX, Mail, RotateCw } from 'lucide-react'
@@ -34,7 +35,6 @@ import styles from './screen.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 LINE通知 送れなかったもの（板 DrwMm）・記録（板 PZBVb）。

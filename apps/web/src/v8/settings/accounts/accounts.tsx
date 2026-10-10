@@ -163,11 +163,11 @@ export default function AccountsV8() {
   /** 行の「…」の中身：詳細・接続をもう一度確かめる・引き継ぎ・アーカイブ（戻す）。 */
   const menuItems = (account: LineAccount): ActionMenuItem[] => {
     const items: ActionMenuItem[] = [
-      { id: 'detail', label: '詳細', external: true, href: `/accounts/detail?id=${account.id}`, onSelect: () => { setOpenMenuId(null); router.push(`/accounts/detail?id=${account.id}`) } },
+      { id: 'detail', label: '詳細', external: false, href: `/accounts/detail?id=${account.id}`, onSelect: () => { setOpenMenuId(null); router.push(`/accounts/detail?id=${account.id}`) } },
       { id: 'recheck', label: '接続をもう一度確かめる', disabled: busy, onSelect: () => void recheck(account) },
     ]
     if (!canManage) return items
-    items.push({ id: 'handover', label: '引き継ぎ', external: true, href: `/accounts/handover?id=${account.id}`, onSelect: () => { setOpenMenuId(null); router.push(`/accounts/handover?id=${account.id}`) } })
+    items.push({ id: 'handover', label: '引き継ぎ', external: false, href: `/accounts/handover?id=${account.id}`, onSelect: () => { setOpenMenuId(null); router.push(`/accounts/handover?id=${account.id}`) } })
     items.push(account.archivedAt
       ? { id: 'restore', label: 'アーカイブから戻す', dividerBefore: true, disabled: busy, onSelect: () => { setOpenMenuId(null); setDialogError(''); setRestoreTarget(account) } }
       : { id: 'archive', label: 'アーカイブ', tone: 'danger', dividerBefore: true, disabled: busy, onSelect: () => { setOpenMenuId(null); setDialogError(''); setArchiveReason(''); setArchiveTarget(account) } })

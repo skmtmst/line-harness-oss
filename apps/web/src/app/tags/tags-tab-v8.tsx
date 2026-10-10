@@ -554,7 +554,7 @@ export default function TagsTabV8({
         label: item.label,
         danger: item.tone === 'danger',
         disabled: item.disabled,
-        onSelect: () => item.onSelect(),
+        onSelect: () => item.onSelect?.(),
       })
     }
     for (const item of rowMenuItems(tag)) {

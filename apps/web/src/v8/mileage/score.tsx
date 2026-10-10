@@ -569,7 +569,7 @@ export default function ScoreTab() {
                           {
                             id: 'friend',
                             label: 'この人を見る',
-                            external: true,
+                            external: false,
                             href: `/friends/detail?id=${encodeURIComponent(item.friendId)}`, onSelect: () => router.push(`/friends/detail?id=${encodeURIComponent(item.friendId)}`),
                           },
                         ]}
@@ -641,7 +641,7 @@ export default function ScoreTab() {
                 open={ruleMenuId === '__head'}
                 onOpenChange={(next) => setRuleMenuId(next ? '__head' : null)}
                 items={[
-                  { id: 'edit', label: '決めごとの編集画面を開く', external: true, href: '/mileage/score-rules', onSelect: () => router.push('/mileage/score-rules') },
+                  { id: 'edit', label: '決めごとの編集画面を開く', external: false, href: '/mileage/score-rules', onSelect: () => router.push('/mileage/score-rules') },
                   {
                     id: 'stop',
                     label: '公開中のルールを止める',
@@ -697,7 +697,7 @@ export default function ScoreTab() {
                             open={ruleMenuId === rule.id}
                             onOpenChange={(next) => setRuleMenuId(next ? rule.id : null)}
                             items={[
-                              { id: 'edit', label: '編集', external: true, href: '/mileage/score-rules', onSelect: () => router.push('/mileage/score-rules') },
+                              { id: 'edit', label: '編集', external: false, href: '/mileage/score-rules', onSelect: () => router.push('/mileage/score-rules') },
                               {
                                 id: 'remove',
                                 label: '外す',
@@ -918,7 +918,6 @@ export function ScoreAdjustDialog({
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-
 
       setError(actionScoreAdjustmentErrorMessage(caught)) }
     } finally {

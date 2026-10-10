@@ -210,7 +210,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   const rowMenuItems = (search: SavedSearch): ActionMenuItem[] => {

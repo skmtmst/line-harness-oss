@@ -699,7 +699,7 @@ function FriendAddList() {
             label={label}
             className={styles.menuButton}
             note={rule.isFallback && canEdit ? 'この設定は消せません（いちばん最後の受け皿）' : undefined}
-            items={rowMenuItems(rule).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect() } }))}
+            items={rowMenuItems(rule).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect?.() } }))}
             open={openMenuId === rule.id}
             onOpenChange={(next) => setOpenMenuId(next ? rule.id : null)}
           />
@@ -797,7 +797,7 @@ function FriendAddList() {
                   onDragEnter={() => liveOrder.enter(rule.id)}
                   onDragOver={dragId ? (event) => event.preventDefault() : undefined}
                   onDrop={dragId ? () => dropOn(liveOrder.dropTarget(rule.id)) : undefined}
-                >
+                 href={editHref(rule.id)}>
                   <Td
                     className={styles.colOrder}
                     draggable={canReorder}
@@ -831,7 +831,7 @@ function FriendAddList() {
                 </Tr>
               ))}
               {sinkRule ? (
-                <Tr key={sinkRule.id} className={`${styles.row} ${styles.sinkRow}`} data-table-layout="columns" data-row-id={sinkRule.id}>
+                <Tr key={sinkRule.id} className={`${styles.row} ${styles.sinkRow}`} data-table-layout="columns" data-row-id={sinkRule.id} href={editHref(sinkRule.id)}>
                   <Td className={styles.colOrder}>
                     <span className={styles.orderBox} title="いちばん最後に動く・動かせない">
                       <Lock size={14} aria-hidden="true" className={styles.lock} />

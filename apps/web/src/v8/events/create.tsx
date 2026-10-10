@@ -1,4 +1,5 @@
 'use client'
+
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Globe, User, Users, X } from 'lucide-react'
@@ -24,7 +25,6 @@ import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 イベント予約「イベントを作る」（Pencil `d4adD4`）。
@@ -229,7 +229,7 @@ function EventsCreateV8Inner() {
         boardId="d4adD4"
         title="イベントを作る"
         help="中身・回と定員・申し込みのきまりを決めます。下書きのあいだは、お客さまには見えません。"
-        footerActions={<Button href="/events">一覧へ戻る</Button>} dirty={false}
+        footerActions={<></>} dirty={false}
       >
         <Notice tone="info">{permissionDeniedMessage('store')}</Notice>
       </CreatePage></SaveErrorScope>

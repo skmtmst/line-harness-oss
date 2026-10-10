@@ -1,4 +1,5 @@
 'use client'
+
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useStaffRole } from '@/lib/staff-role'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
@@ -292,7 +293,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   if (loadState === 'error') {
     return <SaveErrorScope errors={saveErrors}><TargetMissing kind="error" title="リッチメニューを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void loadGroup()} /></SaveErrorScope>
   }
-  const backLink = <Link href="/rich-menus" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />リッチメニューへ</Link>
+  const backLink = <></>
   if (!group) return <SaveErrorScope errors={saveErrors}><div className={styles.loadingHead}>{backLink}<DetailLoading /></div></SaveErrorScope>
 
   const audience = audienceOf(group)

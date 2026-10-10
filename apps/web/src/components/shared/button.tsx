@@ -1,3 +1,4 @@
+
 import Link from 'next/link'
 import type { LinkProps } from 'next/link'
 import { Check, LoaderCircle, ArrowUpRight } from 'lucide-react'
@@ -61,6 +62,7 @@ type LinkButtonProps = CommonProps &
   Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'aria-disabled' | 'children' | 'className' | 'disabled' | 'href'> & {
     external?: boolean
     href: LinkProps['href']
+    external?: boolean
     disabled?: never
     'aria-disabled'?: never
   }
@@ -97,7 +99,8 @@ export default function Button(props: ButtonProps) {
   const classes = [styles.button, styles[variant], styles[size], props.textTone === 'ink' ? styles.textInk : null, props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, className: _className, href, external, size: _size, variant: _variant, align, textTone: _textTone, presentation, ...linkProps } = props
+    const { children, className: _className, href, external, size: _size, variant: _variant, align, textTone: _textTone, presentation, external, ...linkProps } = props
+    const newTab = external || linkProps.target === '_blank'
     return (
       <Link href={href} className={classes} data-align={align} data-presentation={presentation} {...linkProps} target={external ? '_blank' : linkProps.target} rel={external ? 'noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
         {children}

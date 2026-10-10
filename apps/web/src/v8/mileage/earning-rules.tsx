@@ -1,4 +1,5 @@
 'use client'
+
 import { jstDateOffset } from '@/lib/jst-datetime'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
@@ -763,7 +764,7 @@ export default function EarningRulesTab() {
               {
                 id: 'edit',
                 label: '編集',
-                external: true,
+                external: false,
                 href: `/mileage/earning-rules/edit?id=${encodeURIComponent(rule.id)}`, onSelect: () => router.push(`/mileage/earning-rules/edit?id=${encodeURIComponent(rule.id)}`),
               },
               {

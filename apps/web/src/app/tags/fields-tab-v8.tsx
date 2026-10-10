@@ -280,7 +280,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   /** 行の「…」。編集・移行・削除。 */

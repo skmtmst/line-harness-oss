@@ -38,7 +38,7 @@ function pages(dir: string, out: string[] = []): string[] {
  * `page.tsx` だけを読むと「帯が無い」ことになり、直しようがない。
  */
 function readWithParts(file: string, depth = 0, seen = new Set<string>()): string {
-  if (depth > 2 || seen.has(file)) return ''
+  if (depth > 8 || seen.has(file)) return ''
   seen.add(file)
   let source: string
   try {

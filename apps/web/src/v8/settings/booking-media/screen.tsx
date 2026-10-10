@@ -1,6 +1,6 @@
 'use client'
-import Toggle from '@/components/shared/toggle';
 
+import Toggle from '@/components/shared/toggle';
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { notifySaved } from '@/components/shared/toast'
 import CopyTextButton from '@/components/shared/copy-text-button'
@@ -432,8 +432,8 @@ export default function BookingMediaPage() {
                           icon: row.closeOnBooking ? <Check size={14} aria-hidden="true" /> : undefined,
                           onSelect: () => setRow(row.code, { closeOnBooking: !row.closeOnBooking }),
                         }] : []),
-                        ...(row.pageUrl ? [{ id: 'open-page', label: '店舗ページを開く', external: true, href: row.pageUrl!, onSelect: () => { window.open(row.pageUrl!, '_blank', 'noopener,noreferrer') } }] : []),
-                        ...(row.loginUrl ? [{ id: 'open-login', label: '管理画面を開く', external: true, href: row.loginUrl!, onSelect: () => { window.open(row.loginUrl!, '_blank', 'noopener,noreferrer') } }] : []),
+                        ...(row.pageUrl ? [{ id: 'open-page', label: '店舗ページを開く', external: true, href: row.pageUrl!, onSelect:row.pageUrl! }] : []),
+                        ...(row.loginUrl ? [{ id: 'open-login', label: '管理画面を開く', external: true, href: row.loginUrl!, onSelect:row.loginUrl! }] : []),
                       ]}
                     />
                   ) : null}

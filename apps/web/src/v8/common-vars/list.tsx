@@ -809,7 +809,7 @@ function CommonVarsListInner() {
       label: entry.label,
       danger: entry.tone === 'danger',
       disabled: entry.disabled,
-      onSelect: () => entry.onSelect(),
+      onSelect: () => entry.onSelect?.(),
     }))
     : []
 

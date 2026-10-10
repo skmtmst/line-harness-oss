@@ -1119,7 +1119,7 @@ function EditCommonVarV8Inner() {
           ) : null}
         </>
       ) : undefined}
-      identity={<Link href="/contents/vars" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />共通情報へ</Link>}
+      identity={<></>}
       preview={preview}
       destructive={canWrite && item ? (
         <Button variant="danger" type="button" onClick={() => void openDelete()}>

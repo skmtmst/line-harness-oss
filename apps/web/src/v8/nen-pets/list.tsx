@@ -201,9 +201,9 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
   const friendHref = `/friends/detail?id=${encodeURIComponent(pet.owner.friendId)}`
   const items: ActionMenuItem[] = [
     ...(canEdit ? [{ id: 'edit', label: 'ペットの情報を直す', onSelect: onEdit }] : []),
-    { id: 'owner', label: '飼い主を開く', external: true, href: friendHref, onSelect: () => { router.push(friendHref) } },
+    { id: 'owner', label: '飼い主を開く', external: false, href: friendHref, onSelect: () => { router.push(friendHref) } },
     /* マイページの更新を頼む送信の口は無いので、受信箱でこの飼い主とのトークを開いて頼む。 */
-    { id: 'nudge', label: 'マイページで更新を促す', external: true, href: `/chats?friend=${encodeURIComponent(pet.owner.friendId)}`, onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(pet.owner.friendId)}`) } },
+    { id: 'nudge', label: 'マイページで更新を促す', external: false, href: `/chats?friend=${encodeURIComponent(pet.owner.friendId)}`, onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(pet.owner.friendId)}`) } },
   ]
   const updated = pet.weightKg == null ? emptyValue('unknown') : monthDay(pet.weightUpdatedAt)
   return (

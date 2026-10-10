@@ -1,6 +1,6 @@
 'use client'
-import Toggle from '@/components/shared/toggle';
 
+import Toggle from '@/components/shared/toggle';
 import { notifySaved } from '@/components/shared/toast'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
@@ -330,6 +330,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
 
       if (isCurrentRequest()) { if (!fieldFailure)
 
+
  setError(describeFriendAddFailure(caught, '設定', 'load').message) }
     } finally {
       if (isCurrentRequest()) setLoading(false)
@@ -449,7 +450,6 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       } else {
         { if (!fieldFailure)
 
-
         setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store')) }
       }
       return null
@@ -494,7 +494,6 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       if (loadRequestRef.current !== request) return
       const fieldFailure = saveErrors.capture(caught)
       { if (!fieldFailure)
-
 
       setError(describeFriendAddFailure(caught, '設定', 'load').message) }
     } finally {
@@ -544,7 +543,6 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       if (loadRequestRef.current !== request) return
       const fieldFailure = saveErrors.capture(saveFailure)
       { if (!fieldFailure)
-
 
       setError('テストを実行できませんでした。') }
     } finally {
@@ -614,7 +612,6 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       if (loadRequestRef.current !== request) return
       const fieldFailure = saveErrors.capture(saveFailure)
       { if (!fieldFailure)
-
 
       setError('有効化できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
@@ -717,6 +714,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       notifyToast('複製した下書きを追加しました')
       router.push(`/friend-add-settings?kind=${rule.friendKind}&highlight=${encodeURIComponent(response.data.id)}&status=draft`)
     } catch (cause) { if (!saveErrors.capture(cause))
+
  setError('複製できませんでした。保存済みの内容を読み直してお試しください。') }
     finally { setDuplicating(false) }
   }
@@ -778,7 +776,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         </>
       ) : (
         /* 閲覧のみ：変える操作（保存・次へ・有効にする）は置かない。 */
-        <Button href="/friend-add-settings">一覧へ戻る</Button>
+        <></>
       )} dirty={false}
     >
       {!canEdit ? (

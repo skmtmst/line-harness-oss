@@ -222,7 +222,6 @@ export default function RankSettingsV8({
       } else {
         { if (!fieldFailure)
 
-
         setError(describeApiFailure(caught, 'ランクの削除', {
           scope: 'store',
         })) }
@@ -255,7 +254,6 @@ export default function RankSettingsV8({
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-
 
       setError(describeApiFailure(caught, 'ECへの同期', {
         scope: 'store',
@@ -351,7 +349,7 @@ export default function RankSettingsV8({
                     {/* 行の右端は「…」（タグを開く・ランクを削除する）。1つの機能の印にしない。 */}
                     <RowActions
                       subjectName={`ランク「${label}」`}
-                      menuItems={row.tagId ? [{ id: 'tag', label: 'タグを開く', external: true, href: `/tags/edit?id=${encodeURIComponent(row.tagId ?? '')}`, onSelect: () => router.push(`/tags/edit?id=${encodeURIComponent(row.tagId ?? '')}`) }] : []}
+                      menuItems={row.tagId ? [{ id: 'tag', label: 'タグを開く', external: false, href: `/tags/edit?id=${encodeURIComponent(row.tagId ?? '')}`, onSelect: () => router.push(`/tags/edit?id=${encodeURIComponent(row.tagId ?? '')}`) }] : []}
                       destructiveItem={readonly ? undefined : {
                         id: 'delete',
                         label: 'ランクを削除する',

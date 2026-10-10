@@ -1,12 +1,18 @@
+
+import React, { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
+import FormsListV8 from './list'
+
+;
 // @vitest-environment happy-dom
 /*
  * V8 回答フォーム一覧（src/v8/forms）の動きの試験。BEHAVIOR.md の「今までと変えたところ」を守る。
  * 未分類の件数・閲覧のみの帯と押せない「フォルダを追加」・行の「…」の読み上げ名・1152 で保存先を出さない・表示件数 10/20/50。
  */
-import React, { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -57,11 +63,7 @@ vi.mock('@/lib/use-narrow-viewport', () => ({
   useNarrowViewport: () => narrow.value,
 }))
 
-import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
-import type { StaffMember } from '@line-crm/shared'
-import FormsListV8 from './list'
-
-;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 let host: HTMLDivElement
 let root: Root
@@ -183,7 +185,7 @@ describe('V8 回答フォーム一覧', () => {
     expect(screen.getByRole('menuitem', { name: '集まった回答' })).toBeTruthy()
     expect(screen.queryByRole('menuitem', { name: '編集' })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: '削除' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '「来店アンケート」の詳細を見る' }))
+    fireEvent.click(host.querySelector('[data-row-id="f-1"]')!)
     await flush()
     expect(screen.queryByRole('button', { name: 'フォーム名を変更する' })).toBeNull()
     expect(screen.queryByText('編集する')).toBeNull()

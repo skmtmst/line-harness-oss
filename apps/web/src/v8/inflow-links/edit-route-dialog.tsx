@@ -23,6 +23,7 @@ import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import EditorSurface from '@/components/shared/editor-surface'
 
 /*
  * ★V8 の一覧（src/v8/inflow-links/list.tsx）用の写し。元は
@@ -38,6 +39,7 @@ interface MessageTemplate {
 }
 
 interface Props {
+  surface?: 'page' | 'dialog' | 'inline'
   route: EntryRoute | null
   pools: TrafficPool[]
   scenarios: Scenario[]
@@ -72,6 +74,7 @@ export default function EditRouteModal({
   initialRefCode,
   poolMemberNames,
   accountId,
+  surface,
   onClose,
   onSaved,
 }: Props) {
@@ -173,7 +176,6 @@ export default function EditRouteModal({
       // 400系はAPIの理由、403・5xxは運用の言葉へ写す（WRITE-01）。
       { if (!fieldFailure)
 
-
       setError(withPermissionFailure(err, describeSaveFailure(err), 'store')) }
     } finally {
       // 失敗時に「保存中…」のまま固まらないよう、必ず戻す。
@@ -193,7 +195,7 @@ export default function EditRouteModal({
   // R270: 作成と同じくフォルダは任意。空欄は未分類のまま保存する。
   const saveDisabled = submitting
   return (
-    <SaveErrorScope errors={saveErrors}><Dialog
+    <SaveErrorScope errors={saveErrors}><EditorSurface surface={surface}
       open
       title={isNew ? '新規リファラルリンク' : 'リファラルリンク編集'}
       busy={submitting}
@@ -351,6 +353,6 @@ export default function EditRouteModal({
       <CouponSettings accountId={route?.lineAccountId ?? accountId} disabled={submitting}
         value={{ couponEnabled: form.couponEnabled ?? false, couponAssetId: form.couponAssetId ?? null, couponAudience: form.couponAudience ?? 'new_friends' }}
         onChange={(next) => { setForm((current) => ({ ...current, ...next })); setFieldErrors((current) => ({ ...current, 'route-coupon': '' })) }} />
-    </Dialog></SaveErrorScope>
+    </EditorSurface></SaveErrorScope>
   )
 }

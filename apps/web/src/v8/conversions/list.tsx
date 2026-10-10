@@ -265,15 +265,15 @@ function ListSkeleton() {
   )
 }
 
-export default function ConversionListV8({ accountId }: { accountId: string | null }) {
+export default function ConversionListV8({ accountId, editId }: { accountId: string | null; editId?: string | null }) {
   return (
     <Suspense fallback={<ListState kind="loading" />}>
-      <ConversionList accountId={accountId} />
+      <ConversionList accountId={accountId} editId={editId} />
     </Suspense>
   )
 }
 
-function ConversionList({ accountId }: { accountId: string | null }) {
+function ConversionList({ accountId, editId }: { accountId: string | null; editId?: string | null }) {
   const saveErrors = useSaveFormErrors()
   usePageTitle('コンバージョン')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
@@ -449,7 +449,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
     setIngestError('')
   }, [panelId, detailTarget])
 
-  const openEdit = (target: ConversionDefinitionListItem) => {
+  const beginEdit = (target: ConversionDefinitionListItem) => {
     if (!canEdit) return
     setDetailTarget(null)
     setEditTarget(target)
@@ -468,6 +468,11 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   }
 
   /* 編集を送る。開いたときの版をそのまま渡し、409 は上書きせずに読み直しを促す。 */
+  const openEdit = (target: ConversionDefinitionListItem) => router.push(`/conversions/edit?id=${encodeURIComponent(target.id)}`)
+  useEffect(() => {
+    const target = definitions?.items.find((item) => item.id === editId)
+    if (target) beginEdit(target)
+  }, [editId, definitions])
   const submitEdit = async () => {
     if (!editTarget || !editForm || editSaving || !canEdit) return
     const invalid = (field: string, message: string) => {
@@ -519,6 +524,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       setEditForm(null)
       setEditValueModeNotice(null)
       await load()
+      if (editId !== undefined) router.push('/conversions')
     } catch (error) {
       const fieldFailure = saveErrors.capture(error);
 
@@ -833,7 +839,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
     { id: 'usage', label: '使う場所を見る', onSelect: () => setPanelId(point.id) },
     ...(canEdit ? [
       { id: 'move', label: 'フォルダへ移す', onSelect: () => folderMove.open(point) },
-      { id: 'add-usage', label: '使う場所を足す', external: true, href: addUsageHref(point), onSelect: () => router.push(addUsageHref(point)) },
+      { id: 'add-usage', label: '使う場所を足す', external: false, href: addUsageHref(point), onSelect: () => router.push(addUsageHref(point)) },
       ...(point.status !== 'stopped' ? [{ id: 'edit', label: '編集する', onSelect: () => openEdit(point) }] : []),
       ...(point.state === 'draft'
         ? [{ id: 'publish', label: '公開する', disabled: publishing, onSelect: () => void publishDraft(point) }]
@@ -1166,7 +1172,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                           label={menuLabel}
                           open={openMenuId === point.id}
                           onOpenChange={(next) => setOpenMenuId(next ? point.id : null)}
-                          items={rowMenuItems(point).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect() } }))}
+                          items={rowMenuItems(point).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect?.() } }))}
                         />
                       </div>
                     </Td>
@@ -1194,25 +1200,55 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   const reportUnavailable = listUnavailable || reportFailed
   const delta = kpi.previousCount === null ? null : kpi.currentCount - kpi.previousCount
 
+  const editSurface = (<ConversionEditDialog surface={editId !== undefined ? 'page' : 'dialog'}
+          editTarget={editTarget}
+          setEditTarget={(target) => { setEditTarget(target); if (!target && editId) router.push('/conversions') }}
+          editForm={editForm}
+          setEditForm={(next) => {
+            const changed = typeof next === 'function' ? next(editForm) : next
+            if (editFieldIssue && editForm && changed) {
+              const fieldKeys: Record<string, keyof EditForm> = {
+                'cv-edit-name': 'name', 'cv-edit-url': 'targetUrl', 'cv-edit-value-mode': 'valueMode',
+                'cv-edit-value': 'fixedValue', 'cv-edit-window': 'deduplicationWindowDays',
+                'cv-edit-days': 'attributionDays', 'cv-edit-memo': 'exclusionMemo', 'cv-edit-exclusion': 'exclusion',
+              }
+              const key = fieldKeys[editFieldIssue.field]
+              if (key && editForm[key] !== changed[key]) setEditFieldIssue(null)
+            }
+            setEditForm(changed)
+          }}
+          editValueModeNotice={editValueModeNotice}
+          setEditValueModeNotice={setEditValueModeNotice}
+          editSaving={editSaving}
+          editError={editError}
+          editFieldIssue={editFieldIssue}
+          submitEdit={() => void submitEdit()}
+        />)
+  if (editId !== undefined) {
+    if (loading) return <ListState kind="loading" />
+    if (!canEdit || !editTarget) return <ListState kind="error" title="この成果地点を編集できません" description="権限と成果地点を確認してください。" />
+    return editSurface
+  }
+
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
-      skeleton
-      help={<>{"成果として数えるできごと（成果地点）を決めます。配信・流入・アフィリエイトの成果は、ここの数え方で集計します。"}{canEdit
+      help={canEdit
             ? '行の「…」から 編集・使う場所を見る・使う場所を足す・止める・複製。止めると、使っている配信や流入リンクでも数えなくなります。'
-            : '行の「…」から 中身と使う場所を見られます。止めると、使っている配信や流入リンクでも数えなくなります。'}</>}
+            : '行の「…」から 中身と使う場所を見られます。止めると、使っている配信や流入リンクでも数えなくなります。'}
       boardId="r6dJFy"
       headingSize="regular"
       title="コンバージョン"
-      actions={canExport ?
+      description="成果として数えるできごと（成果地点）を決めます。配信・流入・アフィリエイトの成果は、ここの数え方で集計します。"
+      actions={
         <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
-          <Download size={15} aria-hidden="true" />CSVで書き出す
-        </Button> : null
+          <Download size={15} aria-hidden="true" />CSV で書き出す
+        </Button>
       }
       stats={<>
         {!canEdit && role !== null ? (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
           </div>
         ) : null}
         {exportError ? <div className={styles.statsNotice}><Notice tone="warn">{exportError}</Notice></div> : null}
@@ -1314,31 +1350,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
           setReversalTarget={setReversalTarget}
           setReversalReason={setReversalReason}
           submitReversal={() => void submitReversal()}
-        />
-        <ConversionEditDialog
-          editTarget={editTarget}
-          setEditTarget={setEditTarget}
-          editForm={editForm}
-          setEditForm={(next) => {
-            const changed = typeof next === 'function' ? next(editForm) : next
-            if (editFieldIssue && editForm && changed) {
-              const fieldKeys: Record<string, keyof EditForm> = {
-                'cv-edit-name': 'name', 'cv-edit-url': 'targetUrl', 'cv-edit-value-mode': 'valueMode',
-                'cv-edit-value': 'fixedValue', 'cv-edit-window': 'deduplicationWindowDays',
-                'cv-edit-days': 'attributionDays', 'cv-edit-memo': 'exclusionMemo', 'cv-edit-exclusion': 'exclusion',
-              }
-              const key = fieldKeys[editFieldIssue.field]
-              if (key && editForm[key] !== changed[key]) setEditFieldIssue(null)
-            }
-            setEditForm(changed)
-          }}
-          editValueModeNotice={editValueModeNotice}
-          setEditValueModeNotice={setEditValueModeNotice}
-          editSaving={editSaving}
-          editError={editError}
-          editFieldIssue={editFieldIssue}
-          submitEdit={() => void submitEdit()}
-        />
+        />{editSurface}
       </>}
     >
       {listBody}

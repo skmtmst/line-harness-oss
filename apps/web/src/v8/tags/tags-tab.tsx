@@ -1,4 +1,6 @@
 'use client'
+import { useDeferredDelete } from '@/lib/use-deferred-delete';
+
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
@@ -67,8 +69,6 @@ import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 import { ListPager } from '@/components/templates/list-page'
-
-
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
@@ -170,6 +170,7 @@ function TagFolderDialog({
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
+
 
       setError(group ? 'フォルダを直せませんでした' : 'フォルダを追加できませんでした') }
     } finally {
@@ -506,8 +507,8 @@ export default function TagsTab({
       ]
     }
     const list: ActionMenuItem[] = [
-      { id: 'edit', label: '編集', external: true, href: `/tags/edit?id=${tag.id}`, onSelect: () => router.push(`/tags/edit?id=${tag.id}`) },
-      { id: 'copy', label: '複製して作る', external: true, href: `/tags/new?copy=${tag.id}`, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
+      { id: 'edit', label: '編集', external: false, href: `/tags/edit?id=${tag.id}`, onSelect: () => router.push(`/tags/edit?id=${tag.id}`) },
+      { id: 'copy', label: '複製して作る', external: false, href: `/tags/new?copy=${tag.id}`, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
       { id: 'move', label: 'フォルダへ移す', onSelect: () => setMenuMoveFor(tag.id) },
     ]
     if (tag.status === 'archived') return [{ id: 'restore', label: '保管から戻す', disabled: restoring, onSelect: () => { setRestoreError(''); setRestoreTarget(tag) } }]
@@ -556,7 +557,7 @@ export default function TagsTab({
         }
         continue
       }
-      list.push({ id: item.id, label: item.label, danger: item.tone === 'danger', disabled: item.disabled, onSelect: () => item.onSelect() })
+      list.push({ id: item.id, label: item.label, danger: item.tone === 'danger', disabled: item.disabled, onSelect: () => item.onSelect?.() })
     }
     return list
   }

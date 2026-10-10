@@ -26,7 +26,7 @@ export default function FolderDistributionDialog({ name, templates, templateFold
 }) {
   const [picked, setPicked] = useState(templates.map((row) => row.id))
   const [selected, setSelected] = useState<string[]>([])
-  return <Dialog open designNode="JSirC" designWidth={620} title={`フォルダ「${name}」の ${templates.length} 件を配る`}
+  return <Dialog open designNode="JSirC" designWidth={720} title={`フォルダ「${name}」の ${templates.length} 件を配る`}
     description="フォルダの中のひな形をまとめて、選んだアカウントへ配ります。"
     busy={busy} error={error} onCancel={onCancel}
     designHeaderPadding="24px 24px 8px" designContentPadding="8px 24px 20px"

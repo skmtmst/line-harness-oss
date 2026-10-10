@@ -1,6 +1,6 @@
 'use client'
-import Toggle from '@/components/shared/toggle';
 
+import Toggle from '@/components/shared/toggle';
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
@@ -359,7 +359,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
 
   const menuFor = (setting: NenCampaignSetting): ActionMenuItem[] => {
     const items: ActionMenuItem[] = []
-    if (canEdit) items.push({ id: 'edit', label: '編集', external: true, href: `/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`, onSelect: () => { router.push(`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`) } })
+    if (canEdit) items.push({ id: 'edit', label: '編集', external: false, href: `/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`, onSelect: () => { router.push(`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`) } })
     items.push({ id: 'preview', label: '中身を見る', onSelect: () => props.onPreviewCampaign(setting.campaignKey) })
     if (canEdit) {
       items.push({ id: 'test', label: 'テスト送信', disabled: props.testing !== null, onSelect: () => props.onTestSend(setting) })
@@ -442,7 +442,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
                 const timing = formatCampaignTiming(setting)
                 const audience = formatCampaignAudience(setting)
                 return (
-                  <Tr data-row-id={setting.campaignKey} key={setting.campaignKey} className={styles.row} data-table-layout="columns">
+                  <Tr data-row-id={setting.campaignKey} key={setting.campaignKey} className={styles.row} data-table-layout="columns" onOpen={() => props.onPreviewCampaign(setting.campaignKey)}>
                     <Td className={styles.colName}><FolderDotName>
                       {canEdit ? (
                         <Link href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className={styles.name} ><TruncatedText value={String(setting.label ?? '')} /></Link>
@@ -737,7 +737,7 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                 const views = metric?.articleOpened.value
                 const draft = column.publishedAt == null
                 return (
-                  <Tr data-row-id={column.id} key={column.id} className={styles.row} data-table-layout="columns" selected={props.selectedColumnId === column.id}>
+                  <Tr data-row-id={column.id} key={column.id} className={styles.row} data-table-layout="columns" selected={props.selectedColumnId === column.id} onOpen={() => props.onSelectColumn(column.id)}>
                     <Td className={styles.colName}><FolderDotName>
                       <span className={styles.nameStack}>
                         <button type="button" className={styles.name} title={column.title} onClick={() => props.onSelectColumn(column.id)}>{column.title}</button>

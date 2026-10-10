@@ -1,3 +1,4 @@
+
 import Link from 'next/link'
 import type { AnchorHTMLAttributes } from 'react'
 import { ArrowRight, ArrowUpRight } from 'lucide-react'
@@ -21,9 +22,10 @@ export default function TextLink({
   href: string
   children: React.ReactNode
   className?: string
+  external?: boolean
 }) {
   return (
-    <Link href={href} className={[styles.root, className].filter(Boolean).join(' ')} {...rest} target={external ? '_blank' : rest.target} rel={external ? 'noreferrer' : rest.rel}>
+    <Link href={href} target={external ? '_blank' : undefined} rel={external ? 'noreferrer' : undefined} className={[styles.root, className].filter(Boolean).join(' ')} {...rest} target={external ? '_blank' : rest.target} rel={external ? 'noreferrer' : rest.rel}>
       <span className={styles.label}>{children}</span>
       {external ? <ArrowUpRight size={12} aria-hidden="true" data-external-icon className={styles.arrow} /> : <ArrowRight size={12} aria-hidden="true" className={styles.arrow} />}
     </Link>

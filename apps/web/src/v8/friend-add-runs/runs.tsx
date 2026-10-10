@@ -1,4 +1,6 @@
 'use client'
+import { canManageRole } from '@/lib/staff-role';
+
 import SegmentedControl from '@/components/shared/segmented'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useListUrlValue } from '@/components/shared/list-url-state'

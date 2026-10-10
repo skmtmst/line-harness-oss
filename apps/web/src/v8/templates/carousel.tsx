@@ -1,6 +1,6 @@
 'use client'
-import { isOwnerOrAdmin } from '@/lib/staff-capability';
 
+import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import { notifySaved } from '@/components/shared/toast'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { tapExtrasError, type TapExtras } from '@line-crm/shared'
@@ -47,6 +47,7 @@ import styles from './question-new.module.css'
 import own from './carousel.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import InlineSettings from '@/components/shared/inline-settings'
 
 /*
  * ★V8 テンプレート「カルーセルを作る・編集」（Pencil `J60utH`）。
@@ -239,7 +240,6 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
 
           { if (!fieldFailure)
 
-
           setError('いまの中身を読み取れませんでした。保存すると上書きされます。') }
         }
       })
@@ -382,7 +382,20 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     return (
       <SaveErrorScope errors={saveErrors}><TemplateEditFrame boardId="J60utH" title="カルーセル" description="カルーセルの作成・変更はオーナーと管理者だけができます" side={null}>
         <p className={styles.note}>一覧で中身を確認できます。</p>
-        <Link href="/templates" className={styles.back}>一覧へ戻る</Link>
+        <></>
+      <InlineSettings open={actionsFor !== null && Boolean(panel?.actions[actionsFor ?? 0])} title="押されたときの動き" onClose={() => setActionsFor(null)}>
+        {actionsFor !== null && panel?.actions[actionsFor] ? (
+          <InlineActionList
+            actions={panel.actions[actionsFor].actions}
+            onChange={(next) => update(selectedIndex, { actions: panel.actions.map((a, j) => (j === actionsFor ? { ...a, actions: next } : a)) })}
+            tags={actionOptions.tags}
+            fields={actionOptions.fields}
+            marks={actionOptions.marks}
+            scenarios={actionOptions.scenarios}
+            vars={actionOptions.vars}
+          />
+        ) : null}
+      </InlineSettings>
       </TemplateEditFrame></SaveErrorScope>
     )
   }

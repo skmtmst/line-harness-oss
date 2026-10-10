@@ -309,7 +309,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
     if (!canEdit) return [{ id: 'open', label: '詳しく見る', onSelect: () => openMarkDetail(mark.id) }]
     if (mark.archivedAt) return [{ id: 'restore', label: '保管から戻す', disabled: restoring, onSelect: () => { setRestoreError(''); setRestoreTarget(mark) } }]
     return [
-      { id: 'edit', label: '編集', external: true, href: `/tags/marks/edit?id=${encodeURIComponent(mark.id)}`, onSelect: () => router.push(`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`) },
+      { id: 'edit', label: '編集', external: false, href: `/tags/marks/edit?id=${encodeURIComponent(mark.id)}`, onSelect: () => router.push(`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`) },
       {
         id: 'archive',
         label: '保管する',
@@ -331,7 +331,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   /* 帯は4つ。マークの数は一覧そのものから、人数は受信箱の集計から。 */

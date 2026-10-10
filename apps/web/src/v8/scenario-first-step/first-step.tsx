@@ -587,7 +587,7 @@ export default function ScenarioFirstStepV8() {
     <SaveErrorScope errors={saveErrors}><CreatePage
       boardId={narrow ? 'U5rxyH' : 'V6xAo'}
       title="1通目を設定"
-      identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
+      identity={<></>}
       steps={(
         <Steps
           label="シナリオ作成の進み方"

@@ -486,3 +486,6 @@
 /* headHeight/rowHeightを持つ列型でも、一覧の骨組みが高さを決める。 */
 [data-theme='v8'] :global([data-list-skeleton]) .frame[data-column-layout] .table > thead > tr[data-table-layout='columns'] { height: var(--tpl-list-head-h); min-height: var(--tpl-list-head-h); }
 [data-theme='v8'] :global([data-list-skeleton]) .frame[data-column-layout] .table > tbody > tr[data-table-layout='columns']:not(:has([colspan])) { height: var(--tpl-list-row-h); min-height: var(--tpl-list-row-h); }
+.row[data-highlighted] {
+  background: var(--color-accent-soft);
+}

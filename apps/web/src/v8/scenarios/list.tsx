@@ -1,7 +1,9 @@
 'use client'
+import { useDeferredDelete } from '@/lib/use-deferred-delete';
+import { useDetailPanelUrl } from '@/components/shared/detail-panel';
+
 import { canManageRole } from '@/lib/staff-role';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
-
 import StatusBadge from '@/components/shared/status-badge'
 import SharedStatusPill from '@/components/shared/status-pill'
 import { collectListRows } from '@/components/shared/collect-list-rows'
@@ -83,6 +85,8 @@ import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
+import { notifyToast } from '@/components/shared/toast'
 
 /*
  * ★V8 シナリオ配信の一覧（Pencil「★V8 画面の地図」のシナリオ配信の行：
@@ -144,6 +148,7 @@ export default function ScenariosListV8() {
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
 
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const router = useRouter()
   // 1152 の板（`wjfLe`）。板IDと道具の段の並びだけを切り替える。
   const narrow = useNarrowViewport()
@@ -189,17 +194,16 @@ export default function ScenariosListV8() {
   const [deleteError, setDeleteError] = useState('')
 
   /* 複製の窓（★V8 `Al4Ek`）。 */
-  const [duplicateTarget, setDuplicateTarget] = useState<ScenarioRow | null>(null)
-  const [duplicateName, setDuplicateName] = useState('')
+  const duplicateLock = useRef(false)
   const [duplicating, setDuplicating] = useState(false)
-  const [duplicateError, setDuplicateError] = useState('')
+  const setDuplicateError =(message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
 
   /* 行の「…」。開いている行のID。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。開いている行のID。 */
   const [pendingStop, setPendingStop] = useState<string[] | null>(null)
   const toggleBusyRef = useRef(false)
-  const [panelId, setPanelId] = useState<string | null>(null)
+  const [panelId, setPanelId] = useDetailPanelUrl('scenario')
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
   const [dragId, setDragId] = useState<string | null>(null)
   /** キーボードで動かした結果を読み上げる（live 領域）。 */
@@ -562,24 +566,24 @@ export default function ScenariosListV8() {
 
   /* ===== 複製（★V8 `Al4Ek`） ===== */
 
-  const openDuplicate = (s: ScenarioRow) => {
-    setDuplicateName(`${s.name} のコピー`)
-    setDuplicateError('')
-    setDuplicateTarget(s)
+  const openDuplicate = (s: ScenarioRow) => { void runDuplicate(s)
   }
 
-  const runDuplicate = async () => {
+  const runDuplicate = async (duplicateTarget: ScenarioRow) => {
+    if (duplicateLock.current) return
     if (!duplicateTarget || duplicating) return
-    const name = duplicateName.trim() || `${duplicateTarget.name} のコピー`
+    duplicateLock.current = true
+    const name = `${duplicateTarget.name}のコピー`
     setDuplicating(true)
     setDuplicateError('')
     try {
       const copyId = await duplicateScenario(duplicateTarget.id, name)
-      setDuplicateTarget(null)
+
+      notifyToast('複製しました', { tone: 'success' })
       void loadScenarios()
       void loadOverallTotal()
       void loadStats()
-      router.push(`/scenarios/detail?id=${copyId}`)
+      duplicateFeedback.mark(duplicateTarget.id, copyId)
     } catch (e) {
       if (e instanceof DuplicateAborted) {
         setDuplicateError(`複製が「${e.stage}」で止まりました。途中まで作成されたコピーが一覧に残っています。`)
@@ -588,22 +592,10 @@ export default function ScenariosListV8() {
       }
       void loadScenarios()
     } finally {
+      duplicateLock.current = false
       setDuplicating(false)
     }
   }
-
-  /** 複製の窓の「引き継ぐもの」：通の数と配信方式は対象のシナリオから書く。 */
-  const duplicateCarries = duplicateTarget
-    ? [
-        `メッセージ ${duplicateTarget.stepCount === undefined ? '' : `${duplicateTarget.stepCount} 通`}（質問を含む）`,
-        '開始のきっかけ',
-        'アクション',
-        '配信対象の条件',
-        '最後の1通の後',
-        `配信方式（${deliveryModeLabels[duplicateTarget.deliveryMode ?? 'relative']}）`,
-        'フォルダ',
-      ].join('・')
-    : ''
 
   /* ===== 並び替え ===== */
 
@@ -768,7 +760,7 @@ export default function ScenariosListV8() {
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   const panelIndex = panelId === null ? -1 : scenarios.findIndex((s) => s.id === panelId)
@@ -896,8 +888,8 @@ export default function ScenariosListV8() {
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
-            <RovingTbody reorderKey={liveOrder.shown.map((s) => s.id).join(',')}>
-              {liveOrder.shown.map((s, saveFieldIndex) => {
+            <RovingTbody reorderKey={duplicateFeedback.order(liveOrder.shown, scenarios).map((s) => s.id).join(',')}>
+              {duplicateFeedback.order(liveOrder.shown, scenarios).map((s, saveFieldIndex) => {
                 const rowFolder = s.folderId ? folders.find((f) => f.id === s.folderId) : undefined
                 const folderName = s.folderId
                   ? rowFolder?.name ?? 'フォルダ'
@@ -914,6 +906,7 @@ export default function ScenariosListV8() {
                 return (
                   <Tr
                     interactive
+                    highlighted={duplicateFeedback.highlightedId === s.id}
                     key={s.id}
                     data-reorder-id={s.id}
                     onDragEnter={() => liveOrder.enter(s.id)}
@@ -1342,53 +1335,16 @@ export default function ScenariosListV8() {
                 回答フォーム・流入経路・計測リンクからの参照は数えられていません。消したあとに参照が外れることがあります。
               </p>
               {!targetStillListed && (
-                <p className={styles.deleteWarn}>
+                <SaveErrorField names={["duplicateName","duplicate_name"]}><p className={styles.deleteWarn}>
                   このシナリオが一覧から外れました（LINEアカウントの切り替えなど）。この窓を閉じて、いまの一覧から選び直してください。
-                </p>
+                </p></SaveErrorField>
               )}
             </div>
           )}
         </ConfirmDialog>
 
         {/* 複製の窓（★V8 `Al4Ek`：新しい名前・引き継ぐもの・引き継がないもの・停止中で作られる）。題の左に印は置かない（絵どおり）。 */}
-        <Dialog
-          open={duplicateTarget !== null}
-          title="このシナリオを複製する"
-          confirmation
-          designNode="Al4Ek"
-          confirmLabel={duplicating ? '複製中…' : '複製する'}
-          confirmIcon={<Copy size={14} aria-hidden="true" />}
-          busy={duplicating}
-          error={duplicateError}
-          onConfirm={() => runDuplicate()}
-          onCancel={() => {
-            if (duplicating) return
-            setDuplicateTarget(null)
-            setDuplicateError('')
-          }}
-        >
-          <div className={styles.dupBody}>
-            <Field label="新しい名前"><SaveErrorField names={["duplicateName","duplicate_name"]}><TextField
-                value={duplicateName}
-                onChange={(event) => setDuplicateName(event.target.value)}
-                disabled={duplicating}
-                maxLength={80}
-                aria-label="新しい名前"
-              /></SaveErrorField></Field>
-            <div className={styles.dupBox}>
-              <p className={styles.dupBoxTitle}>引き継ぐもの</p>
-              <p className={styles.dupBoxText}>{`・${duplicateCarries}`}</p>
-            </div>
-            <div className={styles.dupBox}>
-              <p className={styles.dupBoxTitle}>引き継がないもの</p>
-              <p className={styles.dupBoxText}>・購読中の人・配信の記録</p>
-            </div>
-            <div className={styles.dupNote}>
-              <ShieldCheck size={16} aria-hidden="true" />
-              <span>複製は「停止中」で作られます。開始のきっかけも写しますが、配信を始めるまで誰にも届きません。</span>
-            </div>
-          </div>
-        </Dialog>
+        <></>
       </>}
       folders={<>
         <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" onCancel={() => setPendingStop(null)} onConfirm={() => { const ids = pendingStop; setPendingStop(null); if (ids) runBulkToggle(false, ids) }} />

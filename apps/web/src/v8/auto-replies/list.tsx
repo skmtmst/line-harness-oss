@@ -1,7 +1,11 @@
 'use client'
+import { Clock } from 'lucide-react';
+import { useDeferredDelete } from '@/lib/use-deferred-delete';
+import { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import { scheduleChipLabels, scheduleText } from './words';
+
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import { canManageRole } from '@/lib/staff-role';
-
 import SharedStatusPill from '@/components/shared/status-pill'
 import BulkBar from '@/components/shared/bulk-bar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -94,6 +98,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
 
 /*
  * ★V8 自動応答の一覧（Pencil「★V8 画面の地図」の自動応答の行：
@@ -290,7 +295,7 @@ export default function AutoRepliesListV8() {
   /* ★V8 かんたんに作る（板 `G4GejG`）。詳しい分け方（Xr6eu）は P6vbxn 待ち。 */
   const [quickOpen, setQuickOpen] = useState(false)
   /* 行の詳細パネル（V8「サクサク感」C①・D・E）。開いている行のID。 */
-  const [panelId, setPanelId] = useState<string | null>(null)
+  const [panelId, setPanelId] = useDetailPanelUrl('reply')
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -299,9 +304,10 @@ export default function AutoRepliesListV8() {
   const [toggleError, setToggleError] = useState('')
   const [moveIds, setMoveIds] = useState<string[] | null>(null)
   const [moveDraft, setMoveDraft] = useState('')
-  const [duplicateTarget, setDuplicateTarget] = useState<AutoReply | null>(null)
+  const duplicateLock = useRef(false)
+  const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const [duplicating, setDuplicating] = useState(false)
-  const [duplicateError, setDuplicateError] = useState('')
+  const setDuplicateError =(message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
   const [actionError, setActionError] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
   const [moveNotice, setMoveNotice] = useState('')
@@ -698,14 +704,17 @@ export default function AutoRepliesListV8() {
   /*
    * 複製（行の「…」→「複製する」）。複製の口は無いので、同じ内容で新しく作る。
    * コピーは必ず「停止中」で作る（AUTOREPLY-08：動かすのは別の操作）。
-   * 元ルールが残っているあいだだけ確認窓を出す（stale guard）。
+   * 名前や確認の窓は出さず、その場で作る（B-177）。
    */
-  const duplicateKeyRef = useRef(crypto.randomUUID())
-  useEffect(() => { duplicateKeyRef.current = crypto.randomUUID() }, [duplicateTarget?.id])
-  const runDuplicate = async () => {
+  const duplicateKeysRef = useRef(new Map<string, string>())
+  const runDuplicate = async (duplicateTarget: AutoReply) => {
+    if (duplicateLock.current) return
     if (!duplicateTarget || duplicating) return
+    duplicateLock.current = true
     setDuplicating(true)
     setDuplicateError('')
+    const operationId = `${selectedAccountId}:${duplicateTarget.id}`
+    if (!duplicateKeysRef.current.has(operationId)) duplicateKeysRef.current.set(operationId, crypto.randomUUID())
     const source = duplicateTarget
     try {
       const result = await api.autoReplies.create({
@@ -734,13 +743,15 @@ export default function AutoRepliesListV8() {
         keywordMatchMode: source.keywordMatchMode === 'all' ? 'all' : 'any',
         folderId: source.folderId,
         internalMemo: source.internalMemo,
-      }, duplicateKeyRef.current)
+      }, duplicateKeysRef.current.get(operationId)!)
       if (!result.success) {
         setDuplicateError('複製できませんでした。状態を読み直してからお試しください。')
         return
       }
-      setDuplicateTarget(null)
-      notifyToast(`「${displayName(source)}」をコピーしました（停止中で作られました）`, { tone: 'success' })
+
+      duplicateKeysRef.current.delete(operationId)
+      duplicateFeedback.mark(source.id, result.data.id)
+      notifyToast('複製しました', { tone: 'success' })
       await load()
     } catch (reason) {
       const fieldFailure = saveErrors.capture(reason)
@@ -752,6 +763,7 @@ export default function AutoRepliesListV8() {
           : '複製できませんでした。状態を読み直してからお試しください。',
       ) }
     } finally {
+      duplicateLock.current = false
       setDuplicating(false)
     }
   }
@@ -767,6 +779,7 @@ export default function AutoRepliesListV8() {
    * 動かした結果をそのまま知らせる（`moveNotice` は残す）。
    */
   const applyPriorityUpdates = (updates: Array<{ id: string; priority: number }>, notice: string) => {
+    duplicateFeedback.clear()
     if (updates.length === 0) return
     const requestAccountId = selectedAccountId
     const nextById = new Map(updates.map((u) => [u.id, u.priority] as const))
@@ -866,7 +879,7 @@ export default function AutoRepliesListV8() {
         icon: <Copy size={14} aria-hidden="true" />,
         onSelect: () => {
           setDuplicateError('')
-          setDuplicateTarget(r)
+          void runDuplicate(r)
         },
       },
     ]
@@ -931,7 +944,7 @@ export default function AutoRepliesListV8() {
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   const panelIndex = panelId === null ? -1 : items.findIndex((r) => r.id === panelId)
@@ -1150,8 +1163,8 @@ export default function AutoRepliesListV8() {
               {tableHeadCells}
             </TableHeadRow>
           </thead>
-          <RovingTbody reorderKey={liveOrder.shown.map((r) => r.id).join(',')}>
-            {liveOrder.shown.map((r, saveFieldIndex) => {
+          <RovingTbody reorderKey={duplicateFeedback.order(liveOrder.shown, items).map((r) => r.id).join(',')}>
+            {duplicateFeedback.order(liveOrder.shown, items).map((r, saveFieldIndex) => {
               const name = displayName(r)
               const conflicts = r.conflictAttentionCount ?? 0
               const actions = actionSummary(r)
@@ -1324,7 +1337,7 @@ export default function AutoRepliesListV8() {
                     variant="secondary"
                     onClick={() => {
                       setDuplicateError('')
-                      setDuplicateTarget(panelRow)
+                      void runDuplicate(panelRow)
                       setPanelId(null)
                     }}
                   >
@@ -1745,20 +1758,7 @@ export default function AutoRepliesListV8() {
       </ConfirmDialog>
 
       {/* 複製の確認窓。コピーは停止中で作る（動かすのは別の操作）。 */}
-      <ConfirmDialog
-        open={duplicateTarget !== null}
-        title={duplicateTarget ? `「${displayName(duplicateTarget)}」を複製しますか？` : ''}
-        description="同じ条件と返し方のルールをもう1つ作ります。コピーは「停止中」で作られるので、確認してから動かしてください。名前に「（コピー）」を付けます。"
-        confirmLabel={duplicating ? '複製中…' : '複製する'}
-        busy={duplicating}
-        error={duplicateError}
-        onConfirm={() => runDuplicate()}
-        onCancel={() => {
-          if (duplicating) return
-          setDuplicateTarget(null)
-          setDuplicateError('')
-        }}
-      />
+      <></>
       {quickOpen ? (
         <QuickCreateV8
           accountId={selectedAccountId}

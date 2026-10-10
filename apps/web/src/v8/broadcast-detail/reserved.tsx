@@ -124,7 +124,7 @@ export default function Reserved({
               <span>{notificationText || '配信の開始・完了・エラーは、Slack の同じスレッドへ知らせます。'}</span>
             </p>
             <div className={styles.doneButtons}>
-              <Button href="/broadcasts">一覧へ戻る</Button>
+              <></>
               <Button variant="primary" href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`}>
                 <Eye aria-hidden="true" />
                 予約の内容を見る

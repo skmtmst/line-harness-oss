@@ -352,7 +352,7 @@ function toContextMenuItems(menuItems: ActionMenuItem[]): ContextMenuItem[] {
     label: item.label,
     danger: item.tone === 'danger',
     disabled: item.disabled,
-    onSelect: () => item.onSelect(),
+    onSelect: () => item.onSelect?.(),
   }))
 }
 

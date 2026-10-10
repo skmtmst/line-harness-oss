@@ -1,4 +1,5 @@
 'use client'
+
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -44,7 +45,6 @@ import {
 import styles from './form.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8-B コラムを書く（`yRDwW`）。
@@ -117,7 +117,7 @@ export default function ColumnNew() {
         boardId="yRDwW"
         title="コラムを書く"
         help="外部サイトの記事へつなぐ下書きを作ります。記事本文は外部サイトで管理します。"
-        footerActions={<Button href="/nen-campaigns?tab=columns">一覧へ戻る</Button>} dirty={false}
+        footerActions={<></>} dirty={false}
       >
         <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。コラムを書くのは管理者に頼んでください。" />
       </CreatePage></SaveErrorScope>

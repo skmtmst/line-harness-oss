@@ -380,7 +380,7 @@ export default function ScenarioCreateV8() {
       stepsSpacing="compact"
       boardId="dnzqC"
       title="シナリオを作る"
-      identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
+      identity={<></>}
       steps={(
         <Steps
           label="シナリオ作成の進み方"

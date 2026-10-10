@@ -254,6 +254,7 @@ function FieldMigrate() {
         saveErrors.capture(saveFailure) /* 取り直せないときは下の説明へ */ }
       if (!gateRef.current.current(token) || accountRef.current !== account)
 
+
  return null
       const status = (reason as { status?: number } | null)?.status
       if (status === 409) {
@@ -295,7 +296,6 @@ function FieldMigrate() {
       if (!gateRef.current.current(token) || accountRef.current !== account) return
       const fieldFailure = saveErrors.capture(reason)
       { if (!fieldFailure)
-
 
       setError(reason instanceof ApiError ? reason.message : '事前確認を実行できませんでした') }
     } finally {
@@ -350,7 +350,6 @@ function FieldMigrate() {
       const fieldFailure = saveErrors.capture(reason)
       { if (!fieldFailure)
 
-
       setError(reason instanceof ApiError ? reason.message : '移行を開始できませんでした。事前確認からやり直してください。') }
     } finally {
       if (gateRef.current.current(token) && accountRef.current === account) setExecuting(false)
@@ -396,7 +395,6 @@ function FieldMigrate() {
       } catch (saveFailure) {
         saveErrors.capture(saveFailure) /* 下の説明へ */ }
       { if (!fieldFailure)
-
 
       setError(reason instanceof ApiError ? reason.message : '移行を再開できませんでした。事前確認からやり直してください。') }
     } finally {
@@ -492,7 +490,7 @@ function FieldMigrate() {
   const pollAttention = pollProblem !== '' && (!run || RUN_RUNNING.has(run.status))
   const status = pollAttention ? pollProblem : run ? RUN_STATUS_LABELS[run.status] : executedRunId ? '実行を受け付けました。結果を確認しています' : confirmed ? `事前確認済み：${preview?.summary.total ?? 0} 人` : undefined
   const usage = typeof source.usageCount === 'number' ? `${formatNumber(source.usageCount)} 人に値が入っている` : '値が入っている人数は未集計'
-  const back = <Link href="/tags?tab=fields" className={styles.backLink}>← 友だち情報欄へ</Link>
+  const back = <></>
   const rows = sample ? sampleRows(sample) : []
 
   if (!canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></SaveErrorScope>

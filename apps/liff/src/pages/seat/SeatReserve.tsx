@@ -1,3 +1,4 @@
+import { useUrlStep } from '../../lib/use-url-step.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import liff from '@line/liff';
@@ -50,10 +51,11 @@ const DEFAULT_GUESTS = 2;
  */
 export default function SeatReserve() {
   const { token = '' } = useParams();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  const showMine = params.get('view') === 'mine';
   const [store, setStore] = useState<Store | null>(null);
   const [loadState, setLoadState] = useState<'loading' | 'error' | 'missing' | 'ready'>('loading');
-  const [view, setView] = useState<View>(params.get('view') === 'mine' ? 'mine' : 'pick');
+  const [view, setView] = useUrlStep<View>(params.get('view') === 'mine' ? 'mine' : 'pick', { search: params.toString(), write: (query, replace) => setParams(query, { replace }) });
   const [today, setToday] = useState('');
   const [chips, setChips] = useState<DayChip[]>([]);
   const [days, setDays] = useState<Record<string, DaySlots>>({});
@@ -128,13 +130,13 @@ export default function SeatReserve() {
       setChips(c);
       setDate(t);
       await loadDays(s, [...c.map((x) => x.date), addDays(t, c.length)], DEFAULT_GUESTS);
-      if (params.get('view') === 'mine') await loadMine(s);
+      if (showMine) await loadMine(s);
       setLoadState('ready');
     } catch (e) {
       logFailure('seat-link', e);
       setLoadState((e as { status?: number }).status === 404 ? 'missing' : 'error');
     }
-  }, [token, loadDays, loadMine, params]);
+  }, [token, loadDays, loadMine, showMine]);
 
   useEffect(() => {
     void load();

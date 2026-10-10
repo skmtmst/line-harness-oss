@@ -1,7 +1,8 @@
 'use client'
+import { useDetailPanelUrl } from '@/components/shared/detail-panel';
+
 import { canManageRole } from '@/lib/staff-role';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
-
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
@@ -208,7 +209,7 @@ function toContextItems(items: ActionMenuItem[]): ContextMenuItem[] {
     label: item.label,
     danger: item.tone === 'danger',
     disabled: item.disabled,
-    onSelect: () => item.onSelect(),
+    onSelect: () => item.onSelect?.(),
   }))
 }
 
@@ -423,7 +424,7 @@ function WebinarList() {
   const [highlightedId, setHighlightedId] = useState<string | null>(useSearchParams().get('highlight'))
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [duplicateError, setDuplicateError] = useState('')
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [activeId, setActiveId] = useDetailPanelUrl('webinar')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<WebinarListItem | null>(null)
   const [archiving, setArchiving] = useState(false)
@@ -991,7 +992,7 @@ function WebinarList() {
                           open={openMenuId === w.id}
                           onOpenChange={(next) => setOpenMenuId(next ? w.id : null)}
                           note={canEdit ? undefined : READONLY_REASON}
-                          items={menuItems.map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect() } }))}
+                          items={menuItems.map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect?.() } }))}
                         />
                       </div>
                     </Td>

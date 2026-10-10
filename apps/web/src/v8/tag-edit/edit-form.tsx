@@ -1,4 +1,7 @@
 'use client'
+import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
+import { ActionDrawer } from '@/components/friend-fields/tag-editor-v4';
+
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -230,7 +233,7 @@ export function TagEditForm({
         footerOutlined={Boolean(host)}
         notice={<>{host?.notice}{readOnly ? <p className={styles.roBand} role="note" data-design-node="fkGUR">{host ? '閲覧のみで見ています。変える操作は統括の管理者に頼んでください。' : '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'}</p> : null}{conflictBand}</>}
         title={host?.title ?? (tag.name || 'タグを編集')}
-        identity={host ? undefined : <Link href="/tags" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />タグへ</Link>}
+        identity={host ? undefined : <></>}
         help={host?.description ?? `${groupName}フォルダ・${tag.friendCount ?? 0}人に付いている・${formatDay(tag.createdAt)}作成`}
         preview={host ? host.preview(values) : side}
         destructive={host || readOnly ? undefined : <Button variant="danger" type="button" onClick={onDelete}>タグを削除する</Button>}

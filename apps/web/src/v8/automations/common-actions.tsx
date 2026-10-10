@@ -1,4 +1,5 @@
 'use client'
+
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useFolderMove } from '@/components/shared/use-folder-move'
 import { moveCommonActionToFolder } from '@/lib/move-to-folder'
@@ -55,7 +56,6 @@ import styles from './common-actions.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 オートメーションの共通アクション（Pencil `LnGNw`）。
@@ -337,11 +337,11 @@ export default function CommonActionsV8() {
                   ? `古い版 ${item.oldVersionBindingCount}`
                   : item.status === 'published' && item.draftVersion != null ? '下書きあり' : null
                 return (
-                  <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
+                  <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id} href={versionsHref(item.id)}>
                     <Td className={styles.colName}>
                       {/* 名前の前に分類先の色の丸。説明は名前の頭にそろえる。 */}
                       <FolderDotName folder={folders.find((folder) => folder.id === item.folderId) ?? null}>{folderMove.checkbox(item)}
-                        <a className={styles.name} href={versionsHref(item.id)}  onClick={(event) => { event.preventDefault(); router.push(versionsHref(item.id)) }}><TruncatedText value={String(item.name ?? '')} /></a>
+                        <a className={styles.name} href={versionsHref(item.id)}  onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && event.button === 0) { event.preventDefault(); router.push(versionsHref(item.id)) } }}><TruncatedText value={String(item.name ?? '')} /></a>
                       </FolderDotName>
 
                     </Td>
@@ -365,7 +365,7 @@ export default function CommonActionsV8() {
                           open={openMenuId === item.id}
                           onOpenChange={(next) => setOpenMenuId(next ? item.id : null)}
                           note={canEdit ? undefined : READONLY_REASON}
-                          items={rowMenuItems(item).map((menuItem) => ({ ...menuItem, onSelect: () => { setOpenMenuId(null); menuItem.onSelect() } }))}
+                          items={rowMenuItems(item).map((menuItem) => ({ ...menuItem, onSelect: () => { setOpenMenuId(null); menuItem.onSelect?.() } }))}
                         />
                       </div>
                     </Td>

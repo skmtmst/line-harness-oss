@@ -1008,7 +1008,7 @@ export default function TemplatesListV8() {
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
     : []
 

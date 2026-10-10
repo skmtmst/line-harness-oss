@@ -1,7 +1,9 @@
 'use client'
+import { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import { useDeferredDelete } from '@/lib/use-deferred-delete';
+
 import { canManageRole } from '@/lib/staff-role';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
-
 import SharedStatusBadge from '@/components/shared/status-badge'
 import SharedStatusPill from '@/components/shared/status-pill'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
@@ -248,7 +250,7 @@ export default function BroadcastListV8() {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const [panelId, setPanelId] = useState<string | null>(null)
+  const [panelId, setPanelId] = useDetailPanelUrl('broadcast')
   const [menuMoveFor, setMenuMoveFor] = useState<string | null>(null)
   /* 「フォルダへ移す」を選んだ直後の onClose は2段目への切り替えなので閉じない。 */
   const keepMenuOpenRef = useRef(false)
@@ -405,6 +407,7 @@ export default function BroadcastListV8() {
 
       if (err instanceof ApiError && err.status === 403) setForbidden(true)
       else { if (!fieldFailure)
+
 
  setError(searchError || loadFailureNotice(err, '一斉配信')) }
     } finally {
@@ -706,8 +709,8 @@ export default function BroadcastListV8() {
      */
     if (isFromHeadquarters(broadcast)) {
       return [
-        { id: 'view', label: '見る', external: true, href: `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`, onSelect: () => goDetail(broadcast.id) },
-        ...(canEdit ? [{ id: 'duplicate', label: '複製', external: true, icon: <Copy size={14} aria-hidden="true" />, href: `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`) }] : []),
+        { id: 'view', label: '見る', external: false, href: `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`, onSelect: () => goDetail(broadcast.id) },
+        ...(canEdit ? [{ id: 'duplicate', label: '複製', external: false, icon: <Copy size={14} aria-hidden="true" />, href: `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`) }] : []),
       ]
     }
     // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。この「…」は変える項目だけなので空になる。
@@ -717,14 +720,14 @@ export default function BroadcastListV8() {
       items.push({
         id: 'resume',
         label: '編集を続ける',
-        external: true,
+        external: false,
         href: `/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`),
       })
     }
     items.push({
       id: 'duplicate',
       label: '複製',
-      external: true,
+      external: false,
       icon: <Copy size={14} aria-hidden="true" />,
       href: `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`),
     })
@@ -754,6 +757,7 @@ export default function BroadcastListV8() {
       id: item.id,
       label: item.label,
       external: item.external,
+      href: item.href,
       dividerBefore: item.dividerBefore,
       icon: item.icon,
       danger: item.tone === 'danger',

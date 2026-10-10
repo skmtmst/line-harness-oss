@@ -2893,7 +2893,7 @@ select:not([multiple]):not(.appearance-none) {
 /* 作ってあるもの・配るアカウントを選ぶ窓 dJZ7Q（picker）：欄の1行と窓の寸法。 */
 [data-theme="v8"] {
   --tpl-picker-width: 880px;
-  --tpl-picker-narrow-width: 760px;
+  --tpl-picker-narrow-width: 640px;
   --tpl-picker-height: 560px;
   --tpl-picker-folder-width: 190px;
   --tpl-picker-preview-width: 250px;

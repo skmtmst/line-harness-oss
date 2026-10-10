@@ -760,3 +760,7 @@ shared-button-importer components/shared/action-list.tsx
 shared-button-importer components/templates/preview-launcher.tsx
 shared-button-importer v8/webhooks/incoming-actions.tsx
 shared-button-importer components/shared/friend-picker-field.tsx
+# B-177：項目内の設定と、作る・編集に共通の箱。実利用先も照合。
+shared-button-importer components/shared/editor-surface.tsx
+shared-button-importer components/shared/inline-settings.tsx
+shared-button-importer v8/hq-templates/distribution-result-dialog.tsx

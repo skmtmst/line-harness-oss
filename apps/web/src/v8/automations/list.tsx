@@ -557,7 +557,7 @@ export default function AutomationListV8() {
                           open={openMenuId === item.id}
                           onOpenChange={(next) => setOpenMenuId(next ? item.id : null)}
                           note={canEdit ? undefined : READONLY_REASON}
-                          items={rowMenuItems(item).map((menuItem) => ({ ...menuItem, onSelect: () => { setOpenMenuId(null); menuItem.onSelect() } }))}
+                          items={rowMenuItems(item).map((menuItem) => ({ ...menuItem, onSelect: () => { setOpenMenuId(null); menuItem.onSelect?.() } }))}
                         />
                       </div>
                     </Td>

@@ -1,6 +1,5 @@
 'use client'
 
-import { drawerWidth } from './panel-sizes'
 
 import React, { useContext, useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -10,6 +9,7 @@ import styles from './drawer.module.css'
 import Dialog from './dialog'
 import { useFormInputDirty } from './form-input-dirty'
 import { useOverlayDiscard } from './overlay-discard'
+import { drawerWidth } from './destination-policy'
 
 export type DrawerDetail = { label: string; value: ReactNode }
 
@@ -104,7 +104,7 @@ export default function Drawer({
       data-width={width}
       data-layout={layout}
       data-design-width=""
-      style={{ '--drawer-design-width': `${drawerWidth(designWidth ?? (width === 'editor' || width === 'order' || width === 'composer' ? 540 : 480))}px` } as CSSProperties}
+      style={{ '--drawer-design-width': `${width === 'composer' ? 1160 : width === 'editor' ? 540 : drawerWidth(designWidth ?? (width === 'order' ? 540 : 480))}px` } as CSSProperties}
       tabIndex={-1}
       data-closing={leaving || undefined}
       data-design-part="drawer"

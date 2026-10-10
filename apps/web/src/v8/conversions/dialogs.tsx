@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from 'react'
 import Button from '@/components/shared/button'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import Dialog from '@/components/shared/dialog'
+import EditorSurface from '@/components/shared/editor-surface'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -481,7 +482,7 @@ export interface ConversionEditDialogProps {
 }
 
 /** 「○○を編集」の窓。中身は `page.tsx` にあったまま。 */
-export function ConversionEditDialog(props: ConversionEditDialogProps) {
+export function ConversionEditDialog(props: ConversionEditDialogProps & { surface?: 'page' | 'dialog' }) {
   const {
     editTarget,
     setEditTarget,
@@ -495,7 +496,7 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
     submitEdit,
   } = props
   return (
-    <Dialog
+    <EditorSurface surface={props.surface}
       open={editTarget !== null && editForm !== null}
       busy={editSaving}
       title={editTarget ? `「${editTarget.name}」を編集` : ''}
@@ -631,6 +632,6 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
           {editError ? <Notice tone="danger">{editError}</Notice> : null}
         </div>
       ) : null}
-    </Dialog>
+    </EditorSurface>
   )
 }

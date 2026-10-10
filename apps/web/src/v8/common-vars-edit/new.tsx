@@ -1,4 +1,6 @@
 'use client'
+import { isOwnerOrAdmin } from '@/lib/staff-capability';
+
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import CopyTextButton from '@/components/shared/copy-text-button'
@@ -377,6 +379,7 @@ export default function NewCommonVarV8() {
       if (e instanceof ApiError && e.status === 409) {
         { if (!fieldFailure)
 
+
         setError('その差し込み名は既に使われています') }
         focusField('cv-key')
       } else {
@@ -434,7 +437,7 @@ export default function NewCommonVarV8() {
       boardId="p82v9"
       title="共通情報を作る"
       help="保存しただけでは差し込まれません。公開すると使えるようになります"
-      identity={<Link href="/contents/vars" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />共通情報へ</Link>}
+      identity={<></>}
       preview={preview}
       footerActions={(
         <>

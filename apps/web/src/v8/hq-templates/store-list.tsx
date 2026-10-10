@@ -1,4 +1,5 @@
 'use client'
+import TagPill from '@/components/shared/tag-pill';
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useMemo, useState, type ReactNode } from 'react'
@@ -478,7 +479,7 @@ export default function HqStoreList(props: HqStoreListProps) {
             const folder = folderOf(row.folder_id)
             const sub = templateSubLine(row, KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? words.item)
             return (
-              <Tr key={row.id} data-row-id={row.id} density="template">
+              <Tr key={row.id} data-row-id={row.id} density="template" onOpen={() => (onOpen ?? onEdit)(row)}>
                 {type === 'rich_menu' ? <Td className={storeStyles.cellPlain}>{rankOf.get(row.id) ?? emptyValue('unknown')}</Td> : null}
                 <NameCell name={(
                     <div className={storeStyles.dotLine}>

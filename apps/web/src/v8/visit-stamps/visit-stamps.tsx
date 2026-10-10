@@ -1,6 +1,6 @@
 'use client'
-import Toggle from '@/components/shared/toggle';
 
+import Toggle from '@/components/shared/toggle';
 import { flushListUrlState, useListUrlValue } from '@/components/shared/list-url-state'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
@@ -700,7 +700,7 @@ function VisitStampsScreen() {
                                     ) : null}
                                     <RowActions subjectName={`${names.name}さんの申請`} menuItems={[
                                       { id: 'photo', label: '写真を大きく見る', onSelect: () => setPhoto(row) },
-                                      { id: 'friend', label: '友だちの詳細を開く', external: true, href: `/friends/detail?id=${encodeURIComponent(row.friend_id)}`, onSelect: () => { router.push(`/friends/detail?id=${encodeURIComponent(row.friend_id)}`) } },
+                                      { id: 'friend', label: '友だちの詳細を開く', external: false, href: `/friends/detail?id=${encodeURIComponent(row.friend_id)}`, onSelect: () => { router.push(`/friends/detail?id=${encodeURIComponent(row.friend_id)}`) } },
                                     ]} />
                                   </span>
                                 </Td>
@@ -745,7 +745,7 @@ function VisitStampsScreen() {
                                   <Td className={styles.colActor}><span className={styles.muted} title={row.actor}>{row.actor}</span></Td>
                                   <Td className={styles.colMenu}>
                                     <RowActions subjectName={`${shortDateTime(row.at)} の記録`}
-                                      menuItems={[{ id: 'friend', label: '友だちの詳細を開く', external: true, href: `/friends/detail?id=${encodeURIComponent(row.friendId)}`, onSelect: () => { router.push(`/friends/detail?id=${encodeURIComponent(row.friendId)}`) } }]}
+                                      menuItems={[{ id: 'friend', label: '友だちの詳細を開く', external: false, href: `/friends/detail?id=${encodeURIComponent(row.friendId)}`, onSelect: () => { router.push(`/friends/detail?id=${encodeURIComponent(row.friendId)}`) } }]}
                                       destructiveItem={canManage && row.reversible ? { id: 'reverse', label: 'この記録を取り消す', onSelect: () => { setDialogError(''); setReversing(row.id) } } : undefined} />
                                   </Td>
                                 </Tr>

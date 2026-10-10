@@ -21,6 +21,7 @@ import FormFileSettings from '@/components/shared/form-file-settings'
 import type { FormRefs } from '@/components/forms/form-refs'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import InlineSettings from '@/components/shared/inline-settings'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { DragHandle, RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
@@ -286,9 +287,9 @@ function OpenBlock(props: RowProps) {
       </div>
       {input ? <InputFields block={input} refs={refs} patch={patch} /> : <DecoFields block={block} patch={patch} accountId={props.accountId} />}
       {input ? (
-        <Dialog open={detailOpen} title={`「${blockTitleLine(block)}」の詳しい設定`} description="分岐・選んだときの動き・入力の形・説明など。変えるとすぐ画面に入ります。" confirmLabel="閉じる" onConfirm={() => setDetailOpen(false)} onCancel={() => setDetailOpen(false)}>
+        <InlineSettings open={detailOpen} title={`「${blockTitleLine(block)}」の詳しい設定`} onClose={() => setDetailOpen(false)}>
           <BlockEditor block={block} index={props.index} sections={props.layout.sections} refs={refs} selected onSelect={() => {}} onChange={patch} />
-        </Dialog>
+        </InlineSettings>
       ) : null}
     </div>
   )

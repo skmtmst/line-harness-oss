@@ -1,3 +1,4 @@
+
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -18,7 +19,7 @@ const render = (props: Partial<React.ComponentProps<typeof Dialog>>) => renderTo
 
 describe('V8 の窓：絵の幅を画面が渡せる', () => {
   it('designWidth を渡すと、4段のうち入れられる幅へそろえる', () => {
-    const html = render({ designWidth: 600 })
+    const html = render({ designWidth: 720 })
     expect(html).toContain('data-design-width=""')
     expect(html).toContain('--dialog-design-width:560px')
     expect(css).toMatch(/\[data-theme='v8'\] \.panel\[data-design-width\] \{\s*width: min\(var\(--dialog-design-width\), 100%\);/)
@@ -26,7 +27,7 @@ describe('V8 の窓：絵の幅を画面が渡せる', () => {
     expect(css.indexOf("[data-theme='v8'] .panel[data-design-width]")).toBeGreaterThan(css.indexOf("[data-theme='v8'] .panel[data-size='large']"))
   })
 
-  it.each([[844, 720], [640, 640], [480, 480], [960, 960]])('幅 %i は %i で描く', (given, expected) => {
+  it.each([[844, 720], [640, 560], [480, 480], [960, 960]])('幅 %i は %i で描く', (given, expected) => {
     expect(render({ designWidth: given })).toContain(`--dialog-design-width:${expected}px`)
   })
 

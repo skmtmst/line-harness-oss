@@ -1,7 +1,7 @@
 'use client'
+
 import { canManageRole } from '@/lib/staff-role';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
-
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useTenantWideAccess } from '@/lib/staff-role'
@@ -121,7 +121,6 @@ export default function HqBroadcastList() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-
 
       setError(caught)
     }

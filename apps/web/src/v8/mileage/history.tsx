@@ -396,7 +396,7 @@ export default function HistoryTab() {
                         onOpenChange={(next) => setMenuId(next ? item.id : null)}
                         items={[
                           ...(pending ? [{ id: 'void', label: '取り消す', onSelect: () => openPending('void', item) }] : []),
-                          { id: 'friend', label: '友だちを見る', external: true, href: friendHref, onSelect: () => router.push(friendHref) },
+                          { id: 'friend', label: '友だちを見る', external: false, href: friendHref, onSelect: () => router.push(friendHref) },
                         ]}
                       />
                     </div>

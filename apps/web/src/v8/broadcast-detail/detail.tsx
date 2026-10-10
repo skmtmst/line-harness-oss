@@ -1,4 +1,5 @@
 'use client'
+
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useState, type ReactNode, type RefObject } from 'react'
@@ -247,7 +248,7 @@ export default function BroadcastDetail({
       id: 'duplicate',
       label: '複製して作る',
       icon: <Copy size={14} aria-hidden="true" />,
-      external: true,
+      external: false,
       href: duplicateHref, onSelect: () => router.push(duplicateHref),
     },
   ]

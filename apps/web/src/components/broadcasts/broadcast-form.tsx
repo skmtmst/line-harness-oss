@@ -2103,9 +2103,7 @@ export default function BroadcastForm({
           <div className="rounded-card border border-hairline bg-canvas p-8 text-center">
             <p className="text-ink text-sm font-semibold">{draftError}</p>
             <div className="mt-4 flex items-center justify-center gap-3">
-              <Link href="/broadcasts" className="text-action text-sm font-medium hover:underline">
-                一斉配信一覧へ戻る
-              </Link>
+              <></>
             </div>
           </div>
         </div></SaveErrorScope>

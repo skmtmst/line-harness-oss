@@ -1,4 +1,5 @@
 'use client'
+
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Check } from 'lucide-react'
@@ -19,7 +20,6 @@ import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 イベント予約「変更の確認」（Pencil `hmr2P`、確かめる窓 `qUdNh`）。
@@ -91,7 +91,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
         boardId="hmr2P"
         title="変更の確認"
         help={description}
-        footerActions={<Button href="/events">一覧へ戻る</Button>}
+        footerActions={<></>}
       >
         {!selectedAccountId ? (
           <ListState kind="empty" title="上のバーでLINE公式アカウントを選んでください" />

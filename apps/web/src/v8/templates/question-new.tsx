@@ -1,6 +1,6 @@
 'use client'
-import { isOwnerOrAdmin } from '@/lib/staff-capability';
 
+import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import TapExtrasField from '@/components/shared/tap-extras-field'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useEffect, useMemo, useState } from 'react'
@@ -32,6 +32,7 @@ import te from '../template-edit/edit.module.css'
 import styles from './question-new.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import InlineSettings from '@/components/shared/inline-settings'
 
 /*
  * ★V8 テンプレート「質問を作る・編集」（Pencil `l87p1J`）。
@@ -207,6 +208,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       const extraError = tapExtraSaveError(caught)
       if (extraError) { fields.setServerErrors(Object.fromEntries(question.choices.map((_, ci) => [`extras-${ci}`, extraError]))); return false }
       if (!saveErrors.capture(caught, fields))
+
  setError(describeApiFailure(caught, '保存', { scope: 'store' }));
 
       return false
@@ -236,7 +238,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     return (
       <SaveErrorScope errors={saveErrors}><TemplateEditFrame boardId="l87p1J" title="質問テンプレート" description="質問テンプレートの作成・変更はオーナーと管理者だけができます" side={null}>
         <p className={styles.note}>一覧で中身を確認できます。</p>
-        <Link href="/templates" className={styles.back}>一覧へ戻る</Link>
+        <></>
       </TemplateEditFrame></SaveErrorScope>
     )
   }

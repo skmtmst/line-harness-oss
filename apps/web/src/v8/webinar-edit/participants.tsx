@@ -204,7 +204,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
             const rate = Math.min(100, Math.round((participant.maxWatchedSeconds / Math.max(1, webinar.durationSeconds)) * 100))
             const badge = actionBadge(participant)
             return (
-              <Tr data-row-id={participant.friendId} key={participant.friendId} className={styles.row} data-table-layout="columns">
+              <Tr data-row-id={participant.friendId} key={participant.friendId} className={styles.row} data-table-layout="columns" href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`}>
                 <Td className={styles.colName}><FolderDotName>
                   <Link href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`} title={name} className={styles.name}>{name}</Link>
 

@@ -1,4 +1,5 @@
 'use client'
+
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useState } from 'react'
@@ -24,7 +25,6 @@ import styles from '../settings.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /* ⑤ 担当スタッフ（VLEaj）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
@@ -169,7 +169,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
           {
             id: 'shifts',
             label: '勤務とシフト',
-            external: true,
+            external: false,
             href: `/booking/staff/shifts?staff_id=${person.id}`, onSelect: () => router.push(`/booking/staff/shifts?staff_id=${person.id}`),
           },
           ...(canEdit ? [

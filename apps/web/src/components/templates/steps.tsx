@@ -102,7 +102,7 @@ export function Steps({
                   aria-label={`${step.label}に戻る`}
                   onClick={() => {
                     if (step.onSelect) {
-                      step.onSelect()
+                      step.onSelect?.()
                       return
                     }
                     if (step.anchor) document.getElementById(step.anchor)?.scrollIntoView({ block: 'start' })

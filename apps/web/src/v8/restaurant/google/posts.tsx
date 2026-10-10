@@ -1,4 +1,5 @@
 'use client'
+import Toggle from '@/components/shared/toggle';
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useState } from 'react'
@@ -202,7 +203,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
     const items: ActionMenuItem[] = [
       { id: 'open', label: actionable ? '編集' : '中身を見る', onSelect: () => go({ tab: 'posts', view: 'edit', id: post.id }) },
     ]
-    if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', external: true, href: post.searchUrl ?? '', onSelect: () => window.open(post.searchUrl ?? '', '_blank', 'noopener') })
+    if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', external: true, href: post.searchUrl ?? '', onSelect:post.searchUrl ?? '' })
     if (post.status === 'draft') items.push({ id: 'cancel', label: '取り消す', disabled: busyId === post.id, onSelect: () => void cancelDraft(post) })
     if (post.instagram?.status === 'failed') items.push({ id: 'ig-retry', label: 'Instagram へ再送', disabled: busyId === post.id, onSelect: () => void retryInstagram(post) })
     if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, disabled: busyId === post.id, onSelect: () => setConfirmRemove(post) })
@@ -646,7 +647,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             </div>
           </>
         ) : (
-          <div className={styles.formActions}><Button onClick={() => go({ tab: 'posts' })}>投稿一覧へ戻る</Button></div>
+          <div className={styles.formActions}></div>
         )}
       </Card>
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
@@ -750,7 +751,7 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
           </div>
         </>
       ) : (
-        <div className={styles.formActions}><Button variant="primary" onClick={() => go({ tab: 'posts' })}>投稿一覧へ戻る</Button></div>
+        <div className={styles.formActions}></div>
       )}
     </Card></SaveErrorScope>
   )

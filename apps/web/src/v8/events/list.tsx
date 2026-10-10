@@ -1,4 +1,5 @@
 'use client'
+
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useFolderMove } from '@/components/shared/use-folder-move'
 import { moveEventToFolder } from '@/lib/move-to-folder'
@@ -46,7 +47,6 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
-
 /*
  * ★V8 イベント予約の一覧（Pencil `e2ekFu`）。
  *
@@ -92,7 +92,7 @@ function toContextMenuItems(menuItems: ActionMenuItem[]): ContextMenuItem[] {
     label: item.label,
     danger: item.tone === 'danger',
     disabled: item.disabled,
-    onSelect: () => item.onSelect(),
+    onSelect: () => item.onSelect?.(),
   }))
 }
 
@@ -541,15 +541,14 @@ export default function EventsListV8() {
                     className={styles.firstCell} name={(
                       <ContextMenu label={`「${e.name}」の操作`} items={toContextMenuItems(menuItems)}>
                         <>{folderMove.checkbox(e)}
-                          <button
-                            type="button"
-                            onClick={() => openDetail(e.id)}
+                          <Link
+                            href={`/events/edit?id=${encodeURIComponent(e.id)}`}
                             title={`${e.name}の詳細を見る`}
                             aria-label={`「${e.name}」の詳細を見る`}
                             className={styles.nameButton}
                           >
                             {e.name}
-                          </button>
+                          </Link>
                         </>
                       </ContextMenu>
                     )} folder={folderDotOf(e.folderId)}
