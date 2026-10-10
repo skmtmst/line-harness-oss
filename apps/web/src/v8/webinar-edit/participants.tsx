@@ -1,9 +1,10 @@
 'use client'
 
 import { FolderDotName } from '@/components/shared/folder-dot'
+import { RowNameLink } from '@/components/shared/table'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useFeatureAccess } from '@/lib/use-feature-access'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bookmark, CircleCheck, CircleSlash, Download, History, LogOut, Undo2 } from 'lucide-react'
 import { ListPageBody, ListPagePagination } from '@/components/templates'
@@ -206,7 +207,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
             return (
               <Tr data-row-id={participant.friendId} key={participant.friendId} className={styles.row} data-table-layout="columns" href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`}>
                 <Td className={styles.colName}><FolderDotName>
-                  <Link href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`} title={name} className={styles.name}>{name}</Link>
+                  <RowNameLink href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`} title={name} className={styles.name}>{name}</RowNameLink>
 
                 </FolderDotName></Td>
                 <Td className={styles.colWhen}><span className={styles.main}>{shortDateTime(participant.latestJoinedAt)}</span></Td>

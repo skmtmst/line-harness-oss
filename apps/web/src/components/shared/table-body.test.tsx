@@ -79,3 +79,28 @@ it('狭い幅で補助列を畳んだら、詰め物の列数も減らして名�
   const spacer = container.querySelector('tr[aria-hidden="true"] td') as HTMLTableCellElement
   expect(spacer.colSpan).toBe(2)
 })
+
+it('高さや窓だけが変わっても残る行を作り直さず、データ・選択の更新は描く', async () => {
+  setup()
+  const select = vi.fn()
+  const renderRow = vi.fn((item: number) => <tr><td><button onClick={() => select(item)}>名前{item}</button></td></tr>)
+  const { container, rerender } = render(<table><TableBody items={items} itemKey={keys} colSpan={1} renderRow={renderRow} /></table>)
+  const first = screen.getByText('名前0')
+  expect(renderRow.mock.calls.filter(([item]) => item === 0)).toHaveLength(1)
+  act(() => {
+    callbacks.at(-1)?.([...container.querySelectorAll('[data-table-index]')].map(target => ({ target })) as ResizeObserverEntry[], {} as ResizeObserver)
+  })
+  await waitFor(() => {
+    const spacers = [...container.querySelectorAll('tr[aria-hidden="true"] td')].reduce((sum, cell) => sum + Number((cell as HTMLElement).style.height.replace('px', '')), 0)
+    expect(spacers + container.querySelectorAll('[data-table-index]').length * 59).toBe(118000)
+  })
+  expect(screen.getByText('名前0')).toBe(first)
+  expect(renderRow.mock.calls.filter(([item]) => item === 0)).toHaveLength(1)
+  fireEvent.click(first)
+  expect(select).toHaveBeenCalledWith(0)
+  const updated = vi.fn((item: number) => <tr aria-selected={item === 0}><td><button onClick={() => select(item + 1)}>更新{item}</button></td></tr>)
+  rerender(<table><TableBody items={items} itemKey={keys} colSpan={1} renderRow={updated} /></table>)
+  expect(screen.getByText('更新0').closest('tr')?.getAttribute('aria-selected')).toBe('true')
+  fireEvent.click(screen.getByText('更新0'))
+  expect(select).toHaveBeenLastCalledWith(1)
+})

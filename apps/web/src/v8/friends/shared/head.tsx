@@ -9,7 +9,7 @@ import { PageHeading } from '@/components/templates/page-frame'
  *   （ADjK8・hn6Y8・T9gblG・L48eY の「板の頭」：題／説明／タブ／タブの説明。
  *   板の頭の「← 友だちへ」は 2026-10-08 に無くした。戻るのは上の帯のパンくず）
  */
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import type { ReactNode } from 'react'
 import { FRIENDS_TABS, FRIENDS_TAB_NOTES, type FriendsTabKey } from './nav'
 import styles from './head.module.css'

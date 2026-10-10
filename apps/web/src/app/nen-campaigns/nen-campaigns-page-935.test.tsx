@@ -135,7 +135,7 @@ async function mount() {
 }
 
 async function click(element: HTMLElement) {
-  await act(async () => { element.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+  await act(async () => { element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })) })
   await settle()
 }
 
@@ -178,6 +178,7 @@ async function openColumn() {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/nen-campaigns')
   vi.clearAllMocks()
   network.settings.mockResolvedValue({ success: true, data: [columnSetting()] })
   network.columns.mockResolvedValue({
@@ -242,7 +243,7 @@ describe('紹介文の書きかけを守る（#935 N-301）', () => {
     await typeIntro('書きかけの紹介文')
 
     const link = Array.from(container.querySelectorAll('a[href]'))
-      .find((a) => a.getAttribute('href') === '/nen-campaigns/columns/new')
+      .find((a) => new URL(a.getAttribute('href')!, window.location.origin).pathname === '/nen-campaigns/columns/new')
     expect(link).toBeDefined()
     await click(link!)
 
@@ -250,7 +251,7 @@ describe('紹介文の書きかけを守る（#935 N-301）', () => {
     expect(navigation.push).not.toHaveBeenCalled()
 
     await click(bodyButton('保存せずに移る'))
-    expect(navigation.push).toHaveBeenCalledWith('/nen-campaigns/columns/new')
+    expect(new URL(navigation.push.mock.calls.at(-1)![0], window.location.origin).pathname).toBe('/nen-campaigns/columns/new')
   })
 
   it('ブラウザを閉じる操作は書きかけの間だけ止める', async () => {
@@ -282,10 +283,10 @@ describe('紹介文の書きかけを守る（v8 の見た目）', () => {
     if (!found) throw new Error('v8 の紹介文の入力欄が見つかりません')
     return found as HTMLTextAreaElement
   }
-  const v8Column = (title: string): HTMLButtonElement => {
-    const found = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === title && b.getAttribute('title') === title)
+  const v8Column = (title: string): HTMLAnchorElement => {
+    const found = Array.from(container.querySelectorAll('a')).find((b) => b.textContent === title && b.getAttribute('title') === title)
     if (!found) throw new Error(`コラム「${title}」の行が見つかりません: ${container.textContent?.slice(0, 300)}`)
-    return found as HTMLButtonElement
+    return found as HTMLAnchorElement
   }
   async function openV8Column() {
     const tab = Array.from(container.querySelectorAll('[role="tab"], button'))
@@ -310,9 +311,11 @@ describe('紹介文の書きかけを守る（v8 の見た目）', () => {
     await click(v8Column('題名c2'))
     expect(bodyText()).toContain('入力した紹介文が保存されていません')
     expect(v8Intro().value).toBe('書きかけの紹介文')
+    expect(new URLSearchParams(window.location.search).get('column')).toBe('c1')
 
     await click(bodyButton('保存せずに移る'))
     expect(v8Intro().value).toBe('紹介文c2')
+    expect(new URLSearchParams(window.location.search).get('column')).toBe('c2')
   })
 
   it('書きかけのまま画面内リンクを押すと確認し、確認後に移動する', async () => {
@@ -321,13 +324,13 @@ describe('紹介文の書きかけを守る（v8 の見た目）', () => {
     await typeV8Intro('書きかけの紹介文')
 
     const link = Array.from(container.querySelectorAll('a[href]'))
-      .find((a) => a.getAttribute('href') === '/nen-campaigns/columns/new')
+      .find((a) => new URL(a.getAttribute('href')!, window.location.origin).pathname === '/nen-campaigns/columns/new')
     expect(link).toBeDefined()
     await click(link as HTMLElement)
     expect(bodyText()).toContain('このまま移ると、入力した紹介文が消えます')
     expect(navigation.push).not.toHaveBeenCalled()
 
     await click(bodyButton('保存せずに移る'))
-    expect(navigation.push).toHaveBeenCalledWith('/nen-campaigns/columns/new')
+    expect(new URL(navigation.push.mock.calls.at(-1)![0], window.location.origin).pathname).toBe('/nen-campaigns/columns/new')
   })
 })

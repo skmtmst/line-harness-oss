@@ -1,3 +1,4 @@
+import BookingIntake from '../../../../../liff/src/components/BookingIntake.js';
 import { useState } from 'react';
 import { createApi, type MenuItem, type StaffItem } from '../lib/api.js';
 import { useSalonContext } from '../lib/context.js';
@@ -71,16 +72,7 @@ export default function Confirm({
           />
         </dl>
       </div>
-      <label className="block">
-        <span className="text-xs font-medium text-gray-600 mb-1 block">ご要望（任意）</span>
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-y bg-white"
-          rows={3}
-          placeholder="髪型の希望、アレルギー、その他"
-        />
-      </label>
+      <BookingIntake question={menu.intake_question} value={note} onChange={setNote} />
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
           {error}

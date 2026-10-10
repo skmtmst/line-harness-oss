@@ -272,6 +272,15 @@ function propExpression(content, start) {
   return content.slice(start, start + 400)
 }
 
+function classLookRules(expr, module) {
+  if (!module) return []
+  const classes = [...expr.matchAll(new RegExp(`\\b${module.name}(?:\\.(\\w+)|\\[['"]([\\w-]+)['"]\\])`, 'g'))]
+    .map((match) => new RegExp(`\\.${escapeRe(match[1] ?? match[2])}(?![\\w-])`))
+  return cssRules(module.css).filter((rule) => classes.some((re) => re.test(rule.selector)))
+    .map((rule) => ({ selector: rule.selector.replace(/\s+/g, ' ').trim(), look: declarations(rule.body).filter((d) => LOOK_PROP.test(d.prop)) }))
+    .filter((rule) => rule.look.length)
+}
+
 /** (b) JSX：持ち主の部品に見た目の className / style を渡している所（幅・余白・並びだけのものは数えない）。 */
 export function scanPropOverrides(pattern, rel, content, codeRoot = null, read = safeRead) {
   const p = pattern._code
@@ -286,7 +295,11 @@ export function scanPropOverrides(pattern, rel, content, codeRoot = null, read =
     const expr = propExpression(content, m.index + m[0].length)
     if (!overrideLooks(m[2], expr, module)) continue
     const line = lineAt(content, at + 1)
-    hits.push({ file: rel, line, kind: `prop:${m[2]}`, component: m[1], text: (lines[line - 1] ?? '').trim().slice(0, 180), scope: scopeOf(rel) })
+    // 行全体を比べると onOpen・detailKey・改行だけの変更も新規になる。
+    // 部品・上書きの値・そのクラスの見た目を比べ、CSSの値の変更も見逃さない。
+    const visualRules = m[2] === 'className' ? classLookRules(expr, module) : []
+    const identity = JSON.stringify([m[1], m[2], expr.replace(/\s+/g, ' ').trim(), visualRules])
+    hits.push({ file: rel, line, kind: `prop:${m[2]}`, component: m[1], identity, text: (lines[line - 1] ?? '').trim().slice(0, 180), scope: scopeOf(rel) })
   }
   return hits
 }
@@ -389,6 +402,7 @@ export function scanHardcoded(patterns, rel, content, glob) {
 }
 
 export function scanCode(catalog, codeRoot, patterns = catalog.patterns) {
+  cache.clear()
   const glob = catalog._global
   const files = CODE_ROOTS.flatMap((sub) => walkFiles(join(codeRoot, sub)))
   const a = Object.fromEntries(patterns.map((p) => [p.id, []]))
@@ -728,7 +742,7 @@ export function codeFindings(report) {
 }
 
 export function newCodeFindings(before, after) {
-  const key = (hit) => JSON.stringify([hit.category, hit.pattern, hit.file, hit.kind ?? hit.signal, hit.text.replace(/\s+/g, ' ').trim()])
+  const key = (hit) => JSON.stringify([hit.category, hit.pattern, hit.file, hit.kind ?? hit.signal, hit.identity ?? hit.text.replace(/\s+/g, ' ').trim()])
   const remaining = new Map()
   for (const hit of codeFindings(before)) {
     const id = key(hit)

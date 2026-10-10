@@ -131,7 +131,7 @@ export async function customerAvailability(
           const occupied = (
             await db
               .prepare(
-                `SELECT l.table_id FROM rt_reservations JOIN rt_reservation_table_links l ON l.reservation_id=rt_reservations.id WHERE store_id=? AND id<>? AND status NOT IN ('cancelled','no_show') AND (status<>'pending' OR hold_expires_at IS NULL OR julianday(hold_expires_at)>julianday('now')) AND julianday(starts_at)<julianday(?) AND julianday(ends_at)>julianday(?) UNION SELECT l.table_id FROM rt_seat_waitlist JOIN rt_seat_waitlist_table_links l ON l.waitlist_id=rt_seat_waitlist.id WHERE store_id=? AND status='invited' AND julianday(hold_expires_at)>julianday('now') AND julianday(starts_at)<julianday(?) AND julianday(ends_at)>julianday(?)`,
+                `SELECT l.table_id FROM rt_reservations JOIN rt_reservation_table_links l ON l.reservation_id=rt_reservations.id WHERE store_id=? AND id<>? AND departed_at IS NULL AND status NOT IN ('cancelled','no_show') AND (status<>'pending' OR hold_expires_at IS NULL OR julianday(hold_expires_at)>julianday('now')) AND julianday(starts_at)<julianday(?) AND julianday(ends_at)>julianday(?) UNION SELECT l.table_id FROM rt_seat_waitlist JOIN rt_seat_waitlist_table_links l ON l.waitlist_id=rt_seat_waitlist.id WHERE store_id=? AND status='invited' AND julianday(hold_expires_at)>julianday('now') AND julianday(starts_at)<julianday(?) AND julianday(ends_at)>julianday(?)`,
               )
               .bind(
                 store.id,
@@ -151,7 +151,7 @@ export async function customerAvailability(
         const inventories = (
           await db
             .prepare(
-              `SELECT i.line_capacity,(SELECT COALESCE(SUM(r.guest_count),0) FROM rt_reservations r WHERE r.store_id=i.store_id AND r.source='line' AND r.id<>? AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(i.starts_at,'+'||i.slot_minutes||' minutes') AND julianday(r.ends_at)>julianday(i.starts_at)) used FROM rt_inventory_slots i WHERE i.store_id=? AND julianday(i.starts_at)<julianday(?) AND julianday(i.starts_at,'+'||i.slot_minutes||' minutes')>julianday(?)`,
+              `SELECT i.line_capacity,(SELECT COALESCE(SUM(r.guest_count),0) FROM rt_reservations r WHERE r.store_id=i.store_id AND r.source='line' AND r.id<>? AND r.status NOT IN ('cancelled','no_show') AND r.departed_at IS NULL AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(i.starts_at,'+'||i.slot_minutes||' minutes') AND julianday(r.ends_at)>julianday(i.starts_at)) used FROM rt_inventory_slots i WHERE i.store_id=? AND julianday(i.starts_at)<julianday(?) AND julianday(i.starts_at,'+'||i.slot_minutes||' minutes')>julianday(?)`,
             )
             .bind(excludeId ?? '', store.id, endsAt, startsAt)
             .all<{ line_capacity: number; used: number }>()

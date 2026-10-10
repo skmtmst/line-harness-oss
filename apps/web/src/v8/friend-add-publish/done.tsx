@@ -10,7 +10,7 @@ import { Activity, Check, Link2, List } from 'lucide-react'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import { PUBLISH_STEPS, editStepHref } from './flow'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import styles from './publish.module.css'
 
 export default function FriendAddDoneV8({ ruleId, ruleName, routeNames, priority, slackConnected }: {

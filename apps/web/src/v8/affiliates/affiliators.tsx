@@ -1,4 +1,7 @@
 'use client'
+
+import { useListItemHref } from '@/components/shared/list-navigation'
+import { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import { useListUrlJsonValue } from '@/components/shared/list-url-state'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
@@ -21,7 +24,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { RowNameLink, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { ListPagePagination } from '@/components/templates'
 import {
@@ -132,7 +135,8 @@ export default function AffiliatorsTab() {
   const [resumeTarget, setResumeTarget] = useState<{ id: string; name: string } | null>(null)
   const [resuming, setResuming] = useState(false)
   const [resumeError, setResumeError] = useState('')
-  const [drawerId, setDrawerId] = useState<string | null>(null)
+  const [drawerId, setDrawerId] = useDetailPanelUrl('affiliate')
+  const itemHref = useListItemHref()
   const [drawerEdit, setDrawerEdit] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [bulkConfirm, setBulkConfirm] = useState(false)
@@ -535,7 +539,7 @@ export default function AffiliatorsTab() {
         </thead>
         <tbody>
           {pagedRows.map((row, saveFieldIndex) => (
-            <Tr key={row.id} className={styles.row} data-table-layout="columns" data-row-id={row.id}>
+            <Tr key={row.id} className={styles.row} data-table-layout="columns" data-row-id={row.id} detailKey="affiliate" onOpen={() => { setDrawerId(current => current === row.id ? null : row.id); setDrawerEdit(false) }}>
               <Td className={styles.colCheck}>
                 {readonly ? null : (
                   <SaveErrorField names={[`pagedRows.${saveFieldIndex}.id`,"id","row.id","checked"]}><Checkbox
@@ -634,9 +638,9 @@ export default function AffiliatorsTab() {
 
   function nameButton(row: { id: string; name: string }) {
     return (
-      <button type="button" className={styles.rowName} title={row.name}  onClick={() => openDrawer(row.id, false)}>
+      <RowNameLink onOpen={() => openDrawer(row.id, false)} href={itemHref('affiliate', row.id)} className={styles.rowName} title={row.name}>
         {row.name}
-      </button>
+      </RowNameLink>
     )
   }
   const drawerRow = drawerId ? rows.find((row) => row.id === drawerId) ?? null : null
@@ -679,7 +683,6 @@ export default function AffiliatorsTab() {
             linkBaseUrl={linkBaseUrl}
             onClose={() => {
               setDrawerId(null)
-              if (focusAffiliateId) samePageUrl.replace('/affiliates')
             }}
             onChanged={() => { void loadList(); void loadApprovals({ fresh: true }) }}
             onStopRequest={(id, name) => setArchiveTarget({ id, name })}

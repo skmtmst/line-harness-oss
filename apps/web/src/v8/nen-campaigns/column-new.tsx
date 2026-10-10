@@ -1,35 +1,36 @@
 'use client'
 
-import { createPageReturnHref } from '@/components/shared/create-page'
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { Image as ImageIcon, Save, Type } from 'lucide-react'
-import type { Tag } from '@line-crm/shared'
-import { CreatePage } from '@/components/templates'
+import { createPageReturnHref } from '@/components/shared/create-page';
+import { useEffect, useState } from 'react';
+import { Image as ImageIcon, Save, Type } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { Eye } from 'lucide-react';
+import type { Tag } from '@line-crm/shared';
+import { CreatePage } from '@/components/templates';
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Drawer from '@/components/shared/drawer'
 import DateTimeField from '@/components/shared/date-time-field'
-import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
+import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview';
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import RadioCard from '@/components/shared/radio-card'
 import MediaSlot from '@/components/shared/media-slot'
-import { uploadImageFile } from '@/components/shared/media-library-upload'
-import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import { TextField } from '@/components/shared/text-field'
-import { FieldError, Field } from '@/components/shared/form-controls'
-import { focusFormField } from '@/lib/use-field-validation'
-import { api, ApiError } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { formatNumber } from '@/lib/format'
-import { CATEGORY_MAX, EMPTY_DRAFT, EXCERPT_MAX, TITLE_MAX, TITLE_NOTICE_LENGTH, canSubmit, failureOf, toCreateInput, titleNotice, validateDraft, visibleAccountTags, type ColumnDraft, type Failure } from './column-form'
+import { uploadImageFile } from '@/components/shared/media-library-upload';
+import { EntityKindField } from '@/components/shared/entity-picker-sources';
+import { TextField } from '@/components/shared/text-field';
+import { FieldError, Field } from '@/components/shared/form-controls';
+import { focusFormField } from '@/lib/use-field-validation';
+import { api, ApiError } from '@/lib/api';
+import { useAccount } from '@/contexts/account-context';
+import { useStaffRole, canManageRole } from '@/lib/staff-role';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
+import { formatNumber } from '@/lib/format';
+import { CATEGORY_MAX, EMPTY_DRAFT, EXCERPT_MAX, TITLE_MAX, TITLE_NOTICE_LENGTH, canSubmit, failureOf, toCreateInput, titleNotice, validateDraft, visibleAccountTags, type ColumnDraft, type Failure } from './column-form';
 import styles from './form.module.css'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*

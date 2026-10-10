@@ -88,8 +88,8 @@ function TodayStore() {
     if (!d.accountId) return
     setBusyId(id)
     try {
-      await restaurantTestApi.postSeatVisitMark(d.accountId, id, { kind: 'visited' })
-      notifyToast('来店にしました。')
+      const response=await restaurantTestApi.postSeatVisitMark(d.accountId, id, { kind: 'visited',expectedVersion:d.today?.find(r=>r.id===id)?.customer_version??1,requestId:crypto.randomUUID() })
+      notifyToast(response?.data?.stamp?.status==='recorded'?`来店にしました。スタンプ ${response.data.stamp.count} 個を確認しました。`:'来店にしました。')
       await d.reload()
     } catch (caught) {
       notifyToast(caught instanceof Error && caught.message ? caught.message : '来店にできませんでした。', { tone: 'error' })
@@ -103,7 +103,7 @@ function TodayStore() {
     if (!d.accountId) return
     setBusyId(id)
     try {
-      await restaurantTestApi.deleteSeatVisitMark(d.accountId, id)
+      await restaurantTestApi.deleteSeatVisitMark(d.accountId, id,d.today?.find(r=>r.id===id)?.customer_version??1,crypto.randomUUID())
       notifyToast('来店の印を取り消しました。')
     } catch (caught) {
       notifyToast(caught instanceof Error && caught.message ? caught.message : '取り消せませんでした。', { tone: 'error' })
@@ -213,9 +213,10 @@ function TodayStore() {
         ) : null}
         <DashboardRow
           variant="restaurant" asideSize="restaurant"
-          aside={<SidePanel media={d.media} google={google} latestReview={d.latestReview} canWrite={canWrite} now={now} />}
+          aside={<SidePanel rotation={d.rotation} media={d.media} google={google} latestReview={d.latestReview} canWrite={canWrite} now={now} />}
         >
           <TodayTable
+            onDeparture={async(id,undo)=>{setBusyId(id);try{await restaurantTestApi.attendance(d.accountId,id,{action:undo?'undo_departure':'depart',expectedVersion:d.today?.find(r=>r.id===id)?.customer_version??1,requestId:crypto.randomUUID()});notifyToast(undo?'退店を訂正しました。':'退店にしました。卓が空きました。')}catch(e){notifyToast(e instanceof Error?e.message:'退店を保存できませんでした。',{tone:'error'})}finally{await d.reload();setBusyId('')}}}
             rows={d.today} tables={tables} storeName={d.store?.name}
             canWrite={canWrite}
             busyId={busyId}
@@ -230,6 +231,7 @@ function TodayStore() {
   return (
     <SaveErrorScope errors={saveErrors}><DashboardPage
       boardId="hKRRF"
+      layout="restaurant"
       subtitle={d.store ? headDescription(d.hours,d.updatedAt) : undefined}
       title="今日のお店"
       help="お店の今日の予約と運用状況です。"

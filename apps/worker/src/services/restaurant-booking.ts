@@ -6,7 +6,7 @@ export async function expireRestaurantHolds(db: D1Database, now = new Date().toI
     WHERE status = 'pending' AND hold_expires_at IS NOT NULL AND datetime(hold_expires_at) <= datetime(?)
       AND (? IS NULL OR store_id = ?) AND (? IS NULL OR store_id IN (SELECT id FROM rt_stores WHERE organization_id = ?))`)
     .bind(now, storeId ?? null, storeId ?? null, organizationId ?? null, organizationId ?? null).run();
-  if (result.meta.changes) await db.prepare(`UPDATE rt_inventory_slots SET reserved_count = COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id = rt_inventory_slots.store_id AND r.status NOT IN ('cancelled', 'no_show') AND datetime(r.starts_at) < datetime(rt_inventory_slots.starts_at, '+' || rt_inventory_slots.slot_minutes || ' minutes') AND datetime(r.ends_at) > datetime(rt_inventory_slots.starts_at)), 0) WHERE (? IS NULL OR store_id = ?) AND (? IS NULL OR store_id IN (SELECT id FROM rt_stores WHERE organization_id = ?))`).bind(storeId ?? null, storeId ?? null, organizationId ?? null, organizationId ?? null).run();
+  if (result.meta.changes) await db.prepare(`UPDATE rt_inventory_slots SET reserved_count = COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id = rt_inventory_slots.store_id AND r.status NOT IN ('cancelled', 'no_show') AND r.departed_at IS NULL AND datetime(r.starts_at) < datetime(rt_inventory_slots.starts_at, '+' || rt_inventory_slots.slot_minutes || ' minutes') AND datetime(r.ends_at) > datetime(rt_inventory_slots.starts_at)), 0) WHERE (? IS NULL OR store_id = ?) AND (? IS NULL OR store_id IN (SELECT id FROM rt_stores WHERE organization_id = ?))`).bind(storeId ?? null, storeId ?? null, organizationId ?? null, organizationId ?? null).run();
   return result.meta.changes;
 }
 

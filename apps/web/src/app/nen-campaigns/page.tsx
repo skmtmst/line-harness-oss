@@ -1,5 +1,7 @@
 'use client'
 
+import { useDetailPanelUrl } from '@/components/shared/detail-panel'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -78,8 +80,8 @@ export default function NenCampaignsPage() {
   const [savingCoupon, setSavingCoupon] = useState(false)
   const [saving, setSaving] = useState<string | null>(null)
   const [testing, setTesting] = useState<string | null>(null)
-  const [previewCampaignKey, setPreviewCampaignKey] = useState<string | null>(null)
-  const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null)
+  const [previewCampaignKey, setPreviewCampaignKey] = useDetailPanelUrl('campaign')
+  const [selectedColumnId, setSelectedColumnId] = useDetailPanelUrl('column')
   const [audienceCount, setAudienceCount] = useState<number | null>(null)
   const [plan, setPlan] = useState<ColumnDeliveryPlan>(() => ({ when: 'now', scheduledAt: defaultScheduleLocal(new Date()) }))
   const [introDraft, setIntroDraft] = useState('')
@@ -188,7 +190,6 @@ export default function NenCampaignsPage() {
   loadTabRef.current = loadTab
   useEffect(() => {
     loadedTabs.current.clear()
-    setSelectedColumnId(null)
     void loadTab(tabRef.current)
   }, [loadTab])
   useEffect(() => {
@@ -239,6 +240,7 @@ export default function NenCampaignsPage() {
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
     dirty: introDirty,
     busy: savingColumnId !== null,
+    handlesLocalLink: (destination) => destination.searchParams.has('column'),
   })
   const [pendingColumnSelect, setPendingColumnSelect] = useState<{ id: string | null } | null>(null)
   const selectColumn = (id: string | null) => {

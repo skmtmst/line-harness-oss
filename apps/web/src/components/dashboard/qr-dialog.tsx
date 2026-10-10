@@ -73,7 +73,9 @@ export default function QrDialog({
   visualReferenceQr = false,
   routes: routesProp,
   routesPending: routesPendingProp,
+  direct,
 }: {
+  direct?:{title:string;description:string;content?:React.ReactNode;footer?:React.ReactNode;qrContent?:React.ReactNode;downloads?:boolean}
   open: boolean
   onClose: () => void
   accountName: string
@@ -278,13 +280,13 @@ export default function QrDialog({
     if (!printWindow) return
     printWindow.opener = null
     const doc = printWindow.document
-    doc.title = `${accountName} 友だち追加QRコード`
+    doc.title = `${accountName} ${direct?.title??'友だち追加QRコード'}`
     const style = doc.createElement('style')
     style.textContent = 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;padding:48px;text-align:center;color:#1a1c1a}main{max-width:560px;margin:0 auto}img{width:360px;height:360px;object-fit:contain}h1{font-size:22px;margin:24px 0 8px}p{font-size:12px;color:#565f59;word-break:break-all}@media print{body{padding:20mm}}'
     doc.head.appendChild(style)
     const main = doc.createElement('main')
     const image = doc.createElement('img')
-    image.alt = '友だち追加QRコード'
+    image.alt = direct?.title??'友だち追加QRコード'
     image.src = qrSrc
     const heading = doc.createElement('h1')
     heading.textContent = accountName
@@ -304,7 +306,7 @@ export default function QrDialog({
       className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4"
       role="dialog"
       aria-modal="true"
-      aria-label="友だち追加のQRコード"
+      aria-label={direct?.title??'友だち追加のQRコード'}
       onClick={onClose}
     >
       <div
@@ -315,9 +317,9 @@ export default function QrDialog({
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-ink text-base font-bold">友だち追加のQRコード</h2>
+            <h2 className="text-ink text-base font-bold">{direct?.title??'友だち追加のQRコード'}</h2>
             <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-              チラシ・店頭POP・名刺などに印刷して使えます。読み取ると友だち追加の画面が開きます。
+              {direct?.description??'チラシ・店頭POP・名刺などに印刷して使えます。読み取ると友だち追加の画面が開きます。'}
             </p>
           </div>
           <button
@@ -337,7 +339,7 @@ export default function QrDialog({
               パネルの内側に収まらず横にはみ出していた。正方形は保つ。
             */}
             <div className="bg-canvas-sunken rounded-panel flex aspect-square w-full max-w-[280px] items-center justify-center">
-              {routeStopped ? (
+              {direct?.qrContent ? direct.qrContent : routeStopped ? (
                 <p className="text-ink-secondary px-4 text-center text-xs leading-relaxed" role="alert">
                   この経路は停止しています。QRコードは表示しません。
                   {stoppedDetail ? <><br />{stoppedDetail}</> : null}
@@ -352,7 +354,7 @@ export default function QrDialog({
                 /* eslint-disable-next-line @next/next/no-img-element -- Worker のQRプロキシ。静的アセットではない */
                 <img
                   src={qrDataUrl || qrSrc}
-                  alt="友だち追加QRコード"
+                  alt={direct?.title??'友だち追加QRコード'}
                   width={220}
                   height={220}
                   className="aspect-square h-auto w-full max-w-[220px]"
@@ -373,7 +375,8 @@ export default function QrDialog({
           </div>
 
           <div className="min-w-0 space-y-4">
-            <div>
+            {direct?.content}
+            {!direct?<div>
               <label htmlFor="qr-route" className="text-ink-secondary mb-1 block text-xs font-medium">
                 発行中の追加URL
               </label>
@@ -406,9 +409,8 @@ export default function QrDialog({
                   選んだ経路のQRコードとURLが表示されます。
                 </p>
               )}
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+            </div>:null}
+            {!direct||direct.downloads?<><div className="grid gap-3 sm:grid-cols-[1fr_auto]">
               <div>
                 <label htmlFor="qr-size" className="text-ink-secondary mb-1 block text-xs font-medium">
                   画像の大きさ
@@ -452,7 +454,7 @@ export default function QrDialog({
                 htmlFor="qr-link"
                 className="text-ink-secondary mb-1 block text-xs font-medium"
               >
-                友だち追加リンク
+                {direct?'来店スタンプのリンク':'友だち追加リンク'}
               </label>
               {/*
                 コピー操作は入力欄の外の独立した列へ出す（DASH-20）。
@@ -487,7 +489,7 @@ export default function QrDialog({
                   ? 'コピーできませんでした。上のURLを選択してコピーしてください'
                   : copyState === 'copied'
                     ? 'コピーしました ✓'
-                    : 'このURLから追加された友だちは、流入元を記録して計測できます。'}
+                    : (direct?'このQRを読んだ本人に押印します。':'このURLから追加された友だちは、流入元を記録して計測できます。')}
               </p>
             </div>
 
@@ -539,10 +541,12 @@ export default function QrDialog({
               <h3 className="text-ink text-sm font-bold">使うときのヒント</h3>
               <ul className="text-ink-faint mt-2 space-y-1 text-xs leading-relaxed">
                 <li>・印刷には「大（1024px）」を選んでください（小さいと読み取れないことがあります）</li>
-                <li>・流入経路ごとにリンクを分けると、どこから来たかを計測できます</li>
+                <li>{direct?'・店頭のQRは同じ日に1回までです':'・流入経路ごとにリンクを分けると、どこから来たかを計測できます'}</li>
                 <li>・QRの周囲は余白を1cm以上あけてください</li>
               </ul>
             </div>
+            </>:null}
+            {direct?.footer}
           </div>
         </div>
       </div>

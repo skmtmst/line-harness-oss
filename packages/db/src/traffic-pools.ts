@@ -1,4 +1,4 @@
-import { jstNow } from './utils.js';
+import { jstNow, nextVersionToken } from './utils.js';
 import { resolveLineCredential } from './line-accounts.js';
 // =============================================================================
 // Traffic Pools — instant account switching via /pool/:slug
@@ -100,7 +100,12 @@ export async function createTrafficPool(
   return (await getTrafficPoolById(db, id))!;
 }
 
+export class TrafficPoolSaveConflict extends Error {
+  constructor(public updatedAt: string) { super('traffic_pool_save_conflict'); }
+}
+
 export interface UpdateTrafficPoolInput {
+  expectedUpdatedAt?: string;
   name?: string;
   activeAccountId?: string;
   isActive?: boolean;
@@ -111,6 +116,11 @@ export async function updateTrafficPool(
   id: string,
   updates: UpdateTrafficPoolInput,
 ): Promise<TrafficPoolWithAccount | null> {
+  const existing = await getTrafficPoolById(db, id);
+  if (!existing) return null;
+  if (updates.expectedUpdatedAt !== undefined && updates.expectedUpdatedAt !== existing.updated_at) {
+    throw new TrafficPoolSaveConflict(existing.updated_at);
+  }
   const fields: string[] = [];
   const values: unknown[] = [];
 
@@ -130,13 +140,19 @@ export async function updateTrafficPool(
   if (fields.length === 0) return getTrafficPoolById(db, id);
 
   fields.push('updated_at = ?');
-  values.push(jstNow());
+  values.push(nextVersionToken(existing.updated_at));
   values.push(id);
 
-  await db
-    .prepare(`UPDATE traffic_pools SET ${fields.join(', ')} WHERE id = ?`)
+  values.push(existing.updated_at);
+  const result = await db
+    .prepare(`UPDATE traffic_pools SET ${fields.join(', ')} WHERE id = ? AND updated_at = ?`)
     .bind(...values)
     .run();
+  if (result.meta.changes !== 1) {
+    const latest = await getTrafficPoolById(db, id);
+    if (!latest) return null;
+    throw new TrafficPoolSaveConflict(latest.updated_at);
+  }
 
   return getTrafficPoolById(db, id);
 }

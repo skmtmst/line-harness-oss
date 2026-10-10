@@ -4,7 +4,7 @@ import { jstDateOffset, jstDate } from '@/lib/jst-datetime'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { CalendarRange, CircleDot, Download, History, Plus, TrendingDown, TrendingUp, Undo2 } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import {

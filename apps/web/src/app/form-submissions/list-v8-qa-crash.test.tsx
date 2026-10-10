@@ -110,6 +110,7 @@ const flush = async (n = 20) => {
   for (let i = 0; i < n; i += 1) await act(async () => { await vi.advanceTimersByTimeAsync(25) })
 }
 beforeEach(() => {
+  window.history.replaceState(null, '', '/form-submissions')
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
   unassignedData = []
   formsDeleteImpact.mockReset()

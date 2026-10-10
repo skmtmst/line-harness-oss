@@ -12,9 +12,9 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Check } from 'lucide-react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import type { Tag } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'

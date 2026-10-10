@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
+import Link from '@/components/shared/list-navigation'
 import { ArrowRight, ChevronLeft } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import type { FriendField, ReminderDraftSettings, ReminderDraftStep, ReminderDraftVersion } from '@line-crm/shared'

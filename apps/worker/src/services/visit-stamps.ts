@@ -55,12 +55,12 @@ export function validateStampSettings(s: VisitStampSettings): void {
   for(const r of s.rankMultipliers)if(typeof r.tagName!=='string'||!r.tagName.trim()||r.tagName.length>100)throw new StampError('ランクのタグ名を確認してください');
 }
 /** 基本→初回→時間の倍率（配列順）→最高ランク→切捨て→上限。店の暦で判定。 */
-export function calculateVisitStamps(s:VisitStampSettings,amount:number,at:string,first:boolean,tagNames:string[]):number {
+export function calculateVisitStamps(s:VisitStampSettings,amount:number,at:string,first:boolean,tagNames:string[],baseCount?:number):number {
   const date=new Date(at),parts=new Intl.DateTimeFormat('en-US',{timeZone:s.timezone,weekday:'short',hour:'numeric',minute:'numeric',hourCycle:'h23'}).formatToParts(date);
   const part=(key:string)=>parts.find(p=>p.type===key)!.value;
   const weekday=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(part('weekday')),minute=Number(part('hour'))*60+Number(part('minute'));
   const bonus=first?s.firstVisitBonus:0,after=s.stackingOrder==='multipliers_then_bonus';
-  let count=(s.mode==='visit'?1:Math.floor(amount/s.amountUnit))+(after?0:bonus);
+  let count=(baseCount??(s.mode==='visit'?1:Math.floor(amount/s.amountUnit)))+(after?0:bonus);
   if(s.maxStackedStamps!==undefined)count=Math.min(s.maxPerVisit,count);
   for(const m of s.multipliers) if(m.active!==false&&(!m.from||date.getTime()>=Date.parse(m.from))&&(!m.to||date.getTime()<Date.parse(m.to))&&(!m.weekdays||m.weekdays.includes(weekday))
     &&(m.startMinute===undefined||(minute>=m.startMinute&&minute<m.endMinute!)))count*=m.multiplier;
@@ -82,6 +82,16 @@ export function stampExpiryExpression(s:VisitStampSettings,at:string):{sql:strin
     AND e.idempotency_key<>'@receipt-bonus' ORDER BY julianday(e.occurred_at),e.rowid LIMIT 1),?),'+9 hours') AS anchor))`,
     args:[`+${s.expiryMonths} months`,`+${s.expiryMonths+1} months`,at]};
 }
+/** 間隔は店頭QRだけ。制限なしでも日本時間で同日1回。 */
+export function storefrontStampIntervalCondition(s:VisitStampSettings,at:string,exempt=true):{sql:string;args:unknown[]} {
+ if(exempt)return {sql:'1=1',args:[]};
+ const hours=s.stampInterval?.mode==='hours'?s.stampInterval.hours:undefined;
+ return {sql:`NOT EXISTS(SELECT 1 FROM visit_stamp_entries e WHERE e.card_id=w.card_id AND e.friend_id=w.friend_id
+ AND e.kind='visit' AND e.visit_key LIKE 'storefront:%' AND e.delta>0
+ AND NOT EXISTS(SELECT 1 FROM visit_stamp_entries r WHERE r.original_id=e.id AND r.kind='reverse')
+ AND (date(e.occurred_at,'+9 hours')>=date(?,'+9 hours')${hours?' OR julianday(e.occurred_at)>julianday(?)-?/24.0':''}))`,args:hours?[at,at,hours]:[at]};
+}
+
 export function stampIntervalCondition(s:VisitStampSettings,at:string,exempt=false):{sql:string;args:unknown[]} {
   const interval=s.stampInterval;
   if(exempt||!interval||interval.mode==='none')return {sql:'1=1',args:[]};

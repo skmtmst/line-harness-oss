@@ -611,3 +611,6 @@
 .sourcePicker{flex-basis: var(--tpl-rest1-restaurant-reservations-reservations-flex-basis-1);width: var(--tpl-rest1-restaurant-reservations-reservations-width-1);}
 
 .nextActions{align-items:center;justify-content:space-between;}.nextActions > *{flex:0 0 auto;}.nextBox{gap: var(--tpl-rest1-restaurant-reservations-reservations-gap-4);}.sideCard{gap: var(--tpl-rest1-restaurant-reservations-reservations-gap-1);}.sideLink{font-size: var(--tpl-rest1-restaurant-reservations-reservations-font-size-1);line-height: var(--tpl-rest1-restaurant-reservations-reservations-line-height-1);}
+
+.filterField[data-filter='period'] { --tpl-rs-rsv-filter-w: var(--tpl-rs-rsv-period-w); }
+.filterField[data-filter='status'] { --tpl-rs-rsv-filter-w: var(--tpl-rs-rsv-status-w); }

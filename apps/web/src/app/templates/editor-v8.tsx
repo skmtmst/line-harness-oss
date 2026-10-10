@@ -12,7 +12,7 @@
  * 離脱番兵（保存せずに離れますか）はここで受け持つ。各画面は dirty を
  * 渡すだけで、戻る・リンク・タブ終了の3経路が同じ確認を出す。
  */
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { ChevronLeft } from 'lucide-react'
 import type { ReactNode } from 'react'
 import Button from '@/components/shared/button'

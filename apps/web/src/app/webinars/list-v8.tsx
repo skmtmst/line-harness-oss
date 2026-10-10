@@ -1,7 +1,7 @@
 'use client'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { CalendarClock, MousePointerClick, Users, Video } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { TableHeadRow, Th } from '@/components/shared/table'

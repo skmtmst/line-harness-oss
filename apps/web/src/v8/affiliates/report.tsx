@@ -1,10 +1,12 @@
 'use client'
 
+import { useDetailPanelUrl } from '@/components/shared/detail-panel'
+
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListItemHref, useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Banknote, CalendarDays, Download, ListOrdered, ReceiptText, ShoppingBag, Trophy, Users } from 'lucide-react'
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
@@ -14,7 +16,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { RowNameLink, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import {
   downloadCsv,
   formatYen,
@@ -89,7 +91,8 @@ export default function ReportTab() {
   const [saved, setSaved] = useState('')
   /* 見方の札を押したか（はじめはアフィリエイターごとで、どちらの札も押していない形）。 */
   const [viewPicked, setViewPicked] = useState(false)
-  const [drawerRow, setDrawerRow] = useState<AffiliateListRow | null>(null)
+  const [drawerId, setDrawerId] = useDetailPanelUrl('affiliate')
+  const itemHref = useListItemHref()
   const [archiveTarget, setArchiveTarget] = useState<{ id: string; name: string } | null>(null)
   const requestSeq = useRef(0)
 
@@ -201,12 +204,10 @@ export default function ReportTab() {
     return `${base}（${diff > 0 ? '+' : '−'}¥${formatNumber(Math.abs(diff))}）`
   }
 
-  const openDrawer = (id: string) => {
-    const affiliate = affiliates.find((a) => a.id === id)
-    if (!affiliate) return
-    const agg = affiliateRows.find((row) => row.id === id)
-    setDrawerRow({ ...affiliate, totalClicks: 0, totalConversions: agg?.conversions ?? 0, totalRevenue: agg?.revenue ?? 0, rewardAmount: agg?.reward ?? 0, linkCount: 0, friendAdds: 0 })
-  }
+  const affiliate = affiliates.find(a => a.id === drawerId)
+  const agg = affiliateRows.find(row => row.id === drawerId)
+  const drawerRow: AffiliateListRow | null = affiliate ? { ...affiliate, totalClicks: 0, totalConversions: agg?.conversions ?? 0, totalRevenue: agg?.revenue ?? 0, rewardAmount: agg?.reward ?? 0, linkCount: 0, friendAdds: 0 } : null
+  const openDrawer = (id: string) => setDrawerId(current => current === id ? null : id)
 
   const loadingWord = '読み込んでいます'
   const errorWord = '読み込めませんでした'
@@ -301,11 +302,11 @@ export default function ReportTab() {
         </thead>
         <tbody>
           {shown.map((row) => (
-            <Tr data-row-id={row.id} key={row.id} className={styles.row} data-table-layout="columns" onOpen={() => openDrawer(row.id)}>
+            <Tr data-row-id={row.id} key={row.id} className={styles.row} data-table-layout="columns" detailKey="affiliate" onOpen={() => openDrawer(row.id)}>
               <Td className={styles.colName}><FolderDotName>
                 <span className={styles.stack}>
                   {view === 'affiliate' ? (
-                    <button type="button" className={styles.rowLink} title={row.name}  onClick={() => openDrawer(row.id)}>{row.name}</button>
+                    <RowNameLink onOpen={() => setDrawerId(row.id)} href={itemHref('affiliate', row.id)} className={styles.rowLink} title={row.name}>{row.name}</RowNameLink>
                   ) : (
                     <span className={styles.rowLinkText} ><TruncatedText value={String(row.name ?? '')} /></span>
                   )}
@@ -367,7 +368,7 @@ export default function ReportTab() {
             readonly={readonly}
             startInEdit={false}
             linkBaseUrl={null}
-            onClose={() => setDrawerRow(null)}
+            onClose={() => setDrawerId(null)}
             onChanged={() => { void load() }}
             onStopRequest={(id, name) => setArchiveTarget({ id, name })}
           />

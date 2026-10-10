@@ -1,6 +1,6 @@
 'use client'
 import CopyTextButton from '@/components/shared/copy-text-button'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CircleHelp, Pause, Play, Plus, RefreshCw } from 'lucide-react'
 import { ApiError, api, type MeasurementSite } from '@/lib/api'

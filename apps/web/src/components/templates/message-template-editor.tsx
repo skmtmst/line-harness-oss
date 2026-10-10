@@ -1,7 +1,7 @@
 'use client'
 
 import EntitySelect from '@/components/shared/entity-select'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useRef, type ReactNode } from 'react'
 import { listInterpolations, validateFlexContent, type CommonVar, type FriendField } from '@line-crm/shared'
 import { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'

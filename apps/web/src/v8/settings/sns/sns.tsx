@@ -1,6 +1,7 @@
 'use client'
 import React, { useCallback, useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Camera, RefreshCw, Settings } from 'lucide-react'
 import type { InstagramConnectionStatus } from '@line-crm/shared'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'

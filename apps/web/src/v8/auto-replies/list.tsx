@@ -1,33 +1,43 @@
 'use client'
-import { Clock, Activity, Ban, ChevronDown, CircleCheck, CircleHelp, Copy, Folder as FolderIcon, Layers, MessageSquare, Pause, Pencil, Square, Play, Trash2, TriangleAlert, Zap, Bookmark, Eye, Plus } from 'lucide-react'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
-import { scheduleChipLabels, scheduleText, LOAD_STATE_WORDS, NO_WRITE_PERMISSION, actionShortWord, autoReplyMatchesQuery, conditionChips, responseTypeWord, stopNote, templateWord, triggerSummary, isCurrentAutoReplyLoad, visibleAutoReplyLoadState, type LoadState } from './words'
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { Clock, Activity, Ban, ChevronDown, CircleCheck, CircleHelp, Copy, Folder as FolderIcon, Layers, MessageSquare, Pause, Pencil, Square, Play, Trash2, TriangleAlert, Zap, Bookmark, Eye, Plus } from 'lucide-react';
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import { scheduleChipLabels, scheduleText, LOAD_STATE_WORDS, NO_WRITE_PERMISSION, actionShortWord, autoReplyMatchesQuery, conditionChips, responseTypeWord, stopNote, templateWord, triggerSummary, isCurrentAutoReplyLoad, visibleAutoReplyLoadState, type LoadState } from './words';
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+
+import { RowNameLink } from '@/components/shared/table';
+
+
+
+
+
 import SharedStatusPill from '@/components/shared/status-pill'
-import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
-import { useListUrlValue, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { RovingTbody } from '@/components/shared/row-roving'
-import { ListPage, ListPagePagination } from '@/components/templates'
+import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar';
+import { useListUrlValue, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state';
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { RovingTbody } from '@/components/shared/row-roving';
+import { ListPage, ListPagePagination } from '@/components/templates';
 import SearchField from '@/components/shared/search-field'
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import type { Folder } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
-import { clampSearchQuery } from '@/lib/search-query'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { formatNumber } from '@/lib/format'
-import { isForbiddenOrRateLimited, permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { notifyToast } from '@/components/shared/toast'
-import { runUndoable } from '@/lib/undoable'
-import { useLiveReorder } from '@/lib/use-live-reorder'
-import { DelayedSkeleton } from '@/components/shared/skeleton'
-import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
-import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+
+
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+
+import type { Folder } from '@line-crm/shared';
+import { api, ApiError } from '@/lib/api';
+import { clampSearchQuery } from '@/lib/search-query';
+import { useAccount } from '@/contexts/account-context';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { formatNumber } from '@/lib/format';
+import { isForbiddenOrRateLimited, permissionDeniedMessage } from '@/components/shared/api-error-message';
+import { notifyToast } from '@/components/shared/toast';
+import { runUndoable } from '@/lib/undoable';
+import { useLiveReorder } from '@/lib/use-live-reorder';
+import { DelayedSkeleton } from '@/components/shared/skeleton';
+import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table';
+import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot';
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import KpiCard from '@/components/shared/kpi-card'
@@ -40,21 +50,21 @@ import TagOverflow from '@/components/shared/tag-overflow'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import { Field } from '@/components/shared/form-controls'
-import { TextField } from '@/components/shared/text-field'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import { withViewTransition } from '@/components/shared/view-transition'
+import { Field } from '@/components/shared/form-controls';
+import { TextField } from '@/components/shared/text-field';
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu } from '@/components/shared/row-actions';
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
+import { withViewTransition } from '@/components/shared/view-transition';
 import Pagination from '@/components/shared/pagination'
 import ReorderHandle from '@/components/shared/reorder-handle'
-import { compareEvaluationOrder, movePriorityUpdates } from './order'
+import { compareEvaluationOrder, movePriorityUpdates } from './order';
 import QuickCreateV8 from './quick-create'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
 
@@ -1129,16 +1139,10 @@ export default function AutoRepliesListV8() {
                   onDrop={dragId ? () => dropOn(liveOrder.dropTarget(r.id)) : undefined}
                   className={styles.rowClick}
                   tabIndex={0}
-                  onClick={() => setPanelId(r.id)}
-                  onKeyDown={(event) => {
-                    if (event.target !== event.currentTarget) return
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      setPanelId(r.id)
-                    }
-                  }} data-row-id={r.id}
+                  detailKey="reply" onOpen={() => setPanelId(panelId === r.id ? null : r.id)}
+                   data-row-id={r.id}
                 >
-                    <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.selectCell}>
                       {canEdit && <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","r.id"]}><Checkbox
                         checked={selectedIds.has(r.id)}
                         onCheckedChange={() => toggleOne(r.id)}
@@ -1162,19 +1166,17 @@ export default function AutoRepliesListV8() {
                   </Td>
                   <NameCell name={<div className={styles.nameRow}>
                       <>
-                        {canEdit ? <Link
+                        {canEdit ? <RowNameLink
                           href={`/auto-replies/edit?id=${r.id}`}
 
                           className={styles.cellTitle}
                           onClick={(event) => {
                             event.stopPropagation()
-                            if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
-                            event.preventDefault()
-                            goEdit(r.id)
+
                           }}
                         >
                           <TruncatedText value={String(name ?? '')} />
-                        </Link> : <button type="button" className={styles.cellTitle} title={name} onClick={(event) => { event.stopPropagation(); setPanelId(r.id) }}>{name}</button>}
+                        </RowNameLink> : <button type="button" className={styles.cellTitle} title={name} onClick={(event) => { event.stopPropagation(); setPanelId(r.id) }}>{name}</button>}
                       </>
 
                     </div>} folder={folderDotOf(r)}
@@ -1224,7 +1226,7 @@ export default function AutoRepliesListV8() {
                       </p>
                     )}
                   </Td>
-                    <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()} data-design-node={openMenuId === r.id ? 'IIesG' : undefined}>
+                    <Td className={styles.menuCell} data-design-node={openMenuId === r.id ? 'IIesG' : undefined}>
                       {/* 横並びにして、メニューの位置の目印（空の span）が行を1段増やさないようにする。 */}
                       <ContextMenu
                         label={`自動応答「${name}」の操作`}

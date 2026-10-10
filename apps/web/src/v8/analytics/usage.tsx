@@ -7,7 +7,7 @@
  * 呼ぶ口・判定・CSV は今の画面（UsageOverviewTab・app/analytics/analytics-usage.ts）と同じ。
  */
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Boxes, Clock, LayoutGrid, RefreshCw, Zap } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'

@@ -1,7 +1,7 @@
 'use client'
 import { Th } from '@/components/shared/table'
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ExternalLink, MoreHorizontal, RefreshCw } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { api, type CommonActionSummary } from '@/lib/api'

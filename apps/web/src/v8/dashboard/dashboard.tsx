@@ -2,7 +2,7 @@
 import SegmentedControl from '@/components/shared/segmented'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import dynamic from 'next/dynamic'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Fragment, useState, type ReactNode } from 'react'
 import { Calendar, Image as ImageIcon, Inbox, Package, Plus, SlidersHorizontal } from 'lucide-react'
 import type { DashboardCardId } from '@line-crm/shared'

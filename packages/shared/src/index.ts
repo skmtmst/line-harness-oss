@@ -80,3 +80,4 @@ export * from "./fixed-friend-fields";
 export * from './affiliate-bank.js';
 export * from './form-availability.js';
 export * from './reservation-board.js';
+export * from './restaurant-external-links.js';

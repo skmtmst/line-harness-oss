@@ -71,6 +71,15 @@ const eventTypeBadgeColor: Record<AutomationEventType, string> = {
   'ec.subscription.upcoming': 'bg-teal-100 text-teal-700',
   'ec.subscription.payment_failed': 'bg-orange-100 text-orange-700',
   'ec.subscription.cancelled': 'bg-slate-100 text-slate-700',
+  'restaurant.reservation.created': 'bg-canvas-sunken text-ink-secondary',
+  'restaurant.reservation.changed': 'bg-canvas-sunken text-ink-secondary',
+  'restaurant.reservation.cancelled': 'bg-canvas-sunken text-ink-secondary',
+  'restaurant.arrived': 'bg-canvas-sunken text-ink-secondary',
+  'restaurant.arrival_undone': 'bg-canvas-sunken text-ink-secondary',
+  'restaurant.departed': 'bg-canvas-sunken text-ink-secondary',
+  'restaurant.departure_undone': 'bg-canvas-sunken text-ink-secondary',
+  'restaurant.waitlist.invited': 'bg-canvas-sunken text-ink-secondary',
+
 }
 
 /**

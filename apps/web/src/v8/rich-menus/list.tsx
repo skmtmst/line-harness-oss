@@ -1,28 +1,37 @@
 'use client'
 
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar'
-import { formatDate as polishFormatDate, formatDay, formatNumber } from '@/lib/format'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
-import { useListUrlValue, useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { ArrowDownUp, CalendarClock, CircleCheck, CloudDownload, CloudOff, FilePen, Hand, Image as ImageIcon, ListOrdered, Plus, Split, TriangleAlert, Trophy } from 'lucide-react'
-import type { Folder } from '@line-crm/shared'
-import { api, ApiError, type RichMenuDeleteImpact, type RichMenuGroupListItem, type RichMenuTapStats } from '@/lib/api'
-import { clampSearchQuery } from '@/lib/search-query'
-import type { SegmentCondition } from '@/lib/segment-condition'
-import { describeCondition } from '@/components/scenarios/scenario-dialogs'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { useRowLeaving } from '@/lib/use-row-leaving'
-import { runOptimistic } from '@/lib/undoable'
-import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
-import { ListPage } from '@/components/templates'
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+import { formatDate as polishFormatDate, formatDay, formatNumber } from '@/lib/format';
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react';
+import { useListUrlValue, useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
+import { ArrowDownUp, CalendarClock, CircleCheck, CloudDownload, CloudOff, FilePen, Hand, Image as ImageIcon, ListOrdered, Plus, Split, TriangleAlert, Trophy } from 'lucide-react';
+
+import { RowNameLink } from '@/components/shared/table';
+
+
+
+
+
+
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { Eye } from 'lucide-react';
+import type { Folder } from '@line-crm/shared';
+import { api, ApiError, type RichMenuDeleteImpact, type RichMenuGroupListItem, type RichMenuTapStats } from '@/lib/api';
+import { clampSearchQuery } from '@/lib/search-query';
+import type { SegmentCondition } from '@/lib/segment-condition';
+import { describeCondition } from '@/components/scenarios/scenario-dialogs';
+import { useAccount } from '@/contexts/account-context';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { useRowLeaving } from '@/lib/use-row-leaving';
+import { runOptimistic } from '@/lib/undoable';
+import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message';
+import { ListPage } from '@/components/templates';
 import SearchField from '@/components/shared/search-field'
-import DetailPanel from '@/components/shared/detail-panel'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
@@ -30,28 +39,28 @@ import FilterChip from '@/components/shared/filter-chip'
 import Notice from '@/components/shared/notice'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
-import { FolderDotName } from '@/components/shared/folder-dot'
+import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel';
+import { FolderDotName } from '@/components/shared/folder-dot';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu } from '@/components/shared/row-actions';
 import Pagination from '@/components/shared/pagination'
-import { DelayedSkeleton } from '@/components/shared/skeleton'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { DelayedSkeleton } from '@/components/shared/skeleton';
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import ReorderHandle from '@/components/shared/reorder-handle'
-import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
-import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
-import { audienceReason, audienceText, blockerTexts, canDelete as canDeleteImpact, impactFromError, impactMatchesRequest, nextDisplayText, referenceKindText, sameDeleteImpactRequest, type DeleteImpactRequest } from './delete-impact'
-import { moveTargetingGroup, orderTargetingGroups, withNormalizedPriority } from './targeting-order'
-import { ExternalImportWorkspace, type LineMenu } from './external-import'
-import { richMenuError, richMenuErrorAll } from './errors'
-import BlockedDeleteDialog, { type BlockedRow } from './blocked-dialog'
+import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder';
+import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal';
+import { audienceReason, audienceText, blockerTexts, canDelete as canDeleteImpact, impactFromError, impactMatchesRequest, nextDisplayText, referenceKindText, sameDeleteImpactRequest, type DeleteImpactRequest } from './delete-impact';
+import { moveTargetingGroup, orderTargetingGroups, withNormalizedPriority } from './targeting-order';
+import { ExternalImportWorkspace, type LineMenu } from './external-import';
+import { richMenuError, richMenuErrorAll } from './errors';
+import BlockedDeleteDialog, { type BlockedRow } from './blocked-dialog';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
-import { notifyToast } from '@/components/shared/toast'
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback';
+import { notifyToast } from '@/components/shared/toast';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
 
@@ -195,7 +204,7 @@ export default function RichMenusListV8() {
   const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
   const importRequestGenerationRef = useRef(0)
   const externalLoadedRef = useRef(false)
-  const [detailId, setDetailId] = useState<string | null>(null)
+  const [detailId, setDetailId] = useDetailPanelUrl('menu')
   const [groups, setGroups] = useState<RichMenuGroupListItem[]>([])
   const [external, setExternal] = useState<{ currentDefault: string | null; lineMenus: LineMenu[] } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -1050,14 +1059,8 @@ export default function RichMenusListV8() {
                   className={styles.row}
                   leaving={leavingId === g.id}
                   tabIndex={0}
-                  onClick={() => setDetailId(g.id)}
-                  onKeyDown={(event) => {
-                    if (event.target !== event.currentTarget) return
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      setDetailId(g.id)
-                    }
-                  }} data-row-id={g.id}
+                  detailKey="menu" onOpen={() => setDetailId(detailId === g.id ? null : g.id)}
+ data-row-id={g.id}
                 >
                   <Td
                     className={styles.orderCell}
@@ -1095,14 +1098,13 @@ export default function RichMenusListV8() {
                   </Td>
                   <Td className={styles.nameCell}>
                     <FolderDotName folder={folderDotOf(g.folderId)}>
-                      <Link
+                      <RowNameLink
                         href={`/rich-menus/edit?id=${g.id}`}
 
                         className={styles.name}
-                        onClick={(event) => { event.stopPropagation(); if (!event.ctrlKey && !event.metaKey && !event.shiftKey) { event.preventDefault(); setDetailId(g.id) } }}
                       >
                         <TruncatedText value={String(g.name ?? '')} />
-                      </Link>
+                      </RowNameLink>
                     </FolderDotName>
 
                   </Td>
@@ -1131,7 +1133,7 @@ export default function RichMenusListV8() {
                     >
                       {taps == null ? emptyValue('unknown') : `${formatNumber(taps)}回`}
                     </Td>
-                  <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
+                  <Td className={styles.menuCell}>
                     <div className={styles.menuBox}>
                       <RowMenu
                         className={styles.menuBtn}
@@ -1426,7 +1428,7 @@ export default function RichMenusListV8() {
 
         {blockedDialog}
         {deleteConfirm}
-        <DetailPanel open={detailId !== null} title={groups.find(group => group.id === detailId)?.name ?? 'リッチメニュー'} onClose={() => setDetailId(null)} footer={detailId ? <Button href={`/rich-menus/edit?id=${encodeURIComponent(detailId)}`}>{canEdit ? '編集する' : '詳しく見る'}</Button> : undefined}>
+        <DetailPanel open={detailId !== null && groups.some(group => group.id === detailId)} title={groups.find(group => group.id === detailId)?.name ?? 'リッチメニュー'} onClose={() => setDetailId(null)} footer={detailId ? <Button href={`/rich-menus/edit?id=${encodeURIComponent(detailId)}`}>{canEdit ? '編集する' : '詳しく見る'}</Button> : undefined}>
         <p>このリッチメニューの中身や設定は「{canEdit ? '編集する' : '詳しく見る'}」から確認できます。</p>
       </DetailPanel>
     </>}

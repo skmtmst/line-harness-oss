@@ -12,7 +12,7 @@
  * 項目の名前と行き先は `friends-tabs.ts` の FRIENDS_MERGED_TABS が正本
  * （キー・名前・href をここで書き換えない）。API・権限も変えない。
  */
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import React, { useRef, useState } from 'react'
 import Notice from '@/components/shared/notice'
 import { canEditFeature } from '@/lib/staff-capability'

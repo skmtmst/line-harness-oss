@@ -1119,7 +1119,7 @@ describe('監査 R91: メニューがあるときも見出しに作成の入口'
     })
     const head = document.querySelector('[data-design="Head"]')
     expect(head).toBeTruthy()
-    const entry = head!.querySelector('a[href="/booking/menus/new"]')
+    const entry = head!.querySelector('a[href^="/booking/menus/new"]')
     expect(entry?.textContent).toContain('予約メニューを作る')
   })
 })

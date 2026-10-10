@@ -6,7 +6,8 @@ import { useFolderMove } from '@/components/shared/use-folder-move'
 import { moveAutomationToFolder } from '@/lib/move-to-folder'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   Activity,
   Archive,
@@ -43,7 +44,7 @@ import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import ManagedFolderPanel, { managedFolderOptions } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { RowNameLink, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -528,7 +529,7 @@ export default function AutomationListV8() {
                   <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colName}>
                       <FolderDotName folder={folders.find((folder) => folder.id === item.folderId) ?? null}>{folderMove.checkbox(item)}
-                        <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
+                        {canEdit && item.status !== 'archived' ? <RowNameLink href={`/automations/drafts?automationId=${encodeURIComponent(item.id)}`} className={styles.name}><TruncatedText value={String(item.name ?? '')} /></RowNameLink> : <span className={styles.name}><TruncatedText value={String(item.name ?? '')} /></span>}
                       </FolderDotName>
                     </Td>
                     <Td className={styles.colTrigger}><span className={styles.cell} title={trigger}>{trigger}</span></Td>

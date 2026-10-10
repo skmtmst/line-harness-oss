@@ -71,7 +71,7 @@ describe('ウォークイン（E-3）', () => {
     expect(api.createReservation).toHaveBeenCalledWith('acc', expect.objectContaining({
       storeId: 's', source: 'manual', guestCount: 2, tableId: 't1', note: WALK_IN_NOTE, startsAt: now.toISOString(), notifyLine: false,
     }))
-    expect(api.postSeatVisitMark).toHaveBeenCalledWith('acc', 'new-1', { kind: 'visited' })
+    expect(api.postSeatVisitMark).toHaveBeenCalledWith('acc', 'new-1', expect.objectContaining({ kind: 'visited',expectedVersion:1,requestId:expect.any(String) }))
     expect(result).toEqual({ id: 'new-1', seated: true })
     expect(isWalkIn({ source: 'manual', note: WALK_IN_NOTE })).toBe(true)
     expect(isWalkIn({ source: 'phone', note: WALK_IN_NOTE })).toBe(false)

@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { PageHeading } from '@/components/templates/page-frame'

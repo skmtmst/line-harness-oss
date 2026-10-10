@@ -1,8 +1,8 @@
 'use client'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   BarChart3,
   Copy,

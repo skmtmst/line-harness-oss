@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { TriangleAlert, CircleCheck, Info, OctagonAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'

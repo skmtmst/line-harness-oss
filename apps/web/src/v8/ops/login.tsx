@@ -1,6 +1,6 @@
 'use client'
 import { LogIn, MessageCircle } from 'lucide-react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useEffect, useState, type FormEvent } from 'react'
 import PasswordField from '@/components/auth/password-field'
 import Button from '@/components/shared/button'

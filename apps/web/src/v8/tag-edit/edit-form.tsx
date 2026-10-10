@@ -1,32 +1,33 @@
 'use client'
-import { ArrowDown, ArrowUp, Plus, Trash2, ArrowLeft, Check, ChevronDown, ChevronUp, Copy, GitCompare, TriangleAlert } from 'lucide-react'
-import { ActionDrawer, RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
+import { ArrowDown, ArrowUp, Plus, Trash2, ArrowLeft, Check, ChevronDown, ChevronUp, Copy, GitCompare, TriangleAlert } from 'lucide-react';
+import { ActionDrawer, RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4';
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
-import type { Tag, TagGroup } from '@line-crm/shared'
-import { api, type TagDependencies, type TagRetroactivePreview } from '@/lib/api'
-import { formatDay } from '@/lib/format'
-import { CreatePage } from '@/components/templates'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import Link from '@/components/shared/list-navigation'
+
+import type { Tag, TagGroup } from '@line-crm/shared';
+import { api, type TagDependencies, type TagRetroactivePreview } from '@/lib/api';
+import { formatDay } from '@/lib/format';
+import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
-import { SaveConflictBand } from '@/components/shared/save-conflict'
+import { SaveConflictBand } from '@/components/shared/save-conflict';
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
-import { Field } from '@/components/shared/form-controls'
-import { TextField } from '@/components/shared/text-field'
-import { tagNameProblem } from '@/v8/tags/tag-name'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import { Field } from '@/components/shared/form-controls';
+import { TextField } from '@/components/shared/text-field';
+import { tagNameProblem } from '@/v8/tags/tag-name';
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import Select from '@/components/shared/select'
-import FolderSelect, { type FolderSelectCreate } from '@/components/shared/folder-select'
-import { SettingCheckbox } from '@/components/shared/checkbox'
-import { DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
+import FolderSelect, { type FolderSelectCreate } from '@/components/shared/folder-select';
+import { SettingCheckbox } from '@/components/shared/checkbox';
+import { DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide';
 import LinkedActionList from '@/components/friend-fields/linked-action-list'
-import { MULTIPLIERS, PRIORITIES, actionsSummary, buildUsageRows, mileageSummary } from './model'
+import { MULTIPLIERS, PRIORITIES, actionsSummary, buildUsageRows, mileageSummary } from './model';
 import styles from './edit.module.css'
-import { emptyValue } from '@/components/shared/empty-value'
+import { emptyValue } from '@/components/shared/empty-value';
 import NumberInput from '@/components/shared/number-field'
-import { SaveErrorField, useSaveErrorReveal } from '@/components/shared/save-form-errors'
+import { SaveErrorField, useSaveErrorReveal } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*

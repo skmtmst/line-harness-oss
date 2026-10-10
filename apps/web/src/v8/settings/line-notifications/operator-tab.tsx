@@ -1,10 +1,11 @@
 'use client'
 
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { RowNameLink } from '@/components/shared/table'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import Notice from '@/components/shared/notice'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, CircleX, Send, Users } from 'lucide-react'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -217,7 +218,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
               return <Tr key={rule.id} data-row-id={rule.id}>
                 <Td className={styles.opName}>
                   {/* 名前から編集画面へ。保存したお知らせを開き直して直せる。 */}
-                  <Link href={`/line-notifications/operator/new?id=${encodeURIComponent(rule.id)}`} className={styles.opNameLink} ><TruncatedText value={String(rule.name ?? '')} /></Link>
+                  <RowNameLink href={`/line-notifications/operator/new?id=${encodeURIComponent(rule.id)}`} className={styles.opNameLink} ><TruncatedText value={String(rule.name ?? '')} /></RowNameLink>
                   <span className={styles.opSub}>{importanceWords(rule)}</span>
                 </Td>
                 <Td className={styles.cell} title={eventWords(rule.eventType)}>{eventWords(rule.eventType)}</Td>

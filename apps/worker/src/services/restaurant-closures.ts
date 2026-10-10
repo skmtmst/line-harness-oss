@@ -45,7 +45,7 @@ export async function closurePreview(db:D1Database,input:RestaurantClosureInput,
  AND (json_array_length(?)=0 OR r.table_id IS NULL OR EXISTS(SELECT 1 FROM rt_reservation_table_links l WHERE l.reservation_id=r.id AND l.table_id IN (SELECT value FROM json_each(?))))`;
  const reservations=(await db.prepare(`SELECT r.id,r.starts_at AS startsAt,r.ends_at AS endsAt,r.guest_count AS guestCount,r.customer_name AS customerName,r.customer_phone AS customerPhone,r.source,r.table_id AS tableId,
  (SELECT f.id FROM friends f JOIN rt_stores s ON s.line_account_id=f.line_account_id WHERE s.id=r.store_id AND f.line_user_id=r.line_uid AND f.is_following=1 LIMIT 1) AS friendId
- FROM rt_reservations r WHERE r.store_id=? AND r.status NOT IN ('cancelled','no_show') AND r.hold_expires_at IS NULL AND ${overlap} ORDER BY julianday(r.starts_at),r.id`)
+ FROM rt_reservations r WHERE r.store_id=? AND r.status NOT IN ('cancelled','no_show') AND r.departed_at IS NULL AND r.hold_expires_at IS NULL AND ${overlap} ORDER BY julianday(r.starts_at),r.id`)
  .bind(...args,args[2]).all<Omit<RestaurantClosurePreview['reservations'][number],'isLineFriend'|'contacted'>>()).results;
  const waiting=await db.prepare(`SELECT COUNT(*) AS count FROM (SELECT w.*,COALESCE(w.ends_at,datetime(w.starts_at,'+120 minutes')) AS end_time FROM rt_seat_waitlist w) r
  WHERE r.store_id=? AND r.status IN ('waiting','invited') AND EXISTS(SELECT 1 FROM json_each(?) p WHERE julianday(r.starts_at)<julianday(json_extract(p.value,'$.endsAt')) AND julianday(r.end_time)>julianday(json_extract(p.value,'$.startsAt')))
@@ -68,7 +68,7 @@ export async function openSeatTables(db:D1Database,storeId:string,startsAt:strin
  const closed=await closuresForRange(db,storeId,startsAt,endsAt);
  const tables=(await db.prepare(`SELECT t.id,t.label,t.seat_type AS seatType,t.min_capacity AS minCapacity,t.max_capacity AS maxCapacity,t.join_group FROM rt_tables t
  WHERE t.store_id=? AND t.is_active=1
- AND (?=1 OR (NOT EXISTS(SELECT 1 FROM rt_reservations r JOIN rt_reservation_table_links l ON l.reservation_id=r.id WHERE r.store_id=t.store_id AND r.id<>? AND l.table_id=t.id AND r.status NOT IN ('cancelled','no_show')
+ AND (?=1 OR (NOT EXISTS(SELECT 1 FROM rt_reservations r JOIN rt_reservation_table_links l ON l.reservation_id=r.id WHERE r.store_id=t.store_id AND r.id<>? AND l.table_id=t.id AND r.status NOT IN ('cancelled','no_show') AND r.departed_at IS NULL
  AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(?) AND julianday(r.ends_at)>julianday(?))
  AND NOT EXISTS(SELECT 1 FROM rt_seat_waitlist w JOIN rt_seat_waitlist_table_links l ON l.waitlist_id=w.id WHERE w.store_id=t.store_id AND l.table_id=t.id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now')
  AND julianday(w.starts_at)<julianday(?) AND julianday(COALESCE(w.ends_at,datetime(w.starts_at,'+120 minutes')))>julianday(?)))) ORDER BY t.max_capacity,t.id`)

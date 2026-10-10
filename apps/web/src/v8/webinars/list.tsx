@@ -1,20 +1,27 @@
 'use client'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import { RowNameLink } from '@/components/shared/table';
+
+
+
+
 import SharedStatusPill from '@/components/shared/status-pill'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
-import type { ReactNode } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Archive, Bookmark, CalendarClock, Download, FilePen, Inbox, MousePointerClick, Plus, Radio, Users, Video } from 'lucide-react'
-import { ListPage, ListPagePagination } from '@/components/templates'
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
+import type { ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Archive, Bookmark, CalendarClock, Download, FilePen, Inbox, MousePointerClick, Plus, Radio, Users, Video } from 'lucide-react';
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { Eye } from 'lucide-react';
+import { ListPage, ListPagePagination } from '@/components/templates';
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import { notifyToast } from '@/components/shared/toast'
-import { RowMenu } from '@/components/shared/row-actions'
+import { notifyToast } from '@/components/shared/toast';
+import { RowMenu } from '@/components/shared/row-actions';
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
@@ -22,32 +29,32 @@ import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
-import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
-import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
-import { FolderDotName, type FolderDotFolder, folderDisplayColor } from '@/components/shared/folder-dot'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared';
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
+import { FolderDotName, type FolderDotFolder, folderDisplayColor } from '@/components/shared/folder-dot';
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import InlineEdit from '@/components/shared/inline-edit'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import AccountRequiredState from '@/components/shared/account-required-state'
 import Pagination from '@/components/shared/pagination'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import { withViewTransition } from '@/components/shared/view-transition'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { publicationStateLabel } from '@/components/webinars/publication-label'
-import { useAccount } from '@/contexts/account-context'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { runUndoable } from '@/lib/undoable'
-import { formatDateTime, formatNumber } from '@/lib/format'
-import { ApiError, webinarApi, type Webinar, type WebinarFolder, type WebinarListItem, type WebinarListParams, type WebinarOverview, type WebinarOverviewMetric } from '@/lib/api'
-import { beforeStart, publicPath, showsCounts, statusLabel, statusTone, webinarListCsv, webinarLoadFailure, type WebinarLoadFailure } from './helpers'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
+import { withViewTransition } from '@/components/shared/view-transition';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { publicationStateLabel } from '@/components/webinars/publication-label';
+import { useAccount } from '@/contexts/account-context';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { runUndoable } from '@/lib/undoable';
+import { formatDateTime, formatNumber } from '@/lib/format';
+import { ApiError, webinarApi, type Webinar, type WebinarFolder, type WebinarListItem, type WebinarListParams, type WebinarOverview, type WebinarOverviewMetric } from '@/lib/api';
+import { beforeStart, publicPath, showsCounts, statusLabel, statusTone, webinarListCsv, webinarLoadFailure, type WebinarLoadFailure } from './helpers';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { csvFileName } from '@/lib/csv-file-name';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
@@ -626,7 +633,7 @@ function WebinarList() {
   /* 行 → 右の詳細パネル。開閉と↑↓の移動はつながる移り変わりで。 */
   const activeIndex = visibleItems.findIndex((w) => w.id === activeId)
   const active = activeIndex >= 0 ? visibleItems[activeIndex] : null
-  const openDetail = useCallback((id: string) => { withViewTransition(() => setActiveId(id)) }, [])
+  const openDetail = useCallback((id: string) => { withViewTransition(() => setActiveId(current => current === id ? null : id)) }, [setActiveId])
   const closeDetail = useCallback(() => { withViewTransition(() => setActiveId(null)) }, [])
   const goDetail = (direction: -1 | 1) => {
     const next = visibleItems[activeIndex + direction]
@@ -909,20 +916,20 @@ function WebinarList() {
                     className={styles.row}
                     data-table-layout="columns"
                     data-row-id={w.id}
-                    onClick={() => openDetail(w.id)}
+                    detailKey="webinar" onOpen={() => openDetail(w.id)}
                   >
                     <Td className={styles.colName}>
                       <ContextMenu label={`「${w.title}」の操作`} items={toContextItems(menuItems)}>
                         <FolderDotName folder={folderDotOf(w)}>
-                          <button
-                            type="button"
+                          <RowNameLink
+                            href={`/webinars/edit?id=${encodeURIComponent(w.id)}`}
                             className={styles.nameButton}
                             title={w.title}
                             aria-label={`「${w.title}」の詳細を見る`}
-                            onClick={(event) => { event.stopPropagation(); openDetail(w.id) }}
+
                           >
                             {w.title}
-                          </button>
+                          </RowNameLink>
                         </FolderDotName>
                       </ContextMenu>
 
@@ -944,7 +951,7 @@ function WebinarList() {
                       )}
                     </Td>
                     <Td className={styles.colPeriod}><span className={styles.period} title={period}>{period}</span></Td>
-                    <Td className={styles.colOps} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.colOps}>
                       <div className={styles.opsBox}>
 
                         <RowMenu

@@ -7,7 +7,8 @@
  * と同じ。違うのは中身の部品——`FieldEditorV8` を使う。
  */
 import { useCallback, useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import type { FriendField, Folder } from '@line-crm/shared'
 import { api, describeSaveFailure } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'

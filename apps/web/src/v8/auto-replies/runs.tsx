@@ -1,18 +1,22 @@
 'use client'
 
 import SegmentedControl from '@/components/shared/segmented'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, Download, MessageCircle, Pause, Pencil, RotateCcw } from 'lucide-react'
-import type { AutoReplyRun, AutoReplyRunsResponse, ExecutionRunStatus } from '@line-crm/shared'
-import { DetailPage } from '@/components/templates'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { RowNameLink } from '@/components/shared/table';
+import { useListUrlValue } from '@/components/shared/list-url-state';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { ArrowLeft, Download, MessageCircle, Pause, Pencil, RotateCcw } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { TriangleAlert } from 'lucide-react';
+import type { AutoReplyRun, AutoReplyRunsResponse, ExecutionRunStatus } from '@line-crm/shared';
+import { DetailPage } from '@/components/templates';
+import { usePageTitle } from '@/components/shell/page-chrome';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu } from '@/components/shared/row-actions';
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -20,19 +24,19 @@ import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import DateField from '@/components/shared/date-field'
-import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { api, ApiError } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { formatDateTime, formatNumber, formatTime, formatListDateTime as polishFormatListDateTime } from '@/lib/format'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge';
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { api, ApiError } from '@/lib/api';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import { formatDateTime, formatNumber, formatTime, formatListDateTime as polishFormatListDateTime } from '@/lib/format';
 import styles from './runs.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message';
+import { csvFileName } from '@/lib/csv-file-name';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select';
 import Notice from '@/components/shared/notice'
 
 /*
@@ -529,7 +533,7 @@ export default function AutoReplyRunsV8() {
                     <Td className={styles.colFriend}>
                       <span className={styles.face} aria-hidden="true">{initialOf(item.friendName)}</span>
                       {item.friendId ? (
-                        <Link className={styles.friendName} href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} ><TruncatedText value={String(name ?? '')} /></Link>
+                        <RowNameLink className={styles.friendName} href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} ><TruncatedText value={String(name ?? '')} /></RowNameLink>
                       ) : (
                         <span className={styles.friendName} ><TruncatedText value={String(name ?? '')} /></span>
                       )}

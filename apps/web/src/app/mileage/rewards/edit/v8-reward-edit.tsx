@@ -11,9 +11,10 @@
  */
 
 import { Suspense, useCallback, useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Check } from 'lucide-react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import Disclosure from '@/components/shared/disclosure'
 import StickyBar from '@/components/shared/sticky-bar'

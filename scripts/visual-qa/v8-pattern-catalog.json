@@ -1529,6 +1529,8 @@
           ],
           "components": [
             "useFormErrors",
+            "Field",
+            "FormField",
             "FieldError",
             "ValidationSummary",
             "ErrorCountBadge"

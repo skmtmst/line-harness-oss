@@ -692,7 +692,7 @@ jobs:
       # 道具の対照は speed-budget.mjs の頭に書いた。
       - name: Speed measurement and reference policy controls
         if: steps.scope.outputs.run == 'true'
-        run: node --test apps/web/scripts/v8-guard/speed-budget.test.mjs
+        run: node --test apps/web/scripts/v8-guard/speed-budget.test.mjs apps/web/scripts/v8-guard/perf3-targets.test.mjs
       - name: Speed budget on V8 (10 screens on a real browser)
         id: speed_budget
         # オーナー決定（2026-10-04）：速さは測り方のぶれで落ちることがあるので、当面は知らせるだけにして止めない。
@@ -718,11 +718,18 @@ jobs:
         env:
           V8_SPEED_PROFILE: ci
         run: node apps/web/scripts/v8-guard/stress-targets.mjs /tmp/v8-guard/speed.json
+      - name: PERF-01 fixed list speed targets (reference)
+        id: perf3_targets
+        # タグ1秒・長い処理65ms。既存の倍率付き判定とは別に固定目標を残す。
+        continue-on-error: true
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        run: node apps/web/scripts/v8-guard/perf3-targets.mjs /tmp/v8-guard/speed.json
       - name: Report speed reference results (including incomplete measurements)
         if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
         env:
           SPEED_BUDGET_OUTCOME: ${{ steps.speed_budget.outcome }}
           STRESS_SPEED_OUTCOME: ${{ steps.stress_speed.outcome }}
+          PERF3_TARGETS_OUTCOME: ${{ steps.perf3_targets.outcome }}
         run: node apps/web/scripts/v8-guard/speed-report.mjs /tmp/v8-guard/speed.json
       - name: Virtual table selection, keyboard and layout
         if: steps.scope.outputs.run == 'true'

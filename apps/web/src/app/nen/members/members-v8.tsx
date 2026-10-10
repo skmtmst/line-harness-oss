@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Download, RefreshCw, Users, PawPrint, ShoppingBag, Link2 } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'

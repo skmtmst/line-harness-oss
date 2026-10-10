@@ -70,6 +70,43 @@ function fixture() {
 }
 
 describe('型の対応表の点検', () => {
+  it('共通のFieldとFormFieldを認識しても、隣の手書きエラーは止める', () => {
+    const { root } = fixture()
+    const rel = 'apps/web/src/v8/demo/error.tsx'
+    const audit = () => run({ code: root, only: ['field-error'] })
+    for (const component of ['Field', 'FormField']) {
+      put(root, rel, `export const P = () => <${component} error={error}><TextField /></${component}>`)
+      expect(audit().code.reach['field-error'].files).toBe(1)
+      expect(audit().code.a['field-error']).toEqual([])
+      put(root, rel, `export const P = () => <><${component} error={error}><TextField /></${component}><p role="alert">失敗</p></>`)
+      expect(audit().code.a['field-error'].map((h: { signal: string }) => h.signal)).toEqual(['raw-alert'])
+    }
+  })
+
+  it('共通の表への動きの追加・改行は通し、上書きの変更・増殖は止める', () => {
+    const { root } = fixture()
+    const rel = 'apps/web/src/v8/demo/table.tsx'
+    const css = 'apps/web/src/v8/demo/table.module.css'
+    const beforeSource = "import styles from './table.module.css'\nexport const P = () => <Tr key={row.id} className={styles.row}><Td className={styles.cell}>名前</Td></Tr>"
+    const afterSource = "import styles from './table.module.css'\nexport const P = () => <Tr key={row.id} className={styles.row} detailKey=\"affiliate\" onOpen={() => { open(row.id) }}>\n<Td className={styles.cell}>別の名前</Td>\n</Tr>"
+    const goodCss = '.row { color: var(--color-ink); display: grid; }\n.cell { font-size: var(--text-caption); }'
+    put(root, rel, beforeSource)
+    put(root, css, goodCss)
+    const audit = () => run({ code: root, only: ['table'] })
+    const before = audit()
+    put(root, rel, afterSource)
+    expect(newCodeFindings(before, audit())).toEqual([])
+    put(root, css, goodCss.replace('--color-ink', '--color-danger'))
+    expect(newCodeFindings(before, audit()).some((h: { kind: string }) => h.kind === 'prop:className')).toBe(true)
+    put(root, css, goodCss)
+    put(root, rel, afterSource.replace('className={styles.row}', 'className="text-red-500"'))
+    expect(newCodeFindings(before, audit()).some((h: { kind: string }) => h.kind === 'prop:className')).toBe(true)
+    put(root, rel, `${afterSource}\nexport const Extra = () => <Tr className={styles.row} />`)
+    expect(newCodeFindings(before, audit()).filter((h: { kind: string }) => h.kind === 'prop:className')).toHaveLength(1)
+    put(root, rel, afterSource.replace('className={styles.row}', 'style={{ color: "var(--color-danger)" }}'))
+    expect(newCodeFindings(before, audit()).some((h: { kind: string }) => h.kind === 'prop:style')).toBe(true)
+  })
+
   it('CLIはbaseとの比較で違反を拒否し、行移動と持ち主への委譲は許可する', () => {
     const { root, pen } = fixture()
     execFileSync('git', ['init', '-q'], { cwd: root })

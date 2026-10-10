@@ -2,7 +2,7 @@
 
 import { ValueBarChart } from '@/components/shared/charts'
 
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { Banknote, Hourglass, Sparkles, Wallet } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsDashboard, type OpsDashboardPeriod, type OpsLineUnregistered } from '@/lib/api'

@@ -32,7 +32,7 @@ export async function seatWalkIn(accountId: string, input: { storeId: string; gu
     notifyLine: false,
   })
   try {
-    await restaurantTestApi.postSeatVisitMark(accountId, created.data.id, { kind: 'visited' })
+    await restaurantTestApi.postSeatVisitMark(accountId, created.data.id, { kind: 'visited',expectedVersion:1,requestId:crypto.randomUUID() })
     return { id: created.data.id, seated: true }
   } catch {
     /* 予約は入った。来店の印だけ付かなかったことを画面が知らせる。 */
