@@ -622,7 +622,8 @@ export default function MenuFormV8() {
       setResourceMessage('設備の割当を保存しました。新しい予約枠から反映されます。')
     } catch (error) {
       if (generationRef.current !== generation) return
-      setResourceMessage(error instanceof ApiError && error.status === 409
+      const fieldFailure = saveErrors.capture(error)
+      if (!fieldFailure) setResourceMessage(error instanceof ApiError && error.status === 409
         ? 'ほかの担当者が先に保存しました。最新の内容を読み直してください。'
         : '設備の割当を保存できませんでした。入力は残っています。もう一度お試しください。')
     } finally {
@@ -1249,13 +1250,13 @@ export default function MenuFormV8() {
               )}
               {editTarget && resourceChoices.filter((item) => resourceIds.has(item.id)).map((item) => (
                 <Field key={item.id} label={`${item.name}の必要数`}>
-                  <NumberInput unit="個" type="number" min={1} max={1000} step={1}
+                  <SaveErrorField names={[`resources.${[...resourceIds].indexOf(item.id)}.quantity`]}><NumberInput unit="個" type="number" min={1} max={1000} step={1}
                     aria-label={`${item.name}の必要数`} value={resourceQuantities[item.id] ?? '1'}
                     disabled={!canManageResources || resourceSaving || saving !== null || !item.isActive}
                     onChange={(event) => {
                       setResourceMessage(null)
                       setResourceQuantities((current) => ({ ...current, [item.id]: event.target.value }))
-                    }} />
+                    }} /></SaveErrorField>
                 </Field>
               ))}
               {editTarget && (canManageResources ? (

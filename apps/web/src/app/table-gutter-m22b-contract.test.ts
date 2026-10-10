@@ -83,9 +83,12 @@ describe('m22b 表の左右の余白（文字だけのセルを包む）', () =>
     expect(body).toContain('<span>{formatNumber(row.active')
   })
 
-  it('/booking/menus：行頭の名前を包む', () => {
-    const body = read('app', 'booking', 'menus', 'page.tsx')
-    expect(body).toContain('<span>{m.name}')
+  it('/booking/menus：名前の操作を専用の欄に収め、省略する', () => {
+    const body = read('v8', 'booking-menus', 'tabs', 'menus-tab.tsx')
+    const css = read('v8', 'booking-menus', 'settings.module.css')
+    expect(body).toContain('className={styles.colName}')
+    expect(body).toContain('className={styles.menuName}')
+    expect(css).toMatch(/\.menuName\s*\{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/)
   })
 
   it('/duplicates：先頭の文字を包む', () => {

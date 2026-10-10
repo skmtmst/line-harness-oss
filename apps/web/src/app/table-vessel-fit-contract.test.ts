@@ -30,25 +30,15 @@ function percentTotal(source: string): number {
 }
 
 describe('表は器の幅にぴったり収める', () => {
-  it('/booking/menus: 操作は「中身を見る」＋「…」で、中身が器からはみ出さない', () => {
-    const page = read('booking/menus/page.tsx')
-    expect(page).toContain('<DataTable')
-    // ★V7 行の操作の決まり：主な1つ＋「…」。共通の RowActions を使う。
-    // 4つ並べると1440pxで器から72pxはみ出す。上へ・下へ・止める／再開は「…」の中。
-    expect(page).toContain('<RowActions')
-    expect(page).toContain("label: '中身を見る'")
-    expect(page).toContain("label: '上へ'")
-    expect(page).toContain("label: '下へ'")
-    expect(page).toContain("label: m.is_active ? '止める' : '再開'")
-    // 行への直置きボタン（↑↓・止める・出す）に戻さない。
-    expect(page).not.toContain('を上へ')
-    expect(page).not.toContain('を下へ')
-    expect(page).not.toContain('止める・出す')
-    // 操作列は「中身を見る」＋「…」（約138px）に合わせた固定幅。4つ並びの w-48 に戻さない。
-    expect(page).toMatch(/<Th[^>]*w-44[^>]*>操作<\/Th>/)
-    expect(page).not.toMatch(/<Th[^>]*w-48[^>]*>操作<\/Th>/)
-    // 割合の合計は 100% 未満。残りは「だれが受けられるか」（自動）が吸う。
-    expect(percentTotal(page)).toBeLessThan(100)
+  it('/booking/menus: V8の名前と行末操作が器からはみ出さない', () => {
+    const page = read('../v8/booking-menus/tabs/menus-tab.tsx')
+    const css = read('../v8/booking-menus/settings.module.css')
+    expect(page).toContain('className={styles.menuRow}')
+    expect(page).toContain('<RowMenu')
+    expect(page).toContain('className={styles.rowMenuButton}')
+    expect(css).toMatch(/\.colName\s*\{[^}]*flex: 1 1 0;[^}]*min-width: 0;/)
+    expect(css).toMatch(/\.rowMenuButton\s*\{[^}]*width: var\(--tpl-bm-28\)/)
+    expect(css).toMatch(/\.menuName\s*\{[^}]*max-width: 100%;[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/)
   })
 
   it('/events: 操作列は固定幅で、中身が器からはみ出さない', () => {

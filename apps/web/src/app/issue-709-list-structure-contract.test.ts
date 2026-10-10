@@ -10,8 +10,7 @@
  * 4. フォームの「フォルダを追加」は押せない理由を hover 限定の title
  *    ではなく常時表示の注記で伝える。
  * 5. 予約メニューにドラッグできない「⠿」の飾りを戻さない。
- * 6. 残件: 28の並び替えは操作列の「…」の中の上へ・下へで行い、注意書きに導線を書く。
- *    専用APIが無いため既存updateMenu（版つきPUT）でsort_orderを交換する。
+ * 6. 予約メニューは共通のつまみ・行操作で並べ替え、版つきの一括APIで保存する。
  */
 import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
@@ -139,27 +138,32 @@ describe('Issue #709: 予約メニューに押せないドラッグ飾りを戻�
   })
 })
 
-describe('Issue #709残件: 28予約メニューは操作列の↑↓で並び替えできる', () => {
-  it('行操作に上へ/下へボタンがある（掴めない飾りの代わり）', () => {
-    const src = read('booking/menus/page.tsx')
-    // ★V7 行の操作の決まり：4つ並べると1440pxで器からはみ出すため、
-    // 上へ・下へは操作列の「…」の中へ集める。並び替え自体は残す。
-    expect(src).toContain("id: 'move-up'")
-    expect(src).toContain("label: '上へ'")
-    expect(src).toContain("id: 'move-down'")
-    expect(src).toContain("label: '下へ'")
-    expect(src).toContain('moveMenu')
+describe('Issue #709残件: V8予約メニューの並べ替えを維持する', () => {
+  it('共通の行操作から上へ・下へ動かせる', () => {
+    const src = read('../v8/booking-menus/tabs/menus-tab.tsx')
+    expect(src).toContain('useReorder({')
+    expect(src).toContain('reorder.menuItems(menu.id')
+    expect(src).toContain('<RowMenu')
+    expect(src).toContain('onReorder: ({ id, ids }) => persistOrder(id, ids)')
   })
 
-  it('注意書きに↑↓の導線を書く', () => {
-    const src = read('booking/menus/page.tsx')
-    expect(src).toContain('操作列の「…」から変えられます')
+  it('つまみも実操作へつなぎ、閲覧のみ・検索中・保存中は動かせない', () => {
+    const src = read('../v8/booking-menus/tabs/menus-tab.tsx')
+    expect(src).toContain('<ReorderHandle')
+    expect(src).toContain('reorder.handleProps(menu.id)')
+    expect(src).toContain('reorder.rowProps(menu.id)')
+    expect(src).toContain('disabledReason: reorderDisabledReason')
+    expect(src).toContain('閲覧のみのため並び替えできません')
+    expect(src).toContain('検索を外すと動かせます')
+    expect(src).toContain('並び替えを保存しています')
   })
 
-  it('並び替えは既存updateMenu（版つきPUT）でsort_orderを交換し、新規APIを作らない', () => {
-    const src = read('booking/menus/page.tsx')
-    expect(src).toContain('bookingApi.updateMenu')
-    expect(src).toContain('sort_order: other.sort_order')
-    expect(src).not.toContain('menus/order')
+  it('既存の一括APIへ版と順位を送り、途中までの順位交換を防ぐ', () => {
+    const src = read('../v8/booking-menus/tabs/menus-tab.tsx')
+    expect(src).toContain('bookingApi.reorderMenus(accountId')
+    expect(src).toContain('expectedVersion: menu.version')
+    expect(src).toContain('sortOrder')
+    expect(src).toContain('setOrderOverride(null)')
+    expect(src).toContain('onReload()')
   })
 })

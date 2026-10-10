@@ -353,6 +353,24 @@ describe('V8メニュー編集: 共有設備の割当', () => {
     fireEvent.click(screen.getByRole('button', { name: '設備の割当を保存する' }))
     await waitFor(() => expect(fixture.saveMenuResources).toHaveBeenCalledWith('account-a', 'menu-1', { expectedVersion: 1, resources: [] }))
   })
+
+  test('必要数の保存エラーを欄へ返し、訂正後は同じ設備を再保存できる', async () => {
+    fixture.saveMenuResources = vi.fn().mockRejectedValueOnce({ status: 422, fields: { 'resources.0.quantity': '空きの数を超えています' } })
+      .mockResolvedValue({ success: true, data: { version: 2 } })
+    await openEditor()
+    const quantity = await screen.findByRole('spinbutton', { name: '個室Aの必要数' })
+    fireEvent.change(quantity, { target: { value: '3' } })
+    fireEvent.click(screen.getByRole('button', { name: '設備の割当を保存する' }))
+    await screen.findByText('空きの数を超えています')
+    expect(quantity.getAttribute('aria-invalid')).toBe('true')
+    expect((quantity as HTMLInputElement).value).toBe('3')
+    expect(screen.queryByText('設備の割当を保存できませんでした。入力は残っています。もう一度お試しください。')).toBeNull()
+    fireEvent.change(quantity, { target: { value: '2' } })
+    expect(screen.queryByText('空きの数を超えています')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '設備の割当を保存する' }))
+    await screen.findByText('設備の割当を保存しました。新しい予約枠から反映されます。')
+    expect(fixture.saveMenuResources).toHaveBeenLastCalledWith('account-a', 'menu-1', { expectedVersion: 1, resources: [{ resourceId: 'room-a', quantity: 2 }] })
+  })
 })
 
 describe('V8メニュー編集: 予約申込時に自動付与するタグ', () => {
