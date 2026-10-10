@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, PauseCircle } from 'lucide-react'
 import { api, type AffiliateAccountSettlementPreview, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
+import InlineEdit from '@/components/shared/inline-edit'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
@@ -466,7 +467,12 @@ export default function AffiliateDrawer({
   return (
     <>
       <Drawer open title={`${affiliate.name}の詳細`} description={subLine} designWidth={620} layout="inset" busy={paymentOpen} onClose={onClose}
-        heading={<span className={styles.titleRow}><span>{affiliate.name}</span><StatusPill tone={affiliate.isActive ? 'active' : 'neutral'}>{affiliate.isActive ? '計測中' : '停止中'}</StatusPill></span>}
+        heading={<span className={styles.titleRow}>{readonly ? <span>{affiliate.name}</span> : <InlineEdit value={affiliate.name} label="紹介者の名前を直す" maxLength={100} onSave={async (next) => {
+          if (!next.trim()) throw new Error('名前を入力してください')
+          const response = await api.affiliates.update(affiliate.id, { name: next.trim() })
+          if (!response.success) throw new Error('名前を保存できませんでした。もう一度お試しください。')
+          notifyToast('名前を保存しました'); onChanged()
+        }} />}<StatusPill tone={affiliate.isActive ? 'active' : 'neutral'}>{affiliate.isActive ? '計測中' : '停止中'}</StatusPill></span>}
         toolbar={(<div className={styles.tabs} role="tablist" aria-label="詳細の中身">
           {DRAWER_TABS.map((item) => (
             <button
