@@ -72,7 +72,6 @@ const GUARDED = [
   // ★V8 マイペットのごはんの目安（h7A2F）。下の帯の保存まで画面に残る変更を useUnsavedGuard で守る。
   'v8/nen-pets/feeding.tsx',
   'app/ops/announcements/page.tsx',
-  'app/reminders/edit/issue469-reminder-screens.tsx',
   'app/reminders/new/new-v8.tsx',
   'app/reminders/new/page.tsx',
   'app/restaurant-test/google/google-business.tsx',

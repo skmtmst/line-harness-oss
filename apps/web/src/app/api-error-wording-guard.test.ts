@@ -101,7 +101,6 @@ const BASELINE: Record<string, number> = {
   'app/nen-campaigns/edit/page.tsx': 1,
   'app/nen-members/photo-review-detail.tsx': 1,
   'app/nen-members/photo-review-v8.tsx': 3,
-  'app/reminders/edit/issue469-reminder-screens.tsx': 1,
   'app/reminders/new/page.tsx': 1,
   'app/restaurant-test/restaurant-console.tsx': 1,
   'app/restaurant-test/stores/new/page.tsx': 2,

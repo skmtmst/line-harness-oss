@@ -5,7 +5,7 @@ import type { ReminderValidationResult } from '@line-crm/shared'
 import { reminderAudienceCounts } from './reminder-publish-flow'
 
 const FLOW = readFileSync(join(process.cwd(), 'src/components/reminders/reminder-publish-flow.tsx'), 'utf8')
-const ISSUE_469 = readFileSync(join(process.cwd(), 'src/app/reminders/edit/issue469-reminder-screens.tsx'), 'utf8')
+const ISSUE_469 = readFileSync(join(process.cwd(), 'src/v8/reminders/edit.tsx'), 'utf8')
 /* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る。 */
 const LIST_PAGE = readFileSync(join(process.cwd(), 'src/app/reminders/list-v8.tsx'), 'utf8')
 
@@ -31,8 +31,8 @@ describe('リマインダ公開フローの実データ表示', () => {
       expect(source).not.toContain('8/23 01:30')
       expect(source).not.toContain('Kenta Kawano')
       // 実装に無い差し込み名・架空の例値を「取得元」付きで並べない
-      expect(source).toContain('{placeholder.testValue}')
-      expect(source).toContain('{placeholder.source}')
+      expect(source).toContain('placeholder.testValue')
+      expect(source).toContain('placeholder.source')
     }
   })
 

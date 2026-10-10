@@ -56,6 +56,7 @@ import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu
 import Dialog from '@/components/shared/dialog'
 import DetailPanel from '@/components/shared/detail-panel'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
@@ -63,7 +64,7 @@ import { SettingCheckbox } from '@/components/shared/checkbox'
 import { TextField } from '@/components/shared/text-field'
 import { TimeField } from '@/components/shared/date-time-field'
 import ConditionBuilder, { findConditionDraftIssue, pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
-import { firstReminderStepMessage, reminderStepTimings, reminderStopSummary, reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels'
+import { firstReminderStepMessage, reminderPlaceholders, reminderStepTimings, reminderStopSummary, reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels'
 import { useReminderTestRecipient } from '@/components/reminders/use-reminder-test-recipient'
 import { useReminderTestSend } from '@/components/reminders/use-reminder-test-send'
 import { TestRecipientGuidance, testRecipientDestinationLabel, testRecipientNote, testSendConfirmDescription } from '@/components/reminders/test-recipient-guidance'
@@ -98,7 +99,7 @@ const REMINDER_TOKENS: readonly InsertTokenSpec[] = [
  *     p5YuP・r1l0bT（通知の中身 1440・1152）/ T0nis（配信予定）/
  *     ltAaq（確認）/ hjNpJ（有効にした）。
  * 画面の枠は型（CreatePage）が持つ。動き（API・保存・競合・テスト送信・有効化）は
- * 今の画面（app/reminders/edit/edit-v8.tsx）と同じ。BEHAVIOR.md に一覧がある。
+ * 既存のAPIと版管理を保持する。BEHAVIOR.md に一覧がある。
  */
 
 type V8Stage = 'basics' | 'target' | 'messages' | 'schedule' | 'confirm' | 'done'
@@ -230,6 +231,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
   const [loadMissing, setLoadMissing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [conflict, setConflict] = useState(false)
   const [compareTarget, setCompareTarget] = useState<ReminderDraftSettings | null>(null)
   const [compareBusy, setCompareBusy] = useState(false)
@@ -250,6 +252,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     const seq = ++requestSeq.current
     setLoading(true)
     setError('')
+    setLoadError(null)
     setLoadMissing(false)
     try {
       const response = await api.reminders.getDraft(reminderId)
@@ -262,6 +265,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
       setConflict(false)
     } catch (caught) {
       if (seq !== requestSeq.current) return
+      setLoadError(caught)
       const fieldFailure = saveErrors.capture(caught);
 
       if (caught instanceof ApiError && caught.status === 404) setLoadMissing(true)
@@ -506,7 +510,8 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     )
   }
   if (!subjectDraft || !subjectSettings) {
-    return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="下書きを表示できませんでした" description={error || '下書きを読み込めませんでした。'} onRetry={() => void loadDraft()} /></SaveErrorScope>
+    const failure = isForbiddenOrRateLimited(loadError) ? loadFailureCopy(loadError, 'リマインダ') : null
+    return <SaveErrorScope errors={saveErrors}><ListState kind="error" title={failure?.title ?? '下書きを表示できませんでした'} description={failure?.description ?? (error || '下書きを読み込めませんでした。')} error={loadError ?? undefined} onRetry={() => void loadDraft()} /></SaveErrorScope>
   }
 
   const testIssue = testSend.phase.kind === 'failed' || testSend.phase.kind === 'unknown' ? testSend.phase.message : ''
@@ -1656,6 +1661,9 @@ function ConfirmStageV8({
   }, [settings.folderId])
 
   const destination = testRecipientDestinationLabel(recipientView, sentName, sentKind)
+  const placeholderSummary = reminderPlaceholders(settings, sentName ?? (recipientView.kind === 'ready' ? recipientView.recipient.displayName : null))
+    .map((placeholder) => `${placeholder.token}：テストで使う値＝${placeholder.testValue}／本番での取得元＝${placeholder.source}`)
+    .join('\n')
   const firstStep = settings.steps[0] ?? null
   const testedLabel = draft.lastTestStatus === 'succeeded' && draft.lastTestedAt
     ? `前回：${formatMd(draft.lastTestedAt)} に送れました（1通目）`
@@ -1744,7 +1752,7 @@ function ConfirmStageV8({
           <p className={styles.cardNote}>{testRecipientNote(recipientView, sentKind)}</p>
         </div>
         <div className={styles.testRow}>
-          <span className={styles.testDestination} aria-label="送り先">送り先：{destination}</span>
+          <span className={styles.testDestination} aria-label="送り先" title={placeholderSummary || undefined}>送り先：{destination}</span>
           <Button variant="secondary" onClick={onSend} disabled={sendBusy || recipientView.kind !== 'ready'} busy={sendBusy} busyLabel="送信中…">
             <Send size={15} aria-hidden="true" />テストを送る
           </Button>
