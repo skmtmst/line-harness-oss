@@ -1,18 +1,19 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(join(import.meta.dirname, 'webhook-interactions.tsx'), 'utf8')
-const HOST = readFileSync(join(import.meta.dirname, 'page.tsx'), 'utf8')
-const NEW_PAGE = readFileSync(join(import.meta.dirname, 'new', 'page.tsx'), 'utf8')
+const HOST = readUiSource(join(import.meta.dirname, 'page.tsx'), 'utf8')
+const NEW_PAGE = readUiSource(join(import.meta.dirname, 'new', 'page.tsx'), 'utf8')
 const MOCK = readFileSync(join(import.meta.dirname, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
 
 describe('点検・軽 第7便外部連携(#585)', () => {
   it('秘密値づくりは1か所に寄せる(#506 軽)', () => {
     expect(HOST).toContain("import { MIN_SECRET_LENGTH, generateSecret } from './secret'")
     expect(NEW_PAGE).toContain("import { MIN_SECRET_LENGTH, generateSecret } from '../secret'")
-    expect(HOST).not.toContain('function generateSecret(')
-    expect(NEW_PAGE).not.toContain('function generateSecret(')
+    expect(readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')).not.toContain('function generateSecret(')
+    expect(readFileSync(new URL('./new/page.tsx', import.meta.url), 'utf8')).not.toContain('function generateSecret(')
   })
 
   it('やり直し可否は手元の保存値で決めない(#506 軽)', () => {

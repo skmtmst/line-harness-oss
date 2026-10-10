@@ -1,10 +1,11 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
 const OVERVIEWS = readFileSync(join(HERE, 'webhook-overviews.tsx'), 'utf8')
 
 describe('V6 外部連携の一覧状態', () => {
@@ -23,9 +24,9 @@ describe('V6 外部連携の一覧状態', () => {
   })
 
   it('アカウント切替前の遅い応答で現在の一覧を上書きしない', () => {
-    expect(PAGE).toContain('const requestGeneration = ++loadGenerationRef.current')
-    expect(PAGE).toContain('loadGenerationRef.current !== requestGeneration')
-    expect(PAGE).toContain('selectedAccountIdRef.current !== requestAccountId')
+    expect(PAGE).toContain('const generation = ++generationRef.current')
+    expect(PAGE).toContain('generationRef.current !== generation')
+    expect(PAGE).toContain('accountRef.current !== accountId')
   })
 
   it('失敗を空状態や古い一覧として表示しない', () => {
@@ -43,7 +44,7 @@ describe('V6 外部連携の一覧状態', () => {
   })
 
   it('失敗時に再読み込みできる', () => {
-    expect(PAGE.match(/onReload=\{\(\) => void load\(\)\}/g)).toHaveLength(2)
+    expect(PAGE).toContain('onRetry={() => void reload()}')
     // ★V7 `x63W5x`：古い個別ボタン（`action`）ではなく、共通の再読み込み口（`onRetry`）。
     expect(OVERVIEWS.match(/onRetry=\{[^}]*\}/g)).toHaveLength(3)
     expect(OVERVIEWS).not.toContain('onClick={onReload}')

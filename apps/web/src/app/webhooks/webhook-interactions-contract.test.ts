@@ -1,9 +1,10 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(join(import.meta.dirname, 'webhook-interactions.tsx'), 'utf8')
-const HOST = readFileSync(join(import.meta.dirname, 'page.tsx'), 'utf8')
+const HOST = readUiSource(join(import.meta.dirname, 'page.tsx'), 'utf8')
 const API = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('V6 外部連携・やり取りの記録 KNG00', () => {
@@ -11,7 +12,7 @@ describe('V6 外部連携・やり取りの記録 KNG00', () => {
     expect(PAGE).toContain('data-design-node="KNG00"')
     expect(HOST).toContain("{ key: 'interactions', label: 'やり取りの記録' }")
     expect(HOST).toContain("{ key: 'outgoing', label: 'こちらから送る' }")
-    expect(HOST).toContain("tab === 'interactions' && <WebhookInteractions />")
+    expect(HOST).toContain("if (tab === 'interactions') return <InteractionsV8Page />")
     expect(API).toContain('/api/webhooks/interactions?')
   })
 
@@ -25,10 +26,10 @@ describe('V6 外部連携・やり取りの記録 KNG00', () => {
     // 総数を、取れたとき（status==='ready'）だけ付ける。
     expect(HOST).toContain("outgoingStatus === 'ready'")
     expect(HOST).toContain("incomingStatus === 'ready'")
-    expect(HOST).toContain('`${item.label} ${outgoing.length}`')
-    expect(HOST).toContain('`${item.label} ${incoming.length}`')
+    expect(HOST).toContain("label('こちらから送る', outgoingCount)")
+    expect(HOST).toContain("label('こちらで受け取る', incomingCount)")
     // 「見本」は画面に並べる見本データから別集計する。
-    expect(HOST).toContain('`見本 ${SOURCE_PRESETS.length + OUTGOING_SAMPLES.length}`')
+    expect(HOST).toContain('`見本 ${SAMPLE_COUNT}`')
   })
 
   it('読込・空・失敗を分け、未取得を0件と見せない', () => {

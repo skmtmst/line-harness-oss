@@ -150,8 +150,6 @@ describe('共通部品の影響範囲', () => {
       // 表の下にページ送りがあり、1ページごとの件数を選べる。
       // ★V8 統合ユーザーの一覧（ADjK8）。20件ずつのページ送り。
       'app/users/users-v8.tsx',
-      'app/webhooks/webhook-interactions.tsx',
-      'app/webhooks/webhook-overviews.tsx',
       // ★V8-B ウェビナー一覧（UyUMw）。表の下にページ送りを置く。
       'app/webinars/edit/participants-v8.tsx',
       'app/webinars/list-v8.tsx',

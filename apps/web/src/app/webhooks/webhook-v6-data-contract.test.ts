@@ -1,3 +1,4 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -5,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const API = readFileSync(join(HERE, '../../lib/api.ts'), 'utf8')
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
 const OVERVIEWS = readFileSync(join(HERE, 'webhook-overviews.tsx'), 'utf8')
 
 describe('V6 外部連携の接続別集計と受信口詳細', () => {
@@ -40,7 +41,7 @@ describe('V6 外部連携の接続別集計と受信口詳細', () => {
 
   it('選んだ受け取り口の詳細をアカウント付きで取得する', () => {
     expect(API).toContain('/api/webhooks/incoming/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}')
-    expect(PAGE).toContain('lineAccountId={selectedAccountId}')
+    expect(PAGE).toContain('api.webhooks.incoming.detail(selectedDetailId, selectedAccountId)')
     expect(OVERVIEWS).toContain('api.webhooks.incoming.detail(selectedDetailId, lineAccountId)')
     expect(OVERVIEWS).toContain('if (cancelled) return')
   })

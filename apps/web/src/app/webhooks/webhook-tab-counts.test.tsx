@@ -84,7 +84,7 @@ function interactionsSummary() {
 /** タブ行（ScrollableTabs）の各タブの文字だけを集める。一覧の「N本のうち」と混ぜない。 */
 function tabTexts(): string[] {
   return Array.from(
-    host.querySelectorAll('[data-scrollable-tabs] button, [data-scrollable-tabs] a'),
+    host.querySelectorAll('[role="tablist"] [role="tab"]'),
   ).map((el) => el.textContent ?? '')
 }
 

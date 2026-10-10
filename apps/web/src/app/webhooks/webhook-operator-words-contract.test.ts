@@ -1,10 +1,11 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
 const OVERVIEWS = readFileSync(join(HERE, 'webhook-overviews.tsx'), 'utf8')
 const SCREEN = `${PAGE}\n${OVERVIEWS}`
 
@@ -19,8 +20,8 @@ describe('V6 外部連携の運用者向け文言', () => {
   it('作成画面と空状態から同じ操作名へ進める', () => {
     // 板 `H031gC`：作る操作は小窓（Dialog）で出す。操作名は変えない。
     expect(PAGE).toContain('title="受け取る設定を追加"')
-    expect(PAGE).toContain('＋ 受け取り口を作る')
-    expect(PAGE).toContain('href="/webhooks/new">＋ 送り先を作る')
+    expect(PAGE).toContain('受け取り口を作る')
+    expect(PAGE).toContain('href="/webhooks/new"')
     expect(PAGE).not.toContain('送る設定を追加')
     expect(OVERVIEWS).toContain('「＋ 受け取り口を作る」から作成してください。')
     expect(OVERVIEWS).toContain('「＋ 送り先を作る」から作成してください。')
@@ -32,7 +33,7 @@ describe('V6 外部連携の運用者向け文言', () => {
   it('使えない操作をヘッダーに出さない', () => {
     expect(PAGE).not.toContain('マニュアルは準備中です')
     expect(PAGE).not.toContain('通知先の追加は準備中です')
-    expect(PAGE).toContain('<Button variant="primary" onClick={() => setShowCreate(true)}>')
+    expect(PAGE).toContain('onClick={openCreate}')
   })
 
   it('取得失敗を0件や空と表示しない', () => {

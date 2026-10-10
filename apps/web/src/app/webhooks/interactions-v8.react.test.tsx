@@ -122,10 +122,10 @@ test('v8 で失敗したものをまとめてやり直すボタンが出る', as
   expect(board?.textContent).toContain('失敗したものをまとめてやり直す')
 })
 
-test('v7 では従来の記録タブが出て Uv9AA は出ない', async () => {
+test('旧テーマ属性でも現役の記録タブが出て Uv9AA が出る', async () => {
   await renderPage()
-  expect(host.querySelector('[data-design-node="Uv9AA"]')).toBeNull()
-  expect(host.querySelector('[data-design-node="KNG00"]')).not.toBeNull()
+  expect(host.querySelector('[data-design-node="Uv9AA"]')).not.toBeNull()
+  expect(host.querySelector('[data-design-node="KNG00"]')).toBeNull()
 })
 
 /*
