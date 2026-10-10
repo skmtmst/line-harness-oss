@@ -368,7 +368,7 @@ export default function HqHomeV8() {
     <div className={styles.folderBox}>
       <FolderPanel
         /* 閲覧のみで登録ボタンを隠したときも、その場所は空けておく（下のフォルダの列が上へ詰まらない。絵 VtJQ6）。 */
-        createAction={createAccount ?? <span className={styles.createSpace} aria-hidden="true" />}
+        createAction={createAccount}
         heading="フォルダ"
         rows={folderRows}
         activeId={folder}

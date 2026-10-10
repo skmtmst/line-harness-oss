@@ -990,9 +990,8 @@ function WebinarList() {
         </KpiBand>
       </>}
       folders={<>
-        {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
-        {createButton ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
         <FolderPanel
+          createAction={createButton}
           activeId={selectedFolder}
           onSelect={(id) => { setSelectedFolder(id); setPage(1) }}
           onAddFolder={canEdit ? () => { setFolderError(''); closeDetail(); setFolderFormOpen(true) } : undefined}

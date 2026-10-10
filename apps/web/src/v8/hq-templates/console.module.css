@@ -14,7 +14,6 @@
 .topCell { vertical-align: top; }
 .tableBox .table tbody td.topCell { vertical-align: top; padding-top: var(--tpl-htn-top-cell-pad); }
 .listArea { display: flex; flex-direction: column; gap: var(--tpl-htn-list-gap); padding: var(--tpl-htn-list-pad); }
-.createSpace { display: block; height: var(--tpl-htn-input-h); }
 .railNote { margin: 0; line-break: anywhere; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-faint); }
 .folderBlock { margin-top: var(--tpl-htn-folder-block-gap); }
 .folderForm { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-htn-chip-gap); }

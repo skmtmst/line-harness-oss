@@ -264,19 +264,19 @@ export default function HqStoreList(props: HqStoreListProps) {
     { kind: 'unfiled' as const, id: 'none', label: '未分類', count: ready ? countIn('none') : null, leadingActions: leadingActions('none', '未分類') },
   ]
   const selectFolder = (id: string) => { onFolderFilter(id); setPage(1) }
-  const folderPanel = folderLoadFailed ? (
-    <Notice tone="danger" className={storeStyles.folderNoteNoticePlacement} >フォルダを読み込めませんでした。ページを再読み込みしてください。</Notice>
-  ) : (
+  const folderPanel = (
     <FolderPanel
+      createAction={createButton(true)}
+      showHeading={!folderLoadFailed}
       activeId={folderFilter}
       onSelect={selectFolder}
-      onAddFolder={canEdit ? () => { setFolderError(''); setFolderNameError(''); setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setFolderDialog({ editing: null }) } : undefined}
+      onAddFolder={!folderLoadFailed && canEdit ? () => { setFolderError(''); setFolderNameError(''); setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setFolderDialog({ editing: null }) } : undefined}
       addFolderLabel="フォルダを追加"
-      rows={folderRows}
+      rows={folderLoadFailed ? [] : folderRows}
     >
-      <p className={storeStyles.folderNote}>
+      {folderLoadFailed ? <Notice tone="danger" className={storeStyles.folderNoteNoticePlacement}>フォルダを読み込めませんでした。ページを再読み込みしてください。</Notice> : <p className={storeStyles.folderNote}>
         {type === 'template' ? 'フォルダは種類のタブをまたいで使えます。消しても、中のテンプレートは未分類に残ります' : `フォルダを消しても、中の${words.item}は未分類に残ります`}
-      </p>
+      </p>}
     </FolderPanel>
   )
 
@@ -536,7 +536,7 @@ export default function HqStoreList(props: HqStoreListProps) {
         </KpiBand>
       )}
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: selectFolder, createAction: createButton(false) ?? undefined }}
-      folders={<>{createButton(true) ?? <span className={storeStyles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
+      folders={folderPanel}
       toolbar={toolbar}
       pagination={pager}
       overlays={(

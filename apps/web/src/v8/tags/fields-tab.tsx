@@ -503,8 +503,8 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
       <ListPageBody
         listHelp={canEdit ? `行の「…」に：編集・${host ? '配る' : '移行（種類を変える）'}・削除。並べ替えはつまんで上下（キーボードは上下キー）` : '行から中身を見られます。'}
         folders={<>
-          {createButton(true)}
           <FolderPanel
+            createAction={createButton(true)}
             activeId={folderFilter}
             onSelect={setFolderFilter}
             onAddFolder={canEdit ? () => host ? host.onAddFolder?.() : setFolderDialog('new') : undefined}

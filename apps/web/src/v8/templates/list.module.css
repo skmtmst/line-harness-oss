@@ -634,7 +634,6 @@
 }
 
 /* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
-.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }
 
 /* ===== 統括のひな形（src/v8/hq-templates/store-list.tsx）：店と同じ一覧に「配布先」と［配る］（幅60＋左の間16）を足す。B-34：行の左右 24 ===== */
 .colHqDest { width: var(--tpl-tl-col-hq-dest); }

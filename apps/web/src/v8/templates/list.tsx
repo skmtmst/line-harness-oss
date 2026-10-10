@@ -876,6 +876,7 @@ export default function TemplatesListV8() {
   }
   const folderPanel = (
     <FolderPanel
+      createAction={createButton(true)}
       activeId={selectedCategory}
       onSelect={selectCategory}
       onAddFolder={canMutateTemplates ? () => setFolderDialogOpen(true) : undefined}
@@ -1684,7 +1685,7 @@ export default function TemplatesListV8() {
         </KpiBand>
       }
       folderNav={narrow ? undefined : { rows: folderRows, activeId: selectedCategory, onSelect: selectCategory, createAction: createButton(false) }}
-      folders={<>{createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
+      folders={folderPanel}
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={listPager}
       overlays={overlays}

@@ -803,8 +803,9 @@ export default function TagsTab({
 
       <ListPageBody
         folders={<>
-          {createButton(true) ?? (status === 'forbidden' ? null : <span className={styles.viewerCreateSpace} aria-hidden="true" />)}
           <FolderPanel
+            createAction={createButton(true)}
+            reserveCreateSpace={status !== 'forbidden'}
             activeId={folder}
             onSelect={setFolder}
             onAddFolder={canEdit ? () => setFolderDialog('new') : undefined}

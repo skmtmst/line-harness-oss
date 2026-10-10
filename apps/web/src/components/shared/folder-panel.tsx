@@ -147,13 +147,13 @@ export default function FolderPanel({
   addFolderNote,
   children,
   createAction,
-  reserveCreateSpace = true,
   readOnly = false,
+  reserveCreateSpace = readOnly || createAction !== undefined,
   disabled = false,
 }: {
   /** V8: 作る操作はフォルダ列の先頭に置く。 */
   createAction?: ReactNode
-  /** 閲覧のみで作る操作を隠すときも、フォルダの位置は変えない。V8 のみ。 */
+  /** 作る操作をnullにして隠すときは、既定で同じ場所を空ける。選ぶだけの列では空けない。V8 のみ。 */
   reserveCreateSpace?: boolean
   /** 選ぶ窓用。行の選択は保ち、作成・編集・並べ替えなどの操作を出さない。 */
   readOnly?: boolean

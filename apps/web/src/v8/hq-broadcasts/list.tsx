@@ -372,7 +372,7 @@ export default function HqBroadcastList() {
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: selectFolder, createAction: createButton(false) ?? undefined }}
       folders={(
         <FolderPanel
-          createAction={createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
+          createAction={createButton(true)}
           activeId={folderFilter}
           onSelect={selectFolder}
           onAddFolder={canManage ? () => { setFolderError(''); setFolderNameError(''); setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setFolderDialog({ editing: null }) } : undefined}

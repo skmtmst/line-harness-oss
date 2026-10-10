@@ -832,9 +832,8 @@ function FriendAddList() {
         </KpiBand>
       }
       folders={<>
-        {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ） */}
-        {createButton ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
         <FolderPanel
+          createAction={createButton}
           activeId={folder ?? ''}
           onSelect={(id) => selectFolder(id || null)}
           onAddFolder={canEdit ? () => { setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setEditingFolder(null); setFolderError(''); setFolderDialogOpen(true) } : undefined}

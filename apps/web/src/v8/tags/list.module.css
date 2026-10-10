@@ -432,7 +432,6 @@
 }
 
 /* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
-.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }
 /* 閲覧のみで隠したフォルダを追加の場所（フォルダを消しても…の注が動かない）。 */
 .viewerFolderAddSpace { display: block; height: var(--tpl-viewer-folder-add-space); }
 

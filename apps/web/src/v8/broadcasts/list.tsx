@@ -732,7 +732,7 @@ export default function BroadcastListV8() {
   /* ===== 部品（広い板・1152 で同じものを並べ替えて使う） ===== */
   /* 閲覧のみには押せない「配信を作る」を置かずに隠す（2026-10-06 オーナー決定）。
      広い板では場所だけ空けて、フォルダの列の並びを絵（NtCE3）どおりに保つ。 */
-  const createButton = (full: boolean) => (!canEdit ? (full ? <span className={styles.viewerCreateSpace} aria-hidden="true" /> : null) : (
+  const createButton = (full: boolean) => (!canEdit ? null : (
     <Button
       type="button"
       variant="primary"
@@ -1144,7 +1144,7 @@ export default function BroadcastListV8() {
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
       folders={narrow ? undefined : (
         <FolderPanel
-          createAction={createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
+          createAction={createButton(true)}
           activeId={folderFilter}
           onSelect={setFolderFilter}
           onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}

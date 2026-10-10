@@ -62,6 +62,22 @@ afterEach(() => {
 const buttons = () => [...document.querySelectorAll('button')]
 
 describe('統括のひな形の一覧（店と同じ形）', () => {
+  it.each([true, false])('フォルダの取得失敗でも作る操作と閲覧時の場所を保つ（編集=%s）', async canEdit => {
+    const h = await render({ folderLoadFailed: true, canEdit })
+    const panel = host.querySelector('aside[aria-label="フォルダ"]')!
+    expect(panel.textContent).toContain('フォルダを読み込めませんでした')
+    expect(panel.textContent).not.toContain('フォルダを追加')
+    const create = panel.querySelector('button') as HTMLButtonElement | null
+    if (canEdit) {
+      expect(create).not.toBeNull()
+      await act(async () => create!.click())
+      expect(h.onCreate).toHaveBeenCalledOnce()
+    } else {
+      expect(create).toBeNull()
+      expect(panel.querySelectorAll(':scope > div[aria-hidden="true"]')).toHaveLength(1)
+    }
+  })
+
   for (const canEdit of [true, false]) {
     it(`タグ一覧はタグ名から始まり、星・注目の操作と絞り込みを出さない（編集=${canEdit}）`, async () => {
       await render({ type: 'tag', kind: undefined, canEdit })
