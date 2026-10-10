@@ -447,7 +447,7 @@ export async function applyPaidBookingPayment(
     `SELECT id, line_account_id, booking_id, status FROM booking_payments
       WHERE provider_payment_id = ?`,
   ).bind(providerPaymentId).first<{
-    id: string; line_account_id: string; booking_id: string; status: string;
+    id: string; line_account_id: string; booking_id: string | null; status: string;
   }>();
   if (!row) return null;
   if (row.status === 'paid') return { duplicate: true };
@@ -455,6 +455,9 @@ export async function applyPaidBookingPayment(
   await markBookingPayment(db, {
     lineAccountId: row.line_account_id, paymentId: row.id, status: 'paid',
   });
+  // A late provider event still updates the preserved payment. There is no
+  // customer/booking left to confirm or notify after data deletion.
+  if (row.booking_id === null) return { duplicate: false };
   const settings = await getBookingAdminSettings(db, row.line_account_id);
   const now = new Date().toISOString();
   if (settings?.approvalMode === 'manual') {
