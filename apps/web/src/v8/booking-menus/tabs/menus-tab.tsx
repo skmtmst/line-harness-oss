@@ -45,6 +45,9 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
+  const [deleteTarget, setDeleteTarget] = useState<BookingMenu | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const [historyTarget, setHistoryTarget] = useState<BookingMenu | null>(null)
   const [visibilityError, setVisibilityError] = useState<string | null>(null)
   const [updatingVisibility, setUpdatingVisibility] = useState(false)
@@ -57,6 +60,19 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
   const menusRef = useRef(menus)
   menusRef.current = menus
   const reorderBusyRef = useRef(false)
+
+  async function deleteMenu() {
+    if (!deleteTarget || deleting || !canEdit) return
+    setDeleting(true); setDeleteError('')
+    try {
+      await bookingApi.deleteMenu(accountId, deleteTarget.id)
+      setDeleteTarget(null); onReload(); notifyToast('予約メニューを削除しました')
+    } catch (cause) {
+      setDeleteError(cause instanceof Error && 'status' in cause && cause.status === 409
+        ? '予約が付いているため削除できません。新しい予約を止めるには「止める」を使ってください。'
+        : '削除できませんでした。状態を読み直してお試しください。')
+    } finally { setDeleting(false) }
+  }
 
   const orderedBase = useMemo(() => {
     const sorted = sortedMenus(menus)
@@ -219,6 +235,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
 
   return (
     <div className={styles.tabStack} data-design="Table">
+      <ConfirmDialog open={deleteTarget !== null} title={`「${deleteTarget?.name ?? ''}」を削除しますか？`} description="予約が付いているメニューは削除できません。" confirmLabel="削除する" destructive busy={deleting} error={deleteError} onConfirm={() => void deleteMenu()} onCancel={() => { if (!deleting) setDeleteTarget(null) }} />
       <Band tone="hint">上から並んだ順に、お客さまの画面に出ます。つまみで並べ替えます。</Band>
 
       <div className={styles.toolbar}>
@@ -280,6 +297,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
               ...(canEdit ? [
                 /* つまみと同じ入口の「上へ／下へ」。検索中・保存中は出さない（つまみも出さない）。 */
                 ...reorder.menuItems(menu.id, () => setOpenMenuId(null)),
+                { id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setDeleteError(''); setDeleteTarget(menu) } },
                 {
                   id: 'visibility',
                   label: (visOverride[menu.id] ?? menu.is_active) ? '止める' : '出す',
