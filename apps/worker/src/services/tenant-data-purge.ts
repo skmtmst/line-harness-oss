@@ -130,7 +130,7 @@ async function purgeOneTenant(
   let remaining = budget;
 
   // 子が先、親が後。親を先に消すと子が親をたどれなくなって消し残る。
-  for (const table of purgeTablesChildFirst()) {
+  tables: for (const table of purgeTablesChildFirst()) {
     if (remaining <= 0) {
       out.finished = false;
       break;
@@ -154,6 +154,11 @@ async function purgeOneTenant(
         const objects = await deleteR2Objects(env, table, condition, keyColumns, tenant.id, chunk);
         out.deletedObjects += objects.deleted;
         out.failedObjects += objects.failed;
+        if (table === 'form_submission_files' && objects.failed > 0) {
+          // Keep the R2 keys and parents reachable so the next run can retry.
+          out.finished = false;
+          break tables;
+        }
       }
 
       const deleted = await env.DB

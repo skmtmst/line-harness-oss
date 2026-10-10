@@ -57,6 +57,8 @@ export function purgeTablesChildFirst(): string[] {
   const depth = new Map<string, number>();
   /** その表の行を選ぶために、まだ残っていないといけない表。 */
   const dependsOn = (name: string): string | undefined => {
+    // Files also reference answers and friends; remove them before either parent.
+    if (name === 'form_submission_files') return 'form_submissions';
     const scope = RETENTION_TABLES[name]?.scope;
     if (!scope) return undefined;
     if (scope.by === 'parent') return scope.parent;

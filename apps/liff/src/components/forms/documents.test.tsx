@@ -16,6 +16,7 @@ describe('書類の入力', () => {
     expect(upload).toHaveBeenCalledWith(image, 'back')
     rerender(<FormFileControl label="PDF" kind="pdf" onUpload={upload} />)
     expect(input.accept).toBe('application/pdf')
+    expect(screen.getByText('危ないファイルの検査は内蔵の検査が標準です。外部の検査は設定した店だけで行います。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '写真を撮る' })).toBeNull()
   })
   it('送信前に形式と10MBを断り、アップロード中は選べない', () => {
