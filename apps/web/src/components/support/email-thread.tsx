@@ -11,7 +11,7 @@ import { createPollGeneration, startVisiblePoll, type VisiblePollHandle } from '
 import TemplatePicker from '@/components/chats/template-picker'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
-import { useAdminTheme } from '@/lib/use-admin-theme'
+
 import ConversationHead from '@/v8/inbox-chat/conversation-head'
 import { formatDateTime } from '@/lib/format'
 import Button from '@/components/shared/button'
@@ -125,7 +125,7 @@ export default function EmailThread({
   /** ★V8：会話の頭の「右の列の出し入れ」で閉じる口。 */
   onCloseCustomerInfo?: () => void
 }) {
-  const isV8 = useAdminTheme() === 'v8'
+
   const [detail, setDetail] = useState<EmailDetail | null>(null)
   const [reply, setReply] = useState('')
   /*
@@ -586,7 +586,7 @@ export default function EmailThread({
 
   return (
     <>
-      {isV8 ? (
+      {(
         /*
          * ★V8：LINE の会話と同じ頭（ConversationHead）。名前の下に「メール・件名」。
          * 対応状況・担当は1つだけ選ぶメニュー（四角のチェックは使わない。オーナー指摘）。
@@ -607,71 +607,6 @@ export default function EmailThread({
             onToggle: () => (customerInfoOpen ? onCloseCustomerInfo?.() : onOpenCustomerInfo()),
           } : undefined}
         />
-      ) : (
-      <EmailThreadHeader>
-        <div className="flex min-w-0 basis-full items-center gap-2 sm:basis-auto sm:flex-1">
-          <EmailThreadBackButton onBack={onBack} />
-          <div className="min-w-0">
-            {/*
-              U008: 長い件名が狭い幅で切れても、押すと(キーボードでも)
-              全文に広げられる。title でも全文を確認できる。
-            */}
-            <button
-              type="button"
-              title={detail.thread.subject}
-              aria-expanded={headerSubjectExpanded}
-              onClick={() => setHeaderSubjectExpanded((v) => !v)}
-              className={`block w-full text-left text-sm font-medium text-ink ${headerSubjectExpanded ? 'whitespace-normal break-all' : 'truncate'}`}
-            >
-              {detail.thread.subject}
-            </button>
-            <p
-              className="text-ink-faint mt-0.5 truncate text-xs"
-              title={`${detail.thread.customer_name || detail.thread.customer_email} ・ メール`}
-            >
-              {detail.thread.customer_name || detail.thread.customer_email} ・ メール
-            </p>
-          </div>
-        </div>
-        {/* LINE のトークと同じ並び：対応 ・ 担当 ・ 顧客情報。 */}
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
-          <label className="flex items-center gap-1.5 text-xs">
-            {/*
-              U010: 「対応」「担当」の短い文字が縦に割れないよう、
-              ラベルは1行で保ち、収まらないときは行ごと次へ落とす。
-            */}
-            <span className="text-ink-faint whitespace-nowrap">対応</span>
-            <Select
-              aria-label="対応"
-              value={detail.thread.status}
-              onChange={(value) => void updateStatus(value as ThreadStatus)}
-              options={[
-                { value: 'unread', label: '未対応' },
-                { value: 'in_progress', label: '対応中' },
-                { value: 'on_hold', label: '保留' },
-                { value: 'resolved', label: '対応済み' },
-              ]}
-            />
-          </label>
-          <label className="flex items-center gap-1.5 text-xs">
-            <span className="text-ink-faint whitespace-nowrap">担当</span>
-            <EntitySelect
-              aria-label="担当"
-              value={detail.thread.assigned_staff_id ?? ''}
-              onChange={(value) => void updateAssignee(value || null)}
-              options={[
-                { value: '', label: '未割り当て' },
-                ...operators.map((op) => ({ ...entityOptionMetadata(op), value: op.id, label: op.name })),
-              ]}
-            />
-          </label>
-          {!customerInfoOpen && onOpenCustomerInfo && (
-            <Button variant="secondary" className="whitespace-nowrap px-2.5 py-1.5 text-xs text-action h-auto" type="button" onClick={onOpenCustomerInfo}>
-              顧客情報を開く
-            </Button>
-          )}
-        </div>
-      </EmailThreadHeader>
       )}
 
       <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto bg-canvas-sunken p-4">
