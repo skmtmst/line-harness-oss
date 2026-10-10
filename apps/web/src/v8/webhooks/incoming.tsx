@@ -777,6 +777,12 @@ export default function WebhooksIncomingV8() {
                         : item.kind === 'ambiguous'
                           ? item.candidates.length > 0 ? `${item.candidates.length} 人の友だちに一致` : '2人以上に一致'
                           : '一致する友だちがいません'}
+                      {item.kind === 'ambiguous' && canResolveUnmatched ? item.candidates.map((candidate) => (
+                        <div key={candidate.friendId}>
+                          <span>{candidate.displayName ?? candidate.friendId}</span>
+                          <Button disabled={dismissingId !== null} busy={dismissingId === item.id} onClick={() => void resolveUnmatched(item, { action: 'link', friendId: candidate.friendId })}>この人に結び付ける</Button>
+                        </div>
+                      )) : null}
                     </Td>
                     <Td className={styles.miniOps}>
                       {canResolveUnmatched ? (
@@ -787,7 +793,7 @@ export default function WebhooksIncomingV8() {
                             {item.kind === 'ambiguous' ? 'どれでもない' : '確認した'}
                           </Button>
                         )
-                      ) : null}
+                      ) : <span className={styles.cardNote}>結び付け・確認は統括または管理者に頼んでください。</span>}
                     {unmatchedActionError && unmatchedActionError.id === item.id ? (
                       <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >{unmatchedActionError.message}</Notice>
                     ) : null}
@@ -812,7 +818,7 @@ export default function WebhooksIncomingV8() {
             <h3 className={styles.cardTitle} id="wh-in-try">届いたつもりで試す</h3>
             <p className={styles.cardNote}>見本の JSON で、どの人に届くかと何が動くかを確かめます。実際の処理は動きません</p>
           </div>
-          <pre className={styles.sampleBox}>{sampleText}</pre>
+          <pre className={styles.sampleBox} title={detail?.latestSample ? `${shortDateTime(detail.latestSample.receivedAt)}に届いた見本。差し込み：${detail.templateFields.map((field) => field.token).join('、')}${detail.latestSample.truncated ? '。項目が多いため先頭50件まで表示しています' : ''}` : undefined}>{sampleText}</pre>
           <div>
             <Button
               onClick={() => {

@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest'
  */
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
-const OVERVIEWS = readFileSync(join(HERE, 'webhook-overviews.tsx'), 'utf8')
+const OVERVIEWS = ['outgoing', 'incoming'].map(name => readUiSource(join(import.meta.dirname, '../../v8/webhooks', `${name}.tsx`), 'utf8')).join('\n')
 const NEW_PAGE = readUiSource(join(HERE, 'new', 'page.tsx'), 'utf8')
 const EDIT_PAGE = readUiSource(join(HERE, 'edit', 'page.tsx'), 'utf8')
 const HELPER = readFileSync(
@@ -51,10 +51,10 @@ describe('R32 作成の操作は権限に合わせる', () => {
 
   it('一覧の変更操作（開始・停止・合言葉・削除・直す）も統括だけに出す', () => {
     expect(PAGE).toContain('canManage ?')
-    expect(OVERVIEWS).toContain('canManage: boolean')
+    expect(OVERVIEWS).toContain("const canManage = staffRole === 'owner'")
     // 試し送信は管理者も使えるので残す。
     expect(OVERVIEWS).toContain('届いたつもりで試す')
-    expect(OVERVIEWS).toContain('1回 試してみる')
+    expect(OVERVIEWS).toContain('試しに送る')
   })
 })
 

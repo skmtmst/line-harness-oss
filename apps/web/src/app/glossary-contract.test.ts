@@ -127,7 +127,6 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
     'app/restaurant-test/v8/google.tsx',
     'app/visual-qa/v8-parts/page.tsx',
     'app/webhooks/webhook-interactions.tsx',
-    'app/webhooks/webhook-overviews.tsx',
     'components/broadcasts/segment-preset-controls.tsx',
     'components/inflow-links/site-script-v8.tsx',
     'components/inflow-links/site-script.tsx',

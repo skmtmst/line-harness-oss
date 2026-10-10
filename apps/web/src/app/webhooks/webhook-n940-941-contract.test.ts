@@ -1,3 +1,4 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 /*
  * #941（N-385〜N-388）の構造契約。
  *
@@ -8,28 +9,30 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const OVERVIEWS = readFileSync(join(import.meta.dirname, 'webhook-overviews.tsx'), 'utf8')
+const OVERVIEWS = ['outgoing', 'incoming'].map(name => readUiSource(join(import.meta.dirname, '../../v8/webhooks', `${name}.tsx`), 'utf8')).join('\n')
 const INTERACTIONS = readFileSync(join(import.meta.dirname, 'webhook-interactions.tsx'), 'utf8')
 const STYLES = readFileSync(join(import.meta.dirname, 'webhook-interactions.module.css'), 'utf8')
+const MENU = readFileSync(join(import.meta.dirname, '../../components/shared/action-menu.tsx'), 'utf8')
 const API = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('N-385: 設定メニューはキーボードだけで開いて選べ、Escape・外側で閉じる', () => {
   it('menu / menuitem の役割と矢印キー移動を持つ', () => {
     expect(OVERVIEWS).toContain('aria-haspopup="menu"')
-    expect(OVERVIEWS).toContain('role="menu"')
-    expect(OVERVIEWS).toContain('role="menuitem"')
-    expect(OVERVIEWS).toContain('onSettingsMenuKeyDown')
-    expect(OVERVIEWS).toContain("'ArrowDown'")
-    expect(OVERVIEWS).toContain("'Home'")
-    expect(OVERVIEWS).toContain("'End'")
+    expect(MENU).toContain('role="menu"')
+    expect(MENU).toContain('role="menuitem"')
+    expect(OVERVIEWS).toContain('<ActionMenu')
+    expect(MENU).toContain('onKeyDown={moveFocus}')
+    expect(MENU).toContain("'ArrowDown'")
+    expect(MENU).toContain("'Home'")
+    expect(MENU).toContain("'End'")
   })
 
   it('開いたら最初の項目へフォーカスし、Escape で閉じて「設定」へ戻す', () => {
-    expect(OVERVIEWS).toContain('settingsMenuItems()[0]?.focus()')
-    expect(OVERVIEWS).toContain("event.key !== 'Escape'")
-    expect(OVERVIEWS).toContain("querySelector('button')?.focus()")
+    expect(MENU).toContain('first.focus({ preventScroll: true })')
+    expect(MENU).toContain("event.key === 'Escape'")
+    expect(MENU).toContain('anchor.focus({ preventScroll: true })')
     // 外側を押しても閉じる（pointerdown で中か外かを見る）
-    expect(OVERVIEWS).toContain("addEventListener('pointerdown', onPointerDown)")
+    expect(MENU).toContain("addEventListener('pointerdown', onPointerDown)")
   })
 })
 

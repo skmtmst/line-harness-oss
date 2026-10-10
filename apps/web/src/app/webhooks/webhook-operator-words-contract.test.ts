@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
-const OVERVIEWS = readFileSync(join(HERE, 'webhook-overviews.tsx'), 'utf8')
+const OVERVIEWS = ['outgoing', 'incoming'].map(name => readUiSource(join(import.meta.dirname, '../../v8/webhooks', `${name}.tsx`), 'utf8')).join('\n')
 const SCREEN = `${PAGE}\n${OVERVIEWS}`
 
 describe('V6 外部連携の運用者向け文言', () => {
@@ -23,8 +23,8 @@ describe('V6 外部連携の運用者向け文言', () => {
     expect(PAGE).toContain('受け取り口を作る')
     expect(PAGE).toContain('href="/webhooks/new"')
     expect(PAGE).not.toContain('送る設定を追加')
-    expect(OVERVIEWS).toContain('「＋ 受け取り口を作る」から作成してください。')
-    expect(OVERVIEWS).toContain('「＋ 送り先を作る」から作成してください。')
+    expect(OVERVIEWS).toContain('最初の受け取り口を作る')
+    expect(OVERVIEWS).toContain('最初の送り先を作る')
     expect(OVERVIEWS).not.toContain('右上の「受け取り口を追加」')
     expect(OVERVIEWS).not.toContain('右上の「送り先を追加」')
     expect(SCREEN).not.toContain('新規Webhook')
@@ -37,11 +37,11 @@ describe('V6 外部連携の運用者向け文言', () => {
   })
 
   it('取得失敗を0件や空と表示しない', () => {
-    // 失敗の枝は2つ（送る・受け取る）。件数（KPI）の「—」判定ぶん1つ増えた。
-    expect(OVERVIEWS.match(/status === 'error'/g)).toHaveLength(3)
-    expect(OVERVIEWS.match(/登録内容は消えていません。/g)).toHaveLength(2)
-    // ★V7 `x63W5x`：古い個別ボタンではなく共通の再読み込み口（`onRetry`）。
-    // ボタンの文言は共通部品（ListState）が持つ。ここでは口があることだけ見る。
-    expect(OVERVIEWS).toContain('onRetry={onReload}')
+    expect(OVERVIEWS).toContain("outgoingStatus === 'error'")
+    expect(OVERVIEWS).toContain("incomingStatus === 'error'")
+    expect(OVERVIEWS).toContain('登録内容は消えていません。')
+    expect(OVERVIEWS).toContain('受け取り口を読み込めませんでした')
+    expect(OVERVIEWS).toContain('onRetry={() => void reload()}')
+
   })
 })

@@ -71,7 +71,6 @@ const KNOWN_FILES: string[] = [
   'app/settings/feature-settings-v8.tsx',
   'app/staff/page.tsx',
   'app/updates/page.tsx',
-  'app/webhooks/webhook-overviews.tsx',
   'app/webinars/edit/page.tsx',
   'app/webinars/edit/review-text.ts',
   'components/chats/friend-info-sidebar.tsx',

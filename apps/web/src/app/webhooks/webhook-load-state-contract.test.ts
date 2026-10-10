@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
-const OVERVIEWS = readFileSync(join(HERE, 'webhook-overviews.tsx'), 'utf8')
+const OVERVIEWS = ['outgoing', 'incoming'].map(name => readUiSource(join(import.meta.dirname, '../../v8/webhooks', `${name}.tsx`), 'utf8')).join('\n')
 
 describe('V6 外部連携の一覧状態', () => {
   it('受信と送信を別々に読込・成功・失敗へ分ける', () => {
@@ -30,15 +30,14 @@ describe('V6 外部連携の一覧状態', () => {
   })
 
   it('失敗を空状態や古い一覧として表示しない', () => {
-    const outgoingStart = OVERVIEWS.indexOf('export function OutgoingOverview')
-    const incomingStart = OVERVIEWS.indexOf('export function IncomingOverview')
-    const outgoing = OVERVIEWS.slice(outgoingStart, incomingStart)
-    const incoming = OVERVIEWS.slice(incomingStart)
-    expect(outgoing.indexOf("status === 'error'")).toBeGreaterThan(-1)
-    expect(outgoing.indexOf('items.length === 0 && !showCreate')).toBeGreaterThan(outgoing.indexOf("status === 'error'"))
-    expect(incoming.indexOf("status === 'error'")).toBeGreaterThan(-1)
-    expect(incoming.indexOf('!selected && !showCreate')).toBeGreaterThan(incoming.indexOf("status === 'error'"))
-    expect(OVERVIEWS.match(/登録内容は消えていません。/g)).toHaveLength(2)
+    const outgoing = readUiSource(join(HERE, '../../v8/webhooks/outgoing.tsx'), 'utf8')
+    const incoming = readUiSource(join(HERE, '../../v8/webhooks/incoming.tsx'), 'utf8')
+    expect(outgoing.indexOf("outgoingStatus === 'error'")).toBeGreaterThan(-1)
+    expect(outgoing.indexOf('visible.length === 0')).toBeGreaterThan(outgoing.indexOf("outgoingStatus === 'error'"))
+    expect(incoming).toContain("incomingStatus === 'error'")
+    expect(incoming).toContain("incomingStatus === 'ready' && !selected")
+    expect(outgoing).toContain('登録内容は消えていません。')
+    expect(incoming).toContain('受け取り口を読み込めませんでした')
     expect(PAGE).toContain("setIncoming([])\n      setIncomingStatus('error')")
     expect(PAGE).toContain("setOutgoing([])\n      setOutgoingStatus('error')")
   })

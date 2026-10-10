@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -5,7 +6,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readUiSource(path.join(__dirname, 'page.tsx'), 'utf8')
-const OVERVIEWS = fs.readFileSync(path.join(__dirname, 'webhook-overviews.tsx'), 'utf8')
+const OVERVIEWS = ['outgoing', 'incoming'].map(name => readUiSource(join(import.meta.dirname, '../../v8/webhooks', `${name}.tsx`), 'utf8')).join('\n')
 
 /** 注釈を落とす。「なぜ直したか」を書いた文が、直したはずの字面に当たるのを避ける。 */
 function code(src: string): string {
@@ -55,6 +56,6 @@ describe('外部連携の「どこから来るか」は、見本から選べる'
 
   it('未設定を半角ハイフンで書かない', () => {
     expect(CODE, "'-' のまま出している").not.toContain("wh.sourceType || '-'")
-    expect(CODE).toContain("?? value ?? '送信元未設定'")
+    expect(CODE).toContain("?? (value || 'その他')")
   })
 })
