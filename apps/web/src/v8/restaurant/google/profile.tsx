@@ -1,11 +1,4 @@
 'use client'
-
-/*
- * ★V8 Googleビジネス プロフィール（`JUTGz`）。
- * 本日の営業時間（変更・今日を休みにする・祝日の確認・早く閉める）→ 店舗情報 → Google側の変更を確認。
- * 口は今の画面と同じ。営業時間の変更・変更の確認・変更履歴・プロフィールの編集は
- * ?tab=profile&view=hours|confirm|history|edit へ移り、入口の page.tsx が今の画面で出す。
- */
 import { useCallback, useEffect, useState } from 'react'
 import { CalendarDays, CalendarX, Clock, GitCompare, History, Pencil, RefreshCw, Timer } from 'lucide-react'
 import Card from '@/components/shared/card'
@@ -23,6 +16,15 @@ import type { GoogleNav } from './google'
 import styles from './google.module.css'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 Googleビジネス プロフィール（`JUTGz`）。
+ * 本日の営業時間（変更・今日を休みにする・祝日の確認・早く閉める）→ 店舗情報 → Google側の変更を確認。
+ * 口は今の画面と同じ。営業時間の変更・変更の確認・変更履歴・プロフィールの編集は
+ * ?tab=profile&view=hours|confirm|history|edit へ移り、入口の page.tsx が今の画面で出す。
+ */
 
 function addressText(a: GoogleProfileAddress | null | undefined): string {
   if (!a) return '—'
@@ -120,7 +122,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
         {earlyClose !== null ? (
           <div className={styles.inlinePanel}>
             <span className={styles.fieldLabel}>今日の閉店時刻</span>
-            <Select size="page-size" aria-label="今日の閉店時刻" value={earlyClose} onChange={(value) => setEarlyClose(value)} options={closeOptions} />
+            <SaveErrorField names={["earlyClose","closeTime","early_close"]}><Select size="page-size" aria-label="今日の閉店時刻" value={earlyClose} onChange={(value) => setEarlyClose(value)} options={closeOptions} /></SaveErrorField>
             <span className={styles.muted}>{`現在 ${formatPeriods(today.periods)}`}</span>
             <span className={styles.spacer} aria-hidden="true" />
             <Button onClick={() => setEarlyClose(null)} disabled={busy}>キャンセル</Button>

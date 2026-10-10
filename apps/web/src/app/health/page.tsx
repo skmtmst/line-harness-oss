@@ -2,7 +2,6 @@
 
 import { useStaffRole } from '@/lib/staff-role'
 import { PageHeading } from '@/components/templates/page-frame'
-
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
@@ -17,6 +16,7 @@ import Notice from '@/components/shared/notice'
 import { parseJstDateTime, shortDateTime } from '@/lib/hq-banners'
 import { ChevronDown } from 'lucide-react'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 interface LineAccount {
   id: string
@@ -418,7 +418,7 @@ export default function HealthPage() {
               <form onSubmit={handleMigrate}>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-ink-secondary mb-1">移行先アカウント</label>
-                  <Select size="full"
+                  <EntitySelect size="full"
                     value={migrateToId}
                     onChange={(value) => setMigrateToId(value)}
                     aria-label="移行先アカウント"
@@ -426,7 +426,7 @@ export default function HealthPage() {
                       { value: '', label: '選択してください' },
                       ...accounts
                         .filter((account) => account.id !== migrateFrom && account.isActive)
-                        .map((account) => ({
+                        .map((account) => ({ ...entityOptionMetadata(account),
                           value: account.id,
                           label: `${account.name} (${account.channelId})`,
                         })),

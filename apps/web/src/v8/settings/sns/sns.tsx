@@ -1,16 +1,6 @@
 'use client'
-
-/**
- * ★V8-B 設定 › SNS 連携（`YINmJ` 未接続 ／ `DFnll` Instagram 接続済み、2026-10-07 利用者承認）。
- *
- * Googleビジネスと Instagram を1列のカードで縦に並べる。
- * Instagram は「Instagram にログインして接続」だけで繋がる（ページを選ぶ段は無い）。
- * 繋ぐ目的は Googleビジネスの投稿を Instagram へ同時に出すこと。
- */
-
 import React, { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-/* lucide には Instagram の印が無いので、写真の印（Camera）を使う。 */
 import { Camera, RefreshCw, Settings } from 'lucide-react'
 import type { InstagramConnectionStatus } from '@line-crm/shared'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -26,6 +16,18 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import styles from './sns.module.css'
 import { formatDate } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/**
+ * ★V8-B 設定 › SNS 連携（`YINmJ` 未接続 ／ `DFnll` Instagram 接続済み、2026-10-07 利用者承認）。
+ *
+ * Googleビジネスと Instagram を1列のカードで縦に並べる。
+ * Instagram は「Instagram にログインして接続」だけで繋がる（ページを選ぶ段は無い）。
+ * 繋ぐ目的は Googleビジネスの投稿を Instagram へ同時に出すこと。
+ */
+
+/* lucide には Instagram の印が無いので、写真の印（Camera）を使う。 */
 
 const GOOGLE_STATE: Record<string, string> = {
   connected: '接続しています',
@@ -59,6 +61,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function SnsSettingsPage() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('SNS 連携')
   usePageCrumbs([{ label: '設定', href: '/settings' }])
   useHideSettingsNav()
@@ -111,9 +114,11 @@ export default function SnsSettingsPage() {
       const res = await api.instagram.start(selectedAccountId)
       if (!res.success) throw new Error(res.error)
       window.location.href = res.data.url
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
       setBusy(false)
-      setActionError('Instagram のログイン画面を開けませんでした。もう一度お試しください。')
+      { if (!fieldFailure)
+      setActionError('Instagram のログイン画面を開けませんでした。もう一度お試しください。') }
     }
   }
 
@@ -124,8 +129,11 @@ export default function SnsSettingsPage() {
     try {
       await api.instagram.refresh(selectedAccountId)
       await load()
-    } catch {
-      setActionError('接続を確かめられませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('接続を確かめられませんでした。もう一度お試しください。') }
     } finally {
       setBusy(false)
     }
@@ -143,17 +151,20 @@ export default function SnsSettingsPage() {
       }
       setConfirm(null)
       await load()
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
       setActionError(confirm === 'google'
         ? 'Googleビジネスの接続を解除できませんでした。もう一度お試しください。'
-        : 'Instagram の接続を解除できませんでした。もう一度お試しください。')
+        : 'Instagram の接続を解除できませんでした。もう一度お試しください。') }
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <PageFrame kind="list" boardId="y3GGTs">
+    <SaveErrorScope errors={saveErrors}><PageFrame kind="list" boardId="y3GGTs">
       <PageHeading
         headingSize="compact"
         title="SNS 連携"
@@ -275,6 +286,6 @@ export default function SnsSettingsPage() {
         onConfirm={() => runDisconnect()}
         onCancel={() => setConfirm(null)}
       />
-    </PageFrame>
+    </PageFrame></SaveErrorScope>
   )
 }

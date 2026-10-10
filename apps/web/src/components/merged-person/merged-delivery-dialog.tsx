@@ -11,6 +11,7 @@ import {
   purposeText,
 } from './merged-person-view'
 import styles from './merged-person-detail.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
  * 配信元の優先順を変える窓（設計 `w8W4Eh`「優先順位を変更」）。
@@ -141,10 +142,10 @@ export default function MergedDeliveryDialog({
         ))}
 
         {clearingAll ? (
-          <Checkbox
+          <SaveErrorField names={["confirmedClearAll","confirmed_clear_all"]}><Checkbox
             checked={confirmedClearAll}
             onCheckedChange={setConfirmedClearAll}
-          >全部を「使わない」にすると、この人へはどこからも送れなくなります。承知のうえで保存します。</Checkbox>
+          >全部を「使わない」にすると、この人へはどこからも送れなくなります。承知のうえで保存します。</Checkbox></SaveErrorField>
         ) : null}
       </div>
     </Dialog>

@@ -4,6 +4,7 @@ import React, { useRef, useState, type ReactNode } from 'react'
 import { CircleCheck, Trash2, TriangleAlert } from 'lucide-react'
 import Dialog from './dialog'
 import { deleteConfirmationTitle, isDeleteConfirmation, normalizeDeleteTitle } from './delete-confirmation'
+import { CONFIRM_WIDTH } from './destination-policy'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -90,7 +91,7 @@ export default function ConfirmDialog({
   designNode,
   designHeaderPadding,
   designHeaderHeight,
-  designWidth,
+  designWidth = CONFIRM_WIDTH,
   designLayout,
   footerAlign,
   designFooterGap,

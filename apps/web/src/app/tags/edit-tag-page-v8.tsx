@@ -24,8 +24,11 @@ import {
   DeleteDialog,
 } from '@/components/friend-fields/edit-tag-page-v4'
 import { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 export default function EditTagPageV8() {
+  const saveErrors = useSaveFormErrors()
+
   usePageTitle('タグを編集')
   const router = useRouter()
   const params = useSearchParams()
@@ -83,16 +86,18 @@ export default function EditTagPageV8() {
       setDefinition(detail.data)
       setTag({ ...detail.data.tag, friendCount: dependenciesResult.success ? dependenciesResult.data.friendCount : detail.data.tag.friendCount })
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       if (caught instanceof ApiError && caught.status === 404) {
         setTagMissing(true)
       } else {
-        setError('読み込みに失敗しました。もう一度読み込んでください。')
+        { if (!fieldFailure) setError('読み込みに失敗しました。もう一度読み込んでください。') }
       }
       setDependenciesStatus((prev) => (prev === 'ready' ? prev : 'error'))
     } finally {
       setLoading(false)
     }
-  }, [tagId, selectedAccountId])
+  }, [tagId, selectedAccountId, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -133,11 +138,13 @@ export default function EditTagPageV8() {
       }
       await load()
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
       // 409 は競合の帯へ出す（`xn95q`）。入力中の値は残す。
       if (reason instanceof ApiError && reason.status === 409) {
         setConflictValues(values)
       } else {
-        setError(describeSaveFailure(reason))
+        { if (!fieldFailure) setError(describeSaveFailure(reason)) }
       }
     } finally {
       setSaving(false)
@@ -162,8 +169,10 @@ export default function EditTagPageV8() {
       const detail = await api.tags.definition(tagId, selectedAccountId)
       if (!detail.success) throw new Error(detail.error)
       setCompareTarget(detail.data)
-    } catch {
-      setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setCompareError('最新の内容を取れませんでした。もう一度お試しください。') }
     } finally {
       setCompareBusy(false)
     }
@@ -177,63 +186,65 @@ export default function EditTagPageV8() {
       if (!result.success) throw new Error(result.error)
       router.push('/tags')
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure) setError(reason instanceof Error ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。') }
       setDeleteOpen(false)
     } finally {
       setDeleting(false)
     }
   }
 
-  if (loading) return <p className="p-6 text-sm text-ink-faint">読み込み中…</p>
+  if (loading) return <SaveErrorScope errors={saveErrors}><p className="p-6 text-sm text-ink-faint">読み込み中…</p></SaveErrorScope>
   if (!tagId) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="unspecified"
         title="編集するタグが指定されていません"
         description="一覧から編集するタグを選び直してください。"
         backHref="/tags"
         backLabel="タグ一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
-  if (!selectedAccountId) return <Notice tone="warn">LINE公式アカウントを選んでください。</Notice>
+  if (!selectedAccountId) return <SaveErrorScope errors={saveErrors}><Notice tone="warn">LINE公式アカウントを選んでください。</Notice></SaveErrorScope>
   if ((!tag || !definition) && (tagMissing || !error)) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="not-found"
         title="このタグは見つかりません"
         description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。"
         accountName={selectedAccount?.name}
         backHref="/tags"
         backLabel="タグ一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
   if (!tag || !definition) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="error"
         title="タグを読み込めませんでした"
         description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
         onRetry={() => void load()}
-      />
+      /></SaveErrorScope>
     )
   }
 
   // アーカイブ(archived)タグは、通常の編集フォームを出さない(#710)。
   if (tag.status === 'archived') {
     return (
-      <ArchivedTagEditor
+      <SaveErrorScope errors={saveErrors}><ArchivedTagEditor
         tag={tag}
         accountId={selectedAccountId}
         onCancel={() => router.push('/tags')}
         onSaved={(updated) => setTag((current) => (current ? { ...current, ...updated } : current))}
-      />
+      /></SaveErrorScope>
     )
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       {!canEdit ? (
         <div className="border-accent bg-accent-soft rounded-card flex flex-wrap items-center gap-3 border p-4" data-design-node="fkGUR" role="note">
           <p className="text-ink min-w-0 flex-1 text-sm">
@@ -284,6 +295,6 @@ export default function EditTagPageV8() {
           setCompareError('')
         }}
       />
-    </>
+    </></SaveErrorScope>
   )
 }

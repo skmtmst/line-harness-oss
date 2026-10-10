@@ -155,6 +155,9 @@
 .frame[data-size='compact'] .reason {
   font-size: var(--tpl-slot-desc-compact);
 }
+.frame[data-size='compact'] .limit {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 .reason {
   color: var(--color-status-danger);

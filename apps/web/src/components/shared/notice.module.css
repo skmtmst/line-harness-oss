@@ -154,3 +154,5 @@
 }
 [data-theme='v8'] .info[data-presentation='account-note'] { background: var(--color-surface-pearl); }
 [data-theme='v8'] .warn[data-presentation='account-note'] { background: var(--tpl-acd-warn-bg); color: var(--tpl-acd-warn-ink); }
+
+[data-theme='v8'] .notice { padding: var(--tpl-notice-pad); font-size: var(--text-body); }

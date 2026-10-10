@@ -14,6 +14,7 @@ import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import { GripHorizontal, Save } from 'lucide-react'
 import compact from './account-ordering-v8.module.css'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type AccountItem = LineAccount & { displayName?: string; basicId?: string | null }
 const ACCOUNT_DRAG_TYPE = 'application/x-line-account-id'
@@ -25,6 +26,8 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
   onClose?: () => void
   onSaved?: () => void
 } = {}) {
+  const saveErrors = useSaveFormErrors()
+
   const [accounts, setAccounts] = useState<AccountItem[]>([])
   const [savedParents, setSavedParents] = useState(new Map<string, string | null>())
   const [draftRootIds, setDraftRootIds] = useState<Set<string>>(() => new Set())
@@ -164,7 +167,9 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
       if (response.success) { await load(); onSaved?.() }
       else setError(response.error)
     } catch (cause) {
-      setError(cause instanceof Error && cause.message && !cause.message.startsWith('API error') ? cause.message : '構成を保存できませんでした。もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure) setError(cause instanceof Error && cause.message && !cause.message.startsWith('API error') ? cause.message : '構成を保存できませんでした。もう一度お試しください。') }
     } finally {
       setSaving(false)
     }
@@ -290,7 +295,7 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
         {(childrenByParent.get(account.id) ?? []).map((child) => compactNode(child, depth + 1))}
       </div>
     }
-    return <>
+    return <SaveErrorScope errors={saveErrors}><>
       <Dialog open title="LINEアカウント階層を編集" designNode="a7lUk" designWidth={600} designTop={140}
         designHeaderPadding="24px 24px 0" designContentPadding="15px 24px 0" busy={saving} onCancel={() => { if (changed.length) setClosing(true); else onClose() }}
         footer={<div className={compact.footer}>
@@ -317,10 +322,10 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
         </div>
       </Dialog>
       <UnsavedLeaveDialog open={closing || leaveTarget !== null} subject="アカウント構成への変更" onConfirm={() => { if (closing) { cancelChanges(); onClose() } else confirmLeave() }} onCancel={() => { setClosing(false); cancelLeave() }} />
-    </>
+    </></SaveErrorScope>
   }
 
-  return <section className="mt-6 border-t border-hairline pt-6" aria-labelledby="account-ordering-title">
+  return <SaveErrorScope errors={saveErrors}><section className="mt-6 border-t border-hairline pt-6" aria-labelledby="account-ordering-title">
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div><h2 id="account-ordering-title" className="font-bold text-ink">LINEアカウントの並び替え</h2><p className="mt-1 text-xs text-ink-secondary">登録済みアカウントをドラッグするか、カードの「…」から移動先を選んで、親・子・孫の順に整理します。</p></div>
       <Button variant="primary" className="whitespace-nowrap px-4 py-2 font-medium disabled:bg-hairline border-0 h-auto" onClick={() => void save()} disabled={changed.length === 0 || saving}>▣ {saving ? '保存中…' : '並びを保存する'}</Button>
@@ -332,7 +337,7 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
       <section className="rounded-card border content-card bg-canvas p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-semibold text-ink">LINEアカウント階層を編集</h2><p className="mt-1 text-xs text-ink-faint">登録済みのLINE公式アカウントを移動して、親・子・孫を設定します。</p></div>{changed.length > 0 && <span className="rounded-pill bg-warning-bg px-3 py-1 text-xs font-semibold text-warning">◉ 未保存の変更 {changed.length}件</span>}</div><div className="mt-4">{loading ? <p className="py-12 text-center text-sm text-ink-faint">読み込み中…</p> : hierarchyRoots.length === 0 ? <div data-hierarchy-root-drop onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move' }} onDrop={(event) => dropOn(event, null)} className={`rounded-control border border-dashed border-info bg-info-bg px-5 py-14 text-center text-sm text-info transition-shadow ${draggedId ? 'ring-2 ring-info/20' : ''}`}>{draggedId ? 'ここで離すと親候補として配置します' : '左のLINEアカウントをここへドロップして構成を作ります'}</div> : hierarchyRoots.map((account) => node(account, 0))}</div><DropLine onDrop={(event) => dropOn(event, null)} label="親LINEの直下へドロップすると「親」になります" blue dragging={Boolean(draggedId)} /><p className="mt-3 rounded-control bg-accent-soft px-4 py-3 text-xs font-semibold text-success">◉ 親・子・孫はすべてLINE公式アカウントです。「他アカウント権限」がONのユーザーだけが、担当LINEより下の階層を表示・操作できます。</p>{changed.length > 0 && <div className="mt-4 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={cancelChanges} disabled={saving}>キャンセル</Button><Button variant="primary" className="px-4 py-2 border-0 h-auto whitespace-normal" onClick={() => void save()} disabled={saving}>▣ 構成を保存する</Button></div>}</section>
     </div>
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="アカウント構成への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
-  </section>
+  </section></SaveErrorScope>
 }
 
 function DropLine({ onDrop, label, blue = false, dragging = false }: { onDrop: (event: DragEvent<HTMLDivElement>) => void; label: string; blue?: boolean; dragging?: boolean }) {

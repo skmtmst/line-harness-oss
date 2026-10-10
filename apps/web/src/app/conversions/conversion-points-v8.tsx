@@ -1,20 +1,4 @@
 'use client'
-
-/*
- * ★V8-B コンバージョンの一覧（Pencil「★V8-B 画面の地図」：一覧 `r6dJFy`、
- * 状態 `E2l8cw`、1152 `BygrU`、閲覧のみ `WSGvo`）。
- *
- * v7 の一覧（`page.tsx` 内の `ConversionsPageInner`）とは別の見せ方。
- * 取得・絞り込み・ページ送りの考え方は v7 と同じ（口へ渡す・画面で
- * 探し直さない）。数の帯は表の行の合計（この30日）と一致させる。
- * 止める操作は表の下の小窓（3択＋理由必須）で行い、共用の止める窓は
- * 開かない。編集・中身を見る・取消の窓は共用（`conversion-dialogs`）。
- *
- * 板との差（口が無いため）：フォルダは「すべて」だけ（成果地点に
- * フォルダの口が無い）。「よく使う絞り込み」は置かない。並び順は
- * v7 の既定（件数が多い順）のまま変えられない。月前半との比較は
- * 出さない（表の行の合計を正本にする）。
- */
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/lib/api'
 import type {
@@ -51,6 +35,24 @@ import styles from './conversion-points-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B コンバージョンの一覧（Pencil「★V8-B 画面の地図」：一覧 `r6dJFy`、
+ * 状態 `E2l8cw`、1152 `BygrU`、閲覧のみ `WSGvo`）。
+ *
+ * v7 の一覧（`page.tsx` 内の `ConversionsPageInner`）とは別の見せ方。
+ * 取得・絞り込み・ページ送りの考え方は v7 と同じ（口へ渡す・画面で
+ * 探し直さない）。数の帯は表の行の合計（この30日）と一致させる。
+ * 止める操作は表の下の小窓（3択＋理由必須）で行い、共用の止める窓は
+ * 開かない。編集・中身を見る・取消の窓は共用（`conversion-dialogs`）。
+ *
+ * 板との差（口が無いため）：フォルダは「すべて」だけ（成果地点に
+ * フォルダの口が無い）。「よく使う絞り込み」は置かない。並び順は
+ * v7 の既定（件数が多い順）のまま変えられない。月前半との比較は
+ * 出さない（表の行の合計を正本にする）。
+ */
 
 /** V8 の絞り込み。`all` を含む以外は v7 の `StatusFilter` と同じ。 */
 export type ConversionPointsV8Status = 'all' | ConversionDefinitionFilter
@@ -158,6 +160,7 @@ function rowSub(point: ConversionDefinitionListItem): string {
 const PAGE_SIZES = [20, 50, 100]
 
 export default function ConversionPointsV8({ model }: { model: ConversionPointsV8Model }) {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('コンバージョン')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const role = useStaffRole()
@@ -231,15 +234,18 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
       if (!res.success) throw new Error(res.error)
       setNotice(`「${point.name}」のコピーを作りました。使う場所は引き継がないので、要れば足してください。`)
       model.onReload()
-    } catch {
-      setActionError('コピーを作れませんでした。読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('コピーを作れませんでした。読み直してから、もう一度お試しください。') }
     } finally {
       setDuplicatingId(null)
     }
   }
 
   return (
-    <div className={styles.board} data-design-node="r6dJFy">
+    <SaveErrorScope errors={saveErrors}><div className={styles.board} data-design-node="r6dJFy">
       <div className={styles.head}>
         <div className={styles.headText}>
           <PageHeading title="コンバージョン" help={<>
@@ -371,12 +377,12 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
           </div>
           <div className={styles.toolbarSecond}>
             <span className={styles.pageSizeWrap}>
-              <Select
+              <SaveErrorField names={["pageSize","page_size"]}><Select
                 aria-label="1ページの件数"
                 value={String(pageSize)}
                 options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
                 onChange={(value) => setPageSize(Number(value))}
-              />
+              /></SaveErrorField>
             </span>
           </div>
 
@@ -685,7 +691,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                     ? `${model.stopImpact.stopImpact.affectedUsageCount}か所で使われています。どうしますか。`
                     : '利用先と影響を読み込めませんでした。'}
               </p>
-              <RadioCardGroup legend="どうしますか？" legendVisible>
+              <SaveErrorField names={["conversion-v8-stop-action","stopAction","model.stopAction"]}><RadioCardGroup legend="どうしますか？" legendVisible>
                 <RadioCard
                   name="conversion-v8-stop-action"
                   value="stop"
@@ -716,10 +722,10 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                     ? '成果0件・利用先0件のため、この成果地点だけを削除できます。'
                     : '成果または利用先があるため、物理削除は選べません。'}
                 />
-              </RadioCardGroup>
+              </RadioCardGroup></SaveErrorField>
               {model.stopAction === 'replace' ? (
                 <span className={styles.reasonField}>
-                  <Select
+                  <SaveErrorField names={["replacementId","model.replacementId","replacement_id","model.replacement_id"]}><Select
                     aria-label="差し替え先の成果地点"
                     value={model.replacementId}
                     options={[
@@ -727,17 +733,17 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                       ...(model.stopImpact?.replacementCandidates ?? []).map((item) => ({ value: item.id, label: item.name })),
                     ]}
                     onChange={model.onReplacementIdChange}
-                  />
+                  /></SaveErrorField>
                 </span>
               ) : null}
-              <Field label="理由" required><input
+              <Field label="理由" required><SaveErrorField names={["stopReason","model.stopReason","stop_reason","model.stop_reason"]}><input
                   aria-label="止める理由"
                   className={inputClass}
                   value={model.stopReason}
                   maxLength={500}
                   placeholder="計測の仕方を変えるため"
                   onChange={(event) => model.onStopReasonChange(event.target.value)}
-                /></Field>
+                /></SaveErrorField></Field>
               {model.stopError ? <p className={styles.panelError} role="alert">{model.stopError}</p> : null}
               <div className={styles.panelButtons}>
                 <Button variant="secondary" onClick={() => model.onCancelStop()} disabled={model.stopping}>
@@ -757,6 +763,6 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
           ) : null}
         </div>
       ) : null}
-    </div>
+    </div></SaveErrorScope>
   )
 }

@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8「メッセージを作る／編集」（絵 u5YC6・1152 は a1k3d・競合は NCbYn）。
- *
- * 左：名前とフォルダ／中身（本文・差し込む）／本文の中のURL。
- * 右：送るときの名前／届き方（本物のスマホ）。1152 ではスマホを窓で開く。
- * 下の帯：キャンセル／下書きを保存／保存して公開。
- * 動き（読み込み・保存・公開・409・利用先の確認）は BEHAVIOR.md。
- */
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved } from '@/components/shared/toast'
 import { useFeatureAccess } from '@/lib/use-feature-access'
@@ -71,6 +62,17 @@ import { loadTemplateExamples } from '@/v8/templates/examples'
 import styles from './edit.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8「メッセージを作る／編集」（絵 u5YC6・1152 は a1k3d・競合は NCbYn）。
+ *
+ * 左：名前とフォルダ／中身（本文・差し込む）／本文の中のURL。
+ * 右：送るときの名前／届き方（本物のスマホ）。1152 ではスマホを窓で開く。
+ * 下の帯：キャンセル／下書きを保存／保存して公開。
+ * 動き（読み込み・保存・公開・409・利用先の確認）は BEHAVIOR.md。
+ */
 
 const snapshot = (draft: TemplateDraft) => JSON.stringify(draft)
 
@@ -82,6 +84,7 @@ type Conflict = { name: string; at: string; latest: TemplateDraft | null }
  * 読み込み・自動保存・公開・店の差し込み候補（友だち情報・共通情報）は使わない。
  */
 export default function TemplateMessageEditor({ id, visual, example = null, host }: { id: string | null; visual: boolean; example?: string | null; host?: TemplateEditHost }) {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const role = useStaffRole()
   // 役割の確認が済むまでは操作を出す（最後の守りはサーバの 403）。staff と分かったら隠す。
@@ -279,7 +282,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         setConflict({ name: latest.data.name, at: conflictTime(latest.data.updatedAt), latest: draftFromDetail(latest.data) })
         return
       }
-    } catch { /* 読めなくても帯は出す */ }
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure) /* 読めなくても帯は出す */ }
     setConflict({ name: editor.draft.name, at: '', latest: null })
   }
 
@@ -309,7 +313,9 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
       const res = await request
       if (!res.ok) {
         if (res.conflict && target.templateId) await raiseConflict(target.templateId)
-        else if (!silent) setError(res.error)
+        else if (!silent && !saveErrors.apply(res.fields ?? {}))
+ setError(res.error);
+
         return null
       }
       if (!id && !target.templateId) {
@@ -357,8 +363,11 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
       }
       return true
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 409) await raiseConflict(templateId)
-      else setError('公開できませんでした。もう一度お試しください。')
+      else { if (!fieldFailure)
+ setError('公開できませんでした。もう一度お試しください。') }
       return false
     }
   }
@@ -430,8 +439,11 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         return
       }
       setConflict((prev) => (prev ? { ...prev, latest: draftFromDetail(detail.data) } : prev))
-    } catch {
-      setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setCompareError('最新の内容を取れませんでした。もう一度お試しください。') }
     } finally {
       setCompareBusy(false)
     }
@@ -443,7 +455,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   /* 閲覧のみ：作る・保存の操作は置かず、帯で知らせる。 */
   if (!canMutate) {
     return (
-      <TemplateEditFrame
+      <SaveErrorScope errors={saveErrors}><TemplateEditFrame
         boardId={boardId}
         title={title}
         description={description}
@@ -452,9 +464,9 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
       >
         <Card padding="none" layout="vertical" className={styles.card}>
           <p className={styles.cardNote}>中身の確認は一覧の行を開くと読めます。</p>
-          <Link href="/templates" className={styles.back}>一覧へ戻る</Link>
+          <></>
         </Card>
-      </TemplateEditFrame>
+      </TemplateEditFrame></SaveErrorScope>
     )
   }
 
@@ -492,7 +504,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   )
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <TemplateEditFrame
         boardId={boardId}
         title={title}
@@ -559,9 +571,9 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                 <p className={styles.cardNote}>一覧に出る名前です。友だちには見えません。</p>
               </div>
               <div className={styles.pair}>
-                <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="te-name"><TextField {...fields.bind('name')} id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-name-error' : undefined} />
+                <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="te-name"><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-name-error' : undefined} /></SaveErrorField>
 <FieldError id="te-name-error">{fields.error('name')}</FieldError></Field></div>
-                <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="te-folder"><FolderSelect
+                <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="te-folder"><SaveErrorField names={["folder","host.folder","folderId","folder_id"]}><FolderSelect
                     id="te-folder"
                     aria-label="フォルダ"
                     value={host ? host.folder : folderId ?? ''}
@@ -573,7 +585,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                       : canMutate && editorAccountId
                         ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: editorAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
                         : undefined}
-                  /></Field></div>
+                  /></SaveErrorField></Field></div>
               </div>
             </Card>
 
@@ -582,7 +594,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                 <h2 className={styles.cardTitle}>中身</h2>
               </div>
               <div className={styles.bodyBox} {...fields.bind('content')}>
-                <InsertTextField
+                <SaveErrorField names={["messageContent","message_content"]}><InsertTextField
                   id="te-content"
                   ref={contentRef}
                   aria-invalid={fields.invalid('content') || undefined}
@@ -595,7 +607,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                   onValueChange={(next) => updateDraft({ messageContent: next })}
                   tokenNames={tokenNames}
                   placeholder={messageType === 'flex' ? '{"type":"bubble", …}' : '例：いつもご利用ありがとうございます。今月のおすすめをお知らせします。'}
-                />
+                /></SaveErrorField>
                 <span className={styles.bodySpacer} aria-hidden="true" />
                 <InsertRow accountId={editorAccountId} state={referenceState} references={references} length={messageContent.length} onInsert={insert} />
               </div>
@@ -697,7 +709,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
       </ConfirmDialog>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="テンプレートの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }
 

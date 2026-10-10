@@ -22,13 +22,6 @@ describe('一斉配信のV8構造（視覚一致は撮影で確認）', () => {
     expect(FORM).not.toContain('LINE_MOCK')
   })
 
-  it('テンプレート選択は設計の確認項目だけをダイアログへ置く', () => {
-    expect(FORM).toContain('designNode="p97Tf"')
-    expect(FORM).toContain('テンプレートの内容を確認してください')
-    expect(FORM).not.toContain('このテンプレートの内容を確認しました')
-    expect(FORM).not.toContain('selectedTemplate?.messageContent}</dd>')
-  })
-
   it('テスト送信の意味と操作名を設計にそろえる', () => {
     /*
       **宛先は選ばない。** APIは宛先を受け取らず、登録済みのテスト送信先

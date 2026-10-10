@@ -1,11 +1,5 @@
 'use client'
 
-/*
- * ★V8 バナー生成の小さな窓。共通の窓（Dialog）に絵の幅・上からの位置を渡し、中身だけを絵どおりに組む。
- * - `W7Z57` プロジェクトを作る（名前は必須・100文字まで、説明は任意・500文字まで）
- * - `AnwtH` 画像を取り込む（入れるプロジェクトを選び、PNG・JPEG・WebP、10MB まで）
- * - `I0w2e` アーカイブの確認・`B24oNg` 一覧から外す確認（プロジェクトの中で使う）
- */
 import { Archive, Plus, Upload } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import Button from '@/components/shared/button'
@@ -18,6 +12,15 @@ import BannerDialogFrame from './frame'
 import styles from './dialogs.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+/*
+ * ★V8 バナー生成の小さな窓。共通の窓（Dialog）に絵の幅・上からの位置を渡し、中身だけを絵どおりに組む。
+ * - `W7Z57` プロジェクトを作る（名前は必須・100文字まで、説明は任意・500文字まで）
+ * - `AnwtH` 画像を取り込む（入れるプロジェクトを選び、PNG・JPEG・WebP、10MB まで）
+ * - `I0w2e` アーカイブの確認・`B24oNg` 一覧から外す確認（プロジェクトの中で使う）
+ */
 
 /** 取り込める画像（API と同じ）。 */
 export const BANNER_UPLOAD_ACCEPT = ['image/png', 'image/jpeg', 'image/webp']
@@ -80,7 +83,7 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
       )}
     >
         <form className={styles.form} onSubmit={(event) => { event.preventDefault(); submit() }}>
-          <div className={styles.field}><Field label="プロジェクト名" htmlFor={`${uid}-name`}><TextField
+          <div className={styles.field}><Field label="プロジェクト名" htmlFor={`${uid}-name`}><SaveErrorField names={["name"]}><TextField
               id={`${uid}-name`}
               value={name}
               maxLength={100}
@@ -89,13 +92,13 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
               placeholder="例：春の感謝祭 2周年"
               onChange={(event) => setName(event.target.value)}
               className={styles.full}
-            /></Field></div>
+            /></SaveErrorField></Field></div>
           <div className={styles.field}>
             <div className={styles.labelRow}>
 
 
             </div>
-            <Field label="説明" htmlFor={`${uid}-description`}><TextArea
+            <Field label="説明" htmlFor={`${uid}-description`}><SaveErrorField names={["description"]}><TextArea
               id={`${uid}-description`}
               rows={2}
               value={description}
@@ -104,7 +107,7 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
               placeholder="例：餃子・生ビールのキャンペーン告知"
               onChange={(event) => setDescription(event.target.value)}
               className={`${styles.full} ${styles.textarea}`}
-            /></Field>
+            /></SaveErrorField></Field>
           </div>
         </form>
     </BannerDialogFrame>
@@ -207,17 +210,17 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
         ) : (
           <>
             <div className={styles.field}><Field label="入れるプロジェクト" htmlFor={`${uid}-project`}><div className={styles.full}>
-                <Select
+                <SaveErrorField names={["projectId","project_id"]}><EntitySelect
                   aria-label="入れるプロジェクト"
                   size="full"
                   id={`${uid}-project`}
                   value={projectId}
                   disabled={loading}
                   onChange={setProjectId}
-                  options={projects.map((p) => ({ value: p.id, label: p.name }))}
-                />
+                  options={projects.map((p) => ({ ...entityOptionMetadata(p), value: p.id, label: p.name }))}
+                /></SaveErrorField>
               </div></Field></div>
-            <MediaSlot
+            <SaveErrorField names={["filePreview","file_preview"]}><MediaSlot
               title="画像を追加"
               previewAlt={file?.name}
               value={filePreview}
@@ -227,7 +230,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
               busy={uploading}
               onFile={(next) => pickFile(next)}
               onRemove={() => setFile(null)}
-            />
+            /></SaveErrorField>
             {file ? <p className={styles.dropText} ><TruncatedText value={String(file.name ?? '')} /></p> : null}
           </>
         )}

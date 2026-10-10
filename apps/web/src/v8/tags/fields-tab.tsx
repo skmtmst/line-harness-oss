@@ -1,14 +1,5 @@
 'use client'
 
-/*
- * ★V8 タグ「友だち情報欄」タブ（Pencil `q5gbcM`）。
- *
- * 動き（読み込み・数の帯・絞り込み・フォルダ・並べ替え・削除の安全確認・移行への入口・
- * 行の詳細パネル・名前のその場の直し・右クリック）は今の V8 タブ（app/tags/fields-tab-v8.tsx）から写した。
- * 見た目は絵に合わせた：数の帯は板の端から端、左にフォルダの列（いちばん上が「項目を作る」）、
- * 右の上に案内の帯、表は名前の前にフォルダの色の丸（表にフォルダ列は置かない）、行の右端は必ず「…」、
- * 表の下に操作の説明。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -46,10 +37,22 @@ import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils'
 import { FIELD_TYPE_LABELS, destinationLabel, fieldDeletionBlockedReason, knownUsageCount } from '@/components/friend-fields/field-list'
 import styles from './list.module.css'
-
 import type { AttributeListHost } from './attribute-host'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { ListPager } from '@/components/templates/list-page'
+import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+
+/*
+ * ★V8 タグ「友だち情報欄」タブ（Pencil `q5gbcM`）。
+ *
+ * 動き（読み込み・数の帯・絞り込み・フォルダ・並べ替え・削除の安全確認・移行への入口・
+ * 行の詳細パネル・名前のその場の直し・右クリック）は今の V8 タブ（app/tags/fields-tab-v8.tsx）から写した。
+ * 見た目は絵に合わせた：数の帯は板の端から端、左にフォルダの列（いちばん上が「項目を作る」）、
+ * 右の上に案内の帯、表は名前の前にフォルダの色の丸（表にフォルダ列は置かない）、行の右端は必ず「…」、
+ * 表の下に操作の説明。
+ */
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -290,10 +293,10 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
     ] : []
     if (!canEdit) return [{ id: 'open', label: '詳しく見る', onSelect: () => openFieldDetail(field.id) }]
     const list: ActionMenuItem[] = [
-      { id: 'edit', label: '編集', external: true, href: `/tags/fields/edit?id=${encodeURIComponent(field.id)}`, onSelect: () => router.push(`/tags/fields/edit?id=${encodeURIComponent(field.id)}`) },
+      { id: 'edit', label: '編集', external: false, href: `/tags/fields/edit?id=${encodeURIComponent(field.id)}`, onSelect: () => router.push(`/tags/fields/edit?id=${encodeURIComponent(field.id)}`) },
     ]
     if ((knownUsageCount(field) ?? 0) > 0) {
-      list.push({ id: 'migrate', label: '移行（種類を変える）', external: true, href: `/tags/fields/migrate?id=${encodeURIComponent(field.id)}`, onSelect: () => router.push(`/tags/fields/migrate?id=${encodeURIComponent(field.id)}`) })
+      list.push({ id: 'migrate', label: '移行（種類を変える）', external: false, href: `/tags/fields/migrate?id=${encodeURIComponent(field.id)}`, onSelect: () => router.push(`/tags/fields/migrate?id=${encodeURIComponent(field.id)}`) })
     }
     if (!field.isInherited) {
       const blocked = fieldDeletionBlockedReason(field)
@@ -315,7 +318,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   /* 数の帯（4つ）。 */
@@ -470,12 +473,12 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
       </DataTable>
 
       {pages > 1 ? (
-        <div className={styles.pager}>
+        <ListPager>
           <span className={styles.pagerCount}>
             {`${visible.length} 件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, visible.length)} 件`}
           </span>
           <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="友だち情報欄のページ送り" />
-        </div>
+        </ListPager>
       ) : null}
 
     </DelayedSkeleton>
@@ -498,6 +501,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
       </KpiBand>}
 
       <ListPageBody
+        skeleton
         listHelp={canEdit ? `行の「…」に：編集・${host ? '配る' : '移行（種類を変える）'}・削除。並べ替えはつまんで上下（キーボードは上下キー）` : '行から中身を見られます。'}
         folders={<>
           {createButton(true)}
@@ -519,7 +523,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
         </>}
         collapsedFolders={<>
           {createButton(false)}
-          <Select aria-label="フォルダ" width={150} value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} />
+          <SaveErrorField names={["folderFilter","folder_filter"]}><Select aria-label="フォルダ" width={150} value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} /></SaveErrorField>
         </>}
         toolbar={<>
           {/* 案内の帯は道具の段の上（絵：表の列の上だけにかかる）。 */}
@@ -527,10 +531,10 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
             <Info className={styles.readonlyIcon} aria-hidden="true" />
             {host ? '情報欄のひな形を各アカウントへ配れます。種類と差し込みの名前は作ったあと変えられません。別の種類は新しいひな形を作ってください。' : '項目の種類を変えると、入っている値が変わることがあります。種類を変えるときは「移行」で事前に確かめてから変えます。'}
           </p>
-          <span className={narrow ? styles.searchNarrow : styles.search}>
+          <ListToolbarSearchSlot>
             <SearchField aria-label="項目名で探す" placeholder="項目名で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
-          </span>
-          <Select
+          </ListToolbarSearchSlot>
+          <SaveErrorField names={["type"]}><Select
             aria-label="種類で絞り込む"
             width={119}
             value={type}
@@ -539,7 +543,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
               { value: 'all', label: '種類：すべて' },
               ...(Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]).map((value) => ({ value, label: `種類：${fieldTypeWord(value)}` })),
             ]}
-          />
+          /></SaveErrorField>
           <span className={styles.toolbarSpacer} />
           <PageSizeSelect value={pageSize} onChange={(value) => setPageSize(value || 20)} options={PAGE_SIZES} label={null} />
         </>}

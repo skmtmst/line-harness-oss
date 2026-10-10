@@ -1,16 +1,4 @@
 'use client'
-
-/*
- * ★V8 シナリオを作る①：シナリオ情報・配信方式（Pencil `dnzqC`）。
- *
- * 型（CreatePage）に、戻る・題・手順の輪と、左の段（シナリオ情報・配信方式）、
- * 下の帯（キャンセル・あとで決める・この方式で保存する）を渡す。右の列は無い。
- *
- * 動き（読み込み・保存・失敗時）は今までの V8（app/scenarios/mode-v8.tsx）と
- * v7（app/scenarios/mode/page.tsx）と同じ。写して型に載せ直した。
- * `id` なしで開いたときはまだ行を作らない。方式の確定か
- * 「あとで決める」ではじめて作成する（N-055）。
- */
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -46,8 +34,23 @@ import { scenarioReferenceData } from '@/components/scenarios/scenario-reference
 import styles from './create.module.css'
 import DeliveryModeDiagram from './delivery-mode-diagram'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 シナリオを作る①：シナリオ情報・配信方式（Pencil `dnzqC`）。
+ *
+ * 型（CreatePage）に、戻る・題・手順の輪と、左の段（シナリオ情報・配信方式）、
+ * 下の帯（キャンセル・あとで決める・この方式で保存する）を渡す。右の列は無い。
+ *
+ * 動き（読み込み・保存・失敗時）は今までの V8（app/scenarios/mode-v8.tsx）と
+ * v7（app/scenarios/mode/page.tsx）と同じ。写して型に載せ直した。
+ * `id` なしで開いたときはまだ行を作らない。方式の確定か
+ * 「あとで決める」ではじめて作成する（N-055）。
+ */
 
 export default function ScenarioCreateV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('シナリオを作成')
   usePageCrumbs([{ label: 'シナリオ配信', href: '/scenarios' }])
   const router = useRouter()
@@ -108,8 +111,13 @@ export default function ScenarioCreateV8() {
         setFolderId(res.data.folderId ?? '')
         return true
       } catch (cause) {
-        setError(scenarioSaveError(cause))
-        setFolderId(scenario.folderId ?? '')
+        const fieldFailure = saveErrors.capture(cause)
+
+        { if (!fieldFailure)
+
+        setError(scenarioSaveError(cause)) }
+        setFolderId(scenario.folderId ?? '');
+
         return false
       } finally {
         setDetailsSaving(false)
@@ -261,7 +269,11 @@ export default function ScenarioCreateV8() {
       // 3段目へ。手順の帯が3段なので、2段で編集画面へ放り出さない。
       router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
     } catch (cause) {
-      setError(id ? scenarioModeError(cause) : 'シナリオを作成できませんでした。時間をおいてもう一度お試しください。')
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+
+      setError(id ? scenarioModeError(cause) : 'シナリオを作成できませんでした。時間をおいてもう一度お試しください。') }
       setSaving(null)
     }
   }
@@ -280,9 +292,12 @@ export default function ScenarioCreateV8() {
           finishDraft()
           router.push(`/scenarios/first-step?id=${encodeURIComponent(createdId)}`)
         }
-      } catch {
+      } catch (saveFailure) {
+        const fieldFailure = saveErrors.capture(saveFailure)
         // WEB226：通信の失敗（例外）も、方式を選んだときと同じ言葉で出す（黙って何も起きない、にしない）。
-        setError('シナリオを作成できませんでした。時間をおいてもう一度お試しください。')
+        { if (!fieldFailure)
+
+        setError('シナリオを作成できませんでした。時間をおいてもう一度お試しください。') }
       } finally {
         setDetailsSaving(false)
       }
@@ -361,11 +376,11 @@ export default function ScenarioCreateV8() {
   const useCommonReason = scenarioError ? isForbiddenOrRateLimited(scenarioError) : false
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       stepsSpacing="compact"
       boardId="dnzqC"
       title="シナリオを作る"
-      identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
+      identity={<></>}
       steps={(
         <Steps
           label="シナリオ作成の進み方"
@@ -436,7 +451,7 @@ export default function ScenarioCreateV8() {
         <div className={styles.infoRow}>
           <div className={styles.nameField} ref={nameWrapRef}>
             <span className={styles.fieldLabel}>シナリオ名 <RequiredBadge /></span>
-            <TextField
+            <SaveErrorField names={["name"]}><TextField
               value={name}
               disabled={fieldsDisabled}
               onChange={(e) => { setName(e.target.value); if (nameError) setNameError('') }}
@@ -445,13 +460,13 @@ export default function ScenarioCreateV8() {
               invalid={Boolean(nameError)}
               aria-label="シナリオ名"
               aria-describedby={nameError ? 'scenario-name-error' : undefined}
-            />
+            /></SaveErrorField>
             {nameError ? <span id="scenario-name-error" className={styles.fieldError}>{nameError}</span> : null}
           </div>
           <div className={styles.folderField}>
             <span className={styles.fieldLabelStrong}>フォルダ</span>
             <span title={selectedFolderName} className={styles.folderSelect}>
-              <FolderSelect
+              <SaveErrorField names={["folderId","folder_id"]}><FolderSelect
                 value={folderId}
                 disabled={fieldsDisabled || folderState !== 'ready'}
                 onChange={(value) => {
@@ -468,7 +483,7 @@ export default function ScenarioCreateV8() {
                 onCreate={canEdit && !locked
                   ? folderCreator((name, color) => api.folders.create({ kind: 'scenario', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
                   : undefined}
-              />
+              /></SaveErrorField>
             </span>
             {folderState !== 'ready' || detailsSaving ? (
               <span className={styles.fieldHint}>
@@ -494,7 +509,7 @@ export default function ScenarioCreateV8() {
           <h2 className={styles.cardTitle}>配信方式</h2>
           <HelpTip label="配信方式の説明">作ったあとは変えられません</HelpTip>
         </div>
-        <RadioCardGroup legend="配信方式" className={styles.modeRow}>
+        <SaveErrorField names={["delivery-mode","selectedMode"]}><RadioCardGroup legend="配信方式" className={styles.modeRow}>
           <RadioCard
             name="delivery-mode"
             value="absolute_time"
@@ -519,9 +534,9 @@ export default function ScenarioCreateV8() {
           >
             <DeliveryModeDiagram mode="elapsed" selected={selectedMode === 'elapsed'} />
           </RadioCard>
-        </RadioCardGroup>
+        </RadioCardGroup></SaveErrorField>
       </Card>
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }
 

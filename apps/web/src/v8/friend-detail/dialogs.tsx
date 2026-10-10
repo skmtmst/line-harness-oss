@@ -1,9 +1,5 @@
 'use client'
 
-/*
- * 個別操作から開く2つの窓：対応状況を編集（N-035）・シナリオに登録する（NEXT-09）。
- * 今の画面では左の欄・下の操作の中に開いていた入力を、V8 では窓にした（中身・送る口は同じ）。
- */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Chat, Scenario } from '@line-crm/shared'
 import Dialog from '@/components/shared/dialog'
@@ -16,8 +12,16 @@ import styles from './detail.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+/*
+ * 個別操作から開く2つの窓：対応状況を編集（N-035）・シナリオに登録する（NEXT-09）。
+ * 今の画面では左の欄・下の操作の中に開いていた入力を、V8 では窓にした（中身・送る口は同じ）。
+ */
 
 export function useSupportEditor(friendId: string, onSaved: (notice: string) => void, onConflict: (message: string) => void, accountId: string | null = null) {
+  const saveErrors = useSaveFormErrors()
   const scopeRef = useRef({ friendId, accountId })
   const [targetAccount, setTargetAccount] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -98,6 +102,8 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
       onSaved('担当・対応状況を更新しました')
     } catch (err) {
       if (gen !== genRef.current) return
+      const fieldFailure = saveErrors.capture(err);
+
       if (err instanceof ApiError && err.status === 409) {
         // 人が入力した状況・担当者は残し、競合した改訂値だけ取り直す。
         // 取り直せない場合は古い改訂値のまま（再保存も409で保護される）。
@@ -109,11 +115,16 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
           if (gen !== genRef.current) return
           if (latest.success) setRevision(latest.data.revision)
           else setError('最新の内容を読み直せませんでした。入力は残っています。もう一度お試しください。')
-        } catch {
+        } catch (reloadFailure) {
           if (gen !== genRef.current) return
+          saveErrors.capture(reloadFailure);
+
           setError('最新の内容を読み直せませんでした。入力は残っています。もう一度お試しください。')
         }
       } else {
+        if (!fieldFailure)
+
+
         setError(withPermissionFailure(err, describeSaveFailure(err), 'store'))
       }
     } finally {
@@ -122,7 +133,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
   }
 
   const dialog = (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open={open && target === friendId && targetAccount === accountId}
       title="対応状況を編集"
       designWidth={440}
@@ -133,7 +144,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
       onCancel={() => setOpen(false)}
     >
       <div className={styles.dialogBody} data-support-editor>
-        <Field label="対応状況"><Select
+        <Field label="対応状況"><SaveErrorField names={["status"]}><Select
             size="full"
             value={status}
             disabled={busy}
@@ -145,17 +156,17 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
               { value: 'on_hold', label: '保留' },
               { value: 'resolved', label: '対応済み' },
             ]}
-          /></Field>
-        <Field label="担当者"><Select
+          /></SaveErrorField></Field>
+        <Field label="担当者"><SaveErrorField names={["operatorId","operator_id"]}><EntitySelect
             size="full"
             value={operatorId}
             disabled={busy}
             onChange={(value) => setOperatorId(value)}
             aria-label="担当者を変える"
-            options={[{ value: '', label: '未割り当て' }, ...operators.map((o) => ({ value: o.id, label: o.name }))]}
-          /></Field>
+            options={[{ value: '', label: '未割り当て' }, ...operators.map((o) => ({ ...entityOptionMetadata(o), value: o.id, label: o.name }))]}
+          /></SaveErrorField></Field>
       </div>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 
   return { openEditor, dialog }
@@ -274,7 +285,7 @@ export function useScenarioPicker(
           <p className={styles.secNote}>登録できるシナリオがありません。</p>
         ) : (
           <>
-            <EntityKindField
+            <SaveErrorField names={["pick"]}><EntityKindField
               kind="scenario"
               label="登録するシナリオ"
               value={pick}
@@ -282,7 +293,7 @@ export function useScenarioPicker(
               accountId={accountId}
               onChange={(value) => setPick(value)}
               options={active}
-            />
+            /></SaveErrorField>
             {picked ? <p className={styles.memo}>「{picked.name}」に{friendName || 'この友だち'}を登録します。</p> : null}
           </>
         )}

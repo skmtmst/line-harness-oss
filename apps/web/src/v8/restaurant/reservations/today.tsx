@@ -25,6 +25,7 @@ import {
   sameDay, shortCourse, slotLabel, sourceKind, sourceName,
 } from './format'
 import styles from './reservations.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export type PhonePreset = { date?: Date; time?: string; tableId?: string; hold?: boolean }
 
@@ -172,13 +173,13 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
         <span className={styles.dateSpacer} />
         {hidden.length > 0 ? <span className={styles.dateNote}>{`${hidden.map((table) => table.code).join('・')} は停止中のため出していません`}</span> : null}
         <span className={styles.sourcePicker}>
-          <Select
+          <SaveErrorField names={["source"]}><Select
             aria-label="予約元"
             size="full"
             value={source}
             onChange={onSource}
             options={[{ value: 'all', label: '予約元：すべて' }, ...Object.entries(SOURCE_LABEL).map(([value, label]) => ({ value, label: `予約元：${label}` }))]}
-          />
+          /></SaveErrorField>
         </span>
       </div>
       <div className={styles.todayColumns}>

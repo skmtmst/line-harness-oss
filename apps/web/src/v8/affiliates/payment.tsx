@@ -1,18 +1,5 @@
 'use client'
-
 import { FolderDotName } from '@/components/shared/folder-dot'
-
-/*
- * ★V8 成果とアフィリエイト「支払い」（板 `aINnz`、期間を締めるの確かめは `usDpO`）。
- *
- * app/affiliates/v8-payment-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で組み直した。
- * 決まりは今と同じ：
- * - 締めは日本時間の暦月で固定する
- * - 締め済みの台帳があれば settlementCurrent で再開する
- * - アカウント切替の遅い応答は世代番号で捨てる
- * - 明細発行・銀行用CSVは合言葉（冪等キー）つき、CSV 書き出しは本人確認を通してから
- * - 0円で外れた成果・持ち越し・取消の差し引きは案内に出す
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarClock, CalendarDays, FileText, Landmark, Lock, ReceiptText, TriangleAlert, Users, Wallet } from 'lucide-react'
@@ -42,6 +29,19 @@ import { PayoutStepUpDialog, SettlementCloseDialog } from './payment-dialogs'
 import { AffiliateToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, StatusPill, ToolbarNotices } from './parts'
 import styles from './affiliates.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 成果とアフィリエイト「支払い」（板 `aINnz`、期間を締めるの確かめは `usDpO`）。
+ *
+ * app/affiliates/v8-payment-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で組み直した。
+ * 決まりは今と同じ：
+ * - 締めは日本時間の暦月で固定する
+ * - 締め済みの台帳があれば settlementCurrent で再開する
+ * - アカウント切替の遅い応答は世代番号で捨てる
+ * - 明細発行・銀行用CSVは合言葉（冪等キー）つき、CSV 書き出しは本人確認を通してから
+ * - 0円で外れた成果・持ち越し・取消の差し引きは案内に出す
+ */
 
 type PaymentFilter = 'all' | 'bank_missing' | 'bank_ok'
 
@@ -65,6 +65,7 @@ const SAVED_VIEWS = [
 ]
 
 export default function PaymentTab() {
+  const saveErrors = useSaveFormErrors()
   const { readonly, narrow, accountId } = useAffiliateShell()
   const period = useMemo(() => currentSettlementPeriod(), [])
   const [items, setItems] = useState<AffiliatePaymentSummary[]>([])
@@ -125,13 +126,15 @@ export default function PaymentTab() {
         })
       }
       setLoadState('ready')
-    } catch {
+    } catch (saveFailure) {
       if (seq !== loadSeq.current) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       setItems([])
       setPreview(null)
-      setLoadState('error')
+      { if (!fieldFailure)
+      setLoadState('error') }
     }
-  }, [accountId, period])
+  }, [accountId, period, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -182,7 +185,10 @@ export default function PaymentTab() {
       }
       if (resumed && succeeded > 0) void load()
     } catch (cause) {
-      setOperationError(cause instanceof Error ? cause.message : '支払明細を発行できませんでした')
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+      setOperationError(cause instanceof Error ? cause.message : '支払明細を発行できませんでした') }
     } finally {
       setOperationBusy(false)
     }
@@ -199,7 +205,10 @@ export default function PaymentTab() {
       if (!response.success) throw new Error(response.error)
       setBatch(response.data)
     } catch (cause) {
-      setOperationError(cause instanceof Error ? cause.message : '振込先を確認できませんでした')
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+      setOperationError(cause instanceof Error ? cause.message : '振込先を確認できませんでした') }
     } finally {
       setOperationBusy(false)
     }
@@ -462,7 +471,7 @@ export default function PaymentTab() {
   )
 
   return (
-    <AffiliateFrame
+    <SaveErrorScope errors={saveErrors}><AffiliateFrame
       help="口座番号は本人だけに表示します。銀行用 CSV（口座情報を含む）は、6桁コードかパスワードで本人確認したときだけ書き出せます（15分で期限切れ）。"
       actions={actions}
       stats={stats}
@@ -492,6 +501,6 @@ export default function PaymentTab() {
       </> : null}
     >
       {body}
-    </AffiliateFrame>
+    </AffiliateFrame></SaveErrorScope>
   )
 }

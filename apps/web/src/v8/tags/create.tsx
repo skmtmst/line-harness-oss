@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8「タグを作る」（Pencil `d9xoI`）。
- *
- * 型（CreatePage）に、段「基本」（タグ名・所属フォルダ・友だち一覧に出す）と段「付け方（どこで付けるか）」、
- * 右の列「このあと」、下の帯（キャンセル・保存して続けて作る・タグを作る）を渡す。
- * 読み込み・複製元・保存の口は今の作る画面（app/tags/new-tag-page-v8.tsx）と同じ。
- * 違うのは見せ方：タグ連動（付いたときの動き）は絵のとおり「作ったあとの編集で足す」。
- * 複製して作る（?copy=）ときは、複製元の連動の中身は画面に出さずにそのまま写して作る。
- */
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -32,10 +22,22 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 import { definitionsForSave, linkedActionFromDefinition } from '@/components/friend-fields/tag-editor-v4'
 import styles from './create.module.css'
-
 import { tagNameProblem } from './tag-name'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8「タグを作る」（Pencil `d9xoI`）。
+ *
+ * 型（CreatePage）に、段「基本」（タグ名・所属フォルダ・友だち一覧に出す）と段「付け方（どこで付けるか）」、
+ * 右の列「このあと」、下の帯（キャンセル・保存して続けて作る・タグを作る）を渡す。
+ * 読み込み・複製元・保存の口は今の作る画面（app/tags/new-tag-page-v8.tsx）と同じ。
+ * 違うのは見せ方：タグ連動（付いたときの動き）は絵のとおり「作ったあとの編集で足す」。
+ * 複製して作る（?copy=）ときは、複製元の連動の中身は画面に出さずにそのまま写して作る。
+ */
+
 export { tagNameProblem } from './tag-name'
 
 export default function TagCreateV8() {
@@ -47,6 +49,7 @@ export default function TagCreateV8() {
 }
 
 function TagCreate() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('タグを作る')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }])
   const router = useRouter()
@@ -182,17 +185,21 @@ function TagCreate() {
         router.push(`/tags?highlight=${created.data.tag.id}`)
       }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure)
+
+      setError(reason instanceof Error ? reason.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。') }
     } finally {
       setSaving(false)
     }
   }
 
-  if (loading) return <ListState kind="loading" title="複製元を読み込んでいます…" />
+  if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="複製元を読み込んでいます…" /></SaveErrorScope>
 
-  if (!canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+  if (!canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></SaveErrorScope>
 
-  const back = <Link href="/tags" className={styles.backLink}>← タグへ</Link>
+  const back = <></>
   const groupFolders = groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))
   // その場でタグのフォルダを作る（dLffh）。左の列の「フォルダを追加」と同じ受け口・同じ権限。
   const createGroup = async (name: string, color: string | null) => {
@@ -203,7 +210,7 @@ function TagCreate() {
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <CreatePage
         boardId="d9xoI"
         title="タグを作る"
@@ -229,7 +236,7 @@ function TagCreate() {
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle} id="tag-new-basic">基本</h2>
           </div>
-          <Field label="タグ名"><TextField
+          <Field label="タグ名"><SaveErrorField names={["name"]}><TextField
               ref={nameRef}
               aria-label="タグ名"
               invalid={Boolean(nameError)}
@@ -239,13 +246,13 @@ function TagCreate() {
               placeholder="例：定期購入者"
               aria-required="true"
               onChange={(event) => { setName(event.target.value); setNameError('') }}
-            />
+            /></SaveErrorField>
 {nameError ? <p id="tag-name-error" className={styles.fieldError} role="alert">{nameError}</p> : null}
 <DuplicateNameNote duplicates={duplicates} kindLabel="タグ" /></Field>
           <div className={styles.field}>
             <span className={styles.label} id="tag-new-folder">所属フォルダ</span>
             <span className={styles.selectBox}>
-              <FolderSelect size="full" aria-label="所属フォルダ" value={groupId} onChange={setGroupId} folders={groupFolders} onCreate={canEditFolders && selectedAccountId ? createGroup : undefined} />
+              <SaveErrorField names={["groupId","group_id"]}><FolderSelect size="full" aria-label="所属フォルダ" value={groupId} onChange={setGroupId} folders={groupFolders} onCreate={canEditFolders && selectedAccountId ? createGroup : undefined} /></SaveErrorField>
             </span>
             {foldersFailed ? (
               <div className={styles.inlineRetry}>
@@ -259,7 +266,7 @@ function TagCreate() {
               <span className={styles.switchTitle}>友だち一覧に出す</span>
               <span className={styles.switchNote}>オンにすると、友だち一覧の名前の下にこのタグが出ます</span>
             </span>
-            <SettingCheckbox checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" />
+            <SaveErrorField names={["isStarred","is_starred"]}><SettingCheckbox checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" /></SaveErrorField>
           </div>
         </section>
 
@@ -288,6 +295,6 @@ function TagCreate() {
         </section>
       </CreatePage>
       <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="入力したタグ" onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }

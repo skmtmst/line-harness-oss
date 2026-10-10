@@ -1,15 +1,5 @@
 'use client'
 
-/*
- * ★V8-B イベント予約の一覧（板 `e2ekFu`）。
- *
- * v7 の一覧（`page.tsx` 内の EventsListPageV7）とは別の部品として持つ。
- * データの口（取得・絞り込み・並び・ページ送り・削除）は同じ。
- * 違いは置き場と見せ方だけ——「イベントを作る」は左のフォルダの列の上、
- * 数の帯は白い板いっぱいの帯、行の右端は「…」1つ。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
- */
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -46,6 +36,17 @@ import styles from './events-list-v8.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8-B イベント予約の一覧（板 `e2ekFu`）。
+ *
+ * v7 の一覧（`page.tsx` 内の EventsListPageV7）とは別の部品として持つ。
+ * データの口（取得・絞り込み・並び・ページ送り・削除）は同じ。
+ * 違いは置き場と見せ方だけ——「イベントを作る」は左のフォルダの列の上、
+ * 数の帯は白い板いっぱいの帯、行の右端は「…」1つ。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ */
 
 /*
  * R601: 読み込みの失敗は「権限不足」と「通信失敗」を分ける。
@@ -111,7 +112,7 @@ function toContextMenuItems(menuItems: ActionMenuItem[]): ContextMenuItem[] {
     label: item.label,
     danger: item.tone === 'danger',
     disabled: item.disabled,
-    onSelect: () => item.onSelect(),
+    onSelect: () => item.onSelect?.(),
   }))
 }
 
@@ -129,6 +130,8 @@ function EventFolderPanelForm({
   onCancel: () => void
   onAdded: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [name, setName] = useState('')
   const [color, setColor] = useState(FOLDER_COLORS[0])
   const [saving, setSaving] = useState(false)
@@ -147,17 +150,22 @@ function EventFolderPanelForm({
       }
       onAdded()
       onCancel()
-    } catch {
-      setError('フォルダを追加できませんでした')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+
+
+      setError('フォルダを追加できませんでした') }
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div>
+    <SaveErrorScope errors={saveErrors}><div>
       <p className="text-ink-faint mt-1 text-xs leading-relaxed">イベントを整理するフォルダです。</p>
-      <Field label="フォルダ名" required><input
+      <Field label="フォルダ名" required><SaveErrorField names={["name"]}><input
           type="text"
           value={name}
           onChange={(event) => setName(event.target.value)}
@@ -166,7 +174,7 @@ function EventFolderPanelForm({
           }}
           placeholder="例：教室"
           className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-        /></Field>
+        /></SaveErrorField></Field>
       <div className="mt-3">
         <span className="text-ink-secondary mb-1 block text-xs font-medium">色</span>
         <div className="flex flex-wrap gap-2">
@@ -193,7 +201,7 @@ function EventFolderPanelForm({
         <Button variant="primary" onClick={() => void add()} disabled={!name.trim() || saving} busy={saving}>追加する</Button>
       </div>
       <p className="text-ink-faint mt-3 text-xs">フォルダを消しても、中のイベントは未分類に残ります。</p>
-    </div>
+    </div></SaveErrorScope>
   )
 }
 

@@ -1,15 +1,5 @@
 'use client'
-
 import { FolderDotName } from '@/components/shared/folder-dot'
-
-/*
- * ★V8 外部連携「やり取りの記録」タブ（Pencil `Uv9AA`、中身は `DA0Ag`）。
- *
- * 型（ListPage）に、タブ・やり取りの帯・案内の帯・道具の段（探す・札4つ・
- * まとめてやり直す）・表・ページ送りをはめる。データの口は v7 と同じ
- * （一覧・送り直し・まとめて送り直し）。URL・鍵・本文は一覧にも中身にも出さない。
- * 絵と今の作りが合わない所は BEHAVIOR.md に書いた（CSV の書き出し口が無い など）。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowDownLeft, ArrowUpRight, CircleAlert, FileCode, History, Inbox, LayoutList, RefreshCw, RotateCw, TriangleAlert } from 'lucide-react'
@@ -38,6 +28,16 @@ import { ViewerBand, WEBHOOKS_DESCRIPTION, WebhookBand, WebhookTabs, useWebhookO
 import { eventWord, shortDateTime } from './words'
 import styles from './interactions.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 外部連携「やり取りの記録」タブ（Pencil `Uv9AA`、中身は `DA0Ag`）。
+ *
+ * 型（ListPage）に、タブ・やり取りの帯・案内の帯・道具の段（探す・札4つ・
+ * まとめてやり直す）・表・ページ送りをはめる。データの口は v7 と同じ
+ * （一覧・送り直し・まとめて送り直し）。URL・鍵・本文は一覧にも中身にも出さない。
+ * 絵と今の作りが合わない所は BEHAVIOR.md に書いた（CSV の書き出し口が無い など）。
+ */
 
 type Direction = 'all' | 'outgoing' | 'incoming'
 type Status = 'all' | 'failed'
@@ -278,12 +278,12 @@ export default function WebhooksInteractionsV8() {
   const trailing = (
     <>
       <div className={styles.smallSelect}>
-        <Select
+        <SaveErrorField names={["periodDays","period_days"]}><Select
           aria-label="期間"
           value={String(periodDays)}
           onChange={(value) => { setPeriodDays(Number(value)); setPage(1) }}
           options={[{ value: '7', label: 'この7日' }, { value: '30', label: 'この30日' }, { value: '90', label: 'この90日' }]}
-        />
+        /></SaveErrorField>
       </div>
       {/* 閲覧のみには押せない「まとめてやり直す」を置かない。 */}
       {canRetry ? (
@@ -388,12 +388,12 @@ export default function WebhooksInteractionsV8() {
       <span className={styles.pagerLead}>
         <span className={styles.pagerCount}>{`${formatNumber(data.total)} 件中 ${rangeFirst}〜${rangeLast} 件`}</span>
         <span className={styles.smallSelect}>
-          <Select
+          <SaveErrorField names={["limit"]}><Select
             aria-label="1ページに出す件数"
             value={String(limit)}
             onChange={(value) => { setLimit(Number(value)); setPage(1) }}
             options={[{ value: '10', label: '10件表示' }, { value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }]}
-          />
+          /></SaveErrorField>
         </span>
       </span>
       <Pagination page={data.page} pageCount={pageCount} onPageChange={setPage} ariaLabel="やり取りの記録のページ送り" />

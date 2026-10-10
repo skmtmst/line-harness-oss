@@ -5,7 +5,7 @@ import type { StaffMember } from '@line-crm/shared'
  * R524: 案件作成でタグ・シナリオの候補取得に失敗したら「（なし）」に
  * 化けさせず、失敗と再試行を出す。取り直すまで保存させない。
  */
-import React, { act } from 'react'
+import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -65,7 +65,7 @@ async function openOptions(buttonId: string) {
   const toggle = host.querySelector<HTMLInputElement>(`input[type=checkbox][aria-label="${switchName}"]`)
   if (toggle && !toggle.checked) await act(async () => { toggle.click() })
   // タグは選ぶ窓（dJZ7Q）。欄の［選ぶ］で開き、窓の候補（radio）の名前を読む。
-  const button = host.querySelector<HTMLButtonElement>(buttonId === 'of-tag' ? '#of-tag button[aria-haspopup="dialog"]' : `#${buttonId}`)
+  const button = host.querySelector<HTMLButtonElement>(buttonId === 'of-tag' ? '#of-tag' : `#${buttonId}`)
   expect(button).toBeTruthy()
   await act(async () => { button!.click() })
   if (buttonId === 'of-tag') {

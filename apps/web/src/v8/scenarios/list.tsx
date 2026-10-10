@@ -1,18 +1,9 @@
 'use client'
+import { useDetailPanelUrl } from '@/components/shared/detail-panel';
 
+import { canManageRole } from '@/lib/staff-role';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import StatusBadge from '@/components/shared/status-badge'
-
-
-/*
- * ★V8 シナリオ配信の一覧（Pencil「★V8 画面の地図」のシナリオ配信の行：
- * 一覧 `axFrW`・狭い板 `wjfLe`・閲覧のみ `X0QrW0`・複製の窓 `Al4Ek`、状態の板は `BxGhV`）。
- *
- * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・保存・権限・
- * 失敗時の扱いは今までの一覧（app/scenarios/list-v8.tsx）と同じ。違いは見せ方だけ——
- * 型（ListPage）の枠に、数の帯・フォルダの列・案内の帯・道具の段・表を渡す。
- * 「シナリオを作る」は左のフォルダの列の上、行の右端は「…」（複製・配信結果・削除）、
- * 行の左の □ を選ぶと表の下にまとめての帯（止める・再開・フォルダへ移す）。
- */
 import SharedStatusPill from '@/components/shared/status-pill'
 import { collectListRows } from '@/components/shared/collect-list-rows'
 import BulkBar from '@/components/shared/bulk-bar'
@@ -92,6 +83,20 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
+import { notifyToast } from '@/components/shared/toast'
+
+/*
+ * ★V8 シナリオ配信の一覧（Pencil「★V8 画面の地図」のシナリオ配信の行：
+ * 一覧 `axFrW`・狭い板 `wjfLe`・閲覧のみ `X0QrW0`・複製の窓 `Al4Ek`、状態の板は `BxGhV`）。
+ *
+ * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・保存・権限・
+ * 失敗時の扱いは今までの一覧（app/scenarios/list-v8.tsx）と同じ。違いは見せ方だけ——
+ * 型（ListPage）の枠に、数の帯・フォルダの列・案内の帯・道具の段・表を渡す。
+ * 「シナリオを作る」は左のフォルダの列の上、行の右端は「…」（複製・配信結果・削除）、
+ * 行の左の □ を選ぶと表の下にまとめての帯（止める・再開・フォルダへ移す）。
+ */
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -137,10 +142,12 @@ function currentMonthStart(now = new Date()): string {
 }
 
 export default function ScenariosListV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('シナリオ配信')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
 
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const router = useRouter()
   // 1152 の板（`wjfLe`）。板IDと道具の段の並びだけを切り替える。
   const narrow = useNarrowViewport()
@@ -186,17 +193,16 @@ export default function ScenariosListV8() {
   const [deleteError, setDeleteError] = useState('')
 
   /* 複製の窓（★V8 `Al4Ek`）。 */
-  const [duplicateTarget, setDuplicateTarget] = useState<ScenarioRow | null>(null)
-  const [duplicateName, setDuplicateName] = useState('')
+  const duplicateLock = useRef(false)
   const [duplicating, setDuplicating] = useState(false)
-  const [duplicateError, setDuplicateError] = useState('')
+  const setDuplicateError =(message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
 
   /* 行の「…」。開いている行のID。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。開いている行のID。 */
   const [pendingStop, setPendingStop] = useState<string[] | null>(null)
   const toggleBusyRef = useRef(false)
-  const [panelId, setPanelId] = useState<string | null>(null)
+  const [panelId, setPanelId] = useDetailPanelUrl('scenario')
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
   const [dragId, setDragId] = useState<string | null>(null)
   /** キーボードで動かした結果を読み上げる（live 領域）。 */
@@ -472,8 +478,9 @@ export default function ScenariosListV8() {
       isCurrent: () => activeAccountRef.current === account,
       request: async () => {
         const results = await Promise.all(
-          ids.map((id) => api.scenarios.update(id, { isActive: next }).catch(() => null)),
-        )
+          ids.map((id) => api.scenarios.update(id, { isActive: next }).catch((saveFailure) => { saveErrors.capture(saveFailure); return null })),
+        );
+
         const failed = results.filter((res) => !res || !res.success).length
         if (failed > 0) throw new Error(`${failed} 件の保存に失敗しました`)
       },
@@ -515,8 +522,9 @@ export default function ScenariosListV8() {
       message: folderId ? 'フォルダへ移しました' : 'フォルダから外しました',
       commit: async () => {
         const results = await Promise.all(
-          ids.map((id) => api.scenarios.update(id, { folderId }).catch(() => null)),
-        )
+          ids.map((id) => api.scenarios.update(id, { folderId }).catch((saveFailure) => { saveErrors.capture(saveFailure); return null })),
+        );
+
         const failed = results.filter((res) => !res || !res.success).length
         if (failed > 0) throw new Error(`${failed} 件のフォルダ移動に失敗しました`)
       },
@@ -557,24 +565,24 @@ export default function ScenariosListV8() {
 
   /* ===== 複製（★V8 `Al4Ek`） ===== */
 
-  const openDuplicate = (s: ScenarioRow) => {
-    setDuplicateName(`${s.name} のコピー`)
-    setDuplicateError('')
-    setDuplicateTarget(s)
+  const openDuplicate = (s: ScenarioRow) => { void runDuplicate(s)
   }
 
-  const runDuplicate = async () => {
+  const runDuplicate = async (duplicateTarget: ScenarioRow) => {
+    if (duplicateLock.current) return
     if (!duplicateTarget || duplicating) return
-    const name = duplicateName.trim() || `${duplicateTarget.name} のコピー`
+    duplicateLock.current = true
+    const name = `${duplicateTarget.name}のコピー`
     setDuplicating(true)
     setDuplicateError('')
     try {
       const copyId = await duplicateScenario(duplicateTarget.id, name)
-      setDuplicateTarget(null)
+
+      notifyToast('複製しました', { tone: 'success' })
       void loadScenarios()
       void loadOverallTotal()
       void loadStats()
-      router.push(`/scenarios/detail?id=${copyId}`)
+      duplicateFeedback.mark(duplicateTarget.id, copyId)
     } catch (e) {
       if (e instanceof DuplicateAborted) {
         setDuplicateError(`複製が「${e.stage}」で止まりました。途中まで作成されたコピーが一覧に残っています。`)
@@ -583,22 +591,10 @@ export default function ScenariosListV8() {
       }
       void loadScenarios()
     } finally {
+      duplicateLock.current = false
       setDuplicating(false)
     }
   }
-
-  /** 複製の窓の「引き継ぐもの」：通の数と配信方式は対象のシナリオから書く。 */
-  const duplicateCarries = duplicateTarget
-    ? [
-        `メッセージ ${duplicateTarget.stepCount === undefined ? '' : `${duplicateTarget.stepCount} 通`}（質問を含む）`,
-        '開始のきっかけ',
-        'アクション',
-        '配信対象の条件',
-        '最後の1通の後',
-        `配信方式（${deliveryModeLabels[duplicateTarget.deliveryMode ?? 'relative']}）`,
-        'フォルダ',
-      ].join('・')
-    : ''
 
   /* ===== 並び替え ===== */
 
@@ -763,7 +759,7 @@ export default function ScenariosListV8() {
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   const panelIndex = panelId === null ? -1 : scenarios.findIndex((s) => s.id === panelId)
@@ -881,18 +877,18 @@ export default function ScenariosListV8() {
             <thead>
               <TableHeadRow>
                 <Th className={styles.selectCell} aria-label="選択">
-                  {canEdit && <Checkbox
+                  {canEdit && <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
                     checked={allOnPageSelected}
                     indeterminate={!allOnPageSelected && selectedCount > 0}
                     onCheckedChange={() => toggleAllOnPage()}
                     aria-label="このページのシナリオをすべて選択"
-                  />}
+                  /></SaveErrorField>}
                 </Th>
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
-            <RovingTbody reorderKey={liveOrder.shown.map((s) => s.id).join(',')}>
-              {liveOrder.shown.map((s) => {
+            <RovingTbody reorderKey={duplicateFeedback.order(liveOrder.shown, scenarios).map((s) => s.id).join(',')}>
+              {duplicateFeedback.order(liveOrder.shown, scenarios).map((s, saveFieldIndex) => {
                 const rowFolder = s.folderId ? folders.find((f) => f.id === s.folderId) : undefined
                 const folderName = s.folderId
                   ? rowFolder?.name ?? 'フォルダ'
@@ -909,6 +905,7 @@ export default function ScenariosListV8() {
                 return (
                   <Tr
                     interactive
+                    highlighted={duplicateFeedback.highlightedId === s.id}
                     key={s.id}
                     data-reorder-id={s.id}
                     onDragEnter={() => liveOrder.enter(s.id)}
@@ -926,11 +923,11 @@ export default function ScenariosListV8() {
                     }} data-row-id={s.id}
                   >
                     <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
-                      {canEdit && <Checkbox
+                      {canEdit && <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","s.id"]}><Checkbox
                         checked={selectedIds.has(s.id)}
                         onCheckedChange={() => toggleOne(s.id)}
                         aria-label={`${s.name}を選択`}
-                      />}
+                      /></SaveErrorField>}
                     </Td>
                     <Td
                       className={styles.gripCell}
@@ -1083,7 +1080,7 @@ export default function ScenariosListV8() {
   const savedBox = (
     <div className={styles.savedBox}>
       <Bookmark size={14} aria-hidden="true" className={styles.savedIcon} />
-      <Select
+      <SaveErrorField names={["savedFilter","saved_filter"]}><Select
         aria-label="よく使う絞り込み"
         value={savedFilter}
         onChange={(value) => {
@@ -1091,7 +1088,7 @@ export default function ScenariosListV8() {
           if (value === 'active') setStoppedOnly(false)
         }}
         options={SAVED_FILTER_OPTIONS}
-      />
+      /></SaveErrorField>
     </div>
   )
 
@@ -1115,7 +1112,7 @@ export default function ScenariosListV8() {
   )
 
   const folderSelect = (
-    <Select aria-label="フォルダ" value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} />
+    <SaveErrorField names={["folderFilter","folderId","folder","folder_filter"]}><Select aria-label="フォルダ" value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} /></SaveErrorField>
   )
 
   const filteredCount =
@@ -1128,12 +1125,12 @@ export default function ScenariosListV8() {
    * 部品は広い板と同じもの（動きは同じ）。並びと段だけを変える。
    */
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
+    <ListToolbarFrame>
       {noteBand}
-      <div className={styles.narrowRow}>
+      <ListToolbarRow>
         {createButton(false)}
         <div className={styles.narrowFolder}>{folderSelect}</div>
-        <div className={styles.narrowSearch}>
+        <ListToolbarSearchSlot>
           <SearchField
             placeholder="シナリオ名で探す"
             aria-label="シナリオ名で探す"
@@ -1141,16 +1138,16 @@ export default function ScenariosListV8() {
             onChange={(value) => setNameQuery(clampSearchQuery(value))}
             onClear={() => setNameQuery('')}
           />
-        </div>
+        </ListToolbarSearchSlot>
         <span className={styles.narrowSpacer} aria-hidden="true" />
         {perPageBox}
-      </div>
-      <div className={styles.narrowRow}>
+      </ListToolbarRow>
+      <ListToolbarRow>
         {filterChips}
         <div className={styles.savedIconOnly} title="よく使う絞り込み">{savedBox}</div>
-      </div>
+      </ListToolbarRow>
       {filteredCount}
-    </div>
+    </ListToolbarFrame>
   )
 
   const wideToolbar = (
@@ -1178,16 +1175,17 @@ export default function ScenariosListV8() {
   /* 板 `O5tUeE`：一覧の口が 403（この役割では開けない）なら、画面ごと権限なしの板にする。 */
   if (scenarioList.error && isForbidden(scenarioList.error)) {
     return (
-      <NoPermissionBoard
+      <SaveErrorScope errors={saveErrors}><NoPermissionBoard
         featureName="シナリオ配信"
         roleLabel={staffRole && staffRole in ROLE_LABELS ? ROLE_LABELS[staffRole as keyof typeof ROLE_LABELS] : null}
         capabilitiesHref="/staff"
-      />
+      /></SaveErrorScope>
     )
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId={narrow ? 'wjfLe' : canEdit ? 'axFrW' : 'X0QrW0'}
       headingSize="regular"
       title="シナリオ配信"
@@ -1293,7 +1291,7 @@ export default function ScenariosListV8() {
         >
           <div className={styles.moveBody}>
             <span className={styles.moveLabel}>移動先のフォルダ</span>
-            <Select
+            <SaveErrorField names={["moveDraft","move_draft"]}><Select
               aria-label="移動先のフォルダ"
               size="full"
               value={moveDraft}
@@ -1302,7 +1300,7 @@ export default function ScenariosListV8() {
                 { value: '', label: '未分類' },
                 ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
               ]}
-            />
+            /></SaveErrorField>
           </div>
         </ConfirmDialog>
 
@@ -1336,53 +1334,16 @@ export default function ScenariosListV8() {
                 回答フォーム・流入経路・計測リンクからの参照は数えられていません。消したあとに参照が外れることがあります。
               </p>
               {!targetStillListed && (
-                <p className={styles.deleteWarn}>
+                <SaveErrorField names={["duplicateName","duplicate_name"]}><p className={styles.deleteWarn}>
                   このシナリオが一覧から外れました（LINEアカウントの切り替えなど）。この窓を閉じて、いまの一覧から選び直してください。
-                </p>
+                </p></SaveErrorField>
               )}
             </div>
           )}
         </ConfirmDialog>
 
         {/* 複製の窓（★V8 `Al4Ek`：新しい名前・引き継ぐもの・引き継がないもの・停止中で作られる）。題の左に印は置かない（絵どおり）。 */}
-        <Dialog
-          open={duplicateTarget !== null}
-          title="このシナリオを複製する"
-          confirmation
-          designNode="Al4Ek"
-          confirmLabel={duplicating ? '複製中…' : '複製する'}
-          confirmIcon={<Copy size={14} aria-hidden="true" />}
-          busy={duplicating}
-          error={duplicateError}
-          onConfirm={() => runDuplicate()}
-          onCancel={() => {
-            if (duplicating) return
-            setDuplicateTarget(null)
-            setDuplicateError('')
-          }}
-        >
-          <div className={styles.dupBody}>
-            <Field label="新しい名前"><TextField
-                value={duplicateName}
-                onChange={(event) => setDuplicateName(event.target.value)}
-                disabled={duplicating}
-                maxLength={80}
-                aria-label="新しい名前"
-              /></Field>
-            <div className={styles.dupBox}>
-              <p className={styles.dupBoxTitle}>引き継ぐもの</p>
-              <p className={styles.dupBoxText}>{`・${duplicateCarries}`}</p>
-            </div>
-            <div className={styles.dupBox}>
-              <p className={styles.dupBoxTitle}>引き継がないもの</p>
-              <p className={styles.dupBoxText}>・購読中の人・配信の記録</p>
-            </div>
-            <div className={styles.dupNote}>
-              <ShieldCheck size={16} aria-hidden="true" />
-              <span>複製は「停止中」で作られます。開始のきっかけも写しますが、配信を始めるまで誰にも届きません。</span>
-            </div>
-          </div>
-        </Dialog>
+        <></>
       </>}
       folders={<>
         <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" onCancel={() => setPendingStop(null)} onConfirm={() => { const ids = pendingStop; setPendingStop(null); if (ids) runBulkToggle(false, ids) }} />
@@ -1401,6 +1362,6 @@ export default function ScenariosListV8() {
         </p>
       ) : null}
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

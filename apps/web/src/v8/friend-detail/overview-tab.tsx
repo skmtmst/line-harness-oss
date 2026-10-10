@@ -1,8 +1,5 @@
 'use client'
 
-/*
- * 概要タブ（JCDRm・Q5F2QE の 1.）。左に要点 320px、右に数の帯・進行中・同じ人・最近の履歴・行う操作。
- */
 import StatusPill from '@/components/shared/status-pill'
 import Link from 'next/link'
 import {
@@ -34,6 +31,11 @@ import styles from './detail.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+
+
+/*
+ * 概要タブ（JCDRm・Q5F2QE の 1.）。左に要点 320px、右に数の帯・進行中・同じ人・最近の履歴・行う操作。
+ */
 
 function GroupHead({ title, action }: { title: string; action?: React.ReactNode }) {
   return (

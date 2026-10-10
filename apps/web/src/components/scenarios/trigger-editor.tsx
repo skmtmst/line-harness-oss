@@ -27,6 +27,7 @@ import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { describeCondition } from './scenario-dialogs'
 import { scenarioReferenceData } from './scenario-reference-data'
 import { formatNumber } from '@/lib/format'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 interface TagOption {
   id: string
@@ -85,6 +86,8 @@ export default function TriggerEditor({
   activeNow = null,
   lineAccountId = null,
 }: TriggerEditorProps) {
+  const saveErrors = useSaveFormErrors()
+
   /** 最後にサーバーへ保存されている（されていると分かっている）一覧。 */
   const subject = `${scenarioId}:${lineAccountId}`
   const subjectRef = useRef({ key: subject, generation: 0 })
@@ -135,12 +138,14 @@ export default function TriggerEditor({
             }
           : { kind: 'error' },
       )
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       setMatch({ kind: 'error' })
     }
     // 条件の中身が変わったときだけ作り直す。参照の同一性では判断しない。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conditionKey, lineAccountId, scenarioId])
+  }, [conditionKey, lineAccountId, scenarioId, saveErrors])
 
   useEffect(() => {
     void recount()
@@ -159,16 +164,17 @@ export default function TriggerEditor({
       if (!preserveDraft) setDraft(res.data)
       onChanged?.(res.data.length)
       return true
-    } catch {
+    } catch (saveFailure) {
       if (!isCurrent()) return false
+      const fieldFailure = saveErrors.capture(saveFailure)
       setSaved(null)
-      setError('開始条件を読み込めませんでした。もう一度お試しください。')
+      { if (!fieldFailure) setError('開始条件を読み込めませんでした。もう一度お試しください。') }
       return false
     } finally {
       if (isCurrent()) setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenarioId, lineAccountId])
+  }, [scenarioId, lineAccountId, saveErrors])
 
   useEffect(() => {
     setSaved(null); setDraft([]); setError(''); setSaving(false); savingRef.current = false
@@ -231,9 +237,12 @@ export default function TriggerEditor({
       }
       if (at === subjectRef.current && await load()) onClose()
     } catch (error) {
+
+
       if (at !== subjectRef.current) return
+      const fieldFailure = saveErrors.capture(error)
       await load(true)
-      setError(error instanceof Error ? `保存できませんでした。変更は残しています。${error.message}` : '保存できませんでした。変更は残しています。もう一度保存してください。')
+      { if (!fieldFailure) setError(error instanceof Error ? `保存できませんでした。変更は残しています。${error.message}` : '保存できませんでした。変更は残しています。もう一度保存してください。') }
     } finally {
       if (at === subjectRef.current) { savingRef.current = false; setSaving(false) }
     }
@@ -245,7 +254,7 @@ export default function TriggerEditor({
   const tagName = (id: string | null) => tags.find((t) => t.id === id)?.name ?? '（消されたタグ）'
 
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open
       title="シナリオの開始条件"
       description="どの出来事をきっかけに、どの友だちへ開始するかを設定します。変更は「開始条件を保存」を押すまで反映されません。"
@@ -356,14 +365,14 @@ export default function TriggerEditor({
               ＋ 友だち追加時
             </Button>
             <div className="min-w-0 flex-1">
-              <EntityKindField
+              <SaveErrorField names={["addingTagId"]}><EntityKindField
                 kind="tag"
                 label="きっかけにするタグ"
                 value={addingTagId}
                 clearable
                 onChange={(value) => setAddingTagId(value)}
                 options={tags.filter((tag) => !usedTagIds.has(tag.id))}
-              />
+              /></SaveErrorField>
             </div>
             <Button
               size="field"
@@ -484,6 +493,6 @@ export default function TriggerEditor({
         </div>
         <Notice tone="warn" className="mt-4">保存後も配信は始まりません。テスト送信と開始確認を完了してから稼働させます。</Notice>
       </div>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }

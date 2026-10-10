@@ -1,3 +1,4 @@
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 /*
  * ★V8 CTA・フォーム（`Q0Jrk`）の描画。
@@ -174,15 +175,13 @@ describe('CTA・フォームのV8（Q0Jrk）', () => {
     let save: (() => Promise<boolean>) | null = null
     const host = render({ onEditorChange: changed, registerSave: (callback) => { save = callback } })
     await act(async () => undefined)
-    const selected = host.querySelector<HTMLButtonElement>('button[aria-label="申込に使う回答フォーム"]')!
-    await act(async () => selected.click())
-    await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[role="option"] button')].find((element) => element.textContent?.includes('この画面のフォーム'))!.click())
+    await pickEntity('申込に使う回答フォーム', 'この画面のフォーム')
     const title = host.querySelector('input') as HTMLInputElement
     await act(async () => fireEvent.change(title, { target: { value: '入力を残すCTA' } }))
     const click = async (label: string) => act(async () => { [...host.querySelectorAll('button')].find((element) => element.textContent === label)!.click() })
     await click('申込フォームを保存する')
     expect(host.querySelector('[data-design-node="pvimJ"]')).not.toBeNull()
-    expect(selected.textContent).toContain('この画面のフォーム')
+    expect(host.querySelector('button[aria-label="申込に使う回答フォーム"]')?.parentElement?.textContent).toContain('この画面のフォーム')
     await act(async () => { expect(await save!()).toBe(false) })
     expect(apiMocks.saveCtas).not.toHaveBeenCalled()
     await click('違いを比べる')
@@ -193,7 +192,7 @@ describe('CTA・フォームのV8（Q0Jrk）', () => {
     expect(changed).not.toHaveBeenCalled()
     await act(async () => { [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((element) => element.textContent === '最新を読み込んで続ける')!.click() })
     expect(changed).toHaveBeenCalledWith(latest)
-    expect(selected.textContent).toContain('保存済みのフォーム')
+    expect(host.querySelector('button[aria-label="申込に使う回答フォーム"]')?.parentElement?.textContent).toContain('保存済みのフォーム')
     expect(title.value).toBe('入力を残すCTA')
   })
 

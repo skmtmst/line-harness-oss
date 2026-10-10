@@ -1,19 +1,4 @@
 'use client'
-
-/*
- * ★V8 テンプレートの詳細。
- * Pencil：詳細（未公開の変更あり）`UTbi1`、公開する `cuR8I`、
- * 削除（使っている所がある）`Z0g3si`／（使っていない）`V6JFnd`。
- *
- * v7 の見た目は変えない。data-theme="v8" のときだけこちらが出る。
- * 動き（読み込み・公開の競合・削除の安全・権限）は v7 の detail/page.tsx
- * と同じに保つ。
- *
- * 「複製する」はサーバー側に POST /api/templates/:id/duplicate がまだ
- * 無い（直しかけを写さない決まりのため、画面側の写しでは作れない）ので
- * API待ち。DEVIN-QUESTIONS.md に記録済み。
- */
-
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -41,6 +26,22 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 テンプレートの詳細。
+ * Pencil：詳細（未公開の変更あり）`UTbi1`、公開する `cuR8I`、
+ * 削除（使っている所がある）`Z0g3si`／（使っていない）`V6JFnd`。
+ *
+ * v7 の見た目は変えない。data-theme="v8" のときだけこちらが出る。
+ * 動き（読み込み・公開の競合・削除の安全・権限）は v7 の detail/page.tsx
+ * と同じに保つ。
+ *
+ * 「複製する」はサーバー側に POST /api/templates/:id/duplicate がまだ
+ * 無い（直しかけを写さない決まりのため、画面側の写しでは作れない）ので
+ * API待ち。DEVIN-QUESTIONS.md に記録済み。
+ */
 
 type Usage = NonNullable<TemplateDetailData['usedBy']>
 
@@ -185,6 +186,8 @@ function buildUsageRows(usage: Usage | null): UsageRow[] {
 const USAGE_VISIBLE = 4
 
 export default function TemplateDetailV8() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -233,10 +236,15 @@ export default function TemplateDetailV8() {
       } else {
         setVersionsError('版の履歴を読み込めませんでした。もう一度お試しください。')
       }
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
       setVersionsError('版の履歴を読み込めませんでした。もう一度お試しください。')
     }
-  }, [id])
+  }
+  }, [id, saveErrors]);
+
 
   const reload = useCallback(async () => {
     setMissing(false)
@@ -261,16 +269,20 @@ export default function TemplateDetailV8() {
         setMissing(true)
       }
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 404) {
         setMissing(true)
       } else {
-        setError('テンプレートを読み込めませんでした。もう一度お試しください。')
+        { if (!fieldFailure)
+
+        setError('テンプレートを読み込めませんでした。もう一度お試しください。') }
       }
     } finally {
       setLoading(false)
     }
     void loadVersions()
-  }, [id, loadVersions])
+  }, [id, loadVersions, saveErrors])
 
   useEffect(() => {
     if (!id) {
@@ -328,17 +340,20 @@ export default function TemplateDetailV8() {
       setPublishOpen(false)
       await reload()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
       if (caught instanceof ApiError && caught.status === 409) {
-        setPublishError('ほかの人が先に公開・編集しました。最新の状態を読み直したので、内容を確かめてからもう一度お試しください。')
+        { if (!fieldFailure)
+        setPublishError('ほかの人が先に公開・編集しました。最新の状態を読み直したので、内容を確かめてからもう一度お試しください。') }
         void reload()
       } else {
-        setPublishError('公開できませんでした。状態を読み直してから、もう一度お試しください。')
+        { if (!fieldFailure)
+        setPublishError('公開できませんでした。状態を読み直してから、もう一度お試しください。') }
       }
     } finally {
       setPublishing(false)
     }
-  }, [id, publishing, template, reload])
+  }, [id, publishing, template, reload, saveErrors])
 
   const doRevert = useCallback(async () => {
     if (reverting || revertTarget === null || !template) return
@@ -354,15 +369,19 @@ export default function TemplateDetailV8() {
       setCompareTarget(null)
       await reload()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
       setRevertError(
         caught instanceof ApiError && caught.status === 409
           ? 'ほかの人が先に公開しました。開き直して確認してください。'
           : 'この版に戻せませんでした。状態を読み直してから、もう一度お試しください。',
       )
+    }
     } finally {
       setReverting(false)
     }
-  }, [id, reverting, revertTarget, template, reload])
+  }, [id, reverting, revertTarget, template, reload, saveErrors])
 
   const remove = useCallback(async () => {
     if (deleting || usageCount > 0 || !template) return
@@ -373,12 +392,15 @@ export default function TemplateDetailV8() {
       if (!res.success) throw new Error(res.error)
       setDeleteOpen(false)
       router.push('/templates')
-    } catch {
-      setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
-  }, [deleting, usageCount, template, id, router])
+  }, [deleting, usageCount, template, id, router, saveErrors])
 
   const openDelete = useCallback(() => {
     setDeleteError('')
@@ -391,36 +413,36 @@ export default function TemplateDetailV8() {
 
   if (!id) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="unspecified"
         title="見るテンプレートが指定されていません"
         description="一覧から、見たいテンプレートを選び直してください。"
         backHref="/templates"
         backLabel="テンプレートの一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
 
   if (missing || (!error && !loading && !template)) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="not-found"
         title="このテンプレートは見つかりません"
         description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。"
         backHref="/templates"
         backLabel="テンプレートの一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
 
   if (error || (!loading && !template)) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="error"
         title="テンプレートを読み込めませんでした"
         description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
         onRetry={() => void reload()}
-      />
+      /></SaveErrorScope>
     )
   }
 
@@ -444,7 +466,7 @@ export default function TemplateDetailV8() {
     : (versions ?? []).find((v) => v.versionNumber === compareTarget)?.messageContent ?? null
 
   return (
-    <div className={styles.board} data-design-node="UTbi1">
+    <SaveErrorScope errors={saveErrors}><div className={styles.board} data-design-node="UTbi1">
       <nav data-design="Crumb">
         <Link href="/templates" className={styles.crumb}>
           <ChevronLeft size={14} aria-hidden="true" />
@@ -873,6 +895,6 @@ export default function TemplateDetailV8() {
           setRevertError('')
         }}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }

@@ -1,21 +1,4 @@
 'use client'
-
-/*
- * ★V8-B 会員（Pencil「★V8-B 画面の地図」専用機能の組：
- * 会員一覧 `AOWoJ`、ランク設定 `fb9NJ`、ランク設定の競合 `e5yBLx`、
- * ライフタイム `zQ5vY`、状態の板 `dzx5D`）。
- *
- * v7（page.tsx 内の MembersInner と members-tab / rank-settings-tab /
- * lifetime-tab）とは別の部品として持ち、data-theme="v8" のときだけ
- * こちらが出る。データの口（settings・members・saveRanks・saveMilestones・
- * deleteRank・resync）は同じ。違いは置き場と見せ方だけ——
- * ・会員の数の帯は1枚の白い板に区切り線で4つ（離したカードにしない）。
- * ・道具の段は「会員を探す」＋よく使う札（○○以上・ペットあり・EC未連携）。
- * ・ランクの表には タグ・会員数 列があり、削除は移す先つきの
- *   版つき DELETE（版が違うと競合の帯 e5yBLx へ）。
- * ・「ECとの照合」タブは今の作りどおり /ec-commerce/identity-candidates へ。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Download, RefreshCw, Users, PawPrint, ShoppingBag, Link2 } from 'lucide-react'
@@ -59,6 +42,25 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { csvFileName } from '@/lib/csv-file-name'
 import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B 会員（Pencil「★V8-B 画面の地図」専用機能の組：
+ * 会員一覧 `AOWoJ`、ランク設定 `fb9NJ`、ランク設定の競合 `e5yBLx`、
+ * ライフタイム `zQ5vY`、状態の板 `dzx5D`）。
+ *
+ * v7（page.tsx 内の MembersInner と members-tab / rank-settings-tab /
+ * lifetime-tab）とは別の部品として持ち、data-theme="v8" のときだけ
+ * こちらが出る。データの口（settings・members・saveRanks・saveMilestones・
+ * deleteRank・resync）は同じ。違いは置き場と見せ方だけ——
+ * ・会員の数の帯は1枚の白い板に区切り線で4つ（離したカードにしない）。
+ * ・道具の段は「会員を探す」＋よく使う札（○○以上・ペットあり・EC未連携）。
+ * ・ランクの表には タグ・会員数 列があり、削除は移す先つきの
+ *   版つき DELETE（版が違うと競合の帯 e5yBLx へ）。
+ * ・「ECとの照合」タブは今の作りどおり /ec-commerce/identity-candidates へ。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ */
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -394,7 +396,7 @@ function MembersTabV8({
           EC未連携
         </FilterChip>
         <span className={styles.toolbarRight}>
-          <Select
+          <SaveErrorField names={["rank"]}><Select
             aria-label="よく使う絞り込み"
             value={rank}
             onChange={(value) => { setRank(value); if (value) setChipTopRanks(false); setPage(1) }}
@@ -402,8 +404,8 @@ function MembersTabV8({
               { value: '', label: 'よく使う絞り込み' },
               ...(data?.ranks ?? settings?.ranks ?? []).map((r) => ({ value: r.key, label: `ランク：${r.name}` })),
             ]}
-          />
-          <Select
+          /></SaveErrorField>
+          <SaveErrorField names={["sort"]}><Select
             aria-label="並び順"
             value={sort}
             onChange={(value) => { setSort(value as NenMemberSort); setPage(1) }}
@@ -413,7 +415,7 @@ function MembersTabV8({
               { value: 'balance_desc', label: 'マイル残高が多い順' },
               { value: 'recent', label: '最終購入が新しい順' },
             ]}
-          />
+          /></SaveErrorField>
           <PageSizeSelect
             value={pageSize}
             options={[10, 20, 50]}
@@ -573,6 +575,8 @@ export function RankSettingsTabV8({
   onRetry: () => void
   readonly: boolean
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [drafts, setDrafts] = useState<RankDraft[]>([])
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -667,9 +671,13 @@ export function RankSettingsTabV8({
         ? 'ランク設定を保存し、ECへ同期しました。タグも付け替えています。'
         : 'ランク設定を保存しました。ECへの同期は失敗したので、右の「もう一度同期」で送り直せます。')
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
       setError(describeApiFailure(caught, 'ランク設定の保存', {
         scope: 'store',
-      }))
+      })) }
     } finally {
       setBusy(false)
     }
@@ -698,14 +706,18 @@ export function RankSettingsTabV8({
       setNotice(res.data.ecSync === 'synced' ? 'ランクを削除し、会員を移し先へ反映しました。' : `ランクを削除しました。${res.data.message ?? ''}`)
       onRetry()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 409) {
-        const res = await nenRanksApi.settings(accountId).catch(() => null)
+        const res = await nenRanksApi.settings(accountId).catch(() => null);
+
         if (res?.success) setConflict({ latest: res.data })
         setRemoveTarget(null)
       } else {
+        { if (!fieldFailure)
         setError(describeApiFailure(caught, 'ランクの削除', {
           scope: 'store',
-        }))
+        })) }
       }
     } finally {
       setBusy(false)
@@ -732,26 +744,30 @@ export function RankSettingsTabV8({
       onSaved(accountId, res.data)
       setNotice(res.data.sync?.status === 'synced' ? 'ECへ同期しました。' : `ECへの同期に失敗しました：${res.data.sync?.error ?? ''}`)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
       setError(describeApiFailure(caught, 'ECへの同期', {
         scope: 'store',
-      }))
+      })) }
     } finally {
       setBusy(false)
     }
   }
 
   const noticeEl = notice ? <p className={styles.notice} role="status">{notice}</p> : null
-  if (status === 'loading' && !settings) return <>{noticeEl}<ListState kind="loading" title="ランク設定を読み込んでいます" /></>
-  if (status === 'forbidden') return <ListState kind="forbidden" />
-  if (status === 'error') return <ListState kind="error" title="ランク設定を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} />
-  if (!settings) return <>{noticeEl}<ListState kind="loading" title="ランク設定を読み込んでいます" /></>
+  if (status === 'loading' && !settings) return <SaveErrorScope errors={saveErrors}><>{noticeEl}<ListState kind="loading" title="ランク設定を読み込んでいます" /></></SaveErrorScope>
+  if (status === 'forbidden') return <SaveErrorScope errors={saveErrors}><ListState kind="forbidden" /></SaveErrorScope>
+  if (status === 'error') return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="ランク設定を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} /></SaveErrorScope>
+  if (!settings) return <SaveErrorScope errors={saveErrors}><>{noticeEl}<ListState kind="loading" title="ランク設定を読み込んでいます" /></></SaveErrorScope>
 
   const rules = settings.rules
   const removeRow = removeTarget !== null ? drafts[removeTarget] : null
   const removeCandidates = removeRow ? drafts.filter((row) => row.id && row.id !== removeRow.id) : []
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       {conflict ? (
         /* e5yBLx：黄色の帯。保存した人の情報は API に無いので時刻だけ出す。 */
         <NoteBar
@@ -805,17 +821,17 @@ export function RankSettingsTabV8({
                     return (
                       <Tr key={row.id ?? `new-${index}`}>
                         <Td className="w-40">
-                          <TextField aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} disabled={readonly} onChange={(event) => update(index, { name: event.target.value })} />
+                          <SaveErrorField names={[`drafts.${index}.name`,"row.name"]}><TextField aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} disabled={readonly} onChange={(event) => update(index, { name: event.target.value })} /></SaveErrorField>
                         </Td>
                         <Td className="w-36">
                           <span className="flex items-center gap-2">
-                            <NumberInput numericText aria-label={`しきい値 ${index + 1}`} inputMode="numeric" value={row.threshold} disabled={readonly || isBase} onChange={(event) => update(index, { threshold: event.target.value })} />
+                            <SaveErrorField names={[`drafts.${index}.threshold`,"threshold","row.threshold"]}><NumberInput numericText aria-label={`しきい値 ${index + 1}`} inputMode="numeric" value={row.threshold} disabled={readonly || isBase} onChange={(event) => update(index, { threshold: event.target.value })} /></SaveErrorField>
                             <span className="shrink-0 text-caption font-semibold text-ink-faint">円〜{isBase ? '（固定）' : null}</span>
                           </span>
                         </Td>
                         <Td className="w-28">
                           <span className="flex items-center gap-2">
-                            <TextField aria-label={`マイル還元 ${index + 1}`} inputMode="decimal" value={row.rate} disabled={readonly} onChange={(event) => update(index, { rate: event.target.value })} />
+                            <SaveErrorField names={[`drafts.${index}.rate`,"rate","row.rate"]}><TextField aria-label={`マイル還元 ${index + 1}`} inputMode="decimal" value={row.rate} disabled={readonly} onChange={(event) => update(index, { rate: event.target.value })} /></SaveErrorField>
                             <span className="shrink-0 text-caption font-semibold text-ink-faint">%</span>
                           </span>
                         </Td>
@@ -897,7 +913,7 @@ export function RankSettingsTabV8({
         onCancel={() => setRemoveTarget(null)}
       >
         {removeRow && removeRow.memberCount > 0 ? (
-          <Select
+          <SaveErrorField names={["replacement","replacementRankId"]}><Select
             aria-label="会員の移す先"
             value={replacement}
             onChange={setReplacement}
@@ -905,7 +921,7 @@ export function RankSettingsTabV8({
               { value: '', label: '移す先のランクを選ぶ' },
               ...removeCandidates.map((row) => ({ value: row.id ?? '', label: row.name.trim() || '（名前なし）' })),
             ]}
-          />
+          /></SaveErrorField>
         ) : null}
       </ConfirmDialog>
 
@@ -940,7 +956,7 @@ export function RankSettingsTabV8({
           </div>
         ) : null}
       </ConfirmDialog>
-    </>
+    </></SaveErrorScope>
   )
 }
 
@@ -972,6 +988,8 @@ function LifetimeTabV8({
   onRetry: () => void
   readonly: boolean
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [drafts, setDrafts] = useState<MilestoneDraft[]>([])
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -1019,22 +1037,26 @@ function LifetimeTabV8({
       onSaved(accountId, res.data)
       setNotice(res.data.sync?.status === 'synced' ? '節目を保存し、ECへ同期しました。' : '節目を保存しました。ECへの同期は失敗したので、ランク設定の「もう一度同期」で送り直せます。')
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
       setError(describeApiFailure(caught, '節目の保存', {
         scope: 'store',
-      }))
+      })) }
     } finally {
       setBusy(false)
     }
   }
 
   const noticeEl = notice ? <p className={styles.notice} role="status">{notice}</p> : null
-  if (status === 'loading' && !settings) return <>{noticeEl}<ListState kind="loading" title="ライフタイムを読み込んでいます" /></>
-  if (status === 'forbidden') return <ListState kind="forbidden" />
-  if (status === 'error') return <ListState kind="error" title="ライフタイムを読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} />
-  if (!settings) return <>{noticeEl}<ListState kind="loading" title="ライフタイムを読み込んでいます" /></>
+  if (status === 'loading' && !settings) return <SaveErrorScope errors={saveErrors}><>{noticeEl}<ListState kind="loading" title="ライフタイムを読み込んでいます" /></></SaveErrorScope>
+  if (status === 'forbidden') return <SaveErrorScope errors={saveErrors}><ListState kind="forbidden" /></SaveErrorScope>
+  if (status === 'error') return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="ライフタイムを読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} /></SaveErrorScope>
+  if (!settings) return <SaveErrorScope errors={saveErrors}><>{noticeEl}<ListState kind="loading" title="ライフタイムを読み込んでいます" /></></SaveErrorScope>
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
       {error ? <p className={styles.errorText} role="alert">{error}</p> : null}
 
@@ -1066,11 +1088,11 @@ function LifetimeTabV8({
                 <Tr key={row.id ?? `new-${index}`}>
                   <Td className="w-44">
                     <span className="flex items-center gap-2">
-                      <NumberInput numericText unit="円" aria-label={`節目 ${index + 1}`} inputMode="numeric" value={row.threshold} disabled={readonly} onChange={(event) => update(index, { threshold: event.target.value })} />
+                      <SaveErrorField names={[`drafts.${index}.threshold`,"threshold","row.threshold"]}><NumberInput numericText unit="円" aria-label={`節目 ${index + 1}`} inputMode="numeric" value={row.threshold} disabled={readonly} onChange={(event) => update(index, { threshold: event.target.value })} /></SaveErrorField>
 
                     </span>
                   </Td>
-                  <Td className="w-48"><TextField aria-label={`称号 ${index + 1}`} value={row.title} maxLength={30} disabled={readonly} onChange={(event) => update(index, { title: event.target.value })} /></Td>
+                  <Td className="w-48"><SaveErrorField names={[`drafts.${index}.title`,"row.title"]}><TextField aria-label={`称号 ${index + 1}`} value={row.title} maxLength={30} disabled={readonly} onChange={(event) => update(index, { title: event.target.value })} /></SaveErrorField></Td>
                   <Td>
                     <span className="flex min-w-0 items-center gap-2.5">
                       {row.benefit ? (
@@ -1089,7 +1111,7 @@ function LifetimeTabV8({
                       /* 閲覧のみ：押せない文字で出す。locked は「オン固定」なので実際の値を見せられない */
                       <span className="text-label text-ink-secondary">{row.notify ? '通知する' : '通知しない'}</span>
                     ) : (
-                      <SettingCheckbox checked={row.notify} onChange={(checked) => update(index, { notify: checked })} label={row.notify ? '通知する' : '通知しない'} />
+                      <SaveErrorField names={[`drafts.${index}.notify`,"notify","row.notify","notifyOnReach"]}><SettingCheckbox checked={row.notify} onChange={(checked) => update(index, { notify: checked })} label={row.notify ? '通知する' : '通知しない'} /></SaveErrorField>
                     )}
                   </Td>
                   <Td align="right" className="w-14">
@@ -1125,6 +1147,6 @@ function LifetimeTabV8({
       />
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="節目への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }

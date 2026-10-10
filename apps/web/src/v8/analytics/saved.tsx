@@ -1,11 +1,4 @@
 'use client'
-
-/*
- * ★V8 分析「保存した分析」（Pencil `bglah`）。
- * 数の帯 → 道具の段（探す・説明）→ 左に保存した分析の表、右に選んだ分析の履歴（結果を見る・CSV・内容を変える）
- * → 定期レポート（作る・止める・また送る・しまう）→ 1回だけ送った結果。
- * 呼ぶ口・世代の守り・失敗の言い分け・CSV は今の画面（SavedAnalyticsTab）と同じ。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Bookmark, Download, FilePen, History, Mail, Plus } from 'lucide-react'
@@ -26,6 +19,15 @@ import styles from './analytics.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 分析「保存した分析」（Pencil `bglah`）。
+ * 数の帯 → 道具の段（探す・説明）→ 左に保存した分析の表、右に選んだ分析の履歴（結果を見る・CSV・内容を変える）
+ * → 定期レポート（作る・止める・また送る・しまう）→ 1回だけ送った結果。
+ * 呼ぶ口・世代の守り・失敗の言い分け・CSV は今の画面（SavedAnalyticsTab）と同じ。
+ */
 
 const SAVED_STATE_LABELS: Record<SavedAnalyticsSnapshot['state'], string> = { available: '利用可能', partial: '一部集計', unavailable: '未取得', failed: '失敗' }
 const REPORT_STATUS_LABELS: Record<AnalyticsReportSchedule['status'], string> = { active: '有効', paused: '停止中', archived: 'アーカイブ' }
@@ -84,6 +86,7 @@ function ScheduleMenu({ schedule }: { schedule: AnalyticsReportSchedule }) {
 }
 
 export default function SavedV8({ accountId, onCountChange, canManage }: { accountId: string; onCountChange?: (count: number | null) => void; canManage: boolean }) {
+  const saveErrors = useSaveFormErrors()
   const [items, setItems] = useState<SavedAnalyticsSummary[]>([])
   const [query, setQuery] = useListUrlValue('q', '')
   const [selectedId, setSelectedId] = useState('')
@@ -173,7 +176,11 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
       setSchedules((current) => status === 'archived' ? current.filter((item) => item.id !== schedule.id) : current.map((item) => (item.id === schedule.id ? response.data : item)))
       setArchiveTarget(null)
     } catch (caught) {
-      setSchedulesError(caught instanceof Error ? caught.message : '定期レポートを更新できませんでした')
+      const fieldFailure = saveErrors.capture(caught);
+
+
+      if (!fieldFailure) {
+      setSchedulesError(caught instanceof Error ? caught.message : '定期レポートを更新できませんでした') }
     } finally {
       setScheduleBusyId('')
     }
@@ -224,7 +231,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
   const failed = error ? '読み込めませんでした' : null
   const crossCount = items.filter((item) => item.kind === 'cross').length
 
-  return <>
+  return <SaveErrorScope errors={saveErrors}><>
     <KpiBand className={styles.band}>
       <KpiCard presentation="band" title="保存した分析" icon={<Bookmark size={13} aria-hidden="true" />} value={error ? null : items.length} unit="件" detail={failed ?? `クロス分析 ${crossCount}・ファネル ${items.length - crossCount}`} loading={loading} />
       <KpiCard presentation="band" title="保存結果数" icon={<History size={13} aria-hidden="true" />} value={error ? null : items.reduce((sum, item) => sum + item.snapshotCount, 0)} unit="件" detail={failed ?? '時点ごとに固定した結果'} loading={loading} />
@@ -354,5 +361,5 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
         </dl>
       })() : null}
     </Dialog>
-  </>
+  </></SaveErrorScope>
 }

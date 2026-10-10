@@ -1,15 +1,5 @@
 'use client'
 
-/*
- * ★V8 タグ「保存した検索」タブ（Pencil `IWnYX`）。
- *
- * ここは管理だけ。条件を作るのは友だち一覧の絞り込みで、「この条件を保存」で増える。
- * 動き（読み込み・数の帯・絞り込み・並べ替え・削除・行の詳細パネル・名前のその場の直し・右クリック）は
- * 今の V8 タブ（app/tags/searches-v8.tsx）から写した。見た目は絵に合わせた：
- * 表は「条件名・内容／該当／共有／使っている所／更新／友だち一覧へ／…」。つまみの列は無く、
- * 並べ替えは行の「…」の「上へ動かす・下へ動かす」（つまみで ↑↓ と同じ口）。
- * 絵の下の段のとおり、行の「…」に「複製して保存」を足した（同じ条件で新しく保存する）。
- */
 import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { FolderDotName } from '@/components/shared/folder-dot'
@@ -47,6 +37,19 @@ import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+
+/*
+ * ★V8 タグ「保存した検索」タブ（Pencil `IWnYX`）。
+ *
+ * ここは管理だけ。条件を作るのは友だち一覧の絞り込みで、「この条件を保存」で増える。
+ * 動き（読み込み・数の帯・絞り込み・並べ替え・削除・行の詳細パネル・名前のその場の直し・右クリック）は
+ * 今の V8 タブ（app/tags/searches-v8.tsx）から写した。見た目は絵に合わせた：
+ * 表は「条件名・内容／該当／共有／使っている所／更新／友だち一覧へ／…」。つまみの列は無く、
+ * 並べ替えは行の「…」の「上へ動かす・下へ動かす」（つまみで ↑↓ と同じ口）。
+ * 絵の下の段のとおり、行の「…」に「複製して保存」を足した（同じ条件で新しく保存する）。
+ */
 
 const PAGE_SIZES = [10, 20, 50]
 const MAX_SAVED = 50
@@ -88,6 +91,7 @@ function updatedText(search: SavedSearch): string {
 }
 
 export default function SearchesTab({ accountId, canEdit }: { accountId: string | null; canEdit: boolean }) {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const [items, setItems] = useState<SavedSearch[]>([])
   const [summary, setSummary] = useState<SavedSearchSummary | null>(null)
@@ -152,14 +156,16 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       setItems(savedSearches.items)
       setSummary(savedSearches.summary)
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason);
+
       if (sequence === loadSequence.current) {
         if (reason instanceof ApiError && reason.status === 403) setForbidden(true)
-        else setLoadError(reason instanceof ApiError ? reason.message : '保存した検索を読み込めませんでした')
+        else { if (!fieldFailure) setLoadError(reason instanceof ApiError ? reason.message : '保存した検索を読み込めませんでした') }
       }
     } finally {
       if (sequence === loadSequence.current) setLoading(false)
     }
-  }, [accountId])
+  }, [accountId, saveErrors])
   useEffect(() => { void load() }, [load])
 
   /* アカウントが変わったら、前のアカウントの削除確認を閉じる。 */
@@ -179,7 +185,11 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       setPendingDelete(null)
       void load()
     } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure)
+
+      setError(reason instanceof ApiError ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。') }
     }
   }
 
@@ -198,7 +208,11 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       notifySaved(`「${search.name}のコピー」を保存しました`)
       void load()
     } catch (reason) {
-      setError(reason instanceof ApiError ? `複製できませんでした（${reason.message}）` : '複製できませんでした')
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure)
+
+      setError(reason instanceof ApiError ? `複製できませんでした（${reason.message}）` : '複製できませんでした') }
     }
   }
 
@@ -214,9 +228,13 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       if (!res.success) throw new Error(res.error)
       void load()
     } catch (reason) {
-      setItems(previous)
+      const fieldFailure = saveErrors.capture(reason)
+      setItems(previous);
+
       const message = reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした'
-      setError(message)
+      { if (!fieldFailure)
+
+      setError(message) }
       setRetryOrder(next)
       notifyToast(message, { tone: 'error', actionLabel: 'もう一度', onAction: () => { void applyOrder(next) } })
     }
@@ -257,9 +275,9 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
     const list: ActionMenuItem[] = []
     const index = filteredList.findIndex((item) => item.id === search.id)
     if (search.lineAccountId) {
-      list.push({ id: 'open', label: '友だち一覧へ', external: true, href: `/friends?savedSearch=${search.id}`, onSelect: () => router.push(`/friends?savedSearch=${search.id}`) })
+      list.push({ id: 'open', label: '友だち一覧へ', external: false, href: `/friends?savedSearch=${search.id}`, onSelect: () => router.push(`/friends?savedSearch=${search.id}`) })
       if (canEdit) {
-        list.push({ id: 'edit', label: '編集', external: true, href: `/tags/searches/edit?id=${encodeURIComponent(search.id)}`, onSelect: () => router.push(`/tags/searches/edit?id=${encodeURIComponent(search.id)}`) })
+        list.push({ id: 'edit', label: '編集', external: false, href: `/tags/searches/edit?id=${encodeURIComponent(search.id)}`, onSelect: () => router.push(`/tags/searches/edit?id=${encodeURIComponent(search.id)}`) })
         list.push({
           id: 'duplicate',
           label: '複製して保存',
@@ -298,7 +316,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   const sharedCount = items.filter((item) => item.isShared).length
@@ -437,7 +455,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
   )
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <KpiBand data-design="KPIs" className={styles.kpis}>
         {kpiCards.map((kpi) => (
           <KpiCard
@@ -460,12 +478,13 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       </div>
 
       <ListPageBody
+        skeleton
         listHelp={canEdit ? `保存は最大 ${MAX_SAVED} 件。行の「…」に：編集・複製して保存・削除。` : `保存は最大 ${MAX_SAVED} 件。`}
         toolbar={<>
-          <span className={styles.search}>
+          <ListToolbarSearchSlot>
             <SearchField aria-label="条件名で探す" placeholder="条件名で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
-          </span>
-          <Select
+          </ListToolbarSearchSlot>
+          <SaveErrorField names={["usageFilter","usage_filter"]}><Select
             value={usageFilter}
             width={170}
             onChange={(value) => setUsageFilter(value as SavedSearchUsageFilter)}
@@ -475,8 +494,8 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
               { value: 'used', label: '使っている所：あり' },
               { value: 'unused', label: '使っている所：なし' },
             ]}
-          />
-          <Select
+          /></SaveErrorField>
+          <SaveErrorField names={["matchFilter","match_filter"]}><Select
             value={matchFilter}
             width={145}
             onChange={(value) => setMatchFilter(value as typeof matchFilter)}
@@ -487,7 +506,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
               { value: 'zero', label: '該当人数：0人' },
               { value: 'unknown', label: '該当人数：未集計' },
             ]}
-          />
+          /></SaveErrorField>
           <span className={styles.toolbarSpacer} />
           <PageSizeSelect value={pageSize} onChange={(value) => setPageSize(value || 20)} options={PAGE_SIZES} label={null} />
         </>}
@@ -569,6 +588,6 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
         onCancel={() => setPendingDelete(null)}
         onConfirm={() => { const target = pendingDelete; if (target) void confirmRemove(target) }}
       />
-    </>
+    </></SaveErrorScope>
   )
 }

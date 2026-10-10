@@ -1,4 +1,5 @@
 'use client'
+import { canEditFeature } from '@/lib/staff-capability';
 
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import { Suspense, useEffect, useState } from 'react'
@@ -25,6 +26,7 @@ import { bookingMenuError } from '../menu-validation'
 import { formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import MenuFormV8 from '@/v8/booking-menus/menu-form'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /**
  * メニューを追加する（設計 V6 28-1-B / node GhOb3、★V8 は QqER7）。
@@ -779,7 +781,7 @@ function NewBookingMenuPageV7() {
                 maxLength={100}
                 aria-label="タグを検索"
               />
-              <Select size="full" id="bm-auto-tag" aria-label="予約後に付けるタグ" value={autoTagId ?? ''} onChange={(value) => setAutoTagId(value === '' ? null : value)} options={[{ value: '', label: '— なし —' }, ...tagOptions.map((t) => ({ value: t.id, label: t.name }))]} />
+              <EntitySelect kind="tag" size="full" id="bm-auto-tag" aria-label="予約後に付けるタグ" value={autoTagId ?? ''} onChange={(value) => setAutoTagId(value === '' ? null : value)} options={[{ value: '', label: '— なし —' }, ...tagOptions.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))]} />
               {trimmedQuery !== '' && visibleTagCandidates.length === 0 && (
                 <p className="text-ink-faint text-xs">
                   「{trimmedQuery}」に合うタグがありません。

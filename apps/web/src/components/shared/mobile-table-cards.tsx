@@ -57,7 +57,7 @@ export default function MobileTableCards({ items }: { items: MobileTableCard[] }
           if (!item.onSelect || event.target !== event.currentTarget) return
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
-            item.onSelect()
+            item.onSelect?.()
           }
         }
         return (

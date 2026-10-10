@@ -10,11 +10,18 @@
   color: var(--color-ink); background: var(--color-canvas);
 }
 :global([data-theme='v8']) .frame[data-standalone] { width: 100%; margin: 0; min-height: 100%; }
+:global([data-theme='v8']) .frame:is([data-template-layout='event-list'], [data-template-layout='event-roster'], [data-template-layout='distribution']) {
+  --tpl-head-pad-top: var(--tpl-head-pad-side);
+  --tpl-head-pad-bottom: var(--tpl-folder-pad-block);
+  --tpl-toolbar-pad-block: var(--tpl-folder-pad-block);
+}
+:global([data-theme='v8']) .frame[data-template-layout='event-list'] { --folder-row-pad-block: var(--tpl-toolbar-gap); }
+:global([data-theme='v8']) .frame[data-template-layout='event-list'] .toolbar { row-gap: var(--tpl-section-pad); }
 :global([data-theme='v8']) .heading {
   display: flex; align-items: center; flex-wrap: wrap; gap: var(--polish-space-field);
   padding: var(--tpl-head-pad-top) var(--tpl-head-pad-side) var(--tpl-head-pad-bottom); flex-shrink: 0;
 }
-:global([data-theme='v8']) .headingText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-head-gap); }
+:global([data-theme='v8']) .headingText { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-head-gap); }
 :global([data-theme='v8']) .titleRow { display: flex; align-items: center; gap: var(--polish-space-row); min-width: 0; }
 :global([data-theme='v8']) .title { margin: 0; min-width: 0; overflow: visible; white-space: normal; overflow-wrap: anywhere; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
 :global([data-theme='v8']) .pageTitle { min-width: 0; overflow: visible; white-space: normal; overflow-wrap: anywhere; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
@@ -154,6 +161,8 @@
 :global([data-theme='v8']) .frame[data-has-footer] { height: calc(100dvh - 74px); min-height: 0; }
 :global([data-theme='v8']) .frame[data-has-footer] > .split,
 :global([data-theme='v8']) .frame[data-has-footer] > .settings { min-height: 0; overflow-y: auto; }
+:global([data-theme='v8']) .frame[data-has-footer] > [data-template-region='body'] { flex: 1; min-height: 0; overflow-y: auto; }
+:global([data-theme='v8']) .frame [data-template-region='preview'][data-preview-narrow='hidden'] { align-self: flex-start; }
 :global([data-theme='v8']) .footer { flex-shrink: 0; }
 
 /* 入力と見え方は別々に送る。本文全体のスクロールバーで左右の列幅を削らない。 */
@@ -187,6 +196,7 @@
   :global([data-theme='v8']) .preview[data-preview-narrow='compact'] { padding: var(--tpl-r2-rail-compact-pad); }
   :global([data-theme='v8']) .preview[data-preview-narrow='compact'] .previewContent { width: var(--tpl-r2-rail-compact-content-width); }
   :global([data-theme='v8']) .preview[data-preview-narrow='hidden'] { display: none; }
+  :global([data-theme='v8']) .frame [data-template-region='preview'][data-preview-narrow='hidden'] { display: none; }
   :global([data-theme='v8']) .inboxSummary, :global([data-theme='v8']) .analyticsAside, :global([data-theme='v8']) .dashboardAside:not([data-aside-size='column']) { display: none; }
   :global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside:not([data-aside-size='column']) { display: none; }
   :global([data-theme='v8']) .asideToggle { display: block; }
@@ -317,3 +327,19 @@
   :global([data-theme='v8']) .bookingStats { width: 100%; }
   :global([data-theme='v8']) .bookingHeading .heading { padding-block: var(--tpl-booking-narrow-head-pad); }
 }
+
+/* B-178：フォルダの列は余白込み200、ページ送りは右寄せ。 */
+:global([data-theme='v8']) [data-list-skeleton] .folders { box-sizing: border-box; width: var(--tpl-folder-width); }
+:global([data-theme='v8']) [data-list-skeleton] .paginationRow { justify-content: flex-end; gap: var(--space-16); }
+
+:global([data-theme='v8']) [data-list-skeleton] .pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-16); }
+
+/* ページ送りを別の子で組む一覧でも、型の余白を二重に足さない。 */
+:global([data-theme='v8']) [data-list-skeleton] .pagination .pagination { padding: 0; }
+
+/* 道具の段の左右・上下の余白は型が一度だけ持つ。 */
+:global([data-theme='v8']) [data-list-skeleton] .toolbar :global([data-list-toolbar]) { padding: 0; }
+
+:global([data-theme='v8']) .frame[data-template-layout='distribution'] { --tpl-toolbar-pad-block: var(--tpl-distribution-toolbar-pad); }
+:global([data-theme='v8']) .frame[data-template-layout='distribution'] .listBody { flex: none; }
+:global([data-theme='v8']) .frame[data-template-layout='distribution'] > .footer { margin: var(--tpl-toolbar-gap) 0 0; }

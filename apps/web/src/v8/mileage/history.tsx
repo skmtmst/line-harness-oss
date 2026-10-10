@@ -2,16 +2,6 @@
 
 import { jstDateOffset, jstDate } from '@/lib/jst-datetime'
 import { FolderDotName } from '@/components/shared/folder-dot'
-
-/*
- * ★V8 マイル「履歴」（板 `oRbJi`、状態は見本帳 `zaqP9`）。
- *
- * app/mileage/v8-history-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
- * フォルダの列は無い（絵どおり）。表は「いつ・だれに・増減・なぜ・残高・だれが・操作」。
- * 行末は操作ボタン1つ（確定待ちは「確定する」、付けた分は「取り消す」、
- * ほかは「友だちを見る」）＋「…」。行を押すとその友だちのマイルの詳細。
- * 種類・方法・期間の絞り込みは「よく使う絞り込み」の見方として残す。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -50,6 +40,17 @@ import styles from './mileage.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 マイル「履歴」（板 `oRbJi`、状態は見本帳 `zaqP9`）。
+ *
+ * app/mileage/v8-history-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
+ * フォルダの列は無い（絵どおり）。表は「いつ・だれに・増減・なぜ・残高・だれが・操作」。
+ * 行末は操作ボタン1つ（確定待ちは「確定する」、付けた分は「取り消す」、
+ * ほかは「友だちを見る」）＋「…」。行を押すとその友だちのマイルの詳細。
+ * 種類・方法・期間の絞り込みは「よく使う絞り込み」の見方として残す。
+ */
 
 function viewName(item: MileageAdminHistoryItem) {
   return item.displayName || '名前未取得'
@@ -395,7 +396,7 @@ export default function HistoryTab() {
                         onOpenChange={(next) => setMenuId(next ? item.id : null)}
                         items={[
                           ...(pending ? [{ id: 'void', label: '取り消す', onSelect: () => openPending('void', item) }] : []),
-                          { id: 'friend', label: '友だちを見る', external: true, href: friendHref, onSelect: () => router.push(friendHref) },
+                          { id: 'friend', label: '友だちを見る', external: false, href: friendHref, onSelect: () => router.push(friendHref) },
                         ]}
                       />
                     </div>
@@ -473,13 +474,13 @@ export default function HistoryTab() {
           onCancel={() => { if (!pendingBusy) setPendingAction(null) }}
           onConfirm={() => runPendingAction()}
         >
-          <Field label="理由" required><textarea
+          <Field label="理由" required><SaveErrorField names={["pendingReason","pending_reason"]}><textarea
               className={styles.textarea}
               value={pendingReason}
               onChange={(event) => setPendingReason(event.target.value)}
               placeholder={pendingAction?.kind === 'confirm' ? '例：入金を確認しました' : '例：予約がキャンセルされました'}
               rows={3}
-            /></Field>
+            /></SaveErrorField></Field>
         </Dialog>
       }
     >

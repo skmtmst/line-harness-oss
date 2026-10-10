@@ -1,5 +1,4 @@
 'use client'
-
 import { BadgeCheck, CircleHelp, Clock, MessageSquareText } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpsKnowledgeArticle } from '@/lib/api'
@@ -22,6 +21,7 @@ import parts from './parts.module.css'
 import styles from './ops-knowledge-v8.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
  * 運営のナレッジ V8（絵 `h114s`・記事 `R5ckwJ`）。
@@ -120,13 +120,13 @@ export default function OpsKnowledgeV8() {
             <SearchField value={q} onChange={(value) => { setQ(value); setOffset(0) }} placeholder="タイトル・質問・キーワードで探す" aria-label="タイトル・質問・キーワードで探す" />
           </div>
           <div className={styles.select}>
-            <Select aria-label="種類" value={kind} onChange={(value) => { setKind(value); setOffset(0) }} options={[{ value: '', label: '種類：すべて' }, ...KNOWLEDGE_KINDS]} />
+            <SaveErrorField names={["kind"]}><Select aria-label="種類" value={kind} onChange={(value) => { setKind(value); setOffset(0) }} options={[{ value: '', label: '種類：すべて' }, ...KNOWLEDGE_KINDS]} /></SaveErrorField>
           </div>
           <div className={styles.select}>
-            <Select aria-label="状態" value={state} onChange={(value) => { setState(value); setOffset(0) }} options={[{ value: '', label: '状態：すべて' }, { value: 'pending', label: '承認待ち' }, { value: 'approved', label: '承認済み' }, { value: 'needs_review', label: '要確認' }, { value: 'dismissed', label: '見送り' }]} />
+            <SaveErrorField names={["state"]}><Select aria-label="状態" value={state} onChange={(value) => { setState(value); setOffset(0) }} options={[{ value: '', label: '状態：すべて' }, { value: 'pending', label: '承認待ち' }, { value: 'approved', label: '承認済み' }, { value: 'needs_review', label: '要確認' }, { value: 'dismissed', label: '見送り' }]} /></SaveErrorField>
           </div>
           <div className={styles.select}>
-            <Select aria-label="記事の種類" value={articleKind} onChange={(value) => { setArticleKind(value); setOffset(0) }} options={[{ value: '', label: '記事：すべて' }, ...KNOWLEDGE_ARTICLE_KINDS]} />
+            <SaveErrorField names={["articleKind","article_kind"]}><Select aria-label="記事の種類" value={articleKind} onChange={(value) => { setArticleKind(value); setOffset(0) }} options={[{ value: '', label: '記事：すべて' }, ...KNOWLEDGE_ARTICLE_KINDS]} /></SaveErrorField>
           </div>
           <span className={styles.spacer} />
           <span className={styles.count}>{ready && total > 0 ? <ListRange total={total} first={offset + 1} last={Math.min(offset + rows.length, total)} /> : ready ? '0件' : emptyValue('unknown')}</span>

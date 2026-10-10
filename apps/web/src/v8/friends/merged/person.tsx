@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8 統合ユーザーの詳細（Pencil `Hn9eE`）。/friends?tab=merged&person=<id>（一覧の名前からも開く）。
- *
- * 読み込み・「配信に使う」の保存・解除・使う値の保存は今と同じ口（components/merged-person の useMergedPerson：
- * 版の照合・409 の読み直し）。窓（目的ごとの順位・使う値・解除の理由）も今のものを使う。
- * 見せ方：頭（← 統合ユーザーへ）→ 左に3つの段、右の列に「使う値を直す」と「使っている値」。
- * 変えられない人には、スイッチ・解除・直すのボタンを置かない（状態の文字だけ）。
- */
 import { Unlink } from 'lucide-react'
 import { formatDateTime } from '@/lib/format'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
@@ -28,6 +19,17 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 統合ユーザーの詳細（Pencil `Hn9eE`）。/friends?tab=merged&person=<id>（一覧の名前からも開く）。
+ *
+ * 読み込み・「配信に使う」の保存・解除・使う値の保存は今と同じ口（components/merged-person の useMergedPerson：
+ * 版の照合・409 の読み直し）。窓（目的ごとの順位・使う値・解除の理由）も今のものを使う。
+ * 見せ方：頭（← 統合ユーザーへ）→ 左に3つの段、右の列に「使う値を直す」と「使っている値」。
+ * 変えられない人には、スイッチ・解除・直すのボタンを置かない（状態の文字だけ）。
+ */
 
 /** 9/30（日本時間）。 */
 function shortDate(iso: string): string {
@@ -115,7 +117,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
                     <Td className={styles.td}><span className={friend.isFollowing ? `${styles.pill} ${styles.pillOk}` : `${styles.pill} ${styles.pillMuted}`}>{friend.isFollowing ? '友だち' : 'ブロック・削除'}</span></Td>
                     <Td className={styles.td}>
                       {canManage ? (
-                        <Toggle checked={active} label={`${friend.lineAccountName} の配信に使う`} onChange={m.saving ? undefined : (next) => m.setDeliveryActive(friend.friendId, next)} />
+                        <SaveErrorField names={["active","deliveryActive","delivery_active"]}><Toggle checked={active} label={`${friend.lineAccountName} の配信に使う`} onChange={m.saving ? undefined : (next) => m.setDeliveryActive(friend.friendId, next)} /></SaveErrorField>
                       ) : <span className={styles.small}>{active ? '使う' : '使わない'}</span>}
                     </Td>
                   </Tr>
@@ -240,7 +242,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
         )}
       >
         <p className={styles.small}>{`解除する友だち：${m.unlinkTarget?.displayName ?? ''}`}</p>
-        <Field label="解除する理由" required><TextArea value={m.unlinkReason} onChange={(event) => m.setUnlinkReason(event.target.value)} placeholder="確認した根拠を書いてください" /></Field>
+        <Field label="解除する理由" required><SaveErrorField names={["unlinkReason","m.unlinkReason","unlink_reason","m.unlink_reason"]}><TextArea value={m.unlinkReason} onChange={(event) => m.setUnlinkReason(event.target.value)} placeholder="確認した根拠を書いてください" /></SaveErrorField></Field>
       </Dialog>
     </PageFrame>
   )

@@ -309,3 +309,6 @@ it('閲覧のみでは対応・担当・メモ・タグを変える操作を隠�
   expect(button('＋ 追加')).toBeUndefined()
   expect(document.querySelector('[aria-label="未契約を外す"]')).toBeNull()
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

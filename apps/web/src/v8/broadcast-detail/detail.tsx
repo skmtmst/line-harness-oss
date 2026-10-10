@@ -1,20 +1,6 @@
 'use client'
 
 import { useFeatureAccess } from '@/lib/use-feature-access'
-
-/*
- * ★V8 一斉配信の詳細（2026-10-06 一から書き直し）。
- * 絵：下書き `cgiGB`（再撮 `dK1aE`）・承認待ち `pNiUk`（`wfHIE`）・送った後 `F3X1Mo`（`tPm3e`）・
- * ほかの人が更新した `Q28Gb`・予約の取り消しの窓 `BeNtj`。
- *
- * 白い板いっぱいに 板の頭（題＋札・1行の説明・進みの帯／右に操作）→（競合の帯）→ タブ →
- * 左の本文（余白 20・28、段の間 22）と右の欄（幅 380、配信した設定 → メッセージのスマホ）。
- * カードで囲まず、線で分ける（絵 `cgiGB` ほか）。
- *
- * 読み込み・承認・集計・競合の見張りは入口（app/broadcasts/detail/page.tsx）が持ち、
- * ここは見せ方と、この画面だけの操作（テスト送信・削除・予約の取り消し）を持つ。
- * 宛先・記録のタブの中身は入口から差し込む（古い画面の部品を import しないため）。
- */
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useState, type ReactNode, type RefObject } from 'react'
 import KpiBand from '@/components/shared/kpi-band'
@@ -71,6 +57,21 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 一斉配信の詳細（2026-10-06 一から書き直し）。
+ * 絵：下書き `cgiGB`（再撮 `dK1aE`）・承認待ち `pNiUk`（`wfHIE`）・送った後 `F3X1Mo`（`tPm3e`）・
+ * ほかの人が更新した `Q28Gb`・予約の取り消しの窓 `BeNtj`。
+ *
+ * 白い板いっぱいに 板の頭（題＋札・1行の説明・進みの帯／右に操作）→（競合の帯）→ タブ →
+ * 左の本文（余白 20・28、段の間 22）と右の欄（幅 380、配信した設定 → メッセージのスマホ）。
+ * カードで囲まず、線で分ける（絵 `cgiGB` ほか）。
+ *
+ * 読み込み・承認・集計・競合の見張りは入口（app/broadcasts/detail/page.tsx）が持ち、
+ * ここは見せ方と、この画面だけの操作（テスト送信・削除・予約の取り消し）を持つ。
+ * 宛先・記録のタブの中身は入口から差し込む（古い画面の部品を import しないため）。
+ */
 
 /** 送るまでの6段階。承認が絡まない・予約しない配信はその段を省く。 */
 const DELIVERY_STEPS: ReadonlyArray<{ key: string; label: string }> = [
@@ -247,7 +248,7 @@ export default function BroadcastDetail({
       id: 'duplicate',
       label: '複製して作る',
       icon: <Copy size={14} aria-hidden="true" />,
-      external: true,
+      external: false,
       href: duplicateHref, onSelect: () => router.push(duplicateHref),
     },
   ]
@@ -849,13 +850,13 @@ function ApprovalBox({
       </dl>
       {mine ? (
         <>
-          <div className={styles.field}><Field label="差し戻すときの理由" htmlFor="approval-reject-reason"><TextField
+          <div className={styles.field}><Field label="差し戻すときの理由" htmlFor="approval-reject-reason"><SaveErrorField names={["reason"]}><TextField
               id="approval-reject-reason"
               maxLength={1000}
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder="例：日時を 10 月にずらしてください"
-            /></Field></div>
+            /></SaveErrorField></Field></div>
           {approval.message ? <p className={styles.error}>{approval.message}</p> : null}
           <div className={styles.approvalButtons}>
             <Button

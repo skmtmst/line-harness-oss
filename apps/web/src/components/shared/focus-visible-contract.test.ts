@@ -71,7 +71,7 @@ describe('押せる部品のフォーカスが見える', () => {
     }
   })
 
-  it('入力欄の輪郭は action 色で2px・外側に余白', () => {
+  it('入力欄の輪郭は青い色で2px・外側に余白', () => {
     // TextField・Select・DateField ほか、入力欄のフォーカスは
     // `2px・action 色・outline-offset: 2px` にそろえる。
     // 緑（accent 系）は「正常」の意味なので輪郭に使わない。

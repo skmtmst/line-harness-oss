@@ -1,59 +1,32 @@
 // @vitest-environment happy-dom
-
-/*
- * R26追補: スマホ幅では動作の文章入力欄を種類の選択の下に全幅で置く。
- *
- * `flex-1` だけだと種類の選択と同行に残り、390px では約50pxに押し込まれて
- * 「ありた…」と切れていた。`basis-full` で折り返す。jsdom では幅を測れない
- * ため、折り返しを起こすクラスが付くことを描いた実物で見る。
- */
-
-import { cleanup, render } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import ActionEditor from '@/components/forms/action-editor'
-import { EMPTY_REFS } from '@/components/forms/form-refs'
-
-describe('動作の文章入力欄はスマホ幅で全幅に折り返す', () => {
-  afterEach(() => {
-    cleanup()
+import { useState } from 'react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
+import type { FormAction } from '@line-crm/shared'
+import ActionEditor from './action-editor'
+import { EMPTY_REFS } from './form-refs'
+function Editor({ initial }: { initial: FormAction[] }) {
+  const [value, setValue] = useState(initial)
+  return <><output data-testid="value">{JSON.stringify(value)}</output><ActionEditor value={value} onChange={setValue} refs={EMPTY_REFS} /></>
+}
+afterEach(cleanup)
+describe('B-169 フォームの動作は行の下で編集する', () => {
+  it('本文の改訂を保存用の値へ返す', () => {
+    render(<Editor initial={[{ kind: 'send_text', text: 'ありがとうございます' }]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'テキストを送る「ありがとうございます」' }))
+    fireEvent.change(screen.getByRole('textbox', { name: '送る文面' }), { target: { value: 'またお越しください' } })
+    expect(screen.getByTestId('value').textContent).toContain('またお越しください')
   })
-
-  it('「テキストを送る」の文章欄が全幅の折り返しを持つ', () => {
-    const view = render(
-      <ActionEditor
-        value={[{ kind: 'send_text', text: 'ありがとうございます' }]}
-        onChange={() => {}}
-        refs={EMPTY_REFS}
-      />,
-    )
-    const input = view.getByPlaceholderText('送る文面')
-    expect(input.className).toContain('basis-full')
-    expect(input.className).toContain('sm:basis-auto')
+  it('友だち情報の値を保って編集する', () => {
+    render(<Editor initial={[{ kind: 'friend_field', fieldId: '', value: '123' }]} />)
+    fireEvent.click(screen.getByRole('button', { name: /未設定/ }))
+    fireEvent.change(screen.getByRole('textbox', { name: '書き込む値' }), { target: { value: '456' } })
+    expect(screen.getByTestId('value').textContent).toContain('456')
   })
-
-  it('「友だち情報に書く」の値欄が全幅の折り返しを持つ', () => {
-    const view = render(
-      <ActionEditor
-        value={[{ kind: 'friend_field', fieldId: '', value: '123' }]}
-        onChange={() => {}}
-        refs={EMPTY_REFS}
-      />,
-    )
-    const input = view.getByPlaceholderText('書き込む値')
-    expect(input.className).toContain('basis-full')
-    expect(input.className).toContain('sm:basis-auto')
-  })
-
-  it('入力欄を持たない種類には文章欄を出さない', () => {
-    const view = render(
-      <ActionEditor
-        value={[{ kind: 'reminder', reminderId: '' }]}
-        onChange={() => {}}
-        refs={EMPTY_REFS}
-      />,
-    )
-    expect(view.queryByPlaceholderText('送る文面')).toBeNull()
-    expect(view.queryByPlaceholderText('書き込む値')).toBeNull()
-    expect(view.getByText('— リマインダ —')).toBeTruthy()
+  it('リマインダには本文の入力を出さない', () => {
+    render(<Editor initial={[{ kind: 'reminder', reminderId: '' }]} />)
+    fireEvent.click(screen.getByRole('button', { name: /未設定/ }))
+    expect(screen.queryByRole('textbox', { name: '送る文面' })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: '書き込む値' })).toBeNull()
   })
 })

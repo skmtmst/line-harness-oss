@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8 統括のメンバー（Pencil `r4ARpV`。招待の窓 `yLKwV`・権限を変える窓 `BHEl9`・
- * 変える前の確認 `M4jS9`）。
- *
- * v7 の画面（app/hq/members/page.tsx）と読み書きの口・権限・失敗時の扱いは同じ。
- * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左の「統括の設定」の列
- * （型のフォルダの列）・数のカード4枚・権限者の表・役割の説明。
- */
 import { Plus } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
@@ -28,6 +19,17 @@ import styles from './members.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 統括のメンバー（Pencil `r4ARpV`。招待の窓 `yLKwV`・権限を変える窓 `BHEl9`・
+ * 変える前の確認 `M4jS9`）。
+ *
+ * v7 の画面（app/hq/members/page.tsx）と読み書きの口・権限・失敗時の扱いは同じ。
+ * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左の「統括の設定」の列
+ * （型のフォルダの列）・数のカード4枚・権限者の表・役割の説明。
+ */
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -66,6 +68,7 @@ export default function HqMembersV8() {
 }
 
 function MembersInner() {
+  const saveErrors = useSaveFormErrors()
   // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」（絵 `V8-B/r4ARpV`）。
   usePageTitle('メンバー')
   usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
@@ -112,13 +115,16 @@ function MembersInner() {
       if (loginRes?.success) setLastLogins(loginRes.data)
       setStatus('ready')
     } catch (caught) {
+      saveErrors.capture(caught);
+
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
-  }, [])
+  }, [saveErrors])
 
   useEffect(() => {
     void load()
-  }, [load])
+  }, [load]);
+
 
   const accountNames = useMemo(() => new Map(accounts.map((a) => [a.id, a.name])), [accounts])
   /* 絵 `r4ARpV` の並び：状態→役割（オーナー→管理者→担当者→閲覧のみ）→名前。 */
@@ -163,14 +169,18 @@ function MembersInner() {
       setDialog({ open: false, member: null })
       await load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (!stepUpToken && caught instanceof ApiError && caught.code === 'STEP_UP_REQUIRED') {
-        setStepUp({ retry: (token) => submitDialog(value, token) })
+        setStepUp({ retry: (token) => submitDialog(value, token) });
+
         return
       }
       // M026：原文のまま出さず、共通の状態別案内へ渡す（本人確認の分岐は先に残す）。
+      { if (!fieldFailure)
       setDialogError(japaneseDetailOf(caught) || describeApiFailure(caught, '保存', {
         scope: 'hq',
-      }))
+      })) }
     } finally {
       setDialogBusy(false)
     }
@@ -185,10 +195,12 @@ function MembersInner() {
       if (!res.success) throw new Error(res.error)
       setNotice(`${member.email} へ招待メールを送り直しました。`)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       // M026：再試行の言葉がない代替文にしない。共通の状態別案内へ渡す。
+      { if (!fieldFailure)
       setActionError(japaneseDetailOf(caught) || describeApiFailure(caught, '招待メールの再送', {
         scope: 'hq',
-      }))
+      })) }
     } finally {
       setResendingId(null)
     }
@@ -199,7 +211,7 @@ function MembersInner() {
   const ready = status === 'ready' && !restricted
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId="r4ARpV"
       title="メンバー"
       help="統括の画面に入れる人です。役割と、見られるアカウント（担当範囲）を決めます。"
@@ -322,6 +334,6 @@ function MembersInner() {
           onClose={() => setStepUp(null)}
         />
       ) : null}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

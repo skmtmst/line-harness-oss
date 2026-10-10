@@ -1,14 +1,5 @@
 'use client'
 
-/*
- * ★V8 組織・権限（Pencil `bSp4h`、店舗の窓 `vCEKM`、ユーザーの窓 `ou60i`、停止の確認 `bMpC5`、再発行の確認 `rSRFK`）。
- *
- * 左に組織階層（幅280）、右に 店舗管理 → 予約メール取り込みアドレス → 数3 →
- * アカウント一覧 → 権限マトリクス。口は今の画面と同じ。
- * ログインとの連携（今の画面では表の中の選ぶ欄）は、絵の行に場所が無いので
- * 「変更」の窓の中へ移した（機能は落とさない）。
- * 閲覧のみ（変える権限が無い人）には、作る・編集・停止・発行のボタンを置かない。動きは BEHAVIOR.md。
- */
 import { Field as SharedField } from '@/components/shared/form-controls'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react'
@@ -35,6 +26,18 @@ import { formatStamp, Panel, StatRow, Status } from '../common-a/parts'
 import styles from './organization.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+/*
+ * ★V8 組織・権限（Pencil `bSp4h`、店舗の窓 `vCEKM`、ユーザーの窓 `ou60i`、停止の確認 `bMpC5`、再発行の確認 `rSRFK`）。
+ *
+ * 左に組織階層（幅280）、右に 店舗管理 → 予約メール取り込みアドレス → 数3 →
+ * アカウント一覧 → 権限マトリクス。口は今の画面と同じ。
+ * ログインとの連携（今の画面では表の中の選ぶ欄）は、絵の行に場所が無いので
+ * 「変更」の窓の中へ移した（機能は落とさない）。
+ * 閲覧のみ（変える権限が無い人）には、作る・編集・停止・発行のボタンを置かない。動きは BEHAVIOR.md。
+ */
 
 const roleLabel: Record<RestaurantMembership['role'], string> = {
   super_admin: 'SuperAdmin',
@@ -73,7 +76,7 @@ function DefaultSelect({ name, ariaLabel, defaultValue, options }: {
   options: { value: string; label: string; disabled?: boolean }[]
 }) {
   const [value, setValue] = useState(defaultValue)
-  return <Select name={name} aria-label={ariaLabel} value={value} onChange={setValue} size="full" options={options} />
+  return <SaveErrorField names={["value"]}><Select name={name} aria-label={ariaLabel} value={value} onChange={setValue} size="full" options={options} /></SaveErrorField>
 }
 
 function StoreLineAccountSelect({ accounts, stores, currentStore }: {
@@ -116,7 +119,7 @@ function StoreForm({ store, accounts, stores, busy, onSubmit, onCancel }: {
         <Field label="店舗コード" name="code" defaultValue={store?.code} required />
         <Field label="エリア" name="area" defaultValue={store?.area || ''} />
         <Field label="収容人数" name="capacity" type="number" defaultValue={String(store?.capacity ?? 24)} required />
-        <div className={styles.field}><span className={styles.fieldLabel}>タイムゾーン</span><span>日本時間（Asia/Tokyo）</span><input type="hidden" name="timezone" value="Asia/Tokyo" /></div>
+        <div className={styles.field}><span className={styles.fieldLabel}>タイムゾーン</span><span>日本時間（Asia/Tokyo）</span><SaveErrorField names={["timezone"]}><input type="hidden" name="timezone" value="Asia/Tokyo" /></SaveErrorField></div>
         {store ? (
           <SharedField label={<><span className={styles.fieldLabel}>状態</span></>}><DefaultSelect name="status" ariaLabel="状態" defaultValue={store.status} options={[{ value: 'active', label: '有効' }, { value: 'paused', label: '停止中' }, { value: 'archived', label: 'アーカイブ' }]} /></SharedField>
         ) : null}
@@ -178,8 +181,6 @@ function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: string;
     }
   }
 
-
-
   return (
     <Panel title="予約メール取り込みアドレス" description="予約媒体から届く通知メールの転送先として設定します。">
       <div className={styles.intakeBody}>
@@ -195,7 +196,7 @@ function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: string;
       ) : addresses.length === 0 ? (
         <p className={styles.intakeEmpty}>未発行</p>
       ) : (
-        addresses.map((item) => (
+        addresses.map((item, saveFieldIndex) => (
           <div key={item.id} className={styles.intakeCard}>
             <div className={styles.intakeCardHead}>
               <span className={styles.intakeState}>{item.revokedAt ? `${formatStamp(item.revokedAt)}まで有効` : '現在使用中'}</span>
@@ -203,7 +204,7 @@ function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: string;
               <Status value={item.status} />
             </div>
             <div className={styles.intakeRow}>
-              <TextField aria-label={`${store.name}の取り込みアドレス`} readOnly value={item.address} className={styles.intakeAddress} />
+              <SaveErrorField names={[`addresses.${saveFieldIndex}.address`,"address","item.address"]}><TextField aria-label={`${store.name}の取り込みアドレス`} readOnly value={item.address} className={styles.intakeAddress} /></SaveErrorField>
               <CopyTextButton value={item.address} aria-label="メールアドレスをコピー"  />
             </div>
             <p className={styles.intakeMeta}>{`発行日時：${formatStamp(item.createdAt)}`}</p>
@@ -242,7 +243,7 @@ function LoginConnection({ member, logins, busy, save }: { member: RestaurantMem
       <p className={styles.muted}>{loginSummary(member)}</p>
       {logins.length ? (
         <div className={styles.loginRow}>
-          <Select aria-label={`${member.staff_name}のログインメンバー`} value={selected} onChange={setSelected} size="full" options={[{ value: '', label: '連携しない' }, ...logins.map((l) => ({ value: l.id, label: l.name }))]} />
+          <SaveErrorField names={["selected"]}><EntitySelect aria-label={`${member.staff_name}のログインメンバー`} value={selected} onChange={setSelected} size="full" options={[{ value: '', label: '連携しない' }, ...logins.map((l) => ({ ...entityOptionMetadata(l), value: l.id, label: l.name }))]} /></SaveErrorField>
           <Button disabled={busy || selected === (member.staff_id || '')} onClick={() => save(selected || null)}>ログインと連携</Button>
         </div>
       ) : null}
@@ -283,6 +284,8 @@ function MemberForm({ member, stores, busy, onSubmit, onCancel, login }: {
 }
 
 function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
+  const saveErrors = useSaveFormErrors()
+
   const { data, store, selectedStoreId, busy, mutate } = ctx
   const { accounts, selectedAccountId } = useAccount()
   const role = useStaffRole()
@@ -314,8 +317,11 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
     const request = { ...body, expectedPolicyVersion: member?.loginPolicyVersion, idempotencyKey: crypto.randomUUID() }
     try { return await restaurantTestApi.updateMembership(accountId, id, request) }
     catch (error) {
+      saveErrors.capture(error);
+
       if (!isStepUpRequired(error)) throw error
-      const token = await gate('staff.permissions.change', '店の役割とログイン権限を変更する')
+      const token = await gate('staff.permissions.change', '店の役割とログイン権限を変更する');
+
       if (!token) throw new Error('本人確認を中止しました。変更は保存されていません。')
       return restaurantTestApi.updateMembership(accountId, id, request, token)
     }
@@ -361,7 +367,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       {readOnly ? (
         <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.readOnlyIcon} /><span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span></div>
       ) : null}
@@ -537,7 +543,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
           </Panel>
         </div>
       </div>
-    </>
+    </></SaveErrorScope>
   )
 }
 

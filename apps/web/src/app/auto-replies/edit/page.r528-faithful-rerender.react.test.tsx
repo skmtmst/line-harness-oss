@@ -1,3 +1,13 @@
+
+import React, { act, Profiler, type ReactNode } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { AccountProvider, useAccount } from '@/contexts/account-context'
+import { PageChromeProvider } from '@/components/shell/page-chrome'
+import { clearLineAccountsCache } from '@/lib/line-accounts-cache'
+import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
+import AutoReplyEditPage from './page'
 // @vitest-environment happy-dom
 /*
  * J7 faithful oracle (R528: 188-001/002)。
@@ -6,10 +16,6 @@
  * 実useStaffRole/useAccountを使い、mockは輸送 (api)・router transport・URLSearchParams adapterのみ。
  * router spyはnative遷移の再現ではない。原条件未達なら結果として返し、期待を弱めない。
  */
-import React, { act, Profiler, type ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
 
 const push = vi.hoisted(() => vi.fn())
 const replace = vi.hoisted(() => vi.fn())
@@ -27,6 +33,7 @@ const transport = vi.hoisted(() => ({
   commonVars: vi.fn(),
   reminders: vi.fn(),
   events: vi.fn(),
+  notificationRules: vi.fn(),
   staffMe: vi.fn(),
   lineAccounts: vi.fn(),
 }))
@@ -68,17 +75,12 @@ vi.mock('@/lib/api', async (importOriginal) => {
       scenarios: { list: transport.scenarios },
       commonVars: { list: transport.commonVars },
       reminders: { list: transport.reminders },
+      notifications: { ...actual.api.notifications, operatorRules: { list: transport.notificationRules } },
       staff: { me: transport.staffMe },
       lineAccounts: { list: transport.lineAccounts },
     },
   }
 })
-
-import { AccountProvider, useAccount } from '@/contexts/account-context'
-import { PageChromeProvider } from '@/components/shell/page-chrome'
-import { clearLineAccountsCache } from '@/lib/line-accounts-cache'
-import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
-import AutoReplyEditPage from './page'
 
 const ACCOUNT = {
   id: 'synthetic-account',
@@ -237,7 +239,8 @@ beforeEach(() => {
   transport.scenarios.mockResolvedValue({ success: true, data: [] })
   transport.commonVars.mockResolvedValue({ success: true, data: [] })
   transport.reminders.mockResolvedValue({ success: true, data: [] })
-  transport.events.mockResolvedValue({ items: [], total: 0 })
+  transport.events.mockResolvedValue({ items: [], total: 0, limit: 200, sort: [] })
+  transport.notificationRules.mockResolvedValue({ success: true, data: { items: [] } })
 })
 
 afterEach(async () => {

@@ -1,18 +1,4 @@
 'use client'
-
-/*
- * ★V8 マイル「マイルを手で増やす・減らす」（板 `M8zhjL`）。
- * app/mileage/friends/detail/v8-mileage-adjust-dialog.tsx から写し、直書きの style を外した。
- *
- * 口と約束（理由必須・追記だけ・再送しても二重反映しない・
- * 境界以上は別のオーナー承認・通知の再送）は v7
- * （mileage-adjustment-dialog.tsx）と同じ。見せ方だけ V8——
- * 対象の人・増やす／減らす／0にする・マイル数・有効期限・
- * 理由区分・調整元ID・詳しい理由・知らせる・この変更で起きること・
- * 境界の注記・実行ボタン。起きることが見えた上で押すので、
- * 実行前の確認段はこの1画面にまとめる。
- */
-
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Minus, Plus } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -29,6 +15,21 @@ import styles from './mileage.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 マイル「マイルを手で増やす・減らす」（板 `M8zhjL`）。
+ * app/mileage/friends/detail/v8-mileage-adjust-dialog.tsx から写し、直書きの style を外した。
+ *
+ * 口と約束（理由必須・追記だけ・再送しても二重反映しない・
+ * 境界以上は別のオーナー承認・通知の再送）は v7
+ * （mileage-adjustment-dialog.tsx）と同じ。見せ方だけ V8——
+ * 対象の人・増やす／減らす／0にする・マイル数・有効期限・
+ * 理由区分・調整元ID・詳しい理由・知らせる・この変更で起きること・
+ * 境界の注記・実行ボタン。起きることが見えた上で押すので、
+ * 実行前の確認段はこの1画面にまとめる。
+ */
 
 /** 手でマイルを動かすときの失敗の言葉（app/mileage/friends/detail/mileage-adjustment-dialog.tsx から写した）。 */
 export function mileageAdjustmentErrorMessage(error: unknown): string {
@@ -78,6 +79,7 @@ export default function MileageAdjustDialog({
   canConfigurePolicy: boolean
   initialDirection?: 'increase' | 'decrease'
 }) {
+  const saveErrors = useSaveFormErrors()
   const [direction, setDirection] = useState<Direction>(initialDirection ?? 'increase')
   const [amountText, setAmountText] = useState('100')
   const [reasonCategory, setReasonCategory] = useState<ReasonCategory>('customer_support')
@@ -210,7 +212,11 @@ export default function MileageAdjustDialog({
       await onCompleted()
       onCancel()
     } catch (caught) {
-      setError(mileageAdjustmentErrorMessage(caught))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
+      setError(mileageAdjustmentErrorMessage(caught)) }
     } finally {
       setBusy(false)
     }
@@ -230,7 +236,11 @@ export default function MileageAdjustDialog({
         notificationErrorCode: response.data.notification?.errorCode ?? null,
       })
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : '通知を再送できませんでした。時間をおいてもう一度お試しください。')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
+      setError(caught instanceof ApiError ? caught.message : '通知を再送できませんでした。時間をおいてもう一度お試しください。') }
     } finally {
       setRetrying(false)
     }
@@ -248,7 +258,11 @@ export default function MileageAdjustDialog({
       const response = await api.mileage.setAdjustmentPolicy({ accountId, approvalThreshold: threshold })
       if (response.success) setPolicy(response.data)
     } catch (caught) {
-      setError(mileageAdjustmentErrorMessage(caught))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
+      setError(mileageAdjustmentErrorMessage(caught)) }
     } finally {
       setBusy(false)
     }
@@ -263,7 +277,7 @@ export default function MileageAdjustDialog({
         : `${formatNumber(delta)} マイル増やす`
 
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open={open}
       designNode="M8zhjL"
       designWidth={600}
@@ -384,7 +398,7 @@ export default function MileageAdjustDialog({
           <div className={`${styles.dlgGrid2} ${styles.dateGrid}`}>
             <div>
               <p className={styles.dlgFieldLabel}>マイル数</p>
-              <NumberInput numericText
+              <SaveErrorField names={["currentBalance","amountText","current_balance","amount_text"]}><NumberInput numericText
                 {...fields.bind('amount')}
                 className={styles.dlgInput}
                 inputMode="numeric"
@@ -394,20 +408,20 @@ export default function MileageAdjustDialog({
                 aria-label="マイル数"
                 aria-invalid={fields.invalid('amount') || undefined}
                 aria-describedby={describedBy('amount')}
-              />
+              /></SaveErrorField>
               <FieldError id="adj-amount-error">{fields.error('amount')}</FieldError>
             </div>
             <div>
               <p className={styles.dlgFieldLabel}>この分の有効期限</p>
               <span {...fields.bind('expires')}>
-                <DateField
+                <SaveErrorField names={["expiresOn","expires_on"]}><DateField
                   value={expiresOn}
                   disabled={direction !== 'increase'}
                   onChange={setExpiresOn}
                   aria-label="この分の有効期限"
                   invalid={fields.invalid('expires')}
                   aria-describedby={describedBy('expires')}
-                />
+                /></SaveErrorField>
               </span>
               <FieldError id="adj-expires-error">{fields.error('expires')}</FieldError>
             </div>
@@ -416,17 +430,17 @@ export default function MileageAdjustDialog({
           <div className={styles.dlgGrid2}>
             <div>
               <p className={styles.dlgCaption}>理由区分</p>
-              <Select
+              <SaveErrorField names={["reasonCategory","reason_category"]}><Select
                 aria-label="理由区分"
                 size="full"
                 value={reasonCategory}
                 options={REASON_OPTIONS}
                 onChange={(value) => setReasonCategory(value as ReasonCategory)}
-              />
+              /></SaveErrorField>
             </div>
             <div>
               <p className={`${styles.dlgFieldLabel} ${styles.labelRow}`}>問い合わせ・注文・調整元ID<span className={styles.dlgPersonSub}>任意</span></p>
-              <input
+              <SaveErrorField names={["sourceReferenceId","source_reference_id"]}><input
                 {...fields.bind('source')}
                 className={styles.dlgInput}
                 value={sourceReferenceId}
@@ -435,14 +449,14 @@ export default function MileageAdjustDialog({
                 aria-label="問い合わせ・注文・調整元ID"
                 aria-invalid={fields.invalid('source') || undefined}
                 aria-describedby={describedBy('source')}
-              />
+              /></SaveErrorField>
               <FieldError id="adj-source-error">{fields.error('source')}</FieldError>
             </div>
           </div>
 
           <div className={styles.dlgGroup}>
             <p className={styles.dlgCaption}>詳しい理由</p>
-            <textarea
+            <SaveErrorField names={["reason"]}><textarea
               {...fields.bind('reason')}
               className={styles.dlgTextarea}
               value={reason}
@@ -450,13 +464,13 @@ export default function MileageAdjustDialog({
               aria-label="詳しい理由"
               aria-invalid={fields.invalid('reason') || undefined}
               aria-describedby={describedBy('reason')}
-            />
+            /></SaveErrorField>
             <FieldError id="adj-reason-error">{fields.error('reason')}</FieldError>
           </div>
 
           {/* 絵 M8zhjL：スイッチ＋題と説明の2行。 */}
           <div className={styles.notifyRow}>
-            <SettingCheckbox checked={notifyFriend} onChange={setNotifyFriend} label="友だちに知らせる（LINE通知）" />
+            <SaveErrorField names={["notifyFriend","notify_friend"]}><SettingCheckbox checked={notifyFriend} onChange={setNotifyFriend} label="友だちに知らせる（LINE通知）" /></SaveErrorField>
             <div className={styles.dlgPersonText}>
               <span className={styles.dlgPersonName}>友だちに知らせる（LINE通知）</span>
               <span className={styles.dlgPersonSub}>増減したマイルと変更後の残高をLINEで知らせます。</span>
@@ -468,13 +482,13 @@ export default function MileageAdjustDialog({
               <p className={styles.dlgPersonName}>高額調整の承認境界が未設定です</p>
               <p className={styles.dlgPersonSub}>この値以上は、この画面では実行せず、別のオーナー承認を必要とします。</p>
               <div className={styles.policyRow}>
-                <NumberInput numericText
+                <SaveErrorField names={["policyThresholdText","policy_threshold_text"]}><NumberInput numericText
                   className={styles.dlgInput}
                   inputMode="numeric"
                   value={policyThresholdText}
                   onChange={(event) => setPolicyThresholdText(event.target.value.replace(/[^0-9]/g, ''))}
                   aria-label="別のオーナー承認が必要になるマイル数"
-                />
+                /></SaveErrorField>
                 <Button onClick={() => void configurePolicy()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">承認境界を保存する</Button>
               </div>
             </section>
@@ -505,6 +519,6 @@ export default function MileageAdjustDialog({
           ) : null}
         </div>
       )}
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }

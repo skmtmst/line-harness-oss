@@ -1,21 +1,4 @@
 'use client'
-
-/*
- * ★V8 ダッシュボード編集（Pencil `mcOqK`）。V8 の入口（v8/dashboard/dashboard.tsx）からだけ開く。
- *
- * 動き（並べ替え・表示の ON/OFF・「今日やること」は4枠まで・初期状態に戻す・
- * 保存の失敗と 409・読み上げ）は v7 と共有の `components/dashboard/dashboard-editor.tsx`
- * と同じ計算（reorder / move / toggle）をそのまま使い、見た目だけを絵どおりに組む。
- * v7 の部品は変えない。
- *
- * - 引き出し 540（共通の Drawer width="editor"）。頭に「カードと配置／プレビュー」の切り替えと説明1行。
- * - 行：持ち手・名前と置き場所・上下（24 の枠つき）・スイッチ。OFF の行は薄い地。
- * - 4枠の注意は、5つ目を ON にした瞬間だけそのグループの上に出す（OFF にしたカードの名前を書く）。
- * - 下：左に「初期状態に戻す」（確認の窓 400 を挟む）、右に「閉じる」「ダッシュボードに反映」。
- * - 失敗は下の帯：保存できない（もう一度保存する）／ほかの人が変えた 409（最新の配置を読み込む）。
- * - キーボードで持ち上げている間だけ、操作の案内を下の帯に出す。
- */
-
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -63,6 +46,24 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import styles from './dashboard-editor.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 ダッシュボード編集（Pencil `mcOqK`）。V8 の入口（v8/dashboard/dashboard.tsx）からだけ開く。
+ *
+ * 動き（並べ替え・表示の ON/OFF・「今日やること」は4枠まで・初期状態に戻す・
+ * 保存の失敗と 409・読み上げ）は v7 と共有の `components/dashboard/dashboard-editor.tsx`
+ * と同じ計算（reorder / move / toggle）をそのまま使い、見た目だけを絵どおりに組む。
+ * v7 の部品は変えない。
+ *
+ * - 引き出し 540（共通の Drawer width="editor"）。頭に「カードと配置／プレビュー」の切り替えと説明1行。
+ * - 行：持ち手・名前と置き場所・上下（24 の枠つき）・スイッチ。OFF の行は薄い地。
+ * - 4枠の注意は、5つ目を ON にした瞬間だけそのグループの上に出す（OFF にしたカードの名前を書く）。
+ * - 下：左に「初期状態に戻す」（確認の窓 400 を挟む）、右に「閉じる」「ダッシュボードに反映」。
+ * - 失敗は下の帯：保存できない（もう一度保存する）／ほかの人が変えた 409（最新の配置を読み込む）。
+ * - キーボードで持ち上げている間だけ、操作の案内を下の帯に出す。
+ */
 
 const CARD_DEFINITION_MAP = new Map(DASHBOARD_CARD_DEFINITIONS.map((card) => [card.id, card]))
 const GROUPS: DashboardGroup[] = ['today', 'main', 'right']
@@ -117,7 +118,7 @@ function CardRow({ item, definition, canMoveUp, canMoveDown, disabled, onMove, o
           <ChevronDown aria-hidden="true" />
         </IconButton>
       </div>
-      <SettingCheckbox disabled={disabled} checked={item.visible} onChange={() => onToggle()} label={`${definition.label}を表示`} />
+      <SaveErrorField names={["visible","item.visible"]}><SettingCheckbox disabled={disabled} checked={item.visible} onChange={() => onToggle()} label={`${definition.label}を表示`} /></SaveErrorField>
     </div>
   )
 }
@@ -137,13 +138,13 @@ function Preview({ draft }: { draft: DashboardPreferences }) {
     <div className={styles.preview}>
       <div className={styles.previewHead}>
         <p className={styles.hint}>実際のダッシュボードと同じ順番で表示します。</p>
-        <SegmentedControl<'pc' | 'mobile'>
+        <SaveErrorField names={["device"]}><SegmentedControl<'pc' | 'mobile'>
           size="small"
           aria-label="プレビューの画面幅"
           value={device}
           onChange={setDevice}
           options={[{ value: 'pc', label: 'PC' }, { value: 'mobile', label: 'スマホ' }]}
-        />
+        /></SaveErrorField>
       </div>
       <div className={styles.previewBoard}>
         {total === 0 ? <p className={styles.previewEmpty}>表示するカードがありません</p> : null}
@@ -346,12 +347,12 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
         onClose={close}
         toolbar={(
           <div className={styles.toolbar}>
-            <SegmentedControl<'cards' | 'preview'>
+            <SaveErrorField names={["mode"]}><SegmentedControl<'cards' | 'preview'>
               aria-label="ダッシュボード編集の表示"
               value={mode}
               onChange={setMode}
               options={[{ value: 'cards', label: 'カードと配置' }, { value: 'preview', label: 'プレビュー' }]}
-            />
+            /></SaveErrorField>
             {mode === 'cards' ? (
               <p className={styles.hint}>持ち手をドラッグして移動。上下ボタン・キーボードでも順番を変更。スイッチで表示を切り替えます。</p>
             ) : null}

@@ -62,6 +62,7 @@ describe('ActionMenu ★V7 の項目', () => {
               label: 'テンプレートを送る',
               description: '受信箱で選んで送ります',
               external: true,
+              href: 'https://example.com/templates',
               onSelect,
             },
             {
@@ -86,6 +87,9 @@ describe('ActionMenu ★V7 の項目', () => {
     // 別画面へ行く項目は ↗（読み上げに含めない飾り）。
     const external = document.querySelector('svg[aria-hidden="true"]')
     expect(external).toBeTruthy()
+    expect(menuButtons()[1].getAttribute('target')).toBe('_blank')
+    expect(menuButtons()[1].getAttribute('rel')?.split(/\s+/)).toContain('noreferrer')
+    expect(menuButtons()[1].getAttribute('rel')?.split(/\s+/)).toContain('noopener')
     // 危ない操作は danger。
     const danger = menuButtons().find((b) => b.textContent?.includes('アーカイブする'))
     expect(danger?.className).toMatch(/danger/)

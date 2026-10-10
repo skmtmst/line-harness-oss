@@ -48,7 +48,7 @@
 }
 
 .chip[aria-pressed='true'] {
-  outline-color: var(--color-action);
+  outline-color: var(--color-focus-ring);
   background: var(--color-accent-soft);
   color: var(--color-action);
   font-weight: 600;

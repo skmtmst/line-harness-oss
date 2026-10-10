@@ -1,16 +1,5 @@
 'use client'
 
-/*
- * ★V8 友だち追加時の配信の一覧（Pencil：一覧 `MRhef`・閲覧のみ `LEwkJ`・1152 `P20kYU`・
- * 受け皿の「…」`C0lfUP`・受け皿は止められない `cFo2p`・状態 `kFz4b`）。
- *
- * 型（ListPage）に、閲覧のみの帯＋区分のタブ・数の帯・左のフォルダの列（上に「初回案内を作る」）・
- * 案内の帯・道具の段・表（順・設定・最初に送るもの・状態・直近7日・…）を渡す。
- * 受け皿（経路が分からなかった人）はいちばん下に固定で鍵の印・薄い地。
- *
- * データの口・保存の口・権限・失敗の扱いは app/friend-add-settings/list-v8.tsx と同じ
- * （BEHAVIOR.md）。違うのは見せ方だけ。
- */
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue, writeListUrlParam } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
@@ -74,6 +63,20 @@ import { folderDisplayColor } from '@/components/shared/folder-dot'
 import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
+
+/*
+ * ★V8 友だち追加時の配信の一覧（Pencil：一覧 `MRhef`・閲覧のみ `LEwkJ`・1152 `P20kYU`・
+ * 受け皿の「…」`C0lfUP`・受け皿は止められない `cFo2p`・状態 `kFz4b`）。
+ *
+ * 型（ListPage）に、閲覧のみの帯＋区分のタブ・数の帯・左のフォルダの列（上に「初回案内を作る」）・
+ * 案内の帯・道具の段・表（順・設定・最初に送るもの・状態・直近7日・…）を渡す。
+ * 受け皿（経路が分からなかった人）はいちばん下に固定で鍵の印・薄い地。
+ *
+ * データの口・保存の口・権限・失敗の扱いは app/friend-add-settings/list-v8.tsx と同じ
+ * （BEHAVIOR.md）。違うのは見せ方だけ。
+ */
 
 const KIND_LABELS: Record<FriendAddRuleKind, string> = {
   first_time: 'はじめて友だち追加した人',
@@ -185,6 +188,7 @@ export default function FriendAddListV8() {
 }
 
 function FriendAddList() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('友だち追加時の配信')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -264,9 +268,13 @@ function FriendAddList() {
       setData(response.data)
     } catch (caught) {
       if (requestId !== requestSequence.current) return
+      const fieldFailure = saveErrors.capture(caught)
       // 権限・対象なし・重複を「通信を確認して」にまとめない。
       const failure = describeFriendAddFailure(caught, '友だち追加時の配信', 'load')
-      setError(failure.message)
+      { if (!fieldFailure)
+
+
+      setError(failure.message) }
       setErrorStatus(failure.status)
       setData(null)
     } finally {
@@ -357,7 +365,10 @@ function FriendAddList() {
       setFolderDialogOpen(false)
       await load()
     } catch (caught) {
-      setFolderError(describeFriendAddFailure(caught, 'フォルダ', 'create').message)
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setFolderError(describeFriendAddFailure(caught, 'フォルダ', 'create').message) }
     } finally {
       setFolderBusy(false)
     }
@@ -390,11 +401,14 @@ function FriendAddList() {
       const res = await api.friendAddRules.reorder(selectedAccountId, kind, order)
       if (!res.success) throw new Error(res.error)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
       setActionError(
         caught instanceof Error && caught.message
           ? `並び替えを保存できませんでした。${caught.message}`
           : '並び替えを保存できませんでした。状態を読み直してから、もう一度お試しください。',
-      )
+      ) }
     } finally {
       void load()
     }
@@ -447,8 +461,11 @@ function FriendAddList() {
       }
       setStopTarget(null)
       await load()
-    } catch {
-      setStopError('止められませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setStopError('止められませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setStopBusy(false)
     }
@@ -475,7 +492,10 @@ function FriendAddList() {
       if (requestedDeleteId) samePageUrl.replace(`/friend-add-settings?kind=${kind}`)
       await load()
     } catch (caught) {
-      setDeleteError(describeFriendAddFailure(caught, '設定', 'delete').message.replaceAll('削除', '保管'))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setDeleteError(describeFriendAddFailure(caught, '設定', 'delete').message.replaceAll('削除', '保管')) }
     } finally {
       setDeleteBusy(false)
     }
@@ -595,7 +615,7 @@ function FriendAddList() {
   ) : null
   const folderSelect = (
     <div className={styles.folderSelect}>
-      <Select
+      <SaveErrorField names={["folder","activeId"]}><Select
         size="standard"
         aria-label="フォルダで絞り込む"
         value={folder ?? ''}
@@ -604,7 +624,7 @@ function FriendAddList() {
           { value: '', label: 'フォルダ：すべて' },
           ...folders.map((entry) => ({ value: entry.key, label: `フォルダ：${entry.name}` })),
         ]}
-      />
+      /></SaveErrorField>
     </div>
   )
   const searchBox = (
@@ -646,18 +666,18 @@ function FriendAddList() {
   ) : null
   /* 1152 の板（P20kYU）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「状態の札」。 */
   const toolbar = narrow ? (
-    <div className={styles.narrowTools}>
+    <ListToolbarFrame>
       {notice}
       {errorBand}
-      <div className={styles.narrowRow}>
+      <ListToolbarRow>
         {createButton}
         {folderSelect}
         {searchBox}
         <span className={styles.spacer} aria-hidden="true" />
         {perPageBox}
-      </div>
-      <div className={styles.narrowRow}>{statusChips}</div>
-    </div>
+      </ListToolbarRow>
+      <ListToolbarRow>{statusChips}</ListToolbarRow>
+    </ListToolbarFrame>
   ) : (
     <>
       {notice}
@@ -679,7 +699,7 @@ function FriendAddList() {
             label={label}
             className={styles.menuButton}
             note={rule.isFallback && canEdit ? 'この設定は消せません（いちばん最後の受け皿）' : undefined}
-            items={rowMenuItems(rule).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect() } }))}
+            items={rowMenuItems(rule).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect?.() } }))}
             open={openMenuId === rule.id}
             onOpenChange={(next) => setOpenMenuId(next ? rule.id : null)}
           />
@@ -777,7 +797,7 @@ function FriendAddList() {
                   onDragEnter={() => liveOrder.enter(rule.id)}
                   onDragOver={dragId ? (event) => event.preventDefault() : undefined}
                   onDrop={dragId ? () => dropOn(liveOrder.dropTarget(rule.id)) : undefined}
-                >
+                 href={editHref(rule.id)}>
                   <Td
                     className={styles.colOrder}
                     draggable={canReorder}
@@ -811,7 +831,7 @@ function FriendAddList() {
                 </Tr>
               ))}
               {sinkRule ? (
-                <Tr key={sinkRule.id} className={`${styles.row} ${styles.sinkRow}`} data-table-layout="columns" data-row-id={sinkRule.id}>
+                <Tr key={sinkRule.id} className={`${styles.row} ${styles.sinkRow}`} data-table-layout="columns" data-row-id={sinkRule.id} href={editHref(sinkRule.id)}>
                   <Td className={styles.colOrder}>
                     <span className={styles.orderBox} title="いちばん最後に動く・動かせない">
                       <Lock size={14} aria-hidden="true" className={styles.lock} />
@@ -847,7 +867,8 @@ function FriendAddList() {
   ) : null
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       help={<>{"友だち追加されたときに、来た経路（流入リンク）ごとに初回の案内を送り、タグ付けやシナリオを始めます。"}{ORDER_NOTE}</>}
       boardId={canEdit ? 'MRhef' : 'LEwkJ'}
       headingSize="regular"
@@ -975,6 +996,6 @@ function FriendAddList() {
       </>}
     >
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

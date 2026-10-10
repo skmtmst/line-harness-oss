@@ -1,3 +1,4 @@
+import { useFieldContext } from './field-context'
 import styles from './toggle.module.css'
 
 /**
@@ -7,6 +8,8 @@ import styles from './toggle.module.css'
  * オフに見せると、出ているのに消えていると読めてしまう。
  */
 export default function Toggle({
+  id,
+  invalid,
   checked,
   locked,
   disabled,
@@ -14,6 +17,8 @@ export default function Toggle({
   onChange,
   className,
 }: {
+  id?: string
+  invalid?: boolean
   checked: boolean
   /** 消せない項目。オンのまま押せない。 */
   locked?: boolean
@@ -24,9 +29,15 @@ export default function Toggle({
   onChange?: (next: boolean) => void
   className?: string
 }) {
+  const field = useFieldContext()
+  const bad = invalid || field?.invalid
   const on = locked || checked
   return (
     <button
+      id={id}
+      aria-invalid={bad || undefined}
+      aria-describedby={field?.describedBy}
+      style={bad ? { outline: '1px solid var(--color-danger)' } : undefined}
       type="button"
       role="switch"
       aria-checked={on}

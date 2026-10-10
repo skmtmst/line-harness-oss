@@ -1,12 +1,5 @@
 // @vitest-environment happy-dom
-/*
- * R230: 回答フォーム全体の複製（実マウント）。
- *
- * 見る筋書き:
- *   1. 行の「…」に「複製する」がある
- *   2. 押すと確認窓が出て、引き継ぐもの・引き継がないものが分かる
- *   3. 複製名を付けて実行すると、新しい下書きの編集画面へ進む
- */
+/* B-177・R230：複製は確認窓を出さず、一覧の元の行の下へ下書きを追加する。 */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -76,10 +69,10 @@ beforeEach(() => {
     setItem: () => {},
     removeItem: () => {},
   })
-  fetchApi.mockImplementation(async () => ({
+  fetchApi.mockImplementation(async (path: string) => ({
     success: true,
     data: {
-      items: [{ ...baseForm, id: 'f-1', name: '元のフォーム' }],
+      items: [path.includes('q=') ? { ...baseForm, id: 'f-2', name: '元のフォームのコピー' } : { ...baseForm, id: 'f-1', name: '元のフォーム' }],
       total: 1, all_total: 1, page: 1, limit: 20,
     },
   }))
@@ -97,7 +90,7 @@ afterEach(() => {
 })
 
 describe('フォーム全体の複製（R230・実マウント）', () => {
-  it('行の「…」から複製でき、新しい下書きの編集画面へ進む', async () => {
+  it('行の「…」から1件だけ複製し、一覧に下書きを足す', async () => {
     await act(async () => {
       root.render(<FormSubmissionsPage />)
     })
@@ -111,28 +104,21 @@ describe('フォーム全体の複製（R230・実マウント）', () => {
     })
     // メニューは最上層の portal に出る（一覧の表で切られないため）。document で探す。
     const duplicateItem = Array.from(document.querySelectorAll('[role="menuitem"]'))
-      .find((el) => el.textContent === '複製')
+      .find((el) => el.textContent === '複製する')
     expect(duplicateItem).toBeTruthy()
 
-    // 2. 確認窓に引き継ぐもの・引き継がないものが出る
     await act(async () => {
       duplicateItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     await act(async () => {})
-    expect(document.body.textContent).toContain('「元のフォーム」を複製しますか？')
-    expect(document.body.textContent).toContain('集まった回答・公開状態・集計は引き継ぎません')
-    const nameInput = document.body.querySelector('input[value="元のフォームの複製"]') as HTMLInputElement | null
-    expect(nameInput).toBeTruthy()
-
-    // 3. 実行すると新しい下書きの編集画面へ進む
-    const confirmButton = Array.from(document.body.querySelectorAll('button'))
-      .find((el) => el.textContent === '複製する')
-    expect(confirmButton).toBeTruthy()
-    await act(async () => {
-      confirmButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
-    await act(async () => {})
-    expect(formsDuplicate).toHaveBeenCalledWith('f-1', 'account-a', '元のフォームの複製')
-    expect(routerPush).toHaveBeenCalledWith('/form-submissions/edit?id=f-2&tab=basic')
+    expect(formsDuplicate).toHaveBeenCalledTimes(1)
+    expect(formsDuplicate).toHaveBeenCalledWith('f-1', 'account-a', '元のフォームのコピー')
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(routerPush).not.toHaveBeenCalled()
+    const rows = Array.from(host.querySelectorAll('tbody tr'))
+    expect(rows).toHaveLength(2)
+    expect(rows[0].textContent).toContain('元のフォーム')
+    expect(rows[1].textContent).toContain('元のフォームのコピー')
+    expect(rows[1].textContent).toContain('下書き')
   })
 })

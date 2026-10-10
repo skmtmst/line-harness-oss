@@ -1,13 +1,5 @@
 'use client'
 
-/*
- * ★V8 オートメーションのルール一覧（Pencil：一覧 `LWQXd`・1152 `En14p`・閲覧のみ `nH9L8`）。
- *
- * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・保存・権限・失敗時の扱いは
- * 今までの V8 一覧（app/automations/list-v8.tsx）と同じ（BEHAVIOR.md）。違いは見せ方だけ——
- * 型（ListPage）に、タブ・数の帯・左のフォルダの列（上に「ルールを作る」）・案内の帯・
- * 道具の段・表（絵の列の並び）を渡す。行の右端は「編集する」と「…」。
- */
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useFolderMove } from '@/components/shared/use-folder-move'
@@ -75,6 +67,17 @@ import styles from './list.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+import FriendPickerField from '@/components/shared/friend-picker-field'
+
+/*
+ * ★V8 オートメーションのルール一覧（Pencil：一覧 `LWQXd`・1152 `En14p`・閲覧のみ `nH9L8`）。
+ *
+ * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・保存・権限・失敗時の扱いは
+ * 今までの V8 一覧（app/automations/list-v8.tsx）と同じ（BEHAVIOR.md）。違いは見せ方だけ——
+ * 型（ListPage）に、タブ・数の帯・左のフォルダの列（上に「ルールを作る」）・案内の帯・
+ * 道具の段・表（絵の列の並び）を渡す。行の右端は「編集する」と「…」。
+ */
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -147,6 +150,7 @@ function TableHead({ selection }: { selection?: ReactNode } = {}) {
 }
 
 export default function AutomationListV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('オートメーション')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -314,13 +318,17 @@ export default function AutomationListV8() {
       notifyToast(pending.kind === 'restore' ? 'ルールを保管から戻しました' : pending.kind === 'archive' ? 'ルールを保管しました' : 'ルールの状態を変えました')
       setPending(null)
       await load()
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
+
+      if (!fieldFailure) {
       setActionError(
         pending.kind === 'archive'
           ? 'このルールを保管できませんでした。状態を読み直してから、もう一度お試しください。'
           : pending.kind === 'restore' ? '保管から戻せませんでした。状態を読み直してから、もう一度お試しください。'
           : '稼働を切り替えられませんでした。状態を読み直してから、もう一度お試しください。',
-      )
+      ) }
     } finally {
       setWorking(false)
     }
@@ -388,12 +396,12 @@ export default function AutomationListV8() {
 
   /* ===== フォルダ ===== */
   const folderSelect = (
-    <Select
+    <SaveErrorField names={["folderFilter","folder_filter"]}><Select
       aria-label="フォルダ"
       value={folderFilter}
       onChange={setFolderFilter}
       options={managedFolderOptions('automation', folders, { allId: '', unfiledId: UNFILED })}
-    />
+    /></SaveErrorField>
   )
   /* 閲覧のみには押せない「ルールを作る」を置かない（場所だけ空ける）。 */
   const createButton = (full: boolean) => canEdit ? (
@@ -417,11 +425,11 @@ export default function AutomationListV8() {
   const savedBox = (
     <div className={styles.savedBox}>
       <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-      <Select aria-label="よく使う絞り込み" value={saved} onChange={(value) => {
+      <SaveErrorField names={["saved"]}><Select aria-label="よく使う絞り込み" value={saved} onChange={(value) => {
         setSaved(value as SavedKey)
         if (value === 'name' || value === 'runs') setSort(value)
         else setSort('updated')
-      }} options={SAVED_OPTIONS} />
+      }} options={SAVED_OPTIONS} /></SaveErrorField>
     </div>
   )
   const perPageBox = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
@@ -461,14 +469,14 @@ export default function AutomationListV8() {
       <ListToolbar
         search={{ placeholder: 'ルール名・きっかけで探す', label: 'ルールを検索', width: 240, value: search, onChange: setSearch }}
         filters={filterChips}
-        trailing={<>{savedBox}<ListToolbarSort aria-label="並び順" width={170} value={sort} onChange={(value) => {
+        trailing={<>{savedBox}<SaveErrorField names={["sort"]}><ListToolbarSort aria-label="並び順" width={170} value={sort} onChange={(value) => {
           setSort(value as 'updated' | 'runs' | 'name')
           if (saved === 'runs' || saved === 'name') setSaved('')
         }} options={[
           { value: 'updated', label: '並び：更新が新しい順' },
           { value: 'runs', label: '並び：動いた回数が多い順' },
           { value: 'name', label: '並び：名前順' },
-        ]} />{perPageBox}</>}
+        ]} /></SaveErrorField>{perPageBox}</>}
       />
     </>
   )
@@ -549,7 +557,7 @@ export default function AutomationListV8() {
                           open={openMenuId === item.id}
                           onOpenChange={(next) => setOpenMenuId(next ? item.id : null)}
                           note={canEdit ? undefined : READONLY_REASON}
-                          items={rowMenuItems(item).map((menuItem) => ({ ...menuItem, onSelect: () => { setOpenMenuId(null); menuItem.onSelect() } }))}
+                          items={rowMenuItems(item).map((menuItem) => ({ ...menuItem, onSelect: () => { setOpenMenuId(null); menuItem.onSelect?.() } }))}
                         />
                       </div>
                     </Td>
@@ -573,7 +581,8 @@ export default function AutomationListV8() {
   ) : null
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       help={<>{AUTOMATIONS_DESCRIPTION}{canEdit
             ? '行の「…」から 編集・複製・1人で試す・止める・動いた記録を見る・削除。'
             : '行の「…」から 動いた記録を見る。'}</>}
@@ -647,14 +656,12 @@ export default function AutomationListV8() {
             <div className={styles.testBody}>
               <Field note={<>
                 すること：{testing.actions.map((action) => automationActionLabel(action.type)).join('・') || '登録した処理'}
-              </>} label="試す友だちのID">
-                <TextField
-                  aria-label="試す友だちのID"
+              </>} label="試す友だち">
+                <SaveErrorField names={["testFriendId","test_friend_id"]}><FriendPickerField label="試す友だち" accountId={selectedAccountId ?? null}
                   value={testFriendId}
-                  onChange={(event) => setTestFriendId(event.target.value)}
-                  placeholder="試す友だちID"
+                  onChange={ setTestFriendId}
                   disabled={testBusy || testDone}
-                />
+                /></SaveErrorField>
               </Field>
 
               {testError ? <Notice tone="danger">{testError}</Notice> : null}
@@ -665,6 +672,6 @@ export default function AutomationListV8() {
       </>}
     >
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

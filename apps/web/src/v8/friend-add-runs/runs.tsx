@@ -1,18 +1,8 @@
 'use client'
+import { canManageRole } from '@/lib/staff-role';
 
 import SegmentedControl from '@/components/shared/segmented'
 import { useFeatureAccess } from '@/lib/use-feature-access'
-
-/*
- * ★V8 友だち追加時の配信の実行結果（Pencil `REIxB`）。
- *
- * 型は詳細（DetailPage）：頭（戻る・題・説明・右に3つの操作）→ 数の帯（4つ）→
- * 失敗の帯 → 実行の記録（道具の段・表・ページ送り）→ 経路ごとの内訳と二重送信を防ぐ・知らせ。
- * 並びと寸法は合格した自動応答の実行結果（`src/v8/auto-replies/runs.tsx`・`nWmLg`）と同じ。
- * 取得・操作の動き（読み直し・絞り込み・カーソルのページ送り・一時停止・CSV）は
- * `app/friend-add-settings/runs/runs-v8.tsx` から写した（import はしない）。動きの一覧は BEHAVIOR.md。
- */
-
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -48,6 +38,17 @@ import { csvCell, elapsedText, formatJstDateTime, jstTime, routingAction, routin
 import styles from './runs.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 友だち追加時の配信の実行結果（Pencil `REIxB`）。
+ *
+ * 型は詳細（DetailPage）：頭（戻る・題・説明・右に3つの操作）→ 数の帯（4つ）→
+ * 失敗の帯 → 実行の記録（道具の段・表・ページ送り）→ 経路ごとの内訳と二重送信を防ぐ・知らせ。
+ * 並びと寸法は合格した自動応答の実行結果（`src/v8/auto-replies/runs.tsx`・`nWmLg`）と同じ。
+ * 取得・操作の動き（読み直し・絞り込み・カーソルのページ送り・一時停止・CSV）は
+ * `app/friend-add-settings/runs/runs-v8.tsx` から写した（import はしない）。動きの一覧は BEHAVIOR.md。
+ */
 
 type KindFilter = 'all' | FriendAddEventKind
 type AttributionFilter = 'all' | FriendAddEventAttributionStatus
@@ -507,13 +508,13 @@ function FriendAddRunsInner() {
           <SegmentedControl aria-label="結果で絞り込む" value={activeChip} onChange={pickChip} options={chips.map(chip=>({value:chip.key,label:chip.label}))} />
           <span className={styles.toolsSpacer} aria-hidden="true" />
           <div className={styles.sizeBox}>
-            <Select
+            <SaveErrorField names={["perPage","limit","per_page"]}><Select
               aria-label="1ページに出す件数"
               size="page-size"
               value={String(perPage)}
               onChange={(value) => { setPerPage(Number(value)); resetCursor() }}
               options={PAGE_SIZE_OPTIONS}
-            />
+            /></SaveErrorField>
           </div>
         </div>
 

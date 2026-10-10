@@ -371,3 +371,6 @@ describe('R306/R307 予約時マイルの設定リンク', () => {
     await waitFor(() => expect(screen.getByText('マイルを 50 付ける')).toBeTruthy())
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

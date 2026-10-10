@@ -82,7 +82,6 @@ import type {
   ConversionPoint,
   ConversionMeasureMethod,
   Affiliate,
-  Template,
   Automation,
   AutomationLog,
   Chat,
@@ -3919,8 +3918,6 @@ export type FriendListItem = FriendWithTags & Partial<{
 export function friendAddStopIdempotencyKey(ruleId: string, version: number): string {
   return `friend-add-rule-stop:${encodeURIComponent(ruleId)}:v${version}`
 }
-
-
 
 /** 一覧画面の上部に出す数（タグ・テンプレート・シナリオ・リマインダ）。 */
 export type ListStats = {
@@ -12605,6 +12602,14 @@ export const api = {
   },
   webhooks: {
     incoming: {
+      saveConfig: (id: string, lineAccountId: string, data: {
+        expectedVersion: number;
+        identityMatching: IncomingWebhookDetail['identityMatching'];
+        actions: Array<Pick<IncomingWebhookDetail['actions'][number], 'refKind' | 'refId' | 'refVersionId'>>;
+      }) => fetchApi<ApiResponse<{ id: string; version: number }>>(
+        `/api/webhooks/incoming/${encodeURIComponent(id)}/config?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        { method: 'PATCH', body: JSON.stringify(data) },
+      ),
       list: (lineAccountId: string) =>
         fetchApi<ApiResponse<IncomingWebhook[]>>(
           `/api/webhooks/incoming?lineAccountId=${encodeURIComponent(lineAccountId)}`,
@@ -13573,7 +13578,7 @@ export const api = {
   // 同ページから参照する。Worker の applyRefAttribution は entry_routes → tracked_links
   // の順でフォールバックするので、tracked_links 登録済み ref は実際にはシナリオ発火している。
   trackedLinks: {
-    list: () =>
+    list: (accountId?: string) =>
       fetchApi<
         ApiResponse<
           Array<{
@@ -13591,7 +13596,7 @@ export const api = {
             updatedAt: string
           }>
         >
-      >('/api/tracked-links'),
+      >(`/api/tracked-links${accountId ? `?lineAccountId=${encodeURIComponent(accountId)}` : ''}`),
   },
   pools: {
     list: (options?: FetchApiOptions) =>

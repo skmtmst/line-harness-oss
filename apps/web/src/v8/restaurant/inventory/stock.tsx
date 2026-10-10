@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8 予約枠・在庫「時間帯ごとの在庫」タブ（板 `Y8SjT2`・競合 `qf3ky`・媒体を閉じる知らせ `Yyw6i`）。
- *
- * 案内の帯 → 左：席と枠の配分（卓とつながる）→ 時間帯ごとの在庫の表 → 開ける時間
- * （先頭に「行を押したとき：その時間帯の配分だけ直す」の箱）、右：選んだ時間帯の卓 → 下の帯
- * （開ける時間と配分を保存）。ほかの担当者が先に保存していたら（409）競合の帯を出し、
- * 比べてから保存するか、最新を読み込んで続ける。
- * データの口・送る形は今の画面（app/restaurant-test/v8/inventory.tsx）と同じ。動きは BEHAVIOR.md。
- */
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeftRight, Armchair, BookOpen, Check, TriangleAlert, RefreshCw, Trash2 } from 'lucide-react'
@@ -40,6 +30,18 @@ import styles from './inventory.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 予約枠・在庫「時間帯ごとの在庫」タブ（板 `Y8SjT2`・競合 `qf3ky`・媒体を閉じる知らせ `Yyw6i`）。
+ *
+ * 案内の帯 → 左：席と枠の配分（卓とつながる）→ 時間帯ごとの在庫の表 → 開ける時間
+ * （先頭に「行を押したとき：その時間帯の配分だけ直す」の箱）、右：選んだ時間帯の卓 → 下の帯
+ * （開ける時間と配分を保存）。ほかの担当者が先に保存していたら（409）競合の帯を出し、
+ * 比べてから保存するか、最新を読み込んで続ける。
+ * データの口・送る形は今の画面（app/restaurant-test/v8/inventory.tsx）と同じ。動きは BEHAVIOR.md。
+ */
 
 type Alloc = { ota: number; line: number; walkin: number }
 type Hours = RestaurantOpeningDay[]
@@ -73,9 +75,9 @@ function storeToday(timezone: string | undefined): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: timezone || 'Asia/Tokyo' }).format(new Date())
 }
 
-function NumberField({ label, value, onChange, canEdit, invalid = false }: { label: string; value: number; onChange: (value: number) => void; canEdit: boolean; invalid?: boolean }) {
+function NumberField({ id, 'aria-describedby': describedBy, label, value, onChange, canEdit, invalid = false }: { id?: string; 'aria-describedby'?: string; label: string; value: number; onChange: (value: number) => void; canEdit: boolean; invalid?: boolean }) {
   return (
-    <NumberInput
+    <SaveErrorField names={["value"]}><NumberInput
       type="number"
       min={0}
       aria-label={label}
@@ -83,11 +85,12 @@ function NumberField({ label, value, onChange, canEdit, invalid = false }: { lab
       readOnly={!canEdit}
       invalid={invalid}
       onChange={(event) => onChange(Number(event.target.value))}
-    />
+    /></SaveErrorField>
   )
 }
 
 export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context; canEdit: boolean }) {
+  const saveErrors = useSaveFormErrors()
   const { data, store, busy, mutate } = ctx
   const { selectedAccountId } = useAccount()
   const storeId = store?.id
@@ -235,13 +238,15 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
     let hoursBy: string | null = null
     let hoursAt: string | null = null
     if (selectedAccountId && storeId) {
-      try { latestRows = (await restaurantTestApi.inventoryDay(selectedAccountId, storeId, date)).data } catch { /* 今の行のまま */ }
+      try { latestRows = (await restaurantTestApi.inventoryDay(selectedAccountId, storeId, date)).data } catch (saveFailure) {
+        saveErrors.capture(saveFailure) /* 今の行のまま */ }
       try {
         const res = await restaurantTestApi.openingHours(selectedAccountId, storeId)
         latestHours = res.data.hours || emptyWeek()
         hoursBy = res.data.updatedBy
         hoursAt = res.data.updatedAt
-      } catch { /* 今の時間のまま */ }
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure) /* 今の時間のまま */ }
     }
     const newest = latestRows.slice().sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''))[0]
     const memberName = (id: string | null) => data.memberships.find((member) => member.id === id)?.staff_name ?? null
@@ -279,6 +284,8 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
           setHoursVersion(res.data.version); setHours(attemptedHours)
         }
       } catch (err) {
+        saveErrors.capture(err);
+
         if (err instanceof ApiError && err.status === 409) {
           await raiseConflict(attemptedAlloc, attemptedHours)
           /* 知らせは競合の帯が持つ（上の帯は重ねない）。 */
@@ -298,6 +305,8 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
       try {
         await restaurantTestApi.updateInventory(selectedAccountId, selected.row.id, { otaCapacity: attempt.ota, lineCapacity: attempt.line, walkInCapacity: attempt.walkin, expectedVersion: slotVersion ?? selected.row.version })
       } catch (err) {
+        saveErrors.capture(err);
+
         if (err instanceof ApiError && err.status === 409) {
           await raiseConflict(attempt, null)
           throw new QuietError('conflict')
@@ -327,7 +336,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
     setHoursDraft((current) => (current ?? emptyWeek()).map((day) => (day.weekday === weekday ? { ...day, periods: next } : day)))
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       {loadError ? (
         <Notice tone="warn" message={loadError} action={<Button onClick={() => setRefresh((n) => n + 1)}>もう一度読み込む</Button>} />
       ) : null}
@@ -386,9 +395,9 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
               <Button variant="text" size="inline" href="/restaurant-test/tables">座席・卓管理で変える →</Button>
             </div>
             <div className={styles.allocGrid}>
-              <Field label={<><span className={styles.allocLabel}>OTA（予約媒体）</span></>}><NumberField canEdit={canEdit} invalid={allocInvalid} label="OTA（予約媒体）" value={alloc.ota} onChange={(ota) => updateAlloc({ ...alloc, ota })} /></Field>
-              <Field label={<><span className={styles.allocLabel}>LINE 専用</span></>}><NumberField canEdit={canEdit} invalid={allocInvalid} label="LINE 専用" value={alloc.line} onChange={(line) => updateAlloc({ ...alloc, line })} /></Field>
-              <Field label={<><span className={styles.allocLabel}>当日（ウォークイン）</span></>}><NumberField canEdit={canEdit} invalid={allocInvalid} label="当日（ウォークイン）" value={alloc.walkin} onChange={(walkin) => updateAlloc({ ...alloc, walkin })} /></Field>
+              <Field label={<><span className={styles.allocLabel}>OTA（予約媒体）</span></>}><SaveErrorField names={["ota","alloc.ota"]}><NumberField canEdit={canEdit} invalid={allocInvalid} label="OTA（予約媒体）" value={alloc.ota} onChange={(ota) => updateAlloc({ ...alloc, ota })} /></SaveErrorField></Field>
+              <Field label={<><span className={styles.allocLabel}>LINE 専用</span></>}><SaveErrorField names={["line","alloc.line"]}><NumberField canEdit={canEdit} invalid={allocInvalid} label="LINE 専用" value={alloc.line} onChange={(line) => updateAlloc({ ...alloc, line })} /></SaveErrorField></Field>
+              <Field label={<><span className={styles.allocLabel}>当日（ウォークイン）</span></>}><SaveErrorField names={["walkin","alloc.walkin"]}><NumberField canEdit={canEdit} invalid={allocInvalid} label="当日（ウォークイン）" value={alloc.walkin} onChange={(walkin) => updateAlloc({ ...alloc, walkin })} /></SaveErrorField></Field>
               <div className={styles.allocField}><span className={styles.allocLabel}>店頭・電話</span>
                 <span className={styles.remainder}>{`${remainder}（残り）`}</span>
               </div>
@@ -398,7 +407,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
           <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-stock-title">
             <div className={styles.sectionHeadRow}>
               <CardHeader size="stacked" titleId="rs-stock-title" title={`時間帯ごとの在庫（${dayLabel(date)}）`} meta="予約台帳の予約から、埋まっている卓と空きを出します。行を押すと右に卓の埋まりぐあいが出ます" />
-              <span className={styles.datePicker}><DateField aria-label="在庫の日付" value={date} disabled={busy} onChange={changeDate} /></span>
+              <span className={styles.datePicker}><SaveErrorField names={["date"]}><DateField aria-label="在庫の日付" value={date} disabled={busy} onChange={changeDate} /></SaveErrorField></span>
             </div>
             {dayRows === null ? (
               <div className={styles.stateBox}><ListState kind="loading" /></div>
@@ -469,9 +478,9 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
               <Card layout="vertical" padding="default" gap="tight" surface="inset" aria-label={`${selected.time} の配分だけ直す`}>
                 <h3 className={styles.sectionTitle}>{`行を押したとき：${selected.time} の配分だけ直す`}</h3>
                 <div className={styles.slotGrid}>
-                  <Field label={<><span className={styles.slotLabel}>OTA（予約媒体）</span></>}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}のOTA`} value={currentSlotAlloc.ota} onChange={(ota) => updateSlot({ ...currentSlotAlloc, ota })} /></Field>
-                  <Field label={<><span className={styles.slotLabel}>LINE 専用</span></>}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}のLINE`} value={currentSlotAlloc.line} onChange={(line) => updateSlot({ ...currentSlotAlloc, line })} /></Field>
-                  <Field label={<><span className={styles.slotLabel}>当日（ウォークイン）</span></>}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}の当日`} value={currentSlotAlloc.walkin} onChange={(walkin) => updateSlot({ ...currentSlotAlloc, walkin })} /></Field>
+                  <Field label={<><span className={styles.slotLabel}>OTA（予約媒体）</span></>}><SaveErrorField names={["ota","currentSlotAlloc.ota"]}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}のOTA`} value={currentSlotAlloc.ota} onChange={(ota) => updateSlot({ ...currentSlotAlloc, ota })} /></SaveErrorField></Field>
+                  <Field label={<><span className={styles.slotLabel}>LINE 専用</span></>}><SaveErrorField names={["line","currentSlotAlloc.line"]}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}のLINE`} value={currentSlotAlloc.line} onChange={(line) => updateSlot({ ...currentSlotAlloc, line })} /></SaveErrorField></Field>
+                  <Field label={<><span className={styles.slotLabel}>当日（ウォークイン）</span></>}><SaveErrorField names={["walkin","currentSlotAlloc.walkin"]}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}の当日`} value={currentSlotAlloc.walkin} onChange={(walkin) => updateSlot({ ...currentSlotAlloc, walkin })} /></SaveErrorField></Field>
                 </div>
                 <div className={styles.slotActions}>
                   <span className={styles.slotBase}>{`全部の時間帯の配分：OTA ${alloc.ota}・LINE ${alloc.line}・当日 ${alloc.walkin}（上で入れた数）`}</span>
@@ -495,11 +504,11 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
                   <div className={styles.dayHead}>
                     {/* 閲覧のみ：つまみ・時刻を選ぶ部品は置かず、いまの時間を文字で見せる（2026-10-06 オーナー決定）。 */}
                     {canEdit ? (
-                      <SettingCheckbox
+                      <SaveErrorField names={["open","day"]}><SettingCheckbox
                         checked={open}
                         label={`${name}曜日に予約を受ける`}
                         onChange={(next) => setDay(weekday, next ? [{ opensAt: '17:00', closesAt: '22:00' }] : [])}
-                      />
+                      /></SaveErrorField>
                     ) : null}
                     <span className={styles.dayName}>{name}</span>
                   </div>
@@ -509,24 +518,24 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
                         <div key={index} className={styles.period}>
                           {canEdit ? <>
                             <span className={styles.timeInput}>
-                              <TimeField
+                              <SaveErrorField names={[`periods.${index}.opensAt`,`periods.${index}.opens_at`,"opensAt","period.opensAt","day","opens_at","period.opens_at"]}><TimeField
                                 aria-label={`${name}曜日 ${index + 1}つ目の開始`}
                                 minuteStep={30}
                                 size="default"
                                 value={period.opensAt}
                                 onChange={(value) => setDay(weekday, day.periods.map((p, i) => (i === index ? { ...p, opensAt: value } : p)))}
-                              />
+                              /></SaveErrorField>
                             </span>
                             <span className={styles.tilde}>〜</span>
                             <span className={styles.timeInput}>
-                              <TimeField
+                              <SaveErrorField names={[`periods.${index}.closesAt`,`periods.${index}.closes_at`,"closesAt","period.closesAt","day","closes_at","period.closes_at"]}><TimeField
                                 allowEndOfDay
                                 aria-label={`${name}曜日 ${index + 1}つ目の終了`}
                                 minuteStep={30}
                                 size="default"
                                 value={period.closesAt}
                                 onChange={(value) => setDay(weekday, day.periods.map((p, i) => (i === index ? { ...p, closesAt: value } : p)))}
-                              />
+                              /></SaveErrorField>
                             </span>
                           </> : (
                             <span aria-label={`${name}曜日 ${index + 1}つ目の時間帯`}>{`${period.opensAt}〜${period.closesAt}`}</span>
@@ -621,7 +630,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
       >
         {conflict ? <ConflictDiff conflict={conflict} latestAlloc={allocOf(rows[0])} latestHours={hours} /> : null}
       </RsDialog>
-    </>
+    </></SaveErrorScope>
   )
 }
 

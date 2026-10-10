@@ -20,6 +20,8 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  'v8/hq-deliveries/console.tsx',
+  'v8/webhooks/incoming-actions.tsx',
   'app/booking/bookings/detail/page.tsx',
   'v8/automations/create/create.tsx',
   'v8/settings/pools/create.tsx',
@@ -226,6 +228,7 @@ const COVERED_BY_PARENT: Record<string, string> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'components/shared/entity-picker.tsx': '選ぶ窓の候補は仮選択で、選ぶを押したときだけ親へ渡す。閉じる操作は仮選択を破棄し、親の保存前の値を変えない。',
   'app/affiliates/tabs.tsx': '一覧の作成窓は共通Dialogが入力を守り、作成済みの結果だけdirty=falseで閉じる。',
   'components/chats/friend-info-sidebar.tsx':
     '受信箱の右の欄（B-26 その場で直す）。対応状況・担当・タグは押した瞬間に保存し、メモは書くのをやめて1秒で保存する。保存待ちの入力を溜めないので番兵の対象外（失敗は知らせで戻してもう一度試す）',

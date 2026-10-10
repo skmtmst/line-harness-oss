@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8 機能設定（Pencil `ywFJT`・1152 `bKipf`・競合 `ziYCN`・状態の見本帳 `bR6a1`）。
- *
- * 動き（読み込み・保存・競合・オフ前の影響確認・離脱の番兵・初期値に戻す・並びを変える）は
- * 今までの V8（app/settings/feature-settings-v8.tsx）と同じ。処理は同じ場所の
- * use-feature-settings.ts（写し）に1つだけ置く。見た目だけを型（SettingsPage）と部品で組み直した。
- * 動きの一覧は同じ場所の BEHAVIOR.md。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -45,6 +36,17 @@ import {
 } from './use-feature-settings'
 import styles from './screen.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 機能設定（Pencil `ywFJT`・1152 `bKipf`・競合 `ziYCN`・状態の見本帳 `bR6a1`）。
+ *
+ * 動き（読み込み・保存・競合・オフ前の影響確認・離脱の番兵・初期値に戻す・並びを変える）は
+ * 今までの V8（app/settings/feature-settings-v8.tsx）と同じ。処理は同じ場所の
+ * use-feature-settings.ts（写し）に1つだけ置く。見た目だけを型（SettingsPage）と部品で組み直した。
+ * 動きの一覧は同じ場所の BEHAVIOR.md。
+ */
 
 const TITLE = '機能設定'
 const DESCRIPTION = '使わない機能をオフにすると、左のメニューから消えます。作ったデータは消えません'
@@ -129,12 +131,12 @@ function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwi
           必須
         </span>
       ) : canManage ? (
-        <SettingCheckbox
+        <SaveErrorField names={["enabled"]}><SettingCheckbox
           checked={enabled}
           label={`${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
           disabled={busy}
           onChange={(next) => onToggle(item, next)}
-        />
+        /></SaveErrorField>
       ) : (
         <span className={styles.stateText}>{enabled ? 'オン' : 'オフ'}</span>
       )}
@@ -521,7 +523,7 @@ export default function FeatureSettingsScreen() {
           {/* N-444：変更があるときだけ理由の欄を出す。 */}
           {canManage && dirty && (
             <Field label="変更理由（必須）" htmlFor="feature-settings-reason" error={reasonError || undefined} note="空のままでは保存できません。運用状態の更新履歴に残ります。">
-              <TextField
+              <SaveErrorField names={["reason"]}><TextField
                 ref={reasonRef}
                 id="feature-settings-reason"
                 aria-required="true"
@@ -530,7 +532,7 @@ export default function FeatureSettingsScreen() {
                 placeholder="例：マイルを使わないのでオフにする"
                 maxLength={300}
                 disabled={saving}
-              />
+              /></SaveErrorField>
             </Field>
           )}
         </>

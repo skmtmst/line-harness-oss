@@ -1,16 +1,4 @@
 'use client'
-
-/*
- * ★V8 成果とアフィリエイト「アフィリエイター」（板 `nJlxX`・1152 `KdFRI`・
- * 閲覧のみ `v9JWQ`、状態は見本帳 `rRk0C`、行を押すと引き出し `tnTn9`）。
- *
- * app/affiliates/v8-affiliates-tab.tsx から動きを写し、見た目を一覧の型
- * （ListPage）で組み直した。データの口・操作は今と同じ（一覧・集計・承認待ち・
- * 今回の締めの見込み・紹介リンクのコピー・紹介を止める・まとめて止める・CSV）。
- *
- * フォルダの列：アフィリエイターを分けて保存する口は無いので、報酬の決め方で
- * 分けた見え方の切り替えとして持つ（保存しない）。
- */
 import { useListUrlJsonValue } from '@/components/shared/list-url-state'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
@@ -69,6 +57,20 @@ import {
 import styles from './affiliates.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 成果とアフィリエイト「アフィリエイター」（板 `nJlxX`・1152 `KdFRI`・
+ * 閲覧のみ `v9JWQ`、状態は見本帳 `rRk0C`、行を押すと引き出し `tnTn9`）。
+ *
+ * app/affiliates/v8-affiliates-tab.tsx から動きを写し、見た目を一覧の型
+ * （ListPage）で組み直した。データの口・操作は今と同じ（一覧・集計・承認待ち・
+ * 今回の締めの見込み・紹介リンクのコピー・紹介を止める・まとめて止める・CSV）。
+ *
+ * フォルダの列：アフィリエイターを分けて保存する口は無いので、報酬の決め方で
+ * 分けた見え方の切り替えとして持つ（保存しない）。
+ */
 
 type FilterKey = 'active' | 'reward'
 type SortKey = 'conversions' | 'reward' | 'name' | 'newest'
@@ -98,6 +100,7 @@ const GROUPS: Array<{ key: GroupKey; label: string; match: (row: AffiliateListRo
 ]
 
 export default function AffiliatorsTab() {
+  const saveErrors = useSaveFormErrors()
   const samePageUrl = useSamePageUrl()
   const { readonly, narrow, accountId, setCount, focusAffiliateId } = useAffiliateShell()
   const settlementPeriod = useMemo(() => currentSettlementPeriod(), [])
@@ -215,13 +218,16 @@ export default function AffiliatorsTab() {
       }
       setPaymentTotal(res.data.totalAmount)
       setPaymentState('ready')
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure);
+
       if (mounted.current) {
         setPaymentState('error')
         setPaymentTotal(null)
       }
     }
-  }, [accountId, settlementPeriod])
+  }, [accountId, settlementPeriod, saveErrors]);
+
 
   const loadMonthly = useCallback(async () => {
     setMonthlyState('loading')
@@ -427,12 +433,12 @@ export default function AffiliatorsTab() {
 
   const folderSelect = (
     <div className={styles.narrowFolder}>
-      <Select
+      <SaveErrorField names={["group"]}><Select
         aria-label="報酬の決め方"
         value={group}
         options={GROUPS.map((item) => ({ value: item.key, label: item.key === 'all' || !ready ? item.label : `${item.label} ${groupCount(item.key)}` }))}
         onChange={(value) => resetPage(() => setGroup(value as GroupKey))}
-      />
+      /></SaveErrorField>
     </div>
   )
 
@@ -511,11 +517,11 @@ export default function AffiliatorsTab() {
           <TableHeadRow className={styles.headRow} data-table-layout="columns">
             <Th className={styles.colCheck}>
               {readonly ? null : (
-                <Checkbox
+                <SaveErrorField names={["allChecked","checked","all_checked"]}><Checkbox
                   aria-label="このページの全員を選ぶ"
                   checked={allChecked}
                   onCheckedChange={(checked) => setChecked(pagedRows.map((row) => row.id), checked)}
-                />
+                /></SaveErrorField>
               )}
             </Th>
             <Th className={styles.colName}>アフィリエイター</Th>
@@ -528,15 +534,15 @@ export default function AffiliatorsTab() {
           </TableHeadRow>
         </thead>
         <tbody>
-          {pagedRows.map((row) => (
+          {pagedRows.map((row, saveFieldIndex) => (
             <Tr key={row.id} className={styles.row} data-table-layout="columns" data-row-id={row.id}>
               <Td className={styles.colCheck}>
                 {readonly ? null : (
-                  <Checkbox
+                  <SaveErrorField names={[`pagedRows.${saveFieldIndex}.id`,"id","row.id","checked"]}><Checkbox
                     aria-label={`${row.name}を選ぶ`}
                     checked={selected.has(row.id)}
                     onCheckedChange={(checked) => setChecked([row.id], checked)}
-                  />
+                  /></SaveErrorField>
                 )}
               </Td>
               <Td className={styles.colName}>
@@ -622,7 +628,7 @@ export default function AffiliatorsTab() {
       setResumeTarget(null)
       notifyToast('紹介を再開しました')
       await loadList()
-    } catch { setResumeError('紹介を再開できませんでした。状態を読み直してお試しください。') }
+    } catch (cause) { if (!saveErrors.capture(cause)) setResumeError('紹介を再開できませんでした。状態を読み直してお試しください。') }
     finally { setResuming(false) }
   }
 
@@ -636,7 +642,7 @@ export default function AffiliatorsTab() {
   const drawerRow = drawerId ? rows.find((row) => row.id === drawerId) ?? null : null
 
   return (
-    <AffiliateFrame
+    <SaveErrorScope errors={saveErrors}><AffiliateFrame
       actions={
         <Button onClick={exportCsv} disabled={shownRows.length === 0}>
           <Download size={15} aria-hidden="true" /> CSVで書き出す
@@ -682,6 +688,6 @@ export default function AffiliatorsTab() {
       </>}
     >
       {body}
-    </AffiliateFrame>
+    </AffiliateFrame></SaveErrorScope>
   )
 }

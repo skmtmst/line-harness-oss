@@ -154,3 +154,5 @@
   .splitTrailing { border-radius: var(--radius-card); justify-content: flex-end; flex-wrap: wrap; }
 }
 }
+
+.inlineBar[data-presentation='distribution'] { justify-content: center; gap: var(--tpl-wh-check-gap); padding: var(--tpl-htn-footer-pad); background: var(--color-canvas); box-shadow: var(--tpl-htn-line-top); }

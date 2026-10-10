@@ -1,16 +1,6 @@
 'use client'
+import TagPill from '@/components/shared/tag-pill';
 
-/*
- * ★V8 統括のひな形の一覧を「店の同じ機能の一覧と同じ形」で出す（オーナー 2026-10-08・B-27〜B-29・B-34・B-36）。
- * 絵：テンプレート i0Ao0R（V8.pen の行「統括」）・LRc93（V8-B 版）、回答フォーム wZPua、タグ DzdC3、リッチメニュー noVq4。
- *
- * 店の一覧（src/v8/templates/list.tsx）と同じ型（ListPage）・同じ共通部品（数の帯・種類のタブ・フォルダの列・表・ページ送り）・
- * 同じ見た目（店の一覧の CSS をそのまま読む）で組む。違いは「配る」口だけ：
- *   - 表の「使っている所」の代わりに「配布先」（N アカウント・まだ配っていない）
- *   - 全種類の行の右端「…」の左に［配る］（共通部品 RowQuickAction。「…」の中にも同じ項目。オーナー 2026-10-08）
- *   - 数の帯は配ったアカウントの数
- * 読み書き（一覧・分類・複製・削除・配る）は呼ぶ側（console.tsx）が今までどおり持つ。ここは見せ方と押した知らせだけ。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useMemo, useState, type ReactNode } from 'react'
 import {
@@ -50,6 +40,19 @@ import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 統括のひな形の一覧を「店の同じ機能の一覧と同じ形」で出す（オーナー 2026-10-08・B-27〜B-29・B-34・B-36）。
+ * 絵：テンプレート i0Ao0R（V8.pen の行「統括」）・LRc93（V8-B 版）、回答フォーム wZPua、タグ DzdC3、リッチメニュー noVq4。
+ *
+ * 店の一覧（src/v8/templates/list.tsx）と同じ型（ListPage）・同じ共通部品（数の帯・種類のタブ・フォルダの列・表・ページ送り）・
+ * 同じ見た目（店の一覧の CSS をそのまま読む）で組む。違いは「配る」口だけ：
+ *   - 表の「使っている所」の代わりに「配布先」（N アカウント・まだ配っていない）
+ *   - 全種類の行の右端「…」の左に［配る］（共通部品 RowQuickAction。「…」の中にも同じ項目。オーナー 2026-10-08）
+ *   - 数の帯は配ったアカウントの数
+ * 読み書き（一覧・分類・複製・削除・配る）は呼ぶ側（console.tsx）が今までどおり持つ。ここは見せ方と押した知らせだけ。
+ */
 
 /** 店のテンプレートと同じ6種類（上のタブ）。 */
 export const KIND_TABS: { kind: TemplateKind; label: string; icon: typeof MessageSquare }[] = [
@@ -142,6 +145,7 @@ export interface HqStoreListProps {
 }
 
 export default function HqStoreList(props: HqStoreListProps) {
+  const saveErrors = useSaveFormErrors()
   const {
     type, rows, ready, busy, canEdit, accountTotal, stats, kind, kindCounts, onKindChange, folders, folderLoadFailed, folderFilter, onFolderFilter,
     onAddFolder, onRenameFolder, onDeleteFolder, onReloadFolders, onCreate, onEdit, onOpen, onDistribute, onDistributeFolder, folderContents, onDuplicate, onRemove, notices, overlays,
@@ -289,8 +293,10 @@ export default function HqStoreList(props: HqStoreListProps) {
       else await onAddFolder(name, folderColor)
       setFolderDialog(null)
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       // 理由ごとに言い分ける（共通の describeFolderFailure）。入力した名前と色は残す。
-      const failure = describeFolderFailure(caught, 'save')
+      const failure = describeFolderFailure(caught, 'save');
+
       if (failure.kind === 'missing') {
         notifyToast(failure.message, { tone: 'error' })
         await onReloadFolders?.().catch(() => undefined)
@@ -298,8 +304,8 @@ export default function HqStoreList(props: HqStoreListProps) {
         return
       }
       if (failure.kind === 'conflict') await onReloadFolders?.().catch(() => undefined)
-      if (failure.nameError) setFolderNameError(failure.nameError)
-      else setFolderError(failure.message)
+      if (failure.nameError) { if (!fieldFailure) setFolderNameError(failure.nameError) }
+      else { if (!fieldFailure) setFolderError(failure.message) }
     } finally {
       setFolderBusy(false)
     }
@@ -312,7 +318,10 @@ export default function HqStoreList(props: HqStoreListProps) {
       await onDeleteFolder(latestFolder(deletingFolder))
       setDeletingFolder(null)
     } catch (caught) {
-      const failure = describeFolderFailure(caught, 'delete')
+      const fieldFailure = saveErrors.capture(caught);
+
+      const failure = describeFolderFailure(caught, 'delete');
+
       if (failure.kind === 'missing') {
         notifyToast(failure.message, { tone: 'error' })
         await onReloadFolders?.().catch(() => undefined)
@@ -320,7 +329,8 @@ export default function HqStoreList(props: HqStoreListProps) {
         return
       }
       if (failure.kind === 'conflict') await onReloadFolders?.().catch(() => undefined)
-      setFolderError(failure.message)
+      { if (!fieldFailure)
+      setFolderError(failure.message) }
     } finally {
       setFolderBusy(false)
     }
@@ -341,15 +351,15 @@ export default function HqStoreList(props: HqStoreListProps) {
           <>
           {type === 'tag' ? (
             <>
-              <Select aria-label="使用状態で絞り込む" width={145} value={tagUsage} onChange={(value) => { setTagUsage(value as TagUsageFilter); setPage(1) }} options={[
+              <SaveErrorField names={["tagUsage","tag_usage"]}><Select aria-label="使用状態で絞り込む" width={145} value={tagUsage} onChange={(value) => { setTagUsage(value as TagUsageFilter); setPage(1) }} options={[
                 { value: 'all', label: '使用状態：すべて' },
                 { value: 'used', label: '使用状態：付いている' },
                 { value: 'unused', label: '使用状態：未使用' },
-              ]} />
-              <Select aria-label="付け方で絞り込む" width={132} value={tagMethod} onChange={(value) => { setTagMethod(value); setPage(1) }} options={[
+              ]} /></SaveErrorField>
+              <SaveErrorField names={["tagMethod","tag_method"]}><Select aria-label="付け方で絞り込む" width={132} value={tagMethod} onChange={(value) => { setTagMethod(value); setPage(1) }} options={[
                 { value: 'all', label: '付け方：すべて' },
                 ...assignmentMethods(rows).map((method) => ({ value: method, label: `付け方：${method}` })),
-              ]} />
+              ]} /></SaveErrorField>
             </>
           ) : null}
           <div role="group" aria-label="配ったかで絞り込む" className={storeStyles.chipGroup}>
@@ -361,7 +371,7 @@ export default function HqStoreList(props: HqStoreListProps) {
         )}
         trailing={(
           <div className={storeStyles.perPageBox}>
-            <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZE_OPTIONS} />
+            <SaveErrorField names={["pageSize","page_size"]}><Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZE_OPTIONS} /></SaveErrorField>
           </div>
         )}
       />
@@ -469,7 +479,7 @@ export default function HqStoreList(props: HqStoreListProps) {
             const folder = folderOf(row.folder_id)
             const sub = templateSubLine(row, KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? words.item)
             return (
-              <Tr key={row.id} data-row-id={row.id} density="template">
+              <Tr key={row.id} data-row-id={row.id} density="template" onOpen={() => (onOpen ?? onEdit)(row)}>
                 {type === 'rich_menu' ? <Td className={storeStyles.cellPlain}>{rankOf.get(row.id) ?? emptyValue('unknown')}</Td> : null}
                 <NameCell name={(
                     <div className={storeStyles.dotLine}>
@@ -508,11 +518,12 @@ export default function HqStoreList(props: HqStoreListProps) {
   ) : <p className={storeStyles.pagerSolo}>{summary}</p>
 
   if (type === 'tag' && attribute.tab !== 'tags') {
-    return <OtherTabPanel tab={attribute.tab} title={words.title} description={words.description} onSelect={(key) => { attribute.select(key); setPage(1) }} />
+    return <SaveErrorScope errors={saveErrors}><OtherTabPanel tab={attribute.tab} title={words.title} description={words.description} onSelect={(key) => { attribute.select(key); setPage(1) }} /></SaveErrorScope>
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId={type === 'template' ? 'i0Ao0R' : type === 'form' ? 'wZPua' : type === 'tag' ? 'DzdC3' : type === 'rich_menu' ? 'noVq4' : 'LRc93'}
       headingSize="regular"
       title={words.title}
@@ -521,7 +532,7 @@ export default function HqStoreList(props: HqStoreListProps) {
       stats={(
         <KpiBand data-design="KPIs" className={storeStyles.kpiStrip}>
           {bandKpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={<span className={storeStyles.kpiDetailWrap}>{kpi.detail}</span>} />
+            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} />
           ))}
         </KpiBand>
       )}
@@ -562,6 +573,6 @@ export default function HqStoreList(props: HqStoreListProps) {
     >
       {notices}
       {body}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

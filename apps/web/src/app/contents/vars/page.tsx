@@ -1,7 +1,6 @@
 'use client'
 
 import { RowActions } from '@/components/shared/row-actions'
-
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -51,6 +50,7 @@ import VarsExportPanel from './export-panel'
 import { formatDay, formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import CommonVarsListV8 from '@/v8/common-vars/list'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /**
  * 共通情報の一覧。
@@ -1277,14 +1277,14 @@ function VarsPageInner() {
                     </p>
                     <label className="text-ink-secondary mt-2 block text-xs font-semibold">
                       差し替え先
-                      <Select size="full"
+                      <EntitySelect size="full"
                         value={replacementId}
                         disabled={singleBusy || replacementCandidates.length === 0}
                         onChange={(value) => void selectReplacement(value)}
                         aria-label="差し替え先"
                         className="mt-1"
                         options={replacementCandidates.length > 0
-                          ? replacementCandidates.map((candidate) => ({
+                          ? replacementCandidates.map((candidate) => ({ ...entityOptionMetadata(candidate),
                               value: candidate.id,
                               label: `${placeholderText(candidate.varKey)} — ${candidate.value || '（空）'}`,
                             }))

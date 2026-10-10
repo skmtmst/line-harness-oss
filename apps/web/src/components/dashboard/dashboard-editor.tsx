@@ -53,6 +53,7 @@ import Toggle from '@/components/shared/toggle'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export type { DashboardCardId }
 
@@ -171,14 +172,14 @@ function SortableCardRow({ item, definition, canMoveUp, canMoveDown, onMove, onT
         </button>
       </div>
       {theme === 'v8' ? (
-        <Toggle checked={item.visible} onChange={() => onToggle()} label={`${definition.label}を表示`} />
+        <SaveErrorField names={["visible","item.visible"]}><Toggle checked={item.visible} onChange={() => onToggle()} label={`${definition.label}を表示`} /></SaveErrorField>
       ) : (
-        <Checkbox
+        <SaveErrorField names={["visible","item.visible"]}><Checkbox
           checked={item.visible}
           onCheckedChange={onToggle}
           aria-label={`${definition.label}を${item.visible ? '非表示' : '表示'}にする`}
           className="shrink-0"
-        />
+        /></SaveErrorField>
       )}
     </div>
   )

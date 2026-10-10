@@ -24,6 +24,7 @@ import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/com
 import DefaultValueInput from '@/components/friend-fields/default-value-input'
 import { sameLabels, storedDefaultLabels } from './fields/default-labels'
 import styles from './field-editor-v8.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /* 板 `w9zY5`：よく使う 6 つは左に選ぶカード、残りは右の欄の札。 */
 const PRIMARY_TYPES: FriendFieldType[] = ['text', 'textarea', 'select', 'multi_select', 'date', 'number']
@@ -274,25 +275,25 @@ export default function FieldEditorV8({
             <div className={styles.sectionBody}>
               <div className={styles.field}>
                 <span className={styles.fieldLabel}>項目名 <RequiredBadge /></span>
-                <input
+                <SaveErrorField names={["name"]}><input
                   className={styles.input}
                   value={name}
                   disabled={locked}
                   onChange={(event) => { setName(event.target.value); if (mode === 'create' && !keyTouched) setFieldKey(suggestKey(event.target.value)) }}
                   placeholder="例：愛犬のお名前"
-                />
+                /></SaveErrorField>
                 <DuplicateNameNote duplicates={nameDuplicates} kindLabel="項目" />
               </div>
               {mode === 'create' ? (
                 <>
                   <div className={styles.field}>
                     <span className={styles.fieldLabel}>差し込み名 <RequiredBadge /></span>
-                    <input
+                    <SaveErrorField names={["fieldKey","keyTouched","field_key","key_touched"]}><input
                       className={`${styles.input} ${styles.mono}`}
                       value={fieldKey}
                       onChange={(event) => { setKeyTouched(true); setFieldKey(event.target.value) }}
                       placeholder="pet_name"
-                    />
+                    /></SaveErrorField>
                     {keyOwners.length > 0 ? <p className={styles.fieldHint} style={{ color: 'var(--color-warning)' }}>この差し込み名はすでに「{keyOwners[0]}」で使われています。別の差し込み名にしてください。</p> : null}
                   </div>
                   <p className={`${styles.macroPreview} ${styles.mono}`}>{`{{field.${fieldKey || 'pet_name'}}}`}</p>
@@ -315,14 +316,14 @@ export default function FieldEditorV8({
                     ) : null}
                   </p>
                 ) : (
-                  <Select
+                  <SaveErrorField names={["folderId","folder_id"]}><Select
                     aria-label="友だち情報欄のフォルダ"
                     value={folderId}
                     onChange={setFolderId}
                     disabled={locked}
                     size="full"
                     options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
-                  />
+                  /></SaveErrorField>
                 )}
                 <span className={styles.fieldHint}>フォルダは友だち詳細のタブになります。</span>
               </div>
@@ -374,14 +375,14 @@ export default function FieldEditorV8({
                   <div className={styles.optionList}>
                     {options.map((value, index) => (
                       <div key={index} className={styles.optionRow}>
-                        <input
+                        <SaveErrorField names={["value","options"]}><input
                           className={styles.input}
                           value={value}
                           disabled={locked}
                           aria-label={`選択肢 ${index + 1}`}
                           placeholder={index === 0 ? '例：柴' : undefined}
                           onChange={(event) => setOptions(options.map((item, i) => (i === index ? event.target.value : item)))}
-                        />
+                        /></SaveErrorField>
                         <button
                           type="button"
                           className={styles.optionRemove}
@@ -425,19 +426,19 @@ export default function FieldEditorV8({
           <section className={styles.section}>
             <h2 className={styles.sectionTitle}>オプション</h2>
             <div className={styles.sectionBody}>
-              <Checkbox checked={isPersonal} onCheckedChange={setIsPersonal} disabled={locked}>
+              <SaveErrorField names={["isPersonal","is_personal"]}><Checkbox checked={isPersonal} onCheckedChange={setIsPersonal} disabled={locked}>
                 個人情報として保護する<span className={styles.optionNote}>（画面で伏せ、書き出しに権限が要る）</span>
-              </Checkbox>
-              <Checkbox checked={isStarred} onCheckedChange={setIsStarred} disabled={locked}>
+              </Checkbox></SaveErrorField>
+              <SaveErrorField names={["isStarred","is_starred"]}><Checkbox checked={isStarred} onCheckedChange={setIsStarred} disabled={locked}>
                 友だち一覧の列に出す
-              </Checkbox>
-              <Checkbox checked={ecIsMaster} onCheckedChange={setEcIsMaster} disabled={locked}>
+              </Checkbox></SaveErrorField>
+              <SaveErrorField names={["ecIsMaster","ec_is_master"]}><Checkbox checked={ecIsMaster} onCheckedChange={setEcIsMaster} disabled={locked}>
                 EC側の値を正とする<span className={styles.optionNote}>（EC連携で上書き）</span>
-              </Checkbox>
+              </Checkbox></SaveErrorField>
               {ecIsMaster ? (
                 <div className={styles.field}>
                   <span className={styles.fieldLabel}>EC側の項目名</span>
-                  <input className={`${styles.input} ${styles.mono}`} value={ecFieldPath} disabled={locked} onChange={(event) => setEcFieldPath(event.target.value)} placeholder="customer.phone" />
+                  <SaveErrorField names={["ecFieldPath","ec_field_path"]}><input className={`${styles.input} ${styles.mono}`} value={ecFieldPath} disabled={locked} onChange={(event) => setEcFieldPath(event.target.value)} placeholder="customer.phone" /></SaveErrorField>
                 </div>
               ) : null}
             </div>

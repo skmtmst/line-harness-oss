@@ -14,6 +14,7 @@ import type { RestaurantCustomerHistory } from '@line-crm/shared'
 import { restaurantTestApi, type RestaurantReservation } from '@/lib/restaurant-test-api'
 import { Panel } from './shell'
 import ledger from './reservations.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export type PhonePreset = {
   date?: Date
@@ -220,7 +221,7 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
       <div className={ledger.phoneBody}>
         <form ref={formRef} className={ledger.phoneMain} onSubmit={save}>
           <Panel title="何を入れますか">
-            <RadioCardGroup legend="何を入れますか">
+            <SaveErrorField names={["ledger-phone-kind","kind"]}><RadioCardGroup legend="何を入れますか">
               <RadioCard
                 name="ledger-phone-kind"
                 value="customer"
@@ -238,10 +239,10 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
                 note="電話・常連・団体のために空けておく"
 
               />
-            </RadioCardGroup>
+            </RadioCardGroup></SaveErrorField>
           </Panel>
 
-          {kind === 'hold' ? <Panel title="仮押さえの期限"><label>何分後に解除しますか<input type="number" aria-label="仮押さえの期限（分）" min={1} max={120} value={holdMinutes} onChange={e => setHoldMinutes(Number(e.target.value))} /></label><p>期限を過ぎると空き卓に戻ります。台帳には履歴が残ります。</p></Panel> : null}
+          {kind === 'hold' ? <Panel title="仮押さえの期限"><label>何分後に解除しますか<SaveErrorField names={["holdMinutes","hold_minutes"]}><input type="number" aria-label="仮押さえの期限（分）" min={1} max={120} value={holdMinutes} onChange={e => setHoldMinutes(Number(e.target.value))} /></SaveErrorField></label><p>期限を過ぎると空き卓に戻ります。台帳には履歴が残ります。</p></Panel> : null}
           <Panel
             title="だれの予約ですか"
             description="LINEの友だちなら名前で探して結びつけます。LINE未連携の電話番号でも入れられます"
@@ -253,7 +254,7 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
             {whoTab === 'line' ? (
               <>
                 <label className="mt-3 block text-xs font-medium text-ink-secondary">名前・電話番号で探す
-                  <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="名前・電話番号で探す" aria-label="名前・電話番号で探す" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+                  <SaveErrorField names={["search"]}><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="名前・電話番号で探す" aria-label="名前・電話番号で探す" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></SaveErrorField>
                 </label>
                 {search.trim().length >= 2 && !person ? (
                   <div className="mt-2 flex flex-col gap-1">
@@ -286,10 +287,10 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
             ) : (
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <label className="text-xs font-medium text-ink-secondary">電話番号
-                  <input value={manualPhone} onChange={(event) => setManualPhone(event.target.value)} inputMode="tel" aria-label="電話番号" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+                  <SaveErrorField names={["manualPhone","manual_phone"]}><input value={manualPhone} onChange={(event) => setManualPhone(event.target.value)} inputMode="tel" aria-label="電話番号" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></SaveErrorField>
                 </label>
                 <label className="text-xs font-medium text-ink-secondary">お名前
-                  <input value={manualName} onChange={(event) => setManualName(event.target.value)} aria-label="お名前" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+                  <SaveErrorField names={["manualName","manual_name"]}><input value={manualName} onChange={(event) => setManualName(event.target.value)} aria-label="お名前" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></SaveErrorField>
                 </label>
               </div>
             )}
@@ -298,10 +299,10 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
           <Panel title="いつ・何人・どの卓">
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-xs font-medium text-ink-secondary">日付
-                <input type="date" value={date} onChange={(event) => setDate(event.target.value)} required aria-label="日付" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+                <SaveErrorField names={["date"]}><input type="date" value={date} onChange={(event) => setDate(event.target.value)} required aria-label="日付" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></SaveErrorField>
               </label>
               <label className="text-xs font-medium text-ink-secondary">人数
-                <input type="number" min={1} max={100} value={count} onChange={(event) => setCount(Number(event.target.value))} required aria-label="人数" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+                <SaveErrorField names={["count","guestCount"]}><input type="number" min={1} max={100} value={count} onChange={(event) => setCount(Number(event.target.value))} required aria-label="人数" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></SaveErrorField>
               </label>
             </div>
             <p className={`${ledger.fieldHelp} mt-3`}>空いている時間（{count}名が入る卓がある時間）{endsAt ? `・${time}〜${endsAt}（2時間）` : ''}</p>
@@ -314,16 +315,16 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <label className="text-xs font-medium text-ink-secondary">卓
-                <Select aria-label="卓" value={tableMode} onChange={setTableMode} size="full" className="mt-1" options={[
+                <SaveErrorField names={["tableMode","table_mode"]}><Select aria-label="卓" value={tableMode} onChange={setTableMode} size="full" className="mt-1" options={[
                   { value: 'auto', label: recommended ? `自動で選ぶ（おすすめ：${recommended.code} ${recommended.capacity}）` : '自動で選ぶ' },
                   ...tables.filter((t) => t.active).map((t) => ({ value: t.id, label: `${t.code}・${t.label}（${t.capacity}）` })),
-                ]} />
+                ]} /></SaveErrorField>
               </label>
               <label className="text-xs font-medium text-ink-secondary">コース
-                <Select aria-label="コース" value={courseId} onChange={setCourseId} size="full" className="mt-1" options={[
+                <SaveErrorField names={["courseId","course_id"]}><Select aria-label="コース" value={courseId} onChange={setCourseId} size="full" className="mt-1" options={[
                   { value: '', label: '席のみ' },
                   ...courses.map((c) => ({ value: c.id, label: c.name })),
-                ]} />
+                ]} /></SaveErrorField>
               </label>
             </div>
             <p className={ledger.fieldHelp}>自動で選ぶと、人数が入る卓のうち余る席が一番少ない卓にします（座席・卓管理の自動配席ルール）。</p>
@@ -331,7 +332,7 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
 
           <Panel title="要望・アレルギー">
             <label className="text-xs font-medium text-ink-secondary">アレルギー・特記事項
-              <input value={allergy} onChange={(event) => setAllergy(event.target.value)} placeholder="えび" aria-label="アレルギー・特記事項" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+              <SaveErrorField names={["allergy","allergyNote"]}><input value={allergy} onChange={(event) => setAllergy(event.target.value)} placeholder="えび" aria-label="アレルギー・特記事項" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></SaveErrorField>
             </label>
           </Panel>
 
@@ -339,9 +340,9 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
             title="お客さまに何を送りますか"
             description="LINEとつながっている方には予約の案内を送れます。送らない選択もできます"
           >
-            <Checkbox checked={notify} onCheckedChange={setNotify}>
+            <SaveErrorField names={["notify"]}><Checkbox checked={notify} onCheckedChange={setNotify}>
               予約を受け付けたことを、いますぐLINEに送る
-            </Checkbox>
+            </Checkbox></SaveErrorField>
             <p className={ledger.fieldHelp}>日時・人数・コースを書いた案内が届きます。前日・当日のご案内はLINE来店フォローで設定します。</p>
           </Panel>
           {error ? <p className={ledger.formError} role="alert">{error}</p> : null}

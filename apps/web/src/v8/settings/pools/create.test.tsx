@@ -1,3 +1,4 @@
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 /*
  * ★V8-B プール管理の「プールを作る」（板 `D0AOyx`）。
@@ -135,11 +136,7 @@ describe('V8-B プールを作る（D0AOyx）', () => {
     const addButton = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('アカウントを足す'))
     await act(async () => { addButton!.click() })
     await flush()
-    const trigger = document.querySelector('button[aria-label="足すアカウント"]') as HTMLButtonElement
-    await act(async () => { trigger!.click() })
-    await flush()
-    const option = [...document.querySelectorAll('[role="option"] button')].find((o) => o.textContent === '然-NEN-中目黒店') as HTMLElement
-    await act(async () => { option!.click() })
+    await pickEntity('足すアカウント', '然-NEN-中目黒店')
     await flush()
     const add = [...document.querySelectorAll('button')].find((b) => b.textContent === '追加')
     await act(async () => { add!.click() })

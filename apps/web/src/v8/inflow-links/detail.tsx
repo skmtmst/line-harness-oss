@@ -1,16 +1,5 @@
 'use client'
 
-/*
- * ★V8 流入と計測の詳細（Pencil `Q5le3`）。
- *
- * 型は詳細（DetailPage）：頭（戻る・題・説明・右に3つの操作）→ 数の帯（4つ）→ その後（この経路から来た人）→
- * 友だちになったときの帯 → この経路から来た友だちの表（道具の段・表・ページ送り）→ 下の2つの箱。
- *
- * 呼ぶ口・権限・失敗の扱いは今の詳細（app/inflow-links/detail/page.tsx）と同じ（BEHAVIOR.md の「詳細」）。
- * 違うのは見せ方だけ：
- * - 受付を止める・別リンクへ送る・削除するは「その後」の段の右上の「…」から（今は段の題の右）
- * - 閲覧のみ（owner・admin 以外）には、リンクを編集・止める・することを変える・「…」を出さず、閲覧のみの帯を出す
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import Link from 'next/link'
@@ -49,6 +38,20 @@ import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+/*
+ * ★V8 流入と計測の詳細（Pencil `Q5le3`）。
+ *
+ * 型は詳細（DetailPage）：頭（戻る・題・説明・右に3つの操作）→ 数の帯（4つ）→ その後（この経路から来た人）→
+ * 友だちになったときの帯 → この経路から来た友だちの表（道具の段・表・ページ送り）→ 下の2つの箱。
+ *
+ * 呼ぶ口・権限・失敗の扱いは今の詳細（app/inflow-links/detail/page.tsx）と同じ（BEHAVIOR.md の「詳細」）。
+ * 違うのは見せ方だけ：
+ * - 受付を止める・別リンクへ送る・削除するは「その後」の段の右上の「…」から（今は段の題の右）
+ * - 閲覧のみ（owner・admin 以外）には、リンクを編集・止める・することを変える・「…」を出さず、閲覧のみの帯を出す
+ */
 
 interface MessageTemplate {
   id: string
@@ -94,6 +97,7 @@ export function monthKeyOf(iso: string | null): string | null {
 }
 
 function InflowDetailContent() {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
@@ -292,12 +296,15 @@ function InflowDetailContent() {
       setDeleteOpen(false)
       router.replace('/inflow-links')
     } catch (cause) {
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
       setDeleteError(cause instanceof ApiError && (
         cause.code === 'ENTRY_ROUTE_IN_USE'
         || cause.code === 'ENTRY_ROUTE_NAME_CONFIRMATION_MISMATCH'
       )
         ? cause.message
-        : '選んだ処理を完了できませんでした。状態を読み直してから、もう一度お試しください。')
+        : '選んだ処理を完了できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
@@ -364,7 +371,8 @@ function InflowDetailContent() {
     try {
       const res = await api.entryRoutes.update(route.id, { isActive: true })
       if (res.success) setRoute({ ...route, isActive: true })
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       // 失敗しても画面はそのまま。止まったままなのが分かる。
     }
   }
@@ -377,34 +385,34 @@ function InflowDetailContent() {
 
   if (!selectedId) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="unspecified"
         title="見る流入経路が指定されていません"
         description="一覧から、見たい流入経路を選び直してください。"
         backHref="/inflow-links"
         backLabel="流入経路の一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
   if (error) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="error"
         title="流入経路を読み込めませんでした"
         description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
         onRetry={() => setFunnelAttempt((n) => n + 1)}
-      />
+      /></SaveErrorScope>
     )
   }
   if (routeMissing || (!loading && !routeLoading && !route)) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="not-found"
         title="この流入経路は見つかりません"
         description="削除されたか、リンクが古くなっています。一覧から選び直してください。"
         backHref="/inflow-links"
         backLabel="流入経路の一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
 
@@ -419,10 +427,10 @@ function InflowDetailContent() {
   const qrDownloadUrl = url
     ? `${workerBase.replace(/\/$/, '')}/api/qr?size=320x320&data=${encodeURIComponent(url)}&download=1&filename=${encodeURIComponent(`referral-${route?.refCode ?? ''}`)}`
     : undefined
-  const back = <Link href="/inflow-links" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />流入と計測へ</Link>
+  const back = <></>
 
   return (
-    <DetailPage
+    <SaveErrorScope errors={saveErrors}><DetailPage
       boardId="Q5le3"
       title={route?.name ?? '読み込み中…'}
       help={route ? `${route.genre || '未分類'}・${url}・${accountName}・作った日 ${createdDate}` : undefined}
@@ -443,14 +451,14 @@ function InflowDetailContent() {
       {copyFailed && url ? (
         <div role="alert" className={styles.copyFallback}>
           <p className={styles.note}>コピーできませんでした。下の欄を選んでコピーしてください。</p>
-          <input
+          <SaveErrorField names={["url"]}><input
             readOnly
             autoFocus
             value={url}
             aria-label="流入経路のURL"
             onFocus={(e) => e.currentTarget.select()}
             className={styles.fieldInput}
-          />
+          /></SaveErrorField>
         </div>
       ) : null}
 
@@ -610,21 +618,21 @@ function InflowDetailContent() {
             </div>
             <span className={styles.toolsSpacer} aria-hidden="true" />
             <div className={styles.periodBox}>
-              <Select
+              <SaveErrorField names={["friendPeriod","friend_period"]}><Select
                 aria-label="期間"
                 value={friendPeriod}
                 options={PERIOD_OPTIONS}
                 onChange={(value) => { setFriendPeriod(value as FriendPeriod); setFriendPage(1) }}
-              />
+              /></SaveErrorField>
             </div>
             <div className={styles.sizeBox}>
-              <Select
+              <SaveErrorField names={["friendPageSize","friend_page_size"]}><Select
                 aria-label="表示件数"
                 size="page-size"
                 value={String(friendPageSize)}
                 options={PAGE_SIZE_OPTIONS}
                 onChange={(value) => { setFriendPageSize(Number(value)); setFriendPage(1) }}
-              />
+              /></SaveErrorField>
             </div>
           </div>
           {friendsState === 'error' ? (
@@ -658,7 +666,7 @@ function InflowDetailContent() {
                 {friendPageRows.map((friend) => {
                   const blocked = isBlockedFriend(friend)
                   return (
-                    <Tr key={friend.id} className={styles.row} data-table-layout="columns" data-row-id={friend.id}>
+                    <Tr key={friend.id} className={styles.row} data-table-layout="columns" href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>
                       <Td className={styles.colWhen}>
                         <span className={styles.when}>
                           {friend.trackedAt ? friend.trackedAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/').replace(/^0/, '') : '日時不明'}
@@ -745,6 +753,7 @@ function InflowDetailContent() {
       ) : null}
       {editingRoute && route ? (
         <EditRouteModal
+          surface="inline"
           route={route}
           pools={pools}
           scenarios={scenarios}
@@ -784,7 +793,7 @@ function InflowDetailContent() {
               </ul>
             </Notice>
             <p className={styles.deleteSafe}>この経路から来た友だちと、付いたタグ・進んでいるシナリオは消えません。</p>
-            <RadioCardGroup legend="どうしますか？" legendVisible className={styles.deleteChoices}>
+            <SaveErrorField names={["inflow-delete-choice","value","deleteChoice"]}><RadioCardGroup legend="どうしますか？" legendVisible className={styles.deleteChoices}>
               {DELETE_CHOICES.filter(([value]) => value !== 'delete' || canPermanentlyDelete).map(([value, title, description]) => (
                 <RadioCard
                   key={value}
@@ -797,11 +806,11 @@ function InflowDetailContent() {
                   note={description}
                 />
               ))}
-            </RadioCardGroup>
+            </RadioCardGroup></SaveErrorField>
             {deleteChoice === 'redirect' ? (
               <div className={styles.deleteField}>
                 <span className={styles.deleteChoiceTitle}>転送先のリンク</span>
-                <Select
+                <SaveErrorField names={["redirectTargetId","redirect_target_id"]}><EntitySelect
                   aria-label="転送先のリンク"
                   id="inflow-redirect-target"
                   value={redirectTargetId}
@@ -810,9 +819,9 @@ function InflowDetailContent() {
                   size="full"
                   options={[
                     { value: '', label: '選んでください' },
-                    ...routes.filter((candidate) => candidate.id !== route.id).map((candidate) => ({ value: candidate.id, label: `${candidate.name}（${candidate.refCode}）` })),
+                    ...routes.filter((candidate) => candidate.id !== route.id).map((candidate) => ({ ...entityOptionMetadata(candidate), value: candidate.id, label: `${candidate.name}（${candidate.refCode}）` })),
                   ]}
-                />
+                /></SaveErrorField>
                 <span className={styles.note}>先頭を自動で選ぶことはしません。必ず選んでください。</span>
               </div>
             ) : null}
@@ -820,7 +829,7 @@ function InflowDetailContent() {
           </div>
         </Dialog>
       ) : null}
-    </DetailPage>
+    </DetailPage></SaveErrorScope>
   )
 }
 

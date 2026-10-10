@@ -1,5 +1,4 @@
 'use client'
-
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
@@ -30,6 +29,7 @@ import {
 } from './use-feature-settings'
 import styles from './settings-v8.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
  * 機能設定の V8 画面（★V8-B `ywFJT`）。
@@ -164,11 +164,11 @@ function FeatureRowV8({ item, features, usage, featureUsage, usageRetry, sharedS
             必須
           </span>
         ) : (
-          <SettingCheckbox
+          <SaveErrorField names={["enabled"]}><SettingCheckbox
             checked={enabled}
             label={`${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
             onChange={(next) => onToggle(item, next)}
-          />
+          /></SaveErrorField>
         )}
       </div>
     </li>
@@ -318,8 +318,6 @@ export function ReorderDialog({ groups, initialOrder, onCancel, onApply, moveIte
     </div>
   )
 }
-
-
 
 export function FeatureSettingsV8() {
   const settings = useFeatureSettings()
@@ -519,14 +517,14 @@ export function FeatureSettingsV8() {
           {dirty && <div className={styles.reasonBand}><Field note={<>保存の記録に残ります。空のままでは保存できません。</>} label={<>
 
               変更理由
-            </>} htmlFor="feature-settings-reason" required><input
+            </>} htmlFor="feature-settings-reason" required><SaveErrorField names={["reason"]}><input
               id="feature-settings-reason"
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder="例：マイルを使わないのでオフにする"
               maxLength={300}
               disabled={saving}
-            />
+            /></SaveErrorField>
 </Field></div>}
 
         </>

@@ -1,15 +1,5 @@
 'use client'
-
 import { FolderDotName } from '@/components/shared/folder-dot'
-
-/*
- * ★V8 マイル「友だちのマイル詳細」（板 `R6kIG`、手で増やす・減らす `M8zhjL`）。
- *
- * app/mileage/friends/detail/v8-friend-detail.tsx から動きを写し、詳細の型（DetailPage）で組み直した。
- * 頭に名前と操作（トークを開く・減らす・増やす）、数の帯は4マス、明細の箱（探す・札・期間・件数・
- * 表「日時・内容・きっかけ・使い道・種類・担当・増減・…」・ページ送り）、下に「たまったきっかけ・
- * 交換した使い道」の2枚。確定待ちの確定・取消・通知の再送は行末の「…」から。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -62,6 +52,16 @@ import { PerPageSelect } from './parts'
 import MileageAdjustDialog from './adjust-dialog'
 import styles from './mileage.module.css'
 import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 マイル「友だちのマイル詳細」（板 `R6kIG`、手で増やす・減らす `M8zhjL`）。
+ *
+ * app/mileage/friends/detail/v8-friend-detail.tsx から動きを写し、詳細の型（DetailPage）で組み直した。
+ * 頭に名前と操作（トークを開く・減らす・増やす）、数の帯は4マス、明細の箱（探す・札・期間・件数・
+ * 表「日時・内容・きっかけ・使い道・種類・担当・増減・…」・ページ送り）、下に「たまったきっかけ・
+ * 交換した使い道」の2枚。確定待ちの確定・取消・通知の再送は行末の「…」から。
+ */
 
 type MileageDetail = {
   summary: MileageSummary
@@ -426,12 +426,12 @@ function FriendDetailInner() {
           </div>
           <span className={styles.spacer} aria-hidden="true" />
           <div className={styles.periodBox}>
-            <Select
+            <SaveErrorField names={["period","page"]}><Select
               aria-label="期間"
               value={period}
               options={[{ value: 'all', label: 'すべて' }, { value: 'month', label: '今月' }]}
               onChange={(value) => { setPage(1); setPeriod(value) }}
-            />
+            /></SaveErrorField>
           </div>
           <PerPageSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next) }} />
         </div>
@@ -594,7 +594,7 @@ function FriendDetailInner() {
             </div>
           </div>
           <Field label="理由" htmlFor="mileage-pending-reason" required>
-            <TextArea id="mileage-pending-reason" rows={3} value={pendingReason} onChange={(event) => setPendingReason(event.target.value)} />
+            <SaveErrorField names={["pendingReason","pending_reason"]}><TextArea id="mileage-pending-reason" rows={3} value={pendingReason} onChange={(event) => setPendingReason(event.target.value)} /></SaveErrorField>
           </Field>
           <Notice tone="info">理由は履歴に残り、あとから実行者と一緒に確認できます。</Notice>
         </div>

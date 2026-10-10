@@ -30,15 +30,15 @@ export function GridTable({ children, label, design, framed = true, className }:
   className?: string
 }) {
   const variables = Object.fromEntries(Object.entries(design).map(([key, value]) => [`--grid-table-${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`, value]))
-  return <div role="table" aria-label={label} className={[styles.table, className].filter(Boolean).join(' ')} data-framed={framed || undefined} style={variables as CSSProperties}>{children}</div>
+  return <div data-shared-part="list-table" role="table" aria-label={label} className={[styles.table, className].filter(Boolean).join(' ')} data-framed={framed || undefined} style={variables as CSSProperties}>{children}</div>
 }
 
-export function GridHeadRow({ children }: { children: ReactNode }) {
-  return <div role="row" className={styles.row} data-head="">{children}</div>
+export function GridHeadRow({ children, className }: { children: ReactNode; className?: string }) {
+  return <div data-shared-part="list-head" role="row" className={[styles.row, className].filter(Boolean).join(' ')} data-head="">{children}</div>
 }
 
 export function GridRow({ children, className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div role="row" className={[styles.row, className].filter(Boolean).join(' ')} {...props}>{children}</div>
+  return <div data-shared-part="list-row" role="row" className={[styles.row, className].filter(Boolean).join(' ')} {...props}>{children}</div>
 }
 
 export function GridCell({ children, className, align, ...props }: HTMLAttributes<HTMLSpanElement> & { align?: 'left' | 'right' }) {

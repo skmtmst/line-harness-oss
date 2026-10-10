@@ -1,13 +1,16 @@
 'use client'
 
-/* 写し：app/common-actions/branch-editor.tsx（src/v8 は古い画面ファイルを import できない）。中身は変えていない。 */
-
 import type { CommonActionResources, CommonActionStep } from '@/lib/api'
 import { newCommonActionStep, newStepId } from '@/components/automations/common-action-editor'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { ACTION_LABELS } from './version-diff'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import BranchActionList from '@/components/automations/branch-action-list'
+import EntitySelect from '@/components/shared/entity-select'
+
+/* 写し：app/common-actions/branch-editor.tsx（src/v8 は古い画面ファイルを import できない）。中身は変えていない。 */
 
 export function newBranchStep(): CommonActionStep {
   return {
@@ -34,6 +37,7 @@ export type BranchPatch =
   | { kind: 'ruleAdd' }
   | { kind: 'ruleRemove'; ruleIndex: number }
   | { kind: 'sideAction'; side: 'then' | 'else'; stepIndex: number; commonActionId: string }
+  | { kind: 'sideSet'; side: 'then' | 'else'; steps: CommonActionStep[] }
   | { kind: 'sideAdd'; side: 'then' | 'else' }
   | { kind: 'sideRemove'; side: 'then' | 'else'; stepIndex: number }
 
@@ -113,6 +117,7 @@ export function updateBranchStep(step: CommonActionStep, patch: BranchPatch): Co
       )
       return { ...step, params: { ...step.params, [patch.side]: next } }
     }
+    case 'sideSet': return { ...step, params: { ...step.params, [patch.side]: patch.steps } }
     case 'sideAdd': {
       const next = [...(patch.side === 'then' ? thenSteps : elseSteps), newReferenceStep()]
       return { ...step, params: { ...step.params, [patch.side]: next } }
@@ -158,10 +163,6 @@ export default function BranchEditors({
   onUpdate: (id: string, patch: BranchPatch) => void
   onRemove: (id: string) => void
 }) {
-  const commonActionOptions = [
-    { value: '', label: '公開版を選ぶ' },
-    ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` })),
-  ]
   const tagOptions = (selected: string) => [
     ...resources.tags,
     // 保存済みのタグが選択肢に無いときも値を保つ（消さない）。
@@ -178,29 +179,11 @@ export default function BranchEditors({
         const { thenSteps, elseSteps } = branchSides(step)
         const renderSide = (side: 'then' | 'else', sideSteps: CommonActionStep[], sideLabel: string) => (
           <div>
-            <p className="text-ink-secondary mb-1 text-sm font-semibold">{sideLabel}</p>
-            <div className="space-y-2">
-              {sideSteps.map((sideStep, sideIndex) => sideStep.type === 'common_action' ? (
-                <div key={sideStep.id} className="flex items-center gap-2">
-                  <Select
-                    size="full"
-                    aria-label={`${sideLabel}${sideIndex + 1}の公開版`}
-                    className="mt-1"
-                    value={String(sideStep.params.commonActionId ?? '')}
-                    onChange={(value) => onUpdate(step.id, { kind: 'sideAction', side, stepIndex: sideIndex, commonActionId: value })}
-                    options={commonActionOptions}
+            <SaveErrorField names={["commonActionId","sideStep.params.commonActionId","params.commonActionId","common_action_id","side_step.params.common_action_id","params.common_action_id"]}><p className="text-ink-secondary mb-1 text-sm font-semibold">{sideLabel}</p></SaveErrorField>
+            <BranchActionList
+                    value={sideSteps} resources={resources} label={sideLabel} titleOf={readonlyStepSummary}
+                    onChange={next => onUpdate(step.id, { kind: 'sideSet', side, steps: next })}
                   />
-                  {sideSteps.length > 1 ? (
-                    <Button aria-label={`${sideLabel}${sideIndex + 1}を外す`} onClick={() => onUpdate(step.id, { kind: 'sideRemove', side, stepIndex: sideIndex })}>外す</Button>
-                  ) : null}
-                </div>
-              ) : (
-                <div key={sideStep.id} className="text-ink-secondary text-sm">
-                  {readonlyStepSummary(sideStep)}（ここでは変えられません）
-                </div>
-              ))}
-              <Button onClick={() => onUpdate(step.id, { kind: 'sideAdd', side })}>処理を足す</Button>
-            </div>
           </div>
         )
         return (
@@ -211,7 +194,7 @@ export default function BranchEditors({
             </div>
             <div className="mt-3">
               <span className="text-ink-secondary text-sm">条件の組み合わせ</span>
-              <Select
+              <SaveErrorField names={["operator","condition.operator"]}><Select
                 size="full"
                 aria-label="条件の組み合わせ"
                 className="mt-1"
@@ -221,7 +204,7 @@ export default function BranchEditors({
                   { value: 'AND', label: OPERATOR_LABEL.AND },
                   { value: 'OR', label: OPERATOR_LABEL.OR },
                 ]}
-              />
+              /></SaveErrorField>
             </div>
             <div className="mt-3 space-y-2">
               {condition.rules.map((rule, ruleIndex) => rule.type === 'tag_exists' || rule.type === 'tag_not_exists' ? (
@@ -229,13 +212,13 @@ export default function BranchEditors({
                   <div className="text-ink-secondary min-w-0 flex-1 text-sm">
                     <span>条件{ruleIndex + 1}（{RULE_TYPE_LABEL[rule.type]}）</span>
                     <div className="mt-1">
-                      <EntityKindField
+                      <SaveErrorField names={["value","rule.value"]}><EntityKindField
                         kind="tag"
                         label={`条件${ruleIndex + 1}のタグ`}
                         value={rule.value}
                         onChange={(value) => onUpdate(step.id, { kind: 'ruleTag', ruleIndex, tagId: value })}
                         options={tagOptions(rule.value)}
-                      />
+                      /></SaveErrorField>
                     </div>
                   </div>
                   {condition.rules.length > 1 ? (

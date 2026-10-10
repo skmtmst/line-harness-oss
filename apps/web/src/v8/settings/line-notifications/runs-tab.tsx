@@ -1,13 +1,5 @@
 'use client'
 
-/*
- * ★V8 LINE通知 送れなかったもの（板 DrwMm）・記録（板 PZBVb）。
- *
- * 並び（絵）：送れなかったものだけ数のマス4つ → 探す・対象・期間（記録は「クリック記録あり」）・右に再読み込み →
- * 表（日時・お知らせ・対象者・状態・理由・対応・試行・クリック。1行 53）→ 下の1行（送れなかったものは帯）。
- * 試行の履歴・受信箱で連絡・再試行・対応済みは、お知らせの名前を押して開く「記録の詳細」に置く（行は1段のまま）。
- * 読み込み・再試行・対応済みの口と世代の守りは今の部品（components/line-notifications/notification-run-list）の関数を使う。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Ban, CircleX, Mail, RotateCw } from 'lucide-react'
@@ -42,6 +34,16 @@ import { formatNumber } from '@/lib/format'
 import styles from './screen.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 LINE通知 送れなかったもの（板 DrwMm）・記録（板 PZBVb）。
+ *
+ * 並び（絵）：送れなかったものだけ数のマス4つ → 探す・対象・期間（記録は「クリック記録あり」）・右に再読み込み →
+ * 表（日時・お知らせ・対象者・状態・理由・対応・試行・クリック。1行 53）→ 下の1行（送れなかったものは帯）。
+ * 試行の履歴・受信箱で連絡・再試行・対応済みは、お知らせの名前を押して開く「記録の詳細」に置く（行は1段のまま）。
+ * 読み込み・再試行・対応済みの口と世代の守りは今の部品（components/line-notifications/notification-run-list）の関数を使う。
+ */
 
 const PAGE_SIZE = 20
 
@@ -67,8 +69,6 @@ const STATUS: Record<EcNotificationRun['status'], { label: string; tone: 'good' 
   excluded: { label: '送信対象外', tone: 'muted' },
   failed: { label: '送れなかった', tone: 'danger' },
 }
-
-
 
 /** 「10/1 21:30」。オフセットの無い古い行は既に日本時間として読む（今の部品と同じ決まり）。 */
 function shortJst(value: string | null | undefined): string {
@@ -194,14 +194,14 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
         <SearchField aria-label="お客様の名前・注文番号で探す" placeholder="お客様の名前・注文番号で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
       </div>
       <div className={styles.runRecipient}>
-        <Select aria-label="対象を絞り込み" label="対象" value={recipientFilter} onChange={(value) => setRecipientFilter(value as RecipientFilter)} options={[
+        <SaveErrorField names={["recipientFilter","recipient","recipient_filter"]}><Select aria-label="対象を絞り込み" label="対象" value={recipientFilter} onChange={(value) => setRecipientFilter(value as RecipientFilter)} options={[
           { value: 'all', label: 'すべて' }, { value: 'customer', label: '顧客' }, { value: 'operator', label: '運用者' },
-        ]} />
+        ]} /></SaveErrorField>
       </div>
       <div className={styles.runPeriod}>
-        <Select aria-label="期間を絞り込み" value={periodFilter} onChange={(value) => setPeriodFilter(value as PeriodFilter)} options={[
+        <SaveErrorField names={["periodFilter","period","period_filter"]}><Select aria-label="期間を絞り込み" value={periodFilter} onChange={(value) => setPeriodFilter(value as PeriodFilter)} options={[
           { value: 'all', label: 'すべての期間' }, { value: '24h', label: '24時間以内' }, { value: '7d', label: '7日以内' }, { value: '30d', label: '30日以内' },
-        ]} />
+        ]} /></SaveErrorField>
       </div>
       {mode === 'history' ? <FilterChip selected={filter === 'clicked'} onChange={() => setFilter(filter === 'clicked' ? 'all' : 'clicked')}>クリック記録あり</FilterChip> : null}
       <span className={styles.runSpacer} />
