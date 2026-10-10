@@ -10,6 +10,7 @@ import Select from '@/components/shared/select'
 import { AttachmentRow } from '@/components/shared/file-drop'
 import MediaSlot from '@/components/shared/media-slot'
 import { formatDateTime } from '@/lib/format'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const LABELS: Record<BroadcastAssetKind, { title: string; description: string; singular: string }> = {
   rich_message: { title: 'リッチメッセージ', description: '画像とタップ領域を組み合わせたテンプレートを作成し、一斉配信から引用できます。', singular: 'リッチメッセージ' },
@@ -45,6 +46,8 @@ function formatAssetBytes(bytes: number): string {
  * 作った直後のタブが0件のままになっていた。渡さなければ今までどおり。
  */
 export default function BroadcastAssetManager({ kind, onChanged }: { kind: BroadcastAssetKind; onChanged?: () => void }) {
+  const saveErrors = useSaveFormErrors()
+
   const { selectedAccountId } = useAccount()
   const scopeKey = `${selectedAccountId ?? ''}:${kind}`
   const scopeRef = useRef(scopeKey)
@@ -104,9 +107,11 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
       setDeleteTarget(null)
       await load()
       onChanged?.()
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
       // 生のAPIエラーは出さない。運用者が次に何をすればよいかだけを書く。
-      setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。')
+      { if (!fieldFailure) setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
@@ -123,10 +128,12 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
       if (!res.success) throw new Error(res.error)
       setItems(res.data)
       setLoadState('ready')
-    } catch {
-      if (scopeRef.current === key && loadGeneration.current === generation) setLoadState('error')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      if (scopeRef.current === key && loadGeneration.current === generation) { if (!fieldFailure) setLoadState('error') }
     }
-  }, [kind, selectedAccountId, scopeKey])
+  }, [kind, selectedAccountId, scopeKey, saveErrors])
   useEffect(() => { void load(); return () => { loadGeneration.current++ } }, [load])
 
   const reset = useCallback(() => { editorGeneration.current++; setEditing(null); setShowForm(false); setName(''); setImageUrl(''); setImageFile(null); setDescription(''); setActionUrl(''); setCards([newCard()]); setMoreCard(true); setError('') }, [])
@@ -157,8 +164,10 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
       if (!res.success) { setError(res.error); return }
       if (cardId === null) { setImageUrl(res.data.url); setImageFile({ name: file.name, size: file.size }) }
       else setCards((items) => items.map(card => card.id === cardId ? { ...card, imageUrl: res.data.url } : card))
-    } catch {
-      if (current()) setError('画像をアップロードできませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      if (current()) { if (!fieldFailure) setError('画像をアップロードできませんでした。もう一度お試しください。') }
     }
   }
 
@@ -166,7 +175,7 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
   // 「もっと見る」も1列使うので、付けるとき本文は9枚まで（API と同じ数え方）。
   const maxCards = moreCard && kind === 'card_message' ? MAX_PANELS - 1 : MAX_PANELS
   const save = async () => {
-    if (!name.trim()) { setError('名前を入力してください'); return }
+    if (!name.trim()) { if (!saveErrors.fail("name", '名前を入力してください')) setError('名前を入力してください'); return }
     if (kind === 'card_message' && cards.length > maxCards) { setError(`「もっと見る」パネルを付けるときは${MAX_PANELS - 1}枚までです。パネルを減らすか、「もっと見る」を外してください`); return }
     const payload: Record<string, unknown> = kind === 'card_message'
       ? { cards, moreCard }
@@ -174,7 +183,7 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
         ? { imageUrl, description, actionUrl, tapAreas: actionUrl ? [{ x: 0, y: 0, width: 100, height: 100, actionType: 'uri', value: actionUrl }] : [] }
         : { description, actionUrl }
     if (kind === 'rich_message' && !imageUrl) { setError('画像をアップロードしてください'); return }
-    if (kind === 'card_message' && cards.some((card) => !card.title.trim())) { setError('すべてのカードにタイトルを入力してください'); return }
+    if (kind === 'card_message' && cards.some((card) => !card.title.trim())) { if (!saveErrors.fail("card.title", 'すべてのカードにタイトルを入力してください')) setError('すべてのカードにタイトルを入力してください'); return }
     setSaving(true); setError('')
     try {
       const res = editing
@@ -183,22 +192,24 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
       if (!res.success) { setError(res.error); return }
       reset(); await load()
       onChanged?.()
-    } catch { setError('保存できませんでした') } finally { setSaving(false) }
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+ { if (!fieldFailure) setError('保存できませんでした') } } finally { setSaving(false) }
   }
 
   const meta = LABELS[kind]
-  return <div className="space-y-5">
+  return <SaveErrorScope errors={saveErrors}><div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3" data-design-node="FuBeQ"><div className="flex flex-wrap gap-2"><Button onClick={() => { reset(); setShowForm(true) }} variant="primary">{meta.singular}を作る</Button></div><Button href="/broadcasts/new?templatePicker=1">一斉配信で使う</Button></div>
     {showForm && <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card-surface">
       <div className="mb-5 flex items-center justify-between"><h3 className="font-bold">{editing ? '編集' : `新しい${meta.singular}`}</h3><button onClick={reset} className="text-sm text-ink-faint">閉じる</button></div>
-      <div className="space-y-4"><label className="block text-sm font-medium text-ink-secondary">名前<input value={name} onChange={(e) => setName(e.target.value)} className="mt-1.5 w-full rounded-card border px-3 py-2.5 font-normal" placeholder={`${meta.singular}の管理名`} /></label>
+      <div className="space-y-4"><label className="block text-sm font-medium text-ink-secondary">名前<SaveErrorField names={["name"]}><input value={name} onChange={(e) => setName(e.target.value)} className="mt-1.5 w-full rounded-card border px-3 py-2.5 font-normal" placeholder={`${meta.singular}の管理名`} /></SaveErrorField></label>
       {kind === 'rich_message' && <>
         {/*
           画像の送信は1回のAPI呼び出しで、途中の割合を測れない。
           実測できない進みは出さない（Progress は足さない）。
           パネル内の画像も同じ画像を入れる所（MediaSlot・Z7vd2）の小さい形。
         */}
-        <MediaSlot
+        <SaveErrorField names={["imageUrl","image_url"]}><MediaSlot
           title="画像を追加"
           value={imageUrl || null}
           accept="image/jpeg,image/png"
@@ -206,12 +217,12 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
           fit="contain"
           onFile={(file) => void upload(file)}
           onRemove={clearImage}
-        />
+        /></SaveErrorField>
         {imageFile ? <AttachmentRow name={imageFile.name} meta={formatAssetBytes(imageFile.size)} tone="photo" onRemove={clearImage} /> : null}
-        <input value={actionUrl} onChange={(e) => setActionUrl(e.target.value)} placeholder="タップ時に開くURL" className="w-full rounded-card border px-3 py-2.5 text-sm" />
+        <SaveErrorField names={["actionUrl","action_url"]}><input value={actionUrl} onChange={(e) => setActionUrl(e.target.value)} placeholder="タップ時に開くURL" className="w-full rounded-card border px-3 py-2.5 text-sm" /></SaveErrorField>
       </>}
-      {kind === 'card_message' && <div className="space-y-3">{cards.map((card, index) => <div key={card.id} className="rounded-card border bg-surface-pearl p-4"><div className="mb-3 flex justify-between"><b className="text-sm">パネル {index + 1}</b><button disabled={cards.length === 1} onClick={() => setCards((all) => all.filter((_, i) => i !== index))} className="text-xs text-status-danger disabled:opacity-30">削除する</button></div><div className="grid gap-3 md:grid-cols-2"><Select aria-label={`パネル ${index + 1} の種類`} value={card.template} onChange={(value) => setCards((all) => all.map((c,i) => i===index ? {...c,template:value}:c))} options={[{ value: 'product', label: 'プロダクト' }, { value: 'location', label: 'ロケーション' }, { value: 'person', label: '人物' }, { value: 'image', label: '画像' }]} size="full" /><MediaSlot size="compact" title="画像を追加" previewAlt={`パネル ${index + 1} の画像`} value={card.imageUrl || null} accept="image/jpeg,image/png" limitText="10MB 以内" onFile={(f) => void upload(f,index)} onRemove={() => setCards((all) => all.map((c,i) => i===index ? {...c,imageUrl:''}:c))} /><input value={card.title} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,title:e.target.value}:c))} placeholder="タイトル" className="rounded-control border px-3 py-2 text-sm"/><input value={card.description} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,description:e.target.value}:c))} placeholder="説明" className="rounded-control border px-3 py-2 text-sm"/><input value={card.actionLabel} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,actionLabel:e.target.value}:c))} placeholder="ボタン名" className="rounded-control border px-3 py-2 text-sm"/><input value={card.actionUrl} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,actionUrl:e.target.value}:c))} placeholder="アクションURL" className="rounded-control border px-3 py-2 text-sm"/></div></div>)}<button disabled={cards.length >= maxCards} onClick={() => setCards((all) => [...all,newCard()])} className="w-full rounded-card border border-dashed py-3 text-sm font-medium text-success disabled:text-ink-faint">＋ パネルを追加する（{cards.length}/{MAX_PANELS}）</button><Checkbox checked={moreCard} onCheckedChange={setMoreCard}>末尾に「もっと見る」パネルを表示</Checkbox>{moreCard && <p className="text-xs text-ink-faint">「もっと見る」で1枠使うため、パネルは{MAX_PANELS - 1}枚までです。</p>}</div>}
-      {(kind === 'coupon' || kind === 'research') && <><textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={kind === 'coupon' ? '特典内容・利用条件' : 'アンケートの説明'} className="w-full rounded-card border p-3 text-sm" rows={3}/><input value={actionUrl} onChange={(e) => setActionUrl(e.target.value)} placeholder={kind === 'coupon' ? 'クーポンを開くURL' : '回答フォームURL'} className="w-full rounded-card border px-3 py-2.5 text-sm" /></>}
+      {kind === 'card_message' && <div className="space-y-3">{cards.map((card, index) => <div key={card.id} className="rounded-card border bg-surface-pearl p-4"><div className="mb-3 flex justify-between"><b className="text-sm">パネル {index + 1}</b><button disabled={cards.length === 1} onClick={() => setCards((all) => all.filter((_, i) => i !== index))} className="text-xs text-status-danger disabled:opacity-30">削除する</button></div><div className="grid gap-3 md:grid-cols-2"><SaveErrorField names={[`cards.${index}.template`,"template","card.template","cards"]}><Select aria-label={`パネル ${index + 1} の種類`} value={card.template} onChange={(value) => setCards((all) => all.map((c,i) => i===index ? {...c,template:value}:c))} options={[{ value: 'product', label: 'プロダクト' }, { value: 'location', label: 'ロケーション' }, { value: 'person', label: '人物' }, { value: 'image', label: '画像' }]} size="full" /></SaveErrorField><SaveErrorField names={[`cards.${index}.imageUrl`,`cards.${index}.image_url`,"imageUrl","card.imageUrl","image_url","card.image_url"]}><MediaSlot size="compact" title="画像を追加" previewAlt={`パネル ${index + 1} の画像`} value={card.imageUrl || null} accept="image/jpeg,image/png" limitText="10MB 以内" onFile={(f) => void upload(f,index)} onRemove={() => setCards((all) => all.map((c,i) => i===index ? {...c,imageUrl:''}:c))} /></SaveErrorField><SaveErrorField names={[`cards.${index}.title`,"card.title","cards"]}><input value={card.title} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,title:e.target.value}:c))} placeholder="タイトル" className="rounded-control border px-3 py-2 text-sm"/></SaveErrorField><SaveErrorField names={[`cards.${index}.description`,"description","card.description","cards"]}><input value={card.description} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,description:e.target.value}:c))} placeholder="説明" className="rounded-control border px-3 py-2 text-sm"/></SaveErrorField><SaveErrorField names={[`cards.${index}.actionLabel`,`cards.${index}.action_label`,"actionLabel","card.actionLabel","cards","action_label","card.action_label"]}><input value={card.actionLabel} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,actionLabel:e.target.value}:c))} placeholder="ボタン名" className="rounded-control border px-3 py-2 text-sm"/></SaveErrorField><SaveErrorField names={[`cards.${index}.actionUrl`,`cards.${index}.action_url`,"actionUrl","card.actionUrl","cards","action_url","card.action_url"]}><input value={card.actionUrl} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,actionUrl:e.target.value}:c))} placeholder="アクションURL" className="rounded-control border px-3 py-2 text-sm"/></SaveErrorField></div></div>)}<button disabled={cards.length >= maxCards} onClick={() => setCards((all) => [...all,newCard()])} className="w-full rounded-card border border-dashed py-3 text-sm font-medium text-success disabled:text-ink-faint">＋ パネルを追加する（{cards.length}/{MAX_PANELS}）</button><SaveErrorField names={["moreCard","more_card"]}><Checkbox checked={moreCard} onCheckedChange={setMoreCard}>末尾に「もっと見る」パネルを表示</Checkbox></SaveErrorField>{moreCard && <p className="text-xs text-ink-faint">「もっと見る」で1枠使うため、パネルは{MAX_PANELS - 1}枚までです。</p>}</div>}
+      {(kind === 'coupon' || kind === 'research') && <><SaveErrorField names={["description"]}><textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={kind === 'coupon' ? '特典内容・利用条件' : 'アンケートの説明'} className="w-full rounded-card border p-3 text-sm" rows={3}/></SaveErrorField><SaveErrorField names={["actionUrl","action_url"]}><input value={actionUrl} onChange={(e) => setActionUrl(e.target.value)} placeholder={kind === 'coupon' ? 'クーポンを開くURL' : '回答フォームURL'} className="w-full rounded-card border px-3 py-2.5 text-sm" /></SaveErrorField></>}
       {error && <p className="text-sm text-status-danger">{error}</p>}<div className="flex justify-end gap-2"><button onClick={reset} className="rounded-control border px-4 py-2 text-sm">キャンセル</button><Button variant="primary" className="px-5 py-2 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving} onClick={() => void save()}>{saving ? '保存中…' : '保存する'}</Button></div></div>
     </section>}
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map((item) => <article key={item.id} className="rounded-card border border-hairline bg-canvas p-5 shadow-card-surface"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="rounded-pill bg-accent-soft px-2 py-1 text-micro font-bold text-success">{meta.title}</span><h3 className="mt-3 truncate font-bold text-ink">{item.name}</h3><p className="mt-1 text-xs text-ink-faint">更新 {formatDateTime(item.updatedAt)}</p></div></div><div className="mt-4 flex flex-wrap gap-2"><a href={`/broadcasts/new?contentTemplateId=${encodeURIComponent(item.id)}`} className="rounded-control border border-accent-border px-3 py-2 text-sm font-bold text-success">一斉配信で使う</a><button onClick={() => startEdit(item)} className="min-w-24 flex-1 rounded-control border px-3 py-2 text-sm font-bold">編集</button><button onClick={() => { setDeleteError(''); setDeleteTarget({ item, accountId: selectedAccountId }) }} className="rounded-control border border-status-danger-border px-3 py-2 text-sm font-bold text-status-danger">削除する</button></div></article>)}{loadState === 'loading' && <p role="status">テンプレートを読み込んでいます…</p>}{loadState === 'error' && <div role="alert">テンプレートを読み込めませんでした。<Button onClick={() => void load()}>再読み込み</Button></div>}{loadState === 'ready' && items.length === 0 && <div className="col-span-full rounded-card border border-dashed bg-canvas p-12 text-center text-sm text-ink-faint">まだ{meta.singular}テンプレートがありません。「{meta.singular}を作る」から追加してください。</div>}</div>
@@ -248,5 +259,5 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
         <li>・戻せません: 同じ{meta.singular}が必要になったときは、作り直してください。</li>
       </ul>
     </ConfirmDialog>
-  </div>
+  </div></SaveErrorScope>
 }

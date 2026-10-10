@@ -9,6 +9,8 @@ import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { formatDateTime } from '@/lib/format'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /**
  * 友だち追加のQRコード（設計 V2 1-1-1）。
@@ -375,7 +377,7 @@ export default function QrDialog({
               <label htmlFor="qr-route" className="text-ink-secondary mb-1 block text-xs font-medium">
                 発行中の追加URL
               </label>
-              <Select
+              <SaveErrorField names={["routeId","route_id"]}><EntitySelect
                 aria-label="発行中の追加URL"
                 size="full"
                 id="qr-route"
@@ -387,9 +389,9 @@ export default function QrDialog({
                 className="w-full"
                 options={[
                   { value: '', label: '基本の追加URL' },
-                  ...routes.filter((r) => r.isActive).map((r) => ({ value: r.id, label: r.name })),
+                  ...routes.filter((r) => r.isActive).map((r) => ({ ...entityOptionMetadata(r), value: r.id, label: r.name })),
                 ]}
-              />
+              /></SaveErrorField>
               {routeStopped ? (
                 <p className="text-danger mt-1 text-xs" role="alert">
                   この経路は停止しています。QRコードと印刷は出せません。
@@ -411,7 +413,7 @@ export default function QrDialog({
                 <label htmlFor="qr-size" className="text-ink-secondary mb-1 block text-xs font-medium">
                   画像の大きさ
                 </label>
-                <Select
+                <SaveErrorField names={["size"]}><Select
                   aria-label="画像の大きさ"
                   size="full"
                   id="qr-size"
@@ -419,7 +421,7 @@ export default function QrDialog({
                   onChange={(value) => setSize(value)}
                   className="w-full"
                   options={SIZES.map((s) => ({ value: s.value, label: s.label }))}
-                />
+                /></SaveErrorField>
               </div>
               <div>
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">
@@ -458,14 +460,14 @@ export default function QrDialog({
                 URL と重なり、狭い幅では右側が切れていた。狭い幅では下へ。
               */}
               <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                <textarea
+                <SaveErrorField names={["link"]}><textarea
                   id="qr-link"
                   readOnly
                   rows={3}
                   value={blocked ? '' : link}
                   onFocus={(e) => e.currentTarget.select()}
                   className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-w-0 flex-1 resize-none border px-3 py-2 font-mono text-xs leading-relaxed focus:outline-none"
-                />
+                /></SaveErrorField>
                 <Button
                   variant="secondary"
                   type="button"

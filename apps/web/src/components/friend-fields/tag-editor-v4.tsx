@@ -1,7 +1,6 @@
 'use client'
 
 import { DragHandle } from '@/components/shared/row-actions'
-
 import SharedToggle from '@/components/shared/toggle'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -26,6 +25,8 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from './attribute-kind-guide'
 import { formatNumber } from '@/lib/format'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 export type LinkedAction = {
   id: string
@@ -74,7 +75,7 @@ const MULTIPLIERS = [
   { value: '30000', label: '3.0倍' },
 ]
 
-const ACTION_TYPES = [
+export const ACTION_TYPES = [
   ['テキスト送信', 'テキスト送信'],
   ['テンプレート送信', 'テンプレート'],
   ['タグ追加', 'タグ'],
@@ -91,7 +92,7 @@ const ACTION_TYPES = [
 ] as const
 export type TagEditorActionLabel = (typeof ACTION_TYPES)[number][0]
 
-const ACTION_DEFINITIONS: Record<(typeof ACTION_TYPES)[number][0], { actionType: string; resource?: keyof CommonActionResources; paramKey?: string }> = {
+export const ACTION_DEFINITIONS: Record<(typeof ACTION_TYPES)[number][0], { actionType: string; resource?: keyof CommonActionResources; paramKey?: string }> = {
   'テキスト送信': { actionType: 'send_message' },
   'テンプレート送信': { actionType: 'send_message', resource: 'templates', paramKey: 'templateId' },
   'タグ追加': { actionType: 'add_tag', resource: 'tags', paramKey: 'tagId' },
@@ -219,17 +220,17 @@ export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes,
             <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink">2. 実行するタイミング
               <HelpTip label="実行するタイミングの説明">時間をあけて実行すると、その時間が経ってから実行されます。待機中にタグが外れた場合は実行されません。</HelpTip>
             </h3>
-            <SegmentedControl
+            <SaveErrorField names={["timing"]}><SegmentedControl
               aria-label="実行するタイミング"
               size="timing"
               options={[{ value: 'immediate', label: 'すぐに実行' }, { value: 'delay', label: '時間をあけて実行' }]}
               value={timing}
               onChange={setTiming}
-            />
+            /></SaveErrorField>
             {timing === 'delay' ? (
               <div className="mt-3 flex items-center gap-2">
-                <input aria-label="実行までの待ち時間" type="number" min={1} value={delay} onChange={(event) => setDelay(event.target.value)} className={`${inputClass} max-w-28`} />
-                <Select
+                <SaveErrorField names={["delay"]}><input aria-label="実行までの待ち時間" type="number" min={1} value={delay} onChange={(event) => setDelay(event.target.value)} className={`${inputClass} max-w-28`} /></SaveErrorField>
+                <SaveErrorField names={["delayUnit","delay_unit"]}><Select
                   aria-label="遅延の単位"
                   value={delayUnit}
                   onChange={(value) => setDelayUnit(value as typeof delayUnit)}
@@ -238,7 +239,7 @@ export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes,
                     { value: 'hours', label: '時間後' },
                     { value: 'days', label: '日後' },
                   ]}
-                />
+                /></SaveErrorField>
               </div>
             ) : null}
           </section>
@@ -246,11 +247,11 @@ export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes,
           <section className="mt-7 border-t border-hairline pt-6">
             <h3 className="mb-3 text-sm font-bold text-ink">3. {selected[0]}の内容</h3>
             {selected[0] === 'テキスト送信' || selected[0] === '担当者通知' ? (
-              <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={6} className={inputClass} />
+              <SaveErrorField names={["message"]}><textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={6} className={inputClass} /></SaveErrorField>
             ) : selected[0] === 'マイル付与' ? (
-              <input type="number" min={1} value={amount} onChange={(event) => setAmount(event.target.value)} className={inputClass} aria-label="付与マイル" />
+              <SaveErrorField names={["amount"]}><input type="number" min={1} value={amount} onChange={(event) => setAmount(event.target.value)} className={inputClass} aria-label="付与マイル" /></SaveErrorField>
             ) : (
-              <><Combobox aria-label={`${selected[0]}に使う内容を選択`} placeholder={unavailable ? 'この種類は配布先で設定してください' : resources ? `${selected[1]}を選択` : '選択肢を読み込み中…'} value={resourceId} onChange={setResourceId} disabled={unavailable || !resources} loading={!unavailable && !resources} options={choices.map((choice) => ({ value: choice.id, label: choice.name }))} className="w-full" />{referenceState && selected[0] === 'テンプレート送信' && <div className="mt-3 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary"><span className="font-semibold">プレビュー</span><br />選んだテンプレートの公開版を送ります。</div>}</>
+              <><SaveErrorField names={["resourceId","resource_id"]}><EntitySelect clearable size="full" aria-label={`${selected[0]}に使う内容を選択`} placeholder={unavailable ? 'この種類は配布先で設定してください' : resources ? `${selected[1]}を選択` : '選択肢を読み込み中…'} value={resourceId} onChange={setResourceId} disabled={unavailable || !resources} loading={!unavailable && !resources} options={choices.map((choice) => ({ ...entityOptionMetadata(choice), value: choice.id, label: choice.name }))} className="w-full" /></SaveErrorField>{referenceState && selected[0] === 'テンプレート送信' && <div className="mt-3 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary"><span className="font-semibold">プレビュー</span><br />選んだテンプレートの公開版を送ります。</div>}</>
             )}
             <div className="mt-3 rounded-control border border-hairline bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary">
               <span className="font-semibold">実行内容の確認：</span> {selected[0]}を{timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後に`}実行します。
@@ -259,7 +260,7 @@ export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes,
 
           <section className="mt-7 border-t border-hairline pt-6">
             <label className="mb-1 block text-sm font-semibold text-ink">4. 追加する位置</label>
-            <Select
+            <SaveErrorField names={["position"]}><Select
               aria-label="追加する位置"
               value={position}
               onChange={setPosition}
@@ -268,7 +269,7 @@ export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes,
                 { value: 'before', label: '選択中のアクションの前', disabled: !selectedAction },
               ]}
               size="full"
-            />
+            /></SaveErrorField>
           </section>
     </Drawer>
   )
@@ -344,7 +345,7 @@ export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, o
             <button type="button" onClick={fetchPreview} className="ml-2 font-semibold underline">再計算する</button>
           </p>
         )}
-        <Checkbox className="mt-3" checked={accepted} onCheckedChange={setAccepted}>人数と合計マイルを確認しました</Checkbox>
+        <SaveErrorField names={["accepted"]}><Checkbox className="mt-3" checked={accepted} onCheckedChange={setAccepted}>人数と合計マイルを確認しました</Checkbox></SaveErrorField>
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="secondary" className="px-4 py-2.5 font-medium text-ink-secondary h-auto whitespace-normal" type="button" onClick={onSaveWithoutApplying}>反映しないで保存する</Button>
           <Button variant="primary" className="px-4 py-2.5 font-bold border-0 h-auto whitespace-normal" type="button" disabled={!accepted || loading || Boolean(previewError)} onClick={() => onSave(preview?.previewToken ?? '')}>{loading ? '対象を計算中…' : 'さかのぼって反映して保存する'}</Button>
@@ -530,8 +531,8 @@ export default function TagEditorV4({
               右端が表示領域の外へ出る。
             */}
             <div className="grid gap-4 md:grid-cols-[320px_minmax(0,1fr)]">
-              <label className="min-w-0"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">所属フォルダ</span><Select aria-label="所属フォルダ" value={groupId} onChange={setGroupId} options={[{ value: '', label: '未分類' }, ...groups.map((group) => ({ value: group.id, label: group.name }))]} size="full" /></label>
-              <label className="min-w-0"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名 <RequiredBadge /></span><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 定期購入者" className={inputClass} /><DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" /></label>
+              <label className="min-w-0"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">所属フォルダ</span><SaveErrorField names={["groupId", "group_id", "folderId", "tag.folderId", "definition.tag.folderId"]}><Select aria-label="所属フォルダ" value={groupId} onChange={setGroupId} options={[{ value: '', label: '未分類' }, ...groups.map((group) => ({ value: group.id, label: group.name }))]} size="full" /></SaveErrorField></label>
+              <label className="min-w-0"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名 <RequiredBadge /></span><SaveErrorField names={["name", "tag.name", "definition.tag.name"]}><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 定期購入者" className={inputClass} /></SaveErrorField><DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" /></label>
             </div>
             <p className="mt-3 text-xs leading-5 text-ink-faint">どの分類に入れるかを選びます。未選択なら「未分類」になります。フォルダの色がタグの印になります。</p>
             {/*
@@ -547,7 +548,7 @@ export default function TagEditorV4({
             ) : null}
             {/* IDEA-04: 「タグ」を選んだ理由と、値を持たせるなら情報欄・対応状態なら対応マークという違いを、作る場所で確認できるようにする。 */}
             <div className="mt-4"><AttributeKindGuide current="tag" /></div>
-            <Checkbox className="mt-4" checked={isStarred} onCheckedChange={setIsStarred} description="このスイッチ、またはタグ一覧の星をクリックして、友だち一覧への表示をON／OFFできます。">友だち一覧に表示する（★）</Checkbox>
+            <SaveErrorField names={["isStarred","is_starred"]}><Checkbox className="mt-4" checked={isStarred} onCheckedChange={setIsStarred} description="このスイッチ、またはタグ一覧の星をクリックして、友だち一覧への表示をON／OFFできます。">友だち一覧に表示する（★）</Checkbox></SaveErrorField>
           </section>
 
           <section className={cardClass}>
@@ -559,7 +560,7 @@ export default function TagEditorV4({
           </section>
 
           <section className={cardClass}>
-            <div className="flex items-start justify-between gap-4"><StepTitle number={3} title="タグが付いたときの連動" note="このタグが付いた瞬間に動かす処理をまとめて決めます。" /><div className="flex items-center gap-2"><span className={`text-xs font-medium ${linked ? 'text-accent-deep' : 'text-ink-faint'}`}>{linked ? 'ON' : 'OFF'}</span><Toggle checked={linked} onChange={setLinked} label="タグ連動" /></div></div>
+            <div className="flex items-start justify-between gap-4"><StepTitle number={3} title="タグが付いたときの連動" note="このタグが付いた瞬間に動かす処理をまとめて決めます。" /><div className="flex items-center gap-2"><span className={`text-xs font-medium ${linked ? 'text-accent-deep' : 'text-ink-faint'}`}>{linked ? 'ON' : 'OFF'}</span><SaveErrorField names={["linked", "linkedEnabled", "tag.linkedEnabled"]}><Toggle checked={linked} onChange={setLinked} label="タグ連動" /></SaveErrorField></div></div>
             {!linked ? (
               <div className="rounded-control border border-hairline bg-canvas-sunken p-4">
                 <p className="text-sm font-semibold text-ink">ONにすると、ここで次の設定ができます</p>
@@ -580,15 +581,15 @@ export default function TagEditorV4({
               <div className="space-y-3">
                 <div className="grid gap-3 md:grid-cols-2">
                   {/* R137: 390pxで右へはみ出さないよう子の欄も縮める。 */}
-                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">本人へのマイル付与</span><div className="flex items-center gap-2"><input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={inputClass} /><span className="text-sm text-ink-faint">mile</span></div><span className="mt-1 block text-micro leading-4 text-ink-faint">このタグが付いた本人へ、一度だけ積みます。</span></label>
-                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">紹介者へのマイル付与</span><div className="flex items-center gap-2"><input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={inputClass} /><span className="text-sm text-ink-faint">mile</span></div><span className="mt-1 block text-micro leading-4 text-ink-faint">紹介経由の友だちなら、その紹介者にも積みます。</span></label>
-                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">今後のマイル倍率</span><Select aria-label="今後のマイル倍率" value={multiplier} onChange={setMultiplier} options={MULTIPLIERS.map((option) => ({ value: option.value, label: option.label }))} size="full" /><span className="mt-1 block text-micro leading-4 text-ink-faint">このタグが付いている間、次回以降の付与倍率に使います。</span></label>
-                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">倍率の優先度</span><Select aria-label="倍率の優先度" value={priority} onChange={setPriority} options={[0, 1, 2, 3, 4, 5].map((value) => ({ value: String(value), label: value === 0 ? '標準' : `優先度 ${value}` }))} size="full" /><span className="mt-1 block text-micro leading-4 text-ink-faint">倍率タグが複数ある場合、数字が大きい設定を優先します。</span></label>
+                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">本人へのマイル付与</span><div className="flex items-center gap-2"><SaveErrorField names={["reward", "rewardMiles", "mileageReward", "mileage.self", "tag.mileage.self", "definition.tag.mileage.self"]}><input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={inputClass} /></SaveErrorField><span className="text-sm text-ink-faint">mile</span></div><span className="mt-1 block text-micro leading-4 text-ink-faint">このタグが付いた本人へ、一度だけ積みます。</span></label>
+                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">紹介者へのマイル付与</span><div className="flex items-center gap-2"><SaveErrorField names={["referralReward", "referral_reward", "referralRewardMiles", "referralMileageReward", "mileage.referrer", "tag.mileage.referrer", "definition.tag.mileage.referrer"]}><input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={inputClass} /></SaveErrorField><span className="text-sm text-ink-faint">mile</span></div><span className="mt-1 block text-micro leading-4 text-ink-faint">紹介経由の友だちなら、その紹介者にも積みます。</span></label>
+                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">今後のマイル倍率</span><SaveErrorField names={["multiplier", "multiplierBps", "mileageMultiplierBps", "mileage.multiplier", "tag.mileage.multiplier", "definition.tag.mileage.multiplier"]}><Select aria-label="今後のマイル倍率" value={multiplier} onChange={setMultiplier} options={MULTIPLIERS.map((option) => ({ value: option.value, label: option.label }))} size="full" /></SaveErrorField><span className="mt-1 block text-micro leading-4 text-ink-faint">このタグが付いている間、次回以降の付与倍率に使います。</span></label>
+                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">倍率の優先度</span><SaveErrorField names={["priority", "multiplierPriority", "mileageMultiplierPriority", "mileage.priority", "tag.mileage.priority", "definition.tag.mileage.priority"]}><Select aria-label="倍率の優先度" value={priority} onChange={setPriority} options={[0, 1, 2, 3, 4, 5].map((value) => ({ value: String(value), label: value === 0 ? '標準' : `優先度 ${value}` }))} size="full" /></SaveErrorField><span className="mt-1 block text-micro leading-4 text-ink-faint">倍率タグが複数ある場合、数字が大きい設定を優先します。</span></label>
                 </div>
-                <RadioCardGroup legend="タグを外して付け直したときの扱い" legendVisible>
+                <SaveErrorField names={["reapplyMode"]}><RadioCardGroup legend="タグを外して付け直したときの扱い" legendVisible>
                   <RadioCard name="reapplyMode" value="once" checked={reapplyMode === 'once'} onChange={() => setReapplyMode('once')} title="最初の1回だけ積む" note="誤操作や付け直しで、同じマイルが重複しません。" />
                   <RadioCard name="reapplyMode" value="every" checked={reapplyMode === 'every'} onChange={() => setReapplyMode('every')} title="付け直すたびに積む" note="購入回数など、同じタグを繰り返し使う運用向けです。" />
-                </RadioCardGroup>
+                </RadioCardGroup></SaveErrorField>
                 <div className="border-t border-hairline pt-3">
                   <div className="mb-2 flex items-center justify-between"><div><h3 className="text-sm font-bold text-ink">連動アクション</h3><p className="mt-0.5 text-xs text-ink-faint">上から順に実行されます。つまんで動かすか、↑↓ボタンで順番を変更できます。</p></div><button type="button" onClick={() => setDrawerOpen(true)} className="rounded-control border border-action/25 bg-action-soft px-3 py-2 text-sm font-semibold text-action">＋ アクションを追加する</button></div>
                   {actions.length === 0 ? <p className="rounded-control border border-dashed border-hairline p-5 text-center text-sm text-ink-faint">連動アクションはまだありません</p> : <div className="overflow-x-auto pb-1"><ol className="space-y-2">{actions.map((action, index) => <li key={action.id} draggable onDragStart={() => setDragActionId(action.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => { const fromId = dragActionId; setDragActionId(null); if (!fromId || fromId === action.id) return; setActions((current) => { const from = current.findIndex((item) => item.id === fromId); if (from < 0) return current; const reordered = current.filter((item) => item.id !== fromId); reordered.splice(Math.min(index, reordered.length), 0, current[from]); return reordered }) }} onDragEnd={() => setDragActionId(null)} className={`grid grid-cols-[28px_32px_118px_minmax(0,1fr)_90px_32px_32px_32px_32px] items-center gap-2 rounded-control border border-hairline px-3 py-2 text-sm ${dragActionId === action.id ? 'opacity-50' : ''}`}><DragHandle label={`「${action.label}」を並べ替える`} draggable onDragStart={() => setDragActionId(action.id)} onDragEnd={() => setDragActionId(null)} onMove={direction => moveAction(index, direction)} /><span className="flex h-6 w-6 items-center justify-center rounded-pill bg-canvas-sunken text-xs font-medium">{index + 1}</span><span className={`rounded-control border px-2 py-1 text-center text-xs ${action.type === 'タグ追加' || action.type === 'タグ解除' || action.type === 'マイル付与' ? 'border-success bg-success-bg text-success' : action.type === '友だち情報更新' || action.type === '対応マーク変更' || action.type.startsWith('リマインダ') ? 'border-warning bg-warning-bg text-warning' : action.type.startsWith('シナリオ') || action.type === 'リッチメニュー切替' ? 'border-action bg-action-soft text-action' : 'border-info bg-info-bg text-action'}`}>{action.type}</span><span className="truncate font-medium text-ink" title={action.label}>{action.label}</span><span className={`rounded-pill px-2 py-1 text-center text-xs ${action.timing === 'すぐに' ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'}`}>{action.timing === 'すぐに' ? '即時' : action.timing}</span><IconButton onClick={() => moveAction(index, -1)} disabled={index === 0} aria-label={`${index + 1}番目のアクションを上へ`} title="上へ"><ArrowUp size={15} aria-hidden /></IconButton><IconButton onClick={() => moveAction(index, 1)} disabled={index === actions.length - 1} aria-label={`${index + 1}番目のアクションを下へ`} title="下へ"><ArrowDown size={15} aria-hidden /></IconButton><IconButton onClick={() => duplicateAction(action, index)} aria-label={`${index + 1}番目のアクションを複製`}><Copy size={15} aria-hidden /></IconButton><IconButton onClick={() => setActions((current) => current.filter((item) => item.id !== action.id))} className="text-danger" aria-label={`${index + 1}番目のアクションを削除`}><Trash2 size={15} aria-hidden /></IconButton></li>)}</ol></div>}
@@ -611,7 +612,7 @@ export default function TagEditorV4({
 
           {mode === 'edit' && (
             <section className={cardClass}>
-              <div className="flex items-start justify-between gap-4"><StepTitle number={4} title="すでに付いている人への反映" note="既存の友だちにも、今回のマイル設定をさかのぼって反映できます。" /><Toggle checked={applyToExisting} onChange={setApplyToExisting} label="遡及反映" /></div>
+              <div className="flex items-start justify-between gap-4"><StepTitle number={4} title="すでに付いている人への反映" note="既存の友だちにも、今回のマイル設定をさかのぼって反映できます。" /><SaveErrorField names={["applyToExisting","apply_to_existing"]}><Toggle checked={applyToExisting} onChange={setApplyToExisting} label="遡及反映" /></SaveErrorField></div>
               {/* N-047: 対象人数はサーバーの事前計算。未計算の間は「—」で誤読させない（固定表示=visual-qaは従来の数）。 */}
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">現在の対象者</p><p className="mt-1 text-xl font-semibold">{tag?.friendCount ?? 0}<span className="ml-1 text-xs font-normal">人</span></p></div><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">本人マイル対象</p><p className="mt-1 text-xl font-semibold">{retroPreview ? retroPreview.selfTargets : referenceRetroactiveState ? (tag?.friendCount ?? 0) : '—'}<span className="ml-1 text-xs font-normal">人</span></p></div><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">紹介者対象</p><p className="mt-1 text-xl font-semibold">{retroPreview ? retroPreview.referralTargets : referenceRetroactiveState ? Math.min(tag?.friendCount ?? 0, 34) : '—'}<span className="ml-1 text-xs font-normal">人</span></p></div><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">倍率</p><p className="mt-1 text-sm font-semibold">次回付与から</p></div></div>
               {retroPreview && (retroPreview.selfExcluded > 0 || retroPreview.referralExcluded > 0) && (

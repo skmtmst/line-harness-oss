@@ -13,6 +13,7 @@ import LiffPhoneFrame from '@/components/shared/liff-phone-frame'
 import { PREFECTURES, normalizeRatingValue, FORM_OPTIONS_DEFAULT, type FormBlock, type FormInputBlock, type FormLayout } from '@line-crm/shared'
 import { DateYmdField, AddressControls, BookingControls, FormChoiceRow, FormFileControl, FormSelectControl, FormTextControl, RatingStars } from '../../../../liff/src/components/forms/controls'
 import styles from './edit.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const WEEKDAY = '日月火水木金土'
 const SAMPLE_TIMES = ['10:00', '11:00', '13:00', '14:00', '15:00', '16:00']
@@ -110,7 +111,7 @@ function PhoneQuestion({ block, bookingMenus }: { block: FormInputBlock; booking
       {block.type === 'radio' || block.type === 'checkbox' ? <div className={styles.phoneChoices} data-inline={block.inline || undefined}>
         {(block.choices ?? []).map((choice) => {
           const selected = block.type === 'radio' && text ? text === choice.label : selectedChoices.includes(choice.label)
-          return <FormChoiceRow key={choice.id} selected={selected}><input type={block.type} checked={selected} readOnly tabIndex={-1} />{choice.label}</FormChoiceRow>
+          return <FormChoiceRow key={choice.id} selected={selected}><SaveErrorField names={["selected"]}><input type={block.type} checked={selected} readOnly tabIndex={-1} /></SaveErrorField>{choice.label}</FormChoiceRow>
         })}
       </div> : null}
       {block.type === 'rating' ? <RatingStars name={block.name} current={normalizeRatingValue(text)} onChange={() => {}} /> : null}

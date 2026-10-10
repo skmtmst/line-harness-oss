@@ -85,3 +85,14 @@
 .toggle { cursor: pointer; }
 .toggle[data-selected='false'] { background: var(--color-shell); color: var(--color-ink-secondary); }
 }
+
+/* B-180：表・要点の欄・編集の札はすべて同じ24px。 */
+[data-theme='v8'] .pill,
+[data-theme='v8'] .pill[data-size] {
+  box-sizing: border-box;
+  height: var(--tpl-tag-pill-h);
+  --tag-pill-font: var(--text-caption);
+  --tag-pill-dot: 6px;
+  --tag-pill-pad: 0 8px;
+  --tag-pill-gap: 6px;
+}

@@ -1,8 +1,12 @@
-// @vitest-environment happy-dom
+
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
+import { notifyToast } from '@/components/shared/toast'
+import { api } from '@/lib/api'
+import { NewAutomationV8 } from '@/v8/automations/create/create'
+// @vitest-environment happy-dom
 
 // 実ブラウザではV8のガードが保存・送信中の切替を止める。
 // それとは別に、Provider側の選択が変わった場合も遅い応答を他店へ混ぜない。
@@ -37,6 +41,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     ...actual,
     api: {
       ...actual.api,
+      friends: { ...actual.api.friends, list: vi.fn(async () => ({ success: true, data: { items: [{ id: 'friend-1', displayName: '試験の友だち' }], total: 1 } })) },
       tags: { ...actual.api.tags, list: vi.fn() },
       scenarios: { ...actual.api.scenarios, list: vi.fn() },
       friendFields: { ...actual.api.friendFields, list: vi.fn() },
@@ -60,9 +65,6 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 vi.mock('@/components/shared/toast', () => ({ notifyToast: vi.fn() }))
-import { notifyToast } from '@/components/shared/toast'
-import { api } from '@/lib/api'
-import { NewAutomationV8 } from '@/v8/automations/create/create'
 
 function ok<T>(data: T) { return { success: true as const, data } }
 function draft(accountId = 'account-1') {
@@ -119,12 +121,12 @@ async function changeProvider(view: ReturnType<typeof render>, id: string) {
 }
 async function fillTagRule(name: string) {
   fireEvent.change(screen.getByRole('textbox', { name: '名前', exact: true }), { target: { value: name } })
-  fireEvent.click(screen.getByRole('button', { name: /^1つめのすること「.+」の操作$/ }))
-  fireEvent.click(await screen.findByRole('menuitem', { name: '中身を直す' }))
-  const dialog = await screen.findByRole('dialog', { name: '1つめのすること', exact: true })
+  fireEvent.click(screen.getByRole('button', { name: '1つ目の行うことのその他操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '設定を変える' }))
   await pickEntity('自動化で付けるタグ', 'VIP')
-  fireEvent.keyDown(dialog, { key: 'Escape' })
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: '1つめのすること', exact: true })).toBeNull())
+  fireEvent.click(screen.getByRole('button', { name: '1つ目の行うことのその他操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '設定を閉じる' }))
+
 }
 async function save() {
   const calls = vi.mocked(api.automations.updateDraft).mock.calls.length
@@ -157,7 +159,7 @@ describe('V8本体の遅延応答と店舗の分離', () => {
 
   it.each(['成功', '失敗'])('1人テストの%s応答が店舗切替後に来ても、別店舗と戻った店舗へ成否を残さない', async (outcome) => {
     const view = await mount()
-    fireEvent.change(screen.getByLabelText('1人テストの友だちID'), { target: { value: 'friend-1' } })
+    await pickEntity('試す友だち', '試験の友だち')
     fireEvent.click(screen.getByRole('button', { name: '1人で試す', exact: true }))
     const dialog = await screen.findByRole('dialog', { name: '1人テストの確認' })
     const pending = deferred<unknown>()
@@ -178,3 +180,6 @@ describe('V8本体の遅延応答と店舗の分離', () => {
     expect(screen.queryByText(/テストする友だちが見つかりません/)).toBeNull()
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

@@ -98,6 +98,7 @@ export default function MembersV8({
 
   return (
     <ListPage
+      skeleton
       boardId={BOARD_NODE[tab]}
       title="会員"
       help="ネットショップの会員と LINE の友だちを結びつけて、ランクやペットの情報を見ます。"

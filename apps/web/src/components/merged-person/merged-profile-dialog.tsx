@@ -7,6 +7,7 @@ import Dialog from '@/components/shared/dialog'
 import { Field } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import type { FriendProfileCandidate } from '@/lib/api'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export type ProfileCandidateDraft = Record<string, {
   optionIndex: string
@@ -89,7 +90,7 @@ export default function MergedProfileDialog({
               <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-3">
                 <p className="text-sm font-bold leading-5 text-ink">{field.fieldLabel}</p>
                 <Field label="採用する値">
-                  <Select
+                  <SaveErrorField names={["optionIndex","row.optionIndex","option_index","row.option_index"]}><Select
                     size="full"
                     className="w-full"
                     aria-label={`${field.fieldLabel}の採用値`}
@@ -105,10 +106,10 @@ export default function MergedProfileDialog({
                         label: `${option.valuePreview ?? '値は未取得'} ／ ${option.sourceLabel}`,
                       })),
                     ]}
-                  />
+                  /></SaveErrorField>
                 </Field>
                 <Field label="これからの更新">
-                  <Select
+                  <SaveErrorField names={["updateMode","row.updateMode","update_mode","row.update_mode"]}><Select
                     size="full"
                     className="w-full"
                     aria-label={`${field.fieldLabel}の更新方法`}
@@ -125,7 +126,7 @@ export default function MergedProfileDialog({
                       { value: 'fixed', label: 'この値で固定' },
                       { value: 'auto', label: '同じ取得元の新しい値で更新' },
                     ]}
-                  />
+                  /></SaveErrorField>
                 </Field>
               </div>
             </Card>

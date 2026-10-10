@@ -78,9 +78,9 @@
 
   /* 操作。LINEの状態色とは分け、設定画面のリンクと主要ボタンに使う。 */
   --color-action: var(--color-accent-deep);
-  --color-focus-ring: #2563eb;
-  --color-action-hover: var(--color-action);
+  --color-action-hover: var(--color-accent);
   --color-action-soft: var(--color-accent-soft);
+  --color-focus-ring: #2563eb;
   --color-on-action: #ffffff;
 
   /*
@@ -478,7 +478,7 @@
   --color-notice-warning-bg: #fff7e6;
   --color-notice-danger-bg: #fef0f0;
   --color-menu-danger: #e5484d;
-  --color-link: #0b63ce;
+  --color-link: var(--color-accent-deep);
   --color-checkbox-line: #dadde2;
   --radius-checkbox-mark: 3px;
   --text-callout: 14px;
@@ -1454,6 +1454,8 @@
   --tpl-preview-title-size: var(--polish-text-section); --tpl-preview-title-lh: 23px;
   --tpl-tabs-h: 28px; --tpl-tabs-pad-bottom: 10px; --tpl-tabs-text-lh: 18px; --tpl-tabs-compact-lh: 18.5px; --tpl-tabs-compact-line-overlap: -2px;
   --tpl-chip-h: 36px; --tpl-chip-pad: 0 10px; --tpl-chip-gap: 5px; --tpl-body-pad: var(--polish-space-card); --tpl-body-gap: var(--polish-space-row); --tpl-body-lh: 22px; --tpl-insert-pad: 0 14px; --tpl-body-spacer: 24px; --tpl-chip-row-gap: 4px; --tpl-rule-row-gap: 12px; --tpl-chip-label-lh: 20px; --tpl-kw-chip-pad: 4px 6px 4px 10px; --tpl-kw-input-w: 200px; --tpl-kw-input-pad: 0 12px; --tpl-seg-btn-h: 32px; --tpl-seg-btn-pad: 0 12px; --tpl-weekday-w: 48px; --tpl-field-gap-basic: var(--polish-space-row); --tpl-count-num-size: 24px; --tpl-count-num-lh: 29px; --tpl-summary-key-w: 140px; --tpl-summary-val-lh: 21px; --tpl-summary-gap: var(--polish-space-field); --tpl-conflict-desc-lh: 18px; --tpl-rule-note-lh: 16px;
+  /* B-169: 共通の行（★V8 XXFT4）の44pxの高さ・52pxの行間。 */
+  --tpl-action-row-compact-pad: 8px 12px; --tpl-action-kind-w: 100px; --tpl-action-list-gap: 8px; --tpl-action-icon-box: 24px; --tpl-action-grip-w: 16px;
   --tpl-action-row-pad: 10px 12px; --tpl-action-row-gap: 10px; --tpl-action-select-w: 140px;
   /* LINEアカウントの詳細（ihjfd）・送受信を止める（CFAyf）・資格情報（Msb1j）・アーカイブ（WOfBN）・登録の編集（n9Z2P）・乗り換え（x2dSNv）。 */
   /* acct：登録の手順の下と、乗り換えの本文の寸法（既定の設定フォームは保つ）。 */
@@ -1720,6 +1722,23 @@
   --tpl-ev-card-pad: var(--polish-space-card); --tpl-ev-row-h: var(--polish-table-row); --tpl-ev-num-w: 70px; --tpl-ev-state-w: 102px; --tpl-ev-state-pad: 10px; --tpl-ev-chip-pad: 2px 8px; --tpl-ev-chip-dot: 6px; --tpl-ev-chip-gap: 5px; --tpl-ev-chip-lh: 18px; --tpl-ev-band-pad: 10px 12px; --tpl-ev-band-lh: 18px; --tpl-ev-ba-gap: 4px; --tpl-ev-bubble-pad: 6px 11px; --tpl-ev-key-w: 150px; --tpl-ev-impact-h: 298px; --tpl-ev-confirm-pull: -21px;
   --tpl-ev-bk-pick-w: 220px; --tpl-ev-ls-col-when: 170px; --tpl-ev-ls-col-seats: 100px; --tpl-ev-ls-first-pad: 60px; --tpl-ev-ls-state-pad: 19px; --tpl-ev-ls-row-h: var(--polish-table-row); --tpl-ev-md-thumb-h: 126px; --tpl-ev-md-thumb-narrow-w: 80px; --tpl-ev-md-usage-top: 3px; --tpl-ev-md-grid-pad: 0 24px; --tpl-ev-md-grid-top: 18px; --tpl-ev-ls-saved-w: 152px; --tpl-ev-ls-col-pending: 88px; --tpl-ev-ls-col-state: 172px;
   --tpl-ev-fr-rail-w: 356px; --tpl-ev-fr-col-gap: 28px; --tpl-ev-fr-pull-top: 0px; --tpl-ev-fr-rail-pad: 24px; --tpl-ev-fr-alert-pad: 12px 20px; --tpl-ev-fr-bar-label-w: 118px; --tpl-ev-fr-bar-count-w: 90px; --tpl-ev-fr-bar-h: 8px; --tpl-ev-fr-quote-h: 47px; --tpl-ev-fr-head-h: var(--polish-table-head); --tpl-ev-fr-row-h: var(--polish-table-row); --tpl-ev-fr-col-when: 132px; --tpl-ev-fr-col-who: 352px; --tpl-ev-fr-col-state: 106px; --tpl-ev-fr-pager-pad: 0 4px 0 20px; --tpl-ev-fr-detail-h: 39px; --tpl-ev-fr-quote-gap: 6px; --tpl-ev-bk-pull-top: -8px; --tpl-ev-bk-broadcast-top: 19px; --tpl-ev-bk-broadcast-gap: 34px; --tpl-ev-bk-pull-side: -4px; --tpl-ev-bk-kpi-num: 20px; --tpl-ev-bk-kpi-num-lh: 24px; --tpl-ev-bk-head-gap: 11px; --tpl-ev-bk-card-top: 14px; --tpl-ev-bk-att-pad: 8px 12px; --tpl-ev-bk-row-h: var(--polish-table-row); --tpl-ev-bk-main-row-h: var(--polish-table-row); --tpl-ev-bk-main-cols: 462px 156px 116px minmax(0, 1fr) auto; --tpl-ev-bk-wait-cols: minmax(0, 1fr) 116px 136px 136px 120px; --tpl-ev-bk-cancel-cols: minmax(0, 1fr) 116px 140px;
+  --tpl-distribution-toolbar-pad: 13px;
+  --tpl-distribution-progress-pad: 14px 16px 12px;
+  --tpl-distribution-col-check: 52px;
+  --tpl-distribution-col-item: 196px;
+  --tpl-distribution-col-version: 156px;
+  --tpl-distribution-col-mode: 184px;
+  --tpl-distribution-dot-pull: -16px;
+  --tpl-distribution-compact-item: 180px;
+  --tpl-distribution-compact-version: 126px;
+  --tpl-distribution-compact-mode: 170px;
+  --tpl-roster-message-pad: 20px 24px;
+  --tpl-roster-head-pad: 14px 24px 13px;
+  --tpl-roster-body-pad: 16px 24px;
+  --tpl-roster-record-h: 46px;
+  --tpl-roster-history-head-h: 32px;
+  --tpl-roster-main-cols: minmax(0, 1fr) 156px 116px 366px;
+  --tpl-roster-main-compact-cols: minmax(0, 1fr) 120px 92px 330px;
   --tpl-composer-pad-top: 12px; --tpl-composer-pad-side: 20px; --tpl-composer-pad-bottom: 16px;
   /* 分析のレポートを作る（H5UoIu・競合 G83vi）。 */
   --tpl-an-rp-head-pad: 20px 24px 16px; --tpl-an-rp-head-gap: 8px; --tpl-an-rp-back-size: 13px; --tpl-an-rp-title-size: var(--polish-text-section); --tpl-an-rp-lead-size: 12px; --tpl-an-rp-bold: 700;
@@ -2890,7 +2909,7 @@ select:not([multiple]):not(.appearance-none) {
 /* 作ってあるもの・配るアカウントを選ぶ窓 dJZ7Q（picker）：欄の1行と窓の寸法。 */
 [data-theme="v8"] {
   --tpl-picker-width: 880px;
-  --tpl-picker-narrow-width: 760px;
+  --tpl-picker-narrow-width: 640px;
   --tpl-picker-height: 560px;
   --tpl-picker-folder-width: 190px;
   --tpl-picker-preview-width: 250px;
@@ -2986,3 +3005,57 @@ html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader']
   background: var(--color-canvas);
   box-shadow: var(--card-shadow);
 }
+
+/* B-159 / B-161 / B-180：採用済みの値。部品ごとの写しよりこの値を優先する。 */
+[data-theme='v8'] {
+  --text-body: 13px;
+  --text-label: 12px;
+  --radius-segment: 10px;
+  --color-table-head: #f7f8fa;
+  --color-focus-ring: #2563eb;
+  --shadow-controls-pop: 0 8px 24px rgba(29, 29, 31, 0.12);
+  --shadow-float: var(--shadow-controls-pop);
+  --shadow-overlay: var(--shadow-controls-pop);
+  --select-menu-shadow: var(--shadow-controls-pop);
+  --v8-parts-dialog-shadow: var(--shadow-controls-pop);
+  --shadow-controls-toggle: 0 1px 2px rgba(29, 29, 31, 0.16);
+  --color-badge-neutral-bg: #94a3b81a; --color-badge-neutral: #475569;
+  --color-badge-success-bg: #16a34a1a; --color-badge-success: #087a3e;
+  --color-badge-warning-bg: #f973161a; --color-badge-warning: #c2410c;
+  --color-badge-danger-bg: #ef44441a; --color-badge-danger: #b91c1c;
+  --color-badge-info-bg: #2563eb1a; --color-badge-info: #1d4ed8;
+  --tpl-folder-create-h: 36px;
+  --tpl-folder-create-pad: 0 16px;
+  --tpl-button-h: 36px;
+  --tpl-button-pad-side: 16px;
+  --tpl-dialog-width: 560px;
+  --tpl-dialog-large-width: 720px;
+  --tpl-dialog-title-size: 18px;
+  --tpl-dialog-title-weight: 700;
+  --tpl-tabs-h: 36px;
+  --tpl-tabs-weight: 500;
+  --tpl-tabs-current-weight: 600;
+  --tpl-badge-h: 22px;
+  --tpl-tag-pill-h: 24px;
+  --tpl-section-title-size: 15px;
+  --tpl-section-title-weight: 700;
+  --tpl-field-label-size: 12px;
+  --tpl-field-label-weight: 500;
+  --tpl-card-pad: 16px;
+  --tpl-notice-pad: 12px 16px;
+  --tpl-thead-pad-side: 16px;
+}
+
+/* B-178：一覧の骨組み（v19Ivv）。画面の寸法ではなく部品の値。 */
+[data-theme='v8'] {
+  --tpl-list-row-h: 60px;
+  --tpl-list-head-h: 40px;
+  --tpl-list-search-w: 240px;
+  --tpl-list-search-min: 120px;
+  --tpl-list-band-h: 116px;
+  --tpl-list-band-pad: 16px 24px;
+  --tpl-list-gap: 8px;
+  --tpl-list-cell-side: 16px;
+}
+
+[data-theme='v8'] { --tpl-image-frame-w: 160px; --tpl-image-frame-h: 106px; }

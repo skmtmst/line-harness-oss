@@ -120,6 +120,7 @@ export default function PetsV8({
 
   return (
     <ListPage
+      skeleton
       boardId={BOARD[tab]}
       headingSize="regular"
       title="マイペット"

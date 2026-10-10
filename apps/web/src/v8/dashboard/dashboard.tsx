@@ -1,4 +1,5 @@
 'use client'
+import SegmentedControl from '@/components/shared/segmented';
 
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
@@ -115,7 +116,7 @@ export default function DashboardV8() {
         title={title}
         items={[
           { id: 'detail', label: openDetail === id ? '内訳を閉じる' : '内訳を見る', onSelect: () => setOpenDetail((current) => (current === id ? null : id)) },
-          { id: 'go', label, external: true, href: href, onSelect: () => router.push(href) },
+          { id: 'go', label, external: false, href: href, onSelect: () => router.push(href) },
           ...(canEditLayout ? [{ id: 'edit', label: 'ダッシュボード編集', dividerBefore: true, onSelect: d.openEditor }] : []),
         ]}
       />

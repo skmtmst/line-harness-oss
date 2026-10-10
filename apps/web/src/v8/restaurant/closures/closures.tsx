@@ -1,12 +1,4 @@
 'use client'
-
-/*
- * ★V8 予約枠・在庫 ›「休業日・貸切」タブ（提案 E-10 `UVnvR`。採用 2026-10-07）。
- *
- * 上：他の予約サイトの枠を閉じる知らせ（休業・貸切の分）→ 左：月のカレンダー（臨時休業・貸切・定休）
- * ｜右：これからの休業・貸切（「…」から変える・消す）と Google の営業時間。
- * 足す・変える窓（`nVvXy`）は closure-dialog.tsx。動きは BEHAVIOR.md。
- */
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Bell, Check, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -31,6 +23,16 @@ import {
 import styles from './closures.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 予約枠・在庫 ›「休業日・貸切」タブ（提案 E-10 `UVnvR`。採用 2026-10-07）。
+ *
+ * 上：他の予約サイトの枠を閉じる知らせ（休業・貸切の分）→ 左：月のカレンダー（臨時休業・貸切・定休）
+ * ｜右：これからの休業・貸切（「…」から変える・消す）と Google の営業時間。
+ * 足す・変える窓（`nVvXy`）は closure-dialog.tsx。動きは BEHAVIOR.md。
+ */
 
 type MediaLink = { code: string; name: string; loginUrl: string | null; closeOnBooking: boolean }
 
@@ -66,6 +68,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   dialog: ClosureDialogTarget | null
   onDialog: (target: ClosureDialogTarget | null) => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const store = ctx.store
   const storeId = ctx.selectedStoreId
@@ -182,7 +185,11 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
       await restaurantTestApi.completeChannelCloseTask(accountId, task.id)
       notifyToast(`${nameOf(task.channel)}の枠を閉じた印を付けました。`)
     } catch (caught) {
-      notifyToast(withPermissionFailure(caught, describeSaveFailure(caught), 'store'), { tone: 'error' })
+      const fieldFailure = saveErrors.capture(caught);
+
+
+      if (!fieldFailure) {
+      notifyToast(withPermissionFailure(caught, describeSaveFailure(caught), 'store'), { tone: 'error' }) }
     } finally {
       await loadTasks()
       setBusy('')
@@ -236,14 +243,14 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   }
 
   if (loadError !== null && closures === null) {
-    return <div className={styles.state}><ListState kind="error" error={loadError} onRetry={() => void loadClosures()} /></div>
+    return <SaveErrorScope errors={saveErrors}><div className={styles.state}><ListState kind="error" error={loadError} onRetry={() => void loadClosures()} /></div></SaveErrorScope>
   }
 
   const weeks = monthWeeks(month)
   const closeMedia = media.filter((m) => m.closeOnBooking)
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       {first && firstItem ? (
         <div className={styles.bandRow}>
           <div className={styles.band} role="status" data-closure-band="">
@@ -432,6 +439,6 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
         onConfirm={() => remove()}
         onCancel={() => setRemoving(null)}
       />
-    </>
+    </></SaveErrorScope>
   )
 }

@@ -1,12 +1,5 @@
 'use client'
 
-/*
- * ★V8 重複検出（Pencil `hn6Y8`、1152 は `G9C4Uw`、状態の見本帳は `SXCb3`）。/friends?tab=duplicates。
- *
- * データの口は今と同じ（/api/duplicates/stats・/api/identity-candidates・再検出）。
- * 見せ方：頭（← 友だちへ・タブ・表示中をCSVで書き出す）→ 案内の帯 → 数4つ →
- * 探す・状態の札・見直した時刻・もう一度見直す → 重複の候補（比べて決める）→ アカウントごとの重なり。
- */
 import { jstDate } from '@/lib/jst-datetime'
 import Link from 'next/link'
 import { Download, Info, RotateCw } from 'lucide-react'
@@ -28,6 +21,15 @@ import { CONFIDENCE_WORD, STATUS_FILTERS, STATUS_WORD, confidenceTone, slashDate
 import styles from './list.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+
+
+/*
+ * ★V8 重複検出（Pencil `hn6Y8`、1152 は `G9C4Uw`、状態の見本帳は `SXCb3`）。/friends?tab=duplicates。
+ *
+ * データの口は今と同じ（/api/duplicates/stats・/api/identity-candidates・再検出）。
+ * 見せ方：頭（← 友だちへ・タブ・表示中をCSVで書き出す）→ 案内の帯 → 数4つ →
+ * 探す・状態の札・見直した時刻・もう一度見直す → 重複の候補（比べて決める）→ アカウントごとの重なり。
+ */
 
 export default function DuplicatesListV8() {
   usePageTitle('友だち')

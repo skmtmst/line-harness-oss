@@ -330,3 +330,6 @@ describe('V8 友だち情報の欄の通し：作る→値を書く', () => {
     expect(onDone).toHaveBeenCalled()
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

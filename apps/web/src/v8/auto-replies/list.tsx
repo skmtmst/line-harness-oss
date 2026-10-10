@@ -1,6 +1,10 @@
 'use client'
+import { Clock } from 'lucide-react';
+import { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import { scheduleChipLabels, scheduleText } from './words';
 
-
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { canManageRole } from '@/lib/staff-role';
 import SharedStatusPill from '@/components/shared/status-pill'
 import BulkBar from '@/components/shared/bulk-bar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -9,18 +13,6 @@ import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar, { ListToolbarOptional } from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
-/*
- * ★V8 自動応答の一覧（Pencil「★V8 画面の地図」の自動応答の行：
- * 一覧 `uE9gf`、行の「…」は `IIesG`、止めるは `i8F12`、削除は `u8sKN`、
- * 状態の板は `G8i4xP`）。
- *
- * v7 の一覧（app/auto-replies/page.tsx 内の AutoRepliesPageV7）とは
- * 別の部品として持つ。データの口は同じ。違いは置き場と見せ方だけ——
- * 「ルールを作る」は左のフォルダの列の上、行の右端は「…」（編集・実行結果・
- * 複製・止める/再開・フォルダへ移す・削除）、行の左の □ を選ぶと表の下に
- * まとめての帯（止める・再開・フォルダへ移す）。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
- */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
@@ -104,6 +96,21 @@ import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
+
+/*
+ * ★V8 自動応答の一覧（Pencil「★V8 画面の地図」の自動応答の行：
+ * 一覧 `uE9gf`、行の「…」は `IIesG`、止めるは `i8F12`、削除は `u8sKN`、
+ * 状態の板は `G8i4xP`）。
+ *
+ * v7 の一覧（app/auto-replies/page.tsx 内の AutoRepliesPageV7）とは
+ * 別の部品として持つ。データの口は同じ。違いは置き場と見せ方だけ——
+ * 「ルールを作る」は左のフォルダの列の上、行の右端は「…」（編集・実行結果・
+ * 複製・止める/再開・フォルダへ移す・削除）、行の左の □ を選ぶと表の下に
+ * まとめての帯（止める・再開・フォルダへ移す）。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ */
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -244,6 +251,7 @@ function CreateRuleButton({ full, compact, disabled, disabledTitle, menuOpen, on
 }
 
 export default function AutoRepliesListV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('自動応答')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -286,7 +294,7 @@ export default function AutoRepliesListV8() {
   /* ★V8 かんたんに作る（板 `G4GejG`）。詳しい分け方（Xr6eu）は P6vbxn 待ち。 */
   const [quickOpen, setQuickOpen] = useState(false)
   /* 行の詳細パネル（V8「サクサク感」C①・D・E）。開いている行のID。 */
-  const [panelId, setPanelId] = useState<string | null>(null)
+  const [panelId, setPanelId] = useDetailPanelUrl('reply')
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -295,9 +303,10 @@ export default function AutoRepliesListV8() {
   const [toggleError, setToggleError] = useState('')
   const [moveIds, setMoveIds] = useState<string[] | null>(null)
   const [moveDraft, setMoveDraft] = useState('')
-  const [duplicateTarget, setDuplicateTarget] = useState<AutoReply | null>(null)
+  const duplicateLock = useRef(false)
+  const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const [duplicating, setDuplicating] = useState(false)
-  const [duplicateError, setDuplicateError] = useState('')
+  const setDuplicateError =(message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
   const [actionError, setActionError] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
   const [moveNotice, setMoveNotice] = useState('')
@@ -352,11 +361,15 @@ export default function AutoRepliesListV8() {
         requestGeneration,
         loadGenerationRef.current,
       )) return
+      const fieldFailure = saveErrors.capture(reason)
       setLoadedAccountId(requestAccountId)
-      setLoadError(reason)
+      { if (!fieldFailure)
+      setLoadError(reason) }
+      { if (!fieldFailure)
       setLoadState(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
-  }, [selectedAccountId])
+  }
+  }, [selectedAccountId, saveErrors])
 
   const loadFolders = useCallback(async () => {
     try {
@@ -365,13 +378,15 @@ export default function AutoRepliesListV8() {
         setFolders(res.data)
         setUnfiledCount(res.unfiledCount ?? null)
       }
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       // 置き場が取れなくても一覧は出す。取れない失敗で画面を落とさない。
     }
-  }, [])
+  }, [saveErrors])
 
   useEffect(() => { load() }, [load])
-  useEffect(() => { void loadFolders() }, [loadFolders])
+  useEffect(() => { void loadFolders() }, [loadFolders]);
+
 
   const templateById = useMemo(() => new Map(templates.map((t) => [t.id, t])), [templates])
 
@@ -560,6 +575,8 @@ export default function AutoRepliesListV8() {
               : await api.autoReplies.update(id, { isActive: true })
             if (!result.success) failed += 1
           } catch (error) {
+            saveErrors.capture(error);
+
             if (error instanceof ApiError && error.status === 403) forbidden = true
             failed += 1
           }
@@ -605,11 +622,14 @@ export default function AutoRepliesListV8() {
       setPendingDelete(null)
       if (selectedAccountIdRef.current === requestAccountId) await load()
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure)
       setDeleteError(
         reason instanceof ApiError && reason.status === 403
           ? `${NO_WRITE_PERMISSION.label}。${NO_WRITE_PERMISSION.note}`
           : '自動応答を削除できませんでした。状態を読み直してからお試しください。',
-      )
+      ) }
     } finally {
       setDeleting(false)
     }
@@ -659,7 +679,8 @@ export default function AutoRepliesListV8() {
           try {
             const result = await api.autoReplies.update(id, { folderId })
             if (!result.success) failed += 1
-          } catch {
+          } catch (saveFailure) {
+            saveErrors.capture(saveFailure)
             failed += 1
           }
         }
@@ -682,14 +703,17 @@ export default function AutoRepliesListV8() {
   /*
    * 複製（行の「…」→「複製する」）。複製の口は無いので、同じ内容で新しく作る。
    * コピーは必ず「停止中」で作る（AUTOREPLY-08：動かすのは別の操作）。
-   * 元ルールが残っているあいだだけ確認窓を出す（stale guard）。
+   * 名前や確認の窓は出さず、その場で作る（B-177）。
    */
-  const duplicateKeyRef = useRef(crypto.randomUUID())
-  useEffect(() => { duplicateKeyRef.current = crypto.randomUUID() }, [duplicateTarget?.id])
-  const runDuplicate = async () => {
+  const duplicateKeysRef = useRef(new Map<string, string>())
+  const runDuplicate = async (duplicateTarget: AutoReply) => {
+    if (duplicateLock.current) return
     if (!duplicateTarget || duplicating) return
+    duplicateLock.current = true
     setDuplicating(true)
     setDuplicateError('')
+    const operationId = `${selectedAccountId}:${duplicateTarget.id}`
+    if (!duplicateKeysRef.current.has(operationId)) duplicateKeysRef.current.set(operationId, crypto.randomUUID())
     const source = duplicateTarget
     try {
       const result = await api.autoReplies.create({
@@ -718,21 +742,27 @@ export default function AutoRepliesListV8() {
         keywordMatchMode: source.keywordMatchMode === 'all' ? 'all' : 'any',
         folderId: source.folderId,
         internalMemo: source.internalMemo,
-      }, duplicateKeyRef.current)
+      }, duplicateKeysRef.current.get(operationId)!)
       if (!result.success) {
         setDuplicateError('複製できませんでした。状態を読み直してからお試しください。')
         return
       }
-      setDuplicateTarget(null)
-      notifyToast(`「${displayName(source)}」をコピーしました（停止中で作られました）`, { tone: 'success' })
+
+      duplicateKeysRef.current.delete(operationId)
+      duplicateFeedback.mark(source.id, result.data.id)
+      notifyToast('複製しました', { tone: 'success' })
       await load()
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure)
       setDuplicateError(
         reason instanceof ApiError && reason.status === 403
           ? `${NO_WRITE_PERMISSION.label}。${NO_WRITE_PERMISSION.note}`
           : '複製できませんでした。状態を読み直してからお試しください。',
-      )
+      ) }
     } finally {
+      duplicateLock.current = false
       setDuplicating(false)
     }
   }
@@ -748,6 +778,7 @@ export default function AutoRepliesListV8() {
    * 動かした結果をそのまま知らせる（`moveNotice` は残す）。
    */
   const applyPriorityUpdates = (updates: Array<{ id: string; priority: number }>, notice: string) => {
+    duplicateFeedback.clear()
     if (updates.length === 0) return
     const requestAccountId = selectedAccountId
     const nextById = new Map(updates.map((u) => [u.id, u.priority] as const))
@@ -847,7 +878,7 @@ export default function AutoRepliesListV8() {
         icon: <Copy size={14} aria-hidden="true" />,
         onSelect: () => {
           setDuplicateError('')
-          setDuplicateTarget(r)
+          void runDuplicate(r)
         },
       },
     ]
@@ -912,7 +943,7 @@ export default function AutoRepliesListV8() {
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   const panelIndex = panelId === null ? -1 : items.findIndex((r) => r.id === panelId)
@@ -1121,18 +1152,18 @@ export default function AutoRepliesListV8() {
           <thead>
             <TableHeadRow>
                 <Th className={styles.selectCell} aria-label="選択">
-                  {canEdit && <Checkbox
+                  {canEdit && <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
                     checked={allOnPageSelected}
                     indeterminate={!allOnPageSelected && selectedCount > 0}
                     onCheckedChange={() => toggleAllOnPage()}
                     aria-label="このページのルールをすべて選択"
-                  />}
+                  /></SaveErrorField>}
                 </Th>
               {tableHeadCells}
             </TableHeadRow>
           </thead>
-          <RovingTbody reorderKey={liveOrder.shown.map((r) => r.id).join(',')}>
-            {liveOrder.shown.map((r) => {
+          <RovingTbody reorderKey={duplicateFeedback.order(liveOrder.shown, items).map((r) => r.id).join(',')}>
+            {duplicateFeedback.order(liveOrder.shown, items).map((r, saveFieldIndex) => {
               const name = displayName(r)
               const conflicts = r.conflictAttentionCount ?? 0
               const actions = actionSummary(r)
@@ -1160,11 +1191,11 @@ export default function AutoRepliesListV8() {
                   }} data-row-id={r.id}
                 >
                     <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
-                      {canEdit && <Checkbox
+                      {canEdit && <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","r.id"]}><Checkbox
                         checked={selectedIds.has(r.id)}
                         onCheckedChange={() => toggleOne(r.id)}
                         aria-label={`${name}を選択`}
-                      />}
+                      /></SaveErrorField>}
                     </Td>
                   <Td
                     className={styles.gripCell}
@@ -1305,7 +1336,7 @@ export default function AutoRepliesListV8() {
                     variant="secondary"
                     onClick={() => {
                       setDuplicateError('')
-                      setDuplicateTarget(panelRow)
+                      void runDuplicate(panelRow)
                       setPanelId(null)
                     }}
                   >
@@ -1448,7 +1479,7 @@ export default function AutoRepliesListV8() {
               </div>
   )
   const savedBox = (
-              <Select
+              <SaveErrorField names={["savedFilter","zeroThisMonthOnly","saved_filter","zero_this_month_only"]}><Select
                 aria-label="よく使う絞り込み"
                 icon={<Bookmark size={14} aria-hidden="true" />}
                 value={savedFilter}
@@ -1463,11 +1494,11 @@ export default function AutoRepliesListV8() {
                   { value: 'toggle-zero', label: zeroThisMonthOnly ? '今月0回の絞り込みを外す' : '今月0回で絞り込む' },
                   ...((conflictCount ?? 0) > 0 || conflictOnly ? [{ value: 'toggle-conflict', label: conflictOnly ? '重なりの絞り込みを外す' : '重なりありで絞り込む' }] : []),
                 ]}
-              />
+              /></SaveErrorField>
   )
   const perPageBox = (
               <div data-per-page-select>
-                <Select
+                <SaveErrorField names={["pageSize","page_size"]}><Select
                   className="w-full"
                   aria-label="1ページに出す件数"
                   size="page-size"
@@ -1477,7 +1508,7 @@ export default function AutoRepliesListV8() {
                     setPage(1)
                   }}
                   options={PAGE_SIZE_OPTIONS}
-                />
+                /></SaveErrorField>
               </div>
   )
   const createButton = (<>
@@ -1489,7 +1520,7 @@ export default function AutoRepliesListV8() {
           />}
   </>)
   const folderSelect = (
-          <Select
+          <SaveErrorField names={["folderFilter","folder","folder_filter"]}><Select
             aria-label="フォルダ"
             value={folderFilter}
             onChange={(value) => {
@@ -1497,7 +1528,7 @@ export default function AutoRepliesListV8() {
               setPage(1)
             }}
             options={folderSelectOptions}
-          />
+          /></SaveErrorField>
   )
 
   /*
@@ -1505,9 +1536,9 @@ export default function AutoRepliesListV8() {
    * 部品は広い板と同じもの（動きは同じ）。並びと段だけを変える。
    */
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
+    <ListToolbarFrame>
       <Notice tone="info">上のルールから順に見て、最初に当たった1つだけが動きます。順番は行の左のつまみで入れ替えます。</Notice>
-      <div className={styles.narrowRow}>
+      <ListToolbarRow>
         {canEdit && <CreateRuleButton
           compact
           disabled={false}
@@ -1515,7 +1546,7 @@ export default function AutoRepliesListV8() {
           onOpenMenu={(anchor) => { createMenuAnchorRef.current = anchor; setCreateMenuOpen(true) }}
         />}
         <div className={styles.narrowFolder}>{folderSelect}</div>
-        <div className={styles.narrowSearch}>
+        <ListToolbarSearchSlot>
           <SearchField
             placeholder="ルール名・言葉で探す"
             aria-label="ルール名・言葉で探す"
@@ -1529,20 +1560,20 @@ export default function AutoRepliesListV8() {
               setPage(1)
             }}
           />
-        </div>
+        </ListToolbarSearchSlot>
         <span className={styles.narrowSpacer} aria-hidden="true" />
         {perPageBox}
-      </div>
-      <div className={styles.narrowRow}>
+      </ListToolbarRow>
+      <ListToolbarRow>
         {filterChips}
         {sortBox}
         <ListToolbarOptional compact label="よく使う絞り込み">{savedBox}</ListToolbarOptional>
-      </div>
-    </div>
+      </ListToolbarRow>
+    </ListToolbarFrame>
   )
 
   return (
-    <ListPage boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" title={<>
+    <SaveErrorScope errors={saveErrors}><ListPage skeleton boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" title={<>
         自動応答
       </>} help={<>{<>
         届いたメッセージに、決めた言葉・曜日・時間帯で自動で返します。上のルールから順に、最初に当たった1つだけが動きます。
@@ -1609,13 +1640,13 @@ export default function AutoRepliesListV8() {
         {pendingToggle?.kind === 'stop' && (
           <div className={styles.reasonField}>
             <Field label="止める理由" htmlFor="auto-reply-stop-reason" optional>
-              <TextField
+              <SaveErrorField names={["toggleReason","toggle_reason"]}><TextField
                 id="auto-reply-stop-reason"
                 value={toggleReason}
                 onChange={(event) => setToggleReason(event.target.value)}
                 maxLength={500}
                 placeholder="例：キャンペーンが終わったので"
-              />
+              /></SaveErrorField>
             </Field>
           </div>
         )}
@@ -1712,7 +1743,7 @@ export default function AutoRepliesListV8() {
       >
         <div className={styles.moveBody}>
           <span className={styles.moveLabel}>移動先のフォルダ</span>
-          <Select
+          <SaveErrorField names={["moveDraft","move_draft"]}><Select
             aria-label="移動先のフォルダ"
             size="full"
             value={moveDraft}
@@ -1721,25 +1752,12 @@ export default function AutoRepliesListV8() {
               { value: '', label: '未分類' },
               ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
             ]}
-          />
+          /></SaveErrorField>
         </div>
       </ConfirmDialog>
 
       {/* 複製の確認窓。コピーは停止中で作る（動かすのは別の操作）。 */}
-      <ConfirmDialog
-        open={duplicateTarget !== null}
-        title={duplicateTarget ? `「${displayName(duplicateTarget)}」を複製しますか？` : ''}
-        description="同じ条件と返し方のルールをもう1つ作ります。コピーは「停止中」で作られるので、確認してから動かしてください。名前に「（コピー）」を付けます。"
-        confirmLabel={duplicating ? '複製中…' : '複製する'}
-        busy={duplicating}
-        error={duplicateError}
-        onConfirm={() => runDuplicate()}
-        onCancel={() => {
-          if (duplicating) return
-          setDuplicateTarget(null)
-          setDuplicateError('')
-        }}
-      />
+      <></>
       {quickOpen ? (
         <QuickCreateV8
           accountId={selectedAccountId}
@@ -1806,6 +1824,6 @@ export default function AutoRepliesListV8() {
           </p>
         ) : null}
         {listBody}
-      </ListPage>
+      </ListPage></SaveErrorScope>
   )
 }

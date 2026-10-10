@@ -9,6 +9,7 @@
  * プール一覧・LINEアカウント一覧・プールごとの所属アカウント・追加・外す・削除。
  * 「新規プール」は V8 の作る画面（/pools/new・`D0AOyx`）へ移る。
  */
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Copy, Info, Plus } from 'lucide-react'
@@ -151,6 +152,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
   canManage: boolean
   onChange: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const isMain = pool.slug === 'main'
   const apiBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const publicUrl = `${apiBase}/pool/${pool.slug}`
@@ -180,7 +182,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
       const response = await api.pools.update(pool.id, { name: editName.trim() })
       if (!response.success) throw new Error(response.error)
       setEditing(false); notifyToast('プールを保存しました'); onChange()
-    } catch { setEditError('保存できませんでした。入力は残っています。もう一度お試しください。') }
+    } catch (cause) { if (!saveErrors.capture(cause)) setEditError('保存できませんでした。入力は残っています。もう一度お試しください。') }
     finally { setEditBusy(false) }
   }
 
@@ -228,11 +230,11 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
       {copyError ? <p role="alert" className={styles.inlineError}>{copyError}</p> : null}
       <PoolMembers poolId={pool.id} accounts={accounts} canManage={canManage} onChange={onChange} />
 
-      <Dialog open={editing} title="プールを編集" designWidth={560} busy={editBusy} error={editError} onCancel={closeEdit} onConfirm={() => void saveEdit()} confirmLabel="保存する">
+      <SaveErrorScope errors={saveErrors}><Dialog open={editing} title="プールを編集" designWidth={560} busy={editBusy} error={editError} onCancel={closeEdit} onConfirm={() => void saveEdit()} confirmLabel="保存する">
         <Field label="プール名" htmlFor={`pool-name-${pool.id}`} required error={nameError}>
-          <TextField id={`pool-name-${pool.id}`} value={editName} maxLength={100} onChange={(event) => { setEditName(event.target.value); setNameError('') }} />
+          <SaveErrorField names={["name"]}><TextField id={`pool-name-${pool.id}`} value={editName} maxLength={100} onChange={(event) => { setEditName(event.target.value); setNameError('') }} /></SaveErrorField>
         </Field>
-      </Dialog>
+      </Dialog></SaveErrorScope>
       <ConfirmDialog open={discardOpen} title="入力を破棄しますか？" description="変更したプール名は保存されません。" confirmLabel="破棄する" onConfirm={() => { setDiscardOpen(false); setEditing(false) }} onCancel={() => setDiscardOpen(false)} />
       <ConfirmDialog
         open={confirmOpen}

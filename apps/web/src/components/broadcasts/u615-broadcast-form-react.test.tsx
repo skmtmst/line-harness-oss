@@ -12,7 +12,7 @@
  */
 import React, { act, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BroadcastStepKey } from './broadcast-steps'
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -164,8 +164,8 @@ describe('監査 #615：一斉配信の受け入れ', () => {
     // メッセージの段へ一緒に進まないと、選択窓は描画されない段の中に隠れたままになる。
     expect(stepCalls).toContain('message')
 
-    const rows = [...container.querySelectorAll<HTMLElement>('.broadcast-template-row')]
-    expect(rows.map((row) => row.querySelector('strong')?.textContent)).toContain('初回来店のお礼')
+    const rows = [...document.querySelectorAll<HTMLElement>('[role="dialog"] input[type="radio"]')]
+    expect(rows.map((row) => row.getAttribute('aria-label'))).toContain('初回来店のお礼')
 
     // DOMに居ても `hidden` の親の内側なら画面には出ない。監査が見たのはその状態。
     for (const row of rows) {
@@ -187,7 +187,7 @@ describe('監査 #615：一斉配信の受け入れ', () => {
 
     const text = container.textContent ?? ''
     expect(text).not.toContain('8月キャンペーン配信済み')
-    expect(text).toContain('実行しない')
+    expect(text).toContain('行うことはまだありません。')
   })
 
   it('BC-03: メッセージ段のプレビューも、未定なのに固定の配信日時を出さない', async () => {

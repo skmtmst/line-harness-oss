@@ -11,6 +11,7 @@
  * 読み込み・失敗の分け方・段の行き来（URL の pane）・離れる前の確かめ・
  * 1本の保存の帯は app/webinars/edit/page.tsx と同じ（BEHAVIOR.md）。
  */
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -85,6 +86,7 @@ function normalizePane(value: string | null): PaneKey {
 }
 
 function EditInner() {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -371,7 +373,7 @@ function EditInner() {
       const copied = await webinarApi.duplicate(id, editor.version)
       notifyToast('複製した下書きを追加しました')
       router.push(`/webinars?status=draft&highlight=${encodeURIComponent(copied.data.id)}`)
-    } catch { setDuplicateError('複製できませんでした。保存済みの内容を読み直してお試しください。') }
+    } catch (cause) { if (!saveErrors.capture(cause)) setDuplicateError('複製できませんでした。保存済みの内容を読み直してお試しください。') }
     finally { setDuplicating(false) }
   }
   const menuActions = !readOnly ? <><RowMenu label="ウェビナーの操作" triggerProps={{ disabled: pausing || savingForNav !== false || duplicating }} items={[
@@ -422,7 +424,7 @@ function EditInner() {
   const keep = (key: PaneKey, node: ReactNode) => (visited.has(key) ? <div key={key} hidden={pane !== key}>{node}</div> : null)
 
   return (
-    <div className="min-w-0" data-wc-editor="v8">
+    <SaveErrorScope errors={saveErrors}><div className="min-w-0" data-wc-editor="v8">
       {keep('basic', <BasicPane ctx={ctx} chrome={wizardChrome('basic')} onDirtyChange={dirtyReporterFor('basic')} registerSave={saveRegistrarFor('basic')} />)}
       {keep('video', <VideoPane ctx={ctx} chrome={wizardChrome('video')} onDirtyChange={dirtyReporterFor('video')} registerSave={saveRegistrarFor('video')} />)}
       {keep('cta', <CtaPane ctx={ctx} chrome={wizardChrome('cta')} onDirtyChange={dirtyReporterFor('cta')} registerSave={saveRegistrarFor('cta')} />)}
@@ -433,7 +435,7 @@ function EditInner() {
       {keep('comments', <CommentsPane ctx={ctx} chrome={detailChrome} onDirtyChange={dirtyReporterFor('comments')} registerSave={saveRegistrarFor('comments')} />)}
       {leaveDialog}
       <ConfirmDialog open={pauseVersion !== null} title="ウェビナーを停止しますか？" description="新しい視聴を受け付けなくなります。" confirmLabel="停止する" busy={pausing} error={pauseError || undefined} onConfirm={() => pause()} onCancel={() => { if (!pausing) setPauseVersion(null) }} />
-    </div>
+    </div></SaveErrorScope>
   )
 }
 

@@ -1,5 +1,4 @@
 'use client'
-
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -64,6 +63,7 @@ import styles from '../wizard-v8.module.css'
 import { formatNumber } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8 リマインダを作る・手順2〜5と完了。
@@ -161,6 +161,7 @@ function useNarrowBoard() {
 }
 
 export default function ReminderEditV8({ reminderId, stage }: { reminderId: string; stage: string | null }) {
+  const saveErrors = useSaveFormErrors()
   const v8stage = stageFor(stage)
   /* 手順③だけ：1152 幅なら板 `r1l0bT`。ほかの手順は今の印のまま。 */
   const narrowBoard = useNarrowBoard()
@@ -240,12 +241,15 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
       clearConflict()
     } catch (caught) {
       if (seq !== requestSeq.current) return
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 404) setLoadMissing(true)
-      else setError('下書きを読み込めませんでした。')
+      else { if (!fieldFailure)
+ setError('下書きを読み込めませんでした。') }
     } finally {
       if (seq === requestSeq.current) setLoading(false)
     }
-  }, [reminderId, clearConflict])
+  }, [reminderId, clearConflict, saveErrors])
 
   useEffect(() => {
     setDraft(null)
@@ -340,12 +344,17 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
       setBasics(basicsFromDraft(response.data.settings))
       return true
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 409) {
         const data = caught.data as { updatedAt?: unknown } | null
         saveConflict.mark(typeof data?.updatedAt === 'string' ? data.updatedAt : '')
+        { if (!fieldFailure)
         setError('この下書きは別の画面で先に更新されました。最新の内容を読み直してください。')
+      }
       } else {
-        setError('保存できませんでした。')
+        { if (!fieldFailure)
+        setError('保存できませんでした。') }
       }
       return false
     } finally {
@@ -375,8 +384,12 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
       if (!response.success) throw new Error(response.error)
       setPublished(response.data)
       go('done')
-    } catch {
-      setError('リマインダを有効化できませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+
+      setError('リマインダを有効化できませんでした。') }
     } finally {
       setBusy(false)
     }
@@ -385,14 +398,14 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
   const subjectDraft = draft && draft.reminderId === reminderId ? draft : null
   const subjectSettings = subjectDraft ? settings : null
 
-  if (loading) return <ListState kind="loading" title="下書きを読み込んでいます" />
+  if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="下書きを読み込んでいます" /></SaveErrorScope>
   if (loadMissing) {
     return (
-      <ListState kind="empty" title="このリマインダは見つかりません" description="削除されたか、別の記録です。一覧から選び直してください。" action={<Button href="/reminders">リマインダ一覧へ戻る</Button>} />
+      <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="このリマインダは見つかりません" description="削除されたか、別の記録です。一覧から選び直してください。" action={<Button href="/reminders">リマインダ一覧へ戻る</Button>} /></SaveErrorScope>
     )
   }
   if (!subjectDraft || !subjectSettings) {
-    return <ListState kind="error" title="下書きを表示できませんでした" description={error || '下書きを読み込めませんでした。'} onRetry={() => void loadDraft()} />
+    return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="下書きを表示できませんでした" description={error || '下書きを読み込めませんでした。'} onRetry={() => void loadDraft()} /></SaveErrorScope>
   }
 
   const testIssue = testSend.phase.kind === 'failed' || testSend.phase.kind === 'unknown' ? testSend.phase.message : ''
@@ -417,7 +430,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
             : 'hjNpJ'
 
   return (
-    <div className={styles.page} data-design-node={designNode} data-reminder-v8-stage={v8stage}>
+    <SaveErrorScope errors={saveErrors}><div className={styles.page} data-design-node={designNode} data-reminder-v8-stage={v8stage}>
       <WizardHeadV8
         title="リマインダを作る"
         current={currentKey}
@@ -557,7 +570,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
         onReload={() => void saveConflict.reloadLatest()}
         onCancel={saveConflict.closeCompare}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }
 
@@ -792,7 +805,7 @@ function TargetStageV8({
               <p className={styles.cardNote}>{allNote}の友だちに送ります</p>
             </div>
             <div className={`${styles.choiceGrid} ${styles.choiceGrid2}`} role="radiogroup" aria-label="対象者">
-              <ChoiceCardV8
+              <SaveErrorField names={["reminder-v8-audience","mode"]}><ChoiceCardV8
                 name="reminder-v8-audience"
                 value="all"
                 checked={mode === 'all'}
@@ -800,8 +813,8 @@ function TargetStageV8({
                 icon={<Users size={18} />}
                 title={allLabel}
                 note={allNote}
-              />
-              <ChoiceCardV8
+              /></SaveErrorField>
+              <SaveErrorField names={["reminder-v8-audience","mode"]}><ChoiceCardV8
                 name="reminder-v8-audience"
                 value="condition"
                 checked={mode === 'condition'}
@@ -809,7 +822,7 @@ function TargetStageV8({
                 icon={<SlidersHorizontal size={18} />}
                 title="条件に合う人だけ"
                 note="タグ・友だち情報などで絞る"
-              />
+              /></SaveErrorField>
             </div>
             {mode === 'condition' ? (
               <ConditionBuilder
@@ -862,33 +875,33 @@ function TargetStageV8({
                   <span className={styles.stopTitle}>予約がキャンセルされた</span>
                   <span className={styles.stopNote}>すぐ止める</span>
                 </span>
-                <SettingCheckbox
+                <SaveErrorField names={["bookingCancelled","stop.bookingCancelled","booking_cancelled","stop.booking_cancelled"]}><SettingCheckbox
                   label="予約がキャンセルされたら止める"
                   checked={stop.bookingCancelled}
                   onChange={(next) => onChange({ ...settings, stopConditions: { ...stop, bookingCancelled: next } })}
-                />
+                /></SaveErrorField>
               </div>
               <div className={styles.stopRow}>
                 <span className={styles.stopText}>
                   <span className={styles.stopTitle}>対応マークが「完了」になった</span>
                   <span className={styles.stopNote}>残りを止める</span>
                 </span>
-                <SettingCheckbox
+                <SaveErrorField names={["supportMarkCompleted","stop.supportMarkCompleted","support_mark_completed","stop.support_mark_completed"]}><SettingCheckbox
                   label="対応マークが完了になったら止める"
                   checked={stop.supportMarkCompleted}
                   onChange={(next) => onChange({ ...settings, stopConditions: { ...stop, supportMarkCompleted: next } })}
-                />
+                /></SaveErrorField>
               </div>
               <div className={styles.stopRow}>
                 <span className={styles.stopText}>
                   <span className={styles.stopTitle}>基準日を7日過ぎた</span>
                   <span className={styles.stopNote}>自動で終わる</span>
                 </span>
-                <SettingCheckbox
+                <SaveErrorField names={["daysAfterTarget","stop.daysAfterTarget","days_after_target","stop.days_after_target"]}><SettingCheckbox
                   label="基準日を7日過ぎたら自動で終わる"
                   checked={stop.daysAfterTarget != null}
                   onChange={(next) => onChange({ ...settings, stopConditions: { ...stop, daysAfterTarget: next ? 7 : null } })}
-                />
+                /></SaveErrorField>
               </div>
               <div className={styles.stopRow}>
                 <span className={styles.stopText}>
@@ -1090,14 +1103,14 @@ function MessagesStageV8({
                         base={sampleBase.current}
                         onChange={(patch) => updateStep(step.stableStepId, patch)}
                       />
-                      <TextArea
+                      <SaveErrorField names={[`steps.${index}.messageContent`,`steps.${index}.message_content`,"messageContent","step.messageContent","message_content","step.message_content"]}><TextArea
                         ref={bodyRef}
                         className={styles.bodyArea}
                         value={step.messageContent}
                         maxLength={BODY_LIMIT}
                         placeholder="友だちに届く本文を書きます"
                         onChange={(event) => updateStep(step.stableStepId, { messageContent: event.target.value })}
-                      />
+                      /></SaveErrorField>
                       <div className={styles.insertRow}>
                         <span className={styles.insertLabel}>差し込む</span>
                         <button type="button" className={styles.chip} onClick={() => insertToken('{{name}}')}>
@@ -1200,7 +1213,7 @@ function TimingEditor({
     return (
       <div className={styles.timingRow}>
         <span>基準日の</span>
-        <NumberInput unit="日"
+        <SaveErrorField names={["days"]}><NumberInput unit="日"
           type="number"
           min={0}
           max={365}
@@ -1211,7 +1224,7 @@ function TimingEditor({
             const next = Number(event.target.value)
             if (Number.isInteger(next) && next >= 0) onChange({ offsetDays: after ? next : -next })
           }}
-        />
+        /></SaveErrorField>
 
         <Select
           value={after ? 'after' : 'before'}
@@ -1220,13 +1233,13 @@ function TimingEditor({
           options={[{ value: 'before', label: '前' }, { value: 'after', label: '後' }]}
         />
         <span>の</span>
-        <TextInput
+        <SaveErrorField names={["sendAtTime","step.sendAtTime","send_at_time","step.send_at_time"]}><TextInput
           type="time"
           aria-label="送る時刻"
           style={{ width: 110 }}
           value={step.sendAtTime ?? ''}
           onChange={(event) => onChange({ sendAtTime: event.target.value || null })}
-        />
+        /></SaveErrorField>
         <span className={styles.timingExample}>
           例：{formatMd(base)} の基準日 → {formatMd(exampleSendAt({ ...step, offsetDays: after ? days : -days }, 'time', base))} に届く
         </span>
@@ -1246,7 +1259,7 @@ function TimingEditor({
   return (
     <div className={styles.timingRow}>
       <span>基準日の</span>
-      <NumberInput
+      <SaveErrorField names={["amount"]}><NumberInput
         type="number"
         min={0}
         aria-label="基準日からの時間"
@@ -1256,19 +1269,19 @@ function TimingEditor({
           const next = Number(event.target.value)
           if (Number.isInteger(next) && next >= 0) onChange({ offsetMinutes: toMinutes(next, unit, direction) })
         }}
-      />
-      <Select
+      /></SaveErrorField>
+      <SaveErrorField names={["unit"]}><Select
         value={unit}
         onChange={(next) => onChange({ offsetMinutes: toMinutes(amount, next as 'min' | 'hour' | 'day', direction) })}
         aria-label="単位"
         options={[{ value: 'min', label: '分' }, { value: 'hour', label: '時間' }, { value: 'day', label: '日' }]}
-      />
-      <Select
+      /></SaveErrorField>
+      <SaveErrorField names={["direction"]}><Select
         value={direction}
         onChange={(next) => onChange({ offsetMinutes: toMinutes(amount, unit, next as 'before' | 'after') })}
         aria-label="基準日の前か後か"
         options={[{ value: 'before', label: '前' }, { value: 'after', label: '後' }]}
-      />
+      /></SaveErrorField>
       <span className={styles.timingExample}>
         例：{formatMd(base)} の基準日 → {formatMd(exampleSendAt(step, 'countdown', base))} に届く
       </span>
@@ -1324,7 +1337,7 @@ function ScheduleStageV8({
               <p className={styles.cardNote}>有効にしたら、この予定で送ります。予約が変わると予定も変わります。</p>
             </div>
             <div className={styles.previewHead}>
-              <SegmentedControl
+              <SaveErrorField names={["range"]}><SegmentedControl
                 aria-label="予定の範囲"
                 options={[
                   { value: '7d', label: '今後7日' },
@@ -1333,7 +1346,7 @@ function ScheduleStageV8({
                 ]}
                 value={range}
                 onChange={setRange}
-              />
+              /></SaveErrorField>
               <span className={styles.previewCount}>
                 {range === 'conflict' ? `重なり ${countLabel(rangeCount, '件')}` : `${range === '7d' ? '今後7日' : '今後30日'} ${countLabel(rangeCount, '通')}`}
               </span>

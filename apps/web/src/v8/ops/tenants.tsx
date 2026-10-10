@@ -1,5 +1,4 @@
 'use client'
-
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import Link from 'next/link'
@@ -28,6 +27,7 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
  * 運営の契約先アカウント V8（絵 `XWtYC`・作る窓 `i0FTN`）。
@@ -239,11 +239,11 @@ export default function OpsTenantsV8() {
         onCancel={closeCreate}
       >
         <div className={parts.dialogBody}>
-          <Field label="統括名（会社名）"><TextField value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="株式会社 然" maxLength={100} aria-label="統括名（会社名）" /></Field>
+          <Field label="統括名（会社名）"><SaveErrorField names={["newName","new_name"]}><TextField value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="株式会社 然" maxLength={100} aria-label="統括名（会社名）" /></SaveErrorField></Field>
           <div className={styles.field}>
             <span className={styles.smallLabel}>飲食店機能</span>
             <div className={styles.fullSelect}>
-              <Select aria-label="飲食店機能" value={newRestaurant ? 'use' : 'skip'} onChange={(value) => setNewRestaurant(value === 'use')} size="full" options={[{ value: 'skip', label: '使わない' }, { value: 'use', label: '使う' }]} />
+              <SaveErrorField names={["newRestaurant","new_restaurant"]}><Select aria-label="飲食店機能" value={newRestaurant ? 'use' : 'skip'} onChange={(value) => setNewRestaurant(value === 'use')} size="full" options={[{ value: 'skip', label: '使わない' }, { value: 'use', label: '使う' }]} /></SaveErrorField>
             </div>
           </div>
           <p className={parts.dialogNote}>作ると、統括の最初の権限者へ招待を送れるようになります。プランは契約先の詳細で決めます。</p>

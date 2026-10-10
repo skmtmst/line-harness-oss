@@ -23,6 +23,7 @@ import MenuPortal from '@/components/shared/menu-portal'
 import Button from '@/components/shared/button'
 import { InsertButton, type InsertTextTarget } from '@/components/shared/insert-text-field'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /** 日付の書き方。worker の interpolation-date.ts と同じ並び。 */
 const DATE_FORMATS: { token: string; label: string; example: string }[] = [
@@ -219,12 +220,12 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
               「あと3日」のように出ます。配信のたびに数え直すので、書き換えは要りません。
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <DateField
+              <SaveErrorField names={["targetDate","target_date"]}><DateField
                 value={targetDate}
                 onChange={setTargetDate}
                 aria-label="目標日"
                 className="min-w-0 flex-1"
-              />
+              /></SaveErrorField>
               <Button variant="secondary" className="text-ink-secondary v7:h-8 shrink-0 px-3 text-xs whitespace-normal" type="button" disabled={!targetDate} onClick={() => insert(`{{days_until:${targetDate}}}`)}>
                 入れる
               </Button>

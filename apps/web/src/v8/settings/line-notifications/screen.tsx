@@ -1,16 +1,6 @@
 'use client'
-
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { RowActions } from '@/components/shared/row-actions'
-
-/*
- * ★V8 LINE通知（Pencil `g3iDs`。運用者へのお知らせ `u8xibp`・送れなかったもの `DrwMm`・記録 `PZBVb`）。
- *
- * app/line-notifications/page.tsx を写して、見た目（外側の型・中のメニュー・タブ・数のカード・帯・札・表）だけを
- * 絵に合わせた（src/v8 は @/app を読めない）。動き（読み込み・下書き・保存・公開・止める・テスト送信・
- * アカウント切替の見張り）は同じ。運用者へのお知らせの一覧は今の部品を入口（page.tsx）から差し込む。
- * 動きの一覧は同じ場所の BEHAVIOR.md。
- */
 import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import MediaSlot from '@/components/shared/media-slot'
@@ -63,6 +53,18 @@ import {
 } from '@/components/shared/api-error-message'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { readSaveFieldErrors } from '@/lib/api-field-errors'
+import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 LINE通知（Pencil `g3iDs`。運用者へのお知らせ `u8xibp`・送れなかったもの `DrwMm`・記録 `PZBVb`）。
+ *
+ * app/line-notifications/page.tsx を写して、見た目（外側の型・中のメニュー・タブ・数のカード・帯・札・表）だけを
+ * 絵に合わせた（src/v8 は @/app を読めない）。動き（読み込み・下書き・保存・公開・止める・テスト送信・
+ * アカウント切替の見張り）は同じ。運用者へのお知らせの一覧は今の部品を入口（page.tsx）から差し込む。
+ * 動きの一覧は同じ場所の BEHAVIOR.md。
+ */
+
 const customerFilters = [
   ['all', 'すべて'],
   ['enabled', '出している'],
@@ -273,6 +275,7 @@ type CustomerMutationApi = {
 type CustomerMutationOutcome =
   | {
       kind: 'applied'
+      fields?: Record<string, string>
       definition: LineNotificationDefinition | null
       enabled: boolean
       tone: 'success' | 'error'
@@ -283,6 +286,7 @@ type CustomerMutationOutcome =
   | { kind: 'stale'; contentSaved: boolean; settleDraft: false }
   | {
       kind: 'failed'
+      fields?: Record<string, string>
       message: string
       contentSaved: boolean
       settleDraft: false
@@ -453,19 +457,20 @@ export async function saveCustomerNotification(args: {
       message: savedNotice(`${setting.label}を保存しました。`, settleDraft),
       contentSaved: true, settleDraft,
     }
-  } catch {
+  } catch (saveFailure) {
+    const fieldErrors = readSaveFieldErrors(saveFailure)
     const createdDefinition = created?.success ? created.data : undefined
     if (isStale(guard)) return { kind: 'stale', contentSaved: Boolean(createdDefinition), settleDraft: false }
     if (createdDefinition) {
       return {
-        kind: 'failed',
+        kind: 'failed', ...(Object.keys(fieldErrors).length ? { fields: fieldErrors } : {}),
         message: `${setting.label}の下書きは作りましたが、出せませんでした。もう一度お試しください。`,
         contentSaved: true,
         settleDraft: false,
         createdDefinition,
       }
     }
-    return { kind: 'failed', message: `${setting.label}を保存できませんでした。`, contentSaved: false, settleDraft: false }
+    return { kind: 'failed', ...(Object.keys(fieldErrors).length ? { fields: fieldErrors } : {}), message: `${setting.label}を保存できませんでした。`, contentSaved: false, settleDraft: false }
   }
 }
 
@@ -488,10 +493,11 @@ async function publishCustomerNotification(args: {
     const result = await args.api.updateDraft(definition.id, customerDraftPayload(setting, definition))
     if (!result.success) throw new Error('save before publish failed')
     saved = result.data
-  } catch {
+  } catch (saveFailure) {
+    const fieldErrors = readSaveFieldErrors(saveFailure)
     if (isStale(guard)) return { kind: 'stale', contentSaved: false, settleDraft: false }
     return {
-      kind: 'failed',
+      kind: 'failed', ...(Object.keys(fieldErrors).length ? { fields: fieldErrors } : {}),
       message: `${setting.label}の下書きを保存できなかったため、公開していません。編集内容はそのまま残しています。`,
       contentSaved: false, settleDraft: false,
     }
@@ -506,12 +512,13 @@ async function publishCustomerNotification(args: {
       message: savedNotice(`${setting.label}を公開しました。`, settleDraft),
       contentSaved: true, settleDraft,
     }
-  } catch {
+  } catch (saveFailure) {
+    const fieldErrors = readSaveFieldErrors(saveFailure)
     // 下書きは入った。残っているのは公開だけ。
     if (isStale(guard)) return { kind: 'stale', contentSaved: true, settleDraft: false }
     const settleDraft = canSettleDraft(guard, true)
     return {
-      kind: 'applied', definition: saved, enabled: setting.isEnabled, tone: 'error',
+      kind: 'applied', ...(Object.keys(fieldErrors).length ? { fields: fieldErrors } : {}), definition: saved, enabled: setting.isEnabled, tone: 'error',
       message: savedNotice(`${setting.label}を公開できませんでした。編集内容は下書きとして保存済みです。もう一度公開を押してください。`, settleDraft),
       contentSaved: true, settleDraft,
     }
@@ -527,7 +534,7 @@ const TABS = [
 
 /* 出す・止める（共通のつまみ）。押すとすぐは変えず、確認の窓を開く（#734）。送っている間は押せない。 */
 function NotificationToggle({ setting, busy, onToggle }: { setting: EcNotificationSetting; busy: boolean; onToggle: () => void }) {
-  return <Toggle checked={setting.isEnabled} label={`${setting.label}のお知らせを出す・止める`} onChange={busy ? undefined : () => onToggle()} />
+  return <SaveErrorField names={["isEnabled","setting.isEnabled","is_enabled","enabled","setting.is_enabled"]}><Toggle checked={setting.isEnabled} label={`${setting.label}のお知らせを出す・止める`} onChange={busy ? undefined : () => onToggle()} /></SaveErrorField>
 }
 
 function CardPreview({ setting }: { setting: EcNotificationSetting }) {
@@ -615,26 +622,26 @@ function CustomerNotificationEditor({
         <section className="rounded-card border content-card bg-canvas p-4">
           <h2 className="font-bold text-ink">送るもの</h2>
           <div className="mt-3 space-y-4">
-            <Field htmlFor="customer-notification-title" label="通知の見出し" error={titleError}><TextField id="customer-notification-title" value={setting.title ?? ''} maxLength={80} ref={titleRef} onChange={(event) => { setTitleError(''); onChange({ title: event.target.value }) }} /></Field>
-            <Field htmlFor="customer-notification-intro" label="ご案内文"><TextArea id="customer-notification-intro" value={setting.introText} maxLength={800} rows={5} onChange={(event) => onChange({ introText: event.target.value })} /></Field>
+            <Field htmlFor="customer-notification-title" label="通知の見出し" error={titleError}><SaveErrorField names={["title","setting.title","titleError","name","title_error"]}><TextField id="customer-notification-title" value={setting.title ?? ''} maxLength={80} ref={titleRef} onChange={(event) => { setTitleError(''); onChange({ title: event.target.value }) }} /></SaveErrorField></Field>
+            <Field htmlFor="customer-notification-intro" label="ご案内文"><SaveErrorField names={["introText","setting.introText","intro_text","setting.intro_text"]}><TextArea id="customer-notification-intro" value={setting.introText} maxLength={800} rows={5} onChange={(event) => onChange({ introText: event.target.value })} /></SaveErrorField></Field>
             <div className="rounded-control border border-nen-border bg-nen-ivory p-4">
               <p className="text-sm font-bold text-nen-green">このお知らせで差し込める項目（EC連携から来ます）</p>
               <div className="mt-2 flex flex-wrap gap-2">{setting.fixedFields.map((field) => <span key={field} className="rounded-pill bg-canvas px-2.5 py-1 text-xs text-nen-chip ring-1 ring-nen-gold-soft">{field}</span>)}</div>
             </div>
-            <Field htmlFor="customer-notification-outro" label="結びの文章"><TextArea id="customer-notification-outro" value={setting.outroText} maxLength={800} rows={3} onChange={(event) => onChange({ outroText: event.target.value })} /></Field>
+            <Field htmlFor="customer-notification-outro" label="結びの文章"><SaveErrorField names={["outroText","setting.outroText","outro_text","setting.outro_text"]}><TextArea id="customer-notification-outro" value={setting.outroText} maxLength={800} rows={3} onChange={(event) => onChange({ outroText: event.target.value })} /></SaveErrorField></Field>
           </div>
         </section>
 
         <section className="rounded-card border content-card bg-canvas p-4">
           <h2 className="font-bold text-ink">ボタン</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <Field htmlFor="customer-notification-button" label="ボタンの文字"><TextField id="customer-notification-button" value={setting.buttonLabel} maxLength={20} onChange={(event) => onChange({ buttonLabel: event.target.value })} /></Field>
+            <Field htmlFor="customer-notification-button" label="ボタンの文字"><SaveErrorField names={["buttonLabel","setting.buttonLabel","button_label","setting.button_label"]}><TextField id="customer-notification-button" value={setting.buttonLabel} maxLength={20} onChange={(event) => onChange({ buttonLabel: event.target.value })} /></SaveErrorField></Field>
             {/* 押したら（共通の欄・YPzmo・B-129）。保存は今のまま開く URL の文字（空欄＝注文情報の URL）。 */}
             <div className="block text-sm font-semibold text-ink-secondary sm:col-span-2">押したときに開く先<div className="mt-1.5 font-normal"><UriTapActionField name="通知のボタン" kindLabel="押したときに開く先" url={setting.buttonUrl} uriPlaceholder="注文情報のURLを使う場合は空欄" onChange={(buttonUrl) => onChange({ buttonUrl })} /></div></div>
           </div>
           <div className="mt-3">
             <p className="mb-1.5 text-sm font-semibold text-ink-secondary">カード画像（未設定の場合はロゴ中心のカード）</p>
-            <MediaSlot
+            <SaveErrorField names={["imageUrl","setting.imageUrl","image_url","setting.image_url"]}><MediaSlot
               title="カード画像を追加"
               previewAlt="カード画像"
               value={setting.imageUrl || null}
@@ -644,7 +651,7 @@ function CustomerNotificationEditor({
               upload={uploadImageFile}
               onChange={(url) => onChange({ imageUrl: url ?? '' })}
               urlEntry={{ value: setting.imageUrl, onChange: (url) => onChange({ imageUrl: url }), label: 'カード画像URL', placeholder: 'https://…' }}
-            />
+            /></SaveErrorField>
           </div>
         </section>
 
@@ -694,6 +701,8 @@ function CustomerNotificationEditor({
 }
 
 function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: (lineAccountId: string | null) => ReactNode } = {}) {
+  const saveErrors = useSaveFormErrors()
+
   const { selectedAccountId, selectedAccount } = useAccount()
   /* 変える操作（出す・止める・文面を直す）はオーナー・管理者だけ。閲覧のみには押せないボタンを置かない。役割が分かるまでは今までどおり出す。 */
   const staffRole = useStaffRole()
@@ -912,15 +921,18 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
       setLoadState('ready')
       setCustomerLoadError(null)
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error);
+
       if (!stale()) {
         // ★V7 `x63W5x`：一覧の失敗でページ上の帯は出さない。
         // 一覧の場所の ListState error だけにまとめる。
         setLoadState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
         // M031: 捕まえた失敗を ListState へ渡す。403は再試行なし、429は待ち案内になる。
-        setCustomerLoadError(error)
+        if (!fieldFailure) {
+        setCustomerLoadError(error) }
       }
     }
-  }, [selectedAccountId, tab])
+  }, [selectedAccountId, tab, saveErrors])
   useEffect(() => { void load() }, [load])
 
   /*
@@ -1092,7 +1104,9 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
           ? current.map((item) => item.id === createdDefinition.id ? createdDefinition : item)
           : [...current, createdDefinition])
       }
-      setNotice({ tone: 'error', text: outcome.message })
+      if (!saveErrors.apply(outcome.fields ?? {}))
+      setNotice({ tone: 'error', text: outcome.message });
+
       return
     }
     const saved = outcome.definition
@@ -1106,6 +1120,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
       const previous = lastSavedRef.current.get(setting.eventType)
       if (previous) lastSavedRef.current.set(setting.eventType, { ...previous, isEnabled: outcome.enabled })
     }
+    if (outcome.tone !== 'error' || !saveErrors.apply(outcome.fields ?? {}))
     setNotice({ tone: outcome.tone, text: outcome.message })
   }
 
@@ -1202,7 +1217,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
     ? { label: '出している', tone: 'good' }
     : isIncomplete(setting) ? { label: '文面が未設定', tone: 'warn' } : { label: '停止中', tone: 'muted' }
 
-  return <SbSettingsScreen
+  return <SaveErrorScope errors={saveErrors}><SbSettingsScreen
     boardId={expandedSetting === null ? ({ customer: 'g3iDs', operator: 'u8xibp', failures: 'DrwMm', history: 'PZBVb' } as Record<string, string>)[tab] : undefined}
     layout="narrow-nav"
     actions={tab === 'operator' && expandedSetting === null && canManage ? <>
@@ -1376,7 +1391,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
         </DataTable>}
     </section>
     </> : null}
-  </SbSettingsScreen>
+  </SbSettingsScreen></SaveErrorScope>
 }
 
 /*

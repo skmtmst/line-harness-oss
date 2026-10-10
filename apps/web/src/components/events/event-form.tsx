@@ -2,12 +2,10 @@
 
 import { jstDate } from '@/lib/jst-datetime'
 import { RowActions } from '@/components/shared/row-actions'
-
 import { X } from 'lucide-react'
 import { RowMenu } from '@/components/shared/row-actions'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import StickyBar from '@/components/shared/sticky-bar'
-
 import { useEffect, useState } from 'react'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useRouter } from 'next/navigation'
@@ -34,7 +32,6 @@ import DateField from '@/components/shared/date-field'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TimeField } from '@/components/shared/date-time-field'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-// #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
 import {
   EVENT_CANCEL_DEADLINE_OPTIONS,
   EVENT_DEFAULT_DRAFT,
@@ -46,6 +43,9 @@ import {
   parseDeadlineSelect,
 } from './event-draft-shared'
 import { formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+// #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
 
 type Tab = 'overview' | 'slots' | 'publish'
 
@@ -726,32 +726,7 @@ function OverviewTab({
             {activeAccounts.length === 0 && (
               <div className="text-sm text-ink-faint italic p-2">アクティブなアカウントがありません</div>
             )}
-            {activeAccounts.map((a) => {
-              // 現在ログイン中のアカウントは外せない (外すと保存後 redirect が
-              // 即 404 になる)。target_type 切替時に sentinel seed されている
-              // ことの保護も兼ねる。
-              const isCurrent = a.id === currentAccountId
-              const checked = accountIds.includes(a.id) || isCurrent
-              return (
-                <Checkbox
-                  key={a.id}
-                  className={`flex w-full gap-2 rounded-control border border-hairline p-2 ${isCurrent ? 'opacity-90 bg-canvas-sunken cursor-not-allowed' : 'cursor-pointer hover:bg-canvas-sunken'}`}
-                  checked={checked}
-                  disabled={isCurrent}
-                  onCheckedChange={(next) => {
-                    if (isCurrent) return
-                    update('account_ids', (next
-                      ? [...accountIds, a.id]
-                      : accountIds.filter((x) => x !== a.id)) as unknown as EventDetail['account_ids'])
-                  }}
-                  description={isCurrent ? '今のアカウント・必須' : undefined}
-                >
-                  <span title={isCurrent ? '現在ログイン中のアカウントは必須です' : undefined}>
-                    {a.country ? a.country + ' ' : ''}{a.name}
-                  </span>
-                </Checkbox>
-              )
-            })}
+            <EntitySelect aria-label="対象アカウント（重複なし配信）" noun="アカウント" values={[...new Set([...accountIds, ...(currentAccountId ? [currentAccountId] : [])])]} onChange={(ids) => update('account_ids', [...new Set([...ids, ...(currentAccountId ? [currentAccountId] : [])])] as unknown as EventDetail['account_ids'])} options={activeAccounts.map((a) => ({ value: a.id, label: `${a.country ? a.country + ' ' : ''}${a.name}`, locked: a.id === currentAccountId, description: a.id === currentAccountId ? '今のアカウント・必須' : undefined }))} />
             <div className="text-ink-faint mt-1 text-xs">{accountIds.length} 件選択中</div>
           </div>
         )}
@@ -1513,12 +1488,12 @@ function PublishTab({
         <label htmlFor="ev-visible-tag" className="mb-1.5 block text-sm font-medium text-ink-secondary">
           公開対象
         </label>
-        <Select
+        <EntitySelect kind="tag"
           aria-label="公開対象"
           id="ev-visible-tag"
           value={draft.visible_tag_id ?? ''}
           onChange={(value) => update('visible_tag_id', value === '' ? null : value)}
-          options={[{ value: '', label: '友だち全員' }, ...tags.map((t) => ({ value: t.id, label: `${t.name} を持つ人だけ` }))]}
+          options={[{ value: '', label: '友だち全員' }, ...tags.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: `${t.name} を持つ人だけ` }))]}
         />
         <p className="mt-1 text-xs text-ink-faint">
           絞ると、タグを持たない人にはイベントが存在しないものとして扱われます。

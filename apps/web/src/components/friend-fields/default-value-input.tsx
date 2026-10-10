@@ -3,6 +3,7 @@
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import { TextArea, TextInput } from '@/components/shared/form-controls'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export type DefaultValueMode = 'text' | 'longtext' | 'single' | 'multi' | 'file'
 
@@ -54,7 +55,7 @@ export default function DefaultValueInput({
           {options.map((option) => {
             const checked = multiValue.includes(option)
             return (
-              <Checkbox
+              <SaveErrorField names={["checked"]} key={option}><Checkbox
                 key={option}
                 checked={checked}
                 disabled={disabled}
@@ -66,7 +67,7 @@ export default function DefaultValueInput({
                   )
                 }}
                 className="py-1"
-              ><span className="min-w-0 flex-1 truncate" title={option}>{option}</span></Checkbox>
+              ><span className="min-w-0 flex-1 truncate" title={option}>{option}</span></Checkbox></SaveErrorField>
             )
           })}
         </div>
@@ -79,7 +80,7 @@ export default function DefaultValueInput({
   if (mode === 'single') {
     return (
       <>
-        <Select
+        <SaveErrorField names={["singleValue","single_value"]}><Select
           id={inputId}
           value={singleValue}
           onChange={onSingleChange}
@@ -87,7 +88,7 @@ export default function DefaultValueInput({
           aria-label="既定値"
           size="full"
           options={[{ value: '', label: '未設定' }, ...options.map((option) => ({ value: option, label: option }))]}
-        />
+        /></SaveErrorField>
         <p className="mt-2 text-xs leading-5 text-ink-faint">
           空欄のとき選んだ値が使われます。選択肢を変えたら選び直してください。
         </p>
@@ -104,14 +105,14 @@ export default function DefaultValueInput({
   if (mode === 'longtext') {
     return (
       <>
-        <TextArea
+        <SaveErrorField names={["textValue","text_value"]}><TextArea
           id={inputId}
           rows={4}
           value={textValue}
           onChange={(event) => onTextChange(event.target.value)}
           disabled={disabled}
           placeholder="未設定"
-        />
+        /></SaveErrorField>
         <p className="mt-2 text-xs leading-5 text-ink-faint">
           空欄のとき、この文章がそのまま使われます。改行も残ります。
         </p>
@@ -119,12 +120,12 @@ export default function DefaultValueInput({
     )
   }
   return (
-    <TextInput
+    <SaveErrorField names={["textValue","text_value"]}><TextInput
       id={inputId}
       value={textValue}
       onChange={(event) => onTextChange(event.target.value)}
       disabled={disabled}
       placeholder="未設定"
-    />
+    /></SaveErrorField>
   )
 }

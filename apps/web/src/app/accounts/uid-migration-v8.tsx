@@ -1,19 +1,5 @@
 'use client'
 
-/*
- * ★V8 UID移行（Pencil `Z0jHp` 要確認の判断・`L48eY` 本移行の完了・
- * `sdbsQ` 板5）。
- *
- * v7 と同じ判断・実行・切り戻しの仕組み（use-uid-migration.ts）を使い、
- * 見た目だけを V8 に積み替える。
- *
- * - 5つの段を横のステッパーで示す（Z0jHp 上部）
- * - 分類ごとの人数を4枚の数カードで出す（自動一致／要確認／一致しない／競合）
- * - 要確認の行は「どうするか」の選び欄で1行ずつ確定する（保存は行ごと。
- *   まとめて保存のAPIは無い）
- * - 完了した履歴は L48eY の形（結果の帯＋照合の結果＋履歴）
- * - 「本移行を実行」「切り戻す」は確認ダイアログを開くだけ（FRIEND-33/36）
- */
 import type { UidMigrationItem, UidMigrationRun } from '@/lib/api'
 import Button from '@/components/shared/button'
 import { Steps } from '@/components/templates/steps'
@@ -41,6 +27,23 @@ import {
 } from './use-uid-migration'
 import styles from '@/app/friends/friends-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+/*
+ * ★V8 UID移行（Pencil `Z0jHp` 要確認の判断・`L48eY` 本移行の完了・
+ * `sdbsQ` 板5）。
+ *
+ * v7 と同じ判断・実行・切り戻しの仕組み（use-uid-migration.ts）を使い、
+ * 見た目だけを V8 に積み替える。
+ *
+ * - 5つの段を横のステッパーで示す（Z0jHp 上部）
+ * - 分類ごとの人数を4枚の数カードで出す（自動一致／要確認／一致しない／競合）
+ * - 要確認の行は「どうするか」の選び欄で1行ずつ確定する（保存は行ごと。
+ *   まとめて保存のAPIは無い）
+ * - 完了した履歴は L48eY の形（結果の帯＋照合の結果＋履歴）
+ * - 「本移行を実行」「切り戻す」は確認ダイアログを開くだけ（FRIEND-33/36）
+ */
 
 const PRE_EXECUTE_STATUSES = ['dry_run', 'review', 'ready']
 
@@ -163,16 +166,16 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
         <div className={styles.duoCards}>
           <div className={styles.fieldStack}>
             <span className={styles.fieldLabel}>移行元</span>
-            <Select aria-label="移行元アカウント" value={fromAccountId} onChange={(value) => setFromAccountId(value)} options={[{ value: '', label: '移行元アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} size="full" />
+            <SaveErrorField names={["fromAccountId","from_account_id"]}><EntitySelect aria-label="移行元アカウント" value={fromAccountId} onChange={(value) => setFromAccountId(value)} options={[{ value: '', label: '移行元アカウントを選択' }, ...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name }))]} size="full" /></SaveErrorField>
           </div>
           <div className={styles.fieldStack}>
             <span className={styles.fieldLabel}>移行先</span>
-            <Select aria-label="移行先アカウント" value={toAccountId} onChange={(value) => setToAccountId(value)} options={[{ value: '', label: '移行先アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} size="full" />
+            <SaveErrorField names={["toAccountId","to_account_id"]}><EntitySelect aria-label="移行先アカウント" value={toAccountId} onChange={(value) => setToAccountId(value)} options={[{ value: '', label: '移行先アカウントを選択' }, ...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name }))]} size="full" /></SaveErrorField>
           </div>
         </div>
         <div className={styles.fieldStack} style={{ marginTop: 12 }}>
           <span className={styles.fieldLabel}>利用目的</span>
-          <TextField value={purpose} onChange={(event) => setPurpose(event.target.value)} />
+          <SaveErrorField names={["purpose"]}><TextField value={purpose} onChange={(event) => setPurpose(event.target.value)} /></SaveErrorField>
         </div>
         <div style={{ marginTop: 12 }}>
           <FileDropzone
@@ -427,8 +430,8 @@ function MigrationReviewBoard({
           <StatusBadge tone={statusView.badgeTone}>{statusView.badgeLabel}</StatusBadge>
         </div>
         <div className={styles.toolbar}>
-          <Select aria-label="分類で絞り込む" value={classification} onChange={(value) => onFilterChange(value as '' | ItemClassification, pendingOnly)} options={[{ value: '', label: 'すべての分類' }, ...ITEM_CLASSIFICATIONS.map((value) => ({ value, label: classLabel[value] }))]} size="standard" />
-          <Checkbox checked={pendingOnly} onCheckedChange={(checked) => onFilterChange(classification, checked)}>未判断のみ</Checkbox>
+          <SaveErrorField names={["classification"]}><Select aria-label="分類で絞り込む" value={classification} onChange={(value) => onFilterChange(value as '' | ItemClassification, pendingOnly)} options={[{ value: '', label: 'すべての分類' }, ...ITEM_CLASSIFICATIONS.map((value) => ({ value, label: classLabel[value] }))]} size="standard" /></SaveErrorField>
+          <SaveErrorField names={["pendingOnly","pending_only"]}><Checkbox checked={pendingOnly} onCheckedChange={(checked) => onFilterChange(classification, checked)}>未判断のみ</Checkbox></SaveErrorField>
           <span className={styles.toolbarSpacer} />
           <span className={styles.toolbarCount}>全 {formatNumber(total)} 件{detailBusy ? '・読み込み中…' : ''}</span>
         </div>
@@ -447,7 +450,7 @@ function MigrationReviewBoard({
                 </tr>
               </thead>
               <tbody>
-                {active.items?.map((item) => (
+                {active.items?.map((item, saveFieldIndex) => (
                   <tr key={item.id}>
                     <td className={`${styles.nowrap} ${styles.mono}`} title={item.oldUid}>{item.oldUid}</td>
                     <td>
@@ -470,7 +473,7 @@ function MigrationReviewBoard({
                         {decisionsLocked || !canDecide ? (
                           <span className={styles.pairCellSub}>{item.decision === 'pending' ? '未判断' : item.decision === 'link' ? '結び付ける' : item.decision === 'create' ? '新しく作る' : '除く'}</span>
                         ) : (
-                          <Select
+                          <SaveErrorField names={[`items.${saveFieldIndex}.decision`,"decision","item.decision"]}><Select
                             aria-label={`${item.oldUid} の引き継ぎ方`}
                             size="standard"
                             disabled={busy || detailBusy}
@@ -481,7 +484,7 @@ function MigrationReviewBoard({
                               ...(item.newUid ? [{ value: 'link', label: '結び付ける' }, { value: 'create', label: '新しく作る' }] : []),
                               { value: 'exclude', label: '除く' },
                             ]}
-                          />
+                          /></SaveErrorField>
                         )}
                         <button type="button" className={styles.linkAction} disabled={busy || detailBusy} onClick={() => onShowDetail(item)}>詳細</button>
                       </div>

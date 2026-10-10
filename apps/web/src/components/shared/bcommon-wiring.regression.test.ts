@@ -9,7 +9,8 @@ it('WEB-019: 自動応答の未接続のつまみを描かない', () => {
 })
 it('共通点検1: 未分類は開いたフォルダ', () => {
   // 選ぶ窓のフォルダの列は共通の FolderPanel（pickfold）。未分類の印は部品が開いたフォルダで描く。
-  expect(read('v8/inbox-chat/template-picker-view.tsx')).toContain('<FolderPickerShell')
+  expect(read('v8/inbox-chat/template-picker-view.tsx')).toContain('<EntityPickerDialog')
+  expect(read('components/shared/entity-picker.tsx')).toContain('<FolderPanel')
   expect(read('components/shared/folder-picker-shell.tsx')).toContain('<FolderPanel readOnly')
   expect(read('components/shared/folder-panel.tsx')).toMatch(/kind === 'unfiled' \? <FolderOpen/)
 })

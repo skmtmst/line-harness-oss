@@ -13,6 +13,7 @@ import Notice from '@/components/shared/notice'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import styles from './mileage.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export const PAGE_SIZE_OPTIONS = [10, 20, 50].map((size) => ({ value: String(size), label: `${size} 件表示` }))
 
@@ -29,7 +30,7 @@ export function SavedSelect({
   return (
     <div className={styles.savedBox}>
       <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-      <Select aria-label="よく使う絞り込み" value={value} options={options} onChange={onChange} />
+      <SaveErrorField names={["value"]}><Select aria-label="よく使う絞り込み" value={value} options={options} onChange={onChange} /></SaveErrorField>
     </div>
   )
 }
@@ -38,13 +39,13 @@ export function SavedSelect({
 export function PerPageSelect({ value, onChange }: { value: number; onChange: (value: number) => void }) {
   return (
     <div data-per-page-select>
-      <Select
+      <SaveErrorField names={["value"]}><Select
         aria-label="1ページに出す件数"
         size="page-size"
         value={String(value)}
         onChange={(next) => onChange(Number(next))}
         options={PAGE_SIZE_OPTIONS}
-      />
+      /></SaveErrorField>
     </div>
   )
 }

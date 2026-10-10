@@ -1,15 +1,6 @@
 'use client'
 
 import { FolderDotName } from '@/components/shared/folder-dot'
-
-/*
- * ★V8 成果とアフィリエイト「レポート」（板 `Eo56k`）。
- *
- * app/affiliates/v8-report-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で組み直した。
- * 数えるのは「認めた成果」だけ（承認の全件読み）。期間は今月・前の期間・すべて。
- * アフィリエイターごと・案件ごとの2つの見方。行（名前）を押すとその人の詳細の引き出し（tnTn9）。
- * 取得の上限を超えたら、合計を出さずに知らせる（今と同じ）。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -44,6 +35,16 @@ import TruncatedText from '@/components/shared/truncated-text'
 import PeriodPicker, { useReportPeriod } from '@/components/shared/period-picker'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 成果とアフィリエイト「レポート」（板 `Eo56k`）。
+ *
+ * app/affiliates/v8-report-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で組み直した。
+ * 数えるのは「認めた成果」だけ（承認の全件読み）。期間は今月・前の期間・すべて。
+ * アフィリエイターごと・案件ごとの2つの見方。行（名前）を押すとその人の詳細の引き出し（tnTn9）。
+ * 取得の上限を超えたら、合計を出さずに知らせる（今と同じ）。
+ */
 
 type ViewKey = 'affiliate' | 'offer'
 
@@ -300,7 +301,7 @@ export default function ReportTab() {
         </thead>
         <tbody>
           {shown.map((row) => (
-            <Tr data-row-id={row.id} key={row.id} className={styles.row} data-table-layout="columns">
+            <Tr data-row-id={row.id} key={row.id} className={styles.row} data-table-layout="columns" onOpen={() => openDrawer(row.id)}>
               <Td className={styles.colName}><FolderDotName>
                 <span className={styles.stack}>
                   {view === 'affiliate' ? (
@@ -324,7 +325,7 @@ export default function ReportTab() {
                     label={`${row.name}の操作`}
                     items={[
                       { id: 'view', label: '成果を見る', onSelect: () => openDrawer(row.id) },
-                      { id: 'approvals', label: 'この人の成果承認を開く', external: true, href: `/affiliates?tab=approvals&affiliate=${encodeURIComponent(row.id)}`, onSelect: () => router.push(`/affiliates?tab=approvals&affiliate=${encodeURIComponent(row.id)}`) },
+                      { id: 'approvals', label: 'この人の成果承認を開く', external: false, href: `/affiliates?tab=approvals&affiliate=${encodeURIComponent(row.id)}`, onSelect: () => router.push(`/affiliates?tab=approvals&affiliate=${encodeURIComponent(row.id)}`) },
                     ]}
                   />
                 ) : null}

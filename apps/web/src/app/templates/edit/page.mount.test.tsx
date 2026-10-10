@@ -533,3 +533,6 @@ describe('新しく作る', () => {
     expect(insertOptions()).toContain('A店のペット名')
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

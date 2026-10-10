@@ -105,7 +105,7 @@
   cursor: pointer;
 }
 .dateButton > svg { color: var(--color-ink-faint); }
-.dateButton[data-active='true'] { outline-color: var(--color-action); color: var(--color-action); }
+.dateButton[data-active='true'] { outline-color: var(--color-focus-ring); color: var(--color-action); }
 
 .datePopover {
   position: absolute;

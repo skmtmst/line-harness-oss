@@ -1,5 +1,4 @@
 'use client'
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchApi } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -22,6 +21,7 @@ import {
   type BookingConflict,
 } from '../lib/booking-channels'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -73,6 +73,8 @@ function ConnectDialog({
   onClose: () => void
   onDone: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [calendarId, setCalendarId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -89,13 +91,17 @@ function ConnectDialog({
       notifyToast(`${staff.displayName}の Google カレンダーをつなぎました。`)
       onDone()
     } catch (e) {
-      setError(describeApiFailure(e, 'つなげませんでした。ID を確かめてやり直してください。'))
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure)
+
+      setError(describeApiFailure(e, 'つなげませんでした。ID を確かめてやり直してください。')) }
     } finally {
       setBusy(false)
     }
   }
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open
       title={`${staff.displayName}の Google カレンダーをつなぐ`}
       description="Google カレンダーの ID（メールアドレスの形）を入れると、その予定を「埋まっている時間」として扱います。"
@@ -106,8 +112,8 @@ function ConnectDialog({
       onConfirm={() => void save()}
       onCancel={onClose}
     >
-      <TextField aria-label="カレンダーの ID" value={calendarId} onChange={(e) => setCalendarId(e.target.value)} placeholder="例：shop@example.com" />
-    </Dialog>
+      <SaveErrorField names={["calendarId","calendar_id"]}><TextField aria-label="カレンダーの ID" value={calendarId} onChange={(e) => setCalendarId(e.target.value)} placeholder="例：shop@example.com" /></SaveErrorField>
+    </Dialog></SaveErrorScope>
   )
 }
 
@@ -161,7 +167,7 @@ export function ConflictDialog({
         onConfirm={() => void move()}
         onCancel={onClose}
       >
-        <Select
+        <SaveErrorField names={["targetId","staffId","target_id"]}><Select
           aria-label="移す先のスタッフ"
           value={targetId}
           onChange={setTargetId}
@@ -169,8 +175,8 @@ export function ConflictDialog({
             { value: '', label: '移す先を選ぶ' },
             ...targets.map((t) => ({ value: t.staffId, label: `${t.displayName}へ移す` })),
           ]}
-        />
-        <SettingCheckbox label="移したことを、お客さまに知らせる" checked={notify} onChange={setNotify} />
+        /></SaveErrorField>
+        <SaveErrorField names={["notify","notifyCustomer"]}><SettingCheckbox label="移したことを、お客さまに知らせる" checked={notify} onChange={setNotify} /></SaveErrorField>
       </Dialog>
     </div>
   )
@@ -178,6 +184,8 @@ export function ConflictDialog({
 
 /** 予約経路の連携タブ（ZyDd6）。スタッフの Google カレンダーと予約経路の一覧。 */
 export default function ChannelsTabV8({ accountId, canEdit }: { accountId: string; canEdit: boolean }) {
+  const saveErrors = useSaveFormErrors()
+
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState('')
   const [data, setData] = useState<BookingChannelsData | null>(null)
@@ -205,8 +213,11 @@ export default function ChannelsTabV8({ accountId, canEdit }: { accountId: strin
       setData((current) => current ? { ...current, autoAssign: next } : current)
       notifyToast(next ? '自動割り当てを入れました。' : '自動割り当てを止めました。')
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e);
+
       if (latestAccountId.current === accountId) {
-        setAssignError(describeApiFailure(e, '自動割り当てを保存できませんでした。'))
+        { if (!fieldFailure)
+        setAssignError(describeApiFailure(e, '自動割り当てを保存できませんでした。')) }
       }
     } finally {
       assignBusy.current = false
@@ -233,16 +244,22 @@ export default function ChannelsTabV8({ accountId, canEdit }: { accountId: strin
         try {
           const d = await bookingChannelsApi.calendarDetail(accountId, s.staffId)
           return [s.staffId, d.connection?.calendar_id ?? ''] as const
-        } catch {
+        } catch (saveFailure) {
+          saveErrors.capture(saveFailure);
+
           return [s.staffId, ''] as const
         }
       }))
       setCalendars(Object.fromEntries(details.filter(([, id]) => id)))
     } catch (e) {
-      setError(describeApiFailure(e, '予約経路を読み込めませんでした。'))
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure)
+
+      setError(describeApiFailure(e, '予約経路を読み込めませんでした。')) }
       setStatus('error')
     }
-  }, [accountId])
+  }, [accountId, saveErrors])
 
   useEffect(() => {
     void load()
@@ -250,13 +267,13 @@ export default function ChannelsTabV8({ accountId, canEdit }: { accountId: strin
 
   const firstConflict = conflicts[0] ?? null
 
-  if (status === 'loading') return <ListState kind="loading" />
+  if (status === 'loading') return <SaveErrorScope errors={saveErrors}><ListState kind="loading" /></SaveErrorScope>
   if (status === 'error' || !data) {
-    return <ListState kind="error" title="予約経路を読み込めませんでした" description={error} onRetry={() => void load()} />
+    return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="予約経路を読み込めませんでした" description={error} onRetry={() => void load()} /></SaveErrorScope>
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
+    <SaveErrorScope errors={saveErrors}><div className="flex min-w-0 flex-col gap-4">
       <NoteBar tone="info" help="ほかの予約サービスがスタッフの Google カレンダーへ予約を書き出せれば、その時間は自動で LINE の予約受付から外れます。">
         いちばん確かなのは「スタッフの Google カレンダー」です。
       </NoteBar>
@@ -345,11 +362,11 @@ export default function ChannelsTabV8({ accountId, canEdit }: { accountId: strin
         <h2 className="text-base font-bold text-ink">外から予約が入ったとき</h2>
         <fieldset disabled={!canEdit || savingAssign}>
           <span>指名なしの予約は、その時間に空いているスタッフへ自動で割り当て</span>
-          <Toggle
+          <SaveErrorField names={["autoAssign","data.autoAssign","auto_assign","data.auto_assign"]}><Toggle
             label="指名なしの予約は、その時間に空いているスタッフへ自動で割り当て"
             checked={data.autoAssign}
             onChange={(next) => void saveAutoAssign(next)}
-          />
+          /></SaveErrorField>
         </fieldset>
         {assignError ? <p role="alert" className="text-sm text-ink-secondary">{assignError}</p> : null}
       </section>
@@ -360,6 +377,6 @@ export default function ChannelsTabV8({ accountId, canEdit }: { accountId: strin
       {conflictOpen && firstConflict ? (
         <ConflictDialog accountId={accountId} conflict={firstConflict} staff={data.staff} onClose={() => setConflictOpen(false)} onDone={() => { setConflictOpen(false); void load() }} />
       ) : null}
-    </div>
+    </div></SaveErrorScope>
   )
 }

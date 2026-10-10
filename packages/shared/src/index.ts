@@ -48,6 +48,7 @@ export * from './hq-broadcasts.js';
 export * from './restaurant-closures';
 export * from './company-settings';
 export * from './hq-template-distribution-display';
+export * from './hq-delivery-templates';
 export * from './hq-template-list';
 
 export * from './scenario-drafts.js';

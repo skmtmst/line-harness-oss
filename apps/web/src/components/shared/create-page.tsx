@@ -12,6 +12,7 @@ import HelpTip from '@/components/shared/help-tip'
 import StickyBar from '@/components/shared/sticky-bar'
 import ValidationSummary from '@/components/shared/validation-summary'
 import { describeSaveFailure } from '@/lib/api'
+import { SaveErrorScope, useSaveFormErrors } from './save-form-errors'
 import type { FormErrors } from '@/lib/use-form-errors'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 
@@ -125,6 +126,8 @@ export default function CreatePage({
   statusLabel,
   children,
 }: CreatePageProps) {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const theme = useAdminTheme()
   const [saving, setSaving] = useState(false)
@@ -193,7 +196,7 @@ export default function CreatePage({
       // 作った行を一覧で目立たせる。どこに増えたのか探させない。
       router.push(successHref ? successHref(id) : createPageReturnHref(parent[1], id))
     } catch (e) {
-      setError(describeError ? describeError(e) : createPageErrorMessage(e))
+      if (!(saveErrors.capture(e, fields))) setError(describeError ? describeError(e) : createPageErrorMessage(e))
       setErrorKind('save')
     } finally {
       setSaving(false)
@@ -250,7 +253,7 @@ export default function CreatePage({
   )
 
   return (
-    <VariantContext.Provider value={variant}>
+    <SaveErrorScope errors={saveErrors}><VariantContext.Provider value={variant}>
     <div data-design-node={designNode} data-create-variant={variant}>
       <AutoFormLeaveGuard busy={saving} />
       {showHeader ? (
@@ -300,7 +303,7 @@ export default function CreatePage({
         </div>
       )}
     </div>
-    </VariantContext.Provider>
+    </VariantContext.Provider></SaveErrorScope>
   )
 }
 

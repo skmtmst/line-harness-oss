@@ -1,16 +1,5 @@
 'use client'
 
-/*
- * 一斉配信の二者承認の見た目（m12a / 設計 A）。
- *
- * A-1 送る前の確認（承認する人の選択・ひとこと）
- * A-2 承認待ちの札・帯（依頼の取り消し・もう一度知らせる）
- * A-3 承認する人の操作（承認する人にだけ出す）
- * A-4 1人運用の人数の確認
- *
- * 既存の共有部品だけを使う。新しい見た目の決まりは作らない。
- * 緑の塗りボタンは置かない（押すボタンは呼び出し側の確認ダイアログが持つ）。
- */
 import { useState } from 'react'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
@@ -23,6 +12,21 @@ import type {
   BroadcastApprovalState,
 } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+
+/*
+ * 一斉配信の二者承認の見た目（m12a / 設計 A）。
+ *
+ * A-1 送る前の確認（承認する人の選択・ひとこと）
+ * A-2 承認待ちの札・帯（依頼の取り消し・もう一度知らせる）
+ * A-3 承認する人の操作（承認する人にだけ出す）
+ * A-4 1人運用の人数の確認
+ *
+ * 既存の共有部品だけを使う。新しい見た目の決まりは作らない。
+ * 緑の塗りボタンは置かない（押すボタンは呼び出し側の確認ダイアログが持つ）。
+ */
 
 export type ApprovalStatus = NonNullable<ApiBroadcast['approvalStatus']>
 
@@ -108,7 +112,7 @@ export function ApprovalRequestFields({
           ) : candidatesState === 'error' ? (
             <p className="text-danger text-xs">承認できる人を読み込めませんでした。開き直してください。</p>
           ) : (
-            <Select
+            <SaveErrorField names={["approverId","approver_id"]}><EntitySelect
               aria-label="承認をお願いする人"
               size="full"
               id="approval-approver"
@@ -117,9 +121,9 @@ export function ApprovalRequestFields({
               onChange={(value) => onApproverChange(value)}
               options={[
                 { value: '', label: candidates.length === 0 ? '承認できる人がいません' : '選んでください' },
-                ...candidates.map((item) => ({ value: item.id, label: item.name })),
+                ...candidates.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name })),
               ]}
-            />
+            /></SaveErrorField>
           )}
           <p className="text-ink-faint mt-1 text-xs">
             送る相手 {formatCount(recipientCount)}。
@@ -129,14 +133,14 @@ export function ApprovalRequestFields({
           <label htmlFor="approval-note" className="text-ink mb-1 block text-xs font-semibold">
             ひとこと（任意）
           </label>
-          <TextArea
+          <SaveErrorField names={["note"]}><TextArea
             id="approval-note"
             rows={3}
             maxLength={500}
             value={note}
             onChange={(event) => onNoteChange(event.target.value)}
             placeholder="秋の案内です。10時までに見てください"
-          />
+          /></SaveErrorField>
         </div>
       </div>
     </div>
@@ -175,14 +179,14 @@ export function SingleOperatorFields({
           </label>
           <HelpTip label="人数の説明">送る相手の人数。送信の直前に数えた数。</HelpTip>
         </div>
-        <TextField
+        <SaveErrorField names={["value"]}><TextField
           id="approval-count"
           inputMode="numeric"
           autoComplete="off"
           value={value}
           onChange={(event) => onChange(event.target.value.replace(/[^0-9]/g, ''))}
           placeholder={String(recipientCount)}
-        />
+        /></SaveErrorField>
         {value.trim() !== '' ? (
           matched ? (
             <p className="text-success mt-1 text-xs">人数が合いました</p>
@@ -365,14 +369,14 @@ export function ApproverSection({
         <label htmlFor="approval-reject-reason" className="text-ink mb-1 block text-xs font-semibold">
           差し戻すときの理由（差し戻すときは必須）
         </label>
-        <TextArea
+        <SaveErrorField names={["rejectReason","reject_reason"]}><TextArea
           id="approval-reject-reason"
           rows={2}
           maxLength={1000}
           value={rejectReason}
           onChange={(event) => setRejectReason(event.target.value)}
           placeholder="理由を入れてください"
-        />
+        /></SaveErrorField>
       </div>
       {message ? <p className="text-danger mt-2 text-xs">{message}</p> : null}
       <div className="mt-3 flex flex-wrap gap-2">

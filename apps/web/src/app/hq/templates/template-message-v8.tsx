@@ -1,5 +1,4 @@
 'use client'
-
 import { useState } from 'react'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
@@ -12,6 +11,7 @@ import { withUploadedImage } from '@/lib/hq-template-authoring'
 import { CardEditor, ImageUpload } from './template-definition-editor'
 import styles from './template-console.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
  * 板 X4JcOf：メッセージのひな形を作る（V8だけ）。
@@ -96,8 +96,8 @@ export default function TemplateMessageFormV8({
           beforeType={(
             <>
               <h2>ひな形の中身</h2>
-              <Field label="ひな形の名前"><input aria-label="ひな形の名前" className={styles.input} value={name} maxLength={200} disabled={disabled} onChange={(event) => onNameChange(event.target.value)} /></Field>
-              <Field label="分類"><input aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={disabled} onChange={(event) => onChange({ ...value, template: { ...current, category: event.target.value } })} /></Field>
+              <Field label="ひな形の名前"><SaveErrorField names={["name"]}><input aria-label="ひな形の名前" className={styles.input} value={name} maxLength={200} disabled={disabled} onChange={(event) => onNameChange(event.target.value)} /></SaveErrorField></Field>
+              <Field label="分類"><SaveErrorField names={["category","current.category"]}><input aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={disabled} onChange={(event) => onChange({ ...value, template: { ...current, category: event.target.value } })} /></SaveErrorField></Field>
             </>
           )}
           editorContent={useCardEditor ? <>

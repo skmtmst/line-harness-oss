@@ -10,6 +10,7 @@
 | [v8-feature-additions.md](v8-feature-additions.md) | 機能追加 F-1〜F-25（オーナー採用 2026-10-02）の決まり |
 | [v8-booking-additions.md](v8-booking-additions.md) | 予約の追加（前回と同じ・キャンセル待ち・今日の予約・売上・無断キャンセル・写真）、予約経路と枠の自動調整（F-24・F-25）、店のキャンセル待ち（F-6） |
 | [v8-liff.md](v8-liff.md) | お客さまの画面（LIFF）28 枚の決まり・見た目の型・カレンダー・決済の準備 |
+| [form-file-attachments.md](form-file-attachments.md) | 回答フォームの書類の添付（写真・PDF・本人確認書類、B-176）の決まり・検査・保存期限・権限 |
 
 ## 共通の決まり
 - 自動で送る LINE（知らせ・案内）には `X-Line-Harness-Source: manual` を付けない。担当者の1対1返信だけに付ける。検証環境の送信止めに従う。

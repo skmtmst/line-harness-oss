@@ -1,17 +1,7 @@
 'use client'
+import { canEditFeature } from '@/lib/staff-capability';
+import Toggle from '@/components/shared/toggle';
 
-/*
- * ★V8「勤務とシフト」（板 d5fmnM・管理者）・「自分の勤務」（板 E3YDK・スタッフ本人）・
- * 「ひも付けなし」（板 wvGke）。入口は app/booking/staff/shifts/page.tsx。
- *
- * 白い板1枚：頭（管理者は「← 担当スタッフへ」・題・説明）→ 中身
- * （左＝担当者の切り替え／ひも付けの帯・いつもの勤務時間・休憩・この日だけ・
- * 何週分かのシフト・Google カレンダー、右＝LIFF の日時選択の見本）。
- *
- * 役割はサーバー（/api/staff/me）から読む。確認中と読めないときは操作を隠す。
- * 動き（読み込み・保存・版の競合・権限・失敗時の扱い）は今までの
- * app/booking/staff/shifts/staff-detail-v8.tsx から写した。BEHAVIOR.md を参照。
- */
 import { jstDate } from '@/lib/jst-datetime'
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import { useStaffRole } from '@/lib/staff-role'
@@ -52,6 +42,21 @@ import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+/*
+ * ★V8「勤務とシフト」（板 d5fmnM・管理者）・「自分の勤務」（板 E3YDK・スタッフ本人）・
+ * 「ひも付けなし」（板 wvGke）。入口は app/booking/staff/shifts/page.tsx。
+ *
+ * 白い板1枚：頭（管理者は「← 担当スタッフへ」・題・説明）→ 中身
+ * （左＝担当者の切り替え／ひも付けの帯・いつもの勤務時間・休憩・この日だけ・
+ * 何週分かのシフト・Google カレンダー、右＝LIFF の日時選択の見本）。
+ *
+ * 役割はサーバー（/api/staff/me）から読む。確認中と読めないときは操作を隠す。
+ * 動き（読み込み・保存・版の競合・権限・失敗時の扱い）は今までの
+ * app/booking/staff/shifts/staff-detail-v8.tsx から写した。BEHAVIOR.md を参照。
+ */
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -321,6 +326,8 @@ function OwnShiftEntry() {
 /* ───────────── 勤務とシフト（d5fmnM・E3YDK） ───────────── */
 
 function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boolean }) {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const { selectedAccountId, selectedAccount } = useAccount()
   const [staffList, setStaffList] = useState<BookingStaff[]>([])
@@ -415,14 +422,15 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       setSlots((own.length > 0 ? own : availability.by_staff).flatMap((item) => item.slots))
       setSlotClosedDates(availability.closed_dates ?? [])
       setPreviewError(false)
-    } catch {
+    } catch (saveFailure) {
       if (requestId !== requestRef.current) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       setSlots([])
-      setPreviewError(true)
+      { if (!fieldFailure) setPreviewError(true) }
     } finally {
       if (requestId === requestRef.current) setPreviewLoading(false)
     }
-  }, [staffId])
+  }, [staffId, saveErrors])
 
   const applyRules = (list: Array<{ weekday: number; start_time: string; end_time: string }>) => {
     const savedRules: Record<number, { start: string; end: string }> = {}
@@ -525,14 +533,17 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       else setSlots([])
     } catch (error) {
       if (requestId !== requestRef.current) return
+      saveErrors.capture(error);
+
       if (error instanceof ApiError && error.status === 404) {
         setStaffMissing(true)
-        setLoadStatus('ready')
+        setLoadStatus('ready');
+
         return
       }
       setLoadStatus('error')
     }
-  }, [selectedAccountId, staffId, isSelf, loadAvailability])
+  }, [selectedAccountId, staffId, isSelf, loadAvailability, saveErrors])
 
   useEffect(() => {
     void load()
@@ -558,9 +569,10 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
         setStaffExceptions(exceptionsRes.data.items.filter((item) => item.scopeKind === 'staff' && item.scopeId === staffId))
       }
       if (menuId) await loadAvailability(selectedAccountId, menuId, timeZone, requestId)
-    } catch {
+    } catch (saveFailure) {
       if (requestId !== requestRef.current) return
-      setPreviewError(true)
+      const fieldFailure = saveErrors.capture(saveFailure)
+      { if (!fieldFailure) setPreviewError(true) }
     }
   }
 
@@ -597,9 +609,13 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       if (saveGeneration !== requestRef.current) return
     } catch (error) {
       if (saveGeneration !== requestRef.current) return
-      setRuleError(staffErrorMessage(error, '保存'))
+      const fieldFailure = saveErrors.capture(error)
+      { if (!fieldFailure)
+      setRuleError(staffErrorMessage(error, '保存')) }
     } finally {
-      if (saveGeneration !== requestRef.current) return
+      if (saveGeneration !== requestRef.current)
+
+ return
       setSavingRules(false)
     }
   }
@@ -663,6 +679,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       setOpenDaysFor(null)
     } catch (error) {
       if (saveGeneration !== requestRef.current) return
+      const fieldFailure = saveErrors.capture(error)
       // 409 のときだけ最新へ描き直す。それ以外は入力を消さない。
       const conflict = error instanceof ApiError && error.status === 409 ? asBreakConflict(error.data) : null
       if (conflict) {
@@ -671,7 +688,8 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
           .map((item) => ({ id: item.id, weekday: item.weekday ?? 1, start_time: item.start_time, end_time: item.end_time }))))
         setBreaksVersion(conflict.version)
       }
-      setBreakError(staffErrorMessage(error, '保存'))
+      { if (!fieldFailure)
+      setBreakError(staffErrorMessage(error, '保存')) }
     } finally {
       if (saveGeneration !== requestRef.current) return
       setSavingBreaks(false)
@@ -707,6 +725,8 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       return true
     } catch (error) {
       if (saveGeneration !== requestRef.current) return false
+      const fieldFailure = saveErrors.capture(error);
+
       const conflict = error instanceof ApiError && error.status === 409 ? asBreakConflict(error.data) : null
       if (conflict) {
         setDateRows(conflict.breaks
@@ -714,7 +734,8 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
           .map((item) => ({ key: item.id, id: item.id, date: item.work_date ?? '', start: item.start_time, end: item.end_time })))
         setBreakDatesVersion(conflict.version)
       }
-      setShiftError(staffErrorMessage(error, '保存'))
+      { if (!fieldFailure)
+      setShiftError(staffErrorMessage(error, '保存')) }
       return false
     } finally {
       if (saveGeneration !== requestRef.current) return false
@@ -746,9 +767,13 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       if (saveGeneration !== requestRef.current) return
     } catch (error) {
       if (saveGeneration !== requestRef.current) return
-      setShiftError(staffErrorMessage(error, '保存'))
+      const fieldFailure = saveErrors.capture(error)
+      { if (!fieldFailure)
+      setShiftError(staffErrorMessage(error, '保存')) }
     } finally {
-      if (saveGeneration !== requestRef.current) return
+      if (saveGeneration !== requestRef.current)
+
+ return
       setSavingShift(false)
     }
   }
@@ -797,9 +822,13 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       setDayAddMemo('')
     } catch (error) {
       if (saveGeneration !== requestRef.current) return
-      setShiftError(staffErrorMessage(error, '追加'))
+      const fieldFailure = saveErrors.capture(error)
+      { if (!fieldFailure)
+      setShiftError(staffErrorMessage(error, '追加')) }
     } finally {
-      if (saveGeneration !== requestRef.current) return
+      if (saveGeneration !== requestRef.current)
+
+ return
       setDayAddBusy(false)
     }
   }
@@ -825,9 +854,13 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       if (saveGeneration !== requestRef.current) return
     } catch (error) {
       if (saveGeneration !== requestRef.current) return
-      setShiftError(staffErrorMessage(error, '削除'))
+      const fieldFailure = saveErrors.capture(error)
+      { if (!fieldFailure)
+      setShiftError(staffErrorMessage(error, '削除')) }
     } finally {
-      if (saveGeneration !== requestRef.current) return
+      if (saveGeneration !== requestRef.current)
+
+ return
       setDeleting(false)
     }
   }
@@ -861,9 +894,13 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       if (saveGeneration !== requestRef.current) return
     } catch (error) {
       if (saveGeneration !== requestRef.current) return
-      setGenError(staffErrorMessage(error, '作成'))
+      const fieldFailure = saveErrors.capture(error)
+      { if (!fieldFailure)
+      setGenError(staffErrorMessage(error, '作成')) }
     } finally {
-      if (saveGeneration !== requestRef.current) return
+      if (saveGeneration !== requestRef.current)
+
+ return
       setGenerating(false)
     }
   }
@@ -885,12 +922,18 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       setCalendarInput('')
       if (menuId) await loadAvailability(selectedAccountId, menuId, timeZone, requestRef.current)
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error);
+
       if (error instanceof ApiError && error.status === 503) {
-        setCalendarFormError('Googleの接続設定がまだなのでつなげません。管理者に連絡してください。入力はそのまま残しています。')
+        { if (!fieldFailure)
+        setCalendarFormError('Googleの接続設定がまだなのでつなげません。管理者に連絡してください。入力はそのまま残しています。') }
       } else if (error instanceof ApiError && error.status === 422) {
+        { if (!fieldFailure)
         setCalendarFormError('そのカレンダーに届きませんでした。IDを確かめてください。入力はそのまま残しています。')
+      }
       } else {
-        setCalendarFormError(staffErrorMessage(error, '保存'))
+        { if (!fieldFailure)
+        setCalendarFormError(staffErrorMessage(error, '保存')) }
       }
     } finally {
       setSavingCalendar(false)
@@ -908,7 +951,10 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       setCalendarError(null)
       if (menuId) await loadAvailability(selectedAccountId, menuId, timeZone, requestRef.current)
     } catch (error) {
-      setCalendarFormError(staffErrorMessage(error, '削除'))
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure)
+      setCalendarFormError(staffErrorMessage(error, '削除')) }
     } finally {
       setDisconnecting(false)
     }
@@ -954,26 +1000,26 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   const node = isSelf ? 'E3YDK' : 'd5fmnM'
 
   if (!selectedAccountId) {
-    return <PageState node={node} self={isSelf} title="LINEアカウントを選んでください" desc="勤務とシフトを確認するアカウントを選びます。" />
+    return <SaveErrorScope errors={saveErrors}><PageState node={node} self={isSelf} title="LINEアカウントを選んでください" desc="勤務とシフトを確認するアカウントを選びます。" /></SaveErrorScope>
   }
   if (loadStatus === 'loading') {
-    return <PageState node={node} self={isSelf} title="読み込み中" desc="担当者の勤務とシフトを読み込んでいます。" />
+    return <SaveErrorScope errors={saveErrors}><PageState node={node} self={isSelf} title="読み込み中" desc="担当者の勤務とシフトを読み込んでいます。" /></SaveErrorScope>
   }
   if (loadStatus === 'error') {
     return (
-      <PageState
+      <SaveErrorScope errors={saveErrors}><PageState
         node={node}
         self={isSelf}
         title="担当者の勤務とシフトを表示できませんでした"
         desc="保存済みの内容は消えていません。時間をおいて、もう一度読み込んでください。"
         actions={<Button onClick={() => setReloadKey((value) => value + 1)}>勤務とシフトを再読み込み</Button>}
-      />
+      /></SaveErrorScope>
     )
   }
   if (staffMissing || !staff) {
     if (isSelf) {
       return (
-        <PageState
+        <SaveErrorScope errors={saveErrors}><PageState
           node="wvGke"
           self
           icon={<UserX className={styles.stateIcon} aria-hidden="true" />}
@@ -984,29 +1030,29 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
           actions={ownStaffId
             ? <Button href={`/booking/staff/shifts?staff_id=${ownStaffId}`}>自分の勤務を開く</Button>
             : <Button href="/booking/bookings">予約の一覧へ戻る</Button>}
-        />
+        /></SaveErrorScope>
       )
     }
     return (
-      <PageState
+      <SaveErrorScope errors={saveErrors}><PageState
         node="d5fmnM"
         self={false}
         title="担当者が見つかりませんでした"
         desc="削除されたか、別のアカウントの担当者です。一覧から選び直してください。"
         actions={<Button href="/booking/menus?tab=staff">担当スタッフの一覧に戻る</Button>}
-      />
+      /></SaveErrorScope>
     )
   }
 
   const staffLabel = (item: BookingStaff) => `${item.name}${item.role ? `（${item.role}）` : ''}`
   // 閲覧のみ：時刻を選ぶ部品は置かず、いまの時刻を文字で見せる（2026-10-06 オーナー決定）。
   const timeBox = (label: string, value: string, onChange: (v: string) => void) => (canEdit
-    ? <TimeField aria-label={label} value={value} invalid={badTimes.includes(label)} onChange={(v) => { if (badTimes.includes(label)) setBadTimes([]); onChange(v) }} className={styles.time} />
+    ? <SaveErrorField names={["value","badTimes","bad_times"]}><TimeField aria-label={label} value={value} invalid={badTimes.includes(label)} onChange={(v) => { if (badTimes.includes(label)) setBadTimes([]); onChange(v) }} className={styles.time} /></SaveErrorField>
     : <span aria-label={label} className={`${styles.time} ${styles.timeText}`}>{value || emptyValue('unknown')}</span>
   )
 
   return (
-    <div className={layout.shell} data-design-node={node}>
+    <SaveErrorScope errors={saveErrors}><div className={layout.shell} data-design-node={node}>
       <Head self={isSelf} />
 
       <div className={layout.body} data-design="Body">
@@ -1018,13 +1064,13 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               <div className={styles.switcherField}>
                 <span className={layout.smallLabel} id="bks-switch-label">担当者を切り替える</span>
                 <span className={styles.selectBox}>
-                  <Select
+                  <SaveErrorField names={["staffId","scopeId","staff_id"]}><EntitySelect
                     aria-label="担当者を切り替える"
                     size="full"
                     value={staffId}
                     onChange={(value) => router.push(`/booking/staff/shifts?staff_id=${value}`)}
-                    options={staffList.map((item) => ({ value: item.id, label: staffLabel(item) }))}
-                  />
+                    options={staffList.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: staffLabel(item) }))}
+                  /></SaveErrorField>
                 </span>
               </div>
               <p className={styles.switcherNote}>保存すると、右の予約画面にすぐ出ます。</p>
@@ -1046,7 +1092,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                 return (
                   <div className={styles.dayRow} key={day.weekday} data-on={row.active || undefined}>
                     <span className={styles.dayName}>{day.short}</span>
-                    {canEdit ? <SettingCheckbox label={`${day.label}は出勤する`} checked={row.active} onChange={(checked) => updateDraft(day.weekday, { active: checked })} /> : null}
+                    {canEdit ? <SaveErrorField names={["active","row.active"]}><SettingCheckbox label={`${day.label}は出勤する`} checked={row.active} onChange={(checked) => updateDraft(day.weekday, { active: checked })} /></SaveErrorField> : null}
                     {row.active ? (
                       <>
                         <span className={styles.dayState}>出る</span>
@@ -1090,8 +1136,8 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                     </button>
                     {openDaysFor === group.key ? (
                       <span className={styles.daysPanel} role="group" aria-label="休憩の曜日">
-                        {STAFF_DAYS.map((day) => (
-                          <Checkbox
+                        {STAFF_DAYS.map((day, saveFieldIndex) => (
+                          <SaveErrorField names={[`STAFF_DAYS.${saveFieldIndex}.weekday`,"weekday","day.weekday"]} key={day.weekday}><Checkbox
                             key={day.weekday}
                             checked={group.weekdays.includes(day.weekday)}
                             onCheckedChange={(checked) => updateBreakGroup(group.key, {
@@ -1099,7 +1145,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                             })}
                           >
                             {day.short}
-                          </Checkbox>
+                          </Checkbox></SaveErrorField>
                         ))}
                       </span>
                     ) : null}
@@ -1195,7 +1241,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               {dayAddOpen && canEdit ? (
                 <div className={styles.dayAdd}>
                   <span className={styles.kindBox}>
-                    <Select
+                    <SaveErrorField names={["dayAddKind","day_add_kind"]}><Select
                       aria-label="足す種別"
                       value={dayAddKind}
                       onChange={(value) => setDayAddKind(value as DayAddKind)}
@@ -1204,9 +1250,9 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                         { value: 'break', label: 'この日だけの休憩' },
                         ...(canEditExceptions ? [{ value: 'closed', label: 'この日だけの休み' }] : []),
                       ]}
-                    />
+                    /></SaveErrorField>
                   </span>
-                  <span className={styles.dateBox}><DateField aria-label="この日の日付" value={dayAddDate} onChange={setDayAddDate} /></span>
+                  <span className={styles.dateBox}><SaveErrorField names={["dayAddDate","dateFrom","dateTo","work_date","date","day_add_date"]}><DateField aria-label="この日の日付" value={dayAddDate} onChange={setDayAddDate} /></SaveErrorField></span>
                   {dayAddKind !== 'closed' ? (
                     <>
                       {timeBox('この日の始まり', dayAddStart, setDayAddStart)}
@@ -1214,7 +1260,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                       {timeBox('この日の終わり', dayAddEnd, setDayAddEnd)}
                     </>
                   ) : (
-                    <input type="text" value={dayAddMemo} onChange={(e) => setDayAddMemo(e.target.value)} placeholder="理由（任意・例：研修のため）" aria-label="休みの理由" className={`${layout.input} ${styles.memo}`} />
+                    <SaveErrorField names={["dayAddMemo","reason","day_add_memo"]}><input type="text" value={dayAddMemo} onChange={(e) => setDayAddMemo(e.target.value)} placeholder="理由（任意・例：研修のため）" aria-label="休みの理由" className={`${layout.input} ${styles.memo}`} /></SaveErrorField>
                   )}
                   <Button variant="primary" onClick={() => void addDayEntry()} disabled={dayAddBusy || savingShift} busy={dayAddBusy}>足す</Button>
                 </div>
@@ -1234,9 +1280,9 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               <div className={styles.genRow}>
                 <div className={layout.field}>
                   <span className={layout.label}>開始日</span>
-                  <span className={styles.dateBox}><DateField aria-label="まとめて作り始める日" value={genFrom} onChange={setGenFrom} /></span>
+                  <span className={styles.dateBox}><SaveErrorField names={["genFrom","from_date","gen_from"]}><DateField aria-label="まとめて作り始める日" value={genFrom} onChange={setGenFrom} /></SaveErrorField></span>
                 </div>
-                <div className={layout.field}><Field label="週の数（1〜12）" htmlFor="bks-weeks"><NumberInput id="bks-weeks" aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className={layout.input} /></Field></div>
+                <div className={layout.field}><Field label="週の数（1〜12）" htmlFor="bks-weeks"><SaveErrorField names={["genWeeks","gen_weeks"]}><NumberInput id="bks-weeks" aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className={layout.input} /></SaveErrorField></Field></div>
                 {canEdit ? (
                   <Button variant="primary" onClick={() => void generateFromRules()} disabled={generating} busy={generating} busyLabel="作成中…">
                     <CalendarPlus className={styles.btnIcon} aria-hidden="true" />作る
@@ -1255,7 +1301,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                 : '予定がある時間は、予約枠から自動で外れます。LINE で入った予約は、このカレンダーに書き込みます。ほかの予約サービスがこのカレンダーへ書き出せば、そちらの予約でも自動で枠が埋まります。'}</p>
               {!serviceConfigured ? <p className={layout.warnBand} role="status">Googleの接続設定がまだなのでつなげません。管理者に連絡してください。</p> : null}
               <div className={styles.calRow}>
-                <div className={`${layout.field} ${styles.calField}`}><Field label="カレンダーの ID" htmlFor="bks-cal-id"><input
+                <div className={`${layout.field} ${styles.calField}`}><Field label="カレンダーの ID" htmlFor="bks-cal-id"><SaveErrorField names={["calendarInput","calendarId","calendar_input","calendar_id"]}><input
                     id="bks-cal-id"
                     aria-label="カレンダーのID"
                     value={calendarId ? (calendarInput || calendarId) : calendarInput}
@@ -1266,7 +1312,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                     placeholder="例：example@example.invalid"
                     readOnly={!canEdit}
                     className={layout.input}
-                  /></Field></div>
+                  /></SaveErrorField></Field></div>
                 {calendarId ? <span className={styles.pill} data-tone="on"><span className={styles.pillDot} aria-hidden="true" />つながっている</span> : null}
               </div>
               {calendarId ? (
@@ -1346,6 +1392,6 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
         onCancel={() => setConfirmDisconnect(false)}
         onConfirm={() => disconnectCalendar()}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }

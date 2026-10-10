@@ -224,6 +224,7 @@
 }
 .actionRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--tpl-rule-row-gap);
   padding: var(--tpl-rule-row-gap);

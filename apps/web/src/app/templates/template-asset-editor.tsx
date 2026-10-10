@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import type { MediaItem } from '@line-crm/shared'
@@ -7,7 +8,7 @@ import { api, type BroadcastAssetKind } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import LinePreview from '@/components/shared/line-preview'
-import Combobox from '@/components/shared/combobox'
+
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -566,12 +567,12 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                   <DateTimeField aria-label="受付の終了" value={researchEndsAt} onChange={setResearchEndsAt} className="mt-2" />
                 </div>
                 <Field label="答えてもらう人" note="タグで絞れます。選ばなければ全員が対象です。">
-                  <Combobox
+                  <EntitySelect clearable size="full" kind="tag"
                     aria-label="答えてもらう人"
                     placeholder="友だち全員"
                     value={targetTagId}
                     onChange={setTargetTagId}
-                    options={actionOptions.tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+                    options={actionOptions.tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))}
                     className="mt-2 w-full"
                   />
                 </Field>

@@ -17,8 +17,11 @@ import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import FieldEditorV8, { type FieldEditorValues } from './field-editor-v8'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 export default function EditFieldPageV8() {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -47,13 +50,15 @@ export default function EditFieldPageV8() {
       if (!res.success) throw new Error(res.error)
       setFolders(res.data)
       setFoldersState('ready')
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
       // R516: 失敗を隠さず、所属の選択欄の場所で再試行する。
-      setFoldersState('error')
+      { if (!fieldFailure) setFoldersState('error') }
     } finally {
       setFoldersReloading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     let cancelled = false
@@ -125,8 +130,10 @@ export default function EditFieldPageV8() {
         setJustSaved(false)
         setError('ほかの担当者が先に変更しました。最新の内容を確認してから保存し直してください。')
       }
-    } catch {
-      setError('最新の内容を確認できませんでした。接続を確かめて、もう一度保存してください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure) setError('最新の内容を確認できませんでした。接続を確かめて、もう一度保存してください。') }
     }
   }
 
@@ -155,11 +162,13 @@ export default function EditFieldPageV8() {
       if (!res.success) throw new Error(res.error)
       router.push(`/tags?tab=fields&highlight=${res.data.id}`)
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
       if (reason instanceof ApiError && reason.status === 409
         && (reason as { code?: string }).code === 'VERSION_CONFLICT') {
         await handleVersionConflict(sent)
       } else {
-        setError(reason instanceof ApiError ? reason.message : '項目を保存できませんでした')
+        { if (!fieldFailure) setError(reason instanceof ApiError ? reason.message : '項目を保存できませんでした') }
       }
     } finally {
       setSaving(false)
@@ -172,44 +181,44 @@ export default function EditFieldPageV8() {
     setEditorResetKey((key) => key + 1)
   }
 
-  if (loading) return <ListState kind="loading" />
+  if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" /></SaveErrorScope>
   if (!id) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="unspecified"
         title="編集する友だち情報欄が指定されていません"
         description="一覧から編集する項目を選び直してください。"
         backHref="/tags?tab=fields"
         backLabel="友だち情報欄の一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
-  if (!selectedAccountId) return <p className="rounded-card border border-hairline bg-canvas p-5 text-sm text-ink-secondary">上部でLINE公式アカウントを選んでください。</p>
+  if (!selectedAccountId) return <SaveErrorScope errors={saveErrors}><p className="rounded-card border border-hairline bg-canvas p-5 text-sm text-ink-secondary">上部でLINE公式アカウントを選んでください。</p></SaveErrorScope>
   if (notFound || (!error && !field)) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="not-found"
         title="この項目は見つかりません"
         description="削除されたか、別のLINEアカウントの項目です。一覧から選び直せます。"
         accountName={selectedAccount?.name}
         backHref="/tags?tab=fields"
         backLabel="友だち情報欄の一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
   if (!field) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="error"
         title="項目を読み込めませんでした"
         description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
         onRetry={() => setReloadKey((k) => k + 1)}
-      />
+      /></SaveErrorScope>
     )
   }
 
   return (
-    <div>
+    <SaveErrorScope errors={saveErrors}><div>
       {/* R517: 応答消失後の再試行で、送った内容が保存済みと分かった。 */}
       {justSaved ? (
         <Notice
@@ -247,6 +256,6 @@ export default function EditFieldPageV8() {
         onCancel={() => router.push('/tags?tab=fields')}
         onSubmit={(values) => void save(values)}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }

@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8 オートメーションの動いた記録（Pencil `g98F9`）。
- *
- * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・動きは今までの V8
- * （app/automations/runs-v8.tsx）と同じ（一覧・検索・結果の絞り込み・テスト実行の出し分け・CSV・
- * 中身・もう一度やる・取りやめ・?run= の直リンク）。違いは見せ方だけ——
- * 型（ListPage）に、タブ・数の帯・案内の帯・道具の段・表（絵の列の並び）を渡す。
- * 中身は右の詳細パネルで開く。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -45,6 +35,18 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 オートメーションの動いた記録（Pencil `g98F9`）。
+ *
+ * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・動きは今までの V8
+ * （app/automations/runs-v8.tsx）と同じ（一覧・検索・結果の絞り込み・テスト実行の出し分け・CSV・
+ * 中身・もう一度やる・取りやめ・?run= の直リンク）。違いは見せ方だけ——
+ * 型（ListPage）に、タブ・数の帯・案内の帯・道具の段・表（絵の列の並び）を渡す。
+ * 中身は右の詳細パネルで開く。
+ */
 
 type RunStatus = AutomationRunDetail['status']
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
@@ -450,7 +452,7 @@ export default function AutomationRunsV8() {
   const savedBox = (
     <div className={styles.savedBox}>
       <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-      <Select
+      <SaveErrorField names={["saved"]}><Select
         aria-label="よく使う絞り込み"
         value={saved}
         onChange={(value) => setSaved(value as SavedKey)}
@@ -458,7 +460,7 @@ export default function AutomationRunsV8() {
           { value: '', label: 'よく使う絞り込み' },
           { value: 'include-test', label: 'テスト実行も見る' },
         ]}
-      />
+      /></SaveErrorField>
     </div>
   )
   const toolbar = (
@@ -510,7 +512,7 @@ export default function AutomationRunsV8() {
                 const versionLine = `v${run.versionNumber}${run.isTest ? '・テスト' : ''}`
                 const menuLabel = `記録「${run.subject ?? '友だち名なし'}・${run.automationName}」の操作`
                 return (
-                  <Tr key={run.id} className={styles.row} data-table-layout="columns" data-row-id={run.id}>
+                  <Tr key={run.id} className={styles.row} data-table-layout="columns" data-row-id={run.id} onOpen={() => setSelectedRun(run)}>
                     <Td className={styles.colWhen}>
                       <button type="button" className={styles.subject} onClick={() => setSelectedRun(run)}>
                         {run.subject ?? '友だち名なし'}
@@ -540,7 +542,7 @@ export default function AutomationRunsV8() {
                           label={menuLabel}
                           open={openMenuId === run.id}
                           onOpenChange={(next) => setOpenMenuId(next ? run.id : null)}
-                          items={rowMenuItems(run).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect() } }))}
+                          items={rowMenuItems(run).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect?.() } }))}
                         />
                       </div>
                     </Td>

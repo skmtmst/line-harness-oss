@@ -1,22 +1,6 @@
 'use client'
-
 import { notifySaved } from '@/components/shared/toast'
 import { Th } from '@/components/shared/table'
-
-/*
- * ★V8「担当メニューをまとめて決める」（板 ooufy）。
- *
- * 白い板1枚：頭（←予約へ・題・未保存の印・5タブ）→ 中身（左＝メニュー×
- * スタッフの升目表と升の中身を変える段、右＝空きの欄）→ 書きかけがある間だけ
- * 下に保存帯（キャンセル・保存）。タブは押すと予約設定のそのタブへ移る
- * （未保存なら共通の離脱確認が出る）。
- *
- * 升の緑の升を押すと「受ける／受けない」が切り替わり、その升の時間と料金を
- * 変える段が下に出る。担当が0人のメニューは黄色い帯で知らせる。
- * 動き（一括保存・未保存の離脱確認・権限での閲覧のみ化・失敗時の扱い）は
- * v7 の /booking/menus/staff と同じ。テーマが v7 のときはこのファイルは
- * 読まれず、従来の見た目が出る。
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
@@ -48,6 +32,22 @@ import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8「担当メニューをまとめて決める」（板 ooufy）。
+ *
+ * 白い板1枚：頭（←予約へ・題・未保存の印・5タブ）→ 中身（左＝メニュー×
+ * スタッフの升目表と升の中身を変える段、右＝空きの欄）→ 書きかけがある間だけ
+ * 下に保存帯（キャンセル・保存）。タブは押すと予約設定のそのタブへ移る
+ * （未保存なら共通の離脱確認が出る）。
+ *
+ * 升の緑の升を押すと「受ける／受けない」が切り替わり、その升の時間と料金を
+ * 変える段が下に出る。担当が0人のメニューは黄色い帯で知らせる。
+ * 動き（一括保存・未保存の離脱確認・権限での閲覧のみ化・失敗時の扱い）は
+ * v7 の /booking/menus/staff と同じ。テーマが v7 のときはこのファイルは
+ * 読まれず、従来の見た目が出る。
+ */
 
 /* 予約設定の5タブ（settings-v8.tsx の V8_TABS と同じ並び）。 */
 const V8_TABS = [
@@ -98,6 +98,7 @@ function MatrixSkeleton() {
 }
 
 export default function AssignMatrixV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('予約設定')
   const sp = useSearchParams()
   /** 一覧から「スタッフ割当」で来たときに、その行を目立たせる。 */
@@ -150,7 +151,8 @@ export default function AssignMatrixV8() {
       try {
         const bulk = await bookingApi.listStaffMenusBulk(selectedAccountId)
         for (const entry of bulk.staff) matrices.set(entry.staff_id, entry.matrix)
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
         await Promise.all(
           staffRes.staff.map(async (s) => {
             const r = await bookingApi.getStaffMenus(selectedAccountId, s.id)
@@ -176,17 +178,25 @@ export default function AssignMatrixV8() {
       setGrid(next)
       setSavedGrid(next)
     } catch (e) {
-      setLoadError(e)
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure)
+      setLoadError(e) }
       if (isForbiddenOrRateLimited(e)) {
+        { if (!fieldFailure)
+
         setError(loadFailureCopy(e, '担当スタッフの割り当て').description ?? '読み込めませんでした。')
+      }
       } else {
         const message = e instanceof Error ? e.message : ''
+        { if (!fieldFailure)
         setError(message && !/^API error: /.test(message) ? message : '読み込めませんでした。画面を再読み込みして確認してください。')
       }
+    }
     } finally {
       setLoading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     void load()
@@ -239,9 +249,13 @@ export default function AssignMatrixV8() {
         onAction: () => void undoSave(before, grid),
       })
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure)
+
       setError(
         `${withPermissionFailure(e, describeSaveFailure(e), 'store')}（保存は取り消されました。画面を再読み込みして最新の状態を確認してください）`,
-      )
+      ) }
     } finally {
       setSaving(false)
     }
@@ -264,9 +278,13 @@ export default function AssignMatrixV8() {
       flashDone()
       notifyToast('元に戻しました')
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure)
+
       setError(
         `${withPermissionFailure(e, describeSaveFailure(e), 'store')}（元に戻せませんでした。画面を再読み込みして最新の状態を確認してください）`,
-      )
+      ) }
     } finally {
       setSaving(false)
     }
@@ -329,7 +347,7 @@ export default function AssignMatrixV8() {
     (selectedRow!.override_duration_minutes != null || selectedRow!.override_price != null)
 
   return (
-    <div className={shell.shell} data-design-node="ooufy">
+    <SaveErrorScope errors={saveErrors}><div className={shell.shell} data-design-node="ooufy">
       <PageHeading title={<>担当メニューをまとめて決める</>}
         crumbs={<><p className={shell.headNote} role="status" aria-live="polite">
           {dirty ? '未保存の変更があります' : 'メニューごとに、予約を受けられるスタッフを決めます'}
@@ -434,14 +452,14 @@ export default function AssignMatrixV8() {
                                 onFocusCapture={() => setSelected({ staffId: s.id, menuId: m.id })}
                               >
                                 <span className={styles.cellBox}>
-                                  <Checkbox
+                                  <SaveErrorField names={["offered"]}><Checkbox
                                     checked={offered}
                                     disabled={!canEditMenus}
                                     onCheckedChange={(checked) =>
                                       update(s.id, m.id, { is_offered: checked ? 1 : 0 })
                                     }
                                     aria-label={`${m.name} を ${staffLabel(s)} が受ける`}
-                                  />
+                                  /></SaveErrorField>
                                   {overridden ? (
                                     <span className={styles.ovrDot} title="時間・料金をこのスタッフ用に変えています" />
                                   ) : null}
@@ -461,7 +479,7 @@ export default function AssignMatrixV8() {
                       {`升を押したとき（${staffLabel(selectedStaff)} × ${selectedMenu.name}）`}
                     </h3>
                   <div className={styles.overrideFields}>
-                    <Field label="このスタッフの所要時間" note={`メニューは ${selectedMenu.duration_minutes} 分`}><NumberInput unit="分"
+                    <Field label="このスタッフの所要時間" note={`メニューは ${selectedMenu.duration_minutes} 分`}><SaveErrorField names={["override_duration_minutes","selectedRow.override_duration_minutes","selected_row.override_duration_minutes"]}><NumberInput unit="分"
                           type="number"
                           min={1}
                           disabled={!canEditMenus || !selectedRow.is_offered}
@@ -474,9 +492,9 @@ export default function AssignMatrixV8() {
                           }
                           placeholder={String(selectedMenu.duration_minutes)}
                           aria-label={`${staffLabel(selectedStaff)} の ${selectedMenu.name} の所要時間`}
-                        />
+                        /></SaveErrorField>
                         </Field>
-                    <Field label="このスタッフの料金" note={`メニューは ${menuPriceLabel(selectedMenu)}`}><NumberInput unit="円"
+                    <Field label="このスタッフの料金" note={`メニューは ${menuPriceLabel(selectedMenu)}`}><SaveErrorField names={["override_price","selectedRow.override_price","selected_row.override_price"]}><NumberInput unit="円"
                           type="number"
                           min={0}
                           disabled={!canEditMenus || !selectedRow.is_offered}
@@ -489,7 +507,7 @@ export default function AssignMatrixV8() {
                           }
                           placeholder={formatNumber(selectedMenu.base_price)}
                           aria-label={`${staffLabel(selectedStaff)} の ${selectedMenu.name} の料金`}
-                        />
+                        /></SaveErrorField>
                         </Field>
                     <span className={styles.overrideClear}>
                       <Button
@@ -587,6 +605,6 @@ export default function AssignMatrixV8() {
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }

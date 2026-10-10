@@ -127,3 +127,18 @@
 [data-theme='v8'] .badge:not(.annotation)[data-tone='neutral'] { background: var(--polish-status-neutral-bg); color: var(--polish-status-neutral-ink); }
 [data-theme='v8'] .badge:not(.annotation)[data-tone='neutral']::before { background: var(--polish-status-neutral-dot); }
 [data-theme='v8'] .badge:not(.annotation)::before { background: var(--polish-status-neutral-dot); width: var(--polish-status-dot-size); height: var(--polish-status-dot-size); flex-basis: var(--polish-status-dot-size); }
+
+/* B-159 / B-180：小さい注記も状態なら同じ22px・12/600。 */
+[data-theme='v8'] .badge {
+  box-sizing: border-box;
+  height: var(--tpl-badge-h);
+  font-size: var(--text-caption); font-weight: 600; line-height: 18px;
+}
+[data-theme='v8'] .badge.micro {
+  font-size: var(--text-caption); font-weight: 600; line-height: 18px;
+}
+[data-theme='v8'] .neutral { background: var(--color-badge-neutral-bg); color: var(--color-badge-neutral); }
+[data-theme='v8'] .success { background: var(--color-badge-success-bg); color: var(--color-badge-success); }
+[data-theme='v8'] .warning { background: var(--color-badge-warning-bg); color: var(--color-badge-warning); }
+[data-theme='v8'] .danger { background: var(--color-badge-danger-bg); color: var(--color-badge-danger); }
+[data-theme='v8'] .info { background: var(--color-badge-info-bg); color: var(--color-badge-info); }

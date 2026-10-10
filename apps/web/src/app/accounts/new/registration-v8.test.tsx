@@ -1,7 +1,10 @@
-// @vitest-environment happy-dom
+
 import { afterEach,beforeEach,expect,test,vi } from 'vitest'
 import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react'
 import Page from './page'
+import { pickEntity, pickEntities } from '@/components/shared/entity-picker-test-helpers'
+// @vitest-environment happy-dom
+
 const calls=vi.hoisted(()=>({list:vi.fn(),tags:vi.fn(),staff:vi.fn(),connectCheck:vi.fn(),connect:vi.fn()}))
 vi.mock('@/lib/use-admin-theme',()=>({useAdminTheme:()=> 'v8'}))
 vi.mock('@/lib/api',()=>({api:{lineAccounts:{list:calls.list,connectCheck:calls.connectCheck,connect:calls.connect},lineAccountTags:{list:calls.tags},staff:{list:calls.staff}}}))
@@ -14,9 +17,8 @@ test('V8 registration forwards tags, parent, staff and chosen LIFF together',asy
  render(<Page/>);
  fireEvent.click(screen.getByRole('button',{name:'次へ'}));
  for(const [id,value] of [['v8-channel-id','123'],['v8-channel-secret','fixture'],['v8-login-channel-id','2007123456'],['v8-login-channel-secret','fixture']])fireEvent.change(document.getElementById(id)!,{target:{value}})
- fireEvent.click(screen.getByRole('button',{name:'次へ'}));
- fireEvent.click(await screen.findByRole('button',{name:'本店'}));fireEvent.click(screen.getByRole('button',{name:'いま決める'}));fireEvent.click(await screen.findByLabelText('担当者'));
- fireEvent.click(screen.getByRole('button',{name:'親アカウント'}));fireEvent.click(screen.getByRole('option',{name:'本部'}).querySelector('button')!);
+ fireEvent.click(screen.getByRole('button',{name:'次へ'}));await pickEntities('タグ', ['本店']);fireEvent.click(screen.getByRole('button',{name:'いま決める'}));await pickEntities('このアカウントを担当範囲に追加する人', ['担当者']);
+ await pickEntity('親アカウント','本部');
  fireEvent.change(screen.getByLabelText('既存のLIFF ID'),{target:{value:'2007123456-existing'}})
  fireEvent.click(screen.getByRole('button',{name:'次へ'}));fireEvent.click(screen.getByRole('button',{name:'接続して設定する'}));
  await waitFor(()=>expect(calls.connectCheck).toHaveBeenCalledWith(expect.objectContaining({tagIds:['tag'],parentLineAccountId:'parent',staffIds:['member'],liffId:'2007123456-existing'})))

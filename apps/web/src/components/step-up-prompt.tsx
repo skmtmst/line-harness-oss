@@ -4,6 +4,7 @@ import React, { useCallback, useState } from 'react'
 import { api, ApiError, type StepUpPurpose } from '@/lib/api'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import StepUpDialog from '@/components/shared/step-up-dialog'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 export type StepUpRequest = {
   purpose: StepUpPurpose
@@ -94,6 +95,8 @@ export default function StepUpPrompt({
   onDone: () => void
   onClose: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const method = readSessionSnapshot()?.stepUpMethod ?? 'totp'
@@ -108,13 +111,15 @@ export default function StepUpPrompt({
       await request.retry(res.data.token)
       onDone()
     } catch (caught) {
-      setError(stepUpFailureMessage(caught))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure) setError(stepUpFailureMessage(caught)) }
     } finally {
       setBusy(false)
     }
   }
   return (
-    <StepUpDialog
+    <SaveErrorScope errors={saveErrors}><StepUpDialog
       open
       action={request.action}
       method={method}
@@ -122,6 +127,6 @@ export default function StepUpPrompt({
       error={method === 'none' ? undefined : error}
       onSubmit={(value) => void submit(value)}
       onCancel={onClose}
-    />
+    /></SaveErrorScope>
   )
 }

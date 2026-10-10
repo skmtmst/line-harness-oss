@@ -260,6 +260,10 @@ export type RowAction = {
 export type RowActionDestructiveItem = Omit<ActionMenuItem, 'tone' | 'dividerBefore'>
 
 export type RowActionsProps = {
+  /** 行うことなど、枠付きの小さなメニューを使う行。既定は一覧の枠なし。 */
+  menuAppearance?: RowMenuProps['appearance']
+  menuSize?: RowMenuProps['size']
+
   /** 先頭の操作。既定ラベルは「詳細」。 */
   detail?: RowAction
   /** 編集は「…」に入れる。許可されない場合は渡さない。 */
@@ -297,6 +301,8 @@ function RowActionButton({ action, defaultLabel }: { action: RowAction; defaultL
  * それ以外を集約する「⋯」メニューを同じ順・同じ見た目で出す。
  */
 export function RowActions({
+  menuAppearance = 'plain',
+  menuSize,
   detail,
   edit,
   menuItems = [],
@@ -323,7 +329,8 @@ export function RowActions({
       {detail ? <RowActionButton action={detail} defaultLabel="詳細" /> : null}
       {items.length > 0 ? (
         <RowMenu
-          appearance="plain"
+          appearance={menuAppearance}
+          size={menuSize}
           items={items}
           label={subjectName ? `${subjectName}のその他操作` : 'そのほかの操作'}
           menuLabel={subjectName ? `${subjectName}の操作` : '操作'}

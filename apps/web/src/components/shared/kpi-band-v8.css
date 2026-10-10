@@ -84,3 +84,13 @@
 /* B-187：補足も操作も無いマスは空の段を取らない。 */
 [data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail]:has(> span:only-child:empty) { display: none; }
 [data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] > span:first-child { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* B-178：一覧は116の帯。マスのcompact指定を残しても段の寸法は共通。 */
+[data-theme='v8'] [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']) > [data-design-version] {
+  min-height: var(--tpl-list-band-h); box-sizing: border-box;
+  padding: var(--tpl-list-band-pad); gap: var(--tpl-list-gap);
+}
+/* 長い説明は1行で省略する。KpiCardのtitleから全文を確かめられる。 */
+[data-theme='v8'] [data-list-skeleton] [data-kpi-strip]:not([data-kpi-density='compact']) [data-kpi-detail] > span {
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}

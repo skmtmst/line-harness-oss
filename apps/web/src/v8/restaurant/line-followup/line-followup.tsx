@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8 LINE来店フォロー（Pencil `xLpnS`）。
- *
- * 確認用の注意の帯 → 数6（フロー・4種の有無・本送信）→ 流れのカード2列
- * （頭：NEN RESTAURANT・流れの名前・プレビューのみ／左：タイトル・本文・配信・下書き保存／
- * 右：LINEでの見え方）→ LINE ミニアプリ連携。
- * データの口は今の画面と同じ（snapshot の lineFlows＋updateLineFlow）。保存しても送らない。
- * 閲覧のみ（変える権限が無い人）には「下書きを保存する」を置かない。動きは BEHAVIOR.md。
- */
 import { useRef, useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
 import { Eye, Utensils } from 'lucide-react'
@@ -23,6 +13,18 @@ import { Panel, StatRow } from '../common-a/parts'
 import styles from './line-followup.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 LINE来店フォロー（Pencil `xLpnS`）。
+ *
+ * 確認用の注意の帯 → 数6（フロー・4種の有無・本送信）→ 流れのカード2列
+ * （頭：NEN RESTAURANT・流れの名前・プレビューのみ／左：タイトル・本文・配信・下書き保存／
+ * 右：LINEでの見え方）→ LINE ミニアプリ連携。
+ * データの口は今の画面と同じ（snapshot の lineFlows＋updateLineFlow）。保存しても送らない。
+ * 閲覧のみ（変える権限が無い人）には「下書きを保存する」を置かない。動きは BEHAVIOR.md。
+ */
 
 /** 数の並びに出す4種（本物の flow_type）と、カードの頭の名前。 */
 const FLOW_KINDS: Record<string, { stat: string; note: string; title: string }> = {
@@ -60,9 +62,9 @@ function FlowCard({ flow, store, ctx, readOnly }: { flow: RestaurantLineFlow; st
       </div>
       <div className={styles.flowBody}>
         <div className={styles.form}>
-          <Field label="タイトル"><TextField value={title} onChange={(event) => setTitle(event.target.value)} readOnly={readOnly} /></Field>
+          <Field label="タイトル"><SaveErrorField names={["title"]}><TextField value={title} onChange={(event) => setTitle(event.target.value)} readOnly={readOnly} /></SaveErrorField></Field>
           <Field label="本文"><span className={styles.bodyBox} onClick={() => bodyRef.current?.focus()}>
-              <textarea ref={bodyRef} value={body} onChange={(event) => setBody(event.target.value)} rows={1} readOnly={readOnly} className={styles.bodyInput} />
+              <SaveErrorField names={["body"]}><textarea ref={bodyRef} value={body} onChange={(event) => setBody(event.target.value)} rows={1} readOnly={readOnly} className={styles.bodyInput} /></SaveErrorField>
             </span></Field>
           <div className={styles.flowFoot}>
             <span className={styles.timing}>{timingLabel(flow)}</span>

@@ -87,7 +87,8 @@ export default function scanBlankGap(opts = {}) {
     if (visCache.has(el)) return visCache.get(el)
     let v = true
     const s = CS(el)
-    if (el.matches('nav,[data-template-region="folders"],[data-template-region="collapsed-folders"],[data-line-preview-part="talk"]') || /フォルダの列|左メニュー/.test(el.getAttribute('data-pencil-name') || '') || /(?:^|[ _-])(?:bubbleBody|bubbleText|bubbleIn|bubbleOut|messageBubble|bubble)(?:[_ -]|$)/i.test(typeof el.className === 'string' ? el.className : '')) v = false
+    // ページ内のタブは見える中身。段が増えても、その場所を空白と数えない。
+    if ((el.matches('nav') && !el.querySelector('[role="tablist"]')) || el.matches('[data-template-region="folders"],[data-template-region="collapsed-folders"],[data-line-preview-part="talk"]') || /フォルダの列|左メニュー/.test(el.getAttribute('data-pencil-name') || '') || /(?:^|[ _-])(?:bubbleBody|bubbleText|bubbleIn|bubbleOut|messageBubble|bubble)(?:[_ -]|$)/i.test(typeof el.className === 'string' ? el.className : '')) v = false
     else if (s.display === 'none' || s.visibility === 'hidden' || s.visibility === 'collapse' || Number(s.opacity) < 0.03) v = false
     else if (el.parentElement && el.parentElement !== document.documentElement) v = visible(el.parentElement)
     visCache.set(el, v)

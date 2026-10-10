@@ -79,7 +79,8 @@ describe('友だちV8の画面契約', () => {
     expect(PAGE).not.toContain('window.alert')
     expect(PAGE).not.toContain('window.confirm')
     /* N-039: 通知・保存検索の窓は部品側へ。共通overlay規約（Esc・復元）に乗せる。 */
-    for (const source of [NOTICE_DIALOG, SAVED_DIALOG]) {
+    expect(SAVED_DIALOG).toContain('<EntityPickerDialog')
+    for (const source of [NOTICE_DIALOG]) {
       expect(source).toContain('role="dialog"')
       expect(source).toContain('aria-modal="true"')
       expect(source).toContain('useOverlayFocus')

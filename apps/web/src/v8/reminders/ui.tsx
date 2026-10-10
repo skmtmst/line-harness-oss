@@ -64,12 +64,7 @@ export function ReminderV8Stepper({ current, reminderId }: { current: ReminderV8
 
 /** 頭の「← リマインダへ」。 */
 export function BackToReminders() {
-  return (
-    <Link href="/reminders" className={styles.backLink}>
-      <ChevronLeft size={14} aria-hidden="true" />
-      リマインダへ
-    </Link>
-  )
+  return null
 }
 
 /** 右の列の「設定内容」。共通部品 CreateSummaryCard に載せる。 */

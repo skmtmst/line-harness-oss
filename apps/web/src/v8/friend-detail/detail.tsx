@@ -1,13 +1,5 @@
 'use client'
 
-/*
- * ★V8 友だち詳細（Pencil「★P1-4 友だち詳細」Q5F2QE・概要は JCDRm）。
- *
- * 入口は app/friends/detail/page.tsx（V8 のときだけこの画面）。
- * データの口・権限・失敗の扱いは今の画面と同じ（BEHAVIOR.md）。見せ方だけ絵どおり：
- * 板の頭（顔・名前・札・補足／…・個別操作・受信箱で開く）→ タブ10個 → タブの中身。
- * タブの中身はタブごとのファイルに分けた。
- */
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, CircleCheck, Copy, List, MessageCircle, MessageSquare, Star, Workflow, Zap } from 'lucide-react'
@@ -45,6 +37,16 @@ import { PageHeading } from '@/components/templates/page-frame'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+
+
+/*
+ * ★V8 友だち詳細（Pencil「★P1-4 友だち詳細」Q5F2QE・概要は JCDRm）。
+ *
+ * 入口は app/friends/detail/page.tsx（V8 のときだけこの画面）。
+ * データの口・権限・失敗の扱いは今の画面と同じ（BEHAVIOR.md）。見せ方だけ絵どおり：
+ * 板の頭（顔・名前・札・補足／…・個別操作・受信箱で開く）→ タブ10個 → タブの中身。
+ * タブの中身はタブごとのファイルに分けた。
+ */
 
 /** タブ10個（並びと URL の値は今の画面と同じ）。 */
 export const FRIEND_DETAIL_TABS = [
@@ -114,11 +116,11 @@ function FriendDetailV8Inner() {
   ]
   // 「…」＝関連する画面を開く。別の画面へ移るものは ↗（external）。
   const secondaryActions: ActionMenuItem[] = [
-    { id: 'templates', label: 'テンプレート一覧を見る', icon: <List size={16} />, external: true, href: '/templates', onSelect: () => router.push('/templates') },
-    { id: 'scenarios', label: 'シナリオ一覧を見る', icon: <List size={16} />, external: true, href: '/scenarios', onSelect: () => router.push('/scenarios') },
-    { id: 'reminders', label: 'リマインダ一覧を見る', icon: <List size={16} />, external: true, href: '/reminders', onSelect: () => router.push('/reminders') },
-    { id: 'mileage', label: 'マイルを確認', icon: <Star size={16} />, external: true, href: '/mileage', onSelect: () => router.push('/mileage') },
-    { id: 'duplicates', label: '重複候補を確認', icon: <Copy size={16} />, external: true, href: '/duplicates', onSelect: () => router.push('/duplicates') },
+    { id: 'templates', label: 'テンプレート一覧を見る', icon: <List size={16} />, external: false, href: '/templates', onSelect: () => router.push('/templates') },
+    { id: 'scenarios', label: 'シナリオ一覧を見る', icon: <List size={16} />, external: false, href: '/scenarios', onSelect: () => router.push('/scenarios') },
+    { id: 'reminders', label: 'リマインダ一覧を見る', icon: <List size={16} />, external: false, href: '/reminders', onSelect: () => router.push('/reminders') },
+    { id: 'mileage', label: 'マイルを確認', icon: <Star size={16} />, external: false, href: '/mileage', onSelect: () => router.push('/mileage') },
+    { id: 'duplicates', label: '重複候補を確認', icon: <Copy size={16} />, external: false, href: '/duplicates', onSelect: () => router.push('/duplicates') },
     { id: 'back-to-list', label: '友だち一覧へ戻る', icon: <ArrowLeft size={16} />, dividerBefore: true, onSelect: () => router.push('/friends') },
   ]
 

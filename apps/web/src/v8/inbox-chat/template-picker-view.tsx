@@ -13,13 +13,12 @@
  */
 import type { RefObject } from 'react'
 import { CornerDownLeft, FolderOpen, Send } from 'lucide-react'
-import FolderPickerShell from '@/components/shared/folder-picker-shell'
+import { EntityPickerDialog } from '@/components/shared/entity-picker'
 import Button from '@/components/shared/button'
-import { type FolderPanelRow } from '@/components/shared/folder-panel'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import Toggle from '@/components/shared/toggle'
 import SearchField from '@/components/shared/search-field'
-import styles from './inbox-chat.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
+import styles from '@/components/shared/entity-picker.module.css'
 
 export type TemplatePickerSideKey = 'frequent' | 'all' | 'none' | `folder:${string}`
 
@@ -69,30 +68,14 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
   ]
 
   return (
-    <FolderPickerShell title="テンプレートを選ぶ" onClose={props.onClose} rows={folderRows} activeId={side.active} onFolder={(key) => props.onPickSide(key as TemplatePickerSideKey)}
-      sideNote={side.status === 'error' ? <p className={styles.tpSideNote}>フォルダを読み込めませんでした</p> : null}
-      search={<SearchField ref={props.searchInputRef} value={props.search} onChange={props.onSearch} onClear={() => props.onSearch('')} placeholder="テンプレート名・本文で探す" aria-label="テンプレート名・本文で探す" className={styles.tpSearchField} />}
-      beforeFooter={<>
-          {props.unresolved && props.unresolved.length > 0 ? (
-            <p className={styles.tpError} role="alert">
-              解決できない差し込みがあります: {props.unresolved.map((v) => `{{${v}}}`).join(' ')}。このまま送信するとエラーになります。
-            </p>
-          ) : null}
-          {packMode && packItems.length > 0 ? (
-            <div className={styles.tpBand}>
-              <span className={styles.tpBandLabel}>続けて送る順：</span>
-              <span className={styles.tpBandOrder} title={packItems.map((item) => item.name).join(' → ')}>
-                {packItems.map((item, index) => `${'①②③④⑤'[index] ?? `${index + 1}.`} ${item.name}`).join(' → ')}
-              </span>
-              <span className={styles.tpBandCount}>{packItems.length} / {PACK_MAX}通</span>
-            </div>
-          ) : null}
-      </>}
+    <EntityPickerDialog
+      onCancel={props.onClose}
+      title="テンプレートを選ぶ"
       footer={<>
             <div className={styles.tpFootLead}>
               {props.canPack ? (
                 <>
-                  <SettingCheckbox checked={packMode} label="2通以上を続けて送る" onChange={props.onPackMode} />
+                  <Toggle checked={packMode} label="2通以上を続けて送る" onChange={props.onPackMode} />
                   <span className={styles.tpFootText}>
                     <span className={styles.tpFootTitle}>2通以上を続けて送る</span>
                     <span className={styles.tpFootSub}>最大5通・選んだ順に送る</span>
@@ -110,6 +93,21 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
             </div>
       </>}
     >
+          <div className={styles.tpBody}>
+            <div className={styles.tpSide}>
+              <FolderPanel readOnly rows={folderRows} activeId={side.active} onSelect={(key) => props.onPickSide(key as TemplatePickerSideKey)} />
+              {side.status === 'error' ? <p className={styles.tpSideNote}>フォルダを読み込めませんでした</p> : null}
+            </div>
+            <div className={styles.tpList}>
+              <SearchField
+                ref={props.searchInputRef}
+                value={props.search}
+                onChange={props.onSearch}
+                onClear={() => props.onSearch('')}
+                placeholder="テンプレート名・本文で探す"
+                aria-label="テンプレート名・本文で探す"
+                className={styles.tpSearchField}
+              />
               {props.frequentNote ? (
                 <p className={styles.tpNote}>まだ送信・使用の実績がないため、実績順ではなく登録順で表示しています。</p>
               ) : null}
@@ -138,7 +136,7 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
                               : <span className={styles.tpBox} aria-hidden="true" />
                           ) : null}
                           <span className={styles.tpCardText}>
-                            <span className={styles.tpCardName} ><TruncatedText value={String(template.name ?? '')} /></span>
+                            <span className={styles.tpCardName} title={template.name}>{template.name}</span>
                             <span className={styles.tpCardBody}>{template.content}</span>
                           </span>
                         </button>
@@ -149,9 +147,25 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
               )}
               {props.remaining > 0 ? (
                 <Button variant="secondary" size="compact" onClick={props.onLoadMore} disabled={props.loadingMore}>
-                  {props.loadingMore ? '読み込み中...' : `さらに表示（残り${props.remaining} 件）`}
+                  {props.loadingMore ? '読み込み中...' : `さらに表示（残り${props.remaining}件）`}
                 </Button>
               ) : null}
-    </FolderPickerShell>
+            </div>
+          </div>
+          {props.unresolved && props.unresolved.length > 0 ? (
+            <p className={styles.tpError} role="alert">
+              解決できない差し込みがあります: {props.unresolved.map((v) => `{{${v}}}`).join(' ')}。このまま送信するとエラーになります。
+            </p>
+          ) : null}
+          {packMode && packItems.length > 0 ? (
+            <div className={styles.tpBand}>
+              <span className={styles.tpBandLabel}>続けて送る順：</span>
+              <span className={styles.tpBandOrder} title={packItems.map((item) => item.name).join(' → ')}>
+                {packItems.map((item, index) => `${'①②③④⑤'[index] ?? `${index + 1}.`} ${item.name}`).join(' → ')}
+              </span>
+              <span className={styles.tpBandCount}>{packItems.length} / {PACK_MAX}通</span>
+            </div>
+          ) : null}
+    </EntityPickerDialog>
   )
 }

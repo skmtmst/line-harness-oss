@@ -1,5 +1,4 @@
 'use client'
-
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useEffect, useRef, useState } from 'react'
 import type { HqFriendAttributeDetail, HqTemplateReceivedVersion } from '@line-crm/shared'
@@ -17,6 +16,7 @@ import SavedDistributionDialog from './saved-distribution-dialog'
 import { accountsInFolder, distributionFolderRows, DistributionFolderPanel, useDistributionFolders } from './distribution-accounts'
 import styles from './console.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const choiceKey = (account: string, source: string) => JSON.stringify([account, source])
 const labels = { create: '新しく作る', overwrite: '上書き', alias: '別名で作る', skip: '配らない' }
@@ -105,14 +105,14 @@ export default function AttributeDistribution({ detail, saved = false, canEdit =
     <PageHeading title={`アカウントへ配る：${detail.template.name}`} />
     {error ? <Notice tone="danger" message={error} /> : null}
     <ListPageBody folders={<DistributionFolderPanel rows={folderRows} activeId={filter} onSelect={setFilter} failed={folders.failed} />}
-      collapsedFolders={<Select aria-label="アカウントのフォルダ" value={filter} onChange={setFilter} options={folderRows.map((row) => ({ value: row.id, label: row.label }))} />}
-      toolbar={<><input aria-label="アカウント名で探す" className={styles.input} value={search} onChange={(event) => setSearch(event.target.value)} /><span>{`選んだ ${selected.length} アカウント`}</span></>}>
+      collapsedFolders={<SaveErrorField names={["filter"]}><Select aria-label="アカウントのフォルダ" value={filter} onChange={setFilter} options={folderRows.map((row) => ({ value: row.id, label: row.label }))} /></SaveErrorField>}
+      toolbar={<><SaveErrorField names={["search"]}><input aria-label="アカウント名で探す" className={styles.input} value={search} onChange={(event) => setSearch(event.target.value)} /></SaveErrorField><span>{`選んだ ${selected.length} アカウント`}</span></>}>
       <DataTable><thead><TableHeadRow><Th>選択</Th><Th>アカウント</Th><Th>配布方法・結果</Th></TableHeadRow></thead><tbody>
-        {visible.map((account) => <Tr key={account.id} data-row-id={account.id}>
-          <Td><Checkbox aria-label={account.name} disabled={busy || stage !== 'accounts'} checked={selected.includes(account.id)} onCheckedChange={(on) => setSelected((current) => on ? [...new Set([...current, account.id])] : current.filter((id) => id !== account.id))} /></Td>
+        {visible.map((account, saveFieldIndex) => <Tr key={account.id} data-row-id={account.id}>
+          <Td><SaveErrorField names={[`visible.${saveFieldIndex}.id`,"id","account.id","selected"]}><Checkbox aria-label={account.name} disabled={busy || stage !== 'accounts'} checked={selected.includes(account.id)} onCheckedChange={(on) => setSelected((current) => on ? [...new Set([...current, account.id])] : current.filter((id) => id !== account.id))} /></SaveErrorField></Td>
           <Td><FolderDotName folder={folders.membership?.get(account.id)?.folder}>{account.name}</FolderDotName></Td>
           <Td>{stage === 'confirm' ? preflight?.stores.find((store) => store.accountId === account.id)?.items.map((item) => <div key={item.sourceId}>
-            <span>{item.name}</span>{item.duplicate ? <Select aria-label={`${account.name} ${item.name}の配布方法`} value={choices[choiceKey(account.id, item.sourceId)] ?? ''} disabled={busy} onChange={(mode) => setChoices((current) => ({ ...current, [choiceKey(account.id, item.sourceId)]: mode as HqAttributeResolution['mode'] }))} options={[{ value: '', label: '選んでください' }, ...item.allowedModes.map((mode) => ({ value: mode, label: labels[mode] }))]} /> : <span>新しく作る</span>}
+            <span>{item.name}</span>{item.duplicate ? <SaveErrorField names={["choices"]}><Select aria-label={`${account.name} ${item.name}の配布方法`} value={choices[choiceKey(account.id, item.sourceId)] ?? ''} disabled={busy} onChange={(mode) => setChoices((current) => ({ ...current, [choiceKey(account.id, item.sourceId)]: mode as HqAttributeResolution['mode'] }))} options={[{ value: '', label: '選んでください' }, ...item.allowedModes.map((mode) => ({ value: mode, label: labels[mode] }))]} /></SaveErrorField> : <span>新しく作る</span>}
             {item.reason ? <p>{item.reason}</p> : null}
           </div>) : stage === 'result' ? (() => { const store = result?.stores.find((row) => row.accountId === account.id); return store ? <><StatusBadge tone={store.status === 'succeeded' ? 'success' : failures.includes(store) ? 'danger' : 'neutral'}>{store.status === 'succeeded' ? '成功' : failures.includes(store) ? '失敗' : '配っています'}</StatusBadge>{store.reason ? <p>{store.reason}</p> : null}</> : selected.includes(account.id) ? '確認中…' : emptyValue('unknown') })() : '確認のあとで選ぶ'}</Td>
         </Tr>)}

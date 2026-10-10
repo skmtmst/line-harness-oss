@@ -1,12 +1,4 @@
 'use client'
-
-/*
- * ★V8 予約台帳「一覧」（板 `Z3FoM`）。今週・今月もこの形で、その期間の予約を出す。
- *
- * 数5（予約・ご来店人数・LINE予約・媒体予約・未配席）→ 期間・状態の絞り込みと
- * 受信データを試す・手動予約を登録する → 予約タイムラインの表（時刻・予約元・お客さま・人数・卓・
- * コース・注意事項・状態・操作）→ ページ送り（一覧だけ）。
- */
 import { Inbox, Plus } from 'lucide-react'
 import KpiCard from '@/components/shared/kpi-card'
 import Card from '@/components/shared/card'
@@ -22,6 +14,16 @@ import { Panel, StatRow, Status } from '../booking-kit/shell'
 import { INACTIVE_STATUSES, type LedgerView, isHold, maskPhone, mdhm, sourceKind, sourceName } from './format'
 import styles from './reservations.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 予約台帳「一覧」（板 `Z3FoM`）。今週・今月もこの形で、その期間の予約を出す。
+ *
+ * 数5（予約・ご来店人数・LINE予約・媒体予約・未配席）→ 期間・状態の絞り込みと
+ * 受信データを試す・手動予約を登録する → 予約タイムラインの表（時刻・予約元・お客さま・人数・卓・
+ * コース・注意事項・状態・操作）→ ページ送り（一覧だけ）。
+ */
 
 export const PAGE_SIZE = 20
 
@@ -76,16 +78,16 @@ export default function ListView({ view, rows, total, tables, page, period, stat
           <>
             <div className={styles.filterField}>
               <Field labelSize="compact" label="期間">
-              <Select aria-label="期間" size="full" value={period} onChange={onPeriod} options={[
+              <SaveErrorField names={["period"]}><Select aria-label="期間" size="full" value={period} onChange={onPeriod} options={[
                 { value: 'upcoming', label: '今後の予約' },
                 { value: 'all', label: 'すべての期間' },
                 { value: 'past', label: '過去の予約' },
-              ]} />
+              ]} /></SaveErrorField>
               </Field>
             </div>
             <div className={styles.filterField}>
               <Field labelSize="compact" label="状態">
-              <Select aria-label="状態" size="full" value={status} onChange={onStatus} options={LEDGER_STATUS_OPTIONS} />
+              <SaveErrorField names={["status"]}><Select aria-label="状態" size="full" value={status} onChange={onStatus} options={LEDGER_STATUS_OPTIONS} /></SaveErrorField>
               </Field>
             </div>
           </>

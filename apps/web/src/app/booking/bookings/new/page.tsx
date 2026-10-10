@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { PageHeading } from '@/components/templates/page-frame'
 
 import DateField from '@/components/shared/date-field'
@@ -871,20 +872,20 @@ export default function NewProxyBookingPage() {
             <Card title="いつ・何を">
               <div className="grid gap-3 md:grid-cols-2">
                 <Field label="予約メニュー">
-                  <Select
+                  <EntitySelect kind="booking_menu"
                     aria-label="予約メニュー"
                     value={menuId}
                     onChange={setMenuId}
-                    options={[{ value: '', label: '選択してください' }, ...menus.map((item) => ({ value: item.id, label: item.name }))]}
+                    options={[{ value: '', label: '選択してください' }, ...menus.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name }))]}
                     size="full"
                   />
                 </Field>
                 <Field label="スタッフ">
-                  <Select
+                  <EntitySelect
                     aria-label="スタッフ"
                     value={staffId}
                     onChange={setStaffId}
-                    options={[{ value: '', label: '選択してください' }, ...staff.map((item) => ({ value: item.id, label: item.display_name }))]}
+                    options={[{ value: '', label: '選択してください' }, ...staff.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.display_name }))]}
                     disabled={!menuId}
                     size="full"
                   />

@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react'
+import type { FormEventHandler, ReactNode } from 'react'
 import styles from './radio-card.module.css'
+import { joinDescribedBy, useFieldContext } from './field-context'
 
 /**
  * ラジオカード。「この中から1つだけ選ぶ」選択肢をカードで出す共通部品。
@@ -28,12 +29,20 @@ import styles from './radio-card.module.css'
  * `className` はカードを並べる内側のコンテナへ付く（既定は縦1列）。
  */
 export function RadioCardGroup({
+  id,
   legend,
+  invalid,
+  'aria-describedby': describedBy,
+  onInput,
   legendVisible = false,
   className,
   children,
 }: {
   /** 群の名前。例「基準日の選択」「配信方法」。 */
+  id?: string
+  invalid?: boolean
+  'aria-describedby'?: string
+  onInput?: FormEventHandler<HTMLFieldSetElement>
   legend: string
   /** true にすると群名を見出しとして表示する。既定は読み上げ専用。 */
   legendVisible?: boolean
@@ -41,7 +50,7 @@ export function RadioCardGroup({
   children: ReactNode
 }) {
   return (
-    <fieldset className={styles.group}>
+    <fieldset id={id} className={styles.group} aria-invalid={invalid || undefined} aria-describedby={describedBy} onInput={onInput}>
       <legend className={legendVisible ? styles.legend : 'sr-only'}>{legend}</legend>
       <div className={[styles.items, className].filter(Boolean).join(' ')}>{children}</div>
     </fieldset>
@@ -49,6 +58,7 @@ export function RadioCardGroup({
 }
 
 export interface RadioCardProps {
+  id?: string
   /** 同じ群で同じ name。矢印キーで行き来できるのは同じ name のラジオ同士だけ。 */
   name: string
   value: string
@@ -98,6 +108,7 @@ export interface RadioCardProps {
 }
 
 export default function RadioCard({
+  id,
   name,
   value,
   checked,
@@ -116,6 +127,8 @@ export default function RadioCard({
   height = 'default',
   size = 'default',
 }: RadioCardProps) {
+  const field = useFieldContext()
+  invalid = invalid || Boolean(field?.invalid)
   return (
     <label
       className={[
@@ -136,12 +149,14 @@ export default function RadioCard({
       {icon && variant !== 'form' ? <span className={styles.topIcon} aria-hidden="true">{icon}</span> : null}
       <input
         type="radio"
+        id={id}
         className={styles.radio}
         name={name}
         value={value}
         checked={checked}
         disabled={disabled}
         aria-invalid={invalid || undefined}
+        aria-describedby={joinDescribedBy(field?.describedBy)}
         onChange={() => onChange(value)}
       />
       <span className={styles.body}>

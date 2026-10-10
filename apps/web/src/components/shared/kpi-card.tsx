@@ -36,6 +36,8 @@ export type KpiCardProps = {
    * 渡したときは value と unit を使わない（★V6 37-6 の数値カード帯）。
    */
   valueText?: string
+  /** 「18 / 20人」のように、整形した値にも単位を添える。 */
+  valueTextWithUnit?: boolean
   /**
    * 見出し・数値に続く3段目。短い状態・短い補足だけを置く。
    * 「未計測」「集計不可」「取得失敗」などの状態自体はここに残し、
@@ -127,6 +129,7 @@ export default function KpiCard({
   className,
   valueTone = 'default',
   valueText,
+  valueTextWithUnit = false,
   ...cardProps
 }: KpiCardProps) {
   const variantClass = {

@@ -1,14 +1,8 @@
 'use client'
 
-/*
- * ★V8 テンプレートの一覧（Pencil「★V8 画面の地図」のテンプレートの行）。
- * 一覧 `v19Ivv`・1152 `L7zA7C`・閲覧のみ `hEDTK`・削除の確認 `V6JFnd`・
- * 削除できない `Z0g3si`・作る種類を選ぶ `R9XUMr`・状態の板 `susGP`。
- *
- * 動き（呼ぶ API・権限・失敗の扱い・URL の指定）は今までの V8 一覧
- * （app/templates/list-v8.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
- * 動きの一覧は同じ場所の BEHAVIOR.md。
- */
+import { isOwnerOrAdmin } from '@/lib/staff-capability';
+import { canManageRole } from '@/lib/staff-role';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import BulkBar from '@/components/shared/bulk-bar'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
@@ -98,6 +92,18 @@ import { formatDate as polishFormatDate, formatListDateTime as polishFormatListD
 import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
+
+/*
+ * ★V8 テンプレートの一覧（Pencil「★V8 画面の地図」のテンプレートの行）。
+ * 一覧 `v19Ivv`・1152 `L7zA7C`・閲覧のみ `hEDTK`・削除の確認 `V6JFnd`・
+ * 削除できない `Z0g3si`・作る種類を選ぶ `R9XUMr`・状態の板 `susGP`。
+ *
+ * 動き（呼ぶ API・権限・失敗の扱い・URL の指定）は今までの V8 一覧
+ * （app/templates/list-v8.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
+ * 動きの一覧は同じ場所の BEHAVIOR.md。
+ */
 
 /** 一覧のタブ。message/question は同じテンプレートの束を中身で分ける。 */
 type Section = 'message' | 'question' | 'rich_video' | BroadcastAssetKind
@@ -213,6 +219,7 @@ function isRichVideoTemplate(template: Template): boolean {
 }
 
 export default function TemplatesListV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('テンプレート')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -308,9 +315,10 @@ export default function TemplatesListV8() {
   /* 右クリックされた行（「…」と同じ項目を出す）。 */
   const [contextId, setContextId] = useState<string | null>(null)
 
-  const [duplicateTarget, setDuplicateTarget] = useState<Template | null>(null)
+  const duplicateLock = useRef(false)
+  const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const [duplicating, setDuplicating] = useState(false)
-  const [duplicateError, setDuplicateError] = useState('')
+  const setDuplicateError =(message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
 
   /** まとめて削除の確認。対象は「使っていない」ものだけ。 */
   const [pendingBulkDelete, setPendingBulkDelete] = useState<Template[] | null>(null)
@@ -334,7 +342,6 @@ export default function TemplatesListV8() {
     setBlockedUsage(null)
     setPendingBulkDelete(null)
     setMoveIds(null)
-    setDuplicateTarget(null)
     setOpenMenuId(null)
     setSelectedIds(new Set())
   }, [selectedAccountId])
@@ -360,16 +367,19 @@ export default function TemplatesListV8() {
       if (res.success) setTemplates(res.data as Template[])
       else setFailure(failureOfResponse())
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e);
+
       if (activeAccountRef.current === accountId && requestGeneration === loadGenerationRef.current) {
         // 権限不足を「読み込めませんでした」に混ぜない。
-        setFailure(failureOf(e))
+        { if (!fieldFailure)
+        setFailure(failureOf(e)) }
       }
     } finally {
       if (activeAccountRef.current === accountId && requestGeneration === loadGenerationRef.current) {
         setLoading(false)
       }
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -384,10 +394,11 @@ export default function TemplatesListV8() {
       const result = await api.broadcastMessageAssets.counts({ accountId })
       if (activeAccountRef.current !== accountId) return
       if (result.success) setAssetCounts(result.data)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       /* 件数が取れなくても一覧は出す。黙って古い件数のままにする。 */
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => { void loadAssetCounts() }, [loadAssetCounts])
 
@@ -407,10 +418,13 @@ export default function TemplatesListV8() {
         setFolders(res.data)
         setUnfiledCount(res.unfiledCount ?? null)
       } else setFolderError('フォルダを読み込めませんでした。')
-    } catch {
-      if (activeAccountRef.current === accountId) setFolderError('フォルダを読み込めませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
+      if (activeAccountRef.current === accountId) { if (!fieldFailure) setFolderError('フォルダを読み込めませんでした。')
     }
-  }, [selectedAccountId])
+  }
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => { void loadFolders() }, [loadFolders])
 
@@ -560,7 +574,7 @@ export default function TemplatesListV8() {
       return next
     })
   }
-  const pageIds = shownItems.map((t) => t.id)
+  const pageIds = duplicateFeedback.order( shownItems, templates).map((t) => t.id)
   const allOnPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
   const toggleAllOnPage = () => {
     setSelectedIds((current) => {
@@ -598,8 +612,11 @@ export default function TemplatesListV8() {
       const res = await api.folders.swapOrder(target.id, neighbor.id, selectedAccountId ?? undefined)
       if (!res.success) throw new Error(res.error)
       await loadFolders()
-    } catch {
-      setFolderError('並び順を変えられませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setFolderError('並び順を変えられませんでした。') }
     } finally {
       setFolderBusy(false)
     }
@@ -615,8 +632,11 @@ export default function TemplatesListV8() {
       setDeletingFolder(null)
       if (selectedCategory === deletingFolder.id) setSelectedCategory('all')
       await loadFolders()
-    } catch {
-      setFolderError('フォルダを削除できませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setFolderError('フォルダを削除できませんでした。') }
     } finally {
       setFolderBusy(false)
     }
@@ -649,8 +669,11 @@ export default function TemplatesListV8() {
       setPendingDelete(null)
       // 件数（未分類・フォルダ別）はフォルダ側の集計が持つので両方読み直す。
       await Promise.all([load(), loadFolders()])
-    } catch {
-      setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
@@ -701,8 +724,10 @@ export default function TemplatesListV8() {
   }
 
   /* 複製。複製の口は無いので、同じ内容で「下書き」として新しく作る。 */
-  const runDuplicate = async () => {
+  const runDuplicate = async (duplicateTarget: Template) => {
+    if (duplicateLock.current) return
     if (!duplicateTarget) return
+    duplicateLock.current = true
     setDuplicating(true)
     setDuplicateError('')
     const source = duplicateTarget
@@ -721,16 +746,21 @@ export default function TemplatesListV8() {
         setDuplicateError('複製できませんでした。状態を読み直してからお試しください。')
         return
       }
-      setDuplicateTarget(null)
-      notifyToast(`「${source.name}」をコピーしました（下書きで作られました）`, { tone: 'success' })
+
+      duplicateFeedback.mark(source.id, result.data.id)
+      notifyToast('複製しました', { tone: 'success' })
       await Promise.all([load(), loadFolders()])
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure)
       setDuplicateError(
         reason instanceof ApiError && reason.status === 403
           ? permissionDeniedMessage('store')
           : '複製できませんでした。状態を読み直してからお試しください。',
-      )
+      ) }
     } finally {
+      duplicateLock.current = false
       setDuplicating(false)
     }
   }
@@ -756,11 +786,14 @@ export default function TemplatesListV8() {
       notifyToast(`${pendingBulkDelete.length} 件のテンプレートを削除しました`, { tone: 'success' })
       await Promise.all([load(), loadFolders()])
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure)
       setBulkDeleteError(
         reason instanceof ApiError && reason.status === 403
           ? permissionDeniedMessage('store')
           : '削除できませんでした。状態を読み直してからお試しください。',
-      )
+      ) }
     } finally {
       setBulkDeleting(false)
     }
@@ -779,7 +812,7 @@ export default function TemplatesListV8() {
       {
         id: 'usage',
         label: '使っている所を見る',
-        external: true,
+        external: false,
         href: detailHref(t), onSelect: () => withViewTransition(() => router.push(detailHref(t))),
       },
       {
@@ -794,7 +827,7 @@ export default function TemplatesListV8() {
           icon: <Copy size={14} aria-hidden="true" />,
           onSelect: () => {
             setDuplicateError('')
-            setDuplicateTarget(t)
+            void runDuplicate(t)
           },
         },
         {
@@ -841,7 +874,7 @@ export default function TemplatesListV8() {
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
     : []
 
@@ -970,7 +1003,7 @@ export default function TemplatesListV8() {
   )
   const perPageBox = (
     <div className={styles.perPageBox}>
-      <Select
+      <SaveErrorField names={["pageSize","page_size"]}><Select
         aria-label="1ページに出す件数"
         size="page-size"
         value={String(pageSize)}
@@ -979,17 +1012,17 @@ export default function TemplatesListV8() {
           setPage(1)
         }}
         options={PAGE_SIZE_OPTIONS}
-      />
+      /></SaveErrorField>
     </div>
   )
 
   /* 1152 の板（L7zA7C）：1段目「作る・フォルダ・探す … 件数」、2段目「札・よく使う絞り込み（印だけ）」。 */
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
-      <div className={styles.narrowRow}>
+    <ListToolbarFrame>
+      <ListToolbarRow>
         {createButton(false)}
         <div className={styles.narrowFolder}>
-          <Select
+          <SaveErrorField names={["selectedCategory","selected_category"]}><Select
             aria-label="フォルダ"
             value={selectedCategory}
             onChange={(value) => {
@@ -997,9 +1030,9 @@ export default function TemplatesListV8() {
               setPage(1)
             }}
             options={folderSelectOptions}
-          />
+          /></SaveErrorField>
         </div>
-        <div className={styles.narrowSearch}>
+        <ListToolbarSearchSlot>
           <SearchField
             aria-label="テンプレートを検索"
             placeholder="名前・本文で探す"
@@ -1007,19 +1040,19 @@ export default function TemplatesListV8() {
             onChange={onSearch}
             onClear={() => onSearch('')}
           />
-        </div>
+        </ListToolbarSearchSlot>
         <span className={styles.spacer} aria-hidden="true" />
         {perPageBox}
-      </div>
-      <div className={styles.narrowRow}>
+      </ListToolbarRow>
+      <ListToolbarRow>
         {filterChips}
         {savedBox(true)}
-      </div>
-    </div>
+      </ListToolbarRow>
+    </ListToolbarFrame>
   )
 
   const wideToolbar = (
-    <div className={styles.wideTools}>
+    <ListToolbarFrame>
       <ListToolbar
         search={{
           placeholder: '名前・本文・差し込みで探す',
@@ -1030,7 +1063,7 @@ export default function TemplatesListV8() {
         filters={filterChips}
         trailing={<><ListToolbarOptional label="よく使う絞り込み">{savedBox(false)}</ListToolbarOptional>{perPageBox}</>}
       />
-    </div>
+    </ListToolbarFrame>
   )
 
   /* ===== 一覧の中身（`susGP`：読込中・読み込めない・空・0件を分ける） ===== */
@@ -1109,12 +1142,12 @@ export default function TemplatesListV8() {
                 <Th className={styles.selectCell} aria-label="選択">
                   {/* 閲覧のみ：まとめて変える操作が無いので、選ぶチェックを置かない（列の幅は残す） */}
                   {canMutateTemplates ? (
-                    <Checkbox
+                    <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
                       checked={allOnPageSelected}
                       indeterminate={!allOnPageSelected && selectedCount > 0}
                       onCheckedChange={() => toggleAllOnPage()}
                       aria-label="このページのテンプレートをすべて選択"
-                    />
+                    /></SaveErrorField>
                   ) : null}
                 </Th>
                 <Th className={styles.headCell}>テンプレート</Th>
@@ -1127,7 +1160,7 @@ export default function TemplatesListV8() {
               </TableHeadRow>
             </thead>
             <RovingTbody>
-              {shownItems.map((t) => {
+              {duplicateFeedback.order(shownItems, templates).map((t, saveFieldIndex) => {
                 const publish = publishStateOf(t)
                 const kindLabel = t.question ? 'question' : t.messageType
                 const excerpt = excerptOf(t)
@@ -1151,11 +1184,11 @@ export default function TemplatesListV8() {
                   >
                     <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
                       {canMutateTemplates ? (
-                        <Checkbox
+                        <SaveErrorField names={[`shownItems.${saveFieldIndex}.id`,"id","t.id"]}><Checkbox
                           checked={selectedIds.has(t.id)}
                           onCheckedChange={() => toggleOne(t.id)}
                           aria-label={`「${t.name}」を選択`}
-                        />
+                        /></SaveErrorField>
                       ) : null}
                     </Td>
                     <NameCell name={
@@ -1311,7 +1344,7 @@ export default function TemplatesListV8() {
         open={pickerOpen}
         title="どの種類を作りますか"
         designNode="I4jUUW"
-        designWidth={1060}
+        designWidth={960}
         designTop={200}
         designHeaderPadding="24px 24px 0"
         designHeaderHeight={48}
@@ -1504,7 +1537,7 @@ export default function TemplatesListV8() {
       >
         <div className={styles.moveBody}>
           <span className={styles.moveLabel}>移動先のフォルダ</span>
-          <Select
+          <SaveErrorField names={["moveDraft","move_draft"]}><Select
             aria-label="移動先のフォルダ"
             size="full"
             value={moveDraft}
@@ -1514,25 +1547,12 @@ export default function TemplatesListV8() {
               { value: '', label: '未分類' },
               ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
             ]}
-          />
+          /></SaveErrorField>
         </div>
       </ConfirmDialog>
 
       {/* 複製の確認窓。コピーは下書きで作る（公開は別の操作）。 */}
-      <ConfirmDialog
-        open={duplicateTarget !== null}
-        title={duplicateTarget ? `「${duplicateTarget.name}」を複製しますか？` : ''}
-        description="同じ本文のテンプレートをもう1つ作ります。コピーは「下書き」で作られるので、確認してから公開してください。名前に「（コピー）」を付けます。"
-        confirmLabel={duplicating ? '複製中…' : '複製する'}
-        busy={duplicating}
-        error={duplicateError}
-        onConfirm={() => runDuplicate()}
-        onCancel={() => {
-          if (duplicating) return
-          setDuplicateTarget(null)
-          setDuplicateError('')
-        }}
-      />
+      <></>
 
       {folderDialogOpen && (
         <FolderAddDialog
@@ -1601,7 +1621,7 @@ export default function TemplatesListV8() {
                   variant="secondary"
                   onClick={() => {
                     setDuplicateError('')
-                    setDuplicateTarget(activeTemplate)
+                    void runDuplicate(activeTemplate)
                   }}
                 >
                   複製する
@@ -1653,7 +1673,7 @@ export default function TemplatesListV8() {
               <>
                 <p className={styles.panelLabel}>移動先のフォルダ</p>
                 <div className={styles.moveBody}>
-                  <Select
+                  <SaveErrorField names={["moveDraft","move_draft"]}><Select
                     aria-label="移動先のフォルダ"
                     size="full"
                     value={moveDraft}
@@ -1663,7 +1683,7 @@ export default function TemplatesListV8() {
                       { value: '', label: '未分類' },
                       ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
                     ]}
-                  />
+                  /></SaveErrorField>
                   <Button type="button" variant="primary" disabled={moving} busy={moving} onClick={() => void runMove()}>
                     {moving ? '移動中…' : '移動する'}
                   </Button>
@@ -1685,7 +1705,7 @@ export default function TemplatesListV8() {
   /* 資産タブ（カルーセル・リッチメッセージ・クーポン・リサーチ）。中身の管理は既存の部品のまま。 */
   if (!isTemplateSection) {
     return (
-      <ListPage boardId={narrow ? 'L7zA7C' : 'v19Ivv'} headingSize="regular" {...heading} tabs={tabs} overlays={overlays}>
+      <SaveErrorScope errors={saveErrors}><ListPage boardId={narrow ? 'L7zA7C' : 'v19Ivv'} headingSize="regular" {...heading} tabs={tabs} overlays={overlays}>
         <div className={styles.assetBody}>
           {canMutateTemplates ? (
             <BroadcastAssetManager kind={activeSection} onChanged={() => void loadAssetCounts()} />
@@ -1698,12 +1718,13 @@ export default function TemplatesListV8() {
             </>
           )}
         </div>
-      </ListPage>
+      </ListPage></SaveErrorScope>
     )
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
+      skeleton
       boardId={narrow ? 'L7zA7C' : 'v19Ivv'}
       headingSize="regular"
       {...heading}
@@ -1719,7 +1740,7 @@ export default function TemplatesListV8() {
               icon={<kpi.icon size={13} aria-hidden="true" />}
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
-              detail={<span className={styles.kpiDetailWrap}>{kpi.detail}</span>}
+              detail={kpi.detail}
             />
           ))}
         </KpiBand>
@@ -1731,6 +1752,6 @@ export default function TemplatesListV8() {
       overlays={overlays}
     >
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

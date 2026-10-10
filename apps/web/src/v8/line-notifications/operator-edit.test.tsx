@@ -1,10 +1,14 @@
-// @vitest-environment happy-dom
+
+import { screen } from '@testing-library/react';
 import React, { act } from 'react'
 import { fireEvent } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { OPERATOR_EVENT_OPTIONS } from '@/app/line-notifications/operator-event-options'
 import { EVENT_OPTIONS, eventPlaceLabel } from './operator-words'
+import OperatorEditV8 from './operator-edit'
+import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
+// @vitest-environment happy-dom
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -27,8 +31,6 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
-
-import OperatorEditV8 from './operator-edit'
 
 const recipients = {
   items: [
@@ -90,9 +92,11 @@ describe('運用者へのお知らせを なおす（hiBO8）', () => {
     await render()
     expect(host?.querySelector('[data-design-node="hiBO8"]')).not.toBeNull()
     expect(host?.querySelector('[data-template-region="heading"] h2')?.textContent).toBe('「新しい予約が入りました」を編集する')
-    const rows = Array.from(host?.querySelectorAll('ul[class*=staffList] > li') ?? []).map((li) => li.textContent ?? '')
+    fireEvent.click(screen.getByRole('button', { name: '受け取るスタッフ' }))
+    const rows = screen.getAllByRole('checkbox').filter((node) => node.closest('[role="dialog"]')).filter((node) => ['高田 誠', '山本 健', '佐藤 杏'].includes(node.getAttribute('aria-label') ?? '')).map((node) => node.closest('label')?.textContent ?? '')
     expect(rows.length).toBe(3)
-    expect(rows[1]).toContain('LINE 未ログイン')
+    expect(document.body.textContent).toContain('山本 健')
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     expect(host?.textContent).toContain('選択 2 人／LINEで受け取れる 1 人／管理画面で受け取れる 2 人')
     // 保存ずみの「メールでも送る」を戻す。
     const mail = Array.from(host?.querySelectorAll('label') ?? []).find((label) => label.textContent?.includes('メールでも送る'))
@@ -194,9 +198,7 @@ test('名前が空の保存は止め、理由を欄に一度だけ出して欄�
 
 test('宛先をすべて外した保存は止め、欄の理由と赤枠を出す', async () => {
   await render()
-  await act(async () => {
-    for (const input of host!.querySelectorAll<HTMLInputElement>('ul[class*=staffList] input:checked')) input.click()
-  })
+  await pickEntities('受け取るスタッフ', ['高田 誠', '山本 健'])
   await act(async () => {
     [...host!.querySelectorAll('button')].find(button => button.textContent === '下書きを保存する')!.click()
   })

@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
@@ -654,13 +655,13 @@ export default function EmailThread({
           </label>
           <label className="flex items-center gap-1.5 text-xs">
             <span className="text-ink-faint whitespace-nowrap">担当</span>
-            <Select
+            <EntitySelect
               aria-label="担当"
               value={detail.thread.assigned_staff_id ?? ''}
               onChange={(value) => void updateAssignee(value || null)}
               options={[
                 { value: '', label: '未割り当て' },
-                ...operators.map((op) => ({ value: op.id, label: op.name })),
+                ...operators.map((op) => ({ ...entityOptionMetadata(op), value: op.id, label: op.name })),
               ]}
             />
           </label>

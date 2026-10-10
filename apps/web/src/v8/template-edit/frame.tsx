@@ -16,6 +16,7 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import tpl from '@/components/templates/page-templates.module.css'
 import StickyBar from '@/components/shared/sticky-bar'
 import styles from './edit.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export function TemplateEditFrame({
   boardId,
@@ -44,7 +45,7 @@ export function TemplateEditFrame({
 }) {
   const [alsoSave, setAlsoSave] = useState(false)
   if (composerHost?.composer) return <Drawer open dirty={false} width="composer" title={title} titleAccessory={<span className={styles.composerTitleAccessories}><HelpTip label="この画面の使い方">テンプレートと同じ編集画面です。作ったものをこの吹き出しに入れます。</HelpTip><StatusBadge tone="neutral" dot={false}>{`吹き出し ${composerHost.composer.index + 1} に入ります`}</StatusBadge></span>} onClose={composerHost.onCancel} busy={composerHost.busy} footer={<div className={styles.composerFooter}>
-    {composerHost.composer.canSaveTemplate !== false ? <Checkbox disabled={composerHost.busy} checked={alsoSave} onCheckedChange={setAlsoSave}>テンプレートとしても保存する</Checkbox> : <span />}
+    {composerHost.composer.canSaveTemplate !== false ? <SaveErrorField names={["alsoSave","also_save"]}><Checkbox disabled={composerHost.busy} checked={alsoSave} onCheckedChange={setAlsoSave}>テンプレートとしても保存する</Checkbox></SaveErrorField> : <span />}
     <span className={styles.composerFooterActions}><Button disabled={composerHost.busy} onClick={composerHost.onCancel}>キャンセル</Button><Button variant="primary" disabled={composerHost.busy} busy={composerHost.busy} onClick={() => onComposerInsert?.(alsoSave)}>この吹き出しに入れる</Button></span>
   </div>}><div className={styles.composerSplit}><div className={styles.composerContent}>{band}{children}</div><aside className={styles.composerSide}>{side}</aside></div></Drawer>
   return (

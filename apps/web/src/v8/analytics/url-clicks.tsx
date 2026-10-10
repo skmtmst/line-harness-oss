@@ -1,12 +1,5 @@
 'use client'
-
 import TruncatedText from '@/components/shared/truncated-text'
-
-/*
- * ★V8 分析「URLクリック」（Pencil `iK4cQ`）。
- * 数の帯 → 道具の段（探す・状態・期間・CSV）→ URLごとの表 → 数え方の注。
- * 呼ぶ口（検索語は API へ・200件まで）・状態の絞り込み・ページ送り・CSV は今の画面（UrlClicksOverviewTab）と同じ。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useEffect, useMemo, useState } from 'react'
 import { Download, Link2, MousePointerClick, Unlink, Users } from 'lucide-react'
@@ -25,6 +18,13 @@ import styles from './analytics.module.css'
 import { useReportPeriod } from '@/components/shared/period-picker'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 分析「URLクリック」（Pencil `iK4cQ`）。
+ * 数の帯 → 道具の段（探す・状態・期間・CSV）→ URLごとの表 → 数え方の注。
+ * 呼ぶ口（検索語は API へ・200件まで）・状態の絞り込み・ページ送り・CSV は今の画面（UrlClicksOverviewTab）と同じ。
+ */
 
 type Link = AnalyticsUrlClicksOverview['data']['links'][number]
 
@@ -72,7 +72,7 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
 
   const toolbar = <div className={styles.toolbar}>
     <div className={styles.searchBox}><SearchField id="url-click-search" aria-label="URL・配信名・リンク名で探す" value={query} onChange={(value) => { setQuery(value); setPage(0) }} onClear={() => { setQuery(''); setPage(0) }} placeholder="URL・配信名・リンク名で探す" loading={state.loading} /></div>
-    <div className={styles.selectBox}><Select id="url-state" aria-label="URLの状態" value={status} options={[{ value: 'all', label: 'すべての状態' }, { value: 'active', label: '計測中' }, { value: 'stopped', label: '停止中' }]} onChange={(value) => { setStatus(value); setPage(0) }} /></div>
+    <div className={styles.selectBox}><SaveErrorField names={["status"]}><Select id="url-state" aria-label="URLの状態" value={status} options={[{ value: 'all', label: 'すべての状態' }, { value: 'active', label: '計測中' }, { value: 'stopped', label: '停止中' }]} onChange={(value) => { setStatus(value); setPage(0) }} /></SaveErrorField></div>
     <RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} />
     <span className={styles.spacer} />
     <Button variant="secondary" onClick={exportRows} disabled={exportDisabled}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
@@ -129,7 +129,7 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
       {links.length > 10 ? <div className={styles.pager}>
         <span>{`${links.length} 件中 ${links.length ? currentPage * pageSize + 1 : 0}〜${Math.min((currentPage + 1) * pageSize, links.length)} 件（取得した範囲）`}</span>
         <span className={styles.spacer} />
-        <Select aria-label="表示件数" value={String(pageSize)} options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value} 件` }))} onChange={(value) => { setPageSize(Number(value)); setPage(0) }} />
+        <SaveErrorField names={["pageSize","page_size"]}><Select aria-label="表示件数" value={String(pageSize)} options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value} 件` }))} onChange={(value) => { setPageSize(Number(value)); setPage(0) }} /></SaveErrorField>
         <Button variant="secondary" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>前へ</Button>
         <Button variant="secondary" disabled={currentPage === lastPage} onClick={() => setPage(currentPage + 1)}>次へ</Button>
       </div> : null}

@@ -1,15 +1,4 @@
 'use client'
-
-/*
- * ★V8-B 広告連携（板 `qSTVR`）・広告とのつなぎ（板 `FDBsG`）・
- * 広告への送信履歴（板 `p0kA3`）。
- *
- * v7 の広告タブ（`ad-integration.tsx`）とは別の見せ方。取ってくる口・
- * 取り込み・手入力・取消し・書き出しの動きは v7 と同じ。口に無い所
- * （つなぐ操作・対応表の件数・媒体の絞り込み・流入元の紐づけ）は作らず、
- * 今の形のままか「—」にする。v7 を直す必要が出たら
- * `ad-integration.tsx` 側も同じ判断を入れる（V8 完成までの二重管理）。
- */
 import Link from 'next/link'
 import type React from 'react'
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
@@ -37,6 +26,19 @@ import NumberInput from '@/components/shared/number-field'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorScope, useSaveFormErrors, SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B 広告連携（板 `qSTVR`）・広告とのつなぎ（板 `FDBsG`）・
+ * 広告への送信履歴（板 `p0kA3`）。
+ *
+ * v7 の広告タブ（`ad-integration.tsx`）とは別の見せ方。取ってくる口・
+ * 取り込み・手入力・取消し・書き出しの動きは v7 と同じ。口に無い所
+ * （つなぐ操作・対応表の件数・媒体の絞り込み・流入元の紐づけ）は作らず、
+ * 今の形のままか「—」にする。v7 を直す必要が出たら
+ * `ad-integration.tsx` 側も同じ判断を入れる（V8 完成までの二重管理）。
+ */
 
 const LOG_PAGE_SIZE = 20
 
@@ -164,6 +166,8 @@ const READONLY_REASON = 'この操作にはオーナーか管理者の権限が�
  * 同じ順番・同じ口。取り直しは `reload` にまとめる。
  */
 function useAdV8Model() {
+  const saveErrors = useSaveFormErrors()
+
   const { selectedAccountId } = useAccount()
   const loadGenerationRef = useRef(0)
   const latestAccountRef = useRef(selectedAccountId)
@@ -254,13 +258,14 @@ function useAdV8Model() {
         setManualEntries([])
         setCostFailed(true)
       }
-    } catch {
+    } catch (saveFailure) {
       if (!isCurrent()) return
+      saveErrors.capture(saveFailure)
       setFailed(true)
     } finally {
       if (isCurrent()) setLoading(false)
     }
-  }, [logPage, query, selectedAccountId, status])
+  }, [logPage, query, selectedAccountId, status, saveErrors])
 
   useEffect(() => {
     setPlatforms([])
@@ -338,12 +343,16 @@ function useAdV8Model() {
       setManualDay('')
       setManualAmount('')
       void load()
-    } catch {
-      setManualError('記録できませんでした。通信状態を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
+
+      if (!fieldFailure) {
+      setManualError('記録できませんでした。通信状態を確かめて、もう一度お試しください。') }
     } finally {
       setManualBusy(false)
     }
-  }, [selectedAccountId, manualBusy, manualLabel, manualDay, manualAmount, manualRouteId, load])
+  }, [selectedAccountId, manualBusy, manualLabel, manualDay, manualAmount, manualRouteId, load, saveErrors])
 
   const submitCancel = useCallback(async () => {
     if (!cancelTarget || cancelBusy) return
@@ -362,12 +371,16 @@ function useAdV8Model() {
       }
       setCancelTarget(null)
       void load()
-    } catch {
-      setCancelError('取り消せませんでした。通信状態を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
+
+      if (!fieldFailure) {
+      setCancelError('取り消せませんでした。通信状態を確かめて、もう一度お試しください。') }
     } finally {
       setCancelBusy(false)
     }
-  }, [cancelTarget, cancelBusy, cancelReason, load])
+  }, [cancelTarget, cancelBusy, cancelReason, load, saveErrors])
 
   const runImportNow = useCallback(
     async (platformId: string) => {
@@ -378,13 +391,17 @@ function useAdV8Model() {
         const res = await api.adPlatforms.importCost(platformId)
         if (!res.success) setImportError(res.error ?? '取り込めませんでした')
         void load()
-      } catch {
-        setImportError('取り込めませんでした。接続設定を確かめて、もう一度お試しください。')
+      } catch (saveFailure) {
+        const fieldFailure = saveErrors.capture(saveFailure);
+
+
+        if (!fieldFailure) {
+        setImportError('取り込めませんでした。接続設定を確かめて、もう一度お試しください。') }
       } finally {
         setImportingId(null)
       }
     },
-    [importingId, load],
+    [importingId, load, saveErrors],
   )
 
   const exportLogs = useCallback(() => {
@@ -438,7 +455,7 @@ function useAdV8Model() {
   const avgCostPerFriend = linkedFriendAdds > 0 ? Math.round(linkedJpyCost / linkedFriendAdds) : null
   const routeRefById = new Map(entryRoutes.map((route) => [route.id, route.refCode]))
 
-  return {
+  return { saveErrors,
     selectedAccountId,
     platforms,
     connected,
@@ -582,14 +599,14 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
         }}
       >
         <div className="space-y-4">
-          <div><Field label="流入元の名前" htmlFor="ad-cost-label-v8"><TextField
+          <div><Field label="流入元の名前" htmlFor="ad-cost-label-v8"><SaveErrorField names={["manualLabel","model.manualLabel","sourceLabel","manual_label","model.manual_label"]}><TextField
               id="ad-cost-label-v8"
               value={model.manualLabel}
               onChange={(event: React.ChangeEvent<HTMLInputElement>) => model.setManualLabel(event.target.value)}
               placeholder="例：チラシ"
               maxLength={100}
-            /></Field></div>
-          <div><Field note={<>結びつけると友だち追加の人数で「1人あたり」が出ます。</>} label="計測リンク（分かれば）" htmlFor="ad-cost-route-v8"><Select
+            /></SaveErrorField></Field></div>
+          <div><Field note={<>結びつけると友だち追加の人数で「1人あたり」が出ます。</>} label="計測リンク（分かれば）" htmlFor="ad-cost-route-v8"><SaveErrorField names={["manualRouteId","model.manualRouteId","entryRouteId","manual_route_id","model.manual_route_id"]}><Select
               id="ad-cost-route-v8"
               aria-label="計測リンク"
               value={model.manualRouteId}
@@ -598,16 +615,16 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
                 { value: '', label: '結びつけない' },
                 ...model.entryRoutes.map((route) => ({ value: route.id, label: route.name })),
               ]}
-            />
+            /></SaveErrorField>
 </Field></div>
-          <div><Field label="費用の日付" htmlFor="ad-cost-day-v8"><DateField id="ad-cost-day-v8" value={model.manualDay} onChange={model.setManualDay} /></Field></div>
-          <div><Field label="費用（円）" htmlFor="ad-cost-amount-v8"><NumberInput numericText
+          <div><Field label="費用の日付" htmlFor="ad-cost-day-v8"><SaveErrorField names={["manualDay","model.manualDay","day","manual_day","model.manual_day"]}><DateField id="ad-cost-day-v8" value={model.manualDay} onChange={model.setManualDay} /></SaveErrorField></Field></div>
+          <div><Field label="費用（円）" htmlFor="ad-cost-amount-v8"><SaveErrorField names={["manualAmount","model.manualAmount","amountMinor","manual_amount","model.manual_amount"]}><NumberInput numericText
               id="ad-cost-amount-v8"
               inputMode="numeric"
               value={model.manualAmount}
               onChange={(event: React.ChangeEvent<HTMLInputElement>) => model.setManualAmount(event.target.value)}
               placeholder="例：20000"
-            /></Field></div>
+            /></SaveErrorField></Field></div>
         </div>
       </Dialog>
 
@@ -632,13 +649,13 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
                 {formatMinor(model.cancelTarget.amountMinor, model.cancelTarget.currency)}
               </strong>
             </p>
-            <div><Field label="取り消す理由" htmlFor="ad-cost-cancel-reason-v8" required><TextField
+            <div><Field label="取り消す理由" htmlFor="ad-cost-cancel-reason-v8" required><SaveErrorField names={["reason","cancelReason","model.cancelReason","cancel_reason","model.cancel_reason"]}><TextField
                 id="ad-cost-cancel-reason-v8"
                 value={model.cancelReason}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) => model.setCancelReason(event.target.value)}
                 placeholder="例：金額を間違えた"
                 maxLength={200}
-              /></Field></div>
+              /></SaveErrorField></Field></div>
           </div>
         ) : null}
       </Dialog>
@@ -665,7 +682,7 @@ export function AdMetricsV8() {
   const otherTotals = [...model.totalCostByCurrency].filter(([currency]) => currency !== 'JPY')
 
   return (
-    <AdV8Gate model={model} loadingTitle="広告連携を読み込んでいます">
+    <SaveErrorScope errors={model.saveErrors}><AdV8Gate model={model} loadingTitle="広告連携を読み込んでいます">
       <div className={styles.board} data-design-node="qSTVR">
         <div className={styles.head}>
           <div className={styles.headText}>
@@ -1002,7 +1019,7 @@ export function AdMetricsV8() {
 
         <ManualEntryDialogs model={model} />
       </div>
-    </AdV8Gate>
+    </AdV8Gate></SaveErrorScope>
   )
 }
 
@@ -1020,7 +1037,7 @@ export function AdConnectionsV8() {
   const model = useAdV8Model()
 
   return (
-    <AdV8Gate model={model} loadingTitle="広告とのつなぎを読み込んでいます">
+    <SaveErrorScope errors={model.saveErrors}><AdV8Gate model={model} loadingTitle="広告とのつなぎを読み込んでいます">
       <div className={styles.board} data-design-node="FDBsG">
         <div className={styles.head}>
           <div className={styles.headText}>
@@ -1129,7 +1146,7 @@ export function AdConnectionsV8() {
           </p>
         </section>
       </div>
-    </AdV8Gate>
+    </AdV8Gate></SaveErrorScope>
   )
 }
 
@@ -1147,7 +1164,7 @@ export function AdHistoryV8() {
   const model = useAdV8Model()
 
   return (
-    <AdV8Gate model={model} loadingTitle="広告への送信履歴を読み込んでいます">
+    <SaveErrorScope errors={model.saveErrors}><AdV8Gate model={model} loadingTitle="広告への送信履歴を読み込んでいます">
       <div className={styles.board} data-design-node="p0kA3">
         <div className={styles.head}>
           <div className={styles.headText}>
@@ -1181,12 +1198,12 @@ export function AdHistoryV8() {
               aria-label="成果・クリックの種類で探す"
             />
           </span>
-          <Select
+          <SaveErrorField names={["status","model.status","statusAndPage","status_and_page"]}><Select
             value={model.status}
             onChange={model.setStatusAndPage}
             options={STATUS_OPTIONS}
             aria-label="送信状態"
-          />
+          /></SaveErrorField>
           <span className={styles.toolbarSpacer} />
           <span className={styles.toolbarCount}>全 {formatNumber(model.logTotal)} 件</span>
         </div>
@@ -1284,6 +1301,6 @@ export function AdHistoryV8() {
           断られた理由：クリックの目印の期限（90日）が切れていました。やり直しても同じ目印を使うため、2重には数えられません。
         </p>
       </div>
-    </AdV8Gate>
+    </AdV8Gate></SaveErrorScope>
   )
 }

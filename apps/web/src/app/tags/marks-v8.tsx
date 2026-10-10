@@ -1,11 +1,4 @@
 'use client'
-
-/*
- * ★V8 タグ「対応マーク」タブの一覧（Pencil `vKDj5`、状態 `U0aKD`）。
- *
- * フォルダを持たないタブなので、作る口は見出しの右（page 側の headAction）。
- * 数え方・並べ替え・保管の確認窓は v7（`mark-list.tsx`）と同じ関数を使う。
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -32,6 +25,15 @@ import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { TagRowsSkeleton } from './tag-rows-skeleton'
 import styles from './list-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 タグ「対応マーク」タブの一覧（Pencil `vKDj5`、状態 `U0aKD`）。
+ *
+ * フォルダを持たないタブなので、作る口は見出しの右（page 側の headAction）。
+ * 数え方・並べ替え・保管の確認窓は v7（`mark-list.tsx`）と同じ関数を使う。
+ */
 
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -263,7 +265,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   const rowMenuItems = (mark: MarkRow): ActionMenuItem[] => {
@@ -339,7 +341,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
               onClear={() => setQuery('')}
             />
           </div>
-          <Select
+          <SaveErrorField names={["usage"]}><Select
             aria-label="利用状態"
             value={usage}
             onChange={(value) => setUsage(value as typeof usage)}
@@ -348,7 +350,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
               { value: 'used', label: '使用中' },
               { value: 'unused', label: '未使用' },
             ]}
-          />
+          /></SaveErrorField>
         </div>
 
         {actionError ? (
@@ -503,7 +505,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
                 {visible.length}件中 {visible.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}〜{Math.min(currentPage * pageSize, visible.length)}件
               </span>
               <div className={styles.pagerRight}>
-                <Select
+                <SaveErrorField names={["pageSize","page_size"]}><Select
                   aria-label="表示件数"
                   size="page-size"
                   value={String(pageSize)}
@@ -513,7 +515,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
                     { value: '50', label: '50件表示' },
                     { value: '100', label: '100件表示' },
                   ]}
-                />
+                /></SaveErrorField>
                 <Pagination
                   page={currentPage}
                   pageCount={pages}

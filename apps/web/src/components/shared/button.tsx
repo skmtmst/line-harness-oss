@@ -1,3 +1,4 @@
+
 import Link from 'next/link'
 import type { LinkProps } from 'next/link'
 import { Check, LoaderCircle, ArrowUpRight } from 'lucide-react'
@@ -98,10 +99,11 @@ export default function Button(props: ButtonProps) {
 
   if ('href' in props && props.href !== undefined) {
     const { children, className: _className, href, external, size: _size, variant: _variant, align, textTone: _textTone, presentation, ...linkProps } = props
+    const newTab = external || linkProps.target === '_blank'
     return (
-      <Link href={href} className={classes} data-align={align} data-presentation={presentation} {...linkProps} target={external ? '_blank' : linkProps.target} rel={external ? 'noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
+      <Link href={href} className={classes} data-align={align} data-presentation={presentation} {...linkProps} target={newTab ? '_blank' : linkProps.target} rel={newTab ? 'noopener noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
         {children}
-        {external ? <ArrowUpRight size={13} aria-hidden="true" data-external-icon /> : null}
+        {newTab ? <ArrowUpRight size={13} aria-hidden="true" data-external-icon /> : null}
       </Link>
     )
   }

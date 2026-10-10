@@ -11,6 +11,8 @@ import Button from '@/components/shared/button'
 import ScheduleDialog from './schedule-dialog'
 import { TextArea } from '@/components/shared/text-field'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /**
  * 1人だけ選んだときの操作（設計 `BulkBar` の6つ）。
@@ -188,7 +190,7 @@ function StatusPanel({ friendId, busy, run }: { friendId: string; busy: boolean;
   return (
     <Row>
       {/* R117: 読み上げで何を変える欄か分かるよう、共通Selectでも固有の名前を付ける。 */}
-      <Select
+      <SaveErrorField names={["status"]}><Select
         aria-label="対応状況"
         value={status}
         onChange={(value) => setStatus(value as Chat['status'])}
@@ -198,7 +200,7 @@ function StatusPanel({ friendId, busy, run }: { friendId: string; busy: boolean;
           { value: 'on_hold', label: '保留' },
           { value: 'resolved', label: '対応済み' },
         ]}
-      />
+      /></SaveErrorField>
       {/* 友だちIDでも引ける（resolveOrCreateChat）。トークが無い人にも当てられる。 */}
       <Go busy={busy} onClick={() => void run(() => api.chats.update(friendId, { status }), '対応状況を変えました')} />
     </Row>
@@ -235,7 +237,7 @@ function TemplatePanel({ friendId, accountId, busy, run }: { friendId: string; a
   return (
     <div className="space-y-2">
       <Row>
-        <div className="min-w-0 flex-1"><EntityKindField kind="template" label="テンプレート" options={templates} value={id} onChange={setId} /></div>
+        <div className="min-w-0 flex-1"><SaveErrorField names={["id"]}><EntityKindField kind="template" label="テンプレート" options={templates} value={id} onChange={setId} /></SaveErrorField></div>
         <Go
           busy={busy || !picked}
           onClick={() =>
@@ -267,7 +269,7 @@ function ScenarioPanel({ friendId, accountId, busy, run }: { friendId: string; a
   }, [accountId])
   return (
     <Row>
-      <div className="min-w-0 flex-1"><EntityKindField kind="scenario" label="シナリオ" options={items} accountId={accountId} value={id} onChange={setId} /></div>
+      <div className="min-w-0 flex-1"><SaveErrorField names={["id"]}><EntityKindField kind="scenario" label="シナリオ" options={items} accountId={accountId} value={id} onChange={setId} /></SaveErrorField></div>
       <Go
         busy={busy || !id}
         onClick={() => void run(() => api.scenarios.enroll(id, friendId), 'シナリオを開始しました')}
@@ -353,7 +355,7 @@ function TagPanel({
 
   return (
     <Row>
-      <div className="min-w-0 flex-1"><EntityKindField kind="tag" label="タグ" options={tags} value={id} onChange={setId} /></div>
+      <div className="min-w-0 flex-1"><SaveErrorField names={["id"]}><EntityKindField kind="tag" label="タグ" options={tags} value={id} onChange={setId} /></SaveErrorField></div>
       <Go busy={busy || !id} onClick={attach} label="付ける" />
       <Button variant="secondary" className="text-ink-secondary px-3 py-1.5 text-xs disabled:opacity-50 h-auto whitespace-normal" type="button" disabled={busy || !id} onClick={detach}>
         外す
@@ -367,20 +369,20 @@ function FieldPanel({ friendId, busy, run }: { friendId: string; busy: boolean; 
   const [value, setValue] = useState('')
   return (
     <Row>
-      <input
+      <SaveErrorField names={["key"]}><input
         aria-label="項目名"
         value={key}
         onChange={(e) => setKey(e.target.value)}
         placeholder="項目名"
         className={SELECT}
-      />
-      <input
+      /></SaveErrorField>
+      <SaveErrorField names={["value"]}><input
         aria-label="値"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="値"
         className={SELECT}
-      />
+      /></SaveErrorField>
       <Go
         busy={busy || !key.trim()}
         onClick={() =>
@@ -408,13 +410,13 @@ function ReminderPanel({ friendId, busy, run }: { friendId: string; busy: boolea
   }, [])
   return (
     <Row>
-      <div className="min-w-0 flex-1"><EntityKindField kind="reminder" label="リマインダ" options={items} value={id} onChange={setId} /></div>
-      <DateTimeField
+      <div className="min-w-0 flex-1"><SaveErrorField names={["id"]}><EntityKindField kind="reminder" label="リマインダ" options={items} value={id} onChange={setId} /></SaveErrorField></div>
+      <SaveErrorField names={["targetDate","target_date"]}><DateTimeField
         value={targetDate}
         onChange={setTargetDate}
         aria-label="ゴール日時"
         className="w-60"
-      />
+      /></SaveErrorField>
       <Go
         busy={busy || !id || !targetDate}
         onClick={() =>
@@ -444,7 +446,7 @@ function OperatorPanel({ friendId, busy, run }: { friendId: string; busy: boolea
     return () => { active = false }
   }, [])
   return <Row>
-    <Select aria-label="担当者" value={id} onChange={setId} options={[{ value: '', label: '未割り当て' }, ...operators.map((operator) => ({ value: operator.id, label: operator.name }))]} />
+    <SaveErrorField names={["id","operatorId"]}><EntitySelect aria-label="担当者" value={id} onChange={setId} options={[{ value: '', label: '未割り当て' }, ...operators.map((operator) => ({ ...entityOptionMetadata(operator), value: operator.id, label: operator.name }))]} /></SaveErrorField>
     <Go busy={busy || failed} onClick={() => void run(() => api.chats.update(friendId, { operatorId: id || null }), '担当者を変えました')} />
     {failed && <p role="alert" className="text-xs text-danger">担当者を読み込めませんでした。閉じてもう一度開いてください。</p>}
   </Row>

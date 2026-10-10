@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { CheckCircle2, Hourglass, Inbox, Paperclip, Plus, Sparkles, Timer } from 'lucide-react'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -452,8 +453,8 @@ function OpsSupportV7() {
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block md:col-span-2">
             <span className="mb-1.5 block text-caption font-medium text-ink">契約先</span>
-            <Select size="full" aria-label="契約先" value={form.tenantId} onChange={(value) => setForm((f) => ({ ...f, tenantId: value }))}
-              options={[{ value: '', label: '契約先を選ぶ' }, ...tenants.map((t) => ({ value: t.id, label: t.name }))]} />
+            <EntitySelect size="full" aria-label="契約先" value={form.tenantId} onChange={(value) => setForm((f) => ({ ...f, tenantId: value }))}
+              options={[{ value: '', label: '契約先を選ぶ' }, ...tenants.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))]} />
           </label>
           <label className="block">
             <span className="mb-1.5 block text-caption font-medium text-ink">種類</span>

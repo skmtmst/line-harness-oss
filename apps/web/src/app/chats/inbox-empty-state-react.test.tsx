@@ -1,5 +1,6 @@
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
-import React, { act } from 'react'
+import { act } from 'react'
 import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -105,16 +106,7 @@ async function applySingleFilter(kind: 'search' | 'status' | 'quick' | 'assignee
   await click('絞り込み')
   if (kind === 'assignee') {
     // 担当者の選択は候補つき入力へ移した。表示名を打って候補を押す。
-    await act(async () => {
-      const field = document.querySelector<HTMLInputElement>('[aria-label="担当者で絞り込む（パネル）"]')!
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '担当A')
-      field.dispatchEvent(new Event('input', { bubbles: true }))
-    })
-    await act(async () => {
-      const option = [...document.querySelectorAll('li[role="option"]')].find((li) => li.textContent?.includes('担当A'))
-      expect(option, '担当A').toBeTruthy()
-      ;(option as HTMLElement).click()
-    })
+    await pickEntity('担当者で絞り込む（パネル）', '担当A')
     return
   }
   await act(async () => { document.querySelector<HTMLInputElement>('[aria-label="未読だけ表示"]')!.click() })
@@ -278,16 +270,7 @@ test('全条件の結果0件を区別し、解除後に会話を戻す', async (
   })
   await click('未対応')
   await click('絞り込み')
-  await act(async () => {
-    const field = document.querySelector<HTMLInputElement>('[aria-label="担当者で絞り込む（パネル）"]')!
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '担当A')
-    field.dispatchEvent(new Event('input', { bubbles: true }))
-  })
-  await act(async () => {
-    const option = [...document.querySelectorAll('li[role="option"]')].find((li) => li.textContent?.includes('担当A'))
-    expect(option, '担当A').toBeTruthy()
-    ;(option as HTMLElement).click()
-  })
+  await pickEntity('担当者で絞り込む（パネル）', '担当A')
   await eventually(() => {
     const assigneeCall = calls.filter((url) => url.pathname === '/api/chats').at(-1)!
     expect(assigneeCall.searchParams.get('operatorId')).toBe('operator-a')
