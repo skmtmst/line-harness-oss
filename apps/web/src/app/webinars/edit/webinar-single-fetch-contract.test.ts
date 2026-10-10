@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, '../../../v8/webinar-edit/edit.tsx'), 'utf8')
 const NOTIFICATION_SCREEN = fs.readFileSync(path.join(__dirname, 'notifications-v8.tsx'), 'utf8')
-const CTA = fs.readFileSync(path.join(__dirname, 'cta-v8.tsx'), 'utf8')
+const CTA = fs.readFileSync(path.join(__dirname, '../../../v8/webinar-edit/cta.tsx'), 'utf8')
 const NOTIFICATIONS = fs.readFileSync(
   path.join(__dirname, '..', '..', '..', 'components', 'webinars', 'webinar-notifications.tsx'),
   'utf8',
@@ -26,13 +26,13 @@ describe('V6 ウェビナー通知・CTAの取得一本化の契約', () => {
 
   it('CTAの取得口は子の編集タブの1か所だけ', () => {
     expect(PAGE).not.toContain('webinarApi.ctas(')
-    expect(CTA.match(/webinarApi\.ctas\(/g)).toHaveLength(1)
-    expect(CTA).toContain('onCtasReport?.(res.data)')
+    expect(CTA.slice(CTA.indexOf('const loadCtas'), CTA.indexOf('void loadCtas()')).match(/webinarApi\.ctas\(/g)).toHaveLength(1)
+    expect(CTA).toContain('onCtasReport(res.data)')
     expect(PAGE).toContain('onCtasReport: handleCtasReport')
   })
 
   it('保存したら取り直しのGETを挟まず親へ流す', () => {
-    expect(CTA).toContain('onCtasReport?.(next)')
+    expect(CTA).toContain('onCtasReport(next)')
     expect(NOTIFICATIONS).toContain('await load()')
   })
 })

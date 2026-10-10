@@ -176,7 +176,6 @@ const COVERED_BY_PARENT: Record<string, string> = {
   'components/webinars/webinar-form.tsx': 'app/webinars/edit/page.tsx',
   'components/webinars/webinar-notifications.tsx': 'app/webinars/edit/page.tsx',
   'app/webinars/edit/video-v8.tsx': 'app/webinars/edit/page.tsx',
-  'app/webinars/edit/cta-v8.tsx': 'app/webinars/edit/page.tsx',
   'app/webinars/edit/notifications-v8.tsx': 'app/webinars/edit/page.tsx',
   'app/webinars/edit/participants-v8.tsx': 'app/webinars/edit/page.tsx',
   // ★V8 版の描画。番兵（useUnsavedGuard）は同じ画面の page.tsx が
