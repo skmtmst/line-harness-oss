@@ -118,7 +118,7 @@ test('実物CSS：差し込み行の項目は8px、印と字は4px。未定義�
     const page=await browser.newPage()
     const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8')
     const insert=readFileSync(new URL('../../src/components/shared/message-insert-row.module.css',import.meta.url),'utf8')
-    await page.setContent(`<style>${globals}${insert}</style><main><div class="body" data-message-body><textarea>本文</textarea><div class="row" data-message-insert-row><div class="controls"><span class="label">差し込む</span><button class="button" data-message-insert-button><svg></svg>名前</button></div><span class="count">2 / 5,000</span></div></div></main>`)
+    await page.setContent(`<html data-theme="v8"><style>${globals}${insert}</style><main><div class="body" data-message-body><textarea>本文</textarea><div class="row" data-message-insert-row><div class="controls"><span class="label">差し込む</span><button class="button" data-message-insert-button><svg></svg>名前</button></div><span class="count">2 / 5,000</span></div></div></main>`)
     assert.equal(await page.locator('.controls').evaluate(el=>getComputedStyle(el).columnGap),'8px')
     assert.equal(await page.locator('.button').evaluate(el=>getComputedStyle(el).columnGap),'4px')
     assert.equal(await page.locator('.row').evaluate(el=>getComputedStyle(el).columnGap),'12px')
