@@ -474,7 +474,7 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
                     value={name}
                     onChange={(event) => updateDraft({ name: event.target.value })}
                     placeholder="例：予約前日のご案内"
-                    className="border-hairline rounded-control focus-visible:outline-action w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
+                    className="border-hairline rounded-control focus-visible:outline-focus-ring w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
                   />
                 </Field>
                 <Field label="フォルダ" htmlFor="tp8-folder">
@@ -509,7 +509,7 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
                   rows={messageType === 'flex' ? 14 : 6}
                   value={messageContent}
                   onChange={(event) => updateDraft({ messageContent: event.target.value })}
-                  className={`border-hairline rounded-control focus-visible:outline-action w-full resize-y border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 ${messageType === 'flex' ? 'font-mono text-xs' : ''}`}
+                  className={`border-hairline rounded-control focus-visible:outline-focus-ring w-full resize-y border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 ${messageType === 'flex' ? 'font-mono text-xs' : ''}`}
                 />
                 {messageType === 'flex' && flexError ? (
                   <p role="alert" className="text-danger mt-1 text-xs">{flexError}このままでは保存できません。</p>

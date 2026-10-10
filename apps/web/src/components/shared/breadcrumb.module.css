@@ -19,7 +19,7 @@
 .link {
   flex: none;
   white-space: nowrap;
-  color: var(--color-status-info); /* fill: $status-info */
+  color: var(--color-action); /* fill: $status-info */
 }
 
 .link:hover {

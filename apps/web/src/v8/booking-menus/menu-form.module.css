@@ -129,7 +129,7 @@
 }
 
 .input:focus-visible {
-  outline: var(--tpl-bm-2) solid var(--color-action);
+  outline: var(--tpl-bm-2) solid var(--color-focus-ring);
   outline-offset: calc(var(--tpl-bm-1) * -1);
 }
 
@@ -163,7 +163,7 @@
 }
 
 .unitField:focus-within {
-  outline: var(--tpl-bm-2) solid var(--color-action);
+  outline: var(--tpl-bm-2) solid var(--color-focus-ring);
 }
 
 .unitField input {

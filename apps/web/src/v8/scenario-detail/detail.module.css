@@ -99,7 +99,7 @@
 }
 
 .iconButton:focus-visible {
-  outline: 1px solid var(--color-action);
+  outline: 1px solid var(--color-focus-ring);
 }
 
 .iconButton > svg {

@@ -185,11 +185,11 @@
     },
     "--color-status-info": {
       "pencil": "$status-info",
-      "source": "#175cd3",
-      "resolved": "#175cd3",
+      "source": "var(--color-focus-ring)",
+      "resolved": "#2563eb",
       "status": "active",
-      "note": "状態バッジの情報色",
-      "lastCheckedAt": "2026-08-24"
+      "note": "B-198: 案内の札の青。文字リンクの緑と分ける",
+      "lastCheckedAt": "2026-10-10"
     },
     "--color-status-info-soft": {
       "pencil": "$status-info-soft",
@@ -1855,11 +1855,11 @@
           "resolved": "600"
         },
         {
-          "pencil": "t0jk8p action fill: $action（#669: 緑は主操作専用。見出しリンクはaction色へ）",
+          "pencil": "t0jk8p action fill: $action（B-198: 文字リンクは #087a3e）",
           "class": "action",
           "prop": "color",
           "source": "var(--color-action)",
-          "resolved": "#0b63ce"
+          "resolved": "#087a3e"
         },
         {
           "pencil": "t0jk8p action layout",
@@ -1998,7 +1998,7 @@
           "class": "info",
           "prop": "color",
           "source": "var(--color-status-info)",
-          "resolved": "#175cd3"
+          "resolved": "#2563eb"
         },
         {
           "pencil": "warning fill: $status-warn-soft",

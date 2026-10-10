@@ -265,7 +265,7 @@
 }
 
 [data-theme='v8'] .panel[data-width='editor'] .close:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 

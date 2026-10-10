@@ -80,7 +80,7 @@
 
 /* フォーカス枠は選択色と別にする（色だけで選択／操作位置を兼ねない）。 */
 .radio:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -222,7 +222,7 @@
   background: var(--color-canvas); box-shadow: none;
 }
 [data-theme='v8'] .radio:checked { background: var(--color-canvas); outline: 5px solid var(--color-accent-deep); outline-offset: -2.5px; box-shadow: none; }
-[data-theme='v8'] .radio:focus-visible { outline: 2px solid var(--color-action); outline-offset: 3px; }
+[data-theme='v8'] .radio:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 3px; }
 [data-theme='v8'] .checked, [data-theme='v8'] .checked:hover { background: var(--color-accent-soft); outline: 1.5px solid var(--color-accent-deep); outline-offset: -0.75px; }
 [data-theme='v8'] .disabled { background: var(--color-canvas-sunken); outline-color: var(--color-ink-disabled); }
 [data-theme='v8'] .disabled .radio { outline-color: var(--color-ink-disabled); }
@@ -254,7 +254,7 @@
   pointer-events: none;
 }
 [data-theme='v8'] .compact:has(> .radio:focus-visible) {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -329,7 +329,7 @@
 [data-theme='v8'] .form .title { display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 19px; }
 [data-theme='v8'] .form .note { font-size: 11px; line-height: 16px; }
 [data-theme='v8'] .form > .radio { top: 0; right: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-[data-theme='v8'] .form:has(> .radio:focus-visible) { outline: 2px solid var(--color-action); outline-offset: 2px; }
+[data-theme='v8'] .form:has(> .radio:focus-visible) { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 .inlineIcon { display: inline-flex; color: var(--color-ink-secondary); }
 [data-theme='v8'] .form.checked .inlineIcon { color: var(--color-accent-deep); }
 .inlineIcon svg { width: 14px; height: 14px; }

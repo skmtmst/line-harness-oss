@@ -2,7 +2,7 @@ import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mj
 import { expect, it } from 'vitest'
 const read = (path: string) => readFileSync(`src/${path}`, 'utf8')
 it('WEB-006: 枠なしの選ぶ欄も焦点を消さない', () => {
-  expect(read('components/shared/select.module.css')).toMatch(/\.textTrigger:focus-visible\s*\{[^}]*outline:[^}]*var\(--color-action\)/)
+  expect(read('components/shared/select.module.css')).toMatch(/\.textTrigger:focus-visible\s*\{[^}]*outline:[^}]*var\(--color-focus-ring\)/)
 })
 it('WEB-019: 自動応答の未接続のつまみを描かない', () => {
   expect(read('components/auto-replies/inline-action-rows-v8.tsx')).not.toContain('<GripVertical')

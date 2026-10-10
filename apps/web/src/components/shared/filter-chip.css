@@ -121,7 +121,7 @@
 [data-theme='v8'] .v6-filter-chip[aria-pressed='true'] { background: var(--color-ink); color: var(--color-on-accent); outline-color: var(--color-ink); box-shadow: none; }
 [data-theme='v8'] .v6-filter-chip__icon { width: 13px; height: 13px; }
 [data-theme='v8'] .v6-filter-chip[aria-pressed='true'] .v6-filter-chip__count { color: var(--color-on-accent); }
-[data-theme='v8'] .v6-filter-chip:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+[data-theme='v8'] .v6-filter-chip:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 
 [data-theme='v8'] .v6-filter-chip { border-radius: 999px; }
 

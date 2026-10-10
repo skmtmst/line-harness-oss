@@ -212,7 +212,7 @@ a.railStep:hover .railLabel {
 }
 
 .actions > button.iconButton:focus-visible {
-  outline: var(--tpl-bd-focus) solid var(--color-action);
+  outline: var(--tpl-bd-focus) solid var(--color-focus-ring);
   outline-offset: var(--tpl-bd-focus);
 }
 

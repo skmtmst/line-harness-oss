@@ -147,7 +147,6 @@
 
 /* 数の帯：上の線は見出しの段と重ねない。 */
 
-
 /* 表。見出しと行の区切り線だけ。外側の枠は作らない。 */
 .tableWrap {
   min-width: 0;
@@ -445,7 +444,7 @@ a.answerCount:hover {
 }
 
 .panelInput:focus-visible {
-  outline: var(--tpl-fm-focus-ring) solid var(--color-action);
+  outline: var(--tpl-fm-focus-ring) solid var(--color-focus-ring);
   outline-offset: 1px;
 }
 
@@ -464,7 +463,7 @@ a.answerCount:hover {
 }
 
 .colorSwatch[data-selected] {
-  outline: var(--tpl-fm-focus-ring) solid var(--color-action);
+  outline: var(--tpl-fm-focus-ring) solid var(--color-focus-ring);
   outline-offset: var(--tpl-fm-focus-ring);
 }
 

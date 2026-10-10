@@ -25,9 +25,9 @@ const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '')
  */
 
 function token(name: string): string {
-  const match = GLOBALS.match(new RegExp(`--color-${name}:\\s*(#[0-9a-fA-F]{6});`))
+  const match = GLOBALS.match(new RegExp(`--color-${name}:\\s*(#[0-9a-fA-F]{6}|var\\(--color-([\\w-]+)\\));`))
   if (!match) throw new Error(`--color-${name} が見つからない`)
-  return match[1]
+  return match[2] ? token(match[2]) : match[1]
 }
 
 function luminance(hex: string): number {

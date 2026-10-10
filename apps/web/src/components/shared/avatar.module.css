@@ -43,7 +43,7 @@
 .s56 { width: 56px; height: 56px; font-size: 22px; }
 
 .t0 { background: var(--color-accent-soft); color: var(--color-accent-deep); }
-.t1 { background: var(--color-status-info-soft); color: var(--color-status-info); }
+.t1 { background: var(--color-status-info-soft); color: var(--color-action); }
 .t2 { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
 .t3 { background: var(--color-danger-bg); color: var(--color-danger); }
 .t4 { background: var(--color-info-bg); color: var(--color-info); }

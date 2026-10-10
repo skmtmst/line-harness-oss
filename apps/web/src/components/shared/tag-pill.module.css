@@ -79,7 +79,7 @@
 .remove svg { width: var(--tag-pill-font); height: var(--tag-pill-font); }
 .remove:hover { background: var(--color-shell); }
 .link:focus-visible, .remove:focus-visible, .toggle:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 .toggle { cursor: pointer; }

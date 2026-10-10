@@ -35,6 +35,10 @@ function tokenMap(): Map<string, string> {
   for (const match of css.matchAll(/--color-([\w-]+):\s*(#[0-9a-fA-F]{6})/g)) {
     map.set(match[1], match[2].toLowerCase())
   }
+  for (const match of css.matchAll(/--color-([\w-]+):\s*var\(--color-([\w-]+)\)/g)) {
+    const resolved = map.get(match[2])
+    if (resolved) map.set(match[1], resolved)
+  }
   return map
 }
 
