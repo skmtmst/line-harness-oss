@@ -19,6 +19,11 @@ routes = [
   { pattern = "stg-api.musubo.jp", custom_domain = true }
 ]
 
+# 検証環境だけ、失敗したときのサーバー記録を後から読めるようにする。
+# （本番 wrangler.toml には入れない。ここは検証用の設定ファイル。）
+[observability]
+enabled = true
+
 [assets]
 directory = "dist/client"
 binding = "ASSETS"

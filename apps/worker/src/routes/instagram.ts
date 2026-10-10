@@ -19,6 +19,7 @@ import {
   instagramHash,
   instagramGraph,
   instagramPages,
+  type InstagramPageScan,
   instagramLongToken,
   instagramCanPublish,
   INSTAGRAM_PUBLISH_SCOPE,
@@ -196,6 +197,13 @@ instagram.get(
   denyReadOnly(),
   async (c) => {
     let hash: string | null = null;
+    // 失敗したときだけサーバー記録へ出す手がかり。権限の名前と件数だけで、合鍵や個人の情報は入れない。
+    const scan: InstagramPageScan = {
+      total: 0,
+      withInstagram: 0,
+      withToken: 0,
+    };
+    let grantedScopes: string | null = null;
     try {
       const cfg = ready(c),
         state = c.req.query('state'),
@@ -236,10 +244,11 @@ instagram.get(
       );
       if (!short.access_token) throw new InstagramError('invalid_meta_token');
       const long = await instagramLongToken(cfg, short.access_token);
+      grantedScopes = long.scopes.join(',');
       // 同時投稿の許可が無い接続は保存しない。画面は未接続のままなので、もう一度ログインすれば取り直せる。
       if (!long.scopes.includes(INSTAGRAM_PUBLISH_SCOPE))
         throw new InstagramError('instagram_publish_not_granted', 403);
-      const pages = await instagramPages(cfg, long.token),
+      const pages = await instagramPages(cfg, long.token, scan),
         page = pages[0];
       // ビジネスアカウント（またはクリエイターアカウント）でなければ投稿の口が無い。
       if (!page)
@@ -299,8 +308,19 @@ instagram.get(
         .bind(hash)
         .run();
       return c.redirect(snsReturnUrl(c, 'connected'));
-    } catch {
-      // 失敗の中身は画面に出さない。使い切りの state は必ず捨てて、やり直せる状態に戻す。
+    } catch (e) {
+      // 失敗の中身は画面に出さない（文言は「つなげませんでした」のまま）。
+      // ただし理由が分からないと直せないので、秘密値を含まない手がかりだけ記録に残す。
+      console.error(
+        JSON.stringify({
+          event: 'instagram_oauth_callback_failed',
+          code: e instanceof InstagramError ? e.code : 'instagram_failed',
+          detail: e instanceof InstagramError ? (e.detail ?? null) : null,
+          grantedScopes,
+          pages: scan,
+        }),
+      );
+      // 使い切りの state は必ず捨てて、やり直せる状態に戻す。
       if (hash)
         await c.env.DB.prepare(
           'DELETE FROM instagram_oauth_states WHERE state_hash=?',
