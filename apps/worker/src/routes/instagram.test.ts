@@ -384,6 +384,69 @@ it('壊れた設定・署名済みの壊れた本文・偽のページ候補を�
   expect(vi.mocked(fetch).mock.calls).toHaveLength(calls);
 });
 
+/**
+ * Meta のエラー説明文は Meta が書く自由な文章で、こちらが送った値が混ざって返ることがある。
+ * 失敗の理由をサーバー記録へ残すとき、合鍵・アプリシークレット・認可コードが記録へ出ないことを確かめる。
+ */
+it('Metaのエラー説明文に秘密値が混ざっても、サーバー記録には出さない', async () => {
+  const longToken = 'EAAG0ZaOp9ZBdBO1234567890abcdefghij';
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: URL | string) =>
+      Response.json(
+        {
+          error: {
+            type: 'OAuthException',
+            code: 100,
+            error_subcode: 33,
+            // Meta がこちらの送った値をそのまま返してきた最悪の形を模す。
+            message:
+              `Invalid request: ${String(url)} ` +
+              `client_secret=${config.META_APP_SECRET} code=mock_code ` +
+              `access_token=${longToken}`,
+          },
+        },
+        { status: 400 },
+      ),
+    ),
+  );
+  const logged: string[] = [];
+  const spy = vi
+    .spyOn(console, 'error')
+    .mockImplementation((...args: unknown[]) => {
+      logged.push(args.map(String).join(' '));
+    });
+  try {
+    const start = await read(await req('/api/instagram/oauth/start', {})),
+      state = new URL(start.data.url).searchParams.get('state')!;
+    const callback = await req(
+      '/api/instagram/oauth/callback?' +
+        new URLSearchParams({ state, code: 'mock_code' }),
+    );
+    expect(callback.status).toBe(302);
+    expect(callback.headers.get('location')).toContain('instagram=failed');
+  } finally {
+    spy.mockRestore();
+  }
+  const record = logged.find((line) =>
+    line.includes('instagram_oauth_callback_failed'),
+  );
+  expect(record).toBeDefined();
+  // 原因調べに使う種別・番号は残る。
+  expect(record).toContain('type=OAuthException');
+  expect(record).toContain('code=100');
+  expect(record).toContain('subcode=33');
+  expect(record).toContain('[redacted]');
+  // 秘密値そのものは一切残らない。
+  for (const secret of [
+    config.META_APP_SECRET,
+    'mock_code',
+    longToken,
+    config.META_TOKEN_ENCRYPTION_KEY,
+  ])
+    expect(logged.join('\n')).not.toContain(secret);
+});
+
 it('写真DMと受信時刻の順、別アカウントのカーソルを守る', async () => {
   await connect();
   const messages = [
