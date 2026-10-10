@@ -28,14 +28,23 @@ import MergedProfileDialog, {
   emptyProfileCandidateDraft,
   selectedProfileCandidateCount,
 } from './merged-profile-dialog'
-import {
-  MergedAdminCard,
-  MergedDeliveryCard,
-  MergedFriendsTable,
-  MergedHistoryTable,
-  MergedProfileCard,
-  MergedProfileValues,
-} from './merged-person-sections'
+import MergedPersonDetailV8 from './merged-person-detail-v8'
+import MergedPersonV8 from '@/v8/friends/merged/person'
+
+const view = vi.hoisted(() => ({ person: null as MergedPersonDetail | null }))
+vi.mock('./use-merged-person', () => ({
+  useMergedPerson: () => ({
+    phase: 'ready', person: { ...view.person, profileCandidates: [], tagCandidates: [] },
+    saveError: '', editing: false, profileEditing: false, profileDraft: {}, saving: false, profileSaving: false,
+    unlinkTarget: null, unlinkReason: '', unlinking: false,
+    setSaveError: vi.fn(), setEditing: vi.fn(), openProfileEditor: vi.fn(), setProfileDraft: vi.fn(),
+    setProfileEditing: vi.fn(), save: vi.fn(), saveProfile: vi.fn(), setUnlinkTarget: vi.fn(),
+    setUnlinkReason: vi.fn(), unlink: vi.fn(), reload: vi.fn(), setDeliveryActive: vi.fn(),
+  }),
+}))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/friends' }))
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const read = (path: string) => readFileSync(join(SRC, path), 'utf8')
@@ -98,15 +107,12 @@ const PERSON: MergedPersonDetail = {
   archivedAt: null,
 }
 
-const ALL = () =>
-  [
-    renderToStaticMarkup(<MergedProfileCard person={PERSON} />),
-    renderToStaticMarkup(<MergedDeliveryCard priorities={PERSON.deliveryPriorities} onEdit={() => {}} />),
-    renderToStaticMarkup(<MergedAdminCard person={PERSON} />),
-    renderToStaticMarkup(<MergedFriendsTable friends={PERSON.linkedFriends} />),
-    renderToStaticMarkup(<MergedProfileValues values={PERSON.profileValues} />),
-    renderToStaticMarkup(<MergedHistoryTable history={PERSON.history} />),
-  ].join('')
+function renderPerson(person: MergedPersonDetail, Component: typeof MergedPersonDetailV8): string {
+  view.person = person
+  return renderToStaticMarkup(<Component personId={person.id} onClose={() => {}} />)
+}
+describe.each([MergedPersonDetailV8, MergedPersonV8])('現役V8の統合ユーザー詳細 (%#)', (View) => {
+const ALL = () => renderPerson(PERSON, View)
 
 describe('統合ユーザー詳細の中身', () => {
   it('操作用のIDを本文へ出さない', () => {
@@ -117,6 +123,8 @@ describe('統合ユーザー詳細の中身', () => {
     expect(html).not.toContain('identity-friend-1')
     expect(html).not.toContain('visual-qa-account')
     expect(html).not.toContain('merged-person-1')
+    expect(html).toContain('href="/friends/detail?id=friend-identity-right"')
+    expect(html).toContain('href="/friends/detail?id=friend-identity-left"')
   })
 
   it('メール・電話はマスク済みの値だけを出す', () => {
@@ -128,7 +136,7 @@ describe('統合ユーザー詳細の中身', () => {
   })
 
   it('未取得と取得できた値を見分けられる', () => {
-    const html = renderToStaticMarkup(<MergedFriendsTable friends={PERSON.linkedFriends} />)
+    const html = ALL()
     // 本店は 92%、移行で入った支店は記録が無いので「—」。
     expect(html).toContain('92%')
     expect(html).toContain('—')
@@ -136,7 +144,7 @@ describe('統合ユーザー詳細の中身', () => {
   })
 
   it('採用元と、いつ誰が決めたかを出す', () => {
-    const html = renderToStaticMarkup(<MergedProfileValues values={PERSON.profileValues} />)
+    const html = ALL()
     expect(html).toContain('回答フォーム')
     expect(html).toContain('来店アンケート')
     expect(html).toContain('この値で固定')
@@ -146,37 +154,37 @@ describe('統合ユーザー詳細の中身', () => {
   })
 
   it('用途ごとに優先順を並べ、使う・使わないを言う', () => {
-    const html = renderToStaticMarkup(
-      <MergedDeliveryCard priorities={PERSON.deliveryPriorities} onEdit={() => {}} />,
-    )
+    const html = ALL() + renderToStaticMarkup(<MergedDeliveryDialog open priorities={PERSON.deliveryPriorities} revision={PERSON.revision} busy={false} onCancel={() => {}} onSave={() => {}} />)
     expect(html).toContain('一斉配信')
     expect(html).toContain('本店')
     expect(html).toContain('支店')
     expect(html).toContain('使う')
-    expect(html).toContain('優先順位を変更')
+    expect(html).toContain('目的ごとの順位を編集')
   })
 
   it('読み込んだ版を出す（保存に付けて送るもの）', () => {
-    expect(renderToStaticMarkup(<MergedAdminCard person={PERSON} />)).toContain('第4版')
+    expect(ALL()).toContain('第4版')
   })
 })
 
 describe('取得できた0件を「まだありません」と書く', () => {
   it('失敗と同じ文にしない', () => {
-    const friends = renderToStaticMarkup(<MergedFriendsTable friends={[]} />)
+    const friends = renderPerson({ ...PERSON, linkedFriends: [] }, View)
     expect(friends).toContain('結び付いている友だちはまだありません。')
     expect(friends).not.toContain('表示できませんでした')
 
-    const values = renderToStaticMarkup(<MergedProfileValues values={[]} />)
-    expect(values).toContain('採用した値はまだありません。')
-    expect(values).toContain('統合された属性 0件')
+    const values = renderPerson({ ...PERSON, profileValues: [] }, View)
+    expect(values).toContain('まだ値はありません。')
+    expect(values).toContain('採用した属性：0件')
 
-    const history = renderToStaticMarkup(<MergedHistoryTable history={[]} />)
-    expect(history).toContain('まだ記録がありません。')
+    const history = renderPerson({ ...PERSON, history: [] }, View)
+    expect(history).toContain('まだ履歴はありません。')
 
-    const delivery = renderToStaticMarkup(<MergedDeliveryCard priorities={[]} onEdit={() => {}} />)
+    const delivery = renderPerson({ ...PERSON, deliveryPriorities: [] }, View)
     expect(delivery).toContain('優先順はまだ決めていません。')
   })
+})
+
 })
 
 describe('配信元を変える窓', () => {
@@ -272,7 +280,7 @@ describe('プロフィールの採用値を変える窓', () => {
 
 describe('画面のつなぎ', () => {
   const detail = [
-    'components/merged-person/merged-person-detail.tsx',
+    'v8/friends/merged/person.tsx',
     'components/merged-person/use-merged-person.ts',
     'components/merged-person/merged-person-detail-v8.tsx',
   ].map(read).join('\n')
@@ -280,9 +288,6 @@ describe('画面のつなぎ', () => {
   const page = read('app/users/page.tsx')
 
   it('撮影の押し口と対象面に印を付ける', () => {
-    // #748: 行の操作はメニュー部品経由になり、印は menuButtonProps で渡す形へ。
-    // ★V7（#748）：統合ユーザー詳細は名前から開く。撮影の仕組みは印を1回押して詳細を開くので、
-    // 「…」（メニューを開くだけ）ではなく、詳細を直接開く名前のボタンに印を付ける。
     expect(row).toContain('data-qa-open="Hn9eE"')
     expect(detail).toContain('data-design-node="Hn9eE"')
   })

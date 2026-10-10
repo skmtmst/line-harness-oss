@@ -1,0 +1,80 @@
+/* V8: 配信元の優先順を変える窓。 */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sectionNote {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: 1.4;
+}
+
+.priorityGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.priorityRank {
+  min-width: 20px;
+  color: var(--color-ink-faint);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.dialogBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.editRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+}
+
+.editRowOff {
+  background: var(--color-surface-pearl);
+}
+
+.editText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.editTitle {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.editNote {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: 1.4;
+}
+
+.rankButtons {
+  display: flex;
+  gap: 4px;
+}
+
+.note {
+  border-radius: var(--radius-mini);
+  background: var(--color-surface-pearl);
+  padding: 10px 12px;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: 1.5;
+}

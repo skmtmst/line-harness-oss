@@ -9,10 +9,11 @@ import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Toggle from '@/components/shared/toggle'
 import { TextArea } from '@/components/shared/text-field'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { DataTable, TableHeadRow, Th, Tr, Td, RowNameLink, TableStateRow } from '@/components/shared/table'
 import MergedDeliveryDialog from '@/components/merged-person/merged-delivery-dialog'
 import MergedProfileDialog from '@/components/merged-person/merged-profile-dialog'
 import { useMergedPerson } from '@/components/merged-person/use-merged-person'
+import { deliveryPriorityDetails, linkedFriendDetails, personDetails, profileValueDetails } from '@/components/merged-person/merged-person-metadata'
 import styles from './person.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -86,7 +87,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
                   <button type="button" className={styles.linkRight} onClick={() => { m.setSaveError(''); m.setEditing(true) }}>目的ごとの順位を編集 →</button>
                 ) : null}
               </div>
-              <p className={styles.cardSub}>どのアカウントから送るかを決めます。全部「使わない」にすると、どこからも送れなくなります</p>
+              <p className={styles.cardSub} title={deliveryPriorityDetails(person.deliveryPriorities)}>どのアカウントから送るかを決めます。全部「使わない」にすると、どこからも送れなくなります</p>
             </div>
             <DataTable className={styles.table}>
               <colgroup>
@@ -107,7 +108,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
                 {deliveryRows.map(({ friend, active }) => (
                   <Tr key={friend.friendId} className={styles.row} data-row-id={friend.friendId}>
                     <Td className={styles.td}>{friend.lineAccountName}</Td>
-                    <Td className={styles.td}>{friend.displayName}</Td>
+                    <Td className={styles.td}><RowNameLink href={`/friends/detail?id=${encodeURIComponent(friend.friendId)}`}>{friend.displayName}</RowNameLink></Td>
                     <Td className={styles.td}><span className={friend.isFollowing ? `${styles.pill} ${styles.pillOk}` : `${styles.pill} ${styles.pillMuted}`}>{friend.isFollowing ? '友だち' : 'ブロック・削除'}</span></Td>
                     <Td className={styles.td}>
                       {canManage ? (
@@ -141,11 +142,12 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
                 </TableHeadRow>
               </thead>
               <tbody>
+                {person.linkedFriends.length === 0 ? <TableStateRow colSpan={4} kind="empty" title="結び付いている友だちはまだありません。" /> : null}
                 {person.linkedFriends.map((friend) => (
                   <Tr key={friend.friendId} className={`${styles.row} ${styles.rowTall}`} data-row-id={friend.friendId}>
                     <Td className={styles.td}>{friend.lineAccountName}</Td>
-                    <Td className={styles.td}>{friend.displayName}</Td>
-                    <Td className={styles.td}>{shortDate(friend.linkedAt)}</Td>
+                    <Td className={styles.td}><RowNameLink href={`/friends/detail?id=${encodeURIComponent(friend.friendId)}`}>{friend.displayName}</RowNameLink></Td>
+                    <Td className={styles.td} title={linkedFriendDetails(friend)}>{shortDate(friend.linkedAt)}</Td>
                     <Td className={styles.td}>
                       {canManage ? (
                         <button type="button" className={styles.textButton} disabled={m.saving} onClick={() => m.setUnlinkTarget(friend)}>
@@ -182,14 +184,15 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
             <Button type="button" variant="secondary" className={styles.railButton} onClick={m.openProfileEditor} data-qa-open="Hn9eE-profile">使う値を直す</Button>
           ) : null}
           <section className={styles.valuesCard} aria-labelledby="mp-values">
-            <h3 id="mp-values" className={styles.valuesTitle}>使っている値</h3>
+            <h3 id="mp-values" className={styles.valuesTitle} title={personDetails(person)}>使っている値</h3>
             <ul className={styles.values}>
+              {person.profileValues.length === 0 ? <li className={styles.cardSub}>まだ値はありません。</li> : null}
               <li className={styles.value}>
                 <span className={styles.valueLabel}>LINE表示名</span>
                 <span className={styles.valueText}>{person.primaryDisplayName}</span>
               </li>
               {person.profileValues.map((value) => (
-                  <li key={value.fieldKey} className={styles.value} title={value.sourceLabel ? `元：${value.sourceLabel}` : undefined}>
+                  <li key={value.fieldKey} className={styles.value} title={profileValueDetails(value)}>
                     <span className={styles.valueLabel}>{FIELD_WORD[value.fieldLabel] ?? value.fieldLabel}</span>
                     <span className={styles.valueText}>{value.valuePreview ?? emptyValue('unknown')}</span>
                   </li>
