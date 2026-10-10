@@ -511,11 +511,12 @@ CREATE TABLE affiliate_offers (
   created_at      TEXT NOT NULL
 , operation_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
-CREATE TABLE affiliate_payout_batch_lines (
+CREATE TABLE "affiliate_payout_batch_lines" (
+  affiliate_id_history TEXT,
   id TEXT PRIMARY KEY,
   batch_id TEXT NOT NULL REFERENCES affiliate_payout_batches(id),
   settlement_line_id TEXT NOT NULL REFERENCES affiliate_settlement_lines(id),
-  affiliate_id TEXT NOT NULL REFERENCES affiliates(id),
+  affiliate_id TEXT REFERENCES affiliates(id) ON DELETE SET NULL,
   amount_minor INTEGER NOT NULL,
   bank_code TEXT NOT NULL,
   bank_name TEXT NOT NULL,
@@ -547,10 +548,11 @@ CREATE TABLE affiliate_payout_batches (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 , version INTEGER NOT NULL DEFAULT 1, idempotency_key TEXT, request_fingerprint TEXT, export_object_key TEXT, export_expires_at TEXT, download_token_hash TEXT, export_idempotency_key TEXT, export_request_fingerprint TEXT);
 
-CREATE TABLE affiliate_payout_results (
+CREATE TABLE "affiliate_payout_results" (
+  affiliate_id_history TEXT,
   id TEXT PRIMARY KEY,
   batch_id TEXT NOT NULL REFERENCES affiliate_payout_batches(id),
-  affiliate_id TEXT NOT NULL REFERENCES affiliates(id),
+  affiliate_id TEXT REFERENCES affiliates(id) ON DELETE SET NULL,
   settlement_line_id TEXT NOT NULL REFERENCES affiliate_settlement_lines(id),
   paid_amount_minor INTEGER NOT NULL,
   result TEXT NOT NULL CHECK (result IN ('paid', 'failed', 'returned')),
@@ -598,23 +600,27 @@ CREATE TABLE affiliate_reward_entries (
   UNIQUE (conversion_event_id, entry_type)
 );
 
-CREATE TABLE affiliate_settlement_lines (
+CREATE TABLE "affiliate_settlement_lines" (
+  adjustment_id_history TEXT,
+  entry_id_history TEXT,
+  affiliate_id_history TEXT,
   id TEXT PRIMARY KEY,
   settlement_id TEXT NOT NULL REFERENCES affiliate_settlements(id),
-  affiliate_id TEXT NOT NULL REFERENCES affiliates(id),
-  entry_id TEXT REFERENCES affiliate_reward_entries(id),
-  adjustment_id TEXT REFERENCES affiliate_adjustments(id),
+  affiliate_id TEXT REFERENCES affiliates(id) ON DELETE SET NULL,
+  entry_id TEXT REFERENCES affiliate_reward_entries(id) ON DELETE SET NULL,
+  adjustment_id TEXT REFERENCES affiliate_adjustments(id) ON DELETE SET NULL,
   amount_minor INTEGER NOT NULL,
   status TEXT NOT NULL DEFAULT 'included' CHECK (status IN ('included', 'withheld')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  CHECK ((entry_id IS NOT NULL AND adjustment_id IS NULL) OR (entry_id IS NULL AND adjustment_id IS NOT NULL))
+  CHECK ((COALESCE(entry_id, entry_id_history) IS NOT NULL AND COALESCE(adjustment_id, adjustment_id_history) IS NULL) OR (COALESCE(entry_id, entry_id_history) IS NULL AND COALESCE(adjustment_id, adjustment_id_history) IS NOT NULL))
 );
 
-CREATE TABLE affiliate_settlements (
+CREATE TABLE "affiliate_settlements" (
+  affiliate_id_history TEXT,
   id TEXT PRIMARY KEY,
   organization_id TEXT NOT NULL REFERENCES tenants(id),
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
-  affiliate_id TEXT REFERENCES affiliates(id),
+  affiliate_id TEXT REFERENCES affiliates(id) ON DELETE SET NULL,
   period_from TEXT NOT NULL,
   period_to TEXT NOT NULL,
   timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo',
@@ -628,11 +634,12 @@ CREATE TABLE affiliate_settlements (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 , request_fingerprint TEXT NOT NULL DEFAULT '');
 
-CREATE TABLE affiliate_statements (
+CREATE TABLE "affiliate_statements" (
+  affiliate_id_history TEXT,
   id TEXT PRIMARY KEY,
   organization_id TEXT NOT NULL REFERENCES tenants(id),
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
-  affiliate_id TEXT NOT NULL REFERENCES affiliates(id),
+  affiliate_id TEXT REFERENCES affiliates(id) ON DELETE SET NULL,
   settlement_id TEXT NOT NULL REFERENCES affiliate_settlements(id),
   total_amount_minor INTEGER NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('generated', 'expired', 'revoked')),
@@ -1437,9 +1444,10 @@ CREATE TABLE billing_invoices (
   created_at          TEXT NOT NULL
 );
 
-CREATE TABLE booking_audit_logs (
+CREATE TABLE "booking_audit_logs" (
+  booking_id_history TEXT,
   id              TEXT PRIMARY KEY,
-  booking_id      TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  booking_id      TEXT REFERENCES bookings(id) ON DELETE SET NULL,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   action          TEXT NOT NULL,
   before_json     TEXT CHECK (before_json IS NULL OR json_valid(before_json)),
@@ -1589,10 +1597,11 @@ CREATE TABLE booking_payment_menu_settings (
   updated_at TEXT NOT NULL
 );
 
-CREATE TABLE booking_payments (
+CREATE TABLE "booking_payments" (
+  booking_id_history TEXT,
   id TEXT PRIMARY KEY,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
-  booking_id TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  booking_id TEXT REFERENCES bookings(id) ON DELETE SET NULL,
   amount INTEGER NOT NULL CHECK (amount >= 0),
   currency TEXT NOT NULL DEFAULT 'JPY',
   status TEXT NOT NULL DEFAULT 'unpaid'
@@ -4432,9 +4441,10 @@ CREATE TABLE messages_log (
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT, line_message_id TEXT, line_message_account_key TEXT, unsent_at TEXT, quote_token TEXT, quoted_message_id TEXT, search_content TEXT);
 
-CREATE TABLE mileage_adjustment_approval_events (
+CREATE TABLE "mileage_adjustment_approval_events" (
+  request_id_history TEXT,
   id              TEXT PRIMARY KEY,
-  request_id      TEXT NOT NULL REFERENCES mileage_adjustment_approval_requests (id) ON DELETE CASCADE,
+  request_id      TEXT REFERENCES mileage_adjustment_approval_requests(id) ON DELETE SET NULL,
   actor_staff_id  TEXT NOT NULL,
   action          TEXT NOT NULL CHECK (action IN ('requested', 'approved', 'rejected', 'cancelled')),
   reason          TEXT,
@@ -4994,9 +5004,10 @@ CREATE TABLE nen_pet_profiles (
   updated_at TEXT NOT NULL
 , breed TEXT, weight_kg REAL, concerns TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(concerns)), recommended_daily_grams INTEGER, recommended_daily_min_grams INTEGER, recommended_daily_max_grams INTEGER, venison_daily_grams INTEGER, food_cycle_days INTEGER, image_r2_key TEXT, image_url TEXT, neutered INTEGER CHECK (neutered IN (0, 1)), activity_level TEXT NOT NULL DEFAULT 'normal' CHECK (activity_level IN ('low', 'normal', 'high')), daily_kcal INTEGER, feeding_product_id TEXT, weight_updated_at TEXT);
 
-CREATE TABLE nen_photo_assessment_runs (
+CREATE TABLE "nen_photo_assessment_runs" (
+  photo_id_history TEXT,
   id TEXT PRIMARY KEY,
-  photo_id TEXT NOT NULL REFERENCES nen_photo_submissions(id) ON DELETE CASCADE,
+  photo_id TEXT REFERENCES nen_photo_submissions(id) ON DELETE SET NULL,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
   requested_version INTEGER NOT NULL CHECK (requested_version > 0),
   status TEXT NOT NULL DEFAULT 'queued'
@@ -5057,18 +5068,20 @@ CREATE TABLE nen_photo_derivatives (
   UNIQUE(photo_id, kind, source_version)
 );
 
-CREATE TABLE nen_photo_original_download_audit (
+CREATE TABLE "nen_photo_original_download_audit" (
+  photo_id_history TEXT,
   id TEXT PRIMARY KEY,
-  photo_id TEXT NOT NULL REFERENCES nen_photo_submissions(id) ON DELETE CASCADE,
+  photo_id TEXT REFERENCES nen_photo_submissions(id) ON DELETE SET NULL,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
   requested_by TEXT NOT NULL,
   event TEXT NOT NULL CHECK (event IN ('issued', 'downloaded')),
   created_at TEXT NOT NULL
 );
 
-CREATE TABLE nen_photo_original_download_grants (
+CREATE TABLE "nen_photo_original_download_grants" (
+  photo_id_history TEXT,
   token_hash TEXT PRIMARY KEY,
-  photo_id TEXT NOT NULL REFERENCES nen_photo_submissions(id) ON DELETE CASCADE,
+  photo_id TEXT REFERENCES nen_photo_submissions(id) ON DELETE SET NULL,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
   requested_by TEXT NOT NULL,
   requested_version INTEGER NOT NULL CHECK (requested_version > 0),
@@ -5137,8 +5150,9 @@ CREATE TABLE nen_photo_publications (
 , sort_order INTEGER NOT NULL DEFAULT 0, reward_policy_key TEXT, reward_points INTEGER CHECK (reward_points BETWEEN 0 AND 100000));
 
 CREATE TABLE "nen_photo_review_events" (
+  photo_id_history TEXT,
   id TEXT PRIMARY KEY,
-  photo_id TEXT NOT NULL REFERENCES nen_photo_submissions(id) ON DELETE CASCADE,
+  photo_id TEXT REFERENCES nen_photo_submissions(id) ON DELETE SET NULL,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
   from_status TEXT NOT NULL CHECK (from_status = 'pending'),
   to_status TEXT NOT NULL CHECK (to_status IN ('adopted', 'rejected')),
@@ -5181,9 +5195,10 @@ CREATE TABLE nen_photo_reward_outbox (
   updated_at TEXT NOT NULL
 );
 
-CREATE TABLE nen_photo_risk_assessments (
+CREATE TABLE "nen_photo_risk_assessments" (
+  photo_id_history TEXT,
   id TEXT PRIMARY KEY,
-  photo_id TEXT NOT NULL REFERENCES nen_photo_submissions(id) ON DELETE CASCADE,
+  photo_id TEXT REFERENCES nen_photo_submissions(id) ON DELETE SET NULL,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
   flag TEXT NOT NULL,
   confidence REAL CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1)),
@@ -10437,6 +10452,26 @@ CREATE TRIGGER affiliate_offers_folder_insert BEFORE INSERT ON affiliate_offers 
 
 CREATE TRIGGER affiliate_offers_folder_update BEFORE UPDATE OF folder_id,line_account_id ON affiliate_offers WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='affiliate_offer' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
 
+CREATE TRIGGER affiliate_payout_batch_lines_history_detach AFTER UPDATE OF affiliate_id ON affiliate_payout_batch_lines BEGIN UPDATE affiliate_payout_batch_lines SET affiliate_id_history = COALESCE(NEW.affiliate_id, OLD.affiliate_id, OLD.affiliate_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER affiliate_payout_batch_lines_history_insert AFTER INSERT ON affiliate_payout_batch_lines BEGIN UPDATE affiliate_payout_batch_lines SET affiliate_id_history = COALESCE(NEW.affiliate_id, NEW.affiliate_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER affiliate_payout_results_history_detach AFTER UPDATE OF affiliate_id ON affiliate_payout_results BEGIN UPDATE affiliate_payout_results SET affiliate_id_history = COALESCE(NEW.affiliate_id, OLD.affiliate_id, OLD.affiliate_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER affiliate_payout_results_history_insert AFTER INSERT ON affiliate_payout_results BEGIN UPDATE affiliate_payout_results SET affiliate_id_history = COALESCE(NEW.affiliate_id, NEW.affiliate_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER affiliate_settlement_lines_history_detach AFTER UPDATE OF adjustment_id, entry_id, affiliate_id ON affiliate_settlement_lines BEGIN UPDATE affiliate_settlement_lines SET adjustment_id_history = COALESCE(NEW.adjustment_id, OLD.adjustment_id, OLD.adjustment_id_history), entry_id_history = COALESCE(NEW.entry_id, OLD.entry_id, OLD.entry_id_history), affiliate_id_history = COALESCE(NEW.affiliate_id, OLD.affiliate_id, OLD.affiliate_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER affiliate_settlement_lines_history_insert AFTER INSERT ON affiliate_settlement_lines BEGIN UPDATE affiliate_settlement_lines SET adjustment_id_history = COALESCE(NEW.adjustment_id, NEW.adjustment_id_history), entry_id_history = COALESCE(NEW.entry_id, NEW.entry_id_history), affiliate_id_history = COALESCE(NEW.affiliate_id, NEW.affiliate_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER affiliate_settlements_history_detach AFTER UPDATE OF affiliate_id ON affiliate_settlements BEGIN UPDATE affiliate_settlements SET affiliate_id_history = COALESCE(NEW.affiliate_id, OLD.affiliate_id, OLD.affiliate_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER affiliate_settlements_history_insert AFTER INSERT ON affiliate_settlements BEGIN UPDATE affiliate_settlements SET affiliate_id_history = COALESCE(NEW.affiliate_id, NEW.affiliate_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER affiliate_statements_history_detach AFTER UPDATE OF affiliate_id ON affiliate_statements BEGIN UPDATE affiliate_statements SET affiliate_id_history = COALESCE(NEW.affiliate_id, OLD.affiliate_id, OLD.affiliate_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER affiliate_statements_history_insert AFTER INSERT ON affiliate_statements BEGIN UPDATE affiliate_statements SET affiliate_id_history = COALESCE(NEW.affiliate_id, NEW.affiliate_id_history) WHERE id = NEW.id; END;
+
 CREATE TRIGGER affiliates_folder_insert BEFORE INSERT ON affiliates WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='affiliate' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
 
 CREATE TRIGGER affiliates_folder_update BEFORE UPDATE OF folder_id,line_account_id ON affiliates WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='affiliate' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
@@ -10466,9 +10501,17 @@ CREATE TRIGGER banner_projects_folder_insert BEFORE INSERT ON banner_projects WH
 
 CREATE TRIGGER banner_projects_folder_update BEFORE UPDATE OF folder_id,tenant_id ON banner_projects WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM hq_banner_folders WHERE id=NEW.folder_id AND tenant_id=NEW.tenant_id AND kind='project' AND archived_at IS NULL) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
 
+CREATE TRIGGER booking_audit_logs_history_detach AFTER UPDATE OF booking_id ON booking_audit_logs BEGIN UPDATE booking_audit_logs SET booking_id_history = COALESCE(NEW.booking_id, OLD.booking_id, OLD.booking_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER booking_audit_logs_history_insert AFTER INSERT ON booking_audit_logs BEGIN UPDATE booking_audit_logs SET booking_id_history = COALESCE(NEW.booking_id, NEW.booking_id_history) WHERE id = NEW.id; END;
+
 CREATE TRIGGER booking_auto_assign_sync_rules_insert AFTER INSERT ON account_settings WHEN NEW.key='booking_auto_assign' BEGIN UPDATE booking_sync_rules SET auto_assign=CASE WHEN NEW.value='true' THEN 1 ELSE 0 END,version=version+1,updated_at=datetime('now') WHERE line_account_id=NEW.line_account_id AND auto_assign<>CASE WHEN NEW.value='true' THEN 1 ELSE 0 END; END;
 
 CREATE TRIGGER booking_auto_assign_sync_rules_update AFTER UPDATE ON account_settings WHEN NEW.key='booking_auto_assign' BEGIN UPDATE booking_sync_rules SET auto_assign=CASE WHEN NEW.value='true' THEN 1 ELSE 0 END,version=version+1,updated_at=datetime('now') WHERE line_account_id=NEW.line_account_id AND auto_assign<>CASE WHEN NEW.value='true' THEN 1 ELSE 0 END; END;
+
+CREATE TRIGGER booking_payments_history_detach AFTER UPDATE OF booking_id ON booking_payments BEGIN UPDATE booking_payments SET booking_id_history = COALESCE(NEW.booking_id, OLD.booking_id, OLD.booking_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER booking_payments_history_insert AFTER INSERT ON booking_payments BEGIN UPDATE booking_payments SET booking_id_history = COALESCE(NEW.booking_id, NEW.booking_id_history) WHERE id = NEW.id; END;
 
 CREATE TRIGGER booking_resource_consumptions_account_insert
 BEFORE INSERT ON booking_resource_consumptions
@@ -10807,6 +10850,10 @@ CREATE TRIGGER messages_search_invalidate AFTER UPDATE OF content,unsent_at,deli
 WHEN OLD.content IS NOT NEW.content OR OLD.unsent_at IS NOT NEW.unsent_at OR OLD.delivery_type IS NOT NEW.delivery_type
 BEGIN UPDATE messages_log SET search_content=NULL WHERE id=NEW.id; END;
 
+CREATE TRIGGER mileage_adjustment_approval_events_history_detach AFTER UPDATE OF request_id ON mileage_adjustment_approval_events BEGIN UPDATE mileage_adjustment_approval_events SET request_id_history = COALESCE(NEW.request_id, OLD.request_id, OLD.request_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER mileage_adjustment_approval_events_history_insert AFTER INSERT ON mileage_adjustment_approval_events BEGIN UPDATE mileage_adjustment_approval_events SET request_id_history = COALESCE(NEW.request_id, NEW.request_id_history) WHERE id = NEW.id; END;
+
 CREATE TRIGGER mileage_reward_folders_common_delete AFTER DELETE ON mileage_reward_folders BEGIN DELETE FROM folders WHERE id=OLD.id AND kind='mileage_reward' AND account_id=OLD.line_account_id; END;
 
 CREATE TRIGGER mileage_reward_folders_common_insert AFTER INSERT ON mileage_reward_folders WHEN NOT EXISTS(SELECT 1 FROM folders WHERE id=NEW.id) BEGIN INSERT INTO folders(id,kind,account_id,name,display_order,created_at,updated_at) VALUES(NEW.id,'mileage_reward',NEW.line_account_id,NEW.name,NEW.display_order,NEW.created_at,NEW.updated_at); END;
@@ -10816,6 +10863,26 @@ CREATE TRIGGER mileage_reward_folders_common_update AFTER UPDATE ON mileage_rewa
 CREATE TRIGGER mileage_rewards_folder_insert BEFORE INSERT ON mileage_rewards WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='mileage_reward' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
 
 CREATE TRIGGER mileage_rewards_folder_update BEFORE UPDATE OF folder_id,line_account_id ON mileage_rewards WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='mileage_reward' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
+
+CREATE TRIGGER nen_photo_assessment_runs_history_detach AFTER UPDATE OF photo_id ON nen_photo_assessment_runs BEGIN UPDATE nen_photo_assessment_runs SET photo_id_history = COALESCE(NEW.photo_id, OLD.photo_id, OLD.photo_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER nen_photo_assessment_runs_history_insert AFTER INSERT ON nen_photo_assessment_runs BEGIN UPDATE nen_photo_assessment_runs SET photo_id_history = COALESCE(NEW.photo_id, NEW.photo_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER nen_photo_original_download_audit_history_detach AFTER UPDATE OF photo_id ON nen_photo_original_download_audit BEGIN UPDATE nen_photo_original_download_audit SET photo_id_history = COALESCE(NEW.photo_id, OLD.photo_id, OLD.photo_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER nen_photo_original_download_audit_history_insert AFTER INSERT ON nen_photo_original_download_audit BEGIN UPDATE nen_photo_original_download_audit SET photo_id_history = COALESCE(NEW.photo_id, NEW.photo_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER nen_photo_original_download_grants_history_detach AFTER UPDATE OF photo_id ON nen_photo_original_download_grants BEGIN UPDATE nen_photo_original_download_grants SET photo_id_history = COALESCE(NEW.photo_id, OLD.photo_id, OLD.photo_id_history) WHERE token_hash = NEW.token_hash; END;
+
+CREATE TRIGGER nen_photo_original_download_grants_history_insert AFTER INSERT ON nen_photo_original_download_grants BEGIN UPDATE nen_photo_original_download_grants SET photo_id_history = COALESCE(NEW.photo_id, NEW.photo_id_history) WHERE token_hash = NEW.token_hash; END;
+
+CREATE TRIGGER nen_photo_review_events_history_detach AFTER UPDATE OF photo_id ON nen_photo_review_events BEGIN UPDATE nen_photo_review_events SET photo_id_history = COALESCE(NEW.photo_id, OLD.photo_id, OLD.photo_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER nen_photo_review_events_history_insert AFTER INSERT ON nen_photo_review_events BEGIN UPDATE nen_photo_review_events SET photo_id_history = COALESCE(NEW.photo_id, NEW.photo_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER nen_photo_risk_assessments_history_detach AFTER UPDATE OF photo_id ON nen_photo_risk_assessments BEGIN UPDATE nen_photo_risk_assessments SET photo_id_history = COALESCE(NEW.photo_id, OLD.photo_id, OLD.photo_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER nen_photo_risk_assessments_history_insert AFTER INSERT ON nen_photo_risk_assessments BEGIN UPDATE nen_photo_risk_assessments SET photo_id_history = COALESCE(NEW.photo_id, NEW.photo_id_history) WHERE id = NEW.id; END;
 
 CREATE TRIGGER outgoing_webhook_config_version
 AFTER UPDATE OF name, url, event_types, secret, secret_encrypted, is_active, max_retries, deleted_at
