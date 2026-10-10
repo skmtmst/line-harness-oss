@@ -81,8 +81,6 @@ shared-button-importer app/booking/menus/settings-tabs/menus-tab.tsx
 shared-button-importer app/booking/menus/settings-tabs/rules-tab.tsx
 shared-button-importer app/booking/menus/settings-tabs/staff-tab.tsx
 shared-button-importer app/booking/menus/settings-v8.tsx
-shared-button-importer app/booking/menus/staff/assign-v8.tsx
-shared-button-importer app/booking/menus/staff/page.tsx
 shared-button-importer app/booking/prepay-badge-v8.tsx
 shared-button-importer app/booking/staff/page.tsx
 shared-button-importer app/booking/staff/shifts/liff-preview.tsx

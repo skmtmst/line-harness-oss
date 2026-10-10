@@ -18,7 +18,7 @@ const fixture = vi.hoisted(() => ({
   putStaffMenusBulk: null as null | ((...args: unknown[]) => Promise<unknown>),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -27,7 +27,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a' }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => undefined,
 }))
 
@@ -103,15 +103,16 @@ describe('R308 提供できる数は有効の担当だけ', () => {
 
     // 列見出しで非公開と分かる。
     const header = screen.getByText('非公開さん').closest('th') as HTMLElement
-    expect(within(header).getByText('非公開')).toBeTruthy()
+    expect(within(header).getByText('停止中')).toBeTruthy()
     // 有効の見出しには付けない。
     const activeHeader = screen.getByText('稼働さん').closest('th') as HTMLElement
-    expect(within(activeHeader).queryByText('非公開')).toBeNull()
+    expect(within(activeHeader).queryByText('停止中')).toBeNull()
 
     // カットは稼働1＋非公開1の割当。受付できる数は1人と区別する。
     const cut = menuRow('カット')
-    expect(cut.textContent).toContain('1 人')
-    expect(cut.textContent).toContain('割当2（非公開1）')
+    expect((within(cut).getByRole('checkbox', { name: 'カット を 稼働さん が受ける' }) as HTMLInputElement).checked).toBe(true)
+    expect((within(cut).getByRole('checkbox', { name: 'カット を 非公開さん が受ける' }) as HTMLInputElement).checked).toBe(true)
+    expect(screen.queryByText(/「カット」は受付を止めている担当しか/)).toBeNull()
   })
 
   test('非公開だけの割当は受付可能0人と警告する', async () => {
@@ -120,11 +121,11 @@ describe('R308 提供できる数は有効の担当だけ', () => {
 
     // 特別ケアは非公開しかいない。受付できる数は0人、割当は残す。
     const row = menuRow('特別ケア')
-    expect(row.textContent).toContain('0 人')
-    expect(row.textContent).toContain('割当1（非公開1）')
-    expect(screen.getByText('「特別ケア」は非公開の担当しかいません。')).toBeTruthy()
+    expect((within(row).getByRole('checkbox', { name: '特別ケア を 稼働さん が受ける' }) as HTMLInputElement).checked).toBe(false)
+    expect((within(row).getByRole('checkbox', { name: '特別ケア を 非公開さん が受ける' }) as HTMLInputElement).checked).toBe(true)
+    expect(screen.getByText(/「特別ケア」は受付を止めている担当しかいません。/)).toBeTruthy()
     // 誰も割っていない「お試し」とは別の文言。
-    expect(screen.getByText('「お試し」は担当できるスタッフがいません。')).toBeTruthy()
+    expect(screen.getByText(/「お試し」は担当が0人です。/)).toBeTruthy()
   })
 
   test('有効を外す（未保存）と受付できる数が減り、警告が出る', async () => {
@@ -133,15 +134,15 @@ describe('R308 提供できる数は有効の担当だけ', () => {
 
     // 相談は有効だけの割当。外すと受付できる数が0人になる。
     const row = menuRow('相談')
-    const [activeBox] = within(row).getAllByRole('checkbox', { name: '対応できる' })
+    const activeBox = within(row).getByRole('checkbox', { name: '相談 を 稼働さん が受ける' })
     fireEvent.click(activeBox)
 
-    expect(row.textContent).toContain('0 人')
+    expect((activeBox as HTMLInputElement).checked).toBe(false)
     // お試しと並んで「担当できるスタッフがいません」に入る。
-    const warn = await screen.findByText('このままでは予約フォームに枠が出ません。')
-    const box = warn.closest('div[data-design="Warn"]') as HTMLElement
+    const warn = await screen.findByRole('alert')
+    const box = warn.closest('[data-design="Warn"]') as HTMLElement
     expect(box.textContent).toContain('「相談」')
-    expect(box.textContent).toContain('担当できるスタッフがいません')
+    expect(box.textContent).toContain('担当が0人です')
   })
 })
 
@@ -150,9 +151,10 @@ describe('R309 標準の料金は一覧と同じ言葉', () => {
     render(<MenuStaffMatrix />)
     await screen.findByText('カット')
 
-    expect(menuRow('カット').textContent).toContain('¥8,000')
-    expect(menuRow('相談').textContent).toContain('お問い合わせ')
-    expect(menuRow('お試し').textContent).toContain('無料')
+    for (const [name, price] of [['カット', '¥8,000'], ['相談', 'お問い合わせ'], ['お試し', '無料']]) {
+      fireEvent.click(menuRow(name).querySelector('td')!)
+      expect(screen.getByText(`メニューは ${price}`)).toBeTruthy()
+    }
     // 標準の設定に金額0の表示は残らない。
     expect(screen.queryByText('¥0')).toBeNull()
   })
