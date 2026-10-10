@@ -1,9 +1,10 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 /* 止める窓は v7/V8 共用の `_components/conversion-dialogs.tsx` にある。 */
-const DIALOGS = readFileSync(new URL('./_components/conversion-dialogs.tsx', import.meta.url), 'utf8')
+const DIALOGS = readFileSync(new URL('../../v8/conversions/dialogs.tsx', import.meta.url), 'utf8')
 
 /**
  * #513「中」M2〜M6 の契約(成果地点一覧)。
@@ -17,7 +18,7 @@ const DIALOGS = readFileSync(new URL('./_components/conversion-dialogs.tsx', imp
 describe('成果地点一覧の点検契約(#513 中)', () => {
   it('M2: 先頭だけの表示をやめ、nextCursor を追って50頁まで読む', () => {
     expect(PAGE).toContain('pagination.nextCursor')
-    expect(PAGE).toContain('page < 50')
+    expect(PAGE).toContain('pageIndex < 50')
     expect(PAGE).toContain('truncated')
     expect(PAGE, '無制限の取得に戻っている').not.toContain('for (;;)')
   })
@@ -28,15 +29,15 @@ describe('成果地点一覧の点検契約(#513 中)', () => {
     expect(PAGE).toContain('sort: SORT_TO_API[sort]')
     expect(PAGE).toContain("'cv-desc': 'count_desc'")
     expect(PAGE).toContain("'value-desc': 'value_desc'")
-    expect(PAGE).toContain("'name': 'name_asc'")
+    expect(PAGE).toContain("name: 'name_asc'")
     expect(PAGE, '画面内で探し直している').not.toContain('p.name.includes(q)')
   })
 
   it('M4: 影響なしの確定は理由を出し、読み込み中は確定を止める', () => {
-    expect(PAGE).toContain('if (!stopTarget || stopping || !canReverse) return')
-    expect(PAGE).toContain('if (stopImpactLoading) return')
+    expect(PAGE).toContain('if (!stopTarget || stopping || !canEdit || stopImpactLoading) return')
+    expect(PAGE).toContain('if (!stopImpact)')
     expect(PAGE).toContain('利用先と停止の影響を読み込めませんでした。画面を閉じて、もう一度お試しください。')
-    expect(DIALOGS).toContain('busy={stopping || stopImpactLoading}')
+    expect(PAGE).toContain('busy={stopping || stopImpactLoading}')
   })
 
 

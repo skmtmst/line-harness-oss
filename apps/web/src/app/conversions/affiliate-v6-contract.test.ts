@@ -1,7 +1,7 @@
-import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
+import { readUiSource, readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 const TABS = readFileSync(new URL('../affiliates/tabs.tsx', import.meta.url), 'utf8')
 const LEGACY_PAGE = readFileSync(new URL('../affiliates/page.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')

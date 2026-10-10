@@ -2,7 +2,7 @@ import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const LIST_PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const LIST_PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 const NEW_PAGE = readFileSync(new URL('./new/page.tsx', import.meta.url), 'utf8')
 const ANALYTICS_PAGE = readUiSource(new URL('../analytics/page.tsx', import.meta.url), 'utf8')
 

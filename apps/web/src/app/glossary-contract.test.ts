@@ -110,7 +110,6 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
     'app/conversions/_components/conversion-dialogs.tsx',
     'app/conversions/conversion-points-v8.tsx',
     'app/conversions/new/page.tsx',
-    'app/conversions/page.tsx',
     'app/ec-commerce/connector-panel.tsx',
     'app/emergency/page.tsx',
     'app/inflow-links/ad-integration-v8.tsx',

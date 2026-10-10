@@ -1,10 +1,11 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const NEW_PAGE = readFileSync(new URL('./new/page.tsx', import.meta.url), 'utf8')
-const LIST_PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const LIST_PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 /* 詳細・編集の窓は v7/V8 共用の `_components/conversion-dialogs.tsx` にある。 */
-const DIALOGS = readFileSync(new URL('./_components/conversion-dialogs.tsx', import.meta.url), 'utf8')
+const DIALOGS = readFileSync(new URL('../../v8/conversions/dialogs.tsx', import.meta.url), 'utf8')
 
 /**
  * R41: 起点の説明は対応表(origin-labels)が正本。作成・一覧・詳細・編集の

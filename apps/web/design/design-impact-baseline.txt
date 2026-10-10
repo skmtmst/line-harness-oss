@@ -7,7 +7,6 @@
 # 標準Buttonへ移行済みとして、見た目と主要導線を監視する画面本体。
 button-migration-target app/affiliates/tabs.tsx
 button-migration-target app/analytics/page.tsx
-button-migration-target app/conversions/page.tsx
 button-migration-target app/inflow-links/page.tsx
 button-migration-target app/reminders/page.tsx
 button-migration-target app/templates/page.tsx
@@ -16,7 +15,6 @@ button-migration-target components/friend-fields/tags-page-v4.tsx
 # #984 LAY-14: UID移行の判断表も共通見出しを通しているので監視へ入れる。
 table-header-migration-target app/accounts/migration.tsx
 table-header-migration-target app/affiliates/tabs.tsx
-table-header-migration-target app/conversions/page.tsx
 # #984 LAY-12: 重複検出の3表すべてを共通見出しへ。直書き th は残さない。
 table-header-migration-target app/duplicates/page.tsx
 table-header-migration-target app/inflow-links/page.tsx
@@ -91,7 +89,6 @@ shared-button-importer app/contents/vars/page.tsx
 shared-button-importer app/conversions/_components/conversion-dialogs.tsx
 shared-button-importer app/conversions/conversion-points-v8.tsx
 shared-button-importer app/conversions/new/page.tsx
-shared-button-importer app/conversions/page.tsx
 shared-button-importer app/duplicates/duplicates-v8.tsx
 shared-button-importer app/ec-commerce/connector-panel.tsx
 shared-button-importer app/ec-commerce/ec-connector-v8.tsx

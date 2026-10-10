@@ -17,7 +17,7 @@ import ConversionsPage from './page'
  * 見本が決めた見出し・数の帯・表の列・表の下の小窓が出ることを
  * 実DOMで固定する。v7 では従来の一覧が出ることも固定する。
  */
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
   usePathname: () => '/conversions',
   useSearchParams: () => new URLSearchParams(),

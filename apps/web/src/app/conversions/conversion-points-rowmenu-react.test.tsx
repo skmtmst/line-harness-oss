@@ -31,7 +31,7 @@ class MemoryStorage implements Storage {
 }
 
 vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a> }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(`tab=${fixture.tab}&affiliate=affiliate-a&from=notice`),
   useRouter: () => ({ replace: fixture.replace, push: () => {} }),
 }))
@@ -131,8 +131,13 @@ function byText(text: string): HTMLButtonElement | undefined {
 }
 
 function moreButtons(): HTMLButtonElement[] {
-  return [...document.body.querySelectorAll('button[aria-label="購入のその他操作"]')]
+  return [...document.body.querySelectorAll('button[aria-label="成果地点「購入」の操作"]')]
     .filter((node) => node.isConnected) as HTMLButtonElement[]
+}
+
+function stopButton(): HTMLButtonElement | undefined {
+  return [...document.body.querySelectorAll<HTMLButtonElement>('[aria-label="止めるときの小窓"] button')]
+    .find(button => button.textContent?.trim() === '止める')
 }
 
 async function click(node: HTMLElement | undefined) {
@@ -198,7 +203,7 @@ describe('R280 成果地点の操作メニューは1つだけ', () => {
       row!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     await act(async () => { await Promise.resolve() })
-    expect(document.body.textContent).toContain('この成果地点の数え方と利用状況です。')
+    expect(document.body.querySelector('[aria-label="詳細の小窓"]')).not.toBeNull()
   })
 })
 
@@ -212,7 +217,7 @@ describe('V8 閲覧だけの担当者と権限確認中', () => {
       expect(container.querySelector('a[href="/conversions/new"]')).toBeNull()
       await click(moreButtons()[0])
       expect(byText('編集する')).toBeUndefined()
-      expect(byText('止める・差し替える・削除する')).toBeUndefined()
+      expect(byText('止める')).toBeUndefined()
       expect(byText('使う場所を足す')).toBeUndefined()
       await click(byText('中身を見る'))
       expect(byText('編集')).toBeUndefined()
@@ -231,16 +236,16 @@ describe('V8 閲覧だけの担当者と権限確認中', () => {
   it('停止の理由が空なら送らず、入力した理由と開いた版を送る', async () => {
     await mount()
     await click(moreButtons()[0])
-    await click(byText('止める・差し替える・削除する'))
-    await click(byText('数えるのをやめる'))
+    await click(byText('止める'))
+    await click(stopButton())
     expect(writes).toHaveLength(0)
-    expect(document.body.textContent).toContain('理由を入力してください')
+    expect(stopButton()?.disabled).toBe(true)
     const reason = document.body.querySelector<HTMLInputElement>('#cv-stop-reason')!
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(reason, '計測の仕方を変えるため')
       reason.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    await click(byText('数えるのをやめる'))
+    await click(stopButton())
     expect(writes).toHaveLength(1)
     expect(writes[0].body).toMatchObject({ expectedVersion: 3, reason: '計測の仕方を変えるため' })
   })

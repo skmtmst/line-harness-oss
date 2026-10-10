@@ -32,7 +32,7 @@ const LIST_RANGE_USERS: Array<[string, string]> = [
   ['コンテンツ管理', '../../app/contents/page.tsx'],
   ['運営へのお知らせ', '../../app/line-notifications/operator-notification-rules.tsx'],
   ['NENキャンペーン 送った履歴', '../../app/nen-campaigns/nen-overview.tsx'],
-  ['コンバージョン', '../../app/conversions/page.tsx'],
+  ['コンバージョン', '../../v8/conversions/list.tsx'],
   ['EC連携 取り込みの記録', '../../app/ec-commerce/page.tsx'],
   ['EC連携 会員のつき合わせ', '../../app/ec-commerce/identity-candidates/page.tsx'],
   ['EC連携 定期便', '../../app/ec-commerce/subscriptions-panel.tsx'],
@@ -62,6 +62,10 @@ describe('ListRange 統一（監査6 #667）', () => {
       if (path === '../../v8/webhooks/interactions.tsx') {
         expect(source).toContain('`${formatNumber(data.total)} 件中 ${rangeFirst}〜${rangeLast} 件`')
         expect(source).toContain('data.total === 0 ? 0 : (data.page - 1) * data.limit + 1')
+      } else if (path === '../../v8/conversions/list.tsx') {
+        expect(source).toContain('(currentPage - 1) * pageSize + current.length')
+        expect(source).toContain('formatNumber(shown.length)')
+        expect(source).toContain('pageCount > 1')
       } else expect(source, `${path} に ListRange がない`).toContain('ListRange')
     },
   )

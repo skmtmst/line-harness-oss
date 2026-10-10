@@ -17,7 +17,7 @@ const st = vi.hoisted(() => ({
   points: [] as Array<{ name: string; lineAccountId: string | null }>,
 }))
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
     selectedAccountId: st.accountId,

@@ -1,8 +1,8 @@
-import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
+import { readUiSource, readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync as readRawSource } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 const NEW_PAGE = readFileSync(new URL('./new/page.tsx', import.meta.url), 'utf8')
 
 /**
@@ -21,7 +21,7 @@ describe('V6 成果地点一覧の契約', () => {
     expect(PAGE).toContain("import ListState from '@/components/shared/list-state'")
     expect(PAGE).toContain('<ListState kind="loading"')
     expect(PAGE).toContain('kind="error"')
-    expect(PAGE).toContain('kind="empty"')
+    expect(PAGE).toContain('<EmptyList')
     expect(PAGE).toContain('成果地点を読み込めませんでした')
     expect(PAGE).toContain('onRetry=')
     expect(PAGE).toContain('onRetry={() => void load()}')
@@ -33,7 +33,7 @@ describe('V6 成果地点一覧の契約', () => {
     expect(PAGE).toContain('formatNumber(point.metrics.netCount')
     expect(PAGE).toContain('formatNumber(point.metrics.netValue')
     expect(PAGE).toContain('point.usageCount === 0')
-    expect(PAGE).toContain('definitions.stateCounts.active')
+    expect(PAGE).toContain('stateCounts.active')
     expect(PAGE).not.toContain('利用先の取得は未接続')
   })
 
@@ -47,28 +47,28 @@ describe('V6 成果地点一覧の契約', () => {
   it('検索と並び順を共通部品にし、数えられる並びだけを載せる', () => {
     // ★V7 `Xn1Mz`：検索は共通 ListToolbar の1行目へそろえた（SearchField は
     // 部品の中にある）。素の input 検索に戻さない。
-    expect(PAGE).toContain("import ListToolbar from '@/components/shared/list-toolbar'")
+    expect(PAGE).toContain("from '@/components/shared/list-toolbar'")
     expect(PAGE).toContain('<ListToolbar')
     expect(PAGE).toContain('search={{')
     // V8の独立した一覧はSearchFieldを使う。従来の一覧の入口だけ確認する。
     expect(readRawSource(new URL('./page.tsx', import.meta.url), 'utf8')).not.toContain("import SearchField from '@/components/shared/search-field'")
     expect(PAGE).toContain("import Select from '@/components/shared/select'")
-    expect(PAGE).toContain('const [sort, setSort] = useState<PointSort>')
-    expect(PAGE).toContain('CV数が多い順')
+    expect(PAGE).toContain('useListUrlValue<PointSort>')
+    expect(PAGE).toContain('件数が多い順')
     expect(PAGE).not.toContain('並び替えは準備中です')
   })
 
   it('ページ送りを共通Paginationにする', () => {
     expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")
-    expect(PAGE).toContain('<Pagination page={page} pageCount={pageCount} onPageChange={setPage} />')
-    expect(PAGE).toContain('shown.slice((page - 1) * pageSize, page * pageSize)')
+    expect(PAGE).toContain('<Pagination page={currentPage} pageCount={pageCount}')
+    expect(PAGE).toContain('shown.slice((currentPage - 1) * pageSize, currentPage * pageSize)')
     expect(PAGE).not.toContain('ページの切り替えは準備中です')
   })
 
   it('期間・V6レポート・CSVを実際の口へつなぐ', () => {
     expect(PAGE).toContain('api.conversions.definitionReport({')
     expect(PAGE).toContain('api.conversions.exportDefinitions({')
-    expect(PAGE).toContain('CSVで書き出す')
+    expect(PAGE).toContain('CSV で書き出す')
     expect(PAGE).not.toContain('書き出しはまだ繋がっていません。')
     expect(PAGE).not.toContain('CSVの書き出し口は未接続です。')
     expect(PAGE).not.toContain('準備中')

@@ -90,8 +90,6 @@ describe('共通部品の影響範囲', () => {
       'app/contents/vars/impact-review.tsx',
       'app/contents/vars/page.tsx',
       // ★V8-B コンバージョンの一覧（r6dJFy）。表の下にページ送りを置く。
-      'app/conversions/conversion-points-v8.tsx',
-      'app/conversions/page.tsx',
       // #1011 FRIEND-11: 重複候補が50件を超えると後ろの候補へ辿れなかった。
       // サーバが数えた総数でページ送りを出すため共通へ寄せた。
       // ★V8 重複しているかも（hn6Y8）。v7 と同じくサーバ総数でページ送り。

@@ -71,7 +71,6 @@ const BASELINE: Record<string, number> = {
   'app/contents/media-detail-dialog.tsx': 2,
   'app/contents/media-replacement-dialog.tsx': 1,
   'app/contents/page.tsx': 2,
-  'app/conversions/page.tsx': 2,
   'app/hq/account-browser-v8.tsx': 2,
   'app/hq/account-settings-dialogs.tsx': 2,
   'app/hq/banners/project/page.tsx': 6,

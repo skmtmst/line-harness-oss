@@ -74,7 +74,7 @@ describe('V8の数の帯とメンバー一覧', () => {
 /** 旧来の折りたたみ部品を引き続き使う画面。 */
 describe('KPI折りたたみの適用（#975 U060）', () => {
   const targets: Array<[string, string]> = [
-    ['app/conversions/page.tsx', 'KpiCollapse'],
+    ['v8/conversions/list.tsx', 'KpiBand'],
     ['app/automations/page.tsx', 'KpiCollapse'],
     ['app/automations/runs/page.tsx', 'KpiCollapse'],
     // app/hq/page.tsx は V8 のホーム（v8/hq/home.tsx・絵どおりの数の帯）を出すだけになったので外した（2026-10-09 V7 削除）。
@@ -91,7 +91,7 @@ describe('KPI折りたたみの適用（#975 U060）', () => {
   for (const [path, marker] of targets) {
     it(`${path} が KpiCollapse を使う`, () => {
       const source = readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8')
-      expect(source).toContain(`from '@/components/ui/kpi-collapse'`)
+      expect(source).toContain(marker === 'KpiBand' ? `from '@/components/shared/kpi-band'` : `from '@/components/ui/kpi-collapse'`)
       expect(source).toContain(`<${marker}`)
     })
   }
