@@ -153,3 +153,6 @@
   .report-v8-card { padding: var(--tpl-an-rp-railcard-pad); }
   .report-v8-scheduleGrid, .report-v8-alertGrid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* B-187：列を縦に畳んだ時も段間と下端の余白を重ねない。 */
+.report-v8-fields { padding-bottom: 0; }

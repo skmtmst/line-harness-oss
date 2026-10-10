@@ -33,7 +33,7 @@ const SESSION = {
   lh_selected_account: 'visual-qa-account',
 }
 
-export async function openPage(browser, { baseUrl, route, width, theme, stable = false }) {
+export async function openPage(browser, { baseUrl, route, width, theme, stable = false, settleMs = 2500 }) {
   const page = await browser.newPage({
     viewport: { width, height: 900 },
     ...(stable ? { reducedMotion: 'reduce' } : {}),
@@ -57,7 +57,7 @@ export async function openPage(browser, { baseUrl, route, width, theme, stable =
       content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}[data-scroll-hint],[data-tab-fade]{display:none!important}',
     })
   }
-  await page.waitForTimeout(2500)
+  await page.waitForTimeout(settleMs)
   // Webフォントの読み込み待ち。来る前と来た後で文字の濃さが変わり、
   // 画素比べがぶれる（v7 友だち詳細の右上の「マイ」など時々違う）。
   try {

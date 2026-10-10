@@ -80,3 +80,7 @@
 [data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'][data-kpi-density='compact'] [data-kpi-skeleton] {
   height: var(--tpl-band-compact-number-lh);
 }
+
+/* B-187：補足も操作も無いマスは空の段を取らない。 */
+[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail]:has(> span:only-child:empty) { display: none; }
+[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] > span:first-child { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
