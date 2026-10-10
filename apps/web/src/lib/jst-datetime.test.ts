@@ -1,5 +1,5 @@
 import { jstDateOffset } from './jst-datetime'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { datetimeLocalJstToUtcIso, jstDate } from './jst-datetime'
 
 describe('datetimeLocalJstToUtcIso（JST固定）', () => {
@@ -35,3 +35,27 @@ test("今日の境目は日本の午前0時", () => {
   expect(jstDateOffset(-1, now)).toBe('2026-09-30')
   expect(jstDateOffset(31, now)).toBe('2026-11-01')
  })
+
+// 端末をUTC・ハワイに見立てる。JSTの00:09は同じ日本の当日。
+test.each(['UTC', 'Pacific/Honolulu'])('端末が%sでも今日・月・時刻・検索範囲を日本時間で決める', async timezone => {
+  const previous = process.env.TZ
+  process.env.TZ = timezone
+  vi.useFakeTimers()
+  vi.setSystemTime(new Date('2026-10-10T15:09:00Z'))
+  try {
+    const { jstMonthStart, jstDayStartIso, jstDateTimeLocal, jstTime } = await import('./jst-datetime')
+    expect(jstDate()).toBe('2026-10-11')
+    expect(jstMonthStart()).toBe('2026-10-01')
+    expect(jstTime()).toBe('00:09')
+    expect(jstDateTimeLocal()).toBe('2026-10-11T00:09')
+    expect(jstDayStartIso()).toBe('2026-10-10T15:00:00.000Z')
+    expect(jstDayStartIso(new Date(), 1)).toBe('2026-10-11T15:00:00.000Z')
+    expect(jstDateOffset(-1)).toBe('2026-10-10')
+    // 以前のUTC切り取りなら前日になる。境界を通る試験であることを確認。
+    expect(new Date().toISOString().slice(0, 10)).not.toBe(jstDate())
+  } finally {
+    vi.useRealTimers()
+    if (previous === undefined) delete process.env.TZ
+    else process.env.TZ = previous
+  }
+})

@@ -1018,7 +1018,7 @@ export default function HqBroadcastCreate() {
               <section id="broadcast-step-schedule" className={formStyles.section}>
                 <h3>配信日</h3>
                 <SaveErrorField names={["hq-broadcast-send-mode","when"]}><RadioCardGroup legend="配信日" className={formStyles.methodCards}>
-                  <RadioCard name="hq-broadcast-send-mode" value="now" checked={when === 'now'} onChange={() => setWhen('now')} title="今すぐ配信" note="⑤の確認で「今すぐ送る」を押すと、確認の小窓のあとすぐに送ります" />
+                  <RadioCard name="hq-broadcast-send-mode" value="now" checked={when === 'now'} onChange={() => setWhen('now')} title="今すぐ配信" note="⑤の確認で「今すぐ送る」を押すと、確認画面のあとすぐに送ります" />
                   <RadioCard name="hq-broadcast-send-mode" value="later" checked={when === 'later'} onChange={() => setWhen('later')} title="日時を指定して予約" note="決めた日時に、全アカウント同じ時刻で送ります" />
                 </RadioCardGroup></SaveErrorField>
                 {when === 'later' ? (
@@ -1134,7 +1134,7 @@ export default function HqBroadcastCreate() {
                     messageSummary={`${bubbles.length} 通`}
                   />
                 ) : null}
-                <p className="text-xs text-ink-faint">{when === 'later' ? '予約後も送る前までは、一括配信の詳細から止められます。' : '「今すぐ送る」で確認の小窓を開き、そこで送ると友だちに届きます。送信は取り消せません。'}</p>
+                <p className="text-xs text-ink-faint">{when === 'later' ? '予約後も送る前までは、一括配信の詳細から止められます。' : '「今すぐ送る」で確認画面を開き、そこで送ると友だちに届きます。送信は取り消せません。'}</p>
               </div>
             ) : null}
           </div>

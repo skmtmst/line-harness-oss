@@ -1,5 +1,6 @@
 'use client'
 
+import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
 import { useMemo, useState } from 'react'
 import { useListUrlValue, useListUrlJsonValue } from './list-url-state'
 import SegmentedControl from './segmented'
@@ -10,8 +11,7 @@ import styles from './period-picker.module.css'
 export type PeriodRange = { from: string; to: string }
 export const PERIOD_DAYS = [7, 30, 90] as const
 export function pastPeriod(days: number, now = new Date()): PeriodRange {
-  const today = new Date(now.getTime() + 9 * 3600_000)
-  return { from: new Date(today.getTime() - (days - 1) * 86400_000).toISOString().slice(0, 10), to: today.toISOString().slice(0, 10) }
+  return { from: jstDateOffset(1 - days, now), to: jstDate(now) }
 }
 export function validPeriod(range: PeriodRange): boolean {
   return [range.from, range.to].every((value) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value) && range.from <= range.to

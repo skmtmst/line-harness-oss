@@ -1,5 +1,8 @@
 'use client'
 
+import { jstDateOffset, jstMonthStart } from '@/lib/jst-datetime'
+
+
 /*
  * ★V8-B マイル「履歴」（板 `oRbJi`、状態 `zaqP9`、閲覧のみ `E2Any`）。
  *
@@ -69,14 +72,11 @@ const PRESETS: Array<{ value: string; label: string }> = [
 ]
 
 function monthStart(): string {
-  const date = new Date()
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`
+  return jstMonthStart()
 }
 
 function daysAgo(days: number) {
-  const date = new Date()
-  date.setDate(date.getDate() - days)
-  return date.toISOString().slice(0, 10)
+  return jstDateOffset(-days)
 }
 
 export default function V8HistoryTab({

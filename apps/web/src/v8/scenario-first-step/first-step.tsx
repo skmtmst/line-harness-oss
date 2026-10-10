@@ -19,6 +19,7 @@ import MessageKindFields, { emptyMessageKindState, serializeMessageKind, type Me
 import QuestionEditor, { emptyQuestion, type ScenarioQuestion } from '@/components/scenarios/question-editor';
 import { ConditionDialog } from '@/components/scenarios/scenario-dialogs';
 import CarouselPicker from '@/components/scenarios/carousel-picker'
+import { MessageBody } from '@/components/shared/message-insert-row'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scenarios/char-counter';
 import type { SegmentCondition } from '@/components/shared/condition-builder';
@@ -759,7 +760,7 @@ export default function ScenarioFirstStepV8() {
             </div>
 
             {kind === 'text' ? (
-              <>
+              <MessageBody>
                 <SaveErrorField names={["body","messageContent"]}><InsertTextField
                   id="first-step-body"
                   aria-invalid={Boolean(contentError) || bodyOverLimit || undefined}
@@ -770,15 +771,8 @@ export default function ScenarioFirstStepV8() {
                   aria-label="本文"
                   className={styles.bodyField}
                 /></SaveErrorField>
-                <div className={styles.insertRow}>
-                  <div className={styles.insertTools}>
-                    <InsertToolbar targetRef={bodyRef} value={body} onChange={editBody} />
-                  </div>
-                  <span className={styles.counter} data-over={bodyOverLimit || undefined}>
-                    {formatNumber(bodyLength)} / {formatNumber(LINE_TEXT_LIMIT)}
-                  </span>
-                </div>
-              </>
+                <InsertToolbar targetRef={bodyRef} value={body} onChange={editBody} count={`${formatNumber(bodyLength)} / ${formatNumber(LINE_TEXT_LIMIT)}`} />
+              </MessageBody>
             ) : null}
             {kind === 'image' ? (
               <div className={styles.kindBody}>
