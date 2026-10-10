@@ -41,6 +41,7 @@ export default function Booking() {
   const [doneStatus, setDoneStatus] = useState('requested');
   // 予約のルール「お店が承認してから確定する」。読めなければ承認あり扱い。
   const [autoConfirm, setAutoConfirm] = useState(false);
+  const [cancelDeadline, setCancelDeadline] = useState<number | null>(null);
   useEffect(() => {
     if (!initialMenuId) return;
     let alive = true;
@@ -56,7 +57,7 @@ export default function Booking() {
     api
       .bookingSettings()
       .then((r) => {
-        if (alive) setAutoConfirm(r.approval_mode === 'automatic');
+        if (alive) { setAutoConfirm(r.approval_mode === 'automatic'); setCancelDeadline(r.cancel_deadline_minutes_before ?? null); }
       })
       .catch(() => {
         if (alive) setAutoConfirm(false);
@@ -152,6 +153,7 @@ export default function Booking() {
             staff={staff}
             slot={slot}
             autoConfirm={autoConfirm}
+            cancelDeadlineMinutesBefore={cancelDeadline}
             onBack={() => setStep('datetime')}
             onSubmitted={(result) => {
               setBookingId(result.bookingId);

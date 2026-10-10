@@ -2,6 +2,7 @@ import { TextInput } from '../components/forms/controls.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { VISIT_STAMP_DEFAULT_COLOR, visitStampDarkInk } from '@line-crm/shared';
 import stampStyles from './VisitStamps.module.css';
+import StampConditions from '../components/StampConditions.js';
 import type { VisitStampCard, VisitStampPaperRequest, VisitStampRedemption, VisitStampReward, VisitStampWallet } from '@line-crm/shared';
 import { api, visitStampsApi } from '../lib/api.js';
 import { SUBMIT_FAILED_MESSAGE, logFailure } from '../lib/user-message.js';
@@ -269,6 +270,8 @@ export default function VisitStamps() {
           </p>
           </div>
         </section>
+
+        <StampConditions settings={card.settings} />
 
         {info.best ? (
           <section className="flex flex-col gap-2.5 rounded-2xl bg-liff-ok-bg p-4 outline-[1.5px] outline-liff-primary" aria-label="使える特典">
