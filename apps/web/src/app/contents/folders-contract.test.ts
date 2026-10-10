@@ -31,29 +31,33 @@ describe('R37 フォルダの名前変更・削除の接続', () => {
   })
 
   it('共通情報一覧は FolderPanel の行に名前変更・削除を渡す', () => {
-    expect(VARS).toContain('onEdit: canManageFolders ? () => setEditingFolder(folder) : undefined')
-    expect(VARS).toContain('onDelete: canManageFolders')
-    expect(VARS).toContain("deleteNote: '削除しても、入っていた共通情報は未分類として残ります。'")
+    expect(VARS).toContain('<ManagedFolderPanel')
+    expect(VARS).toContain('canManage={canWrite && Boolean(selectedAccountId)}')
+    expect(VARS).toContain('itemLabel="共通情報"')
+    expect(FOLDERS).toContain('actions.rowActions(folder, index).onEdit?.()')
+    expect(FOLDERS).toContain('actions.rowActions(folder, index).onDelete?.()')
   })
 
   it('共通情報一覧は名前を直す窓と消す前の確認の窓を出す', () => {
-    expect(VARS).toContain('<FolderAddDialog')
+    expect(FOLDERS).toContain('<FolderAddDialog')
     expect(VARS).toContain('kind="common_var"')
-    expect(VARS).toContain('folder={editingFolder}')
-    expect(VARS).toContain('フォルダ「${deletingFolder?.name ??')
-    expect(VARS).toContain('削除しても、入っていた共通情報は未分類として残ります。')
-    expect(VARS).toContain('api.folders.delete(deletingFolder.id')
+    expect(FOLDERS).toContain('folder={editing}')
+    expect(FOLDERS).toContain('<ConfirmDialog')
+    expect(FOLDERS).toContain('中の${itemLabel}は未分類に残ります。')
+    expect(FOLDERS).toContain('api.folders.delete(')
   })
 
   it('共通情報一覧はスマホの選択欄からも名前変更・削除に届く', () => {
     // 狭い幅では縦パネルが出ないため、選んでいるフォルダの操作口を置く。
     expect(VARS).toContain('フォルダ名を変える')
     expect(VARS).toContain('フォルダを削除する')
-    expect(VARS).toContain('canManageFolders && selectedUserFolder')
+    expect(VARS).toContain('...(selectedUserFolder ? [')
+    expect(VARS).toContain('folderControlRef.current?.startEdit(selectedUserFolder)')
+    expect(VARS).toContain('folderControlRef.current?.startDelete(selectedUserFolder)')
   })
 
   it('権限の無い人には押して失敗する口を見せない', () => {
-    expect(VARS).toContain('canManageFolders')
-    expect(VARS).toContain("response.data.role === 'owner' || response.data.role === 'admin'")
+    expect(VARS).toContain('canManage={canWrite && Boolean(selectedAccountId)}')
+    expect(VARS).toContain("useFeatureAccess('commonVars')")
   })
 })

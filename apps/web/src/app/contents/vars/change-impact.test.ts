@@ -1,5 +1,6 @@
 import type { CommonVarChangeImpact } from '@line-crm/shared'
 import { readFileSync } from 'node:fs'
+import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 import type { CommonVarDeleteImpact, CommonVarDeleteImpactItem } from '@line-crm/shared'
 import { ApiError } from '@/lib/api'
@@ -279,7 +280,7 @@ describe('共通情報編集（uNBlA）の画面', () => {
   })
 
   it('一覧の読み込み失敗は権限なしと通信障害で分ける（#578 L8）', () => {
-    const LIST = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+    const LIST = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
     expect(LIST).toContain('見る権限がありません')
     expect(LIST).toContain('接続を確かめて')
   })

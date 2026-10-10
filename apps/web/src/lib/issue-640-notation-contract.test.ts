@@ -8,7 +8,7 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 const SCENARIO_LIST = read('../v8/scenarios/list.tsx')
 const AUTO_REPLIES = read('../v8/auto-replies/list.tsx')
 const FRIEND_ADD = read('../v8/friend-add/list.tsx')
-const VARS = read('../app/contents/vars/page.tsx')
+const VARS = readUiSource(new URL('../app/contents/vars/page.tsx', import.meta.url), 'utf8')
 const NEN_OVERVIEW = read('../app/nen-campaigns/nen-overview.tsx')
 const TAGS = read('../components/friend-fields/tags-page-v4.tsx')
 const ANALYTICS = readUiSource(new URL('../app/analytics/page.tsx', import.meta.url), 'utf8')
@@ -37,13 +37,13 @@ describe('#640 省略表示の全文確認（title）', () => {
     expect(FRIEND_ADD).toContain('title={line}')
   })
 
-  it('/contents/vars: 見出し・使用箇所・更新/操作列に title', () => {
-    const thTitles = VARS.match(/<Th[^>]*title=/g)
-    expect(thTitles, '見出しセルの title が足りない').not.toBeNull()
-    expect(thTitles!.length).toBeGreaterThanOrEqual(6)
-    expect(VARS).toMatch(/whitespace-nowrap px-4 py-3 text-xs"[\s\S]{0,200}?title=\{item\.usageCount/)
-    expect(VARS).toMatch(/title=\{`最終更新 /)
-    expect(VARS).toContain('title="編集・削除"')
+  it('/contents/vars: 省略した中身・使用箇所・更新と操作に全文を残す', () => {
+    expect(VARS).toContain('<TableHeadRow>')
+    expect(VARS).toContain('title={valueText || \'（空）\'}')
+    expect(VARS).toContain('title={`${formatNumber(item.usageCount)}か所で使われています`}')
+    expect(VARS).toContain('const updateTitle = `最終更新 ')
+    expect(VARS).toContain('title={updateTitle}')
+    expect(VARS).toContain('label={`共通情報「${item.name}」の操作`}')
   })
 
   it('/nen-campaigns: 配信名の補足・送った先・並び順に title', () => {

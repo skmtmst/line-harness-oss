@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs'
+import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { impactCsv } from './impact-review'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
 const EXPORT_PANEL = readFileSync(join(HERE, 'export-panel.tsx'), 'utf8')
 const IMPACT_REVIEW = readFileSync(join(HERE, 'impact-review.tsx'), 'utf8')
 const WORKER_EXPORT = readFileSync(join(HERE, '..', '..', '..', '..', '..', 'worker', 'src', 'routes', 'common-var-exports.ts'), 'utf8')

@@ -39,9 +39,9 @@ describe('R38 絞り込みと0件表示の言い分け', () => {
   })
 
   it('共通情報一覧の絞り込み0件にも「条件を外す」を置く', () => {
-    expect(VARS).toContain('emptyPreset={items.length === 0 ? \'createable\' : \'filtered\'}')
-    expect(VARS).toContain('条件に合う共通情報はありません')
-    expect(VARS).toContain('onClick={clearVarFilters}')
-    expect(VARS).toContain("setStateFilter('all')")
+    expect(VARS).toContain('filtered={items.length > 0}')
+    expect(VARS).toContain('onClearFilters={clearVarFilters}')
+    expect(EMPTY).toContain('条件に合うものがありません')
+    expect(VARS).toContain("setChip('all')")
   })
 })

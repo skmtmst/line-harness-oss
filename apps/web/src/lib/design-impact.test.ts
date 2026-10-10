@@ -86,7 +86,6 @@ describe('共通部品の影響範囲', () => {
       // #1145(★V8) の一斉配信の一覧（app/broadcasts/list-v8.tsx）は描かれなくなった。入口は src/v8/broadcasts/list.tsx（下）。
       // #973: 共通情報の変更影響を1件ずつ確認する一覧にページ送りを追加した。
       'app/contents/vars/impact-review.tsx',
-      'app/contents/vars/page.tsx',
       // ★V8-B コンバージョンの一覧（r6dJFy）。表の下にページ送りを置く。
       // #1011 FRIEND-11: 重複候補が50件を超えると後ろの候補へ辿れなかった。
       // サーバが数えた総数でページ送りを出すため共通へ寄せた。

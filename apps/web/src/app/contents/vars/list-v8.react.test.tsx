@@ -183,11 +183,11 @@ test('staff では閲覧のみの帯が出て、作る操作は出さない', as
   expect(createButtons).toHaveLength(0)
 })
 
-test('v7 では従来の一覧が出て、新しい一覧は出ない', async () => {
+test('旧テーマ属性が残っていてもV8の一覧が出る', async () => {
   document.documentElement.dataset.theme = 'v7'
   await renderPage()
-  expect(host?.querySelector('[data-design-node="WuKzU"]')).not.toBeNull()
-  expect(host?.querySelector('[data-design-node~="FM94M"]')).toBeNull()
+  expect(host?.querySelector('[data-design-node="WuKzU"]')).toBeNull()
+  expect(host?.querySelector('[data-design-node~="FM94M"],[data-design-node~="XIzkJ"]')).not.toBeNull()
 })
 
 test('止める窓は予約中の配信の帯を出す（Hhl9M）', async () => {

@@ -63,7 +63,7 @@ const TOOLBAR_ORDER: Array<[string, string, string[]]> = [
    */
   ['ウェビナー', '../../app/webinars/list-v8.tsx', ['<SearchField', '<FilterChip', '<SortSelect', '<PageSizeSelect']],
   ['ウェビナー（V8）', '../../v8/webinars/list.tsx', ["search={{ placeholder: 'ウェビナー名で探す'", 'filters={filterChips}', 'trailing={<>{sortBox}', '{perPageBox}</>}']],
-  ['共通情報', '../../app/contents/vars/page.tsx', ['data-search-row', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
+  ['共通情報', '../../app/contents/vars/page.tsx', ['const wideToolbar', '<ListToolbar', 'search={{', 'filters={filterChips}', 'trailing={<>{orderBox}{perPageBox}</>}']],
 ]
 
 /** 固定の絞り込みチップの前置きは「よく使う絞り込み」の1形（DETAIL-20 の語）。 */
@@ -93,6 +93,11 @@ describe('フィルターバー統一（監査6 #668）', () => {
     '$name の並び順は SortSelect',
     ({ path }) => {
       const source = read(path)
+      if (path === '../../app/contents/vars/page.tsx') {
+        expect(source).toContain('<ListToolbarSort value={order}')
+        expect(source).toContain('setOrder(value as typeof order)')
+        return
+      }
       expect(source, `${path} に SortSelect がない`).toContain('SortSelect')
       // 部品の外で素の Select を「並び順」用に置かない
       expect(source, `${path} に素の並び順セレクトが残っている`).not.toMatch(
@@ -105,6 +110,12 @@ describe('フィルターバー統一（監査6 #668）', () => {
     '$name の表示件数は PageSizeSelect',
     ({ path }) => {
       const source = read(path)
+      if (path === '../../app/contents/vars/page.tsx') {
+        expect(source).toMatch(/<Select\s+aria-label="1ページに出す件数"[\s\S]*?value=\{String\(pageSize\)\}/)
+        expect(source).toContain('options={PAGE_SIZE_OPTIONS}')
+        expect(source).toContain('setPageSize(Number(value))')
+        return
+      }
       expect(source, `${path} に PageSizeSelect がない`).toContain('PageSizeSelect')
       expect(source, `${path} に素の表示件数セレクトが残っている`).not.toMatch(
         /<Select[^)]*aria-label="表示件数"/,
@@ -118,7 +129,7 @@ describe('フィルターバー統一（監査6 #668）', () => {
       const source = path === '../../app/webinars/list-v8.tsx' ? readOriginal(new URL(path, import.meta.url), 'utf8') : read(path)
       let previous = -1
       for (const marker of markers) {
-        const index = source.indexOf(marker)
+        const index = source.indexOf(marker, path === '../../app/contents/vars/page.tsx' ? previous + 1 : 0)
         expect(index, `${path} に ${marker} がない`).toBeGreaterThan(-1)
         expect(index, `${path} で ${marker} が前の項目より先にある`).toBeGreaterThan(previous)
         previous = index
@@ -130,6 +141,11 @@ describe('フィルターバー統一（監査6 #668）', () => {
     '$name の絞り込みチップの前置きは「よく使う絞り込み」',
     ({ path }) => {
       const source = read(path)
+      if (path === '../../app/contents/vars/page.tsx') {
+        expect(source).toContain('aria-label="状態で絞り込む"')
+        expect(source).toContain('filters={filterChips}')
+        return
+      }
       expect(source, `${path} に「よく使う絞り込み」の前置きがない`).toContain('よく使う絞り込み')
       // 旧い前置き（よく使う単体 / 保存した条件 / 保存した検索）は残さない
       expect(source).not.toContain('>よく使う<')

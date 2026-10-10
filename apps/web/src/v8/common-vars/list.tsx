@@ -157,10 +157,7 @@ function stateBadge(item: CommonVar): { label: string; tone: 'success' | 'info' 
   }
 }
 
-/** 差し込み名の右のコピーの印（絵：キーの横の小さな印）。押すと印が「✓」に変わる。 */
-function CopyKeyButton({ value, label }: { value: string; label: string }) {
-  return <CopyTextButton value={value} aria-label={label} />
-}
+
 
 function CommonVarsListInner() {
   const saveErrors = useSaveFormErrors()
@@ -727,9 +724,15 @@ function CommonVarsListInner() {
   /* 行の「…」の中身。右クリックでも同じものを出す。 */
   const rowMenuItems = (item: CommonVar): ActionMenuItem[] => {
     const stopped = (item.status ?? 'active') === 'stopped'
-    // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。この「…」は変える項目だけなので空になる。
-    if (!canWrite) return []
+    const copyKey: ActionMenuItem = {
+      id: 'copy-key',
+      label: '差し込みキーをコピー',
+      content: <CopyTextButton role="menuitem" value={placeholderText(item.varKey)} label="差し込みキーをコピー" aria-label={`${item.name}の差し込みキーをコピー`} />,
+    }
+    // 閲覧のみでもコピーは使える。変更の項目は隠す。
+    if (!canWrite) return [copyKey]
     return [
+      copyKey,
       {
         id: 'edit',
         label: '編集',
@@ -1261,7 +1264,7 @@ function CommonVarsListInner() {
                     <Td className={styles.menuCell}>
                       {/* 横並びにして、メニューの位置の目印が行を1段増やさないようにする。
                           閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す）。 */}
-                      {canWrite ? <div className={styles.menuBox}>
+                      <div className={styles.menuBox}>
                         <RowMenu
                           className={styles.rowMenuButton}
                           label={`共通情報「${item.name}」の操作`}
@@ -1269,7 +1272,7 @@ function CommonVarsListInner() {
                           open={openMenuId === item.id}
                           onOpenChange={(next) => setOpenMenuId(next ? item.id : null)}
                         />
-                      </div> : null}
+                      </div>
                     </Td>
                   </Tr>
                 )
@@ -1496,6 +1499,12 @@ function CommonVarsListInner() {
               <Notice tone="danger" >使用先を確認できませんでした。読み直してから、もう一度お試しください。</Notice>
             ) : deleteImpact ? (
               <>
+                {splitItems(deleteImpact.items).historical.length > 0 ? (
+                  <p className={styles.dialogHint}>
+                    送信済みの配信はこれから変わりません（削除を止める理由には含めません）。
+                    {splitItems(deleteImpact.items).historical.map((usage) => `${usage.kindLabel}「${usage.name}」`).join('、')}
+                  </p>
+                ) : null}
                 {deleteImpact.canDelete ? (
                   <>
                     <p className={styles.dialogLead}>{usageText(deleteImpact)}</p>
