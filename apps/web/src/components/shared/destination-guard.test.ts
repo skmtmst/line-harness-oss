@@ -45,7 +45,7 @@ describe('B-177: 全V8画面の行き先の見張り', () => {
   })
   it('選ぶ窓の幅640を共通の決まりで守る', () => {
     expect(readFileSync(join(root, 'app/globals.css'), 'utf8')).toContain('--tpl-picker-narrow-width: 640px')
-    expect(readFileSync(join(root, 'components/shared/entity-picker.tsx'), 'utf8').match(/size="picker-narrow"/g)).toHaveLength(2)
+    expect(readFileSync(join(root, 'components/shared/entity-picker.tsx'), 'utf8').match(/widthPreset="picker"/g)).toHaveLength(1)
   })
   it('主要な一覧の外枠を保つ', () => {
     for (const feature of ['auto-replies', 'templates', 'rich-menus', 'forms', 'scenarios']) {

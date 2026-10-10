@@ -31,7 +31,7 @@ describe('B-177: 行き先の共通の約束', () => {
     const link = screen.getByRole('menuitem', { name: '公式サイト' })
     expect(link.tagName).toBe('A')
     expect(link.getAttribute('target')).toBe('_blank')
-    expect(link.getAttribute('rel')).toBe('noreferrer')
+    expect(link.getAttribute('rel')?.split(/\s+/)).toContain('noreferrer')
     fireEvent.click(screen.getByRole('menuitem', { name: '中身を見る' }))
     expect(select).toHaveBeenCalledOnce()
     expect(close).toHaveBeenCalledOnce()
@@ -46,7 +46,8 @@ describe('B-177: 行き先の共通の約束', () => {
     render(<><TextLink external href="https://example.com">手引き</TextLink><Button external href="https://example.com">公式サイト</Button></>)
     for (const link of screen.getAllByRole('link')) {
       expect(link.getAttribute('target')).toBe('_blank')
-      expect(link.getAttribute('rel')).toBe('noreferrer')
+      expect(link.getAttribute('rel')?.split(/\s+/)).toContain('noreferrer')
+      expect(link.getAttribute('rel')?.split(/\s+/)).toContain('noopener')
     }
   })
   it('行の余白とEnterで同じ中身を開く。子のチェックやボタンでは開かない', () => {
@@ -64,7 +65,7 @@ describe('B-177: 行き先の共通の約束', () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
     render(<table><tbody><Tr interactive href="/templates/detail?id=1"><Td><a href="/templates/detail?id=1">名前</a></Td><Td>下書き</Td></Tr></tbody></table>)
     fireEvent.click(screen.getByText('下書き'), { metaKey: true })
-    expect(open).toHaveBeenCalledWith('/templates/detail?id=1', '_blank', 'noreferrer')
+    expect(open).toHaveBeenCalledWith('/templates/detail?id=1', '_blank', 'noopener,noreferrer')
     expect(screen.getByRole('link').getAttribute('href')).toBe('/templates/detail?id=1')
   })
   it('押す中身がない行はhoverとTabの止まりを持たない', () => {

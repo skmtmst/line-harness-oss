@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 // B-169: 足す・行を直す・並べ替える・消すの形は共通部品が持つ。
 const owners = [
   'components/forms/action-editor.tsx',
-  'components/auto-replies/inline-action-rows-v8.tsx',
+  'components/shared/action-rows.tsx',
   'components/automations/common-action-editor.tsx',
   'components/automations/branch-action-list.tsx',
   'components/friend-fields/linked-action-list.tsx',

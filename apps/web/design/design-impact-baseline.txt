@@ -329,7 +329,6 @@ shared-button-importer components/accounts/account-switcher.tsx
 shared-button-importer components/auto-replies/edit-dialog.tsx
 shared-button-importer components/auto-replies/inline-action-list.tsx
 shared-button-importer components/shared/action-rows.tsx
-shared-button-importer components/auto-replies/inline-action-rows-v8.tsx
 shared-button-importer components/automations/automation-template-gallery.tsx
 shared-button-importer components/broadcasts/broadcast-approval.tsx
 shared-button-importer components/broadcasts/broadcast-asset-manager.tsx
@@ -764,3 +763,6 @@ shared-button-importer components/shared/friend-picker-field.tsx
 shared-button-importer components/shared/editor-surface.tsx
 shared-button-importer components/shared/inline-settings.tsx
 shared-button-importer v8/hq-templates/distribution-result-dialog.tsx
+shared-button-importer v8/automations/create/friend-multi-select.tsx
+shared-button-importer v8/form-edit/after-tab.tsx
+shared-button-importer v8/hq-deliveries/console.tsx

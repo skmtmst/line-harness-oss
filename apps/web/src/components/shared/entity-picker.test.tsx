@@ -1,6 +1,6 @@
 
 import React, { act, useState } from 'react'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EntityMultiPickerDialog, EntityPickerField, type EntityPickerItem } from './entity-picker'
 // @vitest-environment happy-dom
@@ -29,6 +29,7 @@ describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
     expect(screen.getByText('回答フォームを選ぶ')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '回答フォーム：選ぶ' }))
     const dialog = await screen.findByRole('dialog', { name: '回答フォームを選ぶ' })
+    expect(dialog.style.getPropertyValue('--dialog-design-width')).toBe('640px')
     // フォルダの列で絞る
     fireEvent.click(within(within(dialog).getByRole('navigation', { name: 'フォルダ' })).getByRole('button', { name: /アンケート/ }))
     expect(within(dialog).queryByRole('radio', { name: '初回カウンセリング' })).toBeNull()
@@ -41,6 +42,7 @@ describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))
     expect(onChange).toHaveBeenCalledWith('a')
     expect(screen.queryByRole('dialog')).toBeNull()
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(screen.getByText('来店アンケート')).toBeTruthy()
     expect(screen.getByText('フォルダ：アンケート')).toBeTruthy()
     expect(screen.getByRole('button', { name: '回答フォーム：変える' })).toBeTruthy()
@@ -106,12 +108,14 @@ describe('まとめて選ぶ窓', () => {
     let dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '分類なし' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(screen.getByText('タグを選ぶ')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'タグ：選ぶ' }))
     dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '分類なし' }))
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '来店アンケート' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'この 2件にする' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(screen.getByText('来店アンケート')).toBeTruthy()
     expect(screen.getByText('分類なし')).toBeTruthy()
   })

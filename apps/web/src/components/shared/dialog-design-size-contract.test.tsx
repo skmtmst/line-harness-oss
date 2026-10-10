@@ -19,7 +19,7 @@ const render = (props: Partial<React.ComponentProps<typeof Dialog>>) => renderTo
 
 describe('V8 の窓：絵の幅を画面が渡せる', () => {
   it('designWidth を渡すと、4段のうち入れられる幅へそろえる', () => {
-    const html = render({ designWidth: 720 })
+    const html = render({ designWidth: 600 })
     expect(html).toContain('data-design-width=""')
     expect(html).toContain('--dialog-design-width:560px')
     expect(css).toMatch(/\[data-theme='v8'\] \.panel\[data-design-width\] \{\s*width: min\(var\(--dialog-design-width\), 100%\);/)

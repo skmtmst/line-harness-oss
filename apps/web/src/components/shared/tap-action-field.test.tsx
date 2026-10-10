@@ -50,7 +50,7 @@ test('作ってあるものは窓で仮に選び、［選ぶ］でだけ値を�
   const change = vi.fn()
   const value: TapActionValue = { kind: 'form', uri: '', text: '', refId: '' }
   render(<TapActionField name="ボタン1" value={value} onChange={change} hasLiff sources={{ form: [{ id: 'f1', name: 'アンケート' }, { id: 'f2', name: '申し込み' }] }} />)
-  expect(screen.getByText('回答フォームを選ぶ')).toBeTruthy()
+  expect(screen.getByText('（回答フォームを選んでください）')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'ボタン1の回答フォームを選ぶ' }))
   const dialog = screen.getByRole('dialog')
   // 回答フォームは必ず選ぶので「選ばない」の行は無い。

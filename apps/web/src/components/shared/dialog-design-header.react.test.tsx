@@ -25,7 +25,7 @@ describe('窓の頭の余白・高さを絵から渡す', () => {
   })
 
   it('Dialog：渡すと印と変数が付く（幅と一緒でも両方残る）', () => {
-    render(<Dialog open modal={false} title="確認" designWidth={520} designHeaderPadding="20px 20px 0" designHeaderHeight={44} onCancel={vi.fn()} />)
+    render(<Dialog open modal={false} title="確認" designWidth={560} designHeaderPadding="20px 20px 0" designHeaderHeight={44} onCancel={vi.fn()} />)
     const panel = screen.getByRole('dialog')
     expect(panel.hasAttribute('data-design-header-padding')).toBe(true)
     expect(panel.style.getPropertyValue('--dialog-design-header-padding')).toBe('20px 20px 0')

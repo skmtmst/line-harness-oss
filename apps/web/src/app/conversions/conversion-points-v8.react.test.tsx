@@ -194,7 +194,7 @@ test('v8 の下では Pencil r6dJFy の新しい一覧に切り替わる', async
   })
   // 見出しと右のボタン
   expect(host.textContent).toContain('コンバージョン')
-  expect(host.textContent).toContain("CSVで書き出す")
+  expect(host.textContent).toContain("CSV で書き出す")
   // 数の帯は表の行の合計（52件・¥412,000）と一致する
   expect(host.textContent).toContain('この30日の成果')
   expect(host.textContent).toContain('52')

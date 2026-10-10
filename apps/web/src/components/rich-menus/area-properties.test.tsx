@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AreaProperties } from './area-properties'
 import type { Area } from './canvas-editor'
@@ -55,11 +55,11 @@ function openTags() {
 }
 
 describe('ボタンのタグ選び（B-169・R19/R20）', () => {
-  it('打つと候補が絞り込める', () => {
+  it('打つと候補が絞り込める', async () => {
     render(<Harness />)
     const dialog = openTags()
     fireEvent.change(within(dialog).getByRole('searchbox'), { target: { value: '定期' } })
-    expect(within(dialog).queryByRole('checkbox', { name: 'NEN会員' })).toBeNull()
+    await waitFor(() => expect(within(dialog).queryByRole('checkbox', { name: 'NEN会員' })).toBeNull())
     expect(within(dialog).getByRole('checkbox', { name: '定期便' })).toBeTruthy()
     expect(within(dialog).getByRole('checkbox', { name: '定期便提案対象' })).toBeTruthy()
   })

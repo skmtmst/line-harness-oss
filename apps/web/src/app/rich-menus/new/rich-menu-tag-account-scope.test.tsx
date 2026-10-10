@@ -29,12 +29,12 @@ vi.mock('@/contexts/account-context', () => ({
     selectedAccount: ACCOUNTS[accountState.id],
     loading: false,
   }),
-}))
+}));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
-}))
+}));
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -130,4 +130,4 @@ describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
     expect(tagUrls.some((url) => url.includes('lineAccountId=acc-2'))).toBe(true)
     expect(host.textContent).toContain('1件は、今のアカウントにないため外しました')
   })
-})
+});

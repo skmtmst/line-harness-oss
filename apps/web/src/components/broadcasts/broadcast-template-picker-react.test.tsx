@@ -1,3 +1,4 @@
+import { waitFor } from '@testing-library/react'
 // @vitest-environment happy-dom
 /*
  * 一斉配信の作成フォームにあるテンプレート選択を、本物の React で確かめる
@@ -223,7 +224,7 @@ describe('一斉配信のテンプレート選択（IDEA-11）', () => {
     await renderPicker()
     await typeSearch('再入荷')
 
-    expect(templateRowNames()).toEqual(['再入荷のお知らせ'])
+    await waitFor(() => expect(templateRowNames()).toEqual(['再入荷のお知らせ']))
   })
 
   it('フォルダと未分類で絞れる', async () => {
@@ -240,7 +241,7 @@ describe('一斉配信のテンプレート選択（IDEA-11）', () => {
     await renderPicker()
     await typeSearch('存在しない文字列')
 
-    expect(templateRows()).toHaveLength(0)
+    await waitFor(() => expect(templateRows()).toHaveLength(0))
     expect(document.body.textContent).toContain('当てはまる候補がありません。')
   })
 

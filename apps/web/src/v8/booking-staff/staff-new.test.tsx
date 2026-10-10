@@ -13,9 +13,12 @@ import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 
 const fixture = vi.hoisted(() => ({ staff: [] as Array<Record<string, unknown>>, create: vi.fn(), assign: vi.fn(), update: vi.fn() }))
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null }) }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }));
+
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null }) }));
+
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }));
+
 
 const MENUS = ['カット', 'シャンプー', '爪切り', '歯みがき', '足裏ケア', '毛刈り'].map((name, i) => ({
   id: `m-${i}`, name, duration_minutes: 30, base_price: 1000, price_mode: 'fixed', is_active: 1, sort_order: i,
@@ -34,7 +37,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
       putStaffMenus: (...args: unknown[]) => fixture.assign(...args),
     },
   }
-})
+});
+
 
 const memStorage = vi.hoisted(() => {
   const values = new Map<string, string>()
@@ -66,8 +70,7 @@ afterEach(() => {
 describe('予約スタッフを登録（V8）', () => {
   test('予約メニューは窓の中で全件から探して選べる', async () => {
     render(<StaffNewV8 />)
-    await screen.findByRole('checkbox', { name: 'カット' })
-    expect(screen.getAllByRole('checkbox').filter(item => item.closest('[data-setting-checkbox]') === null)).click(awaitscreen.findByRole('button', { name: '予約を受けられるメニュー' }))
+    fireEvent.click(await screen.findByRole('button', { name: '予約を受けられるメニュー' }))
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getAllByRole('checkbox').filter(item => item.closest('[data-setting-checkbox]') === null)).toHaveLength(6)
     expect(within(dialog).getByRole('checkbox', { name: '足裏ケア' })).toBeTruthy()

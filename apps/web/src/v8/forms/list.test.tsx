@@ -16,7 +16,7 @@ import FormsListV8 from './list'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
-})
+});
 
 const fetchApi = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
@@ -33,35 +33,35 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     fetchApi,
     api: { ...api, forms: { ...api.forms, unarchive }, folders: { ...api.folders, list: listFolders }, listStats: { get: listStats } },
   }
-})
+});
 
 vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
     React.createElement('a', { href, ...rest }, children),
-}))
+}));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
-}))
+}));
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: { id: 'account-a', liffId: 'liff-a' }, loading: false }),
-}))
+}));
 
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
   usePageCrumbs: () => {},
-}))
+}));
 
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
   return { ...actual, useStaffRole: () => role.value }
-})
+});
 
 vi.mock('@/lib/use-narrow-viewport', () => ({
   useNarrowViewport: () => narrow.value,
-}))
+}));
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -98,6 +98,7 @@ async function mount() {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/form-submissions')
   forgetStaffIdentity()
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -125,12 +126,12 @@ beforeEach(() => {
   listFolders.mockResolvedValue({ success: true, data: [{ id: 'fol-1', kind: 'form', name: '来店・予約', itemCount: 6, displayOrder: 0, color: null }], unfiledCount: 3 })
   listStats.mockReset()
   listStats.mockResolvedValue({ success: true, data: { forms: { published: 5, draft: 2, monthlySubmits: 712, prevMonthSubmits: 640, monthlyCompletionRate: 74, pendingPostActions: 2 } } })
-})
+});
 
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
-})
+});
 
 describe('V8 回答フォーム一覧', () => {
   it('未分類の行にフォルダの口の unfiledCount を出す', async () => {
@@ -254,7 +255,7 @@ describe('V8 回答フォーム一覧', () => {
     await mount()
     expect(host.textContent).toContain('45件中 1〜2件を表示')
   })
-})
+});
 
 /*
  * 2026-10-06 点検：表全体を1つの右クリックで包み、押した行を state に入れてから項目を作っていたので、
@@ -312,7 +313,7 @@ describe('V8 回答フォーム一覧の右クリック', () => {
     expect(menu!.getAttribute('aria-label')).toBe('「来店アンケート」の操作')
     expect(menu!.textContent).toContain('受付を止める')
   })
-})
+});
 
 it('アーカイブの絞り込みと復元は版番号を送り、受付を勝手に再開しない', async () => {
   fetchApi.mockImplementation(async (path: string) => ({ success: true, data: path.includes('filter=archived')

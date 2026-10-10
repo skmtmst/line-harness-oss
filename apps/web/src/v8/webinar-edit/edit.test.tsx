@@ -19,7 +19,7 @@ import { fireEvent, screen, within } from '@testing-library/react'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
-})
+});
 
 const routerPush = vi.hoisted(() => vi.fn())
 const nav = vi.hoisted(() => ({ search: 'id=webinar-1&pane=participants' }))
@@ -29,15 +29,15 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPush, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   usePathname: () => '/webinars/edit',
   useSearchParams: () => new URLSearchParams(nav.search),
-}))
+}));
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: { id: 'account-a', name: '本店' }, accounts: [{ id: 'account-a', name: '本店', liffId: 'liff-1' }], loading: false }),
-}))
+}));
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
   return { ...actual, useStaffRole: () => roleState.role }
-})
+});
 
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -129,14 +129,14 @@ beforeEach(() => {
     if (path.includes('/folders')) return json({ success: true, data: [] })
     return json({ data: null })
   })
-})
+});
 
 afterEach(() => {
   act(() => { root.unmount() })
   host.remove()
   vi.unstubAllGlobals()
   document.documentElement.removeAttribute('data-theme')
-})
+});
 
 async function render(node: React.ReactNode) {
   await act(async () => { root.render(<>{node}<ToastHost /></>) })
@@ -335,7 +335,7 @@ describe('V8 ウェビナーの編集', () => {
     expect(buttonText('比べてから保存')).toBeTruthy()
     expect([...host.querySelectorAll('a')].some((link) => link.textContent?.trim() === 'キャンセル')).toBe(true)
   })
-})
+});
 
 it('WEB-166：公開中は編集の…から版を確認して停止する', async () => {
   await render(<WebinarEditV8 />)
@@ -349,7 +349,7 @@ it('WEB-166：公開中は編集の…から版を確認して停止する', asy
   expect(confirm).toBeTruthy()
   await act(async () => { confirm.click() })
   expect(puts.some(p => p.path.endsWith('/pause') && (p.body as { expectedVersion: number }).expectedVersion === 3)).toBe(true)
-})
+});
 
 
 it('編集の複製は保存済みの版を送り、一覧で下書きを光らせる行き先へ移る', async () => {
@@ -361,4 +361,4 @@ it('編集の複製は保存済みの版を送り、一覧で下書きを光ら�
   expect(puts).toContainEqual({ path: '/api/webinars/webinar-1/duplicate', body: { expectedVersion: 3 } })
   expect(routerPush).toHaveBeenCalledWith('/webinars?status=draft&highlight=copied-webinar')
   expect(document.querySelector('[role="dialog"]')).toBeNull()
-})
+});

@@ -88,7 +88,8 @@ describe('ActionMenu ★V7 の項目', () => {
     const external = document.querySelector('svg[aria-hidden="true"]')
     expect(external).toBeTruthy()
     expect(menuButtons()[1].getAttribute('target')).toBe('_blank')
-    expect(menuButtons()[1].getAttribute('rel')).toBe('noreferrer')
+    expect(menuButtons()[1].getAttribute('rel')?.split(/\s+/)).toContain('noreferrer')
+    expect(menuButtons()[1].getAttribute('rel')?.split(/\s+/)).toContain('noopener')
     // 危ない操作は danger。
     const danger = menuButtons().find((b) => b.textContent?.includes('アーカイブする'))
     expect(danger?.className).toMatch(/danger/)

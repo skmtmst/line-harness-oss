@@ -62,8 +62,7 @@ it('WEB-019：つまみはマウスと上下キーで同じ順へ動かせる', 
 
 it('編集を開くと送信・リマインダ・イベントの候補が入る', () => {
   render(<InlineActionRowsV8 actions={[a({})]} onChange={()=>{}} {...opts} templates={[{id:'t',name:'案内'}]} reminders={[{id:'r',name:'翌日'}]} events={[{id:'e',name:'相談会'}]} />)
-  fireEvent.click(screen.getByRole('button',{name:'1つ目の処理の操作'}))
-  fireEvent.click(screen.getByRole('menuitem',{name:'設定を変える'}))
+  fireEvent.click(screen.getByRole('button',{name:'対応マークを付ける「予約変更」'}))
   expect(screen.getByText(/中身の編集/).textContent).toContain('案内')
   expect(screen.getByText(/中身の編集/).textContent).toContain('翌日')
   expect(screen.getByText(/中身の編集/).textContent).toContain('相談会')

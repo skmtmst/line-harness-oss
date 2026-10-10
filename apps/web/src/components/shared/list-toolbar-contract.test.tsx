@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
 import React from 'react'
+import { readFileSync } from 'node:fs'
+const read = (name: string) => readFileSync(new URL(name, import.meta.url), 'utf8')
 import { renderToStaticMarkup } from 'react-dom/server'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'

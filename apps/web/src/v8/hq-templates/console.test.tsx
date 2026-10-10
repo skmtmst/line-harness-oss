@@ -384,6 +384,12 @@ describe('統括のテンプレートを直す（質問・クーポン：店の�
 })
 
 
+const distributionScreen = () => {
+  const frame = document.querySelector<HTMLElement>('[data-page-template="distribution"]')
+  expect(frame).not.toBeNull()
+  return frame!
+}
+
 describe('G-3：保存が済んでから配るか選ぶ', () => {
   const author = async () => {
     render(<HqTemplatesV8 type="template" />)
@@ -435,7 +441,8 @@ describe('G-3：保存が済んでから配るか選ぶ', () => {
     expect(within(dialog).getByText('選んだ 2 アカウント')).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: '2 アカウントへ配る' }))
     await waitFor(() => expect(calls.preflight).toHaveBeenCalledWith('t-new', ['a-1', 'a-2']))
-    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(distributionScreen()).toBeTruthy()
     expect(screen.queryByRole('dialog', { name: '保存しました。アカウントに配りますか？' })).toBeNull()
     expect(screen.queryByText('ひな形を保存しました。')).toBeNull()
     expect(calls.distribute).not.toHaveBeenCalled()
@@ -455,7 +462,8 @@ describe('G-3：保存が済んでから配るか選ぶ', () => {
     expect((within(dialog).getByRole('checkbox', { name: '然 -NEN- 本店' }) as HTMLInputElement).checked).toBe(true)
     fireEvent.click(within(dialog).getByRole('button', { name: '1 アカウントへ配る' }))
     await waitFor(() => expect(calls.preflight).toHaveBeenCalledTimes(2))
-    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(distributionScreen()).toBeTruthy()
     expect(screen.queryByRole('dialog', { name: '保存しました。アカウントに配りますか？' })).toBeNull()
     expect(calls.create).toHaveBeenCalledOnce()
   })
@@ -526,8 +534,8 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
     await pickStores(dialog, ['然 -NEN- 本店'])
     fireEvent.click(within(dialog).getByRole('button', { name: '2 件を 1 アカウントへ配る' }))
     fireEvent.click(await screen.findByRole('button', { name: '次のひな形を確かめる（1/2）' }))
-    expect(screen.getAllByRole('dialog')).toHaveLength(1)
-    expect(screen.getByRole('dialog').style.getPropertyValue('--dialog-design-width')).toBe('720px')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(distributionScreen()).toBeTruthy()
     await waitFor(() => expect(calls.preflight).toHaveBeenCalledWith('t-2', ['a-1']))
     expect(calls.distribute).not.toHaveBeenCalled()
     fireEvent.click(await screen.findByRole('button', { name: '2 件を 1 アカウントへ配る' }))
@@ -589,7 +597,7 @@ describe('統括タグの札は詳細から配布結果まで同じ色を保つ'
     const pill = within(body).getByRole('group', { name: 'タグ「VIP」' })
     expect(pill.querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)
     fireEvent.click(screen.getByRole('button', { name: 'VIPを配る' }))
-    expect(within(screen.getByRole('dialog')).getAllByRole('group', { name: 'タグ「VIP」' }).length).toBeGreaterThan(0)
+    expect(within(distributionScreen()).getAllByRole('group', { name: 'タグ「VIP」' }).length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('checkbox', { name: '然 -NEN- 本店', exact: true }))
     fireEvent.click(screen.getByRole('button', { name: '1アカウントの重複を確認' }))
     fireEvent.click(await screen.findByRole('button', { name: 'この内容で1アカウントへ配る' }))
