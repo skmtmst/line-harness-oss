@@ -96,6 +96,32 @@ describe('B-215 private data deletion', () => {
     expect((await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env())).status).toBe(200);
     expect(sqlite.raw.pragma('foreign_key_check')).toEqual([]);
   });
+  it('purges merged restaurant events and consumed QR data while retaining other friends and stamp history', async () => {
+    sqlite.raw.exec(`INSERT INTO rt_organizations(id,account_id,name,tenant_id) VALUES ('org','a','Restaurant','t');
+      INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES ('store','org','Store','S','a');
+      INSERT INTO visit_stamp_cards(id,tenant_id,name,settings_json) VALUES ('card','t','Card','{}');`);
+    for (const friend of ['u', 'v']) {
+      sqlite.raw.prepare(`INSERT INTO rt_reservation_events(id,store_id,event_type,reservation_version,occurred_at,request_id,line_account_id,friend_id,payload_json)
+        VALUES (?,'store','restaurant.waitlist.invited',0,'now',?,'a',?,'{}')`).run(`event-${friend}`, `request-${friend}`, friend);
+      sqlite.raw.prepare(`INSERT INTO visit_stamp_entries(id,card_id,friend_id,line_account_id,kind,delta,reason,idempotency_key,occurred_at)
+        VALUES (?,'card',?,'a','visit',1,'visit',?,'now')`).run(`stamp-${friend}`, friend, `stamp-${friend}`);
+      sqlite.raw.prepare(`INSERT INTO visit_stamp_qr_codes(id,card_id,line_account_id,kind,token,issued_by,issued_at,expires_at,card_version,base_count,status,
+        consumed_friend_id,consumed_at,consumed_entry_id,request_id,session_id,generation)
+        VALUES (?,'card','a','staff',?,'owner','now','later',1,1,'used',?,'now',?,?,?,1)`)
+        .run(`qr-${friend}`, `token-${friend}`, friend, `stamp-${friend}`, `qr-${friend}`, `session-${friend}`);
+    }
+    sqlite.raw.exec(`INSERT INTO visit_stamp_qr_codes(id,card_id,line_account_id,kind,token,issued_by,issued_at,card_version,base_count,request_id,session_id,generation)
+      VALUES ('storefront','card','a','storefront','public-token','owner','now',1,1,'public','public',1);`);
+    const response = await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env());
+    expect(response.status).toBe(200);
+    expect(sqlite.raw.prepare('SELECT friend_id FROM rt_reservation_events').all()).toEqual([{ friend_id: 'v' }]);
+    expect(sqlite.raw.prepare('SELECT event_id FROM rt_reservation_event_receipts').all()).toEqual([
+      { event_id: 'event-v' }, { event_id: 'event-v' },
+    ]);
+    expect(sqlite.raw.prepare('SELECT id FROM visit_stamp_qr_codes ORDER BY id').all()).toEqual([{ id: 'qr-v' }, { id: 'storefront' }]);
+    expect(count('visit_stamp_entries')).toBe(2);
+    expect(sqlite.raw.pragma('foreign_key_check')).toEqual([]);
+  });
   it('keeps database parents and keys after partial R2 failure, denies content and retries', async () => {
     document('doc2', 'answer');
     remove.mockImplementationOnce(async (keys: string[]) => { objects.delete(keys[0]); throw new Error('private-storage-error'); });

@@ -60,6 +60,7 @@
   "event_bookings": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "event_waitlist": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "field_migration_items": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
+  "form_capacity_claims": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"form_submissions","columns":[{"column":"submission_id","parentColumn":"id"}]}]},
   "form_opens": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[]},
   "form_submission_files": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"form_submissions","columns":[{"column":"submission_id","parentColumn":"id"}]},{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "form_submissions": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
@@ -123,6 +124,8 @@
   "rich_menu_area_taps": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[]},
   "rich_menu_assignment_runs": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "rich_menu_assignments": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
+  "rt_reservation_event_receipts": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"rt_reservation_events","columns":[{"column":"event_id","parentColumn":"id"}]}]},
+  "rt_reservation_events": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[]},
   "scenario_action_fires": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "scenario_pinned_action_fires": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "scheduled_chat_sends": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[]},
@@ -133,6 +136,7 @@
   "user_profile_values": {"friendColumns":["source_friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"source_friend_id","parentColumn":"id"}]}]},
   "visit_stamp_paper_photos": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "visit_stamp_paper_requests": {"friendColumns":["friend_id","submitted_friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"submitted_friend_id","parentColumn":"id"}]},{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
+  "visit_stamp_qr_codes": {"friendColumns":["consumed_friend_id"],"lineUserColumn":false,"references":[]},
   "visit_stamp_wallets": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "webinar_action_executions": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "webinar_followups": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
@@ -144,6 +148,5 @@
   "webinar_registrations": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "webinar_user_comments": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "webinar_view_segments": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
-  "webinar_viewers": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
-  "form_capacity_claims": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"form_submissions","columns":[{"column":"submission_id","parentColumn":"id"}]}]}
+  "webinar_viewers": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]}
 }
